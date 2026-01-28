@@ -28,7 +28,7 @@ endif
 .network.cluster.dir := rke2.d/$(cluster.name)/network
  
 # Physical host network allocation parameters
-.network.host.supernet.cidr = 10.80.0.0/18
+.network.host.super-network.cidr = 10.80.0.0/18
 .network.host.cluster.prefix.length = 21
 .network.host.node.prefix.length = 23
 .network.host.lb.prefix.length = 26
@@ -88,7 +88,7 @@ else
 	.network.lan.lb.slice.index := 7
 endif
 
-.network.lan.lb.pool = $(call .network.strip,$(.network.lan.split.$(.network.lan.lb.slice.index).cidr))
+.network.lan.lb.cidr = $(call .network.strip,$(.network.lan.split.$(.network.lan.lb.slice.index).cidr))
 .network.lan.lb.headscale = $(call .network.subnet-host-inetaddr,lan,$(.network.lan.lb.slice.index),0)
 .network.lan.headscale.inetaddr = $(.network.lan.lb.headscale)
 .network.lan.tailscale.inetaddr = $(call .network.subnet-host-inetaddr,lan,$(.network.lan.lb.slice.index),1)
@@ -118,7 +118,7 @@ endif
 .network.node_type_num_for = $(if $(filter server,$(call get-node-attr,$(1),1)),0,1)
 .network.node_id_for = $(call get-node-attr,$(1),3)
 .network.node_wan_mac_for = $(shell printf "52:54:00:%02x:%02x:%02x" $(cluster.id) $(call .network.node_type_num_for,$(1)) $(call .network.node_id_for,$(1)))
-.network.node_type_num := $(if $(filter server,$(node.type)),0,1)
+.network.node_type_num := $(if $(filter server,$(node.kind)),0,1)
 
 .network.wan.dhcp.range = 10.80.$(.network.cluster_third_octet).2-10.80.$(.network.cluster_third_octet).9,10.80.$(.network.cluster_third_octet).31-10.80.$(call plus,$(.network.cluster_third_octet),7).254
 .network.node.wan.macaddr := $(shell printf "52:54:00:%02x:%02x:%02x" $(cluster.id) $(.network.node_type_num) $(node.id))

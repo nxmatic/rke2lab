@@ -3,13 +3,13 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: apps|Deployment|headscale|headscale-gateway
+    internal.kpt.dev/upstream-identifier: apps|Deployment|${headscale-namespace}|headscale-gateway
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   labels:
     app: headscale-gateway
   name: headscale-gateway
-  namespace: headscale
+  namespace: headscale-system
 spec:
   replicas: 1
   selector:
@@ -39,8 +39,6 @@ spec:
 
               until [ -S /var/run/tailscale/tailscaled.sock ]; do sleep 1; done
 
-              HEADSCALE_URL="http://headscale.headscale.svc.cluster.local:8080"
-
               tailscale up \
                 --login-server=$$HEADSCALE_URL \
                 --authkey=file:/var/secrets/authkey \
@@ -57,12 +55,14 @@ spec:
             - name: DARWIN_HOST
               value: alcide
             - name: VIP_NETWORK_CIDR
-              value: ${cluster-vip-network-cidr}
+              value: 10.80.15.0/24
             - name: TS_AUTHKEY
               valueFrom:
                 secretKeyRef:
                   key: authkey
                   name: headscale-client-auth
+            - name: HEADSCALE_URL
+              value: http://headscale.headscale-system.svc.cluster.local:8080
           image: tailscale/tailscale:v1.76.6
           name: tailscale-gateway
           resources:

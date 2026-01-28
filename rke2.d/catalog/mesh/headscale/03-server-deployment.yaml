@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: headscale
-  namespace: headscale
+  namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
   labels:
     app: headscale
 spec:
@@ -17,7 +17,7 @@ spec:
     spec:
       automountServiceAccountToken: false
       nodeSelector:
-        "cluster-name.cluster/node-role": master # kpt-set: "${cluster-name}.cluster/node-role": master
+        node-role.kubernetes.io/control-plane: "true"
       containers:
       - name: headscale
         image: headscale/headscale:0.27.0
@@ -83,12 +83,12 @@ apiVersion: v1
 kind: Service
 metadata:
   name: headscale
-  namespace: headscale
+  namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
   labels:
     app: headscale
-    io.cilium/lb-inetaddram: home-lan
+    io.cilium/lb-ipam-pool: home-lan
   annotations:
-    io.cilium/lb-inetaddram-inetaddrs: ${lan-headscale-inetaddr} # kpt-set: ${lan-headscale-inetaddr}
+    io.cilium/lb-ipam-ips: ${cluster-lan-headscale-inetaddr} # kpt-set: ${cluster-lan-headscale-inetaddr}
     tailscale.com/expose: "true"
     tailscale.com/hostname: ${cluster-name}-headscale # kpt-set: ${cluster-name}-headscale
 spec:

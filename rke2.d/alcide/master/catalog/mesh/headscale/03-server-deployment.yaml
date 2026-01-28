@@ -1,12 +1,12 @@
 apiVersion: apps/v1
 kind: Deployment
-metadata: # kpt-merge: headscale/headscale
+metadata: # kpt-merge: ${headscale-namespace}/headscale
   name: headscale
-  namespace: headscale
+  namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
   labels:
     app: headscale
   annotations:
-    internal.kpt.dev/upstream-identifier: 'apps|Deployment|headscale|headscale'
+    internal.kpt.dev/upstream-identifier: 'apps|Deployment|${headscale-namespace}|headscale'
 spec:
   replicas: 1
   selector:
@@ -19,7 +19,7 @@ spec:
     spec:
       automountServiceAccountToken: false
       nodeSelector:
-        "cluster-name.cluster/node-role": master # kpt-set: "${cluster-name}.cluster/node-role": master
+        node-role.kubernetes.io/control-plane: "true"
       containers:
       - name: headscale
         image: headscale/headscale:0.27.0
@@ -83,17 +83,17 @@ spec:
 ---
 apiVersion: v1
 kind: Service
-metadata: # kpt-merge: headscale/headscale
+metadata: # kpt-merge: ${headscale-namespace}/headscale
   name: headscale
-  namespace: headscale
+  namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
   labels:
     app: headscale
-    io.cilium/lb-inetaddram: home-lan
+    io.cilium/lb-ipam-pool: home-lan
   annotations:
-    io.cilium/lb-inetaddram-inetaddrs: ${lan-headscale-inetaddr} # kpt-set: ${lan-headscale-inetaddr}
+    io.cilium/lb-ipam-ips: ${cluster-lan-headscale-inetaddr} # kpt-set: ${cluster-lan-headscale-inetaddr}
     tailscale.com/expose: "true"
     tailscale.com/hostname: ${cluster-name}-headscale # kpt-set: ${cluster-name}-headscale
-    internal.kpt.dev/upstream-identifier: '|Service|headscale|headscale'
+    internal.kpt.dev/upstream-identifier: '|Service|${headscale-namespace}|headscale'
 spec:
   type: LoadBalancer
   ports:

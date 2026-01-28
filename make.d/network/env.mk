@@ -9,7 +9,7 @@ make.d/network/env.mk := make.d/network/env.mk
 
 define .network.env.mk
 # Generated network layer environment (cluster $(cluster.name)) - do not edit
-export NETWORK_HOST_SUPERNET_CIDR=$(.network.host.supernet.cidr)
+export NETWORK_HOST_SUPER_NETWORK_CIDR=$(.network.host.super-network.cidr)
 export NETWORK_CLUSTER_CIDR=$(.network.cluster.cidr)
 export NETWORK_CLUSTER_SERVICE_CIDR=$(.network.cluster.service.cidr)
 export NETWORK_CLUSTER_POD_CIDR=$(.network.cluster.pod.cidr)
@@ -38,7 +38,7 @@ export NETWORK_VIP_INTERFACE=$(.network.cluster.vip.interface)
 export NETWORK_VIP_VLAN_ID=$(.network.vip.vlan.id)
 export NETWORK_VIP_VLAN_NAME=$(.network.vip.vlan.name)
 export NETWORK_MASTER_NODE_INETADDR=$(.network.master.node.inetaddr)
-export NETWORK_LAN_LB_POOL=$(.network.lan.lb.pool)
+export NETWORK_LAN_LB_CIDR=$(.network.lan.lb.cidr)
 export NETWORK_LAN_HEADSCALE_INETADDR=$(.network.lan.lb.headscale)
 export NETWORK_LAN_TAILSCALE_INETADDR=$(.network.lan.tailscale.inetaddr)
 export NETWORK_NODE_WAN_MACADDR_MASTER=$(call .network.node_wan_mac_for,master)
@@ -61,7 +61,7 @@ metadata:
     config.kubernetes.io/local-config: "true"
     internal.kpt.dev/function-config: apply-setters
 data:
-  host-supernet-cidr: "$(.network.host.supernet.cidr)"
+  host-super-network-cidr: "$(.network.host.super-network.cidr)"
   cluster-network-cidr: "$(.network.cluster.cidr)"
   node-network-cidr: "$(.network.node.cidr)"
   vip-pool-cidr: "$(.network.cluster.vip.cidr)"
@@ -102,7 +102,7 @@ data:
     - "$(.network.vip.split.0.cidr)"
     - "$(.network.vip.split.1.cidr)"
     - "$(.network.vip.split.2.cidr)"
-  lan-lb-pool: "$\(.network.lan.lb.pool)"
+  lan-lb-cidr: "$\(.network.lan.lb.cidr)"
   lan-headscale-inetaddr: "$\(.network.lan.lb.headscale)"
     - "$(.network.vip.split.3.cidr)"
     - "$(.network.vip.split.4.cidr)"

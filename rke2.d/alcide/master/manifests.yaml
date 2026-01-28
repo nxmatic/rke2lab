@@ -34,10 +34,10 @@ apiVersion: v1
 kind: Namespace
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: '|Namespace|default|headscale'
+    internal.kpt.dev/upstream-identifier: '|Namespace|default|${headscale-namespace}'
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
-  name: headscale
+  name: headscale-system
 ---
 apiVersion: v1
 kind: Namespace
@@ -91,6 +91,8 @@ kind: Namespace
 metadata:
   annotations:
     internal.kpt.dev/upstream-identifier: '|Namespace|default|${tailscale-namespace}'
+    kpt.dev/package-layer: mesh
+    kpt.dev/package-name: tailscale
   name: tailscale-system
 ---
 apiVersion: v1
@@ -4159,31 +4161,31 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: '|ServiceAccount|headscale|headscale-bootstrap'
+    internal.kpt.dev/upstream-identifier: '|ServiceAccount|${headscale-namespace}|headscale-bootstrap'
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   name: headscale-bootstrap
-  namespace: headscale
+  namespace: headscale-system
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: '|ServiceAccount|headscale|headscale-client'
+    internal.kpt.dev/upstream-identifier: '|ServiceAccount|${headscale-namespace}|headscale-client'
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   name: headscale-client
-  namespace: headscale
+  namespace: headscale-system
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: '|ServiceAccount|headscale|headscale-gateway'
+    internal.kpt.dev/upstream-identifier: '|ServiceAccount|${headscale-namespace}|headscale-gateway'
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   name: headscale-gateway
-  namespace: headscale
+  namespace: headscale-system
 ---
 apiVersion: v1
 automountServiceAccountToken: true
@@ -4284,11 +4286,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: rbac.authorization.k8s.io|Role|headscale|headscale-bootstrap
+    internal.kpt.dev/upstream-identifier: rbac.authorization.k8s.io|Role|${headscale-namespace}|headscale-bootstrap
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   name: headscale-bootstrap
-  namespace: headscale
+  namespace: headscale-system
 rules:
 - apiGroups:
   - ""
@@ -5393,11 +5395,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: rbac.authorization.k8s.io|RoleBinding|headscale|headscale-bootstrap
+    internal.kpt.dev/upstream-identifier: rbac.authorization.k8s.io|RoleBinding|${headscale-namespace}|headscale-bootstrap
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   name: headscale-bootstrap
-  namespace: headscale
+  namespace: headscale-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -5405,7 +5407,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: headscale-bootstrap
-  namespace: headscale
+  namespace: headscale-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -5573,7 +5575,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: headscale-client
-  namespace: headscale
+  namespace: headscale-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -5918,16 +5920,16 @@ data:
 kind: ConfigMap
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: '|ConfigMap|headscale|headscale-acl'
+    internal.kpt.dev/upstream-identifier: '|ConfigMap|${headscale-namespace}|headscale-acl'
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   name: headscale-acl
-  namespace: headscale
+  namespace: headscale-system
 ---
 apiVersion: v1
 data:
   config.yaml: |
-    server_url: http://192.168.1.193:8080 # kpt-set: http://${lan-headscale-inetaddr}:8080
+    server_url: http://192.168.1.193:8080 # kpt-set: http://${cluster-lan-headscale-inetaddr}:8080
     listen_addr: 0.0.0.0:8080
     metrics_listen_addr: 0.0.0.0:9090
     grpc_listen_addr: 0.0.0.0:50443
@@ -5983,11 +5985,11 @@ data:
 kind: ConfigMap
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: '|ConfigMap|headscale|headscale-config'
+    internal.kpt.dev/upstream-identifier: '|ConfigMap|${headscale-namespace}|headscale-config'
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   name: headscale-config
-  namespace: headscale
+  namespace: headscale-system
 ---
 apiVersion: v1
 data:
@@ -6001,11 +6003,11 @@ data:
 kind: ConfigMap
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: '|ConfigMap|headscale|headscale-derp'
+    internal.kpt.dev/upstream-identifier: '|ConfigMap|${headscale-namespace}|headscale-derp'
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   name: headscale-derp
-  namespace: headscale
+  namespace: headscale-system
 ---
 apiVersion: v1
 data:
@@ -6330,17 +6332,17 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: '|Service|headscale|headscale'
-    io.cilium/lb-inetaddram-inetaddrs: 192.168.1.65
+    internal.kpt.dev/upstream-identifier: '|Service|${headscale-namespace}|headscale'
+    io.cilium/lb-ipam-pool: 192.168.1.65
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
     tailscale.com/expose: "true"
     tailscale.com/hostname: alcide-headscale
   labels:
     app: headscale
-    io.cilium/lb-inetaddram: home-lan
+    io.cilium/lb-ipam-pool: home-lan
   name: headscale
-  namespace: headscale
+  namespace: headscale-system
 spec:
   ports:
   - name: http
@@ -6597,13 +6599,13 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: apps|Deployment|headscale|headscale
+    internal.kpt.dev/upstream-identifier: apps|Deployment|${headscale-namespace}|headscale
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   labels:
     app: headscale
   name: headscale
-  namespace: headscale
+  namespace: headscale-system
 spec:
   replicas: 1
   selector:
@@ -6665,7 +6667,7 @@ spec:
         - mountPath: /var/run/headscale
           name: run
       nodeSelector:
-        cluster-name.cluster/node-role: '"alcide.cluster/node-role": master'
+        node-role.kubernetes.io/control-plane: "true"
       volumes:
       - configMap:
           name: headscale-config
@@ -6685,13 +6687,13 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: apps|Deployment|headscale|headscale-gateway
+    internal.kpt.dev/upstream-identifier: apps|Deployment|${headscale-namespace}|headscale-gateway
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   labels:
     app: headscale-gateway
   name: headscale-gateway
-  namespace: headscale
+  namespace: headscale-system
 spec:
   replicas: 1
   selector:
@@ -6721,8 +6723,6 @@ spec:
 
           until [ -S /var/run/tailscale/tailscaled.sock ]; do sleep 1; done
 
-          HEADSCALE_URL="http://headscale.headscale.svc.cluster.local:8080"
-
           tailscale up \
             --login-server=$$HEADSCALE_URL \
             --authkey=file:/var/secrets/authkey \
@@ -6739,12 +6739,14 @@ spec:
         - name: DARWIN_HOST
           value: alcide
         - name: VIP_NETWORK_CIDR
-          value: ${cluster-vip-network-cidr}
+          value: 10.80.15.0/24
         - name: TS_AUTHKEY
           valueFrom:
             secretKeyRef:
               key: authkey
               name: headscale-client-auth
+        - name: HEADSCALE_URL
+          value: http://headscale.headscale-system.svc.cluster.local:8080
         image: tailscale/tailscale:v1.76.6
         name: tailscale-gateway
         resources:
@@ -7721,13 +7723,13 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: apps|DaemonSet|headscale|headscale-client
+    internal.kpt.dev/upstream-identifier: apps|DaemonSet|${headscale-namespace}|headscale-client
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   labels:
     app: headscale-client
   name: headscale-client
-  namespace: headscale
+  namespace: headscale-system
 spec:
   selector:
     matchLabels:
@@ -7743,11 +7745,13 @@ spec:
       containers:
       - command:
         - sh
-        - -c
+        - -exc
         - |
-          set -e
+          set -ex
           echo "Starting tailscaled..."
-          tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &
+          tailscaled --tun=userspace-networking \
+            --state=/var/lib/tailscale/tailscaled.state \
+            --socket=/var/run/tailscale/tailscaled.sock &
           TAILSCALED_PID=$$!
 
           echo "Waiting for tailscaled socket..."
@@ -7755,8 +7759,6 @@ spec:
 
           # Use internal cluster service (HTTP) - client is inside the cluster
           # External clients use https://alcide-headscale via Tailscale operator
-          HEADSCALE_URL="http://headscale.headscale.svc.cluster.local:8080"
-
           echo "Connecting to Headscale at $$HEADSCALE_URL..."
           tailscale up \
             --login-server=$$HEADSCALE_URL \
@@ -7788,9 +7790,11 @@ spec:
         - name: TS_SOCKET
           value: /var/run/tailscale/tailscaled.sock
         - name: TS_USERSPACE
-          value: "false"
+          value: "true"
         - name: TS_KUBE_SECRET
           value: ""
+        - name: HEADSCALE_URL
+          value: http://headscale.headscale-system.svc.cluster.local:8080
         image: tailscale/tailscale:v1.76.6
         name: tailscale
         resources:
@@ -7822,19 +7826,22 @@ spec:
       initContainers:
       - command:
         - sh
-        - -c
+        - -exc
         - |
           echo "Waiting for Headscale server..."
-          until wget -q -O- http://headscale.headscale.svc.cluster.local:8080/health; do
+          until wget -q -O- "$HEADSCALE_URL/health"; do
             echo "Headscale not ready, retrying in 5s..."
             sleep 5
           done
           echo "Headscale is ready!"
+        env:
+        - name: HEADSCALE_URL
+          value: http://headscale.headscale-system.svc.cluster.local:8080
         image: busybox:1.36
         name: wait-for-headscale
       - command:
         - sh
-        - -c
+        - -exc
         - |
           echo "Waiting for auth key Secret..."
           until [ -f /var/secrets/authkey ]; do
@@ -7915,7 +7922,7 @@ spec:
         - name: port
           value: "6443"
         - name: vip_interface
-          value: vmnet0
+          value: rke2-vip0
         - name: vip_cidr
           value: "32"
         - name: dns_mode
@@ -7935,7 +7942,7 @@ spec:
         - name: vip_retryperiod
           value: "1"
         - name: address
-          value: 10.80.63.10
+          value: 10.80.15.10
         image: ghcr.io/kube-vip/kube-vip:v0.8.7
         imagePullPolicy: Always
         name: kube-vip
@@ -8006,11 +8013,11 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: batch|Job|headscale|headscale-bootstrap
+    internal.kpt.dev/upstream-identifier: batch|Job|${headscale-namespace}|headscale-bootstrap
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   name: headscale-bootstrap
-  namespace: headscale
+  namespace: headscale-system
 spec:
   template:
     metadata:
@@ -8023,7 +8030,7 @@ spec:
         - sh
         - -c
         - |
-          set -e
+          set -ex
 
           # Install dependencies
           apk add --no-cache curl kubectl jq
@@ -8035,7 +8042,7 @@ spec:
           done
 
           echo "Waiting for headscale pod to be running..."
-          until kubectl get pod -n headscale -l app=headscale -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running; do
+          until kubectl get pod -n "$HEADSCALE_NAMESPACE" -l app=headscale -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running; do
             echo "Headscale pod not ready, retrying in 2s..."
             sleep 2
           done
@@ -8044,11 +8051,11 @@ spec:
           # The CLI has direct access to headscale without API key requirements
 
           echo "Creating admin user..."
-          kubectl exec -n headscale deployment/headscale -- \
+          kubectl exec -n "$HEADSCALE_NAMESPACE" deployment/headscale -- \
             headscale users create admin 2>/dev/null || echo "User admin already exists"
 
           echo "Getting admin user ID..."
-          USER_JSON=$$(kubectl exec -n headscale deployment/headscale -- \
+          USER_JSON=$$(kubectl exec -n "$HEADSCALE_NAMESPACE" deployment/headscale -- \
             headscale users list -o json)
           USER_ID=$$(echo "$$USER_JSON" | jq -r '.[] | select(.name=="admin") | .id // empty')
 
@@ -8061,7 +8068,7 @@ spec:
           echo "Admin user ID: $$USER_ID"
 
           echo "Creating reusable preauth key..."
-          PREAUTH_JSON=$$(kubectl exec -n headscale deployment/headscale -- \
+          PREAUTH_JSON=$$(kubectl exec -n "$HEADSCALE_NAMESPACE" deployment/headscale -- \
             headscale preauthkeys --user "$$USER_ID" create \
             --reusable --expiration 720h -o json)
 
@@ -8081,6 +8088,9 @@ spec:
             --dry-run=client -o yaml | kubectl apply -f -
 
           echo "Bootstrap complete!"
+        env:
+        - name: HEADSCALE_NAMESPACE
+          value: headscale-system
         image: alpine:3.19
         name: bootstrap
       restartPolicy: OnFailure
@@ -8100,7 +8110,7 @@ spec:
   - advertisementType: Service
     selector:
       matchLabels:
-        io.cilium/lb-inetaddram: load-balancers
+        io.cilium/lb-ipam-pool: load-balancers
     service:
       addresses:
       - ExternalIP
@@ -8147,7 +8157,7 @@ spec:
       operator: Exists
   serviceSelector:
     matchLabels:
-      io.cilium/lb-inetaddram: home-lan
+      io.cilium/lb-ipam-pool: home-lan
 ---
 apiVersion: cilium.io/v2alpha1
 kind: CiliumL2AnnouncementPolicy
@@ -8182,7 +8192,7 @@ spec:
   - cidr: 192.168.1.64/27
   serviceSelector:
     matchLabels:
-      io.cilium/lb-inetaddram: home-lan
+      io.cilium/lb-ipam-pool: home-lan
 ---
 apiVersion: cilium.io/v2alpha1
 kind: CiliumLoadBalancerIPPool
@@ -8212,7 +8222,7 @@ spec:
   - cidr: 10.80.8.64/26
   serviceSelector:
     matchExpressions:
-    - key: io.cilium/lb-inetaddram
+    - key: io.cilium/lb-ipam-pool
       operator: DoesNotExist
 ---
 apiVersion: cilium.io/v2alpha1
@@ -8253,7 +8263,7 @@ spec:
   pipeline:
     mutators:
     - configMap:
-        cluster-vip-address: ${node-vip-inetaddr}
+        cluster-node-vip-inetaddr: 10.80.15.10
         cluster-vip-interface: rke2-vip0
         kube-vip-namespace: kube-vip
         kube-vip-version: ${kube-vip-version}
@@ -8288,11 +8298,11 @@ spec:
   pipeline:
     mutators:
     - configMap:
+        cluster-lan-headscale-inetaddr: 192.168.1.65
+        cluster-lan-lb-cidr: 192.168.1.64/27
         cluster-name: alcide
+        cluster-vip-cidr: 10.80.15.0/24
         darwin-host: alcide
-        lan-headscale-inetaddr: 192.168.1.65
-        lan-lb-pool: 192.168.1.64/27
-        vip-network-cidr: ${cluster-vip-network-cidr}
       image: ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2
   upstream:
     package: mesh/headscale
@@ -8324,11 +8334,11 @@ spec:
   pipeline:
     mutators:
     - configMap:
+        cluster-lb-cidr: 10.80.8.64/26
         cluster-name: alcide-cluster
-        lb-pool-cidr: ${cluster-lb-pool-cidr}
+        cluster-node-vip-inetaddr: 10.80.15.10
         tailscale-namespace: tailscale-system
         tailscale-version: 1.82.0
-        vip-address: ${node-vip-inetaddr}
       image: ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2
   upstream:
     package: mesh/tailscale
@@ -8362,13 +8372,13 @@ spec:
     - configMap:
         bgp-local-asn: "65001"
         bgp-peer-asn: "65000"
-        cluster-id: 7
+        cluster-id: 1
+        cluster-lb-cidr: 10.80.8.64/26
         cluster-name: alcide-cluster
+        cluster-node-gateway-inetaddr: 10.80.8.1
+        cluster-vip-cidr: 10.80.15.0/24
         l2-interface-1: vmnet0
         l2-interface-2: lan0
-        lb-pool-cidr: ${cluster-lb-pool-cidr}
-        node-gateway-inetaddr: 10.80.8.1
-        vip-pool-cidr: ${cluster-vip-network-cidr}
       image: ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2
   upstream:
     package: networking/cilium
@@ -8471,8 +8481,8 @@ spec:
   pipeline:
     mutators:
     - configMap:
-        kubelet-dir: ${kubelet-dir}
-        zfs-pool-name: ${zfs-pool-name}
+        kubelet-dir: /var/lib/kubelet
+        zfs-pool-name: tank
       image: ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2
   upstream:
     package: storage-openebs-zfs
@@ -8566,6 +8576,8 @@ kind: HelmChart
 metadata:
   annotations:
     internal.kpt.dev/upstream-identifier: helm.cattle.io|HelmChart|kube-system|tailscale-operator
+    kpt.dev/package-layer: mesh
+    kpt.dev/package-name: tailscale
   name: tailscale-operator
   namespace: kube-system
 spec:
@@ -8574,11 +8586,7 @@ spec:
   repo: https://pkgs.tailscale.com/helmcharts
   targetNamespace: tailscale-system
   valuesContent: |-
-    oauth:
-      clientId: kT715erNJB21CNTRL # sops:encrypted
-      clientSecret: tskey-client-kT715erNJB21CNTRL-BQPzAaha7Keq7CRE3NkXKezuo7yJCTfqE # sops:encrypted
     operatorConfig:
-      hostname: name-tailscale-operator # kpt-set: name-tailscale-operator
       debug: true
   version: 1.82.0
 ---
@@ -8760,12 +8768,14 @@ metadata:
   annotations:
     config.kubernetes.io/depends-on: helm.cattle.io/namespaces/kube-system/HelmChart/tailscale-operator
     internal.kpt.dev/upstream-identifier: tailscale.com|Connector|default|controlplane
+    kpt.dev/package-layer: mesh
+    kpt.dev/package-name: tailscale
   name: controlplane
 spec:
   hostname: alcide-controlplane
   subnetRouter:
     advertiseRoutes:
-    - 10.80.63.10/32
+    - 10.80.15.10/32
     - 10.80.8.64/26
 ---
 apiVersion: traefik.containo.us/v1alpha1

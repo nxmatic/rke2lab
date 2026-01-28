@@ -3,13 +3,13 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: apps|Deployment|headscale|headscale
+    internal.kpt.dev/upstream-identifier: apps|Deployment|${headscale-namespace}|headscale
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   labels:
     app: headscale
   name: headscale
-  namespace: headscale
+  namespace: headscale-system
 spec:
   replicas: 1
   selector:
@@ -71,7 +71,7 @@ spec:
             - mountPath: /var/run/headscale
               name: run
       nodeSelector:
-        cluster-name.cluster/node-role: '"alcide.cluster/node-role": master'
+        node-role.kubernetes.io/control-plane: "true"
       volumes:
         - configMap:
             name: headscale-config

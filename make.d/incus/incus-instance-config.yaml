@@ -16,13 +16,11 @@ config:
   volatile.vmnet0.hwaddr: ${NETWORK_NODE_WAN_MACADDR}
   # RKE2 Core Configuration
   environment.RKE2LAB_DEBUG: false
-  environment.RKE2LAB_NODE_TYPE: "${NODE_TYPE}"
+  environment.RKE2LAB_NODE_NAME: "${NODE_NAME}"
+  environment.RKE2LAB_NODE_KIND: "${NODE_KIND}"
   environment.RKE2LAB_CLUSTER_NAME: "${CLUSTER_NAME}"
   environment.RKE2LAB_CLUSTER_TOKEN: "${CLUSTER_TOKEN}"
   environment.RKE2LAB_CLUSTER_DOMAIN: "${CLUSTER_DOMAIN}"
-  # Tailscale / Headscale provisioning
-  environment.RKE2LAB_NODE_ROLE: "${NODE_ROLE}"
-  environment.RKE2LAB_NODE_NAME: "${NODE_NAME}"
   # RKE2 Network Configuration
   environment.RKE2LAB_CLUSTER_ID: "${CLUSTER_ID}"
   environment.RKE2LAB_NODE_ID: "${NODE_ID}"
@@ -38,7 +36,7 @@ config:
   environment.RKE2LAB_CLUSTER_LB_GATEWAY_INETADDR: "${NETWORK_CLUSTER_LB_GATEWAY_INETADDR}"
   environment.RKE2LAB_CLUSTER_POD_CIDR: "${NETWORK_CLUSTER_POD_CIDR}"
   environment.RKE2LAB_CLUSTER_SERVICE_CIDR: "${NETWORK_CLUSTER_SERVICE_CIDR}"
-  environment.RKE2LAB_LAN_LB_POOL: "${NETWORK_LAN_LB_POOL}"
+  environment.RKE2LAB_LAN_LB_CIDR: "${NETWORK_LAN_LB_CIDR}"
   environment.RKE2LAB_NODE_LAN_INTERFACE: "${NETWORK_NODE_LAN_INTERFACE}"
   environment.RKE2LAB_NODE_WAN_INTERFACE: "${NETWORK_NODE_WAN_INTERFACE}"
   # Cluster Gateway (Lima VM on WAN bridge)

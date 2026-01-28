@@ -78,8 +78,8 @@ include make.d/kpt/rules.mk  # KPT Packages (@codebase)
 # Hierarchical Addressing Reference (moved from Makefile) (@codebase)
 # -----------------------------------------------------------------------------
 # Global
-#   IPv4 supernet: 10.80.0.0/12
-#   IPv6 supernet: fd70:80::/32
+#   IPv4 super-network: 10.80.0.0/12
+#   IPv6 super-network: fd70:80::/32
 # Per-cluster aggregate:
 #   IPv4 /20 block: 10.80.(CLUSTER_ID*16).0/20
 #   IPv6 /48 block: fd70:80:CLUSTER_ID::/48

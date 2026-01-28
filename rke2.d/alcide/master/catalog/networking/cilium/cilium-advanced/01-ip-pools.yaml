@@ -7,11 +7,11 @@ metadata: # kpt-merge: /load-balancers
 spec:
   blocks:
     # LoadBalancer pool inside /26 (128/26): usable hosts 129-190
-    - cidr: ${lb-pool-cidr} # kpt-set: ${lb-pool-cidr}
+    - cidr: ${cluster-lb-cidr} # kpt-set: ${cluster-lb-cidr}
   serviceSelector:
     matchExpressions:
       # Default pool backs services that do not request a custom pool label
-      - key: io.cilium/lb-inetaddram
+      - key: io.cilium/lb-ipam-pool
         operator: DoesNotExist
 ---
 apiVersion: cilium.io/v2alpha1
@@ -23,7 +23,7 @@ metadata: # kpt-merge: /lan-load-balancers
 spec:
   blocks:
     # LAN load balancer pool
-    - cidr: ${lan-lb-pool} # kpt-set: ${lan-lb-pool}
+    - cidr: ${cluster-lan-lb-cidr} # kpt-set: ${cluster-lan-lb-cidr}
   serviceSelector:
     matchLabels:
       io.cilium/loadbalancer-ip-pool: lan-lb
@@ -36,4 +36,4 @@ metadata: # kpt-merge: /virtual-addresses
     internal.kpt.dev/upstream-identifier: 'cilium.io|CiliumLoadBalancerIPPool|default|virtual-addresses'
 spec:
   blocks:
-    - cidr: ${vip-pool-cidr} # kpt-set: ${vip-pool-cidr}
+    - cidr: ${cluster-vip-cidr} # kpt-set: ${cluster-vip-cidr}

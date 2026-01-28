@@ -3,11 +3,11 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: batch|Job|headscale|headscale-bootstrap
+    internal.kpt.dev/upstream-identifier: batch|Job|${headscale-namespace}|headscale-bootstrap
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   name: headscale-bootstrap
-  namespace: headscale
+  namespace: headscale-system
 spec:
   template:
     metadata:
@@ -20,7 +20,7 @@ spec:
             - sh
             - -c
             - |
-              set -e
+              set -ex
 
               # Install dependencies
               apk add --no-cache curl kubectl jq
@@ -32,7 +32,7 @@ spec:
               done
 
               echo "Waiting for headscale pod to be running..."
-              until kubectl get pod -n headscale -l app=headscale -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running; do
+              until kubectl get pod -n "$HEADSCALE_NAMESPACE" -l app=headscale -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running; do
                 echo "Headscale pod not ready, retrying in 2s..."
                 sleep 2
               done
@@ -41,11 +41,11 @@ spec:
               # The CLI has direct access to headscale without API key requirements
 
               echo "Creating admin user..."
-              kubectl exec -n headscale deployment/headscale -- \
+              kubectl exec -n "$HEADSCALE_NAMESPACE" deployment/headscale -- \
                 headscale users create admin 2>/dev/null || echo "User admin already exists"
 
               echo "Getting admin user ID..."
-              USER_JSON=$$(kubectl exec -n headscale deployment/headscale -- \
+              USER_JSON=$$(kubectl exec -n "$HEADSCALE_NAMESPACE" deployment/headscale -- \
                 headscale users list -o json)
               USER_ID=$$(echo "$$USER_JSON" | jq -r '.[] | select(.name=="admin") | .id // empty')
 
@@ -58,7 +58,7 @@ spec:
               echo "Admin user ID: $$USER_ID"
 
               echo "Creating reusable preauth key..."
-              PREAUTH_JSON=$$(kubectl exec -n headscale deployment/headscale -- \
+              PREAUTH_JSON=$$(kubectl exec -n "$HEADSCALE_NAMESPACE" deployment/headscale -- \
                 headscale preauthkeys --user "$$USER_ID" create \
                 --reusable --expiration 720h -o json)
 
@@ -78,6 +78,9 @@ spec:
                 --dry-run=client -o yaml | kubectl apply -f -
 
               echo "Bootstrap complete!"
+          env:
+            - name: HEADSCALE_NAMESPACE
+              value: headscale-system
           image: alpine:3.19
           name: bootstrap
       restartPolicy: OnFailure

@@ -4,6 +4,8 @@ kind: HelmChart
 metadata:
   annotations:
     internal.kpt.dev/upstream-identifier: helm.cattle.io|HelmChart|kube-system|tailscale-operator
+    kpt.dev/package-layer: mesh
+    kpt.dev/package-name: tailscale
   name: tailscale-operator
   namespace: kube-system
 spec:
@@ -12,14 +14,6 @@ spec:
   repo: https://pkgs.tailscale.com/helmcharts
   targetNamespace: tailscale-system
   valuesContent: |-
-    oauth:
-      clientId:
-        fromSecret: operator-oauth
-        key: client_id
-      clientSecret:
-        fromSecret: operator-oauth
-        key: client_secret
     operatorConfig:
-      hostname: name-tailscale-operator # kpt-set: name-tailscale-operator
       debug: true
   version: 1.82.0

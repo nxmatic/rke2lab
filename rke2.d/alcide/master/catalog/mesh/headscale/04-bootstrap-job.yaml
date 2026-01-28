@@ -1,18 +1,18 @@
 apiVersion: v1
 kind: ServiceAccount
-metadata: # kpt-merge: headscale/headscale-bootstrap
+metadata: # kpt-merge: ${headscale-namespace}/headscale-bootstrap
   name: headscale-bootstrap
-  namespace: headscale
+  namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
   annotations:
-    internal.kpt.dev/upstream-identifier: '|ServiceAccount|headscale|headscale-bootstrap'
+    internal.kpt.dev/upstream-identifier: '|ServiceAccount|${headscale-namespace}|headscale-bootstrap'
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
-metadata: # kpt-merge: headscale/headscale-bootstrap
+metadata: # kpt-merge: ${headscale-namespace}/headscale-bootstrap
   name: headscale-bootstrap
-  namespace: headscale
+  namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
   annotations:
-    internal.kpt.dev/upstream-identifier: 'rbac.authorization.k8s.io|Role|headscale|headscale-bootstrap'
+    internal.kpt.dev/upstream-identifier: 'rbac.authorization.k8s.io|Role|${headscale-namespace}|headscale-bootstrap'
 rules:
 - apiGroups: [""]
   resources: ["secrets"]
@@ -29,15 +29,15 @@ rules:
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
-metadata: # kpt-merge: headscale/headscale-bootstrap
+metadata: # kpt-merge: ${headscale-namespace}/headscale-bootstrap
   name: headscale-bootstrap
-  namespace: headscale
+  namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
   annotations:
-    internal.kpt.dev/upstream-identifier: 'rbac.authorization.k8s.io|RoleBinding|headscale|headscale-bootstrap'
+    internal.kpt.dev/upstream-identifier: 'rbac.authorization.k8s.io|RoleBinding|${headscale-namespace}|headscale-bootstrap'
 subjects:
 - kind: ServiceAccount
   name: headscale-bootstrap
-  namespace: headscale
+  namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
 roleRef:
   kind: Role
   name: headscale-bootstrap
@@ -45,11 +45,11 @@ roleRef:
 ---
 apiVersion: batch/v1
 kind: Job
-metadata: # kpt-merge: headscale/headscale-bootstrap
+metadata: # kpt-merge: ${headscale-namespace}/headscale-bootstrap
   name: headscale-bootstrap
-  namespace: headscale
+  namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
   annotations:
-    internal.kpt.dev/upstream-identifier: 'batch|Job|headscale|headscale-bootstrap'
+    internal.kpt.dev/upstream-identifier: 'batch|Job|${headscale-namespace}|headscale-bootstrap'
 spec:
   ttlSecondsAfterFinished: 300
   template:
@@ -59,11 +59,14 @@ spec:
       containers:
       - name: bootstrap
         image: alpine:3.19
+        env:
+        - name: HEADSCALE_NAMESPACE
+          value: ${headscale-namespace} # kpt-set: ${headscale-namespace}
         command:
         - sh
         - -c
         - |
-          set -e
+          set -ex
 
           # Install dependencies
           apk add --no-cache curl kubectl jq
@@ -75,7 +78,7 @@ spec:
           done
 
           echo "Waiting for headscale pod to be running..."
-          until kubectl get pod -n headscale -l app=headscale -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running; do
+          until kubectl get pod -n "$HEADSCALE_NAMESPACE" -l app=headscale -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running; do
             echo "Headscale pod not ready, retrying in 2s..."
             sleep 2
           done
@@ -84,11 +87,11 @@ spec:
           # The CLI has direct access to headscale without API key requirements
 
           echo "Creating admin user..."
-          kubectl exec -n headscale deployment/headscale -- \
+          kubectl exec -n "$HEADSCALE_NAMESPACE" deployment/headscale -- \
             headscale users create admin 2>/dev/null || echo "User admin already exists"
 
           echo "Getting admin user ID..."
-          USER_JSON=$$(kubectl exec -n headscale deployment/headscale -- \
+          USER_JSON=$$(kubectl exec -n "$HEADSCALE_NAMESPACE" deployment/headscale -- \
             headscale users list -o json)
           USER_ID=$$(echo "$$USER_JSON" | jq -r '.[] | select(.name=="admin") | .id // empty')
 
@@ -101,7 +104,7 @@ spec:
           echo "Admin user ID: $$USER_ID"
 
           echo "Creating reusable preauth key..."
-          PREAUTH_JSON=$$(kubectl exec -n headscale deployment/headscale -- \
+          PREAUTH_JSON=$$(kubectl exec -n "$HEADSCALE_NAMESPACE" deployment/headscale -- \
             headscale preauthkeys --user "$$USER_ID" create \
             --reusable --expiration 720h -o json)
 

@@ -3,13 +3,13 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   annotations:
-    internal.kpt.dev/upstream-identifier: apps|DaemonSet|headscale|headscale-client
+    internal.kpt.dev/upstream-identifier: apps|DaemonSet|${headscale-namespace}|headscale-client
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
   labels:
     app: headscale-client
   name: headscale-client
-  namespace: headscale
+  namespace: headscale-system
 spec:
   selector:
     matchLabels:
@@ -25,11 +25,13 @@ spec:
       containers:
         - command:
             - sh
-            - -c
+            - -exc
             - |
-              set -e
+              set -ex
               echo "Starting tailscaled..."
-              tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &
+              tailscaled --tun=userspace-networking \
+                --state=/var/lib/tailscale/tailscaled.state \
+                --socket=/var/run/tailscale/tailscaled.sock &
               TAILSCALED_PID=$$!
 
               echo "Waiting for tailscaled socket..."
@@ -37,8 +39,6 @@ spec:
 
               # Use internal cluster service (HTTP) - client is inside the cluster
               # External clients use https://alcide-headscale via Tailscale operator
-              HEADSCALE_URL="http://headscale.headscale.svc.cluster.local:8080"
-
               echo "Connecting to Headscale at $$HEADSCALE_URL..."
               tailscale up \
                 --login-server=$$HEADSCALE_URL \
@@ -70,9 +70,11 @@ spec:
             - name: TS_SOCKET
               value: /var/run/tailscale/tailscaled.sock
             - name: TS_USERSPACE
-              value: "false"
+              value: "true"
             - name: TS_KUBE_SECRET
               value: ""
+            - name: HEADSCALE_URL
+              value: http://headscale.headscale-system.svc.cluster.local:8080
           image: tailscale/tailscale:v1.76.6
           name: tailscale
           resources:
@@ -104,19 +106,22 @@ spec:
       initContainers:
         - command:
             - sh
-            - -c
+            - -exc
             - |
               echo "Waiting for Headscale server..."
-              until wget -q -O- http://headscale.headscale.svc.cluster.local:8080/health; do
+              until wget -q -O- "$HEADSCALE_URL/health"; do
                 echo "Headscale not ready, retrying in 5s..."
                 sleep 5
               done
               echo "Headscale is ready!"
+          env:
+            - name: HEADSCALE_URL
+              value: http://headscale.headscale-system.svc.cluster.local:8080
           image: busybox:1.36
           name: wait-for-headscale
         - command:
             - sh
-            - -c
+            - -exc
             - |
               echo "Waiting for auth key Secret..."
               until [ -f /var/secrets/authkey ]; do

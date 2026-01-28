@@ -2,13 +2,13 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: headscale-gateway
-  namespace: headscale
+  namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: headscale-gateway
-  namespace: headscale
+  namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
   labels:
     app: headscale-gateway
 spec:
@@ -38,7 +38,9 @@ spec:
         - name: DARWIN_HOST
           value: ${cluster-name} # kpt-set: ${cluster-name}
         - name: VIP_NETWORK_CIDR
-          value: ${cluster-vip-network-cidr} # kpt-set: ${cluster-vip-network-cidr}
+          value: ${cluster-vip-cidr} # kpt-set: ${cluster-vip-cidr}
+        - name: HEADSCALE_URL
+          value: http://headscale.${headscale-namespace}.svc.cluster.local:8080 # kpt-set: http://headscale.${headscale-namespace}.svc.cluster.local:8080
         - name: TS_AUTHKEY
           valueFrom:
             secretKeyRef:
@@ -57,8 +59,6 @@ spec:
           TAILSCALED_PID=$$!
 
           until [ -S /var/run/tailscale/tailscaled.sock ]; do sleep 1; done
-
-          HEADSCALE_URL="http://headscale.headscale.svc.cluster.local:8080"
 
           tailscale up \
             --login-server=$$HEADSCALE_URL \

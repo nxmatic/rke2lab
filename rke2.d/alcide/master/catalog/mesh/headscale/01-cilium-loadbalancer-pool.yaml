@@ -6,10 +6,10 @@ metadata: # kpt-merge: /home-lan
     internal.kpt.dev/upstream-identifier: 'cilium.io|CiliumLoadBalancerIPPool|default|home-lan'
 spec:
   blocks:
-  - cidr: ${lan-lb-pool} # kpt-set: ${lan-lb-pool}
+  - cidr: ${cluster-lan-lb-cidr} # kpt-set: ${cluster-lan-lb-cidr}
   serviceSelector:
     matchLabels:
-      io.cilium/lb-inetaddram: home-lan
+      io.cilium/lb-ipam-pool: home-lan
 ---
 apiVersion: cilium.io/v2alpha1
 kind: CiliumL2AnnouncementPolicy
@@ -27,4 +27,4 @@ spec:
       operator: Exists
   serviceSelector:
     matchLabels:
-      io.cilium/lb-inetaddram: home-lan
+      io.cilium/lb-ipam-pool: home-lan

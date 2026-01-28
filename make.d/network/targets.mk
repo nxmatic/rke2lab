@@ -21,7 +21,7 @@ generate@network: $(.network.mks) ## Generate all network split files (@codebase
 .PHONY: show@network
 show@network: ## Debug network configuration display
 	echo "=== RKE2 Network Configuration ==="
-	echo "Host supernet: $(.network.host.supernet.cidr)"
+	echo "Host super-network: $(.network.host.super-network.cidr)"
 	echo "Cluster $(cluster.id): $(.network.cluster.cidr)"
 	echo "Node $(node.id): $(.network.node.cidr)"
 	echo "Node host IP: $(.network.node.host.inetaddr)"
@@ -49,7 +49,7 @@ Network Configuration Summary:
 =============================
 Cluster: $(cluster.name) (ID: $(cluster.id))
 Node: $(node.name) (ID: $(node.id), Role: $(node.ROLE))
-Host Supernet: $(.network.host.supernet.cidr)
+Host Supernet: $(.network.host.super-network.cidr)
 Cluster Network: $(.network.cluster.cidr)
 Node Network: $(.network.node.cidr)
 Node IP: $(.network.node.host.inetaddr)
@@ -117,7 +117,7 @@ validate@network: ## Validate network configuration
 
 test@network: ## Run strict network checks (fails fast) (@codebase)
 	: "[test@network] Validating namespaced network variables"
-	: "[ok] network.host.supernet.cidr=$(.network.host.supernet.cidr)"
+	: "[ok] network.host.super-network.cidr=$(.network.host.super-network.cidr)"
 	: "[ok] network.cluster.cidr=$(.network.cluster.cidr)"
 	: "[ok] network.node.cidr=$(.network.node.cidr)"
 	: "[ok] network.node.host.inetaddr=$(.network.node.host.inetaddr)"
