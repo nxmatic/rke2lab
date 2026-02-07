@@ -267,10 +267,6 @@ $(.incus.project.marker.file):
 		incus profile create --project=$(.incus.project.name) $(.network.node.profile.name)
 		incus profile device add --project=$(.incus.project.name) $(.network.node.profile.name) \
 		  root disk path=/ pool=default
-		incus profile device add --project=$(.incus.project.name) $(.network.node.profile.name) \
-		  lan0 nic nictype=bridged parent=lan-br name=lan0
-		incus profile device add --project=$(.incus.project.name) $(.network.node.profile.name) \
-		  vmnet0 nic network=vmnet-br name=vmnet0
 	fi
 	touch $@
 
