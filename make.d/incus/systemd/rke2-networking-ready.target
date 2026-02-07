@@ -1,0 +1,10 @@
+[Unit]
+Description=RKE2 Networking Layer Ready Target
+Documentation=https://github.com/nxmatic/rke2lab
+After=rke2-runtime-ready.target
+Requires=rke2-runtime-ready.target
+After=rke2-networking-ready-check.service
+Requires=rke2-networking-ready-check.service
+
+[Install]
+WantedBy=multi-user.target
