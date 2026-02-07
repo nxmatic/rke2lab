@@ -27,11 +27,11 @@ networks:
   - name: vmnet-br
     type: bridge
     config:
-      ipv4.address: 10.80.56.1/21
+      ipv4.address: 10.80.0.1/21
       ipv4.nat: "false" # NAT disabled - cluster-internal only
       ipv4.routing: "false" # No routing - isolated bridge
       ipv4.dhcp: "true"
-      ipv4.dhcp.ranges: 10.80.56.2-10.80.56.9,10.80.56.31-10.80.63.254
+      ipv4.dhcp.ranges: 10.80.0.2-10.80.0.9,10.80.0.31-10.80.7.254
       dns.mode: none
       bridge.driver: native
       # Static DHCP leases for RKE2 nodes - ensures predictable IP allocation
@@ -39,12 +39,12 @@ networks:
       # MACs use QEMU prefix 52:54:00 + cluster_id:node_type:node_id (in hex, zero-padded)
       # IPs use cluster network base + node offset (10 for master, 11-13 for peers, 20+ for workers)
       raw.dnsmasq: |
-        dhcp-host=52:54:00:07:00:00,10.80.56.10,master
-        dhcp-host=52:54:00:07:00:01,10.80.56.11,peer1
-        dhcp-host=52:54:00:07:00:02,10.80.56.12,peer2
-        dhcp-host=52:54:00:07:00:03,10.80.56.13,peer3
-        dhcp-host=52:54:00:07:01:0a,10.80.56.20,worker1
-        dhcp-host=52:54:00:07:01:0b,10.80.56.21,worker2
+        dhcp-host=52:54:00:00:00:00,10.80.0.10,master
+        dhcp-host=52:54:00:00:00:01,10.80.0.11,peer1
+        dhcp-host=52:54:00:00:00:02,10.80.0.12,peer2
+        dhcp-host=52:54:00:00:00:03,10.80.0.13,peer3
+        dhcp-host=52:54:00:00:01:0a,10.80.0.20,worker1
+        dhcp-host=52:54:00:00:01:0b,10.80.0.21,worker2
 profiles:
   - name: rke2lab
     description: RKE2 profile (LAN bridge + cluster bridge)

@@ -18,12 +18,12 @@ devices:
     name: lan0
     nictype: bridged
     parent: lan-br
-    hwaddr: 10:66:6a:4c:07:00
+    hwaddr: 10:66:6a:4c:00:00
   vmnet0:
     type: nic
     name: vmnet0
     network: vmnet-br
-    hwaddr: 52:54:00:07:00:00
+    hwaddr: 52:54:00:00:00:00
   kmsg.dev:
     type: unix-char
     source: /dev/kmsg
