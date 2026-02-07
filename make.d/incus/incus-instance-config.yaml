@@ -12,9 +12,18 @@ config:
     lxc.cgroup.devices.allow = b *:* rwm
   security.privileged: true
   security.nesting: true
-  volatile.lan0.hwaddr: ${NETWORK_LAN_HOST_MACADDR}
-  volatile.vmnet0.hwaddr: ${NETWORK_WAN_HOST_MACADDR}
 devices:
+  lan0:
+    type: nic
+    name: lan0
+    nictype: bridged
+    parent: lan-br
+    hwaddr: ${NETWORK_LAN_HOST_MACADDR}
+  vmnet0:
+    type: nic
+    name: vmnet0
+    network: vmnet-br
+    hwaddr: ${NETWORK_WAN_HOST_MACADDR}
   kmsg.dev:
     type: unix-char
     source: /dev/kmsg
