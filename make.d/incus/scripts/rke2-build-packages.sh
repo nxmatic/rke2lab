@@ -1,5 +1,4 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env -S bash -exuo pipefail
 
 # RKE2 Generic Package Build Script
 # Builds packages from multiple flakes based on YAML descriptor
@@ -8,17 +7,17 @@ set -euo pipefail
 BUILDS_DESCRIPTOR="${1:-/srv/host/nix-builds.yaml}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "[$(date)] Starting RKE2 package builds from descriptor: ${BUILDS_DESCRIPTOR}"
+: "[$(date)] Starting RKE2 package builds from descriptor: ${BUILDS_DESCRIPTOR}"
 
 # Check if descriptor exists
 if [[ ! -f "${BUILDS_DESCRIPTOR}" ]]; then
-    echo "[ERROR] Builds descriptor not found: ${BUILDS_DESCRIPTOR}"
+    : "[ERROR] Builds descriptor not found: ${BUILDS_DESCRIPTOR}"
     exit 1
 fi
 
 # Check if yq is available
 if ! command -v yq &> /dev/null; then
-    echo "[ERROR] yq not found. Please install yq to parse YAML descriptor"
+    : "[ERROR] yq not found. Please install yq to parse YAML descriptor"
     exit 1
 fi
 
@@ -31,14 +30,14 @@ build_package() {
     local package_name="$5"
     local package_attr="$6"
     
-    echo "[$(date)] [${job_name}] Building ${package_name}..."
+    : "[$(date)] [${job_name}] Building ${package_name}..."
     
     # Create output directory
     mkdir -p "${output_dir}"
     
     # Verify flake.nix exists
     if [[ ! -f "${flake_path}/flake.nix" ]]; then
-        echo "[ERROR] [${job_name}] Flake not found at ${flake_path}/flake.nix"
+        : "[ERROR] [${job_name}] Flake not found at ${flake_path}/flake.nix"
         return 1
     fi
     
@@ -49,10 +48,10 @@ build_package() {
            --out-link "${output_dir}/${package_name}" \
            ".#${package_attr}" \
            2>&1 | tee -a "${log_file}"; then
-        echo "[$(date)] [${job_name}] ✓ Built ${package_name}"
+        : "[$(date)] [${job_name}] ✓ Built ${package_name}"
         return 0
     else
-        echo "[ERROR] [${job_name}] Failed to build ${package_name}"
+        : "[ERROR] [${job_name}] Failed to build ${package_name}"
         return 1
     fi
 }
@@ -65,11 +64,11 @@ declare -i failed_jobs=0
 num_jobs=$(yq eval '.jobs | length' "${BUILDS_DESCRIPTOR}")
 
 if [[ $num_jobs -eq 0 ]]; then
-    echo "[WARNING] No builds defined in descriptor"
+    : "[WARNING] No builds defined in descriptor"
     exit 0
 fi
 
-echo "[$(date)] Found ${num_jobs} build job(s)"
+: "[$(date)] Found ${num_jobs} build job(s)"
 
 for ((i = 0; i < num_jobs; i++)); do
     # Extract job configuration
@@ -82,17 +81,17 @@ for ((i = 0; i < num_jobs; i++)); do
     
     # Skip disabled jobs
     if [[ "${job_enabled}" != "true" ]]; then
-        echo "[$(date)] [${job_name}] SKIPPED (disabled)"
+        : "[$(date)] [${job_name}] SKIPPED (disabled)"
         continue
     fi
     
-    echo ""
-    echo "╔════════════════════════════════════════════════════════════════"
-    echo "║ Job: ${job_name}"
-    echo "║ Description: ${job_description}"
-    echo "║ Flake: ${flake_path}"
-    echo "║ Output: ${output_dir}"
-    echo "╚════════════════════════════════════════════════════════════════"
+    : ""
+    : "╔═══════════════════════════════════════════════════════════════="
+    : "║ Job: ${job_name}"
+    : "║ Description: ${job_description}"
+    : "║ Flake: ${flake_path}"
+    : "║ Output: ${output_dir}"
+    : "╚═══════════════════════════════════════════════════════════════="
     
     ((total_jobs++))
     
@@ -112,25 +111,25 @@ for ((i = 0; i < num_jobs; i++)); do
     
     if [[ "${job_failed}" == true ]]; then
         ((failed_jobs++))
-        echo "[$(date)] [${job_name}] ✗ Job failed"
+        : "[$(date)] [${job_name}] ✗ Job failed"
     else
-        echo "[$(date)] [${job_name}] ✓ All packages built successfully"
-        echo "[$(date)] [${job_name}] Output: ${output_dir}"
+        : "[$(date)] [${job_name}] ✓ All packages built successfully"
+        : "[$(date)] [${job_name}] Output: ${output_dir}"
         ls -lh "${output_dir}" 2>/dev/null | head -20 | tee -a "${log_file}"
     fi
-    echo ""
+    : ""
 done
 
-echo "════════════════════════════════════════════════════════════════"
-echo "Build Summary:"
-echo "  Total jobs: ${total_jobs}"
-echo "  Failed jobs: ${failed_jobs}"
-echo "════════════════════════════════════════════════════════════════"
+: "════════════════════════════════════════════════════════════════"
+: "Build Summary:"
+: "  Total jobs: ${total_jobs}"
+: "  Failed jobs: ${failed_jobs}"
+: "════════════════════════════════════════════════════════════════"
 
 if [[ $failed_jobs -gt 0 ]]; then
-    echo "[ERROR] ${failed_jobs} job(s) failed"
+    : "[ERROR] ${failed_jobs} job(s) failed"
     exit 1
 else
-    echo "[$(date)] ✓ All build jobs completed successfully"
+    : "[$(date)] ✓ All build jobs completed successfully"
     exit 0
 fi
