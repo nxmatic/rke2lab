@@ -1,9 +1,9 @@
-# Generated network subnet definitions for type=node network='10.80.56.0/21' prefix=23
+# Generated network subnet definitions for type=node network=10.80.56.0/21 prefix=23
 
 .network.node.eval := eval
 .network.node.call := call
 
-.network.node.split.network := '10.80.56.0/21'
+.network.node.split.network := 10.80.56.0/21
 .network.node.split.prefix := 23
 .network.node.split.count := 4
 .network.node.split.addresses := 510
@@ -43,4 +43,3 @@
 .network.node.split.3.maxaddr='10.80.63.254'
 .network.node.split.3.addresses=510
 .network.node.split.3.cidr='10.80.62.0/23'
-

@@ -1,9 +1,9 @@
-# Generated network subnet definitions for type=vip network='10.80.56.0/21' prefix=24
+# Generated network subnet definitions for type=vip network=10.80.56.0/21 prefix=24
 
 .network.vip.eval := eval
 .network.vip.call := call
 
-.network.vip.split.network := '10.80.56.0/21'
+.network.vip.split.network := 10.80.56.0/21
 .network.vip.split.prefix := 24
 .network.vip.split.count := 8
 .network.vip.split.addresses := 254
