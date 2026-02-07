@@ -30,13 +30,14 @@ fi
 
 mkdir -p /etc/systemd/system
 
-source <( find "${RKE2LAB_SYSTEMD_DIR}" -type f -name '*.service' |
-          xargs -I{} echo systemctl link {} )
-log "linked systemd service units from ${RKE2LAB_SYSTEMD_DIR}"
+: "Copy service unit files"
+find "${RKE2LAB_SYSTEMD_DIR}" -maxdepth 1 -type f \( -name '*.service' -o -name '*.target' \) -exec cp {} /etc/systemd/system/ \;
+log "copied systemd units from ${RKE2LAB_SYSTEMD_DIR}"
 
-source <( find "${RKE2LAB_SYSTEMD_DIR}" -mindepth 1 -type d -name '*.d' |
-		  xargs -I{} echo ln -fs {} /etc/systemd/system/ )
-log "linked systemd override directories from ${RKE2LAB_SYSTEMD_DIR}"
+: "Copy service unit drop-in directories"
+find "${RKE2LAB_SYSTEMD_DIR}" -maxdepth 1 -type d -name '*.d' -exec cp -r {} /etc/systemd/system/ \;
+log "copied systemd override directories from ${RKE2LAB_SYSTEMD_DIR}"
 
+: "Reload systemd to recognize new units"
 systemctl daemon-reload
 log "daemon-reload complete"
