@@ -1,0 +1,12 @@
+---
+apiVersion: v1
+data: {}
+kind: ConfigMap
+metadata:
+  annotations:
+    internal.kpt.dev/upstream-identifier: '|ConfigMap|${headscale-namespace}|flox-env'
+    kpt.dev/package-layer: mesh
+    kpt.dev/package-name: headscale
+    replicator.v1.mittwald.de/replicate-from: flox-runtime/flox-env
+  name: flox-env
+  namespace: headscale-system

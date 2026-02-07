@@ -1,0 +1,106 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata: # kpt-merge: ${headscale-namespace}/headscale-gateway
+  name: headscale-gateway
+  namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
+  annotations:
+    internal.kpt.dev/upstream-identifier: '|ServiceAccount|${headscale-namespace}|headscale-gateway'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: # kpt-merge: ${headscale-namespace}/headscale-gateway
+  name: headscale-gateway
+  namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
+  labels:
+    app: headscale-gateway
+  annotations:
+    internal.kpt.dev/upstream-identifier: 'apps|Deployment|${headscale-namespace}|headscale-gateway'
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: headscale-gateway
+  template:
+    metadata:
+      labels:
+        app: headscale-gateway
+      annotations:
+        flox.dev/environment: "${headscale-flox-env}" # kpt-set: ${headscale-flox-env}
+    spec:
+      runtimeClassName: flox
+      serviceAccountName: headscale-gateway
+      automountServiceAccountToken: false
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: "true"
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: tailscale-gateway
+        image: flox/empty:1.0.0
+        envFrom:
+        - configMapRef:
+            name: headscale-env
+        - configMapRef:
+            name: flox-env
+        env:
+        - name: TS_AUTHKEY
+          valueFrom:
+            secretKeyRef:
+              name: headscale-client-auth
+              key: authkey
+        command:
+        - bash
+        - /scripts/gateway.sh
+        securityContext:
+          privileged: true
+          capabilities:
+            add:
+            - NET_ADMIN
+            - NET_RAW
+        volumeMounts:
+        - name: dev-net-tun
+          mountPath: /dev/net/tun
+        - name: tailscale-state
+          mountPath: /var/lib/tailscale
+        - name: tailscale-socket
+          mountPath: /var/run/tailscale
+        - name: authkey
+          mountPath: /var/secrets
+          readOnly: true
+        - name: gateway-script
+          mountPath: /scripts
+          readOnly: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+            ephemeral-storage: 100Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+            ephemeral-storage: 500Mi
+      volumes:
+      - name: dev-net-tun
+        hostPath:
+          path: /dev/net/tun
+          type: CharDevice
+      - name: tailscale-state
+        hostPath:
+          path: /var/lib/tailscale
+          type: DirectoryOrCreate
+      - name: tailscale-socket
+        emptyDir: {}
+      - name: gateway-script
+        configMap:
+          name: headscale-gateway-script
+          defaultMode: 0755
+      - name: authkey
+        secret:
+          secretName: headscale-client-auth
+          items:
+          - key: authkey
+            path: authkey

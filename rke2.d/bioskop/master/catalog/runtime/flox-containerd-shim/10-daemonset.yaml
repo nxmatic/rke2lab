@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata: # kpt-merge: flox-runtime/flox-runtime-installer
+  name: flox-runtime-installer
+  namespace: flox-runtime # {"$kpt-set":"flox-namespace"}
+  labels:
+    app.kubernetes.io/name: flox-runtime-installer
+    app.kubernetes.io/component: runtime-shim
+  annotations:
+    internal.kpt.dev/upstream-identifier: 'apps|DaemonSet|flox-runtime|flox-runtime-installer'
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: flox-runtime-installer
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: flox-runtime-installer
+        app.kubernetes.io/component: runtime-shim
+    spec:
+      serviceAccountName: flox-runtime-installer
+      automountServiceAccountToken: false
+      hostPID: true
+      restartPolicy: Always
+      tolerations:
+        - operator: "Exists"
+      nodeSelector:
+        flox.dev/enabled: "true"
+      initContainers:
+        - name: shim-installer
+          image: alpine:3.20
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CONTAINERD_CONFIG_FILE
+              value: /var/lib/rancher/rke2/agent/etc/containerd/config.toml # {"$kpt-set":"containerd-config-file"}
+            - name: CONTAINERD_ADDRESS
+              value: /run/k3s/containerd/containerd.sock # {"$kpt-set":"containerd-address"}
+            - name: APK_MAX_RETRIES
+              value: "5" # {"$kpt-set":"apk-max-retries"}
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+          command:
+            - /bin/sh
+            - /scripts/shim-installer.sh
+          volumeMounts:
+            - name: runtime-installer-script
+              mountPath: /scripts
+              readOnly: true
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.10
+          resources:
+            requests:
+              cpu: 5m
+              memory: 32Mi
+              ephemeral-storage: 32Mi
+            limits:
+              cpu: 10m
+              memory: 64Mi
+              ephemeral-storage: 64Mi
+      volumes:
+        - name: runtime-installer-script
+          configMap:
+            name: flox-runtime-installer-script
+            defaultMode: 0755
