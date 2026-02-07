@@ -13,10 +13,10 @@ data:
   node-name: master
   node-kind: server
   cluster-token: bioskop
-  node-host-inetaddr: 10.80.0.10
+  node-host-inetaddr: 10.80.56.10
   cluster-id: "0"
   cluster-init: "true"
-  pod-network-cidr: 10.42.0.0/16
-  service-network-cidr: 10.43.0.0/16
-  node-gateway-inetaddr: 10.80.0.1
-  cluster-vip-gateway-inetaddr: 10.80.7.1
+  pod-network-cidr: 10.56.0.0/16
+  service-network-cidr: 10.57.0.0/16
+  node-gateway-inetaddr: 10.80.56.1
+  cluster-vip-gateway-inetaddr: 10.80.63.1
