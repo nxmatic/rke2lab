@@ -1,0 +1,743 @@
+= Pulumi Migration Plan: Make → Java Pulumi IaC
+:toc:
+:toclevels: 3
+:sectnums:
+
+== Executive Summary
+
+Replace GNU Make-based infrastructure orchestration with **Java Pulumi** for improved maintainability, type safety, and dependency management. Focus migration on highest-pain, highest-benefit components: Incus provisioning and systemd choreography.
+
+**Expected Benefits:**
+- Eliminate hard-to-maintain Makefile conditionals and shell arithmetic
+- Type-safe infrastructure definitions (catch errors at compile-time, not deploy-time)
+- Explicit dependency DAGs (no hidden Make target ordering)
+- Parallel task execution (replace sequential systemd targets where safe)
+- Reproducible cluster deployments with state tracking
+- Better IDE support and refactoring capabilities
+- Reduce ~1500 LOC of Make recipes to ~400 LOC of typed Java code
+
+**Timeline:** 4-6 weeks (phased approach, non-blocking to current RKE2 operations)
+
+== Current State Analysis
+
+=== Make Complexity Assessment
+
+[cols="1,3,2,2"]
+|===
+| Component | Complexity | Pain Level | Migration Priority
+
+| Network generation (`split-rules.mk`, `rke2.d/network/*.mk`)
+| High (subnet splitting logic + static file generation)
+| Medium (works, but fragile shell arithmetic)
+| **Phase 3**
+
+| Incus provisioning (templates + instance creation)
+| High (variable binding, conditional profiles, device config)
+| **HIGH** (unmaintainable template nesting)
+| **Phase 1** ⭐
+
+| Systemd choreography (7-stage target hierarchy)
+| Very High (implicit target dependencies, race conditions)
+| **HIGH** (hard to debug, easy to break)
+| **Phase 1** ⭐
+
+| Nix package builds (`rke2-build-packages.sh`, YAML descriptor)
+| Medium (shell loop + Nix invocation)
+| Low (works reliably, descriptor-driven)
+| **Phase 2**
+
+| KPT manifest generation
+| Medium (custom Make rules + yq transforms)
+| Medium (order-dependent, fragile YAML merging)
+| **Phase 2**
+
+| Git/CI integration (push-to-deploy, tag validation)
+| Low (simple targets, few dependencies)
+| Low (works, rarely changes)
+| **Phase 3** (or keep in Make)
+|===
+
+**Key Insights:**
+- Incus and systemd are **biggest ROI** (most time debugging, most template duplication)
+- Network generation is **lower priority** (already works, mostly algorithmic)
+- Nix builds are **stable** (leave alone during Phase 1)
+
+=== Current Architecture
+
+.Make-based orchestration (existing)
+[source]
+----
+make regenerate-network    # ipcalc + yq → rke2.d/network/*.mk
+make provision-incus       # expand templates → incus launch (sequential)
+make start@bioskop         # 7-stage systemd target chain (sequential, racy)
+make build-packages        # nix-builds.yaml loop (sequential)
+↓
+Cluster ready (if no race conditions)
+----
+
+=== Pain Points (Code Examples)
+
+**Problem 1: Template Variable Binding**
+Current approach (make.d/incus/incus-instance-config.yaml):
+```yaml
+profiles:
+  - $(CLUSTER_PROFILE)  # Make variable substitution
+devices:
+  lan0:
+    hwaddr: $(LAN_HWADDR)  # Must compute before template render
+  vmnet0:
+    hwaddr: $(VMNET_HWADDR)  # Order-dependent
+```
+
+Hardcoded in cluster-specific config (rke2.d/bioskop/master/incus-instance-config.yaml):
+```yaml
+config:
+  limits.cpu: 4  # Duplicated from 3 places
+  limits.memory: 8GB  # Not DRY
+```
+
+→ **Becomes:** Strongly-typed Java config with composition, no duplication.
+
+**Problem 2: Systemd Target Dependencies**
+Current (implicit Make target order):
+```makefile
+$(TARGET_DEPLOY_BIOSKOP_START): $(TARGET_DEPLOY_BIOSKOP_SETUP_CNI)
+	systemctl start rke2-kubelet
+
+$(TARGET_DEPLOY_BIOSKOP_SETUP_CNI): $(TARGET_DEPLOY_BIOSKOP_SETUP_NETWORK)
+	ssh $(MASTER_IP) 'systemctl start rke2-cni'
+
+# 7 levels deep, hard to visualize, race conditions if any target fails
+```
+
+→ **Becomes:** Explicit DAG with error handling and optional parallelization.
+
+**Problem 3: Network Allocation Logic**
+Current (split-rules.mk + ipcalc + awk):
+```makefile
+$(NETWORK_HOST_SUBNETS) := $(shell ipcalc -p $(NETWORK_HOST) $(NETWORK_HOST_PREFIX) | awk '{print $$2}')
+$(NETWORK_NODE_SPLIT) := $(shell echo "$(NETWORK_HOST_SUBNETS)" | awk -F'/' '{print $$2 - 3}')
+```
+
+Fragile, non-testable, results stored in files.
+
+→ **Becomes:** Testable Java code with proper IP library.
+
+== Migration Phases
+
+=== Phase 1: Foundation (Weeks 1-2) ⭐ Highest ROI
+
+**Scope:** Incus provisioning + systemd choreography
+
+**Deliverables:**
+- New `rke2lab-pulumi/` subdirectory with Java Pulumi project
+- Incus instance provisioning (replaces `make.d/incus/scripts/`, templates)
+- Systemd target orchestration (replaces 7-stage `@bioskop` targets)
+- Export cluster state for manual Porch/Tekton integration
+- Make targets `provision-incus` + `start@bioskop` call Pulumi instead
+
+**Files to Create:**
+```
+rke2lab-pulumi/
+├── pom.xml
+├── Pulumi.yaml
+├── Pulumi.yml (stack config)
+└── src/main/java/com/rke2lab/
+    ├── Infra.java                      # Pulumi program entry point
+    ├── configs/
+    │   ├── IncusInstanceConfig.java    # Template config (replaces YAML)
+    │   ├── NetworkConfig.java          # Shared subnet allocations
+    │   └── ClusterConfig.java          # Load from rke2.d/bioskop/config.yaml
+    ├── provisioners/
+    │   └── IncusProvisioner.java       # Instance lifecycle
+    ├── choreography/
+    │   └── SystemdChoreography.java    # 7-stage target DAG
+    └── utils/
+        └── PulumiUtils.java            # Common helpers
+```
+
+**Effort:** 40-60 hours
+- Infra.java scaffold + Pulumi setup: 4 hours
+- IncusInstanceConfig (replace templates): 8 hours
+- IncusProvisioner (create instances): 12 hours
+- SystemdChoreography (DAG + error handling): 16 hours
+- Testing + debugging: 8-12 hours
+
+**Success Criteria:**
+- ✅ `pulumi up` creates master + 3 nodes (same config as Make)
+- ✅ Systemd stages execute in correct order with proper dependency tracking
+- ✅ Instance teardown via `pulumi destroy` (no orphaned Incus instances)
+- ✅ Cluster boots and accepts kubectl connections
+- ✅ `pulumi export` outputs cluster IPs for downstream tooling
+
+**Integration with Make:**
+```makefile
+# In Makefile, provision target becomes:
+provision-incus:
+	cd rke2lab-pulumi && pulumi up --yes
+
+start@bioskop:
+	cd rke2lab-pulumi && pulumi exec choreography.start
+
+# Migrate fully to Pulumi later (Phase 4)
+```
+
+**How it fits Porch/Tekton/Flux:**
+```
+Tekton Task: pulumi up → Pulumi exports {masterIP, nodeIPs, kubeconfig}
+            ↓
+Porch receives cluster connectivity info → KPT packages updated
+            ↓
+Flux syncs RKE2 manifests to live cluster
+```
+
+---
+
+=== Phase 2: Nix Build Orchestration (Week 2-3)
+
+**Scope:** Orchestrate `nix-builds.yaml` descriptor and improve logging
+
+**Deliverables:**
+- NixBuildOrchestrator.java (replaces `rke2-build-packages.sh` imperative loop)
+- Structured logging + error aggregation
+- Integration with Tekton (export per-package build artifacts)
+- Keep actual Nix builds unchanged
+
+**Files to Create:**
+```
+rke2lab-pulumi/src/main/java/com/rke2lab/
+├── builds/
+│   ├── NixBuildOrchestrator.java       # Descriptor → DAG
+│   ├── NixBuildJob.java                # Descriptor class
+│   └── BuildArtifactExporter.java      # Push results to registry/Git
+```
+
+**Effort:** 16-20 hours
+- Descriptor parser + model: 4 hours
+- Orchestrator (load YAML, execute Nix, aggregate results): 8 hours
+- Logging + artifact export: 4 hours
+- Testing: 4-8 hours
+
+**Success Criteria:**
+- ✅ Reads nix-builds.yaml (same schema as current)
+- ✅ Executes all jobs in dependency order
+- ✅ Produces same build artifacts as `rke2-build-packages.sh`
+- ✅ Better error reporting (per-job logs, failed artifact list)
+- ✅ Exports artifacts to Tekton-compatible format
+
+---
+
+=== Phase 3: Network Generation (Week 4-5)
+
+**Scope:** Subnet allocation logic → Java Pulumi
+
+**Deliverables:**
+- NetworkAllocator.java (replaces `split-rules.mk`)
+- Testable subnet splitting with proper IP library
+- Export to `rke2.d/network/*.mk` for Make compatibility (Phase 4: remove exports)
+- Unit tests for subnet math
+
+**Files to Create:**
+```
+rke2lab-pulumi/src/main/java/com/rke2lab/
+├── network/
+│   ├── NetworkAllocator.java           # Subnet logic
+│   ├── SubnetAllocation.java           # Data class
+│   └── test/
+│       └── NetworkAllocatorTest.java   # Unit tests
+```
+
+**Effort:** 20-24 hours
+- Subnet allocation logic: 8 hours (design + implement)
+- IP library integration (commons-net or ipAddress): 2 hours
+- Export to Make-compatible format: 4 hours
+- Unit tests + validation: 6-8 hours
+- Compare against current allocations: 2 hours
+
+**Success Criteria:**
+- ✅ Generates identical subnet allocations as current Make
+- ✅ Deterministic (same input → same output always)
+- ✅ Unit tests verify splitting logic
+- ✅ Can export as JSON for inspection
+- ✅ Faster than current ipcalc + awk pipeline
+
+---
+
+=== Phase 4: Full Migration (Week 5-6)
+
+**Scope:** Remove Make orchestration entirely, Pulumi as single source of truth
+
+**Deliverables:**
+- Remove `make provision-incus`, `make start@bioskop`, `make build-packages` targets
+- Top-level Makefile calls Pulumi for infrastructure
+- Migrate remaining targets (Git push, artifact publishing) to Pulumi
+- Update CI/CD to call `pulumi up` instead of `make` orchestration targets
+
+**Files to Delete:**
+- `make.d/incus/scripts/` (all provisioning scripts)
+- `make.d/incus/systemd/` (systemd service files for provisioning)
+- `make.d/incus/incus-instance-config.yaml` (template)
+- `make.d/network/split-rules.mk` (network generation)
+- User-facing `make provision-incus`, `make start@bioskop` targets
+
+**Files to Update:**
+- `Makefile` (hand off infrastructure to Pulumi, keep manifest/image targets)
+- Documentation (add Pulumi workflows)
+
+**Effort:** 12-16 hours
+- Remove deprecated Make targets and scripts: 4 hours
+- Update CI/CD pipelines (Tekton): 4 hours
+- Documentation + runbooks: 4 hours
+- Testing + edge-case validation: 4-8 hours
+
+**Success Criteria:**
+- ✅ `pulumi up` → fully operational cluster (no Make provisioning calls)
+- ✅ `pulumi destroy` → clean teardown
+- ✅ Tekton tasks call `pulumi up` successfully
+- ✅ No Make targets for provisioning (only image-building, publishing)
+
+---
+
+== Detailed Architecture: Java Pulumi
+
+=== Project Structure
+
+```
+rke2lab-pulumi/
+├── pom.xml                                  # Maven config
+├── Pulumi.yaml                              # Project metadata
+├── Pulumi.yml                               # Stack-specific config (git-ignored)
+├── README.md                                # Setup + usage docs
+├── src/
+│   ├── main/java/com/rke2lab/
+│   │   ├── Infra.java                       # Main Pulumi program
+│   │   ├── ClusterStack.java                # Reusable cluster definition
+│   │   │
+│   │   ├── configs/
+│   │   │   ├── IncusInstanceConfig.java     # Instance spec (replaces YAML template)
+│   │   │   ├── NetworkConfig.java           # Subnet allocations
+│   │   │   ├── ClusterConfig.java           # Load from YAML
+│   │   │   └── SystemdStageConfig.java      # Deployment stage definitions
+│   │   │
+│   │   ├── provisioners/
+│   │   │   ├── IncusProvisioner.java        # Create/destroy instances
+│   │   │   └── IncusDeviceBuilder.java      # Network device helpers
+│   │   │
+│   │   ├── choreography/
+│   │   │   └── SystemdChoreography.java     # Stage DAG + orchestration
+│   │   │
+│   │   ├── builds/
+│   │   │   ├── NixBuildOrchestrator.java    # Execute nix-builds.yaml
+│   │   │   └── NixBuildJob.java             # Descriptor model
+│   │   │
+│   │   ├── network/
+│   │   │   ├── NetworkAllocator.java        # Subnet splitting
+│   │   │   └── SubnetAllocation.java        # Data class
+│   │   │
+│   │   ├── exports/
+│   │   │   └── ClusterExporter.java         # Output cluster state for Porch
+│   │   │
+│   │   └── utils/
+│   │       ├── PulumiUtils.java
+│   │       └── YamlLoader.java
+│   │
+│   └── test/java/com/rke2lab/
+│       ├── network/
+│       │   └── NetworkAllocatorTest.java
+│       ├── provisioners/
+│       │   └── IncusProvisionerTest.java
+│       └── choreography/
+│           └── SystemdChoreographyTest.java
+│
+└── src/main/resources/
+    └── reference-config/                    # Example configs
+        ├── cluster.yaml
+        └── nix-builds.yaml
+```
+
+=== Key Classes (Pseudo-code)
+
+**Infra.java** (Pulumi entry point)
+```java
+public class Infra {
+    public static void main(String[] args) {
+        Pulumi.run(ctx -> {
+            // Load cluster config from rke2.d/bioskop/config.yaml
+            var clusterCfg = ClusterConfig.load("rke2.d/bioskop/config.yaml");
+            
+            // Allocate subnets
+            var networks = NetworkAllocator.allocate(clusterCfg.getNetworkRange());
+            ctx.export("networks", networks);
+            
+            // Provision Incus instances
+            var provisioner = new IncusProvisioner(clusterCfg, networks);
+            var instances = provisioner.provisionCluster();
+            ctx.export("instances", instances);
+            
+            // Orchestrate systemd stages
+            var choreography = new SystemdChoreography(instances);
+            choreography.executeDeploymentStages();
+            ctx.export("kubeconfig", instances.getMaster().getKubeconfig());
+        });
+    }
+}
+```
+
+**IncusInstanceConfig.java** (replaces YAML template)
+```java
+public class IncusInstanceConfig {
+    private String image = "images:ubuntu/22.04";
+    private Integer cpus = 4;
+    private String memory = "8GB";
+    private List<IncusDevice> devices = List.of(
+        new IncusDevice("lan0", "nic", Map.of("nictype", "bridged", "parent", "br0")),
+        new IncusDevice("vmnet0", "nic", Map.of("nictype", "bridged", "parent", "vmnet0"))
+    );
+    private Map<String, String> config = Map.of(
+        "limits.cpu", "4",
+        "limits.memory", "8GB",
+        "security.nesting", "true"
+    );
+    
+    public static IncusInstanceConfig master() { /* ... */ }
+    public static IncusInstanceConfig node() { /* ... */ }
+}
+```
+
+**NetworkAllocator.java**
+```java
+public class NetworkAllocator {
+    public static SubnetAllocation allocate(String baseNetwork) throws IllegalArgumentException {
+        IPAddressString base = new IPAddressString(baseNetwork);
+        List<IPAddressString> splits21 = base.getAddress().getPrefixBlock().split(21);
+        
+        return new SubnetAllocation(
+            host = splits21.get(0),  // 10.80.0.0/21
+            nodes = splits21.get(0).split(23),  // 8x /23 subnets
+            lb = splits21.get(2).split(26),  // 64x /26 subnets
+            vip = splits21.get(1).split(24)   // 8x /24 subnets
+        );
+    }
+}
+```
+
+**SystemdChoreography.java** (explicit DAG)
+```java
+public class SystemdChoreography {
+    private final List<IncusInstance> instances;
+    
+    public void executeDeploymentStages() {
+        var setupNet = stage("setup-network",
+            instances.forEach(i -> i.runCommand("systemctl start rke2-network-setup")),
+            DependsOn.master()
+        );
+        
+        var setupKubelet = stage("setup-kubelet",
+            instances.getMaster().runCommand("systemctl start rke2-kubelet"),
+            DependsOn.after(setupNet)
+        );
+        
+        var cniSetups = instances.stream()
+            .map(i -> stage("cni-" + i.getName(),
+                i.runCommand("systemctl start rke2-cni"),
+                DependsOn.after(setupKubelet)
+            ))
+            .toList();
+        
+        // Wait for all parallel stages, then continue
+        var apiServer = stage("api-server",
+            instances.getMaster().runCommand("systemctl start rke2-api-server"),
+            DependsOn.after(cniSetups)
+        );
+    }
+}
+```
+
+== Integration Points
+
+=== With Porch/Tekton/Flux
+
+**Current flow:**
+```
+Incus (Make) → RKE2 → KPT manifests → (manual Porch/Flux)
+```
+
+**After Phase 1 (Pulumi + Porch):**
+```
+Tekton Task: pulumi up
+    ├─ Provisions Incus instances
+    ├─ Orchestrates systemd stages
+    └─ Exports {masterIP, kubeconfig} → pulumi stack export
+
+Porch:
+    ├─ Reads cluster IPs
+    ├─ Updates KPT package set resources
+    └─ Commits updated manifests to Git
+
+Tekton (validation):
+    ├─ Validates KPT packages
+    ├─ Runs tests against kubeconfig
+    └─ Approves for Flux
+
+Flux:
+    ├─ Syncs Git manifests
+    ├─ Reconciles running state
+    └─ Cluster converges
+```
+
+**Tekton task definition:**
+```yaml
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: provision-cluster
+spec:
+  params:
+  - name: cluster-name
+    default: bioskop
+  steps:
+  - name: pulumi-up
+    image: pulumi/pulumi-java:latest
+    workingDir: /workspace/rke2lab-pulumi
+    script: |
+      pulumi stack select $(params.cluster-name)
+      pulumi up --yes
+      pulumi export > /workspace/cluster-state.json
+```
+
+=== Integration with Nix Builds
+
+Nix builds continue to work as-is initially:
+```
+Phase 1-2: rke2-build-packages.sh (Make) → works unchanged
+Phase 2: NixBuildOrchestrator (Pulumi) → orchestrates nix-builds.yaml
+Phase 3: Tekton task calls NixBuildOrchestrator → automates builds
+```
+
+Eventually:
+```
+Tekton Pipeline:
+  ├─ pulumi exec build.orchestrate (NixBuildOrchestrator)
+  ├─ Push images to registry
+  ├─ Update KPT resources with new image tags
+  ├─ Commit to Git
+  └─ Flux picks up changes
+```
+
+== Testing Strategy
+
+=== Unit Tests
+- `NetworkAllocatorTest`: verify subnet math, edge cases
+- `IncusProvisionerTest`: mock Incus API, verify config construction
+- `SystemdChoreographyTest`: simulate stage execution, verify DAG order
+
+=== Integration Tests
+- Spin up test Incus instance in CI
+- Verify Pulumi creates expected devices/config
+- Run sample systemd stages, verify success
+
+=== Acceptance Criteria (Live Cluster)
+- ✅ `pulumi up` creates functional 3-node cluster
+- ✅ kubectl works from local machine (kubeconfig exported)
+- ✅ Helm/KPT deployments work normally
+- ✅ `pulumi destroy` removes all infrastructure cleanly
+- ✅ Idempotent: second `pulumi up` reports "no changes"
+
+== Skills & Knowledge Required
+
+=== Java
+- Basic: classes, inheritance, generics, collections
+- Intermediate: streams, lambdas, functional composition
+- Familiarity with Maven projects
+
+=== Pulumi
+- Pulumi CLI (`pulumi login`, `pulumi stack select`, `pulumi up/destroy`)
+- Java SDK (Output<T>, ResourceOptions, state tracking)
+- Reading Pulumi API reference for Incus provider
+
+=== System Administration
+- YAML/configuration file loading
+- SSH command execution (remote systemd)
+- Incus CLI + configuration understanding
+- Kubernetes basics (kubeconfig format)
+
+=== No Requirements
+- Docker (Pulumi runs locally, not containerized)
+- Terraform/CDK (different tool, but similar concepts)
+- Deep Nix knowledge (Nix stays unchanged in Phase 1)
+
+== Resource Estimates
+
+[cols="1,2,2,1"]
+|===
+| Phase | Component | Effort | Notes
+
+| 1 | Incus Provisioning | 40-60h | Largest effort
+| 1 | Systemd Choreography | 16h | DAG design + testing
+| 2 | Nix Orchestration | 16-20h | Mostly wrapper code
+| 3 | Network Generation | 20-24h | IP library integration
+| 4 | Cleanup + Migration | 12-16h | Remove Make targets
+|===
+
+**Total: ~120-140 engineer-hours**
+
+**Parallelization:**
+- Phases 1-3 can overlap (network design parallel to Incus implementation)
+- Multiple developers can work on different Java classes
+- Estimated concurrent timeline: 3-4 weeks (with 2 people)
+
+== Risk Mitigation
+
+=== Risk: Pulumi State Loss
+**Mitigation:**
+- Commit `Pulumi.yml.lock` file to Git (stack state)
+- Store Pulumi backend in versioned S3/Azure (not local)
+- Test `pulumi destroy` + `pulumi up` cycle before production
+
+=== Risk: Incus API Incompatibility
+**Mitigation:**
+- Verify Pulumi Incus provider version against Incus release
+- Test against current Incus version early (Phase 1)
+- Keep Make provisioning as fallback during Phase 1-2
+
+=== Risk: Java Build/Runtime Issues
+**Mitigation:**
+- Pin Maven/Java versions in `pom.xml`
+- Test builds in CI/CD environment
+- Use Maven Wrapper (`mvnw`) for reproducibility
+
+=== Risk: Systemd Stage Execution Fails
+**Mitigation:**
+- Add verbose logging to each stage (capture stdout/stderr)
+- Implement rollback (restore previous snapshot on failure)
+- Test systemd stages in isolated environment first
+
+== Success Metrics
+
+[cols="1,3"]
+|===
+| Metric | Target
+
+| Code maintainability
+| < 400 LOC Java vs ~1500 LOC Make for same functionality
+
+| Deployment time
+| Same or faster (parallelization possible in Phase 4)
+
+| Error clarity
+| Typed exceptions vs cryptic Make errors
+
+| Test coverage
+| > 75% unit test coverage for critical classes
+
+| Developer velocity
+| New cluster provisioning: < 10 minutes (vs 30min with Make)
+
+| Configuration reuse
+| 100% (no more template duplication across clusters)
+|===
+
+== Timeline
+
+```
+Week 1:   Phase 1a - Pulumi project scaffold, Incus provisioning (40%)
+Week 2:   Phase 1b - Incus provisioning complete (60%), Systemd choreography started
+Week 3:   Phase 1 complete, Phase 2 underway (Nix orchestration)
+Week 4:   Phase 2 complete, Phase 3 started (Network generation)
+Week 5:   Phase 3 complete, Phase 4 started (Cleanup + migration)
+Week 6:   Phase 4 complete, full Pulumi production-ready
+```
+
+**Non-blocking:**
+- Phases 1-3 can run in parallel with current Make-based operations
+- No disruption to running clusters until Phase 4
+- Rollback available: keep Make targets until Pulumi validated
+
+== Next Steps (When Ready)
+
+1. **Approve this plan** → Team reviews architectural decisions
+2. **Create rke2lab-pulumi/ seed project** → Maven scaffold
+3. **Phase 1a: Incus Provisioning** → Share early prototype for feedback
+4. **Iterate through phases** → Review at each milestone
+5. **Phase 4: Deprecate Make** → Full production cutover
+
+== Appendices
+
+=== A. Comparison: Make vs Pulumi
+
+[cols="1,2,2,1"]
+|===
+| Aspect | Make | Pulumi | Winner
+
+| **Readability** | Low (DSL learning curve) | Medium (Java, IDE support) | Pulumi
+| **Type safety** | None | Full (compile-time checks) | Pulumi
+| **Error messages** | Cryptic | Clear (stack traces) | Pulumi
+| **Parallelization** | Manual (requires rework) | Automatic (DAG) | Pulumi
+| **Testing** | Hard (shell scripts) | Easy (unit testable) | Pulumi
+| **Debugging** | Print statements | IDE debugger + breakpoints | Pulumi
+| **Startup time** | Fast (shell) | Slower (JVM startup) | Make
+| **Familiarity** | High (common in build systems) | Low (learning curve) | Make
+|===
+
+=== B. Example Configuration Files (for reference)
+
+**cluster.yaml** (Pulumi config)
+```yaml
+name: rke2lab
+runtime: java
+description: RKE2 cluster infrastructure
+
+config:
+  cluster:name: bioskop
+  network:base: 10.80.0.0/18
+  incus:
+    image: images:ubuntu/22.04
+    nodes:count: 3
+    master:cpus: 4
+    node:cpus: 2
+```
+
+**nix-builds.yaml** (unchanged)
+```yaml
+jobs:
+  - name: headplane
+    flake: git+https://github.com/nxmatic/rke2-artifacts#headplane
+    cache: /var/lib/cache/headplane
+
+  - name: headscale
+    flake: git+https://github.com/nxmatic/rke2-artifacts#headscale
+    depends_on: [headplane]
+```
+
+=== C. Debugging Pulumi Commands
+
+```bash
+# List current stack resources
+pulumi stack ls
+
+# View resource outputs
+pulumi stack output
+
+# Export full stack state
+pulumi export > stack-state.json
+
+# Dry-run (show what would be created)
+pulumi up --preview
+
+# Destroy specific resource (careful!)
+pulumi destroy --target 'urn:pulumi:stack:...'
+
+# View resource logs
+pulumi logs --resource <resource-name>
+
+# Switch between stacks
+pulumi stack select dev
+pulumi stack select prod
+```
+
+=== D. Further Reading
+
+- Pulumi Java Documentation: https://www.pulumi.com/docs/languages-sdks/java/
+- Pulumi Incus Provider: https://www.pulumi.com/registry/packages/incus/
+- Infrastructure as Code Best Practices: https://www.pulumi.com/blog/infrastructure-as-code/
+- Nix + Pulumi integration patterns: (TBD - design in Phase 2-3)
