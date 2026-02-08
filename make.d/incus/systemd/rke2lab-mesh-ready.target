@@ -1,0 +1,10 @@
+[Unit]
+Description=RKE2Lab Mesh Layer Ready Target
+Documentation=https://github.com/nxmatic/rke2lab
+After=rke2lab-replication-ready.target
+Requires=rke2lab-replication-ready.target
+After=rke2lab-mesh-ready-check.service
+Requires=rke2lab-mesh-ready-check.service
+
+[Install]
+WantedBy=multi-user.target

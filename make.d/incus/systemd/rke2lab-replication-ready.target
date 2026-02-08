@@ -1,0 +1,10 @@
+[Unit]
+Description=RKE2Lab Replication Layer Ready Target
+Documentation=https://github.com/nxmatic/rke2lab
+After=rke2lab-storage-ready.target
+Requires=rke2lab-storage-ready.target
+After=rke2lab-replication-ready-check.service
+Requires=rke2lab-replication-ready-check.service
+
+[Install]
+WantedBy=multi-user.target

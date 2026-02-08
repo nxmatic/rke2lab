@@ -1,8 +1,8 @@
 [Unit]
-Description=RKE2 Network Configuration Service
+Description=RKE2Lab Network Configuration Service
 After=systemd-networkd.service cloud-init.service
 Wants=systemd-networkd.service
-Before=rke2-install.service
+Before=rke2lab-install.service
 
 [Service]
 Type=oneshot

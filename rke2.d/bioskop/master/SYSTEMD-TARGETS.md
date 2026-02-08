@@ -13,26 +13,26 @@ This document describes the **target-based staging system** for RKE2 initializat
 ```
 multi-user.target
     ↑
-    ├─ rke2-server-ready.target
+    ├─ rke2lab-server-ready.target
     │   └─ After: rke2-server.service
     │
-    ├─ rke2-builds-complete.target
-    │   └─ After: rke2-nix-build.service
+    ├─ rke2lab-flox-nix-builds-complete.target
+    │   └─ After: rke2lab-flox-nix-build.service
     │
-    ├─ rke2-runtime-ready.target  
-    │   └─ After: rke2-runtime-ready-check.service
+    ├─ rke2lab-runtime-ready.target  
+    │   └─ After: rke2lab-runtime-ready-check.service
     │
-    ├─ rke2-networking-ready.target
-    │   └─ After: rke2-networking-ready-check.service
+    ├─ rke2lab-networking-ready.target
+    │   └─ After: rke2lab-networking-ready-check.service
     │
-    ├─ rke2-storage-ready.target
-    │   └─ After: rke2-storage-ready-check.service
+    ├─ rke2lab-storage-ready.target
+    │   └─ After: rke2lab-storage-ready-check.service
     │
-    ├─ rke2-replication-ready.target
-    │   └─ After: rke2-replication-ready-check.service
+    ├─ rke2lab-replication-ready.target
+    │   └─ After: rke2lab-replication-ready-check.service
     │
-    └─ rke2-mesh-ready.target
-        └─ After: rke2-mesh-ready-check.service
+    └─ rke2lab-mesh-ready.target
+        └─ After: rke2lab-mesh-ready-check.service
 ```
 
 ## Linear Boot Stages
@@ -40,97 +40,95 @@ multi-user.target
 Each target represents a **milestone** in the cluster initialization:
 
 ### Stage 1: Server Ready
-**Target**: `rke2-server-ready.target`
+**Target**: `rke2lab-server-ready.target`
 - RKE2 server process running
 - Kubernetes API server available
 - Node registered
 
-**Required by**: `rke2-builds-complete.target`
+**Notes**: Flox Nix builds now run independently and no longer gate this target.
 
 ---
 
-### Stage 2: Builds Complete
-**Target**: `rke2-builds-complete.target`
+### Stage 2: Flox Nix Builds Complete
+**Target**: `rke2lab-flox-nix-builds-complete.target`
 - All Nix packages built from `nix-builds.yaml`
 - Outputs available in `/tmp/*-build/`
 - Flox environments available to containerd
 
 **Services that finish before this target**:
-- `rke2-nix-build.service`
+- `rke2lab-flox-nix-build.service`
 
-**Required by**: `rke2-runtime-ready.target`
+**Required by**: _None (runs concurrently)_
 
 **Why this stage exists:**
 - Ensures packages are available before any pods try to use them
-- Blocks deployment if builds fail
-- All downstream layers implicitly guarantee packages are ready
+- Runs in parallel with other stages
 
 ---
 
 ### Stage 3: Runtime Ready
-**Target**: `rke2-runtime-ready.target`
+**Target**: `rke2lab-runtime-ready.target`
 - Kubernetes runtime components deployed (CNI plugins, etc.)
 - Core system pods running
 - Cluster can schedule workloads
 
-**Depends on**: `rke2-builds-complete.target`
 **Services that finish before this target**:
-- `rke2-runtime-ready-check.service`
+- `rke2lab-runtime-ready-check.service`
 
-**Required by**: `rke2-networking-ready.target`
+**Required by**: `rke2lab-networking-ready.target`
 
 ---
 
 ### Stage 4: Networking Ready
-**Target**: `rke2-networking-ready.target`
+**Target**: `rke2lab-networking-ready.target`
 - Cilium CNI deployed and healthy
 - Network policies active
 - Pod networking functional
 
-**Depends on**: `rke2-runtime-ready.target`
+**Depends on**: `rke2lab-runtime-ready.target`
 **Services that finish before this target**:
-- `rke2-networking-ready-check.service`
+- `rke2lab-networking-ready-check.service`
 
-**Required by**: `rke2-storage-ready.target`
+**Required by**: `rke2lab-storage-ready.target`
 
 ---
 
 ### Stage 5: Storage Ready
-**Target**: `rke2-storage-ready.target`
+**Target**: `rke2lab-storage-ready.target`
 - OpenEBS ZFS CSI driver deployed
 - Storage classes available
 - PVCs can be provisioned
 
-**Depends on**: `rke2-networking-ready.target`
+**Depends on**: `rke2lab-networking-ready.target`
 **Services that finish before this target**:
-- `rke2-storage-ready-check.service`
+- `rke2lab-storage-ready-check.service`
 
-**Required by**: `rke2-replication-ready.target`
+**Required by**: `rke2lab-replication-ready.target`
 
 ---
 
 ### Stage 6: Replication Ready
-**Target**: `rke2-replication-ready.target`
+**Target**: `rke2lab-replication-ready.target`
 - Longhorn or other replication systems deployed
 - HA storage available
 
-**Depends on**: `rke2-storage-ready.target`
+**Depends on**: `rke2lab-storage-ready.target`
 **Services that finish before this target**:
-- `rke2-replication-ready-check.service`
+- `rke2lab-replication-ready-check.service`
 
-**Required by**: `rke2-mesh-ready.target`
+**Required by**: `rke2lab-mesh-ready.target`
 
 ---
 
 ### Stage 7: Mesh Ready
-**Target**: `rke2-mesh-ready.target`
+**Target**: `rke2lab-mesh-ready.target`
 - Headscale/Headplane deployed
 - VPN mesh networking active
 - Cluster fully operational
 
-**Depends on**: `rke2-replication-ready.target`
+**Depends on**: `rke2lab-replication-ready.target`
 **Services that finish before this target**:
-- `rke2-mesh-ready-check.service`
+- `rke2lab-mesh-ready-check.service`
 
 **Final stage**: Cluster is production-ready
 
@@ -143,9 +141,9 @@ Each target represents a **milestone** in the cluster initialization:
 ```ini
 [Unit]
 Description=My Custom Service
-After=rke2-builds-complete.target
-Requires=rke2-builds-complete.target
-Before=rke2-mesh-ready.target
+After=rke2lab-flox-nix-builds-complete.target
+Requires=rke2lab-flox-nix-builds-complete.target
+Before=rke2lab-mesh-ready.target
 
 [Service]
 ...
@@ -162,12 +160,12 @@ Before=rke2-mesh-ready.target
 ```ini
 [Unit]
 Description=My Custom Service
-After=rke2-runtime-ready-check.service
-Requires=rke2-runtime-ready-check.service
-After=rke2-networking-ready-check.service
-Requires=rke2-networking-ready-check.service
-After=rke2-storage-ready-check.service
-Requires=rke2-storage-ready-check.service
+After=rke2lab-runtime-ready-check.service
+Requires=rke2lab-runtime-ready-check.service
+After=rke2lab-networking-ready-check.service
+Requires=rke2lab-networking-ready-check.service
+After=rke2lab-storage-ready-check.service
+Requires=rke2lab-storage-ready-check.service
 # ... many dependencies ...
 ```
 
@@ -185,60 +183,63 @@ systemd boot
     ↓
 local-fs.target (mount filesystems)
     ↓
-rke2-install.service
+rke2lab-install.service
     ↓
 rke2-server.service
     ↓
 ┌─────────────────────────────────────────────┐
-│ rke2-server-ready.target                    │
+│ rke2lab-server-ready.target                 │
 └─────────────────────────────────────────────┘
     ↓
-rke2-nix-build.service (builds all Nix packages)
+rke2lab-runtime-secrets.service
+rke2lab-runtime-manifests-install.service
+rke2lab-runtime-ready-check.service
     ↓
 ┌─────────────────────────────────────────────┐
-│ rke2-builds-complete.target                 │  ← Guarantees packages available
+│ rke2lab-runtime-ready.target                │
 └─────────────────────────────────────────────┘
     ↓
-rke2-runtime-secrets.service
-rke2-runtime-manifests-install.service
-rke2-runtime-ready-check.service
+rke2lab-networking-secrets.service
+rke2lab-networking-manifests-install.service
+rke2lab-networking-ready-check.service
     ↓
 ┌─────────────────────────────────────────────┐
-│ rke2-runtime-ready.target                   │
+│ rke2lab-networking-ready.target             │
 └─────────────────────────────────────────────┘
     ↓
-rke2-networking-secrets.service
-rke2-networking-manifests-install.service
-rke2-networking-ready-check.service
+rke2lab-storage-secrets.service
+rke2lab-storage-manifests-install.service
+rke2lab-storage-ready-check.service
     ↓
 ┌─────────────────────────────────────────────┐
-│ rke2-networking-ready.target                │
+│ rke2lab-storage-ready.target                │
 └─────────────────────────────────────────────┘
     ↓
-rke2-storage-secrets.service
-rke2-storage-manifests-install.service
-rke2-storage-ready-check.service
+rke2lab-replication-manifests-install.service
+rke2lab-replication-ready-check.service
     ↓
 ┌─────────────────────────────────────────────┐
-│ rke2-storage-ready.target                   │
+│ rke2lab-replication-ready.target            │
 └─────────────────────────────────────────────┘
     ↓
-rke2-replication-manifests-install.service
-rke2-replication-ready-check.service
+rke2lab-mesh-secrets.service
+rke2lab-mesh-manifests-install.service
+rke2lab-mesh-ready-check.service
     ↓
 ┌─────────────────────────────────────────────┐
-│ rke2-replication-ready.target               │
-└─────────────────────────────────────────────┘
-    ↓
-rke2-mesh-secrets.service
-rke2-mesh-manifests-install.service
-rke2-mesh-ready-check.service
-    ↓
-┌─────────────────────────────────────────────┐
-│ rke2-mesh-ready.target                      │
+│ rke2lab-mesh-ready.target                   │
 └─────────────────────────────────────────────┘
     ↓
 multi-user.target (system fully operational)
+
+In parallel (non-blocking):
+local-fs.target
+    ↓
+rke2lab-flox-nix-build.service (builds all Nix packages)
+    ↓
+┌─────────────────────────────────────────────┐
+│ rke2lab-flox-nix-builds-complete.target     │  ← Guarantees packages available
+└─────────────────────────────────────────────┘
 ```
 
 ---
@@ -251,18 +252,18 @@ multi-user.target (system fully operational)
 ```ini
 [Unit]
 Description=My Runtime Service
-After=rke2-builds-complete.target
-Requires=rke2-builds-complete.target
-Before=rke2-runtime-ready.target
+After=rke2lab-flox-nix-builds-complete.target
+Requires=rke2lab-flox-nix-builds-complete.target
+Before=rke2lab-runtime-ready.target
 ```
 
 **Before Mesh Ready:**
 ```ini
 [Unit]
 Description=My Mesh Service  
-After=rke2-replication-ready.target
-Requires=rke2-replication-ready.target
-Before=rke2-mesh-ready.target
+After=rke2lab-replication-ready.target
+Requires=rke2lab-replication-ready.target
+Before=rke2lab-mesh-ready.target
 ```
 
 ### Create a new stage (advanced)
@@ -270,13 +271,13 @@ Before=rke2-mesh-ready.target
 If you need a custom layer between existing stages:
 
 ```ini
-# make.d/incus/systemd/rke2-mycustom-ready.target
+# make.d/incus/systemd/rke2lab-mycustom-ready.target
 [Unit]
 Description=RKE2 My Custom Layer Ready Target
-After=rke2-storage-ready.target
-Requires=rke2-storage-ready.target
-After=rke2-mycustom-ready-check.service
-Requires=rke2-mycustom-ready-check.service
+After=rke2lab-storage-ready.target
+Requires=rke2lab-storage-ready.target
+After=rke2lab-mycustom-ready-check.service
+Requires=rke2lab-mycustom-ready-check.service
 
 [Install]
 WantedBy=multi-user.target
@@ -284,9 +285,9 @@ WantedBy=multi-user.target
 
 Then update replication target to depend on your new target:
 ```ini
-# rke2-replication-ready.target
-After=rke2-mycustom-ready.target
-Requires=rke2-mycustom-ready.target
+# rke2lab-replication-ready.target
+After=rke2lab-mycustom-ready.target
+Requires=rke2lab-mycustom-ready.target
 ```
 
 ---
@@ -296,25 +297,25 @@ Requires=rke2-mycustom-ready.target
 ### Check which targets are active
 ```bash
 ssh bioskop-nixos.local -- incus exec master -- \
-  systemctl list-units --type=target | grep rke2
+    systemctl list-units --type=target | grep rke2lab
 ```
 
 ### Wait for a specific stage
 ```bash
 ssh bioskop-nixos.local -- incus exec master -- \
-  systemctl is-active rke2-builds-complete.target
+    systemctl is-active rke2lab-flox-nix-builds-complete.target
 ```
 
 ### See what's blocking a target
 ```bash
 ssh bioskop-nixos.local -- incus exec master -- \
-  systemctl list-dependencies --reverse rke2-builds-complete.target
+    systemctl list-dependencies --reverse rke2lab-flox-nix-builds-complete.target
 ```
 
 ### Monitor boot sequence in real-time
 ```bash
 ssh bioskop-nixos.local -- incus exec master -- \
-  journalctl -f -u 'rke2-*.target'
+    journalctl -f -u 'rke2lab-*.target'
 ```
 
 ---
@@ -324,28 +325,30 @@ ssh bioskop-nixos.local -- incus exec master -- \
 ### Before (direct dependencies)
 ```ini
 [Unit]
-After=rke2-runtime-ready-check.service
-Requires=rke2-runtime-ready-check.service
-After=rke2-networking-ready-check.service
-Requires=rke2-networking-ready-check.service
-After=rke2-storage-ready-check.service
-Requires=rke2-storage-ready-check.service
-After=rke2-nix-build.service
-Requires=rke2-nix-build.service
+After=rke2lab-runtime-ready-check.service
+Requires=rke2lab-runtime-ready-check.service
+After=rke2lab-networking-ready-check.service
+Requires=rke2lab-networking-ready-check.service
+After=rke2lab-storage-ready-check.service
+Requires=rke2lab-storage-ready-check.service
+After=rke2lab-flox-nix-build.service
+Requires=rke2lab-flox-nix-build.service
 ```
 
 ### After (target-based)
 ```ini
 [Unit]
-After=rke2-storage-ready.target
-Requires=rke2-storage-ready.target
+After=rke2lab-storage-ready.target
+Requires=rke2lab-storage-ready.target
 ```
 
 **Automatically includes**:
-- ✅ Builds complete (via rke2-builds-complete.target)
-- ✅ Runtime ready (via rke2-runtime-ready.target)
-- ✅ Networking ready (via rke2-networking-ready.target)
-- ✅ Storage ready (via rke2-storage-ready.target)
+- ✅ Runtime ready (via rke2lab-runtime-ready.target)
+- ✅ Networking ready (via rke2lab-networking-ready.target)
+- ✅ Storage ready (via rke2lab-storage-ready.target)
+
+Optional:
+- ✅ Flox builds complete (via rke2lab-flox-nix-builds-complete.target)
 
 All because targets form a dependency chain!
 
@@ -371,15 +374,15 @@ All because targets form a dependency chain!
    ```
 
 5. **Use naming convention**
-   - Targets: `rke2-{layer}-ready.target`
-   - Check services: `rke2-{layer}-ready-check.service`
-   - Install services: `rke2-{layer}-manifests-install.service`
+- Targets: `rke2lab-{layer}-ready.target`
+- Check services: `rke2lab-{layer}-ready-check.service`
+- Install services: `rke2lab-{layer}-manifests-install.service`
 
 ---
 
 ## Related Files
 
-- Target definitions: [make.d/incus/systemd/rke2-*-ready.target](make.d/incus/systemd/)
-- Build service: [make.d/incus/systemd/rke2-nix-build.service](make.d/incus/systemd/rke2-nix-build.service)
-- Mesh install service: [make.d/incus/systemd/rke2-mesh-manifests-install.service](make.d/incus/systemd/rke2-mesh-manifests-install.service)
+- Target definitions: [make.d/incus/systemd/rke2lab-*-ready.target](make.d/incus/systemd/)
+- Build service: [make.d/incus/systemd/rke2lab-flox-nix-build.service](make.d/incus/systemd/rke2lab-flox-nix-build.service)
+- Mesh install service: [make.d/incus/systemd/rke2lab-mesh-manifests-install.service](make.d/incus/systemd/rke2lab-mesh-manifests-install.service)
 - Build descriptor: [rke2.d/bioskop/master/nix-builds.yaml](rke2.d/bioskop/master/nix-builds.yaml)

@@ -1,0 +1,10 @@
+[Unit]
+Description=RKE2Lab Storage Layer Ready Target
+Documentation=https://github.com/nxmatic/rke2lab
+After=rke2lab-networking-ready.target
+Requires=rke2lab-networking-ready.target
+After=rke2lab-storage-ready-check.service
+Requires=rke2lab-storage-ready-check.service
+
+[Install]
+WantedBy=multi-user.target

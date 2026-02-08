@@ -24,12 +24,15 @@ Both `headplane` and `headscale` environments (`nxmatic/headplane`, `nxmatic/hea
 
 ```
 RKE2 Server Started
-    ↓
-rke2-headplane-build.service (builds mesh packages)
-    ↓
-rke2-mesh-manifests-install.service (waits for builds)
-    ↓
+   ↓
+rke2lab-mesh-manifests-install.service
+   ↓
 Kubernetes mesh deployments started with runtimeClassName: flox
+
+In parallel (non-blocking):
+local-fs.target
+   ↓
+rke2lab-flox-nix-build.service (builds mesh packages)
 ```
 
 ### System Integration
@@ -38,14 +41,14 @@ Kubernetes mesh deployments started with runtimeClassName: flox
    - Provides access to all git working trees
    - Allows flake.nix references by path
 
-2. **Build Service**: `rke2-headplane-build.service`
-   - Runs after `rke2-server.service`
-   - Executes `rke2-headplane-build.sh` (builds headplane + headscale)
+2. **Build Service**: `rke2lab-flox-nix-build.service`
+   - Runs after local filesystems are available
+   - Executes `rke2-nix-build.sh` (builds headplane + headscale)
    - Output: `/tmp/mesh-build/{headplane,headplane-agent,headscale}` symlinks
 
-3. **Installation Service Dependency**: `rke2-mesh-manifests-install.service`
-   - Requires `rke2-headplane-build.service` to complete
-   - Ensures builds available before pods try to pull them
+3. **Installation Service Dependency**: `rke2lab-mesh-manifests-install.service`
+   - Runs independently of builds (non-blocking)
+   - Optional: depend on `rke2lab-flox-nix-builds-complete.target` if required
 
 ## Flox Annotations
 
@@ -93,7 +96,7 @@ For any new package requiring local building:
    Type=oneshot
    ExecStart=/srv/host/scripts.d/rke2-{package}-build.sh
    RemainAfterExit=true
-   Environment="PATH=/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
+   Environment="PATH=/usr/bin:/nix/var/nix/profiles/default/bin"
    
    [Install]
    WantedBy=multi-user.target
@@ -105,10 +108,10 @@ For any new package requiring local building:
    - Outputs to appropriate directory
    - Logs to `/var/log/rke2-{package}-build.log`
 
-4. **Update manifest install service** to depend on build service:
+4. **Update manifest install service** to depend on build service (optional):
    ```ini
-   After=rke2-{package}-build.service
-   Requires=rke2-{package}-build.service
+   After=rke2lab-flox-nix-builds-complete.target
+   Requires=rke2lab-flox-nix-builds-complete.target
    ```
 
 5. **Alternative: Push to registry** (if not building locally)
@@ -120,7 +123,7 @@ For any new package requiring local building:
 
 ### Check build logs
 ```bash
-ssh bioskop-nixos.local -- incus exec master -- journalctl -u rke2-headplane-build.service -f
+ssh bioskop-nixos.local -- incus exec master -- journalctl -u rke2lab-flox-nix-build.service -f
 ```
 
 ### Verify build outputs

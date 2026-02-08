@@ -1,5 +1,5 @@
 [Unit]
-Description=Remount RKE2 required volumes as shared
+Description=Remount RKE2Lab required volumes as shared
 Before=rke2-server.service
 DefaultDependencies=no
 

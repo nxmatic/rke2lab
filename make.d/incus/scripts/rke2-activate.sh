@@ -8,35 +8,35 @@ ln -fs /run/systemd/resolve/resolv.conf /etc/resolv.conf
 
 : "Enable RKE2 systemd units"
 systemctl enable \
-	rke2-network-config.service \
-	rke2-network-debug.service \
-	rke2-network-wait.service \
-	rke2-route-cleanup.service \
+	rke2lab-network-config.service \
+	rke2lab-network-debug.service \
+	rke2lab-network-wait.service \
+	rke2lab-route-cleanup.service \
 	zfs-early-umount.service \
-	rke2-remount-shared.service \
-	rke2-runtime-secrets.service \
-	rke2-runtime-manifests-install.service \
-	rke2-runtime-ready-check.service \
-	rke2-cilium-config-manifests-install.service \
-	rke2-replication-manifests-install.service \
-	rke2-replication-ready-check.service \
-	rke2-mesh-secrets.service \
-	rke2-gitops-secrets.service \
-	rke2-gitops-manifests-install.service \
-	rke2-storage-manifests-install.service \
-	rke2-storage-ready-check.service \
-	rke2-networking-manifests-install.service \
-	rke2-networking-ready-check.service \
-	rke2-mesh-manifests-install.service \
-	rke2-mesh-ready-check.service \
-	rke2-cicd-secrets.service \
-	rke2-tekton-pipelines-manifests-install.service
+	rke2lab-remount-shared.service \
+	rke2lab-runtime-secrets.service \
+	rke2lab-runtime-manifests-install.service \
+	rke2lab-runtime-ready-check.service \
+	rke2lab-cilium-config-manifests-install.service \
+	rke2lab-replication-manifests-install.service \
+	rke2lab-replication-ready-check.service \
+	rke2lab-mesh-secrets.service \
+	rke2lab-gitops-secrets.service \
+	rke2lab-gitops-manifests-install.service \
+	rke2lab-storage-manifests-install.service \
+	rke2lab-storage-ready-check.service \
+	rke2lab-networking-manifests-install.service \
+	rke2lab-networking-ready-check.service \
+	rke2lab-mesh-manifests-install.service \
+	rke2lab-mesh-ready-check.service \
+	rke2lab-cicd-secrets.service \
+	rke2lab-tekton-pipelines-manifests-install.service
 
 : "Start network configuration service immediately"
-systemctl enable --now rke2-network-config.service
+systemctl enable --now rke2lab-network-config.service
 
 : "Start and wait for the RKE2 installation to complete"
-systemctl enable --now rke2-install
+systemctl enable --now rke2lab-install
 
 : "Load the RKE2 environment"
 source <( flox activate --dir /var/lib/rancher/rke2 )

@@ -23,10 +23,10 @@ This document describes the **descriptor-driven** build system for RKE2 that:
    - Builds packages and logs results
    - Input: descriptor file path (default: `/srv/host/nix-builds.yaml`)
 
-3. **Generic Systemd Service**: [make.d/incus/systemd/rke2-nix-build.service](make.d/incus/systemd/rke2-nix-build.service)
-   - Runs the generic build script
-   - Executed after RKE2 server starts
-   - Required by manifest install services
+3. **Generic Systemd Service**: [make.d/incus/systemd/rke2lab-flox-nix-build.service](make.d/incus/systemd/rke2lab-flox-nix-build.service)
+  - Runs the generic build script
+  - Executes early (after local filesystems)
+  - Runs in parallel with other stages
 
 4. **Incus Mount**: `nix-builds.descriptor` in instance config
    - Binds descriptor file to `/srv/host/nix-builds.yaml`
@@ -81,21 +81,28 @@ Only if you have a manifest install service that depends on this package:
 ```ini
 [Unit]
 ...
-After=rke2-nix-build.service
-Requires=rke2-nix-build.service
+After=rke2lab-flox-nix-builds-complete.target
+Requires=rke2lab-flox-nix-builds-complete.target
 ```
 
 ### Step 4: Test
 - Restart the master node
-- Check logs: `journalctl -u rke2-nix-build.service -f`
+- Check logs: `journalctl -u rke2lab-flox-nix-build.service -f`
 - Verify outputs: `ls -la /tmp/mycomponent-build/`
 
 ## Service Execution Flow
 
 ```
 RKE2 Server Started
-    ↓
-rke2-nix-build.service
+  ↓
+rke2lab-mesh-manifests-install.service (and others)
+  ↓
+Kubernetes pods start with flox.dev/environment annotations
+
+In parallel (non-blocking):
+local-fs.target
+  ↓
+rke2lab-flox-nix-build.service
     │
     ├─ Read /srv/host/nix-builds.yaml
     │
@@ -106,10 +113,6 @@ rke2-nix-build.service
     │  └─ Create symlinks in outputDir
     │
     └─ Log results to journal + per-job log file
-    ↓
-rke2-mesh-manifests-install.service (and others)
-    ↓
-Kubernetes pods start with flox.dev/environment annotations
     ↓
 Flox shim resolves environment to packages in /tmp/*-build/
 ```
@@ -150,7 +153,7 @@ ssh bioskop-nixos.local -- incus exec master -- cat /srv/host/nix-builds.yaml
 
 ### Watch build in progress
 ```bash
-ssh bioskop-nixos.local -- incus exec master -- journalctl -u rke2-nix-build.service -f
+ssh bioskop-nixos.local -- incus exec master -- journalctl -u rke2lab-flox-nix-build.service -f
 ```
 
 ### Check build outputs
@@ -227,7 +230,7 @@ For multiple clusters (bioskop, alcide, etc.):
 
 ## Backward Compatibility
 
-The old `rke2-headplane-build.service` still exists but is **not used** by mesh manifests. Consider:
+The legacy headplane build service (if still present on older nodes) is **not used** by mesh manifests. Consider:
 - Keeping it as a fallback (don't break it)
 - Or remove it once generic system is validated
 - Update documentation to point to generic builder
@@ -236,7 +239,7 @@ The old `rke2-headplane-build.service` still exists but is **not used** by mesh 
 
 - [rke2.d/bioskop/master/nix-builds.yaml](rke2.d/bioskop/master/nix-builds.yaml) - Nix build descriptor
 - [make.d/incus/scripts/rke2-nix-build.sh](make.d/incus/scripts/rke2-nix-build.sh) - Generic build script
-- [make.d/incus/systemd/rke2-nix-build.service](make.d/incus/systemd/rke2-nix-build.service) - Systemd service
+- [make.d/incus/systemd/rke2lab-flox-nix-build.service](make.d/incus/systemd/rke2lab-flox-nix-build.service) - Systemd service
 - [rke2.d/bioskop/master/incus-instance-config.yaml](rke2.d/bioskop/master/incus-instance-config.yaml) - Incus mount config
 - [MESH-BUILD-STRATEGY.md](rke2.d/bioskop/master/catalog/mesh/MESH-BUILD-STRATEGY.md) - Original strategy document
 - [FLOX-INVENTORY.md](rke2.d/bioskop/master/catalog/mesh/FLOX-INVENTORY.md) - Flox environment usage

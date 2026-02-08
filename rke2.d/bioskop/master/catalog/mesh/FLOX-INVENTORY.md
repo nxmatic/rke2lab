@@ -4,8 +4,8 @@
 
 | Environment | Package | Location | Deployments | Build Status |
 |---|---|---|---|---|
-| `nxmatic/headplane` | headplane | [rke2.d/bioskop/master/catalog/mesh/headplane/](rke2.d/bioskop/master/catalog/mesh/headplane/) | Deployment, Job (agent-sync) | ✅ Building locally (rke2-headplane-build.service) |
-| `nxmatic/headscale` | headscale | [rke2.d/bioskop/master/catalog/mesh/headscale/](rke2.d/bioskop/master/catalog/mesh/headscale/) | Deployment, Daemonset, Job (bootstrap) | ✅ Building locally (rke2-headplane-build.service) |
+| `nxmatic/headplane` | headplane | [rke2.d/bioskop/master/catalog/mesh/headplane/](rke2.d/bioskop/master/catalog/mesh/headplane/) | Deployment, Job (agent-sync) | ✅ Building locally (rke2lab-flox-nix-build.service) |
+| `nxmatic/headscale` | headscale | [rke2.d/bioskop/master/catalog/mesh/headscale/](rke2.d/bioskop/master/catalog/mesh/headscale/) | Deployment, Daemonset, Job (bootstrap) | ✅ Building locally (rke2lab-flox-nix-build.service) |
 
 ## Flake Sources
 
@@ -59,9 +59,9 @@ rke2.d/bioskop/master/catalog/mesh/headscale/
 
 ```mermaid
 graph TD
-    A["rke2-server.service"] --> B["rke2-headplane-build.service"]
-    B --> |builds headplane + headscale| C["tmp/mesh-build/"]
-    C --> D["rke2-mesh-manifests-install.service"]
+    A["rke2-server.service"] --> D["rke2lab-mesh-manifests-install.service"]
+    B["rke2lab-flox-nix-build.service"] --> |builds headplane + headscale| C["tmp/mesh-build/"]
+    C --> D
     D --> |applies manifests| E["Mesh Pods Start"]
     E --> |reference flox.dev/environment| C
 ```
@@ -86,7 +86,7 @@ headscale-namespace: headscale-system
 
 ## Build Outputs
 
-When `rke2-headplane-build.service` runs:
+When `rke2lab-flox-nix-build.service` runs:
 
 ```
 /tmp/mesh-build/
@@ -129,8 +129,8 @@ If deploying to multiple clusters (bioskop, alcide):
 ## Next Steps
 
 1. ✅ Git dir mounted in Incus config
-2. ✅ Build service created (rke2-headplane-build.service)
-3. ✅ Mesh install service updated (depends on build)
+2. ✅ Build service created (rke2lab-flox-nix-build.service)
+3. ✅ Mesh install service updated (independent of build)
 4. ⏳ Test build on next master restart
 5. ⏳ Monitor logs for any issues
 6. 📋 Consider cachix or registry for multi-cluster scenarios

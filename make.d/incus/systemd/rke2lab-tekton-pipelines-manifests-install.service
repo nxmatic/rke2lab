@@ -4,12 +4,12 @@ RequiresMountsFor=/srv/host/system.d /srv/host
 After=local-fs.target
 After=rke2-server.service
 Requires=rke2-server.service
-After=rke2-mesh-ready-check.service
-Requires=rke2-mesh-ready-check.service
-After=rke2-replication-ready-check.service
-Requires=rke2-replication-ready-check.service
-After=rke2-cicd-secrets.service
-Requires=rke2-cicd-secrets.service
+After=rke2lab-mesh-ready-check.service
+Requires=rke2lab-mesh-ready-check.service
+After=rke2lab-replication-ready-check.service
+Requires=rke2lab-replication-ready-check.service
+After=rke2lab-cicd-secrets.service
+Requires=rke2lab-cicd-secrets.service
 ConditionPathExists=/srv/host/scripts.d/rke2-manifests-install.sh
 ConditionPathExists=/srv/host/manifests.d/cicd/tekton-pipelines
 
@@ -22,4 +22,3 @@ StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
-

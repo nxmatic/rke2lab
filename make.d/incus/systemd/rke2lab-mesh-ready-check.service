@@ -1,9 +1,9 @@
 [Unit]
-Description=Wait for RKE2 mesh workloads to be ready
+Description=Wait for RKE2Lab mesh workloads to be ready
 RequiresMountsFor=/srv/host/system.d /srv/host
 After=local-fs.target
-After=rke2-mesh-manifests-install.service
-Requires=rke2-mesh-manifests-install.service
+After=rke2lab-mesh-manifests-install.service
+Requires=rke2lab-mesh-manifests-install.service
 ConditionPathExists=/srv/host/scripts.d/rke2-layer-ready-check.sh
 ConditionPathExists=/srv/host/manifests.d/mesh
 

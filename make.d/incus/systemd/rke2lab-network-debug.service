@@ -1,5 +1,5 @@
 [Unit]
-Description=RKE2 Network Debug Logger
+Description=RKE2Lab Network Debug Logger
 After=systemd-networkd.service
 
 [Service]
