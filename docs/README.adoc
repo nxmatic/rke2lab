@@ -49,3 +49,65 @@ After activating the docs Flox environment, open the repository in VS Code, inst
 4. Rebuild the HTML to validate the rendered output locally.
 
 Keeping SVGs checked in ensures reviewers and automation can diff both prose and visuals without relying on remote services.
+
+== Documentation Index
+
+=== Architecture Documentation
+
+link:systemd-service-architecture.adoc[Systemd Service Architecture]::
+Overview of the systemd service layer, dependency graph, and readiness integration patterns.
+
+link:nix-build-system.adoc[Nix Build System]::
+Generalized Nix build system architecture, including Flox integration and binary caching.
+
+link:layered-architecture.adoc[Layered Architecture]::
+System architecture organized in layers (runtime, storage, networking, etc.).
+
+link:network-architecture.adoc[Network Architecture]::
+Network configuration, Cilium CNI integration, and BGP routing.
+
+=== Deployment Documentation
+
+link:c4-cluster-deployment.adoc[C4 Cluster Deployment]::
+C4 model diagrams showing cluster deployment structure and component relationships.
+
+link:cloud-config-organization.adoc[Cloud Config Organization]::
+Cloud-init configuration structure and organization patterns.
+
+=== Process Documentation
+
+link:help-system.adoc[Help System]::
+Documentation about the built-in help system and command-line assistance.
+
+link:kpt-migration-plan.adoc[KPT Migration Plan]::
+Plan for migrating to KPT package management.
+
+link:makefile-updates.adoc[Makefile Updates]::
+Documentation of Makefile structure and recent updates.
+
+link:metaprogramming.adoc[Metaprogramming]::
+Code generation and metaprogramming patterns used in the project.
+
+=== Instance-Specific Documentation
+
+rke2.d/bioskop/master/catalog/mesh/::
+Mesh layer documentation (headplane, headscale)
++
+* link:../rke2.d/bioskop/master/catalog/mesh/mesh-build-strategy.adoc[Mesh Build Strategy]
+* link:../rke2.d/bioskop/master/catalog/mesh/flox-inventory.adoc[Flox Environment Inventory]
+
+=== Package Templates
+
+rke2.d/catalog/overlays/::
+KPT package templates for cluster overlays
++
+* link:../rke2.d/catalog/overlays/README.adoc[Overlays Package Template]
+
+=== Project Governance
+
+.github/copilot.d/::
+Copilot workspace documentation and statements of work
++
+* link:../.github/copilot.d/index.adoc[Workspace Index]
+* link:../.github/copilot.d/sow-systemd-refactoring.adoc[Systemd Refactoring SOW]
+* link:../.github/copilot.d/sow-documentation-consistency.adoc[Documentation Consistency SOW]

@@ -263,19 +263,19 @@ Not needed for:
 
 | `rke2.d/catalog/overlays/README.md`
 | `rke2.d/catalog/overlays/README.adoc`
-| Pending
+| ✅ Complete
 
 | `rke2.d/bioskop/master/catalog/overlays/README.md`
 | `rke2.d/bioskop/master/catalog/overlays/README.adoc`
-| Pending
+| ✅ Complete
 
 | `rke2.d/alcide/master/catalog/overlays/README.md`
 | `rke2.d/alcide/master/catalog/overlays/README.adoc`
-| Pending
+| ✅ Complete
 
 | `.fleet/rke2/README.md`
 | `.fleet/rke2/README.adoc`
-| Pending
+| ✅ Complete (was already converted)
 |===
 
 === Updated Cross-References
@@ -293,36 +293,36 @@ Update `docs/README.adoc` with new document locations and organization.
 
 ✅ *Format Standardization*
 
-* [ ] All 8 Markdown files converted to AsciiDoc
-* [ ] No .md files remain in technical documentation
-* [ ] All .adoc files use consistent headers
-* [ ] All documents include @codebase tags where appropriate
+* [x] All 8 Markdown files converted to AsciiDoc
+* [x] No .md files remain in technical documentation
+* [x] All .adoc files use consistent headers
+* [x] All documents include @codebase tags where appropriate
 
 ✅ *Naming Consistency*
 
-* [ ] All files use kebab-case.adoc naming
-* [ ] No SCREAMING_CASE files remain
-* [ ] Git history preserved through renames
+* [x] All files use kebab-case.adoc naming
+* [x] No SCREAMING_CASE files remain
+* [x] Git history preserved through renames
 
 ✅ *Location Optimization*
 
-* [ ] Architecture docs in docs/
-* [ ] Instance-specific docs in rke2.d/{instance}/
-* [ ] No duplicate content (or intentional with clear purpose)
+* [x] Architecture docs in docs/
+* [x] Instance-specific docs in rke2.d/{instance}/
+* [x] No duplicate content (or intentional with clear purpose)
 
 ✅ *Cross-References*
 
-* [ ] All internal links updated
-* [ ] No broken references
-* [ ] All docs render correctly in AsciiDoc preview
-* [ ] Links use proper AsciiDoc syntax
+* [x] All internal links updated
+* [x] No broken references (verified with grep search)
+* [x] All docs render correctly in AsciiDoc preview
+* [x] Links use proper AsciiDoc syntax
 
 ✅ *Metadata Completeness*
 
-* [ ] All docs have proper headers
-* [ ] Revision dates included
-* [ ] TOC enabled where appropriate
-* [ ] Consistent attribute usage
+* [x] All docs have proper headers
+* [x] Revision dates included (using {docdate})
+* [x] TOC enabled where appropriate
+* [x] Consistent attribute usage
 
 == Implementation Order
 
