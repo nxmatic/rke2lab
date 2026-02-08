@@ -19,6 +19,9 @@ version = 1
   [install.kubectl]
   pkg-path = "kubectl"
 
+  [install.yq-go]
+  pkg-path = "yq-go"
+
   [install.bash]
   pkg-path = "bash"
 
