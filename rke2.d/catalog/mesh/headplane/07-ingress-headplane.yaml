@@ -6,6 +6,8 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: ${headplane-ingress-class} # kpt-set: ${headplane-ingress-class}
   io.cilium/lb-ipam-ips: ${cluster-lan-headplane-inetaddr} # kpt-set: ${cluster-lan-headplane-inetaddr}
+    kdns.lab42/enabled: "true"
+    kdns.lab42/hostname: ${headplane-ingress-host} # kpt-set: ${headplane-ingress-host}
 spec:
   ingressClassName: ${headplane-ingress-class} # kpt-set: ${headplane-ingress-class}
   rules:

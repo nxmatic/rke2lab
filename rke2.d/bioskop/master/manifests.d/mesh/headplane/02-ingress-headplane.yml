@@ -8,6 +8,8 @@ metadata:
     kpt.dev/package-name: headplane
     kubernetes.io/ingress.class: cilium
     io.cilium/lb-ipam-ips: 192.168.1.194
+    kdns.lab42/enabled: "true"
+    kdns.lab42/hostname: headplane.local
   name: headplane
   namespace: headscale-system
 spec:
