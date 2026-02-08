@@ -31,6 +31,37 @@ spec:
       nodeSelector:
         flox.dev/enabled: "true"
       initContainers:
+        - name: nix-builder
+          image: alpine:3.20
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Check if nix-builds.yaml exists (optional feature)
+              if [ ! -f /host/nix-builds.yaml ]; then
+                echo "No nix-builds.yaml found, skipping Nix builds"
+                exit 0
+              fi
+              # Run the Nix build script
+              /host/scripts/rke2lab-nix-build.sh /host/nix-builds.yaml
+          volumeMounts:
+            - name: host-scripts
+              mountPath: /host/scripts
+              readOnly: true
+            - name: nix-builds-config
+              mountPath: /host/nix-builds.yaml
+              subPath: nix-builds.yaml
+              readOnly: true
+            - name: nix-store
+              mountPath: /nix
+            - name: flox-config
+              mountPath: /root/.config/flox
+              readOnly: true
         - name: shim-installer
           image: alpine:3.20
           imagePullPolicy: IfNotPresent
@@ -65,6 +96,22 @@ spec:
               memory: 64Mi
               ephemeral-storage: 64Mi
       volumes:
+        - name: host-scripts
+          hostPath:
+            path: /srv/host/scripts.d
+            type: Directory
+        - name: nix-builds-config
+          hostPath:
+            path: /srv/host
+            type: Directory
+        - name: nix-store
+          hostPath:
+            path: /nix
+            type: Directory
+        - name: flox-config
+          hostPath:
+            path: /root/.config/flox
+            type: Directory
         - name: runtime-installer-script
           configMap:
             name: flox-runtime-installer-script
