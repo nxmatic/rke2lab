@@ -32,7 +32,7 @@ version = 1
   store-path = "/nix/store/dbcnax93bqfjxwjl7jz3yvam3v3bwpz3-headscale-0.27.1"
 
   [install.headplane-agent]
-  store-path = "/nix/store/rc1wq6a2qjsdxjg7qymcran24528fxyc-hp_agent-0.6.1"
+  store-path = "/nix/store/8vyn525na3lpqynbyifkxi7r67qq86dp-hp_agent-0.6.1"
 
   [install.headplane-ssh-wasn]
   store-path = "/nix/store/rvkhn2k1y1ckarzbgz9pnwbrlmp58dgk-headplane-ssh-wasm-0.6.1"
