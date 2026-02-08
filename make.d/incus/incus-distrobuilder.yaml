@@ -14,6 +14,8 @@
 # scripts (rke2-install-pre, environment activation) depend on it being
 # pre-installed. Without flox, RKE2 cluster bootstrap will fail.
 
+compression: zstd
+
 image:
   distribution: debian
   release: trixie
