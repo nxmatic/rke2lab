@@ -6008,6 +6008,7 @@ metadata:
     internal.kpt.dev/upstream-identifier: '|ConfigMap|${headscale-namespace}|flox-env'
     kpt.dev/package-layer: runtime
     kpt.dev/package-name: flox-containerd-shim
+    replicator.v1.mittwald.de/replicate-to: "headscale-system"
   name: flox-env
   namespace: ${headscale-namespace}
 ---
