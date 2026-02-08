@@ -42,10 +42,26 @@ spec:
             - configMapRef:
                 name: flox-env
           image: flox/empty:1.0.0
+          livenessProbe:
+            exec:
+              command:
+                - /usr/libexec/headplane/healthcheck
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
           name: headplane
           ports:
             - containerPort: 3000
               name: http
+          readinessProbe:
+            exec:
+              command:
+                - /usr/libexec/headplane/healthcheck
+            failureThreshold: 2
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
           resources:
             limits:
               cpu: 500m
@@ -67,8 +83,28 @@ spec:
               readOnly: true
             - mountPath: /var/lib/headplane
               name: data
+            - mountPath: /etc/headscale
+              name: headscale-config
+              readOnly: true
+            - mountPath: /usr/libexec/headplane
+              name: shared-bin
+      initContainers:
+        - command:
+            - sh
+            - -c
+            - |
+              mkdir -p /usr/libexec/headplane
+              ln -sf /.flox/run/aarch64-linux.headplane.run/bin/hp_agent /usr/libexec/headplane/agent
+              ln -sf /.flox/run/aarch64-linux.headplane.run/bin/hp_healthcheck /usr/libexec/headplane/healthcheck
+              chmod +x /usr/libexec/headplane/agent /usr/libexec/headplane/healthcheck
+          image: flox/empty:1.0.0
+          name: setup-agent
+          volumeMounts:
+            - mountPath: /usr/libexec/headplane
+              name: shared-bin
       runtimeClassName: flox
       serviceAccountName: headplane
+      shareProcessNamespace: true
       volumes:
         - name: config
           secret:
@@ -82,3 +118,8 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: headplane-data
+        - configMap:
+            name: headscale-config
+          name: headscale-config
+        - emptyDir: {}
+          name: shared-bin

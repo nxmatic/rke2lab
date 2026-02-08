@@ -12,6 +12,15 @@
       "headplane": {
         "store-path": "/nix/store/15ng86jmka6lff9615dyww141jj06wn9-headplane-0.6.1"
       },
+      "headplane-agent": {
+        "store-path": "/nix/store/8vyn525na3lpqynbyifkxi7r67qq86dp-hp_agent-0.6.1"
+      },
+      "headplane-ssh-wasn": {
+        "store-path": "/nix/store/rvkhn2k1y1ckarzbgz9pnwbrlmp58dgk-headplane-ssh-wasm-0.6.1"
+      },
+      "headscale": {
+        "store-path": "/nix/store/dbcnax93bqfjxwjl7jz3yvam3v3bwpz3-headscale-0.27.1"
+      },
       "kubectl": {
         "pkg-path": "kubectl"
       }
@@ -37,19 +46,55 @@
       "priority": 5
     },
     {
+      "install_id": "headplane-agent",
+      "store_path": "/nix/store/8vyn525na3lpqynbyifkxi7r67qq86dp-hp_agent-0.6.1",
+      "system": "aarch64-linux",
+      "priority": 5
+    },
+    {
+      "install_id": "headplane-agent",
+      "store_path": "/nix/store/8vyn525na3lpqynbyifkxi7r67qq86dp-hp_agent-0.6.1",
+      "system": "aarch64-darwin",
+      "priority": 5
+    },
+    {
+      "install_id": "headplane-ssh-wasn",
+      "store_path": "/nix/store/rvkhn2k1y1ckarzbgz9pnwbrlmp58dgk-headplane-ssh-wasm-0.6.1",
+      "system": "aarch64-linux",
+      "priority": 5
+    },
+    {
+      "install_id": "headplane-ssh-wasn",
+      "store_path": "/nix/store/rvkhn2k1y1ckarzbgz9pnwbrlmp58dgk-headplane-ssh-wasm-0.6.1",
+      "system": "aarch64-darwin",
+      "priority": 5
+    },
+    {
+      "install_id": "headscale",
+      "store_path": "/nix/store/dbcnax93bqfjxwjl7jz3yvam3v3bwpz3-headscale-0.27.1",
+      "system": "aarch64-linux",
+      "priority": 5
+    },
+    {
+      "install_id": "headscale",
+      "store_path": "/nix/store/dbcnax93bqfjxwjl7jz3yvam3v3bwpz3-headscale-0.27.1",
+      "system": "aarch64-darwin",
+      "priority": 5
+    },
+    {
       "attr_path": "bash",
       "broken": false,
       "derivation": "/nix/store/ks9q95cq6503d0hwnv7m1880xhbmw9ic-bash-interactive-5.3p9.drv",
       "description": "GNU Bourne-Again Shell, the de facto standard shell on Linux (for interactive use)",
       "install_id": "bash",
       "license": "GPL-3.0-or-later",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=bfc1b8a4574108ceef22f02bafcf6611380c100d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=00c21e4c93d963c50d4c0c89bfa84ed6e0694df2",
       "name": "bash-interactive-5.3p9",
       "pname": "bash",
-      "rev": "bfc1b8a4574108ceef22f02bafcf6611380c100d",
-      "rev_count": 935279,
-      "rev_date": "2026-01-26T21:10:04Z",
-      "scrape_date": "2026-01-29T04:35:22.760971Z",
+      "rev": "00c21e4c93d963c50d4c0c89bfa84ed6e0694df2",
+      "rev_count": 940249,
+      "rev_date": "2026-02-04T09:32:58Z",
+      "scrape_date": "2026-02-06T04:35:54.466764Z",
       "stabilities": [
         "staging",
         "unstable"
@@ -80,13 +125,13 @@
       "description": "GNU Bourne-Again Shell, the de facto standard shell on Linux (for interactive use)",
       "install_id": "bash",
       "license": "GPL-3.0-or-later",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=bfc1b8a4574108ceef22f02bafcf6611380c100d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=00c21e4c93d963c50d4c0c89bfa84ed6e0694df2",
       "name": "bash-interactive-5.3p9",
       "pname": "bash",
-      "rev": "bfc1b8a4574108ceef22f02bafcf6611380c100d",
-      "rev_count": 935279,
-      "rev_date": "2026-01-26T21:10:04Z",
-      "scrape_date": "2026-01-29T05:05:10.092079Z",
+      "rev": "00c21e4c93d963c50d4c0c89bfa84ed6e0694df2",
+      "rev_count": 940249,
+      "rev_date": "2026-02-04T09:32:58Z",
+      "scrape_date": "2026-02-06T05:05:22.744229Z",
       "stabilities": [
         "staging",
         "unstable"
@@ -117,13 +162,13 @@
       "description": "GNU Core Utilities",
       "install_id": "coreutils",
       "license": "GPL-3.0-or-later",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=bfc1b8a4574108ceef22f02bafcf6611380c100d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=00c21e4c93d963c50d4c0c89bfa84ed6e0694df2",
       "name": "coreutils-9.9",
       "pname": "coreutils",
-      "rev": "bfc1b8a4574108ceef22f02bafcf6611380c100d",
-      "rev_count": 935279,
-      "rev_date": "2026-01-26T21:10:04Z",
-      "scrape_date": "2026-01-29T04:35:23.212322Z",
+      "rev": "00c21e4c93d963c50d4c0c89bfa84ed6e0694df2",
+      "rev_count": 940249,
+      "rev_date": "2026-02-04T09:32:58Z",
+      "scrape_date": "2026-02-06T04:35:54.816106Z",
       "stabilities": [
         "staging",
         "unstable"
@@ -131,6 +176,7 @@
       "unfree": false,
       "version": "9.9",
       "outputs_to_install": [
+        "out",
         "out",
         "out"
       ],
@@ -149,13 +195,13 @@
       "description": "GNU Core Utilities",
       "install_id": "coreutils",
       "license": "GPL-3.0-or-later",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=bfc1b8a4574108ceef22f02bafcf6611380c100d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=00c21e4c93d963c50d4c0c89bfa84ed6e0694df2",
       "name": "coreutils-9.9",
       "pname": "coreutils",
-      "rev": "bfc1b8a4574108ceef22f02bafcf6611380c100d",
-      "rev_count": 935279,
-      "rev_date": "2026-01-26T21:10:04Z",
-      "scrape_date": "2026-01-29T05:05:10.562474Z",
+      "rev": "00c21e4c93d963c50d4c0c89bfa84ed6e0694df2",
+      "rev_count": 940249,
+      "rev_date": "2026-02-04T09:32:58Z",
+      "scrape_date": "2026-02-06T05:05:23.221102Z",
       "stabilities": [
         "staging",
         "unstable"
@@ -182,13 +228,13 @@
       "description": "Kubernetes CLI",
       "install_id": "kubectl",
       "license": "Apache-2.0",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=bfc1b8a4574108ceef22f02bafcf6611380c100d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=00c21e4c93d963c50d4c0c89bfa84ed6e0694df2",
       "name": "kubectl-1.35.0",
       "pname": "kubectl",
-      "rev": "bfc1b8a4574108ceef22f02bafcf6611380c100d",
-      "rev_count": 935279,
-      "rev_date": "2026-01-26T21:10:04Z",
-      "scrape_date": "2026-01-29T04:35:40.185276Z",
+      "rev": "00c21e4c93d963c50d4c0c89bfa84ed6e0694df2",
+      "rev_count": 940249,
+      "rev_date": "2026-02-04T09:32:58Z",
+      "scrape_date": "2026-02-06T04:36:11.010484Z",
       "stabilities": [
         "staging",
         "unstable"
@@ -215,13 +261,13 @@
       "description": "Kubernetes CLI",
       "install_id": "kubectl",
       "license": "Apache-2.0",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=bfc1b8a4574108ceef22f02bafcf6611380c100d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=00c21e4c93d963c50d4c0c89bfa84ed6e0694df2",
       "name": "kubectl-1.35.0",
       "pname": "kubectl",
-      "rev": "bfc1b8a4574108ceef22f02bafcf6611380c100d",
-      "rev_count": 935279,
-      "rev_date": "2026-01-26T21:10:04Z",
-      "scrape_date": "2026-01-29T05:05:32.006475Z",
+      "rev": "00c21e4c93d963c50d4c0c89bfa84ed6e0694df2",
+      "rev_count": 940249,
+      "rev_date": "2026-02-04T09:32:58Z",
+      "scrape_date": "2026-02-06T05:05:44.640255Z",
       "stabilities": [
         "staging",
         "unstable"
