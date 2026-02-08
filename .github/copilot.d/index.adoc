@@ -10,13 +10,17 @@ This directory contains Statements of Work (SOWs), technical plans, and document
 
 == Active Projects
 
+_(No active projects right now)_
+
+== Completed Projects
+
 === Documentation Consistency
 
-*Status*: 📋 Planned +
+*Status*: ✅ Completed +
 *Start Date*: 2026-02-08 +
-*Estimated Duration*: 1-2 sessions
+*Completion Date*: 2026-02-08
 
-Standardize all documentation to AsciiDoc format, establish consistent naming conventions, and reorganize architecture documentation for better discoverability.
+Standardized all documentation to AsciiDoc format, established consistent naming conventions, and reorganized architecture documentation for better discoverability.
 
 *Documents*:
 
@@ -30,7 +34,17 @@ Standardize all documentation to AsciiDoc format, establish consistent naming co
 * Add consistent metadata and @codebase tags
 * Update all cross-references
 
-== Completed Projects
+=== Flox Authentication Sharing
+
+*Status*: ✅ Completed +
+*Start Date*: 2026-02-08 +
+*Completion Date*: 2026-02-08
+
+Enable shared FloxHub authentication from the Darwin host through the Lima VM to Incus instances.
+
+*Documents*:
+
+* link:../../docs/flox-authentication-sharing.adoc[Flox Authentication Sharing]
 
 === Systemd Orchestration Refactoring
 

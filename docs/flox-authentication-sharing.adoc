@@ -62,50 +62,29 @@ flox auth status
 cat ~/.config/flox/flox.toml
 ----
 
-=== Step 2: Mount Flox Config in Lima VM
+=== Step 2: Ensure Lima VM Sees Darwin Home
 
-The Lima VM needs access to the Darwin host's `~/.config/flox/` directory. This can be done via Lima's built-in virtiofs mounts.
+If your Lima VM already mounts `/Users` (or `~`), no additional mount is required. The Flox token will be available at:
 
-*Option A: Mount entire .config directory*
+* `/Users/<darwin-user>/.config/flox/flox.toml`
 
-Edit Lima configuration (`~/.lima/nerd-nixos/lima.yaml` or regenerate):
-
-[source,yaml]
-----
-mounts:
-  - location: "~/.config"
-    writable: false
-    9p:
-      securityModel: none
-      cache: "mmap"
-----
-
-*Option B: Mount only Flox config (more secure)*
+If `/Users` is *not* mounted, add a read-only mount for the Flox config directory and restart the VM.
 
 [source,yaml]
 ----
 mounts:
   - location: "~/.config/flox"
-    mountPoint: "/home/nxmatic.linux/.config/flox"
     writable: false
     9p:
       securityModel: none
       cache: "mmap"
 ----
 
-After editing Lima config, restart the VM:
+Verify from the Lima VM:
 
 [source,bash]
 ----
-limactl stop nerd-nixos
-limactl start nerd-nixos
-----
-
-Verify mount in Lima VM:
-
-[source,bash]
-----
-ssh bioskop-nixos.local "cat ~/.config/flox/flox.toml"
+ssh bioskop-nixos.local "cat /Users/<darwin-user>/.config/flox/flox.toml"
 # Should show same token as Darwin host
 ----
 
@@ -124,7 +103,7 @@ devices:
   
   flox.config.dir:
     type: disk
-    source: /home/nxmatic.linux/.config/flox
+    source: /Users/<darwin-user>/.config/flox
     path: /root/.config/flox
 ----
 
@@ -134,7 +113,7 @@ Or mount to a different user if not using root:
 ----
   flox.config.nxmatic:
     type: disk
-    source: /home/nxmatic.linux/.config/flox
+    source: /Users/<darwin-user>/.config/flox
     path: /home/nxmatic/.config/flox
 ----
 
