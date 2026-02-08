@@ -1,4 +1,4 @@
-#!/usr/bin/bash -exuo pipefail
+#!/usr/bin/env -S bash -exuo pipefail
 
 # RKE2 Generic Package Build Script
 # Builds packages from multiple flakes based on YAML descriptor
