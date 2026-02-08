@@ -84,8 +84,8 @@ spec:
           ports:
             - containerPort: 5353
               hostPort: 5353
-              name: http
-              protocol: TCP
+              name: mdns
+              protocol: UDP
           readinessProbe: null
           resources:
             limits:

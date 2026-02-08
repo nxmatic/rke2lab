@@ -9,6 +9,7 @@ resources:
 patches:
   - path: patches/kdns-api-host.yaml
   - path: patches/kdns-dlv-sidecar.yaml
+  - path: patches/kdns-mdns-udp.yaml
 commonAnnotations:
   kpt.dev/package-layer: networking
   kpt.dev/package-name: kdns
