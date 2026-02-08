@@ -17,8 +17,23 @@ spec:
       annotations:
         flox.dev/environment: "${headplane-flox-env}" # kpt-set: ${headplane-flox-env}
     spec:
+      shareProcessNamespace: true
       runtimeClassName: flox
       serviceAccountName: headplane
+      initContainers:
+        - name: setup-agent
+          image: flox/empty:1.0.0
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /usr/libexec/headplane
+              ln -sf /.flox/run/aarch64-linux.headplane.run/bin/hp_agent /usr/libexec/headplane/agent
+              ln -sf /.flox/run/aarch64-linux.headplane.run/bin/hp_healthcheck /usr/libexec/headplane/healthcheck
+              chmod +x /usr/libexec/headplane/agent /usr/libexec/headplane/healthcheck
+          volumeMounts:
+            - name: shared-bin
+              mountPath: /usr/libexec/headplane
       containers:
         - name: headplane
           image: flox/empty:1.0.0
@@ -51,6 +66,27 @@ spec:
               readOnly: true
             - name: data
               mountPath: /var/lib/headplane
+            - name: headscale-config
+              mountPath: /etc/headscale
+              readOnly: true
+            - name: shared-bin
+              mountPath: /usr/libexec/headplane
+          livenessProbe:
+            exec:
+              command:
+                - /usr/libexec/headplane/healthcheck
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /usr/libexec/headplane/healthcheck
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
           resources:
             requests:
               cpu: 100m
@@ -73,3 +109,8 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: headplane-data
+        - name: headscale-config
+          configMap:
+            name: headscale-config
+        - name: shared-bin
+          emptyDir: {}
