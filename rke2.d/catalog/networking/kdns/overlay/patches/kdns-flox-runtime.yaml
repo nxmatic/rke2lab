@@ -17,3 +17,5 @@ spec:
           image: flox/empty:1.0.0
           command:
             - kdns
+          securityContext:
+            readOnlyRootFilesystem: false
