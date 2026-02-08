@@ -5,13 +5,14 @@ metadata:
   namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
   annotations:
     kubernetes.io/ingress.class: ${headplane-ingress-class} # kpt-set: ${headplane-ingress-class}
+  io.cilium/lb-ipam-ips: ${cluster-lan-headplane-inetaddr} # kpt-set: ${cluster-lan-headplane-inetaddr}
 spec:
   ingressClassName: ${headplane-ingress-class} # kpt-set: ${headplane-ingress-class}
   rules:
     - host: ${headplane-ingress-host} # kpt-set: ${headplane-ingress-host}
       http:
         paths:
-          - path: /admin
+          - path: /
             pathType: Prefix
             backend:
               service:
