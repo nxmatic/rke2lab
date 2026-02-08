@@ -50,11 +50,15 @@ spec:
                 exit 0
               fi
               # Copy ConfigMap from container to host via pipe (can't access container fs from nsenter)
+              # Persist to /var/lib/rke2lab/ so you can re-replay builds after package updates
+              cat /config/flox-builds.yaml | nsenter --target 1 --mount --uts --ipc --net --pid -- \
+                sh -c 'mkdir -p /var/lib/rke2lab && cat > /var/lib/rke2lab/flox-builds.yaml'
+              # Also copy to /tmp for backward compatibility
               cat /config/flox-builds.yaml | nsenter --target 1 --mount --uts --ipc --net --pid -- \
                 sh -c 'cat > /tmp/flox-builds.yaml'
               # Run the build script in host context
               nsenter --target 1 --mount --uts --ipc --net --pid -- \
-                /srv/host/scripts.d/rke2lab-flox-build.sh /tmp/flox-builds.yaml
+                /srv/host/scripts.d/rke2lab-flox-build.sh /var/lib/rke2lab/flox-builds.yaml
           image: alpine:3.20
           imagePullPolicy: IfNotPresent
           name: flox-builder
