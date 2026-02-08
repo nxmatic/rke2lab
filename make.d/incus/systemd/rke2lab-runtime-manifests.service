@@ -12,6 +12,7 @@ ConditionPathExists=/srv/host/manifests.d/runtime
 [Service]
 Type=oneshot
 ExecStart=/srv/host/scripts.d/rke2-manifests-install.sh runtime
+ExecStartPost=/srv/host/scripts.d/rke2-layer-ready.sh runtime
 RemainAfterExit=true
 StandardOutput=journal
 StandardError=journal

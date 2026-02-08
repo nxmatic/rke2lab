@@ -2,15 +2,15 @@
 Description=Install RKE2Lab storage manifests from host share (post-server)
 RequiresMountsFor=/srv/host/system.d /srv/host
 After=local-fs.target
-After=rke2lab-runtime-ready.service
-Requires=rke2lab-runtime-ready.service
-Wants=rke2lab-storage-ready.service
+After=rke2lab-runtime-manifests.service
+Requires=rke2lab-runtime-manifests.service
 ConditionPathExists=/srv/host/scripts.d/rke2-manifests-install.sh
 ConditionPathExists=/srv/host/manifests.d/storage
 
 [Service]
 Type=oneshot
 ExecStart=/srv/host/scripts.d/rke2-manifests-install.sh storage
+ExecStartPost=/srv/host/scripts.d/rke2-openebs-ready.sh
 RemainAfterExit=true
 StandardOutput=journal
 StandardError=journal

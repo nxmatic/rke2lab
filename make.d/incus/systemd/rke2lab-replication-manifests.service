@@ -10,6 +10,7 @@ ConditionPathExists=/srv/host/manifests.d/replication
 [Service]
 Type=oneshot
 ExecStart=/srv/host/scripts.d/rke2-manifests-install.sh replication
+ExecStartPost=/srv/host/scripts.d/rke2-layer-ready.sh replication
 RemainAfterExit=true
 StandardOutput=journal
 StandardError=journal

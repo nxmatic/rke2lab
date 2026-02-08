@@ -1,51 +1,71 @@
-# RKE2 Systemd Target Architecture (@codebase)
+# RKE2 Systemd Service Architecture (@codebase)
 
 ## Overview
 
-This document describes the **target-based staging system** for RKE2 initialization that:
-- Uses systemd targets to represent deployment stages
-- Simplifies service dependencies (depend on targets, not individual services)
-- Makes the boot sequence explicit and linear
-- Follows systemd best practices (like `network.target`, `multi-user.target`)
+This document describes the **linear service dependency system** for RKE2 initialization that:
+- Uses direct service dependencies for clear, linear boot ordering
+- Makes the boot sequence explicit through service After/Requires directives
+- Follows systemd best practices
+- **Phase 3 Enhancement**: Integrates readiness checks into manifests services as `ExecStartPost` actions, eliminating redundant services
+- **Phase 3.5 Simplification**: Removed redundant targets - each "layer ready" concept was just one service, so direct dependencies are clearer
 
-## Target Hierarchy
+## Architecture Evolution
+
+**Phase 2** (Naming Standardization):
+- Renamed `*-manifests-install.service` → `*-manifests.service`
+- Renamed `*-ready-check.service` → `*-ready.service`
+- Standardized script naming
+
+**Phase 3** (Readiness Integration):
+- Moved readiness checks from separate services into `ExecStartPost` of manifests services
+- Targets now depend directly on manifests services (which include readiness verification)
+- Reduced service count and simplified dependency graph
+- Preserved fail-fast behavior: if readiness check fails, manifests service fails
+
+**Phase 3.5** (Target Elimination):
+- Removed all `*-ready.target` files - they were redundant
+- Each target only waited for one service, providing no value
+- Direct service dependencies are clearer and simpler
+- Reduced total service+target count from 30+ to ~20
+
+## Service Dependency Chain
 
 ```
 multi-user.target
     ↑
-    ├─ rke2lab-server-ready.target
-    │   └─ After: rke2-server.service
-    │
     ├─ rke2lab-flox-nix-builds-complete.target
     │   └─ After: rke2lab-flox-nix-build.service
     │
-    ├─ rke2lab-runtime-ready.target  
-    │   └─ After: rke2lab-runtime-ready-check.service
-    │
-    ├─ rke2lab-networking-ready.target
-    │   └─ After: rke2lab-networking-ready-check.service
-    │
-    ├─ rke2lab-storage-ready.target
-    │   └─ After: rke2lab-storage-ready-check.service
-    │
-    ├─ rke2lab-replication-ready.target
-    │   └─ After: rke2lab-replication-ready-check.service
-    │
-    └─ rke2lab-mesh-ready.target
-        └─ After: rke2lab-mesh-ready-check.service
+    └─ Layer services (linear chain):
+        │
+        rke2-server.service
+        ↓
+        rke2lab-runtime-manifests.service (includes readiness check)
+        ↓
+        rke2lab-storage-manifests.service (includes readiness check)
+        ↓
+        rke2lab-networking-manifests.service (includes readiness check)
+        ↓
+        rke2lab-replication-manifests.service (includes readiness check)
+        ↓
+        rke2lab-mesh-manifests.service (includes readiness check)
+        ↓
+        rke2lab-tekton-pipelines-manifests.service
+        ↓
+        rke2lab-gitops-manifests.service
 ```
 
 ## Linear Boot Stages
 
-Each target represents a **milestone** in the cluster initialization:
+Each manifests service represents a **milestone** in the cluster initialization and includes its own readiness verification:
 
 ### Stage 1: Server Ready
-**Target**: `rke2lab-server-ready.target`
+**Service**: `rke2-server.service`
 - RKE2 server process running
 - Kubernetes API server available
 - Node registered
 
-**Notes**: Flox Nix builds now run independently and no longer gate this target.
+**Notes**: Flox Nix builds now run independently and no longer gate this stage.
 
 ---
 
@@ -67,105 +87,109 @@ Each target represents a **milestone** in the cluster initialization:
 ---
 
 ### Stage 3: Runtime Ready
-**Target**: `rke2lab-runtime-ready.target`
-- Kubernetes runtime components deployed (CNI plugins, etc.)
+**Service**: `rke2lab-runtime-manifests.service`
+- Installs Kubernetes runtime components (CNI plugins, etc.)
+- Runs readiness check as `ExecStartPost`
 - Core system pods running
 - Cluster can schedule workloads
 
-**Services that finish before this target**:
-- `rke2lab-runtime-ready-check.service`
-
-**Required by**: `rke2lab-networking-ready.target`
+**Depends on**: `rke2-server.service`, `rke2lab-runtime-secrets.service`
+**Required by**: `rke2lab-storage-manifests.service`
 
 ---
 
 ### Stage 4: Networking Ready
-**Target**: `rke2lab-networking-ready.target`
-- Cilium CNI deployed and healthy
+**Service**: `rke2lab-networking-manifests.service`
+- Installs Cilium CNI manifests
+- Runs readiness check as `ExecStartPost` (`rke2-cilium-ready.sh`)
 - Network policies active
 - Pod networking functional
 
-**Depends on**: `rke2lab-runtime-ready.target`
-**Services that finish before this target**:
-- `rke2lab-networking-ready-check.service`
-
-**Required by**: `rke2lab-storage-ready.target`
+**Depends on**: `rke2lab-storage-manifests.service`
+**Required by**: downstream services
 
 ---
 
 ### Stage 5: Storage Ready
-**Target**: `rke2lab-storage-ready.target`
-- OpenEBS ZFS CSI driver deployed
+**Service**: `rke2lab-storage-manifests.service`
+- Installs OpenEBS ZFS CSI driver manifests
+- Runs readiness check as `ExecStartPost` (`rke2-openebs-ready.sh`)
 - Storage classes available
 - PVCs can be provisioned
 
-**Depends on**: `rke2lab-networking-ready.target`
-**Services that finish before this target**:
-- `rke2lab-storage-ready-check.service`
-
-**Required by**: `rke2lab-replication-ready.target`
+**Depends on**: `rke2lab-runtime-manifests.service`
+**Required by**: `rke2lab-networking-manifests.service`, `rke2lab-replication-manifests.service`
 
 ---
 
 ### Stage 6: Replication Ready
-**Target**: `rke2lab-replication-ready.target`
-- Longhorn or other replication systems deployed
+**Service**: `rke2lab-replication-manifests.service`
+- Installs Longhorn or other replication systems manifests
+- Runs readiness check as `ExecStartPost`
 - HA storage available
 
-**Depends on**: `rke2lab-storage-ready.target`
-**Services that finish before this target**:
-- `rke2lab-replication-ready-check.service`
-
-**Required by**: `rke2lab-mesh-ready.target`
+**Depends on**: `rke2lab-storage-manifests.service` (implicitly through dependency chain)
+**Required by**: `rke2lab-mesh-manifests.service`, `rke2lab-gitops-manifests.service`, `rke2lab-tekton-pipelines-manifests.service`
 
 ---
 
 ### Stage 7: Mesh Ready
-**Target**: `rke2lab-mesh-ready.target`
-- Headscale/Headplane deployed
+**Service**: `rke2lab-mesh-manifests.service`
+- Installs Headscale/Headplane manifests
+- Runs readiness check as `ExecStartPost`
 - VPN mesh networking active
 - Cluster fully operational
 
-**Depends on**: `rke2lab-replication-ready.target`
-**Services that finish before this target**:
-- `rke2lab-mesh-ready-check.service`
+**Depends on**: `rke2lab-replication-manifests.service`, `rke2lab-mesh-secrets.service`
+**Required by**: `rke2lab-tekton-pipelines-manifests.service`
 
-**Final stage**: Cluster is production-ready
+**Final cluster layer**: Cluster is production-ready after this
 
 ---
 
 ## Service Dependency Patterns
 
-### ✅ NEW: Depend on Targets (Preferred)
+### ✅ CURRENT: Direct Service Dependencies
 
 ```ini
 [Unit]
 Description=My Custom Service
-After=rke2lab-flox-nix-builds-complete.target
-Requires=rke2lab-flox-nix-builds-complete.target
-Before=rke2lab-mesh-ready.target
-
-[Service]
-...
+After=rke2lab-storage-manifests.service
+Requires=rke2lab-storage-manifests.service
 ```
 
 **Benefits:**
-- Clear stage boundary
-- Don't care about specific services in earlier stages
-- Easy to add services to any stage without changing dependencies
-- Self-documenting (stage names make purpose obvious)
+- Clear and direct - no indirection
+- Easy to trace dependencies
+- Minimal files to maintain
+- Self-documenting (service names indicate what they do)
 
-### ❌ OLD: Direct Service Dependencies
+### ❌ OLD: Target-based (Pre-Phase 3.5)
 
 ```ini
 [Unit]
 Description=My Custom Service
-After=rke2lab-runtime-ready-check.service
-Requires=rke2lab-runtime-ready-check.service
-After=rke2lab-networking-ready-check.service
-Requires=rke2lab-networking-ready-check.service
-After=rke2lab-storage-ready-check.service
-Requires=rke2lab-storage-ready-check.service
+After=rke2lab-storage-ready.target
+Requires=rke2lab-storage-ready.target
+```
+
+**Problems:**
+- Extra indirection (target → service)
+- More files to maintain (service + target)
+- Targets only waited for one service each, providing no value
+- Unclear what the target actually represents
+
+### ❌ OLDER: Separate Ready Services (Pre-Phase 3)
+
+```ini
+[Unit]
+Description=My Custom Service
+After=rke2lab-runtime-ready.service
+Requires=rke2lab-runtime-ready.service
+After=rke2lab-networking-ready.service
+Requires=rke2lab-networking-ready.service
+After=rke2lab-storage-ready.service
+Requires=rke2lab-storage-ready.service
 # ... many dependencies ...
 ```
 
@@ -173,10 +197,11 @@ Requires=rke2lab-storage-ready-check.service
 - Hard to maintain (long dependency chains)
 - Fragile (breaks if service names change)
 - Unclear (which stage does this belong to?)
+- Required separate ready-check services for each layer
 
 ---
 
-## Complete Boot Flow with Targets
+## Complete Boot Flow
 
 ```
 systemd boot
@@ -187,48 +212,21 @@ rke2lab-install.service
     ↓
 rke2-server.service
     ↓
-┌─────────────────────────────────────────────┐
-│ rke2lab-server-ready.target                 │
-└─────────────────────────────────────────────┘
-    ↓
 rke2lab-runtime-secrets.service
-rke2lab-runtime-manifests-install.service
-rke2lab-runtime-ready-check.service
+rke2lab-runtime-manifests.service (includes readiness check as ExecStartPost)
     ↓
-┌─────────────────────────────────────────────┐
-│ rke2lab-runtime-ready.target                │
-└─────────────────────────────────────────────┘
+rke2lab-storage-manifests.service (includes readiness check as ExecStartPost)
     ↓
-rke2lab-networking-secrets.service
-rke2lab-networking-manifests-install.service
-rke2lab-networking-ready-check.service
+rke2lab-networking-manifests.service (includes readiness check as ExecStartPost)
     ↓
-┌─────────────────────────────────────────────┐
-│ rke2lab-networking-ready.target             │
-└─────────────────────────────────────────────┘
-    ↓
-rke2lab-storage-secrets.service
-rke2lab-storage-manifests-install.service
-rke2lab-storage-ready-check.service
-    ↓
-┌─────────────────────────────────────────────┐
-│ rke2lab-storage-ready.target                │
-└─────────────────────────────────────────────┘
-    ↓
-rke2lab-replication-manifests-install.service
-rke2lab-replication-ready-check.service
-    ↓
-┌─────────────────────────────────────────────┐
-│ rke2lab-replication-ready.target            │
-└─────────────────────────────────────────────┘
+rke2lab-replication-manifests.service (includes readiness check as ExecStartPost)
     ↓
 rke2lab-mesh-secrets.service
-rke2lab-mesh-manifests-install.service
-rke2lab-mesh-ready-check.service
+rke2lab-mesh-manifests.service (includes readiness check as ExecStartPost)
     ↓
-┌─────────────────────────────────────────────┐
-│ rke2lab-mesh-ready.target                   │
-└─────────────────────────────────────────────┘
+rke2lab-tekton-pipelines-manifests.service
+    ↓
+rke2lab-gitops-manifests.service
     ↓
 multi-user.target (system fully operational)
 
@@ -246,143 +244,163 @@ rke2lab-flox-nix-build.service (builds all Nix packages)
 
 ## Adding Services to Stages
 
-### Add a service to existing stage
+### Add a service after a specific layer
 
-**Before Runtime Ready:**
+**After Storage is Ready:**
 ```ini
 [Unit]
-Description=My Runtime Service
-After=rke2lab-flox-nix-builds-complete.target
-Requires=rke2lab-flox-nix-builds-complete.target
-Before=rke2lab-runtime-ready.target
+Description=My Storage-Dependent Service
+After=rke2lab-storage-manifests.service
+Requires=rke2lab-storage-manifests.service
 ```
 
-**Before Mesh Ready:**
+**After Mesh is Ready:**
 ```ini
 [Unit]
 Description=My Mesh Service  
-After=rke2lab-replication-ready.target
-Requires=rke2lab-replication-ready.target
-Before=rke2lab-mesh-ready.target
+After=rke2lab-mesh-manifests.service
+Requires=rke2lab-mesh-manifests.service
 ```
 
-### Create a new stage (advanced)
+### Create a new layer service
 
-If you need a custom layer between existing stages:
+If you need to add a new layer to the chain:
 
 ```ini
-# make.d/incus/systemd/rke2lab-mycustom-ready.target
+# make.d/incus/systemd/rke2lab-mycustom-manifests.service
 [Unit]
-Description=RKE2 My Custom Layer Ready Target
-After=rke2lab-storage-ready.target
-Requires=rke2lab-storage-ready.target
-After=rke2lab-mycustom-ready-check.service
-Requires=rke2lab-mycustom-ready-check.service
+Description=Install My Custom Layer Manifests
+After=rke2lab-storage-manifests.service
+Requires=rke2lab-storage-manifests.service
+ConditionPathExists=/srv/host/scripts.d/rke2-manifests-install.sh
+ConditionPathExists=/srv/host/manifests.d/mycustom
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/scripts.d/rke2-manifests-install.sh mycustom
+ExecStartPost=/srv/host/scripts.d/rke2-layer-ready.sh mycustom
+RemainAfterExit=true
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Then update replication target to depend on your new target:
+Then update the next layer to depend on your new service:
 ```ini
-# rke2lab-replication-ready.target
-After=rke2lab-mycustom-ready.target
-Requires=rke2lab-mycustom-ready.target
+# rke2lab-replication-manifests.service
+After=rke2lab-mycustom-manifests.service
+Requires=rke2lab-mycustom-manifests.service
 ```
 
 ---
 
-## Debugging with Targets
+## Debugging
 
-### Check which targets are active
+### Check which services are active
 ```bash
 ssh bioskop-nixos.local -- incus exec master -- \
-    systemctl list-units --type=target | grep rke2lab
+    systemctl list-units --type=service | grep rke2lab
 ```
 
-### Wait for a specific stage
+### Check if a specific layer is ready
 ```bash
 ssh bioskop-nixos.local -- incus exec master -- \
-    systemctl is-active rke2lab-flox-nix-builds-complete.target
+    systemctl is-active rke2lab-mesh-manifests.service
 ```
 
-### See what's blocking a target
+### See what depends on a service
 ```bash
 ssh bioskop-nixos.local -- incus exec master -- \
-    systemctl list-dependencies --reverse rke2lab-flox-nix-builds-complete.target
+    systemctl list-dependencies --reverse rke2lab-storage-manifests.service
 ```
 
 ### Monitor boot sequence in real-time
 ```bash
 ssh bioskop-nixos.local -- incus exec master -- \
-    journalctl -f -u 'rke2lab-*.target'
+    journalctl -f -u 'rke2lab-*.service'
+```
+
+### Check if a layer's readiness check passed
+```bash
+ssh bioskop-nixos.local -- incus exec master -- \
+    journalctl -u rke2lab-storage-manifests.service | grep -A 20 "ExecStartPost"
 ```
 
 ---
 
 ## Migration from Service Dependencies
 
-### Before (direct dependencies)
+### Before Phase 3 (separate ready services)
 ```ini
 [Unit]
-After=rke2lab-runtime-ready-check.service
-Requires=rke2lab-runtime-ready-check.service
-After=rke2lab-networking-ready-check.service
-Requires=rke2lab-networking-ready-check.service
-After=rke2lab-storage-ready-check.service
-Requires=rke2lab-storage-ready-check.service
+After=rke2lab-runtime-ready.service
+Requires=rke2lab-runtime-ready.service
+After=rke2lab-networking-ready.service
+Requires=rke2lab-networking-ready.service
+After=rke2lab-storage-ready.service
+Requires=rke2lab-storage-ready.service
 After=rke2lab-flox-nix-build.service
 Requires=rke2lab-flox-nix-build.service
 ```
 
-### After (target-based)
+### After Phase 3.5 (direct service dependencies)
 ```ini
 [Unit]
-After=rke2lab-storage-ready.target
-Requires=rke2lab-storage-ready.target
+After=rke2lab-storage-manifests.service
+Requires=rke2lab-storage-manifests.service
 ```
 
 **Automatically includes**:
-- ✅ Runtime ready (via rke2lab-runtime-ready.target)
-- ✅ Networking ready (via rke2lab-networking-ready.target)
-- ✅ Storage ready (via rke2lab-storage-ready.target)
+- ✅ Runtime ready (via rke2lab-runtime-manifests.service dependency chain)
+- ✅ Storage ready (via rke2lab-storage-manifests.service which depends on runtime)
+- ✅ All readiness checks passed (integrated as ExecStartPost in each service)
 
-Optional:
-- ✅ Flox builds complete (via rke2lab-flox-nix-builds-complete.target)
-
-All because targets form a dependency chain!
+Direct, simple, and clear!
 
 ---
 
 ## Best Practices
 
-1. **Always use targets for cross-layer dependencies**
-   - Don't depend on services in other layers
-   - Depend on the target representing that layer
+1. **Use direct service dependencies for cross-layer ordering**
+   - Each manifests service includes its readiness check
+   - Depend directly on the manifests service you need
+   - Clear and simple dependency chain
 
-2. **Services belong to ONE stage**
-   - Use `Before:` to declare which target you contribute to
-   - Use `After:` to depend on previous stage targets
+2. **Each layer is ONE service**
+   - Manifests installation + readiness check in one unit
+   - Fail-fast: if readiness fails, the service fails
+   - No targets needed when there's only one service per layer
 
-3. **Keep targets lightweight**
-   - Targets don't run code
-   - They're just synchronization points
+3. **Keep services focused**
+   - One service = one responsibility (install + verify)
+   - Use `ExecStartPost` for readiness verification
+   - Dependencies are explicit through After/Requires
 
 4. **Document in service descriptions**
    ```ini
-   Description=Install mesh manifests (stage: mesh)
+   Description=Install mesh manifests (includes readiness check)
    ```
 
-5. **Use naming convention**
-- Targets: `rke2lab-{layer}-ready.target`
-- Check services: `rke2lab-{layer}-ready-check.service`
-- Install services: `rke2lab-{layer}-manifests-install.service`
+5. **Naming convention**
+- Manifests services: `rke2lab-{layer}-manifests.service`
+- Scripts: `rke2-{component}-ready.sh`
+- Direct dependencies between layers
+
+6. **Readiness checks are integrated**
+- Each manifests service runs its readiness check as `ExecStartPost`
+- No separate ready services needed
+- Fail-fast behavior preserved: if readiness check fails, the service fails
+- Simpler architecture with fewer files
 
 ---
 
 ## Related Files
 
-- Target definitions: [make.d/incus/systemd/rke2lab-*-ready.target](make.d/incus/systemd/)
-- Build service: [make.d/incus/systemd/rke2lab-flox-nix-build.service](make.d/incus/systemd/rke2lab-flox-nix-build.service)
-- Mesh install service: [make.d/incus/systemd/rke2lab-mesh-manifests-install.service](make.d/incus/systemd/rke2lab-mesh-manifests-install.service)
+- Service definitions: [make.d/incus/systemd/rke2lab-*-manifests.service](make.d/incus/systemd/)
+- Flox build service: [make.d/incus/systemd/rke2lab-flox-nix-build.service](make.d/incus/systemd/rke2lab-flox-nix-build.service)
+- Flox builds target: [make.d/incus/systemd/rke2lab-flox-nix-builds-complete.target](make.d/incus/systemd/rke2lab-flox-nix-builds-complete.target)
+- Mesh manifests service: [make.d/incus/systemd/rke2lab-mesh-manifests.service](make.d/incus/systemd/rke2lab-mesh-manifests.service)
 - Build descriptor: [rke2.d/bioskop/master/nix-builds.yaml](rke2.d/bioskop/master/nix-builds.yaml)
+- Readiness scripts: [make.d/incus/scripts/rke2-*-ready.sh](make.d/incus/scripts/)

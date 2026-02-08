@@ -16,19 +16,14 @@ systemctl enable \
 	rke2lab-remount-shared.service \
 	rke2lab-runtime-secrets.service \
 	rke2lab-runtime-manifests.service \
-	rke2lab-runtime-ready.service \
 	rke2lab-cilium-config-manifests.service \
 	rke2lab-replication-manifests.service \
-	rke2lab-replication-ready.service \
 	rke2lab-mesh-secrets.service \
 	rke2lab-gitops-secrets.service \
 	rke2lab-gitops-manifests.service \
 	rke2lab-storage-manifests.service \
-	rke2lab-storage-ready.service \
 	rke2lab-networking-manifests.service \
-	rke2lab-networking-ready.service \
 	rke2lab-mesh-manifests.service \
-	rke2lab-mesh-ready.service \
 	rke2lab-cicd-secrets.service \
 	rke2lab-tekton-pipelines-manifests.service
 
