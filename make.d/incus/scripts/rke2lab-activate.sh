@@ -14,7 +14,6 @@ systemctl enable \
 	rke2lab-route-cleanup.service \
 	zfs-early-umount.service \
 	rke2lab-remount-shared.service \
-	rke2lab-flox-nix-build.service \
 	rke2lab-runtime-secrets.service \
 	rke2lab-runtime-manifests.service \
 	rke2lab-cilium-config-manifests.service \

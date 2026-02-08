@@ -42,25 +42,18 @@ spec:
             - /bin/sh
             - -c
             - |
-              # Check if nix-builds.yaml exists (optional feature)
+              # Use nsenter to run the build script in the host's environment
+              # This gives access to host's flox, nix, yq, and environment
               if [ ! -f /host/nix-builds.yaml ]; then
                 echo "No nix-builds.yaml found, skipping Nix builds"
                 exit 0
               fi
-              # Run the Nix build script
-              /host/scripts/rke2lab-nix-build.sh /host/nix-builds.yaml
+              nsenter --target 1 --mount --uts --ipc --net --pid -- \
+                /srv/host/scripts.d/rke2lab-nix-build.sh /srv/host/nix-builds.yaml
           volumeMounts:
-            - name: host-scripts
-              mountPath: /host/scripts
-              readOnly: true
             - name: nix-builds-config
               mountPath: /host/nix-builds.yaml
               subPath: nix-builds.yaml
-              readOnly: true
-            - name: nix-store
-              mountPath: /nix
-            - name: flox-config
-              mountPath: /root/.config/flox
               readOnly: true
         - name: shim-installer
           image: alpine:3.20
@@ -96,21 +89,9 @@ spec:
               memory: 64Mi
               ephemeral-storage: 64Mi
       volumes:
-        - name: host-scripts
-          hostPath:
-            path: /srv/host/scripts.d
-            type: Directory
         - name: nix-builds-config
           hostPath:
             path: /srv/host
-            type: Directory
-        - name: nix-store
-          hostPath:
-            path: /nix
-            type: Directory
-        - name: flox-config
-          hostPath:
-            path: /root/.config/flox
             type: Directory
         - name: runtime-installer-script
           configMap:
