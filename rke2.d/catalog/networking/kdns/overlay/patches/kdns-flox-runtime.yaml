@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kdns
+spec:
+  template:
+    metadata:
+      annotations:
+        flox.dev/environment: "nxmatic/kdns" # kpt-set: ${kdns-flox-env}
+    spec:
+      runtimeClassName: flox
+      containers:
+        - name: kdns
+          image: flox/empty:1.0.0
+          command:
+            - kdns

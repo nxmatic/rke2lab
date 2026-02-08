@@ -13,3 +13,4 @@ data:
   release-name: kdns
   serviceaccount-name: kdns
   target-namespace: kube-system
+  kdns-flox-env: nxmatic/kdns
