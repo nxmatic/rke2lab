@@ -52,6 +52,10 @@ devices:
     type: disk
     source: /var/lib/git/nxmatic/rke2lab/rke2.d/bioskop/master/manifests.d
     path: /srv/host/manifests.d
+  catalog.dir:
+    type: disk
+    source: /var/lib/git/nxmatic/rke2lab/rke2.d/bioskop/master/catalog
+    path: /srv/host/catalog
   rke2.config.dir:
     type: disk
     source: /var/lib/git/nxmatic/rke2lab/.local.d/var/lib/kpt/bioskop/master/runtime/rke2-config/configmaps

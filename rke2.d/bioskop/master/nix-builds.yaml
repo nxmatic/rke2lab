@@ -7,7 +7,7 @@ jobs:
   - name: mesh
     description: "Build mesh packages (headplane + headscale) from flake"
     enabled: true
-    flakePath: /srv/host/git/nxmatic/rke2lab/rke2.d/bioskop/master/catalog/mesh/headplane
+    flakePath: /srv/host/catalog/mesh/headplane
     outputDir: /tmp/mesh-build
     logFile: /var/log/rke2-mesh-build.log
     packages:
