@@ -1,7 +1,7 @@
 ---
 apiVersion: v1
 data:
-  HEADPLANE_BASE_URL: http://headplane.headplane.svc.cluster.local:3000
+  HEADPLANE_BASE_URL: http://headplane.headscale-system.svc.cluster.local:3000
   HEADPLANE_COOKIE_SECURE: "true"
   HEADPLANE_NAMESPACE: headscale-system
   HEADSCALE_NAMESPACE: headscale-system
