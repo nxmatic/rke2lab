@@ -72,10 +72,6 @@ devices:
     type: disk
     source: /Users/nxmatic/.config/flox
     path: /root/.config/flox
-  rke2lab.nix-builds.file:
-    type: disk
-    source: /var/lib/git/nxmatic/rke2lab/rke2.d/bioskop/master/nix-builds.yaml
-    path: /srv/host/nix-builds.yaml
   user.metadata:
     type: disk
     source: /var/lib/git/nxmatic/rke2lab/rke2.d/bioskop/master/meta-data
