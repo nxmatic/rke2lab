@@ -12,6 +12,15 @@
       "headplane": {
         "store-path": "/nix/store/15ng86jmka6lff9615dyww141jj06wn9-headplane-0.6.1"
       },
+      "headplane-agent": {
+        "store-path": "/nix/store/8vyn525na3lpqynbyifkxi7r67qq86dp-hp_agent-0.6.1"
+      },
+      "headplane-ssh-wasn": {
+        "store-path": "/nix/store/rvkhn2k1y1ckarzbgz9pnwbrlmp58dgk-headplane-ssh-wasm-0.6.1"
+      },
+      "headscale": {
+        "store-path": "/nix/store/dbcnax93bqfjxwjl7jz3yvam3v3bwpz3-headscale-0.27.1"
+      },
       "kubectl": {
         "pkg-path": "kubectl"
       }
@@ -33,6 +42,42 @@
     {
       "install_id": "headplane",
       "store_path": "/nix/store/15ng86jmka6lff9615dyww141jj06wn9-headplane-0.6.1",
+      "system": "aarch64-darwin",
+      "priority": 5
+    },
+    {
+      "install_id": "headplane-agent",
+      "store_path": "/nix/store/8vyn525na3lpqynbyifkxi7r67qq86dp-hp_agent-0.6.1",
+      "system": "aarch64-linux",
+      "priority": 5
+    },
+    {
+      "install_id": "headplane-agent",
+      "store_path": "/nix/store/8vyn525na3lpqynbyifkxi7r67qq86dp-hp_agent-0.6.1",
+      "system": "aarch64-darwin",
+      "priority": 5
+    },
+    {
+      "install_id": "headplane-ssh-wasn",
+      "store_path": "/nix/store/rvkhn2k1y1ckarzbgz9pnwbrlmp58dgk-headplane-ssh-wasm-0.6.1",
+      "system": "aarch64-linux",
+      "priority": 5
+    },
+    {
+      "install_id": "headplane-ssh-wasn",
+      "store_path": "/nix/store/rvkhn2k1y1ckarzbgz9pnwbrlmp58dgk-headplane-ssh-wasm-0.6.1",
+      "system": "aarch64-darwin",
+      "priority": 5
+    },
+    {
+      "install_id": "headscale",
+      "store_path": "/nix/store/dbcnax93bqfjxwjl7jz3yvam3v3bwpz3-headscale-0.27.1",
+      "system": "aarch64-linux",
+      "priority": 5
+    },
+    {
+      "install_id": "headscale",
+      "store_path": "/nix/store/dbcnax93bqfjxwjl7jz3yvam3v3bwpz3-headscale-0.27.1",
       "system": "aarch64-darwin",
       "priority": 5
     },

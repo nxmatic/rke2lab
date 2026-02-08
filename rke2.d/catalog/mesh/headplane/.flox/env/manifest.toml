@@ -25,13 +25,18 @@ version = 1
   [install.coreutils]
   pkg-path = "coreutils"
 
-  [install.headplane]
   # flake = "git+https://github.com/nxmatic/rke2lab?dir=rke2.d/catalog/mesh/headplane"
+  [install.headplane]
   store-path = "/nix/store/15ng86jmka6lff9615dyww141jj06wn9-headplane-0.6.1"
 
-  [install.headplane-agent]
-  pkg-path = "headplane-agent"
+  [install.headscale]
+  store-path = "/nix/store/dbcnax93bqfjxwjl7jz3yvam3v3bwpz3-headscale-0.27.1"
 
+  [install.headplane-agent]
+  store-path = "/nix/store/rc1wq6a2qjsdxjg7qymcran24528fxyc-hp_agent-0.6.1"
+
+  [install.headplane-ssh-wasn]
+  store-path = "/nix/store/rvkhn2k1y1ckarzbgz9pnwbrlmp58dgk-headplane-ssh-wasm-0.6.1"
 
 ## Other Environment Options -----------------------------------------
 [options]
