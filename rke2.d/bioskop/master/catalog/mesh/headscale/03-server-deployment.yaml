@@ -27,7 +27,6 @@ spec:
       - name: config-init
         image: flox/empty:1.0.0
         command:
-        - bash
         - /scripts/config-init.sh
         volumeMounts:
         - name: config-init-script

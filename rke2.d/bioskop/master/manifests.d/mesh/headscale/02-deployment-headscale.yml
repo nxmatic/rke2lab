@@ -78,7 +78,6 @@ spec:
               name: run
       initContainers:
         - command:
-            - bash
             - /scripts/config-init.sh
           image: flox/empty:1.0.0
           name: config-init

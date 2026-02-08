@@ -67,7 +67,6 @@ spec:
               name: flox-builds-config
               readOnly: true
         - command:
-            - /bin/sh
             - /scripts/shim-installer.sh
           env:
             - name: CONTAINERD_CONFIG_FILE

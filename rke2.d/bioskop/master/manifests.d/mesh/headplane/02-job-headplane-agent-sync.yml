@@ -18,14 +18,13 @@ spec:
     spec:
       containers:
         - command:
-            - /bin/sh
             - /scripts/agent-sync.sh
           envFrom:
             - configMapRef:
                 name: headplane-env
             - configMapRef:
                 name: flox-env
-          image: alpine:3.20
+          image: flox/empty:1.0.0
           name: sync
           resources:
             limits:

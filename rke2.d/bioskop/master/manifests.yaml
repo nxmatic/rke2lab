@@ -7579,7 +7579,6 @@ spec:
           name: run
       initContainers:
       - command:
-        - bash
         - /scripts/config-init.sh
         image: flox/empty:1.0.0
         name: config-init
@@ -7651,7 +7650,6 @@ spec:
       automountServiceAccountToken: false
       containers:
       - command:
-        - bash
         - /scripts/gateway.sh
         env:
         - name: TS_AUTHKEY
@@ -7793,7 +7791,6 @@ spec:
           runAsNonRoot: true
           runAsUser: 1000
       - command:
-        - /bin/sh
         - /scripts/kdns-dlv.sh
         env:
         - name: KDNS_DEBUG_ENABLED
@@ -8513,7 +8510,6 @@ spec:
           name: flox-builds-config
           readOnly: true
       - command:
-        - /bin/sh
         - /scripts/shim-installer.sh
         env:
         - name: CONTAINERD_CONFIG_FILE
@@ -8578,7 +8574,6 @@ spec:
     spec:
       containers:
       - command:
-        - bash
         - /scripts/tailscale-client.sh
         env:
         - name: RKE2_NODENAME
@@ -8638,7 +8633,6 @@ spec:
       hostPID: true
       initContainers:
       - command:
-        - bash
         - /scripts/wait-for-headscale.sh
         envFrom:
         - configMapRef:
@@ -8652,7 +8646,6 @@ spec:
           name: client-scripts
           readOnly: true
       - command:
-        - bash
         - /scripts/wait-for-authkey.sh
         envFrom:
         - configMapRef:
@@ -8854,7 +8847,6 @@ spec:
     spec:
       containers:
       - command:
-        - /bin/sh
         - /scripts/agent-sync.sh
         envFrom:
         - configMapRef:
@@ -8912,7 +8904,6 @@ spec:
     spec:
       containers:
       - command:
-        - bash
         - /scripts/bootstrap.sh
         envFrom:
         - configMapRef:

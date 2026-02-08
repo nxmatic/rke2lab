@@ -27,7 +27,6 @@ spec:
       automountServiceAccountToken: false
       containers:
         - command:
-            - bash
             - /scripts/gateway.sh
           env:
             - name: TS_AUTHKEY

@@ -17,7 +17,9 @@ spec:
         - name: sync
           image: alpine:3.20
           command:
-            - /scripts/agent-sync.sh
+            - /bin/sh
+            - -c
+            - apk add --no-cache yq kubectl && /scripts/agent-sync.sh
           envFrom:
             - configMapRef:
                 name: headplane-env

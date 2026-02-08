@@ -78,7 +78,6 @@ spec:
         - configMapRef:
             name: flox-env
         command:
-        - bash
         - /scripts/wait-for-headscale.sh
         volumeMounts:
         - name: client-scripts
@@ -92,7 +91,6 @@ spec:
         - configMapRef:
             name: flox-env
         command:
-        - bash
         - /scripts/wait-for-authkey.sh
         volumeMounts:
         - name: authkey
@@ -127,7 +125,6 @@ spec:
         - name: TS_KUBE_SECRET
           value: ""
         command:
-        - bash
         - /scripts/tailscale-client.sh
         securityContext:
           privileged: true

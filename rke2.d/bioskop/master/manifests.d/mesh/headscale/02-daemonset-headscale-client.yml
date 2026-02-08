@@ -25,7 +25,6 @@ spec:
     spec:
       containers:
         - command:
-            - bash
             - /scripts/tailscale-client.sh
           env:
             - name: RKE2_NODENAME
@@ -85,7 +84,6 @@ spec:
       hostPID: true
       initContainers:
         - command:
-            - bash
             - /scripts/wait-for-headscale.sh
           envFrom:
             - configMapRef:
@@ -99,7 +97,6 @@ spec:
               name: client-scripts
               readOnly: true
         - command:
-            - bash
             - /scripts/wait-for-authkey.sh
           envFrom:
             - configMapRef:

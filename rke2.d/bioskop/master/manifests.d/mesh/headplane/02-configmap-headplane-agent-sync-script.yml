@@ -3,6 +3,9 @@ apiVersion: v1
 data:
   agent-sync.sh: |-
     #!/usr/bin/env -S bash -exuo pipefail
+    : "PATH=$PATH yq=$(command -v yq)"
+    ls -al /.flox/run/aarch64-linux.headplane.run/bin
+
     AUTHKEY=$(kubectl get secret headscale-client-auth -n "${HEADSCALE_NAMESPACE}" -o jsonpath='{.data.authkey}' | base64 -d)
     kubectl create secret generic headplane-agent-auth \
       -n "${HEADPLANE_NAMESPACE}" \
