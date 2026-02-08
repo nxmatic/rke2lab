@@ -18,13 +18,15 @@ spec:
     spec:
       containers:
         - command:
-            - /scripts/agent-sync.sh
+            - /bin/sh
+            - -c
+            - apk add --no-cache yq kubectl && /scripts/agent-sync.sh
           envFrom:
             - configMapRef:
                 name: headplane-env
             - configMapRef:
                 name: flox-env
-          image: flox/empty:1.0.0
+          image: alpine:3.20
           name: sync
           resources:
             limits:
