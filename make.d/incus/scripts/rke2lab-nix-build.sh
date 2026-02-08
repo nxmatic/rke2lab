@@ -4,6 +4,8 @@
 # Builds packages from multiple flakes based on YAML descriptor
 # Usage: rke2lab-nix-build.sh [descriptor file]
 
+source <( flox activate --dir /var/lib/rancher/rke2 )
+
 BUILDS_DESCRIPTOR="${1:-/srv/host/nix-builds.yaml}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
