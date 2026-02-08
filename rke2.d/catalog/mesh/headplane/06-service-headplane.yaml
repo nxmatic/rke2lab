@@ -5,11 +5,8 @@ metadata:
   namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
   labels:
     app: headplane
-    io.cilium/lb-ipam-pool: lan
-  annotations:
-    io.cilium/lb-ipam-ips: ${cluster-lan-headplane-inetaddr} # kpt-set: ${cluster-lan-headplane-inetaddr}
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: headplane
   ports:
