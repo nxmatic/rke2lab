@@ -39,33 +39,10 @@ spec:
               memory: 32Mi
       hostPID: true
       initContainers:
-        - command:
-            - /bin/sh
-            - -c
-            - |
-              # Use nsenter to run the build script in the host's environment
-              # This gives access to host's flox, nix, yq, and environment
-              if [ ! -f /config/flox-builds.yaml ]; then
-                echo "No flox-builds.yaml found, skipping Nix builds"
-                exit 0
-              fi
-              # Copy ConfigMap from container to host via pipe (can't access container fs from nsenter)
-              cat /config/flox-builds.yaml | nsenter --target 1 --mount --uts --ipc --net --pid -- \
-                sh -c 'cat > /tmp/flox-builds.yaml'
-              # Run the build script in host context
-              nsenter --target 1 --mount --uts --ipc --net --pid -- \
-                /srv/host/scripts.d/rke2lab-flox-build.sh /tmp/flox-builds.yaml
-          image: alpine:3.20
-          imagePullPolicy: IfNotPresent
-          name: flox-builder
-          securityContext:
-            privileged: true
-            runAsGroup: 0
-            runAsUser: 0
-          volumeMounts:
-            - mountPath: /config
-              name: flox-builds-config
-              readOnly: true
+        # DEPRECATED: Legacy Nix build container removed
+        # Builds now run automatically via Flox containerd shim when pods with
+        # 'flox.dev/environment' annotations are created. Packages are built
+        # just-in-time as initContainers in user pods, not via systemd service.
         - command:
             - /scripts/shim-installer.sh
           env:
@@ -93,9 +70,6 @@ spec:
       tolerations:
         - operator: Exists
       volumes:
-        - configMap:
-            name: flox-builds-config
-          name: flox-builds-config
         - configMap:
             defaultMode: 493
             name: flox-runtime-installer-script
