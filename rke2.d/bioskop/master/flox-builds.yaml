@@ -32,6 +32,17 @@ jobs:
       - name: headscale
         attr: "packages.aarch64-linux.headscale"
 
+  # Networking packages (kdns)
+  - name: networking
+    description: "Build networking packages (kdns) from flake"
+    enabled: true
+    flakePath: catalog/networking/kdns
+    outputDir: /tmp/networking-build
+    logFile: /var/log/rke2-networking-build.log
+    packages:
+      - name: kdns
+        attr: "packages.aarch64-linux.kdns"
+
 # To add more Nix build jobs, follow the format:
 # - name: mypackage
 #   description: "Build mypackage from custom flake"

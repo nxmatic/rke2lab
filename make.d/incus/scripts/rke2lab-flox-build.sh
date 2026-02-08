@@ -101,15 +101,29 @@ build_package() {
 		return 1
 	fi
 
+	# Build nix command with optional input overrides
+	local -a nix_args=(
+		"build"
+		"--system" "aarch64-linux"
+		"--extra-experimental-features" "nix-command"
+		"--extra-experimental-features" "flakes"
+		"--no-link"
+	)
+
+	# Add override for kdns-src input if building kdns
+	# Handles the path difference: /var/lib/git vs /srv/host/git
+	if [[ "${package_name}" == "kdns" ]]; then
+		nix_args+=(
+			"--override-input" "kdns-src" "git+file://${GIT_WORKDIR}/lab42/kdns"
+		)
+		: "[$(date)] [${job_name}] Using kdns source: ${GIT_WORKDIR}/lab42/kdns"
+	fi
+
+	nix_args+=( ".#${package_attr}" )
+
 	# Build package
 	if cd "${flake_path}" && \
-	   nix build \
-		   --system aarch64-linux \
-		   --extra-experimental-features nix-command \
-		   --extra-experimental-features flakes \
-		   --no-link \
-		   ".#${package_attr}" \
-		   2>&1 | tee -a "${log_file}"; then
+	   nix "${nix_args[@]}" 2>&1 | tee -a "${log_file}"; then
 		: "[$(date)] [${job_name}] ✓ Built ${package_name}"
 		return 0
 	else
