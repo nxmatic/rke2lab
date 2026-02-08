@@ -19,3 +19,13 @@ spec:
             - kdns
           securityContext:
             readOnlyRootFilesystem: false
+          volumeMounts:
+            - name: flox-config
+              mountPath: /.config/flox
+            - name: flox-cache
+              mountPath: /.cache/flox
+      volumes:
+        - name: flox-config
+          emptyDir: {}
+        - name: flox-cache
+          emptyDir: {}
