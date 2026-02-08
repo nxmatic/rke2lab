@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata:
   name: flox-env
   namespace: flox-runtime
+  annotations:
+    replicator.v1.mittwald.de/replicate-to: "headscale-system"
 data:
   FLOX_DISABLE_METRICS: "true"
   FLOX_NO_TELEMETRY: "1"
