@@ -4,10 +4,12 @@ kind: Service
 metadata:
   annotations:
     internal.kpt.dev/upstream-identifier: '|Service|${headscale-namespace}|headplane'
+    io.cilium/lb-ipam-ips: 192.168.1.194
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headplane
   labels:
     app: headplane
+    io.cilium/lb-ipam-pool: lan
   name: headplane
   namespace: headscale-system
 spec:
