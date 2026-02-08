@@ -31,11 +31,33 @@ spec:
       nodeSelector:
         flox.dev/enabled: "true"
       initContainers:
-        # DEPRECATED: Legacy Nix build container removed
-        # Builds now run automatically via Flox containerd shim when pods with
-        # 'flox.dev/environment' annotations are created. Packages are built
-        # just-in-time as initContainers in user pods, not via systemd service.
-        # See: rke2.d/bioskop/master/catalog/runtime/flox-containerd-shim/README.md
+        - name: flox-builder
+          image: alpine:3.20
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Use nsenter to run the build script in the host's environment
+              # This gives access to host's flox, nix, yq, and environment
+              if [ ! -f /config/flox-builds.yaml ]; then
+                echo "No flox-builds.yaml found, skipping Nix builds"
+                exit 0
+              fi
+              # Copy ConfigMap from container to host via pipe (can't access container fs from nsenter)
+              cat /config/flox-builds.yaml | nsenter --target 1 --mount --uts --ipc --net --pid -- \
+                sh -c 'cat > /tmp/flox-builds.yaml'
+              # Run the build script in host context
+              nsenter --target 1 --mount --uts --ipc --net --pid -- \
+                /srv/host/scripts.d/rke2lab-flox-build.sh /tmp/flox-builds.yaml
+          volumeMounts:
+            - name: flox-builds-config
+              mountPath: /config
+              readOnly: true
         - name: shim-installer
           image: alpine:3.20
           imagePullPolicy: IfNotPresent
@@ -69,6 +91,9 @@ spec:
               memory: 64Mi
               ephemeral-storage: 64Mi
       volumes:
+        - name: flox-builds-config
+          configMap:
+            name: flox-builds-config
         - name: runtime-installer-script
           configMap:
             name: flox-runtime-installer-script

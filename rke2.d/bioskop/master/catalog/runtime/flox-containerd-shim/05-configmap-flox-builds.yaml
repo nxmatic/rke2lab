@@ -7,14 +7,6 @@ metadata: # kpt-merge: flox-runtime/flox-builds-config
     internal.kpt.dev/upstream-identifier: '|ConfigMap|flox-runtime|flox-builds-config'
 data:
   flox-builds.yaml: |
-    # DEPRECATED: Legacy build descriptor
-    # This file is retained for backward compatibility and documentation.
-    # Nix builds are now handled by Flox containerd shim intercepting pod creation
-    # with 'flox.dev/environment' annotations. Packages are built automatically
-    # just-in-time as initContainers, not via systemd service orchestration.
-    #
-    # Configuration preserved below for historical reference.
-    
     version: "1"
     # Nix build jobs that run during RKE2 initialization
     # Each job builds packages from a flake and makes them available to Kubernetes pods
