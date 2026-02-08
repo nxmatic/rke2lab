@@ -17,7 +17,7 @@ multi-user.target
     │   └─ After: rke2-server.service
     │
     ├─ rke2-builds-complete.target
-    │   └─ After: rke2-build-packages.service
+    │   └─ After: rke2-nix-build.service
     │
     ├─ rke2-runtime-ready.target  
     │   └─ After: rke2-runtime-ready-check.service
@@ -56,7 +56,7 @@ Each target represents a **milestone** in the cluster initialization:
 - Flox environments available to containerd
 
 **Services that finish before this target**:
-- `rke2-build-packages.service`
+- `rke2-nix-build.service`
 
 **Required by**: `rke2-runtime-ready.target`
 
@@ -193,7 +193,7 @@ rke2-server.service
 │ rke2-server-ready.target                    │
 └─────────────────────────────────────────────┘
     ↓
-rke2-build-packages.service (builds all Nix packages)
+rke2-nix-build.service (builds all Nix packages)
     ↓
 ┌─────────────────────────────────────────────┐
 │ rke2-builds-complete.target                 │  ← Guarantees packages available
@@ -330,8 +330,8 @@ After=rke2-networking-ready-check.service
 Requires=rke2-networking-ready-check.service
 After=rke2-storage-ready-check.service
 Requires=rke2-storage-ready-check.service
-After=rke2-build-packages.service
-Requires=rke2-build-packages.service
+After=rke2-nix-build.service
+Requires=rke2-nix-build.service
 ```
 
 ### After (target-based)
@@ -380,6 +380,6 @@ All because targets form a dependency chain!
 ## Related Files
 
 - Target definitions: [make.d/incus/systemd/rke2-*-ready.target](make.d/incus/systemd/)
-- Build service: [make.d/incus/systemd/rke2-build-packages.service](make.d/incus/systemd/rke2-build-packages.service)
+- Build service: [make.d/incus/systemd/rke2-nix-build.service](make.d/incus/systemd/rke2-nix-build.service)
 - Mesh install service: [make.d/incus/systemd/rke2-mesh-manifests-install.service](make.d/incus/systemd/rke2-mesh-manifests-install.service)
 - Build descriptor: [rke2.d/bioskop/master/nix-builds.yaml](rke2.d/bioskop/master/nix-builds.yaml)

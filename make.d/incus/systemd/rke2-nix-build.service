@@ -1,5 +1,5 @@
 [Unit]
-Description=RKE2 Generic Package Builder (from YAML descriptor)
+Description=RKE2 Nix Build Service (from YAML descriptor)
 RequiresMountsFor=/srv/host/git /srv/host/nix-builds.yaml
 After=local-fs.target
 After=rke2-server-ready.target
@@ -9,7 +9,7 @@ ConditionPathExists=/srv/host/nix-builds.yaml
 
 [Service]
 Type=oneshot
-ExecStart=/srv/host/scripts.d/rke2-build-packages.sh /srv/host/nix-builds.yaml
+ExecStart=/run/current-system/sw/bin/bash /srv/host/scripts.d/rke2-nix-build.sh /srv/host/nix-builds.yaml
 RemainAfterExit=true
 StandardOutput=journal
 StandardError=journal

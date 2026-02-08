@@ -17,13 +17,13 @@ This document describes the **descriptor-driven** build system for RKE2 that:
    - YAML format with version control
    - Mounted in Incus container at `/srv/host/nix-builds.yaml`
 
-2. **Generic Build Script**: [make.d/incus/scripts/rke2-build-packages.sh](make.d/incus/scripts/rke2-build-packages.sh)
+2. **Generic Build Script**: [make.d/incus/scripts/rke2-nix-build.sh](make.d/incus/scripts/rke2-nix-build.sh)
    - Parses the descriptor with `yq`
    - Iterates through all enabled jobs
    - Builds packages and logs results
    - Input: descriptor file path (default: `/srv/host/nix-builds.yaml`)
 
-3. **Generic Systemd Service**: [make.d/incus/systemd/rke2-build-packages.service](make.d/incus/systemd/rke2-build-packages.service)
+3. **Generic Systemd Service**: [make.d/incus/systemd/rke2-nix-build.service](make.d/incus/systemd/rke2-nix-build.service)
    - Runs the generic build script
    - Executed after RKE2 server starts
    - Required by manifest install services
@@ -81,13 +81,13 @@ Only if you have a manifest install service that depends on this package:
 ```ini
 [Unit]
 ...
-After=rke2-build-packages.service
-Requires=rke2-build-packages.service
+After=rke2-nix-build.service
+Requires=rke2-nix-build.service
 ```
 
 ### Step 4: Test
 - Restart the master node
-- Check logs: `journalctl -u rke2-build-packages.service -f`
+- Check logs: `journalctl -u rke2-nix-build.service -f`
 - Verify outputs: `ls -la /tmp/mycomponent-build/`
 
 ## Service Execution Flow
@@ -95,7 +95,7 @@ Requires=rke2-build-packages.service
 ```
 RKE2 Server Started
     ↓
-rke2-build-packages.service
+rke2-nix-build.service
     │
     ├─ Read /srv/host/nix-builds.yaml
     │
@@ -150,7 +150,7 @@ ssh bioskop-nixos.local -- incus exec master -- cat /srv/host/nix-builds.yaml
 
 ### Watch build in progress
 ```bash
-ssh bioskop-nixos.local -- incus exec master -- journalctl -u rke2-build-packages.service -f
+ssh bioskop-nixos.local -- incus exec master -- journalctl -u rke2-nix-build.service -f
 ```
 
 ### Check build outputs
@@ -235,8 +235,8 @@ The old `rke2-headplane-build.service` still exists but is **not used** by mesh 
 ## Related Files
 
 - [rke2.d/bioskop/master/nix-builds.yaml](rke2.d/bioskop/master/nix-builds.yaml) - Nix build descriptor
-- [make.d/incus/scripts/rke2-build-packages.sh](make.d/incus/scripts/rke2-build-packages.sh) - Generic build script
-- [make.d/incus/systemd/rke2-build-packages.service](make.d/incus/systemd/rke2-build-packages.service) - Systemd service
+- [make.d/incus/scripts/rke2-nix-build.sh](make.d/incus/scripts/rke2-nix-build.sh) - Generic build script
+- [make.d/incus/systemd/rke2-nix-build.service](make.d/incus/systemd/rke2-nix-build.service) - Systemd service
 - [rke2.d/bioskop/master/incus-instance-config.yaml](rke2.d/bioskop/master/incus-instance-config.yaml) - Incus mount config
 - [MESH-BUILD-STRATEGY.md](rke2.d/bioskop/master/catalog/mesh/MESH-BUILD-STRATEGY.md) - Original strategy document
 - [FLOX-INVENTORY.md](rke2.d/bioskop/master/catalog/mesh/FLOX-INVENTORY.md) - Flox environment usage

@@ -1,8 +1,8 @@
-#!/usr/bin/env -S bash -exuo pipefail
+#!/run/current-system/sw/bin/bash -exuo pipefail
 
 # RKE2 Generic Package Build Script
 # Builds packages from multiple flakes based on YAML descriptor
-# Usage: rke2-build-packages.sh [descriptor file]
+# Usage: rke2-nix-build.sh [descriptor file]
 
 BUILDS_DESCRIPTOR="${1:-/srv/host/nix-builds.yaml}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
