@@ -61,7 +61,6 @@ spec:
       - name: bootstrap
         image: flox/empty:1.0.0
         command:
-        - bash
         - /scripts/bootstrap.sh
         envFrom:
         - configMapRef:

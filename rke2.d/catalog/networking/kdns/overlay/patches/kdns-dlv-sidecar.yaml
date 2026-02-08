@@ -15,7 +15,6 @@ spec:
           image: alpine:3.19
           imagePullPolicy: IfNotPresent
           command:
-            - /bin/sh
             - /scripts/kdns-dlv.sh
           env:
             - name: KDNS_DEBUG_ENABLED
