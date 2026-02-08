@@ -8441,6 +8441,30 @@ spec:
       initContainers:
       - command:
         - /bin/sh
+        - -c
+        - |
+          # Use nsenter to run the build script in the host's environment
+          # This gives access to host's flox, nix, yq, and environment
+          if [ ! -f /host/nix-builds.yaml ]; then
+            echo "No nix-builds.yaml found, skipping Nix builds"
+            exit 0
+          fi
+          nsenter --target 1 --mount --uts --ipc --net --pid -- \
+            /srv/host/scripts.d/rke2lab-nix-build.sh /srv/host/nix-builds.yaml
+        image: alpine:3.20
+        imagePullPolicy: IfNotPresent
+        name: nix-builder
+        securityContext:
+          privileged: true
+          runAsGroup: 0
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /host/nix-builds.yaml
+          name: nix-builds-config
+          readOnly: true
+          subPath: nix-builds.yaml
+      - command:
+        - /bin/sh
         - /scripts/shim-installer.sh
         env:
         - name: CONTAINERD_CONFIG_FILE
@@ -8467,6 +8491,10 @@ spec:
       tolerations:
       - operator: Exists
       volumes:
+      - hostPath:
+          path: /srv/host
+          type: Directory
+        name: nix-builds-config
       - configMap:
           defaultMode: 493
           name: flox-runtime-installer-script
