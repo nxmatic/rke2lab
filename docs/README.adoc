@@ -60,6 +60,9 @@ Overview of the systemd service layer, dependency graph, and readiness integrati
 link:nix-build-system.adoc[Nix Build System]::
 Generalized Nix build system architecture, including Flox integration and binary caching.
 
+link:flox-authentication-sharing.adoc[Flox Authentication Sharing]::
+How to share FloxHub authentication from Darwin host through Lima VM to Incus instances.
+
 link:layered-architecture.adoc[Layered Architecture]::
 System architecture organized in layers (runtime, storage, networking, etc.).
 
