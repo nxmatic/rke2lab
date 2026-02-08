@@ -6311,6 +6311,22 @@ data:
     kubectl create secret generic headscale-client-auth \
       --from-literal=authkey="$PREAUTH_KEY" \
       --dry-run=client -o yaml | kubectl apply -f -
+
+    : "Creating Headplane API key..."
+    HEADPLANE_API_KEY=$( kubectl exec -n "$HEADSCALE_NAMESPACE" deployment/headscale -- \
+      headscale apikeys create -o yaml |
+      yq -r '.key' - )
+    if [ -z "$HEADPLANE_API_KEY" ]; then
+      echo "ERROR: Failed to create Headplane API key"
+      exit 1
+    fi
+
+    : "Updating headplane-secrets with API key..."
+    kubectl patch secret headplane-secrets \
+      -n "$HEADSCALE_NAMESPACE" \
+      --type merge \
+      -p "{\"stringData\":{\"api_key\":\"$HEADPLANE_API_KEY\"}}" 2>/dev/null || \
+      echo "Note: headplane-secrets not yet created, will be updated when available"
 kind: ConfigMap
 metadata:
   annotations:
