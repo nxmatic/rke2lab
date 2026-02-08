@@ -17,7 +17,7 @@ upstreamLock:
     repo: /var/lib/git/nxmatic/rke2lab
     directory: /rke2.d/catalog
     ref: main
-    commit: 71a47782c1437a18475ae8af7785d8c715430b73
+    commit: 946956647b2fded9dc9b1863bccf87bf24ba19b6
 info:
   site: https://github.com/nxmatic/rke2lab
   description: |
