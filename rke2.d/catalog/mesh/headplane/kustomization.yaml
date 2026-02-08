@@ -12,8 +12,6 @@ resources:
 - 03-rbac-headplane.yaml
 - 03-serviceaccount-headplane.yaml
 - 02-configmap-headplane-env.yaml
-- 04-configmap-headplane-bootstrap-script.yaml
-- 04-job-headplane-bootstrap.yaml
 - 04-configmap-headplane-agent-sync-script.yaml
 - 04-job-headplane-agent-sync.yaml
 - 05-deployment-headplane.yaml
