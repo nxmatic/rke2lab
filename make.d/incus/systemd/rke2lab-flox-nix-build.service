@@ -1,8 +1,7 @@
 [Unit]
 Description=RKE2Lab Flox Nix Build Service (from YAML descriptor)
-RequiresMountsFor=/srv/host/git /srv/host/nix-builds.yaml
+RequiresMountsFor=/srv/host/nix-builds.yaml
 After=local-fs.target
-Before=rke2lab-flox-nix-builds-complete.target
 ConditionPathExists=/srv/host/nix-builds.yaml
 
 [Service]

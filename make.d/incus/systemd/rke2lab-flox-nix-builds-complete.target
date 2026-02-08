@@ -1,8 +1,0 @@
-[Unit]
-Description=RKE2Lab Flox Nix Builds Complete Target
-Documentation=https://github.com/nxmatic/rke2lab
-After=rke2lab-flox-nix-build.service
-Requires=rke2lab-flox-nix-build.service
-
-[Install]
-WantedBy=multi-user.target
