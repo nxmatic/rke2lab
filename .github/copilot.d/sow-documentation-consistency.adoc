@@ -1,0 +1,384 @@
+= Statement of Work: Documentation Consistency
+:author: AI Assistant + Human Collaborator
+:revdate: 2026-02-08
+:toc: left
+:toclevels: 3
+:icons: font
+
+== Context
+
+The RKE2Lab repository contains documentation in multiple formats (Markdown and AsciiDoc) spread across different locations. The project has established AsciiDoc as the standard format (per link:../../docs/README.adoc[Documentation Guide]), but inconsistencies remain from organic growth.
+
+=== Current State
+
+*Documentation Formats:*
+- **Primary**: AsciiDoc (.adoc) - 95+ files
+- **Legacy**: Markdown (.md) - 8 files in key locations
+
+*Markdown Files Identified:*
+[source]
+----
+rke2.d/bioskop/master/SYSTEMD-TARGETS.md
+rke2.d/bioskop/master/GENERALIZED-BUILD-SYSTEM.md
+rke2.d/bioskop/master/catalog/mesh/MESH-BUILD-STRATEGY.md
+rke2.d/bioskop/master/catalog/mesh/FLOX-INVENTORY.md
+rke2.d/bioskop/master/catalog/overlays/README.md
+rke2.d/alcide/master/catalog/overlays/README.md
+rke2.d/catalog/overlays/README.md
+.fleet/rke2/README.md
+----
+
+*Location Issues:*
+- Technical architecture docs in instance-specific directories (bioskop/master/)
+- Some should be in docs/ for better discoverability
+- Duplicated overlays/README.md across catalog locations
+
+*Naming Conventions:*
+- SCREAMING_CASE: `SYSTEMD-TARGETS.md`, `GENERALIZED-BUILD-SYSTEM.md`
+- kebab-case: `mesh-build-strategy.md`, `flox-inventory.md`
+- Standard (docs/): kebab-case.adoc
+
+*Metadata Issues:*
+- Inconsistent use of `@codebase` tags
+- Some files lack proper AsciiDoc headers/attributes
+- Missing document metadata (author, date, etc.)
+
+== Objectives
+
+. Standardize all documentation to AsciiDoc format
+. Establish consistent naming conventions (kebab-case.adoc)
+. Relocate architecture docs to appropriate locations
+. Add consistent metadata and @codebase tags
+. Eliminate duplicate files
+. Update all internal cross-references
+
+== Scope
+
+=== In Scope
+
+*Format Migration*:
+- Convert 8 Markdown files to AsciiDoc
+- Preserve all content, links, and code blocks
+- Update cross-references in all files
+
+*Location Reorganization*:
+- Move architecture docs from bioskop/master/ to docs/
+- Keep instance-specific configs in place
+- Consolidate duplicate overlays/README files
+
+*Naming Standardization*:
+- Rename SCREAMING_CASE to kebab-case
+- Ensure all docs use .adoc extension
+- Update git history (git mv)
+
+*Metadata Enhancement*:
+- Add AsciiDoc document attributes
+- Include @codebase tags consistently
+- Add proper headers and TOC
+
+=== Out of Scope
+
+- Content rewrites (only formatting/structure)
+- README files in package directories (kpt packages)
+- External documentation references
+- Auto-generated documentation
+
+== Approach
+
+=== Phase 1: Inventory & Analysis
+
+[cols="1,2,2,1"]
+|===
+| File | Current Location | Proposed Action | Priority
+
+| `SYSTEMD-TARGETS.md`
+| `rke2.d/bioskop/master/`
+| Convert to `systemd-service-architecture.adoc` + move to `docs/`
+| High
+
+| `GENERALIZED-BUILD-SYSTEM.md`
+| `rke2.d/bioskop/master/`
+| Convert to `nix-build-system.adoc` + move to `docs/`
+| High
+
+| `MESH-BUILD-STRATEGY.md`
+| `rke2.d/bioskop/master/catalog/mesh/`
+| Convert to AsciiDoc, keep location
+| Medium
+
+| `FLOX-INVENTORY.md`
+| `rke2.d/bioskop/master/catalog/mesh/`
+| Convert to AsciiDoc, keep location
+| Medium
+
+| `rke2.d/catalog/overlays/README.md`
+| Multiple locations (3 copies)
+| Convert template to AsciiDoc, keep copies
+| Low
+
+| `.fleet/rke2/README.md`
+| `.fleet/rke2/`
+| Convert to AsciiDoc
+| Low
+|===
+
+=== Phase 2: Migration Plan
+
+==== High Priority: Architecture Documents
+
+.*SYSTEMD-TARGETS.md → systemd-service-architecture.adoc*
+[source,bash]
+----
+# Convert to AsciiDoc with proper metadata
+# Move to docs/ (architecture documentation)
+# Update references in:
+#   - .github/copilot.d/sow-systemd-refactoring.adoc
+#   - .github/copilot.d/phase3-readiness-integration.adoc
+#   - docs/c4-cluster-deployment.adoc
+----
+
+.*GENERALIZED-BUILD-SYSTEM.md → nix-build-system.adoc*
+[source,bash]
+----
+# Convert to AsciiDoc
+# Move to docs/ (system architecture)
+# Update references in systemd and script files
+----
+
+==== Medium Priority: Catalog Documentation
+
+.*MESH-BUILD-STRATEGY.md → mesh-build-strategy.adoc*
+[source,bash]
+----
+# Convert to AsciiDoc
+# Keep in catalog/mesh/ (deployment-specific)
+# Add proper metadata
+----
+
+.*FLOX-INVENTORY.md → flox-inventory.adoc*
+[source,bash]
+----
+# Convert to AsciiDoc
+# Keep in catalog/mesh/ (deployment-specific)
+# Cross-reference with mesh-build-strategy.adoc
+----
+
+==== Low Priority: Package READMEs
+
+.*overlays/README.md → overlays/README.adoc*
+[source,bash]
+----
+# Convert kpt template to AsciiDoc
+# Update all 3 copies:
+#   - rke2.d/catalog/overlays/
+#   - rke2.d/bioskop/master/catalog/overlays/
+#   - rke2.d/alcide/master/catalog/overlays/
+----
+
+.*.fleet/rke2/README.md → .fleet/rke2/README.adoc*
+[source,bash]
+----
+# Convert to AsciiDoc
+# Keep in .fleet/rke2/ (Fleet-specific)
+----
+
+=== Phase 3: Consistency Enhancements
+
+==== AsciiDoc Headers Template
+
+All converted files should use:
+
+[source,asciidoc]
+----
+= Document Title (@codebase)
+:author: Technical Documentation
+:revdate: {docdate}
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+
+== Overview
+
+Brief description of the document purpose.
+----
+
+==== Cross-Reference Updates
+
+Files with references to update:
+[source]
+----
+.github/copilot.d/sow-systemd-refactoring.adoc
+.github/copilot.d/phase3-readiness-integration.adoc
+docs/c4-cluster-deployment.adoc
+docs/README.adoc
+make.d/incus/scripts/*.sh (comment references)
+----
+
+==== @codebase Tag Usage
+
+Add `@codebase` tag to document titles for:
+- Architecture documentation
+- Technical design docs
+- Build system documentation
+- Deployment guides
+
+Not needed for:
+- Package READMEs (kpt packages)
+- Index/navigation files
+- Session notes
+
+=== Phase 4: Validation
+
+. All .md files converted to .adoc
+. All git history preserved (git mv)
+. All cross-references updated
+. All AsciiDoc files render correctly
+. No broken links
+. Consistent metadata across all docs
+
+== Deliverables
+
+=== Converted Files
+
+[cols="1,2,1"]
+|===
+| Original | New Location | Status
+
+| `SYSTEMD-TARGETS.md`
+| `docs/systemd-service-architecture.adoc`
+| Pending
+
+| `GENERALIZED-BUILD-SYSTEM.md`
+| `docs/nix-build-system.adoc`
+| Pending
+
+| `MESH-BUILD-STRATEGY.md`
+| `rke2.d/bioskop/master/catalog/mesh/mesh-build-strategy.adoc`
+| Pending
+
+| `FLOX-INVENTORY.md`
+| `rke2.d/bioskop/master/catalog/mesh/flox-inventory.adoc`
+| Pending
+
+| `rke2.d/catalog/overlays/README.md`
+| `rke2.d/catalog/overlays/README.adoc`
+| Pending
+
+| `rke2.d/bioskop/master/catalog/overlays/README.md`
+| `rke2.d/bioskop/master/catalog/overlays/README.adoc`
+| Pending
+
+| `rke2.d/alcide/master/catalog/overlays/README.md`
+| `rke2.d/alcide/master/catalog/overlays/README.adoc`
+| Pending
+
+| `.fleet/rke2/README.md`
+| `.fleet/rke2/README.adoc`
+| Pending
+|===
+
+=== Updated Cross-References
+
+- SOW documents (.github/copilot.d/)
+- Architecture docs (docs/)
+- Build scripts (make.d/)
+- Catalog documentation (rke2.d/)
+
+=== Documentation Index Update
+
+Update `docs/README.adoc` with new document locations and organization.
+
+== Acceptance Criteria
+
+✅ *Format Standardization*
+
+* [ ] All 8 Markdown files converted to AsciiDoc
+* [ ] No .md files remain in technical documentation
+* [ ] All .adoc files use consistent headers
+* [ ] All documents include @codebase tags where appropriate
+
+✅ *Naming Consistency*
+
+* [ ] All files use kebab-case.adoc naming
+* [ ] No SCREAMING_CASE files remain
+* [ ] Git history preserved through renames
+
+✅ *Location Optimization*
+
+* [ ] Architecture docs in docs/
+* [ ] Instance-specific docs in rke2.d/{instance}/
+* [ ] No duplicate content (or intentional with clear purpose)
+
+✅ *Cross-References*
+
+* [ ] All internal links updated
+* [ ] No broken references
+* [ ] All docs render correctly in AsciiDoc preview
+* [ ] Links use proper AsciiDoc syntax
+
+✅ *Metadata Completeness*
+
+* [ ] All docs have proper headers
+* [ ] Revision dates included
+* [ ] TOC enabled where appropriate
+* [ ] Consistent attribute usage
+
+== Implementation Order
+
+=== Batch 1: Architecture Documentation (High Priority)
+
+1. Convert SYSTEMD-TARGETS.md → systemd-service-architecture.adoc
+2. Convert GENERALIZED-BUILD-SYSTEM.md → nix-build-system.adoc
+3. Move both to docs/
+4. Update all cross-references
+
+=== Batch 2: Catalog Documentation (Medium Priority)
+
+1. Convert MESH-BUILD-STRATEGY.md → mesh-build-strategy.adoc
+2. Convert FLOX-INVENTORY.md → flox-inventory.adoc
+3. Keep in catalog/mesh/
+4. Update internal cross-references
+
+=== Batch 3: Template Documentation (Low Priority)
+
+1. Convert overlays/README.md → README.adoc (template)
+2. Update all 3 copies
+3. Convert .fleet/rke2/README.md → README.adoc
+
+=== Batch 4: Final Validation
+
+1. Run AsciiDoc validation on all files
+2. Check for broken links
+3. Update docs/README.adoc index
+4. Verify all git history preserved
+
+== Benefits
+
+*Consistency*: Single documentation format across entire repository
+*Discoverability*: Architecture docs in expected location (docs/)
+*Maintainability*: Consistent metadata and cross-referencing
+*Rendering*: All docs compatible with AsciiDoc tooling
+*Searchability*: Consistent naming makes finding docs easier
+*Professionalism*: Uniform appearance and structure
+
+== Risks & Mitigation
+
+*Risk*: Breaking existing cross-references
+*Mitigation*: Comprehensive grep search before/after, maintain redirect comments
+
+*Risk*: Loss of git history
+*Mitigation*: Use `git mv` for all renames, test with `git log --follow`
+
+*Risk*: AsciiDoc conversion errors
+*Mitigation*: Validate each file, preserve code blocks exactly, test rendering
+
+*Risk*: Duplicate content confusion
+*Mitigation*: Document intentional duplicates (kpt templates), consolidate others
+
+== References
+
+* link:../../docs/README.adoc[RKE2Lab Documentation Guide]
+* link:sow-systemd-refactoring.adoc[Systemd Refactoring SOW]
+* https://docs.asciidoctor.org/asciidoc/latest/[AsciiDoc Language Documentation]
+* https://docs.asciidoctor.org/asciidoc/latest/syntax-quick-reference/[AsciiDoc Syntax Reference]
