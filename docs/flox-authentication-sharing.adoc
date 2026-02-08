@@ -1,0 +1,355 @@
+= Flox Authentication Sharing (@codebase)
+:author: Technical Documentation
+:revdate: {docdate}
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+
+== Overview
+
+This document describes how to share Flox Hub authentication from the Darwin host through the Lima NixOS VM to Incus instances, enabling seamless package pulls from FloxHub without manual authentication on each node.
+
+== Authentication Chain
+
+[source]
+----
+Darwin Host (~/.config/flox/flox.toml)
+   ↓ (Lima virtiofs mount)
+Lima NixOS VM (~/.config/flox/ → mounted)
+   ↓ (Incus disk device)
+Incus Instance (/root/.config/flox/ → mounted)
+----
+
+== Flox Authentication Storage
+
+Flox stores authentication in `~/.config/flox/flox.toml`:
+
+[source,toml]
+----
+disable_metrics = true
+floxhub_token = "floxhub_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+----
+
+The token can be set via:
+
+[source,bash]
+----
+# Interactive login (opens browser)
+flox auth login
+
+# Or set token directly
+flox config --set floxhub_token "your-token-here"
+
+# Verify authentication
+flox auth status
+----
+
+== Implementation Steps
+
+=== Step 1: Authenticate on Darwin Host
+
+[source,bash]
+----
+# Login to FloxHub
+flox auth login
+
+# Verify
+flox auth status
+# Should show: ✓ You are logged in to FloxHub as <username>
+
+# Check token is stored
+cat ~/.config/flox/flox.toml
+----
+
+=== Step 2: Mount Flox Config in Lima VM
+
+The Lima VM needs access to the Darwin host's `~/.config/flox/` directory. This can be done via Lima's built-in virtiofs mounts.
+
+*Option A: Mount entire .config directory*
+
+Edit Lima configuration (`~/.lima/nerd-nixos/lima.yaml` or regenerate):
+
+[source,yaml]
+----
+mounts:
+  - location: "~/.config"
+    writable: false
+    9p:
+      securityModel: none
+      cache: "mmap"
+----
+
+*Option B: Mount only Flox config (more secure)*
+
+[source,yaml]
+----
+mounts:
+  - location: "~/.config/flox"
+    mountPoint: "/home/nxmatic.linux/.config/flox"
+    writable: false
+    9p:
+      securityModel: none
+      cache: "mmap"
+----
+
+After editing Lima config, restart the VM:
+
+[source,bash]
+----
+limactl stop nerd-nixos
+limactl start nerd-nixos
+----
+
+Verify mount in Lima VM:
+
+[source,bash]
+----
+ssh bioskop-nixos.local "cat ~/.config/flox/flox.toml"
+# Should show same token as Darwin host
+----
+
+=== Step 3: Mount Flox Config in Incus Instance
+
+Update the Incus instance configuration to mount Flox config from the NixOS VM.
+
+*File*: link:../rke2.d/bioskop/master/incus-instance-config.yaml[rke2.d/bioskop/master/incus-instance-config.yaml]
+
+Add new device under `devices:` section:
+
+[source,yaml]
+----
+devices:
+  # ... existing devices ...
+  
+  flox.config.dir:
+    type: disk
+    source: /home/nxmatic.linux/.config/flox
+    path: /root/.config/flox
+----
+
+Or mount to a different user if not using root:
+
+[source,yaml]
+----
+  flox.config.nxmatic:
+    type: disk
+    source: /home/nxmatic.linux/.config/flox
+    path: /home/nxmatic/.config/flox
+----
+
+=== Step 4: Apply Configuration
+
+Regenerate and restart the Incus instance:
+
+[source,bash]
+----
+# From rke2lab repository root
+cd /private/var/lib/git/nxmatic/rke2lab
+
+# Regenerate instance config
+make -C rke2.d/bioskop/master $(.incus.instance.config.file)
+
+# Stop instance
+incus stop master --project=rke2lab
+
+# Update instance config
+incus config edit master --project=rke2lab < rke2.d/bioskop/master/incus-instance-config.yaml
+
+# Start instance
+incus start master --project=rke2lab
+----
+
+=== Step 5: Verify Authentication in Incus
+
+[source,bash]
+----
+# Connect to Incus instance
+ssh bioskop-nixos.local -- incus exec master -- zsh
+
+# Inside instance, check authentication
+flox auth status
+# Should show: ✓ You are logged in to FloxHub as <username>
+
+# Verify config
+cat /root/.config/flox/flox.toml
+# Should show token from Darwin host
+
+# Test pulling from FloxHub
+flox pull nxmatic/headplane
+----
+
+== Alternative: Environment Variable Approach
+
+If mounting directories is problematic, you can also pass the token via environment variable:
+
+=== In cloud-init user-data
+
+*File*: `make.d/cloud-config/cloud-config.bootstrap.yaml`
+
+[source,yaml]
+----
+runcmd:
+  - |
+    # Set Flox token from environment
+    if [ -n "${FLOXHUB_TOKEN}" ]; then
+      mkdir -p /root/.config/flox
+      flox config --set floxhub_token "${FLOXHUB_TOKEN}"
+    fi
+----
+
+=== In Incus environment file
+
+*File*: `rke2.d/bioskop/master/environment`
+
+[source,bash]
+----
+# Flox authentication
+export FLOXHUB_TOKEN="${FLOXHUB_TOKEN}"
+----
+
+Then update `make.d/incus/targets.mk` to source token from Darwin:
+
+[source,makefile]
+----
+$(.incus.env.file):
+	@echo "FLOXHUB_TOKEN=$$(flox config --list | grep floxhub_token | cut -d= -f2)" >> $@
+----
+
+== Security Considerations
+
+=== Read-Only Mounts
+
+Always mount authentication directories as **read-only** to prevent:
+
+* Accidental token modification from VIM/Incus
+* Security risks from compromised containers
+
+[source,yaml]
+----
+mounts:
+  - location: "~/.config/flox"
+    writable: false  # Critical!
+----
+
+=== Token Rotation
+
+When rotating FloxHub tokens:
+
+[arabic]
+. Login on Darwin: `flox auth login`
+. Token automatically updates in `~/.config/flox/flox.toml`
+. No action needed in Lima VM (virtiofs mount is live)
+. Restart Incus instances to pick up new token (if not using live mount)
+
+=== Git Ignore
+
+Ensure tokens are never committed:
+
+*.gitignore*:
+[source]
+----
+# Flox authentication
+.config/flox/flox.toml
+*.flox.toml
+----
+
+== Troubleshooting
+
+=== Token Not Visible in Incus
+
+[source,bash]
+----
+# Check mount exists
+ssh bioskop-nixos.local -- incus exec master -- mount | grep flox
+
+# Check file permissions
+ssh bioskop-nixos.local -- incus exec master -- ls -la /root/.config/flox/
+
+# Check Lima mount
+ssh bioskop-nixos.local "ls -la ~/.config/flox/"
+----
+
+=== Authentication Still Fails
+
+[source,bash]
+----
+# Verify token format
+cat ~/.config/flox/flox.toml
+# Token should start with: floxhub_token = "floxhub_"
+
+# Test from Darwin
+flox auth status
+
+# Test from Lima VM
+ssh bioskop-nixos.local "flox auth status"
+
+# Test from Incus
+ssh bioskop-nixos.local -- incus exec master -- flox auth status
+----
+
+=== Lima Mount Not Working
+
+[source,bash]
+----
+# Check Lima mounts
+limactl list
+limactl shell nerd-nixos mount | grep flox
+
+# Recreate Lima instance with new config
+limactl stop nerd-nixos
+limactl start nerd-nixos
+----
+
+== Benefits
+
+=== Single Source of Truth
+
+* Authenticate once on Darwin host
+* Automatically available in all layers
+* Token rotation happens in one place
+
+=== Simplified CI/CD
+
+* No need to manage separate credentials per environment
+* Consistent authentication across development and production
+
+=== Security
+
+* Read-only mounts prevent token tampering
+* Centralized token management
+* No duplicate token storage
+
+== Future Enhancements
+
+=== Flox Token via Secret Management
+
+For production environments, consider storing tokens in:
+
+* macOS Keychain (Darwin)
+* Secret Manager (Kubernetes)
+* SOPS-encrypted files (version-controlled)
+
+=== Multi-User Support
+
+For teams, mount per-user Flox configs:
+
+[source,yaml]
+----
+devices:
+  flox.config.alice:
+    type: disk
+    source: /home/alice/.config/flox
+    path: /home/alice/.config/flox
+    
+  flox.config.bob:
+    type: disk  
+    source: /home/bob/.config/flox
+    path: /home/bob/.config/flox
+----
+
+== Related Documents
+
+* link:nix-build-system.adoc[Generalized Nix Build System]
+* link:../rke2.d/bioskop/master/catalog/mesh/mesh-build-strategy.adoc[Mesh Build Strategy]
+* link:../rke2.d/bioskop/master/catalog/mesh/flox-inventory.adoc[Flox Environment Inventory]

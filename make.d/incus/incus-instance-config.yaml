@@ -64,6 +64,10 @@ devices:
     type: disk
     source: ${INCUS_KUBECONFIG_DIR}
     path: /srv/host/kubeconfig.d
+    flox.config.dir:
+      type: disk
+      source: ${FLOX_CONFIG_DIR}
+      path: /root/.config/flox
   user.metadata:
     type: disk
     source: ${CLOUDCONFIG_METADATA_FILE}
