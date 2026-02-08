@@ -160,7 +160,7 @@ write_files:
     permissions: "0644"
     content: |
       [Service]
-      ExecStartPost=/bin/sh -xc '/usr/local/sbin/rke2-cilium-operator-scaling'
+      ExecStartPost=/bin/sh -xc '/usr/local/sbin/rke2lab-cilium-operator-scaling'
 
   # =============================================================================
   # ENVIRONMENT CONFIGURATION FILES
