@@ -109,7 +109,6 @@ spec:
               mkdir -p /usr/libexec/headplane
               ln -sf /.flox/run/aarch64-linux.headplane.run/bin/hp_agent /usr/libexec/headplane/agent
               ln -sf /.flox/run/aarch64-linux.headplane.run/bin/hp_healthcheck /usr/libexec/headplane/healthcheck
-              chmod +x /usr/libexec/headplane/agent /usr/libexec/headplane/healthcheck
           image: flox/empty:1.0.0
           name: setup-agent
           volumeMounts:

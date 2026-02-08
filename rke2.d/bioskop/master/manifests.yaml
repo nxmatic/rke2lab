@@ -6218,7 +6218,7 @@ metadata:
 apiVersion: v1
 data:
   HEADPLANE_BASE_URL: http://headplane.headscale-system.svc.cluster.local:3000
-  HEADPLANE_COOKIE_SECURE: "true"
+  HEADPLANE_COOKIE_SECURE: "false"
   HEADPLANE_NAMESPACE: headscale-system
   HEADSCALE_NAMESPACE: headscale-system
   HEADSCALE_SERVICE_URL: http://headscale.headscale-system.svc.cluster.local:8080
@@ -7472,7 +7472,6 @@ spec:
           mkdir -p /usr/libexec/headplane
           ln -sf /.flox/run/aarch64-linux.headplane.run/bin/hp_agent /usr/libexec/headplane/agent
           ln -sf /.flox/run/aarch64-linux.headplane.run/bin/hp_healthcheck /usr/libexec/headplane/healthcheck
-          chmod +x /usr/libexec/headplane/agent /usr/libexec/headplane/healthcheck
         image: flox/empty:1.0.0
         name: setup-agent
         volumeMounts:

@@ -18,5 +18,5 @@ data:
   headplane-ingress-host: headplane.local
   headplane-mdns-hostname: headplane
   headplane-ingress-class: cilium
-  headplane-cookie-secure: "true"
+  headplane-cookie-secure: "false"
   headplane-data-size: 128Mi
