@@ -9,11 +9,11 @@ ConditionPathExists=/srv/host/nix-builds.yaml
 
 [Service]
 Type=oneshot
-ExecStart=/run/current-system/sw/bin/bash /srv/host/scripts.d/rke2-nix-build.sh /srv/host/nix-builds.yaml
+ExecStart=/usr/bin/bash /srv/host/scripts.d/rke2-nix-build.sh /srv/host/nix-builds.yaml
 RemainAfterExit=true
 StandardOutput=journal
 StandardError=journal
-Environment="PATH=/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
+Environment="PATH=/usr/bin:/nix/var/nix/profiles/default/bin"
 
 [Install]
 WantedBy=multi-user.target
