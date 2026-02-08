@@ -1,8 +1,0 @@
-[Unit]
-Description=RKE2Lab Runtime Layer Ready Target
-Documentation=https://github.com/nxmatic/rke2lab
-After=rke2lab-runtime-ready-check.service
-Requires=rke2lab-runtime-ready-check.service
-
-[Install]
-WantedBy=multi-user.target

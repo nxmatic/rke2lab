@@ -15,22 +15,22 @@ systemctl enable \
 	zfs-early-umount.service \
 	rke2lab-remount-shared.service \
 	rke2lab-runtime-secrets.service \
-	rke2lab-runtime-manifests-install.service \
-	rke2lab-runtime-ready-check.service \
-	rke2lab-cilium-config-manifests-install.service \
-	rke2lab-replication-manifests-install.service \
-	rke2lab-replication-ready-check.service \
+	rke2lab-runtime-manifests.service \
+	rke2lab-runtime-ready.service \
+	rke2lab-cilium-config-manifests.service \
+	rke2lab-replication-manifests.service \
+	rke2lab-replication-ready.service \
 	rke2lab-mesh-secrets.service \
 	rke2lab-gitops-secrets.service \
-	rke2lab-gitops-manifests-install.service \
-	rke2lab-storage-manifests-install.service \
-	rke2lab-storage-ready-check.service \
-	rke2lab-networking-manifests-install.service \
-	rke2lab-networking-ready-check.service \
-	rke2lab-mesh-manifests-install.service \
-	rke2lab-mesh-ready-check.service \
+	rke2lab-gitops-manifests.service \
+	rke2lab-storage-manifests.service \
+	rke2lab-storage-ready.service \
+	rke2lab-networking-manifests.service \
+	rke2lab-networking-ready.service \
+	rke2lab-mesh-manifests.service \
+	rke2lab-mesh-ready.service \
 	rke2lab-cicd-secrets.service \
-	rke2lab-tekton-pipelines-manifests-install.service
+	rke2lab-tekton-pipelines-manifests.service
 
 : "Start network configuration service immediately"
 systemctl enable --now rke2lab-network-config.service

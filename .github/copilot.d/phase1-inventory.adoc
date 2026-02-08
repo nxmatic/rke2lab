@@ -1,0 +1,199 @@
+= Phase 1: Inventory & Mapping
+:author: AI Assistant
+:revdate: 2026-02-08
+:toc: left
+:toclevels: 3
+:icons: font
+
+== Overview
+
+Complete inventory and mapping of all systemd units, scripts, and dependencies in the RKE2Lab environment. This phase provides the foundation for systematic refactoring by documenting the current state.
+
+== Objectives
+
+* Catalog all custom systemd service and target files
+* Map all helper scripts and their invocations
+* Document dependency chains and boot ordering
+* Create old → new name mappings for renaming phase
+* Identify redundancies and simplification opportunities
+
+== Inventory Results
+
+=== Systemd Services (25 total)
+
+==== Manifests Services (8)
+* `rke2lab-runtime-manifests-install.service` → `rke2lab-runtime-manifests.service`
+* `rke2lab-storage-manifests-install.service` → `rke2lab-storage-manifests.service`
+* `rke2lab-networking-manifests-install.service` → `rke2lab-networking-manifests.service`
+* `rke2lab-replication-manifests-install.service` → `rke2lab-replication-manifests.service`
+* `rke2lab-mesh-manifests-install.service` → `rke2lab-mesh-manifests.service`
+* `rke2lab-gitops-manifests-install.service` → `rke2lab-gitops-manifests.service`
+* `rke2lab-tekton-pipelines-manifests-install.service` → `rke2lab-tekton-pipelines-manifests.service`
+* `rke2lab-cilium-config-manifests-install.service` → `rke2lab-cilium-config-manifests.service`
+
+==== Ready Services (5)
+* `rke2lab-runtime-ready-check.service` → `rke2lab-runtime-ready.service`
+* `rke2lab-storage-ready-check.service` → `rke2lab-storage-ready.service`
+* `rke2lab-networking-ready-check.service` → `rke2lab-networking-ready.service`
+* `rke2lab-replication-ready-check.service` → `rke2lab-replication-ready.service`
+* `rke2lab-mesh-ready-check.service` → `rke2lab-mesh-ready.service`
+
+==== Flox/Nix Build Services (3)
+* `rke2lab-flox-nix-build.service`
+* `rke2lab-flox-nix-build@.service`
+* `rke2lab-flox-nix-wait.service`
+
+==== Other Services (9)
+* `rke2lab-fstab-mount.service`
+* `rke2lab-kubectl-config-setup.service`
+* `rke2lab-mount-host.service`
+* `rke2lab-network-config.service`
+* `rke2lab-sanity-check.service`
+* `rke2lab-sanity-symlink.service`
+* `rke2lab-server-ready.service`
+* `rke2lab-rke2-server-ready-probe.service`
+* `rke2-server.service` (upstream)
+
+=== Systemd Targets (7 total)
+
+* `rke2lab-flox-nix-builds-complete.target` _(retained - parallel builds)_
+* `rke2lab-runtime-ready.target` _(eliminated in Phase 3.5)_
+* `rke2lab-storage-ready.target` _(eliminated in Phase 3.5)_
+* `rke2lab-networking-ready.target` _(eliminated in Phase 3.5)_
+* `rke2lab-replication-ready.target` _(eliminated in Phase 3.5)_
+* `rke2lab-mesh-ready.target` _(eliminated in Phase 3.5)_
+* `rke2lab-server-ready.target` _(eliminated in Phase 3.5)_
+
+=== Scripts (23 total)
+
+==== Readiness Check Scripts (3 - renamed)
+* `rke2-openebs-ready-check.sh` → `rke2-openebs-ready.sh`
+* `rke2-cilium-ready-check.sh` → `rke2-cilium-ready.sh`
+* `rke2-layer-ready-check.sh` → `rke2-layer-ready.sh`
+
+==== Activation Scripts
+* `rke2-activate.sh`
+* `rke2-setup.sh`
+
+==== Manifests Application Scripts (5)
+* `rke2-apply-runtime-manifests.sh`
+* `rke2-apply-storage-manifests.sh`
+* `rke2-apply-networking-manifests.sh`
+* `rke2-apply-replication-manifests.sh`
+* `rke2-apply-mesh-manifests.sh`
+
+==== Other Scripts (13)
+* `rke2-create-manifests-dirs.sh`
+* `flox-nix-build.sh`
+* `flox-nix-wait.sh`
+* `rke2-kubectl-config.sh`, `rke2-kubelet-config.sh`
+* `rke2-network-config.sh`
+* `rke2-server-ready-probe.sh`
+* `rke2-sanity-check.sh`, `rke2-sanity-symlink.sh`
+* `setup-fstab-mounts.sh`, `setup-kubectl-config.sh`
+* `vmware-network-config.sh`
+
+== Dependency Chains
+
+=== Before Refactoring
+
+.Boot Flow (Target-Based)
+----
+rke2-server.service
+  ↓
+rke2lab-runtime-manifests-install.service
+  ↓
+rke2lab-runtime-ready-check.service
+  ↓
+rke2lab-runtime-ready.target ← rke2lab-storage-manifests-install.service
+  ↓
+rke2lab-storage-ready-check.service
+  ↓
+rke2lab-storage-ready.target ← rke2lab-networking-manifests-install.service
+  ↓
+rke2lab-networking-ready-check.service
+  ↓
+rke2lab-networking-ready.target ← rke2lab-replication-manifests-install.service
+  ↓
+rke2lab-replication-ready-check.service
+  ↓
+rke2lab-replication-ready.target ← rke2lab-mesh-manifests-install.service
+  ↓
+rke2lab-mesh-ready-check.service
+  ↓
+rke2lab-mesh-ready.target ← tekton/gitops manifests
+----
+
+*Problem*: Each target waits for only one service, providing no value. The separate ready services add complexity.
+
+=== After Refactoring (Phases 2, 3, 3.5)
+
+.Boot Flow (Service-Based)
+----
+rke2-server.service
+  ↓
+rke2lab-runtime-manifests.service (with ExecStartPost ready check)
+  ↓
+rke2lab-storage-manifests.service (After=runtime, ExecStartPost ready check)
+  ↓
+rke2lab-networking-manifests.service (After=storage, ExecStartPost ready check)
+  ↓
+rke2lab-replication-manifests.service (After=networking, ExecStartPost ready check)
+  ↓
+rke2lab-mesh-manifests.service (After=replication, ExecStartPost ready check)
+  ↓
+tekton/gitops manifests (After=mesh)
+----
+
+*Benefits*: 
+* Direct dependencies (clearer)
+* Integrated readiness (fewer files)
+* No redundant targets
+* Fail-fast preserved via ExecStartPost
+
+== Identified Simplification Opportunities
+
+=== Naming Standardization
+* Remove `-install` suffix from manifests services (all install manifests)
+* Remove `-check` suffix from ready services/scripts (all check readiness)
+
+=== Structural Simplification
+* Integrate readiness checks into manifests services as `ExecStartPost`
+* Eliminate separate ready services (5 files)
+* Eliminate redundant targets with single dependencies (6 files)
+
+=== Expected Impact
+* *11 fewer files* (5 services + 6 targets)
+* *Simpler dependencies* (service → service vs service → ready → target → service)
+* *Preserved guarantees* (boot ordering, fail-fast behavior)
+
+== Mapping Output
+
+The complete mapping was documented in [.line-through]#`inventory-and-mapping.md`# `inventory-and-mapping.adoc` (to be converted).
+
+Key takeaways:
+* 25 systemd services cataloged
+* 7 targets analyzed (1 retained, 6 eliminated)
+* 23 scripts inventoried
+* Full dependency graph mapped
+* Naming conventions identified
+* Refactoring opportunities documented
+
+== Acceptance Criteria
+
+✅ *Inventory Complete*
+
+* [x] All systemd units cataloged
+* [x] All scripts documented
+* [x] Dependencies mapped
+* [x] Name mappings defined
+
+✅ *Analysis Complete*
+
+* [x] Redundancies identified
+* [x] Simplification opportunities documented
+* [x] Impact estimated
+
+== Next Phase
+
+Proceed to link:phase2-naming-refactor.adoc[Phase 2: Naming Refactor] to systematically rename all units and scripts.

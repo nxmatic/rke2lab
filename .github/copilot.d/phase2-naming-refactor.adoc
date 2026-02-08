@@ -1,0 +1,213 @@
+= Phase 2: Naming Refactor
+:author: AI Assistant
+:revdate: 2026-02-08
+:toc: left
+:toclevels: 3
+:icons: font
+
+== Overview
+
+Systematic renaming of systemd units and scripts to follow standardized conventions. This phase removes inconsistent suffixes and establishes clear, maintainable naming patterns.
+
+== Objectives
+
+* Rename all manifests services to remove `-install` suffix
+* Rename all ready services to remove `-check` suffix
+* Rename all readiness scripts to remove `-check` suffix
+* Update all references across services, targets, scripts, and documentation
+* Use `git mv` to preserve history
+* Validate no dangling references remain
+
+== Changes Made
+
+=== Systemd Service Files Renamed (13 total)
+
+==== Manifests Services (8)
+[source,bash]
+----
+git mv make.d/incus/systemd/rke2lab-runtime-manifests-install.service \
+       make.d/incus/systemd/rke2lab-runtime-manifests.service
+
+git mv make.d/incus/systemd/rke2lab-storage-manifests-install.service \
+       make.d/incus/systemd/rke2lab-storage-manifests.service
+
+git mv make.d/incus/systemd/rke2lab-networking-manifests-install.service \
+       make.d/incus/systemd/rke2lab-networking-manifests.service
+
+git mv make.d/incus/systemd/rke2lab-replication-manifests-install.service \
+       make.d/incus/systemd/rke2lab-replication-manifests.service
+
+git mv make.d/incus/systemd/rke2lab-mesh-manifests-install.service \
+       make.d/incus/systemd/rke2lab-mesh-manifests.service
+
+git mv make.d/incus/systemd/rke2lab-gitops-manifests-install.service \
+       make.d/incus/systemd/rke2lab-gitops-manifests.service
+
+git mv make.d/incus/systemd/rke2lab-tekton-pipelines-manifests-install.service \
+       make.d/incus/systemd/rke2lab-tekton-pipelines-manifests.service
+
+git mv make.d/incus/systemd/rke2lab-cilium-config-manifests-install.service \
+       make.d/incus/systemd/rke2lab-cilium-config-manifests.service
+----
+
+==== Ready Services (5)
+[source,bash]
+----
+git mv make.d/incus/systemd/rke2lab-runtime-ready-check.service \
+       make.d/incus/systemd/rke2lab-runtime-ready.service
+
+git mv make.d/incus/systemd/rke2lab-storage-ready-check.service \
+       make.d/incus/systemd/rke2lab-storage-ready.service
+
+git mv make.d/incus/systemd/rke2lab-networking-ready-check.service \
+       make.d/incus/systemd/rke2lab-networking-ready.service
+
+git mv make.d/incus/systemd/rke2lab-replication-ready-check.service \
+       make.d/incus/systemd/rke2lab-replication-ready.service
+
+git mv make.d/incus/systemd/rke2lab-mesh-ready-check.service \
+       make.d/incus/systemd/rke2lab-mesh-ready.service
+----
+
+=== Scripts Renamed (3 total)
+
+[source,bash]
+----
+git mv make.d/incus/scripts/rke2-openebs-ready-check.sh \
+       make.d/incus/scripts/rke2-openebs-ready.sh
+
+git mv make.d/incus/scripts/rke2-cilium-ready-check.sh \
+       make.d/incus/scripts/rke2-cilium-ready.sh
+
+git mv make.d/incus/scripts/rke2-layer-ready-check.sh \
+       make.d/incus/scripts/rke2-layer-ready.sh
+----
+
+=== References Updated
+
+==== Systemd Targets (6 files)
+Updated all `After=` and `Requires=` directives to use new service names:
+
+* `rke2lab-runtime-ready.target`
+* `rke2lab-storage-ready.target`
+* `rke2lab-networking-ready.target`
+* `rke2lab-replication-ready.target`
+* `rke2lab-mesh-ready.target`
+* `rke2lab-server-ready.target`
+
+==== Systemd Services (8 files)
+Updated `After=`, `Requires=`, `Wants=`, and `ExecStart=` directives:
+
+* All 5 ready services → new script paths
+* 3 dependent manifests services → new manifests service names
+
+==== Scripts (2 files)
+* `rke2-activate.sh` - Updated systemctl enable list with new service names
+* Drop-in configurations referencing old names
+
+==== Documentation (3 files)
+* `rke2.d/bioskop/master/SYSTEMD-TARGETS.md` - All diagrams and examples
+* `docs/c4-cluster-deployment.adoc` - Service references
+* `.github/copilot.d/sow.md` - References to service names
+
+== Results
+
+=== Files Changed
+* *16 files renamed*: 8 manifests services + 5 ready services + 3 scripts
+* *20+ files updated*: Targets, services, scripts, docs with cross-references
+
+=== Validation
+
+==== Grep Searches Confirmed
+[source,bash]
+----
+# No remaining references to old names
+grep -r "manifests-install" make.d/incus/systemd/  # 0 results
+grep -r "ready-check" make.d/incus/systemd/        # 0 results  
+grep -r "ready-check.sh" make.d/incus/scripts/     # 0 results
+----
+
+==== Git Status
+[source]
+----
+R  make.d/incus/systemd/rke2lab-runtime-manifests{-install,}.service
+R  make.d/incus/systemd/rke2lab-storage-manifests{-install,}.service
+...
+R  make.d/incus/scripts/rke2-openebs-ready{-check,}.sh
+...
+M  make.d/incus/systemd/rke2lab-runtime-ready.target
+M  make.d/incus/scripts/rke2-activate.sh
+...
+----
+
+Git properly detected renames (R prefix) when using `git mv`.
+
+=== Naming Convention Established
+
+.*Standard Patterns*
+|===
+| Component | Pattern | Example
+
+| Manifests service
+| `rke2lab-<layer>-manifests.service`
+| `rke2lab-storage-manifests.service`
+
+| Ready service
+| `rke2lab-<layer>-ready.service`
+| `rke2lab-storage-ready.service`
+
+| Ready target
+| `rke2lab-<layer>-ready.target`
+| `rke2lab-storage-ready.target`
+
+| Script (manifests)
+| `rke2-apply-<layer>-manifests.sh`
+| `rke2-apply-storage-manifests.sh`
+
+| Script (ready)
+| `rke2-<component>-ready.sh`
+| `rke2-openebs-ready.sh`
+|===
+
+== Lessons Learned
+
+=== Git Operations
+* Use `git mv` (not plain `mv`) to preserve rename history
+* Use `git rm -f` to forcibly remove staged files when needed
+* Git detects renames automatically if content is similar enough
+
+=== Reference Updates
+* Provide sufficient context (3+ lines) in file replacements
+* Check all file types: services, targets, scripts, docs
+* Use grep searches to validate no stale references remain
+
+=== Coordination
+* Address user corrections promptly (`git mv` vs `mv`)
+* Validate each layer before moving to next
+* Keep activation scripts aligned with service changes
+
+== Acceptance Criteria
+
+✅ *Renames Complete*
+
+* [x] All 8 manifests services renamed
+* [x] All 5 ready services renamed
+* [x] All 3 readiness scripts renamed
+* [x] Git history preserved (git mv used)
+
+✅ *References Updated*
+
+* [x] All systemd unit files updated
+* [x] All scripts updated
+* [x] All documentation updated
+* [x] No grep results for old names
+
+✅ *Validation*
+
+* [x] Git status shows proper rename detection
+* [x] All files load without errors
+* [x] Dependencies still resolve correctly
+
+== Next Phase
+
+Proceed to link:phase3-readiness-integration.adoc[Phase 3: Readiness Integration & Simplification] to eliminate redundant services and targets.

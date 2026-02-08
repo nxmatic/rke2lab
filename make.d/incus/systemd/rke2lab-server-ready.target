@@ -1,8 +1,0 @@
-[Unit]
-Description=RKE2Lab Server Ready Target
-Documentation=https://github.com/nxmatic/rke2lab
-After=rke2-server.service
-Requires=rke2-server.service
-
-[Install]
-WantedBy=multi-user.target

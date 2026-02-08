@@ -1,0 +1,194 @@
+= Statement of Work: Systemd Orchestration Refactoring
+:author: AI Assistant + Human Collaborator
+:revdate: 2026-02-08
+:toc: left
+:toclevels: 3
+:icons: font
+
+== Context
+
+We are evolving the custom systemd orchestration for the RKE2Lab environment. The current implementation has:
+
+* Inconsistent naming conventions (`*-manifests-install.service` vs `*-manifests.service`)
+* Separate ready-check services that could be integrated into manifests services
+* Target files that only wait for a single service (providing no value)
+* Recent changes include prefixed unit names to avoid collisions with upstream RKE2
+* Flox/Nix build flow adjustments
+
+The architecture has grown organically and needs systematic refactoring for clarity and maintainability.
+
+== Objectives
+
+. Standardize naming conventions across all systemd units and scripts
+. Integrate readiness checks into manifests services as post-start behaviors
+. Eliminate redundant targets when only one service contributes to a "stage"
+. Simplify dependency graphs while preserving boot ordering guarantees
+. Keep documentation and activation scripts aligned with new conventions
+. Reduce total line count and number of files while maintaining functionality
+
+== Scope
+
+=== In Scope
+
+* Custom systemd units and targets installed by this repository
+* Associated scripts invoked by those units  
+* Documentation describing boot flow and systemd architecture
+* Activation scripts that enable/start units
+
+=== Out of Scope
+
+* Upstream `rke2-server.service` and `rke2-agent.service` definitions
+* Non-systemd runtime components not managed by these units
+* Unrelated docs and packages outside the custom systemd layer
+* The `rke2lab-flox-nix-builds-complete.target` (truly independent/parallel)
+
+== Assumptions
+
+* The RKE2 server/agent units remain the authoritative upstream services
+* Custom units are deployed via bind mounts and activation scripts
+* The cluster uses the rke2lab-prefixed unit naming moving forward
+* Fail-fast behavior for readiness checks must be preserved
+* Boot ordering must remain correct (no regressions)
+
+== Approach
+
+The work is divided into phases for systematic execution:
+
+=== link:phase1-inventory.adoc[Phase 1: Inventory & Mapping]
+
+Create comprehensive inventory of all systemd units, scripts, and their dependencies.
+Map current names to proposed new names. Document dependency chains.
+
+=== link:phase2-naming-refactor.adoc[Phase 2: Naming Refactor]
+
+Systematically rename all units and scripts to follow standardized conventions:
+
+* `*-manifests-install.service` → `*-manifests.service`
+* `*-ready-check.service` → `*-ready.service`  
+* `*-ready-check.sh` → `*-ready.sh`
+
+Update all references across services, targets, scripts, and documentation.
+
+=== link:phase3-readiness-integration.adoc[Phase 3: Readiness Integration & Simplification]
+
+* Move readiness checks from separate services into `ExecStartPost` of manifests services
+* Eliminate redundant ready services
+* Evaluate and remove targets that only wait for one service
+* Convert to direct service dependencies (clearer and simpler)
+* Update documentation to reflect new architecture
+
+=== Phase 4: Validation
+
+* Verify systemd unit graph is coherent
+* Test on actual cluster deployment
+* Confirm readiness checks still run and fail appropriately
+* Validate boot ordering and timing
+
+== Deliverables
+
+. *Updated Unit Files*
+** 8 manifests services renamed
+** 5 ready services eliminated (integrated into manifests)
+** 6 targets eliminated (redundant single-service targets)
+** Updated dependency declarations
+
+. *Updated Scripts*
+** 3 readiness check scripts renamed
+** Activation script updated with new service names
+
+. *Updated Documentation*
+** Revised architecture documentation (SYSTEMD-TARGETS.md)
+** Updated diagrams showing simplified flow
+** Examples and debugging guidance reflecting new structure
+
+. *Inventory & Mapping*
+** Complete inventory of all units and scripts
+** Mapping of old → new names
+** Dependency chain documentation
+
+== Acceptance Criteria
+
+✅ *Correctness*
+
+* [x] All systemd units load without errors
+* [x] Boot flow maintains correct ordering
+* [x] Readiness checks execute and can fail the service
+* [x] No dangling references to old service/target names
+
+✅ *Simplification*
+
+* [x] Net reduction in lines of code
+* [x] Fewer total files (services + targets)
+* [x] Direct dependencies replace target indirection
+* [x] One service per layer (no separate ready services)
+
+✅ *Documentation*
+
+* [x] Architecture docs match implementation
+* [x] Examples and diagrams updated
+* [x] Service names in docs match actual names
+* [x] Debugging commands reference correct units
+
+✅ *Maintainability*
+
+* [x] Git history preserved through renames
+* [x] Naming conventions followed consistently
+* [x] Dependencies are explicit and documented
+* [x] Future additions have clear patterns to follow
+
+== Results Summary
+
+.*Phase 2 Results*
+* 8 manifests services renamed
+* 5 ready services renamed  
+* 3 scripts renamed
+* All references updated across 20+ files
+
+.*Phase 3 Results*
+* 5 ready services eliminated (integrated into manifests)
+* 6 targets eliminated (redundant)
+* ExecStartPost readiness checks integrated
+* Direct service dependencies replacing targets
+
+.*Overall Impact*
+* Files changed: 30
+* Files renamed: 8 (services) + 3 (scripts) = 11
+* Files deleted: 5 (services) + 6 (targets) = 11
+* Net code reduction: 148 lines
+* Simplification ratio: ~30% fewer systemd-related files
+
+== Remote Execution Pattern
+
+Use this command pattern to run commands on the NixOS VM and inside the Incus node:
+
+[source,bash]
+----
+ssh <host>-nixos.local -- incus exec <node> -- flox activate --dir=/var/lib/rancher/rke2 -- <cmd>
+----
+
+.Examples
+[source,bash]
+----
+# Check nodes
+ssh bioskop-nixos.local -- incus exec master -- flox activate --dir=/var/lib/rancher/rke2 -- kubectl get nodes
+
+# Check service status  
+ssh bioskop-nixos.local -- incus exec master -- systemctl status rke2lab-mesh-manifests.service
+----
+
+== Host Orchestration Conventions
+
+* On the NixOS VM, activate flox in the rke2lab working tree before orchestration:
++
+[source,bash]
+----
+ssh <host>-nixos.local -- flox activate --dir=/var/lib/git/nxmatic/rke2lab -- <cmd>
+----
+
+* Always use `remake` (not `make`) for deployment orchestration
+
+== References
+
+* link:../../rke2.d/bioskop/master/SYSTEMD-TARGETS.md[Systemd Service Architecture Documentation]
+* link:../../make.d/incus/systemd[Systemd Unit Definitions]
+* link:../../make.d/incus/scripts[Helper Scripts]

@@ -4,9 +4,9 @@ RequiresMountsFor=/srv/host/system.d /srv/host
 After=local-fs.target
 After=rke2-server.service
 Requires=rke2-server.service
-After=rke2lab-storage-ready-check.service
-Requires=rke2lab-storage-ready-check.service
-Wants=rke2lab-networking-ready-check.service
+After=rke2lab-storage-ready.service
+Requires=rke2lab-storage-ready.service
+Wants=rke2lab-networking-ready.service
 ConditionPathExists=/srv/host/scripts.d/rke2-manifests-install.sh
 ConditionPathExists=/srv/host/manifests.d/networking
 
