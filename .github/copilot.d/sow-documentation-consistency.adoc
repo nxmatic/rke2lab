@@ -255,11 +255,11 @@ Not needed for:
 
 | `MESH-BUILD-STRATEGY.md`
 | `rke2.d/bioskop/master/catalog/mesh/mesh-build-strategy.adoc`
-| Pending
+| ✅ Complete
 
 | `FLOX-INVENTORY.md`
 | `rke2.d/bioskop/master/catalog/mesh/flox-inventory.adoc`
-| Pending
+| ✅ Complete
 
 | `rke2.d/catalog/overlays/README.md`
 | `rke2.d/catalog/overlays/README.adoc`
