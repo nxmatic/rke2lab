@@ -44,6 +44,10 @@ devices:
     type: disk
     source: ${INCUS_SCRIPTS_DIR}
     path: /srv/host/scripts.d
+  git.dir:
+    type: disk
+    source: /var/lib/git
+    path: /srv/host/git
   rke2lab.system.dir:
     type: disk
     source: ${INCUS_SYSTEMD_DIR}

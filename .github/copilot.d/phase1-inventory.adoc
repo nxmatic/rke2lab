@@ -39,8 +39,8 @@ Complete inventory and mapping of all systemd units, scripts, and dependencies i
 * `rke2lab-mesh-ready-check.service` → `rke2lab-mesh-ready.service`
 
 ==== Flox/Nix Build Services (3)
-* `rke2lab-flox-nix-build.service`
-* `rke2lab-flox-nix-build@.service`
+* `rke2lab-flox-build.service`
+* `rke2lab-flox-build@.service`
 * `rke2lab-flox-nix-wait.service`
 
 ==== Other Services (9)
@@ -56,7 +56,7 @@ Complete inventory and mapping of all systemd units, scripts, and dependencies i
 
 === Systemd Targets (7 total)
 
-* `rke2lab-flox-nix-builds-complete.target` _(retained - parallel builds)_
+* `rke2lab-flox-builds-complete.target` _(retained - parallel builds)_
 * `rke2lab-runtime-ready.target` _(eliminated in Phase 3.5)_
 * `rke2lab-storage-ready.target` _(eliminated in Phase 3.5)_
 * `rke2lab-networking-ready.target` _(eliminated in Phase 3.5)_

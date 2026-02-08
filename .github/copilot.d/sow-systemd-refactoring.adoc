@@ -40,7 +40,7 @@ The architecture has grown organically and needs systematic refactoring for clar
 * Upstream `rke2-server.service` and `rke2-agent.service` definitions
 * Non-systemd runtime components not managed by these units
 * Unrelated docs and packages outside the custom systemd layer
-* The `rke2lab-flox-nix-builds-complete.target` (truly independent/parallel)
+* The `rke2lab-flox-builds-complete.target` (truly independent/parallel)
 
 == Assumptions
 

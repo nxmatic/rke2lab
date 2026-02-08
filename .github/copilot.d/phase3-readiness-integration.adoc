@@ -43,7 +43,7 @@ ____
 
 *Conclusion*: All targets were redundant. A target with only one dependency provides no value - just use direct service dependencies.
 
-*Exception*: `rke2lab-flox-nix-builds-complete.target` coordinates multiple parallel `rke2lab-flox-nix-build@*.service` instances, so it's legitimate and retained.
+*Exception*: `rke2lab-flox-builds-complete.target` coordinates multiple parallel `rke2lab-flox-build@*.service` instances, so it's legitimate and retained.
 
 == Phase 3: Readiness Integration
 

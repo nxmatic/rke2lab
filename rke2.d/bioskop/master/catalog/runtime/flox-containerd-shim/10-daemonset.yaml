@@ -31,7 +31,7 @@ spec:
       nodeSelector:
         flox.dev/enabled: "true"
       initContainers:
-        - name: nix-builder
+        - name: flox-builder
           image: alpine:3.20
           imagePullPolicy: IfNotPresent
           securityContext:
@@ -44,17 +44,18 @@ spec:
             - |
               # Use nsenter to run the build script in the host's environment
               # This gives access to host's flox, nix, yq, and environment
-              if [ ! -f /config/nix-builds.yaml ]; then
-                echo "No nix-builds.yaml found, skipping Nix builds"
+              if [ ! -f /config/flox-builds.yaml ]; then
+                echo "No flox-builds.yaml found, skipping Nix builds"
                 exit 0
               fi
-              # Copy ConfigMap to host location for script access
+              # Copy ConfigMap from container to host via pipe (can't access container fs from nsenter)
+              cat /config/flox-builds.yaml | nsenter --target 1 --mount --uts --ipc --net --pid -- \
+                sh -c 'cat > /tmp/flox-builds.yaml'
+              # Run the build script in host context
               nsenter --target 1 --mount --uts --ipc --net --pid -- \
-                cp /config/nix-builds.yaml /tmp/nix-builds.yaml
-              nsenter --target 1 --mount --uts --ipc --net --pid -- \
-                /srv/host/scripts.d/rke2lab-nix-build.sh /tmp/nix-builds.yaml
+                /srv/host/scripts.d/rke2lab-flox-build.sh /tmp/flox-builds.yaml
           volumeMounts:
-            - name: nix-builds-config
+            - name: flox-builds-config
               mountPath: /config
               readOnly: true
         - name: shim-installer
@@ -91,9 +92,9 @@ spec:
               memory: 64Mi
               ephemeral-storage: 64Mi
       volumes:
-        - name: nix-builds-config
+        - name: flox-builds-config
           configMap:
-            name: nix-builds-config
+            name: flox-builds-config
         - name: runtime-installer-script
           configMap:
             name: flox-runtime-installer-script

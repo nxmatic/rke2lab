@@ -45,24 +45,27 @@ spec:
             - |
               # Use nsenter to run the build script in the host's environment
               # This gives access to host's flox, nix, yq, and environment
-              if [ ! -f /host/nix-builds.yaml ]; then
-                echo "No nix-builds.yaml found, skipping Nix builds"
+              if [ ! -f /config/flox-builds.yaml ]; then
+                echo "No flox-builds.yaml found, skipping Nix builds"
                 exit 0
               fi
+              # Copy ConfigMap from container to host via pipe (can't access container fs from nsenter)
+              cat /config/flox-builds.yaml | nsenter --target 1 --mount --uts --ipc --net --pid -- \
+                sh -c 'cat > /tmp/flox-builds.yaml'
+              # Run the build script in host context
               nsenter --target 1 --mount --uts --ipc --net --pid -- \
-                /srv/host/scripts.d/rke2lab-nix-build.sh /srv/host/nix-builds.yaml
+                /srv/host/scripts.d/rke2lab-flox-build.sh /tmp/flox-builds.yaml
           image: alpine:3.20
           imagePullPolicy: IfNotPresent
-          name: nix-builder
+          name: flox-builder
           securityContext:
             privileged: true
             runAsGroup: 0
             runAsUser: 0
           volumeMounts:
-            - mountPath: /host/nix-builds.yaml
-              name: nix-builds-config
+            - mountPath: /config
+              name: flox-builds-config
               readOnly: true
-              subPath: nix-builds.yaml
         - command:
             - /bin/sh
             - /scripts/shim-installer.sh
@@ -91,10 +94,9 @@ spec:
       tolerations:
         - operator: Exists
       volumes:
-        - hostPath:
-            path: /srv/host
-            type: Directory
-          name: nix-builds-config
+        - configMap:
+            name: flox-builds-config
+          name: flox-builds-config
         - configMap:
             defaultMode: 493
             name: flox-runtime-installer-script

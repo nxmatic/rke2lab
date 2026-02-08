@@ -8,14 +8,16 @@ log() {
 }
 
 usage() {
-  echo "Usage: $(basename "$0") <layer|layer/subpath> [--package <name>]" >&2
+  echo "Usage: $(basename "$0") <layer|layer/subpath> [--package <name>] [--timeout <duration>]" >&2
   echo "Example: $(basename "$0") networking" >&2
   echo "         $(basename "$0") mesh" >&2
   echo "         $(basename "$0") storage --package openebs-zfs" >&2
+  echo "         $(basename "$0") replication --timeout 600s" >&2
 }
 
 layer=""
 package_filter=""
+timeout="${RKE2_LAYER_READY_TIMEOUT:-300s}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -23,6 +25,15 @@ while [[ $# -gt 0 ]]; do
       package_filter="${2:-}"
       if [[ -z "${package_filter}" ]]; then
         log "Missing package name for $1"
+        usage
+        exit 1
+      fi
+      shift 2
+      ;;
+    -t|--timeout)
+      timeout="${2:-}"
+      if [[ -z "${timeout}" ]]; then
+        log "Missing timeout value for $1"
         usage
         exit 1
       fi
@@ -61,7 +72,6 @@ fi
 layer="${layer%/}"
 base_dir="${RKE2LAB_MANIFESTS_DIR:-/srv/host/manifests.d}"
 src_dir="${base_dir}/${layer}"
-timeout="${RKE2_LAYER_READY_TIMEOUT:-300s}"
 
 if [[ ! -d "${src_dir}" ]]; then
   log "Manifest directory not found: ${src_dir}"
@@ -138,6 +148,13 @@ for entry in "${workloads[@]}"; do
   resource=$(echo "${kind}" | tr '[:upper:]' '[:lower:]')
 
   kubectl get namespace "${namespace}" >/dev/null 2>&1 || kubectl create namespace "${namespace}" >/dev/null
+  
+  # Wait for resource to be created by RKE2 from manifest directory
+  log "Waiting for ${resource}/${name} to be created in namespace ${namespace}"
+  kubectl -n "${namespace}" wait --for=create "${resource}/${name}" --timeout="${timeout}"
+  
+  # Wait for rollout to complete
+  log "Waiting for ${resource}/${name} rollout to complete"
   kubectl -n "${namespace}" rollout status "${resource}/${name}" --timeout="${timeout}"
 done
 

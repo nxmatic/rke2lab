@@ -70,6 +70,11 @@ write_files:
       publish-hinfo=yes
       publish-aaaa-on-ipv4=no
       publish-a-on-ipv6=no
+  # Enable Nix experimental features required for flakes
+  - path: /etc/nix/nix.conf
+    permissions: "0644"
+    content: |
+      experimental-features = nix-command flakes
   # Disable IPv6 globally so nodes stay IPv4-only end-to-end (@codebase)
   - path: /etc/sysctl.d/99-disable-ipv6.conf
     permissions: "0644"

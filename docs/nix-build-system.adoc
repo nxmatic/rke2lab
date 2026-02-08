@@ -10,7 +10,7 @@
 
 This document describes the *descriptor-driven* build system for RKE2 that:
 
-* Defines build jobs in a single Nix build descriptor file (`nix-builds.yaml`)
+* Defines build jobs in a single Nix build descriptor file (`flox-builds.yaml`)
 * Uses a generic systemd service and build script
 * Eliminates the need for package-specific services
 * Scales easily to multiple packages and clusters
@@ -19,24 +19,24 @@ This document describes the *descriptor-driven* build system for RKE2 that:
 
 === Files
 
-. *Descriptor*: link:../rke2.d/bioskop/master/nix-builds.yaml[rke2.d/bioskop/master/nix-builds.yaml]
+. *Descriptor*: link:../rke2.d/bioskop/master/flox-builds.yaml[rke2.d/bioskop/master/flox-builds.yaml]
 ** Defines all Nix build jobs
 ** YAML format with version control
-** Mounted in Incus container at `/srv/host/nix-builds.yaml`
+** Mounted in Incus container at `/srv/host/flox-builds.yaml`
 
-. *Generic Build Script*: link:../make.d/incus/scripts/rke2lab-nix-build.sh[make.d/incus/scripts/rke2lab-nix-build.sh]
+. *Generic Build Script*: link:../make.d/incus/scripts/rke2lab-flox-build.sh[make.d/incus/scripts/rke2lab-flox-build.sh]
 ** Parses the descriptor with `yq`
 ** Iterates through all enabled jobs
 ** Builds packages and logs results
-** Input: descriptor file path (default: `/srv/host/nix-builds.yaml`)
+** Input: descriptor file path (default: `/srv/host/flox-builds.yaml`)
 
-. *Generic Systemd Service*: link:../make.d/incus/systemd/rke2lab-flox-nix-build.service[make.d/incus/systemd/rke2lab-flox-nix-build.service]
+. *Generic Systemd Service*: link:../make.d/incus/systemd/rke2lab-flox-build.service[make.d/incus/systemd/rke2lab-flox-build.service]
 ** Runs the generic build script
 ** Executes early (after local filesystems)
 ** Runs in parallel with other stages
 
 . *Incus Mount*: `nix-builds.descriptor` in instance config
-** Binds descriptor file to `/srv/host/nix-builds.yaml`
+** Binds descriptor file to `/srv/host/flox-builds.yaml`
 ** Allows single source of truth
 
 == Descriptor Format
@@ -70,7 +70,7 @@ ls rke2.d/bioskop/master/catalog/{component}/flake.nix
 
 === Step 2: Add job to descriptor
 
-Edit link:../rke2.d/bioskop/master/nix-builds.yaml[nix-builds.yaml]:
+Edit link:../rke2.d/bioskop/master/flox-builds.yaml[flox-builds.yaml]:
 
 [source,yaml]
 ----
@@ -95,14 +95,14 @@ Only if you have a manifest install service that depends on this package:
 ----
 [Unit]
 ...
-After=rke2lab-flox-nix-builds-complete.target
-Requires=rke2lab-flox-nix-builds-complete.target
+After=rke2lab-flox-builds-complete.target
+Requires=rke2lab-flox-builds-complete.target
 ----
 
 === Step 4: Test
 
 . Restart the master node
-. Check logs: `journalctl -u rke2lab-flox-nix-build.service -f`
+. Check logs: `journalctl -u rke2lab-flox-build.service -f`
 . Verify outputs: `ls -la /tmp/mycomponent-build/`
 
 == Service Execution Flow
@@ -118,9 +118,9 @@ Kubernetes pods start with flox.dev/environment annotations
 In parallel (non-blocking):
 local-fs.target
   ↓
-rke2lab-flox-nix-build.service
+rke2lab-flox-build.service
     │
-    ├─ Read /srv/host/nix-builds.yaml
+    ├─ Read /srv/host/flox-builds.yaml
     │
     ├─ For each enabled job:
     │  ├─ Verify flake.nix exists
@@ -171,14 +171,14 @@ Flox shim resolves environment to packages in /tmp/*-build/
 
 [source,bash]
 ----
-ssh bioskop-nixos.local -- incus exec master -- cat /srv/host/nix-builds.yaml
+ssh bioskop-nixos.local -- incus exec master -- cat /srv/host/flox-builds.yaml
 ----
 
 === Watch build in progress
 
 [source,bash]
 ----
-ssh bioskop-nixos.local -- incus exec master -- journalctl -u rke2lab-flox-nix-build.service -f
+ssh bioskop-nixos.local -- incus exec master -- journalctl -u rke2lab-flox-build.service -f
 ----
 
 === Check build outputs
@@ -199,7 +199,7 @@ ssh bioskop-nixos.local -- incus exec master -- cat /var/log/rke2-mesh-build.log
 
 [source,bash]
 ----
-ssh bioskop-nixos.local -- incus exec master -- yq eval '.jobs[0]' /srv/host/nix-builds.yaml
+ssh bioskop-nixos.local -- incus exec master -- yq eval '.jobs[0]' /srv/host/flox-builds.yaml
 ----
 
 == Multi-Cluster Support
@@ -208,14 +208,14 @@ For multiple clusters (bioskop, alcide, etc.):
 
 === Option A: Shared descriptor (preferred)
 
-* Single `nix-builds.yaml` in rke2.d catalog root
+* Single `flox-builds.yaml` in rke2.d catalog root
 * All clusters use the same build jobs
-* Mount at `/srv/host/nix-builds.yaml` on each cluster
+* Mount at `/srv/host/flox-builds.yaml` on each cluster
 
 === Option B: Cluster-specific descriptors
 
-* `rke2.d/bioskop/master/nix-builds.yaml`
-* `rke2.d/alcide/master/nix-builds.yaml`
+* `rke2.d/bioskop/master/flox-builds.yaml`
+* `rke2.d/alcide/master/flox-builds.yaml`
 * Mount each cluster's descriptor separately
 
 === Option C: Build aggregation
@@ -282,9 +282,9 @@ The legacy headplane build service (if still present on older nodes) is *not use
 
 == Related Files
 
-* link:../rke2.d/bioskop/master/nix-builds.yaml[rke2.d/bioskop/master/nix-builds.yaml] - Nix build descriptor
-* link:../make.d/incus/scripts/rke2lab-nix-build.sh[make.d/incus/scripts/rke2lab-nix-build.sh] - Generic build script
-* link:../make.d/incus/systemd/rke2lab-flox-nix-build.service[make.d/incus/systemd/rke2lab-flox-nix-build.service] - Systemd service
+* link:../rke2.d/bioskop/master/flox-builds.yaml[rke2.d/bioskop/master/flox-builds.yaml] - Nix build descriptor
+* link:../make.d/incus/scripts/rke2lab-flox-build.sh[make.d/incus/scripts/rke2lab-flox-build.sh] - Generic build script
+* link:../make.d/incus/systemd/rke2lab-flox-build.service[make.d/incus/systemd/rke2lab-flox-build.service] - Systemd service
 * link:../rke2.d/bioskop/master/incus-instance-config.yaml[rke2.d/bioskop/master/incus-instance-config.yaml] - Incus mount config
 * link:../rke2.d/bioskop/master/catalog/mesh/mesh-build-strategy.adoc[mesh-build-strategy.adoc] - Original strategy document
 * link:../rke2.d/bioskop/master/catalog/mesh/flox-inventory.adoc[flox-inventory.adoc] - Flox environment usage

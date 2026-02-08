@@ -1,0 +1,175 @@
+= SOW: Flox Build System Refactoring & Optimization
+:doctype: document
+:toc:
+:toclevels: 3
+:keywords: flox, build-system, script-refactor, naming-consistency
+
+== Overview
+Completed comprehensive refactoring of the Nix/Flox build system to improve naming consistency, reduce resource consumption, and optimize script execution.
+
+== Session Summary
+**Date:** February 8, 2026  
+**Status:** ✅ COMPLETED  
+
+== Changes Implemented
+
+=== 1. Build Script Renaming & Optimization
+* *File:* `make.d/incus/scripts/rke2lab-flox-build.sh`
+* ✅ Renamed from `rke2lab-nix-build.sh`
+* ✅ Optimized YAML parsing:
+  - Changed from loading all variables upfront to on-demand loading
+  - Implemented `yq -o shell` with `del(.packages)` for job-level config
+  - Load individual packages in loop via `yq -o shell ".jobs[$i].packages[$j]"`
+  - Eliminated complex variable index extraction with `compgen`
+* ✅ Removed output directory symlinks (`--no-link` flag)
+* ✅ Cleaned up logging:
+  - Replaced `:` noop with proper logging statements
+  - Removed decorative box-drawing separators causing UTF-8 encoding noise
+  - Kept essential job headers and build summaries
+
+=== 2. Systemd Service Renaming
+* *File:* `make.d/incus/systemd/rke2lab-flox-build.service`
+* ✅ Renamed from `rke2lab-flox-nix-build.service`
+* ✅ Service marked as DEPRECATED (builds moved to Kubernetes DaemonSet)
+
+=== 3. Build Descriptor Renaming
+* *File:* `rke2.d/bioskop/master/flox-builds.yaml`
+* ✅ Renamed from `nix-builds.yaml`
+* ✅ Updated all ConfigMap references:
+  - `05-configmap-flox-builds.yaml` (catalog)
+  - `02-configmap-flox-builds.yml` (manifests.d)
+  - `05-configmap-flox-builds.yaml` (.local.d kpt cache)
+* ✅ ConfigMap name: `flox-builds-config` (from `nix-builds-config`)
+* ✅ Re-enabled mesh build job: `enabled: true`
+
+=== 4. DaemonSet & Manifest Updates
+* *Files:*
+  - `rke2.d/bioskop/master/catalog/runtime/flox-containerd-shim/10-daemonset.yaml`
+  - `rke2.d/bioskop/master/manifests.d/runtime/flox-containerd-shim/02-daemonset-flox-runtime-installer.yml`
+  - `rke2.d/bioskop/master/manifests.yaml`
+* ✅ Updated volume mount references to `flox-builds-config`
+* ✅ Updated ConfigMap references to use new name
+* ✅ Updated script invocation path in initContainer
+
+=== 5. Documentation Updates
+* *Files Updated:*
+  - `docs/nix-build-system.adoc`
+  - `docs/systemd-service-architecture.adoc`
+  - `.github/copilot.d/sow-flox-runtime-nix-builds.adoc`
+  - `.github/copilot.d/phase3-readiness-integration.adoc`
+  - `.github/copilot.d/phase1-inventory.adoc`
+  - `.github/copilot.d/sow-systemd-refactoring.adoc`
+* ✅ Updated all file path references
+* ✅ Updated ConfigMap name references
+* ✅ Updated systemd service name references
+
+== Naming Consistency Achieved
+[cols="2,2,3"]
+|===
+| Component | Old Name | New Name
+
+| Build Script | `rke2lab-nix-build.sh` | `rke2lab-flox-build.sh`
+| Systemd Service | `rke2lab-flox-nix-build.service` | `rke2lab-flox-build.service`
+| Service Target | `rke2lab-flox-nix-builds-complete.target` | `rke2lab-flox-builds-complete.target`
+| Build Descriptor | `nix-builds.yaml` | `flox-builds.yaml`
+| ConfigMap Name | `nix-builds-config` | `flox-builds-config`
+| ConfigMap Data Key | `nix-builds.yaml` | `flox-builds.yaml`
+|===
+
+== Technical Improvements
+
+=== Performance Optimizations
+1. **Variable Loading**: On-demand loading vs. upfront loading
+   - Eliminates need for variable index scanning with `compgen`
+   - Reduces shell variable namespace pollution
+   - Cleaner variable extraction with explicit paths
+
+2. **Build Output**: Removed symbolic links
+   - Packages built directly into Nix store
+   - No filesystem clutter from symlink directories
+   - Faster builds without link creation overhead
+
+3. **Logging Efficiency**: Simplified output
+   - Removed UTF-8 box-drawing characters causing encoding noise
+   - Cleaner xtrace output with fewer noop statements
+   - More readable build logs
+
+### Nix Configuration
+* Added to cloud-init (`rke2.d/bioskop/master/user-data`):
+  ```
+  /etc/nix/nix.conf:
+    experimental-features = nix-command flakes
+  ```
+* Ensures Nix flake support enabled system-wide on cluster nodes
+
+== Files Modified
+[cols="1,1"]
+|===
+| Category | Count
+
+| Script files | 1
+| Systemd service files | 1
+| YAML descriptors | 1
+| ConfigMap files | 3 (catalog + manifests.d + .local.d)
+| DaemonSet manifests | 3
+| Documentation files | 6
+| Total | 15
+|===
+
+== Deployment Status
+* ✅ Script optimization: Ready
+* ✅ Naming consistency: Complete
+* ✅ ConfigMap updates: Complete
+* ⚠️ Manifest re-rendering: Pending (requires `kpt` or manual apply)
+* ⚠️ Cluster deployment: Pending (requires manifest apply)
+
+== Test Cases Covered
+- ✅ Script parses enabled/disabled jobs correctly
+- ✅ Variables loaded on-demand without full array upfront
+- ✅ Package iteration works with dynamic package count
+- ✅ Build failures tracked correctly per job
+- ✅ Summary output shows accurate totals
+- ⚠️ Integration test with actual Kubernetes cluster pending
+
+== Next Steps
+
+1. **Re-render manifests** to incorporate updated script references:
+   - Run kpt apply or equivalent templating
+   - Ensure `rke2lab-flox-build.sh` path matches in generated manifests
+
+2. **Deploy to cluster**:
+   - Apply updated DaemonSet manifests
+   - Verify ConfigMap with new name deploys correctly
+
+3. **Monitor first build run**:
+   - Check initContainer logs for script execution
+   - Verify mesh packages (headplane, headplane-agent, headscale) build successfully
+   - Monitor `/var/log/rke2-mesh-build.log` on cluster node
+
+4. **Cleanup**:
+   - Remove old `rke2lab-nix-build.sh` wrapper once fully deployed
+   - Archive deprecated systemd service documentation
+
+== Session Notes
+
+=== Challenges Addressed
+* **UTF-8 Encoding in Logs**: Box-drawing characters (═╔╗╚╝║) caused `$'\342\225\220...'` in xtrace output → Removed decorative borders
+* **Variable Management**: Complex index-based extraction needed simplification → Switched to direct `yq -o shell` per package
+* **set -e Behavior**: Arithmetic operations and yq exit codes causing script termination → Changed to `yq -o shell` which handles properly
+* **Experimental Nix Features**: Flakes require explicit enablement → Added to `/etc/nix/nix.conf` via cloud-init
+
+=== Design Decisions
+1. **Naming Convention**: "flox" vs "nix" reflects that this is flox-runtime infrastructure, not generic Nix builds
+2. **Script Location**: Kept in `/srv/host/scripts.d/` for host-context execution via nsenter
+3. **Descriptor Format**: YAML for human readability and easy ConfigMap integration
+4. **On-demand Variables**: Simpler error handling and smaller variable namespace per iteration
+
+== Resources
+* Build Descriptor: [flox-builds.yaml](../../rke2.d/bioskop/master/flox-builds.yaml)
+* Build Script: [rke2lab-flox-build.sh](../../make.d/incus/scripts/rke2lab-flox-build.sh)
+* DaemonSet Manifest: [10-daemonset.yaml](../../rke2.d/bioskop/master/catalog/runtime/flox-containerd-shim/10-daemonset.yaml)
+* Nix Config: [user-data cloud-init](../../rke2.d/bioskop/master/user-data)
+
+== References
+* Related SOW: link:sow-flox-runtime-nix-builds.adoc[sow-flox-runtime-nix-builds.adoc]
+* Architecture Docs: link:../docs/systemd-service-architecture.adoc[systemd-service-architecture.adoc]

@@ -41,8 +41,8 @@ This document describes the *linear service dependency system* for RKE2 initiali
 ----
 multi-user.target
     ↑
-    ├─ rke2lab-flox-nix-builds-complete.target
-    │   └─ After: rke2lab-flox-nix-build.service
+    ├─ rke2lab-flox-builds-complete.target
+    │   └─ After: rke2lab-flox-build.service
     │
     └─ Layer services (linear chain):
         │
@@ -79,15 +79,15 @@ Each manifests service represents a *milestone* in the cluster initialization an
 
 === Stage 2: Flox Nix Builds Complete
 
-*Target*: `rke2lab-flox-nix-builds-complete.target`
+*Target*: `rke2lab-flox-builds-complete.target`
 
-* All Nix packages built from `nix-builds.yaml`
+* All Nix packages built from `flox-builds.yaml`
 * Outputs available in `/tmp/*-build/`
 * Flox environments available to containerd
 
 *Services that finish before this target*:
 
-* `rke2lab-flox-nix-build.service`
+* `rke2lab-flox-build.service`
 
 *Required by*: _None (runs concurrently)_
 
@@ -248,10 +248,10 @@ multi-user.target (system fully operational)
 In parallel (non-blocking):
 local-fs.target
     ↓
-rke2lab-flox-nix-build.service (builds all Nix packages)
+rke2lab-flox-build.service (builds all Nix packages)
     ↓
 ┌─────────────────────────────────────────────┐
-│ rke2lab-flox-nix-builds-complete.target     │  ← Guarantees packages available
+│ rke2lab-flox-builds-complete.target     │  ← Guarantees packages available
 └─────────────────────────────────────────────┘
 ----
 
@@ -367,8 +367,8 @@ After=rke2lab-networking-ready.service
 Requires=rke2lab-networking-ready.service
 After=rke2lab-storage-ready.service
 Requires=rke2lab-storage-ready.service
-After=rke2lab-flox-nix-build.service
-Requires=rke2lab-flox-nix-build.service
+After=rke2lab-flox-build.service
+Requires=rke2lab-flox-build.service
 ----
 
 === After Phase 3.5 (direct service dependencies)
@@ -426,9 +426,9 @@ Description=Install mesh manifests (includes readiness check)
 == Related Files
 
 * Service definitions: link:../make.d/incus/systemd/[make.d/incus/systemd/rke2lab-*-manifests.service]
-* Flox build service: link:../make.d/incus/systemd/rke2lab-flox-nix-build.service[rke2lab-flox-nix-build.service]
-* Flox builds target: link:../make.d/incus/systemd/rke2lab-flox-nix-builds-complete.target[rke2lab-flox-nix-builds-complete.target]
+* Flox build service: link:../make.d/incus/systemd/rke2lab-flox-build.service[rke2lab-flox-build.service]
+* Flox builds target: link:../make.d/incus/systemd/rke2lab-flox-builds-complete.target[rke2lab-flox-builds-complete.target]
 * Mesh manifests service: link:../make.d/incus/systemd/rke2lab-mesh-manifests.service[rke2lab-mesh-manifests.service]
-* Build descriptor: link:../rke2.d/bioskop/master/nix-builds.yaml[nix-builds.yaml]
+* Build descriptor: link:../rke2.d/bioskop/master/flox-builds.yaml[flox-builds.yaml]
 * Readiness scripts: link:../make.d/incus/scripts/[make.d/incus/scripts/rke2-*-ready.sh]
 * Refactoring documentation: link:../.github/copilot.d/sow-systemd-refactoring.adoc[Systemd Refactoring SOW]

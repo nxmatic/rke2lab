@@ -13,7 +13,7 @@ We are integrating Flox environment management and Nix package builds into the R
 * Evolved from systemd service approach to Kubernetes-native DaemonSet initContainer
 * Implemented nix-builder initContainer using nsenter to access host environment
 * Established Flox authentication sharing from Darwin host to cluster nodes via mount
-* Created descriptor-driven Nix build system (nix-builds.yaml)
+* Created descriptor-driven Nix build system (flox-builds.yaml)
 
 The architecture now follows Kubernetes-native patterns with DaemonSet initContainers running on nodes labeled `flox.dev/enabled=true`.
 
@@ -52,7 +52,7 @@ The architecture now follows Kubernetes-native patterns with DaemonSet initConta
 * Nodes have access to host Nix store at /nix
 * Flox config mounted from Darwin host at /root/.config/flox
 * Scripts bind-mounted from working tree at /srv/host/scripts.d
-* nix-builds.yaml descriptor mounted at /srv/host/nix-builds.yaml
+* flox-builds.yaml descriptor mounted at /srv/host/flox-builds.yaml
 * nsenter can access host PID 1 namespace from privileged container
 * Node labeling with `flox.dev/enabled=true` controls deployment
 
@@ -77,7 +77,7 @@ The architecture now follows Kubernetes-native patterns with DaemonSet initConta
 * [x] DaemonSet creates pods on nodes with `flox.dev/enabled=true`
 * [x] nix-builder initContainer starts before shim-installer
 * [x] nsenter successfully enters host namespace
-* [x] Script locates nix-builds.yaml descriptor
+* [x] Script locates flox-builds.yaml descriptor
 * [x] Flox activation succeeds
 * [x] No errors in initContainer logs
 
@@ -95,10 +95,10 @@ The architecture now follows Kubernetes-native patterns with DaemonSet initConta
 . Check Nix store for build artifacts
 . Review build timing and caching behavior
 . Test descriptor with disabled job (enabled: false)
-. Test graceful skip when nix-builds.yaml missing
+. Test graceful skip when flox-builds.yaml missing
 
 .*Acceptance Criteria*
-* [x] All enabled jobs in nix-builds.yaml execute
+* [x] All enabled jobs in flox-builds.yaml execute
 * [x] Build outputs created in /tmp/{job-name}-build directories
 * [x] Binaries are executable and correct architecture
 * [x] Disabled jobs are skipped
@@ -137,7 +137,7 @@ The architecture now follows Kubernetes-native patterns with DaemonSet initConta
 
 .*Tasks*
 . Write architecture document: Flox DaemonSet pattern
-. Document nix-builds.yaml descriptor format
+. Document flox-builds.yaml descriptor format
 . Create debugging guide with kubectl commands
 . Document nsenter pattern for host environment access
 . Establish Flox authentication mount pattern
@@ -169,7 +169,7 @@ The architecture now follows Kubernetes-native patterns with DaemonSet initConta
 ** Pattern library: Reusable Flox workload patterns
 
 . *Configuration*
-** nix-builds.yaml descriptor specification
+** flox-builds.yaml descriptor specification
 ** Node labeling strategy documented
 ** Mount patterns for Flox/scripts/config
 
@@ -210,7 +210,7 @@ The architecture now follows Kubernetes-native patterns with DaemonSet initConta
 
 .*Architecture Transition*
 * [x] Moved from systemd service to DaemonSet initContainer
-* [x] Removed rke2lab-flox-nix-build.service
+* [x] Removed rke2lab-flox-build.service
 * [x] Updated activation script
 * [x] Simplified volume mounts
 
@@ -221,9 +221,9 @@ The architecture now follows Kubernetes-native patterns with DaemonSet initConta
 * [x] Set proper initContainer ordering (before shim-installer)
 
 .*Configuration*
-* [x] Restored nix-builds.yaml mount in incus-instance-config.yaml
-* [x] Converted nix-builds.yaml from ConfigMap to plain YAML format
-* [x] Added Flox activation to rke2lab-nix-build.sh script
+* [x] Restored flox-builds.yaml mount in incus-instance-config.yaml
+* [x] Converted flox-builds.yaml from ConfigMap to plain YAML format
+* [x] Added Flox activation to rke2lab-flox-build.sh script
 
 .*Commits*
 * 48eb919: fix(cilium): correct operator scaling script name
@@ -307,6 +307,6 @@ ssh bioskop-nixos.local -- incus exec master -- ls -la /tmp/mesh-build/
 == References
 
 * link:../../rke2.d/bioskop/master/catalog/runtime/flox-containerd-shim/10-daemonset.yaml[Flox Runtime DaemonSet]
-* link:../../make.d/incus/scripts/rke2lab-nix-build.sh[Nix Build Script]
-* link:../../rke2.d/bioskop/master/nix-builds.yaml[Build Descriptor]
+* link:../../make.d/incus/scripts/rke2lab-flox-build.sh[Nix Build Script]
+* link:../../rke2.d/bioskop/master/flox-builds.yaml[Build Descriptor]
 * link:../../rke2.d/bioskop/master/incus-instance-config.yaml[Instance Configuration]
