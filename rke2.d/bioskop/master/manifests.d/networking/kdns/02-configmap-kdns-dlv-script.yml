@@ -9,7 +9,7 @@ data:
       : "[i] debug disabled (set annotation debug.kdns.lab42/enabled=true to enable); sleeping"
       sleep 3650d
     fi
-    apk add --no-cache wget ca-certificates >/dev/null
+    apk add --no-cache bash wget ca-certificates >/dev/null
     arch=$(uname -m)
     case "$arch" in
       x86_64) arch=amd64 ;;

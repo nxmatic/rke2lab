@@ -52,8 +52,7 @@ data:
 
     : "Creating Headplane API key..."
     HEADPLANE_API_KEY=$( kubectl exec -n "$HEADSCALE_NAMESPACE" deployment/headscale -- \
-      headscale apikeys create -o yaml |
-      yq -r '.key' - )
+      headscale apikeys create )
     if [ -z "$HEADPLANE_API_KEY" ]; then
       echo "ERROR: Failed to create Headplane API key"
       exit 1

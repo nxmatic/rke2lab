@@ -22,7 +22,8 @@ spec:
   template:
     metadata:
       annotations:
-        debug.kdns.lab42/enabled: "false"
+        debug.kdns.lab42/enabled: "true"
+        flox.dev/environment: nxmatic/kdns
         kpt.dev/package-layer: networking
         kpt.dev/package-name: kdns
       labels:
@@ -32,12 +33,14 @@ spec:
         helm.sh/chart: kdns-0.2.3
     spec:
       containers:
-        - env:
+        - command:
+            - kdns
+          env:
             - name: KUBERNETES_SERVICE_HOST
               value: 10.80.0.10
             - name: KUBERNETES_SERVICE_PORT
               value: "6443"
-          image: ghcr.io/lab42/kdns:v0.2.9
+          image: flox/empty:1.0.0
           imagePullPolicy: IfNotPresent
           livenessProbe: null
           name: kdns
@@ -106,6 +109,7 @@ spec:
               readOnly: true
       dnsPolicy: Default
       hostNetwork: true
+      runtimeClassName: flox
       securityContext: {}
       serviceAccountName: kdns
       shareProcessNamespace: true
