@@ -1,5 +1,5 @@
-run/
+# Flox local state - ignore in version control
 cache/
-lib/
-log/
-!env/
+run/
+*.lock
+env.lock
