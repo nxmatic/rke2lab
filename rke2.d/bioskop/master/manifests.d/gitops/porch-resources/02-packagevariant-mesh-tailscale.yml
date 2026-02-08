@@ -25,9 +25,9 @@ spec:
   pipeline:
     mutators:
       - configMap:
-          cluster-lb-cidr: 10.80.56.64/26
+          cluster-lb-cidr: 10.80.0.64/26
           cluster-name: bioskop-cluster
-          cluster-node-vip-inetaddr: 10.80.63.10
+          cluster-node-vip-inetaddr: 10.80.7.10
           tailscale-namespace: tailscale-system
           tailscale-version: 1.82.0
         image: ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2

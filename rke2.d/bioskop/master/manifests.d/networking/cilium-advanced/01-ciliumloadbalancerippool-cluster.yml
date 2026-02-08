@@ -9,7 +9,7 @@ metadata:
   name: cluster
 spec:
   blocks:
-    - cidr: 10.80.56.64/26
+    - cidr: 10.80.0.64/26
   serviceSelector:
     matchExpressions:
       - key: io.cilium/lb-ipam-pool

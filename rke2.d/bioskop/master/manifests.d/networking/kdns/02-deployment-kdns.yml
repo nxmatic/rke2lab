@@ -74,7 +74,7 @@ spec:
               readOnly: true
         - env:
             - name: KUBERNETES_SERVICE_HOST
-              value: 10.80.56.10
+              value: 10.80.0.10
             - name: KUBERNETES_SERVICE_PORT
               value: "6443"
           image: ghcr.io/lab42/kdns:v0.2.9
