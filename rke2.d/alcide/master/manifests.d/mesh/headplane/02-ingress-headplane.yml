@@ -23,5 +23,5 @@ spec:
                 name: headplane
                 port:
                   number: 3000
-            path: /
+            path: /admin
             pathType: Prefix

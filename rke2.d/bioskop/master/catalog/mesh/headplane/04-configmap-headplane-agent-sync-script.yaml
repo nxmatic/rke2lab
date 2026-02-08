@@ -15,7 +15,7 @@ data:
       --dry-run=client -o yaml | kubectl apply -f -
 
     yq eval '.server.base_url = strenv(HEADPLANE_BASE_URL) |
-      .server.cookie_secure = (env(HEADPLANE_COOKIE_SECURE) | downcase == "true") |
+      .server.cookie_secure = (strenv(HEADPLANE_COOKIE_SECURE) == "true") |
       .headscale.url = strenv(HEADSCALE_SERVICE_URL)' \
       /etc/headplane-template/config.yaml > /tmp/config.$$.yaml
     kubectl create secret generic headplane-config \

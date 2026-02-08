@@ -5,6 +5,7 @@ metadata: # kpt-merge: flox-runtime/flox-env
   namespace: flox-runtime
   annotations:
     internal.kpt.dev/upstream-identifier: '|ConfigMap|flox-runtime|flox-env'
+    replicator.v1.mittwald.de/replicate-to: "headscale-system"
 data:
   FLOX_DISABLE_METRICS: "true"
   FLOX_NO_TELEMETRY: "1"
