@@ -106,7 +106,7 @@ Updated `After=`, `Requires=`, `Wants=`, and `ExecStart=` directives:
 * Drop-in configurations referencing old names
 
 ==== Documentation (3 files)
-* `rke2.d/bioskop/master/SYSTEMD-TARGETS.md` - All diagrams and examples
+* `docs/systemd-service-architecture.adoc` - All diagrams and examples
 * `docs/c4-cluster-deployment.adoc` - Service references
 * `.github/copilot.d/sow.md` - References to service names
 

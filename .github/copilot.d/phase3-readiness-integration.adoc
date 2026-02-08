@@ -310,7 +310,7 @@ gitops/tekton manifests
 
 == Documentation Updates
 
-=== SYSTEMD-TARGETS.md Restructured
+=== systemd-service-architecture.adoc Restructured
 
 Renamed focus from "Target Architecture" to "Service Architecture":
 

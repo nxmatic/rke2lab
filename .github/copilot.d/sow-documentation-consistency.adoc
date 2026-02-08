@@ -93,12 +93,12 @@ rke2.d/catalog/overlays/README.md
 
 | `SYSTEMD-TARGETS.md`
 | `rke2.d/bioskop/master/`
-| Convert to `systemd-service-architecture.adoc` + move to `docs/`
+| ✅ Converted to `docs/systemd-service-architecture.adoc`
 | High
 
 | `GENERALIZED-BUILD-SYSTEM.md`
 | `rke2.d/bioskop/master/`
-| Convert to `nix-build-system.adoc` + move to `docs/`
+| ✅ Converted to `docs/nix-build-system.adoc`
 | High
 
 | `MESH-BUILD-STRATEGY.md`
@@ -247,11 +247,11 @@ Not needed for:
 
 | `SYSTEMD-TARGETS.md`
 | `docs/systemd-service-architecture.adoc`
-| Pending
+| ✅ Complete
 
 | `GENERALIZED-BUILD-SYSTEM.md`
 | `docs/nix-build-system.adoc`
-| Pending
+| ✅ Complete
 
 | `MESH-BUILD-STRATEGY.md`
 | `rke2.d/bioskop/master/catalog/mesh/mesh-build-strategy.adoc`

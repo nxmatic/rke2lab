@@ -97,7 +97,7 @@ Update all references across services, targets, scripts, and documentation.
 ** Activation script updated with new service names
 
 . *Updated Documentation*
-** Revised architecture documentation (SYSTEMD-TARGETS.md)
+** Revised architecture documentation (systemd-service-architecture.adoc)
 ** Updated diagrams showing simplified flow
 ** Examples and debugging guidance reflecting new structure
 
@@ -189,6 +189,6 @@ ssh <host>-nixos.local -- flox activate --dir=/var/lib/git/nxmatic/rke2lab -- <c
 
 == References
 
-* link:../../rke2.d/bioskop/master/SYSTEMD-TARGETS.md[Systemd Service Architecture Documentation]
+* link:../../docs/systemd-service-architecture.adoc[Systemd Service Architecture Documentation]
 * link:../../make.d/incus/systemd[Systemd Unit Definitions]
 * link:../../make.d/incus/scripts[Helper Scripts]
