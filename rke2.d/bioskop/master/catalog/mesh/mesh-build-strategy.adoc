@@ -1,0 +1,188 @@
+= Mesh Packages Build Strategy (@codebase)
+:author: Technical Documentation
+:revdate: {docdate}
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+
+== Overview
+
+This document describes the unified approach for building mesh packages (headplane, headscale) from local Nix flakes during Kubernetes cluster initialization.
+
+== Problem Statement
+
+Both `headplane` and `headscale` environments (`nxmatic/headplane`, `nxmatic/headscale`) are not available on the Flox Hub, requiring:
+
+. Building them locally on the master node
+. Making them available to Kubernetes pods before mesh manifests install
+. Applying consistent patterns across multiple deployments
+
+== Solution Architecture
+
+=== Package Sources
+
+*Headplane & Headscale flake*: link:headplane/flake.nix[rke2.d/bioskop/master/catalog/mesh/headplane/flake.nix]
+
+* Overlays `github:tale/headplane` which provides both packages
+* Builds for `aarch64-linux` and `aarch64-darwin`
+* Exports: `headplane`, `headplane-agent`, `headscale`
+
+=== Build Flow
+
+[source]
+----
+RKE2 Server Started
+   ↓
+rke2lab-mesh-manifests-install.service
+   ↓
+Kubernetes mesh deployments started with runtimeClassName: flox
+
+In parallel (non-blocking):
+local-fs.target
+   ↓
+rke2lab-flox-nix-build.service (builds mesh packages)
+----
+
+=== System Integration
+
+. *Mount*: `/var/lib/git` → `/srv/host/git` (in incus config)
+** Provides access to all git working trees
+** Allows flake.nix references by path
+
+. *Build Service*: `rke2lab-flox-nix-build.service`
+** Runs after local filesystems are available
+** Executes `rke2-nix-build.sh` (builds headplane + headscale)
+** Output: `/tmp/mesh-build/{headplane,headplane-agent,headscale}` symlinks
+
+. *Installation Service Dependency*: `rke2lab-mesh-manifests-install.service`
+** Runs independently of builds (non-blocking)
+** Optional: depend on `rke2lab-flox-nix-builds-complete.target` if required
+
+== Flox Annotations
+
+Mesh pods use pod metadata to reference Flox environments:
+
+[source,yaml]
+----
+metadata:
+  annotations:
+    flox.dev/environment: nxmatic/headplane  # or nxmatic/headscale
+----
+
+These values are configurable via kpt setters:
+
+* Headplane: link:headplane/setters.yaml[setters.yaml] → `headplane-flox-env`
+* Headscale: link:headscale/setters.yaml[setters.yaml] → `headscale-flox-env`
+
+== Container Runtime Integration
+
+The flox containerd shim:
+
+. Reads `flox.dev/environment` annotation
+. Attempts to pull environment from Flox Hub (or local registry)
+. Falls back to `runtimeClassName: flox` configured on the node
+
+*Key*: When packages aren't available on Flox Hub, they must be either:
+
+* Built and available in the node's Nix store, OR
+* Pushed to a registry accessible from the node
+
+== Steps to Apply Pattern to New Packages
+
+For any new package requiring local building:
+
+=== Step 1: Check if flake exists
+
+[source,bash]
+----
+ls -a rke2.d/bioskop/master/catalog/mesh/{package}/flake.nix
+----
+
+=== Step 2: Create systemd build service (template)
+
+[source,ini]
+----
+[Unit]
+Description=Build {package} for aarch64-linux
+After=rke2-server.service
+Requires=rke2-server.service
+ConditionPathExists=/srv/host/git/nxmatic/rke2lab/rke2.d/bioskop/master/catalog/mesh/{package}/flake.nix
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/scripts.d/rke2-{package}-build.sh
+RemainAfterExit=true
+Environment="PATH=/usr/bin:/nix/var/nix/profiles/default/bin"
+
+[Install]
+WantedBy=multi-user.target
+----
+
+=== Step 3: Create build script
+
+Build script that:
+
+* Validates flake.nix exists
+* Runs `nix build .#packages.aarch64-linux.{package-name}`
+* Outputs to appropriate directory
+* Logs to `/var/log/rke2-{package}-build.log`
+
+=== Step 4: Update manifest install service (optional)
+
+[source,ini]
+----
+After=rke2lab-flox-nix-builds-complete.target
+Requires=rke2lab-flox-nix-builds-complete.target
+----
+
+=== Step 5: Alternative - Push to registry
+
+If not building locally:
+
+* Use `rke2-{package}-push.service` for registry pushes
+* Update manifest install to wait for push to complete
+* Update pod annotations to reference registry image
+
+== Troubleshooting
+
+=== Check build logs
+
+[source,bash]
+----
+ssh bioskop-nixos.local -- incus exec master -- journalctl -u rke2lab-flox-nix-build.service -f
+----
+
+=== Verify build outputs
+
+[source,bash]
+----
+ssh bioskop-nixos.local -- incus exec master -- ls -la /tmp/mesh-build/
+----
+
+=== Check flox environment resolution
+
+[source,bash]
+----
+ssh bioskop-nixos.local -- incus exec master -- flox list nxmatic/headplane
+----
+
+=== Monitor Flox shim logs
+
+[source,bash]
+----
+ssh bioskop-nixos.local -- incus exec master -- tail -f /var/lib/rancher/rke2/agent/containerd/containerd.log | grep flox
+----
+
+== Future Considerations
+
+. *Cachix integration*: Push built packages to `nxmatic.cachix.org` for faster builds across clusters
+. *Build matrix*: Extend builds for multi-cluster (alcide, etc.)
+. *Container registry*: Host headplane/headscale OCI images in local registry instead of Flox environments
+. *Cross-compilation*: Build for multiple architectures if supporting mixed-arch clusters
+
+== Related Documents
+
+* link:../../../../../docs/nix-build-system.adoc[Generalized Nix Build System]
+* link:flox-inventory.adoc[Flox Environment Usage Inventory]
+* link:../../../../../docs/systemd-service-architecture.adoc[Systemd Service Architecture]
