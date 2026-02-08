@@ -1,0 +1,312 @@
+= Statement of Work: Flox Runtime & Nix Build Integration
+:author: AI Assistant + Human Collaborator
+:revdate: 2026-02-08
+:toc: left
+:toclevels: 3
+:icons: font
+
+== Context
+
+We are integrating Flox environment management and Nix package builds into the RKE2Lab Kubernetes cluster. Recent work includes:
+
+* Fixed rke2-server restart loop (cilium-operator-scaling script naming)
+* Evolved from systemd service approach to Kubernetes-native DaemonSet initContainer
+* Implemented nix-builder initContainer using nsenter to access host environment
+* Established Flox authentication sharing from Darwin host to cluster nodes via mount
+* Created descriptor-driven Nix build system (nix-builds.yaml)
+
+The architecture now follows Kubernetes-native patterns with DaemonSet initContainers running on nodes labeled `flox.dev/enabled=true`.
+
+== Objectives
+
+. Validate DaemonSet initContainer Nix builds in actual deployment
+. Verify builds execute successfully on all flox-enabled nodes
+. Test multi-node distribution and build caching
+. Document Flox runtime architecture and operational procedures
+. Establish patterns for Flox-based workloads
+. Ensure build observability via kubectl logs
+
+== Scope
+
+=== In Scope
+
+* DaemonSet initContainer nix-builder validation and testing
+* Nix build descriptor format and job execution
+* Flox environment activation and authentication
+* Build output verification and caching strategy
+* Kubernetes-native observability (pod logs, events)
+* Documentation of architecture decisions and patterns
+* Node labeling strategy for Flox enablement
+
+=== Out of Scope
+
+* Flox installation on nodes (pre-installed on host, accessed via nsenter)
+* Non-Flox container runtime configurations
+* Upstream RKE2 manifests not related to Flox runtime
+* Network layer mesh packages usage (separate workload phase)
+* Performance optimization (initial focus on correctness)
+
+== Assumptions
+
+* Flox is pre-installed and authenticated on the host
+* Nodes have access to host Nix store at /nix
+* Flox config mounted from Darwin host at /root/.config/flox
+* Scripts bind-mounted from working tree at /srv/host/scripts.d
+* nix-builds.yaml descriptor mounted at /srv/host/nix-builds.yaml
+* nsenter can access host PID 1 namespace from privileged container
+* Node labeling with `flox.dev/enabled=true` controls deployment
+
+== Approach
+
+=== Phase 1: Deployment Validation
+
+.*Objectives*
+* Deploy DaemonSet to cluster with nix-builder initContainer
+* Verify initContainer starts and runs to completion
+* Validate nsenter successfully accesses host environment
+* Check Flox activation and Nix store access
+
+.*Tasks*
+. Apply DaemonSet manifest to cluster
+. Watch pod lifecycle: `kubectl get pods -n flox-runtime -w`
+. Check initContainer logs: `kubectl logs -n flox-runtime -l app.kubernetes.io/name=flox-runtime-installer -c nix-builder`
+. Verify initContainer completes successfully (exit 0)
+. Check for error messages or missing dependencies
+
+.*Acceptance Criteria*
+* [x] DaemonSet creates pods on nodes with `flox.dev/enabled=true`
+* [x] nix-builder initContainer starts before shim-installer
+* [x] nsenter successfully enters host namespace
+* [x] Script locates nix-builds.yaml descriptor
+* [x] Flox activation succeeds
+* [x] No errors in initContainer logs
+
+=== Phase 2: Build Execution Verification
+
+.*Objectives*
+* Validate Nix builds execute for all jobs in descriptor
+* Verify build outputs are created in expected locations
+* Check build logs for errors or warnings
+* Confirm builds leverage Nix store and caching
+
+.*Tasks*
+. Exec into node to check build outputs: `/tmp/mesh-build`
+. Verify binaries built: headplane, headplane-agent, headscale
+. Check Nix store for build artifacts
+. Review build timing and caching behavior
+. Test descriptor with disabled job (enabled: false)
+. Test graceful skip when nix-builds.yaml missing
+
+.*Acceptance Criteria*
+* [x] All enabled jobs in nix-builds.yaml execute
+* [x] Build outputs created in /tmp/{job-name}-build directories
+* [x] Binaries are executable and correct architecture
+* [x] Disabled jobs are skipped
+* [x] Missing descriptor handled gracefully (no failure)
+* [x] Build logs show Nix store hits for cached packages
+
+=== Phase 3: Multi-Node Distribution
+
+.*Objectives*
+* Validate builds distribute to all flox-enabled nodes
+* Test node join/leave behavior
+* Verify build consistency across nodes
+
+.*Tasks*
+. Label additional nodes with `flox.dev/enabled=true`
+. Watch DaemonSet schedule pods on new nodes
+. Verify builds execute on newly joined nodes
+. Remove label from node, verify pod termination
+. Check build artifact presence across all nodes
+. Compare build outputs for consistency
+
+.*Acceptance Criteria*
+* [x] DaemonSet schedules pods on all labeled nodes
+* [x] New nodes execute builds on first startup
+* [x] Build artifacts consistent across nodes
+* [x] Unlabeling node removes pod gracefully
+* [x] Re-labeling triggers fresh deployment
+
+=== Phase 4: Documentation & Patterns
+
+.*Objectives*
+* Document Flox runtime architecture
+* Create operational runbooks
+* Establish reusable patterns for Flox workloads
+* Document troubleshooting procedures
+
+.*Tasks*
+. Write architecture document: Flox DaemonSet pattern
+. Document nix-builds.yaml descriptor format
+. Create debugging guide with kubectl commands
+. Document nsenter pattern for host environment access
+. Establish Flox authentication mount pattern
+. Create examples for additional Flox workloads
+
+.*Acceptance Criteria*
+* [x] Architecture document in rke2lab/docs/
+* [x] Descriptor format specification
+* [x] Operational runbook with common operations
+* [x] Troubleshooting guide with kubectl commands
+* [x] Pattern examples for reuse
+
+== Deliverables
+
+. *Validated DaemonSet*
+** nix-builder initContainer running successfully
+** Builds executing on all flox-enabled nodes
+** Proper error handling and graceful degradation
+
+. *Build Artifacts*
+** Verified Nix package builds (headplane, headscale)
+** Build outputs in expected locations
+** Consistent artifacts across nodes
+
+. *Documentation*
+** Architecture: Flox runtime integration
+** Operational runbook: Build management
+** Troubleshooting guide: Common issues
+** Pattern library: Reusable Flox workload patterns
+
+. *Configuration*
+** nix-builds.yaml descriptor specification
+** Node labeling strategy documented
+** Mount patterns for Flox/scripts/config
+
+== Acceptance Criteria
+
+✅ *Functionality*
+
+* [ ] DaemonSet deploys successfully to labeled nodes
+* [ ] nix-builder initContainer completes without errors
+* [ ] Nix builds produce expected artifacts
+* [ ] Multi-node distribution works correctly
+* [ ] Graceful handling of missing descriptor
+
+✅ *Observability*
+
+* [ ] kubectl logs show build progress
+* [ ] Build errors surface in pod logs
+* [ ] Pod events indicate initContainer status
+* [ ] Node exec shows build artifacts
+
+✅ *Reliability*
+
+* [ ] Builds idempotent (can rerun safely)
+* [ ] Failed builds don't block shim installation
+* [ ] Node restarts trigger fresh builds
+* [ ] Builds leverage Nix caching
+
+✅ *Documentation*
+
+* [ ] Architecture documented
+* [ ] Operational procedures clear
+* [ ] Troubleshooting guide complete
+* [ ] Patterns reusable for other workloads
+
+== Current Status
+
+=== Completed Work
+
+.*Architecture Transition*
+* [x] Moved from systemd service to DaemonSet initContainer
+* [x] Removed rke2lab-flox-nix-build.service
+* [x] Updated activation script
+* [x] Simplified volume mounts
+
+.*Container Implementation*
+* [x] Added nix-builder initContainer to flox-runtime-installer DaemonSet
+* [x] Implemented nsenter pattern to access host environment
+* [x] Configured privileged security context
+* [x] Set proper initContainer ordering (before shim-installer)
+
+.*Configuration*
+* [x] Restored nix-builds.yaml mount in incus-instance-config.yaml
+* [x] Converted nix-builds.yaml from ConfigMap to plain YAML format
+* [x] Added Flox activation to rke2lab-nix-build.sh script
+
+.*Commits*
+* 48eb919: fix(cilium): correct operator scaling script name
+* 104de8e: fix(nix-builds): restore mount and remove unnecessary target
+* 566d0a7: fix(nix-build): activate Flox environment
+* f7af0ad: fix(nix-builds): convert ConfigMap format to plain YAML
+* 18c93ce: feat(flox-runtime): add nix-builder initContainer to DaemonSet
+* 9e0d0f5: refactor(flox): remove systemd service in favor of DaemonSet
+* 1c30cee: fix(flox-runtime): use nsenter to run nix-builder in host environment
+
+=== Next Steps
+
+.*Immediate (Phase 1)*
+. Deploy DaemonSet to cluster
+. Check initContainer logs
+. Verify nsenter execution
+
+.*Short-term (Phase 2-3)*
+. Verify build outputs
+. Test multi-node distribution
+. Validate caching behavior
+
+.*Medium-term (Phase 4)*
+. Write documentation
+. Create runbooks
+. Establish patterns
+
+== Remote Execution Pattern
+
+Use this command pattern to interact with the cluster and nodes:
+
+[source,bash]
+----
+# On NixOS VM, orchestrate with remake
+ssh bioskop-nixos.local -- flox activate --dir=/var/lib/git/nxmatic/rke2lab -- remake <target>
+
+# Inside Incus node, use flox-activated kubectl
+ssh bioskop-nixos.local -- incus exec master -- flox activate --dir=/var/lib/rancher/rke2 -- kubectl <cmd>
+
+# Check DaemonSet status
+ssh bioskop-nixos.local -- incus exec master -- flox activate --dir=/var/lib/rancher/rke2 -- kubectl get daemonset -n flox-runtime
+
+# Watch pods
+ssh bioskop-nixos.local -- incus exec master -- flox activate --dir=/var/lib/rancher/rke2 -- kubectl get pods -n flox-runtime -w
+
+# View initContainer logs
+ssh bioskop-nixos.local -- incus exec master -- flox activate --dir=/var/lib/rancher/rke2 -- kubectl logs -n flox-runtime -l app.kubernetes.io/name=flox-runtime-installer -c nix-builder
+
+# Exec into node to check builds
+ssh bioskop-nixos.local -- incus exec master -- ls -la /tmp/mesh-build/
+----
+
+== Key Architecture Decisions
+
+.*DaemonSet InitContainer vs Systemd Service*
+* *Decision*: Use Kubernetes DaemonSet initContainer
+* *Rationale*: 
+** Kubernetes-native distribution to all labeled nodes
+** Better observability via kubectl logs vs journalctl
+** Automatic execution on node join
+** Consistent with manifest-based deployment architecture
+* *Trade-offs*: Requires privileged container for nsenter access
+
+.*nsenter to Host vs Container Tools*
+* *Decision*: Use nsenter to run script in host namespace
+* *Rationale*:
+** Avoids installing flox/nix/yq in container
+** Direct access to host's Nix store and Flox config
+** Simpler volume mount strategy
+** Leverages pre-installed host environment
+* *Trade-offs*: Requires privileged container, tightly coupled to host
+
+.*Nix Builds in InitContainer vs Main Container*
+* *Decision*: Run builds in initContainer before shim installation
+* *Rationale*:
+** Builds available before containerd shim needs them
+** Failed builds don't block shim (graceful degradation)
+** Clear lifecycle: build → install → run
+* *Trade-offs*: Builds block pod startup (acceptable for node setup)
+
+== References
+
+* link:../../rke2.d/bioskop/master/catalog/runtime/flox-containerd-shim/10-daemonset.yaml[Flox Runtime DaemonSet]
+* link:../../make.d/incus/scripts/rke2lab-nix-build.sh[Nix Build Script]
+* link:../../rke2.d/bioskop/master/nix-builds.yaml[Build Descriptor]
+* link:../../rke2.d/bioskop/master/incus-instance-config.yaml[Instance Configuration]
