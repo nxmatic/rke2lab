@@ -18,6 +18,9 @@ spec:
     cluster:
       name: sample
       id: 7
+    k8s:
+      serviceHost: localhost
+      servicePort: 6443
     clustermesh:
       enabled: true
       useAPIServer: true
