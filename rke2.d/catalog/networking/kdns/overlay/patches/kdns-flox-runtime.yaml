@@ -19,6 +19,8 @@ spec:
             - kdns
           securityContext:
             readOnlyRootFilesystem: false
+            runAsUser: 0
+            runAsNonRoot: false
           volumeMounts:
             - name: flox-config
               mountPath: /.config/flox
