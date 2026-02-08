@@ -17,7 +17,7 @@ upstreamLock:
     repo: /var/lib/git/nxmatic/rke2lab
     directory: /rke2.d/catalog
     ref: main
-    commit: 84b2ea71b59465c05b029f3f99cd76d3215008cb
+    commit: c61eb5aad6af8b00a680fdc02374b37df358e66c
 info:
   site: https://github.com/nxmatic/rke2lab
   description: |
@@ -37,4 +37,3 @@ pipeline:
     - exec: values-content-setters
     - image: ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2
       configPath: configmap-cluster-setters.yaml
-    - image: ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2

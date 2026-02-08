@@ -8,6 +8,7 @@ export INCUS_WORKINGTREE_DIR=/var/lib/git/nxmatic/rke2lab
 export INCUS_ENV_FILE=/var/lib/git/nxmatic/rke2lab/rke2.d/bioskop/master/environment
 export INCUS_SHARED_DIR=/var/lib/git/nxmatic/rke2lab/.local.d/share
 export INCUS_KUBECONFIG_DIR=/var/lib/git/nxmatic/rke2lab/.local.d/var/kube
+export FLOX_CONFIG_DIR=/Users/nxmatic/.config/flox
 export INCUS_NO_CLOUD_DIR=/var/lib/git/nxmatic/rke2lab/rke2.d/bioskop/master
 export INCUS_IMAGE_BUILD_DIR=/var/lib/git/nxmatic/rke2lab/.local.d/var/lib/distrobuilder/control-node/rootfs
 export INCUS_IMAGE_PACK_CONFIG=/var/lib/git/nxmatic/rke2lab/.local.d/var/lib/distrobuilder/control-node/pack.yaml

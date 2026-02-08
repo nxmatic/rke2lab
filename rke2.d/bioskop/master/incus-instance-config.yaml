@@ -48,10 +48,6 @@ devices:
     type: disk
     source: /var/lib/git/nxmatic/rke2lab/make.d/incus/systemd
     path: /srv/host/system.d
-  rke2lab.nix-builds.file:
-    type: disk
-    source: /var/lib/git/nxmatic/rke2lab/rke2.d/bioskop/master/nix-builds.yaml
-    path: /srv/host/nix-builds.yaml
   manifests.dir:
     type: disk
     source: /var/lib/git/nxmatic/rke2lab/rke2.d/bioskop/master/manifests.d
@@ -68,6 +64,10 @@ devices:
     type: disk
     source: /var/lib/git/nxmatic/rke2lab/.local.d/var/kube
     path: /srv/host/kubeconfig.d
+  flox.config.dir:
+    type: disk
+    source: /Users/nxmatic/.config/flox
+    path: /root/.config/flox
   user.metadata:
     type: disk
     source: /var/lib/git/nxmatic/rke2lab/rke2.d/bioskop/master/meta-data
