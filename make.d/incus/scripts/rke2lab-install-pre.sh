@@ -134,7 +134,7 @@ EoFloxCommonProfile
   source <( flox activate --dir="${FLOX_ENV_DIR}" )
 
   : "Install GitHub CLI in nocloud flox environment"
-  flox install --dir="${FLOX_ENV_DIR}" git gh@2.86
+  flox install --dir="${FLOX_ENV_DIR}" git gh@^2.86
 
   : "Generate nocloud envrc to load environment variables"
   cat > /var/lib/cloud/.envrc <<'EoEnvrc'

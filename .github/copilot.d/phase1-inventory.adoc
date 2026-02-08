@@ -9,6 +9,11 @@
 
 Complete inventory and mapping of all systemd units, scripts, and dependencies in the RKE2Lab environment. This phase provides the foundation for systematic refactoring by documenting the current state.
 
+[NOTE]
+====
+**Architecture Evolution**: The legacy systemd-based Nix build services (`rke2lab-flox-build.service` and `rke2lab-flox-build@.service`) have been superseded by initContainer-based builds in the Flox runtime DaemonSet. These services are documented as historical reference only and have been removed from the codebase. See `rke2.d/bioskop/master/catalog/runtime/flox-containerd-shim/10-daemonset.yaml` for the current implementation.
+====
+
 == Objectives
 
 * Catalog all custom systemd service and target files
@@ -39,8 +44,8 @@ Complete inventory and mapping of all systemd units, scripts, and dependencies i
 * `rke2lab-mesh-ready-check.service` → `rke2lab-mesh-ready.service`
 
 ==== Flox/Nix Build Services (3)
-* `rke2lab-flox-build.service`
-* `rke2lab-flox-build@.service`
+* ~~`rke2lab-flox-build.service`~~ REMOVED - superseded by DaemonSet initContainers
+* ~~`rke2lab-flox-build@.service`~~ REMOVED - superseded by DaemonSet initContainers
 * `rke2lab-flox-nix-wait.service`
 
 ==== Other Services (9)

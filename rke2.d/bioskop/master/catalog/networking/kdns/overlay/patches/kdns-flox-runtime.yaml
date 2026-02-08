@@ -17,3 +17,17 @@ spec:
           image: flox/empty:1.0.0
           command:
             - kdns
+          securityContext:
+            readOnlyRootFilesystem: false
+            runAsNonRoot: false
+            runAsUser: 0
+          volumeMounts:
+            - mountPath: /.config/flox
+              name: flox-config
+            - mountPath: /.cache/flox
+              name: flox-cache
+      volumes:
+        - emptyDir: {}
+          name: flox-config
+        - emptyDir: {}
+          name: flox-cache

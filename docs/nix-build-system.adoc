@@ -6,9 +6,16 @@
 :icons: font
 :source-highlighter: rouge
 
+[WARNING]
+====
+*Deprecated Architecture*: The systemd service-based build system documented below has been superseded by initContainer-based builds in the Flox runtime installer DaemonSet. Builds now run automatically as pods start, eliminating the need for separate systemd orchestration.
+
+See: `rke2.d/bioskop/master/catalog/runtime/flox-containerd-shim/10-daemonset.yaml` for the current implementation.
+====
+
 == Overview
 
-This document describes the *descriptor-driven* build system for RKE2 that:
+This document describes the *legacy descriptor-driven* build system for RKE2 that:
 
 * Defines build jobs in a single Nix build descriptor file (`flox-builds.yaml`)
 * Uses a generic systemd service and build script
@@ -30,10 +37,10 @@ This document describes the *descriptor-driven* build system for RKE2 that:
 ** Builds packages and logs results
 ** Input: descriptor file path (default: `/srv/host/flox-builds.yaml`)
 
-. *Generic Systemd Service*: link:../make.d/incus/systemd/rke2lab-flox-build.service[make.d/incus/systemd/rke2lab-flox-build.service]
-** Runs the generic build script
-** Executes early (after local filesystems)
-** Runs in parallel with other stages
+. *Generic Systemd Service*: ~~link:../make.d/incus/systemd/rke2lab-flox-build.service[make.d/incus/systemd/rke2lab-flox-build.service]~~ *DEPRECATED*
+** ❌ No longer used - reference only
+** ✅ Replaced by initContainer builds in Flox runtime DaemonSet
+** Kept for historical reference only
 
 . *Incus Mount*: `nix-builds.descriptor` in instance config
 ** Binds descriptor file to `/srv/host/flox-builds.yaml`
@@ -105,7 +112,32 @@ Requires=rke2lab-flox-builds-complete.target
 . Check logs: `journalctl -u rke2lab-flox-build.service -f`
 . Verify outputs: `ls -la /tmp/mycomponent-build/`
 
-== Service Execution Flow
+== Service Execution Flow (LEGACY)
+
+[IMPORTANT]
+====
+This section documents the *legacy architecture*. 
+
+**Current Architecture**: Nix builds now run as initContainers within pod lifecycle, triggered automatically by the Flox containerd shim when it encounters `flox.dev/environment` annotations. This eliminates the need for systemd orchestration.
+====
+
+[source]
+----
+RKE2 Server Started
+  ↓
+Manifest services apply custom resources (pods, deployments, etc.)
+  ↓
+Flox containerd shim intercepts pod creation
+  ↓
+For each pod with flox.dev/environment annotation:
+  ├─ InitContainer runs nix build for Flox environment
+  ├─ Each package built and installed into pod environment
+  └─ Main container starts with all packages available
+  ↓
+No systemd service coordination needed
+----
+
+=== Legacy Flow (systemd-based, deprecated)
 
 [source]
 ----
@@ -118,7 +150,7 @@ Kubernetes pods start with flox.dev/environment annotations
 In parallel (non-blocking):
 local-fs.target
   ↓
-rke2lab-flox-build.service
+rke2lab-flox-build.service ❌ DEPRECATED
     │
     ├─ Read /srv/host/flox-builds.yaml
     │
@@ -166,6 +198,18 @@ Flox shim resolves environment to packages in /tmp/*-build/
 * Script is system-agnostic (works with any flake)
 
 == Troubleshooting
+
+[WARNING]
+====
+This section applies to the *legacy systemd-based build system* which is no longer active.
+
+For the current DaemonSet-based approach, debug builds by:
+1. Examining pod logs: `kubectl logs <pod> -c nix-builder` (initContainer logs)
+2. Checking Flox containerd shim logs: `journalctl -u flox-containerd-shim -f`
+3. Verifying environment annotations on pods: `kubectl get pod <pod> -o yaml | grep flox.dev`
+====
+
+=== Legacy Systemd Troubleshooting (deprecated)
 
 === Check descriptor is mounted
 
@@ -272,20 +316,46 @@ monitoring:
   logLevel: debug
 ----
 
-== Backward Compatibility
+== Migration to DaemonSet-Based Builds
 
-The legacy headplane build service (if still present on older nodes) is *not used* by mesh manifests. Consider:
+=== What Changed
 
-* Keeping it as a fallback (don't break it)
-* Or remove it once generic system is validated
-* Update documentation to point to generic builder
+The systemd service approach has been superseded by a more elegant solution:
+
+* **Old**: Separate systemd service runs `nix build` jobs before pods start
+* **New**: Flox containerd shim runs `nix build` as initContainers when pods start
+* **Benefit**: Builds happen just-in-time, no pre-execution needed
+
+=== Backward Compatibility
+
+The legacy systemd service (`rke2lab-flox-build.service`) has been removed. If you still reference it:
+
+* ❌ Do *not* activate or enable the service
+* ❌ Do *not* mount `flox-builds.yaml` for systemd service
+* ✅ Instead, use Flox environment annotations on pods: `annotations: { flox.dev/environment: "namespace/environment-name" }`
+* ✅ The Flox containerd shim will handle building automatically
+
+=== Migration Steps
+
+If you have existing pods using the legacy descriptor-based builds:
+
+1. Create Flox environments for your packages (e.g., `nxmatic/kdns`)
+2. Add `flox.dev/environment` annotation to pod specs
+3. Remove any `After=rke2lab-flox-builds-complete.target` dependencies
+4. Deploy updated manifests
+5. Flox shim will automatically build environments via initContainers
+
+== Legacy systemd Architecture (Reference Only)
+
+The subsections below document the original descriptor-driven system for historical reference.
 
 == Related Files
 
-* link:../rke2.d/bioskop/master/flox-builds.yaml[rke2.d/bioskop/master/flox-builds.yaml] - Nix build descriptor
-* link:../make.d/incus/scripts/rke2lab-flox-build.sh[make.d/incus/scripts/rke2lab-flox-build.sh] - Generic build script
-* link:../make.d/incus/systemd/rke2lab-flox-build.service[make.d/incus/systemd/rke2lab-flox-build.service] - Systemd service
-* link:../rke2.d/bioskop/master/incus-instance-config.yaml[rke2.d/bioskop/master/incus-instance-config.yaml] - Incus mount config
-* link:../rke2.d/bioskop/master/catalog/mesh/mesh-build-strategy.adoc[mesh-build-strategy.adoc] - Original strategy document
-* link:../rke2.d/bioskop/master/catalog/mesh/flox-inventory.adoc[flox-inventory.adoc] - Flox environment usage
+* link:../rke2.d/bioskop/master/flox-builds.yaml[rke2.d/bioskop/master/flox-builds.yaml] - *Legacy* Nix build descriptor (deprecated)
+* link:../make.d/incus/scripts/rke2lab-flox-build.sh[make.d/incus/scripts/rke2lab-flox-build.sh] - *Legacy* generic build script (deprecated)
+* ~~make.d/incus/systemd/rke2lab-flox-build.service~~ - *REMOVED* (see DaemonSet implementation below)
+* link:../rke2.d/bioskop/master/incus-instance-config.yaml[rke2.d/bioskop/master/incus-instance-config.yaml] - *Legacy* Incus mount config (deprecated)
+* link:../rke2.d/bioskop/master/catalog/runtime/flox-containerd-shim/10-daemonset.yaml[rke2.d/bioskop/master/catalog/runtime/flox-containerd-shim/10-daemonset.yaml] - **CURRENT:** Flox runtime DaemonSet (initContainer-based builds)
+* link:../rke2.d/bioskop/master/catalog/mesh/mesh-build-strategy.adoc[mesh-build-strategy.adoc] - *Legacy* strategy document (for reference)
+* link:../rke2.d/bioskop/master/catalog/mesh/flox-inventory.adoc[flox-inventory.adoc] - Flox environment usage patterns
 * link:systemd-service-architecture.adoc[Systemd Service Architecture] - How services integrate with builds
