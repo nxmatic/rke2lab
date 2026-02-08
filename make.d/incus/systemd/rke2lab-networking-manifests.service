@@ -6,13 +6,13 @@ After=rke2-server.service
 Requires=rke2-server.service
 After=rke2lab-storage-manifests.service
 Requires=rke2lab-storage-manifests.service
-ConditionPathExists=/srv/host/scripts.d/rke2-manifests-install.sh
+ConditionPathExists=/srv/host/scripts.d/rke2lab-manifests-install.sh
 ConditionPathExists=/srv/host/manifests.d/networking
 
 [Service]
 Type=oneshot
-ExecStart=/srv/host/scripts.d/rke2-manifests-install.sh networking
-ExecStartPost=/srv/host/scripts.d/rke2-cilium-ready.sh
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh networking
+ExecStartPost=/srv/host/scripts.d/rke2lab-cilium-ready.sh
 RemainAfterExit=true
 StandardOutput=journal
 StandardError=journal

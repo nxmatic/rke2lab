@@ -12,4 +12,4 @@ fi
 
 : "Enable shared mount service"
 systemctl daemon-reload
-systemctl enable rke2-remount-shared
+systemctl enable rke2lab-remount-shared

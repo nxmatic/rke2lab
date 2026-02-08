@@ -4,13 +4,13 @@ RequiresMountsFor=/srv/host/system.d /srv/host
 After=local-fs.target
 After=rke2-server.service
 Requires=rke2-server.service
-ConditionPathExists=/srv/host/scripts.d/rke2-manifests-install.sh
+ConditionPathExists=/srv/host/scripts.d/rke2lab-manifests-install.sh
 ConditionPathExists=/srv/host/manifests.d/replication
 
 [Service]
 Type=oneshot
-ExecStart=/srv/host/scripts.d/rke2-manifests-install.sh replication
-ExecStartPost=/srv/host/scripts.d/rke2-layer-ready.sh replication
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh replication
+ExecStartPost=/srv/host/scripts.d/rke2lab-layer-ready.sh replication
 RemainAfterExit=true
 StandardOutput=journal
 StandardError=journal

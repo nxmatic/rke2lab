@@ -52,7 +52,7 @@ rke2lab-flox-nix-build.service (builds mesh packages)
 
 . *Build Service*: `rke2lab-flox-nix-build.service`
 ** Runs after local filesystems are available
-** Executes `rke2-nix-build.sh` (builds headplane + headscale)
+** Executes `rke2lab-nix-build.sh` (builds headplane + headscale)
 ** Output: `/tmp/mesh-build/{headplane,headplane-agent,headscale}` symlinks
 
 . *Installation Service Dependency*: `rke2lab-mesh-manifests-install.service`

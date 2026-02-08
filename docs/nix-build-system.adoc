@@ -24,7 +24,7 @@ This document describes the *descriptor-driven* build system for RKE2 that:
 ** YAML format with version control
 ** Mounted in Incus container at `/srv/host/nix-builds.yaml`
 
-. *Generic Build Script*: link:../make.d/incus/scripts/rke2-nix-build.sh[make.d/incus/scripts/rke2-nix-build.sh]
+. *Generic Build Script*: link:../make.d/incus/scripts/rke2lab-nix-build.sh[make.d/incus/scripts/rke2lab-nix-build.sh]
 ** Parses the descriptor with `yq`
 ** Iterates through all enabled jobs
 ** Builds packages and logs results
@@ -283,7 +283,7 @@ The legacy headplane build service (if still present on older nodes) is *not use
 == Related Files
 
 * link:../rke2.d/bioskop/master/nix-builds.yaml[rke2.d/bioskop/master/nix-builds.yaml] - Nix build descriptor
-* link:../make.d/incus/scripts/rke2-nix-build.sh[make.d/incus/scripts/rke2-nix-build.sh] - Generic build script
+* link:../make.d/incus/scripts/rke2lab-nix-build.sh[make.d/incus/scripts/rke2lab-nix-build.sh] - Generic build script
 * link:../make.d/incus/systemd/rke2lab-flox-nix-build.service[make.d/incus/systemd/rke2lab-flox-nix-build.service] - Systemd service
 * link:../rke2.d/bioskop/master/incus-instance-config.yaml[rke2.d/bioskop/master/incus-instance-config.yaml] - Incus mount config
 * link:../rke2.d/bioskop/master/catalog/mesh/mesh-build-strategy.adoc[mesh-build-strategy.adoc] - Original strategy document

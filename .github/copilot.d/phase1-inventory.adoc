@@ -67,29 +67,29 @@ Complete inventory and mapping of all systemd units, scripts, and dependencies i
 === Scripts (23 total)
 
 ==== Readiness Check Scripts (3 - renamed)
-* `rke2-openebs-ready-check.sh` → `rke2-openebs-ready.sh`
-* `rke2-cilium-ready-check.sh` → `rke2-cilium-ready.sh`
-* `rke2-layer-ready-check.sh` → `rke2-layer-ready.sh`
+* `rke2lab-openebs-ready-check.sh` → `rke2lab-openebs-ready.sh`
+* `rke2lab-cilium-ready-check.sh` → `rke2lab-cilium-ready.sh`
+* `rke2lab-layer-ready-check.sh` → `rke2lab-layer-ready.sh`
 
 ==== Activation Scripts
-* `rke2-activate.sh`
-* `rke2-setup.sh`
+* `rke2lab-activate.sh`
+* `rke2lab-setup.sh`
 
 ==== Manifests Application Scripts (5)
-* `rke2-apply-runtime-manifests.sh`
-* `rke2-apply-storage-manifests.sh`
-* `rke2-apply-networking-manifests.sh`
-* `rke2-apply-replication-manifests.sh`
-* `rke2-apply-mesh-manifests.sh`
+* `rke2lab-apply-runtime-manifests.sh`
+* `rke2lab-apply-storage-manifests.sh`
+* `rke2lab-apply-networking-manifests.sh`
+* `rke2lab-apply-replication-manifests.sh`
+* `rke2lab-apply-mesh-manifests.sh`
 
 ==== Other Scripts (13)
-* `rke2-create-manifests-dirs.sh`
+* `rke2lab-create-manifests-dirs.sh`
 * `flox-nix-build.sh`
 * `flox-nix-wait.sh`
-* `rke2-kubectl-config.sh`, `rke2-kubelet-config.sh`
-* `rke2-network-config.sh`
-* `rke2-server-ready-probe.sh`
-* `rke2-sanity-check.sh`, `rke2-sanity-symlink.sh`
+* `rke2lab-kubectl-config.sh`, `rke2lab-kubelet-config.sh`
+* `rke2lab-network-config.sh`
+* `rke2lab-server-ready-probe.sh`
+* `rke2lab-sanity-check.sh`, `rke2lab-sanity-symlink.sh`
 * `setup-fstab-mounts.sh`, `setup-kubectl-config.sh`
 * `vmware-network-config.sh`
 

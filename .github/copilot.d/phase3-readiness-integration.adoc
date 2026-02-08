@@ -59,8 +59,8 @@ Added `ExecStartPost` directives to integrate readiness checks:
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/srv/host/scripts.d/rke2-apply-runtime-manifests.sh
-ExecStartPost=/srv/host/scripts.d/rke2-layer-ready.sh runtime
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh runtime
+ExecStartPost=/srv/host/scripts.d/rke2lab-layer-ready.sh runtime
 ----
 
 .*rke2lab-storage-manifests.service*
@@ -69,8 +69,8 @@ ExecStartPost=/srv/host/scripts.d/rke2-layer-ready.sh runtime
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/srv/host/scripts.d/rke2-apply-storage-manifests.sh
-ExecStartPost=/srv/host/scripts.d/rke2-openebs-ready.sh
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh storage
+ExecStartPost=/srv/host/scripts.d/rke2lab-openebs-ready.sh
 ----
 
 .*rke2lab-networking-manifests.service*
@@ -79,8 +79,8 @@ ExecStartPost=/srv/host/scripts.d/rke2-openebs-ready.sh
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/srv/host/scripts.d/rke2-apply-networking-manifests.sh
-ExecStartPost=/srv/host/scripts.d/rke2-cilium-ready.sh
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh networking
+ExecStartPost=/srv/host/scripts.d/rke2lab-cilium-ready.sh
 ----
 
 .*rke2lab-replication-manifests.service*
@@ -89,8 +89,8 @@ ExecStartPost=/srv/host/scripts.d/rke2-cilium-ready.sh
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/srv/host/scripts.d/rke2-apply-replication-manifests.sh
-ExecStartPost=/srv/host/scripts.d/rke2-layer-ready.sh replication
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh replication
+ExecStartPost=/srv/host/scripts.d/rke2lab-layer-ready.sh replication
 ----
 
 .*rke2lab-mesh-manifests.service*
@@ -99,8 +99,8 @@ ExecStartPost=/srv/host/scripts.d/rke2-layer-ready.sh replication
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/srv/host/scripts.d/rke2-apply-mesh-manifests.sh
-ExecStartPost=/srv/host/scripts.d/rke2-layer-ready.sh mesh
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh mesh
+ExecStartPost=/srv/host/scripts.d/rke2lab-layer-ready.sh mesh
 ----
 
 ==== Deleted Services (5 files)
@@ -118,7 +118,7 @@ These services became redundant since their only job was to run the readiness sc
 
 ==== Updated Activation Script
 
-*make.d/incus/scripts/rke2-activate.sh*
+*make.d/incus/scripts/rke2lab-activate.sh*
 
 Removed the 5 deleted services from the systemctl enable list:
 

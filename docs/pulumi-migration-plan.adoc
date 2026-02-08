@@ -41,7 +41,7 @@ Replace GNU Make-based infrastructure orchestration with **Java Pulumi** for imp
 | **HIGH** (hard to debug, easy to break)
 | **Phase 1** ⭐
 
-| Nix package builds (`rke2-nix-build.sh`, YAML descriptor)
+| Nix package builds (`rke2lab-nix-build.sh`, YAML descriptor)
 | Medium (shell loop + Nix invocation)
 | Low (works reliably, descriptor-driven)
 | **Phase 2**
@@ -198,7 +198,7 @@ Flux syncs RKE2 manifests to live cluster
 **Scope:** Orchestrate `nix-builds.yaml` descriptor and improve logging
 
 **Deliverables:**
-- NixBuildOrchestrator.java (replaces `rke2-nix-build.sh` imperative loop)
+- NixBuildOrchestrator.java (replaces `rke2lab-nix-build.sh` imperative loop)
 - Structured logging + error aggregation
 - Integration with Tekton (export per-package build artifacts)
 - Keep actual Nix builds unchanged
@@ -221,7 +221,7 @@ rke2lab-pulumi/src/main/java/com/rke2lab/
 **Success Criteria:**
 - ✅ Reads nix-builds.yaml (same schema as current)
 - ✅ Executes all jobs in dependency order
-- ✅ Produces same build artifacts as `rke2-nix-build.sh`
+- ✅ Produces same build artifacts as `rke2lab-nix-build.sh`
 - ✅ Better error reporting (per-job logs, failed artifact list)
 - ✅ Exports artifacts to Tekton-compatible format
 
@@ -509,7 +509,7 @@ spec:
 
 Nix builds continue to work as-is initially:
 ```
-Phase 1-2: rke2-nix-build.sh (Make) → works unchanged
+Phase 1-2: rke2lab-nix-build.sh (Make) → works unchanged
 Phase 2: NixBuildOrchestrator (Pulumi) → orchestrates nix-builds.yaml
 Phase 3: Tekton task calls NixBuildOrchestrator → automates builds
 ```

@@ -6,7 +6,7 @@ Before=rke2lab-install.service
 
 [Service]
 Type=oneshot
-ExecStart=/srv/host/scripts.d/rke2-network-config.sh
+ExecStart=/srv/host/scripts.d/rke2lab-network-config.sh
 RemainAfterExit=yes
 StandardOutput=journal
 StandardError=journal

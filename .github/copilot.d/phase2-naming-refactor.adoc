@@ -73,14 +73,14 @@ git mv make.d/incus/systemd/rke2lab-mesh-ready-check.service \
 
 [source,bash]
 ----
-git mv make.d/incus/scripts/rke2-openebs-ready-check.sh \
-       make.d/incus/scripts/rke2-openebs-ready.sh
+git mv make.d/incus/scripts/rke2lab-openebs-ready-check.sh \
+       make.d/incus/scripts/rke2lab-openebs-ready.sh
 
-git mv make.d/incus/scripts/rke2-cilium-ready-check.sh \
-       make.d/incus/scripts/rke2-cilium-ready.sh
+git mv make.d/incus/scripts/rke2lab-cilium-ready-check.sh \
+       make.d/incus/scripts/rke2lab-cilium-ready.sh
 
-git mv make.d/incus/scripts/rke2-layer-ready-check.sh \
-       make.d/incus/scripts/rke2-layer-ready.sh
+git mv make.d/incus/scripts/rke2lab-layer-ready-check.sh \
+       make.d/incus/scripts/rke2lab-layer-ready.sh
 ----
 
 === References Updated
@@ -102,7 +102,7 @@ Updated `After=`, `Requires=`, `Wants=`, and `ExecStart=` directives:
 * 3 dependent manifests services → new manifests service names
 
 ==== Scripts (2 files)
-* `rke2-activate.sh` - Updated systemctl enable list with new service names
+* `rke2lab-activate.sh` - Updated systemctl enable list with new service names
 * Drop-in configurations referencing old names
 
 ==== Documentation (3 files)
@@ -133,10 +133,10 @@ grep -r "ready-check.sh" make.d/incus/scripts/     # 0 results
 R  make.d/incus/systemd/rke2lab-runtime-manifests{-install,}.service
 R  make.d/incus/systemd/rke2lab-storage-manifests{-install,}.service
 ...
-R  make.d/incus/scripts/rke2-openebs-ready{-check,}.sh
+R  make.d/incus/scripts/rke2lab-openebs-ready{-check,}.sh
 ...
 M  make.d/incus/systemd/rke2lab-runtime-ready.target
-M  make.d/incus/scripts/rke2-activate.sh
+M  make.d/incus/scripts/rke2lab-activate.sh
 ...
 ----
 
@@ -161,12 +161,12 @@ Git properly detected renames (R prefix) when using `git mv`.
 | `rke2lab-storage-ready.target`
 
 | Script (manifests)
-| `rke2-apply-<layer>-manifests.sh`
-| `rke2-apply-storage-manifests.sh`
+| `rke2lab-manifests-install.sh <layer>`
+| `rke2lab-manifests-install.sh storage`
 
 | Script (ready)
-| `rke2-<component>-ready.sh`
-| `rke2-openebs-ready.sh`
+| `rke2lab-<component>-ready.sh`
+| `rke2lab-openebs-ready.sh`
 |===
 
 == Lessons Learned
