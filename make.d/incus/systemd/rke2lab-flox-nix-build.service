@@ -1,0 +1,3 @@
+# DEPRECATED: Nix builds now run as initContainer in flox-runtime-installer DaemonSet
+# See: rke2.d/bioskop/master/catalog/runtime/flox-containerd-shim/10-daemonset.yaml
+# This file is kept for reference only and is no longer used.
