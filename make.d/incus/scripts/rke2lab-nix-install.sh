@@ -33,7 +33,8 @@ extra-platforms = x86_64-linux x86_64-linux
 extra-sandbox-paths = /run/binfmt /nix/store/7k1f2qca1mxyrzl6wr74dilrhwbx6qvs-qemu-x86_64-binfmt-P /dev/kvm
 keep-outputs = false
 keep-derivations = false
-keep-failed = fals  e
+keep-failed = false
+accept-flake-config = true
 # END rke2lab-nix
 EOF
 fi
