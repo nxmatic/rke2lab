@@ -9,4 +9,4 @@ ExecStart=/srv/host/scripts.d/rke2lab-remount-shared.sh
 RemainAfterExit=true
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=rke2lab.target
