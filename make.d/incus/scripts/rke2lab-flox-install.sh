@@ -2,4 +2,4 @@
 
 : "Install Flox via Nix package manager in the default profile for system-wide availability"
 
-nix profile install --profile /nix/var/nix/profiles/default nixpkgs#flox
+nix profile add --profile /nix/var/nix/profiles/default github:flox/flox/latest

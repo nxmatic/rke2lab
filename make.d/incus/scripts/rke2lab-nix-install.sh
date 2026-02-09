@@ -27,6 +27,8 @@ sandbox-fallback = false
 substituters = https://aseipp-nix-cache.freetls.fastly.net https://nxmatic.cachix.org https://cache.nixos.org/
 system-features = nixos-test benchmark big-parallel kvm gccarch-armv8-a
 trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= nxmatic.cachix.org-1:huMghYiwDpPa1PMXHXK4G1Dp4QOZjgsNqxcjf/AjuJ0= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+extra-trusted-substituters = https://cache.flox.dev
+extra-trusted-public-keys = flox-cache-public-1:7F4OyH7ZCnFhcze3fJdfyXYLQw/aV7GEed86nQ7IsOs=
 trusted-substituters = https://cache.nixos.org
 trusted-users = root nxmatic root nxmatic root @admin @wheel
 extra-platforms = x86_64-linux x86_64-linux
