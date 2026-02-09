@@ -44,9 +44,10 @@ EOF
 chmod 755 /etc/profile.d/nix-profile.sh
 
 # Enable /etc/profile.d sourcing in /etc/bash.bashrc for interactive shells
-cat >> /etc/bash.bashrc <<'EOF'
+if ! grep -q "BEGIN rke2lab-nix" /etc/bash.bashrc; then
+  cat >> /etc/bash.bashrc <<'EOF'
 
-# Source /etc/profile.d scripts for interactive shells
+# BEGIN rke2lab-nix: Source /etc/profile.d scripts for interactive shells
 # (Debian default has this commented out, we enable it)
 if [ -d /etc/profile.d ]; then
   for nix_profile_script in /etc/profile.d/*.sh; do
@@ -56,8 +57,12 @@ if [ -d /etc/profile.d ]; then
   done
   unset nix_profile_script
 fi
+# END rke2lab-nix
 EOF
+fi
 
 # Set BASH_ENV in /etc/environment for non-interactive shells
-echo "BASH_ENV=/etc/profile.d/nix-profile.sh" >> /etc/environment
+if ! grep -q "^BASH_ENV=" /etc/environment 2>/dev/null; then
+  echo "BASH_ENV=/etc/profile.d/nix-profile.sh" >> /etc/environment
+fi
 
