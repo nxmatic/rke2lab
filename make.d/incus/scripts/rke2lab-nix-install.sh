@@ -13,6 +13,9 @@ if [ ! -d /etc/nix ]; then
   exit 1
 fi
 
+# Remove single-user profile if it exists (we only use daemon mode)
+rm -f /etc/profile.d/nix.sh
+
 # Configure Nix after installation (idempotent - only if not already configured by rke2lab)
 if ! grep -q "BEGIN rke2lab-nix" /etc/nix/nix.conf 2>/dev/null; then
   cat >> /etc/nix/nix.conf <<'EOF'
