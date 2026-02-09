@@ -9,19 +9,27 @@ metadata: # kpt-merge: ${headscale-namespace}/headscale-client-scripts
     internal.kpt.dev/upstream-identifier: '|ConfigMap|${headscale-namespace}|headscale-client-scripts'
 data:
   wait-for-headscale.sh: |
-    #!/usr/bin/env -S bash -exuo pipefail
+    #!/bin/sh
+    set -exuo pipefail
 
     : "[i] Waiting for headscale deployment to be available..."
     kubectl wait --for=condition=available deployment/headscale \
       -n "$HEADSCALE_NAMESPACE" --timeout=300s
   wait-for-authkey.sh: |
-    #!/usr/bin/env -S bash -exuo pipefail
+    #!/bin/sh
+    set -exuo pipefail
 
-    : "[i] Waiting for auth key Secret to be populated..."
-    kubectl wait --for=jsonpath='{.data.authkey}' secret/headscale-client-auth \
-      -n "$HEADSCALE_NAMESPACE" --timeout=300s
+    : "[i] Waiting for auth key to be available..."
+    # Secret is volume-mounted, Kubernetes waits for it
+    # Just verify the file exists and is readable
+    until [ -s /var/secrets/authkey ]; do
+      echo "[i] Waiting for authkey file..."
+      sleep 1
+    done
+    echo "[i] Authkey file is ready"
   tailscale-client.sh: |-
-    #!/usr/bin/env -S bash -exuo pipefail
+    #!/bin/sh
+    set -exuo pipefail
 
     : "[i] Starting tailscaled..."
     tailscaled \
