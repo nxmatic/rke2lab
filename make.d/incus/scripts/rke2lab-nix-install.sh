@@ -4,11 +4,16 @@
 
 export HOME=/root
 
-# Create /etc/nix directory
+# Install Nix using official installer
+bash -exuo pipefail <(curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install) --daemon
+
+# Create /etc/nix directory (if not already created by installer)
 mkdir -p /etc/nix
 
-# Create Nix configuration
-cat > /etc/nix/nix.conf <<'EOF'
+# Configure Nix after installation (idempotent - only if not already configured by rke2lab)
+if ! grep -q "BEGIN rke2lab-nix" /etc/nix/nix.conf 2>/dev/null; then
+  cat >> /etc/nix/nix.conf <<'EOF'
+# BEGIN rke2lab-nix: Custom configuration for rke2lab environment
 allowed-users = *
 auto-optimise-store = false
 builders = 
@@ -28,10 +33,9 @@ extra-sandbox-paths = /run/binfmt /nix/store/7k1f2qca1mxyrzl6wr74dilrhwbx6qvs-qe
 keep-outputs = false
 keep-derivations = false
 keep-failed = false
+# END rke2lab-nix
 EOF
-
-# Install Nix using official installer
-bash -exuo pipefail <(curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install) --daemon
+fi
 
 # Create /etc/profile.d/nix-profile.sh for login shells and BASH_ENV
 cat > /etc/profile.d/nix-profile.sh <<'EOF'
