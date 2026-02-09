@@ -1,18 +1,14 @@
 # build-packages.yaml
 # Base image: system update and package installation only
 #
-# BUILD VARIABLES (can be overridden via environment):
-# - FLOX_VERSION: flox package version (default: 1.5.0)
-# - FLOX_BASE_URL: flox download base URL
-#   (default: https://downloads.flox.dev/by-env/stable/deb)
-# - FLOX_DEB_SHA256: optional SHA256 checksum for verification
-#   Known checksums for flox 1.5.0:
-#   - aarch64: [add checksum when available]
-#   - x86_64:  [add checksum when available]
+# Flox and Nix are now installed via cloud-init (user-data) instead of
+# being baked into the base image. This allows:
+# - Using apt repository with proper GPG verification
+# - Easier version updates via package manager
+# - Cleaner separation between base image and runtime configuration
+# - Post-install hooks to properly set up nixbld accounts
 #
-# This configuration installs flox in the base image because cloud-config
-# scripts (rke2-install-pre, environment activation) depend on it being
-# pre-installed. Without flox, RKE2 cluster bootstrap will fail.
+# See rke2.d/bioskop/master/user-data for flox/nix installation details.
 
 image:
   distribution: debian
@@ -192,57 +188,6 @@ actions:
       else
         echo "WARN: locale-gen not found; skipping locale generation"
       fi
-  # Hardened flox installation (Option A) required by cloud-config scripts
-  # (rke2-install-pre, env activation). Flox must be present in base image
-  # because cloud-init scripts immediately depend on it for environment
-  # bootstrapping. This action includes:
-  # - Version pinning with architecture mapping
-  # - Optional SHA256 verification (via FLOX_DEB_SHA256 env var)
-  # - Idempotency check (skip if already installed)
-  # - Configuration file creation (/etc/flox/config.toml)
-  - trigger: post-packages
-    action: |
-      #!/usr/bin/env bash
-      set -euxo pipefail 
-      : "==> Ensuring flox is installed (required for RKE2 cloud-init)"
-      if command -v flox >/dev/null 2>&1; then
-        : "==> flox already present: $(flox --version || true)"
-        exit 0
-      fi
-      FLOX_VERSION="${FLOX_VERSION:-1.8.3}"
-      FLOX_BASE_URL="${FLOX_BASE_URL:-https://downloads.flox.dev/by-env/stable/deb}"
-      DEB_ARCH="$(dpkg --print-architecture)"
-      case "$DEB_ARCH" in
-        arm64) FLOX_URL_ARCH="aarch64" ;;
-        amd64) FLOX_URL_ARCH="x86_64" ;;
-        *) echo "ERROR: Unsupported architecture '$DEB_ARCH' for flox" >&2
-           exit 1 ;;
-      esac
-      FLOX_DEB_URL="${FLOX_BASE_URL}/flox-${FLOX_VERSION}.${FLOX_URL_ARCH}-linux.deb"
-      TMP_DEB="$(mktemp /tmp/flox.XXXXXX.deb)"
-      : "==> Downloading flox $FLOX_VERSION from $FLOX_DEB_URL"
-      if ! curl -fL "$FLOX_DEB_URL" -o "$TMP_DEB"; then
-        echo "ERROR: Failed to download flox package" >&2
-        exit 1
-      fi
-      # SHA256 verification (optional but recommended for production)
-      if [[ -n "${FLOX_DEB_SHA256:-}" ]]; then
-        echo "${FLOX_DEB_SHA256}  ${TMP_DEB}" | sha256sum -c -
-      else
-        echo "WARN: FLOX_DEB_SHA256 not provided; skipping verification" >&2
-      fi
-      : "==> Installing flox .deb"
-      apt-get install -y "$TMP_DEB"
-      rm -f "$TMP_DEB"
-      : "==> Creating /etc/flox/config.toml if absent"
-      install -d -m 0755 /etc/flox
-      if [[ ! -f /etc/flox/config.toml ]]; then
-        cat > /etc/flox/config.toml <<'EOF'
-      # Flox runtime configuration (added at image build time)
-      disable_metrics = true
-      EOF
-      fi
-      : "==> flox installed: $(flox --version || true)"
   # Sanity check APT metadata and capture repository & key summary
   # for diagnostics.
   - trigger: post-packages
