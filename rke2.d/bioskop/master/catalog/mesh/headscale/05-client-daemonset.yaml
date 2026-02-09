@@ -83,16 +83,6 @@ spec:
         - name: client-scripts
           mountPath: /scripts
           readOnly: true
-      - name: wait-for-authkey
-        image: flox/empty:1.0.0
-        command:
-        - /scripts/wait-for-authkey.sh
-        volumeMounts:
-        - name: authkey
-          mountPath: /var/secrets
-        - name: client-scripts
-          mountPath: /scripts
-          readOnly: true
       containers:
       - name: tailscale
         image: flox/empty:1.0.0

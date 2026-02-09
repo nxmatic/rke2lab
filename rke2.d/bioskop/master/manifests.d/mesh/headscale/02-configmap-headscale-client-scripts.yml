@@ -28,18 +28,6 @@ data:
       --reset
 
     wait $TAILSCALED_PID
-  wait-for-authkey.sh: |
-    #!/bin/sh
-    set -exuo pipefail
-
-    : "[i] Waiting for auth key to be available..."
-    # Secret is volume-mounted, Kubernetes waits for it
-    # Just verify the file exists and is readable
-    until [ -s /var/secrets/authkey ]; do
-      echo "[i] Waiting for authkey file..."
-      sleep 1
-    done
-    echo "[i] Authkey file is ready"
   wait-for-headscale.sh: |
     #!/bin/sh
     set -exuo pipefail
