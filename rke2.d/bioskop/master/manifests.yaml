@@ -6042,8 +6042,7 @@ metadata:
 apiVersion: v1
 data:
   shim-installer.sh: |-
-    #!/bin/sh
-    set -exuo pipefail
+    #!/usr/bin/env -S bash -exuo pipefail
 
     install_deps() {
       local attempt=0
@@ -6513,7 +6512,7 @@ data:
   HEADSCALE_NAMESPACE: headscale-system
   HEADSCALE_URL: http://headscale.headscale-system.svc.cluster.local:8080
   RKE2_CLUSTER_NAME: bioskop
-  VIP_NETWORK_CIDR: 10.80.7.0/24
+  VIP_NETWORK_CIDR: 10.80.63.0/24
 kind: ConfigMap
 metadata:
   annotations:
@@ -7791,7 +7790,7 @@ spec:
   template:
     metadata:
       annotations:
-        debug.kdns.lab42/enabled: "true"
+        debug.kdns.lab42/enabled: "false"
         flox.dev/environment: nxmatic/kdns
         kpt.dev/package-layer: networking
         kpt.dev/package-name: kdns
@@ -7806,7 +7805,7 @@ spec:
         - kdns
         env:
         - name: KUBERNETES_SERVICE_HOST
-          value: 10.80.0.10
+          value: 10.80.56.10
         - name: KUBERNETES_SERVICE_PORT
           value: "6443"
         image: flox/empty:1.0.0
@@ -8540,37 +8539,6 @@ spec:
       hostPID: true
       initContainers:
       - command:
-        - /bin/sh
-        - -c
-        - |
-          # Use nsenter to run the build script in the host's environment
-          # This gives access to host's flox, nix, yq, and environment
-          if [ ! -f /config/flox-builds.yaml ]; then
-            echo "No flox-builds.yaml found, skipping Nix builds"
-            exit 0
-          fi
-          # Copy ConfigMap from container to host via pipe (can't access container fs from nsenter)
-          # Persist to /var/lib/rke2lab/ so you can re-replay builds after package updates
-          cat /config/flox-builds.yaml | nsenter --target 1 --mount --uts --ipc --net --pid -- \
-            sh -c 'mkdir -p /var/lib/rke2lab && cat > /var/lib/rke2lab/flox-builds.yaml'
-          # Also copy to /tmp for backward compatibility
-          cat /config/flox-builds.yaml | nsenter --target 1 --mount --uts --ipc --net --pid -- \
-            sh -c 'cat > /tmp/flox-builds.yaml'
-          # Run the build script in host context
-          nsenter --target 1 --mount --uts --ipc --net --pid -- \
-            /srv/host/scripts.d/rke2lab-flox-build.sh /var/lib/rke2lab/flox-builds.yaml
-        image: alpine:3.20
-        imagePullPolicy: IfNotPresent
-        name: flox-builder
-        securityContext:
-          privileged: true
-          runAsGroup: 0
-          runAsUser: 0
-        volumeMounts:
-        - mountPath: /config
-          name: flox-builds-config
-          readOnly: true
-      - command:
         - /scripts/shim-installer.sh
         env:
         - name: CONTAINERD_CONFIG_FILE
@@ -8597,9 +8565,6 @@ spec:
       tolerations:
       - operator: Exists
       volumes:
-      - configMap:
-          name: flox-builds-config
-        name: flox-builds-config
       - configMap:
           defaultMode: 493
           name: flox-runtime-installer-script
@@ -8799,7 +8764,7 @@ spec:
         - name: vip_retryperiod
           value: "1"
         - name: address
-          value: 10.80.7.10
+          value: 10.80.63.10
         image: ghcr.io/kube-vip/kube-vip:v0.8.7
         imagePullPolicy: Always
         name: kube-vip
@@ -9025,7 +8990,7 @@ spec:
     peers:
     - name: gateway-peer
       peerASN: 65020
-      peerAddress: 10.80.0.1
+      peerAddress: 10.80.56.1
       peerConfigRef:
         name: cilium-peer
   nodeSelector:
@@ -9082,7 +9047,7 @@ metadata:
   name: cluster
 spec:
   blocks:
-  - cidr: 10.80.0.64/26
+  - cidr: 10.80.56.64/26
   serviceSelector:
     matchExpressions:
     - key: io.cilium/lb-ipam-pool
@@ -9113,7 +9078,7 @@ metadata:
   name: vip
 spec:
   blocks:
-  - cidr: 10.80.7.0/24
+  - cidr: 10.80.63.0/24
 ---
 apiVersion: config.porch.kpt.dev/v1alpha1
 kind: PackageVariant
@@ -9141,7 +9106,7 @@ spec:
   pipeline:
     mutators:
     - configMap:
-        cluster-node-vip-inetaddr: 10.80.7.10
+        cluster-node-vip-inetaddr: 10.80.63.10
         cluster-vip-interface: rke2-vip0
         kube-vip-namespace: kube-vip
         kube-vip-version: ${kube-vip-version}
@@ -9179,7 +9144,7 @@ spec:
         cluster-lan-headscale-inetaddr: 192.168.1.193
         cluster-lan-lb-cidr: 192.168.1.192/27
         cluster-name: bioskop
-        cluster-vip-cidr: 10.80.7.0/24
+        cluster-vip-cidr: 10.80.63.0/24
         darwin-host: bioskop
       image: ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2
   upstream:
@@ -9212,9 +9177,9 @@ spec:
   pipeline:
     mutators:
     - configMap:
-        cluster-lb-cidr: 10.80.0.64/26
+        cluster-lb-cidr: 10.80.56.64/26
         cluster-name: bioskop-cluster
-        cluster-node-vip-inetaddr: 10.80.7.10
+        cluster-node-vip-inetaddr: 10.80.63.10
         tailscale-namespace: tailscale-system
         tailscale-version: 1.82.0
       image: ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2
@@ -9251,10 +9216,10 @@ spec:
         bgp-local-asn: "65001"
         bgp-peer-asn: "65000"
         cluster-id: 0
-        cluster-lb-cidr: 10.80.0.64/26
+        cluster-lb-cidr: 10.80.56.64/26
         cluster-name: bioskop-cluster
-        cluster-node-gateway-inetaddr: 10.80.0.1
-        cluster-vip-cidr: 10.80.7.0/24
+        cluster-node-gateway-inetaddr: 10.80.56.1
+        cluster-vip-cidr: 10.80.63.0/24
         l2-interface-1: vmnet0
         l2-interface-2: lan0
       image: ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2
@@ -9659,8 +9624,8 @@ spec:
   hostname: bioskop-controlplane
   subnetRouter:
     advertiseRoutes:
-    - 10.80.7.10/32
-    - 10.80.0.64/26
+    - 10.80.63.10/32
+    - 10.80.56.64/26
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware

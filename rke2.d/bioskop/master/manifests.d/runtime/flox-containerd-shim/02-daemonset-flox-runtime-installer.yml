@@ -40,37 +40,6 @@ spec:
       hostPID: true
       initContainers:
         - command:
-            - /bin/sh
-            - -c
-            - |
-              # Use nsenter to run the build script in the host's environment
-              # This gives access to host's flox, nix, yq, and environment
-              if [ ! -f /config/flox-builds.yaml ]; then
-                echo "No flox-builds.yaml found, skipping Nix builds"
-                exit 0
-              fi
-              # Copy ConfigMap from container to host via pipe (can't access container fs from nsenter)
-              # Persist to /var/lib/rke2lab/ so you can re-replay builds after package updates
-              cat /config/flox-builds.yaml | nsenter --target 1 --mount --uts --ipc --net --pid -- \
-                sh -c 'mkdir -p /var/lib/rke2lab && cat > /var/lib/rke2lab/flox-builds.yaml'
-              # Also copy to /tmp for backward compatibility
-              cat /config/flox-builds.yaml | nsenter --target 1 --mount --uts --ipc --net --pid -- \
-                sh -c 'cat > /tmp/flox-builds.yaml'
-              # Run the build script in host context
-              nsenter --target 1 --mount --uts --ipc --net --pid -- \
-                /srv/host/scripts.d/rke2lab-flox-build.sh /var/lib/rke2lab/flox-builds.yaml
-          image: alpine:3.20
-          imagePullPolicy: IfNotPresent
-          name: flox-builder
-          securityContext:
-            privileged: true
-            runAsGroup: 0
-            runAsUser: 0
-          volumeMounts:
-            - mountPath: /config
-              name: flox-builds-config
-              readOnly: true
-        - command:
             - /scripts/shim-installer.sh
           env:
             - name: CONTAINERD_CONFIG_FILE
@@ -97,9 +66,6 @@ spec:
       tolerations:
         - operator: Exists
       volumes:
-        - configMap:
-            name: flox-builds-config
-          name: flox-builds-config
         - configMap:
             defaultMode: 493
             name: flox-runtime-installer-script

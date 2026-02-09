@@ -12,5 +12,5 @@ spec:
   hostname: bioskop-controlplane
   subnetRouter:
     advertiseRoutes:
-      - 10.80.7.10/32
-      - 10.80.0.64/26
+      - 10.80.63.10/32
+      - 10.80.56.64/26

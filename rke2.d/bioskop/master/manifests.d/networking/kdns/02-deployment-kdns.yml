@@ -22,7 +22,7 @@ spec:
   template:
     metadata:
       annotations:
-        debug.kdns.lab42/enabled: "true"
+        debug.kdns.lab42/enabled: "false"
         flox.dev/environment: nxmatic/kdns
         kpt.dev/package-layer: networking
         kpt.dev/package-name: kdns
@@ -37,7 +37,7 @@ spec:
             - kdns
           env:
             - name: KUBERNETES_SERVICE_HOST
-              value: 10.80.0.10
+              value: 10.80.56.10
             - name: KUBERNETES_SERVICE_PORT
               value: "6443"
           image: flox/empty:1.0.0

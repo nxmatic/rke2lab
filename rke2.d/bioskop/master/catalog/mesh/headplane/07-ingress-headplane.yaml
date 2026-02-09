@@ -5,11 +5,11 @@ metadata: # kpt-merge: ${headscale-namespace}/headplane
   namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
   annotations:
     kubernetes.io/ingress.class: ${headplane-ingress-class} # kpt-set: ${headplane-ingress-class}
-    internal.kpt.dev/upstream-identifier: 'networking.k8s.io|Ingress|${headscale-namespace}|headplane'
     io.cilium/lb-ipam-ips: ${cluster-lan-headplane-inetaddr} # kpt-set: ${cluster-lan-headplane-inetaddr}
     lab42.io/mdns.enabled: "true"
-    lab42.io/mdns.host: ${headplane-mdns-hostname} # kpt-set: ${headplane-mdns-hostname}
     lab42.io/mdns.name: ${headplane-mdns-hostname} # kpt-set: ${headplane-mdns-hostname}
+    lab42.io/mdns.host: ${headplane-mdns-hostname} # kpt-set: ${headplane-mdns-hostname}
+    internal.kpt.dev/upstream-identifier: 'networking.k8s.io|Ingress|${headscale-namespace}|headplane'
 spec:
   ingressClassName: ${headplane-ingress-class} # kpt-set: ${headplane-ingress-class}
   rules:

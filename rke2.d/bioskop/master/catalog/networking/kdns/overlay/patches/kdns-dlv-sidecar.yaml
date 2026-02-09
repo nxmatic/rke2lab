@@ -9,7 +9,7 @@ spec:
   template:
     metadata:
       annotations:
-        debug.kdns.lab42/enabled: "true"
+        debug.kdns.lab42/enabled: "false"
     spec:
       shareProcessNamespace: true
       containers:

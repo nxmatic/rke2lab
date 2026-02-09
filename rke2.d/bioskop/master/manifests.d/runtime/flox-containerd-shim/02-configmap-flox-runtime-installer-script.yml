@@ -2,8 +2,7 @@
 apiVersion: v1
 data:
   shim-installer.sh: |-
-    #!/bin/sh
-    set -exuo pipefail
+    #!/usr/bin/env -S bash -exuo pipefail
 
     install_deps() {
       local attempt=0

@@ -7,7 +7,7 @@ data:
   HEADSCALE_NAMESPACE: headscale-system
   HEADSCALE_URL: http://headscale.headscale-system.svc.cluster.local:8080
   RKE2_CLUSTER_NAME: bioskop
-  VIP_NETWORK_CIDR: 10.80.7.0/24
+  VIP_NETWORK_CIDR: 10.80.63.0/24
 kind: ConfigMap
 metadata:
   annotations:

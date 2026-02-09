@@ -14,7 +14,7 @@ spec:
       peers:
         - name: gateway-peer
           peerASN: 65020
-          peerAddress: 10.80.0.1
+          peerAddress: 10.80.56.1
           peerConfigRef:
             name: cilium-peer
   nodeSelector:

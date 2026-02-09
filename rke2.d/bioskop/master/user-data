@@ -190,24 +190,6 @@ write_files:
       command -v helm >/dev/null &&
         source <( helm completion zsh ) 2>/dev/null || true
 runcmd:
-  # Update apt cache after adding flox source
-  - apt-get update
-  # Initialize Nix build group and users (nixbld) before flox operations (@codebase)
-  # This is a safety net - packages' post-install hooks should also create these,
-  # but we ensure they exist immediately before any flox/nix builds begin
-  - |
-    if ! getent group nixbld &>/dev/null; then
-      : "Creating nixbld group and build users"
-      groupadd --system nixbld
-      for i in {0..31}; do
-        useradd --system \
-          --group nixbld \
-          --home-dir /var/empty \
-          --shell /run/current-system/sw/bin/nologin \
-          --comment "Nix build user ${i}" \
-          "nixbld${i}" 2>/dev/null || true
-      done
-    fi
   - /srv/host/scripts.d/rke2lab-systemd-link.sh
   - /srv/host/scripts.d/rke2lab-activate.sh
 hostname: bioskop-master
@@ -223,10 +205,6 @@ resolv_conf:
 # netplan file before systemd-networkd starts.
 # -----------------------------------------------------------------------------
 bootcmd:
-  # Install flox GPG key and apt source before package installation (@codebase)
-  - mkdir -p /usr/share/keyrings
-  - [sh, -c, "curl -fsSL https://downloads.flox.dev/by-env/stable/deb/flox-archive-keyring.gpg -o /usr/share/keyrings/flox-archive-keyring.gpg"]
-  - [sh, -c, "echo 'deb [signed-by=/usr/share/keyrings/flox-archive-keyring.gpg] https://downloads.flox.dev/by-env/stable/deb stable/' > /etc/apt/sources.list.d/flox.list"]
   # Install NoCloud network-config as netplan file before cloud-init processes network
   # This must run in bootcmd because write_files happens too late (after network config)
   - [test, -f, /var/lib/cloud/seed/nocloud/network-config]
@@ -239,5 +217,3 @@ bootcmd:
 # =============================================================================
 packages:
   - avahi-daemon
-  - nix
-  - flox

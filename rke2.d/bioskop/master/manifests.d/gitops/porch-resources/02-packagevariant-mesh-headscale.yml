@@ -28,7 +28,7 @@ spec:
           cluster-lan-headscale-inetaddr: 192.168.1.193
           cluster-lan-lb-cidr: 192.168.1.192/27
           cluster-name: bioskop
-          cluster-vip-cidr: 10.80.7.0/24
+          cluster-vip-cidr: 10.80.63.0/24
           darwin-host: bioskop
         image: ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2
   upstream:
