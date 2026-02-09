@@ -1,10 +1,5 @@
 #!/usr/bin/env -S bash -exu -o pipefail
 
-: "Load Nix environment if available (makes flox available in PATH)"
-if [[ -f /nix/var/nix/profiles/default/etc/profile.d/nix.sh ]]; then
-  source /nix/var/nix/profiles/default/etc/profile.d/nix.sh
-fi
-
 : "Disable IPv6 system-wide"
 sysctl -p /etc/sysctl.d/99-disable-ipv6.conf
 
