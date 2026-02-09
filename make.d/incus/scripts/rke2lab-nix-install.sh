@@ -43,13 +43,9 @@ fi
 # Create /etc/profile.d/nix-profile.sh for login shells and BASH_ENV
 cat > /etc/profile.d/nix-profile.sh <<'EOF'
 #!/bin/bash
-# Initialize Nix profile for login and non-interactive bash shells
-# Source both daemon and single-user Nix profile scripts if they exist
+# Initialize Nix profile for daemon installation
 if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
   . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
-fi
-if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix.sh ]; then
-  . /nix/var/nix/profiles/default/etc/profile.d/nix.sh
 fi
 EOF
 chmod 755 /etc/profile.d/nix-profile.sh
