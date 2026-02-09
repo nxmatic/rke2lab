@@ -44,10 +44,11 @@ fi
 cat > /etc/profile.d/nix-profile.sh <<'EOF'
 #!/bin/bash
 # Initialize Nix profile for login and non-interactive bash shells
-# Check for daemon installation (nix-daemon.sh) or single-user (nix.sh)
+# Source both daemon and single-user Nix profile scripts if they exist
 if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
   . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
-elif [ -e /nix/var/nix/profiles/default/etc/profile.d/nix.sh ]; then
+fi
+if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix.sh ]; then
   . /nix/var/nix/profiles/default/etc/profile.d/nix.sh
 fi
 EOF
