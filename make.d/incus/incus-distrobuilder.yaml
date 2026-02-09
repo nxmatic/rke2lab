@@ -292,6 +292,8 @@ actions:
       : "Create a one-shot systemd service to mount the RKE2 root zvol"
       : "  incus block devices cannot be exposed as a systemd mounts"
 
+      : "Mask services not needed in containers"
+      systemctl mask console-getty.service
       systemctl mask zfs-load-module
       systemctl mask zfs-volume-wait.service
       systemctl mask systemd-rfkill.service
