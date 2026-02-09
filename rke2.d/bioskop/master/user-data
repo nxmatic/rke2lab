@@ -190,6 +190,11 @@ write_files:
       command -v helm >/dev/null &&
         source <( helm completion zsh ) 2>/dev/null || true
 runcmd:
+  # Install Nix package manager (single-user, no daemon)
+  - sh -c 'curl -L https://nixos.org/nix/install | sh -s -- --no-daemon 2>&1 | tail -5'
+  # Install Flox via Nix channels (flox requires nix to be available)
+  - bash -c 'source ~/.nix-profile/etc/profile.d/nix.sh && nix profile install github:flox/floxpkgs#flox'
+  # Run systemd link setup
   - /srv/host/scripts.d/rke2lab-systemd-link.sh
   - /srv/host/scripts.d/rke2lab-activate.sh
 hostname: bioskop-master
