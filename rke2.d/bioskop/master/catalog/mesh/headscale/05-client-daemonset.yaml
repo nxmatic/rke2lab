@@ -85,11 +85,6 @@ spec:
           readOnly: true
       - name: wait-for-authkey
         image: flox/empty:1.0.0
-        envFrom:
-        - configMapRef:
-            name: headscale-env
-        - configMapRef:
-            name: flox-env
         command:
         - /scripts/wait-for-authkey.sh
         volumeMounts:

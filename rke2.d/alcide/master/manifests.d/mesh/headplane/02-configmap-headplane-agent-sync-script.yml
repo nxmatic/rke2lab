@@ -1,0 +1,30 @@
+---
+apiVersion: v1
+data:
+  agent-sync.sh: |-
+    #!/bin/sh
+    set -exuo pipefail
+
+    # Read authkey from mounted secret volume (base64 encoded)
+    AUTHKEY=$(cat /secrets/headscale/authkey | base64 -d)
+    kubectl create secret generic headplane-agent-auth \
+      -n "${HEADPLANE_NAMESPACE}" \
+      --from-literal=preauthkey="${AUTHKEY}" \
+      --dry-run=client -o yaml | kubectl apply -f -
+
+    yq eval '.server.base_url = strenv(HEADPLANE_BASE_URL) |
+      .server.cookie_secure = (strenv(HEADPLANE_COOKIE_SECURE) == "true") |
+      .headscale.url = strenv(HEADSCALE_SERVICE_URL)' \
+      /etc/headplane-template/config.yaml > /tmp/config.$$.yaml
+    kubectl create secret generic headplane-config \
+      -n "${HEADPLANE_NAMESPACE}" \
+      --from-file=config.yaml=/tmp/config.$$.yaml \
+      --dry-run=client -o yaml | kubectl apply -f -
+kind: ConfigMap
+metadata:
+  annotations:
+    internal.kpt.dev/upstream-identifier: '|ConfigMap|${headscale-namespace}|headplane-agent-sync-script'
+    kpt.dev/package-layer: mesh
+    kpt.dev/package-name: headplane
+  name: headplane-agent-sync-script
+  namespace: headscale-system
