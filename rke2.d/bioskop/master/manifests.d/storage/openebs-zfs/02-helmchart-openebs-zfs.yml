@@ -18,7 +18,4 @@ spec:
       bin: /usr/sbin/zfs
     zfsNode:
       kubeletDir: /var/lib/kubelet
-    crds:
-      csi:
-        volumeSnapshots: false
   version: 2.8.0
