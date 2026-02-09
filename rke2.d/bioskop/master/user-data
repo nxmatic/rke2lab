@@ -70,6 +70,7 @@ write_files:
       publish-hinfo=yes
       publish-aaaa-on-ipv4=no
       publish-a-on-ipv6=no
+  # Enable Nix experimental features and shared caches (@codebase)
   # Disable IPv6 globally so nodes stay IPv4-only end-to-end (@codebase)
   - path: /etc/sysctl.d/99-disable-ipv6.conf
     permissions: "0644"
@@ -170,17 +171,6 @@ write_files:
 
       : "Load direnv hook"
       source <( direnv hook zsh )
-  # System-wide bash initialization to load Nix profile
-  # This is sourced by ALL bash shells (login and non-login), including scripts
-  - path: /etc/bash.bashrc
-    permissions: "0644"
-    append: true
-    content: |2
-
-      # Initialize Nix profile for all bash shells (required for flox and other tools)
-      if [[ -f /nix/var/nix/profiles/default/etc/profile.d/nix.sh ]]; then
-        source /nix/var/nix/profiles/default/etc/profile.d/nix.sh
-      fi
   # Bash completion for kubectl and helm
   - path: /etc/bash_completion.d/kube
     permissions: "0644"
@@ -193,14 +183,6 @@ write_files:
         source <( kubectl completion zsh ) 2>/dev/null || true
       command -v helm >/dev/null &&
         source <( helm completion zsh ) 2>/dev/null || true
-  - path: /etc/nix/nix.conf
-    permissions: "0644"
-    content: "allowed-users = *\nauto-optimise-store = false\nbuilders = \ncores = 0\nexperimental-features = nix-command flakes ca-derivations\nmax-jobs = 4\nrequire-sigs = true\nsandbox = false\nsandbox-fallback = false\nsubstituters = https://aseipp-nix-cache.freetls.fastly.net https://nxmatic.cachix.org https://cache.nixos.org/\nsystem-features = nixos-test benchmark big-parallel kvm gccarch-armv8-a\ntrusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= nxmatic.cachix.org-1:huMghYiwDpPa1PMXHXK4G1Dp4QOZjgsNqxcjf/AjuJ0= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=\ntrusted-substituters = https://cache.nixos.org\ntrusted-users = root nxmatic root nxmatic root @admin @wheel\nextra-platforms = x86_64-linux x86_64-linux\nextra-sandbox-paths = /run/binfmt /nix/store/7k1f2qca1mxyrzl6wr74dilrhwbx6qvs-qemu-x86_64-binfmt-P /dev/kvm\nkeep-outputs = false\nkeep-derivations = false\nkeep-failed = false\nexperimental-features = nix-command flakes\n"
-  - path: /etc/profile.d/nix-profile.sh
-    permissions: "0644"
-    content: |
-      [[ -d /nix/var/nix/profiles/default/etc/profile.d/nix.sh ]] &&
-        source /nix/var/nix/profiles/default/etc/profile.d/nix.sh
 runcmd:
   # Install Nix package manager
   - /srv/host/scripts.d/rke2lab-nix-install.sh
