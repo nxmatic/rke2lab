@@ -6,4 +6,6 @@ metadata: # kpt-merge: ${headscale-namespace}/flox-env
   annotations:
     replicator.v1.mittwald.de/replicate-from: flox-runtime/flox-env
     internal.kpt.dev/upstream-identifier: '|ConfigMap|${headscale-namespace}|flox-env'
+  labels:
+    app.kubernetes.io/replicated: "true"
 data: {}
