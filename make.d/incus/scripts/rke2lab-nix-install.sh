@@ -73,3 +73,12 @@ if ! grep -q "^BASH_ENV=" /etc/environment 2>/dev/null; then
   echo "BASH_ENV=/etc/profile.d/nix-profile.sh" >> /etc/environment
 fi
 
+# Set BASH_ENV in systemd environment
+mkdir -p /etc/systemd/system.conf.d
+if [ ! -f /etc/systemd/system.conf.d/10-rke2lab-nix.conf ]; then
+  cat > /etc/systemd/system.conf.d/10-rke2lab-nix.conf <<'EOF'
+[Manager]
+DefaultEnvironment="BASH_ENV=/etc/profile.d/nix-profile.sh"
+EOF
+fi
+
