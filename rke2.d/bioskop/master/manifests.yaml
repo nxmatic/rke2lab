@@ -6195,13 +6195,8 @@ data:
     #!/bin/sh
     set -exuo pipefail
 
-    # Wait for headscale-client-auth secret to be created
-    kubectl wait --for=jsonpath='{.data.authkey}' \
-      secret/headscale-client-auth \
-      -n "${HEADSCALE_NAMESPACE}" \
-      --timeout=300s
-
-    AUTHKEY=$(kubectl get secret headscale-client-auth -n "${HEADSCALE_NAMESPACE}" -o jsonpath='{.data.authkey}' | base64 -d)
+    # Read authkey from mounted secret volume (base64 encoded)
+    AUTHKEY=$(cat /secrets/headscale/authkey | base64 -d)
     kubectl create secret generic headplane-agent-auth \
       -n "${HEADPLANE_NAMESPACE}" \
       --from-literal=preauthkey="${AUTHKEY}" \
@@ -6349,7 +6344,8 @@ metadata:
 apiVersion: v1
 data:
   tailscale-client.sh: |-
-    #!/usr/bin/env -S bash -exuo pipefail
+    #!/bin/sh
+    set -exuo pipefail
 
     : "[i] Starting tailscaled..."
     tailscaled \
@@ -6374,17 +6370,24 @@ data:
       --reset
 
     wait $TAILSCALED_PID
-  wait-for-authkey.sh: |
-    #!/usr/bin/env -S bash -exuo pipefail
-
-    : "[i] Waiting for auth key Secret to be populated..."
-    kubectl wait --for=jsonpath='{.data.authkey}' secret/headscale-client-auth \
-      -n "$HEADSCALE_NAMESPACE" --timeout=300s
   wait-for-headscale.sh: |
-    #!/usr/bin/env -S bash -exuo pipefail
+    #!/bin/sh
+    set -exuo pipefail
 
     : "[i] Waiting for headscale deployment to be available..."
     kubectl wait --for=condition=available deployment/headscale \
+      -n "$HEADSCALE_NAMESPACE" --timeout=300s
+
+    : "[i] Waiting for required ConfigMaps..."
+    kubectl wait --for=create configmap/headscale-client-scripts \
+      -n "$HEADSCALE_NAMESPACE" --timeout=300s
+    kubectl wait --for=create configmap/headscale-env \
+      -n "$HEADSCALE_NAMESPACE" --timeout=300s
+    kubectl wait --for=create configmap/flox-env \
+      -n "$HEADSCALE_NAMESPACE" --timeout=300s
+
+    : "[i] Waiting for required secrets..."
+    kubectl wait --for=create secret/headscale-client-auth \
       -n "$HEADSCALE_NAMESPACE" --timeout=300s
 kind: ConfigMap
 metadata:
@@ -8685,21 +8688,6 @@ spec:
         - mountPath: /scripts
           name: client-scripts
           readOnly: true
-      - command:
-        - /scripts/wait-for-authkey.sh
-        envFrom:
-        - configMapRef:
-            name: headscale-env
-        - configMapRef:
-            name: flox-env
-        image: flox/empty:1.0.0
-        name: wait-for-authkey
-        volumeMounts:
-        - mountPath: /var/secrets
-          name: authkey
-        - mountPath: /scripts
-          name: client-scripts
-          readOnly: true
       nodeSelector:
         node-role.kubernetes.io/control-plane: "true"
       runtimeClassName: flox
@@ -8914,6 +8902,9 @@ spec:
           name: config-template
           readOnly: true
           subPath: config.yaml
+        - mountPath: /secrets/headscale
+          name: headscale-auth
+          readOnly: true
       restartPolicy: OnFailure
       runtimeClassName: flox
       serviceAccountName: headplane
@@ -8925,6 +8916,10 @@ spec:
       - name: config-template
         secret:
           secretName: headplane-config-tmpl
+      - name: headscale-auth
+        secret:
+          optional: false
+          secretName: headscale-client-auth
   ttlSecondsAfterFinished: 300
 ---
 apiVersion: batch/v1

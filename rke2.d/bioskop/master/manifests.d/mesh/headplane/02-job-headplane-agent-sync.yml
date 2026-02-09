@@ -61,6 +61,6 @@ spec:
             secretName: headplane-config-tmpl
         - name: headscale-auth
           secret:
-            secretName: headscale-client-auth
             optional: false
+            secretName: headscale-client-auth
   ttlSecondsAfterFinished: 300

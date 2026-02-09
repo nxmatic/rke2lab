@@ -2,6 +2,8 @@
 Description=Install RKE2Lab mesh manifests from host share (post-server)
 RequiresMountsFor=/srv/host/system.d /srv/host
 After=local-fs.target
+After=rke2lab-networking-manifests.service
+Requires=rke2lab-networking-manifests.service
 After=rke2lab-replication-manifests.service
 Requires=rke2lab-replication-manifests.service
 After=rke2lab-mesh-secrets.service
