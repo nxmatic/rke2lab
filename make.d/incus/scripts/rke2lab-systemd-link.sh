@@ -41,3 +41,12 @@ log "copied systemd override directories from ${RKE2LAB_SYSTEMD_DIR}"
 : "Reload systemd to recognize new units"
 systemctl daemon-reload
 log "daemon-reload complete"
+
+: "Enable all rke2lab services"
+for service_file in /etc/systemd/system/rke2lab-*.service; do
+  if [[ -f "${service_file}" ]]; then
+    service_name=$(basename "${service_file}")
+    systemctl enable "${service_name}" || log "warning: failed to enable ${service_name}"
+  fi
+done
+log "enabled rke2lab services"
