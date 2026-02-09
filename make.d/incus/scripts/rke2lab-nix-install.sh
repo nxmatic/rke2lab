@@ -7,8 +7,11 @@ export HOME=/root
 # Install Nix using official installer
 bash -exuo pipefail <(curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install) --daemon
 
-# Create /etc/nix directory (if not already created by installer)
-mkdir -p /etc/nix
+# Verify Nix installation created /etc/nix directory
+if [ ! -d /etc/nix ]; then
+  echo "ERROR: Nix installer did not create /etc/nix directory" >&2
+  exit 1
+fi
 
 # Configure Nix after installation (idempotent - only if not already configured by rke2lab)
 if ! grep -q "BEGIN rke2lab-nix" /etc/nix/nix.conf 2>/dev/null; then
