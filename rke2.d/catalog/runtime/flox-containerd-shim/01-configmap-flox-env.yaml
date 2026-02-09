@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata:
   name: flox-env
   namespace: flox-runtime
+  labels:
+    app.kubernetes.io/replicated: "true"
   annotations:
     replicator.v1.mittwald.de/replicate-to: "headscale-system"
 data:

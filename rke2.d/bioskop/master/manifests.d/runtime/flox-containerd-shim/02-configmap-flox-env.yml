@@ -6,6 +6,8 @@ data:
   FLOX_NONINTERACTIVE: "1"
 kind: ConfigMap
 metadata:
+  labels:
+    app.kubernetes.io/replicated: "true"
   annotations:
     internal.kpt.dev/upstream-identifier: '|ConfigMap|flox-runtime|flox-env'
     kpt.dev/package-layer: runtime

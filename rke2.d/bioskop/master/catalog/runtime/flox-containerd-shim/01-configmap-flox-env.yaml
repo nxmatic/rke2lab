@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata: # kpt-merge: flox-runtime/flox-env
   name: flox-env
   namespace: flox-runtime
+  labels:
+    app.kubernetes.io/replicated: "true"
   annotations:
     internal.kpt.dev/upstream-identifier: '|ConfigMap|flox-runtime|flox-env'
     replicator.v1.mittwald.de/replicate-to: "headscale-system"

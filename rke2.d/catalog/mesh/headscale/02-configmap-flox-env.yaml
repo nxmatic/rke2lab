@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata:
   name: flox-env
   namespace: ${headscale-namespace} # kpt-set: ${headscale-namespace}
+  labels:
+    app.kubernetes.io/replicated: "true"
   annotations:
     replicator.v1.mittwald.de/replicate-from: flox-runtime/flox-env
 data: {}
