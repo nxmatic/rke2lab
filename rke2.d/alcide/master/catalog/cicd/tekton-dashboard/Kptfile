@@ -1,6 +1,0 @@
-apiVersion: kpt.dev/v1
-kind: Kptfile
-metadata:
-  name: tekton-dashboard
-info:
-  description: Tekton Dashboard (read/write) from upstream release-full.yaml
