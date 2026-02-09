@@ -190,22 +190,22 @@ write_files:
       command -v helm >/dev/null &&
         source <( helm completion zsh ) 2>/dev/null || true
 runcmd:
-  # Initialize Nix build group and users before any flox/nix operations (@codebase)
+  # Initialize Nix build group and users (nixbld) before flox operations (@codebase)
+  # This is a safety net - packages' post-install hooks should also create these,
+  # but we ensure they exist immediately before any flox/nix builds begin
   - |
     if ! getent group nixbld &>/dev/null; then
+      : "Creating nixbld group and build users"
       groupadd --system nixbld
-    fi
-    for i in {0..31}; do
-      username="nixbld${i}"
-      if ! getent passwd "${username}" &>/dev/null; then
+      for i in {0..31}; do
         useradd --system \
           --group nixbld \
           --home-dir /var/empty \
           --shell /run/current-system/sw/bin/nologin \
           --comment "Nix build user ${i}" \
-          "${username}" || true
-      fi
-    done
+          "nixbld${i}" 2>/dev/null || true
+      done
+    fi
   - /srv/host/scripts.d/rke2lab-systemd-link.sh
   - /srv/host/scripts.d/rke2lab-activate.sh
 hostname: bioskop-master
@@ -234,3 +234,4 @@ bootcmd:
 packages:
   - avahi-daemon
   - nix
+  - flox
