@@ -1,0 +1,227 @@
+# RKE2Lab Layer Deployment Order and Dependencies
+# ================================================
+# This file defines the canonical deployment order for RKE2Lab Kubernetes
+# manifest layers. It serves as the source of truth for:
+#
+#   1. Kubernetes manifest application order (via kustomize/kpt)
+#   2. Systemd service dependency generation
+#   3. Documentation of inter-layer dependencies
+#
+# Systemd services should be generated from this file to ensure consistency
+# between manifest dependencies and boot-time orchestration.
+#
+# @codebase
+
+---
+apiVersion: rke2lab.nxmatic.io/v1alpha1
+kind: LayerDependencies
+metadata:
+  name: bioskop-layers
+  description: Deployment order and dependencies for RKE2Lab catalog
+
+# Special layers that run BEFORE rke2-server.service starts
+pre_server_layers:
+  - name: cilium-config
+    description: Cilium HelmChartConfig for bootstrap CNI
+    path: networking/cilium-config
+    systemd:
+      before: rke2-server.service
+      after: rke2lab-install.service
+
+# Main layers deployed AFTER rke2-server.service starts
+# These form a linear dependency chain for reliable boot ordering
+layers:
+  - name: runtime
+    description: Container runtime and core services (Flox, containerd shim)
+    depends_on: []  # First layer, depends only on rke2-server
+    packages:
+      - runtime/flox-containerd-shim
+      - runtime/rke2-config
+    systemd:
+      after: [rke2-server.service]
+      requires: [rke2-server.service, rke2lab-runtime-secrets.service]
+      readiness_check: rke2lab-layer-ready.sh runtime
+    rationale: |
+      Flox runtime must be available before any pods that use the
+      flox RuntimeClass. RKE2 server must be running to accept manifests.
+    
+  - name: storage
+    description: Persistent storage providers (OpenEBS ZFS)
+    depends_on: [runtime]
+    packages:
+      - storage/openebs-zfs
+    systemd:
+      readiness_check: rke2lab-openebs-ready.sh
+    rationale: |
+      Storage CSI drivers need the runtime layer ready to schedule pods.
+      ZFS datasets must be available before workloads request PVCs.
+    prerequisites:
+      - ZFS kernel module loaded on all nodes
+      - ZFS pool created (e.g., tank)
+    
+  - name: networking
+    description: CNI advanced features and network policies (Cilium, Envoy)
+    depends_on: [storage]
+    packages:
+      - networking/cilium
+      - networking/envoy-gateway
+      - networking/kdns
+      - networking/traefik
+    systemd:
+      # Also depends on rke2-server directly (redundant via storage chain)
+      after: [rke2-server.service, rke2lab-storage-manifests.service]
+      requires: [rke2-server.service, rke2lab-storage-manifests.service]
+      readiness_check: rke2lab-cilium-ready.sh
+    rationale: |
+      Cilium advanced features (BGP, L2 announcements, IPAM) require storage
+      for persistent state. BGP peering must be established before services
+      can receive LoadBalancer IPs.
+    prerequisites:
+      - Core CNI (HelmChartConfig) deployed during rke2-server bootstrap
+      - BGP gateway router configured (ASN 65000)
+    
+  - name: replication
+    description: Resource replication across namespaces (Replicator)
+    depends_on: [networking]
+    packages:
+      - replication/replicator
+    systemd:
+      readiness_check: rke2lab-replicator-ready.sh
+    rationale: |
+      Replicator watches and replicates resources (secrets, configmaps).
+      It needs networking to communicate with the API server and other nodes.
+      This layer enables cross-namespace secret sharing required by mesh.
+    readiness_verification: |
+      Specific readiness check verifies:
+      - Deployment kubernetes-replicator is rolled out in kube-system
+      - Pods are running and ready
+      - Controller logs indicate it's watching resources
+      - RBAC (ClusterRole, ClusterRoleBinding) is in place
+    
+  - name: mesh
+    description: Mesh networking (Headscale, Tailscale, Headplane)
+    depends_on: [replication]
+    packages:
+      - mesh/headscale
+      - mesh/headplane
+      - mesh/tailscale
+    systemd:
+      requires: [rke2lab-replication-manifests.service, rke2lab-mesh-secrets.service]
+      readiness_check: rke2lab-layer-ready.sh mesh
+    rationale: |
+      Headscale requires Tailscale operator to be running first.
+      Mesh secrets (OAuth keys, derp maps) need to be replicated
+      via the replicator before Headscale can start.
+    prerequisites:
+      - Tailscale operator deployed (via mesh/tailscale)
+      - DERP configuration and secrets available
+  
+  - name: ha
+    description: High availability components (kube-vip)
+    depends_on: [networking]
+    packages:
+      - ha/kube-vip
+    systemd:
+      readiness_check: rke2lab-layer-ready.sh ha
+    rationale: |
+      kube-vip provides VIP failover for the control plane.
+      Depends on networking for L2 announcements and BGP.
+      Can deploy in parallel with replication/mesh.
+    
+  - name: cicd
+    description: CI/CD pipelines (Tekton)
+    depends_on: [mesh, replication]
+    packages:
+      - cicd/tekton-pipelines
+      - cicd/tekton-dashboard
+    systemd:
+      after: [rke2lab-mesh-manifests.service, rke2lab-replication-manifests.service]
+      requires: [rke2lab-mesh-manifests.service, rke2lab-replication-manifests.service, rke2lab-cicd-secrets.service]
+      readiness_check: rke2lab-layer-ready.sh cicd
+    rationale: |
+      Explicit dependencies for resilience and clarity:
+      - mesh: Tekton runners need mesh connectivity for distributed builds
+      - replication: Tekton requires cross-namespace ServiceAccounts and Secrets
+        replicated by the replicator for pipeline execution contexts
+      
+      While mesh→replication (transitive), making replication explicit ensures
+      Tekton's functional requirement is documented and won't break if the
+      layer chain is refactored.
+    
+  - name: gitops
+    description: GitOps controllers and package management (Flux, Porch)
+    depends_on: [cicd, replication]
+    packages:
+      - gitops/flux-operator
+      - gitops/flux-instance
+      - gitops/porch
+      - gitops/porch-resources
+    systemd:
+      after: [rke2lab-tekton-pipelines-manifests.service, rke2lab-replication-manifests.service]
+      requires: [rke2lab-tekton-pipelines-manifests.service, rke2lab-replication-manifests.service, rke2lab-gitops-secrets.service]
+      readiness_check: rke2lab-layer-ready.sh gitops
+    rationale: |
+      Explicit dependencies for resilience and clarity:
+      - cicd: Porch uses Tekton for kpt function rendering in pipelines
+      - replication: Flux and Porch need cross-namespace secret replication
+        for GitOps repository credentials and SSH keys
+      
+      Both are direct functional requirements, not just ordering constraints.
+      Explicit declaration makes the service self-documenting and resilient
+      to changes in the dependency chain.
+
+# Secrets layers run in parallel with rke2-server, applying encrypted
+# SOPS secrets before the corresponding manifest layer
+secrets_layers:
+  - name: runtime-secrets
+    layer: runtime
+    systemd:
+      after: [rke2-server.service]
+      requires: [rke2-server.service]
+  
+  - name: mesh-secrets
+    layer: mesh
+    systemd:
+      after: [rke2-server.service]
+      requires: [rke2-server.service]
+  
+  - name: gitops-secrets
+    layer: gitops
+    systemd:
+      after: [rke2-server.service]
+      requires: [rke2-server.service]
+  
+  - name: cicd-secrets
+    layer: cicd
+    systemd:
+      after: [rke2-server.service]
+      requires: [rke2-server.service]
+
+# Derived dependency graph (linear chain with branches):
+#
+#   rke2-server.service
+#     ↓
+#   runtime-secrets + runtime-manifests
+#     ↓
+#   storage-manifests
+#     ↓
+#   networking-manifests
+#     ↓
+#   replication-manifests
+#     ↓
+#   mesh-secrets + mesh-manifests
+#     ↓
+#   ├─ cicd-secrets + tekton-pipelines-manifests
+#   │    ↓
+#   └─ gitops-secrets + gitops-manifests
+#
+#   (ha-manifests branches from networking, parallel with replication→mesh)
+
+# Notes:
+# - Redundant transitive dependencies (e.g., networking→rke2-server when
+#   networking→storage→runtime→rke2-server) are kept for clarity and
+#   explicit documentation of critical dependencies
+# - Secrets services depend only on rke2-server since they don't need
+#   other layers ready, just API server availability
+# - Readiness checks ensure each layer is fully operational before
+#   the next layer begins installation

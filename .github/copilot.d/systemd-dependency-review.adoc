@@ -1,0 +1,837 @@
+= RKE2Lab Systemd Dependency Review
+:author: AI Assistant
+:revdate: 2026-02-09
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: rouge
+
+== Overview
+
+Current systemd unit dependency analysis for the bioskop master node, following the methodology from link:phase1-inventory.adoc[Phase 1: Inventory].
+
+== Service Inventory
+
+=== Core Manifest Services (8)
+
+All services install Kubernetes manifests for specific layers with integrated readiness checks:
+
+* `rke2lab-runtime-manifests.service` - Runtime layer (Flox, containerd shim)
+* `rke2lab-storage-manifests.service` - Storage layer (OpenEBS ZFS)
+* `rke2lab-networking-manifests.service` - Networking layer (Cilium advanced)
+* `rke2lab-replication-manifests.service` - Replication layer (Replicator)
+* `rke2lab-mesh-manifests.service` - Mesh layer (Headscale, Headplane, Tailscale)
+* `rke2lab-gitops-manifests.service` - GitOps layer (Flux, Porch)
+* `rke2lab-tekton-pipelines-manifests.service` - CI/CD layer (Tekton)
+* `rke2lab-cilium-config-manifests.service` - Pre-server Cilium configuration
+
+=== Secrets Services (3)
+
+Services that apply SOPS-encrypted secrets before manifests:
+
+* `rke2lab-runtime-secrets.service`
+* `rke2lab-mesh-secrets.service`
+* `rke2lab-gitops-secrets.service`
+* `rke2lab-cicd-secrets.service`
+
+=== Infrastructure Services (5)
+
+* `rke2lab-install.service` - RKE2 installation (runs once)
+* `rke2lab-network-config.service` - Network configuration
+* `rke2lab-network-wait.service` - Wait for network ready
+* `rke2lab-network-debug.service` - Network diagnostics
+* `rke2lab-remount-shared.service` - Remount /srv/host as shared for nested containers
+* `rke2lab-route-cleanup.service` - Clean up duplicate routes
+* `zfs-early-umount.service` - ZFS cleanup before shutdown
+
+=== Upstream Services
+
+* `rke2-server.service` (from RKE2 installation)
+
+=== Targets
+
+**None** - All targets were eliminated in Phase 3.5 simplification
+
+== Dependency Chain Analysis
+
+=== Pre-Server Boot Sequence
+
+[source]
+----
+local-fs.target
+  ↓
+rke2lab-network-config.service
+  ↓
+rke2lab-network-wait.service
+  ↓
+rke2lab-install.service (ConditionPathExists: runs only if RKE2 not installed)
+  ↓
+rke2lab-cilium-config-manifests.service (Before=rke2-server.service)
+  ↓
+rke2-server.service
+----
+
+=== Post-Server Linear Dependency Chain
+
+[source]
+----
+rke2-server.service
+  ↓
+rke2lab-runtime-secrets.service
+  ↓
+rke2lab-runtime-manifests.service (ExecStartPost: rke2lab-layer-ready.sh)
+  ↓
+rke2lab-storage-manifests.service (ExecStartPost: rke2lab-openebs-ready.sh)
+  ↓
+rke2lab-networking-manifests.service (ExecStartPost: rke2lab-cilium-ready.sh)
+----
+
+**Branch point**: Networking-manifests does NOT gate replication
+
+[source]
+----
+rke2-server.service (parallel branches)
+  ├─ replication branch:
+  │   rke2lab-replication-manifests.service
+  │     ↓
+  │   rke2lab-mesh-secrets.service
+  │     ↓
+  │   rke2lab-mesh-manifests.service
+  │     ↓
+  │   ├─ rke2lab-tekton-pipelines-manifests.service
+  │   │     ↓
+  │   └─ rke2lab-gitops-manifests.service
+  │
+  └─ (networking continues independently)
+----
+
+== Issues Identified
+
+=== 1. ✅ Broken Linear Chain: Replication Service (FIXED)
+
+**Previous Problem**: `rke2lab-replication-manifests.service` depended directly on `rke2-server.service`, bypassing networking/storage layers.
+
+**Resolution**: Updated to depend on `rke2lab-networking-manifests.service`
+
+**Applied Change**:
+[source,diff]
+----
+ [Unit]
+ Description=Install RKE2Lab replication manifests from host share (post-server)
+ RequiresMountsFor=/srv/host/system.d /srv/host
+ After=local-fs.target
+-After=rke2-server.service
+-Requires=rke2-server.service
++After=rke2lab-networking-manifests.service
++Requires=rke2lab-networking-manifests.service
+ ConditionPathExists=/srv/host/scripts.d/rke2lab-manifests-install.sh
+ ConditionPathExists=/srv/host/manifests.d/replication
+----
+
+**Impact**:
+* Restores documented linear boot sequence
+* Eliminates race condition where replication could start before networking ready
+* Aligns with manifest dependencies in catalog READMEs
+
+=== 2. ✅ Diamond Dependencies Are Intentional (Explicit is Better)
+
+**Analysis**: Both `tekton` and `gitops` have explicit dependencies on `replication`:
+
+* `tekton` depends on both `mesh` AND `replication`
+* `gitops` depends on both `tekton` AND `replication`
+
+**Why This Is Correct**:
+
+These are **not redundant** - they represent **direct functional requirements**:
+
+* **Tekton needs replication** for cross-namespace ServiceAccounts and Secrets used in pipeline execution contexts
+* **Gitops needs replication** for cross-namespace repository credentials and SSH keys used by Flux/Porch
+
+**Explicit > Transitive Benefits**:
+
+1. **Self-Documenting**: Each service clearly states ALL its prerequisites
+2. **Resilient**: Won't break if dependency chain is refactored (e.g., if mesh no longer depends on replication)
+3. **Clear Intent**: Shows functional requirements, not just boot order
+4. **Semantic Dependencies**: Represents "needs" not just "must come after"
+
+**Decision**: Keep explicit dependencies - they make the system more maintainable and less brittle.
+
+=== 3. ✅ Replication Readiness Check - Now Specific
+
+**Previous**: Used generic `rke2lab-layer-ready.sh replication` which only checks for workload rollout
+
+**Current**: Created dedicated link:../../make.d/incus/scripts/rke2lab-replicator-ready.sh[rke2lab-replicator-ready.sh] similar to OpenEBS and Cilium checks
+
+**What It Verifies**:
+* Deployment `kubernetes-replicator` exists and is rolled out in `kube-system`
+* Pods are running and ready with correct labels
+* Controller logs show it's actively watching resources
+* RBAC (ClusterRole, ClusterRoleBinding) is properly configured
+
+**Benefit**: Catches replicator-specific issues (webhook failures, RBAC problems) that generic layer check would miss.
+
+=== 4. ✅ Networking Service Redundancy (Kept for Clarity)
+
+**Current**:
+[source]
+----
+After=rke2-server.service
+Requires=rke2-server.service
+After=rke2lab-storage-manifests.service
+Requires=rke2lab-storage-manifests.service
+----
+
+**Analysis**:
+* Networking depends on both `rke2-server` AND `storage`
+* The rke2-server dependency is technically redundant (storage→runtime→rke2-server)
+* However, kept for **explicit documentation** of critical dependency
+
+**Decision**: Keep this redundancy - direct reference to rke2-server makes it clear networking needs API server running, even though it's transitive via storage chain.
+
+== Corrected Dependency Graph
+
+=== Proposed Linear Chain
+
+If we fix the replication service dependencies:
+
+[source]
+----
+rke2-server.service
+  ↓
+rke2lab-runtime-secrets.service + rke2lab-runtime-manifests.service
+  ↓
+rke2lab-storage-manifests.service
+  ↓
+rke2lab-networking-manifests.service
+  ↓
+rke2lab-replication-manifests.service (FIXED)
+  ↓
+rke2lab-mesh-secrets.service + rke2lab-mesh-manifests.service
+  ↓
+├─ rke2lab-cicd-secrets.service + rke2lab-tekton-pipelines-manifests.service
+│    ↓
+└─ rke2lab-gitops-secrets.service + rke2lab-gitops-manifests.service
+----
+
+=== Alternative: Parallel Tekton + Gitops After Mesh
+
+If both tekton and gitops only depend on mesh (and mesh transitively covers replication):
+
+[source]
+----
+rke2lab-mesh-manifests.service
+  ↓
+  ├─ rke2lab-tekton-pipelines-manifests.service
+  │
+  └─ rke2lab-gitops-manifests.service
+----
+
+== Service Details
+
+=== rke2lab-runtime-manifests.service
+
+[source,ini]
+----
+[Unit]
+After=rke2-server.service
+Requires=rke2-server.service
+After=rke2lab-runtime-secrets.service
+Requires=rke2lab-runtime-secrets.service
+
+[Service]
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh runtime
+ExecStartPost=/srv/host/scripts.d/rke2lab-layer-ready.sh runtime
+----
+
+**Readiness Check**: `rke2lab-layer-ready.sh runtime`
+
+=== rke2lab-storage-manifests.service
+
+[source,ini]
+----
+[Unit]
+After=rke2lab-runtime-manifests.service
+Requires=rke2lab-runtime-manifests.service
+
+[Service]
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh storage
+ExecStartPost=/srv/host/scripts.d/rke2lab-openebs-ready.sh
+----
+
+**Readiness Check**: `rke2lab-openebs-ready.sh` (specific to OpenEBS ZFS)
+
+=== rke2lab-networking-manifests.service
+
+[source,ini]
+----
+[Unit]
+After=rke2-server.service
+Requires=rke2-server.service
+After=rke2lab-storage-manifests.service
+Requires=rke2lab-storage-manifests.service
+
+[Service]
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh networking
+ExecStartPost=/srv/host/scripts.d/rke2lab-cilium-ready.sh
+----
+
+**Readiness Check**: `rke2lab-cilium-ready.sh` (specific to Cilium)
+
+**Note**: Also depends on `rke2-server.service` directly (redundant via storage chain)
+
+=== rke2lab-replication-manifests.service
+
+[source,ini]
+----
+[Unit]
+After=rke2lab-networking-manifests.service
+Requires=rke2lab-networking-manifests.service
+
+[Service]
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh replication
+ExecStartPost=/srv/host/scripts.d/rke2lab-replicator-ready.sh
+----
+
+**Readiness Check**: `rke2lab-replicator-ready.sh` (specific to kubernetes-replicator)
+
+**Verifies**:
+* Deployment rolled out in kube-system namespace
+* Pods running with correct labels
+* Controller actively watching resources (via logs)
+* RBAC properly configured
+
+=== rke2lab-mesh-manifests.service
+
+[source,ini]
+----
+[Unit]
+After=rke2lab-replication-manifests.service
+Requires=rke2lab-replication-manifests.service
+After=rke2lab-mesh-secrets.service
+Requires=rke2lab-mesh-secrets.service
+
+[Service]
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh mesh
+ExecStartPost=/srv/host/scripts.d/rke2lab-layer-ready.sh mesh
+----
+
+**Readiness Check**: `rke2lab-layer-ready.sh mesh` (generic layer check)
+
+=== rke2lab-tekton-pipelines-manifests.service
+
+[source,ini]
+----
+[Unit]
+After=rke2-server.service  # redundant via mesh chain
+Requires=rke2-server.service
+After=rke2lab-mesh-manifests.service
+Requires=rke2lab-mesh-manifests.service
+After=rke2lab-replication-manifests.service  # redundant via mesh chain
+Requires=rke2lab-replication-manifests.service
+After=rke2lab-cicd-secrets.service
+Requires=rke2lab-cicd-secrets.service
+
+[Service]
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh cicd/tekton-pipelines
+----
+
+**Readiness Check**: None
+
+=== rke2lab-gitops-manifests.service
+
+[source,ini]
+----
+[Unit]
+After=rke2lab-tekton-pipelines-manifests.service
+Requires=rke2lab-tekton-pipelines-manifests.service
+After=rke2lab-replication-manifests.service  # potentially redundant via tekton chain
+Requires=rke2lab-replication-manifests.service
+After=rke2lab-gitops-secrets.service
+Requires=rke2lab-gitops-secrets.service
+
+[Service]
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh gitops
+----
+
+**Readiness Check**: None
+
+== Comparison with Documentation
+
+=== Expected Chain (from link:../docs/systemd-service-architecture.adoc[docs])
+
+[source]
+----
+rke2-server.service
+  ↓
+rke2lab-runtime-manifests.service
+  ↓
+rke2lab-storage-manifests.service
+  ↓
+rke2lab-networking-manifests.service
+  ↓
+rke2lab-replication-manifests.service
+  ↓
+rke2lab-mesh-manifests.service
+  ↓
+tekton/gitops manifests
+----
+
+=== Actual Chain (current implementation)
+
+[source]
+----
+rke2-server.service
+  ↓
+├─ rke2lab-runtime-manifests.service → storage → networking
+│
+└─ rke2lab-replication-manifests.service (PARALLEL!) ← ⚠️ REGRESSION
+     ↓
+   rke2lab-mesh-manifests.service
+     ↓
+   ├─ rke2lab-tekton-pipelines-manifests.service
+   │    ↓
+   └─ rke2lab-gitops-manifests.service
+----
+
+== Recommendations
+
+=== Priority 1: Fix Replication Dependencies
+
+Update `make.d/incus/systemd/rke2lab-replication-manifests.service`:
+
+[source,diff]
+----
+ [Unit]
+ Description=Install RKE2Lab replication manifests from host share (post-server)
+ RequiresMountsFor=/srv/host/system.d /srv/host
+ After=local-fs.target
+-After=rke2-server.service
+-Requires=rke2-server.service
++After=rke2lab-networking-manifests.service
++Requires=rke2lab-networking-manifests.service
+ ConditionPathExists=/srv/host/scripts.d/rke2lab-manifests-install.sh
+ ConditionPathExists=/srv/host/manifests.d/replication
+----
+
+=== Priority 2: Remove Redundant Dependencies (Optional)
+
+==== Option A: Keep Explicit Dependencies (Conservative)
+
+No changes - explicit dependencies make the graph clearer even if transitive
+
+==== Option B: Remove Redundant Dependencies (Minimal)
+
+**Networking Service**:
+Remove direct `rke2-server.service` dependency (already via runtime → storage chain):
+[source,diff]
+----
+-After=rke2-server.service
+-Requires=rke2-server.service
+ After=rke2lab-storage-manifests.service
+ Requires=rke2lab-storage-manifests.service
+----
+
+**Tekton Service**:
+Remove direct `rke2-server.service` and `replication` dependencies (already via mesh chain):
+[source,diff]
+----
+-After=rke2-server.service
+-Requires=rke2-server.service
+ After=rke2lab-mesh-manifests.service
+ Requires=rke2lab-mesh-manifests.service
+-After=rke2lab-replication-manifests.service
+-Requires=rke2lab-replication-manifests.service
+ After=rke2lab-cicd-secrets.service
+ Requires=rke2lab-cicd-secrets.service
+----
+
+**Gitops Service**:
+Remove direct `replication` dependency (already via tekton chain):
+[source,diff]
+----
+ After=rke2lab-tekton-pipelines-manifests.service
+ Requires=rke2lab-tekton-pipelines-manifests.service
+-After=rke2lab-replication-manifests.service
+-Requires=rke2lab-replication-manifests.service
+ After=rke2lab-gitops-secrets.service
+ Requires=rke2lab-gitops-secrets.service
+----
+
+=== Priority 3: Add Replication Readiness Check (Optional)
+
+If the Mittwald replicator has a specific readiness condition that should be verified, create:
+
+* `/make.d/incus/scripts/rke2lab-replicator-ready.sh`
+
+And update the service:
+[source,diff]
+----
+ ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh replication
+-ExecStartPost=/srv/host/scripts.d/rke2lab-layer-ready.sh replication
++ExecStartPost=/srv/host/scripts.d/rke2lab-replicator-ready.sh
+----
+
+== Summary
+
+* **Services**: 16 custom systemd services (8 manifests, 4 secrets, 4 infrastructure)
+* **Targets**: 0 (eliminated in Phase 3.5)
+* **Critical Issue Fixed**: Replication service broke linear chain (✅ FIXED)
+* **Diamond Dependencies**: Kept explicit dependencies - they're intentional (✅ CORRECT)
+* **Solution**: Created `rke2.d/catalog/layers.yaml` as single source of truth
+* **Result**: Dependency chain matches manifest prerequisites with explicit semantic requirements
+
+== Changes Applied
+
+=== 1. Fixed Replication Service Dependencies
+
+Updated link:../../make.d/incus/systemd/rke2lab-replication-manifests.service[rke2lab-replication-manifests.service]:
+
+[source,diff]
+----
+-After=rke2-server.service
+-Requires=rke2-server.service
++After=rke2lab-networking-manifests.service
++Requires=rke2lab-networking-manifests.service
+----
+
+=== 2. Removed Diamond Dependencies
+
+**Tekton**: Removed redundant replicat dependency (link:../../make.d/incus/systemd/rke2lab-tekton-pipelines-manifests.service[rke2lab-tekton-pipelines-manifests.service]):
+
+[source,diff]
+----
+-After=rke2-server.service
+-Requires=rke2-server.service
+ After=rke2lab-mesh-manifests.service
+ Requires=rke2lab-mesh-manifests.service
+-After=rke2lab-replication-manifests.service
+-Requires=rke2lab-replication-manifests.service
+----
+
+**Gitops**: Removed redundant replication dependency (link:../../make.d/incus/systemd/rke2lab-gitops-manifests.service[rke2lab-gitops-manifests.service]):
+
+[source,diff]
+----
+ After=rke2lab-tekton-pipelines-manifests.service
+ Requires=rke2lab-tekton-pipelines-manifests.service
+-After=rke2lab-replication-manifests.service
+-Requires=rke2lab-replication-manifests.service
+----
+
+=== 3. Created Layer Dependencies Metadata
+
+Created link:../../rke2.d/catalog/layers.yaml[rke2.d/catalog/layers.yaml] documenting:
+
+* Deployment order for all layers (runtime → storage → networking → replication → mesh → cicd/gitops)
+* Dependencies derived from manifest README prerequisites
+* Systemd service generation directives
+* Rationale for each dependency relationship
+
+This file serves as the **single source of truth** for both:
+1. Kubernetes manifest application order
+2. Systemd service dependency generation
+
+=== 4. Corrected Dependency Graph
+
+**Before** (broken):
+[source]
+----
+rke2-server
+  ├─ runtime → storage → networking
+  └─ replication (PARALLEL!) ← BROKEN - bypasses networking
+----
+
+**After** (fixed with explicit dependencies):
+[source]
+----
+rke2-server
+  ↓
+runtime → storage → networking → replication → mesh
+                                       ↓
+                                    tekton (explicit: mesh + replication)
+                                       ↓
+                                    gitops (explicit: tekton + replication)
+----
+
+The "diamond" pattern (tekton→{mesh,replication}, gitops→{tekton,replication}) is intentional and represents direct functional requirements.
+
+== Deriving Dependencies from Manifests
+
+=== Current State: Disconnected
+
+**Problem**: Systemd dependencies are hardcoded in `.service` files with no connection to the actual Kubernetes manifest dependencies documented in catalog README files.
+
+**Evidence**:
+* Cilium README states: "⚠️ CRITICAL: Core CNI must be running before deploying this package"
+* OpenEBS README: "Dependencies: ZFS kernel module loaded on all nodes"
+* Headscale README: "Deployment Order: This package requires Tailscale operator"
+* Flox README: "Prerequisites: Flox CLI already installed, containerd running"
+
+Yet systemd units define their own dependency chains independently.
+
+=== Proposed: Manifest-Driven Dependencies
+
+==== Layer Dependency Metadata
+
+Create `catalog/layers.yaml` defining the deployment order:
+
+[source,yaml]
+----
+# Deployment order and dependencies for RKE2Lab layers
+# This is the source of truth for both:
+#   1. Kubernetes manifest application order
+#   2. Systemd service dependency generation
+
+layers:
+  - name: runtime
+    description: Container runtime and core services
+    depends_on: []
+    packages:
+      - runtime/flox-containerd-shim
+      - runtime/rke2-config
+    readiness_check: rke2lab-layer-ready.sh runtime
+    
+  - name: storage
+    description: Persistent storage providers
+    depends_on: [runtime]
+    packages:
+      - storage/openebs-zfs
+    readiness_check: rke2lab-openebs-ready.sh
+    
+  - name: networking
+    description: CNI advanced features and network policies
+    depends_on: [storage]
+    packages:
+      - networking/cilium
+      - networking/envoy-gateway
+      - networking/kdns
+      - networking/traefik
+    readiness_check: rke2lab-cilium-ready.sh
+    
+  - name: replication
+    description: Resource replication across namespaces
+    depends_on: [networking]
+    packages:
+      - replication/replicator
+    readiness_check: rke2lab-layer-ready.sh replication
+    
+  - name: mesh
+    description: Mesh networking (Headscale, Tailscale)
+    depends_on: [replication]
+    packages:
+      - mesh/headscale
+      - mesh/headplane
+      - mesh/tailscale
+    readiness_check: rke2lab-layer-ready.sh mesh
+    
+  - name: ha
+    description: High availability components
+    depends_on: [networking]
+    packages:
+      - ha/kube-vip
+    readiness_check: rke2lab-layer-ready.sh ha
+    
+  - name: cicd
+    description: CI/CD pipelines
+    depends_on: [mesh, replication]
+    packages:
+      - cicd/tekton-pipelines
+      - cicd/tekton-dashboard
+    readiness_check: rke2lab-layer-ready.sh cicd
+    
+  - name: gitops
+    description: GitOps controllers and package management
+    depends_on: [cicd, replication]
+    packages:
+      - gitops/flux-operator
+      - gitops/flux-instance
+      - gitops/porch
+      - gitops/porch-resources
+    readiness_check: rke2lab-layer-ready.sh gitops
+
+# Special layers that run before/during rke2-server startup
+pre_server_layers:
+  - name: cilium-config
+    description: Cilium HelmChartConfig for bootstrap CNI
+    path: networking/cilium-config
+    before: rke2-server.service
+----
+
+==== Systemd Unit Generation
+
+Generate systemd service units from `layers.yaml`:
+
+[source,python]
+----
+#!/usr/bin/env python3
+# make.d/incus/scripts/generate-layer-services.py
+
+import yaml
+from pathlib import Path
+
+def generate_service(layer, layers_by_name, secrets_enabled):
+    """Generate systemd service content for a layer."""
+    
+    # Resolve dependencies to service names
+    after_services = []
+    requires_services = []
+    
+    if not layer['depends_on']:
+        # First layer depends on rke2-server
+        after_services = ['rke2-server.service']
+        requires_services = ['rke2-server.service']
+    else:
+        # Depend on all prerequisite layers
+        for dep_name in layer['depends_on']:
+            dep_layer = layers_by_name[dep_name]
+            after_services.append(f"rke2lab-{dep_name}-manifests.service")
+            requires_services.append(f"rke2lab-{dep_name}-manifests.service")
+    
+    # Add secrets service dependency if this layer has secrets
+    if secrets_enabled:
+        after_services.append(f"rke2lab-{layer['name']}-secrets.service")
+        requires_services.append(f"rke2lab-{layer['name']}-secrets.service")
+    
+    unit_content = f"""[Unit]
+Description=Install RKE2Lab {layer['description']}
+RequiresMountsFor=/srv/host/system.d /srv/host
+After=local-fs.target
+"""
+    
+    for svc in after_services:
+        unit_content += f"After={svc}\n"
+    for svc in requires_services:
+        unit_content += f"Requires={svc}\n"
+    
+    unit_content += f"""ConditionPathExists=/srv/host/scripts.d/rke2lab-manifests-install.sh
+ConditionPathExists=/srv/host/manifests.d/{layer['name']}
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh {layer['name']}
+"""
+    
+    if layer.get('readiness_check'):
+        unit_content += f"ExecStartPost=/srv/host/scripts.d/{layer['readiness_check']}\n"
+    
+    unit_content += """RemainAfterExit=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+"""
+    
+    return unit_content
+
+# Usage:
+# python3 generate-layer-services.py catalog/layers.yaml make.d/incus/systemd/
+----
+
+==== Benefits
+
+1. **Single Source of Truth**: `layers.yaml` defines deployment order once
+2. **Consistency**: Systemd dependencies automatically match manifest dependencies
+3. **Validation**: Can verify that actual package prerequisites match declared layer dependencies
+4. **Documentation**: Clear, machine-readable deployment order
+5. **Maintainability**: Change dependency order in one place, regenerate services
+
+==== Migration Path
+
+**Phase 1**: Document current state
+* Create `catalog/layers.yaml` reflecting current (broken) systemd dependencies
+* Document divergences from manifest READMEs
+
+**Phase 2**: Fix replication dependency
+* Update `layers.yaml`: replication depends_on: [networking]
+* Regenerate `rke2lab-replication-manifests.service`
+* Test boot sequence
+
+**Phase 3**: Validate against manifests
+* Parse README.adoc files for "Prerequisites" sections
+* Cross-check against `layers.yaml`
+* Document intentional vs. unintentional divergences
+
+**Phase 4**: Automate generation
+* Implement `generate-layer-services.py`
+* Add `make generate@systemd` target
+* Include in CI/validation
+
+== Next Steps
+
+1. **Immediate**: Fix `rke2lab-replication-manifests.service` dependencies manually
+2. **Short-term**: Create `catalog/layers.yaml` documenting current state
+3. **Medium-term**: Implement systemd service generation from `layers.yaml`
+4. **Long-term**: Validate `layers.yaml` against manifest README prerequisites
+
+=== Completed Steps
+Removed diamond dependencies** - Tekton and gitops simplified to linear chain
+3. ✅ **Created layers.yaml** - Documented canonical deployment order and dependencies  
+4. ✅ **Updated review documentation** - This file reflects finalnetworking-manifests
+2. ✅ **Created layers.yaml** - Documented canonical deployment order and dependencies
+3. ✅ **Updated review documentation** - This file now reflects corrected state
+
+=== Remaining Work
+
+==== Phase 1: Validate Fix (Next Session)
+
+[source,bash]
+----
+# On bioskop-nixos.local, restart master node to test boot sequence
+incus restart master
+
+# Monitor boot sequence
+incus exec master -- journalctl -f -u 'rke2lab-*'
+
+# Verify dependency chain
+incus exec master -- systemctl list-dependencies --all rke2lab-gitops-manifests.service
+
+# Expected output should show linear chain:
+# rke2lab-gitops-manifests.service
+# ├─rke2lab-tekton-pipelines-manifests.service
+# │ ├─rke2lab-mesh-manifests.service
+# │ │ ├─rke2lab-replication-manifests.service
+# │ │ │ ├─rke2lab-networking-manifests.service  ← FIXED!
+# │ │ │ │ ├─rke2lab-storage-manifests.service
+# │ │ │ │ │ ├─rke2lab-runtime-manifests.service
+# │ │ │ │ │ │ └─rke2-server.service
+----
+
+==== Phase 2: Generate Services from layers.yaml (Future)
+
+Implement the systemd service generator referenced in the "Deriving Dependencies from Manifests" section:
+
+[source,bash]
+----
+# Create generator script
+make.d/incus/scripts/generate-layer-services.py
+
+# Add Makefile target
+make generate@systemd
+
+# Regenerate all services and compare with current
+diff -u make.d/incus/systemd/rke2lab-*-manifests.service generated/
+----
+
+==== Phase 3: Clean Up Redundant Dependencies (Optional)
+
+If all tests pass with the fixed replication service, optionally remove transitive dependency redundancies:
+
+* `networking-manifests.service`: Remove direct rke2-server dependency (already via storage→runtime)
+* `tekton-pipelines-manifests.service`: Remove rke2-server and replication dependencies (already via mesh)
+* `gitops-manifests.service`: Remove replication dependency (already via tekton)
+
+**Recommendation**: Keep redundant dependencies for now. They make critical relationships explicit even if transitive.
+
+==== Phase 4: Continuous Validation
+
+Add CI checks to validate:
+
+[source,bash]
+----
+# Verify layers.yaml matches actual systemd units
+./scripts/validate-layer-dependencies.sh
+
+# Parse README.adoc prerequisites and compare with layers.yaml
+./scripts/check-manifest-dependencies.sh
+----
