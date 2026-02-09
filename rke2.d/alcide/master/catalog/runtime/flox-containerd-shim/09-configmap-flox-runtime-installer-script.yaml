@@ -7,7 +7,8 @@ metadata: # kpt-merge: flox-runtime/flox-runtime-installer-script
     internal.kpt.dev/upstream-identifier: '|ConfigMap|flox-runtime|flox-runtime-installer-script'
 data:
   shim-installer.sh: |-
-    #!/usr/bin/env -S bash -exuo pipefail
+    #!/bin/bash
+    set -exuo pipefail
 
     install_deps() {
       local attempt=0
