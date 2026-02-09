@@ -43,6 +43,9 @@ spec:
               mountPath: /etc/headplane-template/config.yaml
               subPath: config.yaml
               readOnly: true
+            - name: headscale-auth
+              mountPath: /secrets/headscale
+              readOnly: true
       volumes:
         - name: agent-sync-script
           configMap:
@@ -51,3 +54,7 @@ spec:
         - name: config-template
           secret:
             secretName: headplane-config-tmpl
+        - name: headscale-auth
+          secret:
+            secretName: headscale-client-auth
+            optional: false

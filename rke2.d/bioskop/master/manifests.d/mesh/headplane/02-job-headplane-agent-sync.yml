@@ -45,6 +45,9 @@ spec:
               name: config-template
               readOnly: true
               subPath: config.yaml
+            - mountPath: /secrets/headscale
+              name: headscale-auth
+              readOnly: true
       restartPolicy: OnFailure
       runtimeClassName: flox
       serviceAccountName: headplane
@@ -56,4 +59,8 @@ spec:
         - name: config-template
           secret:
             secretName: headplane-config-tmpl
+        - name: headscale-auth
+          secret:
+            secretName: headscale-client-auth
+            optional: false
   ttlSecondsAfterFinished: 300
