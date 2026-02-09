@@ -80,5 +80,7 @@ if [ ! -f /etc/systemd/system.conf.d/10-rke2lab-nix.conf ]; then
 [Manager]
 DefaultEnvironment="BASH_ENV=/etc/profile.d/nix-profile.sh"
 EOF
+  # Reload systemd configuration to apply new environment
+  systemctl daemon-reexec
 fi
 
