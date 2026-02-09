@@ -170,6 +170,17 @@ write_files:
 
       : "Load direnv hook"
       source <( direnv hook zsh )
+  # System-wide bash initialization to load Nix profile
+  # This is sourced by ALL bash shells (login and non-login), including scripts
+  - path: /etc/bash.bashrc
+    permissions: "0644"
+    append: true
+    content: |2
+
+      # Initialize Nix profile for all bash shells (required for flox and other tools)
+      if [[ -f /nix/var/nix/profiles/default/etc/profile.d/nix.sh ]]; then
+        source /nix/var/nix/profiles/default/etc/profile.d/nix.sh
+      fi
   # Bash completion for kubectl and helm
   - path: /etc/bash_completion.d/kube
     permissions: "0644"
