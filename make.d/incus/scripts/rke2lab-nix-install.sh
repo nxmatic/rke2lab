@@ -1,22 +1,17 @@
 #!/usr/bin/env -S bash -exuo pipefail
 
-: "Install Nix package manager and configure system-wide availability"
+[[ -z "${HOME:-}" ]] && export HOME=/root
 
-export HOME=/root
-
-# Install Nix using official installer
+: "Install Nix using official installer"
 bash -exuo pipefail <(curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install) --daemon
 
-# Verify Nix installation created /etc/nix directory
+: "Verify Nix installation created /etc/nix directory"
 if [ ! -d /etc/nix ]; then
   echo "ERROR: Nix installer did not create /etc/nix directory" >&2
   exit 1
 fi
 
-# Remove single-user profile if it exists (we only use daemon mode)
-rm -f /etc/profile.d/nix.sh
-
-# Configure Nix after installation (idempotent - only if not already configured by rke2lab)
+: "Configure Nix after installation (idempotent - only if not already configured by rke2lab)"
 if ! grep -q "BEGIN rke2lab-nix" /etc/nix/nix.conf 2>/dev/null; then
   cat >> /etc/nix/nix.conf <<'EOF'
 # BEGIN rke2lab-nix: Custom configuration for rke2lab environment
@@ -38,12 +33,12 @@ extra-platforms = x86_64-linux x86_64-linux
 extra-sandbox-paths = /run/binfmt /nix/store/7k1f2qca1mxyrzl6wr74dilrhwbx6qvs-qemu-x86_64-binfmt-P /dev/kvm
 keep-outputs = false
 keep-derivations = false
-keep-failed = false
+keep-failed = fals  e
 # END rke2lab-nix
 EOF
 fi
 
-# Create /etc/profile.d/nix-profile.sh for login shells and BASH_ENV
+: "Create /etc/profile.d/nix-profile.sh for login shells and BASH_ENV"
 cat > /etc/profile.d/nix-profile.sh <<'EOF'
 #!/bin/bash
 # Initialize Nix profile for daemon installation
@@ -84,6 +79,6 @@ if [ ! -f /etc/systemd/system.conf.d/10-rke2lab-nix.conf ]; then
 DefaultEnvironment="BASH_ENV=/etc/profile.d/nix-profile.sh"
 EOF
   : "Reload systemd configuration to apply new environment"
-  systemctl daemon-reexec
+  systemctl daemon-reload
 fi
 

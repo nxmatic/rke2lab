@@ -1,5 +1,6 @@
 #!/usr/bin/env -S bash -exuo pipefail
 
 : "Install Flox via Nix package manager"
-: "Note: Nix profile is automatically sourced via /etc/bash.bashrc"
-nix profile add github:flox/floxpkgs#flox
+: "Install to default profile for system-wide availability"
+
+nix profile install --profile /nix/var/nix/profiles/default github:flox/floxpkgs#flox
