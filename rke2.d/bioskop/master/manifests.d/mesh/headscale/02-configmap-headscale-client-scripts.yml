@@ -35,6 +35,18 @@ data:
     : "[i] Waiting for headscale deployment to be available..."
     kubectl wait --for=condition=available deployment/headscale \
       -n "$HEADSCALE_NAMESPACE" --timeout=300s
+
+    : "[i] Waiting for required ConfigMaps..."
+    kubectl wait --for=create configmap/headscale-client-scripts \
+      -n "$HEADSCALE_NAMESPACE" --timeout=300s
+    kubectl wait --for=create configmap/headscale-env \
+      -n "$HEADSCALE_NAMESPACE" --timeout=300s
+    kubectl wait --for=create configmap/flox-env \
+      -n "$HEADSCALE_NAMESPACE" --timeout=300s
+
+    : "[i] Waiting for required secrets..."
+    kubectl wait --for=create secret/headscale-client-auth \
+      -n "$HEADSCALE_NAMESPACE" --timeout=300s
 kind: ConfigMap
 metadata:
   annotations:
