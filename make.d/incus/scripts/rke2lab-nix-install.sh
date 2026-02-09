@@ -44,13 +44,16 @@ fi
 cat > /etc/profile.d/nix-profile.sh <<'EOF'
 #!/bin/bash
 # Initialize Nix profile for login and non-interactive bash shells
-if [[ -f /nix/var/nix/profiles/default/etc/profile.d/nix.sh ]]; then
-  source /nix/var/nix/profiles/default/etc/profile.d/nix.sh
+# Check for daemon installation (nix-daemon.sh) or single-user (nix.sh)
+if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
+  . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+elif [ -e /nix/var/nix/profiles/default/etc/profile.d/nix.sh ]; then
+  . /nix/var/nix/profiles/default/etc/profile.d/nix.sh
 fi
 EOF
 chmod 755 /etc/profile.d/nix-profile.sh
 
-# Enable /etc/profile.d sourcing in /etc/bash.bashrc for interactive shells
+: "Enable /etc/profile.d sourcing in /etc/bash.bashrc for interactive shells"
 if ! grep -q "BEGIN rke2lab-nix" /etc/bash.bashrc; then
   cat >> /etc/bash.bashrc <<'EOF'
 
@@ -68,19 +71,19 @@ fi
 EOF
 fi
 
-# Set BASH_ENV in /etc/environment for non-interactive shells
+: "Set BASH_ENV in /etc/environment for non-interactive shells"
 if ! grep -q "^BASH_ENV=" /etc/environment 2>/dev/null; then
   echo "BASH_ENV=/etc/profile.d/nix-profile.sh" >> /etc/environment
 fi
 
-# Set BASH_ENV in systemd environment
+: "Set BASH_ENV in systemd environment"
 mkdir -p /etc/systemd/system.conf.d
 if [ ! -f /etc/systemd/system.conf.d/10-rke2lab-nix.conf ]; then
   cat > /etc/systemd/system.conf.d/10-rke2lab-nix.conf <<'EOF'
 [Manager]
 DefaultEnvironment="BASH_ENV=/etc/profile.d/nix-profile.sh"
 EOF
-  # Reload systemd configuration to apply new environment
+  : "Reload systemd configuration to apply new environment"
   systemctl daemon-reexec
 fi
 
