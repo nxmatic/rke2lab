@@ -6029,13 +6029,13 @@ data:
   FLOX_NONINTERACTIVE: "1"
 kind: ConfigMap
 metadata:
-  labels:
-    app.kubernetes.io/replicated: "true"
   annotations:
     internal.kpt.dev/upstream-identifier: '|ConfigMap|flox-runtime|flox-env'
     kpt.dev/package-layer: runtime
     kpt.dev/package-name: flox-containerd-shim
     replicator.v1.mittwald.de/replicate-to: headscale-system
+  labels:
+    app.kubernetes.io/replicated: "true"
   name: flox-env
   namespace: flox-runtime
 ---
@@ -6188,6 +6188,8 @@ metadata:
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: headscale
     replicator.v1.mittwald.de/replicate-from: flox-runtime/flox-env
+  labels:
+    app.kubernetes.io/replicated: "true"
   name: flox-env
   namespace: headscale-system
 ---
@@ -6988,6 +6990,8 @@ metadata:
     kpt.dev/package-layer: gitops
     kpt.dev/package-name: porch
     replicator.v1.mittwald.de/replicate-from: kube-system/porch-git-auth
+  labels:
+    app.kubernetes.io/replicated: "true"
   name: porch-git-auth
   namespace: porch-fn-system
 type: kubernetes.io/basic-auth
@@ -7000,6 +7004,8 @@ metadata:
     kpt.dev/package-layer: gitops
     kpt.dev/package-name: porch
     replicator.v1.mittwald.de/replicate-from: kube-system/porch-git-ssh
+  labels:
+    app.kubernetes.io/replicated: "true"
   name: porch-git-ssh
   namespace: porch-fn-system
 type: kubernetes.io/ssh-auth
@@ -7012,6 +7018,8 @@ metadata:
     kpt.dev/package-layer: gitops
     kpt.dev/package-name: porch
     replicator.v1.mittwald.de/replicate-from: kube-system/porch-git-auth
+  labels:
+    app.kubernetes.io/replicated: "true"
   name: porch-git-auth
   namespace: porch-system
 type: kubernetes.io/basic-auth
@@ -7024,6 +7032,8 @@ metadata:
     kpt.dev/package-layer: gitops
     kpt.dev/package-name: porch
     replicator.v1.mittwald.de/replicate-from: kube-system/porch-git-ssh
+  labels:
+    app.kubernetes.io/replicated: "true"
   name: porch-git-ssh
   namespace: porch-system
 type: kubernetes.io/ssh-auth
@@ -7036,6 +7046,8 @@ metadata:
     kpt.dev/package-layer: mesh
     kpt.dev/package-name: tailscale
     replicator.v1.mittwald.de/replicate-from: kube-system/operator-oauth
+  labels:
+    app.kubernetes.io/replicated: "true"
   name: operator-oauth
   namespace: tailscale-system
 type: Opaque
@@ -7061,6 +7073,8 @@ metadata:
     kpt.dev/package-layer: cicd
     kpt.dev/package-name: tekton-pipelines
     replicator.v1.mittwald.de/replicate-from: kube-system/tekton-docker-config
+  labels:
+    app.kubernetes.io/replicated: "true"
   name: tekton-docker-config
   namespace: tekton-pipelines
 type: kubernetes.io/dockerconfigjson
@@ -7073,6 +7087,8 @@ metadata:
     kpt.dev/package-layer: cicd
     kpt.dev/package-name: tekton-pipelines
     replicator.v1.mittwald.de/replicate-from: kube-system/tekton-git-auth
+  labels:
+    app.kubernetes.io/replicated: "true"
   name: tekton-git-auth
   namespace: tekton-pipelines
 type: kubernetes.io/basic-auth

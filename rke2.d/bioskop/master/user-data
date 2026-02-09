@@ -208,6 +208,7 @@ runcmd:
           "nixbld${i}" 2>/dev/null || true
       done
     fi
+  - /srv/host/scripts.d/rke2lab-systemd-link.sh
   - /srv/host/scripts.d/rke2lab-activate.sh
 hostname: bioskop-master
 manage_resolv_conf: true
