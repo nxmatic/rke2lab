@@ -2,7 +2,15 @@
 apiVersion: v1
 data:
   agent-sync.sh: |-
-    #!/usr/bin/env -S bash -exuo pipefail
+    #!/bin/sh
+    set -exuo pipefail
+    
+    # Wait for headscale-client-auth secret to be created
+    kubectl wait --for=jsonpath='{.data.authkey}' \
+      secret/headscale-client-auth \
+      -n "${HEADSCALE_NAMESPACE}" \
+      --timeout=300s
+    
     AUTHKEY=$(kubectl get secret headscale-client-auth -n "${HEADSCALE_NAMESPACE}" -o jsonpath='{.data.authkey}' | base64 -d)
     kubectl create secret generic headplane-agent-auth \
       -n "${HEADPLANE_NAMESPACE}" \
