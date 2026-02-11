@@ -36,7 +36,8 @@ data:
     : "Ensure Nix is available in the host environment for the shim installer script"
     source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 
-    [[ -x "${FLOX_BIN:=$(command -v flox || true)}" ]] || {
+    FLOX_BIN="$(command -v flox || true)"
+    [[ -x "${FLOX_BIN}" ]] || {
       echo "Flox CLI not found in host environment" >&2
       exit 1
     }
