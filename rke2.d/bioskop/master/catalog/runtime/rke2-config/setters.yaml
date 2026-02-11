@@ -1,6 +1,8 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  # Generated setter values for RKE2 config.yaml.d templates; kpt-set from Makefile variables
+  # should be in synch with rke2.d/catalog/runtime/rke2-config/setters.yaml
   # kpt-merge: /rke2-config-setters
   name: rke2-config-setters
   annotations:
@@ -12,8 +14,8 @@ data:
   cluster-name: bioskop
   node-name: master
   node-kind: server
-  rke2-debug: "false"
-  rke2-verbosity: "2"
+  rke2-debug: "true"
+  rke2-verbosity: "4"
   cluster-token: bioskop
   node-host-inetaddr: 10.80.0.10
   cluster-id: "0"
