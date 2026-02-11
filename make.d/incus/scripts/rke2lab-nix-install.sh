@@ -41,45 +41,12 @@ accept-flake-config = true
 EOF
 fi
 
-: "Create /etc/profile.d/nix-profile.sh for login shells and BASH_ENV"
-cat > /etc/profile.d/nix-profile.sh <<'EOF'
-#!/bin/bash
-# Initialize Nix profile for daemon installation
-if [ -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]; then
-  . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
-fi
-EOF
-chmod 755 /etc/profile.d/nix-profile.sh
-
-: "Enable /etc/profile.d sourcing in /etc/bash.bashrc for interactive shells"
-if ! grep -q "BEGIN rke2lab-nix" /etc/bash.bashrc; then
-  cat >> /etc/bash.bashrc <<'EOF'
-
-# BEGIN rke2lab-nix: Source /etc/profile.d scripts for interactive shells
-# (Debian default has this commented out, we enable it)
-if [ -d /etc/profile.d ]; then
-  for nix_profile_script in /etc/profile.d/*.sh; do
-    if [ -r "$nix_profile_script" ]; then
-      . "$nix_profile_script"
-    fi
-  done
-  unset nix_profile_script
-fi
-# END rke2lab-nix
-EOF
-fi
-
-: "Set BASH_ENV in /etc/environment for non-interactive shells"
-if ! grep -q "^BASH_ENV=" /etc/environment 2>/dev/null; then
-  echo "BASH_ENV=/etc/profile.d/nix-profile.sh" >> /etc/environment
-fi
-
-: "Set BASH_ENV in systemd environment"
+: "Configure systemd to prepend Nix profile to PATH"
 mkdir -p /etc/systemd/system.conf.d
 if [ ! -f /etc/systemd/system.conf.d/10-rke2lab-nix.conf ]; then
   cat > /etc/systemd/system.conf.d/10-rke2lab-nix.conf <<'EOF'
 [Manager]
-DefaultEnvironment="BASH_ENV=/etc/profile.d/nix-profile.sh"
+DefaultEnvironment="PATH=/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 EOF
   : "Reload systemd configuration to apply new environment"
   systemctl daemon-reload
