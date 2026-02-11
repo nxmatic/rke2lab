@@ -47,6 +47,9 @@ rke2.d/$(cluster.name)/$(node.name)/%.env.mk: name = $(*)
 rke2.d/$(cluster.name)/$(node.name)/%.env.mk:
 	: "Generating $(file >$(@),$(.make.layer.env.content))$(@)"
 
+$(call always-make-env,rke2.d/$(cluster.name)/%.env.mk)
+$(call always-make-env,rke2.d/$(cluster.name)/$(node.name)/%.env.mk)
+
 define .make.layer.env.content =
 ifndef $(name).env.mk
 $(name).env.mk := $(@)

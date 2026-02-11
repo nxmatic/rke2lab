@@ -15,6 +15,15 @@ make.d/kpt/vars.mk := make.d/kpt/vars.mk
 .kpt.catalog.files = $(shell [ -d "$$(printf "%s" "$(.kpt.catalog.dir)")" ] && find "$$(printf "%s" "$(.kpt.catalog.dir)")" -type f ! -path "*/.git/*" | LC_ALL=C sort)
 .kpt.rke2-config.dir := $(.kpt.catalog.dir)/runtime/rke2-config
 .kpt.rke2-config.setters.file := $(.kpt.rke2-config.dir)/setters.yaml
+.kpt.rke2-config.debug ?=
+.kpt.rke2-config.debug.enabled := false
+.kpt.rke2-config.verbosity := 2
+ifdef .kpt.rke2-config.debug
+	ifneq ($(strip $(.kpt.rke2-config.debug)),)
+		.kpt.rke2-config.debug.enabled := true
+		.kpt.rke2-config.verbosity := $(.kpt.rke2-config.debug)
+	endif
+endif
 .kpt.overlays.dir := $(.kpt.dir)/overlays
 .kpt.overlays.kustomization.yaml.file := $(.kpt.overlays.dir)/kustomization.yaml
 .kpt.kustomization.yaml.file := $(.kpt.dir)/kustomization.yaml

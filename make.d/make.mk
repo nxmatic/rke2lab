@@ -35,12 +35,12 @@ _trace_modes := $(if $(_trace_modes),$(_trace_modes),none)
 # =============================================================================
 # Unified always-make system - single .always-make parameter controls selective rebuilds
 # Usage: make .always-make=cloud-config,network target
-# Available modes: cloud-config, network, incus, instance-config, distrobuilder, kpt-cluster-setters, all
-# Default modes: kpt-cluster-setters (ensures setters ConfigMap is refreshed before render)
+# Available modes: cloud-config, network, incus, instance-config, distrobuilder, kpt-cluster-setters, env, all
+# Default modes: kpt-cluster-setters, env (refresh setters + env.mk caches before render)
 # CLI .always-make values are appended to defaults (not replaced) so you can layer behaviors
 
 # Parse .always-make=mode[,mode] syntax for selective rebuilds, appended to defaults
-.always-make.default-modes ?= kpt-cluster-setters
+.always-make.default-modes ?= kpt-cluster-setters env
 # Accept legacy/alias flag `.force=mode[,mode]` to drive selective rebuilds too
 .always-make.user-modes := $(subst $(comma), ,$(strip $(.always-make) $(.force)))
 .always-make.modes := $(strip $(.always-make.default-modes) $(.always-make.user-modes))
@@ -50,6 +50,7 @@ _trace_modes := $(if $(_trace_modes),$(_trace_modes),none)
 .always-make.instance-config := $(if $(filter instance-config,$(.always-make.modes)),$(true),$(false))
 .always-make.distrobuilder := $(if $(filter distrobuilder,$(.always-make.modes)),$(true),$(false))
 .always-make.kpt-cluster-setters := $(if $(filter kpt-cluster-setters all,$(.always-make.modes)),$(true),$(false))
+.always-make.env := $(if $(filter env,$(.always-make.modes)),$(true),$(false))
 .always-make.all := $(if $(filter all,$(.always-make.modes)),$(true),$(false))
 
 # Global always-make flag (when all mode is enabled or --always-make is used)
@@ -82,9 +83,10 @@ _trace_modes := $(if $(_trace_modes),$(_trace_modes),none)
 .FORCE.instance-config:
 .FORCE.distrobuilder:
 .FORCE.kpt:
+.FORCE.env:
 .FORCE.all:
 
-.PHONY: .FORCE.cloud-config .FORCE.network .FORCE.incus .FORCE.instance-config .FORCE.distrobuilder .FORCE.kpt-cluster-setters
+.PHONY: .FORCE.cloud-config .FORCE.network .FORCE.incus .FORCE.instance-config .FORCE.distrobuilder .FORCE.kpt-cluster-setters .FORCE.env
 .PHONY: .PHONY.kpt-cluster-setters
 .PHONY: .FORCE.all
 
@@ -117,6 +119,10 @@ endef
 
 define always-make-kpt-cluster-setters
 $(call always-make-if,kpt-cluster-setters,$(1))
+endef
+
+define always-make-env
+$(call always-make-if,env,$(1))
 endef
 
 # Target registration macros for metaprogramming
@@ -456,6 +462,7 @@ help: ## Show grouped help for all targets (use FILTER=regex to filter)
 	echo "  instance-config -> Force rebuild of instance configuration files"
 	echo "  distrobuilder   -> Force rebuild of distrobuilder images (expensive operation)"
 	echo "  kpt-cluster-setters -> Force rebuild of kpt cluster setters ConfigMap prior to render"
+	echo "  env             -> Force rebuild of generated *.env.mk files"
 	echo "  all             -> Force rebuild of everything (equivalent to .ALWAYS_MAKE)"
 	echo ""
 	echo "Advanced Features:"
