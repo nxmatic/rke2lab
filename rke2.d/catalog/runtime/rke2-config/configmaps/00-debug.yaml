@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: # kpt-merge: /00-debug
+  name: 00-debug.yaml
+  annotations:
+    description.kpt.dev: Enable RKE2 debug logging for manifest watcher
+    config.kubernetes.io/local-config: "true"
+data:
+  debug: "${rke2-debug}" # kpt-set: ${rke2-debug}
+  v: "${rke2-verbosity}" # kpt-set: ${rke2-verbosity}

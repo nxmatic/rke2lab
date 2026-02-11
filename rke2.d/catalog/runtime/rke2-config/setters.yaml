@@ -12,6 +12,8 @@ data:
   cluster-node-host-inetaddr: 10.0.0.10
   node-role: master
   node-kind: server
+  rke2-debug: "false"
+  rke2-verbosity: "2"
   cluster-id: "7"
   cluster-init: "false"
   cluster-pod-cider: 10.42.0.0/16
