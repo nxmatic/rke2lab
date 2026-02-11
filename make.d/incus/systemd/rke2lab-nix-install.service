@@ -1,7 +1,7 @@
 [Unit]
 Description=Install Nix Package Manager for RKE2 Lab
-After=local-fs.target network.target
-Requires=local-fs.target
+After=local-fs.target network.target rke2lab-network-config.service
+Requires=local-fs.target rke2lab-network-config.service
 
 [Service]
 Type=oneshot
