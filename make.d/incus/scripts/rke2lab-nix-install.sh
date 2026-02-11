@@ -44,9 +44,9 @@ fi
 : "Configure systemd to prepend Nix profile to PATH"
 mkdir -p /etc/systemd/system.conf.d
 if [ ! -f /etc/systemd/system.conf.d/10-rke2lab-nix.conf ]; then
-  cat > /etc/systemd/system.conf.d/10-rke2lab-nix.conf <<'EOF'
+  cat > /etc/systemd/system.conf.d/10-rke2lab-nix.conf <<EOF
 [Manager]
-DefaultEnvironment="PATH=/nix/var/nix/profiles/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+DefaultEnvironment="PATH=/nix/var/nix/profiles/default/bin:$PATH"
 EOF
   : "Reload systemd configuration to apply new environment"
   systemctl daemon-reload

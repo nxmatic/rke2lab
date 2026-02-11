@@ -184,12 +184,6 @@ write_files:
       command -v helm >/dev/null &&
         source <( helm completion zsh ) 2>/dev/null || true
 runcmd:
-  # Install Nix package manager
-  - /srv/host/scripts.d/rke2lab-nix-install.sh
-  # Install Flox via Nix channels (flox requires nix to be available)
-  - /srv/host/scripts.d/rke2lab-flox-install.sh
-  # Run systemd link setup
-  - /srv/host/scripts.d/rke2lab-systemd-link.sh
   # Activate RKE2 environment (this will also activate Flox for the shim installer script)
   - /srv/host/scripts.d/rke2lab-activate.sh
 hostname: bioskop-master
