@@ -1,8 +1,8 @@
 [Unit]
 Description=Run RKE2Lab Installation Script
-After=network-online.target systemd-networkd.service local-fs.target rke2lab-network-config.service rke2lab-network-wait.service rke2lab-systemd-link.service
+After=network-online.target systemd-networkd.service local-fs.target rke2lab-network-config.service rke2lab-network-wait.service rke2lab-systemd-link.service rke2lab-tools.target
 Wants=network-online.target systemd-networkd.service rke2lab-network-config.service rke2lab-network-wait.service
-Requires=rke2lab-network-config.service rke2lab-systemd-link.service
+Requires=rke2lab-network-config.service rke2lab-systemd-link.service rke2lab-tools.target
 RequiresMountsFor=/srv/host/scripts.d
 ConditionPathExists=/srv/host/scripts.d/rke2lab-install.sh
 ConditionPathExists=!/etc/systemd/system/rke2-server.service

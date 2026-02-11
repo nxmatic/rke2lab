@@ -1,0 +1,7 @@
+[Unit]
+Description=RKE2 Lab Tools Installation Target
+Wants=rke2lab-nix-install.service rke2lab-flox-install.service
+After=rke2lab-nix-install.service rke2lab-flox-install.service
+
+[Install]
+WantedBy=rke2lab.target

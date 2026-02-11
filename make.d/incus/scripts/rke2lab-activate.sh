@@ -5,9 +5,9 @@ source /srv/host/environment
 : "Disable IPv6 system-wide"
 sysctl -p /etc/sysctl.d/99-disable-ipv6.conf
 
-: "Disable getty to prevent conflicts with RKE2's console setup"
-systemctl reset-failed getty.target 2>/dev/null || true
-systemctl disable --now getty.target
+: "Disable getty services to free up resources and avoid unnecessary log noise"
+systemctl reset-failed console-getty.service 2>/dev/null || true
+systemctl disable --now getty.target console-getty.service 2>/dev/null || true
 
 : "Configure system-wide DNS"
 ln -fs /run/systemd/resolve/resolv.conf /etc/resolv.conf
@@ -18,9 +18,8 @@ $RKE2LAB_SCRIPTS_DIR/rke2lab-systemd-link.sh
 : "Start network configuration service immediately"
 systemctl enable --now rke2lab-network-config.service
 
-: "Install nix package manager for RKE2 package builds and runtime dependencies"
-$RKE2LAB_SCRIPTS_DIR/rke2lab-nix-install.sh
-$RKE2LAB_SCRIPTS_DIR/rke2lab-flox-install.sh
+: "Enable RKE2 Lab tools target (Nix and Flox installation)"
+systemctl enable --now rke2lab-tools.target
 
 : "Enable RKE2 Lab target and all associated services"
 systemctl enable --now rke2lab.target zfs-early-umount.service rke2lab-install.service

@@ -1,0 +1,14 @@
+[Unit]
+Description=Install Nix Package Manager for RKE2 Lab
+After=local-fs.target network.target
+Requires=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/scripts.d/rke2lab-nix-install.sh
+RemainAfterExit=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=rke2lab-tools.target
