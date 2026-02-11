@@ -44,7 +44,14 @@ spec:
             runAsUser: 0
             runAsGroup: 0
           command:
-            - /scripts/shim-installer.sh
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              : "Install bash and coreutils (GNU env) for script compatibility"
+              apk add --no-cache --max-retries="${APK_MAX_RETRIES}" bash coreutils
+              : "Run the shim installer script"
+              /scripts/shim-installer.sh
           volumeMounts:
             - name: runtime-installer-script
               mountPath: /scripts

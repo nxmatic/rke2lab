@@ -6042,7 +6042,8 @@ metadata:
 apiVersion: v1
 data:
   shim-installer.sh: |-
-    #!/usr/bin/env -S bash -exuo pipefail
+    #!/bin/sh
+    set -exu
 
     install_deps() {
       local attempt=0
@@ -6052,7 +6053,7 @@ data:
         if apk update && apk add --no-cache bash util-linux coreutils >/tmp/apk.log; then
           return 0
         fi
-        if [[ ${attempt} -ge ${max_attempts} ]]; then
+        if [ ${attempt} -ge ${max_attempts} ]; then
           echo "apk install failed after ${attempt} attempts" >&2
           sleep infinity
         fi
@@ -6066,7 +6067,7 @@ data:
       CONTAINERD_CONFIG_FILE="${CONTAINERD_CONFIG_FILE}" \
       bash <<'HOSTSCRIPT'
     set -euxo pipefail
-    export PATH="/var/lib/rancher/rke2/bin:/var/lib/rancher/rke2/agent/bin:${PATH}"
+    export PATH="/nix/var/nix/profiles/default/bin:/var/lib/rancher/rke2/bin:/var/lib/rancher/rke2/agent/bin:${PATH}"
     export FLOX_NO_TELEMETRY=1
     export FLOX_NONINTERACTIVE=1
 
@@ -8539,7 +8540,14 @@ spec:
       hostPID: true
       initContainers:
       - command:
-        - /scripts/shim-installer.sh
+        - /bin/sh
+        - -c
+        - |
+          set -eu
+          : "Install bash and coreutils (GNU env) for script compatibility"
+          apk add --no-cache --max-retries="${APK_MAX_RETRIES}" bash coreutils
+          : "Run the shim installer script"
+          /scripts/shim-installer.sh
         env:
         - name: CONTAINERD_CONFIG_FILE
           value: /var/lib/rancher/rke2/agent/etc/containerd/config.toml

@@ -5,7 +5,8 @@ metadata:
   namespace: flox-runtime # {"$kpt-set":"flox-namespace"}
 data:
   shim-installer.sh: |
-    #!/usr/bin/env -S bash -exuo pipefail
+    #!/usr/bin/env bash
+    set -exuo pipefail
 
     install_deps() {
       local attempt=0
