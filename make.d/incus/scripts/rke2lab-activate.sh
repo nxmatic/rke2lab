@@ -5,9 +5,9 @@ source /srv/host/environment
 : "Disable IPv6 system-wide"
 sysctl -p /etc/sysctl.d/99-disable-ipv6.conf
 
-: "Disable console.getty services to prevent conflicts with RKE2's console setup"
-systemctl reset-failed console-getty.target 2>/dev/null || true
-systemctl disable --now console-getty.target
+: "Disable getty to prevent conflicts with RKE2's console setup"
+systemctl reset-failed getty.target 2>/dev/null || true
+systemctl disable --now getty.target
 
 : "Configure system-wide DNS"
 ln -fs /run/systemd/resolve/resolv.conf /etc/resolv.conf
