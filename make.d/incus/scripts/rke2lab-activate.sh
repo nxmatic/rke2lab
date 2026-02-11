@@ -6,7 +6,7 @@ source /srv/host/environment
 sysctl -p /etc/sysctl.d/99-disable-ipv6.conf
 
 : "Disable console.getty services to prevent conflicts with RKE2's console setup"
-systemctl reset-failed console-getty.service 2>/dev/null || true
+systemctl reset-failed console-getty.target 2>/dev/null || true
 systemctl disable --now console-getty.target
 
 : "Configure system-wide DNS"
