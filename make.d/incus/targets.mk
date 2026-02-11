@@ -75,10 +75,17 @@ $(.incus.instance.config.file):
 	yq eval '( ... | select(tag=="!!str") ) |= envsubst(ne,nu)' $(.incus.instance.config.template) > $(@)
 
 define .incus.env.file.content
-: "[i] Setting root user environment variables"
+# =============================================================================
+# USER ENVIRONMENT
+# =============================================================================
+: "[i] Setting root user environment"
 USER=root
 HOME=/root
-: "[i] Generating RKE2LAB environment variables"
+
+# =============================================================================
+# RKE2LAB - FILESYSTEM PATHS
+# =============================================================================
+: "[i] RKE2LAB paths and directories"
 RKE2LAB_ROOT=/srv/host
 RKE2LAB_ENV_FILE=/srv/host/environment
 RKE2LAB_SCRIPTS_DIR=/srv/host/scripts.d
@@ -87,43 +94,91 @@ RKE2LAB_CONFIG_DIR=/srv/host/config.d
 RKE2LAB_MANIFESTS_DIR=/srv/host/manifests.d
 RKE2LAB_SHARED_DIR=/srv/host/share.d
 RKE2LAB_KUBECONFIG_DIR=/srv/host/kubeconfig.d
+
+# =============================================================================
+# RKE2LAB - CONFIGURATION
+# =============================================================================
+: "[i] RKE2LAB configuration variables"
 RKE2LAB_DEBUG=false
-RKE2LAB_NODE_KIND=$(NODE_KIND)
+
+# =============================================================================
+# RKE2LAB - CLUSTER IDENTITY
+# =============================================================================
+: "[i] RKE2LAB cluster identity and configuration"
+RKE2LAB_CLUSTER_ID=$(CLUSTER_ID)
 RKE2LAB_CLUSTER_NAME=$(CLUSTER_NAME)
 RKE2LAB_CLUSTER_TOKEN=$(CLUSTER_TOKEN)
 RKE2LAB_CLUSTER_DOMAIN=$(CLUSTER_DOMAIN)
-RKE2LAB_NODE_NAME=$(NODE_NAME)
+
+# =============================================================================
+# RKE2LAB - NODE IDENTITY
+# =============================================================================
+: "[i] RKE2LAB node identity (master, peer, worker)"
+RKE2LAB_NODE_ID=$(NODE_ID)
 RKE2LAB_NODE_NAME=$(NODE_NAME)
 RKE2LAB_NODE_KIND=$(NODE_KIND)
-RKE2LAB_NODE_NAME=$(NODE_NAME)
-RKE2LAB_CLUSTER_ID=$(CLUSTER_ID)
-RKE2LAB_NODE_ID=$(NODE_ID)
+
+# =============================================================================
+# RKE2LAB - NETWORK: NODE CONFIGURATION
+# =============================================================================
+: "[i] RKE2LAB network - node-specific addresses"
 RKE2LAB_NETWORK_NODE_HOST_INETADDR=$(NETWORK_NODE_HOST_INETADDR)
 RKE2LAB_NETWORK_NODE_CIDR=$(NETWORK_NODE_CIDR)
 RKE2LAB_NETWORK_NODE_GATEWAY_INETADDR=$(NETWORK_NODE_GATEWAY_INETADDR)
+
+# =============================================================================
+# RKE2LAB - NETWORK: VIP CONFIGURATION
+# =============================================================================
+: "[i] RKE2LAB network - VIP (Virtual IP) configuration"
 RKE2LAB_NETWORK_VIP_INTERFACE=$(NETWORK_VIP_INTERFACE)
 RKE2LAB_NETWORK_VIP_CIDR=$(NETWORK_VIP_CIDR)
 RKE2LAB_NETWORK_VIP_GATEWAY_INETADDR=$(NETWORK_VIP_GATEWAY_INETADDR)
 RKE2LAB_NETWORK_VIP_HOST_INETADDR=$(NETWORK_VIP_HOST_INETADDR)
+
+# =============================================================================
+# RKE2LAB - NETWORK: CLUSTER CONFIGURATION
+# =============================================================================
+: "[i] RKE2LAB network - cluster-wide addresses and CIDRs"
 RKE2LAB_NETWORK_CLUSTER_CIDR=$(NETWORK_CLUSTER_CIDR)
 RKE2LAB_NETWORK_CLUSTER_LB_CIDR=$(NETWORK_CLUSTER_LB_CIDR)
 RKE2LAB_NETWORK_CLUSTER_LB_GATEWAY_INETADDR=$(NETWORK_CLUSTER_LB_GATEWAY_INETADDR)
 RKE2LAB_NETWORK_CLUSTER_POD_CIDR=$(NETWORK_CLUSTER_POD_CIDR)
 RKE2LAB_NETWORK_CLUSTER_SERVICE_CIDR=$(NETWORK_CLUSTER_SERVICE_CIDR)
-RKE2LAB_NETWORK_LAN_LB_CIDR=$(NETWORK_LAN_LB_CIDR)
+RKE2LAB_NETWORK_CLUSTER_GATEWAY_INETADDR=$(NETWORK_CLUSTER_GATEWAY_INETADDR)
+
+# =============================================================================
+# RKE2LAB - NETWORK: LAN/WAN CONFIGURATION
+# =============================================================================
+: "[i] RKE2LAB network - LAN/WAN interfaces and addresses"
 RKE2LAB_NETWORK_LAN_INTERFACE=$(NETWORK_LAN_INTERFACE)
 RKE2LAB_NETWORK_LAN_HOST_INETADDR=$(NETWORK_LAN_HOST_INETADDR)
+RKE2LAB_NETWORK_LAN_LB_CIDR=$(NETWORK_LAN_LB_CIDR)
 RKE2LAB_NETWORK_WAN_INTERFACE=$(NETWORK_WAN_INTERFACE)
-RKE2LAB_NETWORK_CLUSTER_GATEWAY_INETADDR=$(NETWORK_CLUSTER_GATEWAY_INETADDR)
-: "[i] RKE2 environment variables"
+
+# =============================================================================
+# RKE2 - RANCHER KUBERNETES ENGINE
+# =============================================================================
+: "[i] RKE2 server manifests directory"
 RKE2_SERVER_MANIFESTS_DIR=/var/lib/rancher/rke2/server/manifests
-: "[i] containerd environment variables"
+
+# =============================================================================
+# CONTAINER RUNTIME - CONTAINERD
+# =============================================================================
+: "[i] containerd runtime socket, namespace, and configuration"
 CONTAINERD_ADDRESS=/run/k3s/containerd/containerd.sock
 CONTAINERD_NAMESPACE=k8s.io
 CONTAINERD_CONFIG_FILE=/var/lib/rancher/rke2/agent/etc/containerd/config.toml
-: "[i] cri environment variables"
+
+# =============================================================================
+# CONTAINER RUNTIME - CRI (Container Runtime Interface)
+# =============================================================================
+: "[i] CRI configuration file for crictl"
 CRI_CONFIG_FILE=/var/lib/rancher/rke2/agent/etc/crictl.yaml
-: "[i] etcdctl environment variables"
+
+# =============================================================================
+# KUBERNETES CLI - ETCDCTL
+# =============================================================================
+: "[i] etcdctl API version, TLS certificates, and connection settings"
 ETCDCTL_API=3
 ETCDCTL_CERT=/var/lib/rancher/rke2/server/tls/etcd/server-client.crt
 ETCDCTL_KEY=/var/lib/rancher/rke2/server/tls/etcd/server-client.key
@@ -132,23 +187,39 @@ ETCDCTL_ENDPOINTS=https://127.0.0.1:2379
 ETCDCTL_WRITE_OUT=table
 ETCDCTL_DIAL_TIMEOUT=10s
 ETCDCTL_COMMAND_TIMEOUT=30s
-: "[i] kubectl environment variables"
+
+# =============================================================================
+# KUBERNETES CLI - KUBECTL
+# =============================================================================
+: "[i] kubectl output format, diff tool, and krew plugin manager"
 KUBECTL_OUTPUT=yaml
 KUBECTL_EXTERNAL_DIFF=delta
 KREW_ROOT=/var/lib/rancher/rke2/krew
-: "[i] helm environment variables"
+
+# =============================================================================
+# KUBERNETES CLI - CILIUM & HUBBLE
+# =============================================================================
+: "[i] Cilium CLI mode and Hubble observability settings"
 CILIUM_CLI_MODE=kubernetes
 CILIUM_CLI_CONTEXT=default
 HUBBLE_SERVER=localhost:4245
 HUBBLE_TLS=false
-: "[i] helm environment variables"
+
+# =============================================================================
+# KUBERNETES PACKAGE MANAGER - HELM
+# =============================================================================
+: "[i] Helm directories, cache, and plugin locations"
 HELM_DATA_HOME=/var/lib/rancher/rke2/helm
 HELM_CONFIG_HOME=/etc/rancher/rke2/helm
 HELM_CACHE_HOME=/var/cache/rancher/rke2/helm
 HELM_REPOSITORY_CONFIG=/etc/rancher/rke2/helm/repositories.yaml
 HELM_REPOSITORY_CACHE=/var/cache/rancher/rke2/helm/repository
 HELM_PLUGINS=/var/lib/rancher/rke2/helm/plugins
-: "[i] kpt environment variables"
+
+# =============================================================================
+# KUBERNETES PACKAGE MANAGER - KPT
+# =============================================================================
+: "[i] kpt function runtime (using nerdctl for container execution)"
 KRM_FN_RUNTIME=nerdctl
 endef
 
@@ -482,7 +553,6 @@ $(.incus.instance.config.marker.file): ## Ensure incus dir exists before cloud-i
 	touch $@
 
 start@incus: create@incus
-start@incus: $(.incus.env.file)
 start@incus: | zfs.allow 
 start@incus: ## Start the Incus instance
 	: "[+] Starting instance $(node.name)..."
