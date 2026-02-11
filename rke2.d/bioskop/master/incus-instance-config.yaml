@@ -58,7 +58,7 @@ devices:
     path: /srv/host/manifests.d
   rke2.config.dir:
     type: disk
-    source: /var/lib/git/nxmatic/rke2lab/.local.d/var/lib/kpt/bioskop/master/runtime/rke2-config/configmaps
+    source: /var/lib/git/nxmatic/rke2lab/.local.d/var/run/kpt/bioskop/master/runtime/rke2-config/configmaps
     path: /srv/host/config.d
   shared.dir:
     type: disk

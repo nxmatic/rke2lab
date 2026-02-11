@@ -27,7 +27,7 @@ endif
 .kpt.overlays.dir := $(.kpt.dir)/overlays
 .kpt.overlays.kustomization.yaml.file := $(.kpt.overlays.dir)/kustomization.yaml
 .kpt.kustomization.yaml.file := $(.kpt.dir)/kustomization.yaml
-.kpt.render.dir := $(var-dir)/lib/kpt/$(cluster.name)/$(node.name)
+.kpt.render.dir := $(var-dir)/run/kpt/$(cluster.name)/$(node.name)
 .kpt.manifests.file := $(.kpt.dir)/manifests.yaml
 .kpt.manifests.dir  := $(.kpt.dir)/manifests.d
 .kpt.package.aux_files := .gitattributes .krmignore
