@@ -1,7 +1,7 @@
 [Unit]
 Description=RKE2Lab Network Wait Service
 After=systemd-networkd.service
-Before=rke2-server.service rke2-agent.service
+Before=rke2lab.target
 Wants=systemd-networkd.service
 
 [Service]
