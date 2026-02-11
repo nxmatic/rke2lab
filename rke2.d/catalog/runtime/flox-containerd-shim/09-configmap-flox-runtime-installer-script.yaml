@@ -34,10 +34,16 @@ data:
     : "Ensure Nix is available in the host environment for the shim installer script"
     source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 
-    [[ -x "$(command -v flox)" ]] || {
+    FLOX_BIN="$(command -v flox || true)"
+    [[ -x "${FLOX_BIN}" ]] || {
       echo "Flox CLI not found in host environment" >&2
       exit 1
     }
+
+    if [[ "${FLOX_BIN}" != "/usr/bin/flox" ]]; then
+      mkdir -p /usr/bin
+      ln -sf "${FLOX_BIN}" /usr/bin/flox
+    fi
 
     export PATH="/var/lib/rancher/rke2/bin:/var/lib/rancher/rke2/agent/bin:${PATH}"
     export FLOX_NO_TELEMETRY=1
