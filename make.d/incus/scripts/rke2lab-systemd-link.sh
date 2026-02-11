@@ -31,7 +31,7 @@ fi
 mkdir -p /etc/systemd/system
 
 : "Copy service unit files"
-find "${RKE2LAB_SYSTEMD_DIR}" -maxdepth 1 -type f \( -name '*.service' -o -name '*.target' \) -exec cp {} /etc/systemd/system/ \;
+find "${RKE2LAB_SYSTEMD_DIR}" -maxdepth 1 -type f \( -name '*.service' -o -name '*.target' -o -name '*.mount' \) -exec cp {} /etc/systemd/system/ \;
 log "copied systemd units from ${RKE2LAB_SYSTEMD_DIR}"
 
 : "Copy service unit drop-in directories"
@@ -42,11 +42,11 @@ log "copied systemd override directories from ${RKE2LAB_SYSTEMD_DIR}"
 systemctl daemon-reload
 log "daemon-reload complete"
 
-: "Enable all rke2lab services"
-for service_file in /etc/systemd/system/rke2lab-*.service; do
-  if [[ -f "${service_file}" ]]; then
-    service_name=$(basename "${service_file}")
-    systemctl enable "${service_name}" || log "warning: failed to enable ${service_name}"
+: "Enable all rke2lab units (services, targets, mounts)"
+for unit_file in /etc/systemd/system/rke2lab-*.service /etc/systemd/system/rke2lab-*.target /etc/systemd/system/*.mount; do
+  if [[ -f "${unit_file}" ]]; then
+    unit_name=$(basename "${unit_file}")
+    systemctl enable "${unit_name}" || log "warning: failed to enable ${unit_name}"
   fi
 done
-log "enabled rke2lab services"
+log "enabled rke2lab units"

@@ -1,0 +1,17 @@
+[Unit]
+Description=Configure containerd ZFS mount unit for RKE2
+Documentation=https://github.com/nxmatic/rke2lab
+DefaultDependencies=no
+Before=var-lib-rancher-rke2-agent-containerd-io.containerd.snapshotter.v1.zfs.mount
+After=local-fs-pre.target
+RequiresMountsFor=/srv/host
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/srv/host/scripts.d/rke2lab-configure-containerd-zfs-mount.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=local-fs.target
