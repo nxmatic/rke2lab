@@ -12,6 +12,8 @@ data:
   cluster-name: bioskop
   node-name: master
   node-kind: server
+  rke2-debug: "true"
+  rke2-verbosity: "4"
   cluster-token: bioskop
   node-host-inetaddr: 10.80.0.10
   cluster-id: "0"
