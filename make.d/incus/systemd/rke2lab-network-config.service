@@ -12,4 +12,4 @@ StandardOutput=journal
 StandardError=journal
 
 [Install]
-WantedBy=rke2lab.target
+WantedBy=rke2lab-network.target

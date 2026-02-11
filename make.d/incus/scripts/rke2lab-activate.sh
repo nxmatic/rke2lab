@@ -16,7 +16,7 @@ ln -fs /run/systemd/resolve/resolv.conf /etc/resolv.conf
 $RKE2LAB_SCRIPTS_DIR/rke2lab-systemd-link.sh
 
 : "Start network configuration service immediately"
-systemctl enable --now rke2lab-network-config.service
+systemctl enable --now rke2lab-network.target
 
 : "Enable RKE2 Lab tools target (Nix and Flox installation)"
 systemctl enable --now rke2lab-tools.target

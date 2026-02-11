@@ -13,4 +13,4 @@ StandardError=journal+console
 SuccessExitStatus=0 1
 
 [Install]
-WantedBy=rke2lab.target
+WantedBy=rke2lab-network.target
