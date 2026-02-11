@@ -3,11 +3,13 @@
 [[ -n "${HOME:-}" ]] ||
   export HOME=/root
 
+NIX_PROFILE=/nix/var/nix/profiles/default
+
 : "Load the default Nix profile for current shell session"
-source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+source "${NIX_PROFILE}/etc/profile.d/nix-daemon.sh"
 
 : "Ensure git is available via Nix if not already installed"
-nix profile add  nixpkgs#git
+nix profile add --profile "${NIX_PROFILE}" nixpkgs#git
 
 : "Install Flox via Nix package manager in the default profile for system-wide availability"
-nix profile add github:flox/flox/latest
+nix profile add --profile "${NIX_PROFILE}" github:flox/flox/latest
