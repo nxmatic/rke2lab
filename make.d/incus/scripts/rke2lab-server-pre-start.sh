@@ -1,4 +1,6 @@
-#!/usr/bin/env -S bash -exu -o pipefail
+#!/usr/bin/env bash
+
+set -exu -o pipefail
 
 source <( flox activate --dir /var/lib/rancher/rke2 )
 

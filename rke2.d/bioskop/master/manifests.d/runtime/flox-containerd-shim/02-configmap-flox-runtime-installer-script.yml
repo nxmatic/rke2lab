@@ -2,8 +2,8 @@
 apiVersion: v1
 data:
   shim-installer.sh: |-
-    #!/bin/sh
-    set -exu
+    #!/usr/bin/env bash
+    set -exuo pipefail
 
     install_deps() {
       local attempt=0
@@ -13,7 +13,7 @@ data:
         if apk update && apk add --no-cache bash util-linux coreutils >/tmp/apk.log; then
           return 0
         fi
-        if [ ${attempt} -ge ${max_attempts} ]; then
+        if [[ ${attempt} -ge ${max_attempts} ]]; then
           echo "apk install failed after ${attempt} attempts" >&2
           sleep infinity
         fi
@@ -27,7 +27,7 @@ data:
       CONTAINERD_CONFIG_FILE="${CONTAINERD_CONFIG_FILE}" \
       bash <<'HOSTSCRIPT'
     set -euxo pipefail
-    export PATH="/nix/var/nix/profiles/default/bin:/var/lib/rancher/rke2/bin:/var/lib/rancher/rke2/agent/bin:${PATH}"
+    export PATH="/var/lib/rancher/rke2/bin:/var/lib/rancher/rke2/agent/bin:${PATH}"
     export FLOX_NO_TELEMETRY=1
     export FLOX_NONINTERACTIVE=1
 

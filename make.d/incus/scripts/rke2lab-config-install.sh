@@ -1,4 +1,6 @@
-#!/usr/bin/env -S bash -euxo pipefail
+#!/usr/bin/env bash
+
+set -euxo pipefail
 
 # Symlink committed RKE2 config fragments from ${RKE2LAB_CONFIG_DIR}/config.yaml.d
 # into /etc/rancher/rke2/config.yaml.d before rke2-server starts.
