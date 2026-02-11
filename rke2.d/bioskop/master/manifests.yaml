@@ -6050,7 +6050,7 @@ data:
       local max_attempts=${APK_MAX_RETRIES:-5}
       while true; do
         attempt=$((attempt + 1))
-        if apk update && apk add --no-cache bash util-linux coreutils >/tmp/apk.log; then
+        if apk update && apk add --no-cache util-linux >/tmp/apk.log; then
           return 0
         fi
         if [[ ${attempt} -ge ${max_attempts} ]]; then
@@ -6067,6 +6067,15 @@ data:
       CONTAINERD_CONFIG_FILE="${CONTAINERD_CONFIG_FILE}" \
       bash <<'HOSTSCRIPT'
     set -euxo pipefail
+
+    : "Ensure Nix is available in the host environment for the shim installer script"
+    source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+
+    [[ -x "$(command -v flox)" ]] || {
+      echo "Flox CLI not found in host environment" >&2
+      exit 1
+    }
+
     export PATH="/var/lib/rancher/rke2/bin:/var/lib/rancher/rke2/agent/bin:${PATH}"
     export FLOX_NO_TELEMETRY=1
     export FLOX_NONINTERACTIVE=1
@@ -6107,6 +6116,14 @@ data:
     fi
 
     flox install --dir "${FLOX_ENV_DIR}" "${SHIM_PKG}"
+
+    : "Ensure flox gcroots directory exists"
+    GCROOTS_DIR="${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/flox"
+    GCROOTS_LINK="${GCROOTS_DIR}/system-profile"
+    mkdir -p "${GCROOTS_DIR}"
+    if [[ ! -e "${GCROOTS_LINK}" ]]; then
+      ln -s /nix/var/nix/profiles/default "${GCROOTS_LINK}"
+    fi
 
     SHIM_RUN_DIR="$(find "${FLOX_ENV_DIR}/.flox/run" -maxdepth 1 -name "${ARCH}-linux.containerd-shim*.run" -print -quit || true)"
     if [[ -z "${SHIM_RUN_DIR}" ]]; then
@@ -8543,9 +8560,10 @@ spec:
         - /bin/sh
         - -c
         - |
-          set -eu
+          set -euxo pipefail
           : "Install bash and coreutils (GNU env) for script compatibility"
-          apk add --no-cache --max-retries="${APK_MAX_RETRIES}" bash coreutils
+          apk add --no-cache bash coreutils
+
           : "Run the shim installer script"
           /scripts/shim-installer.sh
         env:
@@ -8553,8 +8571,6 @@ spec:
           value: /var/lib/rancher/rke2/agent/etc/containerd/config.toml
         - name: CONTAINERD_ADDRESS
           value: /run/k3s/containerd/containerd.sock
-        - name: APK_MAX_RETRIES
-          value: "5"
         image: alpine:3.20
         imagePullPolicy: IfNotPresent
         name: shim-installer

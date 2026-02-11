@@ -43,9 +43,10 @@ spec:
             - /bin/sh
             - -c
             - |
-              set -eu
+              set -euxo pipefail
               : "Install bash and coreutils (GNU env) for script compatibility"
-              apk add --no-cache --max-retries="${APK_MAX_RETRIES}" bash coreutils
+              apk add --no-cache bash coreutils
+
               : "Run the shim installer script"
               /scripts/shim-installer.sh
           env:
@@ -53,8 +54,6 @@ spec:
               value: /var/lib/rancher/rke2/agent/etc/containerd/config.toml
             - name: CONTAINERD_ADDRESS
               value: /run/k3s/containerd/containerd.sock
-            - name: APK_MAX_RETRIES
-              value: "5"
           image: alpine:3.20
           imagePullPolicy: IfNotPresent
           name: shim-installer
