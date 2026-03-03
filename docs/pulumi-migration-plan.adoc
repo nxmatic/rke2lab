@@ -3,6 +3,14 @@
 :toclevels: 3
 :sectnums:
 
+[IMPORTANT]
+====
+This document is superseded for architecture direction by
+`docs/cluster-provisioning-control-plane-v2.adoc`.
+
+Use this file as historical migration context only.
+====
+
 == Executive Summary
 
 Replace GNU Make-based infrastructure orchestration with **Java Pulumi** for improved maintainability, type safety, and dependency management. Focus migration on highest-pain, highest-benefit components: Incus provisioning and systemd choreography.

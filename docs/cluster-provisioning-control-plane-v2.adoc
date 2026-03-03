@@ -1,0 +1,268 @@
+= Cluster Provisioning Control Plane v2 (Superseding Plan)
+:toc: left
+:toclevels: 3
+:sectlinks:
+:sectanchors:
+:source-highlighter: rouge
+:revdate: 2026-03-03
+
+== Status
+
+This document is the current planning entrypoint for cluster provisioning architecture.
+
+It supersedes previous planning documents for bootstrap orchestration details, notably:
+
+* `docs/pulumi-migration-plan.adoc`
+* `docs/kpt-migration-plan.adoc` (bootstrap-related sections)
+
+`docs/porch-adoption-plan.adoc` remains valid for Phase 2 GitOps operations and is not replaced.
+
+== Context and goals
+
+We keep a strict two-phase model:
+
+* Phase 1: bootstrap and node lifecycle provisioning
+* Phase 2: full GitOps cluster operations (Porch/Flux/Tekton)
+
+Key constraints and preferences:
+
+* Single-host support plane today: bare metal -> NixOS VM -> Incus RKE2 nodes
+* Cilium mesh across clusters
+* Java-first implementation preference
+* Existing Flox runtime parity inside/outside cluster
+
+== Target architecture
+
+For CAPI-based implementation on current infrastructure, the expected provider composition is:
+
+* CAPI core controllers (management cluster)
+* CAPRKE2 (bootstrap + control-plane providers)
+* CAPN (`cluster-api-provider-incus`) as Infrastructure Provider
+
+This combination maps directly to the current NixOS VM + Incus node model.
+
+=== Stage A (outside cluster): bootstrap control-plane seed
+
+Run a Pulumi-based provisioning app locally inside the NixOS VM to:
+
+* provision initial master node
+* install/activate minimal RKE2 control plane
+* seed GitOps prerequisites (Flux/Porch/Tekton bootstrap manifests and credentials)
+
+This stage is intentionally minimal and one-shot.
+
+=== Stage B (inside cluster): CAPI-driven node and cluster lifecycle
+
+After master is healthy, install and operate CAPI + CAPRKE2 + CAPN in the management cluster (`bioskop`) and let it reconcile workload clusters (`alcide`, `nikopol`), which:
+
+* watches provisioning manifests (CRDs)
+* reconciles control-plane/worker lifecycle through provider controllers
+* provisions Incus-backed machines through CAPN
+* bootstraps and manages RKE2 control planes through CAPRKE2
+
+=== Break-glass path
+
+Always keep an external runner path for management cluster recovery when the control plane is degraded.
+
+== Why KPT is not required in bootstrap
+
+KPT remains a Phase 2 facilitator, not a bootstrap hard dependency.
+
+Bootstrap should focus only on:
+
+* host/VM/node lifecycle
+* first control-plane readiness
+* GitOps controller seeding
+
+All continuous platform changes remain GitOps-managed after handoff.
+
+== Control API contract (proposed)
+
+Minimal CRDs (names indicative):
+
+* `ClusterBootstrap`
+  ** one-shot orchestration intent
+  ** tracks bootstrap phase, endpoint, kubeconfig secret reference
+* `NodeRequest`
+  ** desired node changes (create/replace/delete)
+  ** role/flavor/network profile references
+  ** status with phase, conditions, provider ID, allocated addresses
+
+State transitions (example):
+
+* `Pending -> Validating -> Provisioning -> Joining -> Ready`
+* failure path: `... -> Failed` with retry policy + reason codes
+
+== Runtime model and reliability rules
+
+=== Leader election and concurrency
+
+Use controller leader election and standard CAPI controller runtime safeguards to avoid conflicting reconciliations.
+
+=== Durable control-plane state
+
+CAPI state lives in Kubernetes API resources; ensure etcd backup/recovery strategy is documented for the management cluster.
+
+=== Idempotency
+
+All reconciliation paths (CAPI/CAPRKE2/CAPN) must be safe to retry after crashes/timeouts.
+
+=== Security
+
+* pinned SSH host keys to NixOS VM
+* least-privilege provisioning account
+* secret distribution via existing GitOps security model (SOPS/Secret controllers)
+
+== Comparison of candidate tools (same design, different engines)
+
+[cols="1,2,2,2",options="header"]
+|===
+|Tool |Best fit in this architecture |Strengths |Trade-offs
+
+|Pulumi (Java)
+|Phase 1 management-cluster bootstrap only
+|Strong Java ergonomics, explicit DAG orchestration, automation API, broad provider ecosystem
+|Not selected for in-cluster provisioning service in this plan
+
+|Cluster API (CAPI)
+|Alternative to custom `NodeRequest` control loop
+|Native Kubernetes cluster lifecycle patterns, declarative machine management
+|Requires selecting and operating compatible infra/bootstrap/control-plane providers; integration complexity may be higher initially
+
+|CAPN (cluster-api-provider-incus)
+|Primary Infrastructure Provider candidate for current Incus/LXD topology
+|Purpose-built for Incus/LXD/MicroCloud, supports VMs and containers, aligns with current host model
+|Project maturity and contract/version alignment should be validated during PoC
+
+|Crossplane
+|Control-plane framework for custom APIs and compositions
+|Strong API composition model, platform abstractions, policy encapsulation
+|Can be heavy for early bootstrap-focused goals; still needs provider strategy for Incus workflow
+
+|Terraform/OpenTofu + Atlantis
+|PR-driven infra changes in Git workflows
+|Mature ecosystem, auditability for infra PRs
+|Less natural for in-cluster reconciliation/controller-driven node lifecycle than Pulumi/CAPI patterns
+
+|Argo CD / Flux / PipeCD / Jenkins X
+|Phase 2 GitOps delivery and operations
+|Strong continuous reconciliation and delivery workflows
+|Not a complete replacement for node provisioning control-plane logic
+
+|cdk8s
+|Manifest authoring layer (can replace KPT setters/templates or feed KPT output)
+|Type-safe authoring in general-purpose languages, reusable abstractions, good fit for Java-centric teams
+|Introduces generated-manifest workflow discipline; function-style package pipelines differ from KPT model
+|===
+
+== Manifest authoring strategy (KPT and cdk8s)
+
+`cdk8s` is a strong candidate for your team profile (Java developer background) and can be adopted in two practical modes:
+
+* Replace-style: author manifests with `cdk8s` and publish generated YAML directly to GitOps repos.
+* Hybrid-style: author higher-level objects with `cdk8s`, then feed generated YAML through selected KPT package/pipeline steps where KPT still adds value.
+
+Recommended near-term approach:
+
+* Keep KPT for currently stable package pipelines in Phase 2.
+* Introduce `cdk8s` for one new domain package first (pilot), compare maintenance and review ergonomics.
+* Standardize on one output contract (directory layout, naming, metadata labels) so Flux/Porch ingestion remains deterministic regardless of authoring tool.
+
+Decision guardrails for cdk8s adoption:
+
+* Ensure generated YAML is committed (or reproducibly generated in CI) with deterministic ordering.
+* Keep generated artifacts reviewable and diff-friendly.
+* Avoid mixing many templating systems inside one package without a clear ownership boundary.
+
+== Decision
+
+Adopt the following split:
+
+* Pulumi (Java) for management-cluster bootstrap in NixOS VM (Stage A)
+* CAPI + CAPRKE2 + CAPN for in-cluster lifecycle provisioning (Stage B)
+* cdk8s trial for manifest authoring (replace-or-feed strategy with KPT under evaluation)
+
+Keep Porch/Flux/Tekton as authoritative Phase 2 GitOps system.
+
+== Implementation slices for next sessions
+
+=== Slice 1: bootstrap-only PoC
+
+* Pulumi Java app provisions master + waits for API readiness
+* emits kubeconfig + node metadata outputs
+* installs only minimum controllers required to hand off to CAPI management-plane bootstrap
+
+=== Slice 2: CAPI provider PoC (`bioskop` management cluster)
+
+* install CAPI core + CAPRKE2 + CAPN
+* create one workload cluster template and reconcile at least one worker lifecycle event
+* validate clusterclass/topology flow for repeated cluster creation patterns
+
+=== Slice 3: cdk8s authoring pilot with existing GitOps release flow
+
+* author one package domain with cdk8s
+* decide replace-vs-feed integration with KPT/Porch using measured review/release ergonomics
+* keep Flux/Tekton promotion flow unchanged during pilot
+
+=== Slice 4: HA + break-glass
+
+* management cluster backup/recovery drills
+* documented external recovery path for re-seeding management controllers
+* operational runbooks for provider/controller upgrades
+
+== Notes from tool landscape review
+
+Input references were reviewed from Awesome GitOps and linked projects (Flux, Argo CD, Atlantis, PipeCD) plus adjacent candidates (Cluster API, Crossplane, Pulumi docs).
+
+Concrete findings to retain:
+
+* Pulumi Automation API supports Java and is intended for embedding Pulumi operations in long-running apps (e.g. controller backends); it still requires Pulumi CLI available in `PATH`.
+* Cluster API provider ecosystem includes RKE2 bootstrap/control-plane providers, which keeps CAPI as a viable alternative path if we later prefer native CAPI workflows over custom `NodeRequest` logic.
+* Crossplane v2 positions composition/managed resources/operations as a controller-reduction framework; strong fit for API composition, but still requires provider and operations model validation for Incus-centric node lifecycle.
+
+Working conclusion: GitOps controllers remain best for Phase 2 convergence, while a dedicated provisioning control plane is still required for node lifecycle in this topology.
+
+== Reference index (tooling)
+
+=== Pulumi
+
+* Pulumi docs: https://www.pulumi.com/docs/
+* Pulumi Automation API: https://www.pulumi.com/docs/iac/automation-api/
+
+=== Cluster API (CAPI)
+
+* Project repository: https://github.com/kubernetes-sigs/cluster-api
+* Documentation book: https://cluster-api.sigs.k8s.io/
+* Provider implementations index: https://cluster-api.sigs.k8s.io/reference/providers.html
+* RKE2 bootstrap/control-plane provider: https://github.com/rancher/cluster-api-provider-rke2
+
+=== Incus Infrastructure Provider (CAPN)
+
+* CAPN docs/book: https://capn.linuxcontainers.org/
+* CAPN repository: https://github.com/lxc/cluster-api-provider-incus/
+* CAPN quick start: https://capn.linuxcontainers.org/tutorial/quick-start.html
+
+=== Crossplane
+
+* Website: https://www.crossplane.io/
+* What is Crossplane: https://docs.crossplane.io/latest/whats-crossplane/
+
+=== GitOps delivery controllers and platforms
+
+* Flux v2: https://github.com/fluxcd/flux2
+* Argo CD: https://github.com/argoproj/argo-cd
+* PipeCD: https://pipecd.dev/
+* Jenkins X: https://jenkins-x.io/
+
+=== IaC workflow alternatives mentioned
+
+* Atlantis (Terraform PR automation): https://www.runatlantis.io/
+
+=== Manifest authoring alternatives
+
+* cdk8s: https://cdk8s.io/
+* Cluster API addon provider cdk8s: https://github.com/eitco/cluster-api-addon-provider-cdk8s/
+
+=== Curated landscape
+
+* Awesome GitOps: https://github.com/weaveworks/awesome-gitops

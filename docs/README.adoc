@@ -52,6 +52,15 @@ Keeping SVGs checked in ensures reviewers and automation can diff both prose and
 
 == Documentation Index
 
+=== Current Planning Entry Point (Superseding)
+
+link:cluster-provisioning-control-plane-v2.adoc[Cluster Provisioning Control Plane v2 (Superseding Plan)]::
+Current source of truth for provisioning architecture:
+* Stage A bootstrap via Pulumi (local in NixOS VM)
+* Stage B in-cluster node provisioning controller backed by Pulumi
+* Phase 2 GitOps handoff with Porch/Flux/Tekton
+* Tooling comparison (Pulumi, CAPI, Crossplane, Atlantis/OpenTofu)
+
 === Architecture Documentation
 
 link:systemd-service-architecture.adoc[Systemd Service Architecture]::
@@ -83,7 +92,7 @@ link:help-system.adoc[Help System]::
 Documentation about the built-in help system and command-line assistance.
 
 link:kpt-migration-plan.adoc[KPT Migration Plan]::
-Plan for migrating to KPT package management.
+Historical plan (partially superseded for bootstrap scope by v2 provisioning plan).
 
 link:makefile-updates.adoc[Makefile Updates]::
 Documentation of Makefile structure and recent updates.

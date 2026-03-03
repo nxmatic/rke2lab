@@ -1,27 +1,6 @@
 #!/usr/bin/env -S bash -exu -o pipefail
 
 : "Load RKE2 environment" # @codebase
-RKE2LAB_ROOT=${RKE2LAB_ROOT:-/srv/host}
-RKE2LAB_ENV_FILE=${RKE2LAB_ENV_FILE:-${RKE2LAB_ROOT}/environment}
-[[ ! -r "${RKE2LAB_ENV_FILE}" ]] && {
-	echo "[rke2lab-configure-containerd-zfs-mount] missing environment file: ${RKE2LAB_ENV_FILE}" >&2
-	exit 1
-}
-
-set -a
-source "${RKE2LAB_ENV_FILE}"
-set +a
-
-: "Validate node metadata for ZFS dataset" # @codebase
-[[ -n "${RKE2LAB_NODE_NAME:-}" ]] || {
-	echo "[rke2lab-configure-containerd-zfs-mount] RKE2LAB_NODE_NAME is required" >&2
-	exit 1
-}
-[[ -n "${RKE2LAB_NODE_KIND:-}" ]] || {
-	echo "[rke2lab-configure-containerd-zfs-mount] RKE2LAB_NODE_KIND is required" >&2
-	exit 1
-}
-
 source <(flox activate --dir /var/lib/rancher/rke2)
 
 MOUNT_UNIT_PATH=/etc/systemd/system/var-lib-rancher-rke2-agent-containerd-io.containerd.snapshotter.v1.zfs.mount

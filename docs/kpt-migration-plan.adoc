@@ -7,6 +7,14 @@
 :version: 1.0
 :date: 2025-11-12
 
+[IMPORTANT]
+====
+Bootstrap architecture in this document is partially superseded by
+`docs/cluster-provisioning-control-plane-v2.adoc`.
+
+KPT/GitOps operational guidance remains relevant for Phase 2.
+====
+
 == Overview
 
 This document outlines the migration strategy for introducing kpt (Kubernetes Package Tool) into the rke2lab deployment system. The goal is to reduce reliance on RKE2 manifests embedded in cloud-config files, maintaining only minimal bootstrap manifests in RKE2 while managing most cluster components through kpt packages.
