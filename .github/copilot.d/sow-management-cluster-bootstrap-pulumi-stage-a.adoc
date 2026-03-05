@@ -1,0 +1,113 @@
+= Statement of Work: Management Cluster Bootstrap (Pulumi Stage A)
+:author: AI Assistant + Human Collaborator
+:revdate: 2026-03-05
+:toc: left
+:toclevels: 3
+:icons: font
+
+== Context
+
+This SOW captures the *current execution plan* for starting implementation of the superseding provisioning strategy in:
+
+* link:../../docs/cluster-provisioning-control-plane-v2.adoc[Cluster Provisioning Control Plane v2 (Superseding Plan)]
+
+Immediate focus is *Stage A* only:
+
+* bootstrap management control-plane seed from outside the cluster
+* Pulumi (Java) based execution
+* one-shot bootstrap with explicit handoff contract to Stage B
+
+== Objectives
+
+. Create and initialize the `rke2lab-bootstrap` repository as the Stage A implementation home
+. Scaffold a Pulumi Java bootstrap app for management-cluster seed lifecycle
+. Implement bootstrap outputs contract (`kubeconfig`, endpoint, node metadata)
+. Establish runbook and break-glass baseline for repeatable operator execution
+. Keep Stage B (CAPI/CAPRKE2/CAPN) and Phase 2 GitOps flow out of Stage A implementation scope
+
+== Scope
+
+=== In Scope
+
+* New repository setup: `nxmatic/rke2lab-bootstrap`
+* Local split git layout alignment:
+** bare repo: `/var/lib/git/.bare/nxmatic/rke2lab-bootstrap.git`
+** worktree: `/var/lib/git/nxmatic/rke2lab-bootstrap`
+* Pulumi Java project bootstrap structure
+* Stage A execution contract and outputs
+* Initial operator runbook and validation checklist
+
+=== Out of Scope
+
+* In-cluster provisioning controllers (Stage B)
+* Cluster API provider PoC implementation
+* Full GitOps orchestration rollout (Flux/Porch/Tekton automation)
+* Migration of existing rke2lab Make orchestration
+
+== Deliverables
+
+. `rke2lab-bootstrap` repository initialized and accessible
+. Pulumi Java scaffold with baseline project files
+. Stage A bootstrap command path documented
+. Outputs contract documented (machine-readable + human-readable)
+. Break-glass and rollback notes documented
+
+== Acceptance Criteria
+
+✅ *Repository and layout*
+
+* [x] Remote repository exists on GitHub (`nxmatic/rke2lab-bootstrap`)
+* [x] Local split bare/worktree layout is operational
+* [x] `gh get` supports split-mode cloning for this workflow
+
+⬜ *Bootstrap scaffold*
+
+* [ ] Pulumi Java project skeleton committed in `rke2lab-bootstrap`
+* [ ] Build/bootstrap commands execute without unresolved dependencies
+* [ ] Initial stack config path defined for local NixOS VM execution
+
+⬜ *Contract and runbook*
+
+* [ ] Stage A outputs are explicitly documented
+* [ ] Operator runbook includes prerequisites, run, verify, rollback
+* [ ] Break-glass recovery path is documented for degraded management plane
+
+== Execution Notes (Next Session)
+
+=== Recommended first implementation slice
+
+. Initialize Pulumi Java project in `rke2lab-bootstrap`
+. Add baseline config loader + output exporter stubs
+. Implement bootstrap orchestration shell (provision + readiness wait + export)
+. Record first runnable developer flow in README
+
+=== Suggested command baseline
+
+[source,bash]
+----
+# @codebase
+cd /var/lib/git/nxmatic/rke2lab-bootstrap
+
+# @codebase
+git status -sb
+
+# @codebase
+pwd
+----
+
+== Risks and Controls
+
+* *Risk*: Scope drift into Stage B during Stage A coding
+** *Control*: enforce Stage A-only PR boundaries and SOW checklists
+
+* *Risk*: runtime mismatch between Darwin host and NixOS VM tools
+** *Control*: keep execution contract explicit and environment assumptions documented
+
+* *Risk*: unclear ownership of bootstrap outputs
+** *Control*: define output schema early and gate implementation on it
+
+== References
+
+* link:../../docs/cluster-provisioning-control-plane-v2.adoc[Cluster Provisioning Control Plane v2]
+* link:../../docs/README.adoc[Documentation Guide]
+* link:index.adoc[Copilot Workspace Index]

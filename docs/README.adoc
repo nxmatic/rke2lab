@@ -121,5 +121,6 @@ KPT package templates for cluster overlays
 Copilot workspace documentation and statements of work
 +
 * link:../.github/copilot.d/index.adoc[Workspace Index]
+* link:../.github/copilot.d/sow-management-cluster-bootstrap-pulumi-stage-a.adoc[Management Cluster Bootstrap (Pulumi Stage A) SOW]
 * link:../.github/copilot.d/sow-systemd-refactoring.adoc[Systemd Refactoring SOW]
 * link:../.github/copilot.d/sow-documentation-consistency.adoc[Documentation Consistency SOW]

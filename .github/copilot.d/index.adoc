@@ -10,7 +10,20 @@ This directory contains Statements of Work (SOWs), technical plans, and document
 
 == Active Projects
 
-_(No active projects right now)_
+=== Management Cluster Bootstrap (Pulumi Stage A)
+
+*Status*: 🟡 Active +
+*Start Date*: 2026-03-05
+
+Bootstrap implementation kickoff for the superseding provisioning plan:
+
+* Stage A bootstrap via Pulumi (Java)
+* Dedicated repository: `nxmatic/rke2lab-bootstrap`
+* Explicit handoff contract to Stage B
+
+*Documents*:
+
+* link:sow-management-cluster-bootstrap-pulumi-stage-a.adoc[Project Statement of Work]
 
 == Completed Projects
 
