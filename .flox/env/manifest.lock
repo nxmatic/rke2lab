@@ -1,0 +1,536 @@
+{
+  "lockfile-version": 1,
+  "manifest": {
+    "version": 1,
+    "install": {
+      "checkstyle": {
+        "pkg-path": "checkstyle"
+      },
+      "jdk25": {
+        "pkg-path": "jdk25"
+      },
+      "maven": {
+        "pkg-path": "maven"
+      },
+      "visualvm": {
+        "pkg-path": "visualvm"
+      }
+    },
+    "hook": {},
+    "profile": {},
+    "options": {}
+  },
+  "packages": [
+    {
+      "attr_path": "checkstyle",
+      "broken": false,
+      "derivation": "/nix/store/191z1nbiy1bc8xd3gfm3c65m603jndf5-checkstyle-13.2.0.drv",
+      "description": "Checks Java source against a coding standard",
+      "install_id": "checkstyle",
+      "license": "LGPL-2.1",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "checkstyle-13.2.0",
+      "pname": "checkstyle",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T04:46:37.126469Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "13.2.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/mmayxbjcpn4viqrz2k3kc08afcfdmjbf-checkstyle-13.2.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "checkstyle",
+      "broken": false,
+      "derivation": "/nix/store/fc1821y0a03vgqjqimpqx7a053j9zg9w-checkstyle-13.2.0.drv",
+      "description": "Checks Java source against a coding standard",
+      "install_id": "checkstyle",
+      "license": "LGPL-2.1",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "checkstyle-13.2.0",
+      "pname": "checkstyle",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T05:23:00.169835Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "13.2.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/km94caqfw3v9lq1sib1xv4rnchq4fd2q-checkstyle-13.2.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "checkstyle",
+      "broken": false,
+      "derivation": "/nix/store/1w9rdq5hlxpjgsq5swchkzp4dxnwy0xs-checkstyle-13.2.0.drv",
+      "description": "Checks Java source against a coding standard",
+      "install_id": "checkstyle",
+      "license": "LGPL-2.1",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "checkstyle-13.2.0",
+      "pname": "checkstyle",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T06:03:51.445331Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "13.2.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/7z337l4fnggkd9r5zh4w8c6mpgv3pp73-checkstyle-13.2.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "checkstyle",
+      "broken": false,
+      "derivation": "/nix/store/lisndc93l66qbd27lxk78xfl6wgr8lx3-checkstyle-13.2.0.drv",
+      "description": "Checks Java source against a coding standard",
+      "install_id": "checkstyle",
+      "license": "LGPL-2.1",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "checkstyle-13.2.0",
+      "pname": "checkstyle",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T06:47:05.308462Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "13.2.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/b31abzh90cd8qjk0j916mq8x1kr2al4p-checkstyle-13.2.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "jdk25",
+      "broken": false,
+      "derivation": "/nix/store/4g2vqin5qnhllv6djn7krg27mw638s8y-zulu-ca-jdk-25.0.0.drv",
+      "description": "Certified builds of OpenJDK",
+      "install_id": "jdk25",
+      "license": "GPL-2.0-only",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "zulu-ca-jdk-25.0.0",
+      "pname": "jdk25",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T04:46:53.067043Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "25.0.0",
+      "outputs_to_install": [
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/g2m73l2987sld7zzv8hshadghp2y2k84-zulu-ca-jdk-25.0.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "jdk25",
+      "broken": false,
+      "derivation": "/nix/store/s6yi3z3sh5y512k3zxm27l3yrwih20jz-openjdk-25.0.2+10.drv",
+      "description": "Open-source Java Development Kit",
+      "install_id": "jdk25",
+      "license": "GPL-2.0-only",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "openjdk-25.0.2+10",
+      "pname": "jdk25",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T05:23:21.194465Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "25.0.2+10",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/38hwrmfm117ky6rqg4ngdzap3vri7idr-openjdk-25.0.2+10-debug",
+        "out": "/nix/store/b772vilhd4v97dzwj90km7llb9q0anl6-openjdk-25.0.2+10"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "jdk25",
+      "broken": false,
+      "derivation": "/nix/store/ybbxjxqw4wqb9hnpd4ih5qq4gl17shb8-zulu-ca-jdk-25.0.0.drv",
+      "description": "Certified builds of OpenJDK",
+      "install_id": "jdk25",
+      "license": "GPL-2.0-only",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "zulu-ca-jdk-25.0.0",
+      "pname": "jdk25",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T06:04:07.866897Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "25.0.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/3vbniykr27j32shqa83dc1wjk8dha83d-zulu-ca-jdk-25.0.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "jdk25",
+      "broken": false,
+      "derivation": "/nix/store/202ci19d9xkmlgp0bxhqbdxvjkwhv8av-openjdk-25.0.2+10.drv",
+      "description": "Open-source Java Development Kit",
+      "install_id": "jdk25",
+      "license": "GPL-2.0-only",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "openjdk-25.0.2+10",
+      "pname": "jdk25",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T06:47:27.358017Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "25.0.2+10",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/i56khqqvzq83hy67s1xs2dzyjfnimib5-openjdk-25.0.2+10-debug",
+        "out": "/nix/store/3b7hv1zyqmdyvrvl4zfib228238mnfma-openjdk-25.0.2+10"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "maven",
+      "broken": false,
+      "derivation": "/nix/store/sbp7g4gazpgmw1cmh7zyg08qqi5lxyca-maven-3.9.12.drv",
+      "description": "Build automation tool (used primarily for Java projects)",
+      "install_id": "maven",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "maven-3.9.12",
+      "pname": "maven",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T04:46:58.270689Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.9.12",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/njv115l854b6s5xi8z5s9bv1azicq3wk-maven-3.9.12"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "maven",
+      "broken": false,
+      "derivation": "/nix/store/dlf97pybix92f23swgza4swhy3616b1f-maven-3.9.12.drv",
+      "description": "Build automation tool (used primarily for Java projects)",
+      "install_id": "maven",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "maven-3.9.12",
+      "pname": "maven",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T05:23:34.100456Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.9.12",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/60qkfjzwrb323k2yp76fvfi8lbbc0qq1-maven-3.9.12"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "maven",
+      "broken": false,
+      "derivation": "/nix/store/hz3sjr1c5f4rl7g5z2hdkinbncvb4q8y-maven-3.9.12.drv",
+      "description": "Build automation tool (used primarily for Java projects)",
+      "install_id": "maven",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "maven-3.9.12",
+      "pname": "maven",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T06:04:13.243323Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.9.12",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/z7w3vf9hcfhk8njv3f8yisb578xpprlv-maven-3.9.12"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "maven",
+      "broken": false,
+      "derivation": "/nix/store/z20iqqdjdd5llbxb50az905s4ki74569-maven-3.9.12.drv",
+      "description": "Build automation tool (used primarily for Java projects)",
+      "install_id": "maven",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "maven-3.9.12",
+      "pname": "maven",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T06:47:41.864159Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.9.12",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/xy25nymi63dy0ilp373hp6q1p5cbdir9-maven-3.9.12"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "visualvm",
+      "broken": false,
+      "derivation": "/nix/store/h5839c0px0rsz8qn4m5w25aq0r0bkwcf-visualvm-2.2.drv",
+      "description": "Visual interface for viewing information about Java applications",
+      "install_id": "visualvm",
+      "license": "[ GPL-2.0-or-later, Classpath-exception-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "visualvm-2.2",
+      "pname": "visualvm",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T04:49:12.273999Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/76xb7z3553rrcmvll2faqy8k3jkxm9w5-visualvm-2.2"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "visualvm",
+      "broken": false,
+      "derivation": "/nix/store/sj09x58na9z6qfkvl6f3pal138lqf1vq-visualvm-2.2.drv",
+      "description": "Visual interface for viewing information about Java applications",
+      "install_id": "visualvm",
+      "license": "[ GPL-2.0-or-later, Classpath-exception-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "visualvm-2.2",
+      "pname": "visualvm",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T05:26:31.320009Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/argibnmaz461751m0l1iqx8q341a6qig-visualvm-2.2"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "visualvm",
+      "broken": false,
+      "derivation": "/nix/store/aw1yfccxxbnx0p0557b4rw19qfb6pn81-visualvm-2.2.drv",
+      "description": "Visual interface for viewing information about Java applications",
+      "install_id": "visualvm",
+      "license": "[ GPL-2.0-or-later, Classpath-exception-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "visualvm-2.2",
+      "pname": "visualvm",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T06:06:23.204312Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/rmfnvwd2823jf55snyccj519gv21vs51-visualvm-2.2"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "visualvm",
+      "broken": false,
+      "derivation": "/nix/store/zsizw83371cili128cq7p026chmrynbc-visualvm-2.2.drv",
+      "description": "Visual interface for viewing information about Java applications",
+      "install_id": "visualvm",
+      "license": "[ GPL-2.0-or-later, Classpath-exception-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=9dcb002ca1690658be4a04645215baea8b95f31d",
+      "name": "visualvm-2.2",
+      "pname": "visualvm",
+      "rev": "9dcb002ca1690658be4a04645215baea8b95f31d",
+      "rev_count": 960399,
+      "rev_date": "2026-03-08T09:52:19Z",
+      "scrape_date": "2026-03-10T06:50:42.047849Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/nx2c6d0i3l8blyi2nk64l5c4hf53a169-visualvm-2.2"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    }
+  ],
+  "compose": {
+    "composer": {
+      "version": 1,
+      "hook": {},
+      "profile": {},
+      "options": {},
+      "include": {
+        "environments": [
+          {
+            "dir": "../fleet/flox/jdk"
+          }
+        ]
+      }
+    },
+    "include": [
+      {
+        "manifest": {
+          "version": 1,
+          "install": {
+            "checkstyle": {
+              "pkg-path": "checkstyle"
+            },
+            "jdk25": {
+              "pkg-path": "jdk25"
+            },
+            "maven": {
+              "pkg-path": "maven"
+            },
+            "visualvm": {
+              "pkg-path": "visualvm"
+            }
+          },
+          "hook": {},
+          "profile": {},
+          "options": {}
+        },
+        "name": "jdk",
+        "descriptor": {
+          "dir": "../fleet/flox/jdk"
+        }
+      }
+    ],
+    "warnings": []
+  }
+}

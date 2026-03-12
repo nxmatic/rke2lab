@@ -1,0 +1,32 @@
+= RK2Lab Control Plane
+:toc: left
+:toclevels: 2
+
+Pulumi-based management-cluster bootstrap and provisioning control plane for the RK2Lab ecosystem.
+
+== Purpose
+
+This repository owns provisioning lifecycle logic that is intentionally separated from `rke2lab` runtime/manifests docs.
+
+Primary near-term scope:
+
+* Stage A bootstrap of the management cluster (`bioskop`)
+* Deterministic readiness gating
+* Exported bootstrap outputs for Stage B handoff
+
+== Current status
+
+Initial scaffold created. First implementation target is the Stage A bootstrap contract.
+
+== Planned structure
+
+* `docs/bootstrap-contract.adoc` — source-of-truth contract for inputs/outputs/readiness/failure semantics
+* `src/main/java/` — Java Pulumi application
+* `Pulumi.yaml` — Pulumi project metadata
+* `pom.xml` — Maven build configuration
+
+== Next immediate milestones
+
+. Define contract and acceptance checks in `docs/bootstrap-contract.adoc`
+. Implement minimal `pulumi up` path for management-cluster seed
+. Export kubeconfig + endpoint outputs for Stage B consumers

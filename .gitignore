@@ -1,0 +1,18 @@
+# @codebase
+# Build outputs
+target/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+
+# Pulumi local state (if local backend is used)
+.pulumi/
+
+# Local secrets/config
+*.env
+.env
