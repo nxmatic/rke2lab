@@ -29,7 +29,10 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Dedicated Pulumi image provider for Stage A Incus image lifecycle.
+ * Stage A seed image orchestration for Incus image lifecycle.
+ *
+ * <p>This class is intentionally not a Pulumi dynamic resource provider. It coordinates local/remote
+ * artifact materialization and then creates/reads a standard Incus provider-managed {@link Image}.
  */
 public final class PulumiIncusImageProvider {
 
@@ -46,7 +49,17 @@ public final class PulumiIncusImageProvider {
     /**
      * Ensure the seed image exists and return its fingerprint output.
      */
-    public Output<String> ensureSeedImage(InvokeOptions invokeOptions, Provider provider) {
+        public Output<String> ensureSeedImageFingerprint(InvokeOptions invokeOptions, Provider provider) {
+        final Output<String> existingFingerprint = resolveExistingSeedImageFingerprint(invokeOptions);
+        if (existingFingerprint != null) {
+            return existingFingerprint;
+        }
+
+        final BuiltImageArtifacts artifacts = ensureLocalImageArtifacts();
+        return createSeedImageFromArtifacts(provider, artifacts).fingerprint();
+        }
+
+        private Output<String> resolveExistingSeedImageFingerprint(InvokeOptions invokeOptions) {
         try {
             final GetImageResult existingImage = IncusFunctions.getImagePlain(
                     GetImagePlainArgs.builder()
@@ -57,26 +70,28 @@ public final class PulumiIncusImageProvider {
             ).join();
             return Output.of(existingImage.fingerprint());
         } catch (Exception ignored) {
-            final BuiltImageArtifacts artifacts = ensureLocalImageArtifacts();
-            final Image image = new Image(
-                    "seed-image",
-                    ImageArgs.builder()
-                            .project(config.incusProject())
-                            .aliases(ImageAliasArgs.builder()
-                                    .name(config.imageAlias())
-                                    .build())
-                            .sourceFile(ImageSourceFileArgs.builder()
-                                    .metadataPath(artifacts.metadataPath().toString())
-                                    .dataPath(artifacts.dataPath().toString())
-                                    .build())
-                            .build(),
-                    CustomResourceOptions.builder()
-                            .provider(provider)
-                            .build()
-            );
-            return image.fingerprint();
+            return null;
         }
     }
+
+        private Image createSeedImageFromArtifacts(Provider provider, BuiltImageArtifacts artifacts) {
+        return new Image(
+            "seed-image",
+            ImageArgs.builder()
+                .project(config.incusProject())
+                .aliases(ImageAliasArgs.builder()
+                    .name(config.imageAlias())
+                    .build())
+                .sourceFile(ImageSourceFileArgs.builder()
+                    .metadataPath(artifacts.metadataPath().toString())
+                    .dataPath(artifacts.dataPath().toString())
+                    .build())
+                .build(),
+            CustomResourceOptions.builder()
+                .provider(provider)
+                .build()
+        );
+        }
 
     private BuiltImageArtifacts ensureLocalImageArtifacts() {
         final Path workspace = Path.of(config.workspaceDir()).toAbsolutePath().normalize();

@@ -88,7 +88,7 @@ public final class IncusResourceBootstrap {
         ensureNetwork(invokeOptions, incusProvider, config.lanBridgeParent());
         ensureNetwork(invokeOptions, incusProvider, config.vmnetNetworkName());
         final Output<String> ensuredProfileName = ensureProfile(invokeOptions, incusProvider);
-        final Output<String> ensuredImageFingerprint = imageProvider.ensureSeedImage(invokeOptions, incusProvider);
+        final Output<String> ensuredImageFingerprint = imageProvider.ensureSeedImageFingerprint(invokeOptions, incusProvider);
 
         final Instance instance = new Instance(
                 "seed-instance",

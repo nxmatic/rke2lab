@@ -9,6 +9,8 @@ schema-version = "1.10.0"
 [install]
 pulumi.pkg-path = "pulumi-bin"
 pulumictl.pkg-path = "pulumictl"
+distrobuilder.pkg-path = "distrobuilder"
+distrobuilder.systems = ["aarch64-linux"]
 
 
 ## Environment Variables ---------------------------------------------
@@ -18,7 +20,7 @@ pulumictl.pkg-path = "pulumictl"
 [vars]
   PULUMI_CONFIG_PASSPHRASE=''
   PULUMI_HOME='${XDG_STATE_HOME:-$HOME/.local/state}/pulumi'
-  PULUMI_BACKEND_URL='file:///private/var/lib/git/nxmatic/rke2lab-management-cluster/.pulumi-state'
+  PULUMI_BACKEND_URL='file://${FLOX_ENV_PROJECT}/.pulumi-state'
 
 # INTRO_MESSAGE = "It's gettin' Flox in here"
 
@@ -29,7 +31,7 @@ pulumictl.pkg-path = "pulumictl"
 [hook]
 on-activate = '''
   mkdir -p "${PULUMI_HOME}"
-  mkdir -p /private/var/lib/git/nxmatic/rke2lab-management-cluster/.pulumi-state
+  mkdir -p "${FLOX_ENV_PROJECT}/.pulumi-state"
 '''
 
 

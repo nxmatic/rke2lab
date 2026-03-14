@@ -35,6 +35,12 @@
         "version": "^2.8.1",
         "outputs": "all"
       },
+      "distrobuilder": {
+        "pkg-path": "distrobuilder",
+        "systems": [
+          "aarch64-linux"
+        ]
+      },
       "etcdctl": {
         "pkg-path": "etcdctl",
         "pkg-group": "k8s-etcd-tools",
@@ -205,12 +211,12 @@
       }
     },
     "vars": {
-      "PULUMI_BACKEND_URL": "file:///private/var/lib/git/nxmatic/rke2lab-management-cluster/.pulumi-state",
+      "PULUMI_BACKEND_URL": "file://${FLOX_ENV_PROJECT}/.pulumi-state",
       "PULUMI_CONFIG_PASSPHRASE": "",
       "PULUMI_HOME": "${XDG_STATE_HOME:-$HOME/.local/state}/pulumi"
     },
     "hook": {
-      "on-activate": "    if [ -d \"${FLOX_ENV_PROJECT}/.github\" ]; then\n      remote=$(git -C \"${FLOX_ENV_PROJECT}\" remote get-url origin 2>/dev/null || true)\n      if [ -n \"${remote}\" ]; then\n        remote_host=\"github.com\"\n        case \"${remote}\" in\n          git@*:* )\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'@' -f 2 | cut -d':' -f 1)\n            ;;\n          http://*|https://*)\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'/' -f 3)\n            ;;\n          ssh://*)\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'/' -f 3 | cut -d':' -f 1)\n            ;;\n        esac\n    \n        if [ -n \"${GH_TOKEN:-}\" ] && ! gh auth status --hostname \"${remote_host}\" >/dev/null 2>&1; then\n          echo \"Detected GH_TOKEN, logging in gh for ${remote_host}...\" >&2\n          printf '%s' \"${GH_TOKEN}\" | gh auth login --with-token --hostname \"${remote_host}\" >/dev/null 2>&1 || true\n        fi\n    \n        if gh auth status --hostname \"${remote_host}\" >/dev/null 2>&1; then\n          gh auth setup-git --hostname \"${remote_host}\" >/dev/null 2>&1 || true\n        fi\n      fi\n    fi\n  \n  mkdir -p \"${PULUMI_HOME}\"\n  mkdir -p /private/var/lib/git/nxmatic/rke2lab-management-cluster/.pulumi-state\n"
+      "on-activate": "    if [ -d \"${FLOX_ENV_PROJECT}/.github\" ]; then\n      remote=$(git -C \"${FLOX_ENV_PROJECT}\" remote get-url origin 2>/dev/null || true)\n      if [ -n \"${remote}\" ]; then\n        remote_host=\"github.com\"\n        case \"${remote}\" in\n          git@*:* )\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'@' -f 2 | cut -d':' -f 1)\n            ;;\n          http://*|https://*)\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'/' -f 3)\n            ;;\n          ssh://*)\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'/' -f 3 | cut -d':' -f 1)\n            ;;\n        esac\n    \n        if [ -n \"${GH_TOKEN:-}\" ] && ! gh auth status --hostname \"${remote_host}\" >/dev/null 2>&1; then\n          echo \"Detected GH_TOKEN, logging in gh for ${remote_host}...\" >&2\n          printf '%s' \"${GH_TOKEN}\" | gh auth login --with-token --hostname \"${remote_host}\" >/dev/null 2>&1 || true\n        fi\n    \n        if gh auth status --hostname \"${remote_host}\" >/dev/null 2>&1; then\n          gh auth setup-git --hostname \"${remote_host}\" >/dev/null 2>&1 || true\n        fi\n      fi\n    fi\n  \n  mkdir -p \"${PULUMI_HOME}\"\n  mkdir -p \"${FLOX_ENV_PROJECT}/.pulumi-state\"\n"
     },
     "profile": {
       "common": "    GITHUB_SIGNING_KEYFILE=\"$HOME\"/.ssh/keys.d/github-signing\n    if [[ -r \"$GITHUB_SIGNING_KEYFILE\" ]]; then\n      set -a\n      SOPS_AGE_KEY=$( ssh-to-age -private-key < \"$GITHUB_SIGNING_KEYFILE\" )\n      set +a\n    else\n      echo no signing key\n    fi\n  \n    if [ -d \"${FLOX_ENV_PROJECT}/.github\" ]; then\n      gh_login=\"\"\n      if [ -n \"${GH_TOKEN:-}\" ]; then\n        gh_login=$(gh api user --jq '.login' 2>/dev/null || true)\n      elif command -v pass >/dev/null 2>&1; then\n        gh_secret=$(pass show coding/github@work 2>/dev/null | head -n 1 || true)\n        if [ -n \"${gh_secret}\" ]; then\n          gh_login=$(env GH_TOKEN=\"${gh_secret}\" gh api user --jq '.login' 2>/dev/null || true)\n        fi\n      fi\n      if [ -n \"${gh_login}\" ]; then\n        remote=$(git -C \"${FLOX_ENV_PROJECT}\" remote get-url origin 2>/dev/null || true)\n        if [ -n \"${remote}\" ]; then\n          owner=$(printf '%s' \"${remote}\" | cut -d'/' -f 4)\n          repo_name=$(printf '%s' \"${remote}\" | cut -d'/' -f 5 | cut -d'.' -f 1)\n          export GITHUB_LOGIN=\"${gh_login}\"\n          export GITHUB_OWNER=\"${owner}\"\n          export GITHUB_REPOSITORY=\"${owner}/${repo_name}\"\n        fi\n      fi\n    fi\n  \n  if command -v javac >/dev/null 2>&1; then\n    export JAVA_HOME=\"$(dirname \"$(dirname \"$(command -v javac)\")\")\"\n  fi\n"
@@ -2269,6 +2275,35 @@
       "priority": 5
     },
     {
+      "attr_path": "distrobuilder",
+      "broken": false,
+      "derivation": "/nix/store/mavv2sjiw5lzkci37jlbp2xfajq465sa-distrobuilder-3.3.1.drv",
+      "description": "System container image builder for LXC and LXD",
+      "install_id": "distrobuilder",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=fe416aaedd397cacb33a610b33d60ff2b431b127",
+      "name": "distrobuilder-3.3.1",
+      "pname": "distrobuilder",
+      "rev": "fe416aaedd397cacb33a610b33d60ff2b431b127",
+      "rev_count": 962285,
+      "rev_date": "2026-03-12T02:28:01Z",
+      "scrape_date": "2026-03-14T05:15:14.589145Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.3.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/i8m3dkq3y550yx1aqzrpxk89vj59zdjb-distrobuilder-3.3.1"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "jdk25",
       "broken": false,
       "derivation": "/nix/store/4g2vqin5qnhllv6djn7krg27mw638s8y-zulu-ca-jdk-25.0.0.drv",
@@ -2611,6 +2646,12 @@
     "composer": {
       "schema-version": "1.10.0",
       "install": {
+        "distrobuilder": {
+          "pkg-path": "distrobuilder",
+          "systems": [
+            "aarch64-linux"
+          ]
+        },
         "pulumi": {
           "pkg-path": "pulumi-bin"
         },
@@ -2619,12 +2660,12 @@
         }
       },
       "vars": {
-        "PULUMI_BACKEND_URL": "file:///private/var/lib/git/nxmatic/rke2lab-management-cluster/.pulumi-state",
+        "PULUMI_BACKEND_URL": "file://${FLOX_ENV_PROJECT}/.pulumi-state",
         "PULUMI_CONFIG_PASSPHRASE": "",
         "PULUMI_HOME": "${XDG_STATE_HOME:-$HOME/.local/state}/pulumi"
       },
       "hook": {
-        "on-activate": "  mkdir -p \"${PULUMI_HOME}\"\n  mkdir -p /private/var/lib/git/nxmatic/rke2lab-management-cluster/.pulumi-state\n"
+        "on-activate": "  mkdir -p \"${PULUMI_HOME}\"\n  mkdir -p \"${FLOX_ENV_PROJECT}/.pulumi-state\"\n"
       },
       "profile": {
         "common": "  if command -v javac >/dev/null 2>&1; then\n    export JAVA_HOME=\"$(dirname \"$(dirname \"$(command -v javac)\")\")\"\n  fi\n"
