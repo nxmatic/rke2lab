@@ -1,0 +1,15 @@
+[Unit]
+Description=RKE2Lab Network Configuration Service
+After=systemd-networkd.service cloud-init.service
+Wants=systemd-networkd.service
+Before=rke2lab-install.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/scripts.d/rke2lab-network-config.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=rke2lab-network.target

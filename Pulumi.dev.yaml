@@ -5,7 +5,6 @@ config:
   "rke2lab-management-cluster:incus.project": rke2lab
   "rke2lab-management-cluster:incus.defaultRemote": bioskop-nixos
   "rke2lab-management-cluster:incus.remoteAddress": https://bioskop-nixos.local:8443
-  "rke2lab-management-cluster:workspace.dir": .
   "rke2lab-management-cluster:image.alias": control-node
   "rke2lab-management-cluster:image.distrobuilderConfig": classpath:/incus/incus-distrobuilder.yaml
   "rke2lab-management-cluster:instance.config": classpath:/incus/incus-instance-config.yaml

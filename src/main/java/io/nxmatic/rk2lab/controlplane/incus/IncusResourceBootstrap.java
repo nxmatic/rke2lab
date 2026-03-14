@@ -15,6 +15,8 @@ import com.pulumi.incus.outputs.GetImageResult;
 import com.pulumi.deployment.InvokeOptions;
 import com.pulumi.resources.CustomResourceOptions;
 
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -35,6 +37,11 @@ public final class IncusResourceBootstrap {
     public BootstrapResult apply() {
                 final ClasspathAsset distrobuilderAsset = ClasspathAsset.load(config.imageDistrobuilderConfig());
                 final ClasspathAsset instanceConfigAsset = ClasspathAsset.load(config.instanceConfig());
+
+                final String workspace = Path.of(config.workspaceDir()).toAbsolutePath().normalize().toString();
+                final String localRoot = workspace + "/.local.d";
+                final String clusterNodeRoot = workspace + "/rke2.d/" + config.clusterName() + "/" + config.nodeName();
+                final String gitRoot = Path.of(workspace).getParent().getParent().toString();
 
         final ProviderRemoteArgs.Builder remoteArgsBuilder = ProviderRemoteArgs.builder()
                 .name(config.incusDefaultRemote())
@@ -80,14 +87,7 @@ public final class IncusResourceBootstrap {
                                 "user.rke2lab.asset.instance.sha256", instanceConfigAsset.sha256()
                         ))
                         .running(true)
-                        .devices(InstanceDeviceArgs.builder()
-                                .name("vmnet0")
-                                .type("nic")
-                                .properties(Map.of(
-                                        "nictype", "bridged",
-                                        "parent", config.lanBridgeParent()
-                                ))
-                                .build())
+                        .devices(seedInstanceDevices(workspace, localRoot, clusterNodeRoot, gitRoot))
                         .build(),
                 CustomResourceOptions.builder()
                         .provider(incusProvider)
@@ -104,6 +104,83 @@ public final class IncusResourceBootstrap {
                 instanceConfigAsset.uri(),
                 instanceConfigAsset.sha256()
         );
+    }
+
+                private List<InstanceDeviceArgs> seedInstanceDevices(String workspace, String localRoot,
+                                                                                                                                                                                                                                  String clusterNodeRoot,
+                                                                                                                                                                                                                                  String gitRoot) {
+
+        final List<InstanceDeviceArgs> devices = new ArrayList<>();
+        devices.add(device("vmnet0", "nic", Map.of(
+                "nictype", "bridged",
+                "parent", config.lanBridgeParent()
+        )));
+        devices.add(device("kmsg.dev", "unix-char", Map.of(
+                "source", "/dev/kmsg",
+                "path", "/dev/kmsg"
+        )));
+        devices.add(device("zfs.dev", "unix-char", Map.of(
+                "source", "/dev/zfs",
+                "path", "/dev/zfs"
+        )));
+        devices.add(device("secrets.file", "disk", Map.of(
+                "source", workspace + "/.secrets",
+                "path", "/srv/host/.secrets"
+        )));
+        devices.add(device("rke2lab.env.file", "disk", Map.of(
+                "source", clusterNodeRoot + "/environment",
+                "path", "/srv/host/environment"
+        )));
+        devices.add(device("rke2lab.scripts.dir", "disk", Map.of(
+                "source", workspace + "/assets/incus/scripts",
+                "path", "/srv/host/scripts.d"
+        )));
+        devices.add(device("git.dir", "disk", Map.of(
+                "source", gitRoot,
+                "path", "/srv/host/git"
+        )));
+        devices.add(device("rke2lab.system.dir", "disk", Map.of(
+                "source", workspace + "/assets/incus/systemd",
+                "path", "/srv/host/system.d"
+        )));
+        devices.add(device("manifests.dir", "disk", Map.of(
+                "source", clusterNodeRoot + "/manifests.d",
+                "path", "/srv/host/manifests.d"
+        )));
+        devices.add(device("rke2.config.dir", "disk", Map.of(
+                "source", clusterNodeRoot + "/config.d",
+                "path", "/srv/host/config.d"
+        )));
+        devices.add(device("shared.dir", "disk", Map.of(
+                "source", localRoot + "/share",
+                "path", "/srv/host/share.d"
+        )));
+        devices.add(device("kubeconfig.dir", "disk", Map.of(
+                "source", localRoot + "/var/kube",
+                "path", "/srv/host/kubeconfig.d"
+        )));
+
+        devices.add(device("user.metadata", "disk", Map.of(
+                "source", clusterNodeRoot + "/meta-data",
+                "path", "/var/lib/cloud/seed/nocloud/meta-data"
+        )));
+        devices.add(device("user.user-data", "disk", Map.of(
+                "source", clusterNodeRoot + "/user-data",
+                "path", "/var/lib/cloud/seed/nocloud/user-data"
+        )));
+        devices.add(device("user.network-config", "disk", Map.of(
+                "source", clusterNodeRoot + "/network-config",
+                "path", "/var/lib/cloud/seed/nocloud/network-config"
+        )));
+        return List.copyOf(devices);
+    }
+
+    private static InstanceDeviceArgs device(String name, String type, Map<String, String> properties) {
+        return InstanceDeviceArgs.builder()
+                .name(name)
+                .type(type)
+                .properties(properties)
+                .build();
     }
 
         private void requireProject(InvokeOptions invokeOptions) {

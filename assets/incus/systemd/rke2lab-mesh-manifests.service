@@ -1,0 +1,23 @@
+[Unit]
+Description=Install RKE2Lab mesh manifests from host share (post-server)
+RequiresMountsFor=/srv/host/system.d /srv/host
+After=local-fs.target
+After=rke2lab-networking-manifests.service
+Requires=rke2lab-networking-manifests.service
+After=rke2lab-replication-manifests.service
+Requires=rke2lab-replication-manifests.service
+After=rke2lab-mesh-secrets.service
+Requires=rke2lab-mesh-secrets.service
+ConditionPathExists=/srv/host/scripts.d/rke2lab-manifests-install.sh
+ConditionPathExists=/srv/host/manifests.d/mesh
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh mesh
+ExecStartPost=/srv/host/scripts.d/rke2lab-layer-ready.sh mesh
+RemainAfterExit=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=rke2lab.target

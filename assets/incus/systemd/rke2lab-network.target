@@ -1,0 +1,7 @@
+[Unit]
+Description=RKE2 Lab Network Configuration Target
+Wants=rke2lab-network-config.service rke2lab-network-wait.service
+After=rke2lab-network-config.service rke2lab-network-wait.service
+
+[Install]
+WantedBy=multi-user.target

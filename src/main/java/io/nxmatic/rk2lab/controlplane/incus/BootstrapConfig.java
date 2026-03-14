@@ -14,8 +14,10 @@ public record BootstrapConfig(String workspaceDir, String clusterName, String no
         String loadBalancerMode, String lanBridgeParent, String vmnetNetworkName, String apiEndpoint,
         String kubeconfigRef) {
 
+    private static final String WORKSPACE_REPO_PATH = "/private/var/lib/git/nxmatic/rke2lab-management-cluster";
+
     public static final class Builder {
-        private String workspaceDir = "/private/var/lib/git/nxmatic/rke2lab-management-cluster";
+        private String workspaceDir = defaultWorkspaceDir();
 
         private String clusterName = "bioskop";
 
@@ -209,6 +211,15 @@ public record BootstrapConfig(String workspaceDir, String clusterName, String no
             }
 
             return "";
+        }
+
+        private static String defaultWorkspaceDir() {
+            final String limaHostname = System.getenv("LIMA_HOSTNAME");
+            if (limaHostname != null && !limaHostname.isBlank()) {
+                return "/nfs/" + limaHostname + ".local" + WORKSPACE_REPO_PATH;
+            }
+
+            return "/nfs/bioskop.local" + WORKSPACE_REPO_PATH;
         }
     }
 

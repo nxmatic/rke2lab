@@ -1,0 +1,16 @@
+[Unit]
+Description=RKE2Lab Network Wait Service
+After=systemd-networkd.service
+Before=rke2lab.target
+Wants=systemd-networkd.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/scripts.d/rke2lab-network-wait.sh
+RemainAfterExit=true
+StandardOutput=journal+console
+StandardError=journal+console
+SuccessExitStatus=0 1
+
+[Install]
+WantedBy=rke2lab-network.target

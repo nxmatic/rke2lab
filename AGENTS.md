@@ -11,4 +11,4 @@
 - Run verification and operational commands in a terminal that is already inside an SSH session on `bioskop-nixos.local`.
 - Ensure the Flox environment for this repository is activated before running project commands.
 - Preferred working directory is:
-  - `/net/bioskop.local/private/var/lib/git/nxmatic/rke2lab-management-cluster`
+  - `/var/lib/git/nxmatic/rke2lab-management-cluster`

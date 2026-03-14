@@ -1,0 +1,21 @@
+[Unit]
+Description=Run RKE2Lab Installation Script
+After=network-online.target systemd-networkd.service local-fs.target rke2lab-network.target rke2lab-tools.target
+Wants=network-online.target systemd-networkd.service rke2lab-network.target
+Requires=rke2lab-network.target rke2lab-tools.target
+RequiresMountsFor=/srv/host/scripts.d
+ConditionPathExists=/srv/host/scripts.d/rke2lab-install.sh
+ConditionPathExists=!/etc/systemd/system/rke2-server.service
+ConditionPathExists=!/etc/systemd/system/rke2-agent.service
+
+[Service]
+Type=oneshot
+ExecStartPre=/srv/host/scripts.d/rke2lab-install-pre.sh
+ExecStart=/srv/host/scripts.d/rke2lab-install.sh
+ExecStartPost=/srv/host/scripts.d/rke2lab-install-post.sh
+RemainAfterExit=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=rke2lab.target

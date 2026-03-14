@@ -1,0 +1,14 @@
+[Unit]
+Description=Install Flox Package Manager for RKE2 Lab
+After=rke2lab-nix-install.service
+Requires=rke2lab-nix-install.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/scripts.d/rke2lab-flox-install.sh
+RemainAfterExit=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=rke2lab-tools.target
