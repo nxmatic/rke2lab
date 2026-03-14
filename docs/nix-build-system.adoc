@@ -277,7 +277,7 @@ For multiple clusters (bioskop, alcide, etc.):
 packages:
   - name: headplane
     attr: "packages.{arch}.headplane"
-    architectures: [aarch64-linux, x86_64-linux]
+    architectures: [aarch64-linux]
 ----
 
 . *Conditional builds based on node capabilities*

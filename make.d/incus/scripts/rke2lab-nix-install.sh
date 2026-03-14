@@ -31,7 +31,7 @@ extra-trusted-substituters = https://cache.flox.dev
 extra-trusted-public-keys = flox-cache-public-1:7F4OyH7ZCnFhcze3fJdfyXYLQw/aV7GEed86nQ7IsOs=
 trusted-substituters = https://cache.nixos.org
 trusted-users = root nxmatic root nxmatic root @admin @wheel
-extra-platforms = x86_64-linux x86_64-linux
+extra-platforms = aarch64-darwin
 extra-sandbox-paths = /run/binfmt /nix/store/7k1f2qca1mxyrzl6wr74dilrhwbx6qvs-qemu-x86_64-binfmt-P /dev/kvm
 keep-outputs = false
 keep-derivations = false

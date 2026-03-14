@@ -1,46 +1,54 @@
 {
   "lockfile-version": 1,
   "manifest": {
-    "version": 1,
+    "schema-version": "1.10.0",
     "install": {
       "actionlint": {
-        "pkg-path": "actionlint"
+        "pkg-path": "actionlint",
+        "outputs": "all"
       },
       "age": {
         "pkg-path": "age",
-        "pkg-group": "keyhole"
+        "pkg-group": "keyhole",
+        "outputs": "all"
       },
       "autossh": {
-        "pkg-path": "autossh"
+        "pkg-path": "autossh",
+        "outputs": "all"
       },
       "ceph-client": {
         "pkg-path": "ceph-client",
         "pkg-group": "k8s-kubectl-tools",
         "systems": [
           "aarch64-linux"
-        ]
+        ],
+        "outputs": "all"
       },
       "cilium-cli": {
         "pkg-path": "cilium-cli",
-        "pkg-group": "k8s-kubectl-tools"
+        "pkg-group": "k8s-kubectl-tools",
+        "outputs": "all"
       },
       "dasel": {
         "pkg-path": "dasel",
         "pkg-group": "manifest-tools-yaml-tools",
-        "version": "^2.8.1"
+        "version": "^2.8.1",
+        "outputs": "all"
       },
       "dhcp": {
         "pkg-path": "dhcp",
         "pkg-group": "net-tools",
         "systems": [
           "aarch64-linux"
-        ]
+        ],
+        "outputs": "all"
       },
       "direnv": {
         "pkg-path": "direnv"
       },
       "docker-credential-helpers": {
-        "pkg-path": "docker-credential-helpers"
+        "pkg-path": "docker-credential-helpers",
+        "outputs": "all"
       },
       "envsubst": {
         "pkg-path": "envsubst"
@@ -48,124 +56,152 @@
       "etcdctl": {
         "pkg-path": "etcdctl",
         "pkg-group": "k8s-etcd-tools",
-        "version": "^3.3.27"
+        "version": "^3.3.27",
+        "outputs": "all"
       },
       "ethtool": {
         "pkg-path": "ethtool",
         "pkg-group": "net-tools",
         "systems": [
           "aarch64-linux"
-        ]
+        ],
+        "outputs": "all"
       },
       "file": {
-        "pkg-path": "file"
+        "pkg-path": "file",
+        "outputs": "all"
       },
       "fluxcd": {
         "pkg-path": "fluxcd",
-        "pkg-group": "k8s-kubectl-tools"
+        "pkg-group": "k8s-kubectl-tools",
+        "outputs": "all"
       },
       "gdu": {
         "pkg-path": "gdu"
       },
       "gh": {
         "pkg-path": "gh",
-        "pkg-group": "git"
+        "pkg-group": "git",
+        "outputs": "all"
       },
       "git": {
         "pkg-path": "git",
-        "pkg-group": "git"
+        "pkg-group": "git",
+        "outputs": "all"
       },
       "git-town": {
         "pkg-path": "git-town",
-        "pkg-group": "git"
+        "pkg-group": "git",
+        "outputs": "all"
       },
       "gitflow": {
         "pkg-path": "gitflow",
-        "pkg-group": "git"
+        "pkg-group": "git",
+        "outputs": "all"
       },
       "gnumake": {
         "pkg-path": "gnumake",
-        "pkg-group": "gnumake"
+        "pkg-group": "gnumake",
+        "outputs": "all"
       },
       "gnupg": {
         "pkg-path": "gnupg",
-        "pkg-group": "keyhole"
+        "pkg-group": "keyhole",
+        "outputs": "all"
       },
       "helmfile": {
         "pkg-path": "helmfile",
-        "pkg-group": "k8s-kubectl-tools"
+        "pkg-group": "k8s-kubectl-tools",
+        "outputs": "all"
       },
       "ipcalc": {
         "pkg-path": "ipcalc",
         "pkg-group": "net-tools",
-        "version": "^1.0.3"
+        "version": "^1.0.3",
+        "outputs": "all"
       },
       "iperf3": {
         "pkg-path": "iperf3",
-        "pkg-group": "net-tools"
+        "pkg-group": "net-tools",
+        "outputs": "all"
       },
       "iptstate": {
         "pkg-path": "iptstate",
         "pkg-group": "net-tools",
         "systems": [
           "aarch64-linux"
-        ]
+        ],
+        "outputs": "all"
       },
       "keychain": {
         "pkg-path": "keychain",
-        "pkg-group": "keyhole"
+        "pkg-group": "keyhole",
+        "outputs": "all"
       },
       "kpt": {
         "pkg-path": "kpt",
-        "pkg-group": "k8s-kpt-tools"
+        "pkg-group": "k8s-kpt-tools",
+        "outputs": "all"
       },
       "krew": {
         "pkg-path": "krew",
-        "pkg-group": "k8s-kubectl-tools"
+        "pkg-group": "k8s-kubectl-tools",
+        "outputs": "all"
       },
       "kubecectl-doctor": {
         "pkg-path": "kubectl-doctor",
-        "pkg-group": "k8s-kubectl-plugins"
+        "pkg-group": "k8s-kubectl-plugins",
+        "outputs": "all"
       },
       "kubectl": {
         "pkg-path": "kubectl",
-        "pkg-group": "k8s-kubectl-tools"
+        "pkg-group": "k8s-kubectl-tools",
+        "outputs": "all"
       },
       "kubectl-ai": {
         "pkg-path": "kubectl-ai",
-        "pkg-group": "k8s-kubectl-plugins"
+        "pkg-group": "k8s-kubectl-plugins",
+        "outputs": "all"
       },
       "kubectl-explore": {
         "pkg-path": "kubectl-explore",
-        "pkg-group": "k8s-kubectl-plugins"
+        "pkg-group": "k8s-kubectl-plugins",
+        "outputs": "all"
       },
       "kubectl-graph": {
         "pkg-path": "kubectl-graph",
-        "pkg-group": "k8s-kubectl-plugins"
+        "pkg-group": "k8s-kubectl-plugins",
+        "outputs": "all"
       },
       "kubectl-ktop": {
         "pkg-path": "kubectl-ktop",
-        "pkg-group": "k8s-kubectl-plugins"
+        "pkg-group": "k8s-kubectl-plugins",
+        "outputs": "all"
       },
       "kubectl-neat": {
         "pkg-path": "kubectl-neat",
-        "pkg-group": "k8s-kubectl-plugins"
+        "pkg-group": "k8s-kubectl-plugins",
+        "outputs": "all"
       },
       "kubectl-rook-ceph": {
         "pkg-path": "kubectl-rook-ceph",
-        "pkg-group": "k8s-kubectl-plugins"
+        "pkg-group": "k8s-kubectl-plugins",
+        "outputs": "all"
       },
       "kubectl-tree": {
         "pkg-path": "kubectl-tree",
-        "pkg-group": "k8s-kubectl-plugins"
+        "pkg-group": "k8s-kubectl-plugins",
+        "outputs": "all"
       },
       "kubectl-view-secret": {
         "pkg-path": "kubectl-view-secret",
-        "pkg-group": "k8s-kubectl-plugins"
+        "pkg-group": "k8s-kubectl-plugins",
+        "outputs": "all"
       },
       "kubernetes-helm": {
         "pkg-path": "kubernetes-helm",
-        "pkg-group": "k8s-kubectl-tools"
+        "pkg-group": "k8s-kubectl-tools",
+        "outputs": "all"
       },
       "lsof": {
         "pkg-path": "lsof"
@@ -178,63 +214,79 @@
         "pkg-group": "net-tools",
         "systems": [
           "aarch64-linux"
-        ]
+        ],
+        "outputs": "all"
       },
       "nmap": {
         "pkg-path": "nmap",
-        "pkg-group": "net-tools"
+        "pkg-group": "net-tools",
+        "outputs": "all"
       },
       "openssh": {
         "pkg-path": "openssh",
-        "pkg-group": "keyhole"
+        "pkg-group": "keyhole",
+        "outputs": "all"
       },
       "openssl": {
         "pkg-path": "openssl",
-        "pkg-group": "keyhole"
+        "pkg-group": "keyhole",
+        "outputs": "all"
       },
       "pass": {
         "pkg-path": "pass",
-        "pkg-group": "keyhole"
+        "pkg-group": "keyhole",
+        "outputs": "all"
       },
       "podman-wrapper": {
-        "flake": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper"
+        "flake": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper",
+        "outputs": "all"
+      },
+      "pstree": {
+        "pkg-path": "pstree"
       },
       "remake": {
         "pkg-path": "remake",
-        "pkg-group": "gnumake"
+        "pkg-group": "gnumake",
+        "outputs": "all"
       },
       "sops": {
         "pkg-path": "sops",
-        "pkg-group": "keyhole"
+        "pkg-group": "keyhole",
+        "outputs": "all"
       },
       "speedtest": {
         "pkg-path": "speedtest-go",
-        "pkg-group": "net-tools"
+        "pkg-group": "net-tools",
+        "outputs": "all"
       },
       "squashfsTools": {
         "pkg-path": "squashfsTools"
       },
       "ssh-to-age": {
         "pkg-path": "ssh-to-age",
-        "pkg-group": "keyhole"
+        "pkg-group": "keyhole",
+        "outputs": "all"
       },
       "tree": {
         "pkg-path": "tree"
       },
       "tshark": {
         "pkg-path": "tshark",
-        "pkg-group": "net-tools"
+        "pkg-group": "net-tools",
+        "outputs": "all"
       },
       "tubekit": {
         "pkg-path": "tubekit",
-        "pkg-group": "k8s-kubectl-tools"
+        "pkg-group": "k8s-kubectl-tools",
+        "outputs": "all"
       },
       "unzip": {
         "pkg-path": "unzip"
       },
       "yq-go": {
         "pkg-path": "yq-go",
-        "pkg-group": "manifest-tools-yaml-tools"
+        "pkg-group": "manifest-tools-yaml-tools",
+        "outputs": "all"
       }
     },
     "hook": {
@@ -2742,7 +2794,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T04:38:28.038680Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "1.7.10",
@@ -2771,7 +2824,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T05:10:35.116398Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "1.7.10",
@@ -2800,7 +2854,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T04:38:28.160430Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "1.4g",
@@ -2829,7 +2884,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T05:10:35.360868Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "1.4g",
@@ -2858,7 +2914,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T04:38:28.764766Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "2.37.1",
@@ -2887,7 +2944,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T05:10:36.122845Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "2.37.1",
@@ -2916,7 +2974,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T04:38:28.795124Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "0.9.5",
@@ -2945,7 +3004,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T05:10:36.171673Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "0.9.5",
@@ -2974,7 +3034,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T04:38:28.971298Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "1.4.3",
@@ -3003,7 +3064,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T05:10:36.434063Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "1.4.3",
@@ -3032,7 +3094,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T04:38:29.065882Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "5.45",
@@ -3064,12 +3127,15 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T05:10:36.601135Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "5.45",
       "outputs_to_install": [
         "man",
+        "out",
+        "out",
         "out",
         "out"
       ],
@@ -3097,7 +3163,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T04:38:29.261320Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "5.32.0",
@@ -3126,7 +3193,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T05:10:36.914731Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "5.32.0",
@@ -3155,7 +3223,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T04:38:47.223447Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "4.99.5",
@@ -3184,7 +3253,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T05:11:05.544309Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "4.99.5",
@@ -3213,7 +3283,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T04:38:50.592276Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "2.9.2",
@@ -3242,7 +3313,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T05:11:10.820680Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "2.9.2",
@@ -3251,6 +3323,66 @@
       ],
       "outputs": {
         "out": "/nix/store/pd20xhrm65l0dvnxjlj46wkhv328d85j-ncdu-2.9.2"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "pstree",
+      "broken": false,
+      "derivation": "/nix/store/fchmwhlml7y49ywv25lv1j904p9v6i8l-pstree-2.39.drv",
+      "description": "Show the set of running processes as a tree",
+      "install_id": "pstree",
+      "license": "GPL-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d6c71932130818840fc8fe9509cf50be8c64634f",
+      "name": "pstree-2.39",
+      "pname": "pstree",
+      "rev": "d6c71932130818840fc8fe9509cf50be8c64634f",
+      "rev_count": 942779,
+      "rev_date": "2026-02-08T14:52:16Z",
+      "scrape_date": "2026-02-09T04:39:08.274453Z",
+      "stabilities": [
+        "unstable",
+        "staging"
+      ],
+      "unfree": false,
+      "version": "2.39",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/jrscwrlr0il87klvf1kzb7m2ls65n4m3-pstree-2.39"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "pstree",
+      "broken": false,
+      "derivation": "/nix/store/ymqnkfsm871jzmv263z85dz1zbd5zszc-pstree-2.39.drv",
+      "description": "Show the set of running processes as a tree",
+      "install_id": "pstree",
+      "license": "GPL-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=d6c71932130818840fc8fe9509cf50be8c64634f",
+      "name": "pstree-2.39",
+      "pname": "pstree",
+      "rev": "d6c71932130818840fc8fe9509cf50be8c64634f",
+      "rev_count": 942779,
+      "rev_date": "2026-02-08T14:52:16Z",
+      "scrape_date": "2026-02-09T05:11:34.967542Z",
+      "stabilities": [
+        "unstable",
+        "staging"
+      ],
+      "unfree": false,
+      "version": "2.39",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/njbh0y0fxbllih9wkx9fxiw3qlpwxgd3-pstree-2.39"
       },
       "system": "aarch64-linux",
       "group": "toplevel",
@@ -3271,7 +3403,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T04:40:17.608509Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "4.7.4",
@@ -3300,7 +3433,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T05:13:00.590299Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "4.7.4",
@@ -3329,7 +3463,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T04:40:40.319745Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "2.2.1",
@@ -3358,7 +3493,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T05:13:33.099509Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "2.2.1",
@@ -3387,7 +3523,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T04:40:56.727226Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "6.0",
@@ -3416,7 +3553,8 @@
       "rev_date": "2026-02-08T14:52:16Z",
       "scrape_date": "2026-02-09T05:13:53.067392Z",
       "stabilities": [
-        "unstable"
+        "unstable",
+        "staging"
       ],
       "unfree": false,
       "version": "6.0",
@@ -3432,12 +3570,12 @@
     },
     {
       "install_id": "podman-wrapper",
-      "locked-url": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper&ref=refs/heads/main&rev=57d53644fd90b348cf14fe32f058bdb0168ddc9f",
+      "locked-url": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper&ref=refs/heads/main&rev=d2a50d2e83164fb1a41a940f9159e092b8d4f90e",
       "flake-description": "podman-wrapper flake for k8s env",
       "locked-flake-attr-path": "packages.aarch64-darwin.default",
-      "derivation": "/nix/store/ii3hbzss597g7zsd3hblbvd07al1vi6h-docker.drv",
+      "derivation": "/nix/store/cgflxvasgq3zb5wy5wgizncmvn2fc0l1-docker.drv",
       "outputs": {
-        "out": "/nix/store/011zs35wqnf97lbs42w8qxv9z4pvqjps-docker"
+        "out": "/nix/store/qkzsk4j2cfdgzhqdw23cmc42yb27yp09-docker"
       },
       "output-names": [
         "out"
@@ -3455,12 +3593,12 @@
     },
     {
       "install_id": "podman-wrapper",
-      "locked-url": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper&ref=refs/heads/main&rev=57d53644fd90b348cf14fe32f058bdb0168ddc9f",
+      "locked-url": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper&ref=refs/heads/main&rev=d2a50d2e83164fb1a41a940f9159e092b8d4f90e",
       "flake-description": "podman-wrapper flake for k8s env",
       "locked-flake-attr-path": "packages.aarch64-linux.default",
-      "derivation": "/nix/store/62nlkwgnp4yqmvg7y7rmkdbv5hm2jcvk-docker.drv",
+      "derivation": "/nix/store/ig2989c54j2iisk8ia5z4wly2spdn8wa-docker.drv",
       "outputs": {
-        "out": "/nix/store/7g0c0agdkim46fg9djxr81rg4xc2y6b0-docker"
+        "out": "/nix/store/v1dlsm5cww3f4j78s4792g9cs38b6216-docker"
       },
       "output-names": [
         "out"
@@ -3479,7 +3617,7 @@
   ],
   "compose": {
     "composer": {
-      "version": 1,
+      "schema-version": "1.10.0",
       "install": {
         "direnv": {
           "pkg-path": "direnv"
@@ -3488,7 +3626,8 @@
           "pkg-path": "envsubst"
         },
         "file": {
-          "pkg-path": "file"
+          "pkg-path": "file",
+          "outputs": "all"
         },
         "gdu": {
           "pkg-path": "gdu"
@@ -3498,6 +3637,9 @@
         },
         "ncdu": {
           "pkg-path": "ncdu"
+        },
+        "pstree": {
+          "pkg-path": "pstree"
         },
         "squashfsTools": {
           "pkg-path": "squashfsTools"

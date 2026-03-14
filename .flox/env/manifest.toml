@@ -1,12 +1,4 @@
-## Flox Environment Manifest -----------------------------------------
-##
-##   _Everything_ you need to know about the _manifest_ is here:
-##
-##               https://flox.dev/docs/concepts/manifest
-##
-## -------------------------------------------------------------------
-# Flox manifest version managed by Flox CLI
-version = 1
+schema-version = "1.10.0"
 
 
 [include]
@@ -38,10 +30,12 @@ gdu.pkg-path = "gdu"
 ncdu.pkg-path = "ncdu"
 direnv.pkg-path = "direnv"
 file.pkg-path = "file"
+file.outputs = "all"
 envsubst.pkg-path = "envsubst"
 unzip.pkg-path = "unzip"
 squashfsTools.pkg-path = "squashfsTools"
 tree.pkg-path = "tree"
+pstree.pkg-path = "pstree"
 # gum.pkg-path = "gum"
 # gum.version = "^0.14.5"
 
