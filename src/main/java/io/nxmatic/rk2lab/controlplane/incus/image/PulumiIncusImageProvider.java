@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -49,17 +50,17 @@ public final class PulumiIncusImageProvider {
     /**
      * Ensure the seed image exists and return its fingerprint output.
      */
-        public Output<String> ensureSeedImageFingerprint(InvokeOptions invokeOptions, Provider provider) {
-        final Output<String> existingFingerprint = resolveExistingSeedImageFingerprint(invokeOptions);
-        if (existingFingerprint != null) {
-            return existingFingerprint;
+    public Output<String> ensureSeedImageFingerprint(InvokeOptions invokeOptions, Provider provider) {
+        final Optional<String> existingFingerprint = resolveExistingSeedImageFingerprint(invokeOptions);
+        if (existingFingerprint.isPresent()) {
+            return Output.of(existingFingerprint.get());
         }
 
         final BuiltImageArtifacts artifacts = ensureLocalImageArtifacts();
         return createSeedImageFromArtifacts(provider, artifacts).fingerprint();
-        }
+    }
 
-        private Output<String> resolveExistingSeedImageFingerprint(InvokeOptions invokeOptions) {
+    private Optional<String> resolveExistingSeedImageFingerprint(InvokeOptions invokeOptions) {
         try {
             final GetImageResult existingImage = IncusFunctions.getImagePlain(
                     GetImagePlainArgs.builder()
@@ -68,13 +69,13 @@ public final class PulumiIncusImageProvider {
                             .build(),
                     invokeOptions
             ).join();
-            return Output.of(existingImage.fingerprint());
+            return Optional.ofNullable(existingImage.fingerprint());
         } catch (Exception ignored) {
-            return null;
+            return Optional.empty();
         }
     }
 
-        private Image createSeedImageFromArtifacts(Provider provider, BuiltImageArtifacts artifacts) {
+    private Image createSeedImageFromArtifacts(Provider provider, BuiltImageArtifacts artifacts) {
         return new Image(
             "seed-image",
             ImageArgs.builder()
@@ -91,7 +92,7 @@ public final class PulumiIncusImageProvider {
                 .provider(provider)
                 .build()
         );
-        }
+    }
 
     private BuiltImageArtifacts ensureLocalImageArtifacts() {
         final Path workspace = Path.of(config.workspaceDir()).toAbsolutePath().normalize();
