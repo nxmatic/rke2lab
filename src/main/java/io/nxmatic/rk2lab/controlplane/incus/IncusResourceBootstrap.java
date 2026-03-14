@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.pulumi.core.Output;
-import com.pulumi.deployment.InvokeOptions;
 import com.pulumi.incus.IncusFunctions;
 import com.pulumi.incus.Instance;
 import com.pulumi.incus.InstanceArgs;
@@ -15,14 +14,11 @@ import com.pulumi.incus.Profile;
 import com.pulumi.incus.ProfileArgs;
 import com.pulumi.incus.Project;
 import com.pulumi.incus.ProjectArgs;
-import com.pulumi.incus.Provider;
-import com.pulumi.incus.ProviderArgs;
 import com.pulumi.incus.inputs.GetNetworkPlainArgs;
 import com.pulumi.incus.inputs.GetProfilePlainArgs;
 import com.pulumi.incus.inputs.GetProjectPlainArgs;
 import com.pulumi.incus.inputs.InstanceDeviceArgs;
 import com.pulumi.incus.inputs.ProfileDeviceArgs;
-import com.pulumi.incus.inputs.ProviderRemoteArgs;
 import com.pulumi.resources.CustomResourceOptions;
 import io.nxmatic.rk2lab.controlplane.incus.image.PulumiIncusImageProvider;
 
@@ -59,7 +55,7 @@ public final class IncusResourceBootstrap {
         ensureHostMountSources(workspace, localRoot, clusterNodeRoot);
         ensureLaunchSecretsToken(workspace + "/.secrets");
 
-        final ProviderContext providerContext = createProviderContext();
+        final IncusProviderContext providerContext = IncusProviderContext.forBootstrap("seed-incus-provider", config);
 
         final Output<String> ensuredProjectName = ensureProject(providerContext);
         ensureNetwork(providerContext, config.lanBridgeParent());
@@ -98,36 +94,7 @@ public final class IncusResourceBootstrap {
         );
     }
 
-    private ProviderContext createProviderContext() {
-        final ProviderRemoteArgs.Builder remoteArgsBuilder = ProviderRemoteArgs.builder()
-                .name(config.incusDefaultRemote())
-                .address(config.incusRemoteAddress())
-                .protocol("incus");
-
-        final ProviderArgs.Builder providerArgsBuilder = ProviderArgs.builder()
-                .defaultRemote(config.incusDefaultRemote())
-                .acceptRemoteCertificate(false)
-                .generateClientCertificates(false)
-                .remotes(remoteArgsBuilder.build());
-        if (config.incusConfigDir() != null && !config.incusConfigDir().isBlank()) {
-            providerArgsBuilder.configDir(config.incusConfigDir());
-        }
-
-        final Provider provider = new Provider(
-                "seed-incus-provider",
-                providerArgsBuilder.build()
-        );
-
-        final InvokeOptions invokeOptions = new InvokeOptions(
-                null,
-                provider,
-                null
-        );
-
-        return new ProviderContext(provider, invokeOptions);
-    }
-
-    private Output<String> ensureProject(ProviderContext context) {
+    private Output<String> ensureProject(IncusProviderContext context) {
         try {
             IncusFunctions.getProjectPlain(
                     GetProjectPlainArgs.builder()
@@ -150,7 +117,7 @@ public final class IncusResourceBootstrap {
         }
     }
 
-    private Output<String> ensureProfile(ProviderContext context) {
+        private Output<String> ensureProfile(IncusProviderContext context) {
         try {
             IncusFunctions.getProfilePlain(
                     GetProfilePlainArgs.builder()
@@ -402,7 +369,7 @@ public final class IncusResourceBootstrap {
                 .build();
     }
 
-    private void ensureNetwork(ProviderContext context, String networkName) {
+        private void ensureNetwork(IncusProviderContext context, String networkName) {
         try {
             IncusFunctions.getNetworkPlain(
                     GetNetworkPlainArgs.builder()
@@ -424,9 +391,6 @@ public final class IncusResourceBootstrap {
                             .build()
             );
         }
-    }
-
-    private record ProviderContext(Provider provider, InvokeOptions invokeOptions) {
     }
 
     public record BootstrapResult(String seedNodeId, Object imageFingerprint, Object instanceStatus) {
