@@ -1,4 +1,4 @@
-name: rke2lab-management-cluster
+name: rke2lab
 runtime: java
 description: Pulumi-based provisioning control plane for RK2Lab management cluster bootstrap
 packages:

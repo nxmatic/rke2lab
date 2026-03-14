@@ -15,14 +15,19 @@ sleep 1
 ps -ef
 
 : "=== Applying netplan configuration ==="
-ip link set dev lan0 down || true
-ip link set dev vmnet0 down || true
+if systemd-detect-virt --container >/dev/null 2>&1 || [[ -f /run/systemd/container ]]; then
+  : "[i] Container environment detected; applying netplan via generate + networkd reload"
+  netplan generate
+  networkctl reload
+  networkctl reconfigure lan0 vmnet0
+else
+  netplan apply
+fi
 
-netplan apply
-
-: "=== Restarting systemd-networkd to ensure UseRoutes settings take effect ==="
-systemctl restart systemd-networkd
-sleep 3
+: "=== Reloading systemd-networkd non-disruptively ==="
+networkctl reload
+networkctl reconfigure lan0 vmnet0
+sleep 2
 
 : "=== Verifying dhcpcd is not managing vmnet0 ==="
 if ps aux | grep -v grep | grep 'dhcpcd.*vmnet0'; then

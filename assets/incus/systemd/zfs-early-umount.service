@@ -6,7 +6,7 @@ DefaultDependencies=no
 
 [Service]
 Type=oneshot
-ExecStart=/usr/sbin/zfs umount -a
+ExecStart=-/usr/sbin/zfs umount -a
 
 [Install]
 WantedBy=basic.target

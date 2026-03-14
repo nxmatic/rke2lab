@@ -1,14 +1,16 @@
 encryptionsalt: v1:Km/x/GsnihM=:v1:qR0B89B+HsPKYeqn:h8q+cfrtHMFA+mQEVfxqN+X++nRsCQ==
 config:
-  "rke2lab-management-cluster:cluster.name": bioskop
-  "rke2lab-management-cluster:node.name": master
-  "rke2lab-management-cluster:incus.project": rke2lab
-  "rke2lab-management-cluster:incus.defaultRemote": bioskop-nixos
-  "rke2lab-management-cluster:incus.remoteAddress": https://bioskop-nixos.local:8443
-  "rke2lab-management-cluster:image.alias": control-node
-  "rke2lab-management-cluster:image.distrobuilderConfig": classpath:/incus/incus-distrobuilder.yaml
-  "rke2lab-management-cluster:instance.config": classpath:/incus/incus-instance-config.yaml
-  "rke2lab-management-cluster:network.profile": rke2lab
-  "rke2lab-management-cluster:network.lanBridgeParent": lan-br
-  "rke2lab-management-cluster:network.vmnetName": lan-br
-  "rke2lab-management-cluster:bootstrap.skipRecipes": "false"
+  "rke2lab:cluster.name": bioskop
+  "rke2lab:node.name": master
+  "rke2lab:incus.project": rke2lab
+  "rke2lab:incus.defaultRemote": bioskop-nixos
+  "rke2lab:incus.remoteAddress": https://bioskop-nixos.local:8443
+  "rke2lab:image.alias": control-node
+  "rke2lab:image.builderBinary": distrobuilder
+  "rke2lab:image.builderHost": bioskop-nixos.local
+  "rke2lab:image.distrobuilderConfig": classpath:/incus/incus-distrobuilder.yaml
+  "rke2lab:image.sharedFolder": .local.d/var/lib/distrobuilder
+  "rke2lab:network.lanBridgeParent": lan-br
+  "rke2lab:network.vmnetNetworkName": vmnet-br
+  "rke2lab:api.endpoint": https://10.66.106.10:6443
+  "rke2lab:bootstrap.skipRecipes": "false"

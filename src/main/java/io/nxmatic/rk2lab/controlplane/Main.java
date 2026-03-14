@@ -4,7 +4,6 @@ import com.pulumi.Pulumi;
 import com.pulumi.Config;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.incus.IncusResourceBootstrap;
-import io.nxmatic.rk2lab.controlplane.incus.SeedNetworkBindings;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -25,7 +24,7 @@ public final class Main {
         }
 
         Pulumi.run(context -> {
-            final Config config = context.config("rke2lab-management-cluster");
+            final Config config = context.config("rke2lab");
             final BootstrapConfig bootstrapConfig = new BootstrapConfig.Builder()
                     .applyConfig(config)
                     .build();
@@ -40,21 +39,12 @@ public final class Main {
                     + "Set cluster.name=bioskop.");
         }
 
-        final SeedNetworkBindings seedNetworkBindings = SeedNetworkBindings.builder()
-                .lanBridgeParent(config.lanBridgeParent())
-                .vmnetNetworkName(config.vmnetNetworkName())
-                .build();
-
         final String bootstrapPhase;
         final boolean handoffReady;
         final IncusResourceBootstrap.BootstrapResult bootstrapResult = new IncusResourceBootstrap(config).apply();
         final String seedNodeId = bootstrapResult.seedNodeId();
         final Object imageFingerprint = bootstrapResult.imageFingerprint();
         final Object seedInstanceStatus = bootstrapResult.instanceStatus();
-        final String distrobuilderAssetUri = bootstrapResult.distrobuilderAssetUri();
-        final String distrobuilderAssetSha256 = bootstrapResult.distrobuilderAssetSha256();
-        final String instanceConfigAssetUri = bootstrapResult.instanceConfigAssetUri();
-        final String instanceConfigAssetSha256 = bootstrapResult.instanceConfigAssetSha256();
         bootstrapPhase = "Ready";
         handoffReady = true;
 
@@ -65,19 +55,9 @@ public final class Main {
         outputs.put("seedNodeId", seedNodeId);
         outputs.put("seedImageFingerprint", imageFingerprint);
         outputs.put("seedInstanceStatus", seedInstanceStatus);
-        outputs.put("imageDistrobuilderAssetUri", distrobuilderAssetUri);
-        outputs.put("imageDistrobuilderAssetSha256", distrobuilderAssetSha256);
-        outputs.put("instanceConfigAssetUri", instanceConfigAssetUri);
-        outputs.put("instanceConfigAssetSha256", instanceConfigAssetSha256);
         outputs.put("incusProject", config.incusProject());
         outputs.put("imageAlias", config.imageAlias());
-        outputs.put("imageSourceRemote", config.imageSourceRemote());
-        outputs.put("imageSourceName", config.imageSourceName());
-        outputs.put("machineClassRef", config.machineClassRef());
-        outputs.put("loadBalancerMode", config.loadBalancerMode());
-        outputs.put("seedNetworkBindingsRef", seedNetworkBindings.ref());
-        outputs.put("seedLanBridgeParent", seedNetworkBindings.lanBridgeParent());
-        outputs.put("seedVmnetNetworkName", seedNetworkBindings.vmnetNetworkName());
+        outputs.put("seedLanBridgeParent", config.lanBridgeParent());
         outputs.put("handoffReady", handoffReady);
         outputs.put("bootstrapPhase", bootstrapPhase);
         outputs.put("nextStep", "bootstrap-management-cluster-then-apply-stageb-cluster-manifests");

@@ -1,21 +1,35 @@
 package io.nxmatic.rk2lab.controlplane.incus;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.pulumi.core.Output;
 import com.pulumi.incus.IncusFunctions;
 import com.pulumi.incus.Instance;
 import com.pulumi.incus.InstanceArgs;
+import com.pulumi.incus.Network;
+import com.pulumi.incus.NetworkArgs;
+import com.pulumi.incus.Profile;
+import com.pulumi.incus.ProfileArgs;
+import com.pulumi.incus.Project;
+import com.pulumi.incus.ProjectArgs;
 import com.pulumi.incus.Provider;
 import com.pulumi.incus.ProviderArgs;
-import com.pulumi.incus.inputs.GetImagePlainArgs;
 import com.pulumi.incus.inputs.GetNetworkPlainArgs;
 import com.pulumi.incus.inputs.GetProfilePlainArgs;
 import com.pulumi.incus.inputs.GetProjectPlainArgs;
 import com.pulumi.incus.inputs.InstanceDeviceArgs;
+import com.pulumi.incus.inputs.ProfileDeviceArgs;
 import com.pulumi.incus.inputs.ProviderRemoteArgs;
-import com.pulumi.incus.outputs.GetImageResult;
 import com.pulumi.deployment.InvokeOptions;
 import com.pulumi.resources.CustomResourceOptions;
+import io.nxmatic.rk2lab.controlplane.incus.image.PulumiIncusImageProvider;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -26,22 +40,24 @@ import java.util.Map;
 public final class IncusResourceBootstrap {
 
     private final BootstrapConfig config;
+        private final PulumiIncusImageProvider imageProvider;
 
     public IncusResourceBootstrap(BootstrapConfig config) {
         this.config = config;
+                this.imageProvider = new PulumiIncusImageProvider(config);
     }
 
     /**
      * Materialize seed resources directly via the Incus provider.
      */
     public BootstrapResult apply() {
-                final ClasspathAsset distrobuilderAsset = ClasspathAsset.load(config.imageDistrobuilderConfig());
-                final ClasspathAsset instanceConfigAsset = ClasspathAsset.load(config.instanceConfig());
-
                 final String workspace = Path.of(config.workspaceDir()).toAbsolutePath().normalize().toString();
                 final String localRoot = workspace + "/.local.d";
                 final String clusterNodeRoot = workspace + "/rke2.d/" + config.clusterName() + "/" + config.nodeName();
                 final String gitRoot = Path.of(workspace).getParent().getParent().toString();
+
+        ensureHostMountSources(workspace, localRoot, clusterNodeRoot);
+        ensureLaunchSecretsToken(workspace + "/.secrets");
 
         final ProviderRemoteArgs.Builder remoteArgsBuilder = ProviderRemoteArgs.builder()
                 .name(config.incusDefaultRemote())
@@ -68,23 +84,23 @@ public final class IncusResourceBootstrap {
                 null
         );
 
-        requireProject(invokeOptions);
-        requireNetwork(invokeOptions);
-        requireProfile(invokeOptions);
-        final GetImageResult image = requireImage(invokeOptions);
+        final Output<String> ensuredProjectName = ensureProject(invokeOptions, incusProvider);
+        ensureNetwork(invokeOptions, incusProvider, config.lanBridgeParent());
+        ensureNetwork(invokeOptions, incusProvider, config.vmnetNetworkName());
+        final Output<String> ensuredProfileName = ensureProfile(invokeOptions, incusProvider);
+        final Output<String> ensuredImageFingerprint = imageProvider.ensureSeedImage(invokeOptions, incusProvider);
 
         final Instance instance = new Instance(
                 "seed-instance",
                 InstanceArgs.builder()
                         .name(config.nodeName())
-                        .project(config.incusProject())
-                        .image(image.fingerprint())
-                        .profiles(List.of(config.profileName()))
+                        .project(ensuredProjectName)
+                        .image(ensuredImageFingerprint)
+                        .profiles(ensuredProfileName.applyValue(List::of))
                         .config(Map.of(
-                                "user.rke2lab.asset.distrobuilder.resource", distrobuilderAsset.resourcePath(),
-                                "user.rke2lab.asset.distrobuilder.sha256", distrobuilderAsset.sha256(),
-                                "user.rke2lab.asset.instance.resource", instanceConfigAsset.resourcePath(),
-                                "user.rke2lab.asset.instance.sha256", instanceConfigAsset.sha256()
+                                "raw.lxc", "lxc.mount.auto = proc:rw sys:rw",
+                                "security.privileged", "true",
+                                "security.nesting", "true"
                         ))
                         .running(true)
                         .devices(seedInstanceDevices(workspace, localRoot, clusterNodeRoot, gitRoot))
@@ -97,23 +113,217 @@ public final class IncusResourceBootstrap {
 
         return new BootstrapResult(
                 "incus://" + config.incusProject() + "/" + config.nodeName(),
-                image.fingerprint(),
-                instance.status(),
-                distrobuilderAsset.uri(),
-                distrobuilderAsset.sha256(),
-                instanceConfigAsset.uri(),
-                instanceConfigAsset.sha256()
+                ensuredImageFingerprint,
+                instance.status()
         );
     }
+
+        private Output<String> ensureProject(InvokeOptions invokeOptions, Provider provider) {
+                try {
+                        IncusFunctions.getProjectPlain(
+                                        GetProjectPlainArgs.builder()
+                                                        .name(config.incusProject())
+                                                        .build(),
+                                        invokeOptions
+                        ).join();
+                        return Output.of(config.incusProject());
+                } catch (Exception ignored) {
+                        final Project project = new Project(
+                                        "seed-project",
+                                        ProjectArgs.builder()
+                                                        .name(config.incusProject())
+                                                        .build(),
+                                        CustomResourceOptions.builder()
+                                                        .provider(provider)
+                                                        .build()
+                        );
+                        return project.name();
+                }
+        }
+
+        private Output<String> ensureProfile(InvokeOptions invokeOptions, Provider provider) {
+                try {
+                        IncusFunctions.getProfilePlain(
+                                        GetProfilePlainArgs.builder()
+                                                        .name(config.profileName())
+                                                        .project(config.incusProject())
+                                                        .build(),
+                                        invokeOptions
+                        ).join();
+                        return Output.of(config.profileName());
+                } catch (Exception ignored) {
+                        final Profile profile = new Profile(
+                                        "seed-profile",
+                                        ProfileArgs.builder()
+                                                        .name(config.profileName())
+                                                        .project(config.incusProject())
+                                                        .devices(ProfileDeviceArgs.builder()
+                                                                        .name("root")
+                                                                        .type("disk")
+                                                                        .properties(Map.of(
+                                                                                        "path", "/",
+                                                                                        "pool", "default"
+                                                                        ))
+                                                                        .build())
+                                                        .build(),
+                                        CustomResourceOptions.builder()
+                                                        .provider(provider)
+                                                        .build()
+                        );
+                        return profile.name();
+                }
+        }
+
+        private void ensureHostMountSources(String workspace, String localRoot, String clusterNodeRoot) {
+                ensureDirectories(List.of(
+                                clusterNodeRoot,
+                                clusterNodeRoot + "/config.d",
+                                clusterNodeRoot + "/manifests.d",
+                                localRoot + "/share",
+                                localRoot + "/var/kube"
+                ));
+
+                final List<String> missingPaths = new ArrayList<>();
+
+                requirePathExists(workspace + "/.secrets", "required secrets file", missingPaths);
+                requirePathExists(workspace + "/assets/incus/scripts", "required scripts directory", missingPaths);
+                requirePathExists(workspace + "/assets/incus/systemd", "required systemd directory", missingPaths);
+                requirePathExists(clusterNodeRoot + "/environment", "required environment file", missingPaths);
+                requirePathExists(clusterNodeRoot + "/meta-data", "required cloud-init meta-data file", missingPaths);
+                requirePathExists(clusterNodeRoot + "/user-data", "required cloud-init user-data file", missingPaths);
+                requirePathExists(clusterNodeRoot + "/network-config", "required cloud-init network-config file", missingPaths);
+
+                if (!missingPaths.isEmpty()) {
+                        throw new IllegalStateException(
+                                        "Missing required Stage A host source paths for Incus disk devices:\n- "
+                                                        + String.join("\n- ", missingPaths)
+                        );
+                }
+        }
+
+        private void ensureLaunchSecretsToken(String secretsFile) {
+                final String githubToken = resolveGithubToken();
+                if (githubToken.isBlank()) {
+                        return;
+                }
+
+                try {
+                        final ObjectMapper yaml = new ObjectMapper(new YAMLFactory());
+                        final Path secretsPath = Path.of(secretsFile);
+                        final JsonNode rootNode = yaml.readTree(secretsPath.toFile());
+                        final ObjectNode root = rootNode instanceof ObjectNode
+                                        ? (ObjectNode) rootNode
+                                        : yaml.createObjectNode();
+
+                        final JsonNode githubNode = root.get("github");
+                        final ObjectNode github = githubNode instanceof ObjectNode
+                                        ? (ObjectNode) githubNode
+                                        : root.putObject("github");
+
+                        github.put("username", "x-access-token");
+                        github.put("token", githubToken);
+
+                        final String rendered = yaml.writerWithDefaultPrettyPrinter().writeValueAsString(root);
+                        Files.writeString(secretsPath, rendered, StandardCharsets.UTF_8);
+                } catch (IOException ex) {
+                        throw new IllegalStateException("Failed to update launch secrets file with gh token", ex);
+                }
+        }
+
+        private String resolveGithubToken() {
+                final String envToken = firstNonBlank(
+                                System.getenv("GITHUB_TOKEN"),
+                                System.getenv("GH_TOKEN")
+                );
+                if (!envToken.isBlank()) {
+                        return envToken;
+                }
+                return captureCommandOutput("gh", "auth", "token");
+        }
+
+        private String firstNonBlank(String... candidates) {
+                for (String value : candidates) {
+                        if (value != null && !value.isBlank()) {
+                                return value.trim();
+                        }
+                }
+                return "";
+        }
+
+        private String captureCommandOutput(String... command) {
+                final ProcessBuilder pb = new ProcessBuilder(command);
+                pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+                try {
+                        final Process process = pb.start();
+                        final String output = new String(process.getInputStream().readAllBytes()).trim();
+                        final int exit = process.waitFor();
+                        return exit == 0 ? output : "";
+                } catch (IOException | InterruptedException ex) {
+                        if (ex instanceof InterruptedException) {
+                                Thread.currentThread().interrupt();
+                        }
+                        return "";
+                }
+        }
+
+        private void ensureDirectories(List<String> directories) {
+                for (String directory : directories) {
+                        try {
+                                Files.createDirectories(Path.of(directory));
+                        } catch (IOException ex) {
+                                throw new IllegalStateException("Failed to prepare required directory: " + directory, ex);
+                        }
+                }
+        }
+
+        private void requirePathExists(String path, String purpose, List<String> missingPaths) {
+                if (!pathExists(path)) {
+                        missingPaths.add(path + " (" + purpose + ")");
+                }
+        }
+
+        private boolean pathExists(String path) {
+                final Path primary = Path.of(path);
+                if (Files.exists(primary)) {
+                        return true;
+                }
+
+                final String normalized = primary.toAbsolutePath().normalize().toString();
+                if (!normalized.startsWith("/net/")) {
+                        return false;
+                }
+
+                final int privateIndex = normalized.indexOf("/private/");
+                if (privateIndex < 0) {
+                        return false;
+                }
+
+                final String privatePath = normalized.substring(privateIndex);
+                final Path privateCandidate = Path.of(privatePath).normalize();
+                if (Files.exists(privateCandidate)) {
+                        return true;
+                }
+
+                final String withoutPrivatePrefix = privatePath.substring("/private".length());
+                final Path directCandidate = Path.of(withoutPrivatePrefix).normalize();
+                return Files.exists(directCandidate);
+        }
 
                 private List<InstanceDeviceArgs> seedInstanceDevices(String workspace, String localRoot,
                                                                                                                                                                                                                                   String clusterNodeRoot,
                                                                                                                                                                                                                                   String gitRoot) {
 
         final List<InstanceDeviceArgs> devices = new ArrayList<>();
-        devices.add(device("vmnet0", "nic", Map.of(
+        devices.add(device("lan0", "nic", Map.of(
+                "hwaddr", "10:66:6a:4c:00:00",
+                "name", "lan0",
                 "nictype", "bridged",
                 "parent", config.lanBridgeParent()
+        )));
+        devices.add(device("vmnet0", "nic", Map.of(
+                "hwaddr", "52:54:00:00:00:00",
+                "name", "vmnet0",
+                "network", config.vmnetNetworkName()
         )));
         devices.add(device("kmsg.dev", "unix-char", Map.of(
                 "source", "/dev/kmsg",
@@ -183,74 +393,30 @@ public final class IncusResourceBootstrap {
                 .build();
     }
 
-        private void requireProject(InvokeOptions invokeOptions) {
-                try {
-                        IncusFunctions.getProjectPlain(
-                                        GetProjectPlainArgs.builder()
-                                                        .name(config.incusProject())
-                                                        .build(),
-                                        invokeOptions
-                        ).join();
-                } catch (Exception ex) {
-                        throw new IllegalStateException(
-                                        "Required Incus project not found: " + config.incusProject(),
-                                        ex
-                        );
-                }
-        }
-
-        private void requireNetwork(InvokeOptions invokeOptions) {
+        private void ensureNetwork(InvokeOptions invokeOptions, Provider provider, String networkName) {
                 try {
                         IncusFunctions.getNetworkPlain(
                                         GetNetworkPlainArgs.builder()
-                                                        .name(config.lanBridgeParent())
-                                                        .build(),
-                                        invokeOptions
-                        ).join();
-                } catch (Exception ex) {
-                        throw new IllegalStateException(
-                                        "Required Incus bridge/network not found: " + config.lanBridgeParent(),
-                                        ex
-                        );
-                }
-        }
-
-        private void requireProfile(InvokeOptions invokeOptions) {
-                try {
-                        IncusFunctions.getProfilePlain(
-                                        GetProfilePlainArgs.builder()
-                                                        .name(config.profileName())
+                                                        .name(networkName)
                                                         .project(config.incusProject())
                                                         .build(),
                                         invokeOptions
                         ).join();
                 } catch (Exception ex) {
-                        throw new IllegalStateException(
-                                        "Required Incus profile not found: " + config.profileName() + " in project " + config.incusProject(),
-                                        ex
-                        );
-                }
-        }
-
-        private GetImageResult requireImage(InvokeOptions invokeOptions) {
-                try {
-                        return IncusFunctions.getImagePlain(
-                                        GetImagePlainArgs.builder()
-                                                        .name(config.imageAlias())
+                        new Network(
+                                        "seed-network-" + networkName,
+                                        NetworkArgs.builder()
+                                                        .name(networkName)
+                                                        .type("bridge")
                                                         .project(config.incusProject())
                                                         .build(),
-                                        invokeOptions
-                        ).join();
-                } catch (Exception ex) {
-                        throw new IllegalStateException(
-                                        "Required Incus image alias not found: " + config.imageAlias() + " in project " + config.incusProject(),
-                                        ex
+                                        CustomResourceOptions.builder()
+                                                        .provider(provider)
+                                                        .build()
                         );
                 }
         }
 
-        public record BootstrapResult(String seedNodeId, Object imageFingerprint, Object instanceStatus,
-                                                                  String distrobuilderAssetUri, String distrobuilderAssetSha256,
-                                                                  String instanceConfigAssetUri, String instanceConfigAssetSha256) {
+                public record BootstrapResult(String seedNodeId, Object imageFingerprint, Object instanceStatus) {
     }
 }

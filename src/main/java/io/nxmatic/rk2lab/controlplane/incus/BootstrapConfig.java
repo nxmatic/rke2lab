@@ -1,7 +1,10 @@
 package io.nxmatic.rk2lab.controlplane.incus;
 
 import com.pulumi.Config;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
+import java.nio.file.Path;
 import java.util.function.Consumer;
 
 /**
@@ -9,15 +12,18 @@ import java.util.function.Consumer;
  */
 public record BootstrapConfig(String workspaceDir, String clusterName, String nodeName, String incusProject,
     String incusDefaultRemote, String incusRemoteAddress, String incusConfigDir,
-    String imageAlias, String imageDistrobuilderConfig, String imageSourceRemote,
-        String imageSourceName, String networkProfile, String profileName, String instanceConfig, String machineClassRef,
-        String loadBalancerMode, String lanBridgeParent, String vmnetNetworkName, String apiEndpoint,
+    String imageAlias, String imageBuilderBinary, String imageBuilderHost, String imageDistrobuilderConfig,
+    String imageSharedFolder,
+    String profileName, String lanBridgeParent, String vmnetNetworkName,
+        String apiEndpoint,
         String kubeconfigRef) {
 
-    private static final String WORKSPACE_REPO_PATH = "/private/var/lib/git/nxmatic/rke2lab-management-cluster";
+    private static final String WORKSPACE_REPO_PATH_FALLBACK = "/private/var/lib/git/nxmatic/rke2lab";
 
     public static final class Builder {
-        private String workspaceDir = defaultWorkspaceDir();
+        private final Defaults defaults = new Defaults();
+
+        private String workspaceDir = defaults.workspaceDir();
 
         private String clusterName = "bioskop";
 
@@ -29,31 +35,25 @@ public record BootstrapConfig(String workspaceDir, String clusterName, String no
 
         private String incusRemoteAddress = "https://bioskop-nixos.local:8443";
 
-        private String incusConfigDir = defaultIncusConfigDir();
+        private String incusConfigDir = defaults.incusConfigDir();
 
         private String imageAlias = "control-node";
 
+        private String imageBuilderBinary = "distrobuilder";
+
+        private String imageBuilderHost = "bioskop-nixos.local";
+
         private String imageDistrobuilderConfig = "classpath:/incus/incus-distrobuilder.yaml";
 
-        private String imageSourceRemote = "images";
+        private String imageSharedFolder;
 
-        private String imageSourceName = "debian/12";
-
-        private String networkProfile = "rke2lab";
-
-        private String profileName;
-
-        private String instanceConfig = "classpath:/incus/incus-instance-config.yaml";
-
-        private String machineClassRef = "lxc-control-default-v1";
-
-        private String loadBalancerMode = "kube-vip";
+        private String profileName = "rke2lab";
 
         private String lanBridgeParent = "lan-br";
 
         private String vmnetNetworkName = "vmnet-br";
 
-        private String apiEndpoint = "https://TODO:6443";
+        private String apiEndpoint = "https://10.66.106.10:6443";
 
         private String kubeconfigRef;
 
@@ -96,43 +96,28 @@ public record BootstrapConfig(String workspaceDir, String clusterName, String no
             return this;
         }
 
+        public Builder imageBuilderBinary(String value) {
+            this.imageBuilderBinary = value;
+            return this;
+        }
+
+        public Builder imageBuilderHost(String value) {
+            this.imageBuilderHost = value;
+            return this;
+        }
+
         public Builder imageDistrobuilderConfig(String value) {
             this.imageDistrobuilderConfig = value;
             return this;
         }
 
-        public Builder imageSourceRemote(String value) {
-            this.imageSourceRemote = value;
-            return this;
-        }
-
-        public Builder imageSourceName(String value) {
-            this.imageSourceName = value;
-            return this;
-        }
-
-        public Builder networkProfile(String value) {
-            this.networkProfile = value;
+        public Builder imageSharedFolder(String value) {
+            this.imageSharedFolder = value;
             return this;
         }
 
         public Builder profileName(String value) {
             this.profileName = value;
-            return this;
-        }
-
-        public Builder instanceConfig(String value) {
-            this.instanceConfig = value;
-            return this;
-        }
-
-        public Builder machineClassRef(String value) {
-            this.machineClassRef = value;
-            return this;
-        }
-
-        public Builder loadBalancerMode(String value) {
-            this.loadBalancerMode = value;
             return this;
         }
 
@@ -166,16 +151,13 @@ public record BootstrapConfig(String workspaceDir, String clusterName, String no
             override(environment, "incus.remoteAddress", this::incusRemoteAddress);
             override(environment, "incus.configDir", this::incusConfigDir);
             override(environment, "image.alias", this::imageAlias);
+            override(environment, "image.builderBinary", this::imageBuilderBinary);
+            override(environment, "image.builderHost", this::imageBuilderHost);
             override(environment, "image.distrobuilderConfig", this::imageDistrobuilderConfig);
-            override(environment, "image.sourceRemote", this::imageSourceRemote);
-            override(environment, "image.sourceName", this::imageSourceName);
-            override(environment, "network.profile", this::networkProfile);
+            override(environment, "image.sharedFolder", this::imageSharedFolder);
             override(environment, "profile.name", this::profileName);
-            override(environment, "instance.config", this::instanceConfig);
-            override(environment, "machine.classRef", this::machineClassRef);
-            override(environment, "loadBalancer.mode", this::loadBalancerMode);
             override(environment, "network.lanBridgeParent", this::lanBridgeParent);
-            override(environment, "network.vmnetName", this::vmnetNetworkName);
+            override(environment, "network.vmnetNetworkName", this::vmnetNetworkName);
             override(environment, "api.endpoint", this::apiEndpoint);
             override(environment, "kubeconfig.ref", this::kubeconfigRef);
             return this;
@@ -189,17 +171,27 @@ public record BootstrapConfig(String workspaceDir, String clusterName, String no
         }
 
         public BootstrapConfig build() {
-            final String resolvedProfileName = profileName != null ? profileName : networkProfile;
             final String resolvedKubeconfigRef = kubeconfigRef != null ? kubeconfigRef
                     : "/srv/host/kubeconfig.d/rke2-" + clusterName + ".yaml";
 
+            if (imageSharedFolder == null || imageSharedFolder.isBlank()) {
+                throw new IllegalStateException(
+                        "Missing required configuration: image.sharedFolder"
+                );
+            }
+
             return new BootstrapConfig(workspaceDir, clusterName, nodeName, incusProject, incusDefaultRemote,
-                incusRemoteAddress, incusConfigDir, imageAlias, imageDistrobuilderConfig, imageSourceRemote, imageSourceName,
-                networkProfile, resolvedProfileName, instanceConfig, machineClassRef, loadBalancerMode, lanBridgeParent,
-                vmnetNetworkName, apiEndpoint, resolvedKubeconfigRef);
+                incusRemoteAddress, incusConfigDir, imageAlias, imageBuilderBinary, imageBuilderHost,
+                imageDistrobuilderConfig, imageSharedFolder,
+            profileName, lanBridgeParent, vmnetNetworkName,
+            apiEndpoint,
+            resolvedKubeconfigRef);
         }
 
-        private static String defaultIncusConfigDir() {
+    }
+
+    private static final class Defaults {
+        String incusConfigDir() {
             final String env = System.getenv("INCUS_CONFIG_DIR");
             if (env != null && !env.isBlank()) {
                 return env;
@@ -213,19 +205,68 @@ public record BootstrapConfig(String workspaceDir, String clusterName, String no
             return "";
         }
 
-        private static String defaultWorkspaceDir() {
+        String workspaceDir() {
+            final String workspaceRepoPath = detectWorkspaceRepoPath();
             final String limaHostname = System.getenv("LIMA_HOSTNAME");
             if (limaHostname != null && !limaHostname.isBlank()) {
-                return "/nfs/" + limaHostname + ".local" + WORKSPACE_REPO_PATH;
+                return "/net/" + limaHostname + ".local" + workspaceRepoPath;
             }
 
-            return "/nfs/bioskop.local" + WORKSPACE_REPO_PATH;
+            return "/net/bioskop.local" + workspaceRepoPath;
+        }
+
+        String detectWorkspaceRepoPath() {
+            final String gitWorktree = normalizePath(System.getenv("GIT_WORKTREE"));
+            if (!gitWorktree.isBlank()) {
+                return gitWorktree;
+            }
+
+            final String fromUserDir = gitTopLevel(System.getProperty("user.dir", ""));
+            if (!fromUserDir.isBlank()) {
+                return fromUserDir;
+            }
+
+            return WORKSPACE_REPO_PATH_FALLBACK;
+        }
+
+        String gitTopLevel(String workingDirectory) {
+            final String normalizedWorkingDirectory = normalizePath(workingDirectory);
+            if (normalizedWorkingDirectory.isBlank()) {
+                return "";
+            }
+
+            try {
+                final FileRepositoryBuilder builder = new FileRepositoryBuilder()
+                        .findGitDir(Path.of(normalizedWorkingDirectory).toFile());
+
+                if (builder.getGitDir() == null) {
+                    return "";
+                }
+
+                try (Repository repository = builder.build()) {
+                    final java.io.File workTree = repository.getWorkTree();
+                    if (workTree != null) {
+                        return normalizePath(workTree.getPath());
+                    }
+                }
+            } catch (Exception ignored) {
+                // Fallback is handled by caller.
+            }
+
+            return "";
+        }
+
+        String normalizePath(String value) {
+            if (value == null || value.isBlank()) {
+                return "";
+            }
+            return Path.of(value).toAbsolutePath().normalize().toString();
         }
     }
 
     private record EnvironmentValues(Config config) {
         @SuppressWarnings("null")
-        private String raw(String key) {
+        String raw(String key) {
             return config.get(key).orElse("");
         }
     }

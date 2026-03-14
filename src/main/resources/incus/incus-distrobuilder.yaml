@@ -305,6 +305,3 @@ files:
     path: /etc/cloud/cloud.cfg.d/00-nocloud.cfg
     content: |
       datasource_list: [ NoCloud ]
-      datasource:
-        NoCloud:
-          seedfrom: /var/lib/cloud/seed/nocloud/

@@ -44,6 +44,8 @@ nocloud:env:activate() {
   local FLOX_ENV_DIR="/var/lib/cloud"
   if [[ -d "${FLOX_ENV_DIR}/.flox" ]]; then
 	source <( flox activate --dir="${FLOX_ENV_DIR}" )
+  : "Ensure GitHub CLI is present in nocloud flox environment"
+  flox install --dir="${FLOX_ENV_DIR}" git gh@^2.86
 	return
   fi
 
@@ -81,6 +83,7 @@ nocloud:env:activate() {
 
     if [[ -z "$val" ]]; then
       val=$( "${FLOX_ENV}/bin/yq" -r "${key}" "${RKE2LAB_SECRETS_FILE}" 2>/dev/null )
+      [[ "$val" == "null" ]] && val=""
     fi
     
     [[ -z "$val" ]] && return  
@@ -91,9 +94,15 @@ nocloud:env:activate() {
   RKE2LAB_ENV_FILE=${RKE2LAB_ENV_FILE:-${RKE2LAB_ROOT}/environment}
   RKE2LAB_SECRETS_FILE="${RKE2LAB_ROOT}/.secrets"
   
-  : "Ensure RKE2 secrets file exists"
-  mkdir -p "$(dirname "${RKE2LAB_SECRETS_FILE}")"
-  [[ -s "${RKE2LAB_SECRETS_FILE}" ]] || printf '%s\n' '{}' > "${RKE2LAB_SECRETS_FILE}"
+  : "Ensure RKE2 secrets file is present and readable (read-only source of truth)"
+  [[ -s "${RKE2LAB_SECRETS_FILE}" ]] || {
+    echo "[rke2-install-pre] ERROR: secrets file is missing or empty: ${RKE2LAB_SECRETS_FILE}" >&2
+    return 1
+  }
+  [[ -r "${RKE2LAB_SECRETS_FILE}" ]] || {
+    echo "[rke2-install-pre] ERROR: secrets file is not readable: ${RKE2LAB_SECRETS_FILE}" >&2
+    return 1
+  }
 
   set -a
   
@@ -148,33 +157,6 @@ EoEnvrc
 
 : "Activate the nocloud environment"
 nocloud:env:activate
-
-secret:file:update() {
-  local key="$1" var="$2" val
-
-  set +u
-  val="${!var-}"
-  set -u
-
-  [[ -z "${val}" ]] && return 0
-  export "${var}=${val}"
-  yq eval -i ".${key} = strenv(${var})" "${RKE2LAB_SECRETS_FILE}"
-}
-
-secret:file:update 'github.username' GITHUB_USERNAME
-secret:file:update 'github.token' GITHUB_PAT
-secret:file:update 'docker.configJson' DOCKER_CONFIG_JSON
-secret:file:update 'tekton.git.username' TEKTON_GIT_USERNAME
-secret:file:update 'tekton.git.password' TEKTON_GIT_PASSWORD
-secret:file:update 'tekton.docker.configJson' TEKTON_DOCKER_CONFIG_JSON
-secret:file:update 'tekton.docker.registryUrl' TEKTON_DOCKER_REGISTRY_URL
-secret:file:update 'tailscale.client.id' TSKEY_CLIENT_ID
-secret:file:update 'tailscale.client.token' TSKEY_CLIENT_TOKEN
-secret:file:update 'tailscale.api.id' TSKEY_API_ID
-secret:file:update 'tailscale.api.token' TSKEY_API_TOKEN
-
-chmod 0600 "${RKE2LAB_SECRETS_FILE}"
-unset secret:file:update
 
 : "GitHub authentication setup"
 gh auth login --with-token <<EoF
