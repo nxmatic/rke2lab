@@ -8,6 +8,18 @@ This document defines the first executable contract for Pulumi-based management-
 
 Stage A provisions and validates the management cluster seed (`bioskop`) and emits deterministic handoff outputs.
 
+Stage A is intentionally limited to bootstrap responsibilities and is *not* the long-running node reconciler.
+
+After Stage A reaches readiness, Stage B controllers (CAPI + CAPN + CAPRKE2) own lifecycle management for additional control-plane and worker nodes.
+
+== Non-goals
+
+The following are explicitly out of scope for Stage A:
+
+* Ongoing reconciliation of non-seed nodes
+* Horizontal scaling workflows for management or workload clusters
+* Replacement/rolling updates for post-bootstrap nodes
+
 == Required inputs
 
 [cols="1,3",options="header"]
@@ -29,8 +41,20 @@ Stage A provisions and validates the management cluster seed (`bioskop`) and emi
 |`apiEndpoint` |Control-plane endpoint for API access
 |`kubeconfigRef` |Path or secret reference for bootstrap kubeconfig
 |`seedNodeId` |Provider-specific identifier for the seed node
+|`seedImageFingerprint` |Immutable image fingerprint used for seed provisioning
+|`incusProject` |Resolved Incus project used during seed provisioning
+|`handoffReady` |Boolean flag indicating Stage B installation prerequisites are satisfied
 |`bootstrapPhase` |Terminal phase (`Ready` or `Failed`)
 |===
+
+== Stage B handoff contract
+
+A successful Stage A run must provide enough information to install and reconcile CAPI management-plane components:
+
+. Management API endpoint and kubeconfig reference are valid.
+. Seed infrastructure identity is emitted (`seedNodeId`, project, image fingerprint).
+. Handoff marker is explicit (`handoffReady=true`).
+. Re-run safety is preserved (idempotent bootstrap with no destructive drift).
 
 == Readiness gates
 
@@ -50,3 +74,4 @@ Stage A provisions and validates the management cluster seed (`bioskop`) and emi
 * `pulumi up` reaches `bootstrapPhase=Ready` on a clean environment.
 * Re-run is idempotent (no destructive drift for unchanged config).
 * Outputs are sufficient for Stage B CAPI management-plane install.
+* Stage A implementation does not provision non-seed nodes after handoff.

@@ -1,3 +1,11 @@
-name: rk2lab-control-plane
+name: rke2lab-management-cluster
 runtime: java
 description: Pulumi-based provisioning control plane for RK2Lab management cluster bootstrap
+backend:
+  url: "file:///net/bioskop.local/private/var/lib/git/nxmatic/rke2lab-management-cluster/.pulumi-state"
+packages:
+  incus:
+    source: pulumi/pulumi/terraform-provider
+    version: 1.1.1
+    parameters:
+      - lxc/incus

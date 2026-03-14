@@ -14,6 +14,8 @@ Primary near-term scope:
 * Deterministic readiness gating
 * Exported bootstrap outputs for Stage B handoff
 
+Current runtime path is intentionally Stage A-only. Workload-cluster (`alcide`, `nikopol`, etc.) provisioning manifests are applied after management bootstrap as Stage B concerns.
+
 == Current status
 
 Initial scaffold created. First implementation target is the Stage A bootstrap contract.
@@ -21,6 +23,9 @@ Initial scaffold created. First implementation target is the Stage A bootstrap c
 == Planned structure
 
 * `docs/bootstrap-contract.adoc` — source-of-truth contract for inputs/outputs/readiness/failure semantics
+* `docs/incus-distribution-contract.adoc` — reverse-engineered Incus distribution contract for seed/control-node provisioning
+* `docs/stagea-stageb-handoff-contract.adoc` — explicit handoff assets between Stage A bootstrap and Stage B CAPI/CAPN reconciliation
+* `docs/rke2lab-authored-notes-import.adoc` — imported historical planning notes from `rke2lab` carried forward as curated context
 * `src/main/java/` — Java Pulumi application
 * `Pulumi.yaml` — Pulumi project metadata
 * `pom.xml` — Maven build configuration
@@ -28,5 +33,7 @@ Initial scaffold created. First implementation target is the Stage A bootstrap c
 == Next immediate milestones
 
 . Define contract and acceptance checks in `docs/bootstrap-contract.adoc`
+. Capture and normalize Incus distribution contract from `rke2lab` in `docs/incus-distribution-contract.adoc`
+. Define Stage A -> Stage B handoff asset contract in `docs/stagea-stageb-handoff-contract.adoc`
 . Implement minimal `pulumi up` path for management-cluster seed
 . Export kubeconfig + endpoint outputs for Stage B consumers

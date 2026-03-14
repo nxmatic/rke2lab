@@ -1,0 +1,118 @@
+= Stage A -> Stage B Handoff Contract (CAPN/CAPI)
+:toc: left
+:toclevels: 3
+
+This document defines the normalized output contract between:
+
+* *Stage A* (Pulumi bootstrap outside cluster)
+* *Stage B* (CAPI reconciliation with CAPN + CAPRKE2 inside cluster)
+
+The objective is to avoid drift between bootstrap assumptions and CAPI templates.
+
+== Ownership boundary
+
+Stage ownership is strict:
+
+* Stage A creates and validates only the seed control-plane node(s) required to establish management API reachability.
+* Stage B owns all ongoing node lifecycle (scale, replacement, rollout, remediation) through Kubernetes controllers.
+
+== Required handoff assets
+
+The following assets are considered the minimum shared contract.
+
+[cols="1,2,3",options="header"]
+|===
+|Asset |Example field |Why it must be shared
+
+|Management identity
+|`managementClusterName`
+|Binds all Stage B resources and naming to the same management cluster identity.
+
+|API endpoint
+|`apiEndpoint`
+|Required for management-plane controller install and health checks.
+
+|Bootstrap kubeconfig reference
+|`kubeconfigRef`
+|Allows Stage B installer/job to authenticate against the newly bootstrapped cluster.
+
+|Seed provider identity
+|`seedNodeId`
+|Traceability of the bootstrap machine instance and break-glass operations.
+
+|Incus project scope
+|`incusProject`
+|Ensures CAPN resources target the same tenancy/project scope as bootstrap.
+
+|Image alias
+|`imageAlias`
+|Human-facing baseline image contract used by templates and operations.
+
+|Image fingerprint
+|`seedImageFingerprint`
+|Immutable provenance for reproducibility and drift detection.
+
+|Default machine class
+|`machineClassRef` (or equivalent)
+|Maps bootstrap assumptions to CAPN `LXCMachineTemplate` fields.
+
+|Load balancer mode
+|`loadBalancerMode`
+|Must match control-plane endpoint strategy (`lxc`, `oci`, `ovn`, `kube-vip`, `external`).
+
+|Handoff readiness marker
+|`handoffReady`
+|Explicit gate that Stage B prerequisites are complete.
+|===
+
+== CAPN-aligned machine class surface
+
+The machine class published by Stage A should be translatable to CAPN fields in
+`LXCMachineTemplate.spec.template.spec`:
+
+* `instanceType` (for current parity: `container`)
+* `flavor`
+* `profiles`
+* `devices`
+* `target`
+* `image` (`name` and optionally `fingerprint`/`server`/`protocol`)
+
+== Identity secret compatibility
+
+Stage B requires an identity secret referenced by `LXCCluster.spec.secretRef`.
+The following keys are required by CAPN and should be validated during handoff preparation:
+
+* `server`
+* `server-crt`
+* `client-crt`
+* `client-key`
+
+Optional keys:
+
+* `project`
+* `insecure-skip-verify`
+
+== Recommended Stage A output object
+
+[source,yaml]
+----
+# @codebase
+handoff:
+  managementClusterName: bioskop
+  apiEndpoint: https://10.66.106.10:6443
+  kubeconfigRef: /srv/host/kubeconfig.d/rke2-bioskop.yaml
+  seedNodeId: incus://rke2lab/master
+  incusProject: rke2lab
+  imageAlias: control-node
+  seedImageFingerprint: sha256:TODO
+  machineClassRef: lxc-control-default-v1
+  loadBalancerMode: kube-vip
+  handoffReady: false
+----
+
+== Acceptance criteria
+
+* Stage A emits all required handoff fields.
+* Stage B can render CAPI/CAPN resources without external discovery of missing data.
+* Handoff fields are stable across idempotent Stage A re-runs.
+* Seed image fingerprint and provider identity are auditable.

@@ -1,0 +1,269 @@
+= Incus Distribution Contract (Reverse-Engineered v1)
+:toc: left
+:toclevels: 3
+
+This document captures the current Incus node distribution model implemented in `rke2lab` and normalizes it into a stable contract for `rk2lab-control-plane` Stage A and Stage B consumers.
+
+It is intentionally derived from implementation evidence (Make targets + instance config) rather than greenfield design assumptions.
+
+== Scope
+
+This contract covers:
+
+* Incus project and image distribution semantics
+* Node instance configuration shape (security, networking, mounts)
+* Required cloud-init seed and environment wiring
+* Lifecycle phases and expected outputs for control-plane integration
+
+This contract does not yet define provider-specific API calls for CAPN objects; it defines the input/output and behavior envelope they must satisfy.
+
+== Ownership model: Stage A bootstrap vs Stage B CAPI reconciliation
+
+This contract is consumed in two different operational modes:
+
+* *Stage A (outside cluster, Pulumi app)*: provisions exactly one seed control-plane node for management cluster bootstrap.
+* *Stage B (inside cluster, CAPI)*: reconciles additional control-plane and worker nodes via CAPN and CAPRKE2.
+
+Boundary rules:
+
+. Stage A must not become a general node autoscaler or ongoing reconciler.
+. Stage A may create only the minimal seed node(s) required to establish the management API.
+. After handoff, all non-seed node lifecycle operations are owned by Kubernetes controllers (CAPI/CAPN/CAPRKE2).
+. Stage A outputs must be sufficient for deterministic CAPI management-plane installation.
+
+== CAPI alignment and provider ownership
+
+For Stage B, Kubernetes controllers own machine lifecycle:
+
+* *Infrastructure provider*: CAPN (`cluster-api-provider-incus`) creates/manages Incus machines.
+* *Bootstrap/control-plane provider*: CAPRKE2 manages RKE2 join/bootstrap semantics.
+* *CAPI core*: desired/actual state reconciliation, health, rollout, replacement.
+
+Implication for this contract:
+
+* Treat `IncusDistribution` v1 as the bootstrap compatibility contract and profile baseline.
+* Promote stable fields (image, network/profile classes, security policy) into provider-compatible templates for CAPI resources.
+* Keep Stage A-specific host bind mounts as transitional compatibility, not long-term Stage B requirements.
+
+== Evidence sources (reverse-engineered)
+
+Primary sources in `rke2lab`:
+
+* `make.d/incus/vars.mk`
+* `make.d/incus/targets.mk`
+* `make.d/incus/env.mk`
+* `rke2.d/bioskop/master/incus-instance-config.yaml`
+* `docs/cluster-provisioning-control-plane-v2.adoc`
+
+== Canonical distribution schema (v1)
+
+=== Top-level object
+
+[source,yaml]
+----
+# @codebase
+apiVersion: controlplane.nxmatic.io/v1alpha1
+kind: IncusDistribution
+metadata:
+  name: bioskop-control-node-v1
+spec:
+  project:
+    name: rke2lab
+
+  image:
+    alias: control-node
+    architecture: aarch64
+    build:
+      distrobuilderConfigPath: make.d/incus/incus-distrobuilder.yaml
+      artifactDir: .local.d/var/lib/distrobuilder/control-node
+      artifacts:
+        - incus.tar.xz
+        - rootfs.squashfs
+      squashfs:
+        compressor: zstd
+        blockSize: 1M
+
+  instance:
+    defaultName: master
+    profiles:
+      - rke2lab
+    security:
+      privileged: true
+      nesting: true
+      rawLxc: |
+        lxc.cap.drop =
+        lxc.apparmor.profile = unconfined
+        lxc.mount.auto = proc:rw sys:rw cgroup-full:rw
+        lxc.cgroup.devices.allow = c *:* rwm
+        lxc.cgroup.devices.allow = b *:* rwm
+
+    networking:
+      interfaces:
+        - name: lan0
+          type: nic
+          nictype: bridged
+          parent: lan-br
+        - name: vmnet0
+          type: nic
+          network: vmnet-br
+
+    cloudInit:
+      seedMode: nocloud
+      requiredFiles:
+        - meta-data
+        - user-data
+        - network-config
+
+    mounts:
+      required:
+        - source: make.d/incus/scripts
+          target: /srv/host/scripts.d
+        - source: make.d/incus/systemd
+          target: /srv/host/system.d
+        - source: rke2.d/<cluster>/<node>/manifests.d
+          target: /srv/host/manifests.d
+        - source: rke2.d/<cluster>/<node>/environment
+          target: /srv/host/environment
+        - source: .local.d/var/kube
+          target: /srv/host/kubeconfig.d
+
+      optional:
+        - source: /Users/<user>/.config/flox
+          target: /root/.config/flox
+          purpose: flox-auth passthrough
+
+  environmentContract:
+    requiredVars:
+      - RKE2LAB_CLUSTER_NAME
+      - RKE2LAB_NODE_NAME
+      - RKE2LAB_CLUSTER_TOKEN
+      - RKE2LAB_NETWORK_VIP_HOST_INETADDR
+      - RKE2LAB_KUBECONFIG_DIR
+
+status:
+  phase: Ready
+  imageFingerprint: sha256:...
+  projectName: rke2lab
+  instanceName: master
+  providerId: incus://rke2lab/master
+----
+
+== Behavioral contract
+
+=== Lifecycle phases
+
+Expected state machine for distribution application:
+
+* `Pending`
+* `Validating`
+* `ProjectReady`
+* `ImageReady`
+* `InstanceConfigured`
+* `InstanceStarted`
+* `Ready`
+
+Failure path:
+
+* `* -> Failed`
+
+Rules:
+
+* All phases must be idempotent and safe to retry.
+* Image import should replace prior alias in a controlled, non-destructive manner.
+* Instance creation should reconcile missing instances even if marker state exists.
+
+=== Readiness gates
+
+Distribution-level readiness gates (before RKE2-level readiness):
+
+. Incus project exists and is selected.
+. Required profile exists in target project.
+. Image alias exists and resolves to a fingerprint.
+. Instance config renders successfully with resolved variables.
+. Instance is created and reachable via Incus.
+
+RKE2-level readiness remains defined by Stage A bootstrap contract.
+
+== Required outputs for control-plane handoff
+
+These outputs must be emitted by Stage A implementation after distribution convergence:
+
+[cols="1,3",options="header"]
+|===
+|Output |Description
+|`distributionName` |Resolved distribution contract name/version
+|`incusProject` |Applied Incus project
+|`imageAlias` |Imported image alias (expected: `control-node`)
+|`imageFingerprint` |Resolved immutable image fingerprint
+|`instanceName` |Provisioned seed instance name
+|`instanceProviderId` |Provider ID (`incus://<project>/<instance>`)
+|`distributionPhase` |Terminal phase (`Ready` or `Failed`)
+|===
+
+== Source mapping (current -> canonical)
+
+[cols="1,2,3",options="header"]
+|===
+|Canonical field |Current source |Notes
+
+|`spec.project.name`
+|`make.d/incus/vars.mk` (`.incus.project.name = rke2lab`)
+|Project constant today; should become configurable with default.
+
+|`spec.image.alias`
+|`make.d/incus/vars.mk` (`.incus.image.name = control-node`)
+|Alias is mutable pointer; capture fingerprint in status.
+
+|`spec.image.build.*`
+|`make.d/incus/vars.mk`, `make.d/incus/targets.mk`
+|Distrobuilder build-dir + pack-incus pipeline.
+
+|`spec.instance.security.*`
+|`rke2.d/bioskop/master/incus-instance-config.yaml`
+|Privileged + nesting + raw LXC knobs.
+
+|`spec.instance.networking.interfaces`
+|`rke2.d/bioskop/master/incus-instance-config.yaml`
+|`lan0` and `vmnet0` dual-NIC pattern.
+
+|`spec.instance.cloudInit.requiredFiles`
+|`rke2.d/bioskop/master/incus-instance-config.yaml`
+|NoCloud mounted seed files.
+
+|`spec.instance.mounts.required`
+|`rke2.d/bioskop/master/incus-instance-config.yaml`
+|Current heavy bind-mount contract.
+
+|`spec.environmentContract.requiredVars`
+|`make.d/incus/targets.mk` (`.incus.env.file.content`)
+|Variables currently generated into bind-mounted environment file.
+
+|`status.phase` and lifecycle
+|`make.d/incus/targets.mk` target sequencing
+|Phase semantics currently implicit in target graph.
+|===
+
+== Normalization decisions for `rk2lab-control-plane`
+
+. Keep `control-node` as default alias, but always emit fingerprint in outputs.
+. Treat per-node instance name as runtime parameter, not hardcoded `master`.
+. Keep dual-NIC contract (`lan0`, `vmnet0`) as default profile until CAPN-based abstraction supersedes it.
+. Preserve mount contract in Stage A, but classify mounts as `required` vs `optional` explicitly.
+. Promote environment file variables into typed config fields where possible; keep file rendering as compatibility layer.
+. Keep Stage A ownership narrow: seed bootstrap only, then hand off all further node lifecycle to CAPI.
+
+== Open questions
+
+These must be resolved before GA of the contract:
+
+* Which mounts can be removed once bootstrap shifts from host-script orchestration to controller reconciliation?
+* Should Flox config remain host-mounted or be replaced by workload identity/secret flow?
+* What is the final strategy for image version pinning (semantic version, timestamp, or content-addressed labels)?
+* Which distribution fields should live in Pulumi config vs Kubernetes CRDs in Stage B?
+
+== Acceptance checks (for this contract)
+
+* Stage A can create and converge one seed control-node using only this contract + cluster/node inputs.
+* Re-run with unchanged input is idempotent.
+* Outputs include both mutable alias and immutable fingerprint.
+* Failure reports include phase + reason and preserve last successful phase.

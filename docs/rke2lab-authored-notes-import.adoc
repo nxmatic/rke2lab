@@ -1,0 +1,70 @@
+= Imported Notes from `rke2lab` (Historical Context)
+:toc: left
+:toclevels: 2
+
+This document imports and normalizes authored planning notes that were previously maintained in `rke2lab`.
+
+It is intended to preserve architectural intent while transitioning `rke2lab-management-cluster` to the single source of truth for management-cluster provisioning.
+
+== Source documents imported
+
+The following authored notes were reviewed and imported as historical guidance:
+
+* `rke2lab/docs/cluster-provisioning-control-plane-v2.adoc`
+* `rke2lab/docs/pulumi-migration-plan.adoc`
+* `rke2lab/docs/kpt-migration-plan.adoc`
+
+== Imported decisions retained
+
+=== Two-phase operating model
+
+Retain the strict split:
+
+* Stage A: external/bootstrap provisioning (outside cluster)
+* Stage B: in-cluster lifecycle reconciliation (CAPI/CAPRKE2/CAPN)
+
+=== Stage A minimalism
+
+Retain the principle that Stage A must stay narrow:
+
+* bootstrap only what is needed for management API readiness
+* emit deterministic handoff outputs for Stage B
+* avoid becoming a long-running general reconciler
+
+=== Canonical infrastructure ownership
+
+Retain the model where foundational Incus host resources are treated as canonical platform inputs (project/network/profile/image), while Stage A manages bootstrap-specific resources (for now: seed instance lifecycle).
+
+=== Phase 2 GitOps scope
+
+Retain that kpt/GitOps guidance belongs to Phase 2 operations and does not need to be a hard dependency for Stage A bootstrap.
+
+== Imported decisions superseded or narrowed
+
+=== Superseded
+
+* Detailed Make → Pulumi migration mechanics in `pulumi-migration-plan.adoc` are historical; this repository now directly owns the active Pulumi implementation.
+
+=== Narrowed
+
+* kpt migration details are retained as operational context, but Stage A implementation in this repository only keeps the handoff contract boundary relevant to bootstrap.
+
+== Current canonical interpretation in this repository
+
+For `rke2lab-management-cluster`, the practical interpretation is:
+
+1. Define and maintain Stage A contracts under `docs/` in this repository.
+2. Keep Stage A program behavior deterministic and idempotent.
+3. Keep host/platform-level assumptions explicit in stack config and contracts.
+4. Treat cross-repo path dependencies on `../rke2lab` as migration debt to be removed.
+
+== Migration checklist for full decoupling from `rke2lab`
+
+* [ ] Import any remaining Stage A input artifacts currently referenced via `../rke2lab/...`.
+* [ ] Replace stack/config path references with repository-local paths.
+* [ ] Update docs to point to local canonical contracts only.
+* [ ] Add a deprecation pointer in `rke2lab` README to this repository for management provisioning ownership.
+
+== Notes
+
+This file is intentionally a curated import rather than verbatim duplication of all historical documents. The source files listed above remain valuable provenance, while this document captures what is actively carried forward as architecture intent.
