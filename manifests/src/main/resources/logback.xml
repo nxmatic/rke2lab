@@ -1,0 +1,19 @@
+<!-- @codebase -->
+<configuration>
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Default to concise output from third-party libs -->
+  <logger name="org.cdk8s" level="WARN"/>
+  <logger name="software.constructs" level="WARN"/>
+
+  <!-- Application-level signal: synthesis progress, domain registration, summary -->
+  <logger name="io.nxmatic.rk2lab.manifests" level="INFO"/>
+
+  <root level="WARN">
+    <appender-ref ref="STDOUT"/>
+  </root>
+</configuration>
