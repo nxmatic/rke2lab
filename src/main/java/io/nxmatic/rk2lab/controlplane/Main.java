@@ -45,6 +45,8 @@ public final class Main {
         final String seedNodeId = bootstrapResult.seedNodeId();
         final Object imageFingerprint = bootstrapResult.imageFingerprint();
         final Object seedInstanceStatus = bootstrapResult.instanceStatus();
+        final Object seedInstanceUrn = bootstrapResult.instanceUrn();
+        final Object seedProviderUrn = bootstrapResult.providerUrn();
         bootstrapPhase = "Ready";
         handoffReady = true;
 
@@ -53,6 +55,8 @@ public final class Main {
         outputs.put("apiEndpoint", config.apiEndpoint());
         outputs.put("kubeconfigRef", config.kubeconfigRef());
         outputs.put("seedNodeId", seedNodeId);
+        outputs.put("seedInstanceUrn", seedInstanceUrn);
+        outputs.put("seedProviderUrn", seedProviderUrn);
         outputs.put("seedImageFingerprint", imageFingerprint);
         outputs.put("seedInstanceStatus", seedInstanceStatus);
         outputs.put("incusProject", config.incusProject());

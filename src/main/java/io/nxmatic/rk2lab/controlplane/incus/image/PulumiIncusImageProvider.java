@@ -1,6 +1,7 @@
 package io.nxmatic.rk2lab.controlplane.incus.image;
 
 import com.pulumi.core.Output;
+import com.pulumi.deployment.Deployment;
 import com.pulumi.incus.Image;
 import com.pulumi.incus.ImageArgs;
 import com.pulumi.incus.IncusFunctions;
@@ -40,6 +41,7 @@ public final class PulumiIncusImageProvider {
     private static final String REMOTE_BUILD_SCRIPT_RESOURCE = "incus/image/remote-build-incus-image.sh";
     private static final String INCUS_METADATA_FILENAME = "incus.tar.xz";
     private static final String INCUS_ROOTFS_FILENAME = "rootfs.squashfs";
+    private static final int PREVIEW_ALIAS_PREFIX_MAX_LENGTH = 8;
 
     private final BootstrapConfig config;
 
@@ -51,13 +53,44 @@ public final class PulumiIncusImageProvider {
      * Ensure the seed image exists and return its fingerprint output.
      */
     public Output<String> ensureSeedImageFingerprint(InvokeOptions invokeOptions, Provider provider) {
+        final boolean preview = isDryRun();
+        final Path workspace = resolvePreferredHostPath(config.worktree());
+        final Path artifactDir = resolveArtifactDir(workspace);
+        final Path distrobuilderConfigPath = materializeDistrobuilderConfig(workspace);
+        final String expectedBuildChecksum = computeBuildChecksum(distrobuilderConfigPath);
+        final Path checksumMarkerPath = artifactDir.resolve(".build-checksum.sha256");
         final Optional<String> existingFingerprint = resolveExistingSeedImageFingerprint(invokeOptions);
-        if (existingFingerprint.isPresent()) {
+        if (existingFingerprint.isPresent() && checksumMarkerMatches(checksumMarkerPath, expectedBuildChecksum)) {
             return Output.of(existingFingerprint.get());
+        }
+
+        if (preview) {
+            return Output.of(buildPreviewFingerprintSurrogate(expectedBuildChecksum));
         }
 
         final BuiltImageArtifacts artifacts = ensureLocalImageArtifacts();
         return createSeedImageFromArtifacts(provider, artifacts).fingerprint();
+    }
+
+    private boolean isDryRun() {
+        return Deployment.getInstance().isDryRun();
+    }
+
+    private String buildPreviewFingerprintSurrogate(String expectedBuildChecksum) {
+        final String aliasPrefix = shortAliasPrefix(config.imageAlias());
+        return "preview-" + aliasPrefix + "-" + expectedBuildChecksum.substring(0, 16);
+    }
+
+    private String shortAliasPrefix(String alias) {
+        final String normalized = alias == null
+                ? ""
+                : alias.trim().toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
+        if (normalized.isBlank()) {
+            return "image";
+        }
+        return normalized.length() <= PREVIEW_ALIAS_PREFIX_MAX_LENGTH
+                ? normalized
+                : normalized.substring(0, PREVIEW_ALIAS_PREFIX_MAX_LENGTH);
     }
 
     private Optional<String> resolveExistingSeedImageFingerprint(InvokeOptions invokeOptions) {
@@ -95,7 +128,7 @@ public final class PulumiIncusImageProvider {
     }
 
     private BuiltImageArtifacts ensureLocalImageArtifacts() {
-        final Path workspace = Path.of(config.workspaceDir()).toAbsolutePath().normalize();
+        final Path workspace = resolvePreferredHostPath(config.worktree());
         final Path artifactDir = resolveArtifactDir(workspace);
         final Path distrobuilderConfigPath = materializeDistrobuilderConfig(workspace);
         final String expectedBuildChecksum = computeBuildChecksum(distrobuilderConfigPath);
@@ -357,6 +390,69 @@ public final class PulumiIncusImageProvider {
         }
 
         return "";
+    }
+
+    private Path resolvePreferredHostPath(String path) {
+        final Path primary = Path.of(path).toAbsolutePath().normalize();
+        final List<Path> candidates = hostPathCandidates(primary);
+
+        for (Path candidate : candidates) {
+            try {
+                if (Files.exists(candidate)) {
+                    return candidate;
+                }
+            } catch (Exception ignored) {
+                // Try next candidate.
+            }
+        }
+
+        for (Path candidate : candidates) {
+            if (!candidate.toString().startsWith("/net/")) {
+                return candidate;
+            }
+        }
+
+        return primary;
+    }
+
+    private List<Path> hostPathCandidates(Path primary) {
+        final List<Path> candidates = new ArrayList<>();
+        candidates.add(primary);
+
+        final String normalized = primary.toString();
+        if (normalized.startsWith("/private/")) {
+            final Path directCandidate = Path.of(normalized.substring("/private".length())).normalize();
+            candidates.add(directCandidate);
+        }
+
+        if (!normalized.startsWith("/net/")) {
+            return deduplicated(candidates);
+        }
+
+        final int privateIndex = normalized.indexOf("/private/");
+        if (privateIndex < 0) {
+            return deduplicated(candidates);
+        }
+
+        final String privatePath = normalized.substring(privateIndex);
+        final Path privateCandidate = Path.of(privatePath).normalize();
+        candidates.add(privateCandidate);
+
+        final String withoutPrivatePrefix = privatePath.substring("/private".length());
+        final Path directCandidate = Path.of(withoutPrivatePrefix).normalize();
+        candidates.add(directCandidate);
+
+        return deduplicated(candidates);
+    }
+
+    private List<Path> deduplicated(List<Path> candidates) {
+        final List<Path> unique = new ArrayList<>();
+        for (Path candidate : candidates) {
+            if (!unique.contains(candidate)) {
+                unique.add(candidate);
+            }
+        }
+        return unique;
     }
 
     private List<String> buildIncusAsRootCommand(String distrobuilderExecutable,

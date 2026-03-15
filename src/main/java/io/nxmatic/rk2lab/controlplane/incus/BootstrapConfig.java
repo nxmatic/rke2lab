@@ -10,7 +10,7 @@ import java.util.function.Consumer;
 /**
  * Runtime configuration for provider-native Stage A bootstrap.
  */
-public record BootstrapConfig(String workspaceDir, String clusterName, String nodeName, String incusProject,
+public record BootstrapConfig(String worktree, String clusterName, String nodeName, String incusProject,
     String incusDefaultRemote, String incusRemoteAddress, String incusConfigDir,
     String imageAlias, String imageBuilderBinary, String imageBuilderHost, String imageDistrobuilderConfig,
     String imageSharedFolder,
@@ -18,12 +18,12 @@ public record BootstrapConfig(String workspaceDir, String clusterName, String no
         String apiEndpoint,
         String kubeconfigRef) {
 
-    private static final String WORKSPACE_REPO_PATH_FALLBACK = "/private/var/lib/git/nxmatic/rke2lab";
+    private static final String WORKTREE_REPO_PATH_FALLBACK = "/private/var/lib/git/nxmatic/rke2lab";
 
     public static final class Builder {
         private final Defaults defaults = new Defaults();
 
-        private String workspaceDir = defaults.workspaceDir();
+        private String worktree = defaults.worktree();
 
         private String clusterName = "bioskop";
 
@@ -57,8 +57,8 @@ public record BootstrapConfig(String workspaceDir, String clusterName, String no
 
         private String kubeconfigRef;
 
-        public Builder workspaceDir(String value) {
-            this.workspaceDir = value;
+        public Builder worktree(String value) {
+            this.worktree = value;
             return this;
         }
 
@@ -143,7 +143,7 @@ public record BootstrapConfig(String workspaceDir, String clusterName, String no
 
         public Builder applyConfig(Config config) {
             final EnvironmentValues environment = new EnvironmentValues(config);
-            override(environment, "workspace.dir", this::workspaceDir);
+            override(environment, "worktree.dir", this::worktree);
             override(environment, "cluster.name", this::clusterName);
             override(environment, "node.name", this::nodeName);
             override(environment, "incus.project", this::incusProject);
@@ -180,7 +180,7 @@ public record BootstrapConfig(String workspaceDir, String clusterName, String no
                 );
             }
 
-            return new BootstrapConfig(workspaceDir, clusterName, nodeName, incusProject, incusDefaultRemote,
+            return new BootstrapConfig(worktree, clusterName, nodeName, incusProject, incusDefaultRemote,
                 incusRemoteAddress, incusConfigDir, imageAlias, imageBuilderBinary, imageBuilderHost,
                 imageDistrobuilderConfig, imageSharedFolder,
             profileName, lanBridgeParent, vmnetNetworkName,
@@ -205,17 +205,17 @@ public record BootstrapConfig(String workspaceDir, String clusterName, String no
             return "";
         }
 
-        String workspaceDir() {
-            final String workspaceRepoPath = detectWorkspaceRepoPath();
+        String worktree() {
+            final String worktreeRepoPath = detectWorktreeRepoPath();
             final String limaHostname = System.getenv("LIMA_HOSTNAME");
             if (limaHostname != null && !limaHostname.isBlank()) {
-                return "/net/" + limaHostname + ".local" + workspaceRepoPath;
+                return "/net/" + limaHostname + ".local" + worktreeRepoPath;
             }
 
-            return "/net/bioskop.local" + workspaceRepoPath;
+            return "/net/bioskop.local" + worktreeRepoPath;
         }
 
-        String detectWorkspaceRepoPath() {
+        String detectWorktreeRepoPath() {
             final String gitWorktree = normalizePath(System.getenv("GIT_WORKTREE"));
             if (!gitWorktree.isBlank()) {
                 return gitWorktree;
@@ -226,7 +226,7 @@ public record BootstrapConfig(String workspaceDir, String clusterName, String no
                 return fromUserDir;
             }
 
-            return WORKSPACE_REPO_PATH_FALLBACK;
+            return WORKTREE_REPO_PATH_FALLBACK;
         }
 
         String gitTopLevel(String workingDirectory) {

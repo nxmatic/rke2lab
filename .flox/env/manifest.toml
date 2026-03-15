@@ -11,6 +11,7 @@ pulumi.pkg-path = "pulumi-bin"
 pulumictl.pkg-path = "pulumictl"
 distrobuilder.pkg-path = "distrobuilder"
 distrobuilder.systems = ["aarch64-linux"]
+cdk8s-cli.pkg-path = "cdk8s-cli"
 
 
 ## Environment Variables ---------------------------------------------

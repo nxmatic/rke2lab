@@ -14,6 +14,10 @@ spec:
   repo: https://openebs.github.io/zfs-localpv
   targetNamespace: openebs
   valuesContent: |-
+    crds:
+      csi:
+        volumeSnapshots:
+          enabled: false
     zfs:
       bin: /usr/sbin/zfs
     zfsNode:
