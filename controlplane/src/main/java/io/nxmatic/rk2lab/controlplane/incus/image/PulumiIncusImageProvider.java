@@ -4,11 +4,14 @@ import com.pulumi.core.Output;
 import com.pulumi.deployment.Deployment;
 import com.pulumi.incus.Image;
 import com.pulumi.incus.ImageArgs;
+import com.pulumi.incus.IncusFunctions;
 import com.pulumi.incus.Provider;
+import com.pulumi.incus.inputs.GetImagePlainArgs;
 import com.pulumi.incus.inputs.ImageAliasArgs;
 import com.pulumi.incus.inputs.ImageSourceFileArgs;
 import com.pulumi.deployment.InvokeOptions;
 import com.pulumi.resources.CustomResourceOptions;
+import com.pulumi.resources.Resource;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig.WorktreeHost;
 
@@ -43,8 +46,6 @@ public final class PulumiIncusImageProvider {
 
     private static final String INCUS_ROOTFS_FILENAME = "rootfs.squashfs";
 
-    private static final int PREVIEW_ALIAS_PREFIX_MAX_LENGTH = 8;
-
     private final BootstrapConfig config;
 
     public PulumiIncusImageProvider(BootstrapConfig config) {
@@ -55,25 +56,58 @@ public final class PulumiIncusImageProvider {
      * Ensure the seed image exists and return its fingerprint output.
      */
     public Output<String> ensureSeedImageFingerprint(InvokeOptions invokeOptions, Provider provider) {
+        return ensureSeedImageFingerprint(invokeOptions, provider, null);
+    }
+
+    public Output<String> ensureSeedImageFingerprint(InvokeOptions invokeOptions, Provider provider,
+            Resource projectDependency) {
+        final String existingFingerprint = resolveExistingImageFingerprint(invokeOptions);
+        if (!existingFingerprint.isBlank()) {
+            return Output.of(existingFingerprint);
+        }
+
         final boolean preview = isDryRun();
         final Path workspace = config.worktreeDirOn(WorktreeHost.DARWIN);
-        final Path distrobuilderConfigPath = materializeDistrobuilderConfig(workspace);
         if (preview) {
             final Path artifactDir = resolveReadableLocalArtifactDir(resolveArtifactDir(workspace));
             final BuiltImageArtifacts previewArtifacts = new BuiltImageArtifacts(
                     artifactDir.resolve(INCUS_METADATA_FILENAME), artifactDir.resolve(INCUS_ROOTFS_FILENAME));
-            return createSeedImageFromArtifacts(provider, previewArtifacts).fingerprint();
+            return createSeedImageFromArtifacts(provider, previewArtifacts, projectDependency).fingerprint();
         }
 
         final BuiltImageArtifacts artifacts = ensureLocalImageArtifacts();
-        return createSeedImageFromArtifacts(provider, artifacts).fingerprint();
+        return createSeedImageFromArtifacts(provider, artifacts, projectDependency).fingerprint();
+    }
+
+    private String resolveExistingImageFingerprint(InvokeOptions invokeOptions) {
+        try {
+            final var existing = IncusFunctions.getImagePlain(GetImagePlainArgs.builder()
+                    .name(config.imageAlias())
+                    .project(config.incusProject())
+                    .build(), invokeOptions).join();
+
+            if (existing == null) {
+                return "";
+            }
+
+            final String fingerprint = existing.fingerprint();
+            return fingerprint == null ? "" : fingerprint.trim();
+        } catch (Exception ignored) {
+            return "";
+        }
     }
 
     private boolean isDryRun() {
         return Deployment.getInstance().isDryRun();
     }
 
-    private Image createSeedImageFromArtifacts(Provider provider, BuiltImageArtifacts artifacts) {
+    private Image createSeedImageFromArtifacts(Provider provider, BuiltImageArtifacts artifacts,
+            Resource projectDependency) {
+        final CustomResourceOptions.Builder optionsBuilder = CustomResourceOptions.builder().provider(provider);
+        if (projectDependency != null) {
+            optionsBuilder.dependsOn(List.of(projectDependency));
+        }
+
         return new Image("seed-image",
                 ImageArgs.builder()
                          .project(config.incusProject())
@@ -83,7 +117,7 @@ public final class PulumiIncusImageProvider {
                                                         .dataPath(artifacts.dataPath().toString())
                                                         .build())
                          .build(),
-                CustomResourceOptions.builder().provider(provider).build());
+                optionsBuilder.build());
     }
 
     private BuiltImageArtifacts ensureLocalImageArtifacts() {

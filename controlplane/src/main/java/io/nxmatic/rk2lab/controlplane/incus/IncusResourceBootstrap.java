@@ -19,6 +19,7 @@ import com.pulumi.incus.inputs.GetProjectPlainArgs;
 import com.pulumi.incus.inputs.InstanceDeviceArgs;
 import com.pulumi.incus.inputs.ProfileDeviceArgs;
 import com.pulumi.resources.CustomResourceOptions;
+import com.pulumi.resources.Resource;
 
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig.WorktreeHost;
 import io.nxmatic.rk2lab.controlplane.incus.image.PulumiIncusImageProvider;
@@ -86,6 +87,8 @@ public final class IncusResourceBootstrap {
 
         private IncusProviderContext providerContext;
 
+        private Project ensuredProject;
+
         private Output<String> ensuredProjectName;
 
         private Output<String> ensuredProfileName;
@@ -112,12 +115,13 @@ public final class IncusResourceBootstrap {
 
         private ApplyPipeline prepareProviderResources() {
             this.providerContext = IncusProviderContext.forBootstrap("seed-incus-provider", config);
-            this.ensuredProjectName = ensureProject(providerContext);
-            ensureNetwork(providerContext, config.lanBridgeParent());
-            ensureNetwork(providerContext, config.vmnetNetworkName());
-            this.ensuredProfileName = ensureProfile(providerContext);
+            this.ensuredProject = ensureProject(providerContext);
+            this.ensuredProjectName = ensuredProject.name();
+            ensureNetwork(providerContext, config.lanBridgeParent(), ensuredProject);
+            ensureNetwork(providerContext, config.vmnetNetworkName(), ensuredProject);
+            this.ensuredProfileName = ensureProfile(providerContext, ensuredProject);
             this.ensuredImageFingerprint = imageProvider.ensureSeedImageFingerprint(providerContext.invokeOptions(),
-                    providerContext.provider());
+                providerContext.provider(), ensuredProject);
             return this;
         }
 
@@ -152,42 +156,46 @@ public final class IncusResourceBootstrap {
         }
     }
 
-    private Output<String> ensureProject(IncusProviderContext context) {
+    private Project ensureProject(IncusProviderContext context) {
         final String existingProjectId = incusImportLookup.normalizeImportId(
                 incusImportLookup.existingProjectId(context, config.incusProject()));
 
         final CustomResourceOptions.Builder optionsBuilder = CustomResourceOptions.builder()
-                                                                                  .provider(context.provider());
+                                                                                  .provider(context.provider())
+                                                                                  .retainOnDelete(true);
         if (!existingProjectId.isBlank()) {
             optionsBuilder.importId(existingProjectId);
         }
 
-        final Project project = new Project("seed-project", ProjectArgs.builder().name(config.incusProject()).build(),
-                optionsBuilder.build());
-
-        return project.name();
+        return new Project("seed-project", ProjectArgs.builder().name(config.incusProject()).build(),
+            optionsBuilder.build());
     }
 
-    private Output<String> ensureProfile(IncusProviderContext context) {
+        private Output<String> ensureProfile(IncusProviderContext context, Resource projectDependency) {
         final String existingProfileId = incusImportLookup.normalizeImportId(
                 incusImportLookup.existingProfileId(context, config.profileName(), config.incusProject()));
         final boolean profileExists = !existingProfileId.isBlank();
 
         final CustomResourceOptions.Builder optionsBuilder = CustomResourceOptions.builder()
                                                                                   .provider(context.provider())
-                                              .retainOnDelete(true)
+                                                                                  .retainOnDelete(true)
+                                                                                  .dependsOn(List.of(projectDependency))
                                                                                   .ignoreChanges(List.of("name",
                                                                                           "project", "devices",
                                                                                           "config", "description"));
+        if (profileExists) {
+            optionsBuilder.importId(existingProfileId);
+        }
 
-        final ProfileArgs.Builder profileArgsBuilder = ProfileArgs.builder().name(config.profileName());
+        final ProfileArgs.Builder profileArgsBuilder = ProfileArgs.builder()
+                                                                  .name(config.profileName())
+                                                                  .project(config.incusProject());
         if (!profileExists) {
-            profileArgsBuilder.project(config.incusProject())
-                      .devices(ProfileDeviceArgs.builder()
-                                .name("root")
-                                .type("disk")
-                                .properties(Map.of("path", "/", "pool", "default"))
-                                .build());
+            profileArgsBuilder.devices(ProfileDeviceArgs.builder()
+                                                        .name("root")
+                                                        .type("disk")
+                                                        .properties(Map.of("path", "/", "pool", "default"))
+                                                        .build());
         }
 
         final Profile profile = new Profile("seed-profile",
@@ -381,7 +389,7 @@ public final class IncusResourceBootstrap {
         }
     }
 
-    private void ensureNetwork(IncusProviderContext context, String networkName) {
+    private void ensureNetwork(IncusProviderContext context, String networkName, Resource projectDependency) {
         final String existingNetworkId = incusImportLookup.normalizeImportId(
                 incusImportLookup.existingNetworkId(context, networkName, config.incusProject()));
 
@@ -400,6 +408,7 @@ public final class IncusResourceBootstrap {
         final CustomResourceOptions.Builder optionsBuilder = CustomResourceOptions.builder()
                                                                                   .provider(context.provider())
                                                                                   .retainOnDelete(true)
+                                                                                  .dependsOn(List.of(projectDependency))
                                                                                   .ignoreChanges(List.of("project"));
         if (!existingNetworkId.isBlank()) {
             optionsBuilder.importId(existingNetworkId);
@@ -625,13 +634,8 @@ public final class IncusResourceBootstrap {
         }
 
         private String existingProfileId(IncusProviderContext context, String profileName, String incusProject) {
-            final String projectScoped = resolveProfileImportId(context,
+            return resolveProfileImportId(context,
                     GetProfilePlainArgs.builder().name(profileName).project(incusProject).build());
-            if (!projectScoped.isBlank()) {
-                return projectScoped;
-            }
-
-            return resolveProfileImportId(context, GetProfilePlainArgs.builder().name(profileName).build());
         }
 
         private String resolveNetworkImportId(IncusProviderContext context, GetNetworkPlainArgs args) {
