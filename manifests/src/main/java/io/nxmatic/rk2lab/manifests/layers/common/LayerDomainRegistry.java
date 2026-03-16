@@ -13,8 +13,8 @@ import java.util.Set;
 public final class LayerDomainRegistry {
 
     private final Map<String, LayerDomain> domainsById;
-    private final List<ModeledLayer> modeledLayers;
-    private final Map<String, String> domainIdByLayerId;
+    private final List<ManifestUnit> manifestUnits;
+    private final Map<String, String> domainIdByManifestUnitId;
 
     public LayerDomainRegistry(final List<LayerDomain> domains) {
         if (domains == null || domains.isEmpty()) {
@@ -29,20 +29,21 @@ public final class LayerDomainRegistry {
         }
 
         this.domainsById = Map.copyOf(byId);
-        this.modeledLayers = byId.values().stream()
+        this.manifestUnits = byId.values().stream()
                 .flatMap(domain -> domain.layers().stream())
+            .map(layer -> (ManifestUnit) layer)
                 .toList();
 
-        HashMap<String, String> byLayerId = new HashMap<>();
+        HashMap<String, String> byManifestUnitId = new HashMap<>();
         for (LayerDomain domain : byId.values()) {
-            for (ModeledLayer layer : domain.layers()) {
-                String previous = byLayerId.put(layer.layerId(), domain.domainId());
+            for (ManifestUnit manifestUnit : domain.layers()) {
+                String previous = byManifestUnitId.put(manifestUnit.manifestUnitId(), domain.domainId());
                 if (previous != null) {
-                    throw new IllegalStateException("Layer is assigned to multiple domains: " + layer.layerId());
+                    throw new IllegalStateException("Manifest unit is assigned to multiple domains: " + manifestUnit.manifestUnitId());
                 }
             }
         }
-        this.domainIdByLayerId = Map.copyOf(byLayerId);
+        this.domainIdByManifestUnitId = Map.copyOf(byManifestUnitId);
 
         validateDomainDependencies();
     }
@@ -51,29 +52,29 @@ public final class LayerDomainRegistry {
         return List.copyOf(domainsById.values());
     }
 
-    public List<ModeledLayer> modeledLayers() {
-        return modeledLayers;
+    public List<ManifestUnit> manifestUnits() {
+        return manifestUnits;
     }
 
-    public void applyLayerWithDomainDependencies(
-            final String layerId,
-            final LayerDependencyApplier layerDependencyApplier,
+    public void applyManifestUnitWithDomainDependencies(
+            final String manifestUnitId,
+            final ManifestUnitDependencyApplier manifestUnitDependencyApplier,
             final Chart chart
     ) {
-        String domainId = domainIdByLayerId.get(layerId);
+        String domainId = domainIdByManifestUnitId.get(manifestUnitId);
         if (domainId == null) {
-            throw new IllegalStateException("Unable to resolve domain for modeled layer: " + layerId);
+            throw new IllegalStateException("Unable to resolve domain for manifest unit: " + manifestUnitId);
         }
 
         applyDomainWithDependencies(
                 domainId,
-                layerDependencyApplier,
+                manifestUnitDependencyApplier,
                 chart,
                 new HashSet<>(),
                 new HashSet<>()
         );
 
-        layerDependencyApplier.applyLayerWithDependencies(layerId, chart);
+        manifestUnitDependencyApplier.applyManifestUnitWithDependencies(manifestUnitId, chart);
     }
 
     private void validateDomainDependencies() {
@@ -91,7 +92,7 @@ public final class LayerDomainRegistry {
 
     private void applyDomainWithDependencies(
             final String domainId,
-            final LayerDependencyApplier layerDependencyApplier,
+            final ManifestUnitDependencyApplier manifestUnitDependencyApplier,
             final Chart chart,
             final Set<String> visitingDomainIds,
             final Set<String> appliedDomainIds
@@ -112,15 +113,15 @@ public final class LayerDomainRegistry {
         for (String dependencyDomainId : domain.dependsOnDomainIds()) {
             applyDomainWithDependencies(
                     dependencyDomainId,
-                    layerDependencyApplier,
+                    manifestUnitDependencyApplier,
                     chart,
                     visitingDomainIds,
                     appliedDomainIds
             );
         }
 
-        for (ModeledLayer layer : domain.layers()) {
-            layerDependencyApplier.applyLayerWithDependencies(layer.layerId(), chart);
+        for (ManifestUnit manifestUnit : domain.layers()) {
+            manifestUnitDependencyApplier.applyManifestUnitWithDependencies(manifestUnit.manifestUnitId(), chart);
         }
 
         visitingDomainIds.remove(domainId);

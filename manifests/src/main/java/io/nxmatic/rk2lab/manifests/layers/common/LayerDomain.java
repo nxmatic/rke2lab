@@ -3,9 +3,9 @@ package io.nxmatic.rk2lab.manifests.layers.common;
 
 import java.util.List;
 
-public record LayerDomain(String domainId, List<String> dependsOnDomainIds, List<ModeledLayer> layers) {
+public record LayerDomain(String domainId, List<String> dependsOnDomainIds, List<? extends ManifestUnit> layers) {
 
-    public LayerDomain(final String domainId, final List<ModeledLayer> layers) {
+    public LayerDomain(final String domainId, final List<? extends ManifestUnit> layers) {
         this(domainId, List.of(), layers);
     }
 

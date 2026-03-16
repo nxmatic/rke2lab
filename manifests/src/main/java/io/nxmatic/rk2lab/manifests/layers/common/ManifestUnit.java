@@ -5,13 +5,13 @@ import org.cdk8s.Chart;
 
 import java.util.List;
 
-public interface ModeledLayer {
+public interface ManifestUnit {
 
-    String layerId();
+    String manifestUnitId();
 
     List<String> legacyPathPrefixes();
 
-    List<String> dependsOnLayerIds();
+    List<String> dependsOnManifestUnitIds();
 
     void apply(Chart chart);
 }

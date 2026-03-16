@@ -1,13 +1,13 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests;
 
-import io.nxmatic.rk2lab.manifests.layers.common.ApplyingLayerVisitor;
-import io.nxmatic.rk2lab.manifests.layers.common.LayerDependencyApplier;
+import io.nxmatic.rk2lab.manifests.layers.common.ApplyingManifestUnitVisitor;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistry;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistryBuilder;
-import io.nxmatic.rk2lab.manifests.layers.common.LayerRegistry;
-import io.nxmatic.rk2lab.manifests.layers.common.LayerVisitor;
-import io.nxmatic.rk2lab.manifests.layers.common.ModeledLayer;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnit;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitDependencyApplier;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitRegistry;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitVisitor;
 import io.nxmatic.rk2lab.manifests.layers.cicd.CicdDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.gitops.GitopsDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.ha.HaDomainRegistrar;
@@ -19,8 +19,6 @@ import io.nxmatic.rk2lab.manifests.layers.storage.StorageDomainRegistrar;
 import org.cdk8s.App;
 import org.cdk8s.AppProps;
 import org.cdk8s.Chart;
-import org.cdk8s.Include;
-import org.cdk8s.IncludeProps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,45 +78,38 @@ public final class Main {
                     .register(new CicdDomainRegistrar())
                     .build();
 
-            List<ModeledLayer> modeledLayers = domainRegistry.modeledLayers();
+                List<ManifestUnit> manifestUnits = domainRegistry.manifestUnits();
 
-            LayerRegistry layerRegistry = new LayerRegistry(modeledLayers);
-            LayerVisitor layerVisitor = new ApplyingLayerVisitor();
-            LayerDependencyApplier dependencyApplier = new LayerDependencyApplier(layerRegistry, layerVisitor);
+                ManifestUnitRegistry manifestUnitRegistry = new ManifestUnitRegistry(manifestUnits);
+                ManifestUnitVisitor manifestUnitVisitor = new ApplyingManifestUnitVisitor();
+                ManifestUnitDependencyApplier dependencyApplier = new ManifestUnitDependencyApplier(manifestUnitRegistry, manifestUnitVisitor);
 
-            LOG.info("Configured {} modeled domains", domainRegistry.domains().size());
-            LOG.debug("Modeled domains: {}", domainRegistry.domains().stream()
+                LOG.info("Configured {} manifest domains", domainRegistry.domains().size());
+                LOG.debug("Manifest domains: {}", domainRegistry.domains().stream()
                     .map(domain -> domain.domainId())
                     .sorted()
                     .toList());
 
-            IncludeSequence includeSequence = new IncludeSequence();
-            int modeledLayerHitCount = 0;
-            int legacyIncludeCount = 0;
+            int manifestUnitHitCount = 0;
             for (Path manifestFile : manifestFiles) {
                 Path relativePath = manifestsRoot.relativize(manifestFile);
                 String relativePathString = relativePath.toString().replace('\\', '/');
 
-                Optional<ModeledLayer> modeledLayer = layerRegistry.findByLegacyPath(relativePathString);
-                if (modeledLayer.isPresent()) {
-                    modeledLayerHitCount++;
-                    LOG.debug("Applying modeled layer '{}' for manifest path '{}'", modeledLayer.get().layerId(), relativePathString);
-                    domainRegistry.applyLayerWithDomainDependencies(
-                            modeledLayer.get().layerId(),
+                Optional<ManifestUnit> manifestUnit = manifestUnitRegistry.findByLegacyPath(relativePathString);
+                if (manifestUnit.isPresent()) {
+                    manifestUnitHitCount++;
+                    LOG.debug("Applying manifest unit '{}' for manifest path '{}'", manifestUnit.get().manifestUnitId(), relativePathString);
+                    domainRegistry.applyManifestUnitWithDomainDependencies(
+                        manifestUnit.get().manifestUnitId(),
                             dependencyApplier,
                             chart
                     );
                     continue;
                 }
 
-                String includeId = includeSequence.nextIncludeId(relativePath);
-                legacyIncludeCount++;
-                LOG.debug("Including legacy manifest '{}' as '{}'", relativePathString, includeId);
-                new Include(
-                        chart,
-                        includeId,
-                        IncludeProps.builder().url(manifestFile.toAbsolutePath().toString()).build()
-                );
+                    throw new IllegalStateException(
+                        "Manifest path is not mapped to a canonical manifest unit: " + relativePathString
+                    );
             }
 
             app.synth();
@@ -131,11 +122,10 @@ public final class Main {
             Files.move(synthesizedFile, synthManifestFile, StandardCopyOption.REPLACE_EXISTING);
 
             LOG.info(
-                    "Synthesized {} manifest files from {} (modeled hits={}, legacy includes={})",
+                    "Synthesized {} manifest files from {} (manifest unit hits={})",
                     manifestFiles.size(),
                     manifestsRoot,
-                    modeledLayerHitCount,
-                    legacyIncludeCount
+                    manifestUnitHitCount
                 );
             LOG.info("Consolidated manifest output written to {}", synthManifestFile);
         }
@@ -159,19 +149,6 @@ public final class Main {
                 current = current.getParent();
             }
             return Optional.empty();
-        }
-    }
-
-    private static final class IncludeSequence {
-
-        private int index = 0;
-
-        String nextIncludeId(final Path relativePath) {
-            String normalized = relativePath.toString().replace('\\', '/');
-            String sanitized = normalized.replaceAll("[^A-Za-z0-9]+", "-")
-                    .replaceAll("^-+", "")
-                    .replaceAll("-+$", "");
-            return String.format("m-%04d-%s", index++, sanitized);
         }
     }
 }
