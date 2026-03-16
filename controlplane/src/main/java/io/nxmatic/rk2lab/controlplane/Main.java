@@ -52,8 +52,8 @@ public final class Main {
 
         final Map<String, Object> outputs = new LinkedHashMap<>();
         outputs.put("managementClusterName", config.clusterName());
-        outputs.put("apiEndpoint", config.apiEndpoint());
-        outputs.put("kubeconfigRef", config.kubeconfigRef());
+        outputs.put("apiEndpoint", config.apiEndpoint().toString());
+        outputs.put("kubeconfigRef", config.kubeconfigRef().toString());
         outputs.put("seedNodeId", seedNodeId);
         outputs.put("seedInstanceUrn", seedInstanceUrn);
         outputs.put("seedProviderUrn", seedProviderUrn);

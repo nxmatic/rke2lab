@@ -105,11 +105,6 @@ public record BootstrapConfig(Path worktreeDir, String clusterName, String nodeN
 
         private Path kubeconfigRef;
 
-        public Builder worktreeDir(String value) {
-            this.worktree = parsePath(value);
-            return this;
-        }
-
         public Builder worktree(Path value) {
             this.worktree = normalizeAbsolutePath(value);
             return this;
@@ -135,18 +130,8 @@ public record BootstrapConfig(Path worktreeDir, String clusterName, String nodeN
             return this;
         }
 
-        public Builder incusRemoteAddress(String value) {
-            this.incusRemoteAddress = parseUri(value);
-            return this;
-        }
-
         public Builder incusRemoteAddress(URI value) {
             this.incusRemoteAddress = value;
-            return this;
-        }
-
-        public Builder incusConfigDir(String value) {
-            this.incusConfigDir = parsePath(value);
             return this;
         }
 
@@ -165,18 +150,8 @@ public record BootstrapConfig(Path worktreeDir, String clusterName, String nodeN
             return this;
         }
 
-        public Builder imageDistrobuilderConfig(String value) {
-            this.imageDistrobuilderConfig = parseUri(value);
-            return this;
-        }
-
         public Builder imageDistrobuilderConfig(URI value) {
             this.imageDistrobuilderConfig = value;
-            return this;
-        }
-
-        public Builder imageSharedFolder(String value) {
-            this.imageSharedFolder = parsePath(value);
             return this;
         }
 
@@ -200,44 +175,34 @@ public record BootstrapConfig(Path worktreeDir, String clusterName, String nodeN
             return this;
         }
 
-        public Builder apiEndpoint(String value) {
-            this.apiEndpoint = parseUri(value);
-            return this;
-        }
-
         public Builder apiEndpoint(URI value) {
             this.apiEndpoint = value;
             return this;
         }
 
-        public Builder kubeconfigRef(String value) {
-            this.kubeconfigRef = parsePath(value);
-            return this;
-        }
-
         public Builder kubeconfigRef(Path value) {
-            this.kubeconfigRef = value == null ? null : normalizeAbsolutePath(value);
+            this.kubeconfigRef = value == null ? null : value.normalize();
             return this;
         }
 
         public Builder applyConfig(Config config) {
             final EnvironmentValues environment = new EnvironmentValues(config);
-            override(environment, "worktree.dir", this::worktreeDir);
+            override(environment, "worktree.dir", value -> this.worktree(parsePath(value)));
             override(environment, "cluster.name", this::clusterName);
             override(environment, "node.name", this::nodeName);
             override(environment, "incus.project", this::incusProject);
             override(environment, "incus.defaultRemote", this::incusDefaultRemote);
-            override(environment, "incus.remoteAddress", this::incusRemoteAddress);
-            override(environment, "incus.configDir", this::incusConfigDir);
+            override(environment, "incus.remoteAddress", value -> this.incusRemoteAddress(parseUri(value)));
+            override(environment, "incus.configDir", value -> this.incusConfigDir(parsePath(value)));
             override(environment, "image.alias", this::imageAlias);
             override(environment, "image.builderHost", this::imageBuilderHost);
-            override(environment, "image.distrobuilderConfig", this::imageDistrobuilderConfig);
-            override(environment, "image.sharedFolder", this::imageSharedFolder);
+            override(environment, "image.distrobuilderConfig", value -> this.imageDistrobuilderConfig(parseUri(value)));
+            override(environment, "image.sharedFolder", value -> this.imageSharedFolder(parsePath(value)));
             override(environment, "profile.name", this::profileName);
             override(environment, "network.lanBridgeParent", this::lanBridgeParent);
             override(environment, "network.vmnetNetworkName", this::vmnetNetworkName);
-            override(environment, "api.endpoint", this::apiEndpoint);
-            override(environment, "kubeconfig.ref", this::kubeconfigRef);
+            override(environment, "api.endpoint", value -> this.apiEndpoint(parseUri(value)));
+            override(environment, "kubeconfig.ref", value -> this.kubeconfigRef(parsePath(value)));
             return this;
         }
 
@@ -250,7 +215,7 @@ public record BootstrapConfig(Path worktreeDir, String clusterName, String nodeN
 
         public BootstrapConfig build() {
             final Path resolvedKubeconfigRef = kubeconfigRef != null ? kubeconfigRef
-                    : Path.of("/srv/host/kubeconfig.d/rke2-" + clusterName + ".yaml").normalize();
+                    : Path.of(".local.d", "var", "kube", "rke2-" + clusterName + ".yaml").normalize();
 
             if (imageSharedFolder == null || imageSharedFolder.toString().isBlank()) {
                 throw new IllegalStateException("Missing required configuration: image.sharedFolder");
