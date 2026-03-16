@@ -13,7 +13,7 @@ public final class RuntimeDomainRegistrar implements LayerDomainRegistrar {
         return new LayerDomain(
                 "runtime",
                 List.of("storage", "replication"),
-                List.of(new FloxContainerdShimModeledLayer())
+                List.of(new FloxContainerdShimManifestUnit())
         );
     }
 }

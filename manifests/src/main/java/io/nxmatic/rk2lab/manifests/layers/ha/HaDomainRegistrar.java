@@ -1,7 +1,6 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.ha;
 
-import io.nxmatic.rk2lab.manifests.layers.common.IncludeBackedModeledLayer;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomain;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistrar;
 
@@ -15,11 +14,7 @@ public final class HaDomainRegistrar implements LayerDomainRegistrar {
                 "ha",
                 List.of("networking"),
                 List.of(
-                        new IncludeBackedModeledLayer(
-                                "ha/kube-vip",
-                                "ha/kube-vip/",
-                                List.of()
-                        )
+                    new KubeVipManifestUnit()
                 )
         );
     }

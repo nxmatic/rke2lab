@@ -12,7 +12,7 @@ public final class ReplicationDomainRegistrar implements LayerDomainRegistrar {
     public LayerDomain domain() {
         return new LayerDomain(
                 "replication",
-                List.of(new ReplicationReplicatorModeledLayer())
+            List.of(new io.nxmatic.rk2lab.manifests.layers.replication.ReplicationReplicatorManifestUnit())
         );
     }
 }

@@ -12,7 +12,7 @@ public final class StorageDomainRegistrar implements LayerDomainRegistrar {
     public LayerDomain domain() {
         return new LayerDomain(
                 "storage",
-                List.of(new OpenebsZfsModeledLayer())
+            List.of(new OpenebsZfsManifestUnit())
         );
     }
 }

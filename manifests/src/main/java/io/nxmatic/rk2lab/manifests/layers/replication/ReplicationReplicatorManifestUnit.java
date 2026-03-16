@@ -1,18 +1,18 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.replication;
 
-import io.nxmatic.rk2lab.manifests.layers.common.AbstractModeledLayer;
+import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
 import org.cdk8s.Chart;
 
 import java.util.List;
 
-public final class ReplicationReplicatorModeledLayer extends AbstractModeledLayer {
+public final class ReplicationReplicatorManifestUnit extends AbstractManifestUnit {
 
-    public static final String LAYER_ID = "replication/replicator";
+    public static final String MANIFEST_UNIT_ID = "replication/replicator";
 
-    public ReplicationReplicatorModeledLayer() {
+    public ReplicationReplicatorManifestUnit() {
         super(
-                LAYER_ID,
+                MANIFEST_UNIT_ID,
                 List.of(ReplicatorLayer.LEGACY_PATH_PREFIX),
                 List.of()
         );

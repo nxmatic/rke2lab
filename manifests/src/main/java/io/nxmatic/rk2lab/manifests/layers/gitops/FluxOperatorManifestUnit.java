@@ -1,18 +1,18 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.gitops;
 
-import io.nxmatic.rk2lab.manifests.layers.common.AbstractModeledLayer;
+import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
 import org.cdk8s.Chart;
 
 import java.util.List;
 
-public final class FluxOperatorModeledLayer extends AbstractModeledLayer {
+public final class FluxOperatorManifestUnit extends AbstractManifestUnit {
 
-    public static final String LAYER_ID = "gitops/flux-operator";
+    public static final String MANIFEST_UNIT_ID = "gitops/flux-operator";
 
-    public FluxOperatorModeledLayer() {
+    public FluxOperatorManifestUnit() {
         super(
-                LAYER_ID,
+                MANIFEST_UNIT_ID,
                 List.of(FluxOperatorLayer.LEGACY_PATH_PREFIX),
                 List.of()
         );
