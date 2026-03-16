@@ -16,5 +16,12 @@
         <include>**/*</include>
       </includes>
     </fileSet>
+    <fileSet>
+      <directory>${project.basedir}/src/main/resources/host</directory>
+      <outputDirectory>manifests.d/host</outputDirectory>
+      <includes>
+        <include>**/*</include>
+      </includes>
+    </fileSet>
   </fileSets>
 </assembly>

@@ -14,10 +14,11 @@ public final class RuntimeDomainRegistrar implements LayerDomainRegistrar {
                 "runtime",
                 List.of("storage", "replication"),
             List.of(
-                new RuntimeEnvConfigManifestUnit(),
-                new RuntimeRke2ConfigManifestUnit(),
-                new RuntimeCloudConfigManifestUnit(),
-                new FloxContainerdShimManifestUnit()
+                new RKE2LabEnvConfigManifestUnit(),
+                new Rke2ConfigManifestUnit(),
+                new CloudConfigManifestUnit(),
+                new FloxContainerdShimManifestUnit(),
+                new FloxContainerBuildAssetsManifestUnit()
             )
         );
     }

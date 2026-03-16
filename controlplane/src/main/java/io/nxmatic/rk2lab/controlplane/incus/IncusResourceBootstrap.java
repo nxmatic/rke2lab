@@ -123,6 +123,7 @@ public final class IncusResourceBootstrap {
         private ApplyPipeline prepareHostState() {
             classpathAssetMaterializer.materializeIncusAssets(localPaths.assetsRoot());
             classpathAssetMaterializer.materializeManifests(localPaths.manifestsRoot());
+            classpathAssetMaterializer.materializeHostSystemdAssets(localPaths.manifestsRoot().resolve("host"));
             hostMountSourceVerifier.ensureSources(localPaths);
             nodeConfigRegenerator.regenerateCloudConfigDir(localPaths.runtimeCloudConfigRoot(),
                 localPaths.cloudSeedRoot());
@@ -255,7 +256,9 @@ public final class IncusResourceBootstrap {
                                           "/srv/host/system.d")
                       .disk("manifests.dir", hostPaths.manifestsRoot(), "/srv/host/manifests.d")
                       .disk("rke2.config.dir", hostPaths.runtimeRke2ConfigRoot(),
-                                          "/srv/host/config.d")
+                                          "/srv/host/rke2-config")
+                      .disk("cloudconfig.nocloud.dir", hostPaths.runtimeCloudConfigRoot(),
+                                          "/srv/host/cloudconfig-nocloud")
                       .disk("shared.dir", hostPaths.shareRoot(), "/srv/host/share.d")
                       .disk("kubeconfig.dir", hostPaths.kubeconfigRoot(),
                                           "/srv/host/kubeconfig.d")
@@ -274,7 +277,12 @@ public final class IncusResourceBootstrap {
 
         private static BootstrapPaths fromLocalWorktree(Path worktreeRoot, String clusterName, String nodeName) {
             final Path stateRoot = worktreeRoot.resolve(".local.d");
-            final Path hostResourceRoot = worktreeRoot.resolve(".rke2lab").resolve("host");
+            final Path hostResourceRoot = stateRoot.resolve("var")
+                .resolve("run")
+                .resolve("incus")
+                .resolve(clusterName)
+                .resolve(nodeName)
+                .resolve("host");
             final Path clusterNodeRoot = stateRoot.resolve("var")
                     .resolve("lib")
                     .resolve("rke2lab")
@@ -282,8 +290,9 @@ public final class IncusResourceBootstrap {
                     .resolve(nodeName);
             final Path manifestsRoot = hostResourceRoot.resolve("manifests.d");
             final Path runtimeRoot = manifestsRoot.resolve("runtime");
-            final Path scriptsRoot = hostResourceRoot.resolve("scripts.d");
-            final Path systemdRoot = hostResourceRoot.resolve("system.d");
+            final Path hostRoot = manifestsRoot.resolve("host");
+            final Path scriptsRoot = hostRoot.resolve("systemd-scripts");
+            final Path systemdRoot = hostRoot.resolve("systemd-units");
 
             return BootstrapPaths.builder()
                     .worktreeRoot(worktreeRoot)
@@ -639,9 +648,9 @@ public final class IncusResourceBootstrap {
 
         private static final String CLASSPATH_ROOT = "META-INF/io.nxmatic/rk2lab/controlplane";
 
-        private static final String CLASSPATH_ASSET_SCRIPTS_ROOT = CLASSPATH_ROOT + "/incus/assets/scripts";
+        private static final String CLASSPATH_HOST_SYSTEMD_SCRIPTS_ROOT = CLASSPATH_ROOT + "/incus/manifests/manifests.d/host/systemd-scripts";
 
-        private static final String CLASSPATH_ASSET_SYSTEMD_ROOT = CLASSPATH_ROOT + "/incus/assets/systemd";
+        private static final String CLASSPATH_HOST_SYSTEMD_UNITS_ROOT = CLASSPATH_ROOT + "/incus/manifests/manifests.d/host/systemd-units";
 
         private static final String CLASSPATH_MANIFESTS_ROOT = CLASSPATH_ROOT + "/incus/manifests/manifests.d";
 
@@ -649,8 +658,12 @@ public final class IncusResourceBootstrap {
         }
 
         private void materializeIncusAssets(Path assetsTargetRoot) {
-            materializeResourceTree(CLASSPATH_ASSET_SCRIPTS_ROOT, assetsTargetRoot.resolve("scripts.d"), true);
-            materializeResourceTree(CLASSPATH_ASSET_SYSTEMD_ROOT, assetsTargetRoot.resolve("system.d"), false);
+            // Keep materialization hook for non-systemd host assets.
+        }
+
+        private void materializeHostSystemdAssets(Path hostRoot) {
+            materializeResourceTree(CLASSPATH_HOST_SYSTEMD_SCRIPTS_ROOT, hostRoot.resolve("systemd-scripts"), true);
+            materializeResourceTree(CLASSPATH_HOST_SYSTEMD_UNITS_ROOT, hostRoot.resolve("systemd-units"), false);
         }
 
         private void materializeManifests(Path manifestsTargetRoot) {

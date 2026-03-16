@@ -6,11 +6,11 @@ import org.cdk8s.Chart;
 
 import java.util.List;
 
-public final class RuntimeCloudConfigManifestUnit extends AbstractManifestUnit {
+public final class CloudConfigManifestUnit extends AbstractManifestUnit {
 
     public static final String MANIFEST_UNIT_ID = "runtime/cloud-config";
 
-    public RuntimeCloudConfigManifestUnit() {
+    public CloudConfigManifestUnit() {
         super(MANIFEST_UNIT_ID, List.of(RuntimeCloudConfigLayer.LEGACY_PATH_PREFIX), List.of());
     }
 

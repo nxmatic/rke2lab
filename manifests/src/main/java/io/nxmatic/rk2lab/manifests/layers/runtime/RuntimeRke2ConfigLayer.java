@@ -41,7 +41,7 @@ public final class RuntimeRke2ConfigLayer extends Construct {
         createConfigMap("debug.yaml", "Enable RKE2 debug logging for manifest watcher", "|ConfigMap|default|debug",
                 orderedMap(
                         entry("v", "4"),
-                        entry("debug", "true")
+                        entry("debug", "false")
                 ));
         createConfigMap("disable.yaml", "Disable list fragment", "|ConfigMap|default|rke2-disable",
                 Map.of("disable", List.of(

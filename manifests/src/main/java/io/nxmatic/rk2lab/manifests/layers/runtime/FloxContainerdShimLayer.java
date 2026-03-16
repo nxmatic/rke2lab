@@ -8,6 +8,9 @@ import org.cdk8s.ApiObjectProps;
 import org.cdk8s.JsonPatch;
 import software.constructs.Construct;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 public final class FloxContainerdShimLayer extends Construct {
@@ -128,10 +131,23 @@ public final class FloxContainerdShimLayer extends Construct {
 
         configMap.addDependency(namespace);
         configMap.addJsonPatch(JsonPatch.add("/data", Map.of(
-                "shim-installer.sh", "#!/usr/bin/env bash\nset -exuo pipefail\n\ninstall_deps() {\n  local attempt=0\n  local max_attempts=${APK_MAX_RETRIES:-5}\n  while true; do\n    attempt=$((attempt + 1))\n    if apk update && apk add --no-cache util-linux >/tmp/apk.log; then\n      return 0\n    fi\n    if [[ ${attempt} -ge ${max_attempts} ]]; then\n      echo \"apk install failed after ${attempt} attempts\" >&2\n      sleep infinity\n    fi\n    sleep $((attempt * 2))\n  done\n}\n\ninstall_deps\n\nnsenter --target 1 --mount --uts --ipc --net --pid -- env \\\n  CONTAINERD_CONFIG_FILE=\"${CONTAINERD_CONFIG_FILE}\" \\\n  bash <<'HOSTSCRIPT'\nset -euxo pipefail\n\n: \"Ensure Nix is available in the host environment for the shim installer script\"\nsource /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh\n\nFLOX_BIN=\"$(command -v flox || true)\"\n[[ -x \"${FLOX_BIN}\" ]] || {\n  echo \"Flox CLI not found in host environment\" >&2\n  exit 1\n}\n\nif [[ \"${FLOX_BIN}\" != \"/usr/bin/flox\" ]]; then\n  mkdir -p /usr/bin\n  ln -sf \"${FLOX_BIN}\" /usr/bin/flox\nfi\n\nexport PATH=\"/var/lib/rancher/rke2/bin:/var/lib/rancher/rke2/agent/bin:${PATH}\"\nexport FLOX_NO_TELEMETRY=1\nexport FLOX_NONINTERACTIVE=1\n\nCONFIG_FILE=\"${CONTAINERD_CONFIG_FILE}\"\nCONFIG_DIR=\"$(dirname \"${CONFIG_FILE}\")\"\nCONFIG_TEMPLATE=\"${CONFIG_DIR}/config.toml.tmpl\"\nFLOX_ENV_DIR=\"/var/lib/flox-runtime/containerd-shim\"\nARCH=\"$(uname -m)\"\n\nmkdir -p \"${FLOX_ENV_DIR}\"\nif [[ ! -d \"${FLOX_ENV_DIR}/.flox\" ]]; then\n  (cd \"${FLOX_ENV_DIR}\" && flox init)\nfi\n\nif command -v containerd >/dev/null 2>&1; then\n  CONTAINERD_BIN=\"$(command -v containerd)\"\nelif [[ -x /var/lib/rancher/rke2/bin/containerd ]]; then\n  CONTAINERD_BIN=\"/var/lib/rancher/rke2/bin/containerd\"\nelif [[ -x /var/lib/rancher/rke2/agent/bin/containerd ]]; then\n  CONTAINERD_BIN=\"/var/lib/rancher/rke2/agent/bin/containerd\"\nelse\n  echo \"containerd binary not found\" >&2\n  exit 1\nfi\n\nCONTAINERD_VERSION=\"$(${CONTAINERD_BIN} --version | awk '{print $3}')\"\nCONTAINERD_VERSION=\"${CONTAINERD_VERSION#v}\"\nCONTAINERD_MAJOR=\"${CONTAINERD_VERSION%%.*}\"\nif [[ -z \"${CONTAINERD_MAJOR}\" ]]; then\n  echo \"unable to determine containerd version\" >&2\n  exit 1\nfi\nif [[ \"${CONTAINERD_MAJOR}\" -ge 2 ]]; then\n  SHIM_PKG=\"flox/containerd-shim-flox-2x\"\nelse\n  SHIM_PKG=\"flox/containerd-shim-flox-17\"\nfi\n\nflox install --dir \"${FLOX_ENV_DIR}\" \"${SHIM_PKG}\"\n\n: \"Ensure flox gcroots directory exists\"\nGCROOTS_DIR=\"${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/flox\"\nGCROOTS_LINK=\"${GCROOTS_DIR}/system-profile\"\nmkdir -p \"${GCROOTS_DIR}\"\nif [[ ! -e \"${GCROOTS_LINK}\" ]]; then\n  ln -s /nix/var/nix/profiles/default \"${GCROOTS_LINK}\"\nfi\n\nSHIM_RUN_DIR=\"$(find \"${FLOX_ENV_DIR}/.flox/run\" -maxdepth 1 -name \"${ARCH}-linux.containerd-shim*.run\" -print -quit || true)\"\nif [[ -z \"${SHIM_RUN_DIR}\" ]]; then\n  echo \"unable to locate Flox shim run directory\" >&2\n  exit 1\nfi\nSHIM_PATH=\"$(realpath \"${SHIM_RUN_DIR}\")/bin/containerd-shim-flox-v2\"\nif [[ ! -f \"${SHIM_PATH}\" ]]; then\n  echo \"shim binary missing at ${SHIM_PATH}\" >&2\n  exit 1\nfi\ninstall -D -m 0755 \"${SHIM_PATH}\" /usr/local/bin/containerd-shim-flox-v2\n\nif [[ ! -f \"${CONFIG_TEMPLATE}\" ]]; then\n  cp \"${CONFIG_FILE}\" \"${CONFIG_TEMPLATE}\"\nfi\n\nCONFIG_VERSION=\"$(grep -m1 '^version' \"${CONFIG_FILE}\" | awk -F '=' '{print $2}' | tr -d ' \"')\"\nif [[ \"${CONFIG_VERSION}\" == \"3\" ]]; then\n  RUNTIME_SECTION='plugins.\"io.containerd.cri.v1.runtime\".containerd.runtimes.flox'\nelse\n  RUNTIME_SECTION='plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes.flox'\nfi\n\nupdate_config() {\n  local target=\"$1\"\n  [[ -f \"${target}\" ]] || return 0\n  local tmp\n  tmp=\"$(mktemp)\"\n  awk '\n    BEGIN {skip=0}\n    /^## Flox runtime shim/ {skip=1; next}\n    /^\\[plugins\\..*containerd\\.runtimes\\.flox/ {skip=1; next}\n    skip && /^\\[/ && $0 !~ /containerd\\.runtimes\\.flox/ {skip=0}\n    skip {next}\n    {print}\n  ' \"${target}\" > \"${tmp}\"\n  mv \"${tmp}\" \"${target}\"\n  cat <<EOF_BLOCK | sed \"s|__RUNTIME_SECTION__|${RUNTIME_SECTION}|\" | sed 's/^          //' >> \"${target}\"\n## Flox runtime shim\n[__RUNTIME_SECTION__]\n  runtime_path = \"/usr/local/bin/containerd-shim-flox-v2\"\n  runtime_type = \"io.containerd.runc.v2\"\n  pod_annotations = [ \"flox.dev/*\" ]\n  container_annotations = [ \"flox.dev/*\" ]\n[__RUNTIME_SECTION__.options]\n  SystemdCgroup = true\nEOF_BLOCK\n}\n\nupdate_config \"${CONFIG_FILE}\"\nupdate_config \"${CONFIG_TEMPLATE}\"\n\nif systemctl is-active rke2-server >/dev/null; then\n  systemctl restart rke2-server\nelif systemctl is-active rke2-agent >/dev/null; then\n  systemctl restart rke2-agent\nelif systemctl is-active containerd >/dev/null; then\n  systemctl restart containerd\nelse\n  echo \"no known service to restart\" >&2\nfi\nHOSTSCRIPT\n"
+                                "shim-installer.sh", readResource("/runtime/flox-containerd-shim/shim-installer.sh")
         )));
         return configMap;
     }
+
+        private String readResource(final String resourcePath) {
+                final InputStream input = FloxContainerdShimLayer.class.getResourceAsStream(resourcePath);
+                if (input == null) {
+                        throw new IllegalStateException("Missing flox-containerd-shim resource: " + resourcePath);
+                }
+
+                try {
+                        return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+                } catch (IOException ex) {
+                        throw new IllegalStateException("Failed reading flox-containerd-shim resource: " + resourcePath, ex);
+                }
+        }
 
     private ApiObject createServiceAccount(final ApiObject namespace) {
         ApiObject serviceAccount = new ApiObject(
@@ -248,6 +264,11 @@ public final class FloxContainerdShimLayer extends Construct {
                                                                 "mountPath", "/scripts",
                                                                 "name", "runtime-installer-script",
                                                                 "readOnly", true
+                                                        ),
+                                                        Map.of(
+                                                                "mountPath", "/build-assets",
+                                                                "name", "flox-container-build-assets",
+                                                                "readOnly", true
                                                         )
                                                 }
                                         )
@@ -265,6 +286,13 @@ public final class FloxContainerdShimLayer extends Construct {
                                                         "name", "flox-runtime-installer-script"
                                                 ),
                                                 "name", "runtime-installer-script"
+                                        ),
+                                        Map.of(
+                                                "configMap", Map.of(
+                                                        "defaultMode", 493,
+                                                        "name", "flox-container-build-assets"
+                                                ),
+                                                "name", "flox-container-build-assets"
                                         )
                                 }
                         )

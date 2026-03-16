@@ -116,9 +116,9 @@ spec:
 
     mounts:
       required:
-        - source: assets/incus/scripts
+        - source: manifests/src/main/resources/host/systemd-scripts
           target: /srv/host/scripts.d
-        - source: assets/incus/systemd
+        - source: manifests/src/main/resources/host/systemd-units
           target: /srv/host/system.d
         - source: rke2.d/<cluster>/<node>/manifests.d
           target: /srv/host/manifests.d

@@ -7,8 +7,14 @@ set -exuo pipefail
 
 source <(flox activate --dir /var/lib/rancher/rke2)
 
-BUILDS_DESCRIPTOR="${1:-/srv/host/flox-builds.yaml}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="${SCRIPT_PATH%/*}"
+if [[ "${SCRIPT_DIR}" == "${SCRIPT_PATH}" ]]; then
+	SCRIPT_DIR='.'
+fi
+SCRIPT_BASENAME="$(basename "${SCRIPT_PATH}")"
+SCRIPT_STEM="${SCRIPT_BASENAME%.sh}"
+BUILDS_DESCRIPTOR="${1:-${SCRIPT_DIR}/${SCRIPT_STEM}.yaml}"
 
 # Required environment variables
 RKE2LAB_ROOT="${RKE2LAB_ROOT:-/srv/host}"

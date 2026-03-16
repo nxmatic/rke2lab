@@ -8,29 +8,30 @@ log() {
 	printf '[systemd-link] %s\n' "$*"
 }
 
+SYSTEMD_UNITS_DIR="${RKE2LAB_SYSTEMD_DIR}"
+
 # Wait for the bind-mount to appear and contain files (up to 30s)
 for i in {1..30}; do
-	if [[ -d "${RKE2LAB_SYSTEMD_DIR}" && $(find "${RKE2LAB_SYSTEMD_DIR}" -type f | wc -l) -gt 0 ]]; then
+	if [[ -d "${SYSTEMD_UNITS_DIR}" && $(find "${SYSTEMD_UNITS_DIR}" -type f | wc -l) -gt 0 ]]; then
 		break
 	fi
-	log "waiting for ${RKE2LAB_SYSTEMD_DIR} to be populated (attempt ${i}/30)"
+	log "waiting for ${SYSTEMD_UNITS_DIR} to be populated (attempt ${i}/30)"
 	sleep 1
 done
 
-if [[ ! -d "${RKE2LAB_SYSTEMD_DIR}" ]]; then
-	log "systemd directory not found: ${RKE2LAB_SYSTEMD_DIR}"
+if [[ ! -d "${SYSTEMD_UNITS_DIR}" ]]; then
+	log "systemd units directory not found: ${SYSTEMD_UNITS_DIR}"
 	exit 1
 fi
 
 mkdir -p /etc/systemd/system
 
-: "Copy service unit files"
-find "${RKE2LAB_SYSTEMD_DIR}" -maxdepth 1 -type f \( -name '*.service' -o -name '*.target' -o -name '*.mount' \) -exec cp {} /etc/systemd/system/ \;
-log "copied systemd units from ${RKE2LAB_SYSTEMD_DIR}"
-
-: "Copy service unit drop-in directories"
-find "${RKE2LAB_SYSTEMD_DIR}" -maxdepth 1 -type d -name '*.d' -exec cp -r {} /etc/systemd/system/ \;
-log "copied systemd override directories from ${RKE2LAB_SYSTEMD_DIR}"
+: "Stow unit tree from host/systemd-units into /etc/systemd/system"
+xstow -v=3 \
+	-d "$(dirname "${SYSTEMD_UNITS_DIR}")" \
+	-t /etc/systemd/system \
+	"$(basename "${SYSTEMD_UNITS_DIR}")"
+log "stowed systemd units from ${SYSTEMD_UNITS_DIR}"
 
 : "Reload systemd to recognize new units"
 systemctl daemon-reload
