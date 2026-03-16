@@ -3,25 +3,25 @@
 source <(flox activate --dir /var/lib/rancher/rke2)
 
 log() {
-  echo "[rke2-openebs-ready] $*"
+	echo "[rke2-openebs-ready] $*"
 }
 
 wait_for_storageclass() {
-  local sc="${1:?storageclass name required}" timeout="${2:-300}" interval="${3:-5}"
-  local start end
-  start="$(date +%s)"
-  end=$((start + timeout))
-  while ! kubectl get storageclass "${sc}" >/dev/null 2>&1; do
-    if (( $(date +%s) >= end )); then
-      log "StorageClass ${sc} not ready after ${timeout}s"
-      kubectl get storageclass || true
-      return 1
-    fi
-    log "Waiting for StorageClass ${sc}..."
-    sleep "${interval}"
-  done
-  log "StorageClass ${sc} detected"
-  kubectl get storageclass "${sc}"
+	local sc="${1:?storageclass name required}" timeout="${2:-300}" interval="${3:-5}"
+	local start end
+	start="$(date +%s)"
+	end=$((start + timeout))
+	while ! kubectl get storageclass "${sc}" >/dev/null 2>&1; do
+		if (($(date +%s) >= end)); then
+			log "StorageClass ${sc} not ready after ${timeout}s"
+			kubectl get storageclass || true
+			return 1
+		fi
+		log "Waiting for StorageClass ${sc}..."
+		sleep "${interval}"
+	done
+	log "StorageClass ${sc} detected"
+	kubectl get storageclass "${sc}"
 }
 
 log "Waiting for OpenEBS components..."

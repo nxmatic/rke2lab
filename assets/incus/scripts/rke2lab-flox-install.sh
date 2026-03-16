@@ -1,7 +1,7 @@
 #!/usr/bin/env -S bash -exuo pipefail
 
 [[ -n "${HOME:-}" ]] ||
-  export HOME=/root
+	export HOME=/root
 
 NIX_PROFILE=/nix/var/nix/profiles/default
 

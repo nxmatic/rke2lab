@@ -6,10 +6,10 @@ source <(flox activate --dir /var/lib/rancher/rke2)
 : "Link committed RKE2 manifests from RKE2LAB_MANIFESTS_DIR into RKE2 server manifests directory"
 MANIFESTS_DIR=/var/lib/rancher/rke2/server/manifests
 
-: ln -fs $RKE2LAB_MANIFESTS_DIR/ha         $MANIFESTS_DIR
+: ln -fs $RKE2LAB_MANIFESTS_DIR/ha $MANIFESTS_DIR
 : ln -fs $RKE2LAB_MANIFESTS_DIR/networking $MANIFESTS_DIR
 : ln -fs $RKE2LAB_MANIFESTS_DIR/replication/replicator $MANIFESTS_DIR
-: ln -fs $RKE2LAB_MANIFESTS_DIR/storage    $MANIFESTS_DIR
+: ln -fs $RKE2LAB_MANIFESTS_DIR/storage $MANIFESTS_DIR
 
 : "Ensure RKE2 systemd units are visible to systemd"
 SRC_UNIT_DIR="/usr/local/lib/systemd/system"

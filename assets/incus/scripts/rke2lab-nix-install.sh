@@ -3,17 +3,17 @@
 [[ -z "${HOME:-}" ]] && export HOME=/root
 
 : "Install Nix using official installer"
-bash -exuo pipefail <(curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install) --daemon
+bash -exuo pipefail <(curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install) --daemon --yes
 
 : "Verify Nix installation created /etc/nix directory"
 if [ ! -d /etc/nix ]; then
-  echo "ERROR: Nix installer did not create /etc/nix directory" >&2
-  exit 1
+	echo "ERROR: Nix installer did not create /etc/nix directory" >&2
+	exit 1
 fi
 
 : "Configure Nix after installation (idempotent - only if not already configured by rke2lab)"
 if ! grep -q "BEGIN rke2lab-nix" /etc/nix/nix.conf 2>/dev/null; then
-  cat >> /etc/nix/nix.conf <<'EOF'
+	cat >>/etc/nix/nix.conf <<'EOF'
 # BEGIN rke2lab-nix: Custom configuration for rke2lab environment
 allowed-users = *
 auto-optimise-store = false
@@ -44,11 +44,10 @@ fi
 : "Configure systemd to prepend Nix profile to PATH"
 mkdir -p /etc/systemd/system.conf.d
 if [ ! -f /etc/systemd/system.conf.d/10-rke2lab-nix.conf ]; then
-  cat > /etc/systemd/system.conf.d/10-rke2lab-nix.conf <<EOF
+	cat >/etc/systemd/system.conf.d/10-rke2lab-nix.conf <<EOF
 [Manager]
 DefaultEnvironment="PATH=/nix/var/nix/profiles/default/bin:$PATH"
 EOF
-  : "Reload systemd configuration to apply new environment"
-  systemctl daemon-reload
+	: "Reload systemd configuration to apply new environment"
+	systemctl daemon-reload
 fi
-

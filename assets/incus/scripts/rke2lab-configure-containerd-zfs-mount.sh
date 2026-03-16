@@ -7,7 +7,7 @@ MOUNT_UNIT_PATH=/etc/systemd/system/var-lib-rancher-rke2-agent-containerd-io.con
 MOUNT_UNIT_DROPIN_DIR="${MOUNT_UNIT_PATH}.d"
 
 : "Generate node-specific mount unit for containerd ZFS snapshotter"
-cat > "${MOUNT_UNIT_PATH}" <<EOF
+cat >"${MOUNT_UNIT_PATH}" <<EOF
 [Unit]
 Description=Mount containerd zfs snapshotter directory for RKE2 (ZFS dataset)
 Documentation=https://github.com/nxmatic/rke2lab

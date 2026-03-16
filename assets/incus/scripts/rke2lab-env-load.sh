@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# @codebase
+# Load RKE2Lab environment variables from sectioned ConfigMap/Secret manifests.
+# Contract: environment manifests are mounted at ${RKE2LAB_ENV_DIR} (default: /srv/host/environment.d)
+
+RKE2LAB_SCRIPTS_DIR=${RKE2LAB_ROOT:=/srv/host}/scripts.d
+HOME=/root
+
+if [[ ! -r /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]]; then
+	: "Install Nix Daemon and CLI tools to access yq"
+	${RKE2LAB_SCRIPTS_DIR}/rke2lab-nix-install.sh
+fi
+source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+
+if ! command -v flox >/dev/null 2>&1; then
+	: "Install Flox to access yq in a temporary environment"
+	${RKE2LAB_SCRIPTS_DIR}/rke2lab-flox-install.sh
+fi
+
+if [[ -d /var/lib/cloud/.flox ]]; then
+	: "Activate cloud flox environment for yq availability"
+	source <(flox activate --dir /var/lib/cloud)
+fi
+
+if ! command -v yq >/dev/null 2>&1; then
+	: "Preload manifest tools in a temporary flox env"
+	FLOX_TMPDIR=$(mktemp -d)
+	# trap 'rm -rf "${FLOX_TMPDIR}"' EXIT
+
+	flox config --set disable_metrics true
+	flox init --dir="${FLOX_TMPDIR}"
+	flox install --dir="${FLOX_TMPDIR}" dasel yq-go
+	source <(flox activate --dir="${FLOX_TMPDIR}")
+fi
+
+rke2lab::env:load() {
+	local root env_dir files_count yq_cmd
+
+	root=${RKE2LAB_ROOT:-/srv/host}
+	env_dir=${RKE2LAB_ENV_DIR:-${root}/environment.d}
+
+	if [[ ! -d "${env_dir}" ]]; then
+		echo "[rke2lab-env] missing environment directory: ${env_dir}" >&2
+		return 1
+	fi
+
+	shopt -s nullglob
+	local files=("${env_dir}"/*.yml "${env_dir}"/*.yaml)
+	shopt -u nullglob
+
+	files_count=${#files[@]}
+	if [[ "${files_count}" -eq 0 ]]; then
+		echo "[rke2lab-env] no manifest YAML files found in: ${env_dir}" >&2
+		return 1
+	fi
+
+	local file kind
+	for file in "${files[@]}"; do
+		kind="$(yq eval -r '.kind // ""' "${file}")"
+
+		case "${kind}" in
+		ConfigMap)
+			set -a
+			source <(yq eval -o=shell '.data // {}' "${file}")
+			set +a
+			;;
+		Secret)
+			set -a
+			source <(yq eval -o=shell '((.stringData // {}) * ((.data // {}) | with_entries(.value |= @base64d)))' "${file}")
+			set +a
+			;;
+		*)
+			continue
+			;;
+		esac
+	done
+}

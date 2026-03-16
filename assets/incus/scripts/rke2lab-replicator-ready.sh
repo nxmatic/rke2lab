@@ -21,9 +21,9 @@ kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=kubernetes-rep
 # The replicator should log that it's watching resources
 : "Verifying replicator is watching resources..."
 if kubectl -n kube-system logs -l app.kubernetes.io/name=kubernetes-replicator --tail=50 2>/dev/null | grep -qiE '(started|watching|controller)'; then
-  : "Replicator controller appears to be active"
+	: "Replicator controller appears to be active"
 else
-  : "WARNING: Could not verify replicator logs - proceeding anyway"
+	: "WARNING: Could not verify replicator logs - proceeding anyway"
 fi
 
 # Check cluster role and bindings are in place

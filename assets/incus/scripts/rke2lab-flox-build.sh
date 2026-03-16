@@ -5,7 +5,7 @@ set -exuo pipefail
 # Builds packages from multiple flakes based on YAML descriptor
 # Usage: rke2lab-flox-build.sh [descriptor file]
 
-source <( flox activate --dir /var/lib/rancher/rke2 )
+source <(flox activate --dir /var/lib/rancher/rke2)
 
 BUILDS_DESCRIPTOR="${1:-/srv/host/flox-builds.yaml}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -34,7 +34,7 @@ fi
 # Relative paths are resolved relative to rke2.d/{cluster}/{node}/
 resolve_flake_path() {
 	local flake_path="$1"
-	
+
 	# If path is absolute and exists, use as-is
 	if [[ "$flake_path" == /* ]]; then
 		if [[ -d "$flake_path" ]]; then
@@ -46,16 +46,16 @@ resolve_flake_path() {
 			return 1
 		fi
 	fi
-	
+
 	# For relative paths, resolve within rke2.d/{cluster}/{node}/
 	local base_path="${GIT_WORKDIR}/nxmatic/rke2lab/rke2.d/${RKE2LAB_CLUSTER_NAME}/${RKE2LAB_NODE_NAME}"
 	local resolved_path="${base_path}/${flake_path}"
-	
+
 	if [[ -d "$resolved_path" ]]; then
 		echo "$resolved_path"
 		return 0
 	fi
-	
+
 	# Return original path if nothing matched (for error reporting)
 	echo "$flake_path"
 	return 1
@@ -68,7 +68,7 @@ if [[ ! -f "${BUILDS_DESCRIPTOR}" ]]; then
 fi
 
 # Check if yq is available
-if ! command -v yq &> /dev/null; then
+if ! command -v yq &>/dev/null; then
 	: "[ERROR] yq not found. Please install yq to parse YAML descriptor"
 	exit 1
 fi
@@ -120,11 +120,11 @@ build_package() {
 		: "[$(date)] [${job_name}] Using kdns source: ${GIT_WORKDIR}/lab42/kdns"
 	fi
 
-	nix_args+=( ".#${package_attr}" )
+	nix_args+=(".#${package_attr}")
 
 	# Build package
-	if cd "${flake_path}" && \
-	   nix "${nix_args[@]}" 2>&1 | tee -a "${log_file}"; then
+	if cd "${flake_path}" &&
+		nix "${nix_args[@]}" 2>&1 | tee -a "${log_file}"; then
 		: "[$(date)] [${job_name}] ✓ Built ${package_name}"
 		return 0
 	else
@@ -182,7 +182,7 @@ for ((i = 0; i < num_jobs; i++)); do
 	: "║ Output: ${output_dir}"
 	: "╚═══════════════════════════════════════════════════════════════="
 
-	((total_jobs+=1))
+	((total_jobs += 1))
 
 	# Get number of packages in this job
 	num_packages=$(yq eval ".jobs[$i].packages | length" "${BUILDS_DESCRIPTOR}" 2>/dev/null || echo "0")
@@ -193,23 +193,23 @@ for ((i = 0; i < num_jobs; i++)); do
 		# Load individual package variables
 		clear_package_vars
 		source <(yq -o shell ".jobs[$i].packages[$j]" "${BUILDS_DESCRIPTOR}")
-		
+
 		package_name="${name:-}"
 		package_attr="${attr:-}"
-		
+
 		if [[ -z "${name}" || -z "${attr}" ]]; then
 			: "[WARN] [${job_name}] Missing package data at index ${j}; skipping"
 			continue
 		fi
 
 		if ! build_package "${job_name}" "${flake_path}" "${output_dir}" "${log_file}" \
-					   "${package_name}" "${package_attr}"; then
+			"${package_name}" "${package_attr}"; then
 			job_failed=true
 		fi
 	done
 
 	if [[ "${job_failed}" == true ]]; then
-		((failed_jobs+=1))
+		((failed_jobs += 1))
 		: "[$(date)] [${job_name}] ✗ Job failed"
 	else
 		: "[$(date)] [${job_name}] ✓ All packages built successfully"

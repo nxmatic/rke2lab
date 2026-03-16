@@ -1,6 +1,8 @@
 #!/usr/bin/env -S bash -exu -o pipefail
 
-source /srv/host/environment
+: "Load RKE2 environment and helper functions"
+source "/srv/host/scripts.d/rke2lab-env-load.sh"
+rke2lab::env:load
 
 : "Disable IPv6 system-wide"
 sysctl -p /etc/sysctl.d/99-disable-ipv6.conf
@@ -27,16 +29,16 @@ systemctl enable --now rke2lab-tools.target
 systemctl enable --now rke2lab.target zfs-early-umount.service rke2lab-install.service
 
 : "Load the RKE2 environment"
-source <( flox activate --dir /var/lib/rancher/rke2 )
+source <(flox activate --dir /var/lib/rancher/rke2)
 
 : "Expose bind-mounted helper scripts on PATH (strip .sh suffix)"
 scripts_dir=${RKE2LAB_SCRIPTS_DIR}
 if [ -d "$scripts_dir" ]; then
-  for src in "$scripts_dir"/*.sh; do
-    [ -f "$src" ] || continue
-    base=$(basename "${src%.sh}")
-    ln -sf "$src" "/usr/local/sbin/$base"
-  done
+	for src in "$scripts_dir"/*.sh; do
+		[ -f "$src" ] || continue
+		base=$(basename "${src%.sh}")
+		ln -sf "$src" "/usr/local/sbin/$base"
+	done
 fi
 
 : "Start the RKE2 service"

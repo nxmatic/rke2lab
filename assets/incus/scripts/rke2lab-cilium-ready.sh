@@ -1,5 +1,5 @@
 #!/usr/bin/env -S bash -xu -o pipefail
-source <( flox activate --dir /var/lib/rancher/rke2 )
+source <(flox activate --dir /var/lib/rancher/rke2)
 kubectl wait --for=condition=Ready nodes --all --timeout=300s || true
 kubectl wait --for=condition=Ready pods -l k8s-app=cilium -n kube-system --timeout=300s || true
 kubectl wait --for=condition=Available deployment/cilium-operator -n kube-system --timeout=300s || true

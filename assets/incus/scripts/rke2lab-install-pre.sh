@@ -1,17 +1,8 @@
 #!/usr/bin/env -S bash -exu -o pipefail
 
-
 : "Load RKE2 environment" # @codebase
 RKE2LAB_ROOT=${RKE2LAB_ROOT:-/srv/host}
-RKE2LAB_ENV_FILE=${RKE2LAB_ENV_FILE:-${RKE2LAB_ROOT}/environment}
-[[ ! -r "${RKE2LAB_ENV_FILE}" ]] && {
-  echo "[common-profile] missing environment file: ${RKE2LAB_ENV_FILE}" >&2
-  exit 1
-}
-
-set -a
-source "${RKE2LAB_ENV_FILE}"
-set +a
+source "$(dirname "${BASH_SOURCE[0]}")/rke2lab-env-load.sh"
 
 : "Set flox target system for this host"
 RKE2_FLOX_SYSTEM="$(uname -m)-linux"
@@ -19,43 +10,39 @@ export RKE2_FLOX_SYSTEM
 
 : "Configure direnv to use flox"
 direnv:config:generate() {
-  mkdir -p "/root/.config/direnv/lib"
-  curl -o \
-    "/root/.config/direnv/lib/flox.sh" \
-    "https://raw.githubusercontent.com/flox/flox-direnv/v1.1.0/direnv.rc"
-  cat <<EoConfig | cut -c 3- > "/root/.config/direnv/direnv.toml"
+	mkdir -p "/root/.config/direnv/lib"
+	curl -o \
+		"/root/.config/direnv/lib/flox.sh" \
+		"https://raw.githubusercontent.com/flox/flox-direnv/v1.1.0/direnv.rc"
+	cat <<EoConfig | cut -c 3- >"/root/.config/direnv/direnv.toml"
   [whitelist]
   prefix= [ "/home", "/root", "/var/lib/cloud", "/var/lib/rancher/rke2", "${RKE2LAB_ROOT}" ]
 EoConfig
 }
 direnv:config:generate
 
-: "Preload manifest tools in a temporary flox env"
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "${TMPDIR}"' EXIT
-
-flox config --set disable_metrics true
-flox init --dir="${TMPDIR}"
-flox install --dir="${TMPDIR}" dasel yq-go
-source <( flox activate --dir="${TMPDIR}" )
+: "Load RKE2 environment manifests after yq is available"
+rke2lab::env:load
 
 : "Preload the nocloud environment"
 nocloud:env:activate() {
-  local FLOX_ENV_DIR="/var/lib/cloud"
-  if [[ -d "${FLOX_ENV_DIR}/.flox" ]]; then
-	source <( flox activate --dir="${FLOX_ENV_DIR}" )
-  : "Ensure GitHub CLI is present in nocloud flox environment"
-  flox install --dir="${FLOX_ENV_DIR}" git gh@^2.86
-	return
-  fi
+	local FLOX_ENV_DIR="/var/lib/cloud"
 
-  : "Initialize flox environment for nocloud"
-  mkdir -p "${FLOX_ENV_DIR}"
-  flox init --dir="${FLOX_ENV_DIR}"
-  flox install --dir="${FLOX_ENV_DIR}" dasel yq-go
+	if [[ -d "${FLOX_ENV_DIR}/.flox" ]]; then
+		: "Ensure GitHub CLI is present in nocloud flox environment"
+		flox install --dir="${FLOX_ENV_DIR}" git gh@^2.86
+		source <(flox activate --dir="${FLOX_ENV_DIR}")
 
-  : "Include common profile in manifest and activate flox environment"
-  cat <<'EoFloxCommonProfile' | cut -c 3- | tee "${FLOX_ENV_DIR}/.flox/env/profile-common.sh"
+		return
+	fi
+
+	: "Initialize flox environment for nocloud"
+	mkdir -p "${FLOX_ENV_DIR}"
+	flox init --dir="${FLOX_ENV_DIR}"
+	flox install --dir="${FLOX_ENV_DIR}" dasel yq-go
+
+	: "Include common profile in manifest and activate flox environment"
+	cat <<'EoFloxCommonProfile' | cut -c 3- | tee "${FLOX_ENV_DIR}/.flox/env/profile-common.sh"
 
   rke2lab::shell:indirect() {
     local var="$1" value=""
@@ -91,8 +78,8 @@ nocloud:env:activate() {
   }
   
   RKE2LAB_ROOT=${RKE2LAB_ROOT:-/srv/host}
-  RKE2LAB_ENV_FILE=${RKE2LAB_ENV_FILE:-${RKE2LAB_ROOT}/environment}
-  RKE2LAB_SECRETS_FILE="${RKE2LAB_ROOT}/.secrets"
+  RKE2LAB_ENV_DIR=${RKE2LAB_ENV_DIR:-${RKE2LAB_ROOT}/environment.d}
+  RKE2LAB_SECRETS_FILE="${RKE2LAB_ROOT}/worktree/.secrets"
   
   : "Ensure RKE2 secrets file is present and readable (read-only source of truth)"
   [[ -s "${RKE2LAB_SECRETS_FILE}" ]] || {
@@ -106,8 +93,27 @@ nocloud:env:activate() {
 
   set -a
   
-  : "Source RKE2 environment file"
-  source "${RKE2LAB_ENV_FILE}"
+  : "Source RKE2 environment manifests"
+  [[ -d "${RKE2LAB_ENV_DIR}" ]] || {
+    echo "[rke2-install-pre] ERROR: environment directory missing: ${RKE2LAB_ENV_DIR}" >&2
+    return 1
+  }
+  for env_manifest in "${RKE2LAB_ENV_DIR}"/*.yml "${RKE2LAB_ENV_DIR}"/*.yaml; do
+    [[ -f "${env_manifest}" ]] || continue
+
+    kind="$(yq -r '.kind // ""' "${env_manifest}")"
+    case "${kind}" in
+      ConfigMap)
+        source <(yq eval -o=shell '.data // {}' "${env_manifest}")
+        ;;
+      Secret)
+        source <(yq eval -o=shell '((.stringData // {}) * ((.data // {}) | with_entries(.value |= @base64d)))' "${env_manifest}")
+        ;;
+      *)
+        continue
+        ;;
+    esac
+  done
 
   : "Load RKE2-specific dynamic environment variables"
   ARCH="$(dpkg --print-architecture)"
@@ -135,24 +141,24 @@ nocloud:env:activate() {
   set +a
 EoFloxCommonProfile
 
-  dasel -r toml -w yaml < "${FLOX_ENV_DIR}/.flox/env/manifest.toml" |
-    yq eval '.options = {"systems": [env(RKE2_FLOX_SYSTEM)]}' - |
-    yq eval '.profile = { "common": "source ${FLOX_ENV_PROJECT}/.flox/env/profile-common.sh" }' - |
-    dasel --pretty -r yaml -w toml | tee /tmp/manifest.toml.$$ &&
-    mv /tmp/manifest.toml.$$ "${FLOX_ENV_DIR}/.flox/env/manifest.toml"
-  source <( flox activate --dir="${FLOX_ENV_DIR}" )
+	dasel -i toml -o yaml <"${FLOX_ENV_DIR}/.flox/env/manifest.toml" |
+		yq eval '.options = {"systems": [env(RKE2_FLOX_SYSTEM)]}' - |
+		yq eval '.profile = { "common": "source ${FLOX_ENV_PROJECT}/.flox/env/profile-common.sh" }' - |
+		dasel -i yaml -o toml | tee /tmp/manifest.toml.$$ &&
+		mv /tmp/manifest.toml.$$ "${FLOX_ENV_DIR}/.flox/env/manifest.toml"
+	source <(flox activate --dir="${FLOX_ENV_DIR}")
 
-  : "Install GitHub CLI in nocloud flox environment"
-  flox install --dir="${FLOX_ENV_DIR}" git gh@^2.86
+	: "Install GitHub CLI in nocloud flox environment"
+	flox install --dir="${FLOX_ENV_DIR}" git gh@^2.86
 
-  : "Generate nocloud envrc to load environment variables"
-  cat > /var/lib/cloud/.envrc <<'EoEnvrc'
+	: "Generate nocloud envrc to load environment variables"
+	cat >/var/lib/cloud/.envrc <<'EoEnvrc'
   log_status "Loading nocloud environment variables"
 
   [[ "$FLOX_ENV_PROJECT" != "$PWD" ]] &&
     use flox
 EoEnvrc
-  ln -sf /var/lib/cloud/.envrc /var/lib/cloud/seed/nocloud/.envrc
+	ln -sf /var/lib/cloud/.envrc /var/lib/cloud/seed/nocloud/.envrc
 }
 
 : "Activate the nocloud environment"
@@ -162,14 +168,14 @@ nocloud:env:activate
 gh auth login --with-token <<EoF
 ${GITHUB_PAT}
 EoF
-gh auth setup-git --hostname "${GITHUB_HOST:-github.com}"\
+gh auth setup-git --hostname "${GITHUB_HOST:-github.com}"
 
 : "Configure ghcr registry access for containerd" # @codebase
 CONTAINERD_REG_FILE="/etc/rancher/rke2/registries.yaml"
 if [[ ! -f "${CONTAINERD_REG_FILE}" ]]; then
-  : "[rke2-install-pre] registries.yaml not present; creating"
-  mkdir -p "$(dirname "${CONTAINERD_REG_FILE}")"
-  cat >"${CONTAINERD_REG_FILE}" <<EoF | cut -c 3- 
+	: "[rke2-install-pre] registries.yaml not present; creating"
+	mkdir -p "$(dirname "${CONTAINERD_REG_FILE}")"
+	cat >"${CONTAINERD_REG_FILE}" <<EoF | cut -c 3-
   mirrors:
     ghcr.io:
       endpoint:
@@ -180,49 +186,48 @@ if [[ ! -f "${CONTAINERD_REG_FILE}" ]]; then
         username: ${GITHUB_USERNAME}
         password: ${GITHUB_PAT}
 EoF
-  chmod 0644 "${CONTAINERD_REG_FILE}"
+	chmod 0644 "${CONTAINERD_REG_FILE}"
 fi
-
 
 : "Initialize the flox environment for RKE2"
 [[ ! -d /var/lib/rancher/rke2/.flox ]] &&
-  flox init --dir=/var/lib/rancher/rke2
+	flox init --dir=/var/lib/rancher/rke2
 
 : "Include cloud environment in RKE2 flox environment and configure groups"
-dasel -r toml -w yaml \
-  < /var/lib/rancher/rke2/.flox/env/manifest.toml |
-  yq eval '.options = {"systems": [env(RKE2_FLOX_SYSTEM)]}' - |
-  yq eval '.include = {"environments": [{"dir": "/var/lib/cloud"}]}' - |
-  yq eval '.install += {"etcdctl": {"pkg-path": "etcdctl", "pkg-group": "etcd-tools"}}' - |	
-  yq eval '.install += {"ceph-client": {"pkg-path": "ceph-client", "pkg-group": "ceph-tools"}}' - |
-  yq eval '.install += {"cilium-cli": {"pkg-path": "cilium-cli", "pkg-group": "cilium-tools"}}' - |	
-  yq eval '.install += {"helmfile": {"pkg-path": "helmfile", "pkg-group": "helm-tools"}}' - |
-  yq eval '.install += {"kubernetes-helm": {"pkg-path": "kubernetes-helm", "pkg-group": "helm-tools"}}' - |	
-  yq eval '.install += {"zfs": {"pkg-path": "zfs", "pkg-group": "linux"}}' - |
-  yq eval '.install += {"nerdctl": {"pkg-path": "nerdctl", "version": "1.7.5", "pkg-group": "containerd-tools"}}' - |
-  yq eval '.install += {"tektoncd-cli": {"pkg-path": "tektoncd-cli", "pkg-group": "tekton-tools"}}' - |	
-  yq eval '.install += {"kubectl": {"pkg-path": "kubectl", "pkg-group": "kubectl-tools"}}' - |
-  yq eval '.install += {"krew": {"pkg-path": "krew", "pkg-group": "kubectl-tools"}}' - |
-  yq eval '.install += {"kubectl-ai": {"pkg-path": "kubectl-ai", "pkg-group": "kubectl-plugins"}}' - |
-  yq eval '.install += {"kubectl-ktop": {"pkg-path": "kubectl-ktop", "pkg-group": "kubectl-plugins"}}' - |
-  yq eval '.install += {"kubectl-neat": {"pkg-path": "kubectl-neat", "pkg-group": "kubectl-plugins"}}' - |
-  yq eval '.install += {"kubectl-tree": {"pkg-path": "kubectl-tree", "pkg-group": "kubectl-plugins"}}' - |
-  yq eval '.install += {"kubectl-graph": {"pkg-path": "kubectl-graph", "pkg-group": "kubectl-plugins"}}' - |
-  yq eval '.install += {"kubectl-doctor": {"pkg-path": "kubectl-doctor", "pkg-group": "kubectl-plugins"}}' - |
-  yq eval '.install += {"kubectl-explore": {"pkg-path": "kubectl-explore", "pkg-group": "kubectl-plugins"}}' - |
-  yq eval '.install += {"kubectl-rook-ceph": {"pkg-path": "kubectl-rook-ceph", "pkg-group": "kubectl-plugins"}}' - |
-  yq eval '.install += {"kubectl-view-secret": {"pkg-path": "kubectl-view-secret", "pkg-group": "kubectl-plugins"}}' - |
-  yq eval '.install += {"tubekit": {"pkg-path": "tubekit", "pkg-group": "kubectl-tools"}}' - |
-  yq eval '.install += {"yq-go": {"pkg-path": "yq-go", "pkg-group": "yaml-tools"}}' - |
-  yq eval '.install += {"kpt": {"pkg-path": "kpt", "version": "1.0.0-beta.55", "pkg-group": "kpt-tools"}}' - |
-  yq eval '.install += {"delta": {"pkg-path": "delta", "pkg-group": "diff-tools"}}' - |
-  yq eval '.install += {"direnv": {"pkg-path": "direnv", "pkg-group": "direnv-tools"}}' - |
-  yq eval '.install += {"xstow": {"pkg-path": "xstow", "pkg-group": "stow-tools"}}' - |
-  yq eval '.profile = {"common": "source /var/lib/rancher/rke2/.flox/env/profile-common.sh"}' - |
-  dasel --pretty -r yaml -w toml | tee /tmp/manifest.toml.$$ &&
-  mv /tmp/manifest.toml.$$ \
-    /var/lib/rancher/rke2/.flox/env/manifest.toml
-  cat <<'EoFloxCommonProfile' | cut -c 3- | tee /var/lib/rancher/rke2/.flox/env/profile-common.sh
+dasel -i toml -o yaml \
+	</var/lib/rancher/rke2/.flox/env/manifest.toml |
+	yq eval '.options = {"systems": [env(RKE2_FLOX_SYSTEM)]}' - |
+	yq eval '.include = {"environments": [{"dir": "/var/lib/cloud"}]}' - |
+	yq eval '.install += {"etcdctl": {"pkg-path": "etcdctl", "pkg-group": "etcd-tools"}}' - |
+	yq eval '.install += {"ceph-client": {"pkg-path": "ceph-client", "pkg-group": "ceph-tools"}}' - |
+	yq eval '.install += {"cilium-cli": {"pkg-path": "cilium-cli", "pkg-group": "cilium-tools"}}' - |
+	yq eval '.install += {"helmfile": {"pkg-path": "helmfile", "pkg-group": "helm-tools"}}' - |
+	yq eval '.install += {"kubernetes-helm": {"pkg-path": "kubernetes-helm", "pkg-group": "helm-tools"}}' - |
+	yq eval '.install += {"zfs": {"pkg-path": "zfs", "pkg-group": "linux"}}' - |
+	yq eval '.install += {"nerdctl": {"pkg-path": "nerdctl", "version": "1.7.5", "pkg-group": "containerd-tools"}}' - |
+	yq eval '.install += {"tektoncd-cli": {"pkg-path": "tektoncd-cli", "pkg-group": "tekton-tools"}}' - |
+	yq eval '.install += {"kubectl": {"pkg-path": "kubectl", "pkg-group": "kubectl-tools"}}' - |
+	yq eval '.install += {"krew": {"pkg-path": "krew", "pkg-group": "kubectl-tools"}}' - |
+	yq eval '.install += {"kubectl-ai": {"pkg-path": "kubectl-ai", "pkg-group": "kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-ktop": {"pkg-path": "kubectl-ktop", "pkg-group": "kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-neat": {"pkg-path": "kubectl-neat", "pkg-group": "kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-tree": {"pkg-path": "kubectl-tree", "pkg-group": "kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-graph": {"pkg-path": "kubectl-graph", "pkg-group": "kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-doctor": {"pkg-path": "kubectl-doctor", "pkg-group": "kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-explore": {"pkg-path": "kubectl-explore", "pkg-group": "kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-rook-ceph": {"pkg-path": "kubectl-rook-ceph", "pkg-group": "kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-view-secret": {"pkg-path": "kubectl-view-secret", "pkg-group": "kubectl-plugins"}}' - |
+	yq eval '.install += {"tubekit": {"pkg-path": "tubekit", "pkg-group": "kubectl-tools"}}' - |
+	yq eval '.install += {"yq-go": {"pkg-path": "yq-go", "pkg-group": "yaml-tools"}}' - |
+	yq eval '.install += {"kpt": {"pkg-path": "kpt", "version": "1.0.0-beta.55", "pkg-group": "kpt-tools"}}' - |
+	yq eval '.install += {"delta": {"pkg-path": "delta", "pkg-group": "diff-tools"}}' - |
+	yq eval '.install += {"direnv": {"pkg-path": "direnv", "pkg-group": "direnv-tools"}}' - |
+	yq eval '.install += {"xstow": {"pkg-path": "xstow", "pkg-group": "stow-tools"}}' - |
+	yq eval '.profile = {"common": "source /var/lib/rancher/rke2/.flox/env/profile-common.sh"}' - |
+	dasel -i yaml -o toml | tee /tmp/manifest.toml.$$ &&
+	mv /tmp/manifest.toml.$$ \
+		/var/lib/rancher/rke2/.flox/env/manifest.toml
+cat <<'EoFloxCommonProfile' | cut -c 3- | tee /var/lib/rancher/rke2/.flox/env/profile-common.sh
   : "Load nocloud environment from the common profile"
   source "/var/lib/cloud/.flox/env/profile-common.sh" 
  
@@ -248,7 +253,7 @@ dasel -r toml -w yaml \
 EoFloxCommonProfile
 
 : "Load the RKE2 envrc"
-source <( flox activate --dir="/var/lib/rancher/rke2" )
+source <(flox activate --dir="/var/lib/rancher/rke2")
 
 : "Initialize krew and install plugins"
 KREW_ROOT="/var/lib/rancher/rke2/krew"
@@ -256,5 +261,5 @@ mkdir -p "$KREW_ROOT"
 
 : "Install krew plugins using krew directly"
 for plugin in ctx ns; do
-  krew install "$plugin" || true
+	krew install "$plugin" || true
 done

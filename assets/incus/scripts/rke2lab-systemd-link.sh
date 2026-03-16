@@ -1,31 +1,25 @@
 #!/usr/bin/env -S bash -exu -o pipefail
 
 : "Load RKE2 environment" # @codebase
-RKE2LAB_ENV_FILE=${RKE2LAB_ENV_FILE:-/srv/host/environment}
-[[ ! -r "${RKE2LAB_ENV_FILE}" ]] && {
-  echo "[systemd-link] missing environment file: ${RKE2LAB_ENV_FILE}" >&2
-  exit 1
-}
-set -a
-source "${RKE2LAB_ENV_FILE}"
-set +a
+source /srv/host/scripts.d/rke2lab-env-load.sh
+rke2lab::env:load
 
 log() {
-  printf '[systemd-link] %s\n' "$*"
+	printf '[systemd-link] %s\n' "$*"
 }
 
 # Wait for the bind-mount to appear and contain files (up to 30s)
 for i in {1..30}; do
-  if [[ -d "${RKE2LAB_SYSTEMD_DIR}" && $(find "${RKE2LAB_SYSTEMD_DIR}" -type f | wc -l) -gt 0 ]]; then
-    break
-  fi
-  log "waiting for ${RKE2LAB_SYSTEMD_DIR} to be populated (attempt ${i}/30)";
-  sleep 1
+	if [[ -d "${RKE2LAB_SYSTEMD_DIR}" && $(find "${RKE2LAB_SYSTEMD_DIR}" -type f | wc -l) -gt 0 ]]; then
+		break
+	fi
+	log "waiting for ${RKE2LAB_SYSTEMD_DIR} to be populated (attempt ${i}/30)"
+	sleep 1
 done
 
 if [[ ! -d "${RKE2LAB_SYSTEMD_DIR}" ]]; then
-  log "systemd directory not found: ${RKE2LAB_SYSTEMD_DIR}"
-  exit 1
+	log "systemd directory not found: ${RKE2LAB_SYSTEMD_DIR}"
+	exit 1
 fi
 
 mkdir -p /etc/systemd/system
@@ -44,9 +38,9 @@ log "daemon-reload complete"
 
 : "Enable all rke2lab units (services, targets, mounts)"
 for unit_file in /etc/systemd/system/rke2lab-*.service /etc/systemd/system/rke2lab-*.target /etc/systemd/system/*.mount; do
-  if [[ -f "${unit_file}" ]]; then
-    unit_name=$(basename "${unit_file}")
-    systemctl enable "${unit_name}" || log "warning: failed to enable ${unit_name}"
-  fi
+	if [[ -f "${unit_file}" ]]; then
+		unit_name=$(basename "${unit_file}")
+		systemctl enable "${unit_name}" || log "warning: failed to enable ${unit_name}"
+	fi
 done
 log "enabled rke2lab units"

@@ -6,7 +6,8 @@ source <(flox activate --dir /var/lib/rancher/rke2)
 
 : "Wait for server is ready"
 until kubectl get --raw /readyz &>/dev/null; do
- : "Waiting for API server..."; sleep 5; 
+	: "Waiting for API server..."
+	sleep 5
 done
 
 : "Restrict rke2 kubeconfig permissions"
@@ -21,5 +22,5 @@ if [[ -n "${control_plane_nodes}" ]]; then
 			role=control-plane \
 			type=server \
 			node-type=rke2-server
-	done <<< "${control_plane_nodes}"
+	done <<<"${control_plane_nodes}"
 fi
