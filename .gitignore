@@ -16,3 +16,7 @@ target/
 # Local secrets/config
 *.env
 .env
+.github/copilot.d/tmp
+
+# Generated runtime artifacts
+rke2.d/
