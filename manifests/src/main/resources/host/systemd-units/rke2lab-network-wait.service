@@ -6,7 +6,7 @@ Wants=systemd-networkd.service
 
 [Service]
 Type=oneshot
-ExecStart=/srv/host/scripts.d/rke2lab-network-wait.sh
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-network-wait.sh
 RemainAfterExit=true
 StandardOutput=journal+console
 StandardError=journal+console

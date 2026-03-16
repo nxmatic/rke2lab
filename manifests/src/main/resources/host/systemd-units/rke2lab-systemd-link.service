@@ -1,15 +1,15 @@
 [Unit]
 Description=Link RKE2Lab systemd service files from host share
 Documentation=https://github.com/nxmatic/rke2lab
-RequiresMountsFor=/srv/host/system.d /srv/host
+RequiresMountsFor=/srv/host/systemd-units.d /srv/host
 After=local-fs.target
 Before=rke2-server.service rke2-agent.service
-ConditionPathExists=/srv/host/scripts.d/rke2lab-systemd-link.sh
-ConditionPathExists=/srv/host/system.d
+ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-systemd-link.sh
+ConditionPathExists=/srv/host/systemd-units.d
 
 [Service]
 Type=oneshot
-ExecStart=/srv/host/scripts.d/rke2lab-systemd-link.sh
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-systemd-link.sh
 RemainAfterExit=true
 StandardOutput=journal
 StandardError=journal

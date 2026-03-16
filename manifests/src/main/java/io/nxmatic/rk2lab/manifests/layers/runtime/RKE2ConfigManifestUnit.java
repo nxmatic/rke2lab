@@ -6,11 +6,11 @@ import org.cdk8s.Chart;
 
 import java.util.List;
 
-public final class Rke2ConfigManifestUnit extends AbstractManifestUnit {
+public final class RKE2ConfigManifestUnit extends AbstractManifestUnit {
 
     public static final String MANIFEST_UNIT_ID = "runtime/rke2-config";
 
-    public Rke2ConfigManifestUnit() {
+    public RKE2ConfigManifestUnit() {
         super(MANIFEST_UNIT_ID, List.of(RuntimeRke2ConfigLayer.LEGACY_PATH_PREFIX), List.of());
     }
 

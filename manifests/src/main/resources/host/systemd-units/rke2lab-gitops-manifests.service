@@ -1,6 +1,6 @@
 [Unit]
 Description=Install RKE2Lab gitops manifests from host share (post-server)
-RequiresMountsFor=/srv/host/system.d /srv/host
+RequiresMountsFor=/srv/host/systemd-units.d /srv/host
 After=local-fs.target
 After=rke2lab-tekton-pipelines-manifests.service
 Requires=rke2lab-tekton-pipelines-manifests.service
@@ -8,12 +8,12 @@ After=rke2lab-replication-manifests.service
 Requires=rke2lab-replication-manifests.service
 After=rke2lab-gitops-secrets.service
 Requires=rke2lab-gitops-secrets.service
-ConditionPathExists=/srv/host/scripts.d/rke2lab-manifests-install.sh
+ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh
 ConditionPathExists=/srv/host/manifests.d/gitops
 
 [Service]
 Type=oneshot
-ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh gitops
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh gitops
 RemainAfterExit=true
 StandardOutput=journal
 StandardError=journal

@@ -118,13 +118,13 @@ write_files:
       [debug]
         level = "debug"
   # Control plane specific systemd drop-in for Cilium operator scaling
-  - path: /srv/host/system.d/rke2-server.service.d/cilium-operator-scaling.conf
+  - path: /srv/host/systemd-units.d/rke2-server.service.d/cilium-operator-scaling.conf
     # =============================================================================
     # CILIUM OPERATOR SCALING DROP-IN
     # This drop-in runs a custom script after the RKE2 server service starts to scale
     # the Cilium operator deployment to match the number of control plane nodes.
     # =============================================================================
-    # kubeconfig drop-ins are mounted from /srv/host/system.d
+    # kubeconfig drop-ins are mounted from /srv/host/systemd-units.d
 
     permissions: "0644"
     content: |
@@ -192,7 +192,7 @@ runcmd:
       "if dpkg-query -W -f='${Status}' avahi-daemon 2>/dev/null | grep -q 'install ok installed'; then systemctl enable --now avahi-daemon || true; exit 0; fi; for i in 1 2 3 4 5; do apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold install -y -t trixie avahi-daemon && systemctl enable --now avahi-daemon && exit 0; sleep 5; done; echo '[cloud-init] avahi install skipped after retries' >&2; true",
     ]
   # Activate RKE2 environment (this will also activate Flox for the shim installer script)
-  - /srv/host/scripts.d/rke2lab-activate.sh
+  - /srv/host/systemd-scripts.d/rke2lab-activate.sh
 hostname: bioskop-master
 manage_resolv_conf: true
 resolv_conf:

@@ -1,16 +1,16 @@
 [Unit]
 Description=Install RKE2Lab Cilium config manifests before server start
-RequiresMountsFor=/srv/host/system.d /srv/host
+RequiresMountsFor=/srv/host/systemd-units.d /srv/host
 After=local-fs.target
 Requires=rke2lab-install.service
 After=rke2lab-install.service
 Before=rke2-server.service
-ConditionPathExists=/srv/host/scripts.d/rke2lab-manifests-install.sh
+ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh
 ConditionPathExists=/srv/host/manifests.d
 
 [Service]
 Type=oneshot
-ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh networking/cilium-config
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh networking/cilium-config
 RemainAfterExit=true
 StandardOutput=journal
 StandardError=journal

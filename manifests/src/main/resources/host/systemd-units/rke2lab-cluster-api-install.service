@@ -1,14 +1,14 @@
 [Unit]
 Description=Initialize Cluster API management core via clusterctl
-RequiresMountsFor=/srv/host/system.d /srv/host
+RequiresMountsFor=/srv/host/systemd-units.d /srv/host
 After=local-fs.target
 After=rke2lab-networking-manifests.service
 Requires=rke2lab-networking-manifests.service
-ConditionPathExists=/srv/host/scripts.d/rke2lab-cluster-api-install.sh
+ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-cluster-api-install.sh
 
 [Service]
 Type=oneshot
-ExecStart=/srv/host/scripts.d/rke2lab-cluster-api-install.sh
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-cluster-api-install.sh
 RemainAfterExit=true
 StandardOutput=journal
 StandardError=journal

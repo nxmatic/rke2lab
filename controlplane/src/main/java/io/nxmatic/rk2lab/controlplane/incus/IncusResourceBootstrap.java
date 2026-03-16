@@ -250,10 +250,10 @@ public final class IncusResourceBootstrap {
                       .disk("rke2lab.env.dir", hostPaths.runtimeEnvConfigRoot(),
                                           "/srv/host/environment.d")
                       .disk("rke2lab.scripts.dir", hostPaths.scriptsRoot(),
-                                          "/srv/host/scripts.d")
+                                          "/srv/host/systemd-scripts.d")
                       .disk("git.dir", hostPaths.gitRoot(), "/srv/host/git")
                       .disk("rke2lab.system.dir", hostPaths.systemdRoot(),
-                                          "/srv/host/system.d")
+                                          "/srv/host/systemd-units.d")
                       .disk("manifests.dir", hostPaths.manifestsRoot(), "/srv/host/manifests.d")
                       .disk("rke2.config.dir", hostPaths.runtimeRke2ConfigRoot(),
                                           "/srv/host/rke2-config")

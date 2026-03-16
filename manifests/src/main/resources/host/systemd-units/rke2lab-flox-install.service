@@ -5,7 +5,7 @@ Requires=rke2lab-nix-install.service
 
 [Service]
 Type=oneshot
-ExecStart=/srv/host/scripts.d/rke2lab-flox-install.sh
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-flox-install.sh
 RemainAfterExit=true
 StandardOutput=journal
 StandardError=journal

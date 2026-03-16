@@ -5,7 +5,7 @@ DefaultDependencies=no
 
 [Service]
 Type=oneshot
-ExecStart=/srv/host/scripts.d/rke2lab-remount-shared.sh
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-remount-shared.sh
 RemainAfterExit=true
 
 [Install]

@@ -117,9 +117,9 @@ spec:
     mounts:
       required:
         - source: manifests/src/main/resources/host/systemd-scripts
-          target: /srv/host/scripts.d
+          target: /srv/host/systemd-scripts.d
         - source: manifests/src/main/resources/host/systemd-units
-          target: /srv/host/system.d
+          target: /srv/host/systemd-units.d
         - source: rke2.d/<cluster>/<node>/manifests.d
           target: /srv/host/manifests.d
         - source: rke2.d/<cluster>/<node>/environment

@@ -29,12 +29,12 @@ This file is the canonical ownership map for shell script assets in this reposit
 
 | Source tree | Owner component | Materialized host path | Notes |
 |---|---|---|---|
-| `host/systemd-scripts` | `manifests` resources (materialized by `controlplane/incus`) | `manifests.d/host/systemd-scripts` | source path `manifests/src/main/resources/host/systemd-scripts`, mounted into node at `/srv/host/scripts.d` |
-| `host/systemd-units` | `manifests` resources (materialized by `controlplane/incus`) | `manifests.d/host/systemd-units` | source path `manifests/src/main/resources/host/systemd-units`, stowed by `rke2lab-systemd-link.sh` from `/srv/host/system.d` |
+| `host/systemd-scripts` | `manifests` resources (materialized by `controlplane/incus`) | `manifests.d/host/systemd-scripts` | source path `manifests/src/main/resources/host/systemd-scripts`, mounted into node at `/srv/host/systemd-scripts.d` |
+| `host/systemd-units` | `manifests` resources (materialized by `controlplane/incus`) | `manifests.d/host/systemd-units` | source path `manifests/src/main/resources/host/systemd-units`, stowed by `rke2lab-systemd-link.sh` from `/srv/host/systemd-units.d` |
 
 ## Host bootstrap scripts for Incus nodes
 
-These scripts are owned by the controlplane Incus bootstrap pipeline and are mounted as `/srv/host/scripts.d` in node instances.
+These scripts are owned by the controlplane Incus bootstrap pipeline and are mounted as `/srv/host/systemd-scripts.d` in node instances.
 
 - Owner component: `controlplane/incus`
 - Owner code path: `controlplane/src/main/java/io/nxmatic/rk2lab/controlplane/incus/IncusResourceBootstrap.java`

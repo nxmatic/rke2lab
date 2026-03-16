@@ -1,7 +1,7 @@
 #!/usr/bin/env -S bash -exu -o pipefail
 
 : "Load RKE2 environment" # @codebase
-source /srv/host/scripts.d/rke2lab-env-load.sh
+source /srv/host/systemd-scripts.d/rke2lab-env-load.sh
 rke2lab::env:load
 
 log() {

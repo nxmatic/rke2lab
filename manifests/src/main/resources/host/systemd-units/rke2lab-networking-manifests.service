@@ -1,18 +1,18 @@
 [Unit]
 Description=Install RKE2Lab networking manifests from host share (post-server)
-RequiresMountsFor=/srv/host/system.d /srv/host
+RequiresMountsFor=/srv/host/systemd-units.d /srv/host
 After=local-fs.target
 After=rke2-server.service
 Requires=rke2-server.service
 After=rke2lab-storage-manifests.service
 Requires=rke2lab-storage-manifests.service
-ConditionPathExists=/srv/host/scripts.d/rke2lab-manifests-install.sh
+ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh
 ConditionPathExists=/srv/host/manifests.d/networking
 
 [Service]
 Type=oneshot
-ExecStart=/srv/host/scripts.d/rke2lab-manifests-install.sh networking
-ExecStartPost=/srv/host/scripts.d/rke2lab-cilium-ready.sh
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh networking
+ExecStartPost=/srv/host/systemd-scripts.d/rke2lab-cilium-ready.sh
 RemainAfterExit=true
 StandardOutput=journal
 StandardError=journal

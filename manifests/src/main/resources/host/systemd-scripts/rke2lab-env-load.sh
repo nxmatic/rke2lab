@@ -5,7 +5,7 @@ set -euo pipefail
 # Load RKE2Lab environment variables from sectioned ConfigMap/Secret manifests.
 # Contract: environment manifests are mounted at ${RKE2LAB_ENV_DIR} (default: /srv/host/environment.d)
 
-RKE2LAB_SCRIPTS_DIR=${RKE2LAB_ROOT:=/srv/host}/scripts.d
+RKE2LAB_SCRIPTS_DIR=${RKE2LAB_ROOT:=/srv/host}/systemd-scripts.d
 HOME=/root
 
 if [[ ! -r /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]]; then

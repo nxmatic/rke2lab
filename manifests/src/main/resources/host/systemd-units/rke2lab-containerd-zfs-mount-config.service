@@ -9,7 +9,7 @@ RequiresMountsFor=/srv/host
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/srv/host/scripts.d/rke2lab-configure-containerd-zfs-mount.sh
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-configure-containerd-zfs-mount.sh
 StandardOutput=journal
 StandardError=journal
 
