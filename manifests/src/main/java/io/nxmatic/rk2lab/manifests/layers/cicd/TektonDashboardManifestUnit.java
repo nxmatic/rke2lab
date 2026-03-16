@@ -19,5 +19,4 @@ public final class TektonDashboardManifestUnit extends AbstractManifestUnit {
     public void apply(final Chart chart) {
         new TektonDashboardLayer(chart, "layer-cicd-tekton-dashboard");
     }
-
 }

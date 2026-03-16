@@ -19,5 +19,4 @@ public final class TektonPipelinesManifestUnit extends AbstractManifestUnit {
     public void apply(final Chart chart) {
         new TektonPipelinesLayer(chart, "layer-cicd-tekton-pipelines");
     }
-
 }

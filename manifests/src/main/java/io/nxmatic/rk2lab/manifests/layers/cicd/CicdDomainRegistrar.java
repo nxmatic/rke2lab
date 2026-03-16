@@ -13,10 +13,10 @@ public final class CicdDomainRegistrar implements LayerDomainRegistrar {
         return new LayerDomain(
                 "cicd",
                 List.of("gitops"),
-                List.of(
-                    new TektonPipelinesManifestUnit(),
-                    new TektonDashboardManifestUnit()
-                )
+            List.of(
+                new TektonPipelinesManifestUnit(),
+                new TektonDashboardManifestUnit()
+            )
         );
     }
 }

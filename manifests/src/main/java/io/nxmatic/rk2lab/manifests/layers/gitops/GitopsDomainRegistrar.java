@@ -14,10 +14,8 @@ public final class GitopsDomainRegistrar implements LayerDomainRegistrar {
                 "gitops",
                 List.of("replication"),
                 List.of(
-                        new FluxOperatorManifestUnit(),
-                    new FluxInstanceManifestUnit(),
-                    new PorchManifestUnit(),
-                    new PorchResourcesManifestUnit()
+                        new FluxInstanceManifestUnit(),
+                        new PorchResourcesManifestUnit()
                 )
         );
     }

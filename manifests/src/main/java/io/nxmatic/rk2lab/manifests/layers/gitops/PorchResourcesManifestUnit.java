@@ -12,7 +12,7 @@ public final class PorchResourcesManifestUnit extends AbstractManifestUnit {
     public static final String LEGACY_PATH_PREFIX = "gitops/porch-resources/";
 
     public PorchResourcesManifestUnit() {
-        super(MANIFEST_UNIT_ID, List.of(LEGACY_PATH_PREFIX), List.of(PorchManifestUnit.MANIFEST_UNIT_ID));
+        super(MANIFEST_UNIT_ID, List.of(LEGACY_PATH_PREFIX), List.of(FluxInstanceManifestUnit.MANIFEST_UNIT_ID));
     }
 
     @Override

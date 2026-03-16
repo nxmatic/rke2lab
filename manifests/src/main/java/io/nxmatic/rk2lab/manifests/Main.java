@@ -29,8 +29,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
-import java.util.stream.Stream;
 
 public final class Main {
 
@@ -42,8 +40,6 @@ public final class Main {
 
     private static final class ManifestSynthesizer {
 
-        private final String manifestsSubpath = "rke2.d/bioskop/master/manifests.d";
-
         private final Path synthOutdir = Paths.get(System.getProperty("rk2lab.manifests.outdir", "target"))
                                               .toAbsolutePath()
                                               .normalize();
@@ -53,19 +49,6 @@ public final class Main {
 
         void synthesize() throws IOException {
             LOG.info("Starting manifests synthesis");
-
-            Path repoRoot = findRepoRoot(Paths.get("").toAbsolutePath().normalize()).orElseThrow(
-                    () -> new IllegalStateException("Unable to locate repository root containing rke2.d"));
-
-            Path manifestsRoot = repoRoot.resolve(manifestsSubpath);
-            if (!Files.isDirectory(manifestsRoot)) {
-                throw new IllegalStateException("Expected manifests directory is missing: " + manifestsRoot);
-            }
-
-            List<Path> manifestFiles = collectManifestFiles(manifestsRoot);
-            if (manifestFiles.isEmpty()) {
-                throw new IllegalStateException("No .yml manifests found under: " + manifestsRoot);
-            }
 
             App app = new App(AppProps.builder().outdir(synthOutdir.toString()).build());
             Chart chart = new Chart(app, "manifests");
@@ -82,7 +65,10 @@ public final class Main {
                                                                                  .register(new CicdDomainRegistrar())
                                                                                  .build();
 
-            List<ManifestUnit> manifestUnits = domainRegistry.manifestUnits();
+            List<ManifestUnit> manifestUnits = domainRegistry.manifestUnits()
+                                                            .stream()
+                                                            .sorted(Comparator.comparing(ManifestUnit::manifestUnitId))
+                                                            .toList();
 
             ManifestUnitRegistry manifestUnitRegistry = new ManifestUnitRegistry(manifestUnits);
             ManifestUnitVisitor manifestUnitVisitor = new ApplyingManifestUnitVisitor();
@@ -94,22 +80,14 @@ public final class Main {
                     domainRegistry.domains().stream().map(domain -> domain.domainId()).sorted().toList());
 
             int manifestUnitHitCount = 0;
-            for (Path manifestFile : manifestFiles) {
-                Path relativePath = manifestsRoot.relativize(manifestFile);
-                String relativePathString = relativePath.toString().replace('\\', '/');
-
-                Optional<ManifestUnit> manifestUnit = manifestUnitRegistry.findByLegacyPath(relativePathString);
-                if (manifestUnit.isPresent()) {
-                    manifestUnitHitCount++;
-                    LOG.debug("Applying manifest unit '{}' for manifest path '{}'", manifestUnit.get().manifestUnitId(),
-                            relativePathString);
-                    domainRegistry.applyManifestUnitWithDomainDependencies(manifestUnit.get().manifestUnitId(),
-                            dependencyApplier, chart);
-                    continue;
-                }
-
-                throw new IllegalStateException(
-                        "Manifest path is not mapped to a canonical manifest unit: " + relativePathString);
+            for (ManifestUnit manifestUnit : manifestUnits) {
+                manifestUnitHitCount++;
+                LOG.debug("Applying manifest unit '{}'", manifestUnit.manifestUnitId());
+                domainRegistry.applyManifestUnitWithDomainDependencies(
+                        manifestUnit.manifestUnitId(),
+                        dependencyApplier,
+                        chart
+                );
             }
 
             app.synth();
@@ -121,29 +99,9 @@ public final class Main {
             Files.createDirectories(synthManifestFile.getParent());
             Files.move(synthesizedFile, synthManifestFile, StandardCopyOption.REPLACE_EXISTING);
 
-            LOG.info("Synthesized {} manifest files from {} (manifest unit hits={})", manifestFiles.size(),
-                    manifestsRoot, manifestUnitHitCount);
+            LOG.info("Synthesized manifests from canonical manifest units (manifest unit hits={})",
+                    manifestUnitHitCount);
             LOG.info("Consolidated manifest output written to {}", synthManifestFile);
-        }
-
-        private List<Path> collectManifestFiles(final Path manifestsRoot) throws IOException {
-            try (Stream<Path> stream = Files.walk(manifestsRoot)) {
-                return stream.filter(Files::isRegularFile)
-                             .filter(path -> path.getFileName().toString().endsWith(".yml"))
-                             .sorted(Comparator.comparing(path -> manifestsRoot.relativize(path).toString()))
-                             .toList();
-            }
-        }
-
-        private Optional<Path> findRepoRoot(final Path start) {
-            Path current = start;
-            while (current != null) {
-                if (Files.isDirectory(current.resolve("rke2.d"))) {
-                    return Optional.of(current);
-                }
-                current = current.getParent();
-            }
-            return Optional.empty();
         }
     }
 }

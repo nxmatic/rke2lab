@@ -14,7 +14,7 @@ public final class FluxInstanceManifestUnit extends AbstractManifestUnit {
         super(
                 MANIFEST_UNIT_ID,
                 List.of(FluxInstanceLayer.LEGACY_PATH_PREFIX),
-                List.of(FluxOperatorManifestUnit.MANIFEST_UNIT_ID)
+                List.of()
         );
     }
 
