@@ -11,7 +11,7 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <artifactId>manifests</artifactId>
+  <artifactId>rke2lab-manifests</artifactId>
   <name>rke2lab-manifests</name>
 
   <properties>
@@ -157,6 +157,26 @@
             </systemProperty>
           </systemProperties>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.7.1</version>
+        <executions>
+          <execution>
+            <id>attach-manifests-zip</id>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+            <configuration>
+              <descriptors>
+                <descriptor>${project.basedir}/src/assembly/manifests-d.xml</descriptor>
+              </descriptors>
+              <appendAssemblyId>true</appendAssemblyId>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

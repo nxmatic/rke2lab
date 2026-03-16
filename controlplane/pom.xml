@@ -11,8 +11,12 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <artifactId>controlplane</artifactId>
-  <name>rke2lab-controlplane</name>
+  <artifactId>rke2lab-controlplane</artifactId>
+  <name>rke2lab k8s control plane</name>
+
+  <properties>
+    <rk2lab.manifests.unpack.skip>false</rk2lab.manifests.unpack.skip>
+  </properties>
 
   <dependencyManagement>
     <dependencies>
@@ -40,6 +44,11 @@
     <dependency>
       <groupId>io.nxmatic</groupId>
       <artifactId>rke2lab-incus-sdk</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>io.nxmatic</groupId>
+        <artifactId>rke2lab-manifests</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -141,6 +150,10 @@
                   <artifact>*:*</artifact>
                   <excludes>
                     <exclude>META-INF/MANIFEST.MF</exclude>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                    <exclude>META-INF/SIG-*</exclude>
                     <exclude>META-INF/LICENSE*</exclude>
                     <exclude>META-INF/NOTICE*</exclude>
                     <exclude>module-info.class</exclude>
@@ -159,6 +172,48 @@
           <mainClass>io.nxmatic.rk2lab.controlplane.Main</mainClass>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.8.1</version>
+        <executions>
+          <execution>
+            <id>unpack-manifests-bundle</id>
+            <phase>package</phase>
+            <goals>
+              <goal>unpack</goal>
+            </goals>
+            <configuration>
+              <skip>${rk2lab.manifests.unpack.skip}</skip>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>io.nxmatic</groupId>
+                  <artifactId>rke2lab-manifests</artifactId>
+                  <version>${rke2lab.version}</version>
+                  <classifier>manifests-d</classifier>
+                  <type>zip</type>
+                  <outputDirectory>${project.build.directory}/generated-manifests</outputDirectory>
+                  <overWrite>true</overWrite>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>m2e</id>
+      <activation>
+        <property>
+          <name>m2e.version</name>
+        </property>
+      </activation>
+      <properties>
+        <rk2lab.manifests.unpack.skip>true</rk2lab.manifests.unpack.skip>
+      </properties>
+    </profile>
+  </profiles>
 </project>

@@ -19,6 +19,7 @@
   </modules>
 
   <properties>
+    <rke2lab.version>0.1.0-SNAPSHOT</rke2lab.version>
     <maven.compiler.release>25</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 

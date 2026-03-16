@@ -244,7 +244,10 @@ public final class IncusResourceBootstrap {
                     .resolve("rke2lab")
                     .resolve(clusterName)
                     .resolve(nodeName);
-            final Path manifestsRoot = worktreeRoot.resolve("manifests").resolve("target").resolve("manifests.d");
+            final Path manifestsRoot = worktreeRoot.resolve("controlplane")
+                .resolve("target")
+                .resolve("generated-manifests")
+                .resolve("manifests.d");
             final Path runtimeRoot = manifestsRoot.resolve("runtime");
 
             return BootstrapPaths.builder()

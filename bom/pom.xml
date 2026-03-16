@@ -8,7 +8,6 @@
     <groupId>io.nxmatic</groupId>
     <artifactId>rke2lab</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <relativePath>../pom.xml</relativePath>
   </parent>
 
   <artifactId>rke2lab-bom</artifactId>
@@ -29,6 +28,24 @@
 
   <dependencyManagement>
     <dependencies>
+      <!-- rke2lab dependencies -->
+      <dependency>
+        <groupId>io.nxmatic</groupId>
+        <artifactId>rke2lab-controlplane</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic</groupId>
+        <artifactId>rke2lab-controlplane</artifactId>
+        <classifier>exec</classifier>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic</groupId>
+        <artifactId>rke2lab-manifests</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency> 
+      <!-- third-party dependencies -->
       <dependency>
         <groupId>com.pulumi</groupId>
         <artifactId>pulumi</artifactId>
