@@ -47,6 +47,8 @@ public final class Main {
         final Object seedInstanceStatus = bootstrapResult.instanceStatus();
         final Object seedInstanceUrn = bootstrapResult.instanceUrn();
         final Object seedProviderUrn = bootstrapResult.providerUrn();
+        final String provisioningChecksum = bootstrapResult.provisioningChecksum();
+        final String imageBuildChecksum = bootstrapResult.imageBuildChecksum();
         bootstrapPhase = "Ready";
         handoffReady = true;
 
@@ -57,6 +59,8 @@ public final class Main {
         outputs.put("seedNodeId", seedNodeId);
         outputs.put("seedInstanceUrn", seedInstanceUrn);
         outputs.put("seedProviderUrn", seedProviderUrn);
+        outputs.put("seedProvisioningChecksum", provisioningChecksum);
+        outputs.put("seedImageBuildChecksum", imageBuildChecksum);
         outputs.put("seedImageFingerprint", imageFingerprint);
         outputs.put("seedInstanceStatus", seedInstanceStatus);
         outputs.put("incusProject", config.incusProject());

@@ -40,13 +40,15 @@ import java.util.Set;
 public final class PulumiIncusImageProvider {
 
     private static final URI REMOTE_BUILD_SCRIPT_RESOURCE = URI.create(
-            "classpath:/incus/image/remote-build-incus-image.sh");
+            "classpath:/META-INF/io.nxmatic/rk2lab/controlplane/incus/image/remote-build-incus-image.sh");
 
     private static final String INCUS_METADATA_FILENAME = "incus.tar.xz";
 
     private static final String INCUS_ROOTFS_FILENAME = "rootfs.squashfs";
 
     private final BootstrapConfig config;
+
+    private String lastBuildChecksum = "";
 
     public PulumiIncusImageProvider(BootstrapConfig config) {
         this.config = config;
@@ -61,13 +63,16 @@ public final class PulumiIncusImageProvider {
 
     public Output<String> ensureSeedImageFingerprint(InvokeOptions invokeOptions, Provider provider,
             Resource projectDependency) {
+        final Path workspace = config.worktreeDirOn(WorktreeHost.DARWIN);
+        final Path distrobuilderConfigPath = materializeDistrobuilderConfig(workspace);
+        this.lastBuildChecksum = computeBuildChecksum(distrobuilderConfigPath);
+
         final String existingFingerprint = resolveExistingImageFingerprint(invokeOptions);
         if (!existingFingerprint.isBlank()) {
             return Output.of(existingFingerprint);
         }
 
         final boolean preview = isDryRun();
-        final Path workspace = config.worktreeDirOn(WorktreeHost.DARWIN);
         if (preview) {
             final Path artifactDir = resolveReadableLocalArtifactDir(resolveArtifactDir(workspace));
             final BuiltImageArtifacts previewArtifacts = new BuiltImageArtifacts(
@@ -77,6 +82,10 @@ public final class PulumiIncusImageProvider {
 
         final BuiltImageArtifacts artifacts = ensureLocalImageArtifacts();
         return createSeedImageFromArtifacts(provider, artifacts, projectDependency).fingerprint();
+    }
+
+    public String buildChecksum() {
+        return lastBuildChecksum;
     }
 
     private String resolveExistingImageFingerprint(InvokeOptions invokeOptions) {

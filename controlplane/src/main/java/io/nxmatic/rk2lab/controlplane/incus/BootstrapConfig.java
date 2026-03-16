@@ -91,7 +91,8 @@ public record BootstrapConfig(Path worktreeDir, String clusterName, String nodeN
 
         private String imageBuilderHost = "bioskop-nixos.local";
 
-        private URI imageDistrobuilderConfig = URI.create("classpath:/incus/incus-distrobuilder.yaml");
+        private URI imageDistrobuilderConfig = URI.create(
+            "classpath:/META-INF/io.nxmatic/rk2lab/controlplane/incus/incus-distrobuilder.yaml");
 
         private Path imageSharedFolder;
 

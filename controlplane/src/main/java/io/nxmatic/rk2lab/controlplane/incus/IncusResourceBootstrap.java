@@ -25,14 +25,22 @@ import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig.WorktreeHost;
 import io.nxmatic.rk2lab.controlplane.incus.image.PulumiIncusImageProvider;
 
 import java.io.IOException;
+import java.net.JarURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Enumeration;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -55,6 +63,8 @@ public final class IncusResourceBootstrap {
 
     private final NodeConfigRegenerator nodeConfigRegenerator;
 
+    private final ClasspathAssetMaterializer classpathAssetMaterializer;
+
     private final IncusImportLookup incusImportLookup;
 
     private final LaunchSecretsUpdater launchSecretsUpdater;
@@ -64,6 +74,7 @@ public final class IncusResourceBootstrap {
         this.imageProvider = new PulumiIncusImageProvider(config);
         this.hostMountSourceVerifier = HostMountSourceVerifier.INSTANCE;
         this.nodeConfigRegenerator = new NodeConfigRegenerator(CloudConfigSecretRenderer.INSTANCE);
+        this.classpathAssetMaterializer = ClasspathAssetMaterializer.INSTANCE;
         this.incusImportLookup = IncusImportLookup.INSTANCE;
         this.launchSecretsUpdater = LaunchSecretsUpdater.INSTANCE;
     }
@@ -95,6 +106,10 @@ public final class IncusResourceBootstrap {
 
         private Output<String> ensuredImageFingerprint;
 
+        private String provisioningChecksum;
+
+        private String imageBuildChecksum;
+
         private Instance instance;
 
         private ApplyPipeline resolvePaths() {
@@ -106,9 +121,12 @@ public final class IncusResourceBootstrap {
         }
 
         private ApplyPipeline prepareHostState() {
+            classpathAssetMaterializer.materializeIncusAssets(localPaths.assetsRoot());
+            classpathAssetMaterializer.materializeManifests(localPaths.manifestsRoot());
             hostMountSourceVerifier.ensureSources(localPaths);
             nodeConfigRegenerator.regenerateCloudConfigDir(localPaths.runtimeCloudConfigRoot(),
                 localPaths.cloudSeedRoot());
+            this.provisioningChecksum = ProvisioningResourceInventory.checksum(localPaths);
             ensureLaunchSecretsToken(localPaths.secretsFile());
             return this;
         }
@@ -122,37 +140,46 @@ public final class IncusResourceBootstrap {
             this.ensuredProfileName = ensureProfile(providerContext, ensuredProject);
             this.ensuredImageFingerprint = imageProvider.ensureSeedImageFingerprint(providerContext.invokeOptions(),
                 providerContext.provider(), ensuredProject);
+            this.imageBuildChecksum = imageProvider.buildChecksum();
             return this;
         }
 
         private ApplyPipeline createInstance() {
+            final Map<String, String> instanceConfig = new LinkedHashMap<>();
+            instanceConfig.put("raw.lxc", String.join("\n",
+                    "lxc.mount.auto = proc:rw sys:rw cgroup:rw",
+                    "lxc.apparmor.profile = unconfined",
+                    "lxc.cap.drop ="));
+            instanceConfig.put("security.privileged", "true");
+            instanceConfig.put("security.nesting", "true");
+            instanceConfig.put("security.syscalls.intercept.bpf", "true");
+            instanceConfig.put("security.syscalls.intercept.bpf.devices", "true");
+            instanceConfig.put("user.rke2lab.provisioningChecksum", provisioningChecksum);
+            instanceConfig.put("user.rke2lab.imageBuildChecksum", imageBuildChecksum);
+
             this.instance = new Instance("seed-instance",
                     InstanceArgs.builder()
                                 .name(config.nodeName())
                                 .project(ensuredProjectName)
                                 .image(ensuredImageFingerprint)
                                 .profiles(ensuredProfileName.applyValue(List::of))
-                                .config(Map.of("raw.lxc", String.join("\n",
-                                    "lxc.mount.auto = proc:rw sys:rw cgroup:rw",
-                                    "lxc.apparmor.profile = unconfined",
-                                    "lxc.cap.drop ="),
-                                    "security.privileged", "true",
-                                    "security.nesting", "true",
-                                    "security.syscalls.intercept.bpf", "true",
-                                    "security.syscalls.intercept.bpf.devices", "true"))
+                                .config(instanceConfig)
                                 .running(true)
                                 .devices(seedInstanceDevices(nixosPaths))
                                 .build(),
                     CustomResourceOptions.builder()
                                          .provider(providerContext.provider())
-                                     .ignoreChanges(List.of("image"))
+                                         .ignoreChanges(List.of("image"))
+                                         .deleteBeforeReplace(true)
+                                         .replaceOnChanges(List.of("config"))
                                          .build());
             return this;
         }
 
         private BootstrapResult toResult() {
             return new BootstrapResult("incus://" + config.incusProject() + "/" + config.nodeName(),
-                    ensuredImageFingerprint, instance.status(), instance.urn(), providerContext.provider().urn());
+                    ensuredImageFingerprint, instance.status(), instance.urn(), providerContext.provider().urn(),
+                    provisioningChecksum, imageBuildChecksum);
         }
     }
 
@@ -238,7 +265,7 @@ public final class IncusResourceBootstrap {
 
     private record BootstrapPaths(Path worktreeRoot, Path stateRoot, Path clusterNodeRoot, Path manifestsRoot,
             Path runtimeRke2ConfigRoot, Path runtimeCloudConfigRoot, Path runtimeEnvConfigRoot, Path secretsFile,
-            Path scriptsRoot, Path systemdRoot, Path gitRoot, Path shareRoot, Path kubeconfigRoot,
+            Path assetsRoot, Path scriptsRoot, Path systemdRoot, Path gitRoot, Path shareRoot, Path kubeconfigRoot,
             Path cloudSeedRoot) {
 
         private static Builder builder() {
@@ -247,16 +274,16 @@ public final class IncusResourceBootstrap {
 
         private static BootstrapPaths fromLocalWorktree(Path worktreeRoot, String clusterName, String nodeName) {
             final Path stateRoot = worktreeRoot.resolve(".local.d");
+            final Path hostResourceRoot = worktreeRoot.resolve(".rke2lab").resolve("host");
             final Path clusterNodeRoot = stateRoot.resolve("var")
                     .resolve("lib")
                     .resolve("rke2lab")
                     .resolve(clusterName)
                     .resolve(nodeName);
-            final Path manifestsRoot = worktreeRoot.resolve("controlplane")
-                .resolve("target")
-                .resolve("generated-manifests")
-                .resolve("manifests.d");
+            final Path manifestsRoot = hostResourceRoot.resolve("manifests.d");
             final Path runtimeRoot = manifestsRoot.resolve("runtime");
+            final Path scriptsRoot = hostResourceRoot.resolve("scripts.d");
+            final Path systemdRoot = hostResourceRoot.resolve("system.d");
 
             return BootstrapPaths.builder()
                     .worktreeRoot(worktreeRoot)
@@ -267,8 +294,9 @@ public final class IncusResourceBootstrap {
                     .runtimeCloudConfigRoot(runtimeRoot.resolve("cloud-config"))
                     .runtimeEnvConfigRoot(runtimeRoot.resolve("env-config"))
                     .secretsFile(worktreeRoot.resolve(".secrets"))
-                    .scriptsRoot(worktreeRoot.resolve("assets").resolve("incus").resolve("scripts"))
-                    .systemdRoot(worktreeRoot.resolve("assets").resolve("incus").resolve("systemd"))
+                    .assetsRoot(hostResourceRoot)
+                    .scriptsRoot(scriptsRoot)
+                    .systemdRoot(systemdRoot)
                     .gitRoot(worktreeRoot.getParent().getParent())
                     .shareRoot(stateRoot.resolve("share"))
                     .kubeconfigRoot(stateRoot.resolve("var").resolve("kube"))
@@ -286,6 +314,7 @@ public final class IncusResourceBootstrap {
                 .runtimeCloudConfigRoot(config.pathOn(host, runtimeCloudConfigRoot))
                 .runtimeEnvConfigRoot(config.pathOn(host, runtimeEnvConfigRoot))
                 .secretsFile(config.pathOn(host, secretsFile))
+                .assetsRoot(config.pathOn(host, assetsRoot))
                 .scriptsRoot(config.pathOn(host, scriptsRoot))
                 .systemdRoot(config.pathOn(host, systemdRoot))
                 .gitRoot(config.pathOn(host, gitRoot))
@@ -304,6 +333,7 @@ public final class IncusResourceBootstrap {
             private Path runtimeCloudConfigRoot;
             private Path runtimeEnvConfigRoot;
             private Path secretsFile;
+            private Path assetsRoot;
             private Path scriptsRoot;
             private Path systemdRoot;
             private Path gitRoot;
@@ -351,6 +381,11 @@ public final class IncusResourceBootstrap {
                 return this;
             }
 
+            private Builder assetsRoot(Path value) {
+                this.assetsRoot = value;
+                return this;
+            }
+
             private Builder scriptsRoot(Path value) {
                 this.scriptsRoot = value;
                 return this;
@@ -383,7 +418,8 @@ public final class IncusResourceBootstrap {
 
             private BootstrapPaths build() {
                 return new BootstrapPaths(worktreeRoot, stateRoot, clusterNodeRoot, manifestsRoot,
-                        runtimeRke2ConfigRoot, runtimeCloudConfigRoot, runtimeEnvConfigRoot, secretsFile, scriptsRoot,
+                        runtimeRke2ConfigRoot, runtimeCloudConfigRoot, runtimeEnvConfigRoot, secretsFile, assetsRoot,
+                        scriptsRoot,
                         systemdRoot, gitRoot, shareRoot, kubeconfigRoot, cloudSeedRoot);
             }
         }
@@ -588,6 +624,117 @@ public final class IncusResourceBootstrap {
 
         private void ensureDirectories(List<Path> directories) {
             for (Path directory : directories) {
+                try {
+                    Files.createDirectories(directory);
+                } catch (IOException ex) {
+                    throw new IllegalStateException("Failed to prepare required directory: " + directory, ex);
+                }
+            }
+        }
+    }
+
+    private static final class ClasspathAssetMaterializer {
+
+        private static final ClasspathAssetMaterializer INSTANCE = new ClasspathAssetMaterializer();
+
+        private static final String CLASSPATH_ROOT = "META-INF/io.nxmatic/rk2lab/controlplane";
+
+        private static final String CLASSPATH_ASSET_SCRIPTS_ROOT = CLASSPATH_ROOT + "/incus/assets/scripts";
+
+        private static final String CLASSPATH_ASSET_SYSTEMD_ROOT = CLASSPATH_ROOT + "/incus/assets/systemd";
+
+        private static final String CLASSPATH_MANIFESTS_ROOT = CLASSPATH_ROOT + "/incus/manifests/manifests.d";
+
+        private ClasspathAssetMaterializer() {
+        }
+
+        private void materializeIncusAssets(Path assetsTargetRoot) {
+            materializeResourceTree(CLASSPATH_ASSET_SCRIPTS_ROOT, assetsTargetRoot.resolve("scripts.d"), true);
+            materializeResourceTree(CLASSPATH_ASSET_SYSTEMD_ROOT, assetsTargetRoot.resolve("system.d"), false);
+        }
+
+        private void materializeManifests(Path manifestsTargetRoot) {
+            materializeResourceTree(CLASSPATH_MANIFESTS_ROOT, manifestsTargetRoot, false);
+        }
+
+        private void materializeResourceTree(String classpathRoot, Path targetRoot, boolean scriptsExecutable) {
+            ensureDirectories(List.of(targetRoot));
+
+            try {
+                final URL rootUrl = getClass().getClassLoader().getResource(classpathRoot);
+                if (rootUrl == null) {
+                    throw new IllegalStateException("Classpath resource root not found: " + classpathRoot);
+                }
+
+                final String protocol = rootUrl.getProtocol();
+                if ("jar".equals(protocol)) {
+                    copyFromJar(rootUrl, classpathRoot, targetRoot, scriptsExecutable);
+                    return;
+                }
+
+                copyFromDirectory(Path.of(rootUrl.toURI()), targetRoot, scriptsExecutable);
+            } catch (Exception ex) {
+                throw new IllegalStateException("Failed to materialize classpath resources from " + classpathRoot,
+                        ex);
+            }
+        }
+
+        private void copyFromDirectory(Path classpathRoot, Path targetRoot, boolean scriptsExecutable)
+                throws IOException {
+            try (Stream<Path> walk = Files.walk(classpathRoot)) {
+                walk.filter(Files::isRegularFile).forEach(sourcePath -> {
+                    final Path relative = classpathRoot.relativize(sourcePath);
+                    final Path targetPath = targetRoot.resolve(relative);
+                    copyOneFile(sourcePath, targetPath, relative, scriptsExecutable);
+                });
+            }
+        }
+
+        private void copyFromJar(URL rootUrl, String classpathRoot, Path targetRoot, boolean scriptsExecutable)
+                throws IOException {
+            final JarURLConnection connection = (JarURLConnection) rootUrl.openConnection();
+            final String root = classpathRoot + "/";
+            try (JarFile jarFile = connection.getJarFile()) {
+                final Enumeration<JarEntry> entries = jarFile.entries();
+                while (entries.hasMoreElements()) {
+                    final JarEntry entry = entries.nextElement();
+                    final String name = entry.getName();
+                    if (!name.startsWith(root) || entry.isDirectory()) {
+                        continue;
+                    }
+
+                    final Path relative = Path.of(name.substring(root.length()));
+                    final Path targetPath = targetRoot.resolve(relative);
+                    ensureDirectories(List.of(targetPath.getParent()));
+                    try (var in = jarFile.getInputStream(entry)) {
+                        Files.copy(in, targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    }
+                    maybeSetExecutable(targetPath, relative, scriptsExecutable);
+                }
+            }
+        }
+
+        private void copyOneFile(Path sourcePath, Path targetPath, Path relative, boolean scriptsExecutable) {
+            try {
+                ensureDirectories(List.of(targetPath.getParent()));
+                Files.copy(sourcePath, targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                maybeSetExecutable(targetPath, relative, scriptsExecutable);
+            } catch (IOException ex) {
+                throw new IllegalStateException("Failed to copy classpath asset to " + targetPath, ex);
+            }
+        }
+
+        private void maybeSetExecutable(Path targetPath, Path relative, boolean scriptsExecutable) {
+            if (scriptsExecutable) {
+                targetPath.toFile().setExecutable(true, false);
+            }
+        }
+
+        private void ensureDirectories(List<Path> directories) {
+            for (Path directory : directories) {
+                if (directory == null) {
+                    continue;
+                }
                 try {
                     Files.createDirectories(directory);
                 } catch (IOException ex) {
@@ -961,7 +1108,63 @@ public final class IncusResourceBootstrap {
         }
     }
 
+    private static final class ProvisioningResourceInventory {
+
+        private ProvisioningResourceInventory() {
+        }
+
+        private static String checksum(BootstrapPaths paths) {
+            final List<Path> roots = List.of(paths.scriptsRoot(), paths.systemdRoot(), paths.manifestsRoot(),
+                    paths.runtimeRke2ConfigRoot(), paths.runtimeCloudConfigRoot(), paths.runtimeEnvConfigRoot(),
+                    paths.cloudSeedRoot());
+
+            try {
+                final MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                for (Path root : roots) {
+                    updateDigestForPath(digest, root);
+                }
+                return HexFormat.of().formatHex(digest.digest());
+            } catch (NoSuchAlgorithmException ex) {
+                throw new IllegalStateException("SHA-256 is not available", ex);
+            }
+        }
+
+        private static void updateDigestForPath(MessageDigest digest, Path root) {
+            digest.update((byte) '\n');
+            digest.update(root.toString().getBytes(StandardCharsets.UTF_8));
+
+            if (!Files.exists(root)) {
+                digest.update("<missing>".getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+
+            if (Files.isRegularFile(root)) {
+                digestFile(digest, root, root.getFileName());
+                return;
+            }
+
+            try (Stream<Path> walk = Files.walk(root)) {
+                walk.filter(Files::isRegularFile)
+                    .sorted()
+                    .forEach(file -> digestFile(digest, file, root.relativize(file)));
+            } catch (IOException ex) {
+                throw new IllegalStateException("Failed to fingerprint provisioning resources at: " + root, ex);
+            }
+        }
+
+        private static void digestFile(MessageDigest digest, Path file, Path relativePath) {
+            try {
+                digest.update((byte) '\n');
+                digest.update(relativePath.toString().getBytes(StandardCharsets.UTF_8));
+                digest.update((byte) 0);
+                digest.update(Files.readAllBytes(file));
+            } catch (IOException ex) {
+                throw new IllegalStateException("Failed to read provisioning resource: " + file, ex);
+            }
+        }
+    }
+
     public record BootstrapResult(String seedNodeId, Object imageFingerprint, Object instanceStatus, Object instanceUrn,
-            Object providerUrn) {
+            Object providerUrn, String provisioningChecksum, String imageBuildChecksum) {
     }
 }
