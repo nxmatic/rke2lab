@@ -43,14 +43,19 @@ public final class Main {
     private static final class ManifestSynthesizer {
 
         private final String manifestsSubpath = "rke2.d/bioskop/master/manifests.d";
-        private final Path synthOutdir = Paths.get(System.getProperty("rk2lab.manifests.outdir", "target")).toAbsolutePath().normalize();
-        private final Path synthManifestFile = Paths.get(System.getProperty("rk2lab.manifests.file", "target/manifests.yaml")).toAbsolutePath().normalize();
+
+        private final Path synthOutdir = Paths.get(System.getProperty("rk2lab.manifests.outdir", "target"))
+                                              .toAbsolutePath()
+                                              .normalize();
+
+        private final Path synthManifestFile = Paths.get(
+                System.getProperty("rk2lab.manifests.file", "target/manifests.yaml")).toAbsolutePath().normalize();
 
         void synthesize() throws IOException {
             LOG.info("Starting manifests synthesis");
 
-            Path repoRoot = findRepoRoot(Paths.get("").toAbsolutePath().normalize())
-                    .orElseThrow(() -> new IllegalStateException("Unable to locate repository root containing rke2.d"));
+            Path repoRoot = findRepoRoot(Paths.get("").toAbsolutePath().normalize()).orElseThrow(
+                    () -> new IllegalStateException("Unable to locate repository root containing rke2.d"));
 
             Path manifestsRoot = repoRoot.resolve(manifestsSubpath);
             if (!Files.isDirectory(manifestsRoot)) {
@@ -62,33 +67,31 @@ public final class Main {
                 throw new IllegalStateException("No .yml manifests found under: " + manifestsRoot);
             }
 
-                App app = new App(AppProps.builder()
-                    .outdir(synthOutdir.toString())
-                    .build());
-                Chart chart = new Chart(app, "manifests");
+            App app = new App(AppProps.builder().outdir(synthOutdir.toString()).build());
+            Chart chart = new Chart(app, "manifests");
 
-            LayerDomainRegistry domainRegistry = new LayerDomainRegistryBuilder()
-                    .register(new StorageDomainRegistrar())
-                    .register(new ReplicationDomainRegistrar())
-                    .register(new GitopsDomainRegistrar())
-                    .register(new RuntimeDomainRegistrar())
-                    .register(new NetworkingDomainRegistrar())
-                    .register(new MeshDomainRegistrar())
-                    .register(new HaDomainRegistrar())
-                    .register(new CicdDomainRegistrar())
-                    .build();
+            LayerDomainRegistry domainRegistry = new LayerDomainRegistryBuilder().register(new StorageDomainRegistrar())
+                                                                                 .register(
+                                                                                         new ReplicationDomainRegistrar())
+                                                                                 .register(new GitopsDomainRegistrar())
+                                                                                 .register(new RuntimeDomainRegistrar())
+                                                                                 .register(
+                                                                                         new NetworkingDomainRegistrar())
+                                                                                 .register(new MeshDomainRegistrar())
+                                                                                 .register(new HaDomainRegistrar())
+                                                                                 .register(new CicdDomainRegistrar())
+                                                                                 .build();
 
-                List<ManifestUnit> manifestUnits = domainRegistry.manifestUnits();
+            List<ManifestUnit> manifestUnits = domainRegistry.manifestUnits();
 
-                ManifestUnitRegistry manifestUnitRegistry = new ManifestUnitRegistry(manifestUnits);
-                ManifestUnitVisitor manifestUnitVisitor = new ApplyingManifestUnitVisitor();
-                ManifestUnitDependencyApplier dependencyApplier = new ManifestUnitDependencyApplier(manifestUnitRegistry, manifestUnitVisitor);
+            ManifestUnitRegistry manifestUnitRegistry = new ManifestUnitRegistry(manifestUnits);
+            ManifestUnitVisitor manifestUnitVisitor = new ApplyingManifestUnitVisitor();
+            ManifestUnitDependencyApplier dependencyApplier = new ManifestUnitDependencyApplier(manifestUnitRegistry,
+                    manifestUnitVisitor);
 
-                LOG.info("Configured {} manifest domains", domainRegistry.domains().size());
-                LOG.debug("Manifest domains: {}", domainRegistry.domains().stream()
-                    .map(domain -> domain.domainId())
-                    .sorted()
-                    .toList());
+            LOG.info("Configured {} manifest domains", domainRegistry.domains().size());
+            LOG.debug("Manifest domains: {}",
+                    domainRegistry.domains().stream().map(domain -> domain.domainId()).sorted().toList());
 
             int manifestUnitHitCount = 0;
             for (Path manifestFile : manifestFiles) {
@@ -98,18 +101,15 @@ public final class Main {
                 Optional<ManifestUnit> manifestUnit = manifestUnitRegistry.findByLegacyPath(relativePathString);
                 if (manifestUnit.isPresent()) {
                     manifestUnitHitCount++;
-                    LOG.debug("Applying manifest unit '{}' for manifest path '{}'", manifestUnit.get().manifestUnitId(), relativePathString);
-                    domainRegistry.applyManifestUnitWithDomainDependencies(
-                        manifestUnit.get().manifestUnitId(),
-                            dependencyApplier,
-                            chart
-                    );
+                    LOG.debug("Applying manifest unit '{}' for manifest path '{}'", manifestUnit.get().manifestUnitId(),
+                            relativePathString);
+                    domainRegistry.applyManifestUnitWithDomainDependencies(manifestUnit.get().manifestUnitId(),
+                            dependencyApplier, chart);
                     continue;
                 }
 
-                    throw new IllegalStateException(
-                        "Manifest path is not mapped to a canonical manifest unit: " + relativePathString
-                    );
+                throw new IllegalStateException(
+                        "Manifest path is not mapped to a canonical manifest unit: " + relativePathString);
             }
 
             app.synth();
@@ -121,22 +121,17 @@ public final class Main {
             Files.createDirectories(synthManifestFile.getParent());
             Files.move(synthesizedFile, synthManifestFile, StandardCopyOption.REPLACE_EXISTING);
 
-            LOG.info(
-                    "Synthesized {} manifest files from {} (manifest unit hits={})",
-                    manifestFiles.size(),
-                    manifestsRoot,
-                    manifestUnitHitCount
-                );
+            LOG.info("Synthesized {} manifest files from {} (manifest unit hits={})", manifestFiles.size(),
+                    manifestsRoot, manifestUnitHitCount);
             LOG.info("Consolidated manifest output written to {}", synthManifestFile);
         }
 
         private List<Path> collectManifestFiles(final Path manifestsRoot) throws IOException {
             try (Stream<Path> stream = Files.walk(manifestsRoot)) {
-                return stream
-                        .filter(Files::isRegularFile)
-                        .filter(path -> path.getFileName().toString().endsWith(".yml"))
-                        .sorted(Comparator.comparing(path -> manifestsRoot.relativize(path).toString()))
-                        .toList();
+                return stream.filter(Files::isRegularFile)
+                             .filter(path -> path.getFileName().toString().endsWith(".yml"))
+                             .sorted(Comparator.comparing(path -> manifestsRoot.relativize(path).toString()))
+                             .toList();
             }
         }
 
