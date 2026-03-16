@@ -13,7 +13,7 @@ public record IncusProviderContext(Provider provider, InvokeOptions invokeOption
     public static IncusProviderContext forBootstrap(String providerName, BootstrapConfig config) {
         final ProviderRemoteArgs.Builder remoteArgsBuilder = ProviderRemoteArgs.builder()
                 .name(config.incusDefaultRemote())
-                .address(config.incusRemoteAddress())
+                .address(config.incusRemoteAddress().toString())
                 .protocol("incus");
 
         final ProviderArgs.Builder providerArgsBuilder = ProviderArgs.builder()
@@ -21,8 +21,8 @@ public record IncusProviderContext(Provider provider, InvokeOptions invokeOption
                 .acceptRemoteCertificate(false)
                 .generateClientCertificates(false)
                 .remotes(remoteArgsBuilder.build());
-        if (config.incusConfigDir() != null && !config.incusConfigDir().isBlank()) {
-            providerArgsBuilder.configDir(config.incusConfigDir());
+        if (config.incusConfigDir() != null && !config.incusConfigDir().toString().isBlank()) {
+            providerArgsBuilder.configDir(config.incusConfigDir().toString());
         }
 
         final Provider provider = new Provider(
