@@ -13,19 +13,18 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class ProfileState extends com.pulumi.resources.ResourceArgs {
 
     public static final ProfileState Empty = new ProfileState();
 
-    @Import(name="config")
-    private @Nullable Output<Map<String,String>> config;
+    @Import(name = "config")
+    private @Nullable Output<Map<String, String>> config;
 
-    public Optional<Output<Map<String,String>>> config() {
+    public Optional<Output<Map<String, String>>> config() {
         return Optional.ofNullable(this.config);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
@@ -34,41 +33,40 @@ public final class ProfileState extends com.pulumi.resources.ResourceArgs {
 
     /**
      * Profile device
-     * 
      */
-    @Import(name="devices")
+    @Import(name = "devices")
     private @Nullable Output<List<ProfileDeviceArgs>> devices;
 
     /**
      * @return Profile device
-     * 
      */
     public Optional<Output<List<ProfileDeviceArgs>>> devices() {
         return Optional.ofNullable(this.devices);
     }
 
-    @Import(name="name")
+    @Import(name = "name")
     private @Nullable Output<String> name;
 
     public Optional<Output<String>> name() {
         return Optional.ofNullable(this.name);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private ProfileState() {}
+    private ProfileState() {
+    }
 
     private ProfileState(ProfileState $) {
         this.config = $.config;
@@ -82,6 +80,7 @@ public final class ProfileState extends com.pulumi.resources.ResourceArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(ProfileState defaults) {
         return new Builder(defaults);
     }
@@ -97,12 +96,12 @@ public final class ProfileState extends com.pulumi.resources.ResourceArgs {
             $ = new ProfileState(Objects.requireNonNull(defaults));
         }
 
-        public Builder config(@Nullable Output<Map<String,String>> config) {
+        public Builder config(@Nullable Output<Map<String, String>> config) {
             $.config = config;
             return this;
         }
 
-        public Builder config(Map<String,String> config) {
+        public Builder config(Map<String, String> config) {
             return config(Output.of(config));
         }
 
@@ -117,9 +116,7 @@ public final class ProfileState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param devices Profile device
-         * 
          * @return builder
-         * 
          */
         public Builder devices(@Nullable Output<List<ProfileDeviceArgs>> devices) {
             $.devices = devices;
@@ -128,9 +125,7 @@ public final class ProfileState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param devices Profile device
-         * 
          * @return builder
-         * 
          */
         public Builder devices(List<ProfileDeviceArgs> devices) {
             return devices(Output.of(devices));
@@ -138,9 +133,7 @@ public final class ProfileState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param devices Profile device
-         * 
          * @return builder
-         * 
          */
         public Builder devices(ProfileDeviceArgs... devices) {
             return devices(List.of(devices));

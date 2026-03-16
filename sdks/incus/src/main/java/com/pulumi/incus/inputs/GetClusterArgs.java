@@ -10,19 +10,19 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetClusterArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetClusterArgs Empty = new GetClusterArgs();
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private GetClusterArgs() {}
+    private GetClusterArgs() {
+    }
 
     private GetClusterArgs(GetClusterArgs $) {
         this.remote = $.remote;
@@ -31,6 +31,7 @@ public final class GetClusterArgs extends com.pulumi.resources.InvokeArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetClusterArgs defaults) {
         return new Builder(defaults);
     }

@@ -12,21 +12,18 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class NetworkZoneRecordEntryArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final NetworkZoneRecordEntryArgs Empty = new NetworkZoneRecordEntryArgs();
 
     /**
      * Record entry TTL
-     * 
      */
-    @Import(name="ttl")
+    @Import(name = "ttl")
     private @Nullable Output<Double> ttl;
 
     /**
      * @return Record entry TTL
-     * 
      */
     public Optional<Output<Double>> ttl() {
         return Optional.ofNullable(this.ttl);
@@ -34,14 +31,12 @@ public final class NetworkZoneRecordEntryArgs extends com.pulumi.resources.Resou
 
     /**
      * Record entry type
-     * 
      */
-    @Import(name="type", required=true)
+    @Import(name = "type", required = true)
     private Output<String> type;
 
     /**
      * @return Record entry type
-     * 
      */
     public Output<String> type() {
         return this.type;
@@ -49,20 +44,19 @@ public final class NetworkZoneRecordEntryArgs extends com.pulumi.resources.Resou
 
     /**
      * Record entry value
-     * 
      */
-    @Import(name="value", required=true)
+    @Import(name = "value", required = true)
     private Output<String> value;
 
     /**
      * @return Record entry value
-     * 
      */
     public Output<String> value() {
         return this.value;
     }
 
-    private NetworkZoneRecordEntryArgs() {}
+    private NetworkZoneRecordEntryArgs() {
+    }
 
     private NetworkZoneRecordEntryArgs(NetworkZoneRecordEntryArgs $) {
         this.ttl = $.ttl;
@@ -73,6 +67,7 @@ public final class NetworkZoneRecordEntryArgs extends com.pulumi.resources.Resou
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(NetworkZoneRecordEntryArgs defaults) {
         return new Builder(defaults);
     }
@@ -90,9 +85,7 @@ public final class NetworkZoneRecordEntryArgs extends com.pulumi.resources.Resou
 
         /**
          * @param ttl Record entry TTL
-         * 
          * @return builder
-         * 
          */
         public Builder ttl(@Nullable Output<Double> ttl) {
             $.ttl = ttl;
@@ -101,9 +94,7 @@ public final class NetworkZoneRecordEntryArgs extends com.pulumi.resources.Resou
 
         /**
          * @param ttl Record entry TTL
-         * 
          * @return builder
-         * 
          */
         public Builder ttl(Double ttl) {
             return ttl(Output.of(ttl));
@@ -111,9 +102,7 @@ public final class NetworkZoneRecordEntryArgs extends com.pulumi.resources.Resou
 
         /**
          * @param type Record entry type
-         * 
          * @return builder
-         * 
          */
         public Builder type(Output<String> type) {
             $.type = type;
@@ -122,9 +111,7 @@ public final class NetworkZoneRecordEntryArgs extends com.pulumi.resources.Resou
 
         /**
          * @param type Record entry type
-         * 
          * @return builder
-         * 
          */
         public Builder type(String type) {
             return type(Output.of(type));
@@ -132,9 +119,7 @@ public final class NetworkZoneRecordEntryArgs extends com.pulumi.resources.Resou
 
         /**
          * @param value Record entry value
-         * 
          * @return builder
-         * 
          */
         public Builder value(Output<String> value) {
             $.value = value;
@@ -143,9 +128,7 @@ public final class NetworkZoneRecordEntryArgs extends com.pulumi.resources.Resou
 
         /**
          * @param value Record entry value
-         * 
          * @return builder
-         * 
          */
         public Builder value(String value) {
             return value(Output.of(value));

@@ -11,33 +11,33 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class StorageVolumeSourceVolumeArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final StorageVolumeSourceVolumeArgs Empty = new StorageVolumeSourceVolumeArgs();
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private Output<String> name;
 
     public Output<String> name() {
         return this.name;
     }
 
-    @Import(name="pool", required=true)
+    @Import(name = "pool", required = true)
     private Output<String> pool;
 
     public Output<String> pool() {
         return this.pool;
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private StorageVolumeSourceVolumeArgs() {}
+    private StorageVolumeSourceVolumeArgs() {
+    }
 
     private StorageVolumeSourceVolumeArgs(StorageVolumeSourceVolumeArgs $) {
         this.name = $.name;
@@ -48,6 +48,7 @@ public final class StorageVolumeSourceVolumeArgs extends com.pulumi.resources.Re
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(StorageVolumeSourceVolumeArgs defaults) {
         return new Builder(defaults);
     }

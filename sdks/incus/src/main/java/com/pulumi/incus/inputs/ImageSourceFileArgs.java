@@ -11,26 +11,26 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class ImageSourceFileArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final ImageSourceFileArgs Empty = new ImageSourceFileArgs();
 
-    @Import(name="dataPath", required=true)
+    @Import(name = "dataPath", required = true)
     private Output<String> dataPath;
 
     public Output<String> dataPath() {
         return this.dataPath;
     }
 
-    @Import(name="metadataPath")
+    @Import(name = "metadataPath")
     private @Nullable Output<String> metadataPath;
 
     public Optional<Output<String>> metadataPath() {
         return Optional.ofNullable(this.metadataPath);
     }
 
-    private ImageSourceFileArgs() {}
+    private ImageSourceFileArgs() {
+    }
 
     private ImageSourceFileArgs(ImageSourceFileArgs $) {
         this.dataPath = $.dataPath;
@@ -40,6 +40,7 @@ public final class ImageSourceFileArgs extends com.pulumi.resources.ResourceArgs
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(ImageSourceFileArgs defaults) {
         return new Builder(defaults);
     }

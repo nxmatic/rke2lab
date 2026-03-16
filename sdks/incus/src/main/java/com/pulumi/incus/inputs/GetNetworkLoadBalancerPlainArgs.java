@@ -13,68 +13,68 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetNetworkLoadBalancerPlainArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetNetworkLoadBalancerPlainArgs Empty = new GetNetworkLoadBalancerPlainArgs();
 
-    @Import(name="backends")
+    @Import(name = "backends")
     private @Nullable List<GetNetworkLoadBalancerBackend> backends;
 
     public Optional<List<GetNetworkLoadBalancerBackend>> backends() {
         return Optional.ofNullable(this.backends);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable String description;
 
     public Optional<String> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="listenAddress", required=true)
+    @Import(name = "listenAddress", required = true)
     private String listenAddress;
 
     public String listenAddress() {
         return this.listenAddress;
     }
 
-    @Import(name="location")
+    @Import(name = "location")
     private @Nullable String location;
 
     public Optional<String> location() {
         return Optional.ofNullable(this.location);
     }
 
-    @Import(name="network", required=true)
+    @Import(name = "network", required = true)
     private String network;
 
     public String network() {
         return this.network;
     }
 
-    @Import(name="ports")
+    @Import(name = "ports")
     private @Nullable List<GetNetworkLoadBalancerPort> ports;
 
     public Optional<List<GetNetworkLoadBalancerPort>> ports() {
         return Optional.ofNullable(this.ports);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable String project;
 
     public Optional<String> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable String remote;
 
     public Optional<String> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private GetNetworkLoadBalancerPlainArgs() {}
+    private GetNetworkLoadBalancerPlainArgs() {
+    }
 
     private GetNetworkLoadBalancerPlainArgs(GetNetworkLoadBalancerPlainArgs $) {
         this.backends = $.backends;
@@ -90,6 +90,7 @@ public final class GetNetworkLoadBalancerPlainArgs extends com.pulumi.resources.
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkLoadBalancerPlainArgs defaults) {
         return new Builder(defaults);
     }

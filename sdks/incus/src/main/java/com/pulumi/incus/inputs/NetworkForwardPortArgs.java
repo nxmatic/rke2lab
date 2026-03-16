@@ -11,21 +11,18 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final NetworkForwardPortArgs Empty = new NetworkForwardPortArgs();
 
     /**
      * Port description
-     * 
      */
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     /**
      * @return Port description
-     * 
      */
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
@@ -33,14 +30,12 @@ public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceA
 
     /**
      * Listen port to forward
-     * 
      */
-    @Import(name="listenPort", required=true)
+    @Import(name = "listenPort", required = true)
     private Output<String> listenPort;
 
     /**
      * @return Listen port to forward
-     * 
      */
     public Output<String> listenPort() {
         return this.listenPort;
@@ -48,14 +43,12 @@ public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceA
 
     /**
      * Port protocol
-     * 
      */
-    @Import(name="protocol")
+    @Import(name = "protocol")
     private @Nullable Output<String> protocol;
 
     /**
      * @return Port protocol
-     * 
      */
     public Optional<Output<String>> protocol() {
         return Optional.ofNullable(this.protocol);
@@ -63,14 +56,12 @@ public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceA
 
     /**
      * Target address to forward listen port to
-     * 
      */
-    @Import(name="targetAddress", required=true)
+    @Import(name = "targetAddress", required = true)
     private Output<String> targetAddress;
 
     /**
      * @return Target address to forward listen port to
-     * 
      */
     public Output<String> targetAddress() {
         return this.targetAddress;
@@ -78,20 +69,19 @@ public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceA
 
     /**
      * Target port to forward listen port to
-     * 
      */
-    @Import(name="targetPort", required=true)
+    @Import(name = "targetPort", required = true)
     private Output<String> targetPort;
 
     /**
      * @return Target port to forward listen port to
-     * 
      */
     public Output<String> targetPort() {
         return this.targetPort;
     }
 
-    private NetworkForwardPortArgs() {}
+    private NetworkForwardPortArgs() {
+    }
 
     private NetworkForwardPortArgs(NetworkForwardPortArgs $) {
         this.description = $.description;
@@ -104,6 +94,7 @@ public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceA
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(NetworkForwardPortArgs defaults) {
         return new Builder(defaults);
     }
@@ -121,9 +112,7 @@ public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceA
 
         /**
          * @param description Port description
-         * 
          * @return builder
-         * 
          */
         public Builder description(@Nullable Output<String> description) {
             $.description = description;
@@ -132,9 +121,7 @@ public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceA
 
         /**
          * @param description Port description
-         * 
          * @return builder
-         * 
          */
         public Builder description(String description) {
             return description(Output.of(description));
@@ -142,9 +129,7 @@ public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceA
 
         /**
          * @param listenPort Listen port to forward
-         * 
          * @return builder
-         * 
          */
         public Builder listenPort(Output<String> listenPort) {
             $.listenPort = listenPort;
@@ -153,9 +138,7 @@ public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceA
 
         /**
          * @param listenPort Listen port to forward
-         * 
          * @return builder
-         * 
          */
         public Builder listenPort(String listenPort) {
             return listenPort(Output.of(listenPort));
@@ -163,9 +146,7 @@ public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceA
 
         /**
          * @param protocol Port protocol
-         * 
          * @return builder
-         * 
          */
         public Builder protocol(@Nullable Output<String> protocol) {
             $.protocol = protocol;
@@ -174,9 +155,7 @@ public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceA
 
         /**
          * @param protocol Port protocol
-         * 
          * @return builder
-         * 
          */
         public Builder protocol(String protocol) {
             return protocol(Output.of(protocol));
@@ -184,9 +163,7 @@ public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceA
 
         /**
          * @param targetAddress Target address to forward listen port to
-         * 
          * @return builder
-         * 
          */
         public Builder targetAddress(Output<String> targetAddress) {
             $.targetAddress = targetAddress;
@@ -195,9 +172,7 @@ public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceA
 
         /**
          * @param targetAddress Target address to forward listen port to
-         * 
          * @return builder
-         * 
          */
         public Builder targetAddress(String targetAddress) {
             return targetAddress(Output.of(targetAddress));
@@ -205,9 +180,7 @@ public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceA
 
         /**
          * @param targetPort Target port to forward listen port to
-         * 
          * @return builder
-         * 
          */
         public Builder targetPort(Output<String> targetPort) {
             $.targetPort = targetPort;
@@ -216,9 +189,7 @@ public final class NetworkForwardPortArgs extends com.pulumi.resources.ResourceA
 
         /**
          * @param targetPort Target port to forward listen port to
-         * 
          * @return builder
-         * 
          */
         public Builder targetPort(String targetPort) {
             return targetPort(Output.of(targetPort));

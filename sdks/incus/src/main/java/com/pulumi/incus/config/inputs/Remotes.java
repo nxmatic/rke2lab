@@ -14,75 +14,83 @@ import javax.annotation.Nullable;
 @CustomType
 public final class Remotes {
     /**
-     * @return The URL of the Incus host. The default will be the path to the local unix socket, or leaving it as an empty string will use the default socket path.
-     * 
+     * @return The URL of the Incus host. The default will be the path to the local unix socket, or leaving it as an
+     *         empty string will use the default socket path.
      */
     private @Nullable String address;
+
     /**
-     * @return Server authentication type, tls or oidc. ( Only for the &lt;span pulumi-lang-nodejs=&#34;`incus`&#34; pulumi-lang-dotnet=&#34;`Incus`&#34; pulumi-lang-go=&#34;`incus`&#34; pulumi-lang-python=&#34;`incus`&#34; pulumi-lang-yaml=&#34;`incus`&#34; pulumi-lang-java=&#34;`incus`&#34;&gt;`incus`&lt;/span&gt; protocol )
-     * 
+     * @return Server authentication type, tls or oidc. ( Only for the &lt;span pulumi-lang-nodejs=&#34;`incus`&#34;
+     *         pulumi-lang-dotnet=&#34;`Incus`&#34; pulumi-lang-go=&#34;`incus`&#34;
+     *         pulumi-lang-python=&#34;`incus`&#34; pulumi-lang-yaml=&#34;`incus`&#34;
+     *         pulumi-lang-java=&#34;`incus`&#34;&gt;`incus`&lt;/span&gt; protocol )
      */
     private @Nullable String authenticationType;
+
     /**
      * @return Name of the Incus remote.
-     * 
      */
     private String name;
+
     /**
      * @return Server protocol ( incus, oci or simplestreams )
-     * 
      */
     private @Nullable String protocol;
+
     /**
      * @return Public image server
-     * 
      */
     private @Nullable Boolean public_;
+
     /**
      * @return The trust token used for initial authentication with the Incus remote.
-     * 
      */
     private @Nullable String token;
 
-    private Remotes() {}
+    private Remotes() {
+    }
+
     /**
-     * @return The URL of the Incus host. The default will be the path to the local unix socket, or leaving it as an empty string will use the default socket path.
-     * 
+     * @return The URL of the Incus host. The default will be the path to the local unix socket, or leaving it as an
+     *         empty string will use the default socket path.
      */
     public Optional<String> address() {
         return Optional.ofNullable(this.address);
     }
+
     /**
-     * @return Server authentication type, tls or oidc. ( Only for the &lt;span pulumi-lang-nodejs=&#34;`incus`&#34; pulumi-lang-dotnet=&#34;`Incus`&#34; pulumi-lang-go=&#34;`incus`&#34; pulumi-lang-python=&#34;`incus`&#34; pulumi-lang-yaml=&#34;`incus`&#34; pulumi-lang-java=&#34;`incus`&#34;&gt;`incus`&lt;/span&gt; protocol )
-     * 
+     * @return Server authentication type, tls or oidc. ( Only for the &lt;span pulumi-lang-nodejs=&#34;`incus`&#34;
+     *         pulumi-lang-dotnet=&#34;`Incus`&#34; pulumi-lang-go=&#34;`incus`&#34;
+     *         pulumi-lang-python=&#34;`incus`&#34; pulumi-lang-yaml=&#34;`incus`&#34;
+     *         pulumi-lang-java=&#34;`incus`&#34;&gt;`incus`&lt;/span&gt; protocol )
      */
     public Optional<String> authenticationType() {
         return Optional.ofNullable(this.authenticationType);
     }
+
     /**
      * @return Name of the Incus remote.
-     * 
      */
     public String name() {
         return this.name;
     }
+
     /**
      * @return Server protocol ( incus, oci or simplestreams )
-     * 
      */
     public Optional<String> protocol() {
         return Optional.ofNullable(this.protocol);
     }
+
     /**
      * @return Public image server
-     * 
      */
     public Optional<Boolean> public_() {
         return Optional.ofNullable(this.public_);
     }
+
     /**
      * @return The trust token used for initial authentication with the Incus remote.
-     * 
      */
     public Optional<String> token() {
         return Optional.ofNullable(this.token);
@@ -95,23 +103,32 @@ public final class Remotes {
     public static Builder builder(Remotes defaults) {
         return new Builder(defaults);
     }
+
     @CustomType.Builder
     public static final class Builder {
         private @Nullable String address;
+
         private @Nullable String authenticationType;
+
         private String name;
+
         private @Nullable String protocol;
+
         private @Nullable Boolean public_;
+
         private @Nullable String token;
-        public Builder() {}
+
+        public Builder() {
+        }
+
         public Builder(Remotes defaults) {
-    	      Objects.requireNonNull(defaults);
-    	      this.address = defaults.address;
-    	      this.authenticationType = defaults.authenticationType;
-    	      this.name = defaults.name;
-    	      this.protocol = defaults.protocol;
-    	      this.public_ = defaults.public_;
-    	      this.token = defaults.token;
+            Objects.requireNonNull(defaults);
+            this.address = defaults.address;
+            this.authenticationType = defaults.authenticationType;
+            this.name = defaults.name;
+            this.protocol = defaults.protocol;
+            this.public_ = defaults.public_;
+            this.token = defaults.token;
         }
 
         @CustomType.Setter
@@ -120,38 +137,44 @@ public final class Remotes {
             this.address = address;
             return this;
         }
+
         @CustomType.Setter
         public Builder authenticationType(@Nullable String authenticationType) {
 
             this.authenticationType = authenticationType;
             return this;
         }
+
         @CustomType.Setter
         public Builder name(String name) {
             if (name == null) {
-              throw new MissingRequiredPropertyException("Remotes", "name");
+                throw new MissingRequiredPropertyException("Remotes", "name");
             }
             this.name = name;
             return this;
         }
+
         @CustomType.Setter
         public Builder protocol(@Nullable String protocol) {
 
             this.protocol = protocol;
             return this;
         }
+
         @CustomType.Setter("public")
         public Builder public_(@Nullable Boolean public_) {
 
             this.public_ = public_;
             return this;
         }
+
         @CustomType.Setter
         public Builder token(@Nullable String token) {
 
             this.token = token;
             return this;
         }
+
         public Remotes build() {
             final var _resultValue = new Remotes();
             _resultValue.address = address;

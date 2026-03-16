@@ -14,48 +14,45 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class NetworkLbState extends com.pulumi.resources.ResourceArgs {
 
     public static final NetworkLbState Empty = new NetworkLbState();
 
     /**
      * Network load balancer backend
-     * 
      */
-    @Import(name="backends")
+    @Import(name = "backends")
     private @Nullable Output<List<NetworkLbBackendArgs>> backends;
 
     /**
      * @return Network load balancer backend
-     * 
      */
     public Optional<Output<List<NetworkLbBackendArgs>>> backends() {
         return Optional.ofNullable(this.backends);
     }
 
-    @Import(name="config")
-    private @Nullable Output<Map<String,String>> config;
+    @Import(name = "config")
+    private @Nullable Output<Map<String, String>> config;
 
-    public Optional<Output<Map<String,String>>> config() {
+    public Optional<Output<Map<String, String>>> config() {
         return Optional.ofNullable(this.config);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="listenAddress")
+    @Import(name = "listenAddress")
     private @Nullable Output<String> listenAddress;
 
     public Optional<Output<String>> listenAddress() {
         return Optional.ofNullable(this.listenAddress);
     }
 
-    @Import(name="network")
+    @Import(name = "network")
     private @Nullable Output<String> network;
 
     public Optional<Output<String>> network() {
@@ -64,34 +61,33 @@ public final class NetworkLbState extends com.pulumi.resources.ResourceArgs {
 
     /**
      * Network load balancer port
-     * 
      */
-    @Import(name="ports")
+    @Import(name = "ports")
     private @Nullable Output<List<NetworkLbPortArgs>> ports;
 
     /**
      * @return Network load balancer port
-     * 
      */
     public Optional<Output<List<NetworkLbPortArgs>>> ports() {
         return Optional.ofNullable(this.ports);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private NetworkLbState() {}
+    private NetworkLbState() {
+    }
 
     private NetworkLbState(NetworkLbState $) {
         this.backends = $.backends;
@@ -107,6 +103,7 @@ public final class NetworkLbState extends com.pulumi.resources.ResourceArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(NetworkLbState defaults) {
         return new Builder(defaults);
     }
@@ -124,9 +121,7 @@ public final class NetworkLbState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param backends Network load balancer backend
-         * 
          * @return builder
-         * 
          */
         public Builder backends(@Nullable Output<List<NetworkLbBackendArgs>> backends) {
             $.backends = backends;
@@ -135,9 +130,7 @@ public final class NetworkLbState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param backends Network load balancer backend
-         * 
          * @return builder
-         * 
          */
         public Builder backends(List<NetworkLbBackendArgs> backends) {
             return backends(Output.of(backends));
@@ -145,20 +138,18 @@ public final class NetworkLbState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param backends Network load balancer backend
-         * 
          * @return builder
-         * 
          */
         public Builder backends(NetworkLbBackendArgs... backends) {
             return backends(List.of(backends));
         }
 
-        public Builder config(@Nullable Output<Map<String,String>> config) {
+        public Builder config(@Nullable Output<Map<String, String>> config) {
             $.config = config;
             return this;
         }
 
-        public Builder config(Map<String,String> config) {
+        public Builder config(Map<String, String> config) {
             return config(Output.of(config));
         }
 
@@ -191,9 +182,7 @@ public final class NetworkLbState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param ports Network load balancer port
-         * 
          * @return builder
-         * 
          */
         public Builder ports(@Nullable Output<List<NetworkLbPortArgs>> ports) {
             $.ports = ports;
@@ -202,9 +191,7 @@ public final class NetworkLbState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param ports Network load balancer port
-         * 
          * @return builder
-         * 
          */
         public Builder ports(List<NetworkLbPortArgs> ports) {
             return ports(Output.of(ports));
@@ -212,9 +199,7 @@ public final class NetworkLbState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param ports Network load balancer port
-         * 
          * @return builder
-         * 
          */
         public Builder ports(NetworkLbPortArgs... ports) {
             return ports(List.of(ports));

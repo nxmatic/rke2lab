@@ -11,75 +11,75 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class NetworkAclEgressArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final NetworkAclEgressArgs Empty = new NetworkAclEgressArgs();
 
-    @Import(name="action", required=true)
+    @Import(name = "action", required = true)
     private Output<String> action;
 
     public Output<String> action() {
         return this.action;
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="destination")
+    @Import(name = "destination")
     private @Nullable Output<String> destination;
 
     public Optional<Output<String>> destination() {
         return Optional.ofNullable(this.destination);
     }
 
-    @Import(name="destinationPort")
+    @Import(name = "destinationPort")
     private @Nullable Output<String> destinationPort;
 
     public Optional<Output<String>> destinationPort() {
         return Optional.ofNullable(this.destinationPort);
     }
 
-    @Import(name="icmpCode")
+    @Import(name = "icmpCode")
     private @Nullable Output<String> icmpCode;
 
     public Optional<Output<String>> icmpCode() {
         return Optional.ofNullable(this.icmpCode);
     }
 
-    @Import(name="icmpType")
+    @Import(name = "icmpType")
     private @Nullable Output<String> icmpType;
 
     public Optional<Output<String>> icmpType() {
         return Optional.ofNullable(this.icmpType);
     }
 
-    @Import(name="protocol")
+    @Import(name = "protocol")
     private @Nullable Output<String> protocol;
 
     public Optional<Output<String>> protocol() {
         return Optional.ofNullable(this.protocol);
     }
 
-    @Import(name="source")
+    @Import(name = "source")
     private @Nullable Output<String> source;
 
     public Optional<Output<String>> source() {
         return Optional.ofNullable(this.source);
     }
 
-    @Import(name="state", required=true)
+    @Import(name = "state", required = true)
     private Output<String> state;
 
     public Output<String> state() {
         return this.state;
     }
 
-    private NetworkAclEgressArgs() {}
+    private NetworkAclEgressArgs() {
+    }
 
     private NetworkAclEgressArgs(NetworkAclEgressArgs $) {
         this.action = $.action;
@@ -96,6 +96,7 @@ public final class NetworkAclEgressArgs extends com.pulumi.resources.ResourceArg
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(NetworkAclEgressArgs defaults) {
         return new Builder(defaults);
     }

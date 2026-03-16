@@ -11,33 +11,33 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class InstanceSourceInstanceArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final InstanceSourceInstanceArgs Empty = new InstanceSourceInstanceArgs();
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private Output<String> name;
 
     public Output<String> name() {
         return this.name;
     }
 
-    @Import(name="project", required=true)
+    @Import(name = "project", required = true)
     private Output<String> project;
 
     public Output<String> project() {
         return this.project;
     }
 
-    @Import(name="snapshot")
+    @Import(name = "snapshot")
     private @Nullable Output<String> snapshot;
 
     public Optional<Output<String>> snapshot() {
         return Optional.ofNullable(this.snapshot);
     }
 
-    private InstanceSourceInstanceArgs() {}
+    private InstanceSourceInstanceArgs() {
+    }
 
     private InstanceSourceInstanceArgs(InstanceSourceInstanceArgs $) {
         this.name = $.name;
@@ -48,6 +48,7 @@ public final class InstanceSourceInstanceArgs extends com.pulumi.resources.Resou
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(InstanceSourceInstanceArgs defaults) {
         return new Builder(defaults);
     }

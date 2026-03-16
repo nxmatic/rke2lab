@@ -12,47 +12,47 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetNetworkAddressSetArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetNetworkAddressSetArgs Empty = new GetNetworkAddressSetArgs();
 
-    @Import(name="addresses")
+    @Import(name = "addresses")
     private @Nullable Output<List<String>> addresses;
 
     public Optional<Output<List<String>>> addresses() {
         return Optional.ofNullable(this.addresses);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private Output<String> name;
 
     public Output<String> name() {
         return this.name;
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private GetNetworkAddressSetArgs() {}
+    private GetNetworkAddressSetArgs() {
+    }
 
     private GetNetworkAddressSetArgs(GetNetworkAddressSetArgs $) {
         this.addresses = $.addresses;
@@ -65,6 +65,7 @@ public final class GetNetworkAddressSetArgs extends com.pulumi.resources.InvokeA
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkAddressSetArgs defaults) {
         return new Builder(defaults);
     }

@@ -12,47 +12,47 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class ImageSourceImageArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final ImageSourceImageArgs Empty = new ImageSourceImageArgs();
 
-    @Import(name="architecture")
+    @Import(name = "architecture")
     private @Nullable Output<String> architecture;
 
     public Optional<Output<String>> architecture() {
         return Optional.ofNullable(this.architecture);
     }
 
-    @Import(name="copyAliases")
+    @Import(name = "copyAliases")
     private @Nullable Output<Boolean> copyAliases;
 
     public Optional<Output<Boolean>> copyAliases() {
         return Optional.ofNullable(this.copyAliases);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private Output<String> name;
 
     public Output<String> name() {
         return this.name;
     }
 
-    @Import(name="remote", required=true)
+    @Import(name = "remote", required = true)
     private Output<String> remote;
 
     public Output<String> remote() {
         return this.remote;
     }
 
-    @Import(name="type")
+    @Import(name = "type")
     private @Nullable Output<String> type;
 
     public Optional<Output<String>> type() {
         return Optional.ofNullable(this.type);
     }
 
-    private ImageSourceImageArgs() {}
+    private ImageSourceImageArgs() {
+    }
 
     private ImageSourceImageArgs(ImageSourceImageArgs $) {
         this.architecture = $.architecture;
@@ -65,6 +65,7 @@ public final class ImageSourceImageArgs extends com.pulumi.resources.ResourceArg
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(ImageSourceImageArgs defaults) {
         return new Builder(defaults);
     }

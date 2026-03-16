@@ -9,40 +9,40 @@ import java.lang.String;
 import java.util.List;
 import java.util.Objects;
 
-
 public final class GetNetworkLoadBalancerPort extends com.pulumi.resources.InvokeArgs {
 
     public static final GetNetworkLoadBalancerPort Empty = new GetNetworkLoadBalancerPort();
 
-    @Import(name="description", required=true)
+    @Import(name = "description", required = true)
     private String description;
 
     public String description() {
         return this.description;
     }
 
-    @Import(name="listenPort", required=true)
+    @Import(name = "listenPort", required = true)
     private String listenPort;
 
     public String listenPort() {
         return this.listenPort;
     }
 
-    @Import(name="protocol", required=true)
+    @Import(name = "protocol", required = true)
     private String protocol;
 
     public String protocol() {
         return this.protocol;
     }
 
-    @Import(name="targetBackends", required=true)
+    @Import(name = "targetBackends", required = true)
     private List<String> targetBackends;
 
     public List<String> targetBackends() {
         return this.targetBackends;
     }
 
-    private GetNetworkLoadBalancerPort() {}
+    private GetNetworkLoadBalancerPort() {
+    }
 
     private GetNetworkLoadBalancerPort(GetNetworkLoadBalancerPort $) {
         this.description = $.description;
@@ -54,6 +54,7 @@ public final class GetNetworkLoadBalancerPort extends com.pulumi.resources.Invok
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkLoadBalancerPort defaults) {
         return new Builder(defaults);
     }

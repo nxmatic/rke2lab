@@ -11,33 +11,33 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetProjectArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetProjectArgs Empty = new GetProjectArgs();
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private Output<String> name;
 
     public Output<String> name() {
         return this.name;
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private GetProjectArgs() {}
+    private GetProjectArgs() {
+    }
 
     private GetProjectArgs(GetProjectArgs $) {
         this.description = $.description;
@@ -48,6 +48,7 @@ public final class GetProjectArgs extends com.pulumi.resources.InvokeArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetProjectArgs defaults) {
         return new Builder(defaults);
     }

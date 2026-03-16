@@ -10,33 +10,33 @@ import java.lang.String;
 import java.util.Map;
 import java.util.Objects;
 
-
 public final class GetInstanceDeviceArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final GetInstanceDeviceArgs Empty = new GetInstanceDeviceArgs();
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private Output<String> name;
 
     public Output<String> name() {
         return this.name;
     }
 
-    @Import(name="properties", required=true)
-    private Output<Map<String,String>> properties;
+    @Import(name = "properties", required = true)
+    private Output<Map<String, String>> properties;
 
-    public Output<Map<String,String>> properties() {
+    public Output<Map<String, String>> properties() {
         return this.properties;
     }
 
-    @Import(name="type", required=true)
+    @Import(name = "type", required = true)
     private Output<String> type;
 
     public Output<String> type() {
         return this.type;
     }
 
-    private GetInstanceDeviceArgs() {}
+    private GetInstanceDeviceArgs() {
+    }
 
     private GetInstanceDeviceArgs(GetInstanceDeviceArgs $) {
         this.name = $.name;
@@ -47,6 +47,7 @@ public final class GetInstanceDeviceArgs extends com.pulumi.resources.ResourceAr
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetInstanceDeviceArgs defaults) {
         return new Builder(defaults);
     }
@@ -71,12 +72,12 @@ public final class GetInstanceDeviceArgs extends com.pulumi.resources.ResourceAr
             return name(Output.of(name));
         }
 
-        public Builder properties(Output<Map<String,String>> properties) {
+        public Builder properties(Output<Map<String, String>> properties) {
             $.properties = properties;
             return this;
         }
 
-        public Builder properties(Map<String,String> properties) {
+        public Builder properties(Map<String, String> properties) {
             return properties(Output.of(properties));
         }
 

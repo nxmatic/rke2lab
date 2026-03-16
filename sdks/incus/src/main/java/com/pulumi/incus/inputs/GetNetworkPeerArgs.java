@@ -11,82 +11,82 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetNetworkPeerArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetNetworkPeerArgs Empty = new GetNetworkPeerArgs();
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private Output<String> name;
 
     public Output<String> name() {
         return this.name;
     }
 
-    @Import(name="network", required=true)
+    @Import(name = "network", required = true)
     private Output<String> network;
 
     public Output<String> network() {
         return this.network;
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="status")
+    @Import(name = "status")
     private @Nullable Output<String> status;
 
     public Optional<Output<String>> status() {
         return Optional.ofNullable(this.status);
     }
 
-    @Import(name="targetIntegration")
+    @Import(name = "targetIntegration")
     private @Nullable Output<String> targetIntegration;
 
     public Optional<Output<String>> targetIntegration() {
         return Optional.ofNullable(this.targetIntegration);
     }
 
-    @Import(name="targetNetwork")
+    @Import(name = "targetNetwork")
     private @Nullable Output<String> targetNetwork;
 
     public Optional<Output<String>> targetNetwork() {
         return Optional.ofNullable(this.targetNetwork);
     }
 
-    @Import(name="targetProject")
+    @Import(name = "targetProject")
     private @Nullable Output<String> targetProject;
 
     public Optional<Output<String>> targetProject() {
         return Optional.ofNullable(this.targetProject);
     }
 
-    @Import(name="type")
+    @Import(name = "type")
     private @Nullable Output<String> type;
 
     public Optional<Output<String>> type() {
         return Optional.ofNullable(this.type);
     }
 
-    private GetNetworkPeerArgs() {}
+    private GetNetworkPeerArgs() {
+    }
 
     private GetNetworkPeerArgs(GetNetworkPeerArgs $) {
         this.description = $.description;
@@ -104,6 +104,7 @@ public final class GetNetworkPeerArgs extends com.pulumi.resources.InvokeArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkPeerArgs defaults) {
         return new Builder(defaults);
     }

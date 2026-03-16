@@ -10,54 +10,54 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetStoragePoolPlainArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetStoragePoolPlainArgs Empty = new GetStoragePoolPlainArgs();
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable String description;
 
     public Optional<String> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="driver")
+    @Import(name = "driver")
     private @Nullable String driver;
 
     public Optional<String> driver() {
         return Optional.ofNullable(this.driver);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private String name;
 
     public String name() {
         return this.name;
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable String remote;
 
     public Optional<String> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="status")
+    @Import(name = "status")
     private @Nullable String status;
 
     public Optional<String> status() {
         return Optional.ofNullable(this.status);
     }
 
-    @Import(name="target")
+    @Import(name = "target")
     private @Nullable String target;
 
     public Optional<String> target() {
         return Optional.ofNullable(this.target);
     }
 
-    private GetStoragePoolPlainArgs() {}
+    private GetStoragePoolPlainArgs() {
+    }
 
     private GetStoragePoolPlainArgs(GetStoragePoolPlainArgs $) {
         this.description = $.description;
@@ -71,6 +71,7 @@ public final class GetStoragePoolPlainArgs extends com.pulumi.resources.InvokeAr
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetStoragePoolPlainArgs defaults) {
         return new Builder(defaults);
     }

@@ -11,21 +11,18 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class ImageAliasArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final ImageAliasArgs Empty = new ImageAliasArgs();
 
     /**
      * The description for the image alias.
-     * 
      */
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     /**
      * @return The description for the image alias.
-     * 
      */
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
@@ -33,20 +30,19 @@ public final class ImageAliasArgs extends com.pulumi.resources.ResourceArgs {
 
     /**
      * The name of the image alias.
-     * 
      */
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private Output<String> name;
 
     /**
      * @return The name of the image alias.
-     * 
      */
     public Output<String> name() {
         return this.name;
     }
 
-    private ImageAliasArgs() {}
+    private ImageAliasArgs() {
+    }
 
     private ImageAliasArgs(ImageAliasArgs $) {
         this.description = $.description;
@@ -56,6 +52,7 @@ public final class ImageAliasArgs extends com.pulumi.resources.ResourceArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(ImageAliasArgs defaults) {
         return new Builder(defaults);
     }
@@ -73,9 +70,7 @@ public final class ImageAliasArgs extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param description The description for the image alias.
-         * 
          * @return builder
-         * 
          */
         public Builder description(@Nullable Output<String> description) {
             $.description = description;
@@ -84,9 +79,7 @@ public final class ImageAliasArgs extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param description The description for the image alias.
-         * 
          * @return builder
-         * 
          */
         public Builder description(String description) {
             return description(Output.of(description));
@@ -94,9 +87,7 @@ public final class ImageAliasArgs extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param name The name of the image alias.
-         * 
          * @return builder
-         * 
          */
         public Builder name(Output<String> name) {
             $.name = name;
@@ -105,9 +96,7 @@ public final class ImageAliasArgs extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param name The name of the image alias.
-         * 
          * @return builder
-         * 
          */
         public Builder name(String name) {
             return name(Output.of(name));

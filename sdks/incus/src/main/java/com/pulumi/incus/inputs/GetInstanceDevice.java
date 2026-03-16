@@ -9,33 +9,33 @@ import java.lang.String;
 import java.util.Map;
 import java.util.Objects;
 
-
 public final class GetInstanceDevice extends com.pulumi.resources.InvokeArgs {
 
     public static final GetInstanceDevice Empty = new GetInstanceDevice();
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private String name;
 
     public String name() {
         return this.name;
     }
 
-    @Import(name="properties", required=true)
-    private Map<String,String> properties;
+    @Import(name = "properties", required = true)
+    private Map<String, String> properties;
 
-    public Map<String,String> properties() {
+    public Map<String, String> properties() {
         return this.properties;
     }
 
-    @Import(name="type", required=true)
+    @Import(name = "type", required = true)
     private String type;
 
     public String type() {
         return this.type;
     }
 
-    private GetInstanceDevice() {}
+    private GetInstanceDevice() {
+    }
 
     private GetInstanceDevice(GetInstanceDevice $) {
         this.name = $.name;
@@ -46,6 +46,7 @@ public final class GetInstanceDevice extends com.pulumi.resources.InvokeArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetInstanceDevice defaults) {
         return new Builder(defaults);
     }
@@ -66,7 +67,7 @@ public final class GetInstanceDevice extends com.pulumi.resources.InvokeArgs {
             return this;
         }
 
-        public Builder properties(Map<String,String> properties) {
+        public Builder properties(Map<String, String> properties) {
             $.properties = properties;
             return this;
         }

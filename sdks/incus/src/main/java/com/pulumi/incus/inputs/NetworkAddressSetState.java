@@ -12,54 +12,54 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class NetworkAddressSetState extends com.pulumi.resources.ResourceArgs {
 
     public static final NetworkAddressSetState Empty = new NetworkAddressSetState();
 
-    @Import(name="addresses")
+    @Import(name = "addresses")
     private @Nullable Output<List<String>> addresses;
 
     public Optional<Output<List<String>>> addresses() {
         return Optional.ofNullable(this.addresses);
     }
 
-    @Import(name="config")
-    private @Nullable Output<Map<String,String>> config;
+    @Import(name = "config")
+    private @Nullable Output<Map<String, String>> config;
 
-    public Optional<Output<Map<String,String>>> config() {
+    public Optional<Output<Map<String, String>>> config() {
         return Optional.ofNullable(this.config);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="name")
+    @Import(name = "name")
     private @Nullable Output<String> name;
 
     public Optional<Output<String>> name() {
         return Optional.ofNullable(this.name);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private NetworkAddressSetState() {}
+    private NetworkAddressSetState() {
+    }
 
     private NetworkAddressSetState(NetworkAddressSetState $) {
         this.addresses = $.addresses;
@@ -73,6 +73,7 @@ public final class NetworkAddressSetState extends com.pulumi.resources.ResourceA
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(NetworkAddressSetState defaults) {
         return new Builder(defaults);
     }
@@ -101,12 +102,12 @@ public final class NetworkAddressSetState extends com.pulumi.resources.ResourceA
             return addresses(List.of(addresses));
         }
 
-        public Builder config(@Nullable Output<Map<String,String>> config) {
+        public Builder config(@Nullable Output<Map<String, String>> config) {
             $.config = config;
             return this;
         }
 
-        public Builder config(Map<String,String> config) {
+        public Builder config(Map<String, String> config) {
             return config(Output.of(config));
         }
 

@@ -9,82 +9,82 @@ import com.pulumi.exceptions.MissingRequiredPropertyException;
 import java.lang.String;
 import java.util.Objects;
 
-
 public final class GetNetworkAclEgressArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final GetNetworkAclEgressArgs Empty = new GetNetworkAclEgressArgs();
 
-    @Import(name="action", required=true)
+    @Import(name = "action", required = true)
     private Output<String> action;
 
     public Output<String> action() {
         return this.action;
     }
 
-    @Import(name="description", required=true)
+    @Import(name = "description", required = true)
     private Output<String> description;
 
     public Output<String> description() {
         return this.description;
     }
 
-    @Import(name="destination", required=true)
+    @Import(name = "destination", required = true)
     private Output<String> destination;
 
     public Output<String> destination() {
         return this.destination;
     }
 
-    @Import(name="destinationPort", required=true)
+    @Import(name = "destinationPort", required = true)
     private Output<String> destinationPort;
 
     public Output<String> destinationPort() {
         return this.destinationPort;
     }
 
-    @Import(name="icmpCode", required=true)
+    @Import(name = "icmpCode", required = true)
     private Output<String> icmpCode;
 
     public Output<String> icmpCode() {
         return this.icmpCode;
     }
 
-    @Import(name="icmpType", required=true)
+    @Import(name = "icmpType", required = true)
     private Output<String> icmpType;
 
     public Output<String> icmpType() {
         return this.icmpType;
     }
 
-    @Import(name="protocol", required=true)
+    @Import(name = "protocol", required = true)
     private Output<String> protocol;
 
     public Output<String> protocol() {
         return this.protocol;
     }
 
-    @Import(name="source", required=true)
+    @Import(name = "source", required = true)
     private Output<String> source;
 
     public Output<String> source() {
         return this.source;
     }
 
-    @Import(name="sourcePort", required=true)
+    @Import(name = "sourcePort", required = true)
     private Output<String> sourcePort;
 
     public Output<String> sourcePort() {
         return this.sourcePort;
     }
 
-    @Import(name="state", required=true)
+    @Import(name = "state", required = true)
     private Output<String> state;
 
     public Output<String> state() {
         return this.state;
     }
 
-    private GetNetworkAclEgressArgs() {}
+    private GetNetworkAclEgressArgs() {
+    }
 
     private GetNetworkAclEgressArgs(GetNetworkAclEgressArgs $) {
         this.action = $.action;
@@ -102,6 +102,7 @@ public final class GetNetworkAclEgressArgs extends com.pulumi.resources.Resource
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkAclEgressArgs defaults) {
         return new Builder(defaults);
     }

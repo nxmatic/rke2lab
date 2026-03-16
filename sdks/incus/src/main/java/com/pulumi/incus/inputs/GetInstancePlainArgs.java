@@ -13,96 +13,96 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetInstancePlainArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetInstancePlainArgs Empty = new GetInstancePlainArgs();
 
-    @Import(name="architecture")
+    @Import(name = "architecture")
     private @Nullable String architecture;
 
     public Optional<String> architecture() {
         return Optional.ofNullable(this.architecture);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable String description;
 
     public Optional<String> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="devices")
+    @Import(name = "devices")
     private @Nullable List<GetInstanceDevice> devices;
 
     public Optional<List<GetInstanceDevice>> devices() {
         return Optional.ofNullable(this.devices);
     }
 
-    @Import(name="ephemeral")
+    @Import(name = "ephemeral")
     private @Nullable Boolean ephemeral;
 
     public Optional<Boolean> ephemeral() {
         return Optional.ofNullable(this.ephemeral);
     }
 
-    @Import(name="location")
+    @Import(name = "location")
     private @Nullable String location;
 
     public Optional<String> location() {
         return Optional.ofNullable(this.location);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private String name;
 
     public String name() {
         return this.name;
     }
 
-    @Import(name="profiles")
+    @Import(name = "profiles")
     private @Nullable List<String> profiles;
 
     public Optional<List<String>> profiles() {
         return Optional.ofNullable(this.profiles);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable String project;
 
     public Optional<String> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable String remote;
 
     public Optional<String> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="stateful")
+    @Import(name = "stateful")
     private @Nullable Boolean stateful;
 
     public Optional<Boolean> stateful() {
         return Optional.ofNullable(this.stateful);
     }
 
-    @Import(name="status")
+    @Import(name = "status")
     private @Nullable String status;
 
     public Optional<String> status() {
         return Optional.ofNullable(this.status);
     }
 
-    @Import(name="type")
+    @Import(name = "type")
     private @Nullable String type;
 
     public Optional<String> type() {
         return Optional.ofNullable(this.type);
     }
 
-    private GetInstancePlainArgs() {}
+    private GetInstancePlainArgs() {
+    }
 
     private GetInstancePlainArgs(GetInstancePlainArgs $) {
         this.architecture = $.architecture;
@@ -122,6 +122,7 @@ public final class GetInstancePlainArgs extends com.pulumi.resources.InvokeArgs 
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetInstancePlainArgs defaults) {
         return new Builder(defaults);
     }

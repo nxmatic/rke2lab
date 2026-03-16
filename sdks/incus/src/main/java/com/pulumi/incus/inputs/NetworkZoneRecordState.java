@@ -13,19 +13,18 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class NetworkZoneRecordState extends com.pulumi.resources.ResourceArgs {
 
     public static final NetworkZoneRecordState Empty = new NetworkZoneRecordState();
 
-    @Import(name="config")
-    private @Nullable Output<Map<String,String>> config;
+    @Import(name = "config")
+    private @Nullable Output<Map<String, String>> config;
 
-    public Optional<Output<Map<String,String>>> config() {
+    public Optional<Output<Map<String, String>>> config() {
         return Optional.ofNullable(this.config);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
@@ -34,48 +33,47 @@ public final class NetworkZoneRecordState extends com.pulumi.resources.ResourceA
 
     /**
      * Network zone record entry
-     * 
      */
-    @Import(name="entries")
+    @Import(name = "entries")
     private @Nullable Output<List<NetworkZoneRecordEntryArgs>> entries;
 
     /**
      * @return Network zone record entry
-     * 
      */
     public Optional<Output<List<NetworkZoneRecordEntryArgs>>> entries() {
         return Optional.ofNullable(this.entries);
     }
 
-    @Import(name="name")
+    @Import(name = "name")
     private @Nullable Output<String> name;
 
     public Optional<Output<String>> name() {
         return Optional.ofNullable(this.name);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="zone")
+    @Import(name = "zone")
     private @Nullable Output<String> zone;
 
     public Optional<Output<String>> zone() {
         return Optional.ofNullable(this.zone);
     }
 
-    private NetworkZoneRecordState() {}
+    private NetworkZoneRecordState() {
+    }
 
     private NetworkZoneRecordState(NetworkZoneRecordState $) {
         this.config = $.config;
@@ -90,6 +88,7 @@ public final class NetworkZoneRecordState extends com.pulumi.resources.ResourceA
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(NetworkZoneRecordState defaults) {
         return new Builder(defaults);
     }
@@ -105,12 +104,12 @@ public final class NetworkZoneRecordState extends com.pulumi.resources.ResourceA
             $ = new NetworkZoneRecordState(Objects.requireNonNull(defaults));
         }
 
-        public Builder config(@Nullable Output<Map<String,String>> config) {
+        public Builder config(@Nullable Output<Map<String, String>> config) {
             $.config = config;
             return this;
         }
 
-        public Builder config(Map<String,String> config) {
+        public Builder config(Map<String, String> config) {
             return config(Output.of(config));
         }
 
@@ -125,9 +124,7 @@ public final class NetworkZoneRecordState extends com.pulumi.resources.ResourceA
 
         /**
          * @param entries Network zone record entry
-         * 
          * @return builder
-         * 
          */
         public Builder entries(@Nullable Output<List<NetworkZoneRecordEntryArgs>> entries) {
             $.entries = entries;
@@ -136,9 +133,7 @@ public final class NetworkZoneRecordState extends com.pulumi.resources.ResourceA
 
         /**
          * @param entries Network zone record entry
-         * 
          * @return builder
-         * 
          */
         public Builder entries(List<NetworkZoneRecordEntryArgs> entries) {
             return entries(Output.of(entries));
@@ -146,9 +141,7 @@ public final class NetworkZoneRecordState extends com.pulumi.resources.ResourceA
 
         /**
          * @param entries Network zone record entry
-         * 
          * @return builder
-         * 
          */
         public Builder entries(NetworkZoneRecordEntryArgs... entries) {
             return entries(List.of(entries));

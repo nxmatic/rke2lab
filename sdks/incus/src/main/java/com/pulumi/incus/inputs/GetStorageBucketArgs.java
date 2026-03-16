@@ -11,68 +11,68 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetStorageBucketArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetStorageBucketArgs Empty = new GetStorageBucketArgs();
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="location")
+    @Import(name = "location")
     private @Nullable Output<String> location;
 
     public Optional<Output<String>> location() {
         return Optional.ofNullable(this.location);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private Output<String> name;
 
     public Output<String> name() {
         return this.name;
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="s3Url")
+    @Import(name = "s3Url")
     private @Nullable Output<String> s3Url;
 
     public Optional<Output<String>> s3Url() {
         return Optional.ofNullable(this.s3Url);
     }
 
-    @Import(name="storagePool", required=true)
+    @Import(name = "storagePool", required = true)
     private Output<String> storagePool;
 
     public Output<String> storagePool() {
         return this.storagePool;
     }
 
-    @Import(name="target")
+    @Import(name = "target")
     private @Nullable Output<String> target;
 
     public Optional<Output<String>> target() {
         return Optional.ofNullable(this.target);
     }
 
-    private GetStorageBucketArgs() {}
+    private GetStorageBucketArgs() {
+    }
 
     private GetStorageBucketArgs(GetStorageBucketArgs $) {
         this.description = $.description;
@@ -88,6 +88,7 @@ public final class GetStorageBucketArgs extends com.pulumi.resources.InvokeArgs 
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetStorageBucketArgs defaults) {
         return new Builder(defaults);
     }

@@ -10,33 +10,33 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class ClusterGroupMemberState extends com.pulumi.resources.ResourceArgs {
 
     public static final ClusterGroupMemberState Empty = new ClusterGroupMemberState();
 
-    @Import(name="clusterGroup")
+    @Import(name = "clusterGroup")
     private @Nullable Output<String> clusterGroup;
 
     public Optional<Output<String>> clusterGroup() {
         return Optional.ofNullable(this.clusterGroup);
     }
 
-    @Import(name="member")
+    @Import(name = "member")
     private @Nullable Output<String> member;
 
     public Optional<Output<String>> member() {
         return Optional.ofNullable(this.member);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private ClusterGroupMemberState() {}
+    private ClusterGroupMemberState() {
+    }
 
     private ClusterGroupMemberState(ClusterGroupMemberState $) {
         this.clusterGroup = $.clusterGroup;
@@ -47,6 +47,7 @@ public final class ClusterGroupMemberState extends com.pulumi.resources.Resource
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(ClusterGroupMemberState defaults) {
         return new Builder(defaults);
     }

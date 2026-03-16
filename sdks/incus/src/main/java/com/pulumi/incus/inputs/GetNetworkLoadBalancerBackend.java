@@ -8,40 +8,40 @@ import com.pulumi.exceptions.MissingRequiredPropertyException;
 import java.lang.String;
 import java.util.Objects;
 
-
 public final class GetNetworkLoadBalancerBackend extends com.pulumi.resources.InvokeArgs {
 
     public static final GetNetworkLoadBalancerBackend Empty = new GetNetworkLoadBalancerBackend();
 
-    @Import(name="description", required=true)
+    @Import(name = "description", required = true)
     private String description;
 
     public String description() {
         return this.description;
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private String name;
 
     public String name() {
         return this.name;
     }
 
-    @Import(name="targetAddress", required=true)
+    @Import(name = "targetAddress", required = true)
     private String targetAddress;
 
     public String targetAddress() {
         return this.targetAddress;
     }
 
-    @Import(name="targetPort", required=true)
+    @Import(name = "targetPort", required = true)
     private String targetPort;
 
     public String targetPort() {
         return this.targetPort;
     }
 
-    private GetNetworkLoadBalancerBackend() {}
+    private GetNetworkLoadBalancerBackend() {
+    }
 
     private GetNetworkLoadBalancerBackend(GetNetworkLoadBalancerBackend $) {
         this.description = $.description;
@@ -53,6 +53,7 @@ public final class GetNetworkLoadBalancerBackend extends com.pulumi.resources.In
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkLoadBalancerBackend defaults) {
         return new Builder(defaults);
     }

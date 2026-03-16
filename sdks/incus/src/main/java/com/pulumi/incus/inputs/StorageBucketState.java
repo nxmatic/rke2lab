@@ -11,75 +11,75 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class StorageBucketState extends com.pulumi.resources.ResourceArgs {
 
     public static final StorageBucketState Empty = new StorageBucketState();
 
-    @Import(name="config")
-    private @Nullable Output<Map<String,String>> config;
+    @Import(name = "config")
+    private @Nullable Output<Map<String, String>> config;
 
-    public Optional<Output<Map<String,String>>> config() {
+    public Optional<Output<Map<String, String>>> config() {
         return Optional.ofNullable(this.config);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="location")
+    @Import(name = "location")
     private @Nullable Output<String> location;
 
     public Optional<Output<String>> location() {
         return Optional.ofNullable(this.location);
     }
 
-    @Import(name="name")
+    @Import(name = "name")
     private @Nullable Output<String> name;
 
     public Optional<Output<String>> name() {
         return Optional.ofNullable(this.name);
     }
 
-    @Import(name="pool")
+    @Import(name = "pool")
     private @Nullable Output<String> pool;
 
     public Optional<Output<String>> pool() {
         return Optional.ofNullable(this.pool);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="sourceFile")
+    @Import(name = "sourceFile")
     private @Nullable Output<String> sourceFile;
 
     public Optional<Output<String>> sourceFile() {
         return Optional.ofNullable(this.sourceFile);
     }
 
-    @Import(name="target")
+    @Import(name = "target")
     private @Nullable Output<String> target;
 
     public Optional<Output<String>> target() {
         return Optional.ofNullable(this.target);
     }
 
-    private StorageBucketState() {}
+    private StorageBucketState() {
+    }
 
     private StorageBucketState(StorageBucketState $) {
         this.config = $.config;
@@ -96,6 +96,7 @@ public final class StorageBucketState extends com.pulumi.resources.ResourceArgs 
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(StorageBucketState defaults) {
         return new Builder(defaults);
     }
@@ -111,12 +112,12 @@ public final class StorageBucketState extends com.pulumi.resources.ResourceArgs 
             $ = new StorageBucketState(Objects.requireNonNull(defaults));
         }
 
-        public Builder config(@Nullable Output<Map<String,String>> config) {
+        public Builder config(@Nullable Output<Map<String, String>> config) {
             $.config = config;
             return this;
         }
 
-        public Builder config(Map<String,String> config) {
+        public Builder config(Map<String, String> config) {
             return config(Output.of(config));
         }
 

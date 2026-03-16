@@ -10,75 +10,75 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class StorageBucketKeyState extends com.pulumi.resources.ResourceArgs {
 
     public static final StorageBucketKeyState Empty = new StorageBucketKeyState();
 
-    @Import(name="accessKey")
+    @Import(name = "accessKey")
     private @Nullable Output<String> accessKey;
 
     public Optional<Output<String>> accessKey() {
         return Optional.ofNullable(this.accessKey);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="name")
+    @Import(name = "name")
     private @Nullable Output<String> name;
 
     public Optional<Output<String>> name() {
         return Optional.ofNullable(this.name);
     }
 
-    @Import(name="pool")
+    @Import(name = "pool")
     private @Nullable Output<String> pool;
 
     public Optional<Output<String>> pool() {
         return Optional.ofNullable(this.pool);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="role")
+    @Import(name = "role")
     private @Nullable Output<String> role;
 
     public Optional<Output<String>> role() {
         return Optional.ofNullable(this.role);
     }
 
-    @Import(name="secretKey")
+    @Import(name = "secretKey")
     private @Nullable Output<String> secretKey;
 
     public Optional<Output<String>> secretKey() {
         return Optional.ofNullable(this.secretKey);
     }
 
-    @Import(name="storageBucket")
+    @Import(name = "storageBucket")
     private @Nullable Output<String> storageBucket;
 
     public Optional<Output<String>> storageBucket() {
         return Optional.ofNullable(this.storageBucket);
     }
 
-    private StorageBucketKeyState() {}
+    private StorageBucketKeyState() {
+    }
 
     private StorageBucketKeyState(StorageBucketKeyState $) {
         this.accessKey = $.accessKey;
@@ -95,6 +95,7 @@ public final class StorageBucketKeyState extends com.pulumi.resources.ResourceAr
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(StorageBucketKeyState defaults) {
         return new Builder(defaults);
     }

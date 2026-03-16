@@ -13,75 +13,75 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetNetworkArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetNetworkArgs Empty = new GetNetworkArgs();
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="locations")
+    @Import(name = "locations")
     private @Nullable Output<List<String>> locations;
 
     public Optional<Output<List<String>>> locations() {
         return Optional.ofNullable(this.locations);
     }
 
-    @Import(name="managed")
+    @Import(name = "managed")
     private @Nullable Output<Boolean> managed;
 
     public Optional<Output<Boolean>> managed() {
         return Optional.ofNullable(this.managed);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private Output<String> name;
 
     public Output<String> name() {
         return this.name;
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="status")
+    @Import(name = "status")
     private @Nullable Output<String> status;
 
     public Optional<Output<String>> status() {
         return Optional.ofNullable(this.status);
     }
 
-    @Import(name="target")
+    @Import(name = "target")
     private @Nullable Output<String> target;
 
     public Optional<Output<String>> target() {
         return Optional.ofNullable(this.target);
     }
 
-    @Import(name="type")
+    @Import(name = "type")
     private @Nullable Output<String> type;
 
     public Optional<Output<String>> type() {
         return Optional.ofNullable(this.type);
     }
 
-    private GetNetworkArgs() {}
+    private GetNetworkArgs() {
+    }
 
     private GetNetworkArgs(GetNetworkArgs $) {
         this.description = $.description;
@@ -98,6 +98,7 @@ public final class GetNetworkArgs extends com.pulumi.resources.InvokeArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkArgs defaults) {
         return new Builder(defaults);
     }

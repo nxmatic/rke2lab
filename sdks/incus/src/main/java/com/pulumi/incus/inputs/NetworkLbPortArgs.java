@@ -12,21 +12,18 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class NetworkLbPortArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final NetworkLbPortArgs Empty = new NetworkLbPortArgs();
 
     /**
      * Port description
-     * 
      */
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     /**
      * @return Port description
-     * 
      */
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
@@ -34,14 +31,12 @@ public final class NetworkLbPortArgs extends com.pulumi.resources.ResourceArgs {
 
     /**
      * Port to listen to
-     * 
      */
-    @Import(name="listenPort", required=true)
+    @Import(name = "listenPort", required = true)
     private Output<String> listenPort;
 
     /**
      * @return Port to listen to
-     * 
      */
     public Output<String> listenPort() {
         return this.listenPort;
@@ -49,14 +44,12 @@ public final class NetworkLbPortArgs extends com.pulumi.resources.ResourceArgs {
 
     /**
      * Port protocol
-     * 
      */
-    @Import(name="protocol")
+    @Import(name = "protocol")
     private @Nullable Output<String> protocol;
 
     /**
      * @return Port protocol
-     * 
      */
     public Optional<Output<String>> protocol() {
         return Optional.ofNullable(this.protocol);
@@ -64,20 +57,19 @@ public final class NetworkLbPortArgs extends com.pulumi.resources.ResourceArgs {
 
     /**
      * List of target LB backends
-     * 
      */
-    @Import(name="targetBackends", required=true)
+    @Import(name = "targetBackends", required = true)
     private Output<List<String>> targetBackends;
 
     /**
      * @return List of target LB backends
-     * 
      */
     public Output<List<String>> targetBackends() {
         return this.targetBackends;
     }
 
-    private NetworkLbPortArgs() {}
+    private NetworkLbPortArgs() {
+    }
 
     private NetworkLbPortArgs(NetworkLbPortArgs $) {
         this.description = $.description;
@@ -89,6 +81,7 @@ public final class NetworkLbPortArgs extends com.pulumi.resources.ResourceArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(NetworkLbPortArgs defaults) {
         return new Builder(defaults);
     }
@@ -106,9 +99,7 @@ public final class NetworkLbPortArgs extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param description Port description
-         * 
          * @return builder
-         * 
          */
         public Builder description(@Nullable Output<String> description) {
             $.description = description;
@@ -117,9 +108,7 @@ public final class NetworkLbPortArgs extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param description Port description
-         * 
          * @return builder
-         * 
          */
         public Builder description(String description) {
             return description(Output.of(description));
@@ -127,9 +116,7 @@ public final class NetworkLbPortArgs extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param listenPort Port to listen to
-         * 
          * @return builder
-         * 
          */
         public Builder listenPort(Output<String> listenPort) {
             $.listenPort = listenPort;
@@ -138,9 +125,7 @@ public final class NetworkLbPortArgs extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param listenPort Port to listen to
-         * 
          * @return builder
-         * 
          */
         public Builder listenPort(String listenPort) {
             return listenPort(Output.of(listenPort));
@@ -148,9 +133,7 @@ public final class NetworkLbPortArgs extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param protocol Port protocol
-         * 
          * @return builder
-         * 
          */
         public Builder protocol(@Nullable Output<String> protocol) {
             $.protocol = protocol;
@@ -159,9 +142,7 @@ public final class NetworkLbPortArgs extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param protocol Port protocol
-         * 
          * @return builder
-         * 
          */
         public Builder protocol(String protocol) {
             return protocol(Output.of(protocol));
@@ -169,9 +150,7 @@ public final class NetworkLbPortArgs extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param targetBackends List of target LB backends
-         * 
          * @return builder
-         * 
          */
         public Builder targetBackends(Output<List<String>> targetBackends) {
             $.targetBackends = targetBackends;
@@ -180,9 +159,7 @@ public final class NetworkLbPortArgs extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param targetBackends List of target LB backends
-         * 
          * @return builder
-         * 
          */
         public Builder targetBackends(List<String> targetBackends) {
             return targetBackends(Output.of(targetBackends));
@@ -190,9 +167,7 @@ public final class NetworkLbPortArgs extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param targetBackends List of target LB backends
-         * 
          * @return builder
-         * 
          */
         public Builder targetBackends(String... targetBackends) {
             return targetBackends(List.of(targetBackends));

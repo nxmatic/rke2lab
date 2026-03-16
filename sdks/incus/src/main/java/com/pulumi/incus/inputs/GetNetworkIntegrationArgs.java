@@ -11,40 +11,40 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetNetworkIntegrationArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetNetworkIntegrationArgs Empty = new GetNetworkIntegrationArgs();
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private Output<String> name;
 
     public Output<String> name() {
         return this.name;
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="type")
+    @Import(name = "type")
     private @Nullable Output<String> type;
 
     public Optional<Output<String>> type() {
         return Optional.ofNullable(this.type);
     }
 
-    private GetNetworkIntegrationArgs() {}
+    private GetNetworkIntegrationArgs() {
+    }
 
     private GetNetworkIntegrationArgs(GetNetworkIntegrationArgs $) {
         this.description = $.description;
@@ -56,6 +56,7 @@ public final class GetNetworkIntegrationArgs extends com.pulumi.resources.Invoke
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkIntegrationArgs defaults) {
         return new Builder(defaults);
     }

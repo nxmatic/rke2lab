@@ -12,68 +12,68 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetNetworkForwardPlainArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetNetworkForwardPlainArgs Empty = new GetNetworkForwardPlainArgs();
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable String description;
 
     public Optional<String> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="listenAddress", required=true)
+    @Import(name = "listenAddress", required = true)
     private String listenAddress;
 
     public String listenAddress() {
         return this.listenAddress;
     }
 
-    @Import(name="location")
+    @Import(name = "location")
     private @Nullable String location;
 
     public Optional<String> location() {
         return Optional.ofNullable(this.location);
     }
 
-    @Import(name="network", required=true)
+    @Import(name = "network", required = true)
     private String network;
 
     public String network() {
         return this.network;
     }
 
-    @Import(name="ports")
+    @Import(name = "ports")
     private @Nullable List<GetNetworkForwardPort> ports;
 
     public Optional<List<GetNetworkForwardPort>> ports() {
         return Optional.ofNullable(this.ports);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable String project;
 
     public Optional<String> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable String remote;
 
     public Optional<String> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="target")
+    @Import(name = "target")
     private @Nullable String target;
 
     public Optional<String> target() {
         return Optional.ofNullable(this.target);
     }
 
-    private GetNetworkForwardPlainArgs() {}
+    private GetNetworkForwardPlainArgs() {
+    }
 
     private GetNetworkForwardPlainArgs(GetNetworkForwardPlainArgs $) {
         this.description = $.description;
@@ -89,6 +89,7 @@ public final class GetNetworkForwardPlainArgs extends com.pulumi.resources.Invok
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkForwardPlainArgs defaults) {
         return new Builder(defaults);
     }

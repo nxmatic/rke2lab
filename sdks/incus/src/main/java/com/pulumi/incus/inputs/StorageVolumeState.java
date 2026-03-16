@@ -12,96 +12,96 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class StorageVolumeState extends com.pulumi.resources.ResourceArgs {
 
     public static final StorageVolumeState Empty = new StorageVolumeState();
 
-    @Import(name="config")
-    private @Nullable Output<Map<String,String>> config;
+    @Import(name = "config")
+    private @Nullable Output<Map<String, String>> config;
 
-    public Optional<Output<Map<String,String>>> config() {
+    public Optional<Output<Map<String, String>>> config() {
         return Optional.ofNullable(this.config);
     }
 
-    @Import(name="contentType")
+    @Import(name = "contentType")
     private @Nullable Output<String> contentType;
 
     public Optional<Output<String>> contentType() {
         return Optional.ofNullable(this.contentType);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="location")
+    @Import(name = "location")
     private @Nullable Output<String> location;
 
     public Optional<Output<String>> location() {
         return Optional.ofNullable(this.location);
     }
 
-    @Import(name="name")
+    @Import(name = "name")
     private @Nullable Output<String> name;
 
     public Optional<Output<String>> name() {
         return Optional.ofNullable(this.name);
     }
 
-    @Import(name="pool")
+    @Import(name = "pool")
     private @Nullable Output<String> pool;
 
     public Optional<Output<String>> pool() {
         return Optional.ofNullable(this.pool);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="sourceFile")
+    @Import(name = "sourceFile")
     private @Nullable Output<String> sourceFile;
 
     public Optional<Output<String>> sourceFile() {
         return Optional.ofNullable(this.sourceFile);
     }
 
-    @Import(name="sourceVolume")
+    @Import(name = "sourceVolume")
     private @Nullable Output<StorageVolumeSourceVolumeArgs> sourceVolume;
 
     public Optional<Output<StorageVolumeSourceVolumeArgs>> sourceVolume() {
         return Optional.ofNullable(this.sourceVolume);
     }
 
-    @Import(name="target")
+    @Import(name = "target")
     private @Nullable Output<String> target;
 
     public Optional<Output<String>> target() {
         return Optional.ofNullable(this.target);
     }
 
-    @Import(name="type")
+    @Import(name = "type")
     private @Nullable Output<String> type;
 
     public Optional<Output<String>> type() {
         return Optional.ofNullable(this.type);
     }
 
-    private StorageVolumeState() {}
+    private StorageVolumeState() {
+    }
 
     private StorageVolumeState(StorageVolumeState $) {
         this.config = $.config;
@@ -121,6 +121,7 @@ public final class StorageVolumeState extends com.pulumi.resources.ResourceArgs 
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(StorageVolumeState defaults) {
         return new Builder(defaults);
     }
@@ -136,12 +137,12 @@ public final class StorageVolumeState extends com.pulumi.resources.ResourceArgs 
             $ = new StorageVolumeState(Objects.requireNonNull(defaults));
         }
 
-        public Builder config(@Nullable Output<Map<String,String>> config) {
+        public Builder config(@Nullable Output<Map<String, String>> config) {
             $.config = config;
             return this;
         }
 
-        public Builder config(Map<String,String> config) {
+        public Builder config(Map<String, String> config) {
             return config(Output.of(config));
         }
 

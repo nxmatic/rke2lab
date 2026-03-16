@@ -11,33 +11,33 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class InstanceWaitForArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final InstanceWaitForArgs Empty = new InstanceWaitForArgs();
 
-    @Import(name="delay")
+    @Import(name = "delay")
     private @Nullable Output<String> delay;
 
     public Optional<Output<String>> delay() {
         return Optional.ofNullable(this.delay);
     }
 
-    @Import(name="nic")
+    @Import(name = "nic")
     private @Nullable Output<String> nic;
 
     public Optional<Output<String>> nic() {
         return Optional.ofNullable(this.nic);
     }
 
-    @Import(name="type", required=true)
+    @Import(name = "type", required = true)
     private Output<String> type;
 
     public Output<String> type() {
         return this.type;
     }
 
-    private InstanceWaitForArgs() {}
+    private InstanceWaitForArgs() {
+    }
 
     private InstanceWaitForArgs(InstanceWaitForArgs $) {
         this.delay = $.delay;
@@ -48,6 +48,7 @@ public final class InstanceWaitForArgs extends com.pulumi.resources.ResourceArgs
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(InstanceWaitForArgs defaults) {
         return new Builder(defaults);
     }

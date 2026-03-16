@@ -13,68 +13,68 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class InstanceFileArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final InstanceFileArgs Empty = new InstanceFileArgs();
 
-    @Import(name="append")
+    @Import(name = "append")
     private @Nullable Output<Boolean> append;
 
     public Optional<Output<Boolean>> append() {
         return Optional.ofNullable(this.append);
     }
 
-    @Import(name="content")
+    @Import(name = "content")
     private @Nullable Output<String> content;
 
     public Optional<Output<String>> content() {
         return Optional.ofNullable(this.content);
     }
 
-    @Import(name="createDirectories")
+    @Import(name = "createDirectories")
     private @Nullable Output<Boolean> createDirectories;
 
     public Optional<Output<Boolean>> createDirectories() {
         return Optional.ofNullable(this.createDirectories);
     }
 
-    @Import(name="gid")
+    @Import(name = "gid")
     private @Nullable Output<Double> gid;
 
     public Optional<Output<Double>> gid() {
         return Optional.ofNullable(this.gid);
     }
 
-    @Import(name="mode")
+    @Import(name = "mode")
     private @Nullable Output<String> mode;
 
     public Optional<Output<String>> mode() {
         return Optional.ofNullable(this.mode);
     }
 
-    @Import(name="sourcePath")
+    @Import(name = "sourcePath")
     private @Nullable Output<String> sourcePath;
 
     public Optional<Output<String>> sourcePath() {
         return Optional.ofNullable(this.sourcePath);
     }
 
-    @Import(name="targetPath", required=true)
+    @Import(name = "targetPath", required = true)
     private Output<String> targetPath;
 
     public Output<String> targetPath() {
         return this.targetPath;
     }
 
-    @Import(name="uid")
+    @Import(name = "uid")
     private @Nullable Output<Double> uid;
 
     public Optional<Output<Double>> uid() {
         return Optional.ofNullable(this.uid);
     }
 
-    private InstanceFileArgs() {}
+    private InstanceFileArgs() {
+    }
 
     private InstanceFileArgs(InstanceFileArgs $) {
         this.append = $.append;
@@ -90,6 +90,7 @@ public final class InstanceFileArgs extends com.pulumi.resources.ResourceArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(InstanceFileArgs defaults) {
         return new Builder(defaults);
     }

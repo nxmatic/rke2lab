@@ -13,47 +13,47 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetProfileArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetProfileArgs Empty = new GetProfileArgs();
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="devices")
+    @Import(name = "devices")
     private @Nullable Output<List<GetProfileDeviceArgs>> devices;
 
     public Optional<Output<List<GetProfileDeviceArgs>>> devices() {
         return Optional.ofNullable(this.devices);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private Output<String> name;
 
     public Output<String> name() {
         return this.name;
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private GetProfileArgs() {}
+    private GetProfileArgs() {
+    }
 
     private GetProfileArgs(GetProfileArgs $) {
         this.description = $.description;
@@ -66,6 +66,7 @@ public final class GetProfileArgs extends com.pulumi.resources.InvokeArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetProfileArgs defaults) {
         return new Builder(defaults);
     }

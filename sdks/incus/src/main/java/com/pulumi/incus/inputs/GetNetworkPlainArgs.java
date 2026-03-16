@@ -12,75 +12,75 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetNetworkPlainArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetNetworkPlainArgs Empty = new GetNetworkPlainArgs();
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable String description;
 
     public Optional<String> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="locations")
+    @Import(name = "locations")
     private @Nullable List<String> locations;
 
     public Optional<List<String>> locations() {
         return Optional.ofNullable(this.locations);
     }
 
-    @Import(name="managed")
+    @Import(name = "managed")
     private @Nullable Boolean managed;
 
     public Optional<Boolean> managed() {
         return Optional.ofNullable(this.managed);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private String name;
 
     public String name() {
         return this.name;
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable String project;
 
     public Optional<String> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable String remote;
 
     public Optional<String> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="status")
+    @Import(name = "status")
     private @Nullable String status;
 
     public Optional<String> status() {
         return Optional.ofNullable(this.status);
     }
 
-    @Import(name="target")
+    @Import(name = "target")
     private @Nullable String target;
 
     public Optional<String> target() {
         return Optional.ofNullable(this.target);
     }
 
-    @Import(name="type")
+    @Import(name = "type")
     private @Nullable String type;
 
     public Optional<String> type() {
         return Optional.ofNullable(this.type);
     }
 
-    private GetNetworkPlainArgs() {}
+    private GetNetworkPlainArgs() {
+    }
 
     private GetNetworkPlainArgs(GetNetworkPlainArgs $) {
         this.description = $.description;
@@ -97,6 +97,7 @@ public final class GetNetworkPlainArgs extends com.pulumi.resources.InvokeArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkPlainArgs defaults) {
         return new Builder(defaults);
     }

@@ -17,26 +17,25 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class InstanceState extends com.pulumi.resources.ResourceArgs {
 
     public static final InstanceState Empty = new InstanceState();
 
-    @Import(name="architecture")
+    @Import(name = "architecture")
     private @Nullable Output<String> architecture;
 
     public Optional<Output<String>> architecture() {
         return Optional.ofNullable(this.architecture);
     }
 
-    @Import(name="config")
-    private @Nullable Output<Map<String,String>> config;
+    @Import(name = "config")
+    private @Nullable Output<Map<String, String>> config;
 
-    public Optional<Output<Map<String,String>>> config() {
+    public Optional<Output<Map<String, String>>> config() {
         return Optional.ofNullable(this.config);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
@@ -45,20 +44,18 @@ public final class InstanceState extends com.pulumi.resources.ResourceArgs {
 
     /**
      * Profile device
-     * 
      */
-    @Import(name="devices")
+    @Import(name = "devices")
     private @Nullable Output<List<InstanceDeviceArgs>> devices;
 
     /**
      * @return Profile device
-     * 
      */
     public Optional<Output<List<InstanceDeviceArgs>>> devices() {
         return Optional.ofNullable(this.devices);
     }
 
-    @Import(name="ephemeral")
+    @Import(name = "ephemeral")
     private @Nullable Output<Boolean> ephemeral;
 
     public Optional<Output<Boolean>> ephemeral() {
@@ -67,111 +64,109 @@ public final class InstanceState extends com.pulumi.resources.ResourceArgs {
 
     /**
      * Upload file to instance
-     * 
      */
-    @Import(name="files")
+    @Import(name = "files")
     private @Nullable Output<List<InstanceFileArgs>> files;
 
     /**
      * @return Upload file to instance
-     * 
      */
     public Optional<Output<List<InstanceFileArgs>>> files() {
         return Optional.ofNullable(this.files);
     }
 
-    @Import(name="image")
+    @Import(name = "image")
     private @Nullable Output<String> image;
 
     public Optional<Output<String>> image() {
         return Optional.ofNullable(this.image);
     }
 
-    @Import(name="ipv4Address")
+    @Import(name = "ipv4Address")
     private @Nullable Output<String> ipv4Address;
 
     public Optional<Output<String>> ipv4Address() {
         return Optional.ofNullable(this.ipv4Address);
     }
 
-    @Import(name="ipv6Address")
+    @Import(name = "ipv6Address")
     private @Nullable Output<String> ipv6Address;
 
     public Optional<Output<String>> ipv6Address() {
         return Optional.ofNullable(this.ipv6Address);
     }
 
-    @Import(name="macAddress")
+    @Import(name = "macAddress")
     private @Nullable Output<String> macAddress;
 
     public Optional<Output<String>> macAddress() {
         return Optional.ofNullable(this.macAddress);
     }
 
-    @Import(name="name")
+    @Import(name = "name")
     private @Nullable Output<String> name;
 
     public Optional<Output<String>> name() {
         return Optional.ofNullable(this.name);
     }
 
-    @Import(name="profiles")
+    @Import(name = "profiles")
     private @Nullable Output<List<String>> profiles;
 
     public Optional<Output<List<String>>> profiles() {
         return Optional.ofNullable(this.profiles);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="running")
+    @Import(name = "running")
     private @Nullable Output<Boolean> running;
 
     public Optional<Output<Boolean>> running() {
         return Optional.ofNullable(this.running);
     }
 
-    @Import(name="sourceFile")
+    @Import(name = "sourceFile")
     private @Nullable Output<String> sourceFile;
 
     public Optional<Output<String>> sourceFile() {
         return Optional.ofNullable(this.sourceFile);
     }
 
-    @Import(name="sourceInstance")
+    @Import(name = "sourceInstance")
     private @Nullable Output<InstanceSourceInstanceArgs> sourceInstance;
 
     public Optional<Output<InstanceSourceInstanceArgs>> sourceInstance() {
         return Optional.ofNullable(this.sourceInstance);
     }
 
-    @Import(name="status")
+    @Import(name = "status")
     private @Nullable Output<String> status;
 
     public Optional<Output<String>> status() {
         return Optional.ofNullable(this.status);
     }
 
-    @Import(name="target")
+    @Import(name = "target")
     private @Nullable Output<String> target;
 
     public Optional<Output<String>> target() {
         return Optional.ofNullable(this.target);
     }
 
-    @Import(name="type")
+    @Import(name = "type")
     private @Nullable Output<String> type;
 
     public Optional<Output<String>> type() {
@@ -180,20 +175,19 @@ public final class InstanceState extends com.pulumi.resources.ResourceArgs {
 
     /**
      * Wait for instance to be ready
-     * 
      */
-    @Import(name="waitFors")
+    @Import(name = "waitFors")
     private @Nullable Output<List<InstanceWaitForArgs>> waitFors;
 
     /**
      * @return Wait for instance to be ready
-     * 
      */
     public Optional<Output<List<InstanceWaitForArgs>>> waitFors() {
         return Optional.ofNullable(this.waitFors);
     }
 
-    private InstanceState() {}
+    private InstanceState() {
+    }
 
     private InstanceState(InstanceState $) {
         this.architecture = $.architecture;
@@ -222,6 +216,7 @@ public final class InstanceState extends com.pulumi.resources.ResourceArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(InstanceState defaults) {
         return new Builder(defaults);
     }
@@ -246,12 +241,12 @@ public final class InstanceState extends com.pulumi.resources.ResourceArgs {
             return architecture(Output.of(architecture));
         }
 
-        public Builder config(@Nullable Output<Map<String,String>> config) {
+        public Builder config(@Nullable Output<Map<String, String>> config) {
             $.config = config;
             return this;
         }
 
-        public Builder config(Map<String,String> config) {
+        public Builder config(Map<String, String> config) {
             return config(Output.of(config));
         }
 
@@ -266,9 +261,7 @@ public final class InstanceState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param devices Profile device
-         * 
          * @return builder
-         * 
          */
         public Builder devices(@Nullable Output<List<InstanceDeviceArgs>> devices) {
             $.devices = devices;
@@ -277,9 +270,7 @@ public final class InstanceState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param devices Profile device
-         * 
          * @return builder
-         * 
          */
         public Builder devices(List<InstanceDeviceArgs> devices) {
             return devices(Output.of(devices));
@@ -287,9 +278,7 @@ public final class InstanceState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param devices Profile device
-         * 
          * @return builder
-         * 
          */
         public Builder devices(InstanceDeviceArgs... devices) {
             return devices(List.of(devices));
@@ -306,9 +295,7 @@ public final class InstanceState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param files Upload file to instance
-         * 
          * @return builder
-         * 
          */
         public Builder files(@Nullable Output<List<InstanceFileArgs>> files) {
             $.files = files;
@@ -317,9 +304,7 @@ public final class InstanceState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param files Upload file to instance
-         * 
          * @return builder
-         * 
          */
         public Builder files(List<InstanceFileArgs> files) {
             return files(Output.of(files));
@@ -327,9 +312,7 @@ public final class InstanceState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param files Upload file to instance
-         * 
          * @return builder
-         * 
          */
         public Builder files(InstanceFileArgs... files) {
             return files(List.of(files));
@@ -467,9 +450,7 @@ public final class InstanceState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param waitFors Wait for instance to be ready
-         * 
          * @return builder
-         * 
          */
         public Builder waitFors(@Nullable Output<List<InstanceWaitForArgs>> waitFors) {
             $.waitFors = waitFors;
@@ -478,9 +459,7 @@ public final class InstanceState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param waitFors Wait for instance to be ready
-         * 
          * @return builder
-         * 
          */
         public Builder waitFors(List<InstanceWaitForArgs> waitFors) {
             return waitFors(Output.of(waitFors));
@@ -488,9 +467,7 @@ public final class InstanceState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param waitFors Wait for instance to be ready
-         * 
          * @return builder
-         * 
          */
         public Builder waitFors(InstanceWaitForArgs... waitFors) {
             return waitFors(List.of(waitFors));

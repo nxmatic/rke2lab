@@ -11,26 +11,26 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class ImageSourceInstanceArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final ImageSourceInstanceArgs Empty = new ImageSourceInstanceArgs();
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private Output<String> name;
 
     public Output<String> name() {
         return this.name;
     }
 
-    @Import(name="snapshot")
+    @Import(name = "snapshot")
     private @Nullable Output<String> snapshot;
 
     public Optional<Output<String>> snapshot() {
         return Optional.ofNullable(this.snapshot);
     }
 
-    private ImageSourceInstanceArgs() {}
+    private ImageSourceInstanceArgs() {
+    }
 
     private ImageSourceInstanceArgs(ImageSourceInstanceArgs $) {
         this.name = $.name;
@@ -40,6 +40,7 @@ public final class ImageSourceInstanceArgs extends com.pulumi.resources.Resource
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(ImageSourceInstanceArgs defaults) {
         return new Builder(defaults);
     }

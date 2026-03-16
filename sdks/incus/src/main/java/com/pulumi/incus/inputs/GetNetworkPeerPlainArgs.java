@@ -10,82 +10,82 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetNetworkPeerPlainArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetNetworkPeerPlainArgs Empty = new GetNetworkPeerPlainArgs();
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable String description;
 
     public Optional<String> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private String name;
 
     public String name() {
         return this.name;
     }
 
-    @Import(name="network", required=true)
+    @Import(name = "network", required = true)
     private String network;
 
     public String network() {
         return this.network;
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable String project;
 
     public Optional<String> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable String remote;
 
     public Optional<String> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="status")
+    @Import(name = "status")
     private @Nullable String status;
 
     public Optional<String> status() {
         return Optional.ofNullable(this.status);
     }
 
-    @Import(name="targetIntegration")
+    @Import(name = "targetIntegration")
     private @Nullable String targetIntegration;
 
     public Optional<String> targetIntegration() {
         return Optional.ofNullable(this.targetIntegration);
     }
 
-    @Import(name="targetNetwork")
+    @Import(name = "targetNetwork")
     private @Nullable String targetNetwork;
 
     public Optional<String> targetNetwork() {
         return Optional.ofNullable(this.targetNetwork);
     }
 
-    @Import(name="targetProject")
+    @Import(name = "targetProject")
     private @Nullable String targetProject;
 
     public Optional<String> targetProject() {
         return Optional.ofNullable(this.targetProject);
     }
 
-    @Import(name="type")
+    @Import(name = "type")
     private @Nullable String type;
 
     public Optional<String> type() {
         return Optional.ofNullable(this.type);
     }
 
-    private GetNetworkPeerPlainArgs() {}
+    private GetNetworkPeerPlainArgs() {
+    }
 
     private GetNetworkPeerPlainArgs(GetNetworkPeerPlainArgs $) {
         this.description = $.description;
@@ -103,6 +103,7 @@ public final class GetNetworkPeerPlainArgs extends com.pulumi.resources.InvokeAr
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkPeerPlainArgs defaults) {
         return new Builder(defaults);
     }

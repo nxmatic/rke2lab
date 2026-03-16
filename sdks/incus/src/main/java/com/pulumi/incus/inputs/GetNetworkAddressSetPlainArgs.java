@@ -11,47 +11,47 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetNetworkAddressSetPlainArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetNetworkAddressSetPlainArgs Empty = new GetNetworkAddressSetPlainArgs();
 
-    @Import(name="addresses")
+    @Import(name = "addresses")
     private @Nullable List<String> addresses;
 
     public Optional<List<String>> addresses() {
         return Optional.ofNullable(this.addresses);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable String description;
 
     public Optional<String> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private String name;
 
     public String name() {
         return this.name;
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable String project;
 
     public Optional<String> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable String remote;
 
     public Optional<String> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private GetNetworkAddressSetPlainArgs() {}
+    private GetNetworkAddressSetPlainArgs() {
+    }
 
     private GetNetworkAddressSetPlainArgs(GetNetworkAddressSetPlainArgs $) {
         this.addresses = $.addresses;
@@ -64,6 +64,7 @@ public final class GetNetworkAddressSetPlainArgs extends com.pulumi.resources.In
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkAddressSetPlainArgs defaults) {
         return new Builder(defaults);
     }

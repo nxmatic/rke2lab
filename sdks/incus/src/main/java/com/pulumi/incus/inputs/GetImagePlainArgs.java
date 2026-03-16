@@ -9,54 +9,54 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetImagePlainArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetImagePlainArgs Empty = new GetImagePlainArgs();
 
-    @Import(name="architecture")
+    @Import(name = "architecture")
     private @Nullable String architecture;
 
     public Optional<String> architecture() {
         return Optional.ofNullable(this.architecture);
     }
 
-    @Import(name="fingerprint")
+    @Import(name = "fingerprint")
     private @Nullable String fingerprint;
 
     public Optional<String> fingerprint() {
         return Optional.ofNullable(this.fingerprint);
     }
 
-    @Import(name="name")
+    @Import(name = "name")
     private @Nullable String name;
 
     public Optional<String> name() {
         return Optional.ofNullable(this.name);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable String project;
 
     public Optional<String> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable String remote;
 
     public Optional<String> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="type")
+    @Import(name = "type")
     private @Nullable String type;
 
     public Optional<String> type() {
         return Optional.ofNullable(this.type);
     }
 
-    private GetImagePlainArgs() {}
+    private GetImagePlainArgs() {
+    }
 
     private GetImagePlainArgs(GetImagePlainArgs $) {
         this.architecture = $.architecture;
@@ -70,6 +70,7 @@ public final class GetImagePlainArgs extends com.pulumi.resources.InvokeArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetImagePlainArgs defaults) {
         return new Builder(defaults);
     }

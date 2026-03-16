@@ -12,47 +12,47 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetProfilePlainArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetProfilePlainArgs Empty = new GetProfilePlainArgs();
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable String description;
 
     public Optional<String> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="devices")
+    @Import(name = "devices")
     private @Nullable List<GetProfileDevice> devices;
 
     public Optional<List<GetProfileDevice>> devices() {
         return Optional.ofNullable(this.devices);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private String name;
 
     public String name() {
         return this.name;
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable String project;
 
     public Optional<String> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable String remote;
 
     public Optional<String> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private GetProfilePlainArgs() {}
+    private GetProfilePlainArgs() {
+    }
 
     private GetProfilePlainArgs(GetProfilePlainArgs $) {
         this.description = $.description;
@@ -65,6 +65,7 @@ public final class GetProfilePlainArgs extends com.pulumi.resources.InvokeArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetProfilePlainArgs defaults) {
         return new Builder(defaults);
     }

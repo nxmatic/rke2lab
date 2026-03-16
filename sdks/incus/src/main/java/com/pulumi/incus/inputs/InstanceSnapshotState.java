@@ -12,54 +12,54 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class InstanceSnapshotState extends com.pulumi.resources.ResourceArgs {
 
     public static final InstanceSnapshotState Empty = new InstanceSnapshotState();
 
-    @Import(name="createdAt")
+    @Import(name = "createdAt")
     private @Nullable Output<Double> createdAt;
 
     public Optional<Output<Double>> createdAt() {
         return Optional.ofNullable(this.createdAt);
     }
 
-    @Import(name="instance")
+    @Import(name = "instance")
     private @Nullable Output<String> instance;
 
     public Optional<Output<String>> instance() {
         return Optional.ofNullable(this.instance);
     }
 
-    @Import(name="name")
+    @Import(name = "name")
     private @Nullable Output<String> name;
 
     public Optional<Output<String>> name() {
         return Optional.ofNullable(this.name);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="stateful")
+    @Import(name = "stateful")
     private @Nullable Output<Boolean> stateful;
 
     public Optional<Output<Boolean>> stateful() {
         return Optional.ofNullable(this.stateful);
     }
 
-    private InstanceSnapshotState() {}
+    private InstanceSnapshotState() {
+    }
 
     private InstanceSnapshotState(InstanceSnapshotState $) {
         this.createdAt = $.createdAt;
@@ -73,6 +73,7 @@ public final class InstanceSnapshotState extends com.pulumi.resources.ResourceAr
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(InstanceSnapshotState defaults) {
         return new Builder(defaults);
     }

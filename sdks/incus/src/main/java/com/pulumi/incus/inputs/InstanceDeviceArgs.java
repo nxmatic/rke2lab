@@ -10,21 +10,18 @@ import java.lang.String;
 import java.util.Map;
 import java.util.Objects;
 
-
 public final class InstanceDeviceArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final InstanceDeviceArgs Empty = new InstanceDeviceArgs();
 
     /**
      * Device name
-     * 
      */
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private Output<String> name;
 
     /**
      * @return Device name
-     * 
      */
     public Output<String> name() {
         return this.name;
@@ -32,35 +29,32 @@ public final class InstanceDeviceArgs extends com.pulumi.resources.ResourceArgs 
 
     /**
      * Device properties
-     * 
      */
-    @Import(name="properties", required=true)
-    private Output<Map<String,String>> properties;
+    @Import(name = "properties", required = true)
+    private Output<Map<String, String>> properties;
 
     /**
      * @return Device properties
-     * 
      */
-    public Output<Map<String,String>> properties() {
+    public Output<Map<String, String>> properties() {
         return this.properties;
     }
 
     /**
      * Device type
-     * 
      */
-    @Import(name="type", required=true)
+    @Import(name = "type", required = true)
     private Output<String> type;
 
     /**
      * @return Device type
-     * 
      */
     public Output<String> type() {
         return this.type;
     }
 
-    private InstanceDeviceArgs() {}
+    private InstanceDeviceArgs() {
+    }
 
     private InstanceDeviceArgs(InstanceDeviceArgs $) {
         this.name = $.name;
@@ -71,6 +65,7 @@ public final class InstanceDeviceArgs extends com.pulumi.resources.ResourceArgs 
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(InstanceDeviceArgs defaults) {
         return new Builder(defaults);
     }
@@ -88,9 +83,7 @@ public final class InstanceDeviceArgs extends com.pulumi.resources.ResourceArgs 
 
         /**
          * @param name Device name
-         * 
          * @return builder
-         * 
          */
         public Builder name(Output<String> name) {
             $.name = name;
@@ -99,9 +92,7 @@ public final class InstanceDeviceArgs extends com.pulumi.resources.ResourceArgs 
 
         /**
          * @param name Device name
-         * 
          * @return builder
-         * 
          */
         public Builder name(String name) {
             return name(Output.of(name));
@@ -109,30 +100,24 @@ public final class InstanceDeviceArgs extends com.pulumi.resources.ResourceArgs 
 
         /**
          * @param properties Device properties
-         * 
          * @return builder
-         * 
          */
-        public Builder properties(Output<Map<String,String>> properties) {
+        public Builder properties(Output<Map<String, String>> properties) {
             $.properties = properties;
             return this;
         }
 
         /**
          * @param properties Device properties
-         * 
          * @return builder
-         * 
          */
-        public Builder properties(Map<String,String> properties) {
+        public Builder properties(Map<String, String> properties) {
             return properties(Output.of(properties));
         }
 
         /**
          * @param type Device type
-         * 
          * @return builder
-         * 
          */
         public Builder type(Output<String> type) {
             $.type = type;
@@ -141,9 +126,7 @@ public final class InstanceDeviceArgs extends com.pulumi.resources.ResourceArgs 
 
         /**
          * @param type Device type
-         * 
          * @return builder
-         * 
          */
         public Builder type(String type) {
             return type(Output.of(type));

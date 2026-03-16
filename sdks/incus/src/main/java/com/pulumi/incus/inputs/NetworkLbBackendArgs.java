@@ -11,21 +11,18 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class NetworkLbBackendArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final NetworkLbBackendArgs Empty = new NetworkLbBackendArgs();
 
     /**
      * LB backend description
-     * 
      */
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     /**
      * @return LB backend description
-     * 
      */
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
@@ -33,14 +30,12 @@ public final class NetworkLbBackendArgs extends com.pulumi.resources.ResourceArg
 
     /**
      * LB backend name
-     * 
      */
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private Output<String> name;
 
     /**
      * @return LB backend name
-     * 
      */
     public Output<String> name() {
         return this.name;
@@ -48,14 +43,12 @@ public final class NetworkLbBackendArgs extends com.pulumi.resources.ResourceArg
 
     /**
      * LB backend target address
-     * 
      */
-    @Import(name="targetAddress", required=true)
+    @Import(name = "targetAddress", required = true)
     private Output<String> targetAddress;
 
     /**
      * @return LB backend target address
-     * 
      */
     public Output<String> targetAddress() {
         return this.targetAddress;
@@ -63,20 +56,19 @@ public final class NetworkLbBackendArgs extends com.pulumi.resources.ResourceArg
 
     /**
      * LB backend target port
-     * 
      */
-    @Import(name="targetPort")
+    @Import(name = "targetPort")
     private @Nullable Output<String> targetPort;
 
     /**
      * @return LB backend target port
-     * 
      */
     public Optional<Output<String>> targetPort() {
         return Optional.ofNullable(this.targetPort);
     }
 
-    private NetworkLbBackendArgs() {}
+    private NetworkLbBackendArgs() {
+    }
 
     private NetworkLbBackendArgs(NetworkLbBackendArgs $) {
         this.description = $.description;
@@ -88,6 +80,7 @@ public final class NetworkLbBackendArgs extends com.pulumi.resources.ResourceArg
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(NetworkLbBackendArgs defaults) {
         return new Builder(defaults);
     }
@@ -105,9 +98,7 @@ public final class NetworkLbBackendArgs extends com.pulumi.resources.ResourceArg
 
         /**
          * @param description LB backend description
-         * 
          * @return builder
-         * 
          */
         public Builder description(@Nullable Output<String> description) {
             $.description = description;
@@ -116,9 +107,7 @@ public final class NetworkLbBackendArgs extends com.pulumi.resources.ResourceArg
 
         /**
          * @param description LB backend description
-         * 
          * @return builder
-         * 
          */
         public Builder description(String description) {
             return description(Output.of(description));
@@ -126,9 +115,7 @@ public final class NetworkLbBackendArgs extends com.pulumi.resources.ResourceArg
 
         /**
          * @param name LB backend name
-         * 
          * @return builder
-         * 
          */
         public Builder name(Output<String> name) {
             $.name = name;
@@ -137,9 +124,7 @@ public final class NetworkLbBackendArgs extends com.pulumi.resources.ResourceArg
 
         /**
          * @param name LB backend name
-         * 
          * @return builder
-         * 
          */
         public Builder name(String name) {
             return name(Output.of(name));
@@ -147,9 +132,7 @@ public final class NetworkLbBackendArgs extends com.pulumi.resources.ResourceArg
 
         /**
          * @param targetAddress LB backend target address
-         * 
          * @return builder
-         * 
          */
         public Builder targetAddress(Output<String> targetAddress) {
             $.targetAddress = targetAddress;
@@ -158,9 +141,7 @@ public final class NetworkLbBackendArgs extends com.pulumi.resources.ResourceArg
 
         /**
          * @param targetAddress LB backend target address
-         * 
          * @return builder
-         * 
          */
         public Builder targetAddress(String targetAddress) {
             return targetAddress(Output.of(targetAddress));
@@ -168,9 +149,7 @@ public final class NetworkLbBackendArgs extends com.pulumi.resources.ResourceArg
 
         /**
          * @param targetPort LB backend target port
-         * 
          * @return builder
-         * 
          */
         public Builder targetPort(@Nullable Output<String> targetPort) {
             $.targetPort = targetPort;
@@ -179,9 +158,7 @@ public final class NetworkLbBackendArgs extends com.pulumi.resources.ResourceArg
 
         /**
          * @param targetPort LB backend target port
-         * 
          * @return builder
-         * 
          */
         public Builder targetPort(String targetPort) {
             return targetPort(Output.of(targetPort));

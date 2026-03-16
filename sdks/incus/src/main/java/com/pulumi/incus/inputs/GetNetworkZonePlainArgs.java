@@ -10,40 +10,40 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetNetworkZonePlainArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetNetworkZonePlainArgs Empty = new GetNetworkZonePlainArgs();
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable String description;
 
     public Optional<String> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private String name;
 
     public String name() {
         return this.name;
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable String project;
 
     public Optional<String> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable String remote;
 
     public Optional<String> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private GetNetworkZonePlainArgs() {}
+    private GetNetworkZonePlainArgs() {
+    }
 
     private GetNetworkZonePlainArgs(GetNetworkZonePlainArgs $) {
         this.description = $.description;
@@ -55,6 +55,7 @@ public final class GetNetworkZonePlainArgs extends com.pulumi.resources.InvokeAr
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkZonePlainArgs defaults) {
         return new Builder(defaults);
     }

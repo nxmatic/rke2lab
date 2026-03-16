@@ -10,75 +10,75 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetStorageVolumePlainArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetStorageVolumePlainArgs Empty = new GetStorageVolumePlainArgs();
 
-    @Import(name="contentType")
+    @Import(name = "contentType")
     private @Nullable String contentType;
 
     public Optional<String> contentType() {
         return Optional.ofNullable(this.contentType);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable String description;
 
     public Optional<String> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="location")
+    @Import(name = "location")
     private @Nullable String location;
 
     public Optional<String> location() {
         return Optional.ofNullable(this.location);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private String name;
 
     public String name() {
         return this.name;
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable String project;
 
     public Optional<String> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable String remote;
 
     public Optional<String> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="storagePool", required=true)
+    @Import(name = "storagePool", required = true)
     private String storagePool;
 
     public String storagePool() {
         return this.storagePool;
     }
 
-    @Import(name="target")
+    @Import(name = "target")
     private @Nullable String target;
 
     public Optional<String> target() {
         return Optional.ofNullable(this.target);
     }
 
-    @Import(name="type", required=true)
+    @Import(name = "type", required = true)
     private String type;
 
     public String type() {
         return this.type;
     }
 
-    private GetStorageVolumePlainArgs() {}
+    private GetStorageVolumePlainArgs() {
+    }
 
     private GetStorageVolumePlainArgs(GetStorageVolumePlainArgs $) {
         this.contentType = $.contentType;
@@ -95,6 +95,7 @@ public final class GetStorageVolumePlainArgs extends com.pulumi.resources.Invoke
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetStorageVolumePlainArgs defaults) {
         return new Builder(defaults);
     }

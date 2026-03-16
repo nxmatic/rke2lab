@@ -13,68 +13,68 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetNetworkForwardArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetNetworkForwardArgs Empty = new GetNetworkForwardArgs();
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="listenAddress", required=true)
+    @Import(name = "listenAddress", required = true)
     private Output<String> listenAddress;
 
     public Output<String> listenAddress() {
         return this.listenAddress;
     }
 
-    @Import(name="location")
+    @Import(name = "location")
     private @Nullable Output<String> location;
 
     public Optional<Output<String>> location() {
         return Optional.ofNullable(this.location);
     }
 
-    @Import(name="network", required=true)
+    @Import(name = "network", required = true)
     private Output<String> network;
 
     public Output<String> network() {
         return this.network;
     }
 
-    @Import(name="ports")
+    @Import(name = "ports")
     private @Nullable Output<List<GetNetworkForwardPortArgs>> ports;
 
     public Optional<Output<List<GetNetworkForwardPortArgs>>> ports() {
         return Optional.ofNullable(this.ports);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="target")
+    @Import(name = "target")
     private @Nullable Output<String> target;
 
     public Optional<Output<String>> target() {
         return Optional.ofNullable(this.target);
     }
 
-    private GetNetworkForwardArgs() {}
+    private GetNetworkForwardArgs() {
+    }
 
     private GetNetworkForwardArgs(GetNetworkForwardArgs $) {
         this.description = $.description;
@@ -90,6 +90,7 @@ public final class GetNetworkForwardArgs extends com.pulumi.resources.InvokeArgs
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkForwardArgs defaults) {
         return new Builder(defaults);
     }

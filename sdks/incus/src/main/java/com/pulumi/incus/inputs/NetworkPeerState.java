@@ -11,89 +11,89 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class NetworkPeerState extends com.pulumi.resources.ResourceArgs {
 
     public static final NetworkPeerState Empty = new NetworkPeerState();
 
-    @Import(name="config")
-    private @Nullable Output<Map<String,String>> config;
+    @Import(name = "config")
+    private @Nullable Output<Map<String, String>> config;
 
-    public Optional<Output<Map<String,String>>> config() {
+    public Optional<Output<Map<String, String>>> config() {
         return Optional.ofNullable(this.config);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="name")
+    @Import(name = "name")
     private @Nullable Output<String> name;
 
     public Optional<Output<String>> name() {
         return Optional.ofNullable(this.name);
     }
 
-    @Import(name="network")
+    @Import(name = "network")
     private @Nullable Output<String> network;
 
     public Optional<Output<String>> network() {
         return Optional.ofNullable(this.network);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="status")
+    @Import(name = "status")
     private @Nullable Output<String> status;
 
     public Optional<Output<String>> status() {
         return Optional.ofNullable(this.status);
     }
 
-    @Import(name="targetIntegration")
+    @Import(name = "targetIntegration")
     private @Nullable Output<String> targetIntegration;
 
     public Optional<Output<String>> targetIntegration() {
         return Optional.ofNullable(this.targetIntegration);
     }
 
-    @Import(name="targetNetwork")
+    @Import(name = "targetNetwork")
     private @Nullable Output<String> targetNetwork;
 
     public Optional<Output<String>> targetNetwork() {
         return Optional.ofNullable(this.targetNetwork);
     }
 
-    @Import(name="targetProject")
+    @Import(name = "targetProject")
     private @Nullable Output<String> targetProject;
 
     public Optional<Output<String>> targetProject() {
         return Optional.ofNullable(this.targetProject);
     }
 
-    @Import(name="type")
+    @Import(name = "type")
     private @Nullable Output<String> type;
 
     public Optional<Output<String>> type() {
         return Optional.ofNullable(this.type);
     }
 
-    private NetworkPeerState() {}
+    private NetworkPeerState() {
+    }
 
     private NetworkPeerState(NetworkPeerState $) {
         this.config = $.config;
@@ -112,6 +112,7 @@ public final class NetworkPeerState extends com.pulumi.resources.ResourceArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(NetworkPeerState defaults) {
         return new Builder(defaults);
     }
@@ -127,12 +128,12 @@ public final class NetworkPeerState extends com.pulumi.resources.ResourceArgs {
             $ = new NetworkPeerState(Objects.requireNonNull(defaults));
         }
 
-        public Builder config(@Nullable Output<Map<String,String>> config) {
+        public Builder config(@Nullable Output<Map<String, String>> config) {
             $.config = config;
             return this;
         }
 
-        public Builder config(Map<String,String> config) {
+        public Builder config(Map<String, String> config) {
             return config(Output.of(config));
         }
 

@@ -12,68 +12,68 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class CertificateState extends com.pulumi.resources.ResourceArgs {
 
     public static final CertificateState Empty = new CertificateState();
 
-    @Import(name="certificate")
+    @Import(name = "certificate")
     private @Nullable Output<String> certificate;
 
     public Optional<Output<String>> certificate() {
         return Optional.ofNullable(this.certificate);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="fingerprint")
+    @Import(name = "fingerprint")
     private @Nullable Output<String> fingerprint;
 
     public Optional<Output<String>> fingerprint() {
         return Optional.ofNullable(this.fingerprint);
     }
 
-    @Import(name="name")
+    @Import(name = "name")
     private @Nullable Output<String> name;
 
     public Optional<Output<String>> name() {
         return Optional.ofNullable(this.name);
     }
 
-    @Import(name="projects")
+    @Import(name = "projects")
     private @Nullable Output<List<String>> projects;
 
     public Optional<Output<List<String>>> projects() {
         return Optional.ofNullable(this.projects);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="restricted")
+    @Import(name = "restricted")
     private @Nullable Output<Boolean> restricted;
 
     public Optional<Output<Boolean>> restricted() {
         return Optional.ofNullable(this.restricted);
     }
 
-    @Import(name="type")
+    @Import(name = "type")
     private @Nullable Output<String> type;
 
     public Optional<Output<String>> type() {
         return Optional.ofNullable(this.type);
     }
 
-    private CertificateState() {}
+    private CertificateState() {
+    }
 
     private CertificateState(CertificateState $) {
         this.certificate = $.certificate;
@@ -89,6 +89,7 @@ public final class CertificateState extends com.pulumi.resources.ResourceArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(CertificateState defaults) {
         return new Builder(defaults);
     }

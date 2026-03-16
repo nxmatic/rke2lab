@@ -10,54 +10,54 @@ import java.lang.Boolean;
 import java.lang.String;
 import java.util.Objects;
 
-
 public final class GetNetworkForwardPortArgs extends com.pulumi.resources.ResourceArgs {
 
     public static final GetNetworkForwardPortArgs Empty = new GetNetworkForwardPortArgs();
 
-    @Import(name="description", required=true)
+    @Import(name = "description", required = true)
     private Output<String> description;
 
     public Output<String> description() {
         return this.description;
     }
 
-    @Import(name="listenPort", required=true)
+    @Import(name = "listenPort", required = true)
     private Output<String> listenPort;
 
     public Output<String> listenPort() {
         return this.listenPort;
     }
 
-    @Import(name="protocol", required=true)
+    @Import(name = "protocol", required = true)
     private Output<String> protocol;
 
     public Output<String> protocol() {
         return this.protocol;
     }
 
-    @Import(name="snat", required=true)
+    @Import(name = "snat", required = true)
     private Output<Boolean> snat;
 
     public Output<Boolean> snat() {
         return this.snat;
     }
 
-    @Import(name="targetAddress", required=true)
+    @Import(name = "targetAddress", required = true)
     private Output<String> targetAddress;
 
     public Output<String> targetAddress() {
         return this.targetAddress;
     }
 
-    @Import(name="targetPort", required=true)
+    @Import(name = "targetPort", required = true)
     private Output<String> targetPort;
 
     public Output<String> targetPort() {
         return this.targetPort;
     }
 
-    private GetNetworkForwardPortArgs() {}
+    private GetNetworkForwardPortArgs() {
+    }
 
     private GetNetworkForwardPortArgs(GetNetworkForwardPortArgs $) {
         this.description = $.description;
@@ -71,6 +71,7 @@ public final class GetNetworkForwardPortArgs extends com.pulumi.resources.Resour
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkForwardPortArgs defaults) {
         return new Builder(defaults);
     }

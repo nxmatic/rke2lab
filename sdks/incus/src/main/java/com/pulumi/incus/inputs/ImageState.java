@@ -16,90 +16,88 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class ImageState extends com.pulumi.resources.ResourceArgs {
 
     public static final ImageState Empty = new ImageState();
 
     /**
      * Image alias
-     * 
      */
-    @Import(name="aliases")
+    @Import(name = "aliases")
     private @Nullable Output<List<ImageAliasArgs>> aliases;
 
     /**
      * @return Image alias
-     * 
      */
     public Optional<Output<List<ImageAliasArgs>>> aliases() {
         return Optional.ofNullable(this.aliases);
     }
 
-    @Import(name="copiedAliases")
+    @Import(name = "copiedAliases")
     private @Nullable Output<List<String>> copiedAliases;
 
     public Optional<Output<List<String>>> copiedAliases() {
         return Optional.ofNullable(this.copiedAliases);
     }
 
-    @Import(name="createdAt")
+    @Import(name = "createdAt")
     private @Nullable Output<Double> createdAt;
 
     public Optional<Output<Double>> createdAt() {
         return Optional.ofNullable(this.createdAt);
     }
 
-    @Import(name="fingerprint")
+    @Import(name = "fingerprint")
     private @Nullable Output<String> fingerprint;
 
     public Optional<Output<String>> fingerprint() {
         return Optional.ofNullable(this.fingerprint);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    @Import(name="resourceId")
+    @Import(name = "resourceId")
     private @Nullable Output<String> resourceId;
 
     public Optional<Output<String>> resourceId() {
         return Optional.ofNullable(this.resourceId);
     }
 
-    @Import(name="sourceFile")
+    @Import(name = "sourceFile")
     private @Nullable Output<ImageSourceFileArgs> sourceFile;
 
     public Optional<Output<ImageSourceFileArgs>> sourceFile() {
         return Optional.ofNullable(this.sourceFile);
     }
 
-    @Import(name="sourceImage")
+    @Import(name = "sourceImage")
     private @Nullable Output<ImageSourceImageArgs> sourceImage;
 
     public Optional<Output<ImageSourceImageArgs>> sourceImage() {
         return Optional.ofNullable(this.sourceImage);
     }
 
-    @Import(name="sourceInstance")
+    @Import(name = "sourceInstance")
     private @Nullable Output<ImageSourceInstanceArgs> sourceInstance;
 
     public Optional<Output<ImageSourceInstanceArgs>> sourceInstance() {
         return Optional.ofNullable(this.sourceInstance);
     }
 
-    private ImageState() {}
+    private ImageState() {
+    }
 
     private ImageState(ImageState $) {
         this.aliases = $.aliases;
@@ -117,6 +115,7 @@ public final class ImageState extends com.pulumi.resources.ResourceArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(ImageState defaults) {
         return new Builder(defaults);
     }
@@ -134,9 +133,7 @@ public final class ImageState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param aliases Image alias
-         * 
          * @return builder
-         * 
          */
         public Builder aliases(@Nullable Output<List<ImageAliasArgs>> aliases) {
             $.aliases = aliases;
@@ -145,9 +142,7 @@ public final class ImageState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param aliases Image alias
-         * 
          * @return builder
-         * 
          */
         public Builder aliases(List<ImageAliasArgs> aliases) {
             return aliases(Output.of(aliases));
@@ -155,9 +150,7 @@ public final class ImageState extends com.pulumi.resources.ResourceArgs {
 
         /**
          * @param aliases Image alias
-         * 
          * @return builder
-         * 
          */
         public Builder aliases(ImageAliasArgs... aliases) {
             return aliases(List.of(aliases));

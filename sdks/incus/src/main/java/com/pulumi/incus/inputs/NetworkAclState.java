@@ -14,61 +14,61 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class NetworkAclState extends com.pulumi.resources.ResourceArgs {
 
     public static final NetworkAclState Empty = new NetworkAclState();
 
-    @Import(name="config")
-    private @Nullable Output<Map<String,String>> config;
+    @Import(name = "config")
+    private @Nullable Output<Map<String, String>> config;
 
-    public Optional<Output<Map<String,String>>> config() {
+    public Optional<Output<Map<String, String>>> config() {
         return Optional.ofNullable(this.config);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="egresses")
+    @Import(name = "egresses")
     private @Nullable Output<List<NetworkAclEgressArgs>> egresses;
 
     public Optional<Output<List<NetworkAclEgressArgs>>> egresses() {
         return Optional.ofNullable(this.egresses);
     }
 
-    @Import(name="ingresses")
+    @Import(name = "ingresses")
     private @Nullable Output<List<NetworkAclIngressArgs>> ingresses;
 
     public Optional<Output<List<NetworkAclIngressArgs>>> ingresses() {
         return Optional.ofNullable(this.ingresses);
     }
 
-    @Import(name="name")
+    @Import(name = "name")
     private @Nullable Output<String> name;
 
     public Optional<Output<String>> name() {
         return Optional.ofNullable(this.name);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private NetworkAclState() {}
+    private NetworkAclState() {
+    }
 
     private NetworkAclState(NetworkAclState $) {
         this.config = $.config;
@@ -83,6 +83,7 @@ public final class NetworkAclState extends com.pulumi.resources.ResourceArgs {
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(NetworkAclState defaults) {
         return new Builder(defaults);
     }
@@ -98,12 +99,12 @@ public final class NetworkAclState extends com.pulumi.resources.ResourceArgs {
             $ = new NetworkAclState(Objects.requireNonNull(defaults));
         }
 
-        public Builder config(@Nullable Output<Map<String,String>> config) {
+        public Builder config(@Nullable Output<Map<String, String>> config) {
             $.config = config;
             return this;
         }
 
-        public Builder config(Map<String,String> config) {
+        public Builder config(Map<String, String> config) {
             return config(Output.of(config));
         }
 

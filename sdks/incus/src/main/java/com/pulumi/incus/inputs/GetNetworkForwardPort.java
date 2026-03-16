@@ -9,54 +9,54 @@ import java.lang.Boolean;
 import java.lang.String;
 import java.util.Objects;
 
-
 public final class GetNetworkForwardPort extends com.pulumi.resources.InvokeArgs {
 
     public static final GetNetworkForwardPort Empty = new GetNetworkForwardPort();
 
-    @Import(name="description", required=true)
+    @Import(name = "description", required = true)
     private String description;
 
     public String description() {
         return this.description;
     }
 
-    @Import(name="listenPort", required=true)
+    @Import(name = "listenPort", required = true)
     private String listenPort;
 
     public String listenPort() {
         return this.listenPort;
     }
 
-    @Import(name="protocol", required=true)
+    @Import(name = "protocol", required = true)
     private String protocol;
 
     public String protocol() {
         return this.protocol;
     }
 
-    @Import(name="snat", required=true)
+    @Import(name = "snat", required = true)
     private Boolean snat;
 
     public Boolean snat() {
         return this.snat;
     }
 
-    @Import(name="targetAddress", required=true)
+    @Import(name = "targetAddress", required = true)
     private String targetAddress;
 
     public String targetAddress() {
         return this.targetAddress;
     }
 
-    @Import(name="targetPort", required=true)
+    @Import(name = "targetPort", required = true)
     private String targetPort;
 
     public String targetPort() {
         return this.targetPort;
     }
 
-    private GetNetworkForwardPort() {}
+    private GetNetworkForwardPort() {
+    }
 
     private GetNetworkForwardPort(GetNetworkForwardPort $) {
         this.description = $.description;
@@ -70,6 +70,7 @@ public final class GetNetworkForwardPort extends com.pulumi.resources.InvokeArgs
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkForwardPort defaults) {
         return new Builder(defaults);
     }

@@ -13,61 +13,61 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class NetworkForwardState extends com.pulumi.resources.ResourceArgs {
 
     public static final NetworkForwardState Empty = new NetworkForwardState();
 
-    @Import(name="config")
-    private @Nullable Output<Map<String,String>> config;
+    @Import(name = "config")
+    private @Nullable Output<Map<String, String>> config;
 
-    public Optional<Output<Map<String,String>>> config() {
+    public Optional<Output<Map<String, String>>> config() {
         return Optional.ofNullable(this.config);
     }
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable Output<String> description;
 
     public Optional<Output<String>> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="listenAddress")
+    @Import(name = "listenAddress")
     private @Nullable Output<String> listenAddress;
 
     public Optional<Output<String>> listenAddress() {
         return Optional.ofNullable(this.listenAddress);
     }
 
-    @Import(name="network")
+    @Import(name = "network")
     private @Nullable Output<String> network;
 
     public Optional<Output<String>> network() {
         return Optional.ofNullable(this.network);
     }
 
-    @Import(name="ports")
+    @Import(name = "ports")
     private @Nullable Output<List<NetworkForwardPortArgs>> ports;
 
     public Optional<Output<List<NetworkForwardPortArgs>>> ports() {
         return Optional.ofNullable(this.ports);
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable Output<String> project;
 
     public Optional<Output<String>> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable Output<String> remote;
 
     public Optional<Output<String>> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private NetworkForwardState() {}
+    private NetworkForwardState() {
+    }
 
     private NetworkForwardState(NetworkForwardState $) {
         this.config = $.config;
@@ -82,6 +82,7 @@ public final class NetworkForwardState extends com.pulumi.resources.ResourceArgs
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(NetworkForwardState defaults) {
         return new Builder(defaults);
     }
@@ -97,12 +98,12 @@ public final class NetworkForwardState extends com.pulumi.resources.ResourceArgs
             $ = new NetworkForwardState(Objects.requireNonNull(defaults));
         }
 
-        public Builder config(@Nullable Output<Map<String,String>> config) {
+        public Builder config(@Nullable Output<Map<String, String>> config) {
             $.config = config;
             return this;
         }
 
-        public Builder config(Map<String,String> config) {
+        public Builder config(Map<String, String> config) {
             return config(Output.of(config));
         }
 

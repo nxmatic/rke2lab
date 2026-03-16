@@ -13,54 +13,54 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class GetNetworkAclPlainArgs extends com.pulumi.resources.InvokeArgs {
 
     public static final GetNetworkAclPlainArgs Empty = new GetNetworkAclPlainArgs();
 
-    @Import(name="description")
+    @Import(name = "description")
     private @Nullable String description;
 
     public Optional<String> description() {
         return Optional.ofNullable(this.description);
     }
 
-    @Import(name="egresses")
+    @Import(name = "egresses")
     private @Nullable List<GetNetworkAclEgress> egresses;
 
     public Optional<List<GetNetworkAclEgress>> egresses() {
         return Optional.ofNullable(this.egresses);
     }
 
-    @Import(name="ingresses")
+    @Import(name = "ingresses")
     private @Nullable List<GetNetworkAclIngress> ingresses;
 
     public Optional<List<GetNetworkAclIngress>> ingresses() {
         return Optional.ofNullable(this.ingresses);
     }
 
-    @Import(name="name", required=true)
+    @Import(name = "name", required = true)
     private String name;
 
     public String name() {
         return this.name;
     }
 
-    @Import(name="project")
+    @Import(name = "project")
     private @Nullable String project;
 
     public Optional<String> project() {
         return Optional.ofNullable(this.project);
     }
 
-    @Import(name="remote")
+    @Import(name = "remote")
     private @Nullable String remote;
 
     public Optional<String> remote() {
         return Optional.ofNullable(this.remote);
     }
 
-    private GetNetworkAclPlainArgs() {}
+    private GetNetworkAclPlainArgs() {
+    }
 
     private GetNetworkAclPlainArgs(GetNetworkAclPlainArgs $) {
         this.description = $.description;
@@ -74,6 +74,7 @@ public final class GetNetworkAclPlainArgs extends com.pulumi.resources.InvokeArg
     public static Builder builder() {
         return new Builder();
     }
+
     public static Builder builder(GetNetworkAclPlainArgs defaults) {
         return new Builder(defaults);
     }
