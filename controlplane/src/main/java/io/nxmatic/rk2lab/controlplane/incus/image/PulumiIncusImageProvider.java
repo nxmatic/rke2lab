@@ -4,18 +4,17 @@ import com.pulumi.core.Output;
 import com.pulumi.deployment.Deployment;
 import com.pulumi.incus.Image;
 import com.pulumi.incus.ImageArgs;
-import com.pulumi.incus.IncusFunctions;
 import com.pulumi.incus.Provider;
-import com.pulumi.incus.inputs.GetImagePlainArgs;
 import com.pulumi.incus.inputs.ImageAliasArgs;
 import com.pulumi.incus.inputs.ImageSourceFileArgs;
-import com.pulumi.incus.outputs.GetImageResult;
 import com.pulumi.deployment.InvokeOptions;
 import com.pulumi.resources.CustomResourceOptions;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig.WorktreeHost;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
@@ -27,20 +26,23 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 /**
  * Stage A seed image orchestration for Incus image lifecycle.
- *
- * <p>This class is intentionally not a Pulumi dynamic resource provider. It coordinates local/remote
- * artifact materialization and then creates/reads a standard Incus provider-managed {@link Image}.
+ * <p>
+ * This class is intentionally not a Pulumi dynamic resource provider. It coordinates local/remote artifact
+ * materialization and then creates/reads a standard Incus provider-managed {@link Image}.
  */
 public final class PulumiIncusImageProvider {
 
-    private static final String REMOTE_BUILD_SCRIPT_RESOURCE = "incus/image/remote-build-incus-image.sh";
+    private static final URI REMOTE_BUILD_SCRIPT_RESOURCE = URI.create(
+            "classpath:/incus/image/remote-build-incus-image.sh");
+
     private static final String INCUS_METADATA_FILENAME = "incus.tar.xz";
+
     private static final String INCUS_ROOTFS_FILENAME = "rootfs.squashfs";
+
     private static final int PREVIEW_ALIAS_PREFIX_MAX_LENGTH = 8;
 
     private final BootstrapConfig config;
@@ -54,18 +56,13 @@ public final class PulumiIncusImageProvider {
      */
     public Output<String> ensureSeedImageFingerprint(InvokeOptions invokeOptions, Provider provider) {
         final boolean preview = isDryRun();
-        final Path workspace = resolvePreferredHostPath(config.worktree());
-        final Path artifactDir = resolveArtifactDir(workspace);
+        final Path workspace = config.worktreeDirOn(WorktreeHost.DARWIN);
         final Path distrobuilderConfigPath = materializeDistrobuilderConfig(workspace);
-        final String expectedBuildChecksum = computeBuildChecksum(distrobuilderConfigPath);
-        final Path checksumMarkerPath = artifactDir.resolve(".build-checksum.sha256");
-        final Optional<String> existingFingerprint = resolveExistingSeedImageFingerprint(invokeOptions);
-        if (existingFingerprint.isPresent() && checksumMarkerMatches(checksumMarkerPath, expectedBuildChecksum)) {
-            return Output.of(existingFingerprint.get());
-        }
-
         if (preview) {
-            return Output.of(buildPreviewFingerprintSurrogate(expectedBuildChecksum));
+            final Path artifactDir = resolveReadableLocalArtifactDir(resolveArtifactDir(workspace));
+            final BuiltImageArtifacts previewArtifacts = new BuiltImageArtifacts(
+                    artifactDir.resolve(INCUS_METADATA_FILENAME), artifactDir.resolve(INCUS_ROOTFS_FILENAME));
+            return createSeedImageFromArtifacts(provider, previewArtifacts).fingerprint();
         }
 
         final BuiltImageArtifacts artifacts = ensureLocalImageArtifacts();
@@ -76,59 +73,21 @@ public final class PulumiIncusImageProvider {
         return Deployment.getInstance().isDryRun();
     }
 
-    private String buildPreviewFingerprintSurrogate(String expectedBuildChecksum) {
-        final String aliasPrefix = shortAliasPrefix(config.imageAlias());
-        return "preview-" + aliasPrefix + "-" + expectedBuildChecksum.substring(0, 16);
-    }
-
-    private String shortAliasPrefix(String alias) {
-        final String normalized = alias == null
-                ? ""
-                : alias.trim().toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
-        if (normalized.isBlank()) {
-            return "image";
-        }
-        return normalized.length() <= PREVIEW_ALIAS_PREFIX_MAX_LENGTH
-                ? normalized
-                : normalized.substring(0, PREVIEW_ALIAS_PREFIX_MAX_LENGTH);
-    }
-
-    private Optional<String> resolveExistingSeedImageFingerprint(InvokeOptions invokeOptions) {
-        try {
-            final GetImageResult existingImage = IncusFunctions.getImagePlain(
-                    GetImagePlainArgs.builder()
-                            .name(config.imageAlias())
-                            .project(config.incusProject())
-                            .build(),
-                    invokeOptions
-            ).join();
-            return Optional.ofNullable(existingImage.fingerprint());
-        } catch (Exception ignored) {
-            return Optional.empty();
-        }
-    }
-
     private Image createSeedImageFromArtifacts(Provider provider, BuiltImageArtifacts artifacts) {
-        return new Image(
-            "seed-image",
-            ImageArgs.builder()
-                .project(config.incusProject())
-                .aliases(ImageAliasArgs.builder()
-                    .name(config.imageAlias())
-                    .build())
-                .sourceFile(ImageSourceFileArgs.builder()
-                    .metadataPath(artifacts.metadataPath().toString())
-                    .dataPath(artifacts.dataPath().toString())
-                    .build())
-                .build(),
-            CustomResourceOptions.builder()
-                .provider(provider)
-                .build()
-        );
+        return new Image("seed-image",
+                ImageArgs.builder()
+                         .project(config.incusProject())
+                         .aliases(ImageAliasArgs.builder().name(config.imageAlias()).build())
+                         .sourceFile(ImageSourceFileArgs.builder()
+                                                        .metadataPath(artifacts.metadataPath().toString())
+                                                        .dataPath(artifacts.dataPath().toString())
+                                                        .build())
+                         .build(),
+                CustomResourceOptions.builder().provider(provider).build());
     }
 
     private BuiltImageArtifacts ensureLocalImageArtifacts() {
-        final Path workspace = resolvePreferredHostPath(config.worktree());
+        final Path workspace = config.worktreeDirOn(WorktreeHost.DARWIN);
         final Path artifactDir = resolveArtifactDir(workspace);
         final Path distrobuilderConfigPath = materializeDistrobuilderConfig(workspace);
         final String expectedBuildChecksum = computeBuildChecksum(distrobuilderConfigPath);
@@ -138,8 +97,7 @@ public final class PulumiIncusImageProvider {
         Path metadataPath = readableArtifactDir.resolve(INCUS_METADATA_FILENAME);
         Path dataPath = readableArtifactDir.resolve(INCUS_ROOTFS_FILENAME);
 
-        if (Files.exists(metadataPath)
-                && Files.exists(dataPath)
+        if (Files.exists(metadataPath) && Files.exists(dataPath)
                 && checksumMarkerMatches(checksumMarkerPath, expectedBuildChecksum)) {
             return new BuiltImageArtifacts(metadataPath, dataPath);
         }
@@ -152,16 +110,9 @@ public final class PulumiIncusImageProvider {
 
         final String distrobuilderExecutable = tryResolveExecutable(config.imageBuilderBinary());
         if (!distrobuilderExecutable.isBlank()) {
-            final List<String> buildCommand = buildIncusAsRootCommand(
-                    distrobuilderExecutable,
-                    distrobuilderConfigPath.toString(),
-                    artifactDir.toString()
-            );
-            runCommandOrThrow(
-                    workspace,
-                    buildCommand,
-                    "Failed to build Incus image artifacts using distrobuilder"
-            );
+            final List<String> buildCommand = buildIncusAsRootCommand(distrobuilderExecutable,
+                    distrobuilderConfigPath.toString(), artifactDir.toString());
+            runCommandOrThrow(workspace, buildCommand, "Failed to build Incus image artifacts using distrobuilder");
         } else {
             runRemoteBuildOrThrow(workspace, distrobuilderConfigPath, artifactDir);
         }
@@ -172,14 +123,10 @@ public final class PulumiIncusImageProvider {
         dataPath = artifactDir.resolve(INCUS_ROOTFS_FILENAME);
 
         if (!Files.exists(metadataPath) || !Files.exists(dataPath)) {
-            throw new IllegalStateException(
-                    "Distrobuilder did not produce expected artifacts. Missing files in "
-                            + artifactDir
-                            + " (expected incus.tar.xz and rootfs.squashfs). "
-                            + "Configured artifact directory: " + artifactDir
-            );
+            throw new IllegalStateException("Distrobuilder did not produce expected artifacts. Missing files in "
+                    + artifactDir + " (expected incus.tar.xz and rootfs.squashfs). " + "Configured artifact directory: "
+                    + artifactDir);
         }
-
 
         return new BuiltImageArtifacts(metadataPath, dataPath);
     }
@@ -206,9 +153,7 @@ public final class PulumiIncusImageProvider {
             return HexFormat.of().formatHex(digest.digest());
         } catch (IOException ex) {
             throw new IllegalStateException(
-                    "Failed to compute distrobuilder checksum from config: " + distrobuilderConfigPath,
-                    ex
-            );
+                    "Failed to compute distrobuilder checksum from config: " + distrobuilderConfigPath, ex);
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 is not available", ex);
         }
@@ -235,29 +180,21 @@ public final class PulumiIncusImageProvider {
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            Files.writeString(
-                    checksumMarkerPath,
-                    checksum + System.lineSeparator(),
-                    StandardCharsets.UTF_8
-            );
+            Files.writeString(checksumMarkerPath, checksum + System.lineSeparator(), StandardCharsets.UTF_8);
         } catch (IOException ex) {
-            throw new IllegalStateException(
-                    "Failed to write distrobuilder checksum marker: " + checksumMarkerPath,
-                    ex
-            );
+            throw new IllegalStateException("Failed to write distrobuilder checksum marker: " + checksumMarkerPath, ex);
         }
     }
 
     private Path resolveArtifactDir(Path workspace) {
-        final Path configured = Path.of(config.imageSharedFolder());
-        final Path sharedFolderPath = configured.isAbsolute()
-                ? configured.normalize()
+        final Path configured = config.imageSharedFolder();
+        final Path sharedFolderPath = configured.isAbsolute() ? configured.normalize()
                 : workspace.resolve(configured).normalize();
         return sharedFolderPath.resolve(config.imageAlias()).normalize();
     }
 
     private Path resolveSharedFolder(Path workspace) {
-        final Path configured = Path.of(config.imageSharedFolder());
+        final Path configured = config.imageSharedFolder();
         if (configured.isAbsolute()) {
             return configured.normalize();
         }
@@ -311,7 +248,7 @@ public final class PulumiIncusImageProvider {
     }
 
     private Path materializeDistrobuilderConfig(Path workspace) {
-        final String configuredPath = config.imageDistrobuilderConfig();
+        final String configuredPath = config.imageDistrobuilderConfig().toString();
         if (configuredPath.startsWith("classpath:/")) {
             final String resourcePath = configuredPath.substring("classpath:/".length());
             final Path destination = workspace.resolve(".local.d/tmp/" + Path.of(resourcePath).getFileName());
@@ -326,9 +263,7 @@ public final class PulumiIncusImageProvider {
                 return destination;
             } catch (IOException ex) {
                 throw new IllegalStateException(
-                        "Failed to materialize distrobuilder config from classpath: " + configuredPath,
-                        ex
-                );
+                        "Failed to materialize distrobuilder config from classpath: " + configuredPath, ex);
             }
         }
 
@@ -392,78 +327,9 @@ public final class PulumiIncusImageProvider {
         return "";
     }
 
-    private Path resolvePreferredHostPath(String path) {
-        final Path primary = Path.of(path).toAbsolutePath().normalize();
-        final List<Path> candidates = hostPathCandidates(primary);
-
-        for (Path candidate : candidates) {
-            try {
-                if (Files.exists(candidate)) {
-                    return candidate;
-                }
-            } catch (Exception ignored) {
-                // Try next candidate.
-            }
-        }
-
-        for (Path candidate : candidates) {
-            if (!candidate.toString().startsWith("/net/")) {
-                return candidate;
-            }
-        }
-
-        return primary;
-    }
-
-    private List<Path> hostPathCandidates(Path primary) {
-        final List<Path> candidates = new ArrayList<>();
-        candidates.add(primary);
-
-        final String normalized = primary.toString();
-        if (normalized.startsWith("/private/")) {
-            final Path directCandidate = Path.of(normalized.substring("/private".length())).normalize();
-            candidates.add(directCandidate);
-        }
-
-        if (!normalized.startsWith("/net/")) {
-            return deduplicated(candidates);
-        }
-
-        final int privateIndex = normalized.indexOf("/private/");
-        if (privateIndex < 0) {
-            return deduplicated(candidates);
-        }
-
-        final String privatePath = normalized.substring(privateIndex);
-        final Path privateCandidate = Path.of(privatePath).normalize();
-        candidates.add(privateCandidate);
-
-        final String withoutPrivatePrefix = privatePath.substring("/private".length());
-        final Path directCandidate = Path.of(withoutPrivatePrefix).normalize();
-        candidates.add(directCandidate);
-
-        return deduplicated(candidates);
-    }
-
-    private List<Path> deduplicated(List<Path> candidates) {
-        final List<Path> unique = new ArrayList<>();
-        for (Path candidate : candidates) {
-            if (!unique.contains(candidate)) {
-                unique.add(candidate);
-            }
-        }
-        return unique;
-    }
-
-    private List<String> buildIncusAsRootCommand(String distrobuilderExecutable,
-                                                 String configPath,
-                                                 String artifactDir) {
-        final List<String> buildCommand = List.of(
-                distrobuilderExecutable,
-                "build-incus",
-                configPath,
-                artifactDir
-        );
+    private List<String> buildIncusAsRootCommand(String distrobuilderExecutable, String configPath,
+            String artifactDir) {
+        final List<String> buildCommand = List.of(distrobuilderExecutable, "build-incus", configPath, artifactDir);
 
         if (isRunningAsRoot()) {
             return buildCommand;
@@ -471,92 +337,42 @@ public final class PulumiIncusImageProvider {
 
         final String sudoExecutable = tryResolveExecutable("sudo");
         if (sudoExecutable.isBlank()) {
-            throw new IllegalStateException(
-                    "distrobuilder build requires root privileges, but sudo was not found"
-            );
+            throw new IllegalStateException("distrobuilder build requires root privileges, but sudo was not found");
         }
 
-        return List.of(
-                sudoExecutable,
-                "-n",
-                distrobuilderExecutable,
-                "build-incus",
-                configPath,
-                artifactDir
-        );
+        return List.of(sudoExecutable, "-n", distrobuilderExecutable, "build-incus", configPath, artifactDir);
     }
 
     private boolean isRunningAsRoot() {
         return "root".equals(System.getProperty("user.name", ""));
     }
 
-    private void runRemoteBuildOrThrow(Path workspace, Path distrobuilderConfigPath, Path artifactDir) {
+    private void runRemoteBuildOrThrow(Path worktreeDir, Path distrobuilderConfigFile, Path artifactDir) {
         final String remoteHost = config.imageBuilderHost();
         if (remoteHost == null || remoteHost.isBlank()) {
-            throw new IllegalStateException(
-                    "Unable to locate local executable '" + config.imageBuilderBinary() + "' and no remote "
-                            + "image.builderHost is configured"
-            );
+            throw new IllegalStateException("Unable to locate local executable '" + config.imageBuilderBinary()
+                    + "' and no remote " + "image.builderHost is configured");
         }
 
         final String binary = config.imageBuilderBinary() == null || config.imageBuilderBinary().isBlank()
                 ? "distrobuilder"
                 : config.imageBuilderBinary().trim();
-        final String remoteWorkspace = toRemotePath(workspace, remoteHost);
-        final String remoteConfigPath = toRemotePath(distrobuilderConfigPath, remoteHost);
-        final String remoteSharedFolder = toRemotePath(resolveSharedFolder(workspace), remoteHost);
-        final String remoteArtifactDir = remoteSharedFolder + "/" + config.imageAlias();
+        final String remoteWorktreeDir = toNixosPath(worktreeDir);
+        final String remoteDistrobuilderConfigFile = toNixosPath(distrobuilderConfigFile);
+        final String remoteArtifactDir = toNixosPath(
+                resolveSharedFolder(worktreeDir).resolve(config.imageAlias()));
 
-        runRemoteScriptOverSshOrThrow(
-                workspace,
-                remoteHost,
-                REMOTE_BUILD_SCRIPT_RESOURCE,
-                List.of(remoteWorkspace, remoteConfigPath, remoteArtifactDir, binary),
-                "Failed to build Incus image artifacts on remote builder host " + remoteHost
-        );
+        runRemoteScriptOverSshOrThrow(worktreeDir, remoteHost, REMOTE_BUILD_SCRIPT_RESOURCE,
+                List.of(remoteWorktreeDir, remoteDistrobuilderConfigFile, remoteArtifactDir, binary),
+                "Failed to build Incus image artifacts on remote builder host " + remoteHost);
     }
 
-    private String toRemotePath(Path path, String remoteHost) {
-        final String normalized = path.toAbsolutePath().normalize().toString();
-        if (normalized.startsWith("/net/")) {
-            return normalized;
-        }
-
-        final String netPrefix = "/net/" + remoteHostForNet(remoteHost) + ".local";
-        if (normalized.startsWith("/private/")) {
-            return netPrefix + normalized;
-        }
-
-        return netPrefix + "/private" + normalized;
+    private String toNixosPath(Path path) {
+        return config.pathOn(WorktreeHost.NIXOS, path).toString();
     }
 
-    private String remoteHostForNet(String remoteHost) {
-        String host = remoteHost.trim();
-        final int atIndex = host.lastIndexOf('@');
-        if (atIndex >= 0 && atIndex < host.length() - 1) {
-            host = host.substring(atIndex + 1);
-        }
-
-        final int colonIndex = host.indexOf(':');
-        if (colonIndex > 0) {
-            host = host.substring(0, colonIndex);
-        }
-
-        if (host.endsWith(".local")) {
-            host = host.substring(0, host.length() - ".local".length());
-        }
-
-        if (host.isBlank()) {
-            throw new IllegalStateException("Invalid remote host for image builder: " + remoteHost);
-        }
-        return host;
-    }
-
-    private void runRemoteScriptOverSshOrThrow(Path workingDirectory,
-                                               String remoteHost,
-                                               String scriptResourcePath,
-                                               List<String> scriptArgs,
-                                               String failureMessage) {
+    private void runRemoteScriptOverSshOrThrow(Path workingDirectory, String remoteHost, URI scriptResourcePath,
+            List<String> scriptArgs, String failureMessage) {
         final String script = loadClasspathScript(scriptResourcePath);
 
         final List<String> command = new ArrayList<>();
@@ -565,9 +381,8 @@ public final class PulumiIncusImageProvider {
         command.add("sh");
         command.add("-lc");
         command.add("'set -eu; tmp_dir=$(mktemp -d); trap \"rm -rf \\\"$tmp_dir\\\"\" EXIT; "
-            + "script_path=\"$tmp_dir/remote-build-incus-image.sh\"; "
-            + "cat > \"$script_path\"; chmod 700 \"$script_path\"; "
-            + "\"$script_path\" \"$@\"'");
+                + "script_path=\"$tmp_dir/remote-build-incus-image.sh\"; "
+                + "cat > \"$script_path\"; chmod 700 \"$script_path\"; " + "\"$script_path\" \"$@\"'");
         command.add("--");
         command.addAll(scriptArgs);
 
@@ -586,10 +401,8 @@ public final class PulumiIncusImageProvider {
             final int exitCode = process.waitFor();
 
             if (exitCode != 0) {
-                throw new IllegalStateException(
-                        failureMessage + " (exit=" + exitCode + ")\nCommand: "
-                                + String.join(" ", command) + "\nOutput:\n" + output
-                );
+                throw new IllegalStateException(failureMessage + " (exit=" + exitCode + ")\nCommand: "
+                        + String.join(" ", command) + "\nOutput:\n" + output);
             }
         } catch (IOException | InterruptedException ex) {
             if (ex instanceof InterruptedException) {
@@ -599,14 +412,26 @@ public final class PulumiIncusImageProvider {
         }
     }
 
-    private String loadClasspathScript(String scriptResourcePath) {
-        try (var in = getClass().getClassLoader().getResourceAsStream(scriptResourcePath)) {
+    private String loadClasspathScript(URI resourcePath) {
+        if (resourcePath == null || !"classpath".equals(resourcePath.getScheme())) {
+            throw new IllegalStateException("Expected classpath URI, got: " + resourcePath);
+        }
+
+        String path = resourcePath.getPath();
+        if (path == null || path.isBlank()) {
+            throw new IllegalStateException("Classpath URI has empty path: " + resourcePath);
+        }
+        if (path.startsWith("/")) {
+            path = path.substring(1);
+        }
+
+        try (var in = getClass().getClassLoader().getResourceAsStream(path)) {
             if (in == null) {
-                throw new IllegalStateException("Classpath script not found: " + scriptResourcePath);
+                throw new IllegalStateException("Classpath script not found: " + path);
             }
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException ex) {
-            throw new IllegalStateException("Failed to load classpath script: " + scriptResourcePath, ex);
+            throw new IllegalStateException("Failed to load classpath script: " + path, ex);
         }
     }
 
@@ -621,10 +446,8 @@ public final class PulumiIncusImageProvider {
             final int exitCode = process.waitFor();
 
             if (exitCode != 0) {
-                throw new IllegalStateException(
-                        failureMessage + " (exit=" + exitCode + ")\nCommand: "
-                                + String.join(" ", command) + "\nOutput:\n" + output
-                );
+                throw new IllegalStateException(failureMessage + " (exit=" + exitCode + ")\nCommand: "
+                        + String.join(" ", command) + "\nOutput:\n" + output);
             }
         } catch (IOException | InterruptedException ex) {
             if (ex instanceof InterruptedException) {

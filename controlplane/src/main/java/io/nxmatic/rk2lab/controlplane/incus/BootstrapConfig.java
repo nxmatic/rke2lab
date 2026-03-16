@@ -4,26 +4,76 @@ import com.pulumi.Config;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.function.Consumer;
 
 /**
  * Runtime configuration for provider-native Stage A bootstrap.
  */
-public record BootstrapConfig(String worktree, String clusterName, String nodeName, String incusProject,
-    String incusDefaultRemote, String incusRemoteAddress, String incusConfigDir,
-    String imageAlias, String imageBuilderBinary, String imageBuilderHost, String imageDistrobuilderConfig,
-    String imageSharedFolder,
-    String profileName, String lanBridgeParent, String vmnetNetworkName,
-        String apiEndpoint,
-        String kubeconfigRef) {
+public record BootstrapConfig(Path worktreeDir, String clusterName, String nodeName, String incusProject,
+        String incusDefaultRemote, URI incusRemoteAddress, Path incusConfigDir, String imageAlias,
+        String imageBuilderHost, URI imageDistrobuilderConfig, Path imageSharedFolder, String profileName,
+        String lanBridgeParent, String vmnetNetworkName, URI apiEndpoint, Path kubeconfigRef) {
 
+    public String imageBuilderBinary() {
+        return "distrobuilder";
+    }
+
+    public enum WorktreeHost {
+        DARWIN, NIXOS
+    }
+
+    public Path worktreeDirOn(WorktreeHost host) {
+        return pathOn(host, worktreeDir);
+    }
+
+    public Path pathOn(WorktreeHost host, Path rawPath) {
+        final Path normalizedPath = normalizeAbsolutePath(rawPath);
+        if (host == WorktreeHost.DARWIN) {
+            return normalizedPath;
+        }
+
+        final String netPrefix = netPrefix();
+        final String normalized = normalizedPath.toString();
+
+        if (normalized.startsWith("/net/")) {
+            return normalizedPath;
+        }
+        if (normalized.startsWith("/private/")) {
+            return Path.of(netPrefix + normalized).normalize();
+        }
+        if (normalized.startsWith("/")) {
+            return Path.of(netPrefix + "/private" + normalized).normalize();
+        }
+        return Path.of(netPrefix + "/private/" + normalized).normalize();
+    }
+
+    public BootstrapConfig asIncusConfig() {
+        return new BootstrapConfig(worktreeDirOn(WorktreeHost.NIXOS), clusterName, nodeName, incusProject,
+                incusDefaultRemote, incusRemoteAddress, incusConfigDir, imageAlias, imageBuilderHost,
+                imageDistrobuilderConfig, imageSharedFolder, profileName, lanBridgeParent, vmnetNetworkName,
+                apiEndpoint, kubeconfigRef);
+    }
+
+    public Path localWorktreePath() {
+        return worktreeDirOn(WorktreeHost.DARWIN);
+    }
+
+    public String netPrefix() {
+        return "/net/" + clusterName + ".local";
+    }
+
+    private static Path normalizeAbsolutePath(Path rawPath) {
+        return rawPath.toAbsolutePath().normalize();
+    }
+   
     private static final String WORKTREE_REPO_PATH_FALLBACK = "/private/var/lib/git/nxmatic/rke2lab";
 
     public static final class Builder {
         private final Defaults defaults = new Defaults();
 
-        private String worktree = defaults.worktree();
+        private Path worktree = defaults.worktree();
 
         private String clusterName = "bioskop";
 
@@ -33,19 +83,17 @@ public record BootstrapConfig(String worktree, String clusterName, String nodeNa
 
         private String incusDefaultRemote = "bioskop-nixos";
 
-        private String incusRemoteAddress = "https://bioskop-nixos.local:8443";
+        private URI incusRemoteAddress = URI.create("https://bioskop-nixos.local:8443");
 
-        private String incusConfigDir = defaults.incusConfigDir();
+        private Path incusConfigDir = defaults.incusConfigDir();
 
         private String imageAlias = "control-node";
 
-        private String imageBuilderBinary = "distrobuilder";
-
         private String imageBuilderHost = "bioskop-nixos.local";
 
-        private String imageDistrobuilderConfig = "classpath:/incus/incus-distrobuilder.yaml";
+        private URI imageDistrobuilderConfig = URI.create("classpath:/incus/incus-distrobuilder.yaml");
 
-        private String imageSharedFolder;
+        private Path imageSharedFolder;
 
         private String profileName = "rke2lab";
 
@@ -53,12 +101,17 @@ public record BootstrapConfig(String worktree, String clusterName, String nodeNa
 
         private String vmnetNetworkName = "vmnet-br";
 
-        private String apiEndpoint = "https://10.66.106.10:6443";
+        private URI apiEndpoint = URI.create("https://10.66.106.10:6443");
 
-        private String kubeconfigRef;
+        private Path kubeconfigRef;
 
-        public Builder worktree(String value) {
-            this.worktree = value;
+        public Builder worktreeDir(String value) {
+            this.worktree = parsePath(value);
+            return this;
+        }
+
+        public Builder worktree(Path value) {
+            this.worktree = normalizeAbsolutePath(value);
             return this;
         }
 
@@ -71,6 +124,7 @@ public record BootstrapConfig(String worktree, String clusterName, String nodeNa
             this.nodeName = value;
             return this;
         }
+
         public Builder incusProject(String value) {
             this.incusProject = value;
             return this;
@@ -82,22 +136,27 @@ public record BootstrapConfig(String worktree, String clusterName, String nodeNa
         }
 
         public Builder incusRemoteAddress(String value) {
+            this.incusRemoteAddress = parseUri(value);
+            return this;
+        }
+
+        public Builder incusRemoteAddress(URI value) {
             this.incusRemoteAddress = value;
             return this;
         }
 
         public Builder incusConfigDir(String value) {
-            this.incusConfigDir = value;
+            this.incusConfigDir = parsePath(value);
+            return this;
+        }
+
+        public Builder incusConfigDir(Path value) {
+            this.incusConfigDir = value == null ? null : normalizeAbsolutePath(value);
             return this;
         }
 
         public Builder imageAlias(String value) {
             this.imageAlias = value;
-            return this;
-        }
-
-        public Builder imageBuilderBinary(String value) {
-            this.imageBuilderBinary = value;
             return this;
         }
 
@@ -107,12 +166,22 @@ public record BootstrapConfig(String worktree, String clusterName, String nodeNa
         }
 
         public Builder imageDistrobuilderConfig(String value) {
+            this.imageDistrobuilderConfig = parseUri(value);
+            return this;
+        }
+
+        public Builder imageDistrobuilderConfig(URI value) {
             this.imageDistrobuilderConfig = value;
             return this;
         }
 
         public Builder imageSharedFolder(String value) {
-            this.imageSharedFolder = value;
+            this.imageSharedFolder = parsePath(value);
+            return this;
+        }
+
+        public Builder imageSharedFolder(Path value) {
+            this.imageSharedFolder = value == null ? null : value.normalize();
             return this;
         }
 
@@ -132,18 +201,28 @@ public record BootstrapConfig(String worktree, String clusterName, String nodeNa
         }
 
         public Builder apiEndpoint(String value) {
+            this.apiEndpoint = parseUri(value);
+            return this;
+        }
+
+        public Builder apiEndpoint(URI value) {
             this.apiEndpoint = value;
             return this;
         }
 
         public Builder kubeconfigRef(String value) {
-            this.kubeconfigRef = value;
+            this.kubeconfigRef = parsePath(value);
+            return this;
+        }
+
+        public Builder kubeconfigRef(Path value) {
+            this.kubeconfigRef = value == null ? null : normalizeAbsolutePath(value);
             return this;
         }
 
         public Builder applyConfig(Config config) {
             final EnvironmentValues environment = new EnvironmentValues(config);
-            override(environment, "worktree.dir", this::worktree);
+            override(environment, "worktree.dir", this::worktreeDir);
             override(environment, "cluster.name", this::clusterName);
             override(environment, "node.name", this::nodeName);
             override(environment, "incus.project", this::incusProject);
@@ -151,7 +230,6 @@ public record BootstrapConfig(String worktree, String clusterName, String nodeNa
             override(environment, "incus.remoteAddress", this::incusRemoteAddress);
             override(environment, "incus.configDir", this::incusConfigDir);
             override(environment, "image.alias", this::imageAlias);
-            override(environment, "image.builderBinary", this::imageBuilderBinary);
             override(environment, "image.builderHost", this::imageBuilderHost);
             override(environment, "image.distrobuilderConfig", this::imageDistrobuilderConfig);
             override(environment, "image.sharedFolder", this::imageSharedFolder);
@@ -171,62 +249,66 @@ public record BootstrapConfig(String worktree, String clusterName, String nodeNa
         }
 
         public BootstrapConfig build() {
-            final String resolvedKubeconfigRef = kubeconfigRef != null ? kubeconfigRef
-                    : "/srv/host/kubeconfig.d/rke2-" + clusterName + ".yaml";
+            final Path resolvedKubeconfigRef = kubeconfigRef != null ? kubeconfigRef
+                    : Path.of("/srv/host/kubeconfig.d/rke2-" + clusterName + ".yaml").normalize();
 
-            if (imageSharedFolder == null || imageSharedFolder.isBlank()) {
-                throw new IllegalStateException(
-                        "Missing required configuration: image.sharedFolder"
-                );
+            if (imageSharedFolder == null || imageSharedFolder.toString().isBlank()) {
+                throw new IllegalStateException("Missing required configuration: image.sharedFolder");
             }
 
             return new BootstrapConfig(worktree, clusterName, nodeName, incusProject, incusDefaultRemote,
-                incusRemoteAddress, incusConfigDir, imageAlias, imageBuilderBinary, imageBuilderHost,
-                imageDistrobuilderConfig, imageSharedFolder,
-            profileName, lanBridgeParent, vmnetNetworkName,
-            apiEndpoint,
-            resolvedKubeconfigRef);
+                    incusRemoteAddress, incusConfigDir, imageAlias, imageBuilderHost, imageDistrobuilderConfig,
+                    imageSharedFolder, profileName, lanBridgeParent, vmnetNetworkName, apiEndpoint,
+                    resolvedKubeconfigRef);
+        }
+
+        private Path parsePath(String value) {
+            if (value == null || value.isBlank()) {
+                return null;
+            }
+            return Path.of(value).normalize();
+        }
+
+        private URI parseUri(String value) {
+            if (value == null || value.isBlank()) {
+                return null;
+            }
+            return URI.create(value.trim());
         }
 
     }
 
     private static final class Defaults {
-        String incusConfigDir() {
+        Path incusConfigDir() {
             final String env = System.getenv("INCUS_CONFIG_DIR");
             if (env != null && !env.isBlank()) {
-                return env;
+                return Path.of(env).toAbsolutePath().normalize();
             }
 
             final String home = System.getProperty("user.home", "");
             if (!home.isBlank()) {
-                return home + "/.config/incus";
+                return Path.of(home + "/.config/incus").toAbsolutePath().normalize();
             }
 
-            return "";
+            return null;
         }
 
-        String worktree() {
-            final String worktreeRepoPath = detectWorktreeRepoPath();
-            final String limaHostname = System.getenv("LIMA_HOSTNAME");
-            if (limaHostname != null && !limaHostname.isBlank()) {
-                return "/net/" + limaHostname + ".local" + worktreeRepoPath;
-            }
-
-            return "/net/bioskop.local" + worktreeRepoPath;
+        Path worktree() {
+            return detectWorktreeRepoPath();
         }
 
-        String detectWorktreeRepoPath() {
+        Path detectWorktreeRepoPath() {
             final String gitWorktree = normalizePath(System.getenv("GIT_WORKTREE"));
             if (!gitWorktree.isBlank()) {
-                return gitWorktree;
+                return Path.of(gitWorktree).toAbsolutePath().normalize();
             }
 
             final String fromUserDir = gitTopLevel(System.getProperty("user.dir", ""));
             if (!fromUserDir.isBlank()) {
-                return fromUserDir;
+                return Path.of(fromUserDir).toAbsolutePath().normalize();
             }
 
-            return WORKTREE_REPO_PATH_FALLBACK;
+            return Path.of(WORKTREE_REPO_PATH_FALLBACK).toAbsolutePath().normalize();
         }
 
         String gitTopLevel(String workingDirectory) {
@@ -236,8 +318,8 @@ public record BootstrapConfig(String worktree, String clusterName, String nodeNa
             }
 
             try {
-                final FileRepositoryBuilder builder = new FileRepositoryBuilder()
-                        .findGitDir(Path.of(normalizedWorkingDirectory).toFile());
+                final FileRepositoryBuilder builder = new FileRepositoryBuilder().findGitDir(
+                        Path.of(normalizedWorkingDirectory).toFile());
 
                 if (builder.getGitDir() == null) {
                     return "";
