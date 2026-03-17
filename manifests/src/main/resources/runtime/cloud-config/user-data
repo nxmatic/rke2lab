@@ -125,6 +125,8 @@ write_files:
     # the Cilium operator deployment to match the number of control plane nodes.
     # =============================================================================
     # kubeconfig drop-ins are mounted from /srv/host/systemd-units.d
+    # NFS-backed /srv/host paths may not be stable during init-network; defer write.
+    defer: true
 
     permissions: "0644"
     content: |
