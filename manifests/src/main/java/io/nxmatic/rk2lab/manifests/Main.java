@@ -41,8 +41,44 @@ public final class Main {
                     "shim-installer-host.sh", true),
             new MaterializeShimAssetsCommand.EmbeddedAsset("/runtime/flox-containerd-shim/mesh/headplane/flake.nix",
                     "mesh/headplane/flake.nix", false),
+                new MaterializeShimAssetsCommand.EmbeddedAsset(
+                    "/runtime/flox-containerd-shim/mesh/headplane/.flox/.gitattributes",
+                    "mesh/headplane/.flox/.gitattributes", false),
+                new MaterializeShimAssetsCommand.EmbeddedAsset(
+                    "/runtime/flox-containerd-shim/mesh/headplane/.flox/.gitignore",
+                    "mesh/headplane/.flox/.gitignore", false),
+                new MaterializeShimAssetsCommand.EmbeddedAsset(
+                    "/runtime/flox-containerd-shim/mesh/headplane/.flox/env.json",
+                    "mesh/headplane/.flox/env.json", false),
+                new MaterializeShimAssetsCommand.EmbeddedAsset(
+                    "/runtime/flox-containerd-shim/mesh/headplane/.flox/env.lock",
+                    "mesh/headplane/.flox/env.lock", false),
+                new MaterializeShimAssetsCommand.EmbeddedAsset(
+                    "/runtime/flox-containerd-shim/mesh/headplane/.flox/env/manifest.toml",
+                    "mesh/headplane/.flox/env/manifest.toml", false),
+                new MaterializeShimAssetsCommand.EmbeddedAsset(
+                    "/runtime/flox-containerd-shim/mesh/headplane/.flox/env/manifest.lock",
+                    "mesh/headplane/.flox/env/manifest.lock", false),
             new MaterializeShimAssetsCommand.EmbeddedAsset("/runtime/flox-containerd-shim/networking/kdns/flake.nix",
-                    "networking/kdns/flake.nix", false));
+                    "networking/kdns/flake.nix", false),
+                new MaterializeShimAssetsCommand.EmbeddedAsset(
+                    "/runtime/flox-containerd-shim/networking/kdns/.flox/.gitattributes",
+                    "networking/kdns/.flox/.gitattributes", false),
+                new MaterializeShimAssetsCommand.EmbeddedAsset(
+                    "/runtime/flox-containerd-shim/networking/kdns/.flox/.gitignore",
+                    "networking/kdns/.flox/.gitignore", false),
+                new MaterializeShimAssetsCommand.EmbeddedAsset(
+                    "/runtime/flox-containerd-shim/networking/kdns/.flox/env.json",
+                    "networking/kdns/.flox/env.json", false),
+                new MaterializeShimAssetsCommand.EmbeddedAsset(
+                    "/runtime/flox-containerd-shim/networking/kdns/.flox/env.lock",
+                    "networking/kdns/.flox/env.lock", false),
+                new MaterializeShimAssetsCommand.EmbeddedAsset(
+                    "/runtime/flox-containerd-shim/networking/kdns/.flox/env/manifest.toml",
+                    "networking/kdns/.flox/env/manifest.toml", false),
+                new MaterializeShimAssetsCommand.EmbeddedAsset(
+                    "/runtime/flox-containerd-shim/networking/kdns/.flox/env/manifest.lock",
+                    "networking/kdns/.flox/env/manifest.lock", false));
 
     public static void main(String[] args) throws IOException {
         try {
