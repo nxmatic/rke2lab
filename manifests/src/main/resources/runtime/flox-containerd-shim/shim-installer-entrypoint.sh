@@ -1,5 +1,5 @@
 #!/bin/sh
-set -euxo pipefail
+set -eux
 
 : "Install bash and coreutils (GNU env) for script compatibility"
 apk add --no-cache bash coreutils

@@ -17,7 +17,7 @@ public final class FloxContainerdShimLayer extends Construct {
 
     public static final String LEGACY_PATH_PREFIX = "runtime/flox-containerd-shim/";
 
-    private static final String NAMESPACE = "flox-runtime";
+        private static final String NAMESPACE = "rke2lab-system";
 
     private static final String LAYER_NAME = "runtime";
 
@@ -112,7 +112,7 @@ public final class FloxContainerdShimLayer extends Construct {
                 readResource("/runtime/flox-containerd-shim/flox-shim-build.sh"), "flox-shim-build.yaml",
                 readResource("/runtime/flox-containerd-shim/flox-shim-build.yaml"), "mesh-headplane-flake.nix",
                 readResource("/runtime/flox-containerd-shim/mesh/headplane/flake.nix"), "networking-kdns-flake.nix",
-                readResource("/runtime/flox-containerd-shim/networking/kdns/flake.nix"))));
+                                readResource("/runtime/flox-containerd-shim/networking/kdns/flake.nix"))));
         return configMap;
     }
 
@@ -192,12 +192,18 @@ public final class FloxContainerdShimLayer extends Construct {
                                                 Map.of("name", "CONTAINERD_ADDRESS", "value",
                                                         "/run/k3s/containerd/containerd.sock"),
                                                 Map.of("name", "SCRIPT_MOUNT_DIR", "value", "/.sh"),
-                                                Map.of("name", "BUILD_ASSETS_DIR", "value", "/.sh/build-assets"), },
+                                                Map.of("name", "SCRIPT_POLICY_DIR", "value", "/runtime-daemonset"),
+                                                Map.of("name", "BUILD_ASSETS_DIR", "value", "/.sh/build-assets"),
+                                                Map.of("name", "HOST_ROOT", "value", "/host-root") },
                                         "image", "alpine:3.20", "imagePullPolicy", "IfNotPresent", "name",
                                         "shim-installer", "securityContext",
                                         Map.of("privileged", true, "runAsGroup", 0, "runAsUser", 0), "volumeMounts",
-                                        new Object[] { Map.of("mountPath", "/.sh", "name", "runtime-installer-assets",
-                                                "readOnly", true) }) },
+                                        new Object[] {
+                                                Map.of("mountPath", "/.sh", "name", "runtime-installer-assets",
+                                                        "readOnly", true),
+                                                Map.of("mountPath", "/runtime-daemonset", "name",
+                                                        "runtime-daemonset-script-policy", "readOnly", true),
+                                                Map.of("mountPath", "/host-root", "name", "host-root") }) },
                                 "nodeSelector", Map.of("flox.dev/enabled", "true"), "restartPolicy", "Always",
                                 "serviceAccountName", "flox-runtime-installer", "tolerations",
                                 new Object[] { Map.of("operator", "Exists") }, "volumes",
@@ -214,7 +220,14 @@ public final class FloxContainerdShimLayer extends Construct {
                                         Map.of("key", "networking-kdns-flake.nix", "path",
                                                 "build-assets/networking/kdns/flake.nix") },
                                         "name", "flox-runtime-installer-assets"), "name",
-                                        "runtime-installer-assets") })),
+                                        "runtime-installer-assets"),
+                                        Map.of("configMap", Map.of("defaultMode", 493, "items", new Object[] {
+                                                Map.of("key", "daemonset-logging.sh", "path",
+                                                        "daemonset-logging.sh") }, "name",
+                                                RuntimeDaemonsetLayer.SCRIPT_POLICY_CONFIGMAP_NAME), "name",
+                                                "runtime-daemonset-script-policy"),
+                                        Map.of("hostPath", Map.of("path", "/", "type", "Directory"), "name",
+                                                "host-root") })),
                 "updateStrategy", Map.of("rollingUpdate", Map.of("maxUnavailable", 1), "type", "RollingUpdate"))));
     }
 }

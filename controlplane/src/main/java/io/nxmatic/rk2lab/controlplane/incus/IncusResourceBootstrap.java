@@ -58,6 +58,16 @@ public final class IncusResourceBootstrap {
     private static final List<String> CLUSTER_NODE_NAMES = List.of("master", "peer1", "peer2", "peer3", "worker1",
             "worker2");
 
+    private static final class DaemonsetLogPolicy {
+
+        private static final String HOST_SOURCE_DIRECTORY_NAME = "k8s-daemonset.d";
+
+        private static final String GUEST_ROOT_PATH = "/srv/host/k8s-daemonset.d";
+
+        private DaemonsetLogPolicy() {
+        }
+    }
+
     private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
 
     private final BootstrapConfig config;
@@ -279,6 +289,7 @@ public final class IncusResourceBootstrap {
                       .disk("cloudconfig.nocloud.dir", hostPaths.runtimeCloudConfigRoot(),
                                           "/srv/host/cloudconfig-nocloud")
                       .disk("shared.dir", hostPaths.shareRoot(), "/srv/host/rke2lab-share.d")
+                          .disk("daemonset.dir", hostPaths.daemonsetRoot(), DaemonsetLogPolicy.GUEST_ROOT_PATH)
                       .disk("kubeconfig.dir", hostPaths.kubeconfigRoot(),
                                           "/srv/host/rke2lab-kube.d")
                       .disk("nocloud.dir", hostPaths.cloudSeedRoot(), "/var/lib/cloud/seed/nocloud")
@@ -287,7 +298,7 @@ public final class IncusResourceBootstrap {
 
     private record BootstrapPaths(Path worktreeRoot, Path stateRoot, Path clusterNodeRoot, Path manifestsRoot,
             Path runtimeRke2ConfigRoot, Path runtimeCloudConfigRoot, Path runtimeEnvConfigRoot, Path secretsFile,
-            Path assetsRoot, Path scriptsRoot, Path systemdRoot, Path gitRoot, Path shareRoot, Path kubeconfigRoot,
+                    Path assetsRoot, Path daemonsetRoot, Path scriptsRoot, Path systemdRoot, Path gitRoot, Path shareRoot, Path kubeconfigRoot,
             Path cloudSeedRoot) {
 
         private static Builder builder() {
@@ -323,6 +334,7 @@ public final class IncusResourceBootstrap {
                     .runtimeEnvConfigRoot(runtimeRoot.resolve("env-config"))
                     .secretsFile(worktreeRoot.resolve(".secrets"))
                     .assetsRoot(hostResourceRoot)
+                    .daemonsetRoot(hostResourceRoot.resolve(DaemonsetLogPolicy.HOST_SOURCE_DIRECTORY_NAME))
                     .scriptsRoot(scriptsRoot)
                     .systemdRoot(systemdRoot)
                     .gitRoot(worktreeRoot.getParent().getParent())
@@ -343,6 +355,7 @@ public final class IncusResourceBootstrap {
                 .runtimeEnvConfigRoot(config.pathOn(host, runtimeEnvConfigRoot))
                 .secretsFile(config.pathOn(host, secretsFile))
                 .assetsRoot(config.pathOn(host, assetsRoot))
+                .daemonsetRoot(config.pathOn(host, daemonsetRoot))
                 .scriptsRoot(config.pathOn(host, scriptsRoot))
                 .systemdRoot(config.pathOn(host, systemdRoot))
                 .gitRoot(config.pathOn(host, gitRoot))
@@ -362,6 +375,7 @@ public final class IncusResourceBootstrap {
             private Path runtimeEnvConfigRoot;
             private Path secretsFile;
             private Path assetsRoot;
+            private Path daemonsetRoot;
             private Path scriptsRoot;
             private Path systemdRoot;
             private Path gitRoot;
@@ -414,6 +428,11 @@ public final class IncusResourceBootstrap {
                 return this;
             }
 
+            private Builder daemonsetRoot(Path value) {
+                this.daemonsetRoot = value;
+                return this;
+            }
+
             private Builder scriptsRoot(Path value) {
                 this.scriptsRoot = value;
                 return this;
@@ -447,6 +466,7 @@ public final class IncusResourceBootstrap {
             private BootstrapPaths build() {
                 return new BootstrapPaths(worktreeRoot, stateRoot, clusterNodeRoot, manifestsRoot,
                         runtimeRke2ConfigRoot, runtimeCloudConfigRoot, runtimeEnvConfigRoot, secretsFile, assetsRoot,
+                        daemonsetRoot,
                         scriptsRoot,
                         systemdRoot, gitRoot, shareRoot, kubeconfigRoot, cloudSeedRoot);
             }
@@ -574,7 +594,7 @@ public final class IncusResourceBootstrap {
 
         private void ensureSources(BootstrapPaths paths) {
             ensureDirectories(List.of(paths.clusterNodeRoot(), paths.cloudSeedRoot(), paths.shareRoot(),
-                paths.kubeconfigRoot()));
+                paths.kubeconfigRoot(), paths.daemonsetRoot()));
 
             final List<String> missingPaths = new ArrayList<>();
 
@@ -1346,7 +1366,7 @@ public final class IncusResourceBootstrap {
         private static String checksum(BootstrapPaths paths) {
             final List<Path> roots = List.of(paths.scriptsRoot(), paths.systemdRoot(), paths.manifestsRoot(),
                     paths.runtimeRke2ConfigRoot(), paths.runtimeCloudConfigRoot(), paths.runtimeEnvConfigRoot(),
-                    paths.cloudSeedRoot());
+                    paths.cloudSeedRoot(), paths.daemonsetRoot());
 
             try {
                 final MessageDigest digest = MessageDigest.getInstance("SHA-256");

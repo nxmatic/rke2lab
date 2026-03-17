@@ -15,7 +15,10 @@ public final class FloxContainerdShimManifestUnit extends AbstractManifestUnit {
         super(
                 MANIFEST_UNIT_ID,
                 List.of(FloxContainerdShimLayer.LEGACY_PATH_PREFIX),
-            List.of(ReplicationReplicatorManifestUnit.MANIFEST_UNIT_ID)
+            List.of(
+                    ReplicationReplicatorManifestUnit.MANIFEST_UNIT_ID,
+                    RuntimeDaemonsetManifestUnit.MANIFEST_UNIT_ID
+            )
         );
     }
 

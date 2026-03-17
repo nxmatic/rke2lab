@@ -78,7 +78,10 @@ public final class Main {
                     "networking/kdns/.flox/env/manifest.toml", false),
                 new MaterializeShimAssetsCommand.EmbeddedAsset(
                     "/runtime/flox-containerd-shim/networking/kdns/.flox/env/manifest.lock",
-                    "networking/kdns/.flox/env/manifest.lock", false));
+                    "networking/kdns/.flox/env/manifest.lock", false),
+            new MaterializeShimAssetsCommand.EmbeddedAsset(
+                    "/runtime/daemonset/.sh.d/daemonset-logging.sh",
+                    ".sh.d/daemonset-logging.sh", false));
 
     public static void main(String[] args) throws IOException {
         try {
