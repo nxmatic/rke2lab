@@ -127,62 +127,50 @@ Guardrail:
 
 * maintain one canonical path contract for both modes (`networking/kdns/src` preferred for subtree mode, optional explicit override via environment variable when needed)
 
-=== Controlnode Stage A flow (policy-first)
+=== Controlnode M4 C4 view (policy-first + Pulumi initial provisioning)
 
 The controlnode follows a strict policy-first flow before any Stage A provisioning side effects.
+This M4 C4 container view models the Stage A architecture and key runtime relationships for management cluster seed provisioning.
 
-[plantuml,controlnode-stagea-flow,svg]
+[plantuml,controlnode-m4-stagea-flow,svg]
 ----
 @startuml
-title Controlnode Stage A flow (policy-first)
+title Controlnode M4 C4 container view (policy-first + Pulumi initial provisioning)
 
-actor Operator
-participant "controlplane.Main" as CP
-participant "manifests.Main\n(shim-build)" as MF
-participant "Pulumi Engine" as Pulumi
-participant "ManifestUpdateGate\n(ServiceLoader)" as MUG
-participant "ManifestSynthesisService\n(ServiceLoader)" as MSS
-participant "Git Policy Checks\n(clean + flake lock)" as GIT
-participant "Shim flake worktree" as Flakes
-participant "IncusResourceBootstrap" as Incus
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-alt flake/package inputs changed
-	Operator -> MF : run shim-build\n(host/guest as applicable)
-	MF -> Flakes : refresh flake.lock/package outputs
-	Operator -> Flakes : commit updated lock/package set
-else no flake/package changes
-	Operator -> Operator : no shim-build refresh required
-end
+LAYOUT_LEFT_RIGHT()
 
-Operator -> CP : run preview/up (or standalone run)
-CP -> CP : detect Pulumi monitor env
+Person(operator, "Operator", "Runs preview/up and reviews bootstrap outputs")
 
-alt Pulumi monitor present
-	CP -> Pulumi : Pulumi.run(...)
-else standalone
-	CP -> CP : runStandalone()
-end
+System_Ext(pulumiEngine, "Pulumi Engine", "Orchestrates resource plan/apply")
+System_Ext(incusApi, "Incus API/Daemon", "Project/profile/network/image/instance lifecycle")
+System_Ext(gitWorktree, "Git Worktree", "Policy checks: clean worktree + flake lock coherence")
+System_Ext(shimFlakes, "Shim flake worktree", "Shim build inputs and lock/package outputs")
 
-CP -> CP : build BootstrapConfig
-CP -> CP : enforceEntryGatePolicies(localWorktreePath)
+System_Boundary(controlnode, "rke2lab controlnode (Stage A)") {
+  Container(cpMain, "controlplane.Main", "Java / Pulumi", "Entry point; policy-first gate; exports deterministic Stage A outputs")
+  Container(manifestGate, "ManifestUpdateGate", "ServiceLoader API", "Enforces manifest synthesis update gate")
+  Container(manifestSynth, "ManifestSynthesisService", "ServiceLoader provider", "Synthesizes and validates manifests for gate smoke checks")
+  Container(bootstrapCfg, "BootstrapConfig", "Java config model", "Resolves canonical Stage A runtime config")
+  Container(incusBootstrap, "IncusResourceBootstrap", "Java orchestration", "Applies Stage A bootstrap: provider resources, seed image, seed instance")
+  Container(imageProvider, "PulumiIncusImageProvider", "Java helper", "Ensures image fingerprint and checksum-aware image lifecycle")
+}
 
-CP -> MUG : enforce(worktreePath)
-MUG -> MSS : load single provider
-MUG -> MSS : synthesize(ephemeral request)
-MUG -> MUG : validate smoke result\n(file exists, non-empty,\nunit hits > 0, domain count > 0)
+Rel(operator, cpMain, "Runs preview/up or standalone")
+Rel(operator, shimFlakes, "Runs shim-build + commits lock updates when inputs change")
 
-CP -> GIT : enforce clean-git-worktree
-CP -> GIT : enforce flake-lock-coherence
+Rel(cpMain, pulumiEngine, "Uses Pulumi.run(...) when monitor is present")
+Rel(cpMain, bootstrapCfg, "Builds effective bootstrap config")
+Rel(cpMain, manifestGate, "Enforces update gate")
+Rel(manifestGate, manifestSynth, "Loads provider and performs synthesis smoke validation")
+Rel(cpMain, gitWorktree, "Enforces clean worktree + flake-lock coherence")
+Rel(cpMain, incusBootstrap, "Invokes apply() after gates pass")
 
-alt any gate fails
-	CP --> Operator : fail fast (no Stage A changes)
-else all gates pass
-	CP -> CP : validate clusterName == bioskop
-	CP -> Incus : apply()
-	Incus --> CP : BootstrapResult
-	CP -> CP : assemble deterministic outputs
-	CP --> Operator : export outputs (Pulumi)\nor print outputs (standalone)
-end
+Rel(incusBootstrap, imageProvider, "Ensures seed image fingerprint/checksum")
+Rel(imageProvider, incusApi, "Resolves/creates image alias and fingerprint")
+Rel(incusBootstrap, incusApi, "Ensures project/network/profile and creates/replaces seed instance")
+Rel(cpMain, operator, "Exports Stage A outputs\n(apiEndpoint, kubeconfigRef, seed ids, checksums, handoffReady)")
 @enduml
 ----
 
