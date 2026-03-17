@@ -15,8 +15,8 @@ This file is the canonical ownership map for shell script assets in this reposit
 |---|---|---|---|
 | `shim-installer.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/shim-installer.sh` |
 | `shim-installer-host.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/shim-installer-host.sh` |
-| `rke2lab-flox-build.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/rke2lab-flox-build.sh` |
-| `rke2lab-flox-build.yaml` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/rke2lab-flox-build.yaml` |
+| `flox-shim-build.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/flox-shim-build.sh` |
+| `flox-shim-build.yaml` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/flox-shim-build.yaml` |
 | `install.sh` | `networking/envoy-gateway` | `networking/envoy-gateway` | `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/networking/EnvoyGatewayLayer.java` (inline ConfigMap data) |
 | `kdns-dlv.sh` | `networking/kdns` | `networking/kdns` | `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/networking/KdnsLayer.java` (inline ConfigMap data) |
 | `agent-sync.sh` | `mesh/headplane` | `mesh/headplane` | `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/mesh/HeadplaneLayer.java` (inline ConfigMap data) |
@@ -75,5 +75,6 @@ Scripts in this owner set:
 ## Notes
 
 - `runtime/flox-containerd-shim` is the canonical owner for both installer and build-assets ConfigMaps mounted at `/scripts` and `/build-assets`.
+- Shim build assets are materialized under `/srv/host/flox-shim.d` (including `packages/`) and initialized as a local git repository before build execution.
 - Next-stage migration guidance is tracked in `docs/rke2lab-authored-notes-import.adoc` under `=== Next-stage migration note`.
 - Keep this registry updated whenever a script is added, moved, or deleted.

@@ -1,9 +1,9 @@
 #!/bin/bash
 set -exuo pipefail
 
-# RKE2 Generic Package Build Script
-# Builds packages from multiple flakes based on YAML descriptor
-# Usage: rke2lab-flox-build.sh [descriptor file]
+# Flox shim package build script
+# Builds packages from local packaged flakes defined in YAML descriptor
+# Usage: flox-shim-build.sh [descriptor file]
 
 source <(flox activate --dir /var/lib/rancher/rke2)
 
@@ -15,57 +15,13 @@ fi
 SCRIPT_BASENAME="$(basename "${SCRIPT_PATH}")"
 SCRIPT_STEM="${SCRIPT_BASENAME%.sh}"
 BUILDS_DESCRIPTOR="${1:-${SCRIPT_DIR}/${SCRIPT_STEM}.yaml}"
+BUILDS_DESCRIPTOR_DIR="$(dirname "${BUILDS_DESCRIPTOR}")"
 
-# Required environment variables
+# Environment variables
 RKE2LAB_ROOT="${RKE2LAB_ROOT:-/srv/host}"
-RKE2LAB_CLUSTER_NAME="${RKE2LAB_CLUSTER_NAME:-}"
-RKE2LAB_NODE_NAME="${RKE2LAB_NODE_NAME:-}"
-GIT_WORKDIR="${RKE2LAB_ROOT}/git"
+GIT_WORKDIR="${GIT_WORKDIR:-${RKE2LAB_ROOT}/git}"
 
-# Validate required environment variables
-if [[ -z "${RKE2LAB_CLUSTER_NAME}" ]]; then
-	: "[ERROR] RKE2LAB_CLUSTER_NAME environment variable is not set"
-	exit 1
-fi
-
-if [[ -z "${RKE2LAB_NODE_NAME}" ]]; then
-	: "[ERROR] RKE2LAB_NODE_NAME environment variable is not set"
-	exit 1
-fi
-
-: "[$(date)] Starting RKE2 package builds from descriptor: ${BUILDS_DESCRIPTOR}"
-: "[$(date)] Cluster: ${RKE2LAB_CLUSTER_NAME}, Node: ${RKE2LAB_NODE_NAME}"
-
-# Helper function to resolve flake paths
-# Relative paths are resolved relative to rke2.d/{cluster}/{node}/
-resolve_flake_path() {
-	local flake_path="$1"
-
-	# If path is absolute and exists, use as-is
-	if [[ "$flake_path" == /* ]]; then
-		if [[ -d "$flake_path" ]]; then
-			echo "$flake_path"
-			return 0
-		else
-			# Absolute path doesn't exist - return it for error reporting
-			echo "$flake_path"
-			return 1
-		fi
-	fi
-
-	# For relative paths, resolve within rke2.d/{cluster}/{node}/
-	local base_path="${GIT_WORKDIR}/nxmatic/rke2lab/rke2.d/${RKE2LAB_CLUSTER_NAME}/${RKE2LAB_NODE_NAME}"
-	local resolved_path="${base_path}/${flake_path}"
-
-	if [[ -d "$resolved_path" ]]; then
-		echo "$resolved_path"
-		return 0
-	fi
-
-	# Return original path if nothing matched (for error reporting)
-	echo "$flake_path"
-	return 1
-}
+: "[$(date)] Starting flox shim package builds from descriptor: ${BUILDS_DESCRIPTOR}"
 
 # Check if descriptor exists
 if [[ ! -f "${BUILDS_DESCRIPTOR}" ]]; then
@@ -79,6 +35,18 @@ if ! command -v yq &>/dev/null; then
 	exit 1
 fi
 
+# Resolve local flake path from descriptor directory when relative
+resolve_flake_path() {
+	local flake_path="$1"
+
+	if [[ "${flake_path}" == /* ]]; then
+		echo "${flake_path}"
+		return 0
+	fi
+
+	echo "${BUILDS_DESCRIPTOR_DIR}/${flake_path}"
+}
+
 # Function to build a single package
 build_package() {
 	local job_name="$1"
@@ -90,23 +58,24 @@ build_package() {
 
 	: "[$(date)] [${job_name}] Building ${package_name}..."
 
-	# Resolve flake path (handles relative and absolute paths)
-	local resolved_path
-	resolved_path=$(resolve_flake_path "$flake_path")
-	if [[ ! -d "$resolved_path" ]]; then
-		: "[ERROR] [${job_name}] Could not locate flake at ${flake_path}"
+	if [[ -z "${flake_path}" ]]; then
+		: "[ERROR] [${job_name}] flakePath is empty"
 		return 1
 	fi
-	flake_path="$resolved_path"
+
+	local resolved_path
+	resolved_path="$(resolve_flake_path "${flake_path}")"
+	if [[ ! -d "${resolved_path}" ]]; then
+		: "[ERROR] [${job_name}] Could not locate flake path: ${resolved_path}"
+		return 1
+	fi
+	if [[ ! -f "${resolved_path}/flake.nix" ]]; then
+		: "[ERROR] [${job_name}] Missing flake.nix at: ${resolved_path}/flake.nix"
+		return 1
+	fi
 
 	# Create output directory
 	mkdir -p "${output_dir}"
-
-	# Verify flake.nix exists
-	if [[ ! -f "${flake_path}/flake.nix" ]]; then
-		: "[ERROR] [${job_name}] Flake not found at ${flake_path}/flake.nix"
-		return 1
-	fi
 
 	# Build nix command with optional input overrides
 	local -a nix_args=(
@@ -118,19 +87,20 @@ build_package() {
 	)
 
 	# Add override for kdns-src input if building kdns
-	# Handles the path difference: /var/lib/git vs /srv/host/git
 	if [[ "${package_name}" == "kdns" ]]; then
 		nix_args+=(
 			"--override-input" "kdns-src" "git+file://${GIT_WORKDIR}/lab42/kdns"
 		)
-		: "[$(date)] [${job_name}] Using kdns source: ${GIT_WORKDIR}/lab42/kdns"
+		: "[$(date)] [${job_name}] Using kdns source override: ${GIT_WORKDIR}/lab42/kdns"
 	fi
 
-	nix_args+=(".#${package_attr}")
+	local build_target=".#${package_attr}"
+	: "[$(date)] [${job_name}] Flake path: ${resolved_path}"
 
-	# Build package
-	if cd "${flake_path}" &&
-		nix "${nix_args[@]}" 2>&1 | tee -a "${log_file}"; then
+	if (
+		cd "${resolved_path}"
+		nix "${nix_args[@]}" "${build_target}"
+	) 2>&1 | tee -a "${log_file}"; then
 		: "[$(date)] [${job_name}] ✓ Built ${package_name}"
 		return 0
 	else
@@ -184,7 +154,7 @@ for ((i = 0; i < num_jobs; i++)); do
 	: "╔═══════════════════════════════════════════════════════════════="
 	: "║ Job: ${job_name}"
 	: "║ Description: ${job_description}"
-	: "║ Flake: ${flake_path}"
+	: "║ Flake path: ${flake_path}"
 	: "║ Output: ${output_dir}"
 	: "╚═══════════════════════════════════════════════════════════════="
 

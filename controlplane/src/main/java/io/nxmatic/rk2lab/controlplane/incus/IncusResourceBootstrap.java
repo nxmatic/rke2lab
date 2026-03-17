@@ -671,13 +671,14 @@ public final class IncusResourceBootstrap {
         }
 
         private void materializeResourceTree(String classpathRoot, Path targetRoot, boolean scriptsExecutable) {
-            ensureDirectories(List.of(targetRoot));
-
             try {
                 final URL rootUrl = getClass().getClassLoader().getResource(classpathRoot);
                 if (rootUrl == null) {
                     throw new IllegalStateException("Classpath resource root not found: " + classpathRoot);
                 }
+
+                ensureDirectories(List.of(targetRoot));
+                clearTargetRoot(targetRoot);
 
                 final String protocol = rootUrl.getProtocol();
                 if ("jar".equals(protocol)) {
@@ -688,6 +689,27 @@ public final class IncusResourceBootstrap {
                 copyFromDirectory(Path.of(rootUrl.toURI()), targetRoot, scriptsExecutable);
             } catch (Exception ex) {
                 throw new IllegalStateException("Failed to materialize classpath resources from " + classpathRoot,
+                        ex);
+            }
+        }
+
+        private void clearTargetRoot(Path targetRoot) {
+            if (!Files.exists(targetRoot)) {
+                return;
+            }
+            try (Stream<Path> walk = Files.walk(targetRoot)) {
+                walk.sorted((left, right) -> Integer.compare(right.getNameCount(), left.getNameCount()))
+                    .filter(path -> !path.equals(targetRoot))
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException ex) {
+                            throw new IllegalStateException("Failed to clear target root before materialization: "
+                                    + targetRoot, ex);
+                        }
+                    });
+            } catch (IOException ex) {
+                throw new IllegalStateException("Failed to walk target root before materialization: " + targetRoot,
                         ex);
             }
         }

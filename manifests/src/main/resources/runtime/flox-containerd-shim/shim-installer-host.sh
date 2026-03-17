@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 
+source <(flox activate --dir /var/lib/rancher/rke2)
+
 NIX_VAR="/nix/var/nix"
 NIX_VAR_PROFILES_DEFAULT="${NIX_VAR}/profiles/default"
 
@@ -23,10 +25,19 @@ FLOX_BIN="${NIX_VAR_PROFILES_DEFAULT}/bin/flox"
 }
 export FLOX_BIN
 
+: "Ensure the git binary is available and executable"
+GIT_BIN="${NIX_VAR_PROFILES_DEFAULT}/bin/git"
+[[ -x "${GIT_BIN}" ]] || {
+  echo "Git binary not found at ${GIT_BIN}" >&2
+  exit 1
+}
+export GIT_BIN
+
 : "Add Nix and Flox to PATH for shim installer operations"
 mkdir -p /usr/bin
 ln -sf "${NIX_BIN}" /usr/bin/nix
 ln -sf "${FLOX_BIN}" /usr/bin/flox
+ln -sf "${GIT_BIN}" /usr/bin/git
 
 : "Ensure Nix and Flox binaries are on PATH for shim installer operations"
 export PATH="${NIX_VAR_PROFILES_DEFAULT}/bin:${PATH}"
@@ -39,8 +50,10 @@ export FLOX_NO_TELEMETRY=1
 export FLOX_NONINTERACTIVE=1
 
 : "Run flox package prebuild jobs during shim installer init"
-FLOX_BUILD_SCRIPT="/srv/host/systemd-scripts.d/rke2lab-flox-build.sh"
-FLOX_BUILD_DESCRIPTOR="/srv/host/systemd-scripts.d/rke2lab-flox-build.yaml"
+FLOX_SHIM_ROOT="/srv/host/flox-shim.d"
+FLOX_BUILD_SCRIPT="${FLOX_SHIM_ROOT}/flox-shim-build.sh"
+FLOX_BUILD_DESCRIPTOR="${FLOX_SHIM_ROOT}/flox-shim-build.yaml"
+FLOX_SHIM_PACKAGES_DIR="${FLOX_SHIM_ROOT}/packages"
 [[ -x "${FLOX_BUILD_SCRIPT}" ]] || {
   echo "flox build script missing or not executable: ${FLOX_BUILD_SCRIPT}" >&2
   exit 1
@@ -49,6 +62,35 @@ FLOX_BUILD_DESCRIPTOR="/srv/host/systemd-scripts.d/rke2lab-flox-build.yaml"
   echo "flox build descriptor missing or unreadable: ${FLOX_BUILD_DESCRIPTOR}" >&2
   exit 1
 }
+[[ -d "${FLOX_SHIM_PACKAGES_DIR}" ]] || {
+  echo "flox shim packages directory missing: ${FLOX_SHIM_PACKAGES_DIR}" >&2
+  exit 1
+}
+
+: "Initialize and refresh flox-shim package git repository"
+ensure_flox_shim_repo() {
+  if [[ ! -d "${FLOX_SHIM_ROOT}/.git" ]]; then
+    git -C "${FLOX_SHIM_ROOT}" init --initial-branch=main
+  fi
+
+  if [[ -z "$(git -C "${FLOX_SHIM_ROOT}" config --get user.name || true)" ]]; then
+    git -C "${FLOX_SHIM_ROOT}" config user.name "rke2lab-flox-shim"
+  fi
+  if [[ -z "$(git -C "${FLOX_SHIM_ROOT}" config --get user.email || true)" ]]; then
+    git -C "${FLOX_SHIM_ROOT}" config user.email "rke2lab-flox-shim@localhost"
+  fi
+}
+
+refresh_flox_shim_packages_commit() {
+  git -C "${FLOX_SHIM_ROOT}" add packages
+  if ! git -C "${FLOX_SHIM_ROOT}" diff --cached --quiet; then
+    git -C "${FLOX_SHIM_ROOT}" commit -m "chore(flox-shim): refresh packaged flakes"
+  fi
+}
+
+ensure_flox_shim_repo
+refresh_flox_shim_packages_commit
+
 "${FLOX_BUILD_SCRIPT}" "${FLOX_BUILD_DESCRIPTOR}"
 
 : "Resolve containerd config and template files"

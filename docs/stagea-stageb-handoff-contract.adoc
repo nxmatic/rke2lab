@@ -52,6 +52,14 @@ The following assets are considered the minimum shared contract.
 |`seedImageFingerprint`
 |Immutable provenance for reproducibility and drift detection.
 
+|Provisioning checksum
+|`seedProvisioningChecksum`
+|Deterministic fingerprint of Stage A materialized provisioning inputs; drives seed replacement when changed.
+
+|Image build checksum
+|`seedImageBuildChecksum`
+|Deterministic fingerprint of image build inputs; drives seed replacement when changed.
+
 |Default machine class
 |`machineClassRef` (or equivalent)
 |Maps bootstrap assumptions to CAPN `LXCMachineTemplate` fields.
@@ -105,6 +113,8 @@ handoff:
   incusProject: rke2lab
   imageAlias: control-node
   seedImageFingerprint: sha256:TODO
+  seedProvisioningChecksum: sha256:TODO
+  seedImageBuildChecksum: sha256:TODO
   machineClassRef: lxc-control-default-v1
   loadBalancerMode: kube-vip
   handoffReady: false
@@ -116,3 +126,4 @@ handoff:
 * Stage B can render CAPI/CAPN resources without external discovery of missing data.
 * Handoff fields are stable across idempotent Stage A re-runs.
 * Seed image fingerprint and provider identity are auditable.
+* Seed checksum fields are auditable and change when Stage A provisioning/image inputs change.

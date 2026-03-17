@@ -160,8 +160,10 @@ public final class FloxContainerdShimLayer extends Construct {
 
         configMap.addDependency(namespace);
         configMap.addJsonPatch(JsonPatch.add("/data", Map.of(
-                "rke2lab-flox-build.sh", readResource("/runtime/flox-containerd-shim/rke2lab-flox-build.sh"),
-                "rke2lab-flox-build.yaml", readResource("/runtime/flox-containerd-shim/rke2lab-flox-build.yaml")
+                "flox-shim-build.sh", readResource("/runtime/flox-containerd-shim/flox-shim-build.sh"),
+                "flox-shim-build.yaml", readResource("/runtime/flox-containerd-shim/flox-shim-build.yaml"),
+                "packages-mesh-headplane-flake.nix", readResource("/runtime/flox-containerd-shim/packages/mesh/headplane/flake.nix"),
+                "packages-networking-kdns-flake.nix", readResource("/runtime/flox-containerd-shim/packages/networking/kdns/flake.nix")
         )));
         return configMap;
     }

@@ -42,6 +42,8 @@ The following are explicitly out of scope for Stage A:
 |`kubeconfigRef` |Path or secret reference for bootstrap kubeconfig
 |`seedNodeId` |Provider-specific identifier for the seed node
 |`seedImageFingerprint` |Immutable image fingerprint used for seed provisioning
+|`seedProvisioningChecksum` |SHA-256 fingerprint of Stage A provisioning inputs materialized for seed bootstrap
+|`seedImageBuildChecksum` |SHA-256 fingerprint of Incus image build inputs
 |`incusProject` |Resolved Incus project used during seed provisioning
 |`handoffReady` |Boolean flag indicating Stage B installation prerequisites are satisfied
 |`bootstrapPhase` |Terminal phase (`Ready` or `Failed`)
@@ -53,8 +55,9 @@ A successful Stage A run must provide enough information to install and reconcil
 
 . Management API endpoint and kubeconfig reference are valid.
 . Seed infrastructure identity is emitted (`seedNodeId`, project, image fingerprint).
+. Seed drift identity is emitted (`seedProvisioningChecksum`, `seedImageBuildChecksum`).
 . Handoff marker is explicit (`handoffReady=true`).
-. Re-run safety is preserved (idempotent bootstrap with no destructive drift).
+. Re-run safety is preserved (idempotent bootstrap with deterministic seed replacement when checksum inputs change).
 
 == Readiness gates
 
