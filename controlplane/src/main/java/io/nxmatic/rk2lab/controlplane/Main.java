@@ -4,6 +4,7 @@ import com.pulumi.Pulumi;
 import com.pulumi.Config;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.incus.IncusResourceBootstrap;
+import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.api.Status;
@@ -20,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
 
 /**
  * Entry point for the Pulumi management-cluster bootstrap program.
@@ -27,6 +29,7 @@ import java.util.Map;
 public final class Main {
 
     private static final List<EntryGatePolicy> ENTRY_GATE_POLICIES = List.of(
+            new EntryGatePolicy("manifests-synthesis-service", Main::enforceManifestSynthesisServicePublished),
             new EntryGatePolicy("clean-git-worktree", Main::enforceCleanWorktree),
             new EntryGatePolicy("flake-lock-coherence", Main::enforceFlakeLockCoherence));
 
@@ -129,6 +132,21 @@ public final class Main {
         } catch (Exception ex) {
             throw new IllegalStateException("Failed to verify clean git worktree at: " + normalizedWorktreePath,
                     ex);
+        }
+    }
+
+    private static void enforceManifestSynthesisServicePublished(Path worktreePath) {
+        final List<ManifestSynthesisService> providers = ServiceLoader.load(ManifestSynthesisService.class)
+                .stream()
+                .map(ServiceLoader.Provider::get)
+                .toList();
+        if (providers.isEmpty()) {
+            throw new IllegalStateException("No ManifestSynthesisService provider found via ServiceLoader.");
+        }
+        if (providers.size() > 1) {
+            throw new IllegalStateException("Expected exactly one ManifestSynthesisService provider, found "
+                    + providers.size() + ": "
+                    + providers.stream().map(ManifestSynthesisService::providerId).toList());
         }
     }
 
