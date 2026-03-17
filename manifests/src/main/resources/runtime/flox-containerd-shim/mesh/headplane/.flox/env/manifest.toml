@@ -1,0 +1,48 @@
+## Flox Environment Manifest -----------------------------------------
+##
+##   _Everything_ you need to know about the _manifest_ is here:
+##
+##               https://flox.dev/docs/concepts/manifest
+##
+## -------------------------------------------------------------------
+# Flox manifest version managed by Flox CLI
+schema-version = "1.10.0"
+
+
+## Install Packages --------------------------------------------------
+##  $ flox install gum  <- puts a package in [install] section below
+##  $ flox search gum   <- search for a package
+##  $ flox show gum     <- show all versions of a package
+## -------------------------------------------------------------------
+[install]
+
+  [install.kubectl]
+  pkg-path = "kubectl"
+outputs = "all"
+
+  [install.yq-go]
+  pkg-path = "yq-go"
+
+  [install.bash]
+  pkg-path = "bash"
+outputs = "all"
+
+  [install.coreutils]
+  pkg-path = "coreutils"
+outputs = "all"
+
+  [install.headplane]
+  store-path = "/nix/store/7cs76svbqrbdxig00np9dyp1f06ywqrb-headplane-0.6.2"
+
+  [install.headscale]
+  store-path = "/nix/store/dbcnax93bqfjxwjl7jz3yvam3v3bwpz3-headscale-0.27.1"
+
+  [install.headplane-agent]
+  store-path = "/nix/store/vs767haf1x0a4mr6a743jip9s384m80h-hp_agent-0.6.2"
+
+  [install.headplane-ssh-wasm]
+  store-path = "/nix/store/9i1w97bnr8hivdr91lfq6g0pazq3f15p-headplane-ssh-wasm-0.6.2"
+
+## Other Environment Options -----------------------------------------
+[options]
+systems = ["aarch64-linux", "aarch64-darwin"]
