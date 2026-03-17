@@ -34,9 +34,7 @@
       },
       "dasel": {
         "pkg-path": "dasel",
-        "pkg-group": "manifest-tools-yaml-tools",
-        "version": "^2.8.1",
-        "outputs": "all"
+        "version": "3.3.0"
       },
       "distrobuilder": {
         "pkg-path": "distrobuilder",
@@ -2042,66 +2040,6 @@
       "priority": 5
     },
     {
-      "attr_path": "dasel",
-      "broken": false,
-      "derivation": "/nix/store/xw1vdy4mqwrqjaqagxa24nfb1nh6gdqp-dasel-2.8.1.drv",
-      "description": "Query and update data structures from the command line",
-      "install_id": "dasel",
-      "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=62dc67aa6a52b4364dd75994ec00b51fbf474e50",
-      "name": "dasel-2.8.1",
-      "pname": "dasel",
-      "rev": "62dc67aa6a52b4364dd75994ec00b51fbf474e50",
-      "rev_count": 961274,
-      "rev_date": "2026-03-10T06:05:22Z",
-      "scrape_date": "2026-03-13T04:41:52.536282Z",
-      "stabilities": [
-        "unstable",
-        "staging"
-      ],
-      "unfree": false,
-      "version": "2.8.1",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/7d5a08h45w3fldh0sqhlm8h505ja0xi0-dasel-2.8.1"
-      },
-      "system": "aarch64-darwin",
-      "group": "manifest-tools-yaml-tools",
-      "priority": 5
-    },
-    {
-      "attr_path": "dasel",
-      "broken": false,
-      "derivation": "/nix/store/82jwb85ijx10z83bgqnvp53qg6p1m70i-dasel-2.8.1.drv",
-      "description": "Query and update data structures from the command line",
-      "install_id": "dasel",
-      "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=62dc67aa6a52b4364dd75994ec00b51fbf474e50",
-      "name": "dasel-2.8.1",
-      "pname": "dasel",
-      "rev": "62dc67aa6a52b4364dd75994ec00b51fbf474e50",
-      "rev_count": 961274,
-      "rev_date": "2026-03-10T06:05:22Z",
-      "scrape_date": "2026-03-13T05:13:50.556891Z",
-      "stabilities": [
-        "unstable",
-        "staging"
-      ],
-      "unfree": false,
-      "version": "2.8.1",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/cqw113xfw69qbns4dp79sg17wr45j3fz-dasel-2.8.1"
-      },
-      "system": "aarch64-linux",
-      "group": "manifest-tools-yaml-tools",
-      "priority": 5
-    },
-    {
       "attr_path": "yq-go",
       "broken": false,
       "derivation": "/nix/store/s5bai7zv72lmzdz4q70nlpm221ddkk04-yq-go-4.52.4.drv",
@@ -2330,6 +2268,64 @@
       ],
       "outputs": {
         "out": "/nix/store/km94caqfw3v9lq1sib1xv4rnchq4fd2q-checkstyle-13.2.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "dasel",
+      "broken": false,
+      "derivation": "/nix/store/np07g2vxsvjchvckv8j7asjh4m2baqsh-dasel-3.3.0.drv",
+      "description": "Query and update data structures from the command line",
+      "install_id": "dasel",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "dasel-3.3.0",
+      "pname": "dasel",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:42:03.804919Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.3.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/27vc96j0v0fin4aall6236mhn686rbzs-dasel-3.3.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "dasel",
+      "broken": false,
+      "derivation": "/nix/store/cgz24by9c7ai54ywcxpc3j6hjilgs4yb-dasel-3.3.0.drv",
+      "description": "Query and update data structures from the command line",
+      "install_id": "dasel",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "dasel-3.3.0",
+      "pname": "dasel",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:14:38.989225Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.3.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/8pkcrnanv1ylhkynvay2drf36l9mbn2l-dasel-3.3.0"
       },
       "system": "aarch64-linux",
       "group": "toplevel",
@@ -2710,6 +2706,10 @@
         "cdk8s-cli": {
           "pkg-path": "cdk8s-cli"
         },
+        "dasel": {
+          "pkg-path": "dasel",
+          "version": "3.3.0"
+        },
         "distrobuilder": {
           "pkg-path": "distrobuilder",
           "systems": [
@@ -3014,6 +3014,15 @@
       }
     ],
     "warnings": [
+      {
+        "warning": {
+          "Overriding": [
+            "install",
+            "dasel"
+          ]
+        },
+        "higher_priority_name": "Current manifest"
+      },
       {
         "warning": {
           "Overriding": [

@@ -243,7 +243,7 @@ public final class IncusResourceBootstrap {
         if (Deployment.getInstance().isDryRun()) {
             return;
         }
-        launchSecretsUpdater.ensureGithubTokenPresent(secretsFile);
+        launchSecretsUpdater.ensureTokensPresent(secretsFile);
     }
 
         private List<InstanceDeviceArgs> seedInstanceDevices(BootstrapPaths hostPaths) {
@@ -992,6 +992,11 @@ public final class IncusResourceBootstrap {
         private LaunchSecretsUpdater() {
         }
 
+        private void ensureTokensPresent(Path secretsFile) {
+            ensureGithubTokenPresent(secretsFile);
+            ensureFloxHubTokenPresent(secretsFile);
+        }
+
         private void ensureGithubTokenPresent(Path secretsFile) {
             final String githubToken = resolveGithubToken();
             if (githubToken.isBlank()) {
@@ -1006,6 +1011,23 @@ public final class IncusResourceBootstrap {
                 }
             } catch (IOException ex) {
                 throw new IllegalStateException("Failed to update launch secrets file with gh token", ex);
+            }
+        }
+
+        private void ensureFloxHubTokenPresent(Path secretsFile) {
+            final String floxToken = resolveFloxHubToken();
+            if (floxToken.isBlank()) {
+                return;
+            }
+
+            try {
+                final String original = Files.readString(secretsFile, StandardCharsets.UTF_8);
+                final String updated = upsertFloxCredentialsPreservingComments(original, floxToken);
+                if (!original.equals(updated)) {
+                    Files.writeString(secretsFile, updated, StandardCharsets.UTF_8);
+                }
+            } catch (IOException ex) {
+                throw new IllegalStateException("Failed to update launch secrets file with flox token", ex);
             }
         }
 
@@ -1099,6 +1121,75 @@ public final class IncusResourceBootstrap {
             return String.join(lineSeparator, lines);
         }
 
+        private String upsertFloxCredentialsPreservingComments(String content, String floxToken) {
+            final String lineSeparator = content.contains("\r\n") ? "\r\n" : "\n";
+            final List<String> lines = new ArrayList<>(List.of(content.split("\\r?\\n", -1)));
+
+            final Pattern floxHeaderPattern = Pattern.compile("^([\\t ]*)flox:\\s*(#.*)?$");
+            final Pattern tokenPattern = Pattern.compile("^([\\t ]*token\\s*:\\s*)([^#]*)(\\s*(#.*)?)$");
+
+            int floxIndex = -1;
+            String floxIndent = "";
+            for (int i = 0; i < lines.size(); i++) {
+                final Matcher matcher = floxHeaderPattern.matcher(lines.get(i));
+                if (matcher.matches()) {
+                    floxIndex = i;
+                    floxIndent = matcher.group(1);
+                    break;
+                }
+            }
+
+            final String tokenValue = yamlSingleQuoted(floxToken);
+
+            if (floxIndex < 0) {
+                final String childIndent = "  ";
+                if (!lines.isEmpty() && !lines.get(lines.size() - 1).isEmpty()) {
+                    lines.add("");
+                }
+                lines.add("flox:");
+                lines.add(childIndent + "token: " + tokenValue);
+                return String.join(lineSeparator, lines);
+            }
+
+            final int floxIndentWidth = indentationWidth(floxIndent);
+            final String childIndent = floxIndent + "  ";
+
+            int blockStart = floxIndex + 1;
+            int blockEndExclusive = lines.size();
+            for (int i = blockStart; i < lines.size(); i++) {
+                final String line = lines.get(i);
+                final String trimmed = line.trim();
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                if (trimmed.startsWith("#")) {
+                    continue;
+                }
+                if (indentationWidth(line) <= floxIndentWidth) {
+                    blockEndExclusive = i;
+                    break;
+                }
+            }
+
+            int tokenIndex = -1;
+            for (int i = blockStart; i < blockEndExclusive; i++) {
+                final String line = lines.get(i);
+                final Matcher tokenMatcher = tokenPattern.matcher(line);
+                if (tokenMatcher.matches()) {
+                    final String suffix = tokenMatcher.group(3) == null ? "" : tokenMatcher.group(3);
+                    lines.set(i, tokenMatcher.group(1) + tokenValue + suffix);
+                    tokenIndex = i;
+                    break;
+                }
+            }
+
+            if (tokenIndex < 0) {
+                lines.add(blockEndExclusive, childIndent + "token: " + tokenValue);
+            }
+
+            return String.join(lineSeparator, lines);
+        }
+
         private int indentationWidth(String line) {
             int width = 0;
             while (width < line.length()) {
@@ -1121,6 +1212,17 @@ public final class IncusResourceBootstrap {
                 return envToken;
             }
             return captureCommandOutput("gh", "auth", "token");
+        }
+
+        private String resolveFloxHubToken() {
+            final String envToken = firstNonBlank(
+                    System.getenv("FLOXHUB_TOKEN"),
+                    System.getenv("FLOX_TOKEN"),
+                    System.getenv("FLOX_AUTH_TOKEN"));
+            if (!envToken.isBlank()) {
+                return envToken;
+            }
+            return captureCommandOutput("flox", "auth", "token");
         }
 
         private String firstNonBlank(String... candidates) {

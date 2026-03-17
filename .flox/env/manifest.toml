@@ -12,6 +12,8 @@ pulumictl.pkg-path = "pulumictl"
 distrobuilder.pkg-path = "distrobuilder"
 distrobuilder.systems = ["aarch64-linux"]
 cdk8s-cli.pkg-path = "cdk8s-cli"
+dasel.pkg-path = "dasel"
+dasel.version = "3.3.0"
 
 
 ## Environment Variables ---------------------------------------------
