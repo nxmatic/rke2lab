@@ -29,8 +29,10 @@ public final class FloxContainerdShimLayer extends Construct {
         createRuntimeClass();
         ApiObject envConfigMap = createFloxEnvConfigMap(namespace);
         ApiObject installerScriptConfigMap = createInstallerScriptConfigMap(namespace);
+                ApiObject buildAssetsConfigMap = createBuildAssetsConfigMap(namespace);
         ApiObject serviceAccount = createServiceAccount(namespace);
-        createInstallerDaemonSet(namespace, envConfigMap, installerScriptConfigMap, serviceAccount);
+                createInstallerDaemonSet(namespace, envConfigMap, installerScriptConfigMap, buildAssetsConfigMap,
+                                serviceAccount);
     }
 
     private ApiObject createNamespace() {
@@ -136,6 +138,33 @@ public final class FloxContainerdShimLayer extends Construct {
         return configMap;
     }
 
+    private ApiObject createBuildAssetsConfigMap(final ApiObject namespace) {
+        ApiObject configMap = new ApiObject(
+                this,
+                "configmap-flox-container-build-assets",
+                ApiObjectProps.builder()
+                        .apiVersion("v1")
+                        .kind("ConfigMap")
+                        .metadata(ApiObjectMetadata.builder()
+                                .name("flox-container-build-assets")
+                                .namespace("flox-runtime")
+                                .annotations(kptMetadata.packageAnnotations(
+                                        LAYER_NAME,
+                                        PACKAGE_NAME,
+                                        "|ConfigMap|flox-runtime|flox-container-build-assets"
+                                ))
+                                .build())
+                        .build()
+        );
+
+        configMap.addDependency(namespace);
+        configMap.addJsonPatch(JsonPatch.add("/data", Map.of(
+                "rke2lab-flox-build.sh", readResource("/runtime/flox-container-build-assets/rke2lab-flox-build.sh"),
+                "rke2lab-flox-build.yaml", readResource("/runtime/flox-container-build-assets/rke2lab-flox-build.yaml")
+        )));
+        return configMap;
+    }
+
         private String readResource(final String resourcePath) {
                 final InputStream input = FloxContainerdShimLayer.class.getResourceAsStream(resourcePath);
                 if (input == null) {
@@ -175,6 +204,7 @@ public final class FloxContainerdShimLayer extends Construct {
             final ApiObject namespace,
             final ApiObject envConfigMap,
             final ApiObject installerScriptConfigMap,
+            final ApiObject buildAssetsConfigMap,
             final ApiObject serviceAccount
     ) {
         ApiObject daemonSet = new ApiObject(
@@ -202,6 +232,7 @@ public final class FloxContainerdShimLayer extends Construct {
         daemonSet.addDependency(namespace);
         daemonSet.addDependency(envConfigMap);
         daemonSet.addDependency(installerScriptConfigMap);
+        daemonSet.addDependency(buildAssetsConfigMap);
         daemonSet.addDependency(serviceAccount);
 
         daemonSet.addJsonPatch(JsonPatch.add("/spec", Map.of(
