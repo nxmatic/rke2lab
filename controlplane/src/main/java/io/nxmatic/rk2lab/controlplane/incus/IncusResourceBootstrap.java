@@ -28,8 +28,13 @@ import java.io.IOException;
 import java.net.JarURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Enumeration;
@@ -121,6 +126,7 @@ public final class IncusResourceBootstrap {
         }
 
         private ApplyPipeline prepareHostState() {
+            HostAssetRootLifecycle.prepareCleanHostAssetRoot(localPaths.assetsRoot());
             classpathAssetMaterializer.materializeIncusAssets(localPaths.assetsRoot());
             classpathAssetMaterializer.materializeManifests(localPaths.manifestsRoot());
             classpathAssetMaterializer.materializeHostSystemdAssets(localPaths.manifestsRoot().resolve("host"));
@@ -178,15 +184,22 @@ public final class IncusResourceBootstrap {
         }
 
         private BootstrapResult toResult() {
+            final String hostSourceDirRelative = relativizeAgainstWorktree(localPaths.worktreeRoot(),
+                    localPaths.assetsRoot());
             return new BootstrapResult("incus://" + config.incusProject() + "/" + config.nodeName(),
                     ensuredImageFingerprint, instance.status(), instance.urn(), providerContext.provider().urn(),
                     provisioningChecksum, imageBuildChecksum,
-                    localPaths.systemdRoot().toString(),
-                    localPaths.runtimeCloudConfigRoot().toString(),
-                    localPaths.cloudSeedRoot().toString(),
-                    nixosPaths.systemdRoot().toString(),
-                    nixosPaths.runtimeCloudConfigRoot().toString(),
-                    nixosPaths.cloudSeedRoot().toString());
+                    hostSourceDirRelative);
+        }
+
+        private String relativizeAgainstWorktree(Path worktreeRoot, Path path) {
+            final Path normalizedWorktree = worktreeRoot.toAbsolutePath().normalize();
+            final Path normalizedPath = path.toAbsolutePath().normalize();
+            try {
+                return normalizedWorktree.relativize(normalizedPath).toString();
+            } catch (IllegalArgumentException ex) {
+                return normalizedPath.toString();
+            }
         }
     }
 
@@ -785,6 +798,80 @@ public final class IncusResourceBootstrap {
         }
     }
 
+    private static final class HostAssetRootLifecycle {
+
+        private HostAssetRootLifecycle() {
+        }
+
+        private static void prepareCleanHostAssetRoot(Path hostAssetRoot) {
+            try {
+                final Path parent = hostAssetRoot.getParent();
+                if (parent == null) {
+                    throw new IllegalStateException("Host asset root has no parent directory: " + hostAssetRoot);
+                }
+
+                Files.createDirectories(parent);
+
+                if (Files.exists(hostAssetRoot)) {
+                    final Path rotatedPath = rotatedHostPath(hostAssetRoot);
+                    rotate(hostAssetRoot, rotatedPath);
+                    registerRecursiveDeleteAtShutdown(rotatedPath);
+                }
+
+                Files.createDirectories(hostAssetRoot);
+            } catch (IOException ex) {
+                throw new IllegalStateException("Failed to prepare clean host asset root: " + hostAssetRoot, ex);
+            }
+        }
+
+        private static Path rotatedHostPath(Path hostAssetRoot) {
+            final long pid = ProcessHandle.current().pid();
+            final long epochMillis = System.currentTimeMillis();
+            final String rotatedName = hostAssetRoot.getFileName().toString() + "." + pid + "." + epochMillis;
+            return hostAssetRoot.resolveSibling(rotatedName);
+        }
+
+        private static void rotate(Path source, Path target) throws IOException {
+            try {
+                Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException ex) {
+                Files.move(source, target);
+            }
+        }
+
+        private static void registerRecursiveDeleteAtShutdown(Path directory) {
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    deleteRecursively(directory);
+                } catch (IOException ignored) {
+                    // Best-effort cleanup on shutdown.
+                }
+            }, "rk2lab-host-asset-cleanup-" + ProcessHandle.current().pid()));
+        }
+
+        private static void deleteRecursively(Path root) throws IOException {
+            if (!Files.exists(root)) {
+                return;
+            }
+            Files.walkFileTree(root, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    Files.deleteIfExists(file);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                    if (exc != null) {
+                        throw exc;
+                    }
+                    Files.deleteIfExists(dir);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        }
+    }
+
     private static final class IncusImportLookup {
 
         private static final IncusImportLookup INSTANCE = new IncusImportLookup();
@@ -1309,7 +1396,6 @@ public final class IncusResourceBootstrap {
 
         public record BootstrapResult(String seedNodeId, Object imageFingerprint, Object instanceStatus, Object instanceUrn,
             Object providerUrn, String provisioningChecksum, String imageBuildChecksum,
-            String localSystemdUnitsSourceDir, String localCloudConfigSourceDir, String localCloudSeedSourceDir,
-            String nixosSystemdUnitsSourceDir, String nixosCloudConfigSourceDir, String nixosCloudSeedSourceDir) {
+            String hostSourceDirRelative) {
     }
 }

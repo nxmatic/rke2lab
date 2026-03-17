@@ -33,8 +33,7 @@ public final class FloxContainerdShimLayer extends Construct {
         ApiObject envConfigMap = createFloxEnvConfigMap(namespace);
         ApiObject installerAssetsConfigMap = createInstallerAssetsConfigMap(namespace);
         ApiObject serviceAccount = createServiceAccount(namespace);
-        createInstallerDaemonSet(namespace, envConfigMap, installerAssetsConfigMap,
-                serviceAccount);
+        createInstallerDaemonSet(namespace, envConfigMap, installerAssetsConfigMap, serviceAccount);
     }
 
     private ApiObject createNamespace() {
@@ -106,15 +105,14 @@ public final class FloxContainerdShimLayer extends Construct {
                               .build());
 
         configMap.addDependency(namespace);
-        configMap.addJsonPatch(JsonPatch.add("/data",
-                Map.of("shim-installer.sh", readResource("/runtime/flox-containerd-shim/shim-installer.sh"),
-                        "shim-installer-host.sh", readResource("/runtime/flox-containerd-shim/shim-installer-host.sh"),
-                        "shim-installer-entrypoint.sh",
-                        readResource("/runtime/flox-containerd-shim/shim-installer-entrypoint.sh"),
-                        "flox-shim-build.sh", readResource("/runtime/flox-containerd-shim/flox-shim-build.sh"),
-                        "flox-shim-build.yaml", readResource("/runtime/flox-containerd-shim/flox-shim-build.yaml"),
-                        "mesh-headplane-flake.nix", readResource("/runtime/flox-containerd-shim/mesh/headplane/flake.nix"),
-                        "networking-kdns-flake.nix", readResource("/runtime/flox-containerd-shim/networking/kdns/flake.nix"))));
+        configMap.addJsonPatch(JsonPatch.add("/data", Map.of("shim-installer.sh",
+                readResource("/runtime/flox-containerd-shim/shim-installer.sh"), "shim-installer-host.sh",
+                readResource("/runtime/flox-containerd-shim/shim-installer-host.sh"), "shim-installer-entrypoint.sh",
+                readResource("/runtime/flox-containerd-shim/shim-installer-entrypoint.sh"), "flox-shim-build.sh",
+                readResource("/runtime/flox-containerd-shim/flox-shim-build.sh"), "flox-shim-build.yaml",
+                readResource("/runtime/flox-containerd-shim/flox-shim-build.yaml"), "mesh-headplane-flake.nix",
+                readResource("/runtime/flox-containerd-shim/mesh/headplane/flake.nix"), "networking-kdns-flake.nix",
+                readResource("/runtime/flox-containerd-shim/networking/kdns/flake.nix"))));
         return configMap;
     }
 
@@ -198,25 +196,25 @@ public final class FloxContainerdShimLayer extends Construct {
                                         "image", "alpine:3.20", "imagePullPolicy", "IfNotPresent", "name",
                                         "shim-installer", "securityContext",
                                         Map.of("privileged", true, "runAsGroup", 0, "runAsUser", 0), "volumeMounts",
-                                        new Object[] {
-                                                Map.of("mountPath", "/.sh", "name", "runtime-installer-assets",
-                                                        "readOnly", true) }) },
+                                        new Object[] { Map.of("mountPath", "/.sh", "name", "runtime-installer-assets",
+                                                "readOnly", true) }) },
                                 "nodeSelector", Map.of("flox.dev/enabled", "true"), "restartPolicy", "Always",
                                 "serviceAccountName", "flox-runtime-installer", "tolerations",
                                 new Object[] { Map.of("operator", "Exists") }, "volumes",
-                                new Object[] {
-                                        Map.of("configMap",
-                                                Map.of("defaultMode", 493,
-                                                        "items", new Object[] {
-                                                                Map.of("key", "shim-installer.sh", "path", "shim-installer.sh"),
-                                                                Map.of("key", "shim-installer-host.sh", "path", "shim-installer-host.sh"),
-                                                                Map.of("key", "shim-installer-entrypoint.sh", "path", "shim-installer-entrypoint.sh"),
-                                                                Map.of("key", "flox-shim-build.sh", "path", "build-assets/flox-shim-build.sh"),
-                                                                Map.of("key", "flox-shim-build.yaml", "path", "build-assets/flox-shim-build.yaml"),
-                                                                Map.of("key", "mesh-headplane-flake.nix", "path", "build-assets/mesh/headplane/flake.nix"),
-                                                                Map.of("key", "networking-kdns-flake.nix", "path", "build-assets/networking/kdns/flake.nix") },
-                                                        "name", "flox-runtime-installer-assets"),
-                                                "name", "runtime-installer-assets") })),
+                                new Object[] { Map.of("configMap", Map.of("defaultMode", 493, "items", new Object[] {
+                                        Map.of("key", "shim-installer.sh", "path", "shim-installer.sh"),
+                                        Map.of("key", "shim-installer-host.sh", "path", "shim-installer-host.sh"),
+                                        Map.of("key", "shim-installer-entrypoint.sh", "path",
+                                                "shim-installer-entrypoint.sh"),
+                                        Map.of("key", "flox-shim-build.sh", "path", "build-assets/flox-shim-build.sh"),
+                                        Map.of("key", "flox-shim-build.yaml", "path",
+                                                "build-assets/flox-shim-build.yaml"),
+                                        Map.of("key", "mesh-headplane-flake.nix", "path",
+                                                "build-assets/mesh/headplane/flake.nix"),
+                                        Map.of("key", "networking-kdns-flake.nix", "path",
+                                                "build-assets/networking/kdns/flake.nix") },
+                                        "name", "flox-runtime-installer-assets"), "name",
+                                        "runtime-installer-assets") })),
                 "updateStrategy", Map.of("rollingUpdate", Map.of("maxUnavailable", 1), "type", "RollingUpdate"))));
     }
 }

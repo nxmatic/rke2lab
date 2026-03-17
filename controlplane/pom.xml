@@ -134,6 +134,18 @@
         <artifactId>maven-antrun-plugin</artifactId>
         <executions>
           <execution>
+            <id>clean-unpacked-manifests-generated-resources</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target>
+                <delete dir="${project.build.directory}/generated-resources/META-INF/io.nxmatic/rk2lab/controlplane/incus/manifests" quiet="true"/>
+              </target>
+            </configuration>
+          </execution>
+          <execution>
             <id>copy-incus-assets-into-generated-resources</id>
             <phase>generate-resources</phase>
             <goals>
