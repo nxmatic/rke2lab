@@ -6,7 +6,7 @@
     nixpkgs.follows = "flake-commons/nixpkgs";
     flake-utils.follows = "flake-commons/flake-utils";
     kdns-src = {
-      url = "path:./src";
+      url = "github:lab42/kdns?ref=v0.2.15";
       flake = false;
     };
   };
@@ -27,13 +27,15 @@
       packages = {
         kdns = pkgs.buildGoModule rec {
           pname = "kdns";
-          version = "0.2.11";
+          version = "0.2.15";
 
           src = kdns-src;
 
-          vendorHash = "sha256-QOe/fV12UTcBUtxZlkS2Xx6LqRGYdjuYFlxq04rHKB0=";
+          vendorHash = "sha256-pPGuBNI/qcGr3EgVQMa6Xw0PRA4iUGMLDnw4nCWqJ3U=";
 
-          env.CGO_ENABLED = "0";
+          env = {
+            CGO_ENABLED = "0";
+          };
 
           ldflags = [
             "-s"

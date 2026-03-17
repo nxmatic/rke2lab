@@ -52,7 +52,6 @@ BUILDS_DESCRIPTOR_DIR="$(canonicalize_existing_path "${BUILDS_DESCRIPTOR_DIR}")"
 
 # Environment variables
 RKE2LAB_ROOT="${RKE2LAB_ROOT:-/srv/host}"
-GIT_WORKDIR="${GIT_WORKDIR:-${RKE2LAB_ROOT}/git}"
 UPDATED_FLAKE_LOCK_DIRS=""
 
 validate_worktree_mode() {
@@ -213,47 +212,6 @@ resolve_flake_path() {
 	return 0
 }
 
-resolve_kdns_src_worktree() {
-	local -a candidates=()
-	case "${WORKTREE_MODE}" in
-		guest)
-			candidates+=(
-				"${BUILDS_DESCRIPTOR_DIR}/networking/kdns/src"
-				"${BUILDS_DESCRIPTOR_DIR}/networking/kdns"
-			)
-			;;
-		host)
-			candidates+=(
-				"${BUILDS_DESCRIPTOR_DIR}/networking/kdns/src"
-				"${BUILDS_DESCRIPTOR_DIR}/networking/kdns"
-				"${GIT_WORKDIR}/lab42/kdns"
-				"/srv/host/git/lab42/kdns"
-				"/var/lib/git/lab42/kdns"
-			)
-			;;
-	esac
-
-	if [[ -n "${KDNS_SRC_WORKTREE:-}" ]]; then
-		candidates=("${KDNS_SRC_WORKTREE}" "${candidates[@]}")
-	fi
-
-	local candidate
-	for candidate in "${candidates[@]}"; do
-		[[ -n "${candidate}" ]] || continue
-		candidate="$(canonicalize_existing_path "${candidate}")"
-		if [[ -d "${candidate}" && -f "${candidate}/flake.nix" ]]; then
-			echo "${candidate}"
-			return 0
-		fi
-		if [[ -d "${candidate}" && -f "${candidate}/go.mod" ]]; then
-			echo "${candidate}"
-			return 0
-		fi
-	done
-
-	return 1
-}
-
 should_update_locks() {
 	case "${FLOX_SHIM_UPDATE_LOCKS:-auto}" in
 		1|true|TRUE|yes|YES)
@@ -289,7 +247,6 @@ refresh_flake_lock_if_needed() {
 	local job_name="$1"
 	local resolved_path="$2"
 	local log_file="$3"
-	local kdns_src_worktree="$4"
 
 	should_update_locks || return 0
 
@@ -303,13 +260,7 @@ refresh_flake_lock_if_needed() {
 		"--extra-experimental-features" "nix-command"
 		"--extra-experimental-features" "flakes"
 	)
-
-	if [[ -n "${kdns_src_worktree}" ]]; then
-		lock_args+=("--override-input" "kdns-src" "path:${kdns_src_worktree}")
-		: "[$(date)] [${job_name}] Refreshing flake.lock with kdns source override: ${kdns_src_worktree}"
-	else
-		: "[$(date)] [${job_name}] Refreshing flake.lock"
-	fi
+	: "[$(date)] [${job_name}] Refreshing flake.lock"
 
 	if (
 		cd "${resolved_path}"
@@ -363,28 +314,7 @@ build_package() {
 		"--no-link"
 	)
 
-	# Add worktree override for kdns-src input if building kdns
-	local kdns_src_worktree=""
-	if [[ "${package_name}" == "kdns" ]]; then
-		if ! kdns_src_worktree="$(resolve_kdns_src_worktree)"; then
-			: "[ERROR] [${job_name}] Unable to resolve kdns source worktree."
-			: "[ERROR] [${job_name}] Expected one of:"
-			: "[ERROR] [${job_name}]   - ${BUILDS_DESCRIPTOR_DIR}/networking/kdns/src (preferred subtree mode)"
-			: "[ERROR] [${job_name}]   - ${BUILDS_DESCRIPTOR_DIR}/networking/kdns"
-			: "[ERROR] [${job_name}]   - ${GIT_WORKDIR}/lab42/kdns"
-			: "[ERROR] [${job_name}]   - /srv/host/git/lab42/kdns"
-			: "[ERROR] [${job_name}]   - /var/lib/git/lab42/kdns"
-			: "[ERROR] [${job_name}] Or set KDNS_SRC_WORKTREE explicitly."
-			return 1
-		fi
-
-		nix_args+=(
-			"--override-input" "kdns-src" "path:${kdns_src_worktree}"
-		)
-		: "[$(date)] [${job_name}] Using kdns source override (worktree mode: ${WORKTREE_MODE}): ${kdns_src_worktree}"
-	fi
-
-	if ! refresh_flake_lock_if_needed "${job_name}" "${resolved_path}" "${log_file}" "${kdns_src_worktree}"; then
+	if ! refresh_flake_lock_if_needed "${job_name}" "${resolved_path}" "${log_file}"; then
 		return 1
 	fi
 

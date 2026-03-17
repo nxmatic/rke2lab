@@ -108,8 +108,8 @@ resolve_containerd_config() {
 
   for candidate in \
     "${configured}" \
-    "/var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml" \
-    "/var/lib/rancher/rke2/agent/etc/containerd/config.toml"; do
+    "/var/lib/rancher/rke2/agent/etc/containerd/config.toml" \
+    "/var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml"; do
     [[ -n "${candidate}" ]] || continue
     if [[ -f "${candidate}" ]]; then
       printf '%s\n' "${candidate}"
@@ -122,7 +122,31 @@ resolve_containerd_config() {
     return 0
   fi
 
-  printf '%s\n' "/var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml"
+  printf '%s\n' "/var/lib/rancher/rke2/agent/etc/containerd/config.toml"
+}
+
+detect_containerd_config_version() {
+  local config_file="$1"
+  local version=""
+
+  version="$(dasel -r toml -w yaml -f "${config_file}" '.version' 2>/dev/null | yq -r '.' 2>/dev/null || true)"
+
+  if [[ -z "${version}" || "${version}" == "null" ]]; then
+    version="$(yq -p toml -r '.version // ""' "${config_file}" 2>/dev/null || true)"
+  fi
+
+  if [[ -z "${version}" ]]; then
+    case "$(basename "${config_file}")" in
+      config-v3.toml|config-v3.toml.tmpl)
+        version="3"
+        ;;
+      *)
+        version="2"
+        ;;
+    esac
+  fi
+
+  printf '%s\n' "${version}"
 }
 
 CONFIG_FILE="$(resolve_containerd_config)"
@@ -195,7 +219,7 @@ if [[ ! -f "${CONFIG_TEMPLATE}" ]]; then
   cp "${CONFIG_FILE}" "${CONFIG_TEMPLATE}"
 fi
 
-CONFIG_VERSION="$(grep -m1 '^version' "${CONFIG_FILE}" | awk -F '=' '{print $2}' | tr -d ' "')"
+CONFIG_VERSION="$(detect_containerd_config_version "${CONFIG_FILE}")"
 if [[ "${CONFIG_VERSION}" == "3" ]]; then
   RUNTIME_SECTION='plugins."io.containerd.cri.v1.runtime".containerd.runtimes.flox'
 else
