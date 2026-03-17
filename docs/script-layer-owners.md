@@ -75,8 +75,9 @@ Scripts in this owner set:
 ## Notes
 
 - `runtime/flox-containerd-shim` is the canonical owner for both installer and build-assets ConfigMaps mounted at `/scripts` and `/build-assets`.
-- Shim builder execution supports two canonical worktree modes: repository worktree (`rke2lab`) and host shim worktree (`/srv/host/flox-shim.d`).
-- Shim builder mode is explicit (no auto-detection): `flox-shim-build.sh <rke2lab-worktree|flox-shim-worktree> [descriptor]`.
+- Shim builder execution supports two canonical modes: `guest` (repository/local worktree) and `host` (node provisioning worktree under `/srv/host/flox-shim.d`).
+- Shim builder mode is explicit when passed: `flox-shim-build.sh [host|guest] [descriptor]`.
+- Default mode is `guest` when mode is omitted.
 - `kdns` source resolution is worktree-based (`path:` input), with subtree mode preferred at `networking/kdns/src` and explicit override available via `KDNS_SRC_WORKTREE`.
 - Next-stage migration guidance is tracked in `docs/rke2lab-authored-notes-import.adoc` under `=== Next-stage migration note`.
 - Keep this registry updated whenever a script is added, moved, or deleted.

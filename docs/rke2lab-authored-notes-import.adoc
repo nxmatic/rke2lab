@@ -117,9 +117,9 @@ Adopt a worktree-first model for runtime shim package builds:
 
 Canonical execution modes for shim builder:
 
-* `rke2lab-worktree`: run directly from repository-owned resources during local iteration
-* `flox-shim-worktree`: run from `/srv/host/flox-shim.d` during node provisioning
-* mode selection is explicit (passed as builder argument), not auto-detected
+* `guest`: run directly from repository-owned resources during local iteration (default when omitted)
+* `host`: run from `/srv/host/flox-shim.d` during node provisioning
+* mode selection is explicit when passed as builder argument, not auto-detected
 
 Guardrail:
 

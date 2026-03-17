@@ -3,7 +3,7 @@ set -exuo pipefail
 
 # Flox shim package build script
 # Builds packages from local packaged flakes defined in YAML descriptor
-# Usage: flox-shim-build.sh <mode> [descriptor file]
+# Usage: flox-shim-build.sh [mode] [descriptor file]
 
 source <(flox activate --dir /var/lib/rancher/rke2)
 
@@ -14,11 +14,15 @@ if [[ "${SCRIPT_DIR}" == "${SCRIPT_PATH}" ]]; then
 fi
 SCRIPT_BASENAME="$(basename "${SCRIPT_PATH}")"
 SCRIPT_STEM="${SCRIPT_BASENAME%.sh}"
-WORKTREE_MODE="${FLOX_SHIM_WORKTREE_MODE:-}"
+WORKTREE_MODE="${FLOX_SHIM_MODE:-guest}"
 
 if [[ $# -gt 0 ]]; then
-	WORKTREE_MODE="${1}"
-	shift
+	case "${1}" in
+		host|guest)
+			WORKTREE_MODE="${1}"
+			shift
+			;;
+	esac
 fi
 
 BUILDS_DESCRIPTOR="${1:-${SCRIPT_DIR}/${SCRIPT_STEM}.yaml}"
@@ -30,13 +34,14 @@ GIT_WORKDIR="${GIT_WORKDIR:-${RKE2LAB_ROOT}/git}"
 
 validate_worktree_mode() {
 	case "${WORKTREE_MODE}" in
-		rke2lab-worktree|flox-shim-worktree)
+		host|guest)
 			return 0
 			;;
 		*)
 			: "[ERROR] Unsupported or missing shim builder mode: '${WORKTREE_MODE}'"
-			: "[ERROR] Usage: ${SCRIPT_BASENAME} <rke2lab-worktree|flox-shim-worktree> [descriptor file]"
-			: "[ERROR] You can also set FLOX_SHIM_WORKTREE_MODE and pass only [descriptor file]."
+			: "[ERROR] Usage: ${SCRIPT_BASENAME} [host|guest] [descriptor file]"
+			: "[ERROR] Default mode is 'guest' when omitted."
+			: "[ERROR] You can also set FLOX_SHIM_MODE and pass only [descriptor file]."
 			exit 1
 			;;
 	esac
@@ -71,13 +76,13 @@ resolve_flake_path() {
 resolve_kdns_src_worktree() {
 	local -a candidates=()
 	case "${WORKTREE_MODE}" in
-		rke2lab-worktree)
+		guest)
 			candidates+=(
 				"${BUILDS_DESCRIPTOR_DIR}/networking/kdns/src"
 				"${BUILDS_DESCRIPTOR_DIR}/networking/kdns"
 			)
 			;;
-		flox-shim-worktree)
+		host)
 			candidates+=(
 				"${BUILDS_DESCRIPTOR_DIR}/networking/kdns/src"
 				"${BUILDS_DESCRIPTOR_DIR}/networking/kdns"
