@@ -142903,14 +142903,18 @@
     "kdns-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1773751508,
-        "narHash": "sha256-MuIIjCl4l4NY8nGwY/VPw65CzUySJInQalr+DQf/zUo=",
-        "path": "/private/var/lib/git/nxmatic/rke2lab/manifests/src/main/resources/runtime/flox-containerd-shim/networking/kdns",
-        "type": "path"
+        "lastModified": 1773105092,
+        "narHash": "sha256-ZS5kR5eixIX/5NH7gU7Afr5/jyT4febtW3Q4uetWvjM=",
+        "owner": "lab42",
+        "repo": "kdns",
+        "rev": "b1af1f5cf942ca80a8f721e91e4c12a1d388c9b8",
+        "type": "github"
       },
       "original": {
-        "path": "./src",
-        "type": "path"
+        "owner": "lab42",
+        "ref": "v0.2.15",
+        "repo": "kdns",
+        "type": "github"
       }
     },
     "libgit2": {
