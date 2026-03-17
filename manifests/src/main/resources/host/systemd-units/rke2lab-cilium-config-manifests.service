@@ -6,7 +6,7 @@ Requires=rke2lab-install.service
 After=rke2lab-install.service
 Before=rke2-server.service
 ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh
-ConditionPathExists=/srv/host/manifests.d
+ConditionPathExists=/srv/host/rke2-manifests.d
 
 [Service]
 Type=oneshot

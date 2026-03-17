@@ -9,7 +9,7 @@ Requires=rke2lab-replication-manifests.service
 After=rke2lab-mesh-secrets.service
 Requires=rke2lab-mesh-secrets.service
 ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh
-ConditionPathExists=/srv/host/manifests.d/mesh
+ConditionPathExists=/srv/host/rke2-manifests.d/mesh
 
 [Service]
 Type=oneshot

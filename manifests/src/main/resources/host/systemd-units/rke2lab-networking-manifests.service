@@ -7,7 +7,7 @@ Requires=rke2-server.service
 After=rke2lab-storage-manifests.service
 Requires=rke2lab-storage-manifests.service
 ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh
-ConditionPathExists=/srv/host/manifests.d/networking
+ConditionPathExists=/srv/host/rke2-manifests.d/networking
 
 [Service]
 Type=oneshot

@@ -121,7 +121,7 @@ spec:
         - source: manifests/src/main/resources/host/systemd-units
           target: /srv/host/systemd-units.d
         - source: rke2.d/<cluster>/<node>/manifests.d
-          target: /srv/host/manifests.d
+          target: /srv/host/rke2-manifests.d
         - source: rke2.d/<cluster>/<node>/environment
           target: /srv/host/rke2lab-environment.d
         - source: .local.d/var/kube

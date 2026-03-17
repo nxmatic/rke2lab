@@ -70,7 +70,7 @@ if [[ -z "${layer}" ]]; then
 fi
 
 layer="${layer%/}"
-base_dir="${RKE2LAB_MANIFESTS_DIR:-/srv/host/manifests.d}"
+base_dir="${RKE2LAB_MANIFESTS_DIR:-/srv/host/rke2-manifests.d}"
 src_dir="${base_dir}/${layer}"
 
 if [[ ! -d "${src_dir}" ]]; then

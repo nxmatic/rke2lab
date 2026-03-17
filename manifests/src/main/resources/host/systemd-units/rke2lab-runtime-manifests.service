@@ -7,7 +7,7 @@ Requires=rke2-server.service
 After=rke2lab-runtime-secrets.service
 Requires=rke2lab-runtime-secrets.service
 ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh
-ConditionPathExists=/srv/host/manifests.d/runtime/flox-containerd-shim
+ConditionPathExists=/srv/host/rke2-manifests.d/runtime/flox-containerd-shim
 
 [Service]
 Type=oneshot
