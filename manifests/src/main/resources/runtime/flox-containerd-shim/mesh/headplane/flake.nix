@@ -4,7 +4,7 @@
   inputs = {
     flake-commons.url = "github:nxmatic/nix-flake-commons/develop";
     nixpkgs.follows = "flake-commons/nixpkgs";
-    headplane.url = "github:tale/headplane";
+    headplane.url = "github:tale/headplane?ref=v0.6.2";
     headplane.inputs.flake-utils.follows = "flake-utils";
     headplane.inputs.nixpkgs.follows = "nixpkgs";
     flake-utils.follows = "flake-commons/flake-utils";
@@ -36,6 +36,22 @@
       defaultPackage = pkgs.headplane;
     })
     // {
-      overlays.default = headplane.overlays.default;
+      overlays.default = final: prev: let
+        upstream = headplane.overlays.default final prev;
+      in
+        upstream
+        // {
+          headplane =
+            if final.stdenv.hostPlatform.isDarwin
+            then
+              upstream.headplane.overrideAttrs (old: {
+                pnpmDeps = final.pnpm_10.fetchDeps {
+                  inherit (old) pname version src;
+                  hash = "sha256-oSlxe//0AUA9oIFA6piULkHcDnbc+MMVvfMcah9IoxM=";
+                  fetcherVersion = 1;
+                };
+              })
+            else upstream.headplane;
+        };
     };
 }

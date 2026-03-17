@@ -180,7 +180,8 @@ else
   exit 1
 fi
 
-CONTAINERD_VERSION="$(${CONTAINERD_BIN} --version | awk '{print $3}')"
+set -- $(${CONTAINERD_BIN} --version)
+CONTAINERD_VERSION="${3:-}"
 CONTAINERD_VERSION="${CONTAINERD_VERSION#v}"
 CONTAINERD_MAJOR="${CONTAINERD_VERSION%%.*}"
 if [[ -z "${CONTAINERD_MAJOR}" ]]; then
@@ -220,36 +221,36 @@ if [[ ! -f "${CONFIG_TEMPLATE}" ]]; then
 fi
 
 CONFIG_VERSION="$(detect_containerd_config_version "${CONFIG_FILE}")"
-if [[ "${CONFIG_VERSION}" == "3" ]]; then
-  RUNTIME_SECTION='plugins."io.containerd.cri.v1.runtime".containerd.runtimes.flox'
-else
-  RUNTIME_SECTION='plugins."io.containerd.grpc.v1.cri".containerd.runtimes.flox'
-fi
 
 update_config() {
   local target="$1"
   [[ -f "${target}" ]] || return 0
   local tmp
   tmp="$(mktemp)"
-  awk '
-    BEGIN {skip=0}
-    /^## Flox runtime shim/ {skip=1; next}
-    /^\[plugins\..*containerd\.runtimes\.flox/ {skip=1; next}
-    skip && /^\[/ && $0 !~ /containerd\.runtimes\.flox/ {skip=0}
-    skip {next}
-    {print}
-  ' "${target}" > "${tmp}"
+
+  if [[ "${CONFIG_VERSION}" == "3" ]]; then
+    yq -p toml -o toml '
+      del(.plugins."io.containerd.grpc.v1.cri".containerd.runtimes.flox)
+      | del(.plugins."io.containerd.cri.v1.runtime".containerd.runtimes.flox)
+      | .plugins."io.containerd.cri.v1.runtime".containerd.runtimes.flox.runtime_path = "/usr/local/bin/containerd-shim-flox-v2"
+      | .plugins."io.containerd.cri.v1.runtime".containerd.runtimes.flox.runtime_type = "io.containerd.runc.v2"
+      | .plugins."io.containerd.cri.v1.runtime".containerd.runtimes.flox.pod_annotations = ["flox.dev/*"]
+      | .plugins."io.containerd.cri.v1.runtime".containerd.runtimes.flox.container_annotations = ["flox.dev/*"]
+      | .plugins."io.containerd.cri.v1.runtime".containerd.runtimes.flox.options.SystemdCgroup = true
+    ' "${target}" > "${tmp}"
+  else
+    yq -p toml -o toml '
+      del(.plugins."io.containerd.cri.v1.runtime".containerd.runtimes.flox)
+      | del(.plugins."io.containerd.grpc.v1.cri".containerd.runtimes.flox)
+      | .plugins."io.containerd.grpc.v1.cri".containerd.runtimes.flox.runtime_path = "/usr/local/bin/containerd-shim-flox-v2"
+      | .plugins."io.containerd.grpc.v1.cri".containerd.runtimes.flox.runtime_type = "io.containerd.runc.v2"
+      | .plugins."io.containerd.grpc.v1.cri".containerd.runtimes.flox.pod_annotations = ["flox.dev/*"]
+      | .plugins."io.containerd.grpc.v1.cri".containerd.runtimes.flox.container_annotations = ["flox.dev/*"]
+      | .plugins."io.containerd.grpc.v1.cri".containerd.runtimes.flox.options.SystemdCgroup = true
+    ' "${target}" > "${tmp}"
+  fi
+
   mv "${tmp}" "${target}"
-  cat <<EOF_BLOCK | sed "s|__RUNTIME_SECTION__|${RUNTIME_SECTION}|" | sed 's/^          //' >> "${target}"
-## Flox runtime shim
-[__RUNTIME_SECTION__]
-  runtime_path = "/usr/local/bin/containerd-shim-flox-v2"
-  runtime_type = "io.containerd.runc.v2"
-  pod_annotations = [ "flox.dev/*" ]
-  container_annotations = [ "flox.dev/*" ]
-[__RUNTIME_SECTION__.options]
-  SystemdCgroup = true
-EOF_BLOCK
 }
 
 update_config "${CONFIG_FILE}"
