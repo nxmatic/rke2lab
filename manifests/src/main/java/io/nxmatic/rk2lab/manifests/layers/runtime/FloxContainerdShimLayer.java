@@ -133,7 +133,8 @@ public final class FloxContainerdShimLayer extends Construct {
 
         configMap.addDependency(namespace);
         configMap.addJsonPatch(JsonPatch.add("/data", Map.of(
-                                "shim-installer.sh", readResource("/runtime/flox-containerd-shim/shim-installer.sh")
+                                                                "shim-installer.sh", readResource("/runtime/flox-containerd-shim/shim-installer.sh"),
+                                                                "shim-installer-host.sh", readResource("/runtime/flox-containerd-shim/shim-installer-host.sh")
         )));
         return configMap;
     }
@@ -159,8 +160,8 @@ public final class FloxContainerdShimLayer extends Construct {
 
         configMap.addDependency(namespace);
         configMap.addJsonPatch(JsonPatch.add("/data", Map.of(
-                "rke2lab-flox-build.sh", readResource("/runtime/flox-container-build-assets/rke2lab-flox-build.sh"),
-                "rke2lab-flox-build.yaml", readResource("/runtime/flox-container-build-assets/rke2lab-flox-build.yaml")
+                "rke2lab-flox-build.sh", readResource("/runtime/flox-containerd-shim/rke2lab-flox-build.sh"),
+                "rke2lab-flox-build.yaml", readResource("/runtime/flox-containerd-shim/rke2lab-flox-build.yaml")
         )));
         return configMap;
     }
@@ -279,7 +280,7 @@ public final class FloxContainerdShimLayer extends Construct {
                                                         "set -euxo pipefail\n: \"Install bash and coreutils (GNU env) for script compatibility\"\napk add --no-cache bash coreutils\n\n: \"Run the shim installer script\"\n/scripts/shim-installer.sh\n"
                                                 },
                                                 "env", new Object[]{
-                                                        Map.of("name", "CONTAINERD_CONFIG_FILE", "value", "/var/lib/rancher/rke2/agent/etc/containerd/config.toml"),
+                                                        Map.of("name", "CONTAINERD_CONFIG_FILE", "value", "/var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml"),
                                                         Map.of("name", "CONTAINERD_ADDRESS", "value", "/run/k3s/containerd/containerd.sock")
                                                 },
                                                 "image", "alpine:3.20",

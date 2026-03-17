@@ -68,3 +68,13 @@ For `rke2lab-management-cluster`, the practical interpretation is:
 == Notes
 
 This file is intentionally a curated import rather than verbatim duplication of all historical documents. The source files listed above remain valuable provenance, while this document captures what is actively carried forward as architecture intent.
+
+=== Next-stage migration note
+
+For upcoming stages, progressively migrate host-mutating `host/systemd-units` workflows into Kubernetes init-container flows that execute via `nsenter` on host namespaces/filesystems.
+
+Constraints to preserve during this migration:
+
+* keep one canonical owner per workflow (no parallel systemd+init implementations)
+* keep behavior idempotent and deterministic across reruns
+* avoid introducing backward-compatibility aliases unless explicitly requested
