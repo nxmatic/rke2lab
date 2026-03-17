@@ -53,43 +53,128 @@ public final class Main {
     }
 
     void execute(String[] args) {
-        buildCommand(args).run();
+        resolveCommand(args).run();
     }
 
-    private Runnable buildCommand(String[] args) {
+    private CliCommand resolveCommand(String[] args) {
         if (args.length == 0) {
-            return new SynthesizeCommand.Builder(this).request(ManifestSynthesisRequest.fromSystemProperties()).build();
+            return commandOf(new HelpCommand.Builder(this).commands(availableCommands()));
         }
 
         final String command = args[0];
         switch (command) {
+        case "help", "--help", "-h" -> {
+            return commandOf(new HelpCommand.Builder(this).commands(availableCommands()));
+        }
         case "synthesize" -> {
-            return new SynthesizeCommand.Builder(this).request(ManifestSynthesisRequest.fromSystemProperties()).build();
+            return commandOf(new SynthesizeCommand.Builder(this)
+                    .request(ManifestSynthesisRequest.fromSystemProperties()));
         }
         case "shim-build" -> {
             final String mode = args.length > 1 ? args[1] : "guest";
             final Path descriptor = args.length > 2 ? Paths.get(args[2]) : null;
-            return new ShimBuildCommand.Builder(this).mode(mode).descriptor(descriptor).build();
+            return commandOf(new ShimBuildCommand.Builder(this)
+                    .invocationName("shim-build")
+                    .description("Build shim packages from descriptor")
+                    .usage("shim-build [host|guest] [descriptor-file]")
+                    .mode(mode)
+                    .descriptor(descriptor));
         }
         case "nix-flake-update" -> {
             final String mode = args.length > 1 ? args[1] : "guest";
             final Path descriptor = args.length > 2 ? Paths.get(args[2]) : null;
-            return new ShimBuildCommand.Builder(this)
+            return commandOf(new ShimBuildCommand.Builder(this)
+                    .invocationName("nix-flake-update")
+                    .description("Update flake locks only (skip package builds)")
+                    .usage("nix-flake-update [host|guest] [descriptor-file]")
                     .mode(mode)
                     .descriptor(descriptor)
-                    .lockOnly(true)
-                    .build();
+                    .lockOnly(true));
         }
         case "materialize-shim-assets" -> {
             final Path outputDir = args.length > 1 ? Paths.get(args[1]) : Paths.get(".");
-            return new MaterializeShimAssetsCommand.Builder(this).outputDir(outputDir).assets(SHIM_ASSETS).build();
+            return commandOf(new MaterializeShimAssetsCommand.Builder(this).outputDir(outputDir).assets(SHIM_ASSETS));
         }
         default -> throw new IllegalArgumentException(
-                "Unknown command: " + command + ". Supported commands: synthesize, shim-build, nix-flake-update, materialize-shim-assets");
+                "Unknown command: " + command + ". Run with 'help' for available commands.");
         }
     }
 
-    private final class ShimBuildCommand implements Runnable {
+    private List<CliCommand> availableCommands() {
+        return List.of(
+                commandOf(new SynthesizeCommand.Builder(this)
+                        .request(ManifestSynthesisRequest.fromSystemProperties())),
+                commandOf(new ShimBuildCommand.Builder(this)
+                        .invocationName("shim-build")
+                        .description("Build shim packages from descriptor")
+                        .usage("shim-build [host|guest] [descriptor-file]")),
+                commandOf(new ShimBuildCommand.Builder(this)
+                        .invocationName("nix-flake-update")
+                        .description("Update flake locks only (skip package builds)")
+                        .usage("nix-flake-update [host|guest] [descriptor-file]")
+                        .lockOnly(true)),
+                commandOf(new MaterializeShimAssetsCommand.Builder(this).outputDir(Paths.get(".")).assets(SHIM_ASSETS)),
+                commandOf(new HelpCommand.Builder(this).commands(List.of())));
+    }
+
+    private final class HelpCommand implements CliCommand {
+
+        private final List<CliCommand> commands;
+
+        @SuppressWarnings("unused")
+        HelpCommand(Builder builder) {
+            this.commands = builder.commands;
+        }
+
+        @Override
+        public String name() {
+            return "help";
+        }
+
+        @Override
+        public String description() {
+            return "Show available commands and usage";
+        }
+
+        @Override
+        public String usage() {
+            return "help";
+        }
+
+        @Override
+        public void run() {
+            logger.info("Usage: rke2lab-manifests <command> [args]");
+            logger.info("Available commands:");
+            for (CliCommand command : commands) {
+                logger.info("{}", String.format("  %-24s %s", command.usage(), command.description()));
+            }
+        }
+
+        static final class Builder implements CommandBuilder<HelpCommand> {
+            private final Main main;
+
+            private List<CliCommand> commands = List.of();
+
+            Builder(Main main) {
+                this.main = main;
+            }
+
+            Builder commands(List<CliCommand> commands) {
+                this.commands = List.copyOf(commands);
+                return this;
+            }
+
+            public HelpCommand build() {
+                return main.commandOf(this);
+            }
+
+            public Class<HelpCommand> commandClass() {
+                return HelpCommand.class;
+            }
+        }
+    }
+
+    private final class ShimBuildCommand implements CliCommand {
 
         private static final Path WORKTREE_SHIM_ASSETS_RELATIVE_PATH =
             Paths.get("manifests", "src", "main", "resources", "runtime", "flox-containerd-shim");
@@ -100,11 +185,35 @@ public final class Main {
 
         private final boolean lockOnly;
 
+        private final String invocationName;
+
+        private final String description;
+
+        private final String usage;
+
         @SuppressWarnings("unused")
         ShimBuildCommand(Builder builder) {
             this.mode = builder.mode;
             this.descriptor = builder.descriptor;
             this.lockOnly = builder.lockOnly;
+            this.invocationName = builder.invocationName;
+            this.description = builder.description;
+            this.usage = builder.usage;
+        }
+
+        @Override
+        public String name() {
+            return invocationName;
+        }
+
+        @Override
+        public String description() {
+            return description;
+        }
+
+        @Override
+        public String usage() {
+            return usage;
         }
 
         @Override
@@ -240,6 +349,12 @@ public final class Main {
 
             private boolean lockOnly;
 
+            private String invocationName = "shim-build";
+
+            private String description = "Build shim packages from descriptor";
+
+            private String usage = "shim-build [host|guest] [descriptor-file]";
+
             Builder(Main main) {
                 this.main = main;
             }
@@ -259,6 +374,21 @@ public final class Main {
                 return this;
             }
 
+            Builder invocationName(String invocationName) {
+                this.invocationName = invocationName;
+                return this;
+            }
+
+            Builder description(String description) {
+                this.description = description;
+                return this;
+            }
+
+            Builder usage(String usage) {
+                this.usage = usage;
+                return this;
+            }
+
             public ShimBuildCommand build() {
                 return main.commandOf(this);
             }
@@ -269,13 +399,28 @@ public final class Main {
         }
     }
 
-    private final class SynthesizeCommand implements Runnable {
+    private final class SynthesizeCommand implements CliCommand {
 
         final ManifestSynthesisRequest request;
 
         @SuppressWarnings("unused")
         SynthesizeCommand(Builder builder) {
             this.request = builder.request;
+        }
+
+        @Override
+        public String name() {
+            return "synthesize";
+        }
+
+        @Override
+        public String description() {
+            return "Run manifest synthesis with system-property request settings";
+        }
+
+        @Override
+        public String usage() {
+            return "synthesize";
         }
 
         @Override
@@ -330,7 +475,7 @@ public final class Main {
         }
     }
 
-    private final class MaterializeShimAssetsCommand implements Runnable {
+    private final class MaterializeShimAssetsCommand implements CliCommand {
 
         final Path outputDir;
 
@@ -340,6 +485,21 @@ public final class Main {
         MaterializeShimAssetsCommand(Builder builder) {
             this.outputDir = builder.outputDir;
             this.assets = builder.assets;
+        }
+
+        @Override
+        public String name() {
+            return "materialize-shim-assets";
+        }
+
+        @Override
+        public String description() {
+            return "Materialize embedded shim assets to a local directory";
+        }
+
+        @Override
+        public String usage() {
+            return "materialize-shim-assets [output-dir]";
         }
 
         @Override
@@ -424,6 +584,14 @@ public final class Main {
             }
             return commandClass().cast(command);
         }
+    }
+
+    interface CliCommand extends Runnable {
+        String name();
+
+        String description();
+
+        String usage();
     }
 
     public <T extends Runnable> T commandOf(CommandBuilder<T> builder) {
