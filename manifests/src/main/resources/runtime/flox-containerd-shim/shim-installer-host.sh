@@ -98,6 +98,9 @@ refresh_flox_shim_packages_commit
 
 "${FLOX_BUILD_SCRIPT}" "host" "${FLOX_BUILD_DESCRIPTOR}"
 
+# Builder may refresh flake.lock files; commit resulting package-set updates.
+refresh_flox_shim_packages_commit
+
 : "Resolve containerd config and template files"
 resolve_containerd_config() {
   local configured="${CONTAINERD_CONFIG_FILE:-}"

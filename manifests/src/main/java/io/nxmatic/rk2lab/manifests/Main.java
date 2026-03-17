@@ -9,97 +9,456 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.io.File;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.List;
-import java.util.Set;
 import java.util.ServiceLoader;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 public final class Main {
 
-    private static final Logger LOG = LoggerFactory.getLogger(Main.class);
-    private static final List<EmbeddedAsset> SHIM_ASSETS = List.of(
-            new EmbeddedAsset("/runtime/flox-containerd-shim/flox-shim-build.sh", "flox-shim-build.sh", true),
-            new EmbeddedAsset("/runtime/flox-containerd-shim/flox-shim-build.yaml", "flox-shim-build.yaml", false),
-            new EmbeddedAsset("/runtime/flox-containerd-shim/shim-installer.sh", "shim-installer.sh", true),
-            new EmbeddedAsset("/runtime/flox-containerd-shim/shim-installer-host.sh", "shim-installer-host.sh", true),
-            new EmbeddedAsset("/runtime/flox-containerd-shim/mesh/headplane/flake.nix", "mesh/headplane/flake.nix", false),
-            new EmbeddedAsset("/runtime/flox-containerd-shim/networking/kdns/flake.nix", "networking/kdns/flake.nix", false)
-    );
+    private final Logger logger = LoggerFactory.getLogger(Main.class);
+
+    private Main() {
+    }
+
+    private static final List<MaterializeShimAssetsCommand.EmbeddedAsset> SHIM_ASSETS = List.of(
+            new MaterializeShimAssetsCommand.EmbeddedAsset("/runtime/flox-containerd-shim/flox-shim-build.sh",
+                    "flox-shim-build.sh", true),
+            new MaterializeShimAssetsCommand.EmbeddedAsset("/runtime/flox-containerd-shim/flox-shim-build.yaml",
+                    "flox-shim-build.yaml", false),
+            new MaterializeShimAssetsCommand.EmbeddedAsset("/runtime/flox-containerd-shim/shim-installer.sh",
+                    "shim-installer.sh", true),
+            new MaterializeShimAssetsCommand.EmbeddedAsset("/runtime/flox-containerd-shim/shim-installer-host.sh",
+                    "shim-installer-host.sh", true),
+            new MaterializeShimAssetsCommand.EmbeddedAsset("/runtime/flox-containerd-shim/mesh/headplane/flake.nix",
+                    "mesh/headplane/flake.nix", false),
+            new MaterializeShimAssetsCommand.EmbeddedAsset("/runtime/flox-containerd-shim/networking/kdns/flake.nix",
+                    "networking/kdns/flake.nix", false));
 
     public static void main(String[] args) throws IOException {
-        if (args.length > 0) {
-            final String command = args[0];
-            if ("materialize-shim-assets".equals(command)) {
-                final Path outputDir = args.length > 1
-                        ? Paths.get(args[1])
-                        : Paths.get(".");
-                materializeShimAssets(outputDir);
-                return;
-            }
-            throw new IllegalArgumentException("Unknown command: " + command
-                    + ". Supported commands: materialize-shim-assets");
+        try {
+            new Main().execute(args);
+        } catch (UncheckedIOException ex) {
+            throw ex.getCause();
         }
-
-        final ManifestSynthesisService synthesisService = loadRequiredSingleProvider();
-        final ManifestSynthesisResult result = synthesisService.synthesize(ManifestSynthesisRequest.fromSystemProperties());
-        LOG.info("Manifest synthesis completed by provider '{}'", synthesisService.providerId());
-        LOG.info("Consolidated manifest output written to {}", result.manifestFile());
     }
 
-    private static void materializeShimAssets(Path outputDir) throws IOException {
-        final Path normalizedOutputDir = outputDir.toAbsolutePath().normalize();
-        Files.createDirectories(normalizedOutputDir);
+    void execute(String[] args) {
+        buildCommand(args).run();
+    }
 
-        for (EmbeddedAsset asset : SHIM_ASSETS) {
-            final Path targetPath = normalizedOutputDir.resolve(asset.relativePath()).normalize();
-            Files.createDirectories(targetPath.getParent());
+    private Runnable buildCommand(String[] args) {
+        if (args.length == 0) {
+            return new SynthesizeCommand.Builder(this).request(ManifestSynthesisRequest.fromSystemProperties()).build();
+        }
 
-            try (InputStream in = Main.class.getResourceAsStream(asset.classpathResource())) {
-                if (in == null) {
-                    throw new IllegalStateException("Missing embedded resource: " + asset.classpathResource());
+        final String command = args[0];
+        switch (command) {
+        case "synthesize" -> {
+            return new SynthesizeCommand.Builder(this).request(ManifestSynthesisRequest.fromSystemProperties()).build();
+        }
+        case "shim-build" -> {
+            final String mode = args.length > 1 ? args[1] : "guest";
+            final Path descriptor = args.length > 2 ? Paths.get(args[2]) : null;
+            return new ShimBuildCommand.Builder(this).mode(mode).descriptor(descriptor).build();
+        }
+        case "nix-flake-update" -> {
+            final String mode = args.length > 1 ? args[1] : "guest";
+            final Path descriptor = args.length > 2 ? Paths.get(args[2]) : null;
+            return new ShimBuildCommand.Builder(this)
+                    .mode(mode)
+                    .descriptor(descriptor)
+                    .lockOnly(true)
+                    .build();
+        }
+        case "materialize-shim-assets" -> {
+            final Path outputDir = args.length > 1 ? Paths.get(args[1]) : Paths.get(".");
+            return new MaterializeShimAssetsCommand.Builder(this).outputDir(outputDir).assets(SHIM_ASSETS).build();
+        }
+        default -> throw new IllegalArgumentException(
+                "Unknown command: " + command + ". Supported commands: synthesize, shim-build, nix-flake-update, materialize-shim-assets");
+        }
+    }
+
+    private final class ShimBuildCommand implements Runnable {
+
+        private static final Path WORKTREE_SHIM_ASSETS_RELATIVE_PATH =
+            Paths.get("manifests", "src", "main", "resources", "runtime", "flox-containerd-shim");
+
+        private final String mode;
+
+        private final Path descriptor;
+
+        private final boolean lockOnly;
+
+        @SuppressWarnings("unused")
+        ShimBuildCommand(Builder builder) {
+            this.mode = builder.mode;
+            this.descriptor = builder.descriptor;
+            this.lockOnly = builder.lockOnly;
+        }
+
+        @Override
+        public void run() {
+            if (!"host".equals(mode) && !"guest".equals(mode)) {
+                throw new IllegalArgumentException("Unsupported shim-build mode: " + mode + ". Supported modes: host, guest");
+            }
+
+            try {
+                final Path scriptRoot = lockOnly
+                    ? resolveWorktreeShimAssetsRoot()
+                    : materializeShimAssetsToTemporaryRoot();
+
+                final Path buildScript = scriptRoot.resolve("flox-shim-build.sh");
+                if (!Files.isRegularFile(buildScript)) {
+                    throw new IllegalStateException("Shim build script not found at: " + buildScript);
                 }
-                Files.copy(in, targetPath, StandardCopyOption.REPLACE_EXISTING);
+
+                final Path descriptorPath = (descriptor == null ? scriptRoot.resolve("flox-shim-build.yaml") : descriptor)
+                    .toAbsolutePath()
+                    .normalize();
+                final String bashInterpreter = resolveBashInterpreter();
+
+                logger.info("Running shim-build in mode '{}' using descriptor {}", mode, descriptorPath);
+                logger.info("Using bash interpreter for shim-build: {}", bashInterpreter);
+                if (lockOnly) {
+                    logger.info("Lock-only mode enabled for shim-build; package builds will be skipped.");
+                }
+
+                final ProcessBuilder processBuilder = new ProcessBuilder(
+                    bashInterpreter,
+                    buildScript.toString(),
+                        mode,
+                        descriptorPath.toString())
+                                .directory(scriptRoot.toFile())
+                                .inheritIO();
+
+                if (lockOnly) {
+                    processBuilder.environment().put("FLOX_SHIM_UPDATE_LOCKS", "true");
+                    processBuilder.environment().put("FLOX_SHIM_ONLY_UPDATE_LOCKS", "true");
+                }
+
+                final Process process = processBuilder.start();
+
+                final int exitCode = process.waitFor();
+                if (exitCode != 0) {
+                    throw new IllegalStateException("shim-build failed with exit code " + exitCode);
+                }
+            } catch (IOException ex) {
+                throw new UncheckedIOException(ex);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("shim-build was interrupted", ex);
+            }
+        }
+
+        private Path materializeShimAssetsToTemporaryRoot() throws IOException {
+            final Path workDir = Files.createTempDirectory("rke2lab-flox-shim-build-")
+                    .toRealPath()
+                    .normalize();
+            new MaterializeShimAssetsCommand.Builder(Main.this).outputDir(workDir).assets(SHIM_ASSETS).build().run();
+            return workDir;
+        }
+
+        private Path resolveWorktreeShimAssetsRoot() {
+            final Path cwd = Paths.get("").toAbsolutePath().normalize();
+            Path current = cwd;
+            while (current != null) {
+                final Path candidate = current.resolve(WORKTREE_SHIM_ASSETS_RELATIVE_PATH).normalize();
+                if (Files.isDirectory(candidate) && Files.isRegularFile(candidate.resolve("flox-shim-build.sh"))) {
+                    logger.info("Using worktree shim assets for lock update: {}", candidate);
+                    return candidate;
+                }
+                current = current.getParent();
             }
 
-            if (asset.executable()) {
-                try {
-                    Files.setPosixFilePermissions(targetPath, Set.of(
-                            PosixFilePermission.OWNER_READ,
-                            PosixFilePermission.OWNER_WRITE,
-                            PosixFilePermission.OWNER_EXECUTE,
-                            PosixFilePermission.GROUP_READ,
-                            PosixFilePermission.GROUP_EXECUTE,
-                            PosixFilePermission.OTHERS_READ,
-                            PosixFilePermission.OTHERS_EXECUTE));
-                } catch (UnsupportedOperationException ex) {
-                    // Non-POSIX filesystem; best effort only.
+                throw new IllegalStateException("Unable to locate worktree shim assets at relative path '"
+                    + WORKTREE_SHIM_ASSETS_RELATIVE_PATH
+                    + "' from current working directory: "
+                    + cwd);
+        }
+
+        private String resolveBashInterpreter() {
+            final String override = System.getenv("RK2LAB_SHIM_BASH");
+            if (override != null && !override.isBlank()) {
+                return override;
+            }
+
+            if (isExecutableOnPath("bash")) {
+                return "bash";
+            }
+
+            final List<Path> candidates = List.of(
+                    Paths.get("/run/current-system/sw/bin/bash"),
+                    Paths.get("/opt/homebrew/bin/bash"),
+                    Paths.get("/usr/local/bin/bash"),
+                    Paths.get("/bin/bash"));
+
+            for (Path candidate : candidates) {
+                if (Files.isRegularFile(candidate) && Files.isExecutable(candidate)) {
+                    return candidate.toString();
                 }
             }
+
+            return "bash";
         }
 
-        LOG.info("Materialized {} shim assets to {}", SHIM_ASSETS.size(), normalizedOutputDir);
+        private boolean isExecutableOnPath(String executableName) {
+            final String path = System.getenv("PATH");
+            if (path == null || path.isBlank()) {
+                return false;
+            }
+
+            for (String pathEntry : path.split(Pattern.quote(File.pathSeparator))) {
+                if (pathEntry == null || pathEntry.isBlank()) {
+                    continue;
+                }
+                final Path candidate = Paths.get(pathEntry, executableName);
+                if (Files.isRegularFile(candidate) && Files.isExecutable(candidate)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        static final class Builder implements CommandBuilder<ShimBuildCommand> {
+            private final Main main;
+
+            private String mode = "guest";
+
+            private Path descriptor;
+
+            private boolean lockOnly;
+
+            Builder(Main main) {
+                this.main = main;
+            }
+
+            Builder mode(String mode) {
+                this.mode = mode;
+                return this;
+            }
+
+            Builder descriptor(Path descriptor) {
+                this.descriptor = descriptor;
+                return this;
+            }
+
+            Builder lockOnly(boolean lockOnly) {
+                this.lockOnly = lockOnly;
+                return this;
+            }
+
+            public ShimBuildCommand build() {
+                return main.commandOf(this);
+            }
+
+            public Class<ShimBuildCommand> commandClass() {
+                return ShimBuildCommand.class;
+            }
+        }
     }
 
-    private static ManifestSynthesisService loadRequiredSingleProvider() {
-        final List<ManifestSynthesisService> providers = ServiceLoader.load(ManifestSynthesisService.class)
-                .stream()
-                .map(ServiceLoader.Provider::get)
-                .toList();
-        if (providers.isEmpty()) {
-            throw new IllegalStateException("No ManifestSynthesisService provider found via ServiceLoader.");
+    private final class SynthesizeCommand implements Runnable {
+
+        final ManifestSynthesisRequest request;
+
+        @SuppressWarnings("unused")
+        SynthesizeCommand(Builder builder) {
+            this.request = builder.request;
         }
-        if (providers.size() > 1) {
-            throw new IllegalStateException("Expected exactly one ManifestSynthesisService provider, found "
-                    + providers.size() + ": "
-                    + providers.stream().map(ManifestSynthesisService::providerId).toList());
+
+        @Override
+        public void run() {
+            try {
+                final ManifestSynthesisService synthesisService = loadService();
+                final ManifestSynthesisResult result = synthesisService.synthesize(request);
+                logger.info("Manifest synthesis completed by provider '{}'", synthesisService.providerId());
+                logger.info("Consolidated manifest output written to {}", result.manifestFile());
+            } catch (IOException ex) {
+                throw new UncheckedIOException(ex);
+            }
         }
-        return providers.getFirst();
+
+        ManifestSynthesisService loadService() {
+            final List<ManifestSynthesisService> providers = ServiceLoader.load(ManifestSynthesisService.class)
+                                                                          .stream()
+                                                                          .map(ServiceLoader.Provider::get)
+                                                                          .toList();
+            if (providers.isEmpty()) {
+                throw new IllegalStateException("No ManifestSynthesisService provider found via ServiceLoader.");
+            }
+            if (providers.size() > 1) {
+                throw new IllegalStateException(
+                        "Expected exactly one ManifestSynthesisService provider, found " + providers.size() + ": "
+                                + providers.stream().map(ManifestSynthesisService::providerId).toList());
+            }
+            return providers.getFirst();
+        }
+
+        static final class Builder implements CommandBuilder<SynthesizeCommand> {
+            private final Main main;
+
+            Builder(Main main) {
+                this.main = main;
+            }
+
+            private ManifestSynthesisRequest request = ManifestSynthesisRequest.fromSystemProperties();
+
+            Builder request(ManifestSynthesisRequest request) {
+                this.request = request;
+                return this;
+            }
+
+            public SynthesizeCommand build() {
+                return main.commandOf(this);
+            }
+
+            public Class<SynthesizeCommand> commandClass() {
+                return SynthesizeCommand.class;
+            }
+        }
     }
 
-    private record EmbeddedAsset(String classpathResource, String relativePath, boolean executable) {
+    private final class MaterializeShimAssetsCommand implements Runnable {
+
+        final Path outputDir;
+
+        final List<EmbeddedAsset> assets;
+
+        @SuppressWarnings("unused")
+        MaterializeShimAssetsCommand(Builder builder) {
+            this.outputDir = builder.outputDir;
+            this.assets = builder.assets;
+        }
+
+        @Override
+        public void run() {
+            try {
+                final Path normalizedOutputDir = outputDir.toAbsolutePath().normalize();
+                Files.createDirectories(normalizedOutputDir);
+
+                for (EmbeddedAsset asset : assets) {
+                    final Path targetPath = normalizedOutputDir.resolve(asset.relativePath()).normalize();
+                    Files.createDirectories(targetPath.getParent());
+
+                    try (InputStream in = Main.class.getResourceAsStream(asset.classpathResource())) {
+                        if (in == null) {
+                            throw new IllegalStateException("Missing embedded resource: " + asset.classpathResource());
+                        }
+                        Files.copy(in, targetPath, StandardCopyOption.REPLACE_EXISTING);
+                    }
+
+                    if (asset.executable()) {
+                        try {
+                            Files.setPosixFilePermissions(targetPath,
+                                    Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE,
+                                            PosixFilePermission.OWNER_EXECUTE, PosixFilePermission.GROUP_READ,
+                                            PosixFilePermission.GROUP_EXECUTE, PosixFilePermission.OTHERS_READ,
+                                            PosixFilePermission.OTHERS_EXECUTE));
+                        } catch (UnsupportedOperationException ex) {
+                            // Non-POSIX filesystem; best effort only.
+                        }
+                    }
+                }
+
+                logger.info("Materialized {} shim assets to {}", assets.size(), normalizedOutputDir);
+            } catch (IOException ex) {
+                throw new UncheckedIOException(ex);
+            }
+        }
+
+        static final class Builder implements CommandBuilder<MaterializeShimAssetsCommand> {
+            private final Main main;
+
+            private Path outputDir = Paths.get(".");
+
+            private List<EmbeddedAsset> assets = List.of();
+
+            Builder(Main main) {
+                this.main = main;
+            }
+
+            Builder outputDir(Path outputDir) {
+                this.outputDir = outputDir;
+                return this;
+            }
+
+            Builder assets(List<EmbeddedAsset> assets) {
+                this.assets = List.copyOf(assets);
+                return this;
+            }
+
+            public MaterializeShimAssetsCommand build() {
+                return main.commandOf(this);
+            }
+
+            public Class<MaterializeShimAssetsCommand> commandClass() {
+                return MaterializeShimAssetsCommand.class;
+            }
+        }
+
+        private record EmbeddedAsset(String classpathResource, String relativePath, boolean executable) {
+        }
     }
+
+    interface CommandBuilder<T extends Runnable> {
+        Class<T> commandClass();
+
+        Runnable build();
+
+        default T cast(Runnable command) {
+            if (!commandClass().isInstance(command)) {
+                throw new IllegalArgumentException("Expected command of type " + commandClass().getName() + ", got "
+                        + command.getClass().getName());
+            }
+            return commandClass().cast(command);
+        }
+    }
+
+    public <T extends Runnable> T commandOf(CommandBuilder<T> builder) {
+        try {
+            final Constructor<T> constructor = findCommandConstructor(builder);
+            constructor.setAccessible(true);
+            return builder.cast(constructor.getParameterCount() == 2 ? constructor.newInstance(this, builder)
+                    : constructor.newInstance(builder));
+        } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | IllegalArgumentException
+                | InvocationTargetException e) {
+            throw new RuntimeException("Failed to build command of type " + builder.commandClass().getName(), e);
+        }
+    }
+
+    private <T extends Runnable> Constructor<T> findCommandConstructor(CommandBuilder<T> builder)
+            throws NoSuchMethodException {
+        final Class<T> commandType = builder.commandClass();
+        final Class<?> builderType = builder.getClass();
+        for (Constructor<?> candidate : commandType.getDeclaredConstructors()) {
+            final Class<?>[] parameterTypes = candidate.getParameterTypes();
+            if (parameterTypes.length == 2 && parameterTypes[0].equals(Main.class)
+                    && parameterTypes[1].isAssignableFrom(builderType)) {
+                @SuppressWarnings("unchecked")
+                final Constructor<T> constructor = (Constructor<T>) candidate;
+                return constructor;
+            }
+            if (parameterTypes.length == 1 && parameterTypes[0].isAssignableFrom(builderType)) {
+                @SuppressWarnings("unchecked")
+                final Constructor<T> constructor = (Constructor<T>) candidate;
+                return constructor;
+            }
+        }
+
+        throw new NoSuchMethodException("No suitable constructor found for " + commandType.getName()
+                + " with builder type " + builderType.getName());
+    }
+
 }

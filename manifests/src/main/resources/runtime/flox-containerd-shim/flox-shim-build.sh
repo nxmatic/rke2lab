@@ -4,8 +4,7 @@ set -exuo pipefail
 # Flox shim package build script
 # Builds packages from local packaged flakes defined in YAML descriptor
 # Usage: flox-shim-build.sh [mode] [descriptor file]
-
-source <(flox activate --dir /var/lib/rancher/rke2)
+# Set FLOX_SHIM_ONLY_UPDATE_LOCKS=true to refresh flake.lock files only.
 
 SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR="${SCRIPT_PATH%/*}"
@@ -15,6 +14,27 @@ fi
 SCRIPT_BASENAME="$(basename "${SCRIPT_PATH}")"
 SCRIPT_STEM="${SCRIPT_BASENAME%.sh}"
 WORKTREE_MODE="${FLOX_SHIM_MODE:-guest}"
+
+canonicalize_existing_path() {
+	local input_path="$1"
+	if [[ ! -e "${input_path}" ]]; then
+		echo "${input_path}"
+		return 0
+	fi
+
+	if [[ -d "${input_path}" ]]; then
+		(
+			cd "${input_path}"
+			pwd -P
+		)
+		return 0
+	fi
+
+	local input_dir input_base
+	input_dir="$(dirname "${input_path}")"
+	input_base="$(basename "${input_path}")"
+	echo "$(cd "${input_dir}" && pwd -P)/${input_base}"
+}
 
 if [[ $# -gt 0 ]]; then
 	case "${1}" in
@@ -26,11 +46,14 @@ if [[ $# -gt 0 ]]; then
 fi
 
 BUILDS_DESCRIPTOR="${1:-${SCRIPT_DIR}/${SCRIPT_STEM}.yaml}"
+BUILDS_DESCRIPTOR="$(canonicalize_existing_path "${BUILDS_DESCRIPTOR}")"
 BUILDS_DESCRIPTOR_DIR="$(dirname "${BUILDS_DESCRIPTOR}")"
+BUILDS_DESCRIPTOR_DIR="$(canonicalize_existing_path "${BUILDS_DESCRIPTOR_DIR}")"
 
 # Environment variables
 RKE2LAB_ROOT="${RKE2LAB_ROOT:-/srv/host}"
 GIT_WORKDIR="${GIT_WORKDIR:-${RKE2LAB_ROOT}/git}"
+UPDATED_FLAKE_LOCK_DIRS=""
 
 validate_worktree_mode() {
 	case "${WORKTREE_MODE}" in
@@ -47,6 +70,126 @@ validate_worktree_mode() {
 	esac
 }
 
+find_flox_activation_dir() {
+	local -a candidates=()
+
+	if [[ -n "${FLOX_SHIM_ENV_DIR:-}" ]]; then
+		candidates+=("${FLOX_SHIM_ENV_DIR}")
+	fi
+
+	if [[ "${WORKTREE_MODE}" == "host" ]]; then
+		candidates+=("/var/lib/rancher/rke2")
+	fi
+
+	candidates+=(
+		"/var/lib/git/nxmatic/rke2lab"
+		"/srv/host/git/nxmatic/rke2lab"
+	)
+
+	local candidate
+	for candidate in "${candidates[@]}"; do
+		[[ -n "${candidate}" ]] || continue
+		[[ -d "${candidate}" ]] || continue
+		if [[ -d "${candidate}/.flox" || -f "${candidate}/flake.nix" ]]; then
+			echo "${candidate}"
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+activate_flox_environment() {
+	if ! command -v flox >/dev/null 2>&1; then
+		: "[WARN] flox command is unavailable; continuing with existing shell environment"
+		return 0
+	fi
+
+	local activation_dir
+	if ! activation_dir="$(find_flox_activation_dir)"; then
+		: "[WARN] No Flox activation directory found for mode '${WORKTREE_MODE}'; continuing with existing shell environment"
+		return 0
+	fi
+
+	if source <(flox activate --dir "${activation_dir}"); then
+		: "[$(date)] Activated Flox environment from: ${activation_dir}"
+		return 0
+	fi
+
+	: "[WARN] Failed to activate Flox environment from '${activation_dir}'; continuing with existing shell environment"
+	return 0
+}
+
+is_flake_lock_refreshed() {
+	local resolved_path="$1"
+	[[ $'\n'"${UPDATED_FLAKE_LOCK_DIRS}"$'\n' == *$'\n'"${resolved_path}"$'\n'* ]]
+}
+
+mark_flake_lock_refreshed() {
+	local resolved_path="$1"
+	UPDATED_FLAKE_LOCK_DIRS="${UPDATED_FLAKE_LOCK_DIRS}"$'\n'"${resolved_path}"
+}
+
+resolve_user_log_root() {
+	if [[ -n "${XDG_STATE_HOME:-}" ]]; then
+		echo "${XDG_STATE_HOME}/rke2lab"
+		return 0
+	fi
+
+	if [[ -n "${HOME:-}" ]]; then
+		echo "${HOME}/.local/state/rke2lab"
+		return 0
+	fi
+
+	echo "/tmp/rke2lab"
+}
+
+ensure_directory_writable() {
+	local dir_path="$1"
+	mkdir -p "${dir_path}" 2>/dev/null || return 1
+	[[ -w "${dir_path}" ]]
+}
+
+resolve_log_file_path() {
+	local requested_log_file="${1-}"
+	local job_name="${2-unnamed-job}"
+	local log_basename="rke2-${job_name}-build.log"
+
+	if [[ -n "${requested_log_file}" ]]; then
+		local requested_basename
+		requested_basename="$(basename "${requested_log_file}")"
+		if [[ -n "${requested_basename}" ]]; then
+			log_basename="${requested_basename}"
+		fi
+	fi
+
+	if [[ -n "${requested_log_file}" ]]; then
+		local requested_dir
+		requested_dir="$(dirname "${requested_log_file}")"
+		if ensure_directory_writable "${requested_dir}"; then
+			local resolved_system_log
+			resolved_system_log="$(canonicalize_existing_path "${requested_log_file}")"
+			: "[$(date)] [${job_name}] Log scope: system-wide (${resolved_system_log})"
+			echo "${resolved_system_log}"
+			return 0
+		fi
+	fi
+
+	local user_log_root
+	user_log_root="$(resolve_user_log_root)"
+	if ensure_directory_writable "${user_log_root}"; then
+		local resolved_user_log
+		resolved_user_log="$(canonicalize_existing_path "${user_log_root}")/${log_basename}"
+		: "[$(date)] [${job_name}] Log scope: user-wide XDG (${resolved_user_log})"
+		echo "${resolved_user_log}"
+		return 0
+	fi
+
+	local tmp_log="/tmp/${log_basename}"
+	: "[$(date)] [${job_name}] Log scope: user fallback (${tmp_log})"
+	echo "${tmp_log}"
+}
+
 : "[$(date)] Starting flox shim package builds from descriptor: ${BUILDS_DESCRIPTOR}"
 
 # Check if descriptor exists
@@ -55,22 +198,19 @@ if [[ ! -f "${BUILDS_DESCRIPTOR}" ]]; then
 	exit 1
 fi
 
-# Check if yq is available
-if ! command -v yq &>/dev/null; then
-	: "[ERROR] yq not found. Please install yq to parse YAML descriptor"
-	exit 1
-fi
-
 # Resolve local flake path from descriptor directory when relative
 resolve_flake_path() {
 	local flake_path="$1"
+	local resolved_path
 
 	if [[ "${flake_path}" == /* ]]; then
-		echo "${flake_path}"
-		return 0
+		resolved_path="${flake_path}"
+	else
+		resolved_path="${BUILDS_DESCRIPTOR_DIR}/${flake_path}"
 	fi
 
-	echo "${BUILDS_DESCRIPTOR_DIR}/${flake_path}"
+	echo "$(canonicalize_existing_path "${resolved_path}")"
+	return 0
 }
 
 resolve_kdns_src_worktree() {
@@ -100,6 +240,7 @@ resolve_kdns_src_worktree() {
 	local candidate
 	for candidate in "${candidates[@]}"; do
 		[[ -n "${candidate}" ]] || continue
+		candidate="$(canonicalize_existing_path "${candidate}")"
 		if [[ -d "${candidate}" && -f "${candidate}/flake.nix" ]]; then
 			echo "${candidate}"
 			return 0
@@ -110,6 +251,76 @@ resolve_kdns_src_worktree() {
 		fi
 	done
 
+	return 1
+}
+
+should_update_locks() {
+	case "${FLOX_SHIM_UPDATE_LOCKS:-auto}" in
+		1|true|TRUE|yes|YES)
+			return 0
+			;;
+		0|false|FALSE|no|NO)
+			return 1
+			;;
+		auto|AUTO|"")
+			[[ "${WORKTREE_MODE}" == "host" ]]
+			return
+			;;
+		*)
+			: "[WARN] Unknown FLOX_SHIM_UPDATE_LOCKS='${FLOX_SHIM_UPDATE_LOCKS}', defaulting to auto"
+			[[ "${WORKTREE_MODE}" == "host" ]]
+			return
+			;;
+	esac
+}
+
+should_only_update_locks() {
+	case "${FLOX_SHIM_ONLY_UPDATE_LOCKS:-false}" in
+		1|true|TRUE|yes|YES)
+			return 0
+			;;
+		*)
+			return 1
+			;;
+	esac
+}
+
+refresh_flake_lock_if_needed() {
+	local job_name="$1"
+	local resolved_path="$2"
+	local log_file="$3"
+	local kdns_src_worktree="$4"
+
+	should_update_locks || return 0
+
+	if is_flake_lock_refreshed "${resolved_path}"; then
+		return 0
+	fi
+
+	local -a lock_args=(
+		"flake"
+		"lock"
+		"--extra-experimental-features" "nix-command"
+		"--extra-experimental-features" "flakes"
+	)
+
+	if [[ -n "${kdns_src_worktree}" ]]; then
+		lock_args+=("--override-input" "kdns-src" "path:${kdns_src_worktree}")
+		: "[$(date)] [${job_name}] Refreshing flake.lock with kdns source override: ${kdns_src_worktree}"
+	else
+		: "[$(date)] [${job_name}] Refreshing flake.lock"
+	fi
+
+	if (
+		cd "${resolved_path}"
+		nix "${lock_args[@]}"
+	) 2>&1 | tee "${log_file}"; then
+		mark_flake_lock_refreshed "${resolved_path}"
+		: "[$(date)] [${job_name}] ✓ Refreshed flake.lock at ${resolved_path}"
+		return 0
+	fi
+
+	: "[ERROR] [${job_name}] Failed to refresh flake.lock at ${resolved_path}"
 	return 1
 }
 
@@ -153,8 +364,8 @@ build_package() {
 	)
 
 	# Add worktree override for kdns-src input if building kdns
+	local kdns_src_worktree=""
 	if [[ "${package_name}" == "kdns" ]]; then
-		local kdns_src_worktree
 		if ! kdns_src_worktree="$(resolve_kdns_src_worktree)"; then
 			: "[ERROR] [${job_name}] Unable to resolve kdns source worktree."
 			: "[ERROR] [${job_name}] Expected one of:"
@@ -173,13 +384,22 @@ build_package() {
 		: "[$(date)] [${job_name}] Using kdns source override (worktree mode: ${WORKTREE_MODE}): ${kdns_src_worktree}"
 	fi
 
+	if ! refresh_flake_lock_if_needed "${job_name}" "${resolved_path}" "${log_file}" "${kdns_src_worktree}"; then
+		return 1
+	fi
+
+	if should_only_update_locks; then
+		: "[$(date)] [${job_name}] Lock-only mode enabled; skipping build for ${package_name}"
+		return 0
+	fi
+
 	local build_target=".#${package_attr}"
 	: "[$(date)] [${job_name}] Flake path: ${resolved_path}"
 
 	if (
 		cd "${resolved_path}"
 		nix "${nix_args[@]}" "${build_target}"
-	) 2>&1 | tee -a "${log_file}"; then
+	) 2>&1 | tee "${log_file}"; then
 		: "[$(date)] [${job_name}] ✓ Built ${package_name}"
 		return 0
 	else
@@ -205,6 +425,13 @@ fi
 
 validate_worktree_mode
 : "[$(date)] Shim builder worktree mode: ${WORKTREE_MODE}"
+activate_flox_environment
+
+# Check if yq is available
+if ! command -v yq &>/dev/null; then
+	: "[ERROR] yq not found. Please install yq to parse YAML descriptor"
+	exit 1
+fi
 
 clear_job_vars() {
 	unset name description enabled flakePath outputDir logFile
@@ -224,7 +451,7 @@ for ((i = 0; i < num_jobs; i++)); do
 	job_description="${description:-}"
 	flake_path="${flakePath:-}"
 	output_dir="${outputDir:-}"
-	log_file="${logFile:-}"
+	log_file="$(resolve_log_file_path "${logFile:-}" "${job_name:-unnamed-job}")"
 
 	# Skip disabled jobs
 	if [[ "${job_enabled}" != "true" ]]; then
