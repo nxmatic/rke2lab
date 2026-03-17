@@ -180,7 +180,13 @@ public final class IncusResourceBootstrap {
         private BootstrapResult toResult() {
             return new BootstrapResult("incus://" + config.incusProject() + "/" + config.nodeName(),
                     ensuredImageFingerprint, instance.status(), instance.urn(), providerContext.provider().urn(),
-                    provisioningChecksum, imageBuildChecksum);
+                    provisioningChecksum, imageBuildChecksum,
+                    localPaths.systemdRoot().toString(),
+                    localPaths.runtimeCloudConfigRoot().toString(),
+                    localPaths.cloudSeedRoot().toString(),
+                    nixosPaths.systemdRoot().toString(),
+                    nixosPaths.runtimeCloudConfigRoot().toString(),
+                    nixosPaths.cloudSeedRoot().toString());
         }
     }
 
@@ -1199,7 +1205,9 @@ public final class IncusResourceBootstrap {
         }
     }
 
-    public record BootstrapResult(String seedNodeId, Object imageFingerprint, Object instanceStatus, Object instanceUrn,
-            Object providerUrn, String provisioningChecksum, String imageBuildChecksum) {
+        public record BootstrapResult(String seedNodeId, Object imageFingerprint, Object instanceStatus, Object instanceUrn,
+            Object providerUrn, String provisioningChecksum, String imageBuildChecksum,
+            String localSystemdUnitsSourceDir, String localCloudConfigSourceDir, String localCloudSeedSourceDir,
+            String nixosSystemdUnitsSourceDir, String nixosCloudConfigSourceDir, String nixosCloudSeedSourceDir) {
     }
 }

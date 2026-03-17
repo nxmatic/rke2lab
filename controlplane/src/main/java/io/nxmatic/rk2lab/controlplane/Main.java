@@ -71,6 +71,12 @@ public final class Main {
         final Object seedProviderUrn = bootstrapResult.providerUrn();
         final String provisioningChecksum = bootstrapResult.provisioningChecksum();
         final String imageBuildChecksum = bootstrapResult.imageBuildChecksum();
+        final String localSystemdUnitsSourceDir = bootstrapResult.localSystemdUnitsSourceDir();
+        final String localCloudConfigSourceDir = bootstrapResult.localCloudConfigSourceDir();
+        final String localCloudSeedSourceDir = bootstrapResult.localCloudSeedSourceDir();
+        final String nixosSystemdUnitsSourceDir = bootstrapResult.nixosSystemdUnitsSourceDir();
+        final String nixosCloudConfigSourceDir = bootstrapResult.nixosCloudConfigSourceDir();
+        final String nixosCloudSeedSourceDir = bootstrapResult.nixosCloudSeedSourceDir();
         bootstrapPhase = "Ready";
         handoffReady = true;
 
@@ -85,6 +91,12 @@ public final class Main {
         outputs.put("seedImageBuildChecksum", imageBuildChecksum);
         outputs.put("seedImageFingerprint", imageFingerprint);
         outputs.put("seedInstanceStatus", seedInstanceStatus);
+        outputs.put("localSystemdUnitsSourceDir", localSystemdUnitsSourceDir);
+        outputs.put("localCloudConfigSourceDir", localCloudConfigSourceDir);
+        outputs.put("localCloudSeedSourceDir", localCloudSeedSourceDir);
+        outputs.put("nixosSystemdUnitsSourceDir", nixosSystemdUnitsSourceDir);
+        outputs.put("nixosCloudConfigSourceDir", nixosCloudConfigSourceDir);
+        outputs.put("nixosCloudSeedSourceDir", nixosCloudSeedSourceDir);
         outputs.put("incusProject", config.incusProject());
         outputs.put("imageAlias", config.imageAlias());
         outputs.put("seedLanBridgeParent", config.lanBridgeParent());
