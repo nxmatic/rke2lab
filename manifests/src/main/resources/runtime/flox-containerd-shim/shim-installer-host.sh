@@ -96,7 +96,7 @@ refresh_flox_shim_packages_commit() {
 ensure_flox_shim_repo
 refresh_flox_shim_packages_commit
 
-"${FLOX_BUILD_SCRIPT}" "${FLOX_BUILD_DESCRIPTOR}"
+"${FLOX_BUILD_SCRIPT}" "flox-shim-worktree" "${FLOX_BUILD_DESCRIPTOR}"
 
 : "Resolve containerd config and template files"
 resolve_containerd_config() {

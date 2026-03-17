@@ -3,7 +3,7 @@ set -exuo pipefail
 
 # Flox shim package build script
 # Builds packages from local packaged flakes defined in YAML descriptor
-# Usage: flox-shim-build.sh [descriptor file]
+# Usage: flox-shim-build.sh <mode> [descriptor file]
 
 source <(flox activate --dir /var/lib/rancher/rke2)
 
@@ -14,12 +14,33 @@ if [[ "${SCRIPT_DIR}" == "${SCRIPT_PATH}" ]]; then
 fi
 SCRIPT_BASENAME="$(basename "${SCRIPT_PATH}")"
 SCRIPT_STEM="${SCRIPT_BASENAME%.sh}"
+WORKTREE_MODE="${FLOX_SHIM_WORKTREE_MODE:-}"
+
+if [[ $# -gt 0 ]]; then
+	WORKTREE_MODE="${1}"
+	shift
+fi
+
 BUILDS_DESCRIPTOR="${1:-${SCRIPT_DIR}/${SCRIPT_STEM}.yaml}"
 BUILDS_DESCRIPTOR_DIR="$(dirname "${BUILDS_DESCRIPTOR}")"
 
 # Environment variables
 RKE2LAB_ROOT="${RKE2LAB_ROOT:-/srv/host}"
 GIT_WORKDIR="${GIT_WORKDIR:-${RKE2LAB_ROOT}/git}"
+
+validate_worktree_mode() {
+	case "${WORKTREE_MODE}" in
+		rke2lab-worktree|flox-shim-worktree)
+			return 0
+			;;
+		*)
+			: "[ERROR] Unsupported or missing shim builder mode: '${WORKTREE_MODE}'"
+			: "[ERROR] Usage: ${SCRIPT_BASENAME} <rke2lab-worktree|flox-shim-worktree> [descriptor file]"
+			: "[ERROR] You can also set FLOX_SHIM_WORKTREE_MODE and pass only [descriptor file]."
+			exit 1
+			;;
+	esac
+}
 
 : "[$(date)] Starting flox shim package builds from descriptor: ${BUILDS_DESCRIPTOR}"
 
@@ -45,6 +66,46 @@ resolve_flake_path() {
 	fi
 
 	echo "${BUILDS_DESCRIPTOR_DIR}/${flake_path}"
+}
+
+resolve_kdns_src_worktree() {
+	local -a candidates=()
+	case "${WORKTREE_MODE}" in
+		rke2lab-worktree)
+			candidates+=(
+				"${BUILDS_DESCRIPTOR_DIR}/networking/kdns/src"
+				"${BUILDS_DESCRIPTOR_DIR}/networking/kdns"
+			)
+			;;
+		flox-shim-worktree)
+			candidates+=(
+				"${BUILDS_DESCRIPTOR_DIR}/networking/kdns/src"
+				"${BUILDS_DESCRIPTOR_DIR}/networking/kdns"
+				"${GIT_WORKDIR}/lab42/kdns"
+				"/srv/host/git/lab42/kdns"
+				"/var/lib/git/lab42/kdns"
+			)
+			;;
+	esac
+
+	if [[ -n "${KDNS_SRC_WORKTREE:-}" ]]; then
+		candidates=("${KDNS_SRC_WORKTREE}" "${candidates[@]}")
+	fi
+
+	local candidate
+	for candidate in "${candidates[@]}"; do
+		[[ -n "${candidate}" ]] || continue
+		if [[ -d "${candidate}" && -f "${candidate}/flake.nix" ]]; then
+			echo "${candidate}"
+			return 0
+		fi
+		if [[ -d "${candidate}" && -f "${candidate}/go.mod" ]]; then
+			echo "${candidate}"
+			return 0
+		fi
+	done
+
+	return 1
 }
 
 # Function to build a single package
@@ -86,12 +147,25 @@ build_package() {
 		"--no-link"
 	)
 
-	# Add override for kdns-src input if building kdns
+	# Add worktree override for kdns-src input if building kdns
 	if [[ "${package_name}" == "kdns" ]]; then
+		local kdns_src_worktree
+		if ! kdns_src_worktree="$(resolve_kdns_src_worktree)"; then
+			: "[ERROR] [${job_name}] Unable to resolve kdns source worktree."
+			: "[ERROR] [${job_name}] Expected one of:"
+			: "[ERROR] [${job_name}]   - ${BUILDS_DESCRIPTOR_DIR}/networking/kdns/src (preferred subtree mode)"
+			: "[ERROR] [${job_name}]   - ${BUILDS_DESCRIPTOR_DIR}/networking/kdns"
+			: "[ERROR] [${job_name}]   - ${GIT_WORKDIR}/lab42/kdns"
+			: "[ERROR] [${job_name}]   - /srv/host/git/lab42/kdns"
+			: "[ERROR] [${job_name}]   - /var/lib/git/lab42/kdns"
+			: "[ERROR] [${job_name}] Or set KDNS_SRC_WORKTREE explicitly."
+			return 1
+		fi
+
 		nix_args+=(
-			"--override-input" "kdns-src" "git+file://${GIT_WORKDIR}/lab42/kdns"
+			"--override-input" "kdns-src" "path:${kdns_src_worktree}"
 		)
-		: "[$(date)] [${job_name}] Using kdns source override: ${GIT_WORKDIR}/lab42/kdns"
+		: "[$(date)] [${job_name}] Using kdns source override (worktree mode: ${WORKTREE_MODE}): ${kdns_src_worktree}"
 	fi
 
 	local build_target=".#${package_attr}"
@@ -123,6 +197,9 @@ if [[ $num_jobs -eq 0 ]]; then
 fi
 
 : "[$(date)] Found ${num_jobs} build job(s)"
+
+validate_worktree_mode
+: "[$(date)] Shim builder worktree mode: ${WORKTREE_MODE}"
 
 clear_job_vars() {
 	unset name description enabled flakePath outputDir logFile

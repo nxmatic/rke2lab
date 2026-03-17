@@ -6,7 +6,7 @@
     nixpkgs.follows = "flake-commons/nixpkgs";
     flake-utils.follows = "flake-commons/flake-utils";
     kdns-src = {
-      url = "git+file:///var/lib/git/lab42/kdns";
+      url = "path:./src";
       flake = false;
     };
   };
