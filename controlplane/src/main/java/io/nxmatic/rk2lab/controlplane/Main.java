@@ -5,8 +5,12 @@ import com.pulumi.Config;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.incus.IncusResourceBootstrap;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.api.Status;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
 import java.nio.file.Path;
@@ -21,6 +25,10 @@ import java.util.Map;
  * Entry point for the Pulumi management-cluster bootstrap program.
  */
 public final class Main {
+
+    private static final List<EntryGatePolicy> ENTRY_GATE_POLICIES = List.of(
+            new EntryGatePolicy("clean-git-worktree", Main::enforceCleanWorktree),
+            new EntryGatePolicy("flake-lock-coherence", Main::enforceFlakeLockCoherence));
 
     private Main() {
         // Utility class
@@ -43,7 +51,7 @@ public final class Main {
     }
 
     private static BootstrapOutputs bootstrapAndCollectOutputs(BootstrapConfig config) {
-        enforceCleanWorktree(config.localWorktreePath());
+        enforceEntryGatePolicies(config.localWorktreePath());
 
         if (!"bioskop".equals(config.clusterName())) {
             throw new IllegalStateException("Stage A bootstrap supports management cluster 'bioskop' only. "
@@ -146,11 +154,106 @@ public final class Main {
         return truncated;
     }
 
+    private static void enforceEntryGatePolicies(Path worktreePath) {
+        final Path normalizedWorktreePath = worktreePath.toAbsolutePath().normalize();
+        for (EntryGatePolicy policy : ENTRY_GATE_POLICIES) {
+            try {
+                policy.check().run(normalizedWorktreePath);
+            } catch (IllegalStateException ex) {
+                throw new IllegalStateException("Entry-gate policy failed (" + policy.name() + "): " + ex.getMessage(), ex);
+            }
+        }
+    }
+
+    private static void enforceFlakeLockCoherence(Path worktreePath) {
+        final Path normalizedWorktreePath = worktreePath.toAbsolutePath().normalize();
+        try {
+            final FileRepositoryBuilder builder = new FileRepositoryBuilder().findGitDir(normalizedWorktreePath.toFile());
+            if (builder.getGitDir() == null) {
+                throw new IllegalStateException("No git repository found for worktree: " + normalizedWorktreePath);
+            }
+
+            try (Repository repository = builder.build()) {
+                final ObjectId oldTreeId = repository.resolve("HEAD~1^{tree}");
+                final ObjectId newTreeId = repository.resolve("HEAD^{tree}");
+                if (oldTreeId == null || newTreeId == null) {
+                    return;
+                }
+
+                final List<DiffEntry> diffs = diffTrees(repository, oldTreeId, newTreeId);
+                final LinkedHashSet<String> flakeNixDirs = new LinkedHashSet<>();
+                final LinkedHashSet<String> flakeLockDirs = new LinkedHashSet<>();
+
+                for (DiffEntry diff : diffs) {
+                    collectFlakeDirs(diff.getOldPath(), flakeNixDirs, flakeLockDirs);
+                    collectFlakeDirs(diff.getNewPath(), flakeNixDirs, flakeLockDirs);
+                }
+
+                flakeNixDirs.removeAll(flakeLockDirs);
+                if (flakeNixDirs.isEmpty()) {
+                    return;
+                }
+
+                throw new IllegalStateException(
+                        "Flake lock coherence policy violation: detected changes to flake.nix without matching flake.lock "
+                                + "changes in the latest commit. Update locks and commit again. "
+                                + "Affected flake directories:\n- " + String.join("\n- ", flakeNixDirs));
+            }
+        } catch (IllegalStateException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to verify flake lock coherence at: " + normalizedWorktreePath,
+                    ex);
+        }
+    }
+
+    private static List<DiffEntry> diffTrees(Repository repository, ObjectId oldTreeId, ObjectId newTreeId) throws Exception {
+        try (Git git = new Git(repository); ObjectReader reader = repository.newObjectReader()) {
+            final CanonicalTreeParser oldTree = new CanonicalTreeParser();
+            oldTree.reset(reader, oldTreeId);
+            final CanonicalTreeParser newTree = new CanonicalTreeParser();
+            newTree.reset(reader, newTreeId);
+            return git.diff()
+                    .setOldTree(oldTree)
+                    .setNewTree(newTree)
+                    .call();
+        }
+    }
+
+    private static void collectFlakeDirs(String path,
+            LinkedHashSet<String> flakeNixDirs,
+            LinkedHashSet<String> flakeLockDirs) {
+        if (path == null || path.isBlank() || DiffEntry.DEV_NULL.equals(path)) {
+            return;
+        }
+
+        if (path.endsWith("/flake.nix") || "flake.nix".equals(path)) {
+            flakeNixDirs.add(parentDirectory(path));
+            return;
+        }
+        if (path.endsWith("/flake.lock") || "flake.lock".equals(path)) {
+            flakeLockDirs.add(parentDirectory(path));
+        }
+    }
+
+    private static String parentDirectory(String path) {
+        final int lastSlash = path.lastIndexOf('/');
+        return lastSlash < 0 ? "." : path.substring(0, lastSlash);
+    }
+
     private static void append(LinkedHashSet<String> target, Collection<String> values) {
         if (values == null || values.isEmpty()) {
             return;
         }
         target.addAll(values);
+    }
+
+    @FunctionalInterface
+    private interface PolicyCheck {
+        void run(Path worktreePath);
+    }
+
+    private record EntryGatePolicy(String name, PolicyCheck check) {
     }
 
     private record BootstrapOutputs(Map<String, Object> values) {
