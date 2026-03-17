@@ -1,6 +1,8 @@
 = Imported Notes from `rke2lab` (Historical Context)
 :toc: left
 :toclevels: 2
+:kroki-server-url: https://kroki.io
+:plantuml-server-url: {kroki-server-url}/plantuml
 
 This document imports and normalizes authored planning notes that were previously maintained in `rke2lab`.
 
@@ -124,3 +126,73 @@ Canonical execution modes for shim builder:
 Guardrail:
 
 * maintain one canonical path contract for both modes (`networking/kdns/src` preferred for subtree mode, optional explicit override via environment variable when needed)
+
+=== Controlnode Stage A flow (policy-first)
+
+The controlnode follows a strict policy-first flow before any Stage A provisioning side effects.
+
+[plantuml,controlnode-stagea-flow,svg]
+----
+@startuml
+title Controlnode Stage A flow (policy-first)
+
+actor Operator
+participant "controlplane.Main" as CP
+participant "manifests.Main\n(shim-build)" as MF
+participant "Pulumi Engine" as Pulumi
+participant "ManifestUpdateGate\n(ServiceLoader)" as MUG
+participant "ManifestSynthesisService\n(ServiceLoader)" as MSS
+participant "Git Policy Checks\n(clean + flake lock)" as GIT
+participant "Shim flake worktree" as Flakes
+participant "IncusResourceBootstrap" as Incus
+
+alt flake/package inputs changed
+	Operator -> MF : run shim-build\n(host/guest as applicable)
+	MF -> Flakes : refresh flake.lock/package outputs
+	Operator -> Flakes : commit updated lock/package set
+else no flake/package changes
+	Operator -> Operator : no shim-build refresh required
+end
+
+Operator -> CP : run preview/up (or standalone run)
+CP -> CP : detect Pulumi monitor env
+
+alt Pulumi monitor present
+	CP -> Pulumi : Pulumi.run(...)
+else standalone
+	CP -> CP : runStandalone()
+end
+
+CP -> CP : build BootstrapConfig
+CP -> CP : enforceEntryGatePolicies(localWorktreePath)
+
+CP -> MUG : enforce(worktreePath)
+MUG -> MSS : load single provider
+MUG -> MSS : synthesize(ephemeral request)
+MUG -> MUG : validate smoke result\n(file exists, non-empty,\nunit hits > 0, domain count > 0)
+
+CP -> GIT : enforce clean-git-worktree
+CP -> GIT : enforce flake-lock-coherence
+
+alt any gate fails
+	CP --> Operator : fail fast (no Stage A changes)
+else all gates pass
+	CP -> CP : validate clusterName == bioskop
+	CP -> Incus : apply()
+	Incus --> CP : BootstrapResult
+	CP -> CP : assemble deterministic outputs
+	CP --> Operator : export outputs (Pulumi)\nor print outputs (standalone)
+end
+@enduml
+----
+
+=== VS Code preview note (Kroki)
+
+If the VS Code AsciiDoc preview does not render PlantUML blocks locally, use Kroki-backed preview.
+
+Recommended preview attributes:
+
+* `kroki-server-url=https://kroki.io`
+* `plantuml-server-url=https://kroki.io/plantuml`
+
+This document already sets both attributes at the top, so Kroki-capable renderers should resolve diagram blocks without local PlantUML execution.

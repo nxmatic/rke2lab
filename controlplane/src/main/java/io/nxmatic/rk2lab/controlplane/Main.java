@@ -4,7 +4,7 @@ import com.pulumi.Pulumi;
 import com.pulumi.Config;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.incus.IncusResourceBootstrap;
-import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
+import io.nxmatic.rk2lab.manifests.api.ManifestUpdateGate;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.api.Status;
@@ -29,7 +29,7 @@ import java.util.ServiceLoader;
 public final class Main {
 
     private static final List<EntryGatePolicy> ENTRY_GATE_POLICIES = List.of(
-            new EntryGatePolicy("manifests-synthesis-service", Main::enforceManifestSynthesisServicePublished),
+            new EntryGatePolicy("manifests-update-gate", Main::enforceManifestUpdateGate),
             new EntryGatePolicy("clean-git-worktree", Main::enforceCleanWorktree),
             new EntryGatePolicy("flake-lock-coherence", Main::enforceFlakeLockCoherence));
 
@@ -141,19 +141,21 @@ public final class Main {
         }
     }
 
-    private static void enforceManifestSynthesisServicePublished(Path worktreePath) {
-        final List<ManifestSynthesisService> providers = ServiceLoader.load(ManifestSynthesisService.class)
+    private static void enforceManifestUpdateGate(Path worktreePath) {
+        final List<ManifestUpdateGate> gates = ServiceLoader.load(ManifestUpdateGate.class)
                 .stream()
                 .map(ServiceLoader.Provider::get)
                 .toList();
-        if (providers.isEmpty()) {
-            throw new IllegalStateException("No ManifestSynthesisService provider found via ServiceLoader.");
+        if (gates.isEmpty()) {
+            throw new IllegalStateException("No ManifestUpdateGate provider found via ServiceLoader.");
         }
-        if (providers.size() > 1) {
-            throw new IllegalStateException("Expected exactly one ManifestSynthesisService provider, found "
-                    + providers.size() + ": "
-                    + providers.stream().map(ManifestSynthesisService::providerId).toList());
+        if (gates.size() > 1) {
+            throw new IllegalStateException("Expected exactly one ManifestUpdateGate provider, found "
+                    + gates.size() + ": "
+                    + gates.stream().map(ManifestUpdateGate::gateId).toList());
         }
+
+        gates.getFirst().enforce(worktreePath);
     }
 
     private static List<String> summarizeStatus(Status status) {
