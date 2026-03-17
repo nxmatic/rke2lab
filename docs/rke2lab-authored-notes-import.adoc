@@ -184,3 +184,30 @@ Recommended preview attributes:
 * `plantuml-server-url=https://kroki.io/plantuml`
 
 This document already sets both attributes at the top, so Kroki-capable renderers should resolve diagram blocks without local PlantUML execution.
+
+=== Future stage note: Debian -> NixOS base-system migration
+
+Capture this as a dedicated staged migration track (separate from current runtime/systemd->init-container migration work):
+
+. Stage N0 (baseline freeze)
+* freeze and inventory current Debian-specific assumptions (package paths, unit names, kernel/module expectations, bootstrap scripts)
+* define parity test checklist that must pass before and after base-system cutover
+
+. Stage N1 (dual-build image pipeline, single runtime owner)
+* add NixOS image build path in parallel for validation
+* keep one canonical provisioning flow (no long-lived compatibility forks)
+* run parity checks on both images from the same Stage A inputs
+
+. Stage N2 (default switch to NixOS)
+* promote NixOS image as default base system for new seed instances
+* keep deterministic checksums/handoff outputs unchanged at contract level
+
+. Stage N3 (Debian retirement)
+* remove Debian-specific paths/scripts once NixOS path is stable and repeatable
+* update contracts/docs to remove deprecated Debian references
+
+Guardrails for this track:
+
+* policy-first changes before `pulumi preview/up`
+* deterministic/idempotent behavior across reruns
+* one canonical owner/path per behavior (no backward-compatibility aliases unless explicitly requested)
