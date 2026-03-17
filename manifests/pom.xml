@@ -114,6 +114,11 @@
             <goals>
               <goal>java</goal>
             </goals>
+            <configuration>
+              <arguments>
+                <argument>synthesize</argument>
+              </arguments>
+            </configuration>
           </execution>
           <execution>
             <id>explode-manifests</id>
