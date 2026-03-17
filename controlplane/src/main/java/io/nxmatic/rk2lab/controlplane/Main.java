@@ -4,8 +4,17 @@ import com.pulumi.Pulumi;
 import com.pulumi.Config;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.incus.IncusResourceBootstrap;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.Status;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -34,6 +43,8 @@ public final class Main {
     }
 
     private static BootstrapOutputs bootstrapAndCollectOutputs(BootstrapConfig config) {
+        enforceCleanWorktree(config.localWorktreePath());
+
         if (!"bioskop".equals(config.clusterName())) {
             throw new IllegalStateException("Stage A bootstrap supports management cluster 'bioskop' only. "
                     + "Set cluster.name=bioskop.");
@@ -83,6 +94,63 @@ public final class Main {
     private static boolean isPulumiEngineAvailable() {
         final String monitor = System.getenv("PULUMI_MONITOR");
         return monitor != null && !monitor.isBlank();
+    }
+
+    private static void enforceCleanWorktree(Path worktreePath) {
+        final Path normalizedWorktreePath = worktreePath.toAbsolutePath().normalize();
+        try {
+            final FileRepositoryBuilder builder = new FileRepositoryBuilder().findGitDir(normalizedWorktreePath.toFile());
+            if (builder.getGitDir() == null) {
+                throw new IllegalStateException("No git repository found for worktree: " + normalizedWorktreePath);
+            }
+
+            try (Repository repository = builder.build(); Git git = new Git(repository)) {
+                final Status status = git.status().call();
+                if (status.isClean()) {
+                    return;
+                }
+
+                final List<String> changes = summarizeStatus(status);
+                throw new IllegalStateException(
+                        "Pulumi update requires a clean git worktree. Resolve or commit local changes before running Stage A. "
+                                + "Worktree: " + normalizedWorktreePath
+                                + (changes.isEmpty() ? "" : "\nDirty paths:\n- " + String.join("\n- ", changes)));
+            }
+        } catch (IllegalStateException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to verify clean git worktree at: " + normalizedWorktreePath,
+                    ex);
+        }
+    }
+
+    private static List<String> summarizeStatus(Status status) {
+        final LinkedHashSet<String> paths = new LinkedHashSet<>();
+        append(paths, status.getAdded());
+        append(paths, status.getChanged());
+        append(paths, status.getModified());
+        append(paths, status.getRemoved());
+        append(paths, status.getMissing());
+        append(paths, status.getUntracked());
+        append(paths, status.getUntrackedFolders());
+        append(paths, status.getConflicting());
+
+        final ArrayList<String> ordered = new ArrayList<>(paths);
+        final int maxEntries = 20;
+        if (ordered.size() <= maxEntries) {
+            return ordered;
+        }
+
+        final ArrayList<String> truncated = new ArrayList<>(ordered.subList(0, maxEntries));
+        truncated.add("... and " + (ordered.size() - maxEntries) + " more");
+        return truncated;
+    }
+
+    private static void append(LinkedHashSet<String> target, Collection<String> values) {
+        if (values == null || values.isEmpty()) {
+            return;
+        }
+        target.addAll(values);
     }
 
     private record BootstrapOutputs(Map<String, Object> values) {
