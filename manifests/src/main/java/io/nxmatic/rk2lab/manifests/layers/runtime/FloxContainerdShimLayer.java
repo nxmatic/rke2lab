@@ -31,10 +31,9 @@ public final class FloxContainerdShimLayer extends Construct {
         ApiObject namespace = createNamespace();
         createRuntimeClass();
         ApiObject envConfigMap = createFloxEnvConfigMap(namespace);
-        ApiObject installerScriptConfigMap = createInstallerScriptConfigMap(namespace);
-        ApiObject buildshimsConfigMap = createBuildShimsConfigMap(namespace);
+        ApiObject installerAssetsConfigMap = createInstallerAssetsConfigMap(namespace);
         ApiObject serviceAccount = createServiceAccount(namespace);
-        createInstallerDaemonSet(namespace, envConfigMap, installerScriptConfigMap, buildshimsConfigMap,
+        createInstallerDaemonSet(namespace, envConfigMap, installerAssetsConfigMap,
                 serviceAccount);
     }
 
@@ -91,18 +90,18 @@ public final class FloxContainerdShimLayer extends Construct {
         return configMap;
     }
 
-    private ApiObject createInstallerScriptConfigMap(final ApiObject namespace) {
-        ApiObject configMap = new ApiObject(this, "configmap-flox-runtime-installer-script",
+    private ApiObject createInstallerAssetsConfigMap(final ApiObject namespace) {
+        ApiObject configMap = new ApiObject(this, "configmap-flox-runtime-installer-assets",
                 ApiObjectProps.builder()
                               .apiVersion("v1")
                               .kind("ConfigMap")
                               .metadata(ApiObjectMetadata.builder()
-                                                         .name("flox-runtime-installer-script")
+                                                         .name("flox-runtime-installer-assets")
                                                          .namespace(NAMESPACE)
                                                          .annotations(kptMetadata.packageAnnotations(LAYER_NAME,
                                                                  PACKAGE_NAME,
                                                                  "|ConfigMap|" + NAMESPACE
-                                                                         + "|flox-runtime-installer-script"))
+                                                                         + "|flox-runtime-installer-assets"))
                                                          .build())
                               .build());
 
@@ -111,30 +110,11 @@ public final class FloxContainerdShimLayer extends Construct {
                 Map.of("shim-installer.sh", readResource("/runtime/flox-containerd-shim/shim-installer.sh"),
                         "shim-installer-host.sh", readResource("/runtime/flox-containerd-shim/shim-installer-host.sh"),
                         "shim-installer-entrypoint.sh",
-                        readResource("/runtime/flox-containerd-shim/shim-installer-entrypoint.sh"))));
-        return configMap;
-    }
-
-    private ApiObject createBuildShimsConfigMap(final ApiObject namespace) {
-        ApiObject configMap = new ApiObject(this, "configmap-flox-container-build-assets",
-                ApiObjectProps.builder()
-                              .apiVersion("v1")
-                              .kind("ConfigMap")
-                              .metadata(ApiObjectMetadata.builder()
-                                                         .name("flox-container-build-assets")
-                                                         .namespace(NAMESPACE)
-                                                         .annotations(kptMetadata.packageAnnotations(LAYER_NAME,
-                                                                 PACKAGE_NAME,
-                                                                 "|ConfigMap|" + NAMESPACE + "|flox-container-build-assets"))
-                                                         .build())
-                              .build());
-
-        configMap.addDependency(namespace);
-        configMap.addJsonPatch(JsonPatch.add("/data", Map.of("flox-shim-build.sh",
-                readResource("/runtime/flox-containerd-shim/flox-shim-build.sh"), "flox-shim-build.yaml",
-                readResource("/runtime/flox-containerd-shim/flox-shim-build.yaml"), "mesh-headplane-flake.nix",
-                readResource("/runtime/flox-containerd-shim/mesh/headplane/flake.nix"), "networking-kdns-flake.nix",
-                readResource("/runtime/flox-containerd-shim/networking/kdns/flake.nix"))));
+                        readResource("/runtime/flox-containerd-shim/shim-installer-entrypoint.sh"),
+                        "flox-shim-build.sh", readResource("/runtime/flox-containerd-shim/flox-shim-build.sh"),
+                        "flox-shim-build.yaml", readResource("/runtime/flox-containerd-shim/flox-shim-build.yaml"),
+                        "mesh-headplane-flake.nix", readResource("/runtime/flox-containerd-shim/mesh/headplane/flake.nix"),
+                        "networking-kdns-flake.nix", readResource("/runtime/flox-containerd-shim/networking/kdns/flake.nix"))));
         return configMap;
     }
 
@@ -170,8 +150,7 @@ public final class FloxContainerdShimLayer extends Construct {
     }
 
     private void createInstallerDaemonSet(final ApiObject namespace, final ApiObject envConfigMap,
-            final ApiObject installerScriptConfigMap, final ApiObject buildshimsConfigMap,
-            final ApiObject serviceAccount) {
+            final ApiObject installerAssetsConfigMap, final ApiObject serviceAccount) {
         ApiObject daemonSet = new ApiObject(this, "daemonset-flox-runtime-installer",
                 ApiObjectProps.builder()
                               .apiVersion("apps/v1")
@@ -190,8 +169,7 @@ public final class FloxContainerdShimLayer extends Construct {
 
         daemonSet.addDependency(namespace);
         daemonSet.addDependency(envConfigMap);
-        daemonSet.addDependency(installerScriptConfigMap);
-        daemonSet.addDependency(buildshimsConfigMap);
+        daemonSet.addDependency(installerAssetsConfigMap);
         daemonSet.addDependency(serviceAccount);
 
         daemonSet.addJsonPatch(JsonPatch.add("/spec", Map.of(
@@ -221,20 +199,24 @@ public final class FloxContainerdShimLayer extends Construct {
                                         "shim-installer", "securityContext",
                                         Map.of("privileged", true, "runAsGroup", 0, "runAsUser", 0), "volumeMounts",
                                         new Object[] {
-                                                Map.of("mountPath", "/.sh", "name", "runtime-installer-script",
-                                                        "readOnly", true),
-                                                Map.of("mountPath", "/.sh/build-assets", "name", "flox-container-build-assets",
+                                                Map.of("mountPath", "/.sh", "name", "runtime-installer-assets",
                                                         "readOnly", true) }) },
                                 "nodeSelector", Map.of("flox.dev/enabled", "true"), "restartPolicy", "Always",
                                 "serviceAccountName", "flox-runtime-installer", "tolerations",
                                 new Object[] { Map.of("operator", "Exists") }, "volumes",
                                 new Object[] {
                                         Map.of("configMap",
-                                                Map.of("defaultMode", 493, "name", "flox-runtime-installer-script"),
-                                                "name", "runtime-installer-script"),
-                                        Map.of("configMap",
-                                                Map.of("defaultMode", 493, "name", "flox-container-build-assets"),
-                                                "name", "flox-container-build-assets") })),
+                                                Map.of("defaultMode", 493,
+                                                        "items", new Object[] {
+                                                                Map.of("key", "shim-installer.sh", "path", "shim-installer.sh"),
+                                                                Map.of("key", "shim-installer-host.sh", "path", "shim-installer-host.sh"),
+                                                                Map.of("key", "shim-installer-entrypoint.sh", "path", "shim-installer-entrypoint.sh"),
+                                                                Map.of("key", "flox-shim-build.sh", "path", "build-assets/flox-shim-build.sh"),
+                                                                Map.of("key", "flox-shim-build.yaml", "path", "build-assets/flox-shim-build.yaml"),
+                                                                Map.of("key", "mesh-headplane-flake.nix", "path", "build-assets/mesh/headplane/flake.nix"),
+                                                                Map.of("key", "networking-kdns-flake.nix", "path", "build-assets/networking/kdns/flake.nix") },
+                                                        "name", "flox-runtime-installer-assets"),
+                                                "name", "runtime-installer-assets") })),
                 "updateStrategy", Map.of("rollingUpdate", Map.of("maxUnavailable", 1), "type", "RollingUpdate"))));
     }
 }
