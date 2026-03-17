@@ -186,7 +186,7 @@ public final class HeadscaleLayer extends Construct {
         configMap.addDependency(namespace);
         configMap.addJsonPatch(
                 JsonPatch.add("/metadata/labels", Map.of("app.kubernetes.io/replicated", "true")),
-                JsonPatch.add("/metadata/annotations/replicator.v1.mittwald.de~1replicate-from", "flox-runtime/flox-env")
+                JsonPatch.add("/metadata/annotations/replicator.v1.mittwald.de~1replicate-from", "flox-containerd-shim/flox-env")
         );
         return configMap;
     }

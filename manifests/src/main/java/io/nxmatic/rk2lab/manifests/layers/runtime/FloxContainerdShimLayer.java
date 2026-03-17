@@ -38,16 +38,16 @@ public final class FloxContainerdShimLayer extends Construct {
     private ApiObject createNamespace() {
         ApiObject namespace = new ApiObject(
                 this,
-                "namespace-flox-runtime",
+                "namespace-flox-containerd-shim",
                 ApiObjectProps.builder()
                         .apiVersion("v1")
                         .kind("Namespace")
                         .metadata(ApiObjectMetadata.builder()
-                                .name("flox-runtime")
+                                .name("flox-containerd-shim")
                                 .annotations(kptMetadata.packageAnnotations(
                                         LAYER_NAME,
                                         PACKAGE_NAME,
-                                        "|Namespace|default|flox-runtime"
+                                        "|Namespace|default|flox-containerd-shim"
                                 ))
                                 .labels(Map.of("flox.dev/component", "runtime"))
                                 .build())
@@ -91,11 +91,11 @@ public final class FloxContainerdShimLayer extends Construct {
                         .kind("ConfigMap")
                         .metadata(ApiObjectMetadata.builder()
                                 .name("flox-env")
-                                .namespace("flox-runtime")
+                                .namespace("flox-containerd-shim")
                                 .annotations(kptMetadata.packageAnnotations(
                                         LAYER_NAME,
                                         PACKAGE_NAME,
-                                        "|ConfigMap|flox-runtime|flox-env",
+                                        "|ConfigMap|flox-containerd-shim|flox-env",
                                         Map.of("replicator.v1.mittwald.de/replicate-to", "headscale-system")
                                 ))
                                 .labels(Map.of("app.kubernetes.io/replicated", "true"))
@@ -121,11 +121,11 @@ public final class FloxContainerdShimLayer extends Construct {
                         .kind("ConfigMap")
                         .metadata(ApiObjectMetadata.builder()
                                 .name("flox-runtime-installer-script")
-                                .namespace("flox-runtime")
+                                .namespace("flox-containerd-shim")
                                 .annotations(kptMetadata.packageAnnotations(
                                         LAYER_NAME,
                                         PACKAGE_NAME,
-                                        "|ConfigMap|flox-runtime|flox-runtime-installer-script"
+                                        "|ConfigMap|flox-containerd-shim|flox-runtime-installer-script"
                                 ))
                                 .build())
                         .build()
@@ -148,11 +148,11 @@ public final class FloxContainerdShimLayer extends Construct {
                         .kind("ConfigMap")
                         .metadata(ApiObjectMetadata.builder()
                                 .name("flox-container-build-assets")
-                                .namespace("flox-runtime")
+                                .namespace("flox-containerd-shim")
                                 .annotations(kptMetadata.packageAnnotations(
                                         LAYER_NAME,
                                         PACKAGE_NAME,
-                                        "|ConfigMap|flox-runtime|flox-container-build-assets"
+                                        "|ConfigMap|flox-containerd-shim|flox-container-build-assets"
                                 ))
                                 .build())
                         .build()
@@ -188,11 +188,11 @@ public final class FloxContainerdShimLayer extends Construct {
                         .kind("ServiceAccount")
                         .metadata(ApiObjectMetadata.builder()
                                 .name("flox-runtime-installer")
-                                .namespace("flox-runtime")
+                                .namespace("flox-containerd-shim")
                                 .annotations(kptMetadata.packageAnnotations(
                                         LAYER_NAME,
                                         PACKAGE_NAME,
-                                        "|ServiceAccount|flox-runtime|flox-runtime-installer"
+                                        "|ServiceAccount|flox-containerd-shim|flox-runtime-installer"
                                 ))
                                 .build())
                         .build()
@@ -216,11 +216,11 @@ public final class FloxContainerdShimLayer extends Construct {
                         .kind("DaemonSet")
                         .metadata(ApiObjectMetadata.builder()
                                 .name("flox-runtime-installer")
-                                .namespace("flox-runtime")
+                                .namespace("flox-containerd-shim")
                                 .annotations(kptMetadata.packageAnnotations(
                                         LAYER_NAME,
                                         PACKAGE_NAME,
-                                        "apps|DaemonSet|flox-runtime|flox-runtime-installer"
+                                        "apps|DaemonSet|flox-containerd-shim|flox-runtime-installer"
                                 ))
                                 .labels(Map.of(
                                         "app.kubernetes.io/component", "runtime-shim",
