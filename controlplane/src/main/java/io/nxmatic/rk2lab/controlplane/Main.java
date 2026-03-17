@@ -122,10 +122,16 @@ public final class Main {
                 }
 
                 final List<String> changes = summarizeStatus(status);
+                final List<String> relevantChanges = changes.stream()
+                        .filter(Main::isEmbeddedManifestResourcePath)
+                        .toList();
+                if (relevantChanges.isEmpty()) {
+                    return;
+                }
                 throw new IllegalStateException(
-                        "Pulumi update requires a clean git worktree. Resolve or commit local changes before running Stage A. "
+                    "Pulumi update requires a clean manifests module worktree for Stage A. Resolve or commit manifests generator/resource changes before running. "
                                 + "Worktree: " + normalizedWorktreePath
-                                + (changes.isEmpty() ? "" : "\nDirty paths:\n- " + String.join("\n- ", changes)));
+                                + "\nRelevant paths:\n- " + String.join("\n- ", relevantChanges));
             }
         } catch (IllegalStateException ex) {
             throw ex;
@@ -158,7 +164,6 @@ public final class Main {
         append(paths, status.getRemoved());
         append(paths, status.getMissing());
         append(paths, status.getUntracked());
-        append(paths, status.getUntrackedFolders());
         append(paths, status.getConflicting());
 
         final ArrayList<String> ordered = new ArrayList<>(paths);
@@ -264,6 +269,13 @@ public final class Main {
             return;
         }
         target.addAll(values);
+    }
+
+    private static boolean isEmbeddedManifestResourcePath(String path) {
+        return path != null
+                && (path.startsWith("manifests/src/main/resources/")
+                || path.startsWith("manifests/src/main/java/")
+                || "manifests/src/main/resources".equals(path));
     }
 
     @FunctionalInterface
