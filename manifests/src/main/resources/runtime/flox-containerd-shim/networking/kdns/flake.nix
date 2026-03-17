@@ -40,7 +40,7 @@
             "-w"
             "-extldflags=-static"
             "-X github.com/lab42/kdns/cmd.Version=${version}"
-            "-X github.com/lab42/kdns/cmd.Commit=${src.rev or \"dev\"}"
+            "-X github.com/lab42/kdns/cmd.Commit=${src.rev or "dev"}"
             "-X github.com/lab42/kdns/cmd.Date=1970-01-01T00:00:00Z"
           ];
 

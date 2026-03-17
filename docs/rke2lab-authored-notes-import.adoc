@@ -78,3 +78,31 @@ Constraints to preserve during this migration:
 * keep one canonical owner per workflow (no parallel systemd+init implementations)
 * keep behavior idempotent and deterministic across reruns
 * avoid introducing backward-compatibility aliases unless explicitly requested
+
+=== Node setup StatefulSet/Job migration plan baseline (current repository state)
+
+This note captures the migration baseline after runtime shim packaging and checksum-driven seed renewal updates.
+
+Current implementation facts to preserve:
+
+* host bootstrap scripts and units are still sourced from `manifests/src/main/resources/host/systemd-{scripts,units}` and materialized by `controlplane/incus`
+* runtime host mutation already has a proven Kubernetes pattern in `runtime/flox-containerd-shim` using init-container + `nsenter`
+* seed replacement is currently tied to Stage A provisioning checksum (`user.rke2lab.provisioningChecksum`) and image build checksum (`user.rke2lab.imageBuildChecksum`)
+
+Phased migration intent:
+
+. introduce a dedicated node-setup Kubernetes workload (start as DaemonSet/Job with init-container `nsenter` execution)
+. migrate low-risk/idempotent scripts first (readiness/diagnostics and non-critical one-shot setup)
+. migrate ordering-sensitive manifest install flows with explicit Kubernetes ordering and readiness gates
+. only after parity, remove corresponding host systemd unit ownership and materialization
+
+Guardrails:
+
+* keep Stage A deterministic and avoid adding compatibility aliases
+* maintain one canonical implementation per migrated workflow
+* ensure each migrated step has explicit idempotency markers and observable logs
+
+First implementation slice recommendation:
+
+* create a `node-setup` layer with one small, verifiable host-operation script executed through init-container `nsenter`
+* validate on `bioskop` with Flox active by compiling `manifests` + `controlplane`, applying generated manifests, and confirming idempotent rerun behavior

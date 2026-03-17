@@ -53,7 +53,8 @@ export FLOX_NONINTERACTIVE=1
 FLOX_SHIM_ROOT="/srv/host/flox-shim.d"
 FLOX_BUILD_SCRIPT="${FLOX_SHIM_ROOT}/flox-shim-build.sh"
 FLOX_BUILD_DESCRIPTOR="${FLOX_SHIM_ROOT}/flox-shim-build.yaml"
-FLOX_SHIM_PACKAGES_DIR="${FLOX_SHIM_ROOT}/packages"
+FLOX_SHIM_MESH_DIR="${FLOX_SHIM_ROOT}/mesh"
+FLOX_SHIM_NETWORKING_DIR="${FLOX_SHIM_ROOT}/networking"
 [[ -x "${FLOX_BUILD_SCRIPT}" ]] || {
   echo "flox build script missing or not executable: ${FLOX_BUILD_SCRIPT}" >&2
   exit 1
@@ -62,8 +63,12 @@ FLOX_SHIM_PACKAGES_DIR="${FLOX_SHIM_ROOT}/packages"
   echo "flox build descriptor missing or unreadable: ${FLOX_BUILD_DESCRIPTOR}" >&2
   exit 1
 }
-[[ -d "${FLOX_SHIM_PACKAGES_DIR}" ]] || {
-  echo "flox shim packages directory missing: ${FLOX_SHIM_PACKAGES_DIR}" >&2
+[[ -d "${FLOX_SHIM_MESH_DIR}" ]] || {
+  echo "flox shim mesh directory missing: ${FLOX_SHIM_MESH_DIR}" >&2
+  exit 1
+}
+[[ -d "${FLOX_SHIM_NETWORKING_DIR}" ]] || {
+  echo "flox shim networking directory missing: ${FLOX_SHIM_NETWORKING_DIR}" >&2
   exit 1
 }
 
@@ -82,7 +87,7 @@ ensure_flox_shim_repo() {
 }
 
 refresh_flox_shim_packages_commit() {
-  git -C "${FLOX_SHIM_ROOT}" add packages
+  git -C "${FLOX_SHIM_ROOT}" add mesh networking flox-shim-build.yaml flox-shim-build.sh
   if ! git -C "${FLOX_SHIM_ROOT}" diff --cached --quiet; then
     git -C "${FLOX_SHIM_ROOT}" commit -m "chore(flox-shim): refresh packaged flakes"
   fi

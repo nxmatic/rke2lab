@@ -75,6 +75,6 @@ Scripts in this owner set:
 ## Notes
 
 - `runtime/flox-containerd-shim` is the canonical owner for both installer and build-assets ConfigMaps mounted at `/scripts` and `/build-assets`.
-- Shim build assets are materialized under `/srv/host/flox-shim.d` (including `packages/`) and initialized as a local git repository before build execution.
+- Shim build assets are materialized under `/srv/host/flox-shim.d` (for example `mesh/...` and `networking/...`) and initialized as a local git repository before build execution.
 - Next-stage migration guidance is tracked in `docs/rke2lab-authored-notes-import.adoc` under `=== Next-stage migration note`.
 - Keep this registry updated whenever a script is added, moved, or deleted.

@@ -16,6 +16,7 @@ import java.util.Map;
 public final class FloxContainerdShimLayer extends Construct {
 
     public static final String LEGACY_PATH_PREFIX = "runtime/flox-containerd-shim/";
+        private static final String NAMESPACE = "flox-runtime";
 
     private static final String LAYER_NAME = "runtime";
     private static final String PACKAGE_NAME = "flox-containerd-shim";
@@ -43,11 +44,11 @@ public final class FloxContainerdShimLayer extends Construct {
                         .apiVersion("v1")
                         .kind("Namespace")
                         .metadata(ApiObjectMetadata.builder()
-                                .name("flox-containerd-shim")
+                                .name(NAMESPACE)
                                 .annotations(kptMetadata.packageAnnotations(
                                         LAYER_NAME,
                                         PACKAGE_NAME,
-                                        "|Namespace|default|flox-containerd-shim"
+                                        "|Namespace|default|" + NAMESPACE
                                 ))
                                 .labels(Map.of("flox.dev/component", "runtime"))
                                 .build())
@@ -91,11 +92,11 @@ public final class FloxContainerdShimLayer extends Construct {
                         .kind("ConfigMap")
                         .metadata(ApiObjectMetadata.builder()
                                 .name("flox-env")
-                                .namespace("flox-containerd-shim")
+                                .namespace(NAMESPACE)
                                 .annotations(kptMetadata.packageAnnotations(
                                         LAYER_NAME,
                                         PACKAGE_NAME,
-                                        "|ConfigMap|flox-containerd-shim|flox-env",
+                                        "|ConfigMap|" + NAMESPACE + "|flox-env",
                                         Map.of("replicator.v1.mittwald.de/replicate-to", "headscale-system")
                                 ))
                                 .labels(Map.of("app.kubernetes.io/replicated", "true"))
@@ -121,11 +122,11 @@ public final class FloxContainerdShimLayer extends Construct {
                         .kind("ConfigMap")
                         .metadata(ApiObjectMetadata.builder()
                                 .name("flox-runtime-installer-script")
-                                .namespace("flox-containerd-shim")
+                                .namespace(NAMESPACE)
                                 .annotations(kptMetadata.packageAnnotations(
                                         LAYER_NAME,
                                         PACKAGE_NAME,
-                                        "|ConfigMap|flox-containerd-shim|flox-runtime-installer-script"
+                                        "|ConfigMap|" + NAMESPACE + "|flox-runtime-installer-script"
                                 ))
                                 .build())
                         .build()
@@ -148,11 +149,11 @@ public final class FloxContainerdShimLayer extends Construct {
                         .kind("ConfigMap")
                         .metadata(ApiObjectMetadata.builder()
                                 .name("flox-container-build-assets")
-                                .namespace("flox-containerd-shim")
+                                .namespace(NAMESPACE)
                                 .annotations(kptMetadata.packageAnnotations(
                                         LAYER_NAME,
                                         PACKAGE_NAME,
-                                        "|ConfigMap|flox-containerd-shim|flox-container-build-assets"
+                                        "|ConfigMap|" + NAMESPACE + "|flox-container-build-assets"
                                 ))
                                 .build())
                         .build()
@@ -162,8 +163,8 @@ public final class FloxContainerdShimLayer extends Construct {
         configMap.addJsonPatch(JsonPatch.add("/data", Map.of(
                 "flox-shim-build.sh", readResource("/runtime/flox-containerd-shim/flox-shim-build.sh"),
                 "flox-shim-build.yaml", readResource("/runtime/flox-containerd-shim/flox-shim-build.yaml"),
-                "packages-mesh-headplane-flake.nix", readResource("/runtime/flox-containerd-shim/packages/mesh/headplane/flake.nix"),
-                "packages-networking-kdns-flake.nix", readResource("/runtime/flox-containerd-shim/packages/networking/kdns/flake.nix")
+                "mesh-headplane-flake.nix", readResource("/runtime/flox-containerd-shim/mesh/headplane/flake.nix"),
+                "networking-kdns-flake.nix", readResource("/runtime/flox-containerd-shim/networking/kdns/flake.nix")
         )));
         return configMap;
     }
@@ -190,11 +191,11 @@ public final class FloxContainerdShimLayer extends Construct {
                         .kind("ServiceAccount")
                         .metadata(ApiObjectMetadata.builder()
                                 .name("flox-runtime-installer")
-                                .namespace("flox-containerd-shim")
+                                .namespace(NAMESPACE)
                                 .annotations(kptMetadata.packageAnnotations(
                                         LAYER_NAME,
                                         PACKAGE_NAME,
-                                        "|ServiceAccount|flox-containerd-shim|flox-runtime-installer"
+                                        "|ServiceAccount|" + NAMESPACE + "|flox-runtime-installer"
                                 ))
                                 .build())
                         .build()
@@ -218,11 +219,11 @@ public final class FloxContainerdShimLayer extends Construct {
                         .kind("DaemonSet")
                         .metadata(ApiObjectMetadata.builder()
                                 .name("flox-runtime-installer")
-                                .namespace("flox-containerd-shim")
+                                .namespace(NAMESPACE)
                                 .annotations(kptMetadata.packageAnnotations(
                                         LAYER_NAME,
                                         PACKAGE_NAME,
-                                        "apps|DaemonSet|flox-containerd-shim|flox-runtime-installer"
+                                        "apps|DaemonSet|" + NAMESPACE + "|flox-runtime-installer"
                                 ))
                                 .labels(Map.of(
                                         "app.kubernetes.io/component", "runtime-shim",
