@@ -100,7 +100,7 @@ Optional keys:
 handoff:
   managementClusterName: bioskop
   apiEndpoint: https://10.66.106.10:6443
-  kubeconfigRef: /srv/host/kubeconfig.d/rke2-bioskop.yaml
+  kubeconfigRef: /srv/host/rke2lab-kube.d/rke2-bioskop.yaml
   seedNodeId: incus://rke2lab/master
   incusProject: rke2lab
   imageAlias: control-node

@@ -123,9 +123,9 @@ spec:
         - source: rke2.d/<cluster>/<node>/manifests.d
           target: /srv/host/manifests.d
         - source: rke2.d/<cluster>/<node>/environment
-          target: /srv/host/environment
+          target: /srv/host/rke2lab-environment.d
         - source: .local.d/var/kube
-          target: /srv/host/kubeconfig.d
+          target: /srv/host/rke2lab-kube.d
 
       optional:
         - source: /Users/<user>/.config/flox

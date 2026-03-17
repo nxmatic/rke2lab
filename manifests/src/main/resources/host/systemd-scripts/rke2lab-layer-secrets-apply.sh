@@ -19,7 +19,7 @@ fi
 
 layer="${1%/}"
 
-RKE2LAB_REPO_ROOT=${RKE2LAB_REPO_ROOT:-/srv/host/worktree}
+RKE2LAB_REPO_ROOT=${RKE2LAB_REPO_ROOT:-/srv/host/rke2lab-worktree.d}
 SECRETS_FILE="${RKE2LAB_REPO_ROOT}/.secrets"
 
 if [[ -z "${SECRETS_FILE}" ]]; then

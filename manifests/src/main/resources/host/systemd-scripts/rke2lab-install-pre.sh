@@ -78,8 +78,8 @@ nocloud:env:activate() {
   }
   
   RKE2LAB_ROOT=${RKE2LAB_ROOT:-/srv/host}
-  RKE2LAB_ENV_DIR=${RKE2LAB_ENV_DIR:-${RKE2LAB_ROOT}/environment.d}
-  RKE2LAB_SECRETS_FILE="${RKE2LAB_ROOT}/worktree/.secrets"
+  RKE2LAB_ENV_DIR=${RKE2LAB_ENV_DIR:-${RKE2LAB_ROOT}/rke2lab-environment.d}
+  RKE2LAB_SECRETS_FILE="${RKE2LAB_ROOT}/rke2lab-worktree.d/.secrets"
   
   : "Ensure RKE2 secrets file is present and readable (read-only source of truth)"
   [[ -s "${RKE2LAB_SECRETS_FILE}" ]] || {

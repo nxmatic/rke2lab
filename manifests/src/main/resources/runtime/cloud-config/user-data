@@ -159,7 +159,7 @@ write_files:
       journalctl:unit:follow() {
         local unit="$1"
         journalctl --unit $unit --follow --no-tail |
-          tee /srv/host/share/logs/${unit}.log
+          tee /srv/host/rke2lab-share.d/logs/${unit}.log
       }
 
       : "Configure completions"

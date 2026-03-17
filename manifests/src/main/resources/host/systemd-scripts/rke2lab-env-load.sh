@@ -3,7 +3,7 @@ set -euo pipefail
 
 # @codebase
 # Load RKE2Lab environment variables from sectioned ConfigMap/Secret manifests.
-# Contract: environment manifests are mounted at ${RKE2LAB_ENV_DIR} (default: /srv/host/environment.d)
+# Contract: environment manifests are mounted at ${RKE2LAB_ENV_DIR} (default: /srv/host/rke2lab-environment.d)
 
 RKE2LAB_SCRIPTS_DIR=${RKE2LAB_ROOT:=/srv/host}/systemd-scripts.d
 HOME=/root
@@ -39,7 +39,7 @@ rke2lab::env:load() {
 	local root env_dir files_count yq_cmd
 
 	root=${RKE2LAB_ROOT:-/srv/host}
-	env_dir=${RKE2LAB_ENV_DIR:-${root}/environment.d}
+	env_dir=${RKE2LAB_ENV_DIR:-${root}/rke2lab-environment.d}
 
 	if [[ ! -d "${env_dir}" ]]; then
 		echo "[rke2lab-env] missing environment directory: ${env_dir}" >&2

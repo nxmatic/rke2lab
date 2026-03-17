@@ -246,9 +246,9 @@ public final class IncusResourceBootstrap {
                                   .vmnetNic(config.vmnetNetworkName())
                                   .kmsgDevice()
                                   .zfsDevice()
-                      .disk("worktree.dir", hostPaths.worktreeRoot(), "/srv/host/worktree")
+                      .disk("worktree.dir", hostPaths.worktreeRoot(), "/srv/host/rke2lab-worktree.d")
                       .disk("rke2lab.env.dir", hostPaths.runtimeEnvConfigRoot(),
-                                          "/srv/host/environment.d")
+                                          "/srv/host/rke2lab-environment.d")
                       .disk("rke2lab.scripts.dir", hostPaths.scriptsRoot(),
                                           "/srv/host/systemd-scripts.d")
                       .disk("git.dir", hostPaths.gitRoot(), "/srv/host/git")
@@ -259,9 +259,9 @@ public final class IncusResourceBootstrap {
                                           "/srv/host/rke2-config")
                       .disk("cloudconfig.nocloud.dir", hostPaths.runtimeCloudConfigRoot(),
                                           "/srv/host/cloudconfig-nocloud")
-                      .disk("shared.dir", hostPaths.shareRoot(), "/srv/host/share.d")
+                      .disk("shared.dir", hostPaths.shareRoot(), "/srv/host/rke2lab-share.d")
                       .disk("kubeconfig.dir", hostPaths.kubeconfigRoot(),
-                                          "/srv/host/kubeconfig.d")
+                                          "/srv/host/rke2lab-kube.d")
                       .disk("nocloud.dir", hostPaths.cloudSeedRoot(), "/var/lib/cloud/seed/nocloud")
                                   .build();
     }
