@@ -54,12 +54,6 @@ public final class Main {
   private static BootstrapOutputs bootstrapAndCollectOutputs(BootstrapConfig config) {
     enforceEntryGatePolicies(config.localWorktreePath());
 
-    if (!"bioskop".equals(config.clusterName())) {
-      throw new IllegalStateException(
-          "Stage A bootstrap supports management cluster 'bioskop' only. "
-              + "Set cluster.name=bioskop.");
-    }
-
     final String bootstrapPhase;
     final boolean handoffReady;
     final IncusResourceBootstrap.BootstrapResult bootstrapResult =

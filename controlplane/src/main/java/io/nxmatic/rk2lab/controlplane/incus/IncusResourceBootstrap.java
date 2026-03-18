@@ -24,6 +24,7 @@ import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig.WorktreeHost;
 import io.nxmatic.rk2lab.controlplane.incus.image.PulumiIncusImageProvider;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributorRegistry;
+import io.nxmatic.rk2lab.netplan.ClusterNetworkBlueprint;
 import java.io.IOException;
 import java.net.JarURLConnection;
 import java.net.URL;
@@ -164,7 +165,7 @@ public final class IncusResourceBootstrap {
       classpathAssetMaterializer.materializeManifests(localPaths.manifestsRoot());
       classpathAssetMaterializer.materializeHostSystemdAssets(
           localPaths.manifestsRoot().resolve("host"));
-      LayerEnvContext layerContext = new BootstrapLayerEnvContextImpl();
+      LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
       runtimeEnvControlplaneOverlayWriter.write(localPaths.runtimeEnvConfigRoot(), layerContext);
       hostMountSourceVerifier.ensureSources(localPaths);
       nodeConfigRegenerator.regenerateCloudConfigDir(
@@ -308,10 +309,20 @@ public final class IncusResourceBootstrap {
     launchSecretsUpdater.ensureTokensPresent(secretsFile);
   }
 
+  private ClusterNetworkBlueprint deriveBlueprint(String nodeName) {
+    return ClusterNetworkBlueprint.builder()
+        .cluster(config.clusterName())
+        .node(nodeName)
+        .deriveRecipeModel()
+        .build();
+  }
+
   private List<InstanceDeviceArgs> seedInstanceDevices(BootstrapPaths hostPaths) {
+    final ClusterNetworkBlueprint managementNodeBlueprint = deriveBlueprint(config.nodeName());
+
     return DeviceMountPipeline.builder()
-        .lanNic(config.lanBridgeParent())
-        .vmnetNic(config.vmnetNetworkName())
+        .lanNic(config.lanBridgeParent(), managementNodeBlueprint.lan().hostMacaddr().value())
+        .vmnetNic(config.vmnetNetworkName(), managementNodeBlueprint.wan().hostMacaddr().value())
         .kmsgDevice()
         .zfsDevice()
         .disk("worktree.dir", hostPaths.worktreeRoot(), HOST_WORKTREE_PATH)
@@ -413,7 +424,10 @@ public final class IncusResourceBootstrap {
     }
   }
 
-  private final class BootstrapLayerEnvContextImpl implements LayerEnvContext {
+  private final class DefaultBootstrapLayerEnvContext implements LayerEnvContext {
+
+    private final ClusterNetworkBlueprint managementNodeBlueprint =
+        deriveBlueprint(config.nodeName());
 
     @Override
     public Path rootPath() {
@@ -462,7 +476,7 @@ public final class IncusResourceBootstrap {
 
     @Override
     public int nodeId() {
-      return 0; // Master node
+      return managementNodeBlueprint.node().id();
     }
 
     @Override
@@ -472,12 +486,15 @@ public final class IncusResourceBootstrap {
 
     @Override
     public String nodeKind() {
-      return "server"; // Server node in RKE2 terminology
+      return switch (managementNodeBlueprint.node().type()) {
+        case SERVER -> "server";
+        case AGENT -> "agent";
+      };
     }
 
     @Override
     public int clusterId() {
-      return 0;
+      return managementNodeBlueprint.cluster().id();
     }
 
     @Override
@@ -497,7 +514,7 @@ public final class IncusResourceBootstrap {
 
     @Override
     public String clusterCidr() {
-      return "10.80.0.0/21";
+      return managementNodeBlueprint.host().clusterCidr().toString();
     }
 
     @Override
@@ -512,17 +529,17 @@ public final class IncusResourceBootstrap {
 
     @Override
     public String nodeHostInetAddr() {
-      return "10.80.0.10";
+      return managementNodeBlueprint.nodeNetwork().nodeHostInetaddr().getHostAddress();
     }
 
     @Override
     public String nodeNetworkCidr() {
-      return "10.80.0.0/23";
+      return managementNodeBlueprint.nodeNetwork().nodeCidr().toString();
     }
 
     @Override
     public String nodeNetworkGatewayAddr() {
-      return "10.80.0.1";
+      return managementNodeBlueprint.nodeNetwork().nodeGatewayInetaddr().getHostAddress();
     }
   }
 
@@ -765,12 +782,7 @@ public final class IncusResourceBootstrap {
   }
 
   private Map<String, String> vmnetBridgeConfig() {
-    final ClusterNetworkBlueprint managementNodeBlueprint =
-        ClusterNetworkBlueprint.builder()
-            .cluster(config.clusterName())
-            .node(config.nodeName())
-            .deriveRecipeModel()
-            .build();
+    final ClusterNetworkBlueprint managementNodeBlueprint = deriveBlueprint(config.nodeName());
 
     final String clusterGatewayWithPrefix =
         managementNodeBlueprint.host().clusterGatewayInetaddr().getHostAddress()
@@ -781,13 +793,7 @@ public final class IncusResourceBootstrap {
 
     final String rawDnsmasq =
         CLUSTER_NODE_NAMES.stream()
-            .map(
-                nodeName ->
-                    ClusterNetworkBlueprint.builder()
-                        .cluster(config.clusterName())
-                        .node(nodeName)
-                        .deriveRecipeModel()
-                        .build())
+            .map(this::deriveBlueprint)
             .map(
                 blueprint ->
                     "dhcp-host="
@@ -828,24 +834,14 @@ public final class IncusResourceBootstrap {
       return new DeviceMountPipeline();
     }
 
-    private DeviceMountPipeline lanNic(String parentBridge) {
+    private DeviceMountPipeline lanNic(String parentBridge, String hwaddr) {
       return nic(
           "lan0",
-          Map.of(
-              "hwaddr",
-              "10:66:6a:4c:00:00",
-              "name",
-              "lan0",
-              "nictype",
-              "bridged",
-              "parent",
-              parentBridge));
+          Map.of("hwaddr", hwaddr, "name", "lan0", "nictype", "bridged", "parent", parentBridge));
     }
 
-    private DeviceMountPipeline vmnetNic(String networkName) {
-      return nic(
-          "vmnet0",
-          Map.of("hwaddr", "52:54:00:00:00:00", "name", "vmnet0", "network", networkName));
+    private DeviceMountPipeline vmnetNic(String networkName, String hwaddr) {
+      return nic("vmnet0", Map.of("hwaddr", hwaddr, "name", "vmnet0", "network", networkName));
     }
 
     private DeviceMountPipeline kmsgDevice() {

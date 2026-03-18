@@ -23,6 +23,7 @@
     <cdk8s.plus33.version>2.0.0</cdk8s.plus33.version>
     <slf4j.version>2.0.16</slf4j.version>
     <logback.version>1.5.17</logback.version>
+    <ipaddress.version>5.5.1</ipaddress.version>
   </properties>
 
   <dependencyManagement>
@@ -42,6 +43,11 @@
       <dependency>
         <groupId>io.nxmatic</groupId>
         <artifactId>rke2lab-manifests</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic</groupId>
+        <artifactId>rke2lab-netplan</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <!-- third-party dependencies -->
@@ -89,6 +95,11 @@
         <groupId>ch.qos.logback</groupId>
         <artifactId>logback-classic</artifactId>
         <version>${logback.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.seancfoley</groupId>
+        <artifactId>ipaddress</artifactId>
+        <version>${ipaddress.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

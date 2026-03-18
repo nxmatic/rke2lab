@@ -105,15 +105,15 @@ public record BootstrapConfig(
 
     private String incusProject = "rke2lab";
 
-    private String incusDefaultRemote = "bioskop-nixos";
+    private String incusDefaultRemote = defaults.incusDefaultRemote();
 
-    private URI incusRemoteAddress = URI.create("https://bioskop-nixos.local:8443");
+    private URI incusRemoteAddress = defaults.incusRemoteAddress();
 
     private Path incusConfigDir = defaults.incusConfigDir();
 
     private String imageAlias = "control-node";
 
-    private String imageBuilderHost = "bioskop-nixos.local";
+    private String imageBuilderHost = defaults.imageBuilderHost();
 
     private URI imageDistrobuilderConfig =
         URI.create(
@@ -289,6 +289,12 @@ public record BootstrapConfig(
   }
 
   private static final class Defaults {
+    private static final String LIMA_HOSTNAME_ENV = "LIMA_HOSTNAME";
+
+    private static final String DEFAULT_LIMA_HOSTNAME = "bioskop-nixos.local";
+
+    private static final int INCUS_REMOTE_PORT = 8443;
+
     Path incusConfigDir() {
       final String env = System.getenv("INCUS_CONFIG_DIR");
       if (env != null && !env.isBlank()) {
@@ -319,6 +325,31 @@ public record BootstrapConfig(
       }
 
       return Path.of(WORKTREE_REPO_PATH_FALLBACK).toAbsolutePath().normalize();
+    }
+
+    String imageBuilderHost() {
+      return limaHostname();
+    }
+
+    String incusDefaultRemote() {
+      final String hostname = limaHostname();
+      final int dotIndex = hostname.indexOf('.');
+      if (dotIndex <= 0) {
+        return hostname;
+      }
+      return hostname.substring(0, dotIndex);
+    }
+
+    URI incusRemoteAddress() {
+      return URI.create("https://" + limaHostname() + ":" + INCUS_REMOTE_PORT);
+    }
+
+    String limaHostname() {
+      final String env = System.getenv(LIMA_HOSTNAME_ENV);
+      if (env == null || env.isBlank()) {
+        return DEFAULT_LIMA_HOSTNAME;
+      }
+      return env.trim();
     }
 
     String gitTopLevel(String workingDirectory) {

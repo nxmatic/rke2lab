@@ -14,6 +14,10 @@ public final class PorchResourcesLayer extends Construct {
 
   public static final String LEGACY_PATH_PREFIX = "gitops/porch-resources/";
 
+  private static final String CLUSTER_NAME = "${cluster-name}";
+
+  private static final String CLUSTER_ENV = "${cluster-env}";
+
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("gitops", "porch-resources");
 
@@ -36,13 +40,13 @@ public final class PorchResourcesLayer extends Construct {
     ApiObject repository =
         new ApiObject(
             this,
-            "repository-bioskop-catalog",
+            "repository-catalog",
             ApiObjectProps.builder()
                 .apiVersion("config.porch.kpt.dev/v1alpha1")
                 .kind("Repository")
                 .metadata(
                     ApiObjectMetadata.builder()
-                        .name("bioskop-catalog")
+                        .name(catalogRepoName())
                         .namespace("porch-system")
                         .annotations(
                             packageProfile.packageAnnotations(
@@ -50,26 +54,25 @@ public final class PorchResourcesLayer extends Construct {
                         .build())
                 .build());
 
-    repository.addJsonPatch(
-        JsonPatch.add(
-            "/spec",
+    addSpec(
+        repository,
+        Map.of(
+            "deployment",
+            true,
+            "description",
+            "Catalog of curated kpt packages tracked in rke2lab",
+            "git",
             Map.of(
-                "deployment",
-                true,
-                "description",
-                "Catalog of curated kpt packages tracked in rke2lab",
-                "git",
-                Map.of(
-                    "branch",
-                    "main",
-                    "directory",
-                    "catalog",
-                    "repo",
-                    "https://github.com/nxmatic/rke2lab.git",
-                    "secretRef",
-                    "${github-secret}"),
-                "type",
-                "git")));
+                "branch",
+                "main",
+                "directory",
+                "catalog",
+                "repo",
+                "https://github.com/nxmatic/rke2lab.git",
+                "secretRef",
+                "${github-secret}"),
+            "type",
+            "git"));
 
     return repository;
   }
@@ -78,42 +81,41 @@ public final class PorchResourcesLayer extends Construct {
     ApiObject repository =
         new ApiObject(
             this,
-            "repository-bioskop-state",
+            "repository-state",
             ApiObjectProps.builder()
                 .apiVersion("config.porch.kpt.dev/v1alpha1")
                 .kind("Repository")
                 .metadata(
                     ApiObjectMetadata.builder()
-                        .name("bioskop-state")
+                        .name(stateRepoName())
                         .namespace("porch-system")
                         .annotations(
                             packageProfile.packageAnnotations(
-                                "config.porch.kpt.dev|Repository|porch-system|cluster-name-state"))
+                                "config.porch.kpt.dev|Repository|porch-system|${cluster-name}-state"))
                         .build())
                 .build());
 
-    repository.addJsonPatch(
-        JsonPatch.add(
-            "/spec",
+    addSpec(
+        repository,
+        Map.of(
+            "deployment",
+            true,
+            "description",
+            "Rendered Porch package state for ${cluster-name} cluster",
+            "git",
             Map.of(
-                "deployment",
+                "branch",
+                "main",
+                "createBranch",
                 true,
-                "description",
-                "Rendered Porch package state for bioskop cluster",
-                "git",
-                Map.of(
-                    "branch",
-                    "main",
-                    "createBranch",
-                    true,
-                    "directory",
-                    "rke2/bioskop/catalog",
-                    "repo",
-                    "https://github.com/nxmatic/rke2lab.git",
-                    "secretRef",
-                    "${github-secret}"),
-                "type",
-                "git")));
+                "directory",
+                stateRepoDirectory(),
+                "repo",
+                "https://github.com/nxmatic/rke2lab.git",
+                "secretRef",
+                "${github-secret}"),
+            "type",
+            "git"));
 
     return repository;
   }
@@ -127,7 +129,7 @@ public final class PorchResourcesLayer extends Construct {
         "networking/cilium",
         Map.of(
             "cluster-name",
-            "bioskop",
+            CLUSTER_NAME,
             "nxmatic.dev/app",
             "cilium",
             "nxmatic.dev/component",
@@ -142,7 +144,7 @@ public final class PorchResourcesLayer extends Construct {
             "cluster-lb-cidr",
             "10.80.0.64/26",
             "cluster-name",
-            "bioskop-cluster",
+            clusterQualifiedName(),
             "cluster-node-gateway-inetaddr",
             "10.80.0.1",
             "cluster-vip-cidr",
@@ -164,7 +166,7 @@ public final class PorchResourcesLayer extends Construct {
         "networking/envoy-gateway",
         Map.of(
             "cluster-name",
-            "bioskop",
+            CLUSTER_NAME,
             "nxmatic.dev/app",
             "envoy-gateway",
             "nxmatic.dev/component",
@@ -184,7 +186,7 @@ public final class PorchResourcesLayer extends Construct {
         "ha/kube-vip",
         Map.of(
             "cluster-name",
-            "bioskop",
+            CLUSTER_NAME,
             "nxmatic.dev/app",
             "kube-vip",
             "nxmatic.dev/component",
@@ -211,7 +213,7 @@ public final class PorchResourcesLayer extends Construct {
         "mesh/headscale",
         Map.of(
             "cluster-name",
-            "bioskop",
+            CLUSTER_NAME,
             "nxmatic.dev/app",
             "headscale",
             "nxmatic.dev/component",
@@ -222,11 +224,11 @@ public final class PorchResourcesLayer extends Construct {
             "cluster-lan-lb-cidr",
             "192.168.1.192/27",
             "cluster-name",
-            "bioskop",
+            CLUSTER_NAME,
             "cluster-vip-cidr",
             "10.80.7.0/24",
             "darwin-host",
-            "bioskop"),
+            CLUSTER_NAME),
         catalogRepo,
         stateRepo);
   }
@@ -240,7 +242,7 @@ public final class PorchResourcesLayer extends Construct {
         "mesh/tailscale",
         Map.of(
             "cluster-name",
-            "bioskop",
+            CLUSTER_NAME,
             "nxmatic.dev/app",
             "tailscale",
             "nxmatic.dev/component",
@@ -249,7 +251,7 @@ public final class PorchResourcesLayer extends Construct {
             "cluster-lb-cidr",
             "10.80.0.64/26",
             "cluster-name",
-            "bioskop-cluster",
+            clusterQualifiedName(),
             "cluster-node-vip-inetaddr",
             "10.80.7.10",
             "tailscale-namespace",
@@ -269,7 +271,7 @@ public final class PorchResourcesLayer extends Construct {
         "runtime/flox-containerd-shim",
         Map.of(
             "cluster-name",
-            "bioskop",
+            CLUSTER_NAME,
             "nxmatic.dev/app",
             "flox-containerd-shim",
             "nxmatic.dev/component",
@@ -302,7 +304,7 @@ public final class PorchResourcesLayer extends Construct {
         "storage-openebs-zfs",
         Map.of(
             "cluster-name",
-            "bioskop",
+            CLUSTER_NAME,
             "nxmatic.dev/app",
             "openebs-zfs",
             "nxmatic.dev/component",
@@ -338,30 +340,49 @@ public final class PorchResourcesLayer extends Construct {
     packageVariant.addDependency(catalogRepo);
     packageVariant.addDependency(stateRepo);
 
-    packageVariant.addJsonPatch(
-        JsonPatch.add(
-            "/spec",
+    addSpec(
+        packageVariant,
+        Map.of(
+            "adoptionPolicy",
+            "adoptNone",
+            "deletionPolicy",
+            "delete",
+            "downstream",
+            Map.of("package", packageName, "repo", stateRepoName()),
+            "labels",
+            labels,
+            "packageContext",
+            Map.of("data", Map.of("cluster-env", CLUSTER_ENV, "cluster-name", CLUSTER_NAME)),
+            "pipeline",
             Map.of(
-                "adoptionPolicy",
-                "adoptNone",
-                "deletionPolicy",
-                "delete",
-                "downstream",
-                Map.of("package", packageName, "repo", "bioskop-state"),
-                "labels",
-                labels,
-                "packageContext",
-                Map.of("data", Map.of("cluster-env", "dave", "cluster-name", "bioskop")),
-                "pipeline",
-                Map.of(
-                    "mutators",
-                    List.of(
-                        Map.of(
-                            "configMap",
-                            mutatorConfig,
-                            "image",
-                            "ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2"))),
-                "upstream",
-                Map.of("package", packageName, "repo", "bioskop-catalog"))));
+                "mutators",
+                List.of(
+                    Map.of(
+                        "configMap",
+                        mutatorConfig,
+                        "image",
+                        "ghcr.io/kptdev/krm-functions-catalog/apply-setters:v0.2"))),
+            "upstream",
+            Map.of("package", packageName, "repo", catalogRepoName())));
+  }
+
+  private static void addSpec(ApiObject apiObject, Map<String, Object> spec) {
+    apiObject.addJsonPatch(JsonPatch.add("/spec", spec));
+  }
+
+  private static String catalogRepoName() {
+    return CLUSTER_NAME + "-catalog";
+  }
+
+  private static String stateRepoName() {
+    return CLUSTER_NAME + "-state";
+  }
+
+  private static String stateRepoDirectory() {
+    return "rke2/" + CLUSTER_NAME + "/catalog";
+  }
+
+  private static String clusterQualifiedName() {
+    return CLUSTER_NAME + "-cluster";
   }
 }

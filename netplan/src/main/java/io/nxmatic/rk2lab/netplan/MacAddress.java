@@ -1,4 +1,4 @@
-package io.nxmatic.rk2lab.controlplane.incus;
+package io.nxmatic.rk2lab.netplan;
 
 import java.util.Locale;
 import java.util.regex.Pattern;

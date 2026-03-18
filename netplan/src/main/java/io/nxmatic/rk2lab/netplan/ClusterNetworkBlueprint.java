@@ -1,4 +1,4 @@
-package io.nxmatic.rk2lab.controlplane.incus;
+package io.nxmatic.rk2lab.netplan;
 
 import java.net.InetAddress;
 
@@ -24,7 +24,14 @@ public record ClusterNetworkBlueprint(
     return new Builder();
   }
 
+  /** Return the canonical cluster topology: 1 master + 3 control nodes + 2 worker nodes. */
+  public static ClusterTopology topology() {
+    return ClusterTopology.CANONICAL;
+  }
+
   private static ClusterNetworkBlueprint derive(String clusterName, String nodeName) {
+    validateNodeName(nodeName);
+
     final int clusterId = clusterId(clusterName);
 
     final int nodeId = nodeId(nodeName);
@@ -156,6 +163,20 @@ public record ClusterNetworkBlueprint(
     };
   }
 
+  private static void validateNodeName(String nodeName) {
+    // Validate that the node name corresponds to the canonical topology
+    // (1 master + 3 peers + 2 workers)
+    if (!("master".equals(nodeName)
+        || nodeName.matches("peer[1-3]")
+        || nodeName.matches("worker[1-2]"))) {
+      throw new IllegalArgumentException(
+          "Node name '"
+              + nodeName
+              + "' does not conform to canonical topology "
+              + "(master, peer1-3, worker1-2)");
+    }
+  }
+
   private static InetAddress inet(String value) {
     return Cidr.parseAddress(value);
   }
@@ -223,6 +244,20 @@ public record ClusterNetworkBlueprint(
   public record InterfacePlan(String lanInterface, String wanInterface, String vipInterface) {}
 
   public record VlanPlan(int id, String name) {}
+
+  /**
+   * Canonical cluster topology: 1 master, 3 control nodes (peers), 2 worker nodes.
+   *
+   * <p>This is the expected node composition for every cluster managed by the rke2lab
+   * control-plane.
+   */
+  public record ClusterTopology(int masterCount, int controlNodeCount, int workerNodeCount) {
+    public static final ClusterTopology CANONICAL = new ClusterTopology(1, 3, 2);
+
+    public int totalNodeCount() {
+      return masterCount + controlNodeCount + workerNodeCount;
+    }
+  }
 
   /** Fluent API for deriving blueprint from cluster/node identity. */
   public static final class Builder {
