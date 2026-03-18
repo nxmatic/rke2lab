@@ -16,7 +16,7 @@ public final class RuntimeDomainRegistrar implements LayerDomainRegistrar {
             new RKE2LabEnvConfigManifestUnit(),
             new RKE2ConfigManifestUnit(),
             new CloudConfigManifestUnit(),
-            new RuntimeDaemonsetManifestUnit(),
+            new RuntimeDaemonsetScriptPolicyManifestUnit(),
             new FloxContainerdShimManifestUnit()));
   }
 }

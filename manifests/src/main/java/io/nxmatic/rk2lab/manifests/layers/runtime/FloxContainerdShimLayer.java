@@ -388,7 +388,7 @@ public final class FloxContainerdShimLayer extends Construct {
                                         "daemonset-logging.sh")
                                   },
                                   "name",
-                                  RuntimeDaemonsetLayer.SCRIPT_POLICY_CONFIGMAP_NAME),
+                                  RuntimeDaemonsetScriptPolicyLayer.SCRIPT_POLICY_CONFIGMAP_NAME),
                               "name",
                               "runtime-daemonset-script-policy"),
                           Map.of(

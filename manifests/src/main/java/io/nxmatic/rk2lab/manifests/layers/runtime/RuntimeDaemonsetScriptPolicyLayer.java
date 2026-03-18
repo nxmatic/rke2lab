@@ -12,9 +12,7 @@ import org.cdk8s.ApiObjectProps;
 import org.cdk8s.JsonPatch;
 import software.constructs.Construct;
 
-public final class RuntimeDaemonsetLayer extends Construct {
-
-  public static final String LEGACY_PATH_PREFIX = "runtime/daemonset/";
+public final class RuntimeDaemonsetScriptPolicyLayer extends Construct {
 
   public static final String SCRIPT_POLICY_CONFIGMAP_NAME = "runtime-daemonset-script-policy";
 
@@ -26,7 +24,7 @@ public final class RuntimeDaemonsetLayer extends Construct {
 
   private final KptMetadata kptMetadata = new KptMetadata();
 
-  public RuntimeDaemonsetLayer(final Construct scope, final String id) {
+  public RuntimeDaemonsetScriptPolicyLayer(final Construct scope, final String id) {
     super(scope, id);
     createScriptPolicyConfigMap();
   }
@@ -60,7 +58,8 @@ public final class RuntimeDaemonsetLayer extends Construct {
   }
 
   private String readResource(final String resourcePath) {
-    final InputStream input = RuntimeDaemonsetLayer.class.getResourceAsStream(resourcePath);
+    final InputStream input =
+        RuntimeDaemonsetScriptPolicyLayer.class.getResourceAsStream(resourcePath);
     if (input == null) {
       throw new IllegalStateException("Missing runtime daemonset resource: " + resourcePath);
     }

@@ -8,6 +8,7 @@ import com.pulumi.deployment.Deployment;
 import com.pulumi.deployment.InvokeOptions;
 import com.pulumi.deployment.InvokeOutputOptions;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -90,11 +91,11 @@ public class Utilities {
       throw new IllegalStateException(
           java.lang.String.format("expected resource '%s' on Classpath, not found", resourceName));
     }
-    version =
-        new BufferedReader(new InputStreamReader(versionFile))
-            .lines()
-            .collect(Collectors.joining("\n"))
-            .trim();
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(versionFile))) {
+      version = reader.lines().collect(Collectors.joining("\n")).trim();
+    } catch (IOException e) {
+      throw new RuntimeException("cannot load version from '" + resourceName + "'", e);
+    }
   }
 
   public static CompletableFuture<java.lang.String> getPackageRef() {
