@@ -78,6 +78,9 @@
         "pkg-group": "keyhole",
         "outputs": "all"
       },
+      "graphviz": {
+        "pkg-path": "graphviz"
+      },
       "helmfile": {
         "pkg-path": "helmfile",
         "pkg-group": "k8s-kubectl-tools",
@@ -2361,6 +2364,67 @@
       "priority": 5
     },
     {
+      "attr_path": "graphviz",
+      "broken": false,
+      "derivation": "/nix/store/4mbrbp8n8qq41b2hvsdrjvmsi9sh2mig-graphviz-12.2.1.drv",
+      "description": "Graph visualization tools",
+      "install_id": "graphviz",
+      "license": "EPL-1.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=88d3861acdd3d2f0e361767018218e51810df8a1",
+      "name": "graphviz-12.2.1",
+      "pname": "graphviz",
+      "rev": "88d3861acdd3d2f0e361767018218e51810df8a1",
+      "rev_count": 931542,
+      "rev_date": "2026-01-21T18:02:10Z",
+      "scrape_date": "2026-01-23T04:32:31.395106Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "12.2.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/95s5pz5p0nk7av9sm7ig6kiq7gqcasxz-graphviz-12.2.1"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "graphviz",
+      "broken": false,
+      "derivation": "/nix/store/a8vp07722jn0fj2v94xw832y7m2npyw9-graphviz-12.2.1.drv",
+      "description": "Graph visualization tools",
+      "install_id": "graphviz",
+      "license": "EPL-1.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=88d3861acdd3d2f0e361767018218e51810df8a1",
+      "name": "graphviz-12.2.1",
+      "pname": "graphviz",
+      "rev": "88d3861acdd3d2f0e361767018218e51810df8a1",
+      "rev_count": 931542,
+      "rev_date": "2026-01-21T18:02:10Z",
+      "scrape_date": "2026-01-23T05:12:36.157320Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "12.2.1",
+      "outputs_to_install": [
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/x62wfav09lvdwmw5dnk6hhbfcg0v2706-graphviz-12.2.1"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "jdk25",
       "broken": false,
       "derivation": "/nix/store/4g2vqin5qnhllv6djn7krg27mw638s8y-zulu-ca-jdk-25.0.0.drv",
@@ -2715,6 +2779,9 @@
           "systems": [
             "aarch64-linux"
           ]
+        },
+        "graphviz": {
+          "pkg-path": "graphviz"
         },
         "pulumi": {
           "pkg-path": "pulumi-bin"

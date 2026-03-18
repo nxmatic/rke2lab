@@ -138,7 +138,7 @@ public final class HeadplaneLayer extends Construct {
                     + "  --from-literal=preauthkey=\"${AUTHKEY}\" \\\n"
                     + "  --dry-run=client -o yaml | kubectl apply -f -\n\n"
                     + "yq eval '.server.base_url = strenv(HEADPLANE_BASE_URL) |\n"
-                    + "  .server.cookie_secure = (strenv(HEADPLANE_COOKIE_SECURE) == \"true\") |\n"
+                    + "  .server.cookie_secure = (strenv(HEADPLANE_COOKIE_SECURE) | downcase == \"true\") |\n"
                     + "  .headscale.url = strenv(HEADSCALE_SERVICE_URL)' \\\n"
                     + "  /etc/headplane-template/config.yaml > /tmp/config.$$.yaml\n"
                     + "kubectl create secret generic headplane-config \\\n"
