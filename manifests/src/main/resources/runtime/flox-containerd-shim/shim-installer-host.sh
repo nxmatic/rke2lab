@@ -276,9 +276,10 @@ config::format:yaml:to() {
   PREAMBLE=""
   if [[ "${head}" =~ \{\{.*\}\} ]]; then
     PREAMBLE="${head}"
-    tail -n +2 "${file}" | dasel -r toml -w yaml '.'
+    tail -n +2 "${file}" | 
+      dasel -i toml -o yaml
   else
-    dasel -r toml -w yaml -f "${file}" '.'
+    dasel -i toml -o yaml < "${file}"
   fi
 }
 
