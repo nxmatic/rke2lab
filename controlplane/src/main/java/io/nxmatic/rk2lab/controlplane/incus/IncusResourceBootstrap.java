@@ -361,17 +361,8 @@ public final class IncusResourceBootstrap {
         // Aggregate all layer contributions and create 99-configmap with merged vars
         Map<String, String> aggregatedVars = new LinkedHashMap<>();
 
-        // Add host path constants first (bootstrap-level)
-        aggregatedVars.put("RKE2LAB_ROOT", HOST_ROOT_PATH);
+        // Add bootstrap-only constants first; contributor-owned sections override as needed
         aggregatedVars.put("RKE2LAB_REPO_ROOT", HOST_WORKTREE_PATH);
-        aggregatedVars.put("RKE2LAB_ENV_DIR", HOST_ENV_DIR_PATH);
-        aggregatedVars.put("RKE2LAB_SCRIPTS_DIR", HOST_SCRIPTS_DIR_PATH);
-        aggregatedVars.put("RKE2LAB_SYSTEMD_DIR", HOST_SYSTEMD_DIR_PATH);
-        aggregatedVars.put("RKE2LAB_MANIFESTS_DIR", HOST_MANIFESTS_DIR_PATH);
-        aggregatedVars.put("RKE2LAB_CONFIG_DIR", HOST_RKE2_CONFIG_DIR_PATH);
-        aggregatedVars.put("RKE2LAB_CLOUDCONFIG_NO_CLOUD_DIR", HOST_CLOUDCONFIG_NO_CLOUD_DIR_PATH);
-        aggregatedVars.put("RKE2LAB_SHARED_DIR", HOST_SHARE_DIR_PATH);
-        aggregatedVars.put("RKE2LAB_KUBECONFIG_DIR", HOST_KUBECONFIG_DIR_PATH);
 
         // Add layer contributions (later ones override earlier)
         aggregatedVars.putAll(registry.aggregateContributions());

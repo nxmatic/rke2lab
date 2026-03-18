@@ -123,37 +123,6 @@ public final class RuntimeEnvConfigLayer extends Construct {
 
   private Map<String, String> resolveBuiltInSection(final String section) {
     return switch (section) {
-      case "cluster" ->
-          Map.of(
-              "RKE2LAB_CLUSTER_ID", Integer.toString(layerEnvContext.clusterId()),
-              "RKE2LAB_CLUSTER_NAME", layerEnvContext.clusterName(),
-              "RKE2LAB_CLUSTER_TOKEN", layerEnvContext.clusterToken(),
-              "RKE2LAB_CLUSTER_DOMAIN", layerEnvContext.clusterDomain());
-      case "node" ->
-          Map.of(
-              "RKE2LAB_NODE_ID", Integer.toString(layerEnvContext.nodeId()),
-              "RKE2LAB_NODE_NAME", layerEnvContext.nodeName(),
-              "RKE2LAB_NODE_KIND", layerEnvContext.nodeKind());
-      case "paths" ->
-          Map.of(
-              "RKE2LAB_ROOT",
-              layerEnvContext.rootPath().toString(),
-              "RKE2LAB_ENV_DIR",
-              layerEnvContext.envDirPath().toString(),
-              "RKE2LAB_SCRIPTS_DIR",
-              layerEnvContext.scriptsDirPath().toString(),
-              "RKE2LAB_SYSTEMD_DIR",
-              layerEnvContext.systemdDirPath().toString(),
-              "RKE2LAB_CONFIG_DIR",
-              layerEnvContext.configDirPath().toString(),
-              "RKE2LAB_CLOUDCONFIG_NO_CLOUD_DIR",
-              layerEnvContext.cloudconfigNocloudDirPath().toString(),
-              "RKE2LAB_MANIFESTS_DIR",
-              layerEnvContext.manifestsDirPath().toString(),
-              "RKE2LAB_SHARED_DIR",
-              layerEnvContext.sharedDirPath().toString(),
-              "RKE2LAB_KUBECONFIG_DIR",
-              layerEnvContext.kubeconfigDirPath().toString());
       case "kpt" -> Map.of("KRM_FN_RUNTIME", "nerdctl");
       default -> Map.of();
     };
