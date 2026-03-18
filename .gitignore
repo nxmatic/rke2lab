@@ -15,3 +15,6 @@ target/
 
 # GitHub temporary folders
 .github/**/tmp
+
+# Local files
+.local.d
