@@ -86,17 +86,18 @@ public final class HeadplaneLayer extends Construct {
     ApiObject configMap =
         new ApiObject(
             this,
-            "configmap-headplane-env",
+            "configmap-" + MeshLayerRefs.HEADPLANE_ENV_CONFIGMAP.name(),
             ApiObjectProps.builder()
                 .apiVersion("v1")
                 .kind("ConfigMap")
                 .metadata(
                     ApiObjectMetadata.builder()
-                        .name("headplane-env")
+                        .name(MeshLayerRefs.HEADPLANE_ENV_CONFIGMAP.name())
                         .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
-                                "|ConfigMap|${headscale-namespace}|headplane-env"))
+                                "|ConfigMap|${headscale-namespace}|"
+                                    + MeshLayerRefs.HEADPLANE_ENV_CONFIGMAP.name()))
                         .build())
                 .build());
 
@@ -114,6 +115,10 @@ public final class HeadplaneLayer extends Construct {
                 HEADSCALE_NAMESPACE,
                 "HEADSCALE_SERVICE_URL",
                 "http://headscale." + HEADSCALE_NAMESPACE + ".svc.cluster.local:8080")));
+
+    if (registry != null) {
+      registry.publish(MeshLayerRefs.HEADPLANE_ENV_CONFIGMAP, configMap);
+    }
 
     return configMap;
   }
@@ -522,7 +527,10 @@ public final class HeadplaneLayer extends Construct {
                                     "apk add --no-cache yq kubectl && /scripts/agent-sync.sh"),
                                 "envFrom",
                                 List.of(
-                                    Map.of("configMapRef", Map.of("name", "headplane-env")),
+                                    Map.of(
+                                        "configMapRef",
+                                        Map.of(
+                                            "name", MeshLayerRefs.HEADPLANE_ENV_CONFIGMAP.name())),
                                     Map.of(
                                         "configMapRef",
                                         Map.of(
@@ -593,7 +601,10 @@ public final class HeadplaneLayer extends Construct {
                                 "headscale-auth",
                                 "secret",
                                 Map.of(
-                                    "optional", false, "secretName", "headscale-client-auth"))))),
+                                    "optional",
+                                    false,
+                                    "secretName",
+                                    MeshLayerRefs.HEADSCALE_CLIENT_AUTH_SECRET.name()))))),
                 "ttlSecondsAfterFinished",
                 300)));
 
@@ -681,7 +692,11 @@ public final class HeadplaneLayer extends Construct {
                                 Map.entry(
                                     "envFrom",
                                     List.of(
-                                        Map.of("configMapRef", Map.of("name", "headplane-env")),
+                                        Map.of(
+                                            "configMapRef",
+                                            Map.of(
+                                                "name",
+                                                MeshLayerRefs.HEADPLANE_ENV_CONFIGMAP.name())),
                                         Map.of(
                                             "configMapRef",
                                             Map.of(

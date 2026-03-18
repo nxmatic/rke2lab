@@ -408,8 +408,8 @@ public final class HeadscaleLayer extends Construct {
   private ApiObject createConfigMapHeadscaleEnv(final ApiObject namespace) {
     ApiObject configMap =
         configMapWithData(
-            "headscale-env",
-            "|ConfigMap|${headscale-namespace}|headscale-env",
+            MeshLayerRefs.HEADSCALE_ENV_CONFIGMAP.name(),
+            "|ConfigMap|${headscale-namespace}|" + MeshLayerRefs.HEADSCALE_ENV_CONFIGMAP.name(),
             Map.of(
                 "CLUSTER_LAN_HEADSCALE_INETADDR",
                 "192.168.1.193",
@@ -426,6 +426,9 @@ public final class HeadscaleLayer extends Construct {
                 "VIP_NETWORK_CIDR",
                 "10.80.7.0/24"));
     configMap.addDependency(namespace);
+    if (registry != null) {
+      registry.publish(MeshLayerRefs.HEADSCALE_ENV_CONFIGMAP, configMap);
+    }
     return configMap;
   }
 
@@ -464,7 +467,9 @@ public final class HeadscaleLayer extends Construct {
                     + "  exit 1\n"
                     + "fi\n\n"
                     + ": \"Storing preauth key in Secret...\"\n"
-                    + "kubectl create secret generic headscale-client-auth \\\n"
+                    + "kubectl create secret generic "
+                    + MeshLayerRefs.HEADSCALE_CLIENT_AUTH_SECRET.name()
+                    + " \\\n"
                     + "  --from-literal=authkey=\"$PREAUTH_KEY\" \\\n"
                     + "  --dry-run=client -o yaml | kubectl apply -f -\n\n"
                     + ": \"Creating Headplane API key...\"\n"
@@ -525,14 +530,18 @@ public final class HeadscaleLayer extends Construct {
                     + ": \"[i] Waiting for required ConfigMaps...\"\n"
                     + "kubectl wait --for=create configmap/headscale-client-scripts \\\n"
                     + "  -n \"$HEADSCALE_NAMESPACE\" --timeout=300s\n"
-                    + "kubectl wait --for=create configmap/headscale-env \\\n"
+                    + "kubectl wait --for=create configmap/"
+                    + MeshLayerRefs.HEADSCALE_ENV_CONFIGMAP.name()
+                    + " \\\n"
                     + "  -n \"$HEADSCALE_NAMESPACE\" --timeout=300s\n"
                     + "kubectl wait --for=create configmap/"
                     + RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name()
                     + " \\\n"
                     + "  -n \"$HEADSCALE_NAMESPACE\" --timeout=300s\n\n"
                     + ": \"[i] Waiting for required secrets...\"\n"
-                    + "kubectl wait --for=create secret/headscale-client-auth \\\n"
+                    + "kubectl wait --for=create secret/"
+                    + MeshLayerRefs.HEADSCALE_CLIENT_AUTH_SECRET.name()
+                    + " \\\n"
                     + "  -n \"$HEADSCALE_NAMESPACE\" --timeout=300s"));
     configMap.addDependency(namespace);
     configMap.addJsonPatch(JsonPatch.add("/metadata/labels", Map.of("app", "headscale-client")));
@@ -995,7 +1004,10 @@ public final class HeadscaleLayer extends Construct {
                                 List.of("/scripts/bootstrap.sh"),
                                 "envFrom",
                                 List.of(
-                                    Map.of("configMapRef", Map.of("name", "headscale-env")),
+                                    Map.of(
+                                        "configMapRef",
+                                        Map.of(
+                                            "name", MeshLayerRefs.HEADSCALE_ENV_CONFIGMAP.name())),
                                     Map.of(
                                         "configMapRef",
                                         Map.of(
@@ -1119,10 +1131,14 @@ public final class HeadscaleLayer extends Construct {
                                                 "key",
                                                 "authkey",
                                                 "name",
-                                                "headscale-client-auth")))),
+                                                MeshLayerRefs.HEADSCALE_CLIENT_AUTH_SECRET
+                                                    .name())))),
                                 "envFrom",
                                 List.of(
-                                    Map.of("configMapRef", Map.of("name", "headscale-env")),
+                                    Map.of(
+                                        "configMapRef",
+                                        Map.of(
+                                            "name", MeshLayerRefs.HEADSCALE_ENV_CONFIGMAP.name())),
                                     Map.of(
                                         "configMapRef",
                                         Map.of(
@@ -1223,7 +1239,7 @@ public final class HeadscaleLayer extends Construct {
                                     "items",
                                     List.of(Map.of("key", "authkey", "path", "authkey")),
                                     "secretName",
-                                    "headscale-client-auth"))))))));
+                                    MeshLayerRefs.HEADSCALE_CLIENT_AUTH_SECRET.name()))))))));
   }
 
   private void createDaemonsetClient(
@@ -1302,7 +1318,8 @@ public final class HeadscaleLayer extends Construct {
                                                 "key",
                                                 "authkey",
                                                 "name",
-                                                "headscale-client-auth"))),
+                                                MeshLayerRefs.HEADSCALE_CLIENT_AUTH_SECRET
+                                                    .name()))),
                                     Map.of("name", "TS_STATE_DIR", "value", "/var/lib/tailscale"),
                                     Map.of(
                                         "name",
@@ -1313,7 +1330,10 @@ public final class HeadscaleLayer extends Construct {
                                     Map.of("name", "TS_KUBE_SECRET", "value", "")),
                                 "envFrom",
                                 List.of(
-                                    Map.of("configMapRef", Map.of("name", "headscale-env")),
+                                    Map.of(
+                                        "configMapRef",
+                                        Map.of(
+                                            "name", MeshLayerRefs.HEADSCALE_ENV_CONFIGMAP.name())),
                                     Map.of(
                                         "configMapRef",
                                         Map.of(
@@ -1386,7 +1406,10 @@ public final class HeadscaleLayer extends Construct {
                                 List.of("/scripts/wait-for-headscale.sh"),
                                 "envFrom",
                                 List.of(
-                                    Map.of("configMapRef", Map.of("name", "headscale-env")),
+                                    Map.of(
+                                        "configMapRef",
+                                        Map.of(
+                                            "name", MeshLayerRefs.HEADSCALE_ENV_CONFIGMAP.name())),
                                     Map.of(
                                         "configMapRef",
                                         Map.of(
@@ -1441,7 +1464,7 @@ public final class HeadscaleLayer extends Construct {
                                     "items",
                                     List.of(Map.of("key", "authkey", "path", "authkey")),
                                     "secretName",
-                                    "headscale-client-auth"))))))));
+                                    MeshLayerRefs.HEADSCALE_CLIENT_AUTH_SECRET.name()))))))));
   }
 
   private ApiObject configMapWithData(
