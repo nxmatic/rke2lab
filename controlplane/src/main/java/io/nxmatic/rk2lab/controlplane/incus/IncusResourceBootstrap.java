@@ -22,6 +22,8 @@ import com.pulumi.resources.CustomResourceOptions;
 import com.pulumi.resources.Resource;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig.WorktreeHost;
 import io.nxmatic.rk2lab.controlplane.incus.image.PulumiIncusImageProvider;
+import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
+import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributorRegistry;
 import java.io.IOException;
 import java.net.JarURLConnection;
 import java.net.URL;
@@ -65,6 +67,29 @@ public final class IncusResourceBootstrap {
 
   private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
 
+  private static final String HOST_ROOT_PATH = "/srv/host";
+
+  private static final String HOST_WORKTREE_PATH = "/srv/host/rke2lab-worktree.d";
+
+  private static final String HOST_ENV_DIR_PATH = "/srv/host/rke2lab-environment.d";
+
+  private static final String HOST_SCRIPTS_DIR_PATH = "/srv/host/systemd-scripts.d";
+
+  private static final String HOST_GIT_WORKTREE_DIR_PATH = "/srv/host/git-worktree.d";
+
+  private static final String HOST_SYSTEMD_DIR_PATH = "/srv/host/systemd-units.d";
+
+  private static final String HOST_MANIFESTS_DIR_PATH = "/srv/host/rke2-manifests.d";
+
+  private static final String HOST_RKE2_CONFIG_DIR_PATH = "/srv/host/rke2-config.d";
+
+  private static final String HOST_CLOUDCONFIG_NO_CLOUD_DIR_PATH =
+      "/srv/host/cloudconfig-nocloud.d";
+
+  private static final String HOST_SHARE_DIR_PATH = "/srv/host/rke2lab-share.d";
+
+  private static final String HOST_KUBECONFIG_DIR_PATH = "/srv/host/rke2lab-kube.d";
+
   private final BootstrapConfig config;
 
   private final PulumiIncusImageProvider imageProvider;
@@ -72,6 +97,8 @@ public final class IncusResourceBootstrap {
   private final HostMountSourceVerifier hostMountSourceVerifier;
 
   private final NodeConfigRegenerator nodeConfigRegenerator;
+
+  private final RuntimeEnvControlplaneOverlayWriter runtimeEnvControlplaneOverlayWriter;
 
   private final ClasspathAssetMaterializer classpathAssetMaterializer;
 
@@ -84,6 +111,7 @@ public final class IncusResourceBootstrap {
     this.imageProvider = new PulumiIncusImageProvider(config);
     this.hostMountSourceVerifier = HostMountSourceVerifier.INSTANCE;
     this.nodeConfigRegenerator = new NodeConfigRegenerator(CloudConfigSecretRenderer.INSTANCE);
+    this.runtimeEnvControlplaneOverlayWriter = RuntimeEnvControlplaneOverlayWriter.INSTANCE;
     this.classpathAssetMaterializer = ClasspathAssetMaterializer.INSTANCE;
     this.incusImportLookup = IncusImportLookup.INSTANCE;
     this.launchSecretsUpdater = LaunchSecretsUpdater.INSTANCE;
@@ -136,6 +164,8 @@ public final class IncusResourceBootstrap {
       classpathAssetMaterializer.materializeManifests(localPaths.manifestsRoot());
       classpathAssetMaterializer.materializeHostSystemdAssets(
           localPaths.manifestsRoot().resolve("host"));
+      LayerEnvContext layerContext = new BootstrapLayerEnvContextImpl();
+      runtimeEnvControlplaneOverlayWriter.write(localPaths.runtimeEnvConfigRoot(), layerContext);
       hostMountSourceVerifier.ensureSources(localPaths);
       nodeConfigRegenerator.regenerateCloudConfigDir(
           localPaths.runtimeCloudConfigRoot(), localPaths.cloudSeedRoot());
@@ -284,23 +314,216 @@ public final class IncusResourceBootstrap {
         .vmnetNic(config.vmnetNetworkName())
         .kmsgDevice()
         .zfsDevice()
-        .disk("worktree.dir", hostPaths.worktreeRoot(), "/srv/host/rke2lab-worktree.d")
-        .disk(
-            "rke2lab.env.dir", hostPaths.runtimeEnvConfigRoot(), "/srv/host/rke2lab-environment.d")
-        .disk("rke2lab.scripts.dir", hostPaths.scriptsRoot(), "/srv/host/systemd-scripts.d")
-        .disk("git.dir", hostPaths.gitRoot(), "/srv/host/git-worktree.d")
-        .disk("rke2lab.system.dir", hostPaths.systemdRoot(), "/srv/host/systemd-units.d")
-        .disk("manifests.dir", hostPaths.manifestsRoot(), "/srv/host/rke2-manifests.d")
-        .disk("rke2.config.dir", hostPaths.runtimeRke2ConfigRoot(), "/srv/host/rke2-config.d")
+        .disk("worktree.dir", hostPaths.worktreeRoot(), HOST_WORKTREE_PATH)
+        .disk("rke2lab.env.dir", hostPaths.runtimeEnvConfigRoot(), HOST_ENV_DIR_PATH)
+        .disk("rke2lab.scripts.dir", hostPaths.scriptsRoot(), HOST_SCRIPTS_DIR_PATH)
+        .disk("git.dir", hostPaths.gitRoot(), HOST_GIT_WORKTREE_DIR_PATH)
+        .disk("rke2lab.system.dir", hostPaths.systemdRoot(), HOST_SYSTEMD_DIR_PATH)
+        .disk("manifests.dir", hostPaths.manifestsRoot(), HOST_MANIFESTS_DIR_PATH)
+        .disk("rke2.config.dir", hostPaths.runtimeRke2ConfigRoot(), HOST_RKE2_CONFIG_DIR_PATH)
         .disk(
             "cloudconfig.nocloud.dir",
             hostPaths.runtimeCloudConfigRoot(),
-            "/srv/host/cloudconfig-nocloud.d")
-        .disk("shared.dir", hostPaths.shareRoot(), "/srv/host/rke2lab-share.d")
+            HOST_CLOUDCONFIG_NO_CLOUD_DIR_PATH)
+        .disk("shared.dir", hostPaths.shareRoot(), HOST_SHARE_DIR_PATH)
         .disk("daemonset.dir", hostPaths.daemonsetRoot(), DaemonsetLogPolicy.GUEST_ROOT_PATH)
-        .disk("kubeconfig.dir", hostPaths.kubeconfigRoot(), "/srv/host/rke2lab-kube.d")
+        .disk("kubeconfig.dir", hostPaths.kubeconfigRoot(), HOST_KUBECONFIG_DIR_PATH)
         .disk("nocloud.dir", hostPaths.cloudSeedRoot(), "/var/lib/cloud/seed/nocloud")
         .build();
+  }
+
+  private static final class RuntimeEnvControlplaneOverlayWriter {
+
+    private static final RuntimeEnvControlplaneOverlayWriter INSTANCE =
+        new RuntimeEnvControlplaneOverlayWriter();
+
+    private RuntimeEnvControlplaneOverlayWriter() {}
+
+    private void write(Path runtimeEnvConfigRoot, LayerEnvContext layerContext) {
+      try {
+        Files.createDirectories(runtimeEnvConfigRoot);
+
+        // Write layer contributions first
+        LayerEnvContributorRegistry registry = new LayerEnvContributorRegistry(layerContext);
+        registry.writeAllContributions(runtimeEnvConfigRoot);
+
+        // Aggregate all layer contributions and create 99-configmap with merged vars
+        Map<String, String> aggregatedVars = new LinkedHashMap<>();
+
+        // Add host path constants first (bootstrap-level)
+        aggregatedVars.put("RKE2LAB_ROOT", HOST_ROOT_PATH);
+        aggregatedVars.put("RKE2LAB_REPO_ROOT", HOST_WORKTREE_PATH);
+        aggregatedVars.put("RKE2LAB_ENV_DIR", HOST_ENV_DIR_PATH);
+        aggregatedVars.put("RKE2LAB_SCRIPTS_DIR", HOST_SCRIPTS_DIR_PATH);
+        aggregatedVars.put("RKE2LAB_SYSTEMD_DIR", HOST_SYSTEMD_DIR_PATH);
+        aggregatedVars.put("RKE2LAB_MANIFESTS_DIR", HOST_MANIFESTS_DIR_PATH);
+        aggregatedVars.put("RKE2LAB_CONFIG_DIR", HOST_RKE2_CONFIG_DIR_PATH);
+        aggregatedVars.put("RKE2LAB_CLOUDCONFIG_NO_CLOUD_DIR", HOST_CLOUDCONFIG_NO_CLOUD_DIR_PATH);
+        aggregatedVars.put("RKE2LAB_SHARED_DIR", HOST_SHARE_DIR_PATH);
+        aggregatedVars.put("RKE2LAB_KUBECONFIG_DIR", HOST_KUBECONFIG_DIR_PATH);
+
+        // Add layer contributions (later ones override earlier)
+        aggregatedVars.putAll(registry.aggregateContributions());
+
+        // Build ConfigMap YAML with all aggregated variables
+        StringBuilder yaml = new StringBuilder();
+        yaml.append("---\n");
+        yaml.append("apiVersion: v1\n");
+        yaml.append("kind: ConfigMap\n");
+        yaml.append("metadata:\n");
+        yaml.append("  annotations:\n");
+        yaml.append("    config.kubernetes.io/local-config: \"true\"\n");
+        yaml.append(
+            "    description.kpt.dev: Controlplane runtime environment with layer contributions\n");
+        yaml.append(
+            "    env.rk2lab.nxmatic.io/section: section-controlplane-layer-contributions\n");
+        yaml.append("    rk2lab.nxmatic.io/managed-by: controlplane\n");
+        yaml.append("  name: env-section-controlplane-layer-contributions\n");
+        yaml.append("data:\n");
+
+        for (Map.Entry<String, String> entry : aggregatedVars.entrySet()) {
+          yaml.append("  ")
+              .append(entry.getKey())
+              .append(": ")
+              .append(quoteYamlIfNeeded(entry.getValue()))
+              .append("\n");
+        }
+
+        final Path overlayPath =
+            runtimeEnvConfigRoot.resolve(
+                "99-configmap-env-section-controlplane-layer-contributions.yml");
+        Files.writeString(overlayPath, yaml.toString(), StandardCharsets.UTF_8);
+
+      } catch (IOException ex) {
+        throw new IllegalStateException(
+            "Failed to write controlplane runtime env override ConfigMap: " + runtimeEnvConfigRoot,
+            ex);
+      }
+    }
+
+    private static String quoteYamlIfNeeded(String value) {
+      if (value.isEmpty()
+          || value.contains(" ")
+          || value.contains(":")
+          || value.equals("false")
+          || value.equals("true")) {
+        return "\"" + value.replace("\"", "\\\"") + "\"";
+      }
+      return value;
+    }
+  }
+
+  private final class BootstrapLayerEnvContextImpl implements LayerEnvContext {
+
+    @Override
+    public Path rootPath() {
+      return Path.of(HOST_ROOT_PATH);
+    }
+
+    @Override
+    public Path envDirPath() {
+      return Path.of(HOST_ENV_DIR_PATH);
+    }
+
+    @Override
+    public Path scriptsDirPath() {
+      return Path.of(HOST_SCRIPTS_DIR_PATH);
+    }
+
+    @Override
+    public Path systemdDirPath() {
+      return Path.of(HOST_SYSTEMD_DIR_PATH);
+    }
+
+    @Override
+    public Path configDirPath() {
+      return Path.of(HOST_RKE2_CONFIG_DIR_PATH);
+    }
+
+    @Override
+    public Path cloudconfigNocloudDirPath() {
+      return Path.of(HOST_CLOUDCONFIG_NO_CLOUD_DIR_PATH);
+    }
+
+    @Override
+    public Path manifestsDirPath() {
+      return Path.of(HOST_MANIFESTS_DIR_PATH);
+    }
+
+    @Override
+    public Path sharedDirPath() {
+      return Path.of(HOST_SHARE_DIR_PATH);
+    }
+
+    @Override
+    public Path kubeconfigDirPath() {
+      return Path.of(HOST_KUBECONFIG_DIR_PATH);
+    }
+
+    @Override
+    public int nodeId() {
+      return 0; // Master node
+    }
+
+    @Override
+    public String nodeName() {
+      return config.nodeName();
+    }
+
+    @Override
+    public String nodeKind() {
+      return "server"; // Server node in RKE2 terminology
+    }
+
+    @Override
+    public int clusterId() {
+      return 0;
+    }
+
+    @Override
+    public String clusterName() {
+      return config.clusterName();
+    }
+
+    @Override
+    public String clusterToken() {
+      return config.clusterName(); // Using cluster name as token (bioskop)
+    }
+
+    @Override
+    public String clusterDomain() {
+      return "cluster.local";
+    }
+
+    @Override
+    public String clusterCidr() {
+      return "10.80.0.0/21";
+    }
+
+    @Override
+    public String clusterPodCidr() {
+      return "10.42.0.0/16";
+    }
+
+    @Override
+    public String clusterServiceCidr() {
+      return "10.43.0.0/16";
+    }
+
+    @Override
+    public String nodeHostInetAddr() {
+      return "10.80.0.10";
+    }
+
+    @Override
+    public String nodeNetworkCidr() {
+      return "10.80.0.0/23";
+    }
+
+    @Override
+    public String nodeNetworkGatewayAddr() {
+      return "10.80.0.1";
+    }
   }
 
   private record BootstrapPaths(

@@ -82,7 +82,7 @@ find_flox_activation_dir() {
 
 	candidates+=(
 		"/var/lib/git/nxmatic/rke2lab"
-		"/srv/host/git/nxmatic/rke2lab"
+		"/srv/host/git-worktree.d/nxmatic/rke2lab"
 	)
 
 	local candidate
