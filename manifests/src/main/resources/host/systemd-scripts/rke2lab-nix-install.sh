@@ -80,7 +80,7 @@ if ! grep -q "BEGIN rke2lab-nix" /etc/nix/nix.conf 2>/dev/null; then
 # BEGIN rke2lab-nix: Custom configuration for rke2lab environment
 allowed-users = *
 auto-optimise-store = false
-builders = 
+builders =
 cores = 0
 experimental-features = nix-command flakes ca-derivations
 max-jobs = 4

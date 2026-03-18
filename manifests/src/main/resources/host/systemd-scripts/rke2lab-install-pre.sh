@@ -72,15 +72,15 @@ nocloud:env:activate() {
       val=$( "${FLOX_ENV}/bin/yq" -r "${key}" "${RKE2LAB_SECRETS_FILE}" 2>/dev/null )
       [[ "$val" == "null" ]] && val=""
     fi
-    
-    [[ -z "$val" ]] && return  
+
+    [[ -z "$val" ]] && return
     export "$var=$val"
   }
-  
+
   RKE2LAB_ROOT=${RKE2LAB_ROOT:-/srv/host}
   RKE2LAB_ENV_DIR=${RKE2LAB_ENV_DIR:-${RKE2LAB_ROOT}/rke2lab-environment.d}
   RKE2LAB_SECRETS_FILE="${RKE2LAB_ROOT}/rke2lab-worktree.d/.secrets"
-  
+
   : "Ensure RKE2 secrets file is present and readable (read-only source of truth)"
   [[ -s "${RKE2LAB_SECRETS_FILE}" ]] || {
     echo "[rke2-install-pre] ERROR: secrets file is missing or empty: ${RKE2LAB_SECRETS_FILE}" >&2
@@ -92,7 +92,7 @@ nocloud:env:activate() {
   }
 
   set -a
-  
+
   : "Source RKE2 environment manifests"
   [[ -d "${RKE2LAB_ENV_DIR}" ]] || {
     echo "[rke2-install-pre] ERROR: environment directory missing: ${RKE2LAB_ENV_DIR}" >&2
@@ -121,21 +121,21 @@ nocloud:env:activate() {
   : "Backfill secrets from ${RKE2LAB_ROOT}/secrets if not already set (local yq wrapper)"
   rke2lab::secret:value GITHUB_USERNAME '.github.username'
   rke2lab::secret:value GITHUB_PAT '.github.token'
-  rke2lab::secret:value DOCKER_CONFIG_JSON '.docker.configJson'	
+  rke2lab::secret:value DOCKER_CONFIG_JSON '.docker.configJson'
   rke2lab::secret:value TEKTON_GIT_USERNAME '.tekton.git.username'
   rke2lab::secret:value TEKTON_GIT_PASSWORD '.tekton.git.password'
   rke2lab::secret:value TEKTON_DOCKER_CONFIG_JSON '.tekton.docker.configJson'
-  rke2lab::secret:value TEKTON_DOCKER_REGISTRY_URL '.tekton.docker.registryUrl'	
+  rke2lab::secret:value TEKTON_DOCKER_REGISTRY_URL '.tekton.docker.registryUrl'
   rke2lab::secret:value TSKEY_CLIENT_ID '.tailscale.client.id'
   rke2lab::secret:value TSKEY_CLIENT_TOKEN '.tailscale.client.token'
   rke2lab::secret:value TSKEY_API_ID '.tailscale.api.id'
-  rke2lab::secret:value TSKEY_API_TOKEN '.tailscale.api.token'	
-  rke2lab::secret:value TSKEY_OAUTH_ID '.tailscale.oauth.id' 
-  rke2lab::secret:value TSKEY_OAUTH_TOKEN '.tailscale.oauth.token' 
+  rke2lab::secret:value TSKEY_API_TOKEN '.tailscale.api.token'
+  rke2lab::secret:value TSKEY_OAUTH_ID '.tailscale.oauth.id'
+  rke2lab::secret:value TSKEY_OAUTH_TOKEN '.tailscale.oauth.token'
 
   : "Determine default gateway IP for cluster networking"
-  CLUSTER_GATEWAY=$( ip route show default 2>/dev/null | 
-                      awk '/default via/ { print $3; exit }' || 
+  CLUSTER_GATEWAY=$( ip route show default 2>/dev/null |
+                      awk '/default via/ { print $3; exit }' ||
                       true )
 
   set +a
@@ -229,8 +229,8 @@ dasel -i toml -o yaml \
 		/var/lib/rancher/rke2/.flox/env/manifest.toml
 cat <<'EoFloxCommonProfile' | cut -c 3- | tee /var/lib/rancher/rke2/.flox/env/profile-common.sh
   : "Load nocloud environment from the common profile"
-  source "/var/lib/cloud/.flox/env/profile-common.sh" 
- 
+  source "/var/lib/cloud/.flox/env/profile-common.sh"
+
    : "Create kubectl symlinks for the tekton cli"
   ln -sf "$(command -v tkn)" /usr/local/bin/kubectl-tkn || true
 

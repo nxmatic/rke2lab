@@ -329,7 +329,7 @@ containerd::config:flox:update() {
       .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.pod_annotations = ["flox.dev/*"] |
       .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.container_annotations = ["flox.dev/*"] |
       .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.options.SystemdCgroup = true
-    ' | 
+    ' |
     config::format:yaml:from > "${tmp}"
   mv "${tmp}" "${target}"
 }

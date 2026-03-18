@@ -1,130 +1,126 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.common;
 
-import org.cdk8s.Chart;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.cdk8s.Chart;
 
 public final class LayerDomainRegistry {
 
-    private final Map<String, LayerDomain> domainsById;
-    private final List<ManifestUnit> manifestUnits;
-    private final Map<String, String> domainIdByManifestUnitId;
+  private final Map<String, LayerDomain> domainsById;
+  private final List<ManifestUnit> manifestUnits;
+  private final Map<String, String> domainIdByManifestUnitId;
 
-    public LayerDomainRegistry(final List<LayerDomain> domains) {
-        if (domains == null || domains.isEmpty()) {
-            throw new IllegalArgumentException("At least one domain must be configured");
-        }
+  public LayerDomainRegistry(final List<LayerDomain> domains) {
+    if (domains == null || domains.isEmpty()) {
+      throw new IllegalArgumentException("At least one domain must be configured");
+    }
 
-        LinkedHashMap<String, LayerDomain> byId = new LinkedHashMap<>();
-        for (LayerDomain domain : domains) {
-            if (byId.put(domain.domainId(), domain) != null) {
-                throw new IllegalStateException("Duplicate domain id: " + domain.domainId());
-            }
-        }
+    LinkedHashMap<String, LayerDomain> byId = new LinkedHashMap<>();
+    for (LayerDomain domain : domains) {
+      if (byId.put(domain.domainId(), domain) != null) {
+        throw new IllegalStateException("Duplicate domain id: " + domain.domainId());
+      }
+    }
 
-        this.domainsById = Map.copyOf(byId);
-        this.manifestUnits = byId.values().stream()
-                .flatMap(domain -> domain.layers().stream())
+    this.domainsById = Map.copyOf(byId);
+    this.manifestUnits =
+        byId.values().stream()
+            .flatMap(domain -> domain.layers().stream())
             .map(layer -> (ManifestUnit) layer)
-                .toList();
+            .toList();
 
-        HashMap<String, String> byManifestUnitId = new HashMap<>();
-        for (LayerDomain domain : byId.values()) {
-            for (ManifestUnit manifestUnit : domain.layers()) {
-                String previous = byManifestUnitId.put(manifestUnit.manifestUnitId(), domain.domainId());
-                if (previous != null) {
-                    throw new IllegalStateException("Manifest unit is assigned to multiple domains: " + manifestUnit.manifestUnitId());
-                }
-            }
+    HashMap<String, String> byManifestUnitId = new HashMap<>();
+    for (LayerDomain domain : byId.values()) {
+      for (ManifestUnit manifestUnit : domain.layers()) {
+        String previous = byManifestUnitId.put(manifestUnit.manifestUnitId(), domain.domainId());
+        if (previous != null) {
+          throw new IllegalStateException(
+              "Manifest unit is assigned to multiple domains: " + manifestUnit.manifestUnitId());
         }
-        this.domainIdByManifestUnitId = Map.copyOf(byManifestUnitId);
+      }
+    }
+    this.domainIdByManifestUnitId = Map.copyOf(byManifestUnitId);
 
-        validateDomainDependencies();
+    validateDomainDependencies();
+  }
+
+  public List<LayerDomain> domains() {
+    return List.copyOf(domainsById.values());
+  }
+
+  public List<ManifestUnit> manifestUnits() {
+    return manifestUnits;
+  }
+
+  public void applyManifestUnitWithDomainDependencies(
+      final String manifestUnitId,
+      final ManifestUnitDependencyApplier manifestUnitDependencyApplier,
+      final Chart chart) {
+    String domainId = domainIdByManifestUnitId.get(manifestUnitId);
+    if (domainId == null) {
+      throw new IllegalStateException(
+          "Unable to resolve domain for manifest unit: " + manifestUnitId);
     }
 
-    public List<LayerDomain> domains() {
-        return List.copyOf(domainsById.values());
+    applyDomainWithDependencies(
+        domainId, manifestUnitDependencyApplier, chart, new HashSet<>(), new HashSet<>());
+
+    manifestUnitDependencyApplier.applyManifestUnitWithDependencies(manifestUnitId, chart);
+  }
+
+  private void validateDomainDependencies() {
+    for (LayerDomain domain : domainsById.values()) {
+      for (String dependencyDomainId : domain.dependsOnDomainIds()) {
+        if (!domainsById.containsKey(dependencyDomainId)) {
+          throw new IllegalStateException(
+              "Domain dependency references unknown domain: "
+                  + domain.domainId()
+                  + " -> "
+                  + dependencyDomainId);
+        }
+      }
+    }
+  }
+
+  private void applyDomainWithDependencies(
+      final String domainId,
+      final ManifestUnitDependencyApplier manifestUnitDependencyApplier,
+      final Chart chart,
+      final Set<String> visitingDomainIds,
+      final Set<String> appliedDomainIds) {
+    if (appliedDomainIds.contains(domainId)) {
+      return;
     }
 
-    public List<ManifestUnit> manifestUnits() {
-        return manifestUnits;
+    if (!visitingDomainIds.add(domainId)) {
+      throw new IllegalStateException("Cyclic domain dependency detected at: " + domainId);
     }
 
-    public void applyManifestUnitWithDomainDependencies(
-            final String manifestUnitId,
-            final ManifestUnitDependencyApplier manifestUnitDependencyApplier,
-            final Chart chart
-    ) {
-        String domainId = domainIdByManifestUnitId.get(manifestUnitId);
-        if (domainId == null) {
-            throw new IllegalStateException("Unable to resolve domain for manifest unit: " + manifestUnitId);
-        }
-
-        applyDomainWithDependencies(
-                domainId,
-                manifestUnitDependencyApplier,
-                chart,
-                new HashSet<>(),
-                new HashSet<>()
-        );
-
-        manifestUnitDependencyApplier.applyManifestUnitWithDependencies(manifestUnitId, chart);
+    LayerDomain domain = domainsById.get(domainId);
+    if (domain == null) {
+      throw new IllegalStateException("Unknown domain dependency: " + domainId);
     }
 
-    private void validateDomainDependencies() {
-        for (LayerDomain domain : domainsById.values()) {
-            for (String dependencyDomainId : domain.dependsOnDomainIds()) {
-                if (!domainsById.containsKey(dependencyDomainId)) {
-                    throw new IllegalStateException(
-                            "Domain dependency references unknown domain: "
-                                    + domain.domainId() + " -> " + dependencyDomainId
-                    );
-                }
-            }
-        }
+    for (String dependencyDomainId : domain.dependsOnDomainIds()) {
+      applyDomainWithDependencies(
+          dependencyDomainId,
+          manifestUnitDependencyApplier,
+          chart,
+          visitingDomainIds,
+          appliedDomainIds);
     }
 
-    private void applyDomainWithDependencies(
-            final String domainId,
-            final ManifestUnitDependencyApplier manifestUnitDependencyApplier,
-            final Chart chart,
-            final Set<String> visitingDomainIds,
-            final Set<String> appliedDomainIds
-    ) {
-        if (appliedDomainIds.contains(domainId)) {
-            return;
-        }
-
-        if (!visitingDomainIds.add(domainId)) {
-            throw new IllegalStateException("Cyclic domain dependency detected at: " + domainId);
-        }
-
-        LayerDomain domain = domainsById.get(domainId);
-        if (domain == null) {
-            throw new IllegalStateException("Unknown domain dependency: " + domainId);
-        }
-
-        for (String dependencyDomainId : domain.dependsOnDomainIds()) {
-            applyDomainWithDependencies(
-                    dependencyDomainId,
-                    manifestUnitDependencyApplier,
-                    chart,
-                    visitingDomainIds,
-                    appliedDomainIds
-            );
-        }
-
-        for (ManifestUnit manifestUnit : domain.layers()) {
-            manifestUnitDependencyApplier.applyManifestUnitWithDependencies(manifestUnit.manifestUnitId(), chart);
-        }
-
-        visitingDomainIds.remove(domainId);
-        appliedDomainIds.add(domainId);
+    for (ManifestUnit manifestUnit : domain.layers()) {
+      manifestUnitDependencyApplier.applyManifestUnitWithDependencies(
+          manifestUnit.manifestUnitId(), chart);
     }
+
+    visitingDomainIds.remove(domainId);
+    appliedDomainIds.add(domainId);
+  }
 }

@@ -3,5 +3,5 @@ package io.nxmatic.rk2lab.manifests.layers.common;
 
 public interface LayerDomainRegistrar {
 
-    LayerDomain domain();
+  LayerDomain domain();
 }

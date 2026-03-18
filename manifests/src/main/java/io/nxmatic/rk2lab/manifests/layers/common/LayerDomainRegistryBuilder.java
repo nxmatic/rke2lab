@@ -6,18 +6,18 @@ import java.util.List;
 
 public final class LayerDomainRegistryBuilder {
 
-    private final List<LayerDomain> domains = new ArrayList<>();
+  private final List<LayerDomain> domains = new ArrayList<>();
 
-    public LayerDomainRegistryBuilder register(final LayerDomainRegistrar registrar) {
-        return registerDomain(registrar.domain());
-    }
+  public LayerDomainRegistryBuilder register(final LayerDomainRegistrar registrar) {
+    return registerDomain(registrar.domain());
+  }
 
-    public LayerDomainRegistryBuilder registerDomain(final LayerDomain domain) {
-        domains.add(domain);
-        return this;
-    }
+  public LayerDomainRegistryBuilder registerDomain(final LayerDomain domain) {
+    domains.add(domain);
+    return this;
+  }
 
-    public LayerDomainRegistry build() {
-        return new LayerDomainRegistry(List.copyOf(domains));
-    }
+  public LayerDomainRegistry build() {
+    return new LayerDomainRegistry(List.copyOf(domains));
+  }
 }

@@ -8,21 +8,21 @@ import java.util.Map;
 
 public final class LayerDependencyIntentProfile {
 
-    private final Map<String, List<String>> intentToLayerIds;
+  private final Map<String, List<String>> intentToLayerIds;
 
-    public LayerDependencyIntentProfile(final Map<String, List<String>> intentToLayerIds) {
-        this.intentToLayerIds = Map.copyOf(intentToLayerIds);
-    }
+  public LayerDependencyIntentProfile(final Map<String, List<String>> intentToLayerIds) {
+    this.intentToLayerIds = Map.copyOf(intentToLayerIds);
+  }
 
-    public List<String> resolve(final List<String> intents) {
-        LinkedHashSet<String> ordered = new LinkedHashSet<>();
-        for (String intent : intents) {
-            List<String> deps = intentToLayerIds.get(intent);
-            if (deps == null) {
-                throw new IllegalArgumentException("Unknown dependency intent: " + intent);
-            }
-            ordered.addAll(deps);
-        }
-        return List.copyOf(new ArrayList<>(ordered));
+  public List<String> resolve(final List<String> intents) {
+    LinkedHashSet<String> ordered = new LinkedHashSet<>();
+    for (String intent : intents) {
+      List<String> deps = intentToLayerIds.get(intent);
+      if (deps == null) {
+        throw new IllegalArgumentException("Unknown dependency intent: " + intent);
+      }
+      ordered.addAll(deps);
     }
+    return List.copyOf(new ArrayList<>(ordered));
+  }
 }

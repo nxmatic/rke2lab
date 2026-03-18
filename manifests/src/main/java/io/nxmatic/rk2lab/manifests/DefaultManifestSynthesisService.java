@@ -18,91 +18,89 @@ import io.nxmatic.rk2lab.manifests.layers.networking.NetworkingDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.replication.ReplicationDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.storage.StorageDomainRegistrar;
-import org.cdk8s.App;
-import org.cdk8s.AppProps;
-import org.cdk8s.Chart;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
 import java.util.List;
+import org.cdk8s.App;
+import org.cdk8s.AppProps;
+import org.cdk8s.Chart;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-/**
- * Default SPI implementation for canonical manifest synthesis.
- */
+/** Default SPI implementation for canonical manifest synthesis. */
 public final class DefaultManifestSynthesisService implements ManifestSynthesisService {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultManifestSynthesisService.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DefaultManifestSynthesisService.class);
 
-    @Override
-    public String providerId() {
-        return "default-cdk8s-synthesizer";
+  @Override
+  public String providerId() {
+    return "default-cdk8s-synthesizer";
+  }
+
+  @Override
+  public ManifestSynthesisResult synthesize(ManifestSynthesisRequest request) throws IOException {
+    LOG.info("Starting manifests synthesis via provider '{}'", providerId());
+
+    final Path synthOutdir = request.synthOutdir();
+    final Path synthManifestFile = request.synthManifestFile();
+
+    final App app = new App(AppProps.builder().outdir(synthOutdir.toString()).build());
+    final Chart chart = new Chart(app, "manifests");
+
+    final LayerDomainRegistry domainRegistry =
+        new LayerDomainRegistryBuilder()
+            .register(new StorageDomainRegistrar())
+            .register(new ReplicationDomainRegistrar())
+            .register(new GitopsDomainRegistrar())
+            .register(new RuntimeDomainRegistrar())
+            .register(new NetworkingDomainRegistrar())
+            .register(new MeshDomainRegistrar())
+            .register(new HaDomainRegistrar())
+            .register(new CicdDomainRegistrar())
+            .build();
+
+    final List<ManifestUnit> manifestUnits =
+        domainRegistry.manifestUnits().stream()
+            .sorted(Comparator.comparing(ManifestUnit::manifestUnitId))
+            .toList();
+
+    final ManifestUnitRegistry manifestUnitRegistry = new ManifestUnitRegistry(manifestUnits);
+    final ManifestUnitVisitor manifestUnitVisitor = new ApplyingManifestUnitVisitor();
+    final ManifestUnitDependencyApplier dependencyApplier =
+        new ManifestUnitDependencyApplier(manifestUnitRegistry, manifestUnitVisitor);
+
+    LOG.info("Configured {} manifest domains", domainRegistry.domains().size());
+    LOG.debug(
+        "Manifest domains: {}",
+        domainRegistry.domains().stream().map(domain -> domain.domainId()).sorted().toList());
+
+    int manifestUnitHitCount = 0;
+    for (ManifestUnit manifestUnit : manifestUnits) {
+      manifestUnitHitCount++;
+      LOG.debug("Applying manifest unit '{}'", manifestUnit.manifestUnitId());
+      domainRegistry.applyManifestUnitWithDomainDependencies(
+          manifestUnit.manifestUnitId(), dependencyApplier, chart);
     }
 
-    @Override
-    public ManifestSynthesisResult synthesize(ManifestSynthesisRequest request) throws IOException {
-        LOG.info("Starting manifests synthesis via provider '{}'", providerId());
+    app.synth();
 
-        final Path synthOutdir = request.synthOutdir();
-        final Path synthManifestFile = request.synthManifestFile();
-
-        final App app = new App(AppProps.builder().outdir(synthOutdir.toString()).build());
-        final Chart chart = new Chart(app, "manifests");
-
-        final LayerDomainRegistry domainRegistry = new LayerDomainRegistryBuilder().register(new StorageDomainRegistrar())
-                .register(new ReplicationDomainRegistrar())
-                .register(new GitopsDomainRegistrar())
-                .register(new RuntimeDomainRegistrar())
-                .register(new NetworkingDomainRegistrar())
-                .register(new MeshDomainRegistrar())
-                .register(new HaDomainRegistrar())
-                .register(new CicdDomainRegistrar())
-                .build();
-
-        final List<ManifestUnit> manifestUnits = domainRegistry.manifestUnits()
-                .stream()
-                .sorted(Comparator.comparing(ManifestUnit::manifestUnitId))
-                .toList();
-
-        final ManifestUnitRegistry manifestUnitRegistry = new ManifestUnitRegistry(manifestUnits);
-        final ManifestUnitVisitor manifestUnitVisitor = new ApplyingManifestUnitVisitor();
-        final ManifestUnitDependencyApplier dependencyApplier = new ManifestUnitDependencyApplier(
-                manifestUnitRegistry,
-                manifestUnitVisitor
-        );
-
-        LOG.info("Configured {} manifest domains", domainRegistry.domains().size());
-        LOG.debug("Manifest domains: {}",
-                domainRegistry.domains().stream().map(domain -> domain.domainId()).sorted().toList());
-
-        int manifestUnitHitCount = 0;
-        for (ManifestUnit manifestUnit : manifestUnits) {
-            manifestUnitHitCount++;
-            LOG.debug("Applying manifest unit '{}'", manifestUnit.manifestUnitId());
-            domainRegistry.applyManifestUnitWithDomainDependencies(
-                    manifestUnit.manifestUnitId(),
-                    dependencyApplier,
-                    chart
-            );
-        }
-
-        app.synth();
-
-        final Path synthesizedFile = synthOutdir.resolve("manifests.k8s.yaml");
-        if (!Files.exists(synthesizedFile)) {
-            throw new IllegalStateException("Expected synthesized manifest file is missing: " + synthesizedFile);
-        }
-
-        Files.createDirectories(synthManifestFile.getParent());
-        Files.move(synthesizedFile, synthManifestFile, StandardCopyOption.REPLACE_EXISTING);
-
-        LOG.info("Synthesized manifests from canonical manifest units (manifest unit hits={})",
-                manifestUnitHitCount);
-
-        return new ManifestSynthesisResult(synthManifestFile, manifestUnitHitCount, domainRegistry.domains().size());
+    final Path synthesizedFile = synthOutdir.resolve("manifests.k8s.yaml");
+    if (!Files.exists(synthesizedFile)) {
+      throw new IllegalStateException(
+          "Expected synthesized manifest file is missing: " + synthesizedFile);
     }
+
+    Files.createDirectories(synthManifestFile.getParent());
+    Files.move(synthesizedFile, synthManifestFile, StandardCopyOption.REPLACE_EXISTING);
+
+    LOG.info(
+        "Synthesized manifests from canonical manifest units (manifest unit hits={})",
+        manifestUnitHitCount);
+
+    return new ManifestSynthesisResult(
+        synthManifestFile, manifestUnitHitCount, domainRegistry.domains().size());
+  }
 }

@@ -1,17 +1,16 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.common;
 
-import org.cdk8s.Chart;
-
 import java.util.List;
+import org.cdk8s.Chart;
 
 public interface ManifestUnit {
 
-    String manifestUnitId();
+  String manifestUnitId();
 
-    List<String> legacyPathPrefixes();
+  List<String> legacyPathPrefixes();
 
-    List<String> dependsOnManifestUnitIds();
+  List<String> dependsOnManifestUnitIds();
 
-    void apply(Chart chart);
+  void apply(Chart chart);
 }
