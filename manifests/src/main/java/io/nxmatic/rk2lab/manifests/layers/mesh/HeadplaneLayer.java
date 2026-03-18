@@ -2,6 +2,7 @@
 package io.nxmatic.rk2lab.manifests.layers.mesh;
 
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
+import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -506,7 +507,10 @@ public final class HeadplaneLayer extends Construct {
                                 "envFrom",
                                 List.of(
                                     Map.of("configMapRef", Map.of("name", "headplane-env")),
-                                    Map.of("configMapRef", Map.of("name", "flox-env"))),
+                                    Map.of(
+                                        "configMapRef",
+                                        Map.of(
+                                            "name", RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name()))),
                                 "resources",
                                 Map.of(
                                     "limits",
@@ -659,7 +663,11 @@ public final class HeadplaneLayer extends Construct {
                                     "envFrom",
                                     List.of(
                                         Map.of("configMapRef", Map.of("name", "headplane-env")),
-                                        Map.of("configMapRef", Map.of("name", "flox-env")))),
+                                        Map.of(
+                                            "configMapRef",
+                                            Map.of(
+                                                "name",
+                                                RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name())))),
                                 Map.entry(
                                     "livenessProbe",
                                     Map.of(

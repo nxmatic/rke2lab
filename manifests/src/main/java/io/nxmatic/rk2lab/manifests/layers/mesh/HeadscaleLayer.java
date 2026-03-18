@@ -2,6 +2,7 @@
 package io.nxmatic.rk2lab.manifests.layers.mesh;
 
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
+import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -295,14 +296,16 @@ public final class HeadscaleLayer extends Construct {
 
   private ApiObject createConfigMapFloxEnv(final ApiObject namespace) {
     ApiObject configMap =
-        configMapWithData("flox-env", "|ConfigMap|${headscale-namespace}|flox-env", Map.of());
+        configMapWithData(
+            RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name(),
+            "|ConfigMap|${headscale-namespace}|" + RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name(),
+            Map.of());
     configMap.addDependency(namespace);
     configMap.addJsonPatch(
         JsonPatch.add("/metadata/labels", Map.of("app.kubernetes.io/replicated", "true")),
         JsonPatch.add(
             "/metadata/annotations/replicator.v1.mittwald.de~1replicate-from",
-            io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs.FLOX_ENV_CONFIGMAP
-                .qualifiedName()));
+            RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.qualifiedName()));
     return configMap;
   }
 
@@ -501,7 +504,9 @@ public final class HeadscaleLayer extends Construct {
                     + "  -n \"$HEADSCALE_NAMESPACE\" --timeout=300s\n"
                     + "kubectl wait --for=create configmap/headscale-env \\\n"
                     + "  -n \"$HEADSCALE_NAMESPACE\" --timeout=300s\n"
-                    + "kubectl wait --for=create configmap/flox-env \\\n"
+                    + "kubectl wait --for=create configmap/"
+                    + RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name()
+                    + " \\\n"
                     + "  -n \"$HEADSCALE_NAMESPACE\" --timeout=300s\n\n"
                     + ": \"[i] Waiting for required secrets...\"\n"
                     + "kubectl wait --for=create secret/headscale-client-auth \\\n"
@@ -717,7 +722,11 @@ public final class HeadscaleLayer extends Construct {
                                     Map.entry(
                                         "envFrom",
                                         List.of(
-                                            Map.of("configMapRef", Map.of("name", "flox-env")))),
+                                            Map.of(
+                                                "configMapRef",
+                                                Map.of(
+                                                    "name",
+                                                    RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name())))),
                                     Map.entry(
                                         "livenessProbe",
                                         Map.of(
@@ -963,7 +972,10 @@ public final class HeadscaleLayer extends Construct {
                                 "envFrom",
                                 List.of(
                                     Map.of("configMapRef", Map.of("name", "headscale-env")),
-                                    Map.of("configMapRef", Map.of("name", "flox-env"))),
+                                    Map.of(
+                                        "configMapRef",
+                                        Map.of(
+                                            "name", RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name()))),
                                 "resources",
                                 Map.of(
                                     "limits",
@@ -1087,7 +1099,10 @@ public final class HeadscaleLayer extends Construct {
                                 "envFrom",
                                 List.of(
                                     Map.of("configMapRef", Map.of("name", "headscale-env")),
-                                    Map.of("configMapRef", Map.of("name", "flox-env"))),
+                                    Map.of(
+                                        "configMapRef",
+                                        Map.of(
+                                            "name", RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name()))),
                                 "resources",
                                 Map.of(
                                     "limits",
@@ -1275,7 +1290,10 @@ public final class HeadscaleLayer extends Construct {
                                 "envFrom",
                                 List.of(
                                     Map.of("configMapRef", Map.of("name", "headscale-env")),
-                                    Map.of("configMapRef", Map.of("name", "flox-env"))),
+                                    Map.of(
+                                        "configMapRef",
+                                        Map.of(
+                                            "name", RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name()))),
                                 "resources",
                                 Map.of(
                                     "limits",
@@ -1345,7 +1363,10 @@ public final class HeadscaleLayer extends Construct {
                                 "envFrom",
                                 List.of(
                                     Map.of("configMapRef", Map.of("name", "headscale-env")),
-                                    Map.of("configMapRef", Map.of("name", "flox-env"))),
+                                    Map.of(
+                                        "configMapRef",
+                                        Map.of(
+                                            "name", RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name()))),
                                 "volumeMounts",
                                 List.of(
                                     Map.of(
