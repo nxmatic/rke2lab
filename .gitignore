@@ -13,10 +13,5 @@ target/
 # Pulumi local state (if local backend is used)
 .pulumi/
 
-# Local secrets/config
-*.env
-.env
-.github/copilot.d/tmp
-
-# Generated runtime artifacts
-rke2.d/
+# GitHub temporary folders
+.github/**/tmp
