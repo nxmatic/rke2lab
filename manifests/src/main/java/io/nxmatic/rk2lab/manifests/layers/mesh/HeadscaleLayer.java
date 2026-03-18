@@ -2,6 +2,7 @@
 package io.nxmatic.rk2lab.manifests.layers.mesh;
 
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
+import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
 import java.util.List;
 import java.util.Map;
@@ -15,11 +16,21 @@ public final class HeadscaleLayer extends Construct {
 
   public static final String LEGACY_PATH_PREFIX = "mesh/headscale/";
 
+  private static final String HEADSCALE_NAMESPACE = MeshLayerRefs.HEADSCALE_SYSTEM_NAMESPACE.name();
+
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("mesh", "headscale");
 
+  private final ManifestUnitReferenceRegistry registry;
+
   public HeadscaleLayer(final Construct scope, final String id) {
+    this(scope, id, null);
+  }
+
+  public HeadscaleLayer(
+      final Construct scope, final String id, final ManifestUnitReferenceRegistry registry) {
     super(scope, id);
+    this.registry = registry;
 
     ApiObject namespace = createNamespace();
     ApiObject saClient = createServiceAccount("headscale-client", namespace);
@@ -76,20 +87,25 @@ public final class HeadscaleLayer extends Construct {
   }
 
   private ApiObject createNamespace() {
-    return new ApiObject(
-        this,
-        "namespace-headscale-system",
-        ApiObjectProps.builder()
-            .apiVersion("v1")
-            .kind("Namespace")
-            .metadata(
-                ApiObjectMetadata.builder()
-                    .name("headscale-system")
-                    .annotations(
-                        packageProfile.packageAnnotations(
-                            "|Namespace|default|${headscale-namespace}"))
-                    .build())
-            .build());
+    ApiObject namespace =
+        new ApiObject(
+            this,
+            "namespace-" + MeshLayerRefs.HEADSCALE_SYSTEM_NAMESPACE.name(),
+            ApiObjectProps.builder()
+                .apiVersion("v1")
+                .kind("Namespace")
+                .metadata(
+                    ApiObjectMetadata.builder()
+                        .name(HEADSCALE_NAMESPACE)
+                        .annotations(
+                            packageProfile.packageAnnotations(
+                                "|Namespace|default|${headscale-namespace}"))
+                        .build())
+                .build());
+    if (registry != null) {
+      registry.publish(MeshLayerRefs.HEADSCALE_SYSTEM_NAMESPACE, namespace);
+    }
+    return namespace;
   }
 
   private ApiObject createServiceAccount(final String name, final ApiObject namespace) {
@@ -103,7 +119,7 @@ public final class HeadscaleLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name(name)
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "|ServiceAccount|${headscale-namespace}|" + name))
@@ -195,7 +211,7 @@ public final class HeadscaleLayer extends Construct {
                     "name",
                     "headscale-client",
                     "namespace",
-                    "headscale-system"))));
+                    HEADSCALE_NAMESPACE))));
   }
 
   private ApiObject createRoleBootstrap(final ApiObject namespace) {
@@ -209,7 +225,7 @@ public final class HeadscaleLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headscale-bootstrap")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "rbac.authorization.k8s.io|Role|${headscale-namespace}|headscale-bootstrap"))
@@ -263,7 +279,7 @@ public final class HeadscaleLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headscale-bootstrap")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "rbac.authorization.k8s.io|RoleBinding|${headscale-namespace}|headscale-bootstrap"))
@@ -291,7 +307,7 @@ public final class HeadscaleLayer extends Construct {
                     "name",
                     "headscale-bootstrap",
                     "namespace",
-                    "headscale-system"))));
+                    HEADSCALE_NAMESPACE))));
   }
 
   private ApiObject createConfigMapFloxEnv(final ApiObject namespace) {
@@ -312,8 +328,8 @@ public final class HeadscaleLayer extends Construct {
   private ApiObject createConfigMapHeadscaleConfig(final ApiObject namespace) {
     ApiObject configMap =
         configMapWithData(
-            "headscale-config",
-            "|ConfigMap|${headscale-namespace}|headscale-config",
+            MeshLayerRefs.HEADSCALE_CONFIG_CONFIGMAP.name(),
+            "|ConfigMap|${headscale-namespace}|" + MeshLayerRefs.HEADSCALE_CONFIG_CONFIGMAP.name(),
             Map.of(
                 "config.yaml",
                 "server_url: http://headscale.hs.net:8080\n"
@@ -363,6 +379,9 @@ public final class HeadscaleLayer extends Construct {
                     + "  format: text\n"
                     + "  level: info"));
     configMap.addDependency(namespace);
+    if (registry != null) {
+      registry.publish(MeshLayerRefs.HEADSCALE_CONFIG_CONFIGMAP, configMap);
+    }
     return configMap;
   }
 
@@ -399,9 +418,9 @@ public final class HeadscaleLayer extends Construct {
                 "HEADPLANE_NAMESPACE",
                 "${headplane-namespace}",
                 "HEADSCALE_NAMESPACE",
-                "headscale-system",
+                HEADSCALE_NAMESPACE,
                 "HEADSCALE_URL",
-                "http://headscale.headscale-system.svc.cluster.local:8080",
+                "http://headscale." + HEADSCALE_NAMESPACE + ".svc.cluster.local:8080",
                 "RKE2_CLUSTER_NAME",
                 "bioskop",
                 "VIP_NETWORK_CIDR",
@@ -456,11 +475,15 @@ public final class HeadscaleLayer extends Construct {
                     + "  exit 1\n"
                     + "fi\n\n"
                     + ": \"Updating headplane-secrets with API key...\"\n"
-                    + "kubectl patch secret headplane-secrets \\\n"
+                    + "kubectl patch secret "
+                    + MeshLayerRefs.HEADPLANE_SECRETS_SECRET.name()
+                    + " \\\n"
                     + "  -n \"$HEADSCALE_NAMESPACE\" \\\n"
                     + "  --type merge \\\n"
                     + "  -p \"{\\\"stringData\\\":{\\\"api_key\\\":\\\"$HEADPLANE_API_KEY\\\"}}\" 2>/dev/null || \\\n"
-                    + "  echo \"Note: headplane-secrets not yet created, will be updated when available\""));
+                    + "  echo \"Note: "
+                    + MeshLayerRefs.HEADPLANE_SECRETS_SECRET.name()
+                    + " not yet created, will be updated when available\""));
     configMap.addDependency(namespace);
     configMap.addJsonPatch(JsonPatch.add("/metadata/labels", Map.of("app", "headscale")));
     return configMap;
@@ -676,7 +699,7 @@ public final class HeadscaleLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headscale")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .labels(Map.of("app", "headscale"))
                         .annotations(
                             packageProfile.packageAnnotations(
@@ -852,7 +875,8 @@ public final class HeadscaleLayer extends Construct {
                                     "name",
                                     "config-source",
                                     "configMap",
-                                    Map.of("name", "headscale-config")),
+                                    Map.of(
+                                        "name", MeshLayerRefs.HEADSCALE_CONFIG_CONFIGMAP.name())),
                                 Map.of("name", "config", "emptyDir", Map.of()),
                                 Map.of(
                                     "name",
@@ -887,7 +911,7 @@ public final class HeadscaleLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headscale")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .labels(Map.of("app", "headscale", "io.cilium/lb-ipam-pool", "lan"))
                         .annotations(
                             packageProfile.packageAnnotations(
@@ -935,7 +959,7 @@ public final class HeadscaleLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headscale-bootstrap")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "batch|Job|${headscale-namespace}|headscale-bootstrap"))
@@ -1039,7 +1063,7 @@ public final class HeadscaleLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headscale-gateway")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .labels(Map.of("app", "headscale-gateway"))
                         .annotations(
                             packageProfile.packageAnnotations(
@@ -1220,7 +1244,7 @@ public final class HeadscaleLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headscale-client")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .labels(Map.of("app", "headscale-client"))
                         .annotations(
                             packageProfile.packageAnnotations(
@@ -1432,7 +1456,7 @@ public final class HeadscaleLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name(name)
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(packageProfile.packageAnnotations(upstream))
                         .build())
                 .build());

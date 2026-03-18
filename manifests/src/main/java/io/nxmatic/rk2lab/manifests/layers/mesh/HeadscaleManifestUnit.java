@@ -2,6 +2,7 @@
 package io.nxmatic.rk2lab.manifests.layers.mesh;
 
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitContext;
 import java.util.List;
 import org.cdk8s.Chart;
 
@@ -17,5 +18,10 @@ public final class HeadscaleManifestUnit extends AbstractManifestUnit {
   @Override
   public void apply(final Chart chart) {
     new HeadscaleLayer(chart, "layer-mesh-headscale");
+  }
+
+  @Override
+  public void apply(final ManifestUnitContext context) {
+    new HeadscaleLayer(context.chart(), "layer-mesh-headscale", context.registry());
   }
 }

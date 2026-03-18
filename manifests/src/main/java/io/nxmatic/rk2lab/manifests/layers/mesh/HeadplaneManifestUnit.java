@@ -2,6 +2,7 @@
 package io.nxmatic.rk2lab.manifests.layers.mesh;
 
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitContext;
 import java.util.List;
 import org.cdk8s.Chart;
 
@@ -20,5 +21,10 @@ public final class HeadplaneManifestUnit extends AbstractManifestUnit {
   @Override
   public void apply(final Chart chart) {
     new HeadplaneLayer(chart, "layer-mesh-headplane");
+  }
+
+  @Override
+  public void apply(final ManifestUnitContext context) {
+    new HeadplaneLayer(context.chart(), "layer-mesh-headplane", context.registry());
   }
 }

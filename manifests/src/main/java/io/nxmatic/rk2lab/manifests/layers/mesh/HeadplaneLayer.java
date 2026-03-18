@@ -2,6 +2,7 @@
 package io.nxmatic.rk2lab.manifests.layers.mesh;
 
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
+import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
 import java.util.List;
 import java.util.Map;
@@ -15,11 +16,21 @@ public final class HeadplaneLayer extends Construct {
 
   public static final String LEGACY_PATH_PREFIX = "mesh/headplane/";
 
+  private static final String HEADSCALE_NAMESPACE = MeshLayerRefs.HEADSCALE_SYSTEM_NAMESPACE.name();
+
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("mesh", "headplane");
 
+  private final ManifestUnitReferenceRegistry registry;
+
   public HeadplaneLayer(final Construct scope, final String id) {
+    this(scope, id, null);
+  }
+
+  public HeadplaneLayer(
+      final Construct scope, final String id, final ManifestUnitReferenceRegistry registry) {
     super(scope, id);
+    this.registry = registry;
 
     ApiObject serviceAccount = createServiceAccount();
     ApiObject envConfigMap = createEnvConfigMap();
@@ -63,7 +74,7 @@ public final class HeadplaneLayer extends Construct {
             .metadata(
                 ApiObjectMetadata.builder()
                     .name("headplane")
-                    .namespace("headscale-system")
+                    .namespace(HEADSCALE_NAMESPACE)
                     .annotations(
                         packageProfile.packageAnnotations(
                             "|ServiceAccount|${headscale-namespace}|headplane"))
@@ -82,7 +93,7 @@ public final class HeadplaneLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headplane-env")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "|ConfigMap|${headscale-namespace}|headplane-env"))
@@ -94,15 +105,15 @@ public final class HeadplaneLayer extends Construct {
             "/data",
             Map.of(
                 "HEADPLANE_BASE_URL",
-                "http://headplane.headscale-system.svc.cluster.local:3000",
+                "http://headplane." + HEADSCALE_NAMESPACE + ".svc.cluster.local:3000",
                 "HEADPLANE_COOKIE_SECURE",
                 "false",
                 "HEADPLANE_NAMESPACE",
-                "headscale-system",
+                HEADSCALE_NAMESPACE,
                 "HEADSCALE_NAMESPACE",
-                "headscale-system",
+                HEADSCALE_NAMESPACE,
                 "HEADSCALE_SERVICE_URL",
-                "http://headscale.headscale-system.svc.cluster.local:8080")));
+                "http://headscale." + HEADSCALE_NAMESPACE + ".svc.cluster.local:8080")));
 
     return configMap;
   }
@@ -118,7 +129,7 @@ public final class HeadplaneLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headplane-agent-sync-script")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "|ConfigMap|${headscale-namespace}|headplane-agent-sync-script"))
@@ -161,7 +172,7 @@ public final class HeadplaneLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headplane-config-tmpl")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "|Secret|${headscale-namespace}|headplane-config-tmpl"))
@@ -202,23 +213,28 @@ public final class HeadplaneLayer extends Construct {
     ApiObject secret =
         new ApiObject(
             this,
-            "secret-headplane-secrets",
+            "secret-" + MeshLayerRefs.HEADPLANE_SECRETS_SECRET.name(),
             ApiObjectProps.builder()
                 .apiVersion("v1")
                 .kind("Secret")
                 .metadata(
                     ApiObjectMetadata.builder()
-                        .name("headplane-secrets")
-                        .namespace("headscale-system")
+                        .name(MeshLayerRefs.HEADPLANE_SECRETS_SECRET.name())
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
-                                "|Secret|${headscale-namespace}|headplane-secrets"))
+                                "|Secret|${headscale-namespace}|"
+                                    + MeshLayerRefs.HEADPLANE_SECRETS_SECRET.name()))
                         .build())
                 .build());
 
     secret.addJsonPatch(
         JsonPatch.add("/stringData", Map.of("cookie_secret", "0123456789abcdef0123456789abcdef")),
         JsonPatch.add("/type", "Opaque"));
+
+    if (registry != null) {
+      registry.publish(MeshLayerRefs.HEADPLANE_SECRETS_SECRET, secret);
+    }
 
     return secret;
   }
@@ -234,7 +250,7 @@ public final class HeadplaneLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headplane-agent-auth")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "|Secret|${headscale-namespace}|headplane-agent-auth"))
@@ -259,7 +275,7 @@ public final class HeadplaneLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headplane-data")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "|PersistentVolumeClaim|${headscale-namespace}|headplane-data"))
@@ -289,7 +305,7 @@ public final class HeadplaneLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headplane-agent-sync")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "rbac.authorization.k8s.io|Role|${headscale-namespace}|headplane-agent-sync"))
@@ -323,7 +339,7 @@ public final class HeadplaneLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headplane-agent-sync")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "rbac.authorization.k8s.io|RoleBinding|${headscale-namespace}|headplane-agent-sync"))
@@ -352,7 +368,7 @@ public final class HeadplaneLayer extends Construct {
                     "name",
                     "headplane",
                     "namespace",
-                    "headscale-system"))));
+                    HEADSCALE_NAMESPACE))));
 
     return roleBinding;
   }
@@ -368,7 +384,7 @@ public final class HeadplaneLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headplane-k8s-integration")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "rbac.authorization.k8s.io|Role|${headscale-namespace}|headplane-k8s-integration"))
@@ -416,7 +432,7 @@ public final class HeadplaneLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headplane-k8s-integration")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "rbac.authorization.k8s.io|RoleBinding|${headscale-namespace}|headplane-k8s-integration"))
@@ -445,7 +461,7 @@ public final class HeadplaneLayer extends Construct {
                     "name",
                     "headplane",
                     "namespace",
-                    "headscale-system"))));
+                    HEADSCALE_NAMESPACE))));
 
     return roleBinding;
   }
@@ -466,7 +482,7 @@ public final class HeadplaneLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headplane-agent-sync")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "batch|Job|${headscale-namespace}|headplane-agent-sync"))
@@ -602,7 +618,7 @@ public final class HeadplaneLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headplane")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .labels(Map.of("app", "headplane"))
                         .annotations(
                             packageProfile.packageAnnotations(
@@ -617,6 +633,9 @@ public final class HeadplaneLayer extends Construct {
     deployment.addDependency(pvc);
     deployment.addDependency(roleBinding);
     deployment.addDependency(syncJob);
+    if (registry != null) {
+      deployment.addDependency(registry.require(MeshLayerRefs.HEADSCALE_CONFIG_CONFIGMAP));
+    }
 
     deployment.addJsonPatch(
         JsonPatch.add(
@@ -795,7 +814,8 @@ public final class HeadplaneLayer extends Construct {
                                 "name",
                                 "secrets",
                                 "secret",
-                                Map.of("secretName", "headplane-secrets")),
+                                Map.of(
+                                    "secretName", MeshLayerRefs.HEADPLANE_SECRETS_SECRET.name())),
                             Map.of(
                                 "name",
                                 "agent",
@@ -810,7 +830,7 @@ public final class HeadplaneLayer extends Construct {
                                 "name",
                                 "headscale-config",
                                 "configMap",
-                                Map.of("name", "headscale-config")),
+                                Map.of("name", MeshLayerRefs.HEADSCALE_CONFIG_CONFIGMAP.name())),
                             Map.of("name", "shared-bin", "emptyDir", Map.of())))))));
 
     return deployment;
@@ -827,7 +847,7 @@ public final class HeadplaneLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headplane")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .labels(Map.of("app", "headplane"))
                         .annotations(
                             packageProfile.packageAnnotations(
@@ -861,7 +881,7 @@ public final class HeadplaneLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("headplane")
-                        .namespace("headscale-system")
+                        .namespace(HEADSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "networking.k8s.io|Ingress|${headscale-namespace}|headplane",
