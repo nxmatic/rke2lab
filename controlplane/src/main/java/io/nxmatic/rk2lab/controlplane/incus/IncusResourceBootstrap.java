@@ -288,14 +288,14 @@ public final class IncusResourceBootstrap {
         .disk(
             "rke2lab.env.dir", hostPaths.runtimeEnvConfigRoot(), "/srv/host/rke2lab-environment.d")
         .disk("rke2lab.scripts.dir", hostPaths.scriptsRoot(), "/srv/host/systemd-scripts.d")
-        .disk("git.dir", hostPaths.gitRoot(), "/srv/host/git")
+        .disk("git.dir", hostPaths.gitRoot(), "/srv/host/git-worktree.d")
         .disk("rke2lab.system.dir", hostPaths.systemdRoot(), "/srv/host/systemd-units.d")
         .disk("manifests.dir", hostPaths.manifestsRoot(), "/srv/host/rke2-manifests.d")
-        .disk("rke2.config.dir", hostPaths.runtimeRke2ConfigRoot(), "/srv/host/rke2-config")
+        .disk("rke2.config.dir", hostPaths.runtimeRke2ConfigRoot(), "/srv/host/rke2-config.d")
         .disk(
             "cloudconfig.nocloud.dir",
             hostPaths.runtimeCloudConfigRoot(),
-            "/srv/host/cloudconfig-nocloud")
+            "/srv/host/cloudconfig-nocloud.d")
         .disk("shared.dir", hostPaths.shareRoot(), "/srv/host/rke2lab-share.d")
         .disk("daemonset.dir", hostPaths.daemonsetRoot(), DaemonsetLogPolicy.GUEST_ROOT_PATH)
         .disk("kubeconfig.dir", hostPaths.kubeconfigRoot(), "/srv/host/rke2lab-kube.d")

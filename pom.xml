@@ -105,6 +105,15 @@
             </sortPom>
           </pom>
         </configuration>
+        <executions>
+          <execution>
+            <id>spotless-apply-on-build</id>
+            <goals>
+              <goal>apply</goal>
+            </goals>
+            <phase>process-sources</phase>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
