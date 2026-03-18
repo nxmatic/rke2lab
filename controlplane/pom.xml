@@ -141,6 +141,7 @@
             <configuration>
               <target>
                 <delete dir="${project.build.directory}/generated-resources/META-INF/io.nxmatic/rk2lab/controlplane/incus/manifests" quiet="true"/>
+                <delete dir="${project.build.directory}/classes/META-INF/io.nxmatic/rk2lab/controlplane/incus/manifests" quiet="true"/>
               </target>
             </configuration>
           </execution>
