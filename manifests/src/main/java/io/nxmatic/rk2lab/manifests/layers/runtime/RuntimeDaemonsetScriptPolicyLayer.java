@@ -1,7 +1,9 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.runtime;
 
+import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterLayerRefs;
 import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
+import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -14,9 +16,8 @@ import software.constructs.Construct;
 
 public final class RuntimeDaemonsetScriptPolicyLayer extends Construct {
 
-  public static final String SCRIPT_POLICY_CONFIGMAP_NAME = "runtime-daemonset-script-policy";
-
-  private static final String NAMESPACE = "rke2lab-system";
+  public static final String SCRIPT_POLICY_CONFIGMAP_NAME =
+      RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name();
 
   private static final String LAYER_NAME = "runtime";
 
@@ -24,8 +25,16 @@ public final class RuntimeDaemonsetScriptPolicyLayer extends Construct {
 
   private final KptMetadata kptMetadata = new KptMetadata();
 
+  private final ManifestUnitReferenceRegistry registry;
+
   public RuntimeDaemonsetScriptPolicyLayer(final Construct scope, final String id) {
+    this(scope, id, null);
+  }
+
+  public RuntimeDaemonsetScriptPolicyLayer(
+      final Construct scope, final String id, final ManifestUnitReferenceRegistry registry) {
     super(scope, id);
+    this.registry = registry;
     createScriptPolicyConfigMap();
   }
 
@@ -39,15 +48,25 @@ public final class RuntimeDaemonsetScriptPolicyLayer extends Construct {
                 .kind("ConfigMap")
                 .metadata(
                     ApiObjectMetadata.builder()
-                        .name(SCRIPT_POLICY_CONFIGMAP_NAME)
-                        .namespace(NAMESPACE)
+                        .name(RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name())
+                        .namespace(
+                            RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.namespaceName())
                         .annotations(
                             kptMetadata.packageAnnotations(
                                 LAYER_NAME,
                                 PACKAGE_NAME,
-                                "|ConfigMap|" + NAMESPACE + "|" + SCRIPT_POLICY_CONFIGMAP_NAME))
+                                "|ConfigMap|"
+                                    + RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP
+                                        .namespaceName()
+                                    + "|"
+                                    + RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name()))
                         .build())
                 .build());
+
+    if (registry != null) {
+      configMap.addDependency(registry.require(ClusterLayerRefs.RUNTIME_SYSTEM_NAMESPACE));
+      registry.publish(RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP, configMap);
+    }
 
     configMap.addJsonPatch(
         JsonPatch.add(

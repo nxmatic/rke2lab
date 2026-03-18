@@ -7,7 +7,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.cdk8s.Chart;
 
 public final class LayerDomainRegistry {
 
@@ -57,20 +56,24 @@ public final class LayerDomainRegistry {
     return manifestUnits;
   }
 
-  public void applyManifestUnitWithDomainDependencies(
-      final String manifestUnitId,
-      final ManifestUnitDependencyApplier manifestUnitDependencyApplier,
-      final Chart chart) {
-    String domainId = domainIdByManifestUnitId.get(manifestUnitId);
+  public String requireDomainIdForManifestUnit(final String manifestUnitId) {
+    final String domainId = domainIdByManifestUnitId.get(manifestUnitId);
     if (domainId == null) {
       throw new IllegalStateException(
           "Unable to resolve domain for manifest unit: " + manifestUnitId);
     }
+    return domainId;
+  }
+
+  public void applyManifestUnitWithDomainDependencies(
+      final String manifestUnitId,
+      final ManifestUnitDependencyApplier manifestUnitDependencyApplier) {
+    String domainId = requireDomainIdForManifestUnit(manifestUnitId);
 
     applyDomainWithDependencies(
-        domainId, manifestUnitDependencyApplier, chart, new HashSet<>(), new HashSet<>());
+        domainId, manifestUnitDependencyApplier, new HashSet<>(), new HashSet<>());
 
-    manifestUnitDependencyApplier.applyManifestUnitWithDependencies(manifestUnitId, chart);
+    manifestUnitDependencyApplier.applyManifestUnitWithDependencies(manifestUnitId);
   }
 
   private void validateDomainDependencies() {
@@ -90,7 +93,6 @@ public final class LayerDomainRegistry {
   private void applyDomainWithDependencies(
       final String domainId,
       final ManifestUnitDependencyApplier manifestUnitDependencyApplier,
-      final Chart chart,
       final Set<String> visitingDomainIds,
       final Set<String> appliedDomainIds) {
     if (appliedDomainIds.contains(domainId)) {
@@ -108,16 +110,12 @@ public final class LayerDomainRegistry {
 
     for (String dependencyDomainId : domain.dependsOnDomainIds()) {
       applyDomainWithDependencies(
-          dependencyDomainId,
-          manifestUnitDependencyApplier,
-          chart,
-          visitingDomainIds,
-          appliedDomainIds);
+          dependencyDomainId, manifestUnitDependencyApplier, visitingDomainIds, appliedDomainIds);
     }
 
     for (ManifestUnit manifestUnit : domain.layers()) {
       manifestUnitDependencyApplier.applyManifestUnitWithDependencies(
-          manifestUnit.manifestUnitId(), chart);
+          manifestUnit.manifestUnitId());
     }
 
     visitingDomainIds.remove(domainId);

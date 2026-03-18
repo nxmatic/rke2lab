@@ -1,0 +1,8 @@
+// @codebase
+package io.nxmatic.rk2lab.manifests.layers.common.refs;
+
+/** Marker interface for stable references that can index realized cdk8s ApiObjects. */
+public interface ApiObjectRef {
+
+  String referenceId();
+}

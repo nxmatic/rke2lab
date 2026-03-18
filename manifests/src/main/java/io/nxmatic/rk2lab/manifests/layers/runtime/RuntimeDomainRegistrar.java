@@ -11,7 +11,7 @@ public final class RuntimeDomainRegistrar implements LayerDomainRegistrar {
   public LayerDomain domain() {
     return new LayerDomain(
         "runtime",
-        List.of("storage", "replication"),
+        List.of("cluster", "storage", "replication"),
         List.of(
             new RKE2LabEnvConfigManifestUnit(),
             new RKE2ConfigManifestUnit(),

@@ -1,7 +1,9 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.runtime;
 
+import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterLayerRefs;
 import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
+import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -16,43 +18,28 @@ public final class FloxContainerdShimLayer extends Construct {
 
   public static final String LEGACY_PATH_PREFIX = "runtime/flox-containerd-shim/";
 
-  private static final String NAMESPACE = "rke2lab-system";
-
   private static final String LAYER_NAME = "runtime";
 
   private static final String PACKAGE_NAME = "flox-containerd-shim";
 
   private final KptMetadata kptMetadata = new KptMetadata();
 
-  public FloxContainerdShimLayer(final Construct scope, final String id) {
-    super(scope, id);
+  private final ManifestUnitReferenceRegistry registry;
 
-    ApiObject namespace = createNamespace();
-    createRuntimeClass();
-    ApiObject envConfigMap = createFloxEnvConfigMap(namespace);
-    ApiObject installerAssetsConfigMap = createInstallerAssetsConfigMap(namespace);
-    ApiObject serviceAccount = createServiceAccount(namespace);
-    createInstallerDaemonSet(namespace, envConfigMap, installerAssetsConfigMap, serviceAccount);
+  public FloxContainerdShimLayer(final Construct scope, final String id) {
+    this(scope, id, null);
   }
 
-  private ApiObject createNamespace() {
-    ApiObject namespace =
-        new ApiObject(
-            this,
-            "namespace-flox-containerd-shim",
-            ApiObjectProps.builder()
-                .apiVersion("v1")
-                .kind("Namespace")
-                .metadata(
-                    ApiObjectMetadata.builder()
-                        .name(NAMESPACE)
-                        .annotations(
-                            kptMetadata.packageAnnotations(
-                                LAYER_NAME, PACKAGE_NAME, "|Namespace|default|" + NAMESPACE))
-                        .labels(Map.of("flox.dev/component", "runtime"))
-                        .build())
-                .build());
-    return namespace;
+  public FloxContainerdShimLayer(
+      final Construct scope, final String id, final ManifestUnitReferenceRegistry registry) {
+    super(scope, id);
+    this.registry = registry;
+
+    createRuntimeClass();
+    ApiObject envConfigMap = createFloxEnvConfigMap();
+    ApiObject installerAssetsConfigMap = createInstallerAssetsConfigMap();
+    ApiObject serviceAccount = createServiceAccount();
+    createInstallerDaemonSet(envConfigMap, installerAssetsConfigMap, serviceAccount);
   }
 
   private void createRuntimeClass() {
@@ -77,7 +64,7 @@ public final class FloxContainerdShimLayer extends Construct {
         JsonPatch.add("/scheduling", Map.of("nodeSelector", Map.of("flox.dev/enabled", "true"))));
   }
 
-  private ApiObject createFloxEnvConfigMap(final ApiObject namespace) {
+  private ApiObject createFloxEnvConfigMap() {
     ApiObject configMap =
         new ApiObject(
             this,
@@ -87,20 +74,27 @@ public final class FloxContainerdShimLayer extends Construct {
                 .kind("ConfigMap")
                 .metadata(
                     ApiObjectMetadata.builder()
-                        .name("flox-env")
-                        .namespace(NAMESPACE)
+                        .name(RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name())
+                        .namespace(RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName())
                         .annotations(
                             kptMetadata.packageAnnotations(
                                 LAYER_NAME,
                                 PACKAGE_NAME,
-                                "|ConfigMap|" + NAMESPACE + "|flox-env",
+                                "|ConfigMap|"
+                                    + RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName()
+                                    + "|"
+                                    + RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name(),
                                 Map.of(
                                     "replicator.v1.mittwald.de/replicate-to", "headscale-system")))
                         .labels(Map.of("app.kubernetes.io/replicated", "true"))
                         .build())
                 .build());
 
-    configMap.addDependency(namespace);
+    if (registry != null) {
+      configMap.addDependency(registry.require(ClusterLayerRefs.RUNTIME_SYSTEM_NAMESPACE));
+      registry.publish(RuntimeLayerRefs.FLOX_ENV_CONFIGMAP, configMap);
+    }
+
     configMap.addJsonPatch(
         JsonPatch.add(
             "/data",
@@ -114,7 +108,7 @@ public final class FloxContainerdShimLayer extends Construct {
     return configMap;
   }
 
-  private ApiObject createInstallerAssetsConfigMap(final ApiObject namespace) {
+  private ApiObject createInstallerAssetsConfigMap() {
     ApiObject configMap =
         new ApiObject(
             this,
@@ -124,17 +118,28 @@ public final class FloxContainerdShimLayer extends Construct {
                 .kind("ConfigMap")
                 .metadata(
                     ApiObjectMetadata.builder()
-                        .name("flox-runtime-installer-assets")
-                        .namespace(NAMESPACE)
+                        .name(RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP.name())
+                        .namespace(
+                            RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP
+                                .namespaceName())
                         .annotations(
                             kptMetadata.packageAnnotations(
                                 LAYER_NAME,
                                 PACKAGE_NAME,
-                                "|ConfigMap|" + NAMESPACE + "|flox-runtime-installer-assets"))
+                                "|ConfigMap|"
+                                    + RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP
+                                        .namespaceName()
+                                    + "|"
+                                    + RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP
+                                        .name()))
                         .build())
                 .build());
 
-    configMap.addDependency(namespace);
+    if (registry != null) {
+      configMap.addDependency(registry.require(ClusterLayerRefs.RUNTIME_SYSTEM_NAMESPACE));
+      registry.publish(RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP, configMap);
+    }
+
     configMap.addJsonPatch(
         JsonPatch.add(
             "/data",
@@ -170,7 +175,7 @@ public final class FloxContainerdShimLayer extends Construct {
     }
   }
 
-  private ApiObject createServiceAccount(final ApiObject namespace) {
+  private ApiObject createServiceAccount() {
     ApiObject serviceAccount =
         new ApiObject(
             this,
@@ -181,20 +186,23 @@ public final class FloxContainerdShimLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("flox-runtime-installer")
-                        .namespace(NAMESPACE)
+                        .namespace(RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName())
                         .annotations(
                             kptMetadata.packageAnnotations(
                                 LAYER_NAME,
                                 PACKAGE_NAME,
-                                "|ServiceAccount|" + NAMESPACE + "|flox-runtime-installer"))
+                                "|ServiceAccount|"
+                                    + RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName()
+                                    + "|flox-runtime-installer"))
                         .build())
                 .build());
-    serviceAccount.addDependency(namespace);
+    if (registry != null) {
+      serviceAccount.addDependency(registry.require(ClusterLayerRefs.RUNTIME_SYSTEM_NAMESPACE));
+    }
     return serviceAccount;
   }
 
   private void createInstallerDaemonSet(
-      final ApiObject namespace,
       final ApiObject envConfigMap,
       final ApiObject installerAssetsConfigMap,
       final ApiObject serviceAccount) {
@@ -208,12 +216,14 @@ public final class FloxContainerdShimLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("flox-runtime-installer")
-                        .namespace(NAMESPACE)
+                        .namespace(RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName())
                         .annotations(
                             kptMetadata.packageAnnotations(
                                 LAYER_NAME,
                                 PACKAGE_NAME,
-                                "apps|DaemonSet|" + NAMESPACE + "|flox-runtime-installer"))
+                                "apps|DaemonSet|"
+                                    + RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName()
+                                    + "|flox-runtime-installer"))
                         .labels(
                             Map.of(
                                 "app.kubernetes.io/component",
@@ -223,7 +233,10 @@ public final class FloxContainerdShimLayer extends Construct {
                         .build())
                 .build());
 
-    daemonSet.addDependency(namespace);
+    if (registry != null) {
+      daemonSet.addDependency(registry.require(ClusterLayerRefs.RUNTIME_SYSTEM_NAMESPACE));
+      daemonSet.addDependency(registry.require(RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP));
+    }
     daemonSet.addDependency(envConfigMap);
     daemonSet.addDependency(installerAssetsConfigMap);
     daemonSet.addDependency(serviceAccount);
@@ -371,7 +384,7 @@ public final class FloxContainerdShimLayer extends Construct {
                                         "build-assets/networking/kdns/flake.nix")
                                   },
                                   "name",
-                                  "flox-runtime-installer-assets"),
+                                  RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP.name()),
                               "name",
                               "runtime-installer-assets"),
                           Map.of(
@@ -388,7 +401,7 @@ public final class FloxContainerdShimLayer extends Construct {
                                         "daemonset-logging.sh")
                                   },
                                   "name",
-                                  RuntimeDaemonsetScriptPolicyLayer.SCRIPT_POLICY_CONFIGMAP_NAME),
+                                  RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name()),
                               "name",
                               "runtime-daemonset-script-policy"),
                           Map.of(

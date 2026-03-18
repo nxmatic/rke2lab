@@ -301,7 +301,8 @@ public final class HeadscaleLayer extends Construct {
         JsonPatch.add("/metadata/labels", Map.of("app.kubernetes.io/replicated", "true")),
         JsonPatch.add(
             "/metadata/annotations/replicator.v1.mittwald.de~1replicate-from",
-            "rke2lab-system/flox-env"));
+            io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs.FLOX_ENV_CONFIGMAP
+                .qualifiedName()));
     return configMap;
   }
 

@@ -12,5 +12,13 @@ public interface ManifestUnit {
 
   List<String> dependsOnManifestUnitIds();
 
-  void apply(Chart chart);
+  default void apply(ManifestUnitContext context) {
+    apply(context.chart());
+  }
+
+  default void apply(Chart chart) {
+    throw new UnsupportedOperationException(
+        "ManifestUnit must override apply(Chart) or apply(ManifestUnitContext): "
+            + manifestUnitId());
+  }
 }

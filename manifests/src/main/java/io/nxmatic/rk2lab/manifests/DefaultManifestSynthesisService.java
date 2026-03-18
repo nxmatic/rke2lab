@@ -4,6 +4,7 @@ import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisResult;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
 import io.nxmatic.rk2lab.manifests.layers.cicd.CicdDomainRegistrar;
+import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.common.ApplyingManifestUnitVisitor;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistry;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistryBuilder;
@@ -11,6 +12,7 @@ import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnit;
 import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitDependencyApplier;
 import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitRegistry;
 import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitVisitor;
+import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestAssemblyRegistry;
 import io.nxmatic.rk2lab.manifests.layers.gitops.GitopsDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.ha.HaDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.mesh.MeshDomainRegistrar;
@@ -52,6 +54,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
     final LayerDomainRegistry domainRegistry =
         new LayerDomainRegistryBuilder()
+            .register(new ClusterDomainRegistrar())
             .register(new StorageDomainRegistrar())
             .register(new ReplicationDomainRegistrar())
             .register(new GitopsDomainRegistrar())
@@ -67,10 +70,12 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             .sorted(Comparator.comparing(ManifestUnit::manifestUnitId))
             .toList();
 
+    final ManifestAssemblyRegistry assemblyRegistry = new ManifestAssemblyRegistry();
     final ManifestUnitRegistry manifestUnitRegistry = new ManifestUnitRegistry(manifestUnits);
     final ManifestUnitVisitor manifestUnitVisitor = new ApplyingManifestUnitVisitor();
     final ManifestUnitDependencyApplier dependencyApplier =
-        new ManifestUnitDependencyApplier(manifestUnitRegistry, manifestUnitVisitor);
+        new ManifestUnitDependencyApplier(
+            domainRegistry, manifestUnitRegistry, manifestUnitVisitor, chart, assemblyRegistry);
 
     LOG.info("Configured {} manifest domains", domainRegistry.domains().size());
     LOG.debug(
@@ -82,7 +87,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
       manifestUnitHitCount++;
       LOG.debug("Applying manifest unit '{}'", manifestUnit.manifestUnitId());
       domainRegistry.applyManifestUnitWithDomainDependencies(
-          manifestUnit.manifestUnitId(), dependencyApplier, chart);
+          manifestUnit.manifestUnitId(), dependencyApplier);
     }
 
     app.synth();
