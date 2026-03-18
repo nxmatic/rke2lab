@@ -2049,16 +2049,15 @@
       "description": "Portable command-line YAML processor",
       "install_id": "yq-go",
       "license": "[ MIT ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=62dc67aa6a52b4364dd75994ec00b51fbf474e50",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
       "name": "yq-go-4.52.4",
       "pname": "yq-go",
-      "rev": "62dc67aa6a52b4364dd75994ec00b51fbf474e50",
-      "rev_count": 961274,
-      "rev_date": "2026-03-10T06:05:22Z",
-      "scrape_date": "2026-03-13T04:44:32.801036Z",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:44:46.545806Z",
       "stabilities": [
-        "unstable",
-        "staging"
+        "unstable"
       ],
       "unfree": false,
       "version": "4.52.4",
@@ -2079,16 +2078,15 @@
       "description": "Portable command-line YAML processor",
       "install_id": "yq-go",
       "license": "[ MIT ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=62dc67aa6a52b4364dd75994ec00b51fbf474e50",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
       "name": "yq-go-4.52.4",
       "pname": "yq-go",
-      "rev": "62dc67aa6a52b4364dd75994ec00b51fbf474e50",
-      "rev_count": 961274,
-      "rev_date": "2026-03-10T06:05:22Z",
-      "scrape_date": "2026-03-13T05:17:40.745609Z",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:18:29.600662Z",
       "stabilities": [
-        "unstable",
-        "staging"
+        "unstable"
       ],
       "unfree": false,
       "version": "4.52.4",
@@ -2366,19 +2364,18 @@
     {
       "attr_path": "graphviz",
       "broken": false,
-      "derivation": "/nix/store/4mbrbp8n8qq41b2hvsdrjvmsi9sh2mig-graphviz-12.2.1.drv",
+      "derivation": "/nix/store/rspy0sf84b4d7lw1kswihbm7nyvvlx9m-graphviz-12.2.1.drv",
       "description": "Graph visualization tools",
       "install_id": "graphviz",
       "license": "EPL-1.0",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=88d3861acdd3d2f0e361767018218e51810df8a1",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
       "name": "graphviz-12.2.1",
       "pname": "graphviz",
-      "rev": "88d3861acdd3d2f0e361767018218e51810df8a1",
-      "rev_count": 931542,
-      "rev_date": "2026-01-21T18:02:10Z",
-      "scrape_date": "2026-01-23T04:32:31.395106Z",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:42:04.833923Z",
       "stabilities": [
-        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2387,7 +2384,7 @@
         "out"
       ],
       "outputs": {
-        "out": "/nix/store/95s5pz5p0nk7av9sm7ig6kiq7gqcasxz-graphviz-12.2.1"
+        "out": "/nix/store/4q3fpgj28v35gd5q27ga7dbnzzkzlkkn-graphviz-12.2.1"
       },
       "system": "aarch64-darwin",
       "group": "toplevel",
@@ -2396,19 +2393,18 @@
     {
       "attr_path": "graphviz",
       "broken": false,
-      "derivation": "/nix/store/a8vp07722jn0fj2v94xw832y7m2npyw9-graphviz-12.2.1.drv",
+      "derivation": "/nix/store/a7n3fk0qb876lcrj4krjabgbgq07mi79-graphviz-12.2.1.drv",
       "description": "Graph visualization tools",
       "install_id": "graphviz",
       "license": "EPL-1.0",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=88d3861acdd3d2f0e361767018218e51810df8a1",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
       "name": "graphviz-12.2.1",
       "pname": "graphviz",
-      "rev": "88d3861acdd3d2f0e361767018218e51810df8a1",
-      "rev_count": 931542,
-      "rev_date": "2026-01-21T18:02:10Z",
-      "scrape_date": "2026-01-23T05:12:36.157320Z",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:14:40.999535Z",
       "stabilities": [
-        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2418,7 +2414,7 @@
         "out"
       ],
       "outputs": {
-        "out": "/nix/store/x62wfav09lvdwmw5dnk6hhbfcg0v2706-graphviz-12.2.1"
+        "out": "/nix/store/241vgqijh7v53h5r7ilf1hfiriplqlvi-graphviz-12.2.1"
       },
       "system": "aarch64-linux",
       "group": "toplevel",
