@@ -1,7 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!-- @codebase -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
@@ -47,8 +46,8 @@
       <version>${project.version}</version>
     </dependency>
     <dependency>
-        <groupId>io.nxmatic</groupId>
-        <artifactId>rke2lab-manifests</artifactId>
+      <groupId>io.nxmatic</groupId>
+      <artifactId>rke2lab-manifests</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -86,14 +85,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-toolchains-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>select-jdk25-toolchain</id>
-            <goals>
-              <goal>toolchain</goal>
-            </goals>
-          </execution>
-        </executions>
         <configuration>
           <toolchains>
             <jdk>
@@ -102,6 +93,14 @@
             </jdk>
           </toolchains>
         </configuration>
+        <executions>
+          <execution>
+            <id>select-jdk25-toolchain</id>
+            <goals>
+              <goal>toolchain</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -135,10 +134,10 @@
         <executions>
           <execution>
             <id>clean-unpacked-manifests-generated-resources</id>
-            <phase>generate-resources</phase>
             <goals>
               <goal>run</goal>
             </goals>
+            <phase>generate-resources</phase>
             <configuration>
               <target>
                 <delete dir="${project.build.directory}/generated-resources/META-INF/io.nxmatic/rk2lab/controlplane/incus/manifests" quiet="true"/>
@@ -147,18 +146,18 @@
           </execution>
           <execution>
             <id>copy-incus-assets-into-generated-resources</id>
-            <phase>generate-resources</phase>
             <goals>
               <goal>run</goal>
             </goals>
+            <phase>generate-resources</phase>
             <configuration>
               <target>
                 <mkdir dir="${project.build.directory}/generated-resources/META-INF/io.nxmatic/rk2lab/controlplane/incus/assets"/>
-                <copy todir="${project.build.directory}/generated-resources/META-INF/io.nxmatic/rk2lab/controlplane/incus/assets" overwrite="true">
+                <copy overwrite="true" todir="${project.build.directory}/generated-resources/META-INF/io.nxmatic/rk2lab/controlplane/incus/assets">
                   <fileset dir="${maven.multiModuleProjectDirectory}/assets/incus"/>
                 </copy>
                 <mkdir dir="${project.build.directory}/generated-resources/META-INF/io.nxmatic/rk2lab/controlplane/incus"/>
-                <copy todir="${project.build.directory}/generated-resources/META-INF/io.nxmatic/rk2lab/controlplane/incus" overwrite="true">
+                <copy overwrite="true" todir="${project.build.directory}/generated-resources/META-INF/io.nxmatic/rk2lab/controlplane/incus">
                   <fileset dir="${project.basedir}/src/main/resources/incus"/>
                 </copy>
               </target>
@@ -171,10 +170,10 @@
         <artifactId>maven-shade-plugin</artifactId>
         <executions>
           <execution>
-            <phase>package</phase>
             <goals>
               <goal>shade</goal>
             </goals>
+            <phase>package</phase>
             <configuration>
               <createDependencyReducedPom>false</createDependencyReducedPom>
               <shadedArtifactAttached>true</shadedArtifactAttached>
@@ -219,10 +218,10 @@
         <executions>
           <execution>
             <id>unpack-manifests-bundle</id>
-            <phase>generate-resources</phase>
             <goals>
               <goal>unpack</goal>
             </goals>
+            <phase>generate-resources</phase>
             <configuration>
               <skip>${rk2lab.manifests.unpack.skip}</skip>
               <artifactItems>

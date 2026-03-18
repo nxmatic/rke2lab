@@ -1,7 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!-- @codebase -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
@@ -37,14 +36,14 @@
       <dependency>
         <groupId>io.nxmatic</groupId>
         <artifactId>rke2lab-controlplane</artifactId>
-        <classifier>exec</classifier>
         <version>${rke2lab.version}</version>
+        <classifier>exec</classifier>
       </dependency>
       <dependency>
         <groupId>io.nxmatic</groupId>
         <artifactId>rke2lab-manifests</artifactId>
         <version>${rke2lab.version}</version>
-      </dependency> 
+      </dependency>
       <!-- third-party dependencies -->
       <dependency>
         <groupId>com.pulumi</groupId>

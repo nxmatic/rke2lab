@@ -1,7 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!-- @codebase -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
@@ -65,14 +64,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-toolchains-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>select-jdk25-toolchain</id>
-            <goals>
-              <goal>toolchain</goal>
-            </goals>
-          </execution>
-        </executions>
         <configuration>
           <toolchains>
             <jdk>
@@ -81,6 +72,14 @@
             </jdk>
           </toolchains>
         </configuration>
+        <executions>
+          <execution>
+            <id>select-jdk25-toolchain</id>
+            <goals>
+              <goal>toolchain</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -107,36 +106,6 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>synthesize-manifests</id>
-            <phase>prepare-package</phase>
-            <goals>
-              <goal>java</goal>
-            </goals>
-            <configuration>
-              <arguments>
-                <argument>synthesize</argument>
-              </arguments>
-            </configuration>
-          </execution>
-          <execution>
-            <id>explode-manifests</id>
-            <phase>prepare-package</phase>
-            <goals>
-              <goal>exec</goal>
-            </goals>
-            <configuration>
-              <executable>bash</executable>
-              <workingDirectory>${project.basedir}</workingDirectory>
-              <arguments>
-                <argument>${project.basedir}/bin/explode-manifests.sh</argument>
-                <argument>${project.build.directory}/manifests.yaml</argument>
-                <argument>${project.build.directory}/manifests.d</argument>
-              </arguments>
-            </configuration>
-          </execution>
-        </executions>
         <configuration>
           <mainClass>io.nxmatic.rk2lab.manifests.Main</mainClass>
           <systemProperties>
@@ -162,6 +131,36 @@
             </systemProperty>
           </systemProperties>
         </configuration>
+        <executions>
+          <execution>
+            <id>synthesize-manifests</id>
+            <goals>
+              <goal>java</goal>
+            </goals>
+            <phase>prepare-package</phase>
+            <configuration>
+              <arguments>
+                <argument>synthesize</argument>
+              </arguments>
+            </configuration>
+          </execution>
+          <execution>
+            <id>explode-manifests</id>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <phase>prepare-package</phase>
+            <configuration>
+              <executable>bash</executable>
+              <workingDirectory>${project.basedir}</workingDirectory>
+              <arguments>
+                <argument>${project.basedir}/bin/explode-manifests.sh</argument>
+                <argument>${project.build.directory}/manifests.yaml</argument>
+                <argument>${project.build.directory}/manifests.d</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -170,10 +169,10 @@
         <executions>
           <execution>
             <id>attach-manifests-zip</id>
-            <phase>package</phase>
             <goals>
               <goal>single</goal>
             </goals>
+            <phase>package</phase>
             <configuration>
               <descriptors>
                 <descriptor>${project.basedir}/src/assembly/manifests-d.xml</descriptor>
@@ -188,10 +187,10 @@
         <artifactId>maven-shade-plugin</artifactId>
         <executions>
           <execution>
-            <phase>package</phase>
             <goals>
               <goal>shade</goal>
             </goals>
+            <phase>package</phase>
             <configuration>
               <createDependencyReducedPom>false</createDependencyReducedPom>
               <shadedArtifactAttached>true</shadedArtifactAttached>
