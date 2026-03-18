@@ -68,7 +68,7 @@ public final class FloxContainerdShimLayer extends Construct {
     ApiObject configMap =
         new ApiObject(
             this,
-            "configmap-flox-env",
+            "configmap-" + RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name(),
             ApiObjectProps.builder()
                 .apiVersion("v1")
                 .kind("ConfigMap")
@@ -112,7 +112,7 @@ public final class FloxContainerdShimLayer extends Construct {
     ApiObject configMap =
         new ApiObject(
             this,
-            "configmap-flox-runtime-installer-assets",
+            "configmap-" + RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP.name(),
             ApiObjectProps.builder()
                 .apiVersion("v1")
                 .kind("ConfigMap")

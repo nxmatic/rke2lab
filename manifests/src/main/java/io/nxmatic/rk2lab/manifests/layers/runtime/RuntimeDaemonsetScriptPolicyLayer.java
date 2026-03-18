@@ -42,7 +42,7 @@ public final class RuntimeDaemonsetScriptPolicyLayer extends Construct {
     ApiObject configMap =
         new ApiObject(
             this,
-            "configmap-runtime-daemonset-script-policy",
+            "configmap-" + RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name(),
             ApiObjectProps.builder()
                 .apiVersion("v1")
                 .kind("ConfigMap")

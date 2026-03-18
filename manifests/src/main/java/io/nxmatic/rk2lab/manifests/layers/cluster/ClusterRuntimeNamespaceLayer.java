@@ -32,7 +32,7 @@ public final class ClusterRuntimeNamespaceLayer extends Construct {
     final ApiObject namespace =
         new ApiObject(
             this,
-            "namespace-rke2lab-system",
+            "namespace-" + ClusterLayerRefs.RUNTIME_SYSTEM_NAMESPACE.name(),
             ApiObjectProps.builder()
                 .apiVersion("v1")
                 .kind("Namespace")
