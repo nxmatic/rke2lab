@@ -298,7 +298,7 @@ public final class FloxContainerdShimLayer extends Construct {
                                     "name",
                                     "CONTAINERD_CONFIG_FILE",
                                     "value",
-                                    "/var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml"),
+                                    "/var/lib/rancher/rke2/agent/etc/containerd/config.toml"),
                                 Map.of(
                                     "name",
                                     "CONTAINERD_ADDRESS",

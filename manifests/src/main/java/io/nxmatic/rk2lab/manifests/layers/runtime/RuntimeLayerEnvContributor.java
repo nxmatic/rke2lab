@@ -40,8 +40,7 @@ public class RuntimeLayerEnvContributor implements LayerEnvContributor {
           Map.of(
               "CONTAINERD_ADDRESS", "/run/k3s/containerd/containerd.sock",
               "CONTAINERD_NAMESPACE", "k8s.io",
-              "CONTAINERD_CONFIG_FILE",
-                  "/var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml");
+              "CONTAINERD_CONFIG_FILE", "/var/lib/rancher/rke2/agent/etc/containerd/config.toml");
       case "cri" -> Map.of("CRI_CONFIG_FILE", "/var/lib/rancher/rke2/agent/etc/crictl.yaml");
       case "helm" ->
           Map.of(
