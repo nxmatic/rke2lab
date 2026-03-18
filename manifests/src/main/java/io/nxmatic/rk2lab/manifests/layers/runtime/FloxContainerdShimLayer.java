@@ -4,6 +4,7 @@ package io.nxmatic.rk2lab.manifests.layers.runtime;
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterLayerRefs;
 import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
+import io.nxmatic.rk2lab.manifests.layers.mesh.MeshLayerRefs;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -85,7 +86,8 @@ public final class FloxContainerdShimLayer extends Construct {
                                     + "|"
                                     + RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name(),
                                 Map.of(
-                                    "replicator.v1.mittwald.de/replicate-to", "headscale-system")))
+                                    "replicator.v1.mittwald.de/replicate-to",
+                                    MeshLayerRefs.HEADSCALE_SYSTEM_NAMESPACE.name())))
                         .labels(Map.of("app.kubernetes.io/replicated", "true"))
                         .build())
                 .build());
