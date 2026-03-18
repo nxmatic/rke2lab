@@ -6,121 +6,122 @@ package com.pulumi.incus.inputs;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 
 public final class GetNetworkLoadBalancerBackendArgs extends com.pulumi.resources.ResourceArgs {
 
-    public static final GetNetworkLoadBalancerBackendArgs Empty = new GetNetworkLoadBalancerBackendArgs();
+  public static final GetNetworkLoadBalancerBackendArgs Empty =
+      new GetNetworkLoadBalancerBackendArgs();
 
-    @Import(name = "description", required = true)
-    private Output<String> description;
+  @Import(name = "description", required = true)
+  private Output<String> description;
 
-    public Output<String> description() {
-        return this.description;
+  public Output<String> description() {
+    return this.description;
+  }
+
+  @Import(name = "name", required = true)
+  private Output<String> name;
+
+  public Output<String> name() {
+    return this.name;
+  }
+
+  @Import(name = "targetAddress", required = true)
+  private Output<String> targetAddress;
+
+  public Output<String> targetAddress() {
+    return this.targetAddress;
+  }
+
+  @Import(name = "targetPort", required = true)
+  private Output<String> targetPort;
+
+  public Output<String> targetPort() {
+    return this.targetPort;
+  }
+
+  private GetNetworkLoadBalancerBackendArgs() {}
+
+  private GetNetworkLoadBalancerBackendArgs(GetNetworkLoadBalancerBackendArgs $) {
+    this.description = $.description;
+    this.name = $.name;
+    this.targetAddress = $.targetAddress;
+    this.targetPort = $.targetPort;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetNetworkLoadBalancerBackendArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetNetworkLoadBalancerBackendArgs $;
+
+    public Builder() {
+      $ = new GetNetworkLoadBalancerBackendArgs();
     }
 
-    @Import(name = "name", required = true)
-    private Output<String> name;
-
-    public Output<String> name() {
-        return this.name;
+    public Builder(GetNetworkLoadBalancerBackendArgs defaults) {
+      $ = new GetNetworkLoadBalancerBackendArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "targetAddress", required = true)
-    private Output<String> targetAddress;
-
-    public Output<String> targetAddress() {
-        return this.targetAddress;
+    public Builder description(Output<String> description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name = "targetPort", required = true)
-    private Output<String> targetPort;
-
-    public Output<String> targetPort() {
-        return this.targetPort;
+    public Builder description(String description) {
+      return description(Output.of(description));
     }
 
-    private GetNetworkLoadBalancerBackendArgs() {
+    public Builder name(Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    private GetNetworkLoadBalancerBackendArgs(GetNetworkLoadBalancerBackendArgs $) {
-        this.description = $.description;
-        this.name = $.name;
-        this.targetAddress = $.targetAddress;
-        this.targetPort = $.targetPort;
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder targetAddress(Output<String> targetAddress) {
+      $.targetAddress = targetAddress;
+      return this;
     }
 
-    public static Builder builder(GetNetworkLoadBalancerBackendArgs defaults) {
-        return new Builder(defaults);
+    public Builder targetAddress(String targetAddress) {
+      return targetAddress(Output.of(targetAddress));
     }
 
-    public static final class Builder {
-        private GetNetworkLoadBalancerBackendArgs $;
-
-        public Builder() {
-            $ = new GetNetworkLoadBalancerBackendArgs();
-        }
-
-        public Builder(GetNetworkLoadBalancerBackendArgs defaults) {
-            $ = new GetNetworkLoadBalancerBackendArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder description(Output<String> description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder description(String description) {
-            return description(Output.of(description));
-        }
-
-        public Builder name(Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        public Builder targetAddress(Output<String> targetAddress) {
-            $.targetAddress = targetAddress;
-            return this;
-        }
-
-        public Builder targetAddress(String targetAddress) {
-            return targetAddress(Output.of(targetAddress));
-        }
-
-        public Builder targetPort(Output<String> targetPort) {
-            $.targetPort = targetPort;
-            return this;
-        }
-
-        public Builder targetPort(String targetPort) {
-            return targetPort(Output.of(targetPort));
-        }
-
-        public GetNetworkLoadBalancerBackendArgs build() {
-            if ($.description == null) {
-                throw new MissingRequiredPropertyException("GetNetworkLoadBalancerBackendArgs", "description");
-            }
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("GetNetworkLoadBalancerBackendArgs", "name");
-            }
-            if ($.targetAddress == null) {
-                throw new MissingRequiredPropertyException("GetNetworkLoadBalancerBackendArgs", "targetAddress");
-            }
-            if ($.targetPort == null) {
-                throw new MissingRequiredPropertyException("GetNetworkLoadBalancerBackendArgs", "targetPort");
-            }
-            return $;
-        }
+    public Builder targetPort(Output<String> targetPort) {
+      $.targetPort = targetPort;
+      return this;
     }
 
+    public Builder targetPort(String targetPort) {
+      return targetPort(Output.of(targetPort));
+    }
+
+    public GetNetworkLoadBalancerBackendArgs build() {
+      if ($.description == null) {
+        throw new MissingRequiredPropertyException(
+            "GetNetworkLoadBalancerBackendArgs", "description");
+      }
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("GetNetworkLoadBalancerBackendArgs", "name");
+      }
+      if ($.targetAddress == null) {
+        throw new MissingRequiredPropertyException(
+            "GetNetworkLoadBalancerBackendArgs", "targetAddress");
+      }
+      if ($.targetPort == null) {
+        throw new MissingRequiredPropertyException(
+            "GetNetworkLoadBalancerBackendArgs", "targetPort");
+      }
+      return $;
+    }
+  }
 }

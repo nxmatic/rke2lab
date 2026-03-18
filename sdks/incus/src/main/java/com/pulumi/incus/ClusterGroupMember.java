@@ -7,87 +7,121 @@ import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Export;
 import com.pulumi.core.annotations.ResourceType;
 import com.pulumi.core.internal.Codegen;
-import com.pulumi.incus.ClusterGroupMemberArgs;
-import com.pulumi.incus.Utilities;
 import com.pulumi.incus.inputs.ClusterGroupMemberState;
-import java.lang.String;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-@ResourceType(type="incus:index/clusterGroupMember:ClusterGroupMember")
+@ResourceType(type = "incus:index/clusterGroupMember:ClusterGroupMember")
 public class ClusterGroupMember extends com.pulumi.resources.CustomResource {
-    @Export(name="clusterGroup", refs={String.class}, tree="[0]")
-    private Output<String> clusterGroup;
+  @Export(
+      name = "clusterGroup",
+      refs = {String.class},
+      tree = "[0]")
+  private Output<String> clusterGroup;
 
-    public Output<String> clusterGroup() {
-        return this.clusterGroup;
-    }
-    @Export(name="member", refs={String.class}, tree="[0]")
-    private Output<String> member;
+  public Output<String> clusterGroup() {
+    return this.clusterGroup;
+  }
 
-    public Output<String> member() {
-        return this.member;
-    }
-    @Export(name="remote", refs={String.class}, tree="[0]")
-    private Output</* @Nullable */ String> remote;
+  @Export(
+      name = "member",
+      refs = {String.class},
+      tree = "[0]")
+  private Output<String> member;
 
-    public Output<Optional<String>> remote() {
-        return Codegen.optional(this.remote);
-    }
+  public Output<String> member() {
+    return this.member;
+  }
 
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     */
-    public ClusterGroupMember(java.lang.String name) {
-        this(name, ClusterGroupMemberArgs.Empty);
-    }
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param args The arguments to use to populate this resource's properties.
-     */
-    public ClusterGroupMember(java.lang.String name, ClusterGroupMemberArgs args) {
-        this(name, args, null);
-    }
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param args The arguments to use to populate this resource's properties.
-     * @param options A bag of options that control this resource's behavior.
-     */
-    public ClusterGroupMember(java.lang.String name, ClusterGroupMemberArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        super("incus:index/clusterGroupMember:ClusterGroupMember", name, makeArgs(args, options), makeResourceOptions(options, Codegen.empty()), false, Utilities.getPackageRef());
-    }
+  @Export(
+      name = "remote",
+      refs = {String.class},
+      tree = "[0]")
+  private Output</* @Nullable */ String> remote;
 
-    private ClusterGroupMember(java.lang.String name, Output<java.lang.String> id, @Nullable ClusterGroupMemberState state, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        super("incus:index/clusterGroupMember:ClusterGroupMember", name, state, makeResourceOptions(options, id), false, Utilities.getPackageRef());
-    }
+  public Output<Optional<String>> remote() {
+    return Codegen.optional(this.remote);
+  }
 
-    private static ClusterGroupMemberArgs makeArgs(ClusterGroupMemberArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        if (options != null && options.getUrn().isPresent()) {
-            return null;
-        }
-        return args == null ? ClusterGroupMemberArgs.Empty : args;
-    }
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   */
+  public ClusterGroupMember(java.lang.String name) {
+    this(name, ClusterGroupMemberArgs.Empty);
+  }
 
-    private static com.pulumi.resources.CustomResourceOptions makeResourceOptions(@Nullable com.pulumi.resources.CustomResourceOptions options, @Nullable Output<java.lang.String> id) {
-        var defaultOptions = com.pulumi.resources.CustomResourceOptions.builder()
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   * @param args The arguments to use to populate this resource's properties.
+   */
+  public ClusterGroupMember(java.lang.String name, ClusterGroupMemberArgs args) {
+    this(name, args, null);
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   * @param args The arguments to use to populate this resource's properties.
+   * @param options A bag of options that control this resource's behavior.
+   */
+  public ClusterGroupMember(
+      java.lang.String name,
+      ClusterGroupMemberArgs args,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    super(
+        "incus:index/clusterGroupMember:ClusterGroupMember",
+        name,
+        makeArgs(args, options),
+        makeResourceOptions(options, Codegen.empty()),
+        false,
+        Utilities.getPackageRef());
+  }
+
+  private ClusterGroupMember(
+      java.lang.String name,
+      Output<java.lang.String> id,
+      @Nullable ClusterGroupMemberState state,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    super(
+        "incus:index/clusterGroupMember:ClusterGroupMember",
+        name,
+        state,
+        makeResourceOptions(options, id),
+        false,
+        Utilities.getPackageRef());
+  }
+
+  private static ClusterGroupMemberArgs makeArgs(
+      ClusterGroupMemberArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    if (options != null && options.getUrn().isPresent()) {
+      return null;
+    }
+    return args == null ? ClusterGroupMemberArgs.Empty : args;
+  }
+
+  private static com.pulumi.resources.CustomResourceOptions makeResourceOptions(
+      @Nullable com.pulumi.resources.CustomResourceOptions options,
+      @Nullable Output<java.lang.String> id) {
+    var defaultOptions =
+        com.pulumi.resources.CustomResourceOptions.builder()
             .version(Utilities.getVersion())
             .build();
-        return com.pulumi.resources.CustomResourceOptions.merge(defaultOptions, options, id);
-    }
+    return com.pulumi.resources.CustomResourceOptions.merge(defaultOptions, options, id);
+  }
 
-    /**
-     * Get an existing Host resource's state with the given name, ID, and optional extra
-     * properties used to qualify the lookup.
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param id The _unique_ provider ID of the resource to lookup.
-     * @param state
-     * @param options Optional settings to control the behavior of the CustomResource.
-     */
-    public static ClusterGroupMember get(java.lang.String name, Output<java.lang.String> id, @Nullable ClusterGroupMemberState state, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        return new ClusterGroupMember(name, id, state, options);
-    }
+  /**
+   * Get an existing Host resource's state with the given name, ID, and optional extra properties
+   * used to qualify the lookup.
+   *
+   * @param name The _unique_ name of the resulting resource.
+   * @param id The _unique_ provider ID of the resource to lookup.
+   * @param state
+   * @param options Optional settings to control the behavior of the CustomResource.
+   */
+  public static ClusterGroupMember get(
+      java.lang.String name,
+      Output<java.lang.String> id,
+      @Nullable ClusterGroupMemberState state,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    return new ClusterGroupMember(name, id, state, options);
+  }
 }

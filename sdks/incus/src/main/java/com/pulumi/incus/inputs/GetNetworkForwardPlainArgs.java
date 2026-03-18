@@ -5,8 +5,6 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import com.pulumi.incus.inputs.GetNetworkForwardPort;
-import java.lang.String;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -14,150 +12,148 @@ import javax.annotation.Nullable;
 
 public final class GetNetworkForwardPlainArgs extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetNetworkForwardPlainArgs Empty = new GetNetworkForwardPlainArgs();
+  public static final GetNetworkForwardPlainArgs Empty = new GetNetworkForwardPlainArgs();
 
-    @Import(name = "description")
-    private @Nullable String description;
+  @Import(name = "description")
+  private @Nullable String description;
 
-    public Optional<String> description() {
-        return Optional.ofNullable(this.description);
+  public Optional<String> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "listenAddress", required = true)
+  private String listenAddress;
+
+  public String listenAddress() {
+    return this.listenAddress;
+  }
+
+  @Import(name = "location")
+  private @Nullable String location;
+
+  public Optional<String> location() {
+    return Optional.ofNullable(this.location);
+  }
+
+  @Import(name = "network", required = true)
+  private String network;
+
+  public String network() {
+    return this.network;
+  }
+
+  @Import(name = "ports")
+  private @Nullable List<GetNetworkForwardPort> ports;
+
+  public Optional<List<GetNetworkForwardPort>> ports() {
+    return Optional.ofNullable(this.ports);
+  }
+
+  @Import(name = "project")
+  private @Nullable String project;
+
+  public Optional<String> project() {
+    return Optional.ofNullable(this.project);
+  }
+
+  @Import(name = "remote")
+  private @Nullable String remote;
+
+  public Optional<String> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  @Import(name = "target")
+  private @Nullable String target;
+
+  public Optional<String> target() {
+    return Optional.ofNullable(this.target);
+  }
+
+  private GetNetworkForwardPlainArgs() {}
+
+  private GetNetworkForwardPlainArgs(GetNetworkForwardPlainArgs $) {
+    this.description = $.description;
+    this.listenAddress = $.listenAddress;
+    this.location = $.location;
+    this.network = $.network;
+    this.ports = $.ports;
+    this.project = $.project;
+    this.remote = $.remote;
+    this.target = $.target;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetNetworkForwardPlainArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetNetworkForwardPlainArgs $;
+
+    public Builder() {
+      $ = new GetNetworkForwardPlainArgs();
     }
 
-    @Import(name = "listenAddress", required = true)
-    private String listenAddress;
-
-    public String listenAddress() {
-        return this.listenAddress;
+    public Builder(GetNetworkForwardPlainArgs defaults) {
+      $ = new GetNetworkForwardPlainArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "location")
-    private @Nullable String location;
-
-    public Optional<String> location() {
-        return Optional.ofNullable(this.location);
+    public Builder description(@Nullable String description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name = "network", required = true)
-    private String network;
-
-    public String network() {
-        return this.network;
+    public Builder listenAddress(String listenAddress) {
+      $.listenAddress = listenAddress;
+      return this;
     }
 
-    @Import(name = "ports")
-    private @Nullable List<GetNetworkForwardPort> ports;
-
-    public Optional<List<GetNetworkForwardPort>> ports() {
-        return Optional.ofNullable(this.ports);
+    public Builder location(@Nullable String location) {
+      $.location = location;
+      return this;
     }
 
-    @Import(name = "project")
-    private @Nullable String project;
-
-    public Optional<String> project() {
-        return Optional.ofNullable(this.project);
+    public Builder network(String network) {
+      $.network = network;
+      return this;
     }
 
-    @Import(name = "remote")
-    private @Nullable String remote;
-
-    public Optional<String> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder ports(@Nullable List<GetNetworkForwardPort> ports) {
+      $.ports = ports;
+      return this;
     }
 
-    @Import(name = "target")
-    private @Nullable String target;
-
-    public Optional<String> target() {
-        return Optional.ofNullable(this.target);
+    public Builder ports(GetNetworkForwardPort... ports) {
+      return ports(List.of(ports));
     }
 
-    private GetNetworkForwardPlainArgs() {
+    public Builder project(@Nullable String project) {
+      $.project = project;
+      return this;
     }
 
-    private GetNetworkForwardPlainArgs(GetNetworkForwardPlainArgs $) {
-        this.description = $.description;
-        this.listenAddress = $.listenAddress;
-        this.location = $.location;
-        this.network = $.network;
-        this.ports = $.ports;
-        this.project = $.project;
-        this.remote = $.remote;
-        this.target = $.target;
+    public Builder remote(@Nullable String remote) {
+      $.remote = remote;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder target(@Nullable String target) {
+      $.target = target;
+      return this;
     }
 
-    public static Builder builder(GetNetworkForwardPlainArgs defaults) {
-        return new Builder(defaults);
+    public GetNetworkForwardPlainArgs build() {
+      if ($.listenAddress == null) {
+        throw new MissingRequiredPropertyException("GetNetworkForwardPlainArgs", "listenAddress");
+      }
+      if ($.network == null) {
+        throw new MissingRequiredPropertyException("GetNetworkForwardPlainArgs", "network");
+      }
+      return $;
     }
-
-    public static final class Builder {
-        private GetNetworkForwardPlainArgs $;
-
-        public Builder() {
-            $ = new GetNetworkForwardPlainArgs();
-        }
-
-        public Builder(GetNetworkForwardPlainArgs defaults) {
-            $ = new GetNetworkForwardPlainArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder description(@Nullable String description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder listenAddress(String listenAddress) {
-            $.listenAddress = listenAddress;
-            return this;
-        }
-
-        public Builder location(@Nullable String location) {
-            $.location = location;
-            return this;
-        }
-
-        public Builder network(String network) {
-            $.network = network;
-            return this;
-        }
-
-        public Builder ports(@Nullable List<GetNetworkForwardPort> ports) {
-            $.ports = ports;
-            return this;
-        }
-
-        public Builder ports(GetNetworkForwardPort... ports) {
-            return ports(List.of(ports));
-        }
-
-        public Builder project(@Nullable String project) {
-            $.project = project;
-            return this;
-        }
-
-        public Builder remote(@Nullable String remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder target(@Nullable String target) {
-            $.target = target;
-            return this;
-        }
-
-        public GetNetworkForwardPlainArgs build() {
-            if ($.listenAddress == null) {
-                throw new MissingRequiredPropertyException("GetNetworkForwardPlainArgs", "listenAddress");
-            }
-            if ($.network == null) {
-                throw new MissingRequiredPropertyException("GetNetworkForwardPlainArgs", "network");
-            }
-            return $;
-        }
-    }
-
+  }
 }

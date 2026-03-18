@@ -6,102 +6,99 @@ package com.pulumi.incus.inputs;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Map;
 import java.util.Objects;
 
 public final class GetInstanceDeviceArgs extends com.pulumi.resources.ResourceArgs {
 
-    public static final GetInstanceDeviceArgs Empty = new GetInstanceDeviceArgs();
+  public static final GetInstanceDeviceArgs Empty = new GetInstanceDeviceArgs();
 
-    @Import(name = "name", required = true)
-    private Output<String> name;
+  @Import(name = "name", required = true)
+  private Output<String> name;
 
-    public Output<String> name() {
-        return this.name;
+  public Output<String> name() {
+    return this.name;
+  }
+
+  @Import(name = "properties", required = true)
+  private Output<Map<String, String>> properties;
+
+  public Output<Map<String, String>> properties() {
+    return this.properties;
+  }
+
+  @Import(name = "type", required = true)
+  private Output<String> type;
+
+  public Output<String> type() {
+    return this.type;
+  }
+
+  private GetInstanceDeviceArgs() {}
+
+  private GetInstanceDeviceArgs(GetInstanceDeviceArgs $) {
+    this.name = $.name;
+    this.properties = $.properties;
+    this.type = $.type;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetInstanceDeviceArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetInstanceDeviceArgs $;
+
+    public Builder() {
+      $ = new GetInstanceDeviceArgs();
     }
 
-    @Import(name = "properties", required = true)
-    private Output<Map<String, String>> properties;
-
-    public Output<Map<String, String>> properties() {
-        return this.properties;
+    public Builder(GetInstanceDeviceArgs defaults) {
+      $ = new GetInstanceDeviceArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "type", required = true)
-    private Output<String> type;
-
-    public Output<String> type() {
-        return this.type;
+    public Builder name(Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    private GetInstanceDeviceArgs() {
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
-    private GetInstanceDeviceArgs(GetInstanceDeviceArgs $) {
-        this.name = $.name;
-        this.properties = $.properties;
-        this.type = $.type;
+    public Builder properties(Output<Map<String, String>> properties) {
+      $.properties = properties;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder properties(Map<String, String> properties) {
+      return properties(Output.of(properties));
     }
 
-    public static Builder builder(GetInstanceDeviceArgs defaults) {
-        return new Builder(defaults);
+    public Builder type(Output<String> type) {
+      $.type = type;
+      return this;
     }
 
-    public static final class Builder {
-        private GetInstanceDeviceArgs $;
-
-        public Builder() {
-            $ = new GetInstanceDeviceArgs();
-        }
-
-        public Builder(GetInstanceDeviceArgs defaults) {
-            $ = new GetInstanceDeviceArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder name(Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        public Builder properties(Output<Map<String, String>> properties) {
-            $.properties = properties;
-            return this;
-        }
-
-        public Builder properties(Map<String, String> properties) {
-            return properties(Output.of(properties));
-        }
-
-        public Builder type(Output<String> type) {
-            $.type = type;
-            return this;
-        }
-
-        public Builder type(String type) {
-            return type(Output.of(type));
-        }
-
-        public GetInstanceDeviceArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("GetInstanceDeviceArgs", "name");
-            }
-            if ($.properties == null) {
-                throw new MissingRequiredPropertyException("GetInstanceDeviceArgs", "properties");
-            }
-            if ($.type == null) {
-                throw new MissingRequiredPropertyException("GetInstanceDeviceArgs", "type");
-            }
-            return $;
-        }
+    public Builder type(String type) {
+      return type(Output.of(type));
     }
 
+    public GetInstanceDeviceArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("GetInstanceDeviceArgs", "name");
+      }
+      if ($.properties == null) {
+        throw new MissingRequiredPropertyException("GetInstanceDeviceArgs", "properties");
+      }
+      if ($.type == null) {
+        throw new MissingRequiredPropertyException("GetInstanceDeviceArgs", "type");
+      }
+      return $;
+    }
+  }
 }

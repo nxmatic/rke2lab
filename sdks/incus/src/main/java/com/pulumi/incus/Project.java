@@ -7,101 +7,142 @@ import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Export;
 import com.pulumi.core.annotations.ResourceType;
 import com.pulumi.core.internal.Codegen;
-import com.pulumi.incus.ProjectArgs;
-import com.pulumi.incus.Utilities;
 import com.pulumi.incus.inputs.ProjectState;
-import java.lang.Boolean;
-import java.lang.String;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-@ResourceType(type="incus:index/project:Project")
+@ResourceType(type = "incus:index/project:Project")
 public class Project extends com.pulumi.resources.CustomResource {
-    @Export(name="config", refs={Map.class,String.class}, tree="[0,1,1]")
-    private Output<Map<String,String>> config;
+  @Export(
+      name = "config",
+      refs = {Map.class, String.class},
+      tree = "[0,1,1]")
+  private Output<Map<String, String>> config;
 
-    public Output<Map<String,String>> config() {
-        return this.config;
-    }
-    @Export(name="description", refs={String.class}, tree="[0]")
-    private Output<String> description;
+  public Output<Map<String, String>> config() {
+    return this.config;
+  }
 
-    public Output<String> description() {
-        return this.description;
-    }
-    @Export(name="forceDestroy", refs={Boolean.class}, tree="[0]")
-    private Output<Boolean> forceDestroy;
+  @Export(
+      name = "description",
+      refs = {String.class},
+      tree = "[0]")
+  private Output<String> description;
 
-    public Output<Boolean> forceDestroy() {
-        return this.forceDestroy;
-    }
-    @Export(name="name", refs={String.class}, tree="[0]")
-    private Output<String> name;
+  public Output<String> description() {
+    return this.description;
+  }
 
-    public Output<String> name() {
-        return this.name;
-    }
-    @Export(name="remote", refs={String.class}, tree="[0]")
-    private Output</* @Nullable */ String> remote;
+  @Export(
+      name = "forceDestroy",
+      refs = {Boolean.class},
+      tree = "[0]")
+  private Output<Boolean> forceDestroy;
 
-    public Output<Optional<String>> remote() {
-        return Codegen.optional(this.remote);
-    }
+  public Output<Boolean> forceDestroy() {
+    return this.forceDestroy;
+  }
 
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     */
-    public Project(java.lang.String name) {
-        this(name, ProjectArgs.Empty);
-    }
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param args The arguments to use to populate this resource's properties.
-     */
-    public Project(java.lang.String name, @Nullable ProjectArgs args) {
-        this(name, args, null);
-    }
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param args The arguments to use to populate this resource's properties.
-     * @param options A bag of options that control this resource's behavior.
-     */
-    public Project(java.lang.String name, @Nullable ProjectArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        super("incus:index/project:Project", name, makeArgs(args, options), makeResourceOptions(options, Codegen.empty()), false, Utilities.getPackageRef());
-    }
+  @Export(
+      name = "name",
+      refs = {String.class},
+      tree = "[0]")
+  private Output<String> name;
 
-    private Project(java.lang.String name, Output<java.lang.String> id, @Nullable ProjectState state, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        super("incus:index/project:Project", name, state, makeResourceOptions(options, id), false, Utilities.getPackageRef());
-    }
+  public Output<String> name() {
+    return this.name;
+  }
 
-    private static ProjectArgs makeArgs(@Nullable ProjectArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        if (options != null && options.getUrn().isPresent()) {
-            return null;
-        }
-        return args == null ? ProjectArgs.Empty : args;
-    }
+  @Export(
+      name = "remote",
+      refs = {String.class},
+      tree = "[0]")
+  private Output</* @Nullable */ String> remote;
 
-    private static com.pulumi.resources.CustomResourceOptions makeResourceOptions(@Nullable com.pulumi.resources.CustomResourceOptions options, @Nullable Output<java.lang.String> id) {
-        var defaultOptions = com.pulumi.resources.CustomResourceOptions.builder()
+  public Output<Optional<String>> remote() {
+    return Codegen.optional(this.remote);
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   */
+  public Project(java.lang.String name) {
+    this(name, ProjectArgs.Empty);
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   * @param args The arguments to use to populate this resource's properties.
+   */
+  public Project(java.lang.String name, @Nullable ProjectArgs args) {
+    this(name, args, null);
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   * @param args The arguments to use to populate this resource's properties.
+   * @param options A bag of options that control this resource's behavior.
+   */
+  public Project(
+      java.lang.String name,
+      @Nullable ProjectArgs args,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    super(
+        "incus:index/project:Project",
+        name,
+        makeArgs(args, options),
+        makeResourceOptions(options, Codegen.empty()),
+        false,
+        Utilities.getPackageRef());
+  }
+
+  private Project(
+      java.lang.String name,
+      Output<java.lang.String> id,
+      @Nullable ProjectState state,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    super(
+        "incus:index/project:Project",
+        name,
+        state,
+        makeResourceOptions(options, id),
+        false,
+        Utilities.getPackageRef());
+  }
+
+  private static ProjectArgs makeArgs(
+      @Nullable ProjectArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    if (options != null && options.getUrn().isPresent()) {
+      return null;
+    }
+    return args == null ? ProjectArgs.Empty : args;
+  }
+
+  private static com.pulumi.resources.CustomResourceOptions makeResourceOptions(
+      @Nullable com.pulumi.resources.CustomResourceOptions options,
+      @Nullable Output<java.lang.String> id) {
+    var defaultOptions =
+        com.pulumi.resources.CustomResourceOptions.builder()
             .version(Utilities.getVersion())
             .build();
-        return com.pulumi.resources.CustomResourceOptions.merge(defaultOptions, options, id);
-    }
+    return com.pulumi.resources.CustomResourceOptions.merge(defaultOptions, options, id);
+  }
 
-    /**
-     * Get an existing Host resource's state with the given name, ID, and optional extra
-     * properties used to qualify the lookup.
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param id The _unique_ provider ID of the resource to lookup.
-     * @param state
-     * @param options Optional settings to control the behavior of the CustomResource.
-     */
-    public static Project get(java.lang.String name, Output<java.lang.String> id, @Nullable ProjectState state, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        return new Project(name, id, state, options);
-    }
+  /**
+   * Get an existing Host resource's state with the given name, ID, and optional extra properties
+   * used to qualify the lookup.
+   *
+   * @param name The _unique_ name of the resulting resource.
+   * @param id The _unique_ provider ID of the resource to lookup.
+   * @param state
+   * @param options Optional settings to control the behavior of the CustomResource.
+   */
+  public static Project get(
+      java.lang.String name,
+      Output<java.lang.String> id,
+      @Nullable ProjectState state,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    return new Project(name, id, state, options);
+  }
 }

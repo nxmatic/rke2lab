@@ -5,138 +5,134 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.Boolean;
-import java.lang.String;
 import java.util.Objects;
 
 public final class GetNetworkForwardPort extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetNetworkForwardPort Empty = new GetNetworkForwardPort();
+  public static final GetNetworkForwardPort Empty = new GetNetworkForwardPort();
 
-    @Import(name = "description", required = true)
-    private String description;
+  @Import(name = "description", required = true)
+  private String description;
 
-    public String description() {
-        return this.description;
+  public String description() {
+    return this.description;
+  }
+
+  @Import(name = "listenPort", required = true)
+  private String listenPort;
+
+  public String listenPort() {
+    return this.listenPort;
+  }
+
+  @Import(name = "protocol", required = true)
+  private String protocol;
+
+  public String protocol() {
+    return this.protocol;
+  }
+
+  @Import(name = "snat", required = true)
+  private Boolean snat;
+
+  public Boolean snat() {
+    return this.snat;
+  }
+
+  @Import(name = "targetAddress", required = true)
+  private String targetAddress;
+
+  public String targetAddress() {
+    return this.targetAddress;
+  }
+
+  @Import(name = "targetPort", required = true)
+  private String targetPort;
+
+  public String targetPort() {
+    return this.targetPort;
+  }
+
+  private GetNetworkForwardPort() {}
+
+  private GetNetworkForwardPort(GetNetworkForwardPort $) {
+    this.description = $.description;
+    this.listenPort = $.listenPort;
+    this.protocol = $.protocol;
+    this.snat = $.snat;
+    this.targetAddress = $.targetAddress;
+    this.targetPort = $.targetPort;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetNetworkForwardPort defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetNetworkForwardPort $;
+
+    public Builder() {
+      $ = new GetNetworkForwardPort();
     }
 
-    @Import(name = "listenPort", required = true)
-    private String listenPort;
-
-    public String listenPort() {
-        return this.listenPort;
+    public Builder(GetNetworkForwardPort defaults) {
+      $ = new GetNetworkForwardPort(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "protocol", required = true)
-    private String protocol;
-
-    public String protocol() {
-        return this.protocol;
+    public Builder description(String description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name = "snat", required = true)
-    private Boolean snat;
-
-    public Boolean snat() {
-        return this.snat;
+    public Builder listenPort(String listenPort) {
+      $.listenPort = listenPort;
+      return this;
     }
 
-    @Import(name = "targetAddress", required = true)
-    private String targetAddress;
-
-    public String targetAddress() {
-        return this.targetAddress;
+    public Builder protocol(String protocol) {
+      $.protocol = protocol;
+      return this;
     }
 
-    @Import(name = "targetPort", required = true)
-    private String targetPort;
-
-    public String targetPort() {
-        return this.targetPort;
+    public Builder snat(Boolean snat) {
+      $.snat = snat;
+      return this;
     }
 
-    private GetNetworkForwardPort() {
+    public Builder targetAddress(String targetAddress) {
+      $.targetAddress = targetAddress;
+      return this;
     }
 
-    private GetNetworkForwardPort(GetNetworkForwardPort $) {
-        this.description = $.description;
-        this.listenPort = $.listenPort;
-        this.protocol = $.protocol;
-        this.snat = $.snat;
-        this.targetAddress = $.targetAddress;
-        this.targetPort = $.targetPort;
+    public Builder targetPort(String targetPort) {
+      $.targetPort = targetPort;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public GetNetworkForwardPort build() {
+      if ($.description == null) {
+        throw new MissingRequiredPropertyException("GetNetworkForwardPort", "description");
+      }
+      if ($.listenPort == null) {
+        throw new MissingRequiredPropertyException("GetNetworkForwardPort", "listenPort");
+      }
+      if ($.protocol == null) {
+        throw new MissingRequiredPropertyException("GetNetworkForwardPort", "protocol");
+      }
+      if ($.snat == null) {
+        throw new MissingRequiredPropertyException("GetNetworkForwardPort", "snat");
+      }
+      if ($.targetAddress == null) {
+        throw new MissingRequiredPropertyException("GetNetworkForwardPort", "targetAddress");
+      }
+      if ($.targetPort == null) {
+        throw new MissingRequiredPropertyException("GetNetworkForwardPort", "targetPort");
+      }
+      return $;
     }
-
-    public static Builder builder(GetNetworkForwardPort defaults) {
-        return new Builder(defaults);
-    }
-
-    public static final class Builder {
-        private GetNetworkForwardPort $;
-
-        public Builder() {
-            $ = new GetNetworkForwardPort();
-        }
-
-        public Builder(GetNetworkForwardPort defaults) {
-            $ = new GetNetworkForwardPort(Objects.requireNonNull(defaults));
-        }
-
-        public Builder description(String description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder listenPort(String listenPort) {
-            $.listenPort = listenPort;
-            return this;
-        }
-
-        public Builder protocol(String protocol) {
-            $.protocol = protocol;
-            return this;
-        }
-
-        public Builder snat(Boolean snat) {
-            $.snat = snat;
-            return this;
-        }
-
-        public Builder targetAddress(String targetAddress) {
-            $.targetAddress = targetAddress;
-            return this;
-        }
-
-        public Builder targetPort(String targetPort) {
-            $.targetPort = targetPort;
-            return this;
-        }
-
-        public GetNetworkForwardPort build() {
-            if ($.description == null) {
-                throw new MissingRequiredPropertyException("GetNetworkForwardPort", "description");
-            }
-            if ($.listenPort == null) {
-                throw new MissingRequiredPropertyException("GetNetworkForwardPort", "listenPort");
-            }
-            if ($.protocol == null) {
-                throw new MissingRequiredPropertyException("GetNetworkForwardPort", "protocol");
-            }
-            if ($.snat == null) {
-                throw new MissingRequiredPropertyException("GetNetworkForwardPort", "snat");
-            }
-            if ($.targetAddress == null) {
-                throw new MissingRequiredPropertyException("GetNetworkForwardPort", "targetAddress");
-            }
-            if ($.targetPort == null) {
-                throw new MissingRequiredPropertyException("GetNetworkForwardPort", "targetPort");
-            }
-            return $;
-        }
-    }
-
+  }
 }

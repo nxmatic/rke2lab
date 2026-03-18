@@ -5,77 +5,85 @@ package com.pulumi.incus.outputs;
 
 import com.pulumi.core.annotations.CustomType;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Map;
 import java.util.Objects;
 
 @CustomType
 public final class GetInstanceDevice {
+  private String name;
+  private Map<String, String> properties;
+  private String type;
+
+  private GetInstanceDevice() {}
+
+  public String name() {
+    return this.name;
+  }
+
+  public Map<String, String> properties() {
+    return this.properties;
+  }
+
+  public String type() {
+    return this.type;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetInstanceDevice defaults) {
+    return new Builder(defaults);
+  }
+
+  @CustomType.Builder
+  public static final class Builder {
     private String name;
-    private Map<String,String> properties;
+    private Map<String, String> properties;
     private String type;
 
-    private GetInstanceDevice() {}
-    public String name() {
-        return this.name;
-    }
-    public Map<String,String> properties() {
-        return this.properties;
-    }
-    public String type() {
-        return this.type;
+    public Builder() {}
+
+    public Builder(GetInstanceDevice defaults) {
+      Objects.requireNonNull(defaults);
+      this.name = defaults.name;
+      this.properties = defaults.properties;
+      this.type = defaults.type;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    @CustomType.Setter
+    public Builder name(String name) {
+      if (name == null) {
+        throw new MissingRequiredPropertyException("GetInstanceDevice", "name");
+      }
+      this.name = name;
+      return this;
     }
 
-    public static Builder builder(GetInstanceDevice defaults) {
-        return new Builder(defaults);
+    @CustomType.Setter
+    public Builder properties(Map<String, String> properties) {
+      if (properties == null) {
+        throw new MissingRequiredPropertyException("GetInstanceDevice", "properties");
+      }
+      this.properties = properties;
+      return this;
     }
-    @CustomType.Builder
-    public static final class Builder {
-        private String name;
-        private Map<String,String> properties;
-        private String type;
-        public Builder() {}
-        public Builder(GetInstanceDevice defaults) {
-    	      Objects.requireNonNull(defaults);
-    	      this.name = defaults.name;
-    	      this.properties = defaults.properties;
-    	      this.type = defaults.type;
-        }
 
-        @CustomType.Setter
-        public Builder name(String name) {
-            if (name == null) {
-              throw new MissingRequiredPropertyException("GetInstanceDevice", "name");
-            }
-            this.name = name;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder properties(Map<String,String> properties) {
-            if (properties == null) {
-              throw new MissingRequiredPropertyException("GetInstanceDevice", "properties");
-            }
-            this.properties = properties;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder type(String type) {
-            if (type == null) {
-              throw new MissingRequiredPropertyException("GetInstanceDevice", "type");
-            }
-            this.type = type;
-            return this;
-        }
-        public GetInstanceDevice build() {
-            final var _resultValue = new GetInstanceDevice();
-            _resultValue.name = name;
-            _resultValue.properties = properties;
-            _resultValue.type = type;
-            return _resultValue;
-        }
+    @CustomType.Setter
+    public Builder type(String type) {
+      if (type == null) {
+        throw new MissingRequiredPropertyException("GetInstanceDevice", "type");
+      }
+      this.type = type;
+      return this;
     }
+
+    public GetInstanceDevice build() {
+      final var _resultValue = new GetInstanceDevice();
+      _resultValue.name = name;
+      _resultValue.properties = properties;
+      _resultValue.type = type;
+      return _resultValue;
+    }
+  }
 }

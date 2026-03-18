@@ -5,179 +5,176 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class GetNetworkPeerPlainArgs extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetNetworkPeerPlainArgs Empty = new GetNetworkPeerPlainArgs();
+  public static final GetNetworkPeerPlainArgs Empty = new GetNetworkPeerPlainArgs();
 
-    @Import(name = "description")
-    private @Nullable String description;
+  @Import(name = "description")
+  private @Nullable String description;
 
-    public Optional<String> description() {
-        return Optional.ofNullable(this.description);
+  public Optional<String> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "name", required = true)
+  private String name;
+
+  public String name() {
+    return this.name;
+  }
+
+  @Import(name = "network", required = true)
+  private String network;
+
+  public String network() {
+    return this.network;
+  }
+
+  @Import(name = "project")
+  private @Nullable String project;
+
+  public Optional<String> project() {
+    return Optional.ofNullable(this.project);
+  }
+
+  @Import(name = "remote")
+  private @Nullable String remote;
+
+  public Optional<String> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  @Import(name = "status")
+  private @Nullable String status;
+
+  public Optional<String> status() {
+    return Optional.ofNullable(this.status);
+  }
+
+  @Import(name = "targetIntegration")
+  private @Nullable String targetIntegration;
+
+  public Optional<String> targetIntegration() {
+    return Optional.ofNullable(this.targetIntegration);
+  }
+
+  @Import(name = "targetNetwork")
+  private @Nullable String targetNetwork;
+
+  public Optional<String> targetNetwork() {
+    return Optional.ofNullable(this.targetNetwork);
+  }
+
+  @Import(name = "targetProject")
+  private @Nullable String targetProject;
+
+  public Optional<String> targetProject() {
+    return Optional.ofNullable(this.targetProject);
+  }
+
+  @Import(name = "type")
+  private @Nullable String type;
+
+  public Optional<String> type() {
+    return Optional.ofNullable(this.type);
+  }
+
+  private GetNetworkPeerPlainArgs() {}
+
+  private GetNetworkPeerPlainArgs(GetNetworkPeerPlainArgs $) {
+    this.description = $.description;
+    this.name = $.name;
+    this.network = $.network;
+    this.project = $.project;
+    this.remote = $.remote;
+    this.status = $.status;
+    this.targetIntegration = $.targetIntegration;
+    this.targetNetwork = $.targetNetwork;
+    this.targetProject = $.targetProject;
+    this.type = $.type;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetNetworkPeerPlainArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetNetworkPeerPlainArgs $;
+
+    public Builder() {
+      $ = new GetNetworkPeerPlainArgs();
     }
 
-    @Import(name = "name", required = true)
-    private String name;
-
-    public String name() {
-        return this.name;
+    public Builder(GetNetworkPeerPlainArgs defaults) {
+      $ = new GetNetworkPeerPlainArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "network", required = true)
-    private String network;
-
-    public String network() {
-        return this.network;
+    public Builder description(@Nullable String description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name = "project")
-    private @Nullable String project;
-
-    public Optional<String> project() {
-        return Optional.ofNullable(this.project);
+    public Builder name(String name) {
+      $.name = name;
+      return this;
     }
 
-    @Import(name = "remote")
-    private @Nullable String remote;
-
-    public Optional<String> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder network(String network) {
+      $.network = network;
+      return this;
     }
 
-    @Import(name = "status")
-    private @Nullable String status;
-
-    public Optional<String> status() {
-        return Optional.ofNullable(this.status);
+    public Builder project(@Nullable String project) {
+      $.project = project;
+      return this;
     }
 
-    @Import(name = "targetIntegration")
-    private @Nullable String targetIntegration;
-
-    public Optional<String> targetIntegration() {
-        return Optional.ofNullable(this.targetIntegration);
+    public Builder remote(@Nullable String remote) {
+      $.remote = remote;
+      return this;
     }
 
-    @Import(name = "targetNetwork")
-    private @Nullable String targetNetwork;
-
-    public Optional<String> targetNetwork() {
-        return Optional.ofNullable(this.targetNetwork);
+    public Builder status(@Nullable String status) {
+      $.status = status;
+      return this;
     }
 
-    @Import(name = "targetProject")
-    private @Nullable String targetProject;
-
-    public Optional<String> targetProject() {
-        return Optional.ofNullable(this.targetProject);
+    public Builder targetIntegration(@Nullable String targetIntegration) {
+      $.targetIntegration = targetIntegration;
+      return this;
     }
 
-    @Import(name = "type")
-    private @Nullable String type;
-
-    public Optional<String> type() {
-        return Optional.ofNullable(this.type);
+    public Builder targetNetwork(@Nullable String targetNetwork) {
+      $.targetNetwork = targetNetwork;
+      return this;
     }
 
-    private GetNetworkPeerPlainArgs() {
+    public Builder targetProject(@Nullable String targetProject) {
+      $.targetProject = targetProject;
+      return this;
     }
 
-    private GetNetworkPeerPlainArgs(GetNetworkPeerPlainArgs $) {
-        this.description = $.description;
-        this.name = $.name;
-        this.network = $.network;
-        this.project = $.project;
-        this.remote = $.remote;
-        this.status = $.status;
-        this.targetIntegration = $.targetIntegration;
-        this.targetNetwork = $.targetNetwork;
-        this.targetProject = $.targetProject;
-        this.type = $.type;
+    public Builder type(@Nullable String type) {
+      $.type = type;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public GetNetworkPeerPlainArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("GetNetworkPeerPlainArgs", "name");
+      }
+      if ($.network == null) {
+        throw new MissingRequiredPropertyException("GetNetworkPeerPlainArgs", "network");
+      }
+      return $;
     }
-
-    public static Builder builder(GetNetworkPeerPlainArgs defaults) {
-        return new Builder(defaults);
-    }
-
-    public static final class Builder {
-        private GetNetworkPeerPlainArgs $;
-
-        public Builder() {
-            $ = new GetNetworkPeerPlainArgs();
-        }
-
-        public Builder(GetNetworkPeerPlainArgs defaults) {
-            $ = new GetNetworkPeerPlainArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder description(@Nullable String description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder name(String name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder network(String network) {
-            $.network = network;
-            return this;
-        }
-
-        public Builder project(@Nullable String project) {
-            $.project = project;
-            return this;
-        }
-
-        public Builder remote(@Nullable String remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder status(@Nullable String status) {
-            $.status = status;
-            return this;
-        }
-
-        public Builder targetIntegration(@Nullable String targetIntegration) {
-            $.targetIntegration = targetIntegration;
-            return this;
-        }
-
-        public Builder targetNetwork(@Nullable String targetNetwork) {
-            $.targetNetwork = targetNetwork;
-            return this;
-        }
-
-        public Builder targetProject(@Nullable String targetProject) {
-            $.targetProject = targetProject;
-            return this;
-        }
-
-        public Builder type(@Nullable String type) {
-            $.type = type;
-            return this;
-        }
-
-        public GetNetworkPeerPlainArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("GetNetworkPeerPlainArgs", "name");
-            }
-            if ($.network == null) {
-                throw new MissingRequiredPropertyException("GetNetworkPeerPlainArgs", "network");
-            }
-            return $;
-        }
-    }
-
+  }
 }

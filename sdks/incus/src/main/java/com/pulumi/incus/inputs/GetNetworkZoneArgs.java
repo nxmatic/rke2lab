@@ -6,114 +6,111 @@ package com.pulumi.incus.inputs;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class GetNetworkZoneArgs extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetNetworkZoneArgs Empty = new GetNetworkZoneArgs();
+  public static final GetNetworkZoneArgs Empty = new GetNetworkZoneArgs();
 
-    @Import(name = "description")
-    private @Nullable Output<String> description;
+  @Import(name = "description")
+  private @Nullable Output<String> description;
 
-    public Optional<Output<String>> description() {
-        return Optional.ofNullable(this.description);
+  public Optional<Output<String>> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "name", required = true)
+  private Output<String> name;
+
+  public Output<String> name() {
+    return this.name;
+  }
+
+  @Import(name = "project")
+  private @Nullable Output<String> project;
+
+  public Optional<Output<String>> project() {
+    return Optional.ofNullable(this.project);
+  }
+
+  @Import(name = "remote")
+  private @Nullable Output<String> remote;
+
+  public Optional<Output<String>> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  private GetNetworkZoneArgs() {}
+
+  private GetNetworkZoneArgs(GetNetworkZoneArgs $) {
+    this.description = $.description;
+    this.name = $.name;
+    this.project = $.project;
+    this.remote = $.remote;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetNetworkZoneArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetNetworkZoneArgs $;
+
+    public Builder() {
+      $ = new GetNetworkZoneArgs();
     }
 
-    @Import(name = "name", required = true)
-    private Output<String> name;
-
-    public Output<String> name() {
-        return this.name;
+    public Builder(GetNetworkZoneArgs defaults) {
+      $ = new GetNetworkZoneArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "project")
-    private @Nullable Output<String> project;
-
-    public Optional<Output<String>> project() {
-        return Optional.ofNullable(this.project);
+    public Builder description(@Nullable Output<String> description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name = "remote")
-    private @Nullable Output<String> remote;
-
-    public Optional<Output<String>> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder description(String description) {
+      return description(Output.of(description));
     }
 
-    private GetNetworkZoneArgs() {
+    public Builder name(Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    private GetNetworkZoneArgs(GetNetworkZoneArgs $) {
-        this.description = $.description;
-        this.name = $.name;
-        this.project = $.project;
-        this.remote = $.remote;
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder project(@Nullable Output<String> project) {
+      $.project = project;
+      return this;
     }
 
-    public static Builder builder(GetNetworkZoneArgs defaults) {
-        return new Builder(defaults);
+    public Builder project(String project) {
+      return project(Output.of(project));
     }
 
-    public static final class Builder {
-        private GetNetworkZoneArgs $;
-
-        public Builder() {
-            $ = new GetNetworkZoneArgs();
-        }
-
-        public Builder(GetNetworkZoneArgs defaults) {
-            $ = new GetNetworkZoneArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder description(@Nullable Output<String> description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder description(String description) {
-            return description(Output.of(description));
-        }
-
-        public Builder name(Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        public Builder project(@Nullable Output<String> project) {
-            $.project = project;
-            return this;
-        }
-
-        public Builder project(String project) {
-            return project(Output.of(project));
-        }
-
-        public Builder remote(@Nullable Output<String> remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder remote(String remote) {
-            return remote(Output.of(remote));
-        }
-
-        public GetNetworkZoneArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("GetNetworkZoneArgs", "name");
-            }
-            return $;
-        }
+    public Builder remote(@Nullable Output<String> remote) {
+      $.remote = remote;
+      return this;
     }
 
+    public Builder remote(String remote) {
+      return remote(Output.of(remote));
+    }
+
+    public GetNetworkZoneArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("GetNetworkZoneArgs", "name");
+      }
+      return $;
+    }
+  }
 }

@@ -5,94 +5,91 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class ClusterGroupMemberState extends com.pulumi.resources.ResourceArgs {
 
-    public static final ClusterGroupMemberState Empty = new ClusterGroupMemberState();
+  public static final ClusterGroupMemberState Empty = new ClusterGroupMemberState();
 
-    @Import(name = "clusterGroup")
-    private @Nullable Output<String> clusterGroup;
+  @Import(name = "clusterGroup")
+  private @Nullable Output<String> clusterGroup;
 
-    public Optional<Output<String>> clusterGroup() {
-        return Optional.ofNullable(this.clusterGroup);
+  public Optional<Output<String>> clusterGroup() {
+    return Optional.ofNullable(this.clusterGroup);
+  }
+
+  @Import(name = "member")
+  private @Nullable Output<String> member;
+
+  public Optional<Output<String>> member() {
+    return Optional.ofNullable(this.member);
+  }
+
+  @Import(name = "remote")
+  private @Nullable Output<String> remote;
+
+  public Optional<Output<String>> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  private ClusterGroupMemberState() {}
+
+  private ClusterGroupMemberState(ClusterGroupMemberState $) {
+    this.clusterGroup = $.clusterGroup;
+    this.member = $.member;
+    this.remote = $.remote;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(ClusterGroupMemberState defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private ClusterGroupMemberState $;
+
+    public Builder() {
+      $ = new ClusterGroupMemberState();
     }
 
-    @Import(name = "member")
-    private @Nullable Output<String> member;
-
-    public Optional<Output<String>> member() {
-        return Optional.ofNullable(this.member);
+    public Builder(ClusterGroupMemberState defaults) {
+      $ = new ClusterGroupMemberState(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "remote")
-    private @Nullable Output<String> remote;
-
-    public Optional<Output<String>> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder clusterGroup(@Nullable Output<String> clusterGroup) {
+      $.clusterGroup = clusterGroup;
+      return this;
     }
 
-    private ClusterGroupMemberState() {
+    public Builder clusterGroup(String clusterGroup) {
+      return clusterGroup(Output.of(clusterGroup));
     }
 
-    private ClusterGroupMemberState(ClusterGroupMemberState $) {
-        this.clusterGroup = $.clusterGroup;
-        this.member = $.member;
-        this.remote = $.remote;
+    public Builder member(@Nullable Output<String> member) {
+      $.member = member;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder member(String member) {
+      return member(Output.of(member));
     }
 
-    public static Builder builder(ClusterGroupMemberState defaults) {
-        return new Builder(defaults);
+    public Builder remote(@Nullable Output<String> remote) {
+      $.remote = remote;
+      return this;
     }
 
-    public static final class Builder {
-        private ClusterGroupMemberState $;
-
-        public Builder() {
-            $ = new ClusterGroupMemberState();
-        }
-
-        public Builder(ClusterGroupMemberState defaults) {
-            $ = new ClusterGroupMemberState(Objects.requireNonNull(defaults));
-        }
-
-        public Builder clusterGroup(@Nullable Output<String> clusterGroup) {
-            $.clusterGroup = clusterGroup;
-            return this;
-        }
-
-        public Builder clusterGroup(String clusterGroup) {
-            return clusterGroup(Output.of(clusterGroup));
-        }
-
-        public Builder member(@Nullable Output<String> member) {
-            $.member = member;
-            return this;
-        }
-
-        public Builder member(String member) {
-            return member(Output.of(member));
-        }
-
-        public Builder remote(@Nullable Output<String> remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder remote(String remote) {
-            return remote(Output.of(remote));
-        }
-
-        public ClusterGroupMemberState build() {
-            return $;
-        }
+    public Builder remote(String remote) {
+      return remote(Output.of(remote));
     }
 
+    public ClusterGroupMemberState build() {
+      return $;
+    }
+  }
 }

@@ -7,9 +7,6 @@ import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Export;
 import com.pulumi.core.annotations.ResourceType;
 import com.pulumi.core.internal.Codegen;
-import com.pulumi.incus.ProviderArgs;
-import com.pulumi.incus.Utilities;
-import java.lang.String;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
@@ -17,91 +14,105 @@ import javax.annotation.Nullable;
  * The provider type for the incus package. By default, resources use package-wide configuration
  * settings, however an explicit `Provider` instance may be created and passed during resource
  * construction to achieve fine-grained programmatic control over provider settings. See the
- * [documentation](https://www.pulumi.com/docs/reference/programming-model/#providers) for more information.
- * 
+ * [documentation](https://www.pulumi.com/docs/reference/programming-model/#providers) for more
+ * information.
  */
-@ResourceType(type="pulumi:providers:incus")
+@ResourceType(type = "pulumi:providers:incus")
 public class Provider extends com.pulumi.resources.ProviderResource {
-    /**
-     * The directory to look for existing Incus configuration. (default = $HOME/.config/incus)
-     * 
-     */
-    @Export(name="configDir", refs={String.class}, tree="[0]")
-    private Output</* @Nullable */ String> configDir;
+  /** The directory to look for existing Incus configuration. (default = $HOME/.config/incus) */
+  @Export(
+      name = "configDir",
+      refs = {String.class},
+      tree = "[0]")
+  private Output</* @Nullable */ String> configDir;
 
-    /**
-     * @return The directory to look for existing Incus configuration. (default = $HOME/.config/incus)
-     * 
-     */
-    public Output<Optional<String>> configDir() {
-        return Codegen.optional(this.configDir);
-    }
-    /**
-     * The default remote to use when no other remote is defined in a resource.
-     * 
-     */
-    @Export(name="defaultRemote", refs={String.class}, tree="[0]")
-    private Output</* @Nullable */ String> defaultRemote;
+  /**
+   * @return The directory to look for existing Incus configuration. (default = $HOME/.config/incus)
+   */
+  public Output<Optional<String>> configDir() {
+    return Codegen.optional(this.configDir);
+  }
 
-    /**
-     * @return The default remote to use when no other remote is defined in a resource.
-     * 
-     */
-    public Output<Optional<String>> defaultRemote() {
-        return Codegen.optional(this.defaultRemote);
-    }
-    /**
-     * The project where project-scoped resources will be created. Can be overridden in individual resources. (default = default)
-     * 
-     */
-    @Export(name="project", refs={String.class}, tree="[0]")
-    private Output</* @Nullable */ String> project;
+  /** The default remote to use when no other remote is defined in a resource. */
+  @Export(
+      name = "defaultRemote",
+      refs = {String.class},
+      tree = "[0]")
+  private Output</* @Nullable */ String> defaultRemote;
 
-    /**
-     * @return The project where project-scoped resources will be created. Can be overridden in individual resources. (default = default)
-     * 
-     */
-    public Output<Optional<String>> project() {
-        return Codegen.optional(this.project);
-    }
+  /**
+   * @return The default remote to use when no other remote is defined in a resource.
+   */
+  public Output<Optional<String>> defaultRemote() {
+    return Codegen.optional(this.defaultRemote);
+  }
 
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     */
-    public Provider(java.lang.String name) {
-        this(name, ProviderArgs.Empty);
-    }
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param args The arguments to use to populate this resource's properties.
-     */
-    public Provider(java.lang.String name, @Nullable ProviderArgs args) {
-        this(name, args, null);
-    }
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param args The arguments to use to populate this resource's properties.
-     * @param options A bag of options that control this resource's behavior.
-     */
-    public Provider(java.lang.String name, @Nullable ProviderArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        super("incus", name, makeArgs(args, options), makeResourceOptions(options, Codegen.empty()), false, Utilities.getPackageRef());
-    }
+  /**
+   * The project where project-scoped resources will be created. Can be overridden in individual
+   * resources. (default = default)
+   */
+  @Export(
+      name = "project",
+      refs = {String.class},
+      tree = "[0]")
+  private Output</* @Nullable */ String> project;
 
-    private static ProviderArgs makeArgs(@Nullable ProviderArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        if (options != null && options.getUrn().isPresent()) {
-            return null;
-        }
-        return args == null ? ProviderArgs.Empty : args;
-    }
+  /**
+   * @return The project where project-scoped resources will be created. Can be overridden in
+   *     individual resources. (default = default)
+   */
+  public Output<Optional<String>> project() {
+    return Codegen.optional(this.project);
+  }
 
-    private static com.pulumi.resources.CustomResourceOptions makeResourceOptions(@Nullable com.pulumi.resources.CustomResourceOptions options, @Nullable Output<java.lang.String> id) {
-        var defaultOptions = com.pulumi.resources.CustomResourceOptions.builder()
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   */
+  public Provider(java.lang.String name) {
+    this(name, ProviderArgs.Empty);
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   * @param args The arguments to use to populate this resource's properties.
+   */
+  public Provider(java.lang.String name, @Nullable ProviderArgs args) {
+    this(name, args, null);
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   * @param args The arguments to use to populate this resource's properties.
+   * @param options A bag of options that control this resource's behavior.
+   */
+  public Provider(
+      java.lang.String name,
+      @Nullable ProviderArgs args,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    super(
+        "incus",
+        name,
+        makeArgs(args, options),
+        makeResourceOptions(options, Codegen.empty()),
+        false,
+        Utilities.getPackageRef());
+  }
+
+  private static ProviderArgs makeArgs(
+      @Nullable ProviderArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    if (options != null && options.getUrn().isPresent()) {
+      return null;
+    }
+    return args == null ? ProviderArgs.Empty : args;
+  }
+
+  private static com.pulumi.resources.CustomResourceOptions makeResourceOptions(
+      @Nullable com.pulumi.resources.CustomResourceOptions options,
+      @Nullable Output<java.lang.String> id) {
+    var defaultOptions =
+        com.pulumi.resources.CustomResourceOptions.builder()
             .version(Utilities.getVersion())
             .build();
-        return com.pulumi.resources.CustomResourceOptions.merge(defaultOptions, options, id);
-    }
-
+    return com.pulumi.resources.CustomResourceOptions.merge(defaultOptions, options, id);
+  }
 }

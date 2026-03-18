@@ -6,80 +6,77 @@ package com.pulumi.incus.inputs;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class ImageSourceInstanceArgs extends com.pulumi.resources.ResourceArgs {
 
-    public static final ImageSourceInstanceArgs Empty = new ImageSourceInstanceArgs();
+  public static final ImageSourceInstanceArgs Empty = new ImageSourceInstanceArgs();
 
-    @Import(name = "name", required = true)
-    private Output<String> name;
+  @Import(name = "name", required = true)
+  private Output<String> name;
 
-    public Output<String> name() {
-        return this.name;
+  public Output<String> name() {
+    return this.name;
+  }
+
+  @Import(name = "snapshot")
+  private @Nullable Output<String> snapshot;
+
+  public Optional<Output<String>> snapshot() {
+    return Optional.ofNullable(this.snapshot);
+  }
+
+  private ImageSourceInstanceArgs() {}
+
+  private ImageSourceInstanceArgs(ImageSourceInstanceArgs $) {
+    this.name = $.name;
+    this.snapshot = $.snapshot;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(ImageSourceInstanceArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private ImageSourceInstanceArgs $;
+
+    public Builder() {
+      $ = new ImageSourceInstanceArgs();
     }
 
-    @Import(name = "snapshot")
-    private @Nullable Output<String> snapshot;
-
-    public Optional<Output<String>> snapshot() {
-        return Optional.ofNullable(this.snapshot);
+    public Builder(ImageSourceInstanceArgs defaults) {
+      $ = new ImageSourceInstanceArgs(Objects.requireNonNull(defaults));
     }
 
-    private ImageSourceInstanceArgs() {
+    public Builder name(Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    private ImageSourceInstanceArgs(ImageSourceInstanceArgs $) {
-        this.name = $.name;
-        this.snapshot = $.snapshot;
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder snapshot(@Nullable Output<String> snapshot) {
+      $.snapshot = snapshot;
+      return this;
     }
 
-    public static Builder builder(ImageSourceInstanceArgs defaults) {
-        return new Builder(defaults);
+    public Builder snapshot(String snapshot) {
+      return snapshot(Output.of(snapshot));
     }
 
-    public static final class Builder {
-        private ImageSourceInstanceArgs $;
-
-        public Builder() {
-            $ = new ImageSourceInstanceArgs();
-        }
-
-        public Builder(ImageSourceInstanceArgs defaults) {
-            $ = new ImageSourceInstanceArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder name(Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        public Builder snapshot(@Nullable Output<String> snapshot) {
-            $.snapshot = snapshot;
-            return this;
-        }
-
-        public Builder snapshot(String snapshot) {
-            return snapshot(Output.of(snapshot));
-        }
-
-        public ImageSourceInstanceArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("ImageSourceInstanceArgs", "name");
-            }
-            return $;
-        }
+    public ImageSourceInstanceArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("ImageSourceInstanceArgs", "name");
+      }
+      return $;
     }
-
+  }
 }

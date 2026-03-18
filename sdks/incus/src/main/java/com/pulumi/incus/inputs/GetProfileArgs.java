@@ -6,8 +6,6 @@ package com.pulumi.incus.inputs;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import com.pulumi.incus.inputs.GetProfileDeviceArgs;
-import java.lang.String;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -15,128 +13,126 @@ import javax.annotation.Nullable;
 
 public final class GetProfileArgs extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetProfileArgs Empty = new GetProfileArgs();
+  public static final GetProfileArgs Empty = new GetProfileArgs();
 
-    @Import(name = "description")
-    private @Nullable Output<String> description;
+  @Import(name = "description")
+  private @Nullable Output<String> description;
 
-    public Optional<Output<String>> description() {
-        return Optional.ofNullable(this.description);
+  public Optional<Output<String>> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "devices")
+  private @Nullable Output<List<GetProfileDeviceArgs>> devices;
+
+  public Optional<Output<List<GetProfileDeviceArgs>>> devices() {
+    return Optional.ofNullable(this.devices);
+  }
+
+  @Import(name = "name", required = true)
+  private Output<String> name;
+
+  public Output<String> name() {
+    return this.name;
+  }
+
+  @Import(name = "project")
+  private @Nullable Output<String> project;
+
+  public Optional<Output<String>> project() {
+    return Optional.ofNullable(this.project);
+  }
+
+  @Import(name = "remote")
+  private @Nullable Output<String> remote;
+
+  public Optional<Output<String>> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  private GetProfileArgs() {}
+
+  private GetProfileArgs(GetProfileArgs $) {
+    this.description = $.description;
+    this.devices = $.devices;
+    this.name = $.name;
+    this.project = $.project;
+    this.remote = $.remote;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetProfileArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetProfileArgs $;
+
+    public Builder() {
+      $ = new GetProfileArgs();
     }
 
-    @Import(name = "devices")
-    private @Nullable Output<List<GetProfileDeviceArgs>> devices;
-
-    public Optional<Output<List<GetProfileDeviceArgs>>> devices() {
-        return Optional.ofNullable(this.devices);
+    public Builder(GetProfileArgs defaults) {
+      $ = new GetProfileArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "name", required = true)
-    private Output<String> name;
-
-    public Output<String> name() {
-        return this.name;
+    public Builder description(@Nullable Output<String> description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name = "project")
-    private @Nullable Output<String> project;
-
-    public Optional<Output<String>> project() {
-        return Optional.ofNullable(this.project);
+    public Builder description(String description) {
+      return description(Output.of(description));
     }
 
-    @Import(name = "remote")
-    private @Nullable Output<String> remote;
-
-    public Optional<Output<String>> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder devices(@Nullable Output<List<GetProfileDeviceArgs>> devices) {
+      $.devices = devices;
+      return this;
     }
 
-    private GetProfileArgs() {
+    public Builder devices(List<GetProfileDeviceArgs> devices) {
+      return devices(Output.of(devices));
     }
 
-    private GetProfileArgs(GetProfileArgs $) {
-        this.description = $.description;
-        this.devices = $.devices;
-        this.name = $.name;
-        this.project = $.project;
-        this.remote = $.remote;
+    public Builder devices(GetProfileDeviceArgs... devices) {
+      return devices(List.of(devices));
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder name(Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    public static Builder builder(GetProfileArgs defaults) {
-        return new Builder(defaults);
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
-    public static final class Builder {
-        private GetProfileArgs $;
-
-        public Builder() {
-            $ = new GetProfileArgs();
-        }
-
-        public Builder(GetProfileArgs defaults) {
-            $ = new GetProfileArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder description(@Nullable Output<String> description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder description(String description) {
-            return description(Output.of(description));
-        }
-
-        public Builder devices(@Nullable Output<List<GetProfileDeviceArgs>> devices) {
-            $.devices = devices;
-            return this;
-        }
-
-        public Builder devices(List<GetProfileDeviceArgs> devices) {
-            return devices(Output.of(devices));
-        }
-
-        public Builder devices(GetProfileDeviceArgs... devices) {
-            return devices(List.of(devices));
-        }
-
-        public Builder name(Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        public Builder project(@Nullable Output<String> project) {
-            $.project = project;
-            return this;
-        }
-
-        public Builder project(String project) {
-            return project(Output.of(project));
-        }
-
-        public Builder remote(@Nullable Output<String> remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder remote(String remote) {
-            return remote(Output.of(remote));
-        }
-
-        public GetProfileArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("GetProfileArgs", "name");
-            }
-            return $;
-        }
+    public Builder project(@Nullable Output<String> project) {
+      $.project = project;
+      return this;
     }
 
+    public Builder project(String project) {
+      return project(Output.of(project));
+    }
+
+    public Builder remote(@Nullable Output<String> remote) {
+      $.remote = remote;
+      return this;
+    }
+
+    public Builder remote(String remote) {
+      return remote(Output.of(remote));
+    }
+
+    public GetProfileArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("GetProfileArgs", "name");
+      }
+      return $;
+    }
+  }
 }

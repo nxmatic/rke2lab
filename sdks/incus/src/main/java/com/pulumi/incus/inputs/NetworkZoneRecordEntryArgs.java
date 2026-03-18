@@ -6,143 +6,133 @@ package com.pulumi.incus.inputs;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.Double;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class NetworkZoneRecordEntryArgs extends com.pulumi.resources.ResourceArgs {
 
-    public static final NetworkZoneRecordEntryArgs Empty = new NetworkZoneRecordEntryArgs();
+  public static final NetworkZoneRecordEntryArgs Empty = new NetworkZoneRecordEntryArgs();
 
-    /**
-     * Record entry TTL
-     */
-    @Import(name = "ttl")
-    private @Nullable Output<Double> ttl;
+  /** Record entry TTL */
+  @Import(name = "ttl")
+  private @Nullable Output<Double> ttl;
 
-    /**
-     * @return Record entry TTL
-     */
-    public Optional<Output<Double>> ttl() {
-        return Optional.ofNullable(this.ttl);
+  /**
+   * @return Record entry TTL
+   */
+  public Optional<Output<Double>> ttl() {
+    return Optional.ofNullable(this.ttl);
+  }
+
+  /** Record entry type */
+  @Import(name = "type", required = true)
+  private Output<String> type;
+
+  /**
+   * @return Record entry type
+   */
+  public Output<String> type() {
+    return this.type;
+  }
+
+  /** Record entry value */
+  @Import(name = "value", required = true)
+  private Output<String> value;
+
+  /**
+   * @return Record entry value
+   */
+  public Output<String> value() {
+    return this.value;
+  }
+
+  private NetworkZoneRecordEntryArgs() {}
+
+  private NetworkZoneRecordEntryArgs(NetworkZoneRecordEntryArgs $) {
+    this.ttl = $.ttl;
+    this.type = $.type;
+    this.value = $.value;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(NetworkZoneRecordEntryArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private NetworkZoneRecordEntryArgs $;
+
+    public Builder() {
+      $ = new NetworkZoneRecordEntryArgs();
+    }
+
+    public Builder(NetworkZoneRecordEntryArgs defaults) {
+      $ = new NetworkZoneRecordEntryArgs(Objects.requireNonNull(defaults));
     }
 
     /**
-     * Record entry type
+     * @param ttl Record entry TTL
+     * @return builder
      */
-    @Import(name = "type", required = true)
-    private Output<String> type;
-
-    /**
-     * @return Record entry type
-     */
-    public Output<String> type() {
-        return this.type;
+    public Builder ttl(@Nullable Output<Double> ttl) {
+      $.ttl = ttl;
+      return this;
     }
 
     /**
-     * Record entry value
+     * @param ttl Record entry TTL
+     * @return builder
      */
-    @Import(name = "value", required = true)
-    private Output<String> value;
+    public Builder ttl(Double ttl) {
+      return ttl(Output.of(ttl));
+    }
 
     /**
-     * @return Record entry value
+     * @param type Record entry type
+     * @return builder
      */
-    public Output<String> value() {
-        return this.value;
+    public Builder type(Output<String> type) {
+      $.type = type;
+      return this;
     }
 
-    private NetworkZoneRecordEntryArgs() {
+    /**
+     * @param type Record entry type
+     * @return builder
+     */
+    public Builder type(String type) {
+      return type(Output.of(type));
     }
 
-    private NetworkZoneRecordEntryArgs(NetworkZoneRecordEntryArgs $) {
-        this.ttl = $.ttl;
-        this.type = $.type;
-        this.value = $.value;
+    /**
+     * @param value Record entry value
+     * @return builder
+     */
+    public Builder value(Output<String> value) {
+      $.value = value;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    /**
+     * @param value Record entry value
+     * @return builder
+     */
+    public Builder value(String value) {
+      return value(Output.of(value));
     }
 
-    public static Builder builder(NetworkZoneRecordEntryArgs defaults) {
-        return new Builder(defaults);
+    public NetworkZoneRecordEntryArgs build() {
+      if ($.type == null) {
+        throw new MissingRequiredPropertyException("NetworkZoneRecordEntryArgs", "type");
+      }
+      if ($.value == null) {
+        throw new MissingRequiredPropertyException("NetworkZoneRecordEntryArgs", "value");
+      }
+      return $;
     }
-
-    public static final class Builder {
-        private NetworkZoneRecordEntryArgs $;
-
-        public Builder() {
-            $ = new NetworkZoneRecordEntryArgs();
-        }
-
-        public Builder(NetworkZoneRecordEntryArgs defaults) {
-            $ = new NetworkZoneRecordEntryArgs(Objects.requireNonNull(defaults));
-        }
-
-        /**
-         * @param ttl Record entry TTL
-         * @return builder
-         */
-        public Builder ttl(@Nullable Output<Double> ttl) {
-            $.ttl = ttl;
-            return this;
-        }
-
-        /**
-         * @param ttl Record entry TTL
-         * @return builder
-         */
-        public Builder ttl(Double ttl) {
-            return ttl(Output.of(ttl));
-        }
-
-        /**
-         * @param type Record entry type
-         * @return builder
-         */
-        public Builder type(Output<String> type) {
-            $.type = type;
-            return this;
-        }
-
-        /**
-         * @param type Record entry type
-         * @return builder
-         */
-        public Builder type(String type) {
-            return type(Output.of(type));
-        }
-
-        /**
-         * @param value Record entry value
-         * @return builder
-         */
-        public Builder value(Output<String> value) {
-            $.value = value;
-            return this;
-        }
-
-        /**
-         * @param value Record entry value
-         * @return builder
-         */
-        public Builder value(String value) {
-            return value(Output.of(value));
-        }
-
-        public NetworkZoneRecordEntryArgs build() {
-            if ($.type == null) {
-                throw new MissingRequiredPropertyException("NetworkZoneRecordEntryArgs", "type");
-            }
-            if ($.value == null) {
-                throw new MissingRequiredPropertyException("NetworkZoneRecordEntryArgs", "value");
-            }
-            return $;
-        }
-    }
-
+  }
 }

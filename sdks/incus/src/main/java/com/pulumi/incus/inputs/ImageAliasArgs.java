@@ -6,108 +6,101 @@ package com.pulumi.incus.inputs;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class ImageAliasArgs extends com.pulumi.resources.ResourceArgs {
 
-    public static final ImageAliasArgs Empty = new ImageAliasArgs();
+  public static final ImageAliasArgs Empty = new ImageAliasArgs();
 
-    /**
-     * The description for the image alias.
-     */
-    @Import(name = "description")
-    private @Nullable Output<String> description;
+  /** The description for the image alias. */
+  @Import(name = "description")
+  private @Nullable Output<String> description;
 
-    /**
-     * @return The description for the image alias.
-     */
-    public Optional<Output<String>> description() {
-        return Optional.ofNullable(this.description);
+  /**
+   * @return The description for the image alias.
+   */
+  public Optional<Output<String>> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  /** The name of the image alias. */
+  @Import(name = "name", required = true)
+  private Output<String> name;
+
+  /**
+   * @return The name of the image alias.
+   */
+  public Output<String> name() {
+    return this.name;
+  }
+
+  private ImageAliasArgs() {}
+
+  private ImageAliasArgs(ImageAliasArgs $) {
+    this.description = $.description;
+    this.name = $.name;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(ImageAliasArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private ImageAliasArgs $;
+
+    public Builder() {
+      $ = new ImageAliasArgs();
+    }
+
+    public Builder(ImageAliasArgs defaults) {
+      $ = new ImageAliasArgs(Objects.requireNonNull(defaults));
     }
 
     /**
-     * The name of the image alias.
+     * @param description The description for the image alias.
+     * @return builder
      */
-    @Import(name = "name", required = true)
-    private Output<String> name;
+    public Builder description(@Nullable Output<String> description) {
+      $.description = description;
+      return this;
+    }
 
     /**
-     * @return The name of the image alias.
+     * @param description The description for the image alias.
+     * @return builder
      */
-    public Output<String> name() {
-        return this.name;
+    public Builder description(String description) {
+      return description(Output.of(description));
     }
 
-    private ImageAliasArgs() {
+    /**
+     * @param name The name of the image alias.
+     * @return builder
+     */
+    public Builder name(Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    private ImageAliasArgs(ImageAliasArgs $) {
-        this.description = $.description;
-        this.name = $.name;
+    /**
+     * @param name The name of the image alias.
+     * @return builder
+     */
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public ImageAliasArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("ImageAliasArgs", "name");
+      }
+      return $;
     }
-
-    public static Builder builder(ImageAliasArgs defaults) {
-        return new Builder(defaults);
-    }
-
-    public static final class Builder {
-        private ImageAliasArgs $;
-
-        public Builder() {
-            $ = new ImageAliasArgs();
-        }
-
-        public Builder(ImageAliasArgs defaults) {
-            $ = new ImageAliasArgs(Objects.requireNonNull(defaults));
-        }
-
-        /**
-         * @param description The description for the image alias.
-         * @return builder
-         */
-        public Builder description(@Nullable Output<String> description) {
-            $.description = description;
-            return this;
-        }
-
-        /**
-         * @param description The description for the image alias.
-         * @return builder
-         */
-        public Builder description(String description) {
-            return description(Output.of(description));
-        }
-
-        /**
-         * @param name The name of the image alias.
-         * @return builder
-         */
-        public Builder name(Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        /**
-         * @param name The name of the image alias.
-         * @return builder
-         */
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        public ImageAliasArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("ImageAliasArgs", "name");
-            }
-            return $;
-        }
-    }
-
+  }
 }

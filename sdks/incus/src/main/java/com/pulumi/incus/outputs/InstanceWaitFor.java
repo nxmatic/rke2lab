@@ -5,74 +5,82 @@ package com.pulumi.incus.outputs;
 
 import com.pulumi.core.annotations.CustomType;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 @CustomType
 public final class InstanceWaitFor {
+  private @Nullable String delay;
+  private @Nullable String nic;
+  private String type;
+
+  private InstanceWaitFor() {}
+
+  public Optional<String> delay() {
+    return Optional.ofNullable(this.delay);
+  }
+
+  public Optional<String> nic() {
+    return Optional.ofNullable(this.nic);
+  }
+
+  public String type() {
+    return this.type;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(InstanceWaitFor defaults) {
+    return new Builder(defaults);
+  }
+
+  @CustomType.Builder
+  public static final class Builder {
     private @Nullable String delay;
     private @Nullable String nic;
     private String type;
 
-    private InstanceWaitFor() {}
-    public Optional<String> delay() {
-        return Optional.ofNullable(this.delay);
-    }
-    public Optional<String> nic() {
-        return Optional.ofNullable(this.nic);
-    }
-    public String type() {
-        return this.type;
+    public Builder() {}
+
+    public Builder(InstanceWaitFor defaults) {
+      Objects.requireNonNull(defaults);
+      this.delay = defaults.delay;
+      this.nic = defaults.nic;
+      this.type = defaults.type;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    @CustomType.Setter
+    public Builder delay(@Nullable String delay) {
+
+      this.delay = delay;
+      return this;
     }
 
-    public static Builder builder(InstanceWaitFor defaults) {
-        return new Builder(defaults);
+    @CustomType.Setter
+    public Builder nic(@Nullable String nic) {
+
+      this.nic = nic;
+      return this;
     }
-    @CustomType.Builder
-    public static final class Builder {
-        private @Nullable String delay;
-        private @Nullable String nic;
-        private String type;
-        public Builder() {}
-        public Builder(InstanceWaitFor defaults) {
-    	      Objects.requireNonNull(defaults);
-    	      this.delay = defaults.delay;
-    	      this.nic = defaults.nic;
-    	      this.type = defaults.type;
-        }
 
-        @CustomType.Setter
-        public Builder delay(@Nullable String delay) {
-
-            this.delay = delay;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder nic(@Nullable String nic) {
-
-            this.nic = nic;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder type(String type) {
-            if (type == null) {
-              throw new MissingRequiredPropertyException("InstanceWaitFor", "type");
-            }
-            this.type = type;
-            return this;
-        }
-        public InstanceWaitFor build() {
-            final var _resultValue = new InstanceWaitFor();
-            _resultValue.delay = delay;
-            _resultValue.nic = nic;
-            _resultValue.type = type;
-            return _resultValue;
-        }
+    @CustomType.Setter
+    public Builder type(String type) {
+      if (type == null) {
+        throw new MissingRequiredPropertyException("InstanceWaitFor", "type");
+      }
+      this.type = type;
+      return this;
     }
+
+    public InstanceWaitFor build() {
+      final var _resultValue = new InstanceWaitFor();
+      _resultValue.delay = delay;
+      _resultValue.nic = nic;
+      _resultValue.type = type;
+      return _resultValue;
+    }
+  }
 }

@@ -6,54 +6,47 @@ package com.pulumi.incus;
 import com.pulumi.core.TypeShape;
 import com.pulumi.core.internal.Codegen;
 import com.pulumi.incus.config.inputs.Remotes;
-import java.lang.Boolean;
-import java.lang.String;
 import java.util.List;
 import java.util.Optional;
 
 public final class Config {
 
-    private static final com.pulumi.Config config = com.pulumi.Config.of("incus");
-/**
- * Accept the server certificate.
- * 
- */
-    public Optional<Boolean> acceptRemoteCertificate() {
-        return Codegen.booleanProp("acceptRemoteCertificate").config(config).get();
-    }
-/**
- * The directory to look for existing Incus configuration. (default = $HOME/.config/incus)
- * 
- */
-    public Optional<String> configDir() {
-        return Codegen.stringProp("configDir").config(config).get();
-    }
-/**
- * The default remote to use when no other remote is defined in a resource.
- * 
- */
-    public Optional<String> defaultRemote() {
-        return Codegen.stringProp("defaultRemote").config(config).get();
-    }
-/**
- * Automatically generate the Incus client certificates if they don&#39;t exist.
- * 
- */
-    public Optional<Boolean> generateClientCertificates() {
-        return Codegen.booleanProp("generateClientCertificates").config(config).get();
-    }
-/**
- * The project where project-scoped resources will be created. Can be overridden in individual resources. (default = default)
- * 
- */
-    public Optional<String> project() {
-        return Codegen.stringProp("project").config(config).get();
-    }
-/**
- * Incus Remote
- * 
- */
-    public Optional<List<Remotes>> remotes() {
-        return Codegen.objectProp("remotes", TypeShape.<List<Remotes>>builder(List.class).addParameter(Remotes.class).build()).config(config).get();
-    }
+  private static final com.pulumi.Config config = com.pulumi.Config.of("incus");
+
+  /** Accept the server certificate. */
+  public Optional<Boolean> acceptRemoteCertificate() {
+    return Codegen.booleanProp("acceptRemoteCertificate").config(config).get();
+  }
+
+  /** The directory to look for existing Incus configuration. (default = $HOME/.config/incus) */
+  public Optional<String> configDir() {
+    return Codegen.stringProp("configDir").config(config).get();
+  }
+
+  /** The default remote to use when no other remote is defined in a resource. */
+  public Optional<String> defaultRemote() {
+    return Codegen.stringProp("defaultRemote").config(config).get();
+  }
+
+  /** Automatically generate the Incus client certificates if they don&#39;t exist. */
+  public Optional<Boolean> generateClientCertificates() {
+    return Codegen.booleanProp("generateClientCertificates").config(config).get();
+  }
+
+  /**
+   * The project where project-scoped resources will be created. Can be overridden in individual
+   * resources. (default = default)
+   */
+  public Optional<String> project() {
+    return Codegen.stringProp("project").config(config).get();
+  }
+
+  /** Incus Remote */
+  public Optional<List<Remotes>> remotes() {
+    return Codegen.objectProp(
+            "remotes",
+            TypeShape.<List<Remotes>>builder(List.class).addParameter(Remotes.class).build())
+        .config(config)
+        .get();
+  }
 }

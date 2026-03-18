@@ -7,137 +7,183 @@ import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Export;
 import com.pulumi.core.annotations.ResourceType;
 import com.pulumi.core.internal.Codegen;
-import com.pulumi.incus.NetworkLbArgs;
-import com.pulumi.incus.Utilities;
 import com.pulumi.incus.inputs.NetworkLbState;
 import com.pulumi.incus.outputs.NetworkLbBackend;
 import com.pulumi.incus.outputs.NetworkLbPort;
-import java.lang.String;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-@ResourceType(type="incus:index/networkLb:NetworkLb")
+@ResourceType(type = "incus:index/networkLb:NetworkLb")
 public class NetworkLb extends com.pulumi.resources.CustomResource {
-    /**
-     * Network load balancer backend
-     * 
-     */
-    @Export(name="backends", refs={List.class,NetworkLbBackend.class}, tree="[0,1]")
-    private Output</* @Nullable */ List<NetworkLbBackend>> backends;
+  /** Network load balancer backend */
+  @Export(
+      name = "backends",
+      refs = {List.class, NetworkLbBackend.class},
+      tree = "[0,1]")
+  private Output</* @Nullable */ List<NetworkLbBackend>> backends;
 
-    /**
-     * @return Network load balancer backend
-     * 
-     */
-    public Output<Optional<List<NetworkLbBackend>>> backends() {
-        return Codegen.optional(this.backends);
-    }
-    @Export(name="config", refs={Map.class,String.class}, tree="[0,1,1]")
-    private Output<Map<String,String>> config;
+  /**
+   * @return Network load balancer backend
+   */
+  public Output<Optional<List<NetworkLbBackend>>> backends() {
+    return Codegen.optional(this.backends);
+  }
 
-    public Output<Map<String,String>> config() {
-        return this.config;
-    }
-    @Export(name="description", refs={String.class}, tree="[0]")
-    private Output<String> description;
+  @Export(
+      name = "config",
+      refs = {Map.class, String.class},
+      tree = "[0,1,1]")
+  private Output<Map<String, String>> config;
 
-    public Output<String> description() {
-        return this.description;
-    }
-    @Export(name="listenAddress", refs={String.class}, tree="[0]")
-    private Output<String> listenAddress;
+  public Output<Map<String, String>> config() {
+    return this.config;
+  }
 
-    public Output<String> listenAddress() {
-        return this.listenAddress;
-    }
-    @Export(name="network", refs={String.class}, tree="[0]")
-    private Output<String> network;
+  @Export(
+      name = "description",
+      refs = {String.class},
+      tree = "[0]")
+  private Output<String> description;
 
-    public Output<String> network() {
-        return this.network;
-    }
-    /**
-     * Network load balancer port
-     * 
-     */
-    @Export(name="ports", refs={List.class,NetworkLbPort.class}, tree="[0,1]")
-    private Output</* @Nullable */ List<NetworkLbPort>> ports;
+  public Output<String> description() {
+    return this.description;
+  }
 
-    /**
-     * @return Network load balancer port
-     * 
-     */
-    public Output<Optional<List<NetworkLbPort>>> ports() {
-        return Codegen.optional(this.ports);
-    }
-    @Export(name="project", refs={String.class}, tree="[0]")
-    private Output</* @Nullable */ String> project;
+  @Export(
+      name = "listenAddress",
+      refs = {String.class},
+      tree = "[0]")
+  private Output<String> listenAddress;
 
-    public Output<Optional<String>> project() {
-        return Codegen.optional(this.project);
-    }
-    @Export(name="remote", refs={String.class}, tree="[0]")
-    private Output</* @Nullable */ String> remote;
+  public Output<String> listenAddress() {
+    return this.listenAddress;
+  }
 
-    public Output<Optional<String>> remote() {
-        return Codegen.optional(this.remote);
-    }
+  @Export(
+      name = "network",
+      refs = {String.class},
+      tree = "[0]")
+  private Output<String> network;
 
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     */
-    public NetworkLb(java.lang.String name) {
-        this(name, NetworkLbArgs.Empty);
-    }
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param args The arguments to use to populate this resource's properties.
-     */
-    public NetworkLb(java.lang.String name, NetworkLbArgs args) {
-        this(name, args, null);
-    }
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param args The arguments to use to populate this resource's properties.
-     * @param options A bag of options that control this resource's behavior.
-     */
-    public NetworkLb(java.lang.String name, NetworkLbArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        super("incus:index/networkLb:NetworkLb", name, makeArgs(args, options), makeResourceOptions(options, Codegen.empty()), false, Utilities.getPackageRef());
-    }
+  public Output<String> network() {
+    return this.network;
+  }
 
-    private NetworkLb(java.lang.String name, Output<java.lang.String> id, @Nullable NetworkLbState state, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        super("incus:index/networkLb:NetworkLb", name, state, makeResourceOptions(options, id), false, Utilities.getPackageRef());
-    }
+  /** Network load balancer port */
+  @Export(
+      name = "ports",
+      refs = {List.class, NetworkLbPort.class},
+      tree = "[0,1]")
+  private Output</* @Nullable */ List<NetworkLbPort>> ports;
 
-    private static NetworkLbArgs makeArgs(NetworkLbArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        if (options != null && options.getUrn().isPresent()) {
-            return null;
-        }
-        return args == null ? NetworkLbArgs.Empty : args;
-    }
+  /**
+   * @return Network load balancer port
+   */
+  public Output<Optional<List<NetworkLbPort>>> ports() {
+    return Codegen.optional(this.ports);
+  }
 
-    private static com.pulumi.resources.CustomResourceOptions makeResourceOptions(@Nullable com.pulumi.resources.CustomResourceOptions options, @Nullable Output<java.lang.String> id) {
-        var defaultOptions = com.pulumi.resources.CustomResourceOptions.builder()
+  @Export(
+      name = "project",
+      refs = {String.class},
+      tree = "[0]")
+  private Output</* @Nullable */ String> project;
+
+  public Output<Optional<String>> project() {
+    return Codegen.optional(this.project);
+  }
+
+  @Export(
+      name = "remote",
+      refs = {String.class},
+      tree = "[0]")
+  private Output</* @Nullable */ String> remote;
+
+  public Output<Optional<String>> remote() {
+    return Codegen.optional(this.remote);
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   */
+  public NetworkLb(java.lang.String name) {
+    this(name, NetworkLbArgs.Empty);
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   * @param args The arguments to use to populate this resource's properties.
+   */
+  public NetworkLb(java.lang.String name, NetworkLbArgs args) {
+    this(name, args, null);
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   * @param args The arguments to use to populate this resource's properties.
+   * @param options A bag of options that control this resource's behavior.
+   */
+  public NetworkLb(
+      java.lang.String name,
+      NetworkLbArgs args,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    super(
+        "incus:index/networkLb:NetworkLb",
+        name,
+        makeArgs(args, options),
+        makeResourceOptions(options, Codegen.empty()),
+        false,
+        Utilities.getPackageRef());
+  }
+
+  private NetworkLb(
+      java.lang.String name,
+      Output<java.lang.String> id,
+      @Nullable NetworkLbState state,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    super(
+        "incus:index/networkLb:NetworkLb",
+        name,
+        state,
+        makeResourceOptions(options, id),
+        false,
+        Utilities.getPackageRef());
+  }
+
+  private static NetworkLbArgs makeArgs(
+      NetworkLbArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    if (options != null && options.getUrn().isPresent()) {
+      return null;
+    }
+    return args == null ? NetworkLbArgs.Empty : args;
+  }
+
+  private static com.pulumi.resources.CustomResourceOptions makeResourceOptions(
+      @Nullable com.pulumi.resources.CustomResourceOptions options,
+      @Nullable Output<java.lang.String> id) {
+    var defaultOptions =
+        com.pulumi.resources.CustomResourceOptions.builder()
             .version(Utilities.getVersion())
             .build();
-        return com.pulumi.resources.CustomResourceOptions.merge(defaultOptions, options, id);
-    }
+    return com.pulumi.resources.CustomResourceOptions.merge(defaultOptions, options, id);
+  }
 
-    /**
-     * Get an existing Host resource's state with the given name, ID, and optional extra
-     * properties used to qualify the lookup.
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param id The _unique_ provider ID of the resource to lookup.
-     * @param state
-     * @param options Optional settings to control the behavior of the CustomResource.
-     */
-    public static NetworkLb get(java.lang.String name, Output<java.lang.String> id, @Nullable NetworkLbState state, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        return new NetworkLb(name, id, state, options);
-    }
+  /**
+   * Get an existing Host resource's state with the given name, ID, and optional extra properties
+   * used to qualify the lookup.
+   *
+   * @param name The _unique_ name of the resulting resource.
+   * @param id The _unique_ provider ID of the resource to lookup.
+   * @param state
+   * @param options Optional settings to control the behavior of the CustomResource.
+   */
+  public static NetworkLb get(
+      java.lang.String name,
+      Output<java.lang.String> id,
+      @Nullable NetworkLbState state,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    return new NetworkLb(name, id, state, options);
+  }
 }

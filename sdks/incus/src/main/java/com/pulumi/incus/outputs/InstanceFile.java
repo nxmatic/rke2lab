@@ -5,15 +5,65 @@ package com.pulumi.incus.outputs;
 
 import com.pulumi.core.annotations.CustomType;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.Boolean;
-import java.lang.Double;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 @CustomType
 public final class InstanceFile {
+  private @Nullable Boolean append;
+  private @Nullable String content;
+  private @Nullable Boolean createDirectories;
+  private @Nullable Double gid;
+  private @Nullable String mode;
+  private @Nullable String sourcePath;
+  private String targetPath;
+  private @Nullable Double uid;
+
+  private InstanceFile() {}
+
+  public Optional<Boolean> append() {
+    return Optional.ofNullable(this.append);
+  }
+
+  public Optional<String> content() {
+    return Optional.ofNullable(this.content);
+  }
+
+  public Optional<Boolean> createDirectories() {
+    return Optional.ofNullable(this.createDirectories);
+  }
+
+  public Optional<Double> gid() {
+    return Optional.ofNullable(this.gid);
+  }
+
+  public Optional<String> mode() {
+    return Optional.ofNullable(this.mode);
+  }
+
+  public Optional<String> sourcePath() {
+    return Optional.ofNullable(this.sourcePath);
+  }
+
+  public String targetPath() {
+    return this.targetPath;
+  }
+
+  public Optional<Double> uid() {
+    return Optional.ofNullable(this.uid);
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(InstanceFile defaults) {
+    return new Builder(defaults);
+  }
+
+  @CustomType.Builder
+  public static final class Builder {
     private @Nullable Boolean append;
     private @Nullable String content;
     private @Nullable Boolean createDirectories;
@@ -23,123 +73,89 @@ public final class InstanceFile {
     private String targetPath;
     private @Nullable Double uid;
 
-    private InstanceFile() {}
-    public Optional<Boolean> append() {
-        return Optional.ofNullable(this.append);
-    }
-    public Optional<String> content() {
-        return Optional.ofNullable(this.content);
-    }
-    public Optional<Boolean> createDirectories() {
-        return Optional.ofNullable(this.createDirectories);
-    }
-    public Optional<Double> gid() {
-        return Optional.ofNullable(this.gid);
-    }
-    public Optional<String> mode() {
-        return Optional.ofNullable(this.mode);
-    }
-    public Optional<String> sourcePath() {
-        return Optional.ofNullable(this.sourcePath);
-    }
-    public String targetPath() {
-        return this.targetPath;
-    }
-    public Optional<Double> uid() {
-        return Optional.ofNullable(this.uid);
+    public Builder() {}
+
+    public Builder(InstanceFile defaults) {
+      Objects.requireNonNull(defaults);
+      this.append = defaults.append;
+      this.content = defaults.content;
+      this.createDirectories = defaults.createDirectories;
+      this.gid = defaults.gid;
+      this.mode = defaults.mode;
+      this.sourcePath = defaults.sourcePath;
+      this.targetPath = defaults.targetPath;
+      this.uid = defaults.uid;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    @CustomType.Setter
+    public Builder append(@Nullable Boolean append) {
+
+      this.append = append;
+      return this;
     }
 
-    public static Builder builder(InstanceFile defaults) {
-        return new Builder(defaults);
+    @CustomType.Setter
+    public Builder content(@Nullable String content) {
+
+      this.content = content;
+      return this;
     }
-    @CustomType.Builder
-    public static final class Builder {
-        private @Nullable Boolean append;
-        private @Nullable String content;
-        private @Nullable Boolean createDirectories;
-        private @Nullable Double gid;
-        private @Nullable String mode;
-        private @Nullable String sourcePath;
-        private String targetPath;
-        private @Nullable Double uid;
-        public Builder() {}
-        public Builder(InstanceFile defaults) {
-    	      Objects.requireNonNull(defaults);
-    	      this.append = defaults.append;
-    	      this.content = defaults.content;
-    	      this.createDirectories = defaults.createDirectories;
-    	      this.gid = defaults.gid;
-    	      this.mode = defaults.mode;
-    	      this.sourcePath = defaults.sourcePath;
-    	      this.targetPath = defaults.targetPath;
-    	      this.uid = defaults.uid;
-        }
 
-        @CustomType.Setter
-        public Builder append(@Nullable Boolean append) {
+    @CustomType.Setter
+    public Builder createDirectories(@Nullable Boolean createDirectories) {
 
-            this.append = append;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder content(@Nullable String content) {
-
-            this.content = content;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder createDirectories(@Nullable Boolean createDirectories) {
-
-            this.createDirectories = createDirectories;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder gid(@Nullable Double gid) {
-
-            this.gid = gid;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder mode(@Nullable String mode) {
-
-            this.mode = mode;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder sourcePath(@Nullable String sourcePath) {
-
-            this.sourcePath = sourcePath;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder targetPath(String targetPath) {
-            if (targetPath == null) {
-              throw new MissingRequiredPropertyException("InstanceFile", "targetPath");
-            }
-            this.targetPath = targetPath;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder uid(@Nullable Double uid) {
-
-            this.uid = uid;
-            return this;
-        }
-        public InstanceFile build() {
-            final var _resultValue = new InstanceFile();
-            _resultValue.append = append;
-            _resultValue.content = content;
-            _resultValue.createDirectories = createDirectories;
-            _resultValue.gid = gid;
-            _resultValue.mode = mode;
-            _resultValue.sourcePath = sourcePath;
-            _resultValue.targetPath = targetPath;
-            _resultValue.uid = uid;
-            return _resultValue;
-        }
+      this.createDirectories = createDirectories;
+      return this;
     }
+
+    @CustomType.Setter
+    public Builder gid(@Nullable Double gid) {
+
+      this.gid = gid;
+      return this;
+    }
+
+    @CustomType.Setter
+    public Builder mode(@Nullable String mode) {
+
+      this.mode = mode;
+      return this;
+    }
+
+    @CustomType.Setter
+    public Builder sourcePath(@Nullable String sourcePath) {
+
+      this.sourcePath = sourcePath;
+      return this;
+    }
+
+    @CustomType.Setter
+    public Builder targetPath(String targetPath) {
+      if (targetPath == null) {
+        throw new MissingRequiredPropertyException("InstanceFile", "targetPath");
+      }
+      this.targetPath = targetPath;
+      return this;
+    }
+
+    @CustomType.Setter
+    public Builder uid(@Nullable Double uid) {
+
+      this.uid = uid;
+      return this;
+    }
+
+    public InstanceFile build() {
+      final var _resultValue = new InstanceFile();
+      _resultValue.append = append;
+      _resultValue.content = content;
+      _resultValue.createDirectories = createDirectories;
+      _resultValue.gid = gid;
+      _resultValue.mode = mode;
+      _resultValue.sourcePath = sourcePath;
+      _resultValue.targetPath = targetPath;
+      _resultValue.uid = uid;
+      return _resultValue;
+    }
+  }
 }

@@ -5,7 +5,6 @@ package com.pulumi.incus.outputs;
 
 import com.pulumi.core.annotations.CustomType;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -13,122 +12,137 @@ import javax.annotation.Nullable;
 
 @CustomType
 public final class GetNetworkIntegrationResult {
-    private Map<String,String> config;
+  private Map<String, String> config;
+  private String description;
+
+  /**
+   * @return The provider-assigned unique ID for this managed resource.
+   */
+  private String id;
+
+  private String name;
+  private @Nullable String remote;
+  private String type;
+
+  private GetNetworkIntegrationResult() {}
+
+  public Map<String, String> config() {
+    return this.config;
+  }
+
+  public String description() {
+    return this.description;
+  }
+
+  /**
+   * @return The provider-assigned unique ID for this managed resource.
+   */
+  public String id() {
+    return this.id;
+  }
+
+  public String name() {
+    return this.name;
+  }
+
+  public Optional<String> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  public String type() {
+    return this.type;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetNetworkIntegrationResult defaults) {
+    return new Builder(defaults);
+  }
+
+  @CustomType.Builder
+  public static final class Builder {
+    private Map<String, String> config;
     private String description;
-    /**
-     * @return The provider-assigned unique ID for this managed resource.
-     * 
-     */
     private String id;
     private String name;
     private @Nullable String remote;
     private String type;
 
-    private GetNetworkIntegrationResult() {}
-    public Map<String,String> config() {
-        return this.config;
-    }
-    public String description() {
-        return this.description;
-    }
-    /**
-     * @return The provider-assigned unique ID for this managed resource.
-     * 
-     */
-    public String id() {
-        return this.id;
-    }
-    public String name() {
-        return this.name;
-    }
-    public Optional<String> remote() {
-        return Optional.ofNullable(this.remote);
-    }
-    public String type() {
-        return this.type;
+    public Builder() {}
+
+    public Builder(GetNetworkIntegrationResult defaults) {
+      Objects.requireNonNull(defaults);
+      this.config = defaults.config;
+      this.description = defaults.description;
+      this.id = defaults.id;
+      this.name = defaults.name;
+      this.remote = defaults.remote;
+      this.type = defaults.type;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    @CustomType.Setter
+    public Builder config(Map<String, String> config) {
+      if (config == null) {
+        throw new MissingRequiredPropertyException("GetNetworkIntegrationResult", "config");
+      }
+      this.config = config;
+      return this;
     }
 
-    public static Builder builder(GetNetworkIntegrationResult defaults) {
-        return new Builder(defaults);
+    @CustomType.Setter
+    public Builder description(String description) {
+      if (description == null) {
+        throw new MissingRequiredPropertyException("GetNetworkIntegrationResult", "description");
+      }
+      this.description = description;
+      return this;
     }
-    @CustomType.Builder
-    public static final class Builder {
-        private Map<String,String> config;
-        private String description;
-        private String id;
-        private String name;
-        private @Nullable String remote;
-        private String type;
-        public Builder() {}
-        public Builder(GetNetworkIntegrationResult defaults) {
-    	      Objects.requireNonNull(defaults);
-    	      this.config = defaults.config;
-    	      this.description = defaults.description;
-    	      this.id = defaults.id;
-    	      this.name = defaults.name;
-    	      this.remote = defaults.remote;
-    	      this.type = defaults.type;
-        }
 
-        @CustomType.Setter
-        public Builder config(Map<String,String> config) {
-            if (config == null) {
-              throw new MissingRequiredPropertyException("GetNetworkIntegrationResult", "config");
-            }
-            this.config = config;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder description(String description) {
-            if (description == null) {
-              throw new MissingRequiredPropertyException("GetNetworkIntegrationResult", "description");
-            }
-            this.description = description;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder id(String id) {
-            if (id == null) {
-              throw new MissingRequiredPropertyException("GetNetworkIntegrationResult", "id");
-            }
-            this.id = id;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder name(String name) {
-            if (name == null) {
-              throw new MissingRequiredPropertyException("GetNetworkIntegrationResult", "name");
-            }
-            this.name = name;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder remote(@Nullable String remote) {
-
-            this.remote = remote;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder type(String type) {
-            if (type == null) {
-              throw new MissingRequiredPropertyException("GetNetworkIntegrationResult", "type");
-            }
-            this.type = type;
-            return this;
-        }
-        public GetNetworkIntegrationResult build() {
-            final var _resultValue = new GetNetworkIntegrationResult();
-            _resultValue.config = config;
-            _resultValue.description = description;
-            _resultValue.id = id;
-            _resultValue.name = name;
-            _resultValue.remote = remote;
-            _resultValue.type = type;
-            return _resultValue;
-        }
+    @CustomType.Setter
+    public Builder id(String id) {
+      if (id == null) {
+        throw new MissingRequiredPropertyException("GetNetworkIntegrationResult", "id");
+      }
+      this.id = id;
+      return this;
     }
+
+    @CustomType.Setter
+    public Builder name(String name) {
+      if (name == null) {
+        throw new MissingRequiredPropertyException("GetNetworkIntegrationResult", "name");
+      }
+      this.name = name;
+      return this;
+    }
+
+    @CustomType.Setter
+    public Builder remote(@Nullable String remote) {
+
+      this.remote = remote;
+      return this;
+    }
+
+    @CustomType.Setter
+    public Builder type(String type) {
+      if (type == null) {
+        throw new MissingRequiredPropertyException("GetNetworkIntegrationResult", "type");
+      }
+      this.type = type;
+      return this;
+    }
+
+    public GetNetworkIntegrationResult build() {
+      final var _resultValue = new GetNetworkIntegrationResult();
+      _resultValue.config = config;
+      _resultValue.description = description;
+      _resultValue.id = id;
+      _resultValue.name = name;
+      _resultValue.remote = remote;
+      _resultValue.type = type;
+      return _resultValue;
+    }
+  }
 }

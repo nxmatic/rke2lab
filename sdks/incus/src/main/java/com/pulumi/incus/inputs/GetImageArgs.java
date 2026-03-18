@@ -5,145 +5,142 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class GetImageArgs extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetImageArgs Empty = new GetImageArgs();
+  public static final GetImageArgs Empty = new GetImageArgs();
 
-    @Import(name = "architecture")
-    private @Nullable Output<String> architecture;
+  @Import(name = "architecture")
+  private @Nullable Output<String> architecture;
 
-    public Optional<Output<String>> architecture() {
-        return Optional.ofNullable(this.architecture);
+  public Optional<Output<String>> architecture() {
+    return Optional.ofNullable(this.architecture);
+  }
+
+  @Import(name = "fingerprint")
+  private @Nullable Output<String> fingerprint;
+
+  public Optional<Output<String>> fingerprint() {
+    return Optional.ofNullable(this.fingerprint);
+  }
+
+  @Import(name = "name")
+  private @Nullable Output<String> name;
+
+  public Optional<Output<String>> name() {
+    return Optional.ofNullable(this.name);
+  }
+
+  @Import(name = "project")
+  private @Nullable Output<String> project;
+
+  public Optional<Output<String>> project() {
+    return Optional.ofNullable(this.project);
+  }
+
+  @Import(name = "remote")
+  private @Nullable Output<String> remote;
+
+  public Optional<Output<String>> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  @Import(name = "type")
+  private @Nullable Output<String> type;
+
+  public Optional<Output<String>> type() {
+    return Optional.ofNullable(this.type);
+  }
+
+  private GetImageArgs() {}
+
+  private GetImageArgs(GetImageArgs $) {
+    this.architecture = $.architecture;
+    this.fingerprint = $.fingerprint;
+    this.name = $.name;
+    this.project = $.project;
+    this.remote = $.remote;
+    this.type = $.type;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetImageArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetImageArgs $;
+
+    public Builder() {
+      $ = new GetImageArgs();
     }
 
-    @Import(name = "fingerprint")
-    private @Nullable Output<String> fingerprint;
-
-    public Optional<Output<String>> fingerprint() {
-        return Optional.ofNullable(this.fingerprint);
+    public Builder(GetImageArgs defaults) {
+      $ = new GetImageArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "name")
-    private @Nullable Output<String> name;
-
-    public Optional<Output<String>> name() {
-        return Optional.ofNullable(this.name);
+    public Builder architecture(@Nullable Output<String> architecture) {
+      $.architecture = architecture;
+      return this;
     }
 
-    @Import(name = "project")
-    private @Nullable Output<String> project;
-
-    public Optional<Output<String>> project() {
-        return Optional.ofNullable(this.project);
+    public Builder architecture(String architecture) {
+      return architecture(Output.of(architecture));
     }
 
-    @Import(name = "remote")
-    private @Nullable Output<String> remote;
-
-    public Optional<Output<String>> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder fingerprint(@Nullable Output<String> fingerprint) {
+      $.fingerprint = fingerprint;
+      return this;
     }
 
-    @Import(name = "type")
-    private @Nullable Output<String> type;
-
-    public Optional<Output<String>> type() {
-        return Optional.ofNullable(this.type);
+    public Builder fingerprint(String fingerprint) {
+      return fingerprint(Output.of(fingerprint));
     }
 
-    private GetImageArgs() {
+    public Builder name(@Nullable Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    private GetImageArgs(GetImageArgs $) {
-        this.architecture = $.architecture;
-        this.fingerprint = $.fingerprint;
-        this.name = $.name;
-        this.project = $.project;
-        this.remote = $.remote;
-        this.type = $.type;
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder project(@Nullable Output<String> project) {
+      $.project = project;
+      return this;
     }
 
-    public static Builder builder(GetImageArgs defaults) {
-        return new Builder(defaults);
+    public Builder project(String project) {
+      return project(Output.of(project));
     }
 
-    public static final class Builder {
-        private GetImageArgs $;
-
-        public Builder() {
-            $ = new GetImageArgs();
-        }
-
-        public Builder(GetImageArgs defaults) {
-            $ = new GetImageArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder architecture(@Nullable Output<String> architecture) {
-            $.architecture = architecture;
-            return this;
-        }
-
-        public Builder architecture(String architecture) {
-            return architecture(Output.of(architecture));
-        }
-
-        public Builder fingerprint(@Nullable Output<String> fingerprint) {
-            $.fingerprint = fingerprint;
-            return this;
-        }
-
-        public Builder fingerprint(String fingerprint) {
-            return fingerprint(Output.of(fingerprint));
-        }
-
-        public Builder name(@Nullable Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        public Builder project(@Nullable Output<String> project) {
-            $.project = project;
-            return this;
-        }
-
-        public Builder project(String project) {
-            return project(Output.of(project));
-        }
-
-        public Builder remote(@Nullable Output<String> remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder remote(String remote) {
-            return remote(Output.of(remote));
-        }
-
-        public Builder type(@Nullable Output<String> type) {
-            $.type = type;
-            return this;
-        }
-
-        public Builder type(String type) {
-            return type(Output.of(type));
-        }
-
-        public GetImageArgs build() {
-            return $;
-        }
+    public Builder remote(@Nullable Output<String> remote) {
+      $.remote = remote;
+      return this;
     }
 
+    public Builder remote(String remote) {
+      return remote(Output.of(remote));
+    }
+
+    public Builder type(@Nullable Output<String> type) {
+      $.type = type;
+      return this;
+    }
+
+    public Builder type(String type) {
+      return type(Output.of(type));
+    }
+
+    public GetImageArgs build() {
+      return $;
+    }
+  }
 }

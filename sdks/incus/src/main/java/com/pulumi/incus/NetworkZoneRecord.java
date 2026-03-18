@@ -7,122 +7,168 @@ import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Export;
 import com.pulumi.core.annotations.ResourceType;
 import com.pulumi.core.internal.Codegen;
-import com.pulumi.incus.NetworkZoneRecordArgs;
-import com.pulumi.incus.Utilities;
 import com.pulumi.incus.inputs.NetworkZoneRecordState;
 import com.pulumi.incus.outputs.NetworkZoneRecordEntry;
-import java.lang.String;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-@ResourceType(type="incus:index/networkZoneRecord:NetworkZoneRecord")
+@ResourceType(type = "incus:index/networkZoneRecord:NetworkZoneRecord")
 public class NetworkZoneRecord extends com.pulumi.resources.CustomResource {
-    @Export(name="config", refs={Map.class,String.class}, tree="[0,1,1]")
-    private Output<Map<String,String>> config;
+  @Export(
+      name = "config",
+      refs = {Map.class, String.class},
+      tree = "[0,1,1]")
+  private Output<Map<String, String>> config;
 
-    public Output<Map<String,String>> config() {
-        return this.config;
-    }
-    @Export(name="description", refs={String.class}, tree="[0]")
-    private Output<String> description;
+  public Output<Map<String, String>> config() {
+    return this.config;
+  }
 
-    public Output<String> description() {
-        return this.description;
-    }
-    /**
-     * Network zone record entry
-     * 
-     */
-    @Export(name="entries", refs={List.class,NetworkZoneRecordEntry.class}, tree="[0,1]")
-    private Output</* @Nullable */ List<NetworkZoneRecordEntry>> entries;
+  @Export(
+      name = "description",
+      refs = {String.class},
+      tree = "[0]")
+  private Output<String> description;
 
-    /**
-     * @return Network zone record entry
-     * 
-     */
-    public Output<Optional<List<NetworkZoneRecordEntry>>> entries() {
-        return Codegen.optional(this.entries);
-    }
-    @Export(name="name", refs={String.class}, tree="[0]")
-    private Output<String> name;
+  public Output<String> description() {
+    return this.description;
+  }
 
-    public Output<String> name() {
-        return this.name;
-    }
-    @Export(name="project", refs={String.class}, tree="[0]")
-    private Output</* @Nullable */ String> project;
+  /** Network zone record entry */
+  @Export(
+      name = "entries",
+      refs = {List.class, NetworkZoneRecordEntry.class},
+      tree = "[0,1]")
+  private Output</* @Nullable */ List<NetworkZoneRecordEntry>> entries;
 
-    public Output<Optional<String>> project() {
-        return Codegen.optional(this.project);
-    }
-    @Export(name="remote", refs={String.class}, tree="[0]")
-    private Output</* @Nullable */ String> remote;
+  /**
+   * @return Network zone record entry
+   */
+  public Output<Optional<List<NetworkZoneRecordEntry>>> entries() {
+    return Codegen.optional(this.entries);
+  }
 
-    public Output<Optional<String>> remote() {
-        return Codegen.optional(this.remote);
-    }
-    @Export(name="zone", refs={String.class}, tree="[0]")
-    private Output<String> zone;
+  @Export(
+      name = "name",
+      refs = {String.class},
+      tree = "[0]")
+  private Output<String> name;
 
-    public Output<String> zone() {
-        return this.zone;
-    }
+  public Output<String> name() {
+    return this.name;
+  }
 
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     */
-    public NetworkZoneRecord(java.lang.String name) {
-        this(name, NetworkZoneRecordArgs.Empty);
-    }
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param args The arguments to use to populate this resource's properties.
-     */
-    public NetworkZoneRecord(java.lang.String name, NetworkZoneRecordArgs args) {
-        this(name, args, null);
-    }
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param args The arguments to use to populate this resource's properties.
-     * @param options A bag of options that control this resource's behavior.
-     */
-    public NetworkZoneRecord(java.lang.String name, NetworkZoneRecordArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        super("incus:index/networkZoneRecord:NetworkZoneRecord", name, makeArgs(args, options), makeResourceOptions(options, Codegen.empty()), false, Utilities.getPackageRef());
-    }
+  @Export(
+      name = "project",
+      refs = {String.class},
+      tree = "[0]")
+  private Output</* @Nullable */ String> project;
 
-    private NetworkZoneRecord(java.lang.String name, Output<java.lang.String> id, @Nullable NetworkZoneRecordState state, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        super("incus:index/networkZoneRecord:NetworkZoneRecord", name, state, makeResourceOptions(options, id), false, Utilities.getPackageRef());
-    }
+  public Output<Optional<String>> project() {
+    return Codegen.optional(this.project);
+  }
 
-    private static NetworkZoneRecordArgs makeArgs(NetworkZoneRecordArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        if (options != null && options.getUrn().isPresent()) {
-            return null;
-        }
-        return args == null ? NetworkZoneRecordArgs.Empty : args;
-    }
+  @Export(
+      name = "remote",
+      refs = {String.class},
+      tree = "[0]")
+  private Output</* @Nullable */ String> remote;
 
-    private static com.pulumi.resources.CustomResourceOptions makeResourceOptions(@Nullable com.pulumi.resources.CustomResourceOptions options, @Nullable Output<java.lang.String> id) {
-        var defaultOptions = com.pulumi.resources.CustomResourceOptions.builder()
+  public Output<Optional<String>> remote() {
+    return Codegen.optional(this.remote);
+  }
+
+  @Export(
+      name = "zone",
+      refs = {String.class},
+      tree = "[0]")
+  private Output<String> zone;
+
+  public Output<String> zone() {
+    return this.zone;
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   */
+  public NetworkZoneRecord(java.lang.String name) {
+    this(name, NetworkZoneRecordArgs.Empty);
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   * @param args The arguments to use to populate this resource's properties.
+   */
+  public NetworkZoneRecord(java.lang.String name, NetworkZoneRecordArgs args) {
+    this(name, args, null);
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   * @param args The arguments to use to populate this resource's properties.
+   * @param options A bag of options that control this resource's behavior.
+   */
+  public NetworkZoneRecord(
+      java.lang.String name,
+      NetworkZoneRecordArgs args,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    super(
+        "incus:index/networkZoneRecord:NetworkZoneRecord",
+        name,
+        makeArgs(args, options),
+        makeResourceOptions(options, Codegen.empty()),
+        false,
+        Utilities.getPackageRef());
+  }
+
+  private NetworkZoneRecord(
+      java.lang.String name,
+      Output<java.lang.String> id,
+      @Nullable NetworkZoneRecordState state,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    super(
+        "incus:index/networkZoneRecord:NetworkZoneRecord",
+        name,
+        state,
+        makeResourceOptions(options, id),
+        false,
+        Utilities.getPackageRef());
+  }
+
+  private static NetworkZoneRecordArgs makeArgs(
+      NetworkZoneRecordArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    if (options != null && options.getUrn().isPresent()) {
+      return null;
+    }
+    return args == null ? NetworkZoneRecordArgs.Empty : args;
+  }
+
+  private static com.pulumi.resources.CustomResourceOptions makeResourceOptions(
+      @Nullable com.pulumi.resources.CustomResourceOptions options,
+      @Nullable Output<java.lang.String> id) {
+    var defaultOptions =
+        com.pulumi.resources.CustomResourceOptions.builder()
             .version(Utilities.getVersion())
             .build();
-        return com.pulumi.resources.CustomResourceOptions.merge(defaultOptions, options, id);
-    }
+    return com.pulumi.resources.CustomResourceOptions.merge(defaultOptions, options, id);
+  }
 
-    /**
-     * Get an existing Host resource's state with the given name, ID, and optional extra
-     * properties used to qualify the lookup.
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param id The _unique_ provider ID of the resource to lookup.
-     * @param state
-     * @param options Optional settings to control the behavior of the CustomResource.
-     */
-    public static NetworkZoneRecord get(java.lang.String name, Output<java.lang.String> id, @Nullable NetworkZoneRecordState state, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        return new NetworkZoneRecord(name, id, state, options);
-    }
+  /**
+   * Get an existing Host resource's state with the given name, ID, and optional extra properties
+   * used to qualify the lookup.
+   *
+   * @param name The _unique_ name of the resulting resource.
+   * @param id The _unique_ provider ID of the resource to lookup.
+   * @param state
+   * @param options Optional settings to control the behavior of the CustomResource.
+   */
+  public static NetworkZoneRecord get(
+      java.lang.String name,
+      Output<java.lang.String> id,
+      @Nullable NetworkZoneRecordState state,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    return new NetworkZoneRecord(name, id, state, options);
+  }
 }

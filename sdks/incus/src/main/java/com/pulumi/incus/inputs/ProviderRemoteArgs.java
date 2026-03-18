@@ -6,250 +6,241 @@ package com.pulumi.incus.inputs;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.Boolean;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class ProviderRemoteArgs extends com.pulumi.resources.ResourceArgs {
 
-    public static final ProviderRemoteArgs Empty = new ProviderRemoteArgs();
+  public static final ProviderRemoteArgs Empty = new ProviderRemoteArgs();
 
-    /**
-     * The URL of the Incus host. The default will be the path to the local unix socket, or leaving it as an empty
-     * string will use the default socket path.
-     */
-    @Import(name = "address")
-    private @Nullable Output<String> address;
+  /**
+   * The URL of the Incus host. The default will be the path to the local unix socket, or leaving it
+   * as an empty string will use the default socket path.
+   */
+  @Import(name = "address")
+  private @Nullable Output<String> address;
 
-    /**
-     * @return The URL of the Incus host. The default will be the path to the local unix socket, or leaving it as an
-     *         empty string will use the default socket path.
-     */
-    public Optional<Output<String>> address() {
-        return Optional.ofNullable(this.address);
+  /**
+   * @return The URL of the Incus host. The default will be the path to the local unix socket, or
+   *     leaving it as an empty string will use the default socket path.
+   */
+  public Optional<Output<String>> address() {
+    return Optional.ofNullable(this.address);
+  }
+
+  /**
+   * Server authentication type, tls or oidc. ( Only for the &lt;span
+   * pulumi-lang-nodejs=&#34;`incus`&#34; pulumi-lang-dotnet=&#34;`Incus`&#34;
+   * pulumi-lang-go=&#34;`incus`&#34; pulumi-lang-python=&#34;`incus`&#34;
+   * pulumi-lang-yaml=&#34;`incus`&#34; pulumi-lang-java=&#34;`incus`&#34;&gt;`incus`&lt;/span&gt;
+   * protocol )
+   */
+  @Import(name = "authenticationType")
+  private @Nullable Output<String> authenticationType;
+
+  /**
+   * @return Server authentication type, tls or oidc. ( Only for the &lt;span
+   *     pulumi-lang-nodejs=&#34;`incus`&#34; pulumi-lang-dotnet=&#34;`Incus`&#34;
+   *     pulumi-lang-go=&#34;`incus`&#34; pulumi-lang-python=&#34;`incus`&#34;
+   *     pulumi-lang-yaml=&#34;`incus`&#34;
+   *     pulumi-lang-java=&#34;`incus`&#34;&gt;`incus`&lt;/span&gt; protocol )
+   */
+  public Optional<Output<String>> authenticationType() {
+    return Optional.ofNullable(this.authenticationType);
+  }
+
+  /** Name of the Incus remote. */
+  @Import(name = "name", required = true)
+  private Output<String> name;
+
+  /**
+   * @return Name of the Incus remote.
+   */
+  public Output<String> name() {
+    return this.name;
+  }
+
+  /** Server protocol ( incus, oci or simplestreams ) */
+  @Import(name = "protocol")
+  private @Nullable Output<String> protocol;
+
+  /**
+   * @return Server protocol ( incus, oci or simplestreams )
+   */
+  public Optional<Output<String>> protocol() {
+    return Optional.ofNullable(this.protocol);
+  }
+
+  /** Public image server */
+  @Import(name = "public")
+  private @Nullable Output<Boolean> public_;
+
+  /**
+   * @return Public image server
+   */
+  public Optional<Output<Boolean>> public_() {
+    return Optional.ofNullable(this.public_);
+  }
+
+  /** The trust token used for initial authentication with the Incus remote. */
+  @Import(name = "token")
+  private @Nullable Output<String> token;
+
+  /**
+   * @return The trust token used for initial authentication with the Incus remote.
+   */
+  public Optional<Output<String>> token() {
+    return Optional.ofNullable(this.token);
+  }
+
+  private ProviderRemoteArgs() {}
+
+  private ProviderRemoteArgs(ProviderRemoteArgs $) {
+    this.address = $.address;
+    this.authenticationType = $.authenticationType;
+    this.name = $.name;
+    this.protocol = $.protocol;
+    this.public_ = $.public_;
+    this.token = $.token;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(ProviderRemoteArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private ProviderRemoteArgs $;
+
+    public Builder() {
+      $ = new ProviderRemoteArgs();
+    }
+
+    public Builder(ProviderRemoteArgs defaults) {
+      $ = new ProviderRemoteArgs(Objects.requireNonNull(defaults));
     }
 
     /**
-     * Server authentication type, tls or oidc. ( Only for the &lt;span pulumi-lang-nodejs=&#34;`incus`&#34;
-     * pulumi-lang-dotnet=&#34;`Incus`&#34; pulumi-lang-go=&#34;`incus`&#34; pulumi-lang-python=&#34;`incus`&#34;
-     * pulumi-lang-yaml=&#34;`incus`&#34; pulumi-lang-java=&#34;`incus`&#34;&gt;`incus`&lt;/span&gt; protocol )
+     * @param address The URL of the Incus host. The default will be the path to the local unix
+     *     socket, or leaving it as an empty string will use the default socket path.
+     * @return builder
      */
-    @Import(name = "authenticationType")
-    private @Nullable Output<String> authenticationType;
-
-    /**
-     * @return Server authentication type, tls or oidc. ( Only for the &lt;span pulumi-lang-nodejs=&#34;`incus`&#34;
-     *         pulumi-lang-dotnet=&#34;`Incus`&#34; pulumi-lang-go=&#34;`incus`&#34;
-     *         pulumi-lang-python=&#34;`incus`&#34; pulumi-lang-yaml=&#34;`incus`&#34;
-     *         pulumi-lang-java=&#34;`incus`&#34;&gt;`incus`&lt;/span&gt; protocol )
-     */
-    public Optional<Output<String>> authenticationType() {
-        return Optional.ofNullable(this.authenticationType);
+    public Builder address(@Nullable Output<String> address) {
+      $.address = address;
+      return this;
     }
 
     /**
-     * Name of the Incus remote.
+     * @param address The URL of the Incus host. The default will be the path to the local unix
+     *     socket, or leaving it as an empty string will use the default socket path.
+     * @return builder
      */
-    @Import(name = "name", required = true)
-    private Output<String> name;
-
-    /**
-     * @return Name of the Incus remote.
-     */
-    public Output<String> name() {
-        return this.name;
+    public Builder address(String address) {
+      return address(Output.of(address));
     }
 
     /**
-     * Server protocol ( incus, oci or simplestreams )
+     * @param authenticationType Server authentication type, tls or oidc. ( Only for the &lt;span
+     *     pulumi-lang-nodejs=&#34;`incus`&#34; pulumi-lang-dotnet=&#34;`Incus`&#34;
+     *     pulumi-lang-go=&#34;`incus`&#34; pulumi-lang-python=&#34;`incus`&#34;
+     *     pulumi-lang-yaml=&#34;`incus`&#34;
+     *     pulumi-lang-java=&#34;`incus`&#34;&gt;`incus`&lt;/span&gt; protocol )
+     * @return builder
      */
-    @Import(name = "protocol")
-    private @Nullable Output<String> protocol;
-
-    /**
-     * @return Server protocol ( incus, oci or simplestreams )
-     */
-    public Optional<Output<String>> protocol() {
-        return Optional.ofNullable(this.protocol);
-    }
-
-    /**
-     * Public image server
-     */
-    @Import(name = "public")
-    private @Nullable Output<Boolean> public_;
-
-    /**
-     * @return Public image server
-     */
-    public Optional<Output<Boolean>> public_() {
-        return Optional.ofNullable(this.public_);
+    public Builder authenticationType(@Nullable Output<String> authenticationType) {
+      $.authenticationType = authenticationType;
+      return this;
     }
 
     /**
-     * The trust token used for initial authentication with the Incus remote.
+     * @param authenticationType Server authentication type, tls or oidc. ( Only for the &lt;span
+     *     pulumi-lang-nodejs=&#34;`incus`&#34; pulumi-lang-dotnet=&#34;`Incus`&#34;
+     *     pulumi-lang-go=&#34;`incus`&#34; pulumi-lang-python=&#34;`incus`&#34;
+     *     pulumi-lang-yaml=&#34;`incus`&#34;
+     *     pulumi-lang-java=&#34;`incus`&#34;&gt;`incus`&lt;/span&gt; protocol )
+     * @return builder
      */
-    @Import(name = "token")
-    private @Nullable Output<String> token;
+    public Builder authenticationType(String authenticationType) {
+      return authenticationType(Output.of(authenticationType));
+    }
 
     /**
-     * @return The trust token used for initial authentication with the Incus remote.
+     * @param name Name of the Incus remote.
+     * @return builder
      */
-    public Optional<Output<String>> token() {
-        return Optional.ofNullable(this.token);
+    public Builder name(Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    private ProviderRemoteArgs() {
+    /**
+     * @param name Name of the Incus remote.
+     * @return builder
+     */
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
-    private ProviderRemoteArgs(ProviderRemoteArgs $) {
-        this.address = $.address;
-        this.authenticationType = $.authenticationType;
-        this.name = $.name;
-        this.protocol = $.protocol;
-        this.public_ = $.public_;
-        this.token = $.token;
+    /**
+     * @param protocol Server protocol ( incus, oci or simplestreams )
+     * @return builder
+     */
+    public Builder protocol(@Nullable Output<String> protocol) {
+      $.protocol = protocol;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    /**
+     * @param protocol Server protocol ( incus, oci or simplestreams )
+     * @return builder
+     */
+    public Builder protocol(String protocol) {
+      return protocol(Output.of(protocol));
     }
 
-    public static Builder builder(ProviderRemoteArgs defaults) {
-        return new Builder(defaults);
+    /**
+     * @param public_ Public image server
+     * @return builder
+     */
+    public Builder public_(@Nullable Output<Boolean> public_) {
+      $.public_ = public_;
+      return this;
     }
 
-    public static final class Builder {
-        private ProviderRemoteArgs $;
-
-        public Builder() {
-            $ = new ProviderRemoteArgs();
-        }
-
-        public Builder(ProviderRemoteArgs defaults) {
-            $ = new ProviderRemoteArgs(Objects.requireNonNull(defaults));
-        }
-
-        /**
-         * @param address The URL of the Incus host. The default will be the path to the local unix socket, or leaving
-         *            it as an empty string will use the default socket path.
-         * @return builder
-         */
-        public Builder address(@Nullable Output<String> address) {
-            $.address = address;
-            return this;
-        }
-
-        /**
-         * @param address The URL of the Incus host. The default will be the path to the local unix socket, or leaving
-         *            it as an empty string will use the default socket path.
-         * @return builder
-         */
-        public Builder address(String address) {
-            return address(Output.of(address));
-        }
-
-        /**
-         * @param authenticationType Server authentication type, tls or oidc. ( Only for the &lt;span
-         *            pulumi-lang-nodejs=&#34;`incus`&#34; pulumi-lang-dotnet=&#34;`Incus`&#34;
-         *            pulumi-lang-go=&#34;`incus`&#34; pulumi-lang-python=&#34;`incus`&#34;
-         *            pulumi-lang-yaml=&#34;`incus`&#34; pulumi-lang-java=&#34;`incus`&#34;&gt;`incus`&lt;/span&gt;
-         *            protocol )
-         * @return builder
-         */
-        public Builder authenticationType(@Nullable Output<String> authenticationType) {
-            $.authenticationType = authenticationType;
-            return this;
-        }
-
-        /**
-         * @param authenticationType Server authentication type, tls or oidc. ( Only for the &lt;span
-         *            pulumi-lang-nodejs=&#34;`incus`&#34; pulumi-lang-dotnet=&#34;`Incus`&#34;
-         *            pulumi-lang-go=&#34;`incus`&#34; pulumi-lang-python=&#34;`incus`&#34;
-         *            pulumi-lang-yaml=&#34;`incus`&#34; pulumi-lang-java=&#34;`incus`&#34;&gt;`incus`&lt;/span&gt;
-         *            protocol )
-         * @return builder
-         */
-        public Builder authenticationType(String authenticationType) {
-            return authenticationType(Output.of(authenticationType));
-        }
-
-        /**
-         * @param name Name of the Incus remote.
-         * @return builder
-         */
-        public Builder name(Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        /**
-         * @param name Name of the Incus remote.
-         * @return builder
-         */
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        /**
-         * @param protocol Server protocol ( incus, oci or simplestreams )
-         * @return builder
-         */
-        public Builder protocol(@Nullable Output<String> protocol) {
-            $.protocol = protocol;
-            return this;
-        }
-
-        /**
-         * @param protocol Server protocol ( incus, oci or simplestreams )
-         * @return builder
-         */
-        public Builder protocol(String protocol) {
-            return protocol(Output.of(protocol));
-        }
-
-        /**
-         * @param public_ Public image server
-         * @return builder
-         */
-        public Builder public_(@Nullable Output<Boolean> public_) {
-            $.public_ = public_;
-            return this;
-        }
-
-        /**
-         * @param public_ Public image server
-         * @return builder
-         */
-        public Builder public_(Boolean public_) {
-            return public_(Output.of(public_));
-        }
-
-        /**
-         * @param token The trust token used for initial authentication with the Incus remote.
-         * @return builder
-         */
-        public Builder token(@Nullable Output<String> token) {
-            $.token = token;
-            return this;
-        }
-
-        /**
-         * @param token The trust token used for initial authentication with the Incus remote.
-         * @return builder
-         */
-        public Builder token(String token) {
-            return token(Output.of(token));
-        }
-
-        public ProviderRemoteArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("ProviderRemoteArgs", "name");
-            }
-            return $;
-        }
+    /**
+     * @param public_ Public image server
+     * @return builder
+     */
+    public Builder public_(Boolean public_) {
+      return public_(Output.of(public_));
     }
 
+    /**
+     * @param token The trust token used for initial authentication with the Incus remote.
+     * @return builder
+     */
+    public Builder token(@Nullable Output<String> token) {
+      $.token = token;
+      return this;
+    }
+
+    /**
+     * @param token The trust token used for initial authentication with the Incus remote.
+     * @return builder
+     */
+    public Builder token(String token) {
+      return token(Output.of(token));
+    }
+
+    public ProviderRemoteArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("ProviderRemoteArgs", "name");
+      }
+      return $;
+    }
+  }
 }

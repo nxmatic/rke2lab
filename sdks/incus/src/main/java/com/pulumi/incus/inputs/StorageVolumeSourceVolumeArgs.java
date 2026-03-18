@@ -6,100 +6,97 @@ package com.pulumi.incus.inputs;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class StorageVolumeSourceVolumeArgs extends com.pulumi.resources.ResourceArgs {
 
-    public static final StorageVolumeSourceVolumeArgs Empty = new StorageVolumeSourceVolumeArgs();
+  public static final StorageVolumeSourceVolumeArgs Empty = new StorageVolumeSourceVolumeArgs();
 
-    @Import(name = "name", required = true)
-    private Output<String> name;
+  @Import(name = "name", required = true)
+  private Output<String> name;
 
-    public Output<String> name() {
-        return this.name;
+  public Output<String> name() {
+    return this.name;
+  }
+
+  @Import(name = "pool", required = true)
+  private Output<String> pool;
+
+  public Output<String> pool() {
+    return this.pool;
+  }
+
+  @Import(name = "remote")
+  private @Nullable Output<String> remote;
+
+  public Optional<Output<String>> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  private StorageVolumeSourceVolumeArgs() {}
+
+  private StorageVolumeSourceVolumeArgs(StorageVolumeSourceVolumeArgs $) {
+    this.name = $.name;
+    this.pool = $.pool;
+    this.remote = $.remote;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(StorageVolumeSourceVolumeArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private StorageVolumeSourceVolumeArgs $;
+
+    public Builder() {
+      $ = new StorageVolumeSourceVolumeArgs();
     }
 
-    @Import(name = "pool", required = true)
-    private Output<String> pool;
-
-    public Output<String> pool() {
-        return this.pool;
+    public Builder(StorageVolumeSourceVolumeArgs defaults) {
+      $ = new StorageVolumeSourceVolumeArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "remote")
-    private @Nullable Output<String> remote;
-
-    public Optional<Output<String>> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder name(Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    private StorageVolumeSourceVolumeArgs() {
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
-    private StorageVolumeSourceVolumeArgs(StorageVolumeSourceVolumeArgs $) {
-        this.name = $.name;
-        this.pool = $.pool;
-        this.remote = $.remote;
+    public Builder pool(Output<String> pool) {
+      $.pool = pool;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder pool(String pool) {
+      return pool(Output.of(pool));
     }
 
-    public static Builder builder(StorageVolumeSourceVolumeArgs defaults) {
-        return new Builder(defaults);
+    public Builder remote(@Nullable Output<String> remote) {
+      $.remote = remote;
+      return this;
     }
 
-    public static final class Builder {
-        private StorageVolumeSourceVolumeArgs $;
-
-        public Builder() {
-            $ = new StorageVolumeSourceVolumeArgs();
-        }
-
-        public Builder(StorageVolumeSourceVolumeArgs defaults) {
-            $ = new StorageVolumeSourceVolumeArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder name(Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        public Builder pool(Output<String> pool) {
-            $.pool = pool;
-            return this;
-        }
-
-        public Builder pool(String pool) {
-            return pool(Output.of(pool));
-        }
-
-        public Builder remote(@Nullable Output<String> remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder remote(String remote) {
-            return remote(Output.of(remote));
-        }
-
-        public StorageVolumeSourceVolumeArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("StorageVolumeSourceVolumeArgs", "name");
-            }
-            if ($.pool == null) {
-                throw new MissingRequiredPropertyException("StorageVolumeSourceVolumeArgs", "pool");
-            }
-            return $;
-        }
+    public Builder remote(String remote) {
+      return remote(Output.of(remote));
     }
 
+    public StorageVolumeSourceVolumeArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("StorageVolumeSourceVolumeArgs", "name");
+      }
+      if ($.pool == null) {
+        throw new MissingRequiredPropertyException("StorageVolumeSourceVolumeArgs", "pool");
+      }
+      return $;
+    }
+  }
 }

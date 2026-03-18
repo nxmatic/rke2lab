@@ -5,124 +5,121 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class GetStoragePoolPlainArgs extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetStoragePoolPlainArgs Empty = new GetStoragePoolPlainArgs();
+  public static final GetStoragePoolPlainArgs Empty = new GetStoragePoolPlainArgs();
 
-    @Import(name = "description")
-    private @Nullable String description;
+  @Import(name = "description")
+  private @Nullable String description;
 
-    public Optional<String> description() {
-        return Optional.ofNullable(this.description);
+  public Optional<String> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "driver")
+  private @Nullable String driver;
+
+  public Optional<String> driver() {
+    return Optional.ofNullable(this.driver);
+  }
+
+  @Import(name = "name", required = true)
+  private String name;
+
+  public String name() {
+    return this.name;
+  }
+
+  @Import(name = "remote")
+  private @Nullable String remote;
+
+  public Optional<String> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  @Import(name = "status")
+  private @Nullable String status;
+
+  public Optional<String> status() {
+    return Optional.ofNullable(this.status);
+  }
+
+  @Import(name = "target")
+  private @Nullable String target;
+
+  public Optional<String> target() {
+    return Optional.ofNullable(this.target);
+  }
+
+  private GetStoragePoolPlainArgs() {}
+
+  private GetStoragePoolPlainArgs(GetStoragePoolPlainArgs $) {
+    this.description = $.description;
+    this.driver = $.driver;
+    this.name = $.name;
+    this.remote = $.remote;
+    this.status = $.status;
+    this.target = $.target;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetStoragePoolPlainArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetStoragePoolPlainArgs $;
+
+    public Builder() {
+      $ = new GetStoragePoolPlainArgs();
     }
 
-    @Import(name = "driver")
-    private @Nullable String driver;
-
-    public Optional<String> driver() {
-        return Optional.ofNullable(this.driver);
+    public Builder(GetStoragePoolPlainArgs defaults) {
+      $ = new GetStoragePoolPlainArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "name", required = true)
-    private String name;
-
-    public String name() {
-        return this.name;
+    public Builder description(@Nullable String description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name = "remote")
-    private @Nullable String remote;
-
-    public Optional<String> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder driver(@Nullable String driver) {
+      $.driver = driver;
+      return this;
     }
 
-    @Import(name = "status")
-    private @Nullable String status;
-
-    public Optional<String> status() {
-        return Optional.ofNullable(this.status);
+    public Builder name(String name) {
+      $.name = name;
+      return this;
     }
 
-    @Import(name = "target")
-    private @Nullable String target;
-
-    public Optional<String> target() {
-        return Optional.ofNullable(this.target);
+    public Builder remote(@Nullable String remote) {
+      $.remote = remote;
+      return this;
     }
 
-    private GetStoragePoolPlainArgs() {
+    public Builder status(@Nullable String status) {
+      $.status = status;
+      return this;
     }
 
-    private GetStoragePoolPlainArgs(GetStoragePoolPlainArgs $) {
-        this.description = $.description;
-        this.driver = $.driver;
-        this.name = $.name;
-        this.remote = $.remote;
-        this.status = $.status;
-        this.target = $.target;
+    public Builder target(@Nullable String target) {
+      $.target = target;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public GetStoragePoolPlainArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("GetStoragePoolPlainArgs", "name");
+      }
+      return $;
     }
-
-    public static Builder builder(GetStoragePoolPlainArgs defaults) {
-        return new Builder(defaults);
-    }
-
-    public static final class Builder {
-        private GetStoragePoolPlainArgs $;
-
-        public Builder() {
-            $ = new GetStoragePoolPlainArgs();
-        }
-
-        public Builder(GetStoragePoolPlainArgs defaults) {
-            $ = new GetStoragePoolPlainArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder description(@Nullable String description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder driver(@Nullable String driver) {
-            $.driver = driver;
-            return this;
-        }
-
-        public Builder name(String name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder remote(@Nullable String remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder status(@Nullable String status) {
-            $.status = status;
-            return this;
-        }
-
-        public Builder target(@Nullable String target) {
-            $.target = target;
-            return this;
-        }
-
-        public GetStoragePoolPlainArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("GetStoragePoolPlainArgs", "name");
-            }
-            return $;
-        }
-    }
-
+  }
 }

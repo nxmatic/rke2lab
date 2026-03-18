@@ -5,8 +5,6 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
-import com.pulumi.incus.inputs.NetworkZoneRecordEntryArgs;
-import java.lang.String;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -15,177 +13,173 @@ import javax.annotation.Nullable;
 
 public final class NetworkZoneRecordState extends com.pulumi.resources.ResourceArgs {
 
-    public static final NetworkZoneRecordState Empty = new NetworkZoneRecordState();
+  public static final NetworkZoneRecordState Empty = new NetworkZoneRecordState();
 
-    @Import(name = "config")
-    private @Nullable Output<Map<String, String>> config;
+  @Import(name = "config")
+  private @Nullable Output<Map<String, String>> config;
 
-    public Optional<Output<Map<String, String>>> config() {
-        return Optional.ofNullable(this.config);
+  public Optional<Output<Map<String, String>>> config() {
+    return Optional.ofNullable(this.config);
+  }
+
+  @Import(name = "description")
+  private @Nullable Output<String> description;
+
+  public Optional<Output<String>> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  /** Network zone record entry */
+  @Import(name = "entries")
+  private @Nullable Output<List<NetworkZoneRecordEntryArgs>> entries;
+
+  /**
+   * @return Network zone record entry
+   */
+  public Optional<Output<List<NetworkZoneRecordEntryArgs>>> entries() {
+    return Optional.ofNullable(this.entries);
+  }
+
+  @Import(name = "name")
+  private @Nullable Output<String> name;
+
+  public Optional<Output<String>> name() {
+    return Optional.ofNullable(this.name);
+  }
+
+  @Import(name = "project")
+  private @Nullable Output<String> project;
+
+  public Optional<Output<String>> project() {
+    return Optional.ofNullable(this.project);
+  }
+
+  @Import(name = "remote")
+  private @Nullable Output<String> remote;
+
+  public Optional<Output<String>> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  @Import(name = "zone")
+  private @Nullable Output<String> zone;
+
+  public Optional<Output<String>> zone() {
+    return Optional.ofNullable(this.zone);
+  }
+
+  private NetworkZoneRecordState() {}
+
+  private NetworkZoneRecordState(NetworkZoneRecordState $) {
+    this.config = $.config;
+    this.description = $.description;
+    this.entries = $.entries;
+    this.name = $.name;
+    this.project = $.project;
+    this.remote = $.remote;
+    this.zone = $.zone;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(NetworkZoneRecordState defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private NetworkZoneRecordState $;
+
+    public Builder() {
+      $ = new NetworkZoneRecordState();
     }
 
-    @Import(name = "description")
-    private @Nullable Output<String> description;
+    public Builder(NetworkZoneRecordState defaults) {
+      $ = new NetworkZoneRecordState(Objects.requireNonNull(defaults));
+    }
 
-    public Optional<Output<String>> description() {
-        return Optional.ofNullable(this.description);
+    public Builder config(@Nullable Output<Map<String, String>> config) {
+      $.config = config;
+      return this;
+    }
+
+    public Builder config(Map<String, String> config) {
+      return config(Output.of(config));
+    }
+
+    public Builder description(@Nullable Output<String> description) {
+      $.description = description;
+      return this;
+    }
+
+    public Builder description(String description) {
+      return description(Output.of(description));
     }
 
     /**
-     * Network zone record entry
+     * @param entries Network zone record entry
+     * @return builder
      */
-    @Import(name = "entries")
-    private @Nullable Output<List<NetworkZoneRecordEntryArgs>> entries;
+    public Builder entries(@Nullable Output<List<NetworkZoneRecordEntryArgs>> entries) {
+      $.entries = entries;
+      return this;
+    }
 
     /**
-     * @return Network zone record entry
+     * @param entries Network zone record entry
+     * @return builder
      */
-    public Optional<Output<List<NetworkZoneRecordEntryArgs>>> entries() {
-        return Optional.ofNullable(this.entries);
+    public Builder entries(List<NetworkZoneRecordEntryArgs> entries) {
+      return entries(Output.of(entries));
     }
 
-    @Import(name = "name")
-    private @Nullable Output<String> name;
-
-    public Optional<Output<String>> name() {
-        return Optional.ofNullable(this.name);
+    /**
+     * @param entries Network zone record entry
+     * @return builder
+     */
+    public Builder entries(NetworkZoneRecordEntryArgs... entries) {
+      return entries(List.of(entries));
     }
 
-    @Import(name = "project")
-    private @Nullable Output<String> project;
-
-    public Optional<Output<String>> project() {
-        return Optional.ofNullable(this.project);
+    public Builder name(@Nullable Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    @Import(name = "remote")
-    private @Nullable Output<String> remote;
-
-    public Optional<Output<String>> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
-    @Import(name = "zone")
-    private @Nullable Output<String> zone;
-
-    public Optional<Output<String>> zone() {
-        return Optional.ofNullable(this.zone);
+    public Builder project(@Nullable Output<String> project) {
+      $.project = project;
+      return this;
     }
 
-    private NetworkZoneRecordState() {
+    public Builder project(String project) {
+      return project(Output.of(project));
     }
 
-    private NetworkZoneRecordState(NetworkZoneRecordState $) {
-        this.config = $.config;
-        this.description = $.description;
-        this.entries = $.entries;
-        this.name = $.name;
-        this.project = $.project;
-        this.remote = $.remote;
-        this.zone = $.zone;
+    public Builder remote(@Nullable Output<String> remote) {
+      $.remote = remote;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder remote(String remote) {
+      return remote(Output.of(remote));
     }
 
-    public static Builder builder(NetworkZoneRecordState defaults) {
-        return new Builder(defaults);
+    public Builder zone(@Nullable Output<String> zone) {
+      $.zone = zone;
+      return this;
     }
 
-    public static final class Builder {
-        private NetworkZoneRecordState $;
-
-        public Builder() {
-            $ = new NetworkZoneRecordState();
-        }
-
-        public Builder(NetworkZoneRecordState defaults) {
-            $ = new NetworkZoneRecordState(Objects.requireNonNull(defaults));
-        }
-
-        public Builder config(@Nullable Output<Map<String, String>> config) {
-            $.config = config;
-            return this;
-        }
-
-        public Builder config(Map<String, String> config) {
-            return config(Output.of(config));
-        }
-
-        public Builder description(@Nullable Output<String> description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder description(String description) {
-            return description(Output.of(description));
-        }
-
-        /**
-         * @param entries Network zone record entry
-         * @return builder
-         */
-        public Builder entries(@Nullable Output<List<NetworkZoneRecordEntryArgs>> entries) {
-            $.entries = entries;
-            return this;
-        }
-
-        /**
-         * @param entries Network zone record entry
-         * @return builder
-         */
-        public Builder entries(List<NetworkZoneRecordEntryArgs> entries) {
-            return entries(Output.of(entries));
-        }
-
-        /**
-         * @param entries Network zone record entry
-         * @return builder
-         */
-        public Builder entries(NetworkZoneRecordEntryArgs... entries) {
-            return entries(List.of(entries));
-        }
-
-        public Builder name(@Nullable Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        public Builder project(@Nullable Output<String> project) {
-            $.project = project;
-            return this;
-        }
-
-        public Builder project(String project) {
-            return project(Output.of(project));
-        }
-
-        public Builder remote(@Nullable Output<String> remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder remote(String remote) {
-            return remote(Output.of(remote));
-        }
-
-        public Builder zone(@Nullable Output<String> zone) {
-            $.zone = zone;
-            return this;
-        }
-
-        public Builder zone(String zone) {
-            return zone(Output.of(zone));
-        }
-
-        public NetworkZoneRecordState build() {
-            return $;
-        }
+    public Builder zone(String zone) {
+      return zone(Output.of(zone));
     }
 
+    public NetworkZoneRecordState build() {
+      return $;
+    }
+  }
 }

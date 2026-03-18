@@ -6,144 +6,135 @@ package com.pulumi.incus.inputs;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Map;
 import java.util.Objects;
 
 public final class InstanceDeviceArgs extends com.pulumi.resources.ResourceArgs {
 
-    public static final InstanceDeviceArgs Empty = new InstanceDeviceArgs();
+  public static final InstanceDeviceArgs Empty = new InstanceDeviceArgs();
 
-    /**
-     * Device name
-     */
-    @Import(name = "name", required = true)
-    private Output<String> name;
+  /** Device name */
+  @Import(name = "name", required = true)
+  private Output<String> name;
 
-    /**
-     * @return Device name
-     */
-    public Output<String> name() {
-        return this.name;
+  /**
+   * @return Device name
+   */
+  public Output<String> name() {
+    return this.name;
+  }
+
+  /** Device properties */
+  @Import(name = "properties", required = true)
+  private Output<Map<String, String>> properties;
+
+  /**
+   * @return Device properties
+   */
+  public Output<Map<String, String>> properties() {
+    return this.properties;
+  }
+
+  /** Device type */
+  @Import(name = "type", required = true)
+  private Output<String> type;
+
+  /**
+   * @return Device type
+   */
+  public Output<String> type() {
+    return this.type;
+  }
+
+  private InstanceDeviceArgs() {}
+
+  private InstanceDeviceArgs(InstanceDeviceArgs $) {
+    this.name = $.name;
+    this.properties = $.properties;
+    this.type = $.type;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(InstanceDeviceArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private InstanceDeviceArgs $;
+
+    public Builder() {
+      $ = new InstanceDeviceArgs();
+    }
+
+    public Builder(InstanceDeviceArgs defaults) {
+      $ = new InstanceDeviceArgs(Objects.requireNonNull(defaults));
     }
 
     /**
-     * Device properties
+     * @param name Device name
+     * @return builder
      */
-    @Import(name = "properties", required = true)
-    private Output<Map<String, String>> properties;
-
-    /**
-     * @return Device properties
-     */
-    public Output<Map<String, String>> properties() {
-        return this.properties;
+    public Builder name(Output<String> name) {
+      $.name = name;
+      return this;
     }
 
     /**
-     * Device type
+     * @param name Device name
+     * @return builder
      */
-    @Import(name = "type", required = true)
-    private Output<String> type;
+    public Builder name(String name) {
+      return name(Output.of(name));
+    }
 
     /**
-     * @return Device type
+     * @param properties Device properties
+     * @return builder
      */
-    public Output<String> type() {
-        return this.type;
+    public Builder properties(Output<Map<String, String>> properties) {
+      $.properties = properties;
+      return this;
     }
 
-    private InstanceDeviceArgs() {
+    /**
+     * @param properties Device properties
+     * @return builder
+     */
+    public Builder properties(Map<String, String> properties) {
+      return properties(Output.of(properties));
     }
 
-    private InstanceDeviceArgs(InstanceDeviceArgs $) {
-        this.name = $.name;
-        this.properties = $.properties;
-        this.type = $.type;
+    /**
+     * @param type Device type
+     * @return builder
+     */
+    public Builder type(Output<String> type) {
+      $.type = type;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    /**
+     * @param type Device type
+     * @return builder
+     */
+    public Builder type(String type) {
+      return type(Output.of(type));
     }
 
-    public static Builder builder(InstanceDeviceArgs defaults) {
-        return new Builder(defaults);
+    public InstanceDeviceArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("InstanceDeviceArgs", "name");
+      }
+      if ($.properties == null) {
+        throw new MissingRequiredPropertyException("InstanceDeviceArgs", "properties");
+      }
+      if ($.type == null) {
+        throw new MissingRequiredPropertyException("InstanceDeviceArgs", "type");
+      }
+      return $;
     }
-
-    public static final class Builder {
-        private InstanceDeviceArgs $;
-
-        public Builder() {
-            $ = new InstanceDeviceArgs();
-        }
-
-        public Builder(InstanceDeviceArgs defaults) {
-            $ = new InstanceDeviceArgs(Objects.requireNonNull(defaults));
-        }
-
-        /**
-         * @param name Device name
-         * @return builder
-         */
-        public Builder name(Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        /**
-         * @param name Device name
-         * @return builder
-         */
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        /**
-         * @param properties Device properties
-         * @return builder
-         */
-        public Builder properties(Output<Map<String, String>> properties) {
-            $.properties = properties;
-            return this;
-        }
-
-        /**
-         * @param properties Device properties
-         * @return builder
-         */
-        public Builder properties(Map<String, String> properties) {
-            return properties(Output.of(properties));
-        }
-
-        /**
-         * @param type Device type
-         * @return builder
-         */
-        public Builder type(Output<String> type) {
-            $.type = type;
-            return this;
-        }
-
-        /**
-         * @param type Device type
-         * @return builder
-         */
-        public Builder type(String type) {
-            return type(Output.of(type));
-        }
-
-        public InstanceDeviceArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("InstanceDeviceArgs", "name");
-            }
-            if ($.properties == null) {
-                throw new MissingRequiredPropertyException("InstanceDeviceArgs", "properties");
-            }
-            if ($.type == null) {
-                throw new MissingRequiredPropertyException("InstanceDeviceArgs", "type");
-            }
-            return $;
-        }
-    }
-
+  }
 }

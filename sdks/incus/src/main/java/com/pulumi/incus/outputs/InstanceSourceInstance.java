@@ -5,76 +5,84 @@ package com.pulumi.incus.outputs;
 
 import com.pulumi.core.annotations.CustomType;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 @CustomType
 public final class InstanceSourceInstance {
+  private String name;
+  private String project;
+  private @Nullable String snapshot;
+
+  private InstanceSourceInstance() {}
+
+  public String name() {
+    return this.name;
+  }
+
+  public String project() {
+    return this.project;
+  }
+
+  public Optional<String> snapshot() {
+    return Optional.ofNullable(this.snapshot);
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(InstanceSourceInstance defaults) {
+    return new Builder(defaults);
+  }
+
+  @CustomType.Builder
+  public static final class Builder {
     private String name;
     private String project;
     private @Nullable String snapshot;
 
-    private InstanceSourceInstance() {}
-    public String name() {
-        return this.name;
-    }
-    public String project() {
-        return this.project;
-    }
-    public Optional<String> snapshot() {
-        return Optional.ofNullable(this.snapshot);
+    public Builder() {}
+
+    public Builder(InstanceSourceInstance defaults) {
+      Objects.requireNonNull(defaults);
+      this.name = defaults.name;
+      this.project = defaults.project;
+      this.snapshot = defaults.snapshot;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    @CustomType.Setter
+    public Builder name(String name) {
+      if (name == null) {
+        throw new MissingRequiredPropertyException("InstanceSourceInstance", "name");
+      }
+      this.name = name;
+      return this;
     }
 
-    public static Builder builder(InstanceSourceInstance defaults) {
-        return new Builder(defaults);
+    @CustomType.Setter
+    public Builder project(String project) {
+      if (project == null) {
+        throw new MissingRequiredPropertyException("InstanceSourceInstance", "project");
+      }
+      this.project = project;
+      return this;
     }
-    @CustomType.Builder
-    public static final class Builder {
-        private String name;
-        private String project;
-        private @Nullable String snapshot;
-        public Builder() {}
-        public Builder(InstanceSourceInstance defaults) {
-    	      Objects.requireNonNull(defaults);
-    	      this.name = defaults.name;
-    	      this.project = defaults.project;
-    	      this.snapshot = defaults.snapshot;
-        }
 
-        @CustomType.Setter
-        public Builder name(String name) {
-            if (name == null) {
-              throw new MissingRequiredPropertyException("InstanceSourceInstance", "name");
-            }
-            this.name = name;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder project(String project) {
-            if (project == null) {
-              throw new MissingRequiredPropertyException("InstanceSourceInstance", "project");
-            }
-            this.project = project;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder snapshot(@Nullable String snapshot) {
+    @CustomType.Setter
+    public Builder snapshot(@Nullable String snapshot) {
 
-            this.snapshot = snapshot;
-            return this;
-        }
-        public InstanceSourceInstance build() {
-            final var _resultValue = new InstanceSourceInstance();
-            _resultValue.name = name;
-            _resultValue.project = project;
-            _resultValue.snapshot = snapshot;
-            return _resultValue;
-        }
+      this.snapshot = snapshot;
+      return this;
     }
+
+    public InstanceSourceInstance build() {
+      final var _resultValue = new InstanceSourceInstance();
+      _resultValue.name = name;
+      _resultValue.project = project;
+      _resultValue.snapshot = snapshot;
+      return _resultValue;
+    }
+  }
 }

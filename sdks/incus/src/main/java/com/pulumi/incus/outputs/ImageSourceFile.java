@@ -5,61 +5,67 @@ package com.pulumi.incus.outputs;
 
 import com.pulumi.core.annotations.CustomType;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 @CustomType
 public final class ImageSourceFile {
+  private String dataPath;
+  private @Nullable String metadataPath;
+
+  private ImageSourceFile() {}
+
+  public String dataPath() {
+    return this.dataPath;
+  }
+
+  public Optional<String> metadataPath() {
+    return Optional.ofNullable(this.metadataPath);
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(ImageSourceFile defaults) {
+    return new Builder(defaults);
+  }
+
+  @CustomType.Builder
+  public static final class Builder {
     private String dataPath;
     private @Nullable String metadataPath;
 
-    private ImageSourceFile() {}
-    public String dataPath() {
-        return this.dataPath;
-    }
-    public Optional<String> metadataPath() {
-        return Optional.ofNullable(this.metadataPath);
+    public Builder() {}
+
+    public Builder(ImageSourceFile defaults) {
+      Objects.requireNonNull(defaults);
+      this.dataPath = defaults.dataPath;
+      this.metadataPath = defaults.metadataPath;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    @CustomType.Setter
+    public Builder dataPath(String dataPath) {
+      if (dataPath == null) {
+        throw new MissingRequiredPropertyException("ImageSourceFile", "dataPath");
+      }
+      this.dataPath = dataPath;
+      return this;
     }
 
-    public static Builder builder(ImageSourceFile defaults) {
-        return new Builder(defaults);
-    }
-    @CustomType.Builder
-    public static final class Builder {
-        private String dataPath;
-        private @Nullable String metadataPath;
-        public Builder() {}
-        public Builder(ImageSourceFile defaults) {
-    	      Objects.requireNonNull(defaults);
-    	      this.dataPath = defaults.dataPath;
-    	      this.metadataPath = defaults.metadataPath;
-        }
+    @CustomType.Setter
+    public Builder metadataPath(@Nullable String metadataPath) {
 
-        @CustomType.Setter
-        public Builder dataPath(String dataPath) {
-            if (dataPath == null) {
-              throw new MissingRequiredPropertyException("ImageSourceFile", "dataPath");
-            }
-            this.dataPath = dataPath;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder metadataPath(@Nullable String metadataPath) {
-
-            this.metadataPath = metadataPath;
-            return this;
-        }
-        public ImageSourceFile build() {
-            final var _resultValue = new ImageSourceFile();
-            _resultValue.dataPath = dataPath;
-            _resultValue.metadataPath = metadataPath;
-            return _resultValue;
-        }
+      this.metadataPath = metadataPath;
+      return this;
     }
+
+    public ImageSourceFile build() {
+      final var _resultValue = new ImageSourceFile();
+      _resultValue.dataPath = dataPath;
+      _resultValue.metadataPath = metadataPath;
+      return _resultValue;
+    }
+  }
 }

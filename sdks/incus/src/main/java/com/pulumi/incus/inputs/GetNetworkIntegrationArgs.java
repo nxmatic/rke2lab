@@ -6,114 +6,111 @@ package com.pulumi.incus.inputs;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class GetNetworkIntegrationArgs extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetNetworkIntegrationArgs Empty = new GetNetworkIntegrationArgs();
+  public static final GetNetworkIntegrationArgs Empty = new GetNetworkIntegrationArgs();
 
-    @Import(name = "description")
-    private @Nullable Output<String> description;
+  @Import(name = "description")
+  private @Nullable Output<String> description;
 
-    public Optional<Output<String>> description() {
-        return Optional.ofNullable(this.description);
+  public Optional<Output<String>> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "name", required = true)
+  private Output<String> name;
+
+  public Output<String> name() {
+    return this.name;
+  }
+
+  @Import(name = "remote")
+  private @Nullable Output<String> remote;
+
+  public Optional<Output<String>> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  @Import(name = "type")
+  private @Nullable Output<String> type;
+
+  public Optional<Output<String>> type() {
+    return Optional.ofNullable(this.type);
+  }
+
+  private GetNetworkIntegrationArgs() {}
+
+  private GetNetworkIntegrationArgs(GetNetworkIntegrationArgs $) {
+    this.description = $.description;
+    this.name = $.name;
+    this.remote = $.remote;
+    this.type = $.type;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetNetworkIntegrationArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetNetworkIntegrationArgs $;
+
+    public Builder() {
+      $ = new GetNetworkIntegrationArgs();
     }
 
-    @Import(name = "name", required = true)
-    private Output<String> name;
-
-    public Output<String> name() {
-        return this.name;
+    public Builder(GetNetworkIntegrationArgs defaults) {
+      $ = new GetNetworkIntegrationArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "remote")
-    private @Nullable Output<String> remote;
-
-    public Optional<Output<String>> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder description(@Nullable Output<String> description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name = "type")
-    private @Nullable Output<String> type;
-
-    public Optional<Output<String>> type() {
-        return Optional.ofNullable(this.type);
+    public Builder description(String description) {
+      return description(Output.of(description));
     }
 
-    private GetNetworkIntegrationArgs() {
+    public Builder name(Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    private GetNetworkIntegrationArgs(GetNetworkIntegrationArgs $) {
-        this.description = $.description;
-        this.name = $.name;
-        this.remote = $.remote;
-        this.type = $.type;
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder remote(@Nullable Output<String> remote) {
+      $.remote = remote;
+      return this;
     }
 
-    public static Builder builder(GetNetworkIntegrationArgs defaults) {
-        return new Builder(defaults);
+    public Builder remote(String remote) {
+      return remote(Output.of(remote));
     }
 
-    public static final class Builder {
-        private GetNetworkIntegrationArgs $;
-
-        public Builder() {
-            $ = new GetNetworkIntegrationArgs();
-        }
-
-        public Builder(GetNetworkIntegrationArgs defaults) {
-            $ = new GetNetworkIntegrationArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder description(@Nullable Output<String> description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder description(String description) {
-            return description(Output.of(description));
-        }
-
-        public Builder name(Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        public Builder remote(@Nullable Output<String> remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder remote(String remote) {
-            return remote(Output.of(remote));
-        }
-
-        public Builder type(@Nullable Output<String> type) {
-            $.type = type;
-            return this;
-        }
-
-        public Builder type(String type) {
-            return type(Output.of(type));
-        }
-
-        public GetNetworkIntegrationArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("GetNetworkIntegrationArgs", "name");
-            }
-            return $;
-        }
+    public Builder type(@Nullable Output<String> type) {
+      $.type = type;
+      return this;
     }
 
+    public Builder type(String type) {
+      return type(Output.of(type));
+    }
+
+    public GetNetworkIntegrationArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("GetNetworkIntegrationArgs", "name");
+      }
+      return $;
+    }
+  }
 }

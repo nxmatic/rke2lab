@@ -5,169 +5,166 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class GetStorageVolumePlainArgs extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetStorageVolumePlainArgs Empty = new GetStorageVolumePlainArgs();
+  public static final GetStorageVolumePlainArgs Empty = new GetStorageVolumePlainArgs();
 
-    @Import(name = "contentType")
-    private @Nullable String contentType;
+  @Import(name = "contentType")
+  private @Nullable String contentType;
 
-    public Optional<String> contentType() {
-        return Optional.ofNullable(this.contentType);
+  public Optional<String> contentType() {
+    return Optional.ofNullable(this.contentType);
+  }
+
+  @Import(name = "description")
+  private @Nullable String description;
+
+  public Optional<String> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "location")
+  private @Nullable String location;
+
+  public Optional<String> location() {
+    return Optional.ofNullable(this.location);
+  }
+
+  @Import(name = "name", required = true)
+  private String name;
+
+  public String name() {
+    return this.name;
+  }
+
+  @Import(name = "project")
+  private @Nullable String project;
+
+  public Optional<String> project() {
+    return Optional.ofNullable(this.project);
+  }
+
+  @Import(name = "remote")
+  private @Nullable String remote;
+
+  public Optional<String> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  @Import(name = "storagePool", required = true)
+  private String storagePool;
+
+  public String storagePool() {
+    return this.storagePool;
+  }
+
+  @Import(name = "target")
+  private @Nullable String target;
+
+  public Optional<String> target() {
+    return Optional.ofNullable(this.target);
+  }
+
+  @Import(name = "type", required = true)
+  private String type;
+
+  public String type() {
+    return this.type;
+  }
+
+  private GetStorageVolumePlainArgs() {}
+
+  private GetStorageVolumePlainArgs(GetStorageVolumePlainArgs $) {
+    this.contentType = $.contentType;
+    this.description = $.description;
+    this.location = $.location;
+    this.name = $.name;
+    this.project = $.project;
+    this.remote = $.remote;
+    this.storagePool = $.storagePool;
+    this.target = $.target;
+    this.type = $.type;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetStorageVolumePlainArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetStorageVolumePlainArgs $;
+
+    public Builder() {
+      $ = new GetStorageVolumePlainArgs();
     }
 
-    @Import(name = "description")
-    private @Nullable String description;
-
-    public Optional<String> description() {
-        return Optional.ofNullable(this.description);
+    public Builder(GetStorageVolumePlainArgs defaults) {
+      $ = new GetStorageVolumePlainArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "location")
-    private @Nullable String location;
-
-    public Optional<String> location() {
-        return Optional.ofNullable(this.location);
+    public Builder contentType(@Nullable String contentType) {
+      $.contentType = contentType;
+      return this;
     }
 
-    @Import(name = "name", required = true)
-    private String name;
-
-    public String name() {
-        return this.name;
+    public Builder description(@Nullable String description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name = "project")
-    private @Nullable String project;
-
-    public Optional<String> project() {
-        return Optional.ofNullable(this.project);
+    public Builder location(@Nullable String location) {
+      $.location = location;
+      return this;
     }
 
-    @Import(name = "remote")
-    private @Nullable String remote;
-
-    public Optional<String> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder name(String name) {
+      $.name = name;
+      return this;
     }
 
-    @Import(name = "storagePool", required = true)
-    private String storagePool;
-
-    public String storagePool() {
-        return this.storagePool;
+    public Builder project(@Nullable String project) {
+      $.project = project;
+      return this;
     }
 
-    @Import(name = "target")
-    private @Nullable String target;
-
-    public Optional<String> target() {
-        return Optional.ofNullable(this.target);
+    public Builder remote(@Nullable String remote) {
+      $.remote = remote;
+      return this;
     }
 
-    @Import(name = "type", required = true)
-    private String type;
-
-    public String type() {
-        return this.type;
+    public Builder storagePool(String storagePool) {
+      $.storagePool = storagePool;
+      return this;
     }
 
-    private GetStorageVolumePlainArgs() {
+    public Builder target(@Nullable String target) {
+      $.target = target;
+      return this;
     }
 
-    private GetStorageVolumePlainArgs(GetStorageVolumePlainArgs $) {
-        this.contentType = $.contentType;
-        this.description = $.description;
-        this.location = $.location;
-        this.name = $.name;
-        this.project = $.project;
-        this.remote = $.remote;
-        this.storagePool = $.storagePool;
-        this.target = $.target;
-        this.type = $.type;
+    public Builder type(String type) {
+      $.type = type;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public GetStorageVolumePlainArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("GetStorageVolumePlainArgs", "name");
+      }
+      if ($.storagePool == null) {
+        throw new MissingRequiredPropertyException("GetStorageVolumePlainArgs", "storagePool");
+      }
+      if ($.type == null) {
+        throw new MissingRequiredPropertyException("GetStorageVolumePlainArgs", "type");
+      }
+      return $;
     }
-
-    public static Builder builder(GetStorageVolumePlainArgs defaults) {
-        return new Builder(defaults);
-    }
-
-    public static final class Builder {
-        private GetStorageVolumePlainArgs $;
-
-        public Builder() {
-            $ = new GetStorageVolumePlainArgs();
-        }
-
-        public Builder(GetStorageVolumePlainArgs defaults) {
-            $ = new GetStorageVolumePlainArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder contentType(@Nullable String contentType) {
-            $.contentType = contentType;
-            return this;
-        }
-
-        public Builder description(@Nullable String description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder location(@Nullable String location) {
-            $.location = location;
-            return this;
-        }
-
-        public Builder name(String name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder project(@Nullable String project) {
-            $.project = project;
-            return this;
-        }
-
-        public Builder remote(@Nullable String remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder storagePool(String storagePool) {
-            $.storagePool = storagePool;
-            return this;
-        }
-
-        public Builder target(@Nullable String target) {
-            $.target = target;
-            return this;
-        }
-
-        public Builder type(String type) {
-            $.type = type;
-            return this;
-        }
-
-        public GetStorageVolumePlainArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("GetStorageVolumePlainArgs", "name");
-            }
-            if ($.storagePool == null) {
-                throw new MissingRequiredPropertyException("GetStorageVolumePlainArgs", "storagePool");
-            }
-            if ($.type == null) {
-                throw new MissingRequiredPropertyException("GetStorageVolumePlainArgs", "type");
-            }
-            return $;
-        }
-    }
-
+  }
 }

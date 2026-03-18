@@ -5,60 +5,57 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class GetClusterArgs extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetClusterArgs Empty = new GetClusterArgs();
+  public static final GetClusterArgs Empty = new GetClusterArgs();
 
-    @Import(name = "remote")
-    private @Nullable Output<String> remote;
+  @Import(name = "remote")
+  private @Nullable Output<String> remote;
 
-    public Optional<Output<String>> remote() {
-        return Optional.ofNullable(this.remote);
+  public Optional<Output<String>> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  private GetClusterArgs() {}
+
+  private GetClusterArgs(GetClusterArgs $) {
+    this.remote = $.remote;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetClusterArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetClusterArgs $;
+
+    public Builder() {
+      $ = new GetClusterArgs();
     }
 
-    private GetClusterArgs() {
+    public Builder(GetClusterArgs defaults) {
+      $ = new GetClusterArgs(Objects.requireNonNull(defaults));
     }
 
-    private GetClusterArgs(GetClusterArgs $) {
-        this.remote = $.remote;
+    public Builder remote(@Nullable Output<String> remote) {
+      $.remote = remote;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder remote(String remote) {
+      return remote(Output.of(remote));
     }
 
-    public static Builder builder(GetClusterArgs defaults) {
-        return new Builder(defaults);
+    public GetClusterArgs build() {
+      return $;
     }
-
-    public static final class Builder {
-        private GetClusterArgs $;
-
-        public Builder() {
-            $ = new GetClusterArgs();
-        }
-
-        public Builder(GetClusterArgs defaults) {
-            $ = new GetClusterArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder remote(@Nullable Output<String> remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder remote(String remote) {
-            return remote(Output.of(remote));
-        }
-
-        public GetClusterArgs build() {
-            return $;
-        }
-    }
-
+  }
 }

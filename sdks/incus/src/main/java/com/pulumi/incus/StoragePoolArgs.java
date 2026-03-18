@@ -6,165 +6,163 @@ package com.pulumi.incus;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class StoragePoolArgs extends com.pulumi.resources.ResourceArgs {
 
-    public static final StoragePoolArgs Empty = new StoragePoolArgs();
+  public static final StoragePoolArgs Empty = new StoragePoolArgs();
 
-    @Import(name="config")
-    private @Nullable Output<Map<String,String>> config;
+  @Import(name = "config")
+  private @Nullable Output<Map<String, String>> config;
 
-    public Optional<Output<Map<String,String>>> config() {
-        return Optional.ofNullable(this.config);
+  public Optional<Output<Map<String, String>>> config() {
+    return Optional.ofNullable(this.config);
+  }
+
+  @Import(name = "description")
+  private @Nullable Output<String> description;
+
+  public Optional<Output<String>> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "driver", required = true)
+  private Output<String> driver;
+
+  public Output<String> driver() {
+    return this.driver;
+  }
+
+  @Import(name = "name")
+  private @Nullable Output<String> name;
+
+  public Optional<Output<String>> name() {
+    return Optional.ofNullable(this.name);
+  }
+
+  @Import(name = "project")
+  private @Nullable Output<String> project;
+
+  public Optional<Output<String>> project() {
+    return Optional.ofNullable(this.project);
+  }
+
+  @Import(name = "remote")
+  private @Nullable Output<String> remote;
+
+  public Optional<Output<String>> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  @Import(name = "target")
+  private @Nullable Output<String> target;
+
+  public Optional<Output<String>> target() {
+    return Optional.ofNullable(this.target);
+  }
+
+  private StoragePoolArgs() {}
+
+  private StoragePoolArgs(StoragePoolArgs $) {
+    this.config = $.config;
+    this.description = $.description;
+    this.driver = $.driver;
+    this.name = $.name;
+    this.project = $.project;
+    this.remote = $.remote;
+    this.target = $.target;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(StoragePoolArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private StoragePoolArgs $;
+
+    public Builder() {
+      $ = new StoragePoolArgs();
     }
 
-    @Import(name="description")
-    private @Nullable Output<String> description;
-
-    public Optional<Output<String>> description() {
-        return Optional.ofNullable(this.description);
+    public Builder(StoragePoolArgs defaults) {
+      $ = new StoragePoolArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name="driver", required=true)
-    private Output<String> driver;
-
-    public Output<String> driver() {
-        return this.driver;
+    public Builder config(@Nullable Output<Map<String, String>> config) {
+      $.config = config;
+      return this;
     }
 
-    @Import(name="name")
-    private @Nullable Output<String> name;
-
-    public Optional<Output<String>> name() {
-        return Optional.ofNullable(this.name);
+    public Builder config(Map<String, String> config) {
+      return config(Output.of(config));
     }
 
-    @Import(name="project")
-    private @Nullable Output<String> project;
-
-    public Optional<Output<String>> project() {
-        return Optional.ofNullable(this.project);
+    public Builder description(@Nullable Output<String> description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name="remote")
-    private @Nullable Output<String> remote;
-
-    public Optional<Output<String>> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder description(String description) {
+      return description(Output.of(description));
     }
 
-    @Import(name="target")
-    private @Nullable Output<String> target;
-
-    public Optional<Output<String>> target() {
-        return Optional.ofNullable(this.target);
+    public Builder driver(Output<String> driver) {
+      $.driver = driver;
+      return this;
     }
 
-    private StoragePoolArgs() {}
-
-    private StoragePoolArgs(StoragePoolArgs $) {
-        this.config = $.config;
-        this.description = $.description;
-        this.driver = $.driver;
-        this.name = $.name;
-        this.project = $.project;
-        this.remote = $.remote;
-        this.target = $.target;
+    public Builder driver(String driver) {
+      return driver(Output.of(driver));
     }
 
-    public static Builder builder() {
-        return new Builder();
-    }
-    public static Builder builder(StoragePoolArgs defaults) {
-        return new Builder(defaults);
+    public Builder name(@Nullable Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    public static final class Builder {
-        private StoragePoolArgs $;
-
-        public Builder() {
-            $ = new StoragePoolArgs();
-        }
-
-        public Builder(StoragePoolArgs defaults) {
-            $ = new StoragePoolArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder config(@Nullable Output<Map<String,String>> config) {
-            $.config = config;
-            return this;
-        }
-
-        public Builder config(Map<String,String> config) {
-            return config(Output.of(config));
-        }
-
-        public Builder description(@Nullable Output<String> description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder description(String description) {
-            return description(Output.of(description));
-        }
-
-        public Builder driver(Output<String> driver) {
-            $.driver = driver;
-            return this;
-        }
-
-        public Builder driver(String driver) {
-            return driver(Output.of(driver));
-        }
-
-        public Builder name(@Nullable Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        public Builder project(@Nullable Output<String> project) {
-            $.project = project;
-            return this;
-        }
-
-        public Builder project(String project) {
-            return project(Output.of(project));
-        }
-
-        public Builder remote(@Nullable Output<String> remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder remote(String remote) {
-            return remote(Output.of(remote));
-        }
-
-        public Builder target(@Nullable Output<String> target) {
-            $.target = target;
-            return this;
-        }
-
-        public Builder target(String target) {
-            return target(Output.of(target));
-        }
-
-        public StoragePoolArgs build() {
-            if ($.driver == null) {
-                throw new MissingRequiredPropertyException("StoragePoolArgs", "driver");
-            }
-            return $;
-        }
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
+    public Builder project(@Nullable Output<String> project) {
+      $.project = project;
+      return this;
+    }
+
+    public Builder project(String project) {
+      return project(Output.of(project));
+    }
+
+    public Builder remote(@Nullable Output<String> remote) {
+      $.remote = remote;
+      return this;
+    }
+
+    public Builder remote(String remote) {
+      return remote(Output.of(remote));
+    }
+
+    public Builder target(@Nullable Output<String> target) {
+      $.target = target;
+      return this;
+    }
+
+    public Builder target(String target) {
+      return target(Output.of(target));
+    }
+
+    public StoragePoolArgs build() {
+      if ($.driver == null) {
+        throw new MissingRequiredPropertyException("StoragePoolArgs", "driver");
+      }
+      return $;
+    }
+  }
 }

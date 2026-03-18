@@ -6,170 +6,167 @@ package com.pulumi.incus;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.Boolean;
-import java.lang.String;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class CertificateArgs extends com.pulumi.resources.ResourceArgs {
 
-    public static final CertificateArgs Empty = new CertificateArgs();
+  public static final CertificateArgs Empty = new CertificateArgs();
 
-    @Import(name="certificate", required=true)
-    private Output<String> certificate;
+  @Import(name = "certificate", required = true)
+  private Output<String> certificate;
 
-    public Output<String> certificate() {
-        return this.certificate;
+  public Output<String> certificate() {
+    return this.certificate;
+  }
+
+  @Import(name = "description")
+  private @Nullable Output<String> description;
+
+  public Optional<Output<String>> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "name")
+  private @Nullable Output<String> name;
+
+  public Optional<Output<String>> name() {
+    return Optional.ofNullable(this.name);
+  }
+
+  @Import(name = "projects")
+  private @Nullable Output<List<String>> projects;
+
+  public Optional<Output<List<String>>> projects() {
+    return Optional.ofNullable(this.projects);
+  }
+
+  @Import(name = "remote")
+  private @Nullable Output<String> remote;
+
+  public Optional<Output<String>> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  @Import(name = "restricted")
+  private @Nullable Output<Boolean> restricted;
+
+  public Optional<Output<Boolean>> restricted() {
+    return Optional.ofNullable(this.restricted);
+  }
+
+  @Import(name = "type")
+  private @Nullable Output<String> type;
+
+  public Optional<Output<String>> type() {
+    return Optional.ofNullable(this.type);
+  }
+
+  private CertificateArgs() {}
+
+  private CertificateArgs(CertificateArgs $) {
+    this.certificate = $.certificate;
+    this.description = $.description;
+    this.name = $.name;
+    this.projects = $.projects;
+    this.remote = $.remote;
+    this.restricted = $.restricted;
+    this.type = $.type;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(CertificateArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private CertificateArgs $;
+
+    public Builder() {
+      $ = new CertificateArgs();
     }
 
-    @Import(name="description")
-    private @Nullable Output<String> description;
-
-    public Optional<Output<String>> description() {
-        return Optional.ofNullable(this.description);
+    public Builder(CertificateArgs defaults) {
+      $ = new CertificateArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name="name")
-    private @Nullable Output<String> name;
-
-    public Optional<Output<String>> name() {
-        return Optional.ofNullable(this.name);
+    public Builder certificate(Output<String> certificate) {
+      $.certificate = certificate;
+      return this;
     }
 
-    @Import(name="projects")
-    private @Nullable Output<List<String>> projects;
-
-    public Optional<Output<List<String>>> projects() {
-        return Optional.ofNullable(this.projects);
+    public Builder certificate(String certificate) {
+      return certificate(Output.of(certificate));
     }
 
-    @Import(name="remote")
-    private @Nullable Output<String> remote;
-
-    public Optional<Output<String>> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder description(@Nullable Output<String> description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name="restricted")
-    private @Nullable Output<Boolean> restricted;
-
-    public Optional<Output<Boolean>> restricted() {
-        return Optional.ofNullable(this.restricted);
+    public Builder description(String description) {
+      return description(Output.of(description));
     }
 
-    @Import(name="type")
-    private @Nullable Output<String> type;
-
-    public Optional<Output<String>> type() {
-        return Optional.ofNullable(this.type);
+    public Builder name(@Nullable Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    private CertificateArgs() {}
-
-    private CertificateArgs(CertificateArgs $) {
-        this.certificate = $.certificate;
-        this.description = $.description;
-        this.name = $.name;
-        this.projects = $.projects;
-        this.remote = $.remote;
-        this.restricted = $.restricted;
-        this.type = $.type;
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
-    public static Builder builder() {
-        return new Builder();
-    }
-    public static Builder builder(CertificateArgs defaults) {
-        return new Builder(defaults);
+    public Builder projects(@Nullable Output<List<String>> projects) {
+      $.projects = projects;
+      return this;
     }
 
-    public static final class Builder {
-        private CertificateArgs $;
-
-        public Builder() {
-            $ = new CertificateArgs();
-        }
-
-        public Builder(CertificateArgs defaults) {
-            $ = new CertificateArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder certificate(Output<String> certificate) {
-            $.certificate = certificate;
-            return this;
-        }
-
-        public Builder certificate(String certificate) {
-            return certificate(Output.of(certificate));
-        }
-
-        public Builder description(@Nullable Output<String> description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder description(String description) {
-            return description(Output.of(description));
-        }
-
-        public Builder name(@Nullable Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        public Builder projects(@Nullable Output<List<String>> projects) {
-            $.projects = projects;
-            return this;
-        }
-
-        public Builder projects(List<String> projects) {
-            return projects(Output.of(projects));
-        }
-
-        public Builder projects(String... projects) {
-            return projects(List.of(projects));
-        }
-
-        public Builder remote(@Nullable Output<String> remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder remote(String remote) {
-            return remote(Output.of(remote));
-        }
-
-        public Builder restricted(@Nullable Output<Boolean> restricted) {
-            $.restricted = restricted;
-            return this;
-        }
-
-        public Builder restricted(Boolean restricted) {
-            return restricted(Output.of(restricted));
-        }
-
-        public Builder type(@Nullable Output<String> type) {
-            $.type = type;
-            return this;
-        }
-
-        public Builder type(String type) {
-            return type(Output.of(type));
-        }
-
-        public CertificateArgs build() {
-            if ($.certificate == null) {
-                throw new MissingRequiredPropertyException("CertificateArgs", "certificate");
-            }
-            return $;
-        }
+    public Builder projects(List<String> projects) {
+      return projects(Output.of(projects));
     }
 
+    public Builder projects(String... projects) {
+      return projects(List.of(projects));
+    }
+
+    public Builder remote(@Nullable Output<String> remote) {
+      $.remote = remote;
+      return this;
+    }
+
+    public Builder remote(String remote) {
+      return remote(Output.of(remote));
+    }
+
+    public Builder restricted(@Nullable Output<Boolean> restricted) {
+      $.restricted = restricted;
+      return this;
+    }
+
+    public Builder restricted(Boolean restricted) {
+      return restricted(Output.of(restricted));
+    }
+
+    public Builder type(@Nullable Output<String> type) {
+      $.type = type;
+      return this;
+    }
+
+    public Builder type(String type) {
+      return type(Output.of(type));
+    }
+
+    public CertificateArgs build() {
+      if ($.certificate == null) {
+        throw new MissingRequiredPropertyException("CertificateArgs", "certificate");
+      }
+      return $;
+    }
+  }
 }

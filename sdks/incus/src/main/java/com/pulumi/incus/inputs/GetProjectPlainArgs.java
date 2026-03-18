@@ -5,85 +5,82 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class GetProjectPlainArgs extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetProjectPlainArgs Empty = new GetProjectPlainArgs();
+  public static final GetProjectPlainArgs Empty = new GetProjectPlainArgs();
 
-    @Import(name = "description")
-    private @Nullable String description;
+  @Import(name = "description")
+  private @Nullable String description;
 
-    public Optional<String> description() {
-        return Optional.ofNullable(this.description);
+  public Optional<String> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "name", required = true)
+  private String name;
+
+  public String name() {
+    return this.name;
+  }
+
+  @Import(name = "remote")
+  private @Nullable String remote;
+
+  public Optional<String> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  private GetProjectPlainArgs() {}
+
+  private GetProjectPlainArgs(GetProjectPlainArgs $) {
+    this.description = $.description;
+    this.name = $.name;
+    this.remote = $.remote;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetProjectPlainArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetProjectPlainArgs $;
+
+    public Builder() {
+      $ = new GetProjectPlainArgs();
     }
 
-    @Import(name = "name", required = true)
-    private String name;
-
-    public String name() {
-        return this.name;
+    public Builder(GetProjectPlainArgs defaults) {
+      $ = new GetProjectPlainArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "remote")
-    private @Nullable String remote;
-
-    public Optional<String> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder description(@Nullable String description) {
+      $.description = description;
+      return this;
     }
 
-    private GetProjectPlainArgs() {
+    public Builder name(String name) {
+      $.name = name;
+      return this;
     }
 
-    private GetProjectPlainArgs(GetProjectPlainArgs $) {
-        this.description = $.description;
-        this.name = $.name;
-        this.remote = $.remote;
+    public Builder remote(@Nullable String remote) {
+      $.remote = remote;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public GetProjectPlainArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("GetProjectPlainArgs", "name");
+      }
+      return $;
     }
-
-    public static Builder builder(GetProjectPlainArgs defaults) {
-        return new Builder(defaults);
-    }
-
-    public static final class Builder {
-        private GetProjectPlainArgs $;
-
-        public Builder() {
-            $ = new GetProjectPlainArgs();
-        }
-
-        public Builder(GetProjectPlainArgs defaults) {
-            $ = new GetProjectPlainArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder description(@Nullable String description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder name(String name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder remote(@Nullable String remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public GetProjectPlainArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("GetProjectPlainArgs", "name");
-            }
-            return $;
-        }
-    }
-
+  }
 }

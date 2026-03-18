@@ -5,77 +5,80 @@ package com.pulumi.incus.outputs;
 
 import com.pulumi.core.annotations.CustomType;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 @CustomType
 public final class ImageAlias {
-    /**
-     * @return The description for the image alias.
-     * 
-     */
+  /**
+   * @return The description for the image alias.
+   */
+  private @Nullable String description;
+
+  /**
+   * @return The name of the image alias.
+   */
+  private String name;
+
+  private ImageAlias() {}
+
+  /**
+   * @return The description for the image alias.
+   */
+  public Optional<String> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  /**
+   * @return The name of the image alias.
+   */
+  public String name() {
+    return this.name;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(ImageAlias defaults) {
+    return new Builder(defaults);
+  }
+
+  @CustomType.Builder
+  public static final class Builder {
     private @Nullable String description;
-    /**
-     * @return The name of the image alias.
-     * 
-     */
     private String name;
 
-    private ImageAlias() {}
-    /**
-     * @return The description for the image alias.
-     * 
-     */
-    public Optional<String> description() {
-        return Optional.ofNullable(this.description);
-    }
-    /**
-     * @return The name of the image alias.
-     * 
-     */
-    public String name() {
-        return this.name;
+    public Builder() {}
+
+    public Builder(ImageAlias defaults) {
+      Objects.requireNonNull(defaults);
+      this.description = defaults.description;
+      this.name = defaults.name;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    @CustomType.Setter
+    public Builder description(@Nullable String description) {
+
+      this.description = description;
+      return this;
     }
 
-    public static Builder builder(ImageAlias defaults) {
-        return new Builder(defaults);
+    @CustomType.Setter
+    public Builder name(String name) {
+      if (name == null) {
+        throw new MissingRequiredPropertyException("ImageAlias", "name");
+      }
+      this.name = name;
+      return this;
     }
-    @CustomType.Builder
-    public static final class Builder {
-        private @Nullable String description;
-        private String name;
-        public Builder() {}
-        public Builder(ImageAlias defaults) {
-    	      Objects.requireNonNull(defaults);
-    	      this.description = defaults.description;
-    	      this.name = defaults.name;
-        }
 
-        @CustomType.Setter
-        public Builder description(@Nullable String description) {
-
-            this.description = description;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder name(String name) {
-            if (name == null) {
-              throw new MissingRequiredPropertyException("ImageAlias", "name");
-            }
-            this.name = name;
-            return this;
-        }
-        public ImageAlias build() {
-            final var _resultValue = new ImageAlias();
-            _resultValue.description = description;
-            _resultValue.name = name;
-            return _resultValue;
-        }
+    public ImageAlias build() {
+      final var _resultValue = new ImageAlias();
+      _resultValue.description = description;
+      _resultValue.name = name;
+      return _resultValue;
     }
+  }
 }

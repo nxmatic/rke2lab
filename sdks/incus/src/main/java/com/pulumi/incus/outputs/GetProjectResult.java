@@ -5,7 +5,6 @@ package com.pulumi.incus.outputs;
 
 import com.pulumi.core.annotations.CustomType;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -13,107 +12,120 @@ import javax.annotation.Nullable;
 
 @CustomType
 public final class GetProjectResult {
-    private Map<String,String> config;
+  private Map<String, String> config;
+  private String description;
+
+  /**
+   * @return The provider-assigned unique ID for this managed resource.
+   */
+  private String id;
+
+  private String name;
+  private @Nullable String remote;
+
+  private GetProjectResult() {}
+
+  public Map<String, String> config() {
+    return this.config;
+  }
+
+  public String description() {
+    return this.description;
+  }
+
+  /**
+   * @return The provider-assigned unique ID for this managed resource.
+   */
+  public String id() {
+    return this.id;
+  }
+
+  public String name() {
+    return this.name;
+  }
+
+  public Optional<String> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetProjectResult defaults) {
+    return new Builder(defaults);
+  }
+
+  @CustomType.Builder
+  public static final class Builder {
+    private Map<String, String> config;
     private String description;
-    /**
-     * @return The provider-assigned unique ID for this managed resource.
-     * 
-     */
     private String id;
     private String name;
     private @Nullable String remote;
 
-    private GetProjectResult() {}
-    public Map<String,String> config() {
-        return this.config;
-    }
-    public String description() {
-        return this.description;
-    }
-    /**
-     * @return The provider-assigned unique ID for this managed resource.
-     * 
-     */
-    public String id() {
-        return this.id;
-    }
-    public String name() {
-        return this.name;
-    }
-    public Optional<String> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder() {}
+
+    public Builder(GetProjectResult defaults) {
+      Objects.requireNonNull(defaults);
+      this.config = defaults.config;
+      this.description = defaults.description;
+      this.id = defaults.id;
+      this.name = defaults.name;
+      this.remote = defaults.remote;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    @CustomType.Setter
+    public Builder config(Map<String, String> config) {
+      if (config == null) {
+        throw new MissingRequiredPropertyException("GetProjectResult", "config");
+      }
+      this.config = config;
+      return this;
     }
 
-    public static Builder builder(GetProjectResult defaults) {
-        return new Builder(defaults);
+    @CustomType.Setter
+    public Builder description(String description) {
+      if (description == null) {
+        throw new MissingRequiredPropertyException("GetProjectResult", "description");
+      }
+      this.description = description;
+      return this;
     }
-    @CustomType.Builder
-    public static final class Builder {
-        private Map<String,String> config;
-        private String description;
-        private String id;
-        private String name;
-        private @Nullable String remote;
-        public Builder() {}
-        public Builder(GetProjectResult defaults) {
-    	      Objects.requireNonNull(defaults);
-    	      this.config = defaults.config;
-    	      this.description = defaults.description;
-    	      this.id = defaults.id;
-    	      this.name = defaults.name;
-    	      this.remote = defaults.remote;
-        }
 
-        @CustomType.Setter
-        public Builder config(Map<String,String> config) {
-            if (config == null) {
-              throw new MissingRequiredPropertyException("GetProjectResult", "config");
-            }
-            this.config = config;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder description(String description) {
-            if (description == null) {
-              throw new MissingRequiredPropertyException("GetProjectResult", "description");
-            }
-            this.description = description;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder id(String id) {
-            if (id == null) {
-              throw new MissingRequiredPropertyException("GetProjectResult", "id");
-            }
-            this.id = id;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder name(String name) {
-            if (name == null) {
-              throw new MissingRequiredPropertyException("GetProjectResult", "name");
-            }
-            this.name = name;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder remote(@Nullable String remote) {
-
-            this.remote = remote;
-            return this;
-        }
-        public GetProjectResult build() {
-            final var _resultValue = new GetProjectResult();
-            _resultValue.config = config;
-            _resultValue.description = description;
-            _resultValue.id = id;
-            _resultValue.name = name;
-            _resultValue.remote = remote;
-            return _resultValue;
-        }
+    @CustomType.Setter
+    public Builder id(String id) {
+      if (id == null) {
+        throw new MissingRequiredPropertyException("GetProjectResult", "id");
+      }
+      this.id = id;
+      return this;
     }
+
+    @CustomType.Setter
+    public Builder name(String name) {
+      if (name == null) {
+        throw new MissingRequiredPropertyException("GetProjectResult", "name");
+      }
+      this.name = name;
+      return this;
+    }
+
+    @CustomType.Setter
+    public Builder remote(@Nullable String remote) {
+
+      this.remote = remote;
+      return this;
+    }
+
+    public GetProjectResult build() {
+      final var _resultValue = new GetProjectResult();
+      _resultValue.config = config;
+      _resultValue.description = description;
+      _resultValue.id = id;
+      _resultValue.name = name;
+      _resultValue.remote = remote;
+      return _resultValue;
+    }
+  }
 }

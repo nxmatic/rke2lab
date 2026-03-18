@@ -5,9 +5,6 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import com.pulumi.incus.inputs.GetNetworkLoadBalancerBackend;
-import com.pulumi.incus.inputs.GetNetworkLoadBalancerPort;
-import java.lang.String;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -15,154 +12,153 @@ import javax.annotation.Nullable;
 
 public final class GetNetworkLoadBalancerPlainArgs extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetNetworkLoadBalancerPlainArgs Empty = new GetNetworkLoadBalancerPlainArgs();
+  public static final GetNetworkLoadBalancerPlainArgs Empty = new GetNetworkLoadBalancerPlainArgs();
 
-    @Import(name = "backends")
-    private @Nullable List<GetNetworkLoadBalancerBackend> backends;
+  @Import(name = "backends")
+  private @Nullable List<GetNetworkLoadBalancerBackend> backends;
 
-    public Optional<List<GetNetworkLoadBalancerBackend>> backends() {
-        return Optional.ofNullable(this.backends);
+  public Optional<List<GetNetworkLoadBalancerBackend>> backends() {
+    return Optional.ofNullable(this.backends);
+  }
+
+  @Import(name = "description")
+  private @Nullable String description;
+
+  public Optional<String> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "listenAddress", required = true)
+  private String listenAddress;
+
+  public String listenAddress() {
+    return this.listenAddress;
+  }
+
+  @Import(name = "location")
+  private @Nullable String location;
+
+  public Optional<String> location() {
+    return Optional.ofNullable(this.location);
+  }
+
+  @Import(name = "network", required = true)
+  private String network;
+
+  public String network() {
+    return this.network;
+  }
+
+  @Import(name = "ports")
+  private @Nullable List<GetNetworkLoadBalancerPort> ports;
+
+  public Optional<List<GetNetworkLoadBalancerPort>> ports() {
+    return Optional.ofNullable(this.ports);
+  }
+
+  @Import(name = "project")
+  private @Nullable String project;
+
+  public Optional<String> project() {
+    return Optional.ofNullable(this.project);
+  }
+
+  @Import(name = "remote")
+  private @Nullable String remote;
+
+  public Optional<String> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  private GetNetworkLoadBalancerPlainArgs() {}
+
+  private GetNetworkLoadBalancerPlainArgs(GetNetworkLoadBalancerPlainArgs $) {
+    this.backends = $.backends;
+    this.description = $.description;
+    this.listenAddress = $.listenAddress;
+    this.location = $.location;
+    this.network = $.network;
+    this.ports = $.ports;
+    this.project = $.project;
+    this.remote = $.remote;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetNetworkLoadBalancerPlainArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetNetworkLoadBalancerPlainArgs $;
+
+    public Builder() {
+      $ = new GetNetworkLoadBalancerPlainArgs();
     }
 
-    @Import(name = "description")
-    private @Nullable String description;
-
-    public Optional<String> description() {
-        return Optional.ofNullable(this.description);
+    public Builder(GetNetworkLoadBalancerPlainArgs defaults) {
+      $ = new GetNetworkLoadBalancerPlainArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "listenAddress", required = true)
-    private String listenAddress;
-
-    public String listenAddress() {
-        return this.listenAddress;
+    public Builder backends(@Nullable List<GetNetworkLoadBalancerBackend> backends) {
+      $.backends = backends;
+      return this;
     }
 
-    @Import(name = "location")
-    private @Nullable String location;
-
-    public Optional<String> location() {
-        return Optional.ofNullable(this.location);
+    public Builder backends(GetNetworkLoadBalancerBackend... backends) {
+      return backends(List.of(backends));
     }
 
-    @Import(name = "network", required = true)
-    private String network;
-
-    public String network() {
-        return this.network;
+    public Builder description(@Nullable String description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name = "ports")
-    private @Nullable List<GetNetworkLoadBalancerPort> ports;
-
-    public Optional<List<GetNetworkLoadBalancerPort>> ports() {
-        return Optional.ofNullable(this.ports);
+    public Builder listenAddress(String listenAddress) {
+      $.listenAddress = listenAddress;
+      return this;
     }
 
-    @Import(name = "project")
-    private @Nullable String project;
-
-    public Optional<String> project() {
-        return Optional.ofNullable(this.project);
+    public Builder location(@Nullable String location) {
+      $.location = location;
+      return this;
     }
 
-    @Import(name = "remote")
-    private @Nullable String remote;
-
-    public Optional<String> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder network(String network) {
+      $.network = network;
+      return this;
     }
 
-    private GetNetworkLoadBalancerPlainArgs() {
+    public Builder ports(@Nullable List<GetNetworkLoadBalancerPort> ports) {
+      $.ports = ports;
+      return this;
     }
 
-    private GetNetworkLoadBalancerPlainArgs(GetNetworkLoadBalancerPlainArgs $) {
-        this.backends = $.backends;
-        this.description = $.description;
-        this.listenAddress = $.listenAddress;
-        this.location = $.location;
-        this.network = $.network;
-        this.ports = $.ports;
-        this.project = $.project;
-        this.remote = $.remote;
+    public Builder ports(GetNetworkLoadBalancerPort... ports) {
+      return ports(List.of(ports));
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder project(@Nullable String project) {
+      $.project = project;
+      return this;
     }
 
-    public static Builder builder(GetNetworkLoadBalancerPlainArgs defaults) {
-        return new Builder(defaults);
+    public Builder remote(@Nullable String remote) {
+      $.remote = remote;
+      return this;
     }
 
-    public static final class Builder {
-        private GetNetworkLoadBalancerPlainArgs $;
-
-        public Builder() {
-            $ = new GetNetworkLoadBalancerPlainArgs();
-        }
-
-        public Builder(GetNetworkLoadBalancerPlainArgs defaults) {
-            $ = new GetNetworkLoadBalancerPlainArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder backends(@Nullable List<GetNetworkLoadBalancerBackend> backends) {
-            $.backends = backends;
-            return this;
-        }
-
-        public Builder backends(GetNetworkLoadBalancerBackend... backends) {
-            return backends(List.of(backends));
-        }
-
-        public Builder description(@Nullable String description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder listenAddress(String listenAddress) {
-            $.listenAddress = listenAddress;
-            return this;
-        }
-
-        public Builder location(@Nullable String location) {
-            $.location = location;
-            return this;
-        }
-
-        public Builder network(String network) {
-            $.network = network;
-            return this;
-        }
-
-        public Builder ports(@Nullable List<GetNetworkLoadBalancerPort> ports) {
-            $.ports = ports;
-            return this;
-        }
-
-        public Builder ports(GetNetworkLoadBalancerPort... ports) {
-            return ports(List.of(ports));
-        }
-
-        public Builder project(@Nullable String project) {
-            $.project = project;
-            return this;
-        }
-
-        public Builder remote(@Nullable String remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public GetNetworkLoadBalancerPlainArgs build() {
-            if ($.listenAddress == null) {
-                throw new MissingRequiredPropertyException("GetNetworkLoadBalancerPlainArgs", "listenAddress");
-            }
-            if ($.network == null) {
-                throw new MissingRequiredPropertyException("GetNetworkLoadBalancerPlainArgs", "network");
-            }
-            return $;
-        }
+    public GetNetworkLoadBalancerPlainArgs build() {
+      if ($.listenAddress == null) {
+        throw new MissingRequiredPropertyException(
+            "GetNetworkLoadBalancerPlainArgs", "listenAddress");
+      }
+      if ($.network == null) {
+        throw new MissingRequiredPropertyException("GetNetworkLoadBalancerPlainArgs", "network");
+      }
+      return $;
     }
-
+  }
 }

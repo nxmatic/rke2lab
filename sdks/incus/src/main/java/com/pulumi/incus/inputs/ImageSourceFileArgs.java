@@ -6,80 +6,77 @@ package com.pulumi.incus.inputs;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class ImageSourceFileArgs extends com.pulumi.resources.ResourceArgs {
 
-    public static final ImageSourceFileArgs Empty = new ImageSourceFileArgs();
+  public static final ImageSourceFileArgs Empty = new ImageSourceFileArgs();
 
-    @Import(name = "dataPath", required = true)
-    private Output<String> dataPath;
+  @Import(name = "dataPath", required = true)
+  private Output<String> dataPath;
 
-    public Output<String> dataPath() {
-        return this.dataPath;
+  public Output<String> dataPath() {
+    return this.dataPath;
+  }
+
+  @Import(name = "metadataPath")
+  private @Nullable Output<String> metadataPath;
+
+  public Optional<Output<String>> metadataPath() {
+    return Optional.ofNullable(this.metadataPath);
+  }
+
+  private ImageSourceFileArgs() {}
+
+  private ImageSourceFileArgs(ImageSourceFileArgs $) {
+    this.dataPath = $.dataPath;
+    this.metadataPath = $.metadataPath;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(ImageSourceFileArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private ImageSourceFileArgs $;
+
+    public Builder() {
+      $ = new ImageSourceFileArgs();
     }
 
-    @Import(name = "metadataPath")
-    private @Nullable Output<String> metadataPath;
-
-    public Optional<Output<String>> metadataPath() {
-        return Optional.ofNullable(this.metadataPath);
+    public Builder(ImageSourceFileArgs defaults) {
+      $ = new ImageSourceFileArgs(Objects.requireNonNull(defaults));
     }
 
-    private ImageSourceFileArgs() {
+    public Builder dataPath(Output<String> dataPath) {
+      $.dataPath = dataPath;
+      return this;
     }
 
-    private ImageSourceFileArgs(ImageSourceFileArgs $) {
-        this.dataPath = $.dataPath;
-        this.metadataPath = $.metadataPath;
+    public Builder dataPath(String dataPath) {
+      return dataPath(Output.of(dataPath));
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder metadataPath(@Nullable Output<String> metadataPath) {
+      $.metadataPath = metadataPath;
+      return this;
     }
 
-    public static Builder builder(ImageSourceFileArgs defaults) {
-        return new Builder(defaults);
+    public Builder metadataPath(String metadataPath) {
+      return metadataPath(Output.of(metadataPath));
     }
 
-    public static final class Builder {
-        private ImageSourceFileArgs $;
-
-        public Builder() {
-            $ = new ImageSourceFileArgs();
-        }
-
-        public Builder(ImageSourceFileArgs defaults) {
-            $ = new ImageSourceFileArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder dataPath(Output<String> dataPath) {
-            $.dataPath = dataPath;
-            return this;
-        }
-
-        public Builder dataPath(String dataPath) {
-            return dataPath(Output.of(dataPath));
-        }
-
-        public Builder metadataPath(@Nullable Output<String> metadataPath) {
-            $.metadataPath = metadataPath;
-            return this;
-        }
-
-        public Builder metadataPath(String metadataPath) {
-            return metadataPath(Output.of(metadataPath));
-        }
-
-        public ImageSourceFileArgs build() {
-            if ($.dataPath == null) {
-                throw new MissingRequiredPropertyException("ImageSourceFileArgs", "dataPath");
-            }
-            return $;
-        }
+    public ImageSourceFileArgs build() {
+      if ($.dataPath == null) {
+        throw new MissingRequiredPropertyException("ImageSourceFileArgs", "dataPath");
+      }
+      return $;
     }
-
+  }
 }

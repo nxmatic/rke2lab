@@ -5,94 +5,92 @@ package com.pulumi.incus;
 
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
-import java.lang.String;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class ServerArgs extends com.pulumi.resources.ResourceArgs {
 
-    public static final ServerArgs Empty = new ServerArgs();
+  public static final ServerArgs Empty = new ServerArgs();
 
-    @Import(name="config")
-    private @Nullable Output<Map<String,String>> config;
+  @Import(name = "config")
+  private @Nullable Output<Map<String, String>> config;
 
-    public Optional<Output<Map<String,String>>> config() {
-        return Optional.ofNullable(this.config);
+  public Optional<Output<Map<String, String>>> config() {
+    return Optional.ofNullable(this.config);
+  }
+
+  @Import(name = "remote")
+  private @Nullable Output<String> remote;
+
+  public Optional<Output<String>> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  @Import(name = "target")
+  private @Nullable Output<String> target;
+
+  public Optional<Output<String>> target() {
+    return Optional.ofNullable(this.target);
+  }
+
+  private ServerArgs() {}
+
+  private ServerArgs(ServerArgs $) {
+    this.config = $.config;
+    this.remote = $.remote;
+    this.target = $.target;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(ServerArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private ServerArgs $;
+
+    public Builder() {
+      $ = new ServerArgs();
     }
 
-    @Import(name="remote")
-    private @Nullable Output<String> remote;
-
-    public Optional<Output<String>> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder(ServerArgs defaults) {
+      $ = new ServerArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name="target")
-    private @Nullable Output<String> target;
-
-    public Optional<Output<String>> target() {
-        return Optional.ofNullable(this.target);
+    public Builder config(@Nullable Output<Map<String, String>> config) {
+      $.config = config;
+      return this;
     }
 
-    private ServerArgs() {}
-
-    private ServerArgs(ServerArgs $) {
-        this.config = $.config;
-        this.remote = $.remote;
-        this.target = $.target;
+    public Builder config(Map<String, String> config) {
+      return config(Output.of(config));
     }
 
-    public static Builder builder() {
-        return new Builder();
-    }
-    public static Builder builder(ServerArgs defaults) {
-        return new Builder(defaults);
+    public Builder remote(@Nullable Output<String> remote) {
+      $.remote = remote;
+      return this;
     }
 
-    public static final class Builder {
-        private ServerArgs $;
-
-        public Builder() {
-            $ = new ServerArgs();
-        }
-
-        public Builder(ServerArgs defaults) {
-            $ = new ServerArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder config(@Nullable Output<Map<String,String>> config) {
-            $.config = config;
-            return this;
-        }
-
-        public Builder config(Map<String,String> config) {
-            return config(Output.of(config));
-        }
-
-        public Builder remote(@Nullable Output<String> remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder remote(String remote) {
-            return remote(Output.of(remote));
-        }
-
-        public Builder target(@Nullable Output<String> target) {
-            $.target = target;
-            return this;
-        }
-
-        public Builder target(String target) {
-            return target(Output.of(target));
-        }
-
-        public ServerArgs build() {
-            return $;
-        }
+    public Builder remote(String remote) {
+      return remote(Output.of(remote));
     }
 
+    public Builder target(@Nullable Output<String> target) {
+      $.target = target;
+      return this;
+    }
+
+    public Builder target(String target) {
+      return target(Output.of(target));
+    }
+
+    public ServerArgs build() {
+      return $;
+    }
+  }
 }

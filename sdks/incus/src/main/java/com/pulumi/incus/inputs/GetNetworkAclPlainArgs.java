@@ -5,9 +5,6 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import com.pulumi.incus.inputs.GetNetworkAclEgress;
-import com.pulumi.incus.inputs.GetNetworkAclIngress;
-import java.lang.String;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -15,125 +12,123 @@ import javax.annotation.Nullable;
 
 public final class GetNetworkAclPlainArgs extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetNetworkAclPlainArgs Empty = new GetNetworkAclPlainArgs();
+  public static final GetNetworkAclPlainArgs Empty = new GetNetworkAclPlainArgs();
 
-    @Import(name = "description")
-    private @Nullable String description;
+  @Import(name = "description")
+  private @Nullable String description;
 
-    public Optional<String> description() {
-        return Optional.ofNullable(this.description);
+  public Optional<String> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "egresses")
+  private @Nullable List<GetNetworkAclEgress> egresses;
+
+  public Optional<List<GetNetworkAclEgress>> egresses() {
+    return Optional.ofNullable(this.egresses);
+  }
+
+  @Import(name = "ingresses")
+  private @Nullable List<GetNetworkAclIngress> ingresses;
+
+  public Optional<List<GetNetworkAclIngress>> ingresses() {
+    return Optional.ofNullable(this.ingresses);
+  }
+
+  @Import(name = "name", required = true)
+  private String name;
+
+  public String name() {
+    return this.name;
+  }
+
+  @Import(name = "project")
+  private @Nullable String project;
+
+  public Optional<String> project() {
+    return Optional.ofNullable(this.project);
+  }
+
+  @Import(name = "remote")
+  private @Nullable String remote;
+
+  public Optional<String> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  private GetNetworkAclPlainArgs() {}
+
+  private GetNetworkAclPlainArgs(GetNetworkAclPlainArgs $) {
+    this.description = $.description;
+    this.egresses = $.egresses;
+    this.ingresses = $.ingresses;
+    this.name = $.name;
+    this.project = $.project;
+    this.remote = $.remote;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetNetworkAclPlainArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetNetworkAclPlainArgs $;
+
+    public Builder() {
+      $ = new GetNetworkAclPlainArgs();
     }
 
-    @Import(name = "egresses")
-    private @Nullable List<GetNetworkAclEgress> egresses;
-
-    public Optional<List<GetNetworkAclEgress>> egresses() {
-        return Optional.ofNullable(this.egresses);
+    public Builder(GetNetworkAclPlainArgs defaults) {
+      $ = new GetNetworkAclPlainArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "ingresses")
-    private @Nullable List<GetNetworkAclIngress> ingresses;
-
-    public Optional<List<GetNetworkAclIngress>> ingresses() {
-        return Optional.ofNullable(this.ingresses);
+    public Builder description(@Nullable String description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name = "name", required = true)
-    private String name;
-
-    public String name() {
-        return this.name;
+    public Builder egresses(@Nullable List<GetNetworkAclEgress> egresses) {
+      $.egresses = egresses;
+      return this;
     }
 
-    @Import(name = "project")
-    private @Nullable String project;
-
-    public Optional<String> project() {
-        return Optional.ofNullable(this.project);
+    public Builder egresses(GetNetworkAclEgress... egresses) {
+      return egresses(List.of(egresses));
     }
 
-    @Import(name = "remote")
-    private @Nullable String remote;
-
-    public Optional<String> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder ingresses(@Nullable List<GetNetworkAclIngress> ingresses) {
+      $.ingresses = ingresses;
+      return this;
     }
 
-    private GetNetworkAclPlainArgs() {
+    public Builder ingresses(GetNetworkAclIngress... ingresses) {
+      return ingresses(List.of(ingresses));
     }
 
-    private GetNetworkAclPlainArgs(GetNetworkAclPlainArgs $) {
-        this.description = $.description;
-        this.egresses = $.egresses;
-        this.ingresses = $.ingresses;
-        this.name = $.name;
-        this.project = $.project;
-        this.remote = $.remote;
+    public Builder name(String name) {
+      $.name = name;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder project(@Nullable String project) {
+      $.project = project;
+      return this;
     }
 
-    public static Builder builder(GetNetworkAclPlainArgs defaults) {
-        return new Builder(defaults);
+    public Builder remote(@Nullable String remote) {
+      $.remote = remote;
+      return this;
     }
 
-    public static final class Builder {
-        private GetNetworkAclPlainArgs $;
-
-        public Builder() {
-            $ = new GetNetworkAclPlainArgs();
-        }
-
-        public Builder(GetNetworkAclPlainArgs defaults) {
-            $ = new GetNetworkAclPlainArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder description(@Nullable String description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder egresses(@Nullable List<GetNetworkAclEgress> egresses) {
-            $.egresses = egresses;
-            return this;
-        }
-
-        public Builder egresses(GetNetworkAclEgress... egresses) {
-            return egresses(List.of(egresses));
-        }
-
-        public Builder ingresses(@Nullable List<GetNetworkAclIngress> ingresses) {
-            $.ingresses = ingresses;
-            return this;
-        }
-
-        public Builder ingresses(GetNetworkAclIngress... ingresses) {
-            return ingresses(List.of(ingresses));
-        }
-
-        public Builder name(String name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder project(@Nullable String project) {
-            $.project = project;
-            return this;
-        }
-
-        public Builder remote(@Nullable String remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public GetNetworkAclPlainArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("GetNetworkAclPlainArgs", "name");
-            }
-            return $;
-        }
+    public GetNetworkAclPlainArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("GetNetworkAclPlainArgs", "name");
+      }
+      return $;
     }
-
+  }
 }

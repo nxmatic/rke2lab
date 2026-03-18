@@ -7,88 +7,122 @@ import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Export;
 import com.pulumi.core.annotations.ResourceType;
 import com.pulumi.core.internal.Codegen;
-import com.pulumi.incus.ServerArgs;
-import com.pulumi.incus.Utilities;
 import com.pulumi.incus.inputs.ServerState;
-import java.lang.String;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-@ResourceType(type="incus:index/server:Server")
+@ResourceType(type = "incus:index/server:Server")
 public class Server extends com.pulumi.resources.CustomResource {
-    @Export(name="config", refs={Map.class,String.class}, tree="[0,1,1]")
-    private Output<Map<String,String>> config;
+  @Export(
+      name = "config",
+      refs = {Map.class, String.class},
+      tree = "[0,1,1]")
+  private Output<Map<String, String>> config;
 
-    public Output<Map<String,String>> config() {
-        return this.config;
-    }
-    @Export(name="remote", refs={String.class}, tree="[0]")
-    private Output</* @Nullable */ String> remote;
+  public Output<Map<String, String>> config() {
+    return this.config;
+  }
 
-    public Output<Optional<String>> remote() {
-        return Codegen.optional(this.remote);
-    }
-    @Export(name="target", refs={String.class}, tree="[0]")
-    private Output</* @Nullable */ String> target;
+  @Export(
+      name = "remote",
+      refs = {String.class},
+      tree = "[0]")
+  private Output</* @Nullable */ String> remote;
 
-    public Output<Optional<String>> target() {
-        return Codegen.optional(this.target);
-    }
+  public Output<Optional<String>> remote() {
+    return Codegen.optional(this.remote);
+  }
 
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     */
-    public Server(java.lang.String name) {
-        this(name, ServerArgs.Empty);
-    }
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param args The arguments to use to populate this resource's properties.
-     */
-    public Server(java.lang.String name, @Nullable ServerArgs args) {
-        this(name, args, null);
-    }
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param args The arguments to use to populate this resource's properties.
-     * @param options A bag of options that control this resource's behavior.
-     */
-    public Server(java.lang.String name, @Nullable ServerArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        super("incus:index/server:Server", name, makeArgs(args, options), makeResourceOptions(options, Codegen.empty()), false, Utilities.getPackageRef());
-    }
+  @Export(
+      name = "target",
+      refs = {String.class},
+      tree = "[0]")
+  private Output</* @Nullable */ String> target;
 
-    private Server(java.lang.String name, Output<java.lang.String> id, @Nullable ServerState state, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        super("incus:index/server:Server", name, state, makeResourceOptions(options, id), false, Utilities.getPackageRef());
-    }
+  public Output<Optional<String>> target() {
+    return Codegen.optional(this.target);
+  }
 
-    private static ServerArgs makeArgs(@Nullable ServerArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        if (options != null && options.getUrn().isPresent()) {
-            return null;
-        }
-        return args == null ? ServerArgs.Empty : args;
-    }
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   */
+  public Server(java.lang.String name) {
+    this(name, ServerArgs.Empty);
+  }
 
-    private static com.pulumi.resources.CustomResourceOptions makeResourceOptions(@Nullable com.pulumi.resources.CustomResourceOptions options, @Nullable Output<java.lang.String> id) {
-        var defaultOptions = com.pulumi.resources.CustomResourceOptions.builder()
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   * @param args The arguments to use to populate this resource's properties.
+   */
+  public Server(java.lang.String name, @Nullable ServerArgs args) {
+    this(name, args, null);
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   * @param args The arguments to use to populate this resource's properties.
+   * @param options A bag of options that control this resource's behavior.
+   */
+  public Server(
+      java.lang.String name,
+      @Nullable ServerArgs args,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    super(
+        "incus:index/server:Server",
+        name,
+        makeArgs(args, options),
+        makeResourceOptions(options, Codegen.empty()),
+        false,
+        Utilities.getPackageRef());
+  }
+
+  private Server(
+      java.lang.String name,
+      Output<java.lang.String> id,
+      @Nullable ServerState state,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    super(
+        "incus:index/server:Server",
+        name,
+        state,
+        makeResourceOptions(options, id),
+        false,
+        Utilities.getPackageRef());
+  }
+
+  private static ServerArgs makeArgs(
+      @Nullable ServerArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    if (options != null && options.getUrn().isPresent()) {
+      return null;
+    }
+    return args == null ? ServerArgs.Empty : args;
+  }
+
+  private static com.pulumi.resources.CustomResourceOptions makeResourceOptions(
+      @Nullable com.pulumi.resources.CustomResourceOptions options,
+      @Nullable Output<java.lang.String> id) {
+    var defaultOptions =
+        com.pulumi.resources.CustomResourceOptions.builder()
             .version(Utilities.getVersion())
             .build();
-        return com.pulumi.resources.CustomResourceOptions.merge(defaultOptions, options, id);
-    }
+    return com.pulumi.resources.CustomResourceOptions.merge(defaultOptions, options, id);
+  }
 
-    /**
-     * Get an existing Host resource's state with the given name, ID, and optional extra
-     * properties used to qualify the lookup.
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param id The _unique_ provider ID of the resource to lookup.
-     * @param state
-     * @param options Optional settings to control the behavior of the CustomResource.
-     */
-    public static Server get(java.lang.String name, Output<java.lang.String> id, @Nullable ServerState state, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        return new Server(name, id, state, options);
-    }
+  /**
+   * Get an existing Host resource's state with the given name, ID, and optional extra properties
+   * used to qualify the lookup.
+   *
+   * @param name The _unique_ name of the resulting resource.
+   * @param id The _unique_ provider ID of the resource to lookup.
+   * @param state
+   * @param options Optional settings to control the behavior of the CustomResource.
+   */
+  public static Server get(
+      java.lang.String name,
+      Output<java.lang.String> id,
+      @Nullable ServerState state,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    return new Server(name, id, state, options);
+  }
 }

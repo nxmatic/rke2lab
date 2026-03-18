@@ -5,76 +5,84 @@ package com.pulumi.incus.outputs;
 
 import com.pulumi.core.annotations.CustomType;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 @CustomType
 public final class StorageVolumeSourceVolume {
+  private String name;
+  private String pool;
+  private @Nullable String remote;
+
+  private StorageVolumeSourceVolume() {}
+
+  public String name() {
+    return this.name;
+  }
+
+  public String pool() {
+    return this.pool;
+  }
+
+  public Optional<String> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(StorageVolumeSourceVolume defaults) {
+    return new Builder(defaults);
+  }
+
+  @CustomType.Builder
+  public static final class Builder {
     private String name;
     private String pool;
     private @Nullable String remote;
 
-    private StorageVolumeSourceVolume() {}
-    public String name() {
-        return this.name;
-    }
-    public String pool() {
-        return this.pool;
-    }
-    public Optional<String> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder() {}
+
+    public Builder(StorageVolumeSourceVolume defaults) {
+      Objects.requireNonNull(defaults);
+      this.name = defaults.name;
+      this.pool = defaults.pool;
+      this.remote = defaults.remote;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    @CustomType.Setter
+    public Builder name(String name) {
+      if (name == null) {
+        throw new MissingRequiredPropertyException("StorageVolumeSourceVolume", "name");
+      }
+      this.name = name;
+      return this;
     }
 
-    public static Builder builder(StorageVolumeSourceVolume defaults) {
-        return new Builder(defaults);
+    @CustomType.Setter
+    public Builder pool(String pool) {
+      if (pool == null) {
+        throw new MissingRequiredPropertyException("StorageVolumeSourceVolume", "pool");
+      }
+      this.pool = pool;
+      return this;
     }
-    @CustomType.Builder
-    public static final class Builder {
-        private String name;
-        private String pool;
-        private @Nullable String remote;
-        public Builder() {}
-        public Builder(StorageVolumeSourceVolume defaults) {
-    	      Objects.requireNonNull(defaults);
-    	      this.name = defaults.name;
-    	      this.pool = defaults.pool;
-    	      this.remote = defaults.remote;
-        }
 
-        @CustomType.Setter
-        public Builder name(String name) {
-            if (name == null) {
-              throw new MissingRequiredPropertyException("StorageVolumeSourceVolume", "name");
-            }
-            this.name = name;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder pool(String pool) {
-            if (pool == null) {
-              throw new MissingRequiredPropertyException("StorageVolumeSourceVolume", "pool");
-            }
-            this.pool = pool;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder remote(@Nullable String remote) {
+    @CustomType.Setter
+    public Builder remote(@Nullable String remote) {
 
-            this.remote = remote;
-            return this;
-        }
-        public StorageVolumeSourceVolume build() {
-            final var _resultValue = new StorageVolumeSourceVolume();
-            _resultValue.name = name;
-            _resultValue.pool = pool;
-            _resultValue.remote = remote;
-            return _resultValue;
-        }
+      this.remote = remote;
+      return this;
     }
+
+    public StorageVolumeSourceVolume build() {
+      final var _resultValue = new StorageVolumeSourceVolume();
+      _resultValue.name = name;
+      _resultValue.pool = pool;
+      _resultValue.remote = remote;
+      return _resultValue;
+    }
+  }
 }

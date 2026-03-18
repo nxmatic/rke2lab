@@ -5,91 +5,102 @@ package com.pulumi.incus.outputs;
 
 import com.pulumi.core.annotations.CustomType;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Objects;
 
 @CustomType
 public final class GetNetworkLoadBalancerBackend {
+  private String description;
+  private String name;
+  private String targetAddress;
+  private String targetPort;
+
+  private GetNetworkLoadBalancerBackend() {}
+
+  public String description() {
+    return this.description;
+  }
+
+  public String name() {
+    return this.name;
+  }
+
+  public String targetAddress() {
+    return this.targetAddress;
+  }
+
+  public String targetPort() {
+    return this.targetPort;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetNetworkLoadBalancerBackend defaults) {
+    return new Builder(defaults);
+  }
+
+  @CustomType.Builder
+  public static final class Builder {
     private String description;
     private String name;
     private String targetAddress;
     private String targetPort;
 
-    private GetNetworkLoadBalancerBackend() {}
-    public String description() {
-        return this.description;
-    }
-    public String name() {
-        return this.name;
-    }
-    public String targetAddress() {
-        return this.targetAddress;
-    }
-    public String targetPort() {
-        return this.targetPort;
+    public Builder() {}
+
+    public Builder(GetNetworkLoadBalancerBackend defaults) {
+      Objects.requireNonNull(defaults);
+      this.description = defaults.description;
+      this.name = defaults.name;
+      this.targetAddress = defaults.targetAddress;
+      this.targetPort = defaults.targetPort;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    @CustomType.Setter
+    public Builder description(String description) {
+      if (description == null) {
+        throw new MissingRequiredPropertyException("GetNetworkLoadBalancerBackend", "description");
+      }
+      this.description = description;
+      return this;
     }
 
-    public static Builder builder(GetNetworkLoadBalancerBackend defaults) {
-        return new Builder(defaults);
+    @CustomType.Setter
+    public Builder name(String name) {
+      if (name == null) {
+        throw new MissingRequiredPropertyException("GetNetworkLoadBalancerBackend", "name");
+      }
+      this.name = name;
+      return this;
     }
-    @CustomType.Builder
-    public static final class Builder {
-        private String description;
-        private String name;
-        private String targetAddress;
-        private String targetPort;
-        public Builder() {}
-        public Builder(GetNetworkLoadBalancerBackend defaults) {
-    	      Objects.requireNonNull(defaults);
-    	      this.description = defaults.description;
-    	      this.name = defaults.name;
-    	      this.targetAddress = defaults.targetAddress;
-    	      this.targetPort = defaults.targetPort;
-        }
 
-        @CustomType.Setter
-        public Builder description(String description) {
-            if (description == null) {
-              throw new MissingRequiredPropertyException("GetNetworkLoadBalancerBackend", "description");
-            }
-            this.description = description;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder name(String name) {
-            if (name == null) {
-              throw new MissingRequiredPropertyException("GetNetworkLoadBalancerBackend", "name");
-            }
-            this.name = name;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder targetAddress(String targetAddress) {
-            if (targetAddress == null) {
-              throw new MissingRequiredPropertyException("GetNetworkLoadBalancerBackend", "targetAddress");
-            }
-            this.targetAddress = targetAddress;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder targetPort(String targetPort) {
-            if (targetPort == null) {
-              throw new MissingRequiredPropertyException("GetNetworkLoadBalancerBackend", "targetPort");
-            }
-            this.targetPort = targetPort;
-            return this;
-        }
-        public GetNetworkLoadBalancerBackend build() {
-            final var _resultValue = new GetNetworkLoadBalancerBackend();
-            _resultValue.description = description;
-            _resultValue.name = name;
-            _resultValue.targetAddress = targetAddress;
-            _resultValue.targetPort = targetPort;
-            return _resultValue;
-        }
+    @CustomType.Setter
+    public Builder targetAddress(String targetAddress) {
+      if (targetAddress == null) {
+        throw new MissingRequiredPropertyException(
+            "GetNetworkLoadBalancerBackend", "targetAddress");
+      }
+      this.targetAddress = targetAddress;
+      return this;
     }
+
+    @CustomType.Setter
+    public Builder targetPort(String targetPort) {
+      if (targetPort == null) {
+        throw new MissingRequiredPropertyException("GetNetworkLoadBalancerBackend", "targetPort");
+      }
+      this.targetPort = targetPort;
+      return this;
+    }
+
+    public GetNetworkLoadBalancerBackend build() {
+      final var _resultValue = new GetNetworkLoadBalancerBackend();
+      _resultValue.description = description;
+      _resultValue.name = name;
+      _resultValue.targetAddress = targetAddress;
+      _resultValue.targetPort = targetPort;
+      return _resultValue;
+    }
+  }
 }

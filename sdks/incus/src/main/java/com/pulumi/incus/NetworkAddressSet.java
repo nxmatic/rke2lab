@@ -7,107 +7,153 @@ import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Export;
 import com.pulumi.core.annotations.ResourceType;
 import com.pulumi.core.internal.Codegen;
-import com.pulumi.incus.NetworkAddressSetArgs;
-import com.pulumi.incus.Utilities;
 import com.pulumi.incus.inputs.NetworkAddressSetState;
-import java.lang.String;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-@ResourceType(type="incus:index/networkAddressSet:NetworkAddressSet")
+@ResourceType(type = "incus:index/networkAddressSet:NetworkAddressSet")
 public class NetworkAddressSet extends com.pulumi.resources.CustomResource {
-    @Export(name="addresses", refs={List.class,String.class}, tree="[0,1]")
-    private Output<List<String>> addresses;
+  @Export(
+      name = "addresses",
+      refs = {List.class, String.class},
+      tree = "[0,1]")
+  private Output<List<String>> addresses;
 
-    public Output<List<String>> addresses() {
-        return this.addresses;
-    }
-    @Export(name="config", refs={Map.class,String.class}, tree="[0,1,1]")
-    private Output<Map<String,String>> config;
+  public Output<List<String>> addresses() {
+    return this.addresses;
+  }
 
-    public Output<Map<String,String>> config() {
-        return this.config;
-    }
-    @Export(name="description", refs={String.class}, tree="[0]")
-    private Output<String> description;
+  @Export(
+      name = "config",
+      refs = {Map.class, String.class},
+      tree = "[0,1,1]")
+  private Output<Map<String, String>> config;
 
-    public Output<String> description() {
-        return this.description;
-    }
-    @Export(name="name", refs={String.class}, tree="[0]")
-    private Output<String> name;
+  public Output<Map<String, String>> config() {
+    return this.config;
+  }
 
-    public Output<String> name() {
-        return this.name;
-    }
-    @Export(name="project", refs={String.class}, tree="[0]")
-    private Output</* @Nullable */ String> project;
+  @Export(
+      name = "description",
+      refs = {String.class},
+      tree = "[0]")
+  private Output<String> description;
 
-    public Output<Optional<String>> project() {
-        return Codegen.optional(this.project);
-    }
-    @Export(name="remote", refs={String.class}, tree="[0]")
-    private Output</* @Nullable */ String> remote;
+  public Output<String> description() {
+    return this.description;
+  }
 
-    public Output<Optional<String>> remote() {
-        return Codegen.optional(this.remote);
-    }
+  @Export(
+      name = "name",
+      refs = {String.class},
+      tree = "[0]")
+  private Output<String> name;
 
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     */
-    public NetworkAddressSet(java.lang.String name) {
-        this(name, NetworkAddressSetArgs.Empty);
-    }
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param args The arguments to use to populate this resource's properties.
-     */
-    public NetworkAddressSet(java.lang.String name, NetworkAddressSetArgs args) {
-        this(name, args, null);
-    }
-    /**
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param args The arguments to use to populate this resource's properties.
-     * @param options A bag of options that control this resource's behavior.
-     */
-    public NetworkAddressSet(java.lang.String name, NetworkAddressSetArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        super("incus:index/networkAddressSet:NetworkAddressSet", name, makeArgs(args, options), makeResourceOptions(options, Codegen.empty()), false, Utilities.getPackageRef());
-    }
+  public Output<String> name() {
+    return this.name;
+  }
 
-    private NetworkAddressSet(java.lang.String name, Output<java.lang.String> id, @Nullable NetworkAddressSetState state, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        super("incus:index/networkAddressSet:NetworkAddressSet", name, state, makeResourceOptions(options, id), false, Utilities.getPackageRef());
-    }
+  @Export(
+      name = "project",
+      refs = {String.class},
+      tree = "[0]")
+  private Output</* @Nullable */ String> project;
 
-    private static NetworkAddressSetArgs makeArgs(NetworkAddressSetArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        if (options != null && options.getUrn().isPresent()) {
-            return null;
-        }
-        return args == null ? NetworkAddressSetArgs.Empty : args;
-    }
+  public Output<Optional<String>> project() {
+    return Codegen.optional(this.project);
+  }
 
-    private static com.pulumi.resources.CustomResourceOptions makeResourceOptions(@Nullable com.pulumi.resources.CustomResourceOptions options, @Nullable Output<java.lang.String> id) {
-        var defaultOptions = com.pulumi.resources.CustomResourceOptions.builder()
+  @Export(
+      name = "remote",
+      refs = {String.class},
+      tree = "[0]")
+  private Output</* @Nullable */ String> remote;
+
+  public Output<Optional<String>> remote() {
+    return Codegen.optional(this.remote);
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   */
+  public NetworkAddressSet(java.lang.String name) {
+    this(name, NetworkAddressSetArgs.Empty);
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   * @param args The arguments to use to populate this resource's properties.
+   */
+  public NetworkAddressSet(java.lang.String name, NetworkAddressSetArgs args) {
+    this(name, args, null);
+  }
+
+  /**
+   * @param name The _unique_ name of the resulting resource.
+   * @param args The arguments to use to populate this resource's properties.
+   * @param options A bag of options that control this resource's behavior.
+   */
+  public NetworkAddressSet(
+      java.lang.String name,
+      NetworkAddressSetArgs args,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    super(
+        "incus:index/networkAddressSet:NetworkAddressSet",
+        name,
+        makeArgs(args, options),
+        makeResourceOptions(options, Codegen.empty()),
+        false,
+        Utilities.getPackageRef());
+  }
+
+  private NetworkAddressSet(
+      java.lang.String name,
+      Output<java.lang.String> id,
+      @Nullable NetworkAddressSetState state,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    super(
+        "incus:index/networkAddressSet:NetworkAddressSet",
+        name,
+        state,
+        makeResourceOptions(options, id),
+        false,
+        Utilities.getPackageRef());
+  }
+
+  private static NetworkAddressSetArgs makeArgs(
+      NetworkAddressSetArgs args, @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    if (options != null && options.getUrn().isPresent()) {
+      return null;
+    }
+    return args == null ? NetworkAddressSetArgs.Empty : args;
+  }
+
+  private static com.pulumi.resources.CustomResourceOptions makeResourceOptions(
+      @Nullable com.pulumi.resources.CustomResourceOptions options,
+      @Nullable Output<java.lang.String> id) {
+    var defaultOptions =
+        com.pulumi.resources.CustomResourceOptions.builder()
             .version(Utilities.getVersion())
             .build();
-        return com.pulumi.resources.CustomResourceOptions.merge(defaultOptions, options, id);
-    }
+    return com.pulumi.resources.CustomResourceOptions.merge(defaultOptions, options, id);
+  }
 
-    /**
-     * Get an existing Host resource's state with the given name, ID, and optional extra
-     * properties used to qualify the lookup.
-     *
-     * @param name The _unique_ name of the resulting resource.
-     * @param id The _unique_ provider ID of the resource to lookup.
-     * @param state
-     * @param options Optional settings to control the behavior of the CustomResource.
-     */
-    public static NetworkAddressSet get(java.lang.String name, Output<java.lang.String> id, @Nullable NetworkAddressSetState state, @Nullable com.pulumi.resources.CustomResourceOptions options) {
-        return new NetworkAddressSet(name, id, state, options);
-    }
+  /**
+   * Get an existing Host resource's state with the given name, ID, and optional extra properties
+   * used to qualify the lookup.
+   *
+   * @param name The _unique_ name of the resulting resource.
+   * @param id The _unique_ provider ID of the resource to lookup.
+   * @param state
+   * @param options Optional settings to control the behavior of the CustomResource.
+   */
+  public static NetworkAddressSet get(
+      java.lang.String name,
+      Output<java.lang.String> id,
+      @Nullable NetworkAddressSetState state,
+      @Nullable com.pulumi.resources.CustomResourceOptions options) {
+    return new NetworkAddressSet(name, id, state, options);
+  }
 }

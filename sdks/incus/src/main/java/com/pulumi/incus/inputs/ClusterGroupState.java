@@ -5,7 +5,6 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
-import java.lang.String;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -13,104 +12,102 @@ import javax.annotation.Nullable;
 
 public final class ClusterGroupState extends com.pulumi.resources.ResourceArgs {
 
-    public static final ClusterGroupState Empty = new ClusterGroupState();
+  public static final ClusterGroupState Empty = new ClusterGroupState();
 
-    @Import(name = "config")
-    private @Nullable Output<Map<String, String>> config;
+  @Import(name = "config")
+  private @Nullable Output<Map<String, String>> config;
 
-    public Optional<Output<Map<String, String>>> config() {
-        return Optional.ofNullable(this.config);
+  public Optional<Output<Map<String, String>>> config() {
+    return Optional.ofNullable(this.config);
+  }
+
+  @Import(name = "description")
+  private @Nullable Output<String> description;
+
+  public Optional<Output<String>> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "name")
+  private @Nullable Output<String> name;
+
+  public Optional<Output<String>> name() {
+    return Optional.ofNullable(this.name);
+  }
+
+  @Import(name = "remote")
+  private @Nullable Output<String> remote;
+
+  public Optional<Output<String>> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  private ClusterGroupState() {}
+
+  private ClusterGroupState(ClusterGroupState $) {
+    this.config = $.config;
+    this.description = $.description;
+    this.name = $.name;
+    this.remote = $.remote;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(ClusterGroupState defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private ClusterGroupState $;
+
+    public Builder() {
+      $ = new ClusterGroupState();
     }
 
-    @Import(name = "description")
-    private @Nullable Output<String> description;
-
-    public Optional<Output<String>> description() {
-        return Optional.ofNullable(this.description);
+    public Builder(ClusterGroupState defaults) {
+      $ = new ClusterGroupState(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "name")
-    private @Nullable Output<String> name;
-
-    public Optional<Output<String>> name() {
-        return Optional.ofNullable(this.name);
+    public Builder config(@Nullable Output<Map<String, String>> config) {
+      $.config = config;
+      return this;
     }
 
-    @Import(name = "remote")
-    private @Nullable Output<String> remote;
-
-    public Optional<Output<String>> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder config(Map<String, String> config) {
+      return config(Output.of(config));
     }
 
-    private ClusterGroupState() {
+    public Builder description(@Nullable Output<String> description) {
+      $.description = description;
+      return this;
     }
 
-    private ClusterGroupState(ClusterGroupState $) {
-        this.config = $.config;
-        this.description = $.description;
-        this.name = $.name;
-        this.remote = $.remote;
+    public Builder description(String description) {
+      return description(Output.of(description));
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder name(@Nullable Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    public static Builder builder(ClusterGroupState defaults) {
-        return new Builder(defaults);
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
-    public static final class Builder {
-        private ClusterGroupState $;
-
-        public Builder() {
-            $ = new ClusterGroupState();
-        }
-
-        public Builder(ClusterGroupState defaults) {
-            $ = new ClusterGroupState(Objects.requireNonNull(defaults));
-        }
-
-        public Builder config(@Nullable Output<Map<String, String>> config) {
-            $.config = config;
-            return this;
-        }
-
-        public Builder config(Map<String, String> config) {
-            return config(Output.of(config));
-        }
-
-        public Builder description(@Nullable Output<String> description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder description(String description) {
-            return description(Output.of(description));
-        }
-
-        public Builder name(@Nullable Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        public Builder remote(@Nullable Output<String> remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder remote(String remote) {
-            return remote(Output.of(remote));
-        }
-
-        public ClusterGroupState build() {
-            return $;
-        }
+    public Builder remote(@Nullable Output<String> remote) {
+      $.remote = remote;
+      return this;
     }
 
+    public Builder remote(String remote) {
+      return remote(Output.of(remote));
+    }
+
+    public ClusterGroupState build() {
+      return $;
+    }
+  }
 }

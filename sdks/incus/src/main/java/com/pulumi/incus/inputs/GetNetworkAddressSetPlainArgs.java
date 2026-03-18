@@ -5,7 +5,6 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -13,108 +12,106 @@ import javax.annotation.Nullable;
 
 public final class GetNetworkAddressSetPlainArgs extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetNetworkAddressSetPlainArgs Empty = new GetNetworkAddressSetPlainArgs();
+  public static final GetNetworkAddressSetPlainArgs Empty = new GetNetworkAddressSetPlainArgs();
 
-    @Import(name = "addresses")
-    private @Nullable List<String> addresses;
+  @Import(name = "addresses")
+  private @Nullable List<String> addresses;
 
-    public Optional<List<String>> addresses() {
-        return Optional.ofNullable(this.addresses);
+  public Optional<List<String>> addresses() {
+    return Optional.ofNullable(this.addresses);
+  }
+
+  @Import(name = "description")
+  private @Nullable String description;
+
+  public Optional<String> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "name", required = true)
+  private String name;
+
+  public String name() {
+    return this.name;
+  }
+
+  @Import(name = "project")
+  private @Nullable String project;
+
+  public Optional<String> project() {
+    return Optional.ofNullable(this.project);
+  }
+
+  @Import(name = "remote")
+  private @Nullable String remote;
+
+  public Optional<String> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  private GetNetworkAddressSetPlainArgs() {}
+
+  private GetNetworkAddressSetPlainArgs(GetNetworkAddressSetPlainArgs $) {
+    this.addresses = $.addresses;
+    this.description = $.description;
+    this.name = $.name;
+    this.project = $.project;
+    this.remote = $.remote;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetNetworkAddressSetPlainArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetNetworkAddressSetPlainArgs $;
+
+    public Builder() {
+      $ = new GetNetworkAddressSetPlainArgs();
     }
 
-    @Import(name = "description")
-    private @Nullable String description;
-
-    public Optional<String> description() {
-        return Optional.ofNullable(this.description);
+    public Builder(GetNetworkAddressSetPlainArgs defaults) {
+      $ = new GetNetworkAddressSetPlainArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "name", required = true)
-    private String name;
-
-    public String name() {
-        return this.name;
+    public Builder addresses(@Nullable List<String> addresses) {
+      $.addresses = addresses;
+      return this;
     }
 
-    @Import(name = "project")
-    private @Nullable String project;
-
-    public Optional<String> project() {
-        return Optional.ofNullable(this.project);
+    public Builder addresses(String... addresses) {
+      return addresses(List.of(addresses));
     }
 
-    @Import(name = "remote")
-    private @Nullable String remote;
-
-    public Optional<String> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder description(@Nullable String description) {
+      $.description = description;
+      return this;
     }
 
-    private GetNetworkAddressSetPlainArgs() {
+    public Builder name(String name) {
+      $.name = name;
+      return this;
     }
 
-    private GetNetworkAddressSetPlainArgs(GetNetworkAddressSetPlainArgs $) {
-        this.addresses = $.addresses;
-        this.description = $.description;
-        this.name = $.name;
-        this.project = $.project;
-        this.remote = $.remote;
+    public Builder project(@Nullable String project) {
+      $.project = project;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder remote(@Nullable String remote) {
+      $.remote = remote;
+      return this;
     }
 
-    public static Builder builder(GetNetworkAddressSetPlainArgs defaults) {
-        return new Builder(defaults);
+    public GetNetworkAddressSetPlainArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("GetNetworkAddressSetPlainArgs", "name");
+      }
+      return $;
     }
-
-    public static final class Builder {
-        private GetNetworkAddressSetPlainArgs $;
-
-        public Builder() {
-            $ = new GetNetworkAddressSetPlainArgs();
-        }
-
-        public Builder(GetNetworkAddressSetPlainArgs defaults) {
-            $ = new GetNetworkAddressSetPlainArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder addresses(@Nullable List<String> addresses) {
-            $.addresses = addresses;
-            return this;
-        }
-
-        public Builder addresses(String... addresses) {
-            return addresses(List.of(addresses));
-        }
-
-        public Builder description(@Nullable String description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder name(String name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder project(@Nullable String project) {
-            $.project = project;
-            return this;
-        }
-
-        public Builder remote(@Nullable String remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public GetNetworkAddressSetPlainArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("GetNetworkAddressSetPlainArgs", "name");
-            }
-            return $;
-        }
-    }
-
+  }
 }

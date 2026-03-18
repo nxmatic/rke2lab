@@ -5,7 +5,6 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
-import java.lang.String;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -13,189 +12,187 @@ import javax.annotation.Nullable;
 
 public final class StorageBucketState extends com.pulumi.resources.ResourceArgs {
 
-    public static final StorageBucketState Empty = new StorageBucketState();
+  public static final StorageBucketState Empty = new StorageBucketState();
 
-    @Import(name = "config")
-    private @Nullable Output<Map<String, String>> config;
+  @Import(name = "config")
+  private @Nullable Output<Map<String, String>> config;
 
-    public Optional<Output<Map<String, String>>> config() {
-        return Optional.ofNullable(this.config);
+  public Optional<Output<Map<String, String>>> config() {
+    return Optional.ofNullable(this.config);
+  }
+
+  @Import(name = "description")
+  private @Nullable Output<String> description;
+
+  public Optional<Output<String>> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "location")
+  private @Nullable Output<String> location;
+
+  public Optional<Output<String>> location() {
+    return Optional.ofNullable(this.location);
+  }
+
+  @Import(name = "name")
+  private @Nullable Output<String> name;
+
+  public Optional<Output<String>> name() {
+    return Optional.ofNullable(this.name);
+  }
+
+  @Import(name = "pool")
+  private @Nullable Output<String> pool;
+
+  public Optional<Output<String>> pool() {
+    return Optional.ofNullable(this.pool);
+  }
+
+  @Import(name = "project")
+  private @Nullable Output<String> project;
+
+  public Optional<Output<String>> project() {
+    return Optional.ofNullable(this.project);
+  }
+
+  @Import(name = "remote")
+  private @Nullable Output<String> remote;
+
+  public Optional<Output<String>> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  @Import(name = "sourceFile")
+  private @Nullable Output<String> sourceFile;
+
+  public Optional<Output<String>> sourceFile() {
+    return Optional.ofNullable(this.sourceFile);
+  }
+
+  @Import(name = "target")
+  private @Nullable Output<String> target;
+
+  public Optional<Output<String>> target() {
+    return Optional.ofNullable(this.target);
+  }
+
+  private StorageBucketState() {}
+
+  private StorageBucketState(StorageBucketState $) {
+    this.config = $.config;
+    this.description = $.description;
+    this.location = $.location;
+    this.name = $.name;
+    this.pool = $.pool;
+    this.project = $.project;
+    this.remote = $.remote;
+    this.sourceFile = $.sourceFile;
+    this.target = $.target;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(StorageBucketState defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private StorageBucketState $;
+
+    public Builder() {
+      $ = new StorageBucketState();
     }
 
-    @Import(name = "description")
-    private @Nullable Output<String> description;
-
-    public Optional<Output<String>> description() {
-        return Optional.ofNullable(this.description);
+    public Builder(StorageBucketState defaults) {
+      $ = new StorageBucketState(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "location")
-    private @Nullable Output<String> location;
-
-    public Optional<Output<String>> location() {
-        return Optional.ofNullable(this.location);
+    public Builder config(@Nullable Output<Map<String, String>> config) {
+      $.config = config;
+      return this;
     }
 
-    @Import(name = "name")
-    private @Nullable Output<String> name;
-
-    public Optional<Output<String>> name() {
-        return Optional.ofNullable(this.name);
+    public Builder config(Map<String, String> config) {
+      return config(Output.of(config));
     }
 
-    @Import(name = "pool")
-    private @Nullable Output<String> pool;
-
-    public Optional<Output<String>> pool() {
-        return Optional.ofNullable(this.pool);
+    public Builder description(@Nullable Output<String> description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name = "project")
-    private @Nullable Output<String> project;
-
-    public Optional<Output<String>> project() {
-        return Optional.ofNullable(this.project);
+    public Builder description(String description) {
+      return description(Output.of(description));
     }
 
-    @Import(name = "remote")
-    private @Nullable Output<String> remote;
-
-    public Optional<Output<String>> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder location(@Nullable Output<String> location) {
+      $.location = location;
+      return this;
     }
 
-    @Import(name = "sourceFile")
-    private @Nullable Output<String> sourceFile;
-
-    public Optional<Output<String>> sourceFile() {
-        return Optional.ofNullable(this.sourceFile);
+    public Builder location(String location) {
+      return location(Output.of(location));
     }
 
-    @Import(name = "target")
-    private @Nullable Output<String> target;
-
-    public Optional<Output<String>> target() {
-        return Optional.ofNullable(this.target);
+    public Builder name(@Nullable Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    private StorageBucketState() {
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
-    private StorageBucketState(StorageBucketState $) {
-        this.config = $.config;
-        this.description = $.description;
-        this.location = $.location;
-        this.name = $.name;
-        this.pool = $.pool;
-        this.project = $.project;
-        this.remote = $.remote;
-        this.sourceFile = $.sourceFile;
-        this.target = $.target;
+    public Builder pool(@Nullable Output<String> pool) {
+      $.pool = pool;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder pool(String pool) {
+      return pool(Output.of(pool));
     }
 
-    public static Builder builder(StorageBucketState defaults) {
-        return new Builder(defaults);
+    public Builder project(@Nullable Output<String> project) {
+      $.project = project;
+      return this;
     }
 
-    public static final class Builder {
-        private StorageBucketState $;
-
-        public Builder() {
-            $ = new StorageBucketState();
-        }
-
-        public Builder(StorageBucketState defaults) {
-            $ = new StorageBucketState(Objects.requireNonNull(defaults));
-        }
-
-        public Builder config(@Nullable Output<Map<String, String>> config) {
-            $.config = config;
-            return this;
-        }
-
-        public Builder config(Map<String, String> config) {
-            return config(Output.of(config));
-        }
-
-        public Builder description(@Nullable Output<String> description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder description(String description) {
-            return description(Output.of(description));
-        }
-
-        public Builder location(@Nullable Output<String> location) {
-            $.location = location;
-            return this;
-        }
-
-        public Builder location(String location) {
-            return location(Output.of(location));
-        }
-
-        public Builder name(@Nullable Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        public Builder pool(@Nullable Output<String> pool) {
-            $.pool = pool;
-            return this;
-        }
-
-        public Builder pool(String pool) {
-            return pool(Output.of(pool));
-        }
-
-        public Builder project(@Nullable Output<String> project) {
-            $.project = project;
-            return this;
-        }
-
-        public Builder project(String project) {
-            return project(Output.of(project));
-        }
-
-        public Builder remote(@Nullable Output<String> remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder remote(String remote) {
-            return remote(Output.of(remote));
-        }
-
-        public Builder sourceFile(@Nullable Output<String> sourceFile) {
-            $.sourceFile = sourceFile;
-            return this;
-        }
-
-        public Builder sourceFile(String sourceFile) {
-            return sourceFile(Output.of(sourceFile));
-        }
-
-        public Builder target(@Nullable Output<String> target) {
-            $.target = target;
-            return this;
-        }
-
-        public Builder target(String target) {
-            return target(Output.of(target));
-        }
-
-        public StorageBucketState build() {
-            return $;
-        }
+    public Builder project(String project) {
+      return project(Output.of(project));
     }
 
+    public Builder remote(@Nullable Output<String> remote) {
+      $.remote = remote;
+      return this;
+    }
+
+    public Builder remote(String remote) {
+      return remote(Output.of(remote));
+    }
+
+    public Builder sourceFile(@Nullable Output<String> sourceFile) {
+      $.sourceFile = sourceFile;
+      return this;
+    }
+
+    public Builder sourceFile(String sourceFile) {
+      return sourceFile(Output.of(sourceFile));
+    }
+
+    public Builder target(@Nullable Output<String> target) {
+      $.target = target;
+      return this;
+    }
+
+    public Builder target(String target) {
+      return target(Output.of(target));
+    }
+
+    public StorageBucketState build() {
+      return $;
+    }
+  }
 }

@@ -9,175 +9,163 @@ import com.pulumi.incus.inputs.ImageAliasArgs;
 import com.pulumi.incus.inputs.ImageSourceFileArgs;
 import com.pulumi.incus.inputs.ImageSourceImageArgs;
 import com.pulumi.incus.inputs.ImageSourceInstanceArgs;
-import java.lang.String;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class ImageArgs extends com.pulumi.resources.ResourceArgs {
 
-    public static final ImageArgs Empty = new ImageArgs();
+  public static final ImageArgs Empty = new ImageArgs();
+
+  /** Image alias */
+  @Import(name = "aliases")
+  private @Nullable Output<List<ImageAliasArgs>> aliases;
+
+  /**
+   * @return Image alias
+   */
+  public Optional<Output<List<ImageAliasArgs>>> aliases() {
+    return Optional.ofNullable(this.aliases);
+  }
+
+  @Import(name = "project")
+  private @Nullable Output<String> project;
+
+  public Optional<Output<String>> project() {
+    return Optional.ofNullable(this.project);
+  }
+
+  @Import(name = "remote")
+  private @Nullable Output<String> remote;
+
+  public Optional<Output<String>> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  @Import(name = "sourceFile")
+  private @Nullable Output<ImageSourceFileArgs> sourceFile;
+
+  public Optional<Output<ImageSourceFileArgs>> sourceFile() {
+    return Optional.ofNullable(this.sourceFile);
+  }
+
+  @Import(name = "sourceImage")
+  private @Nullable Output<ImageSourceImageArgs> sourceImage;
+
+  public Optional<Output<ImageSourceImageArgs>> sourceImage() {
+    return Optional.ofNullable(this.sourceImage);
+  }
+
+  @Import(name = "sourceInstance")
+  private @Nullable Output<ImageSourceInstanceArgs> sourceInstance;
+
+  public Optional<Output<ImageSourceInstanceArgs>> sourceInstance() {
+    return Optional.ofNullable(this.sourceInstance);
+  }
+
+  private ImageArgs() {}
+
+  private ImageArgs(ImageArgs $) {
+    this.aliases = $.aliases;
+    this.project = $.project;
+    this.remote = $.remote;
+    this.sourceFile = $.sourceFile;
+    this.sourceImage = $.sourceImage;
+    this.sourceInstance = $.sourceInstance;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(ImageArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private ImageArgs $;
+
+    public Builder() {
+      $ = new ImageArgs();
+    }
+
+    public Builder(ImageArgs defaults) {
+      $ = new ImageArgs(Objects.requireNonNull(defaults));
+    }
 
     /**
-     * Image alias
-     * 
+     * @param aliases Image alias
+     * @return builder
      */
-    @Import(name="aliases")
-    private @Nullable Output<List<ImageAliasArgs>> aliases;
+    public Builder aliases(@Nullable Output<List<ImageAliasArgs>> aliases) {
+      $.aliases = aliases;
+      return this;
+    }
 
     /**
-     * @return Image alias
-     * 
+     * @param aliases Image alias
+     * @return builder
      */
-    public Optional<Output<List<ImageAliasArgs>>> aliases() {
-        return Optional.ofNullable(this.aliases);
+    public Builder aliases(List<ImageAliasArgs> aliases) {
+      return aliases(Output.of(aliases));
     }
 
-    @Import(name="project")
-    private @Nullable Output<String> project;
-
-    public Optional<Output<String>> project() {
-        return Optional.ofNullable(this.project);
+    /**
+     * @param aliases Image alias
+     * @return builder
+     */
+    public Builder aliases(ImageAliasArgs... aliases) {
+      return aliases(List.of(aliases));
     }
 
-    @Import(name="remote")
-    private @Nullable Output<String> remote;
-
-    public Optional<Output<String>> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder project(@Nullable Output<String> project) {
+      $.project = project;
+      return this;
     }
 
-    @Import(name="sourceFile")
-    private @Nullable Output<ImageSourceFileArgs> sourceFile;
-
-    public Optional<Output<ImageSourceFileArgs>> sourceFile() {
-        return Optional.ofNullable(this.sourceFile);
+    public Builder project(String project) {
+      return project(Output.of(project));
     }
 
-    @Import(name="sourceImage")
-    private @Nullable Output<ImageSourceImageArgs> sourceImage;
-
-    public Optional<Output<ImageSourceImageArgs>> sourceImage() {
-        return Optional.ofNullable(this.sourceImage);
+    public Builder remote(@Nullable Output<String> remote) {
+      $.remote = remote;
+      return this;
     }
 
-    @Import(name="sourceInstance")
-    private @Nullable Output<ImageSourceInstanceArgs> sourceInstance;
-
-    public Optional<Output<ImageSourceInstanceArgs>> sourceInstance() {
-        return Optional.ofNullable(this.sourceInstance);
+    public Builder remote(String remote) {
+      return remote(Output.of(remote));
     }
 
-    private ImageArgs() {}
-
-    private ImageArgs(ImageArgs $) {
-        this.aliases = $.aliases;
-        this.project = $.project;
-        this.remote = $.remote;
-        this.sourceFile = $.sourceFile;
-        this.sourceImage = $.sourceImage;
-        this.sourceInstance = $.sourceInstance;
+    public Builder sourceFile(@Nullable Output<ImageSourceFileArgs> sourceFile) {
+      $.sourceFile = sourceFile;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
-    }
-    public static Builder builder(ImageArgs defaults) {
-        return new Builder(defaults);
+    public Builder sourceFile(ImageSourceFileArgs sourceFile) {
+      return sourceFile(Output.of(sourceFile));
     }
 
-    public static final class Builder {
-        private ImageArgs $;
-
-        public Builder() {
-            $ = new ImageArgs();
-        }
-
-        public Builder(ImageArgs defaults) {
-            $ = new ImageArgs(Objects.requireNonNull(defaults));
-        }
-
-        /**
-         * @param aliases Image alias
-         * 
-         * @return builder
-         * 
-         */
-        public Builder aliases(@Nullable Output<List<ImageAliasArgs>> aliases) {
-            $.aliases = aliases;
-            return this;
-        }
-
-        /**
-         * @param aliases Image alias
-         * 
-         * @return builder
-         * 
-         */
-        public Builder aliases(List<ImageAliasArgs> aliases) {
-            return aliases(Output.of(aliases));
-        }
-
-        /**
-         * @param aliases Image alias
-         * 
-         * @return builder
-         * 
-         */
-        public Builder aliases(ImageAliasArgs... aliases) {
-            return aliases(List.of(aliases));
-        }
-
-        public Builder project(@Nullable Output<String> project) {
-            $.project = project;
-            return this;
-        }
-
-        public Builder project(String project) {
-            return project(Output.of(project));
-        }
-
-        public Builder remote(@Nullable Output<String> remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder remote(String remote) {
-            return remote(Output.of(remote));
-        }
-
-        public Builder sourceFile(@Nullable Output<ImageSourceFileArgs> sourceFile) {
-            $.sourceFile = sourceFile;
-            return this;
-        }
-
-        public Builder sourceFile(ImageSourceFileArgs sourceFile) {
-            return sourceFile(Output.of(sourceFile));
-        }
-
-        public Builder sourceImage(@Nullable Output<ImageSourceImageArgs> sourceImage) {
-            $.sourceImage = sourceImage;
-            return this;
-        }
-
-        public Builder sourceImage(ImageSourceImageArgs sourceImage) {
-            return sourceImage(Output.of(sourceImage));
-        }
-
-        public Builder sourceInstance(@Nullable Output<ImageSourceInstanceArgs> sourceInstance) {
-            $.sourceInstance = sourceInstance;
-            return this;
-        }
-
-        public Builder sourceInstance(ImageSourceInstanceArgs sourceInstance) {
-            return sourceInstance(Output.of(sourceInstance));
-        }
-
-        public ImageArgs build() {
-            return $;
-        }
+    public Builder sourceImage(@Nullable Output<ImageSourceImageArgs> sourceImage) {
+      $.sourceImage = sourceImage;
+      return this;
     }
 
+    public Builder sourceImage(ImageSourceImageArgs sourceImage) {
+      return sourceImage(Output.of(sourceImage));
+    }
+
+    public Builder sourceInstance(@Nullable Output<ImageSourceInstanceArgs> sourceInstance) {
+      $.sourceInstance = sourceInstance;
+      return this;
+    }
+
+    public Builder sourceInstance(ImageSourceInstanceArgs sourceInstance) {
+      return sourceInstance(Output.of(sourceInstance));
+    }
+
+    public ImageArgs build() {
+      return $;
+    }
+  }
 }

@@ -6,7 +6,6 @@ package com.pulumi.incus.inputs;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -14,174 +13,164 @@ import javax.annotation.Nullable;
 
 public final class NetworkLbPortArgs extends com.pulumi.resources.ResourceArgs {
 
-    public static final NetworkLbPortArgs Empty = new NetworkLbPortArgs();
+  public static final NetworkLbPortArgs Empty = new NetworkLbPortArgs();
 
-    /**
-     * Port description
-     */
-    @Import(name = "description")
-    private @Nullable Output<String> description;
+  /** Port description */
+  @Import(name = "description")
+  private @Nullable Output<String> description;
 
-    /**
-     * @return Port description
-     */
-    public Optional<Output<String>> description() {
-        return Optional.ofNullable(this.description);
+  /**
+   * @return Port description
+   */
+  public Optional<Output<String>> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  /** Port to listen to */
+  @Import(name = "listenPort", required = true)
+  private Output<String> listenPort;
+
+  /**
+   * @return Port to listen to
+   */
+  public Output<String> listenPort() {
+    return this.listenPort;
+  }
+
+  /** Port protocol */
+  @Import(name = "protocol")
+  private @Nullable Output<String> protocol;
+
+  /**
+   * @return Port protocol
+   */
+  public Optional<Output<String>> protocol() {
+    return Optional.ofNullable(this.protocol);
+  }
+
+  /** List of target LB backends */
+  @Import(name = "targetBackends", required = true)
+  private Output<List<String>> targetBackends;
+
+  /**
+   * @return List of target LB backends
+   */
+  public Output<List<String>> targetBackends() {
+    return this.targetBackends;
+  }
+
+  private NetworkLbPortArgs() {}
+
+  private NetworkLbPortArgs(NetworkLbPortArgs $) {
+    this.description = $.description;
+    this.listenPort = $.listenPort;
+    this.protocol = $.protocol;
+    this.targetBackends = $.targetBackends;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(NetworkLbPortArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private NetworkLbPortArgs $;
+
+    public Builder() {
+      $ = new NetworkLbPortArgs();
+    }
+
+    public Builder(NetworkLbPortArgs defaults) {
+      $ = new NetworkLbPortArgs(Objects.requireNonNull(defaults));
     }
 
     /**
-     * Port to listen to
+     * @param description Port description
+     * @return builder
      */
-    @Import(name = "listenPort", required = true)
-    private Output<String> listenPort;
-
-    /**
-     * @return Port to listen to
-     */
-    public Output<String> listenPort() {
-        return this.listenPort;
+    public Builder description(@Nullable Output<String> description) {
+      $.description = description;
+      return this;
     }
 
     /**
-     * Port protocol
+     * @param description Port description
+     * @return builder
      */
-    @Import(name = "protocol")
-    private @Nullable Output<String> protocol;
-
-    /**
-     * @return Port protocol
-     */
-    public Optional<Output<String>> protocol() {
-        return Optional.ofNullable(this.protocol);
+    public Builder description(String description) {
+      return description(Output.of(description));
     }
 
     /**
-     * List of target LB backends
+     * @param listenPort Port to listen to
+     * @return builder
      */
-    @Import(name = "targetBackends", required = true)
-    private Output<List<String>> targetBackends;
+    public Builder listenPort(Output<String> listenPort) {
+      $.listenPort = listenPort;
+      return this;
+    }
 
     /**
-     * @return List of target LB backends
+     * @param listenPort Port to listen to
+     * @return builder
      */
-    public Output<List<String>> targetBackends() {
-        return this.targetBackends;
+    public Builder listenPort(String listenPort) {
+      return listenPort(Output.of(listenPort));
     }
 
-    private NetworkLbPortArgs() {
+    /**
+     * @param protocol Port protocol
+     * @return builder
+     */
+    public Builder protocol(@Nullable Output<String> protocol) {
+      $.protocol = protocol;
+      return this;
     }
 
-    private NetworkLbPortArgs(NetworkLbPortArgs $) {
-        this.description = $.description;
-        this.listenPort = $.listenPort;
-        this.protocol = $.protocol;
-        this.targetBackends = $.targetBackends;
+    /**
+     * @param protocol Port protocol
+     * @return builder
+     */
+    public Builder protocol(String protocol) {
+      return protocol(Output.of(protocol));
     }
 
-    public static Builder builder() {
-        return new Builder();
+    /**
+     * @param targetBackends List of target LB backends
+     * @return builder
+     */
+    public Builder targetBackends(Output<List<String>> targetBackends) {
+      $.targetBackends = targetBackends;
+      return this;
     }
 
-    public static Builder builder(NetworkLbPortArgs defaults) {
-        return new Builder(defaults);
+    /**
+     * @param targetBackends List of target LB backends
+     * @return builder
+     */
+    public Builder targetBackends(List<String> targetBackends) {
+      return targetBackends(Output.of(targetBackends));
     }
 
-    public static final class Builder {
-        private NetworkLbPortArgs $;
-
-        public Builder() {
-            $ = new NetworkLbPortArgs();
-        }
-
-        public Builder(NetworkLbPortArgs defaults) {
-            $ = new NetworkLbPortArgs(Objects.requireNonNull(defaults));
-        }
-
-        /**
-         * @param description Port description
-         * @return builder
-         */
-        public Builder description(@Nullable Output<String> description) {
-            $.description = description;
-            return this;
-        }
-
-        /**
-         * @param description Port description
-         * @return builder
-         */
-        public Builder description(String description) {
-            return description(Output.of(description));
-        }
-
-        /**
-         * @param listenPort Port to listen to
-         * @return builder
-         */
-        public Builder listenPort(Output<String> listenPort) {
-            $.listenPort = listenPort;
-            return this;
-        }
-
-        /**
-         * @param listenPort Port to listen to
-         * @return builder
-         */
-        public Builder listenPort(String listenPort) {
-            return listenPort(Output.of(listenPort));
-        }
-
-        /**
-         * @param protocol Port protocol
-         * @return builder
-         */
-        public Builder protocol(@Nullable Output<String> protocol) {
-            $.protocol = protocol;
-            return this;
-        }
-
-        /**
-         * @param protocol Port protocol
-         * @return builder
-         */
-        public Builder protocol(String protocol) {
-            return protocol(Output.of(protocol));
-        }
-
-        /**
-         * @param targetBackends List of target LB backends
-         * @return builder
-         */
-        public Builder targetBackends(Output<List<String>> targetBackends) {
-            $.targetBackends = targetBackends;
-            return this;
-        }
-
-        /**
-         * @param targetBackends List of target LB backends
-         * @return builder
-         */
-        public Builder targetBackends(List<String> targetBackends) {
-            return targetBackends(Output.of(targetBackends));
-        }
-
-        /**
-         * @param targetBackends List of target LB backends
-         * @return builder
-         */
-        public Builder targetBackends(String... targetBackends) {
-            return targetBackends(List.of(targetBackends));
-        }
-
-        public NetworkLbPortArgs build() {
-            if ($.listenPort == null) {
-                throw new MissingRequiredPropertyException("NetworkLbPortArgs", "listenPort");
-            }
-            if ($.targetBackends == null) {
-                throw new MissingRequiredPropertyException("NetworkLbPortArgs", "targetBackends");
-            }
-            return $;
-        }
+    /**
+     * @param targetBackends List of target LB backends
+     * @return builder
+     */
+    public Builder targetBackends(String... targetBackends) {
+      return targetBackends(List.of(targetBackends));
     }
 
+    public NetworkLbPortArgs build() {
+      if ($.listenPort == null) {
+        throw new MissingRequiredPropertyException("NetworkLbPortArgs", "listenPort");
+      }
+      if ($.targetBackends == null) {
+        throw new MissingRequiredPropertyException("NetworkLbPortArgs", "targetBackends");
+      }
+      return $;
+    }
+  }
 }

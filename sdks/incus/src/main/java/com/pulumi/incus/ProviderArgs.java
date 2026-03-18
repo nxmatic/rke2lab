@@ -6,276 +6,234 @@ package com.pulumi.incus;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.incus.inputs.ProviderRemoteArgs;
-import java.lang.Boolean;
-import java.lang.String;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
-
 public final class ProviderArgs extends com.pulumi.resources.ResourceArgs {
 
-    public static final ProviderArgs Empty = new ProviderArgs();
+  public static final ProviderArgs Empty = new ProviderArgs();
 
-    /**
-     * Accept the server certificate.
-     * 
-     */
-    @Import(name="acceptRemoteCertificate", json=true)
-    private @Nullable Output<Boolean> acceptRemoteCertificate;
+  /** Accept the server certificate. */
+  @Import(name = "acceptRemoteCertificate", json = true)
+  private @Nullable Output<Boolean> acceptRemoteCertificate;
 
-    /**
-     * @return Accept the server certificate.
-     * 
-     */
-    public Optional<Output<Boolean>> acceptRemoteCertificate() {
-        return Optional.ofNullable(this.acceptRemoteCertificate);
+  /**
+   * @return Accept the server certificate.
+   */
+  public Optional<Output<Boolean>> acceptRemoteCertificate() {
+    return Optional.ofNullable(this.acceptRemoteCertificate);
+  }
+
+  /** The directory to look for existing Incus configuration. (default = $HOME/.config/incus) */
+  @Import(name = "configDir")
+  private @Nullable Output<String> configDir;
+
+  /**
+   * @return The directory to look for existing Incus configuration. (default = $HOME/.config/incus)
+   */
+  public Optional<Output<String>> configDir() {
+    return Optional.ofNullable(this.configDir);
+  }
+
+  /** The default remote to use when no other remote is defined in a resource. */
+  @Import(name = "defaultRemote")
+  private @Nullable Output<String> defaultRemote;
+
+  /**
+   * @return The default remote to use when no other remote is defined in a resource.
+   */
+  public Optional<Output<String>> defaultRemote() {
+    return Optional.ofNullable(this.defaultRemote);
+  }
+
+  /** Automatically generate the Incus client certificates if they don&#39;t exist. */
+  @Import(name = "generateClientCertificates", json = true)
+  private @Nullable Output<Boolean> generateClientCertificates;
+
+  /**
+   * @return Automatically generate the Incus client certificates if they don&#39;t exist.
+   */
+  public Optional<Output<Boolean>> generateClientCertificates() {
+    return Optional.ofNullable(this.generateClientCertificates);
+  }
+
+  /**
+   * The project where project-scoped resources will be created. Can be overridden in individual
+   * resources. (default = default)
+   */
+  @Import(name = "project")
+  private @Nullable Output<String> project;
+
+  /**
+   * @return The project where project-scoped resources will be created. Can be overridden in
+   *     individual resources. (default = default)
+   */
+  public Optional<Output<String>> project() {
+    return Optional.ofNullable(this.project);
+  }
+
+  /** Incus Remote */
+  @Import(name = "remotes", json = true)
+  private @Nullable Output<List<ProviderRemoteArgs>> remotes;
+
+  /**
+   * @return Incus Remote
+   */
+  public Optional<Output<List<ProviderRemoteArgs>>> remotes() {
+    return Optional.ofNullable(this.remotes);
+  }
+
+  private ProviderArgs() {}
+
+  private ProviderArgs(ProviderArgs $) {
+    this.acceptRemoteCertificate = $.acceptRemoteCertificate;
+    this.configDir = $.configDir;
+    this.defaultRemote = $.defaultRemote;
+    this.generateClientCertificates = $.generateClientCertificates;
+    this.project = $.project;
+    this.remotes = $.remotes;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(ProviderArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private ProviderArgs $;
+
+    public Builder() {
+      $ = new ProviderArgs();
+    }
+
+    public Builder(ProviderArgs defaults) {
+      $ = new ProviderArgs(Objects.requireNonNull(defaults));
     }
 
     /**
-     * The directory to look for existing Incus configuration. (default = $HOME/.config/incus)
-     * 
+     * @param acceptRemoteCertificate Accept the server certificate.
+     * @return builder
      */
-    @Import(name="configDir")
-    private @Nullable Output<String> configDir;
-
-    /**
-     * @return The directory to look for existing Incus configuration. (default = $HOME/.config/incus)
-     * 
-     */
-    public Optional<Output<String>> configDir() {
-        return Optional.ofNullable(this.configDir);
+    public Builder acceptRemoteCertificate(@Nullable Output<Boolean> acceptRemoteCertificate) {
+      $.acceptRemoteCertificate = acceptRemoteCertificate;
+      return this;
     }
 
     /**
-     * The default remote to use when no other remote is defined in a resource.
-     * 
+     * @param acceptRemoteCertificate Accept the server certificate.
+     * @return builder
      */
-    @Import(name="defaultRemote")
-    private @Nullable Output<String> defaultRemote;
-
-    /**
-     * @return The default remote to use when no other remote is defined in a resource.
-     * 
-     */
-    public Optional<Output<String>> defaultRemote() {
-        return Optional.ofNullable(this.defaultRemote);
+    public Builder acceptRemoteCertificate(Boolean acceptRemoteCertificate) {
+      return acceptRemoteCertificate(Output.of(acceptRemoteCertificate));
     }
 
     /**
-     * Automatically generate the Incus client certificates if they don&#39;t exist.
-     * 
+     * @param configDir The directory to look for existing Incus configuration. (default =
+     *     $HOME/.config/incus)
+     * @return builder
      */
-    @Import(name="generateClientCertificates", json=true)
-    private @Nullable Output<Boolean> generateClientCertificates;
-
-    /**
-     * @return Automatically generate the Incus client certificates if they don&#39;t exist.
-     * 
-     */
-    public Optional<Output<Boolean>> generateClientCertificates() {
-        return Optional.ofNullable(this.generateClientCertificates);
+    public Builder configDir(@Nullable Output<String> configDir) {
+      $.configDir = configDir;
+      return this;
     }
 
     /**
-     * The project where project-scoped resources will be created. Can be overridden in individual resources. (default = default)
-     * 
+     * @param configDir The directory to look for existing Incus configuration. (default =
+     *     $HOME/.config/incus)
+     * @return builder
      */
-    @Import(name="project")
-    private @Nullable Output<String> project;
-
-    /**
-     * @return The project where project-scoped resources will be created. Can be overridden in individual resources. (default = default)
-     * 
-     */
-    public Optional<Output<String>> project() {
-        return Optional.ofNullable(this.project);
+    public Builder configDir(String configDir) {
+      return configDir(Output.of(configDir));
     }
 
     /**
-     * Incus Remote
-     * 
+     * @param defaultRemote The default remote to use when no other remote is defined in a resource.
+     * @return builder
      */
-    @Import(name="remotes", json=true)
-    private @Nullable Output<List<ProviderRemoteArgs>> remotes;
+    public Builder defaultRemote(@Nullable Output<String> defaultRemote) {
+      $.defaultRemote = defaultRemote;
+      return this;
+    }
 
     /**
-     * @return Incus Remote
-     * 
+     * @param defaultRemote The default remote to use when no other remote is defined in a resource.
+     * @return builder
      */
-    public Optional<Output<List<ProviderRemoteArgs>>> remotes() {
-        return Optional.ofNullable(this.remotes);
+    public Builder defaultRemote(String defaultRemote) {
+      return defaultRemote(Output.of(defaultRemote));
     }
 
-    private ProviderArgs() {}
-
-    private ProviderArgs(ProviderArgs $) {
-        this.acceptRemoteCertificate = $.acceptRemoteCertificate;
-        this.configDir = $.configDir;
-        this.defaultRemote = $.defaultRemote;
-        this.generateClientCertificates = $.generateClientCertificates;
-        this.project = $.project;
-        this.remotes = $.remotes;
+    /**
+     * @param generateClientCertificates Automatically generate the Incus client certificates if
+     *     they don&#39;t exist.
+     * @return builder
+     */
+    public Builder generateClientCertificates(
+        @Nullable Output<Boolean> generateClientCertificates) {
+      $.generateClientCertificates = generateClientCertificates;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
-    }
-    public static Builder builder(ProviderArgs defaults) {
-        return new Builder(defaults);
-    }
-
-    public static final class Builder {
-        private ProviderArgs $;
-
-        public Builder() {
-            $ = new ProviderArgs();
-        }
-
-        public Builder(ProviderArgs defaults) {
-            $ = new ProviderArgs(Objects.requireNonNull(defaults));
-        }
-
-        /**
-         * @param acceptRemoteCertificate Accept the server certificate.
-         * 
-         * @return builder
-         * 
-         */
-        public Builder acceptRemoteCertificate(@Nullable Output<Boolean> acceptRemoteCertificate) {
-            $.acceptRemoteCertificate = acceptRemoteCertificate;
-            return this;
-        }
-
-        /**
-         * @param acceptRemoteCertificate Accept the server certificate.
-         * 
-         * @return builder
-         * 
-         */
-        public Builder acceptRemoteCertificate(Boolean acceptRemoteCertificate) {
-            return acceptRemoteCertificate(Output.of(acceptRemoteCertificate));
-        }
-
-        /**
-         * @param configDir The directory to look for existing Incus configuration. (default = $HOME/.config/incus)
-         * 
-         * @return builder
-         * 
-         */
-        public Builder configDir(@Nullable Output<String> configDir) {
-            $.configDir = configDir;
-            return this;
-        }
-
-        /**
-         * @param configDir The directory to look for existing Incus configuration. (default = $HOME/.config/incus)
-         * 
-         * @return builder
-         * 
-         */
-        public Builder configDir(String configDir) {
-            return configDir(Output.of(configDir));
-        }
-
-        /**
-         * @param defaultRemote The default remote to use when no other remote is defined in a resource.
-         * 
-         * @return builder
-         * 
-         */
-        public Builder defaultRemote(@Nullable Output<String> defaultRemote) {
-            $.defaultRemote = defaultRemote;
-            return this;
-        }
-
-        /**
-         * @param defaultRemote The default remote to use when no other remote is defined in a resource.
-         * 
-         * @return builder
-         * 
-         */
-        public Builder defaultRemote(String defaultRemote) {
-            return defaultRemote(Output.of(defaultRemote));
-        }
-
-        /**
-         * @param generateClientCertificates Automatically generate the Incus client certificates if they don&#39;t exist.
-         * 
-         * @return builder
-         * 
-         */
-        public Builder generateClientCertificates(@Nullable Output<Boolean> generateClientCertificates) {
-            $.generateClientCertificates = generateClientCertificates;
-            return this;
-        }
-
-        /**
-         * @param generateClientCertificates Automatically generate the Incus client certificates if they don&#39;t exist.
-         * 
-         * @return builder
-         * 
-         */
-        public Builder generateClientCertificates(Boolean generateClientCertificates) {
-            return generateClientCertificates(Output.of(generateClientCertificates));
-        }
-
-        /**
-         * @param project The project where project-scoped resources will be created. Can be overridden in individual resources. (default = default)
-         * 
-         * @return builder
-         * 
-         */
-        public Builder project(@Nullable Output<String> project) {
-            $.project = project;
-            return this;
-        }
-
-        /**
-         * @param project The project where project-scoped resources will be created. Can be overridden in individual resources. (default = default)
-         * 
-         * @return builder
-         * 
-         */
-        public Builder project(String project) {
-            return project(Output.of(project));
-        }
-
-        /**
-         * @param remotes Incus Remote
-         * 
-         * @return builder
-         * 
-         */
-        public Builder remotes(@Nullable Output<List<ProviderRemoteArgs>> remotes) {
-            $.remotes = remotes;
-            return this;
-        }
-
-        /**
-         * @param remotes Incus Remote
-         * 
-         * @return builder
-         * 
-         */
-        public Builder remotes(List<ProviderRemoteArgs> remotes) {
-            return remotes(Output.of(remotes));
-        }
-
-        /**
-         * @param remotes Incus Remote
-         * 
-         * @return builder
-         * 
-         */
-        public Builder remotes(ProviderRemoteArgs... remotes) {
-            return remotes(List.of(remotes));
-        }
-
-        public ProviderArgs build() {
-            return $;
-        }
+    /**
+     * @param generateClientCertificates Automatically generate the Incus client certificates if
+     *     they don&#39;t exist.
+     * @return builder
+     */
+    public Builder generateClientCertificates(Boolean generateClientCertificates) {
+      return generateClientCertificates(Output.of(generateClientCertificates));
     }
 
+    /**
+     * @param project The project where project-scoped resources will be created. Can be overridden
+     *     in individual resources. (default = default)
+     * @return builder
+     */
+    public Builder project(@Nullable Output<String> project) {
+      $.project = project;
+      return this;
+    }
+
+    /**
+     * @param project The project where project-scoped resources will be created. Can be overridden
+     *     in individual resources. (default = default)
+     * @return builder
+     */
+    public Builder project(String project) {
+      return project(Output.of(project));
+    }
+
+    /**
+     * @param remotes Incus Remote
+     * @return builder
+     */
+    public Builder remotes(@Nullable Output<List<ProviderRemoteArgs>> remotes) {
+      $.remotes = remotes;
+      return this;
+    }
+
+    /**
+     * @param remotes Incus Remote
+     * @return builder
+     */
+    public Builder remotes(List<ProviderRemoteArgs> remotes) {
+      return remotes(Output.of(remotes));
+    }
+
+    /**
+     * @param remotes Incus Remote
+     * @return builder
+     */
+    public Builder remotes(ProviderRemoteArgs... remotes) {
+      return remotes(List.of(remotes));
+    }
+
+    public ProviderArgs build() {
+      return $;
+    }
+  }
 }

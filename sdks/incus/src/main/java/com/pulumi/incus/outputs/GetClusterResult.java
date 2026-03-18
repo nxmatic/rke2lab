@@ -5,9 +5,6 @@ package com.pulumi.incus.outputs;
 
 import com.pulumi.core.annotations.CustomType;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import com.pulumi.incus.outputs.GetClusterMembers;
-import java.lang.Boolean;
-import java.lang.String;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -15,92 +12,102 @@ import javax.annotation.Nullable;
 
 @CustomType
 public final class GetClusterResult {
-    /**
-     * @return The provider-assigned unique ID for this managed resource.
-     * 
-     */
+  /**
+   * @return The provider-assigned unique ID for this managed resource.
+   */
+  private String id;
+
+  private Boolean isClustered;
+  private Map<String, GetClusterMembers> members;
+  private @Nullable String remote;
+
+  private GetClusterResult() {}
+
+  /**
+   * @return The provider-assigned unique ID for this managed resource.
+   */
+  public String id() {
+    return this.id;
+  }
+
+  public Boolean isClustered() {
+    return this.isClustered;
+  }
+
+  public Map<String, GetClusterMembers> members() {
+    return this.members;
+  }
+
+  public Optional<String> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetClusterResult defaults) {
+    return new Builder(defaults);
+  }
+
+  @CustomType.Builder
+  public static final class Builder {
     private String id;
     private Boolean isClustered;
-    private Map<String,GetClusterMembers> members;
+    private Map<String, GetClusterMembers> members;
     private @Nullable String remote;
 
-    private GetClusterResult() {}
-    /**
-     * @return The provider-assigned unique ID for this managed resource.
-     * 
-     */
-    public String id() {
-        return this.id;
-    }
-    public Boolean isClustered() {
-        return this.isClustered;
-    }
-    public Map<String,GetClusterMembers> members() {
-        return this.members;
-    }
-    public Optional<String> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder() {}
+
+    public Builder(GetClusterResult defaults) {
+      Objects.requireNonNull(defaults);
+      this.id = defaults.id;
+      this.isClustered = defaults.isClustered;
+      this.members = defaults.members;
+      this.remote = defaults.remote;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    @CustomType.Setter
+    public Builder id(String id) {
+      if (id == null) {
+        throw new MissingRequiredPropertyException("GetClusterResult", "id");
+      }
+      this.id = id;
+      return this;
     }
 
-    public static Builder builder(GetClusterResult defaults) {
-        return new Builder(defaults);
+    @CustomType.Setter
+    public Builder isClustered(Boolean isClustered) {
+      if (isClustered == null) {
+        throw new MissingRequiredPropertyException("GetClusterResult", "isClustered");
+      }
+      this.isClustered = isClustered;
+      return this;
     }
-    @CustomType.Builder
-    public static final class Builder {
-        private String id;
-        private Boolean isClustered;
-        private Map<String,GetClusterMembers> members;
-        private @Nullable String remote;
-        public Builder() {}
-        public Builder(GetClusterResult defaults) {
-    	      Objects.requireNonNull(defaults);
-    	      this.id = defaults.id;
-    	      this.isClustered = defaults.isClustered;
-    	      this.members = defaults.members;
-    	      this.remote = defaults.remote;
-        }
 
-        @CustomType.Setter
-        public Builder id(String id) {
-            if (id == null) {
-              throw new MissingRequiredPropertyException("GetClusterResult", "id");
-            }
-            this.id = id;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder isClustered(Boolean isClustered) {
-            if (isClustered == null) {
-              throw new MissingRequiredPropertyException("GetClusterResult", "isClustered");
-            }
-            this.isClustered = isClustered;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder members(Map<String,GetClusterMembers> members) {
-            if (members == null) {
-              throw new MissingRequiredPropertyException("GetClusterResult", "members");
-            }
-            this.members = members;
-            return this;
-        }
-        @CustomType.Setter
-        public Builder remote(@Nullable String remote) {
-
-            this.remote = remote;
-            return this;
-        }
-        public GetClusterResult build() {
-            final var _resultValue = new GetClusterResult();
-            _resultValue.id = id;
-            _resultValue.isClustered = isClustered;
-            _resultValue.members = members;
-            _resultValue.remote = remote;
-            return _resultValue;
-        }
+    @CustomType.Setter
+    public Builder members(Map<String, GetClusterMembers> members) {
+      if (members == null) {
+        throw new MissingRequiredPropertyException("GetClusterResult", "members");
+      }
+      this.members = members;
+      return this;
     }
+
+    @CustomType.Setter
+    public Builder remote(@Nullable String remote) {
+
+      this.remote = remote;
+      return this;
+    }
+
+    public GetClusterResult build() {
+      final var _resultValue = new GetClusterResult();
+      _resultValue.id = id;
+      _resultValue.isClustered = isClustered;
+      _resultValue.members = members;
+      _resultValue.remote = remote;
+      return _resultValue;
+    }
+  }
 }

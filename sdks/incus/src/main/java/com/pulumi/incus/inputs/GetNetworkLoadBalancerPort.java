@@ -5,110 +5,107 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.List;
 import java.util.Objects;
 
 public final class GetNetworkLoadBalancerPort extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetNetworkLoadBalancerPort Empty = new GetNetworkLoadBalancerPort();
+  public static final GetNetworkLoadBalancerPort Empty = new GetNetworkLoadBalancerPort();
 
-    @Import(name = "description", required = true)
-    private String description;
+  @Import(name = "description", required = true)
+  private String description;
 
-    public String description() {
-        return this.description;
+  public String description() {
+    return this.description;
+  }
+
+  @Import(name = "listenPort", required = true)
+  private String listenPort;
+
+  public String listenPort() {
+    return this.listenPort;
+  }
+
+  @Import(name = "protocol", required = true)
+  private String protocol;
+
+  public String protocol() {
+    return this.protocol;
+  }
+
+  @Import(name = "targetBackends", required = true)
+  private List<String> targetBackends;
+
+  public List<String> targetBackends() {
+    return this.targetBackends;
+  }
+
+  private GetNetworkLoadBalancerPort() {}
+
+  private GetNetworkLoadBalancerPort(GetNetworkLoadBalancerPort $) {
+    this.description = $.description;
+    this.listenPort = $.listenPort;
+    this.protocol = $.protocol;
+    this.targetBackends = $.targetBackends;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetNetworkLoadBalancerPort defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetNetworkLoadBalancerPort $;
+
+    public Builder() {
+      $ = new GetNetworkLoadBalancerPort();
     }
 
-    @Import(name = "listenPort", required = true)
-    private String listenPort;
-
-    public String listenPort() {
-        return this.listenPort;
+    public Builder(GetNetworkLoadBalancerPort defaults) {
+      $ = new GetNetworkLoadBalancerPort(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "protocol", required = true)
-    private String protocol;
-
-    public String protocol() {
-        return this.protocol;
+    public Builder description(String description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name = "targetBackends", required = true)
-    private List<String> targetBackends;
-
-    public List<String> targetBackends() {
-        return this.targetBackends;
+    public Builder listenPort(String listenPort) {
+      $.listenPort = listenPort;
+      return this;
     }
 
-    private GetNetworkLoadBalancerPort() {
+    public Builder protocol(String protocol) {
+      $.protocol = protocol;
+      return this;
     }
 
-    private GetNetworkLoadBalancerPort(GetNetworkLoadBalancerPort $) {
-        this.description = $.description;
-        this.listenPort = $.listenPort;
-        this.protocol = $.protocol;
-        this.targetBackends = $.targetBackends;
+    public Builder targetBackends(List<String> targetBackends) {
+      $.targetBackends = targetBackends;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder targetBackends(String... targetBackends) {
+      return targetBackends(List.of(targetBackends));
     }
 
-    public static Builder builder(GetNetworkLoadBalancerPort defaults) {
-        return new Builder(defaults);
+    public GetNetworkLoadBalancerPort build() {
+      if ($.description == null) {
+        throw new MissingRequiredPropertyException("GetNetworkLoadBalancerPort", "description");
+      }
+      if ($.listenPort == null) {
+        throw new MissingRequiredPropertyException("GetNetworkLoadBalancerPort", "listenPort");
+      }
+      if ($.protocol == null) {
+        throw new MissingRequiredPropertyException("GetNetworkLoadBalancerPort", "protocol");
+      }
+      if ($.targetBackends == null) {
+        throw new MissingRequiredPropertyException("GetNetworkLoadBalancerPort", "targetBackends");
+      }
+      return $;
     }
-
-    public static final class Builder {
-        private GetNetworkLoadBalancerPort $;
-
-        public Builder() {
-            $ = new GetNetworkLoadBalancerPort();
-        }
-
-        public Builder(GetNetworkLoadBalancerPort defaults) {
-            $ = new GetNetworkLoadBalancerPort(Objects.requireNonNull(defaults));
-        }
-
-        public Builder description(String description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder listenPort(String listenPort) {
-            $.listenPort = listenPort;
-            return this;
-        }
-
-        public Builder protocol(String protocol) {
-            $.protocol = protocol;
-            return this;
-        }
-
-        public Builder targetBackends(List<String> targetBackends) {
-            $.targetBackends = targetBackends;
-            return this;
-        }
-
-        public Builder targetBackends(String... targetBackends) {
-            return targetBackends(List.of(targetBackends));
-        }
-
-        public GetNetworkLoadBalancerPort build() {
-            if ($.description == null) {
-                throw new MissingRequiredPropertyException("GetNetworkLoadBalancerPort", "description");
-            }
-            if ($.listenPort == null) {
-                throw new MissingRequiredPropertyException("GetNetworkLoadBalancerPort", "listenPort");
-            }
-            if ($.protocol == null) {
-                throw new MissingRequiredPropertyException("GetNetworkLoadBalancerPort", "protocol");
-            }
-            if ($.targetBackends == null) {
-                throw new MissingRequiredPropertyException("GetNetworkLoadBalancerPort", "targetBackends");
-            }
-            return $;
-        }
-    }
-
+  }
 }

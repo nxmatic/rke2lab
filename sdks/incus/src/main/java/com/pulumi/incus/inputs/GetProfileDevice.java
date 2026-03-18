@@ -5,90 +5,87 @@ package com.pulumi.incus.inputs;
 
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import java.lang.String;
 import java.util.Map;
 import java.util.Objects;
 
 public final class GetProfileDevice extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetProfileDevice Empty = new GetProfileDevice();
+  public static final GetProfileDevice Empty = new GetProfileDevice();
 
-    @Import(name = "name", required = true)
-    private String name;
+  @Import(name = "name", required = true)
+  private String name;
 
-    public String name() {
-        return this.name;
+  public String name() {
+    return this.name;
+  }
+
+  @Import(name = "properties", required = true)
+  private Map<String, String> properties;
+
+  public Map<String, String> properties() {
+    return this.properties;
+  }
+
+  @Import(name = "type", required = true)
+  private String type;
+
+  public String type() {
+    return this.type;
+  }
+
+  private GetProfileDevice() {}
+
+  private GetProfileDevice(GetProfileDevice $) {
+    this.name = $.name;
+    this.properties = $.properties;
+    this.type = $.type;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetProfileDevice defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetProfileDevice $;
+
+    public Builder() {
+      $ = new GetProfileDevice();
     }
 
-    @Import(name = "properties", required = true)
-    private Map<String, String> properties;
-
-    public Map<String, String> properties() {
-        return this.properties;
+    public Builder(GetProfileDevice defaults) {
+      $ = new GetProfileDevice(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "type", required = true)
-    private String type;
-
-    public String type() {
-        return this.type;
+    public Builder name(String name) {
+      $.name = name;
+      return this;
     }
 
-    private GetProfileDevice() {
+    public Builder properties(Map<String, String> properties) {
+      $.properties = properties;
+      return this;
     }
 
-    private GetProfileDevice(GetProfileDevice $) {
-        this.name = $.name;
-        this.properties = $.properties;
-        this.type = $.type;
+    public Builder type(String type) {
+      $.type = type;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public GetProfileDevice build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("GetProfileDevice", "name");
+      }
+      if ($.properties == null) {
+        throw new MissingRequiredPropertyException("GetProfileDevice", "properties");
+      }
+      if ($.type == null) {
+        throw new MissingRequiredPropertyException("GetProfileDevice", "type");
+      }
+      return $;
     }
-
-    public static Builder builder(GetProfileDevice defaults) {
-        return new Builder(defaults);
-    }
-
-    public static final class Builder {
-        private GetProfileDevice $;
-
-        public Builder() {
-            $ = new GetProfileDevice();
-        }
-
-        public Builder(GetProfileDevice defaults) {
-            $ = new GetProfileDevice(Objects.requireNonNull(defaults));
-        }
-
-        public Builder name(String name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder properties(Map<String, String> properties) {
-            $.properties = properties;
-            return this;
-        }
-
-        public Builder type(String type) {
-            $.type = type;
-            return this;
-        }
-
-        public GetProfileDevice build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("GetProfileDevice", "name");
-            }
-            if ($.properties == null) {
-                throw new MissingRequiredPropertyException("GetProfileDevice", "properties");
-            }
-            if ($.type == null) {
-                throw new MissingRequiredPropertyException("GetProfileDevice", "type");
-            }
-            return $;
-        }
-    }
-
+  }
 }

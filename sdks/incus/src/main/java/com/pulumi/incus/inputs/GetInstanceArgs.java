@@ -6,9 +6,6 @@ package com.pulumi.incus.inputs;
 import com.pulumi.core.Output;
 import com.pulumi.core.annotations.Import;
 import com.pulumi.exceptions.MissingRequiredPropertyException;
-import com.pulumi.incus.inputs.GetInstanceDeviceArgs;
-import java.lang.Boolean;
-import java.lang.String;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -16,251 +13,249 @@ import javax.annotation.Nullable;
 
 public final class GetInstanceArgs extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetInstanceArgs Empty = new GetInstanceArgs();
+  public static final GetInstanceArgs Empty = new GetInstanceArgs();
 
-    @Import(name = "architecture")
-    private @Nullable Output<String> architecture;
+  @Import(name = "architecture")
+  private @Nullable Output<String> architecture;
 
-    public Optional<Output<String>> architecture() {
-        return Optional.ofNullable(this.architecture);
+  public Optional<Output<String>> architecture() {
+    return Optional.ofNullable(this.architecture);
+  }
+
+  @Import(name = "description")
+  private @Nullable Output<String> description;
+
+  public Optional<Output<String>> description() {
+    return Optional.ofNullable(this.description);
+  }
+
+  @Import(name = "devices")
+  private @Nullable Output<List<GetInstanceDeviceArgs>> devices;
+
+  public Optional<Output<List<GetInstanceDeviceArgs>>> devices() {
+    return Optional.ofNullable(this.devices);
+  }
+
+  @Import(name = "ephemeral")
+  private @Nullable Output<Boolean> ephemeral;
+
+  public Optional<Output<Boolean>> ephemeral() {
+    return Optional.ofNullable(this.ephemeral);
+  }
+
+  @Import(name = "location")
+  private @Nullable Output<String> location;
+
+  public Optional<Output<String>> location() {
+    return Optional.ofNullable(this.location);
+  }
+
+  @Import(name = "name", required = true)
+  private Output<String> name;
+
+  public Output<String> name() {
+    return this.name;
+  }
+
+  @Import(name = "profiles")
+  private @Nullable Output<List<String>> profiles;
+
+  public Optional<Output<List<String>>> profiles() {
+    return Optional.ofNullable(this.profiles);
+  }
+
+  @Import(name = "project")
+  private @Nullable Output<String> project;
+
+  public Optional<Output<String>> project() {
+    return Optional.ofNullable(this.project);
+  }
+
+  @Import(name = "remote")
+  private @Nullable Output<String> remote;
+
+  public Optional<Output<String>> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  @Import(name = "stateful")
+  private @Nullable Output<Boolean> stateful;
+
+  public Optional<Output<Boolean>> stateful() {
+    return Optional.ofNullable(this.stateful);
+  }
+
+  @Import(name = "status")
+  private @Nullable Output<String> status;
+
+  public Optional<Output<String>> status() {
+    return Optional.ofNullable(this.status);
+  }
+
+  @Import(name = "type")
+  private @Nullable Output<String> type;
+
+  public Optional<Output<String>> type() {
+    return Optional.ofNullable(this.type);
+  }
+
+  private GetInstanceArgs() {}
+
+  private GetInstanceArgs(GetInstanceArgs $) {
+    this.architecture = $.architecture;
+    this.description = $.description;
+    this.devices = $.devices;
+    this.ephemeral = $.ephemeral;
+    this.location = $.location;
+    this.name = $.name;
+    this.profiles = $.profiles;
+    this.project = $.project;
+    this.remote = $.remote;
+    this.stateful = $.stateful;
+    this.status = $.status;
+    this.type = $.type;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetInstanceArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetInstanceArgs $;
+
+    public Builder() {
+      $ = new GetInstanceArgs();
     }
 
-    @Import(name = "description")
-    private @Nullable Output<String> description;
-
-    public Optional<Output<String>> description() {
-        return Optional.ofNullable(this.description);
+    public Builder(GetInstanceArgs defaults) {
+      $ = new GetInstanceArgs(Objects.requireNonNull(defaults));
     }
 
-    @Import(name = "devices")
-    private @Nullable Output<List<GetInstanceDeviceArgs>> devices;
-
-    public Optional<Output<List<GetInstanceDeviceArgs>>> devices() {
-        return Optional.ofNullable(this.devices);
+    public Builder architecture(@Nullable Output<String> architecture) {
+      $.architecture = architecture;
+      return this;
     }
 
-    @Import(name = "ephemeral")
-    private @Nullable Output<Boolean> ephemeral;
-
-    public Optional<Output<Boolean>> ephemeral() {
-        return Optional.ofNullable(this.ephemeral);
+    public Builder architecture(String architecture) {
+      return architecture(Output.of(architecture));
     }
 
-    @Import(name = "location")
-    private @Nullable Output<String> location;
-
-    public Optional<Output<String>> location() {
-        return Optional.ofNullable(this.location);
+    public Builder description(@Nullable Output<String> description) {
+      $.description = description;
+      return this;
     }
 
-    @Import(name = "name", required = true)
-    private Output<String> name;
-
-    public Output<String> name() {
-        return this.name;
+    public Builder description(String description) {
+      return description(Output.of(description));
     }
 
-    @Import(name = "profiles")
-    private @Nullable Output<List<String>> profiles;
-
-    public Optional<Output<List<String>>> profiles() {
-        return Optional.ofNullable(this.profiles);
+    public Builder devices(@Nullable Output<List<GetInstanceDeviceArgs>> devices) {
+      $.devices = devices;
+      return this;
     }
 
-    @Import(name = "project")
-    private @Nullable Output<String> project;
-
-    public Optional<Output<String>> project() {
-        return Optional.ofNullable(this.project);
+    public Builder devices(List<GetInstanceDeviceArgs> devices) {
+      return devices(Output.of(devices));
     }
 
-    @Import(name = "remote")
-    private @Nullable Output<String> remote;
-
-    public Optional<Output<String>> remote() {
-        return Optional.ofNullable(this.remote);
+    public Builder devices(GetInstanceDeviceArgs... devices) {
+      return devices(List.of(devices));
     }
 
-    @Import(name = "stateful")
-    private @Nullable Output<Boolean> stateful;
-
-    public Optional<Output<Boolean>> stateful() {
-        return Optional.ofNullable(this.stateful);
+    public Builder ephemeral(@Nullable Output<Boolean> ephemeral) {
+      $.ephemeral = ephemeral;
+      return this;
     }
 
-    @Import(name = "status")
-    private @Nullable Output<String> status;
-
-    public Optional<Output<String>> status() {
-        return Optional.ofNullable(this.status);
+    public Builder ephemeral(Boolean ephemeral) {
+      return ephemeral(Output.of(ephemeral));
     }
 
-    @Import(name = "type")
-    private @Nullable Output<String> type;
-
-    public Optional<Output<String>> type() {
-        return Optional.ofNullable(this.type);
+    public Builder location(@Nullable Output<String> location) {
+      $.location = location;
+      return this;
     }
 
-    private GetInstanceArgs() {
+    public Builder location(String location) {
+      return location(Output.of(location));
     }
 
-    private GetInstanceArgs(GetInstanceArgs $) {
-        this.architecture = $.architecture;
-        this.description = $.description;
-        this.devices = $.devices;
-        this.ephemeral = $.ephemeral;
-        this.location = $.location;
-        this.name = $.name;
-        this.profiles = $.profiles;
-        this.project = $.project;
-        this.remote = $.remote;
-        this.stateful = $.stateful;
-        this.status = $.status;
-        this.type = $.type;
+    public Builder name(Output<String> name) {
+      $.name = name;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public Builder name(String name) {
+      return name(Output.of(name));
     }
 
-    public static Builder builder(GetInstanceArgs defaults) {
-        return new Builder(defaults);
+    public Builder profiles(@Nullable Output<List<String>> profiles) {
+      $.profiles = profiles;
+      return this;
     }
 
-    public static final class Builder {
-        private GetInstanceArgs $;
-
-        public Builder() {
-            $ = new GetInstanceArgs();
-        }
-
-        public Builder(GetInstanceArgs defaults) {
-            $ = new GetInstanceArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder architecture(@Nullable Output<String> architecture) {
-            $.architecture = architecture;
-            return this;
-        }
-
-        public Builder architecture(String architecture) {
-            return architecture(Output.of(architecture));
-        }
-
-        public Builder description(@Nullable Output<String> description) {
-            $.description = description;
-            return this;
-        }
-
-        public Builder description(String description) {
-            return description(Output.of(description));
-        }
-
-        public Builder devices(@Nullable Output<List<GetInstanceDeviceArgs>> devices) {
-            $.devices = devices;
-            return this;
-        }
-
-        public Builder devices(List<GetInstanceDeviceArgs> devices) {
-            return devices(Output.of(devices));
-        }
-
-        public Builder devices(GetInstanceDeviceArgs... devices) {
-            return devices(List.of(devices));
-        }
-
-        public Builder ephemeral(@Nullable Output<Boolean> ephemeral) {
-            $.ephemeral = ephemeral;
-            return this;
-        }
-
-        public Builder ephemeral(Boolean ephemeral) {
-            return ephemeral(Output.of(ephemeral));
-        }
-
-        public Builder location(@Nullable Output<String> location) {
-            $.location = location;
-            return this;
-        }
-
-        public Builder location(String location) {
-            return location(Output.of(location));
-        }
-
-        public Builder name(Output<String> name) {
-            $.name = name;
-            return this;
-        }
-
-        public Builder name(String name) {
-            return name(Output.of(name));
-        }
-
-        public Builder profiles(@Nullable Output<List<String>> profiles) {
-            $.profiles = profiles;
-            return this;
-        }
-
-        public Builder profiles(List<String> profiles) {
-            return profiles(Output.of(profiles));
-        }
-
-        public Builder profiles(String... profiles) {
-            return profiles(List.of(profiles));
-        }
-
-        public Builder project(@Nullable Output<String> project) {
-            $.project = project;
-            return this;
-        }
-
-        public Builder project(String project) {
-            return project(Output.of(project));
-        }
-
-        public Builder remote(@Nullable Output<String> remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public Builder remote(String remote) {
-            return remote(Output.of(remote));
-        }
-
-        public Builder stateful(@Nullable Output<Boolean> stateful) {
-            $.stateful = stateful;
-            return this;
-        }
-
-        public Builder stateful(Boolean stateful) {
-            return stateful(Output.of(stateful));
-        }
-
-        public Builder status(@Nullable Output<String> status) {
-            $.status = status;
-            return this;
-        }
-
-        public Builder status(String status) {
-            return status(Output.of(status));
-        }
-
-        public Builder type(@Nullable Output<String> type) {
-            $.type = type;
-            return this;
-        }
-
-        public Builder type(String type) {
-            return type(Output.of(type));
-        }
-
-        public GetInstanceArgs build() {
-            if ($.name == null) {
-                throw new MissingRequiredPropertyException("GetInstanceArgs", "name");
-            }
-            return $;
-        }
+    public Builder profiles(List<String> profiles) {
+      return profiles(Output.of(profiles));
     }
 
+    public Builder profiles(String... profiles) {
+      return profiles(List.of(profiles));
+    }
+
+    public Builder project(@Nullable Output<String> project) {
+      $.project = project;
+      return this;
+    }
+
+    public Builder project(String project) {
+      return project(Output.of(project));
+    }
+
+    public Builder remote(@Nullable Output<String> remote) {
+      $.remote = remote;
+      return this;
+    }
+
+    public Builder remote(String remote) {
+      return remote(Output.of(remote));
+    }
+
+    public Builder stateful(@Nullable Output<Boolean> stateful) {
+      $.stateful = stateful;
+      return this;
+    }
+
+    public Builder stateful(Boolean stateful) {
+      return stateful(Output.of(stateful));
+    }
+
+    public Builder status(@Nullable Output<String> status) {
+      $.status = status;
+      return this;
+    }
+
+    public Builder status(String status) {
+      return status(Output.of(status));
+    }
+
+    public Builder type(@Nullable Output<String> type) {
+      $.type = type;
+      return this;
+    }
+
+    public Builder type(String type) {
+      return type(Output.of(type));
+    }
+
+    public GetInstanceArgs build() {
+      if ($.name == null) {
+        throw new MissingRequiredPropertyException("GetInstanceArgs", "name");
+      }
+      return $;
+    }
+  }
 }

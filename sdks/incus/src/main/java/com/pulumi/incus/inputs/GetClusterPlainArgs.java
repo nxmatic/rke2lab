@@ -4,56 +4,53 @@
 package com.pulumi.incus.inputs;
 
 import com.pulumi.core.annotations.Import;
-import java.lang.String;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
 public final class GetClusterPlainArgs extends com.pulumi.resources.InvokeArgs {
 
-    public static final GetClusterPlainArgs Empty = new GetClusterPlainArgs();
+  public static final GetClusterPlainArgs Empty = new GetClusterPlainArgs();
 
-    @Import(name = "remote")
-    private @Nullable String remote;
+  @Import(name = "remote")
+  private @Nullable String remote;
 
-    public Optional<String> remote() {
-        return Optional.ofNullable(this.remote);
+  public Optional<String> remote() {
+    return Optional.ofNullable(this.remote);
+  }
+
+  private GetClusterPlainArgs() {}
+
+  private GetClusterPlainArgs(GetClusterPlainArgs $) {
+    this.remote = $.remote;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static Builder builder(GetClusterPlainArgs defaults) {
+    return new Builder(defaults);
+  }
+
+  public static final class Builder {
+    private GetClusterPlainArgs $;
+
+    public Builder() {
+      $ = new GetClusterPlainArgs();
     }
 
-    private GetClusterPlainArgs() {
+    public Builder(GetClusterPlainArgs defaults) {
+      $ = new GetClusterPlainArgs(Objects.requireNonNull(defaults));
     }
 
-    private GetClusterPlainArgs(GetClusterPlainArgs $) {
-        this.remote = $.remote;
+    public Builder remote(@Nullable String remote) {
+      $.remote = remote;
+      return this;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    public GetClusterPlainArgs build() {
+      return $;
     }
-
-    public static Builder builder(GetClusterPlainArgs defaults) {
-        return new Builder(defaults);
-    }
-
-    public static final class Builder {
-        private GetClusterPlainArgs $;
-
-        public Builder() {
-            $ = new GetClusterPlainArgs();
-        }
-
-        public Builder(GetClusterPlainArgs defaults) {
-            $ = new GetClusterPlainArgs(Objects.requireNonNull(defaults));
-        }
-
-        public Builder remote(@Nullable String remote) {
-            $.remote = remote;
-            return this;
-        }
-
-        public GetClusterPlainArgs build() {
-            return $;
-        }
-    }
-
+  }
 }
