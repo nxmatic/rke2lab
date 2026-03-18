@@ -5,4 +5,10 @@ package io.nxmatic.rk2lab.manifests.layers.common.refs;
 public interface ApiObjectRef {
 
   String referenceId();
+
+  ApiObjectRefLifecycle lifecycle();
+
+  default boolean isRegistryOwned() {
+    return lifecycle() == ApiObjectRefLifecycle.SYNTHESIZED;
+  }
 }

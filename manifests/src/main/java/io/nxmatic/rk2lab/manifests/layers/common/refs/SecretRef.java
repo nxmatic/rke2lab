@@ -2,7 +2,8 @@
 package io.nxmatic.rk2lab.manifests.layers.common.refs;
 
 /** Stable reference to a Kubernetes Secret independent of realization lifecycle. */
-public record SecretRef(String referenceId, NamespaceRef namespaceRef, String name)
+public record SecretRef(
+    String referenceId, NamespaceRef namespaceRef, String name, ApiObjectRefLifecycle lifecycle)
     implements ApiObjectRef {
 
   public SecretRef {
@@ -15,11 +16,22 @@ public record SecretRef(String referenceId, NamespaceRef namespaceRef, String na
     if (name == null || name.isBlank()) {
       throw new IllegalArgumentException("name must not be blank");
     }
+    if (lifecycle == null) {
+      throw new IllegalArgumentException("lifecycle must not be null");
+    }
   }
 
   public static SecretRef of(
       final String referenceId, final NamespaceRef namespaceRef, final String name) {
-    return new SecretRef(referenceId, namespaceRef, name);
+    return of(referenceId, namespaceRef, name, ApiObjectRefLifecycle.SYNTHESIZED);
+  }
+
+  public static SecretRef of(
+      final String referenceId,
+      final NamespaceRef namespaceRef,
+      final String name,
+      final ApiObjectRefLifecycle lifecycle) {
+    return new SecretRef(referenceId, namespaceRef, name, lifecycle);
   }
 
   public String namespaceName() {

@@ -26,6 +26,17 @@ public final class ManifestAssemblyRegistry {
   }
 
   ApiObject require(final ApiObjectRef ref) {
+    if (ref == null) {
+      throw new IllegalArgumentException("ref must not be null");
+    }
+    if (!ref.isRegistryOwned()) {
+      throw new IllegalStateException(
+          "Reference is not registry-owned and cannot be required: "
+              + ref.referenceId()
+              + " (lifecycle="
+              + ref.lifecycle()
+              + ")");
+    }
     return resolve(ref)
         .orElseThrow(
             () ->
@@ -36,6 +47,14 @@ public final class ManifestAssemblyRegistry {
   void publish(final ApiObjectRef ref, final ApiObject apiObject, final PublicationScope scope) {
     if (ref == null) {
       throw new IllegalArgumentException("ref must not be null");
+    }
+    if (!ref.isRegistryOwned()) {
+      throw new IllegalStateException(
+          "Reference is not registry-owned and cannot be published: "
+              + ref.referenceId()
+              + " (lifecycle="
+              + ref.lifecycle()
+              + ")");
     }
     if (apiObject == null) {
       throw new IllegalArgumentException("apiObject must not be null");
