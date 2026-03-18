@@ -8,7 +8,7 @@ import java.util.Map;
 
 /**
  * Runtime layer environment variable contributor. Contributes: rke2, config, containerd, cri, helm,
- * kubectl, user
+ * kubectl, user, daemonset-script-policy
  */
 public class RuntimeLayerEnvContributor implements LayerEnvContributor {
 
@@ -19,7 +19,15 @@ public class RuntimeLayerEnvContributor implements LayerEnvContributor {
 
   @Override
   public List<String> contributedSections() {
-    return List.of("rke2", "config", "containerd", "cri", "helm", "kubectl", "user");
+    return List.of(
+        "rke2",
+        "config",
+        "containerd",
+        "cri",
+        "helm",
+        "kubectl",
+        "user",
+        "daemonset-script-policy");
   }
 
   @Override
@@ -52,6 +60,10 @@ public class RuntimeLayerEnvContributor implements LayerEnvContributor {
           Map.of(
               "USER", "root",
               "HOME", "/root");
+      case "daemonset-script-policy" ->
+          Map.of(
+              "DAEMONSET_SCRIPT_ROOT", "/var/lib/rke2lab/daemonset-scripts.d",
+              "SCRIPT_POLICY_DIR", "/var/lib/rke2lab/script-policy.d");
       default -> Map.of();
     };
   }

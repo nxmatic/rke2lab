@@ -27,6 +27,7 @@ public final class RuntimeEnvConfigLayer extends Construct {
           "config",
           "containerd",
           "cri",
+          "daemonset-script-policy",
           "etcdctl",
           "helm",
           "kpt",
