@@ -50,10 +50,53 @@ host::tooling:init() {
   export FLOX_NONINTERACTIVE=1
 }
 
+host::nix:flox-conf:ensure() {
+  local flox_conf
+
+  flox_conf="/etc/nix/flox.conf"
+  mkdir -p "$(dirname "${flox_conf}")"
+
+  if [[ -f "${flox_conf}" ]]; then
+    return 0
+  fi
+
+  cat > "${flox_conf}" <<'EOF'
+# Please put any custom nix.conf configurations into your /etc/nix/nix.conf.
+
+
+# Use all cores and run multiple jobs in parallel.
+max-jobs = auto
+cores = 0
+
+# Used when deploying to Darwin.
+extra-sandbox-paths = /System/Library/LaunchDaemons/com.apple.oahd.plist
+
+# Default to use the upstream cache as well as the flox public store.
+extra-trusted-substituters = https://cache.flox.dev
+extra-trusted-public-keys = flox-cache-public-1:7F4OyH7ZCnFhcze3fJdfyXYLQw/aV7GEed86nQ7IsOs= floxhub-1:0QOAlcobcEvq1mqEf4qAYCaWnTTOXpyoRv/PmqfSixM=
+
+# Note: queries to https://cache.nixos.org via Fastly sometimes encounter
+# asymetric routing and thus packet loss. Previously this would cause a very
+# long wait for a substitution to fail. Instead, fail quicker and expect the
+# user to retry.
+connect-timeout = 10
+stalled-download-timeout = 30
+
+# Start GC when free disk space is very low.
+min-free = 128000000
+max-free = 1000000000
+
+# Disable metrics
+EOF
+}
+
 shim::assets:path:init() {
   FLOX_SHIM_ROOT="/srv/host/k8s-daemonset.d/runtime/flox-containerd-shim"
   FLOX_BUILD_SCRIPT="${FLOX_SHIM_ROOT}/flox-shim-build.sh"
   FLOX_BUILD_DESCRIPTOR="${FLOX_SHIM_ROOT}/flox-shim-build.yaml"
+  FLOX_SHIM_PACKAGE_FLAKE="${FLOX_SHIM_ROOT}/flake.nix"
+  FLOX_SHIM_WRAPPER_SCRIPT="${FLOX_SHIM_ROOT}/containerd-shim-flox-v2-wrapper.sh"
+  FLOX_ROOTFS_SYNC_SCRIPT="${FLOX_SHIM_ROOT}/flox-rootfs-sync.sh"
   FLOX_SHIM_MESH_DIR="${FLOX_SHIM_ROOT}/mesh"
   FLOX_SHIM_NETWORKING_DIR="${FLOX_SHIM_ROOT}/networking"
 }
@@ -65,6 +108,18 @@ shim::assets:path:validate() {
   }
   [[ -r "${FLOX_BUILD_DESCRIPTOR}" ]] || {
     echo "flox build descriptor missing or unreadable: ${FLOX_BUILD_DESCRIPTOR}" >&2
+    exit 1
+  }
+  [[ -r "${FLOX_SHIM_PACKAGE_FLAKE}" ]] || {
+    echo "flox shim package flake missing or unreadable: ${FLOX_SHIM_PACKAGE_FLAKE}" >&2
+    exit 1
+  }
+  [[ -x "${FLOX_SHIM_WRAPPER_SCRIPT}" ]] || {
+    echo "flox shim wrapper missing or not executable: ${FLOX_SHIM_WRAPPER_SCRIPT}" >&2
+    exit 1
+  }
+  [[ -x "${FLOX_ROOTFS_SYNC_SCRIPT}" ]] || {
+    echo "flox rootfs sync helper missing or not executable: ${FLOX_ROOTFS_SYNC_SCRIPT}" >&2
     exit 1
   }
   [[ -d "${FLOX_SHIM_MESH_DIR}" ]] || {
@@ -94,10 +149,43 @@ shim::assets:build:run() {
   "${FLOX_BUILD_SCRIPT}" "host" "${FLOX_BUILD_DESCRIPTOR}"
 
   : "Commit any changes to the flox shim build assets to the git repository for tracking"
-  git -C "${FLOX_SHIM_ROOT}" add mesh networking flox-shim-build.yaml flox-shim-build.sh
+  git -C "${FLOX_SHIM_ROOT}" add --all .
   if ! git -C "${FLOX_SHIM_ROOT}" diff --cached --quiet; then
     git -C "${FLOX_SHIM_ROOT}" commit -m "chore(flox-shim): refresh packaged flakes"
   fi
+}
+
+shim::runtime:nix-system:resolve() {
+  case "$(uname -m)" in
+    aarch64|arm64)
+      printf '%s\n' "aarch64-linux"
+      ;;
+    x86_64|amd64)
+      printf '%s\n' "x86_64-linux"
+      ;;
+    *)
+      echo "unsupported host architecture: $(uname -m)" >&2
+      return 1
+      ;;
+  esac
+}
+
+shim::runtime:wrapper-package:build() {
+  local nix_system package_attr
+
+  nix_system="$(shim::runtime:nix-system:resolve)"
+  package_attr="packages.${nix_system}.flox-shim-wrapper"
+
+  (
+    cd "${FLOX_SHIM_ROOT}"
+    nix build \
+      --system "${nix_system}" \
+      --extra-experimental-features nix-command \
+      --extra-experimental-features flakes \
+      --no-link \
+      --print-out-paths \
+      ".#${package_attr}"
+  )
 }
 
 shim::runtime:containerd:resolve-bin() {
@@ -162,6 +250,7 @@ shim::runtime:binary:install() {
   local flox_env_dir="$1"
   local arch="$2"
   local shim_run_dir shim_path
+  local install_root real_shim_path wrapper_pkg_path wrapper_bin wrapper_helper
 
   shim_run_dir="$(find "${flox_env_dir}/.flox/run" -maxdepth 1 -name "${arch}-linux.containerd-shim*.run" -print -quit || true)"
   if [[ -z "${shim_run_dir}" ]]; then
@@ -175,7 +264,25 @@ shim::runtime:binary:install() {
     return 1
   fi
 
-  install -D -m 0755 "${shim_path}" /usr/local/bin/containerd-shim-flox-v2
+  install_root="/usr/local/libexec/rke2lab/flox-shim-wrapper"
+  real_shim_path="${install_root}/containerd-shim-flox-v2.real"
+  wrapper_pkg_path="$(shim::runtime:wrapper-package:build)"
+  wrapper_bin="${wrapper_pkg_path}/bin/containerd-shim-flox-v2"
+  wrapper_helper="${wrapper_pkg_path}/libexec/rke2lab/flox-shim-wrapper/flox-rootfs-sync.sh"
+
+  [[ -x "${wrapper_bin}" ]] || {
+    echo "shim wrapper binary missing at ${wrapper_bin}" >&2
+    return 1
+  }
+  [[ -x "${wrapper_helper}" ]] || {
+    echo "shim rootfs helper missing at ${wrapper_helper}" >&2
+    return 1
+  }
+
+  install -D -m 0755 "${shim_path}" "${real_shim_path}"
+  install -d /usr/local/bin "${install_root}"
+  ln -sfn "${wrapper_helper}" "${install_root}/flox-rootfs-sync.sh"
+  ln -sfn "${wrapper_bin}" /usr/local/bin/containerd-shim-flox-v2
 }
 
 shim::runtime:config-template:ensure() {
@@ -195,7 +302,6 @@ shim::runtime:core:install() {
   containerd_bin="$(shim::runtime:containerd:resolve-bin)"
   shim_pkg="$(shim::runtime:package:resolve "${containerd_bin}")"
   flox install --dir "${flox_env_dir}" "${shim_pkg}"
-  shim::runtime:gcroots:ensure
   shim::runtime:binary:install "${flox_env_dir}" "${arch}"
   shim::runtime:config-template:ensure
 }
@@ -222,10 +328,10 @@ container::service:runtime:restart() {
 
 containerd::config:version:detect() {
   local version
-  version="$(config::format:yaml:to "${CONTAINERD_CONFIG_FILE}" | yq -r '.version // ""' 2>/dev/null || true)"
+  version="$( dasel -i toml -o yaml < "${CONTAINERD_CONFIG_FILE}" | yq -r '.version // ""' 2>/dev/null || true)"
 
   if [[ -z "${version}" ]]; then
-    case "$(basename "${config}")" in
+    case "$(basename "${CONTAINERD_CONFIG_FILE}")" in
       config-v3.toml|config-v3.toml.tmpl)
         version="3"
         ;;
@@ -265,17 +371,18 @@ containerd::config:flox:update() {
 
 : "Initialize host tooling and shim asset paths"
 host::tooling:init
+host::nix:flox-conf:ensure
 shim::assets:path:init
 shim::assets:path:validate
 
 : "Initialize resolved containerd config paths"
 containerd::config:path:init
 
-: "Install/update flox runtime shim binaries on host"
-shim::runtime:core:install
-
 : "Execute the shim build before mutating containerd config"
 shim::assets:build:run
+
+: "Install/update flox runtime shim binaries on host"
+shim::runtime:core:install
 
 : "Update containerd configuration to include the flox shim runtime"
 containerd::config:flox:update

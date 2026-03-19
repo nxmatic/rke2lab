@@ -39,8 +39,15 @@ daemonset::logging:stderr:setup "${HOST_SCRIPT_ROOT}/shim-installer.sh"
 
 install -D -m 0755 "${BUILD_ASSETS_DIR}/flox-shim-build.sh" "${HOST_SCRIPT_ROOT}/flox-shim-build.sh"
 install -D -m 0644 "${BUILD_ASSETS_DIR}/flox-shim-build.yaml" "${HOST_SCRIPT_ROOT}/flox-shim-build.yaml"
+install -D -m 0644 "${BUILD_ASSETS_DIR}/flake.nix" "${HOST_SCRIPT_ROOT}/flake.nix"
+install -D -m 0755 "${BUILD_ASSETS_DIR}/containerd-shim-flox-v2-wrapper.sh" "${HOST_SCRIPT_ROOT}/containerd-shim-flox-v2-wrapper.sh"
+install -D -m 0755 "${BUILD_ASSETS_DIR}/flox-rootfs-sync.sh" "${HOST_SCRIPT_ROOT}/flox-rootfs-sync.sh"
 install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/flake.nix" "${HOST_SCRIPT_ROOT}/mesh/headplane/flake.nix"
 install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/flake.nix" "${HOST_SCRIPT_ROOT}/networking/kdns/flake.nix"
+
+if [[ -f "${BUILD_ASSETS_DIR}/flake.lock" ]]; then
+  install -D -m 0644 "${BUILD_ASSETS_DIR}/flake.lock" "${HOST_SCRIPT_ROOT}/flake.lock"
+fi
 
 nsenter --target 1 --mount --uts --ipc --net --pid -- env \
   CONTAINERD_CONFIG_FILE="${CONTAINERD_CONFIG_FILE}" \

@@ -5,6 +5,16 @@ version: "1"
 # Flakes are provided under ./<domain>/<name>/
 
 jobs:
+  - name: runtime
+    description: "Build runtime shim helper package from packaged flake"
+    enabled: true
+    flakePath: "."
+    outputDir: /tmp/runtime-shim-build
+    logFile: /var/log/rke2-runtime-shim-build.log
+    packages:
+      - name: flox-shim-wrapper
+        attr: "packages.aarch64-linux.flox-shim-wrapper"
+
   - name: mesh
     description: "Build mesh packages (headplane + headscale) from packaged flake"
     enabled: true

@@ -35,11 +35,19 @@ public final class Main {
           new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/flox-shim-build.yaml", "flox-shim-build.yaml", false),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
+              "/runtime/flox-containerd-shim/flake.nix", "flake.nix", false),
+          new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/shim-installer.sh", "shim-installer.sh", true),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/shim-installer-host.sh",
               "shim-installer-host.sh",
               true),
+          new MaterializeShimAssetsCommand.EmbeddedAsset(
+              "/runtime/flox-containerd-shim/containerd-shim-flox-v2-wrapper.sh",
+              "containerd-shim-flox-v2-wrapper.sh",
+              true),
+          new MaterializeShimAssetsCommand.EmbeddedAsset(
+              "/runtime/flox-containerd-shim/flox-rootfs-sync.sh", "flox-rootfs-sync.sh", true),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/mesh/headplane/flake.nix",
               "mesh/headplane/flake.nix",
