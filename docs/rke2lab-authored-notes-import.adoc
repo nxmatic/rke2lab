@@ -145,6 +145,28 @@ Future revisit criteria:
 
 Until those conditions are met, `copy` remains the canonical synchronization behavior and `bind` is tracked as a future optimization rather than an active migration target.
 
+=== Deferred ConfigMap simplification note (serialized-asset pattern)
+
+For a later cleanup pass, reuse the Flox shim wrapper packaging pattern for selected mesh/runtime ConfigMaps that are currently assembled inline in Java.
+
+Initial candidate:
+
+* `mesh/headplane` Flox environment payloads (for example, the Headplane Flox env ConfigMap) should eventually move toward a serialized asset/archive model rather than remaining as hand-built inline map literals
+
+Intent of the follow-up:
+
+* keep layer Java focused on object wiring and dependency structure
+* move larger or more mechanical payload construction into deterministic serialized assets, similar to the shim-wrapper archive + manifest flow
+* make future payload updates easier to diff, validate, and reuse across layers
+
+Guardrails for that later refactor:
+
+* do not change runtime behavior while introducing the packaging cleanup
+* keep one canonical owner for each emitted asset/config payload
+* prefer deterministic archive/manifest generation over ad-hoc string assembly when payload complexity justifies it
+
+This is explicitly deferred work and not required for the current mesh-system / runtime-namespace refactor.
+
 === Controlnode M4 C4 view (policy-first + Pulumi initial provisioning)
 
 The controlnode follows a strict policy-first flow before any Stage A provisioning side effects.

@@ -80,5 +80,6 @@ Scripts in this owner set:
 - Shim builder mode is explicit when passed: `flox-shim-build.sh [host|guest] [descriptor]`.
 - Default mode is `guest` when mode is omitted.
 - `kdns` source resolution is worktree-based (`path:` input), with subtree mode preferred at `networking/kdns/src` and explicit override available via `KDNS_SRC_WORKTREE`.
+- Deferred cleanup note: some inline mesh/runtime ConfigMaps (for example `mesh/headplane` Flox env payloads) are candidates to adopt the same deterministic serialized-asset/archive pattern now used by the Flox shim wrapper.
 - Next-stage migration guidance is tracked in `docs/rke2lab-authored-notes-import.adoc` under `=== Next-stage migration note`.
 - Keep this registry updated whenever a script is added, moved, or deleted.

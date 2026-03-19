@@ -16,7 +16,7 @@ public final class HeadscaleLayer extends Construct {
 
   public static final String LEGACY_PATH_PREFIX = "mesh/headscale/";
 
-  private static final String HEADSCALE_NAMESPACE = MeshLayerRefs.HEADSCALE_SYSTEM_NAMESPACE.name();
+  private static final String HEADSCALE_NAMESPACE = MeshLayerRefs.MESH_SYSTEM_NAMESPACE.name();
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("mesh", "headscale");
@@ -32,7 +32,7 @@ public final class HeadscaleLayer extends Construct {
     super(scope, id);
     this.registry = registry;
 
-    ApiObject namespace = createNamespace();
+    ApiObject namespace = resolveNamespace();
     ApiObject saClient = createServiceAccount("headscale-client", namespace);
     ApiObject saBootstrap = createServiceAccount("headscale-bootstrap", namespace);
     ApiObject saGateway = createServiceAccount("headscale-gateway", namespace);
@@ -86,11 +86,18 @@ public final class HeadscaleLayer extends Construct {
         serviceHeadscale);
   }
 
+  private ApiObject resolveNamespace() {
+    if (registry != null) {
+      return registry.require(MeshLayerRefs.MESH_SYSTEM_NAMESPACE);
+    }
+    return createNamespace();
+  }
+
   private ApiObject createNamespace() {
     ApiObject namespace =
         new ApiObject(
             this,
-            "namespace-" + MeshLayerRefs.HEADSCALE_SYSTEM_NAMESPACE.name(),
+            "namespace-" + MeshLayerRefs.MESH_SYSTEM_NAMESPACE.name(),
             ApiObjectProps.builder()
                 .apiVersion("v1")
                 .kind("Namespace")
@@ -103,7 +110,7 @@ public final class HeadscaleLayer extends Construct {
                         .build())
                 .build());
     if (registry != null) {
-      registry.publish(MeshLayerRefs.HEADSCALE_SYSTEM_NAMESPACE, namespace);
+      registry.publish(MeshLayerRefs.MESH_SYSTEM_NAMESPACE, namespace);
     }
     return namespace;
   }

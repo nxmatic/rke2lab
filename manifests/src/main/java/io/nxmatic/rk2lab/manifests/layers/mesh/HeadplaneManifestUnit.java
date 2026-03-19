@@ -15,7 +15,9 @@ public final class HeadplaneManifestUnit extends AbstractManifestUnit {
     super(
         MANIFEST_UNIT_ID,
         List.of(LEGACY_PATH_PREFIX),
-        List.of(HeadscaleManifestUnit.MANIFEST_UNIT_ID));
+        List.of(
+            MeshSystemNamespaceManifestUnit.MANIFEST_UNIT_ID,
+            HeadscaleManifestUnit.MANIFEST_UNIT_ID));
   }
 
   @Override

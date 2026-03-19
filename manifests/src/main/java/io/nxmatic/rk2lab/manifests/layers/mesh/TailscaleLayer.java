@@ -2,6 +2,7 @@
 package io.nxmatic.rk2lab.manifests.layers.mesh;
 
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
+import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -14,28 +15,45 @@ public final class TailscaleLayer extends Construct {
 
   public static final String LEGACY_PATH_PREFIX = "mesh/tailscale/";
 
+  private static final String TAILSCALE_NAMESPACE = MeshLayerRefs.MESH_SYSTEM_NAMESPACE.name();
+
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("mesh", "tailscale");
 
-  public TailscaleLayer(final Construct scope, final String id) {
-    super(scope, id);
+  private final ManifestUnitReferenceRegistry registry;
 
-    ApiObject namespace = createNamespace();
+  public TailscaleLayer(final Construct scope, final String id) {
+    this(scope, id, null);
+  }
+
+  public TailscaleLayer(
+      final Construct scope, final String id, final ManifestUnitReferenceRegistry registry) {
+    super(scope, id);
+    this.registry = registry;
+
+    ApiObject namespace = resolveNamespace();
     createSecret(namespace);
-    ApiObject helmChart = createHelmChart();
+    ApiObject helmChart = createHelmChart(namespace);
     createConnector(helmChart);
+  }
+
+  private ApiObject resolveNamespace() {
+    if (registry != null) {
+      return registry.require(MeshLayerRefs.MESH_SYSTEM_NAMESPACE);
+    }
+    return createNamespace();
   }
 
   private ApiObject createNamespace() {
     return new ApiObject(
         this,
-        "namespace-tailscale-system",
+        "namespace-" + TAILSCALE_NAMESPACE,
         ApiObjectProps.builder()
             .apiVersion("v1")
             .kind("Namespace")
             .metadata(
                 ApiObjectMetadata.builder()
-                    .name("tailscale-system")
+                    .name(TAILSCALE_NAMESPACE)
                     .annotations(
                         packageProfile.packageAnnotations(
                             "|Namespace|default|${tailscale-namespace}"))
@@ -43,7 +61,7 @@ public final class TailscaleLayer extends Construct {
             .build());
   }
 
-  private ApiObject createHelmChart() {
+  private ApiObject createHelmChart(final ApiObject namespace) {
     ApiObject helmChart =
         new ApiObject(
             this,
@@ -54,12 +72,14 @@ public final class TailscaleLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("tailscale-operator")
-                        .namespace("kube-system")
+                        .namespace(TAILSCALE_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
-                                "helm.cattle.io|HelmChart|kube-system|tailscale-operator"))
+                                "helm.cattle.io|HelmChart|${tailscale-namespace}|tailscale-operator"))
                         .build())
                 .build());
+
+    helmChart.addDependency(namespace);
 
     helmChart.addJsonPatch(
         JsonPatch.add(
@@ -72,7 +92,7 @@ public final class TailscaleLayer extends Construct {
                 "repo",
                 "https://pkgs.tailscale.com/helmcharts",
                 "targetNamespace",
-                "tailscale-system",
+                TAILSCALE_NAMESPACE,
                 "valuesContent",
                 "operatorConfig:\n"
                     + "  hostname: name-tailscale-operator # kpt-set: name-tailscale-operator\n"
@@ -97,7 +117,9 @@ public final class TailscaleLayer extends Construct {
                         .annotations(
                             Map.of(
                                 "config.kubernetes.io/depends-on",
-                                "helm.cattle.io/namespaces/kube-system/HelmChart/tailscale-operator",
+                                "helm.cattle.io/namespaces/"
+                                    + TAILSCALE_NAMESPACE
+                                    + "/HelmChart/tailscale-operator",
                                 "internal.kpt.dev/upstream-identifier",
                                 "tailscale.com|Connector|default|controlplane",
                                 "kpt.dev/package-layer",
@@ -129,7 +151,7 @@ public final class TailscaleLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("operator-oauth")
-                        .namespace("tailscale-system")
+                        .namespace(TAILSCALE_NAMESPACE)
                         .labels(Map.of("app.kubernetes.io/replicated", "true"))
                         .annotations(
                             Map.of(

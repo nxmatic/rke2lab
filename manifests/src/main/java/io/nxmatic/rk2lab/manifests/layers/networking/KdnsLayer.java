@@ -1,6 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.networking;
 
+import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterLayerRefs;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.DebugSidecarProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.DebugSidecarToggleResolver;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
@@ -23,6 +24,7 @@ public final class KdnsLayer extends Construct {
   private static final String PACKAGE_NAME = "kdns";
   private static final boolean DEBUG_SIDECAR_ENABLED =
       DebugSidecarToggleResolver.resolveByDomainLayer(LAYER_NAME, PACKAGE_NAME, false);
+  private static final String KDNS_NAMESPACE = ClusterLayerRefs.RUNTIME_SYSTEM_NAMESPACE.name();
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile(LAYER_NAME, PACKAGE_NAME);
@@ -91,7 +93,7 @@ public final class KdnsLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("kdns")
-                        .namespace("kube-system")
+                        .namespace(KDNS_NAMESPACE)
                         .annotations(packageProfile.packageAnnotationsWithoutUpstream())
                         .labels(
                             Map.of(
@@ -122,7 +124,7 @@ public final class KdnsLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("kdns-ingress-reader-binding")
-                        .namespace("kube-system")
+                        .namespace(KDNS_NAMESPACE)
                         .annotations(packageProfile.packageAnnotationsWithoutUpstream())
                         .build())
                 .build());
@@ -142,7 +144,8 @@ public final class KdnsLayer extends Construct {
                 "kdns-ingress-reader")),
         JsonPatch.add(
             "/subjects",
-            List.of(Map.of("kind", "ServiceAccount", "name", "kdns", "namespace", "kube-system"))));
+            List.of(
+                Map.of("kind", "ServiceAccount", "name", "kdns", "namespace", KDNS_NAMESPACE))));
     return clusterRoleBinding;
   }
 
@@ -157,7 +160,7 @@ public final class KdnsLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("kdns-dlv-script")
-                        .namespace("kube-system")
+                        .namespace(KDNS_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "|ConfigMap|${target-namespace}|kdns-dlv-script"))
@@ -212,7 +215,7 @@ public final class KdnsLayer extends Construct {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("kdns")
-                        .namespace("kube-system")
+                        .namespace(KDNS_NAMESPACE)
                         .annotations(
                             packageProfile.packageAnnotations(
                                 "apps|Deployment|${target-namespace}|kdns"))

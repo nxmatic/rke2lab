@@ -13,6 +13,9 @@ public final class MeshDomainRegistrar implements LayerDomainRegistrar {
         "mesh",
         List.of("networking", "replication"),
         List.of(
-            new HeadscaleManifestUnit(), new TailscaleManifestUnit(), new HeadplaneManifestUnit()));
+            new MeshSystemNamespaceManifestUnit(),
+            new HeadscaleManifestUnit(),
+            new TailscaleManifestUnit(),
+            new HeadplaneManifestUnit()));
   }
 }
