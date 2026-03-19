@@ -43,10 +43,6 @@ public final class Main {
               "shim-installer-host.sh",
               true),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/containerd-shim-flox-v2-wrapper.sh",
-              "containerd-shim-flox-v2-wrapper.sh",
-              true),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/flox-rootfs-sync.sh", "flox-rootfs-sync.sh", true),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/mesh/headplane/flake.nix",

@@ -124,7 +124,6 @@ shim::assets:path:init() {
   FLOX_BUILD_SCRIPT="${FLOX_SHIM_ROOT}/flox-shim-build.sh"
   FLOX_BUILD_DESCRIPTOR="${FLOX_SHIM_ROOT}/flox-shim-build.yaml"
   FLOX_SHIM_PACKAGE_FLAKE="${FLOX_SHIM_ROOT}/flake.nix"
-  FLOX_SHIM_WRAPPER_SCRIPT="${FLOX_SHIM_ROOT}/containerd-shim-flox-v2-wrapper.sh"
   FLOX_ROOTFS_SYNC_SCRIPT="${FLOX_SHIM_ROOT}/flox-rootfs-sync.sh"
   FLOX_SHIM_MESH_DIR="${FLOX_SHIM_ROOT}/mesh"
   FLOX_SHIM_NETWORKING_DIR="${FLOX_SHIM_ROOT}/networking"
@@ -141,10 +140,6 @@ shim::assets:path:validate() {
   }
   [[ -r "${FLOX_SHIM_PACKAGE_FLAKE}" ]] || {
     echo "flox shim package flake missing or unreadable: ${FLOX_SHIM_PACKAGE_FLAKE}" >&2
-    exit 1
-  }
-  [[ -x "${FLOX_SHIM_WRAPPER_SCRIPT}" ]] || {
-    echo "flox shim wrapper missing or not executable: ${FLOX_SHIM_WRAPPER_SCRIPT}" >&2
     exit 1
   }
   [[ -x "${FLOX_ROOTFS_SYNC_SCRIPT}" ]] || {

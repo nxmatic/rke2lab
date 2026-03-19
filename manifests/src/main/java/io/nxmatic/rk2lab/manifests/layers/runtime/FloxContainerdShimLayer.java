@@ -165,10 +165,6 @@ public final class FloxContainerdShimLayer extends Construct {
                 Map.entry(
                     "runtime-flake.nix", readResource("/runtime/flox-containerd-shim/flake.nix")),
                 Map.entry(
-                    "containerd-shim-flox-v2-wrapper.sh",
-                    readResource(
-                        "/runtime/flox-containerd-shim/containerd-shim-flox-v2-wrapper.sh")),
-                Map.entry(
                     "flox-rootfs-sync.sh",
                     readResource("/runtime/flox-containerd-shim/flox-rootfs-sync.sh")),
                 Map.entry(
@@ -402,11 +398,6 @@ public final class FloxContainerdShimLayer extends Construct {
                                         "runtime-flake.nix",
                                         "path",
                                         "build-assets/flake.nix"),
-                                    Map.of(
-                                        "key",
-                                        "containerd-shim-flox-v2-wrapper.sh",
-                                        "path",
-                                        "build-assets/containerd-shim-flox-v2-wrapper.sh"),
                                     Map.of(
                                         "key",
                                         "flox-rootfs-sync.sh",

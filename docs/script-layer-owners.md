@@ -15,7 +15,6 @@ This file is the canonical ownership map for shell script assets in this reposit
 |---|---|---|---|
 | `shim-installer.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/shim-installer.sh` |
 | `shim-installer-host.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/shim-installer-host.sh` |
-| `containerd-shim-flox-v2-wrapper.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/containerd-shim-flox-v2-wrapper.sh` |
 | `flox-rootfs-sync.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/flox-rootfs-sync.sh` |
 | `flox-shim-build.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/flox-shim-build.sh` |
 | `flox-shim-build.yaml` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/flox-shim-build.yaml` |
