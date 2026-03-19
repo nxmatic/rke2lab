@@ -1,6 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.runtime;
 
+import io.nxmatic.rk2lab.manifests.WrapperGoArchiveAssets;
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterLayerRefs;
 import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
@@ -145,27 +146,43 @@ public final class FloxContainerdShimLayer extends Construct {
     configMap.addJsonPatch(
         JsonPatch.add(
             "/data",
-            Map.of(
-                "shim-installer.sh",
-                readResource("/runtime/flox-containerd-shim/shim-installer.sh"),
-                "shim-installer-host.sh",
-                readResource("/runtime/flox-containerd-shim/shim-installer-host.sh"),
-                "shim-installer-entrypoint.sh",
-                readResource("/runtime/flox-containerd-shim/shim-installer-entrypoint.sh"),
-                "flox-shim-build.sh",
-                readResource("/runtime/flox-containerd-shim/flox-shim-build.sh"),
-                "flox-shim-build.yaml",
-                readResource("/runtime/flox-containerd-shim/flox-shim-build.yaml"),
-                "runtime-flake.nix",
-                readResource("/runtime/flox-containerd-shim/flake.nix"),
-                "containerd-shim-flox-v2-wrapper.sh",
-                readResource("/runtime/flox-containerd-shim/containerd-shim-flox-v2-wrapper.sh"),
-                "flox-rootfs-sync.sh",
-                readResource("/runtime/flox-containerd-shim/flox-rootfs-sync.sh"),
-                "mesh-headplane-flake.nix",
-                readResource("/runtime/flox-containerd-shim/mesh/headplane/flake.nix"),
-                "networking-kdns-flake.nix",
-                readResource("/runtime/flox-containerd-shim/networking/kdns/flake.nix"))));
+            Map.ofEntries(
+                Map.entry(
+                    "shim-installer.sh",
+                    readResource("/runtime/flox-containerd-shim/shim-installer.sh")),
+                Map.entry(
+                    "shim-installer-host.sh",
+                    readResource("/runtime/flox-containerd-shim/shim-installer-host.sh")),
+                Map.entry(
+                    "shim-installer-entrypoint.sh",
+                    readResource("/runtime/flox-containerd-shim/shim-installer-entrypoint.sh")),
+                Map.entry(
+                    "flox-shim-build.sh",
+                    readResource("/runtime/flox-containerd-shim/flox-shim-build.sh")),
+                Map.entry(
+                    "flox-shim-build.yaml",
+                    readResource("/runtime/flox-containerd-shim/flox-shim-build.yaml")),
+                Map.entry(
+                    "runtime-flake.nix", readResource("/runtime/flox-containerd-shim/flake.nix")),
+                Map.entry(
+                    "containerd-shim-flox-v2-wrapper.sh",
+                    readResource(
+                        "/runtime/flox-containerd-shim/containerd-shim-flox-v2-wrapper.sh")),
+                Map.entry(
+                    "flox-rootfs-sync.sh",
+                    readResource("/runtime/flox-containerd-shim/flox-rootfs-sync.sh")),
+                Map.entry(
+                    WrapperGoArchiveAssets.ARCHIVE_CONFIGMAP_KEY,
+                    WrapperGoArchiveAssets.archiveBase64()),
+                Map.entry(
+                    WrapperGoArchiveAssets.MANIFEST_CONFIGMAP_KEY,
+                    WrapperGoArchiveAssets.manifestJson()),
+                Map.entry(
+                    "mesh-headplane-flake.nix",
+                    readResource("/runtime/flox-containerd-shim/mesh/headplane/flake.nix")),
+                Map.entry(
+                    "networking-kdns-flake.nix",
+                    readResource("/runtime/flox-containerd-shim/networking/kdns/flake.nix")))));
     return configMap;
   }
 
@@ -395,6 +412,18 @@ public final class FloxContainerdShimLayer extends Construct {
                                         "flox-rootfs-sync.sh",
                                         "path",
                                         "build-assets/flox-rootfs-sync.sh"),
+                                    Map.of(
+                                        "key",
+                                        WrapperGoArchiveAssets.ARCHIVE_CONFIGMAP_KEY,
+                                        "path",
+                                        "build-assets/"
+                                            + WrapperGoArchiveAssets.ARCHIVE_CONFIGMAP_KEY),
+                                    Map.of(
+                                        "key",
+                                        WrapperGoArchiveAssets.MANIFEST_CONFIGMAP_KEY,
+                                        "path",
+                                        "build-assets/"
+                                            + WrapperGoArchiveAssets.MANIFEST_CONFIGMAP_KEY),
                                     Map.of(
                                         "key",
                                         "mesh-headplane-flake.nix",

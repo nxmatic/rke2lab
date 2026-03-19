@@ -127,6 +127,24 @@ Guardrail:
 
 * maintain one canonical path contract for both modes (`networking/kdns/src` preferred for subtree mode, optional explicit override via environment variable when needed)
 
+=== Runtime shim rootfs sync mount-mode deferral
+
+For the current Flox shim wrapper evolution, keep `bundle/.flox -> rootfs/.flox` synchronization in copy mode and explicitly defer bind-mount mode.
+
+Reason for deferral:
+
+* a bind mount created from the host view is not guaranteed to be visible inside the eventual container mount namespace; visibility depends on namespace timing and propagation
+* the current wrapper model `exec`s into the real shim, so it does not naturally retain a post-exec cleanup phase for deterministic unmount-before-bundle-deletion behavior
+* copy mode is less elegant but remains deterministic, namespace-agnostic, and free of mount-lifecycle cleanup hazards while the Go wrapper is still being introduced
+
+Future revisit criteria:
+
+* implement bind mode only as an explicit, opt-in path
+* make it namespace-aware rather than assuming host-namespace mount visibility
+* pair it with deterministic cleanup semantics (either namespace-scoped teardown or dedicated cleanup helper/supervisor)
+
+Until those conditions are met, `copy` remains the canonical synchronization behavior and `bind` is tracked as a future optimization rather than an active migration target.
+
 === Controlnode M4 C4 view (policy-first + Pulumi initial provisioning)
 
 The controlnode follows a strict policy-first flow before any Stage A provisioning side effects.

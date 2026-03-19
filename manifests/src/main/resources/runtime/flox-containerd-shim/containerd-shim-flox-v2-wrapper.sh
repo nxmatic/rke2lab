@@ -3,7 +3,7 @@ set -euo pipefail
 
 REAL_SHIM="${FLOX_SHIM_REAL:-/usr/local/libexec/rke2lab/flox-shim-wrapper/containerd-shim-flox-v2.real}"
 ROOTFS_SYNC_HELPER="${FLOX_ROOTFS_SYNC_HELPER:-/usr/local/libexec/rke2lab/flox-shim-wrapper/flox-rootfs-sync.sh}"
-ROOTFS_SYNC_ENABLED="${FLOX_SHIM_ROOTFS_SYNC:-0}"
+ROOTFS_SYNC_ENABLED="${FLOX_SHIM_ROOTFS_SYNC:-1}"
 WRAPPER_LOG="${FLOX_SHIM_WRAPPER_LOG:-/var/log/rke2lab/flox-shim-wrapper.log}"
 
 ensure_log_target() {

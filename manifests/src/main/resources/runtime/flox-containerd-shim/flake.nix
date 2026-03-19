@@ -20,27 +20,34 @@
       pkgs = import nixpkgs {inherit system;};
     in {
       packages = {
-        flox-shim-wrapper = pkgs.stdenvNoCC.mkDerivation {
+        flox-shim-wrapper = pkgs.buildGoModule {
           pname = "flox-shim-wrapper";
           version = "0.1.0";
-          src = ./.;
+          src = builtins.path {
+            path = ./wrapper-go;
+            name = "flox-shim-wrapper-src";
+          };
+          subPackages = ["cmd/containerd-shim-flox-v2"];
+          vendorHash = "sha256-g+yaVIx4jxpAQ/+WrGKxhVeliYx7nLQe/zsGpxV4Fn4=";
 
-          dontConfigure = true;
-          dontBuild = true;
+          env = {
+            CGO_ENABLED = "0";
+          };
 
-          installPhase = ''
-            runHook preInstall
+          ldflags = [
+            "-s"
+            "-w"
+          ];
 
-            install -D -m 0755 "$src/containerd-shim-flox-v2-wrapper.sh" \
-              "$out/bin/containerd-shim-flox-v2"
-            install -D -m 0755 "$src/flox-rootfs-sync.sh" \
+          postInstall = ''
+            runHook postInstallPre
+
+            install -D -m 0755 ${./flox-rootfs-sync.sh} \
               "$out/libexec/rke2lab/flox-shim-wrapper/flox-rootfs-sync.sh"
 
-            patchShebangs \
-              "$out/bin/containerd-shim-flox-v2" \
-              "$out/libexec/rke2lab/flox-shim-wrapper/flox-rootfs-sync.sh"
+            patchShebangs "$out/libexec/rke2lab/flox-shim-wrapper/flox-rootfs-sync.sh"
 
-            runHook postInstall
+            runHook postInstallPost
           '';
 
           meta = with pkgs.lib; {

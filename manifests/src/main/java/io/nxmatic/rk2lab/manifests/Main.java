@@ -624,6 +624,8 @@ public final class Main {
           }
         }
 
+        WrapperGoArchiveAssets.materializeTo(normalizedOutputDir);
+
         logger.info("Materialized {} shim assets to {}", assets.size(), normalizedOutputDir);
       } catch (IOException ex) {
         throw new UncheckedIOException(ex);

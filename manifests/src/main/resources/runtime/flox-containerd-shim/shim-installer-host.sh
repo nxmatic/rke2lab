@@ -50,6 +50,35 @@ host::tooling:init() {
   export FLOX_NONINTERACTIVE=1
 }
 
+host::tooling:bin:resolve() {
+  local bin_name="$1"
+  local candidate
+
+  if candidate="$(command -v "${bin_name}" 2>/dev/null)" && [[ -n "${candidate}" && -x "${candidate}" ]]; then
+    printf '%s\n' "${candidate}"
+    return 0
+  fi
+
+  for candidate in \
+    "/var/lib/rancher/rke2/.flox/run"/*/bin/"${bin_name}" \
+    "/nix/var/nix/profiles/default/bin/${bin_name}" \
+    "/root/.nix-profile/bin/${bin_name}"; do
+    if [[ -x "${candidate}" ]]; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+
+  echo "required binary not found: ${bin_name}" >&2
+  return 1
+}
+
+host::tooling:config-tools:resolve() {
+  YQ_BIN="$(host::tooling:bin:resolve yq)"
+  DASEL_BIN="$(host::tooling:bin:resolve dasel)"
+  export YQ_BIN DASEL_BIN
+}
+
 host::nix:flox-conf:ensure() {
   local flox_conf
 
@@ -239,11 +268,11 @@ shim::runtime:gcroots:ensure() {
   local gcroots_dir gcroots_link
 
   gcroots_dir="${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/flox"
-  gcroots_link="${gcroots_dir}/system-profile"
+  # gcroots_link="${gcroots_dir}/system-profile"
   mkdir -p "${gcroots_dir}"
-  if [[ ! -e "${gcroots_link}" ]]; then
-    ln -s /nix/var/nix/profiles/default "${gcroots_link}"
-  fi
+  # if [[ ! -e "${gcroots_link}" ]]; then
+  #  ln -s /nix/var/nix/profiles/default "${gcroots_link}"
+  # fi
 }
 
 shim::runtime:binary:install() {
@@ -299,6 +328,7 @@ shim::runtime:core:install() {
   arch="$(uname -m)"
 
   shim::runtime:env:ensure "${flox_env_dir}"
+  shim::runtime:gcroots:ensure
   containerd_bin="$(shim::runtime:containerd:resolve-bin)"
   shim_pkg="$(shim::runtime:package:resolve "${containerd_bin}")"
   flox install --dir "${flox_env_dir}" "${shim_pkg}"
@@ -328,7 +358,7 @@ container::service:runtime:restart() {
 
 containerd::config:version:detect() {
   local version
-  version="$( dasel -i toml -o yaml < "${CONTAINERD_CONFIG_FILE}" | yq -r '.version // ""' 2>/dev/null || true)"
+  version="$( "${DASEL_BIN}" -i toml -o yaml < "${CONTAINERD_CONFIG_FILE}" | "${YQ_BIN}" -r '.version // ""' 2>/dev/null || true)"
 
   if [[ -z "${version}" ]]; then
     case "$(basename "${CONTAINERD_CONFIG_FILE}")" in
@@ -355,8 +385,8 @@ containerd::config:flox:update() {
   tmp="$(mktemp)" &&
     trap "rm -f ${tmp}" RETURN
 
-  dasel -i toml -o yaml < ${CONTAINERD_CONFIG_TEMPLATE} |
-    CRI_PLUGIN_ROOT="${plugin_root}" yq '
+  "${DASEL_BIN}" -i toml -o yaml < "${CONTAINERD_CONFIG_TEMPLATE}" |
+    CRI_PLUGIN_ROOT="${plugin_root}" "${YQ_BIN}" '
       del(.plugins."io.containerd.cri.v1.runtime".containerd.runtimes.flox) |
       del(.plugins."io.containerd.grpc.v1.cri".containerd.runtimes.flox) |
       .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.runtime_path = "/usr/local/bin/containerd-shim-flox-v2" |
@@ -365,12 +395,13 @@ containerd::config:flox:update() {
       .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.container_annotations = ["flox.dev/*"] |
       .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.options.SystemdCgroup = true
     ' |
-    dasel -i yaml -o toml > "${tmp}" &&
+    "${DASEL_BIN}" -i yaml -o toml > "${tmp}" &&
       mv "${tmp}" "${CONTAINERD_CONFIG_TEMPLATE}"
 }
 
 : "Initialize host tooling and shim asset paths"
 host::tooling:init
+host::tooling:config-tools:resolve
 host::nix:flox-conf:ensure
 shim::assets:path:init
 shim::assets:path:validate
