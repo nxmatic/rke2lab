@@ -30,14 +30,14 @@ kdns::manifest:patch() {
   deployment_manifest="${RKE2LAB_MANIFESTS_DIR:-/srv/host/rke2-manifests.d}/networking/kdns/02-deployment-kdns.yml"
   [[ -f "${deployment_manifest}" ]] || return 0
 
-  flox_env="${RKE2LAB_KDNS_FLOX_ENV:-nxmatic/kdns}"
-  debug_enabled="${RKE2LAB_KDNS_DEBUG_ENABLED:-false}"
+  flox_env="${RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV:-nxmatic/kdns}"
+  debug_enabled="${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}"
 
-  RKE2LAB_KDNS_FLOX_ENV="${flox_env}" \
-  RKE2LAB_KDNS_DEBUG_ENABLED="${debug_enabled}" \
+  RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV="${flox_env}" \
+  RKE2LAB_POLICY_DEBUG_KDNS_ENABLED="${debug_enabled}" \
     yq eval -i '
-      .spec.template.metadata.annotations."flox.dev/environment" = strenv(RKE2LAB_KDNS_FLOX_ENV) |
-      .spec.template.metadata.annotations."debug.kdns.lab42/enabled" = strenv(RKE2LAB_KDNS_DEBUG_ENABLED)
+      .spec.template.metadata.annotations."flox.dev/environment" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV) |
+      .spec.template.metadata.annotations."debug.kdns.lab42/enabled" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_ENABLED)
     ' "${deployment_manifest}"
 }
 

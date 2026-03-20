@@ -1,11 +1,13 @@
 package io.nxmatic.rk2lab.manifests;
 
+import io.nxmatic.rk2lab.manifests.api.ManifestDomainPolicy;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisResult;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
 import io.nxmatic.rk2lab.manifests.layers.cicd.CicdDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.common.ApplyingManifestUnitVisitor;
+import io.nxmatic.rk2lab.manifests.layers.common.LayerDomain;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistry;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistryBuilder;
 import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnit;
@@ -25,7 +27,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.cdk8s.App;
 import org.cdk8s.AppProps;
 import org.cdk8s.Chart;
@@ -52,7 +58,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     final App app = new App(AppProps.builder().outdir(synthOutdir.toString()).build());
     final Chart chart = new Chart(app, "manifests");
 
-    final LayerDomainRegistry domainRegistry =
+    final LayerDomainRegistry configuredDomainRegistry =
         new LayerDomainRegistryBuilder()
             .register(new ClusterDomainRegistrar())
             .register(new StorageDomainRegistrar())
@@ -64,6 +70,9 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             .register(new HaDomainRegistrar())
             .register(new CicdDomainRegistrar())
             .build();
+
+    final LayerDomainRegistry domainRegistry =
+        applyManifestDomainPolicy(request, configuredDomainRegistry);
 
     final List<ManifestUnit> manifestUnits =
         domainRegistry.manifestUnits().stream()
@@ -107,5 +116,77 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
     return new ManifestSynthesisResult(
         synthManifestFile, manifestUnitHitCount, domainRegistry.domains().size());
+  }
+
+  private LayerDomainRegistry applyManifestDomainPolicy(
+      ManifestSynthesisRequest request, LayerDomainRegistry configuredDomainRegistry) {
+    if (request.manifestDomainPolicy().isEmpty()) {
+      return configuredDomainRegistry;
+    }
+
+    final ManifestDomainPolicy manifestDomainPolicy = request.manifestDomainPolicy().orElseThrow();
+    final Map<String, LayerDomain> configuredDomainsById =
+        configuredDomainRegistry.domains().stream()
+            .collect(
+                java.util.stream.Collectors.toMap(
+                    LayerDomain::domainId,
+                    domain -> domain,
+                    (left, right) -> left,
+                    LinkedHashMap::new));
+
+    final List<String> unknownDomainIds =
+        manifestDomainPolicy.domainIds().stream()
+            .filter(domainId -> !configuredDomainsById.containsKey(domainId))
+            .sorted()
+            .toList();
+    if (!unknownDomainIds.isEmpty()) {
+      throw new IllegalArgumentException(
+          "Manifest-domain policy references domains unsupported by provider '"
+              + providerId()
+              + "': "
+              + unknownDomainIds);
+    }
+
+    final LinkedHashSet<String> requestedEnabledDomainIds =
+        new LinkedHashSet<>(manifestDomainPolicy.enabledDomainIds());
+    if (requestedEnabledDomainIds.isEmpty()) {
+      throw new IllegalArgumentException(
+          "Manifest-domain policy disables all domains for provider '" + providerId() + "'.");
+    }
+
+    final LinkedHashSet<String> effectiveDomainIds = new LinkedHashSet<>();
+    for (String requestedDomainId : requestedEnabledDomainIds) {
+      collectDomainDependencies(requestedDomainId, configuredDomainsById, effectiveDomainIds);
+    }
+
+    LOG.info(
+        "Applying manifest-domain policy: requested domains={}, effective domains={}",
+        requestedEnabledDomainIds,
+        effectiveDomainIds);
+
+    final List<LayerDomain> filteredDomains =
+        configuredDomainRegistry.domains().stream()
+            .filter(domain -> effectiveDomainIds.contains(domain.domainId()))
+            .toList();
+    return new LayerDomainRegistry(filteredDomains);
+  }
+
+  private void collectDomainDependencies(
+      String domainId,
+      Map<String, LayerDomain> configuredDomainsById,
+      Set<String> effectiveDomainIds) {
+    if (!effectiveDomainIds.add(domainId)) {
+      return;
+    }
+
+    final LayerDomain domain = configuredDomainsById.get(domainId);
+    if (domain == null) {
+      throw new IllegalArgumentException(
+          "Unknown manifest domain in policy resolution: " + domainId);
+    }
+
+    for (String dependencyDomainId : domain.dependsOnDomainIds()) {
+      collectDomainDependencies(dependencyDomainId, configuredDomainsById, effectiveDomainIds);
+    }
   }
 }

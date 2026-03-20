@@ -82,13 +82,13 @@ resolve_package_variant() {
 
 	case "${package_name}" in
 		kdns)
-			if rke2lab::bool:is_true "${RKE2LAB_KDNS_DEBUG_ENABLED:-false}"; then
+			if rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}"; then
 				package_name="kdns-debug"
 				[[ "${package_attr}" == *-debug ]] || package_attr="${package_attr}-debug"
 			fi
 			;;
 		flox-shim-wrapper)
-			if rke2lab::bool:is_true "${RKE2LAB_FLOX_SHIM_WRAPPER_DEBUG_ENABLED:-false}"; then
+			if rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_FLOX_SHIM_WRAPPER_ENABLED:-false}"; then
 				package_name="flox-shim-wrapper-debug"
 				[[ "${package_attr}" == *-debug ]] || package_attr="${package_attr}-debug"
 			fi

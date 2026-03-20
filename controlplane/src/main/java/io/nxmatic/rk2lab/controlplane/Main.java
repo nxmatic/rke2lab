@@ -4,6 +4,7 @@ import com.pulumi.Config;
 import com.pulumi.Pulumi;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.incus.IncusResourceBootstrap;
+import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rk2lab.manifests.api.ManifestUpdateGate;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -46,18 +47,21 @@ public final class Main {
           final Config config = context.config("rke2lab");
           final BootstrapConfig bootstrapConfig =
               new BootstrapConfig.Builder().applyConfig(config).build();
-          final BootstrapOutputs outputs = bootstrapAndCollectOutputs(bootstrapConfig);
+          final ControlplanePolicy controlplanePolicy = ControlplanePolicy.from(config);
+          final BootstrapOutputs outputs =
+              bootstrapAndCollectOutputs(bootstrapConfig, controlplanePolicy);
           outputs.values().forEach(context::export);
         });
   }
 
-  private static BootstrapOutputs bootstrapAndCollectOutputs(BootstrapConfig config) {
+  private static BootstrapOutputs bootstrapAndCollectOutputs(
+      BootstrapConfig config, ControlplanePolicy policy) {
     enforceEntryGatePolicies(config.localWorktreePath());
 
     final String bootstrapPhase;
     final boolean handoffReady;
     final IncusResourceBootstrap.BootstrapResult bootstrapResult =
-        new IncusResourceBootstrap(config).apply();
+        new IncusResourceBootstrap(config, policy).apply();
     final String seedNodeId = bootstrapResult.seedNodeId();
     final Object imageFingerprint = bootstrapResult.imageFingerprint();
     final Object seedInstanceStatus = bootstrapResult.instanceStatus();
@@ -84,10 +88,7 @@ public final class Main {
     outputs.put("incusProject", config.incusProject());
     outputs.put("imageAlias", config.imageAlias());
     outputs.put("seedLanBridgeParent", config.lanBridgeParent());
-    outputs.put("kdnsDebugEnabled", config.kdnsDebugEnabled());
-    outputs.put(
-        "kdnsFloxEnvironment", config.kdnsDebugEnabled() ? "nxmatic/kdns-debug" : "nxmatic/kdns");
-    outputs.put("floxShimWrapperDebugEnabled", config.floxShimWrapperDebugEnabled());
+    outputs.putAll(policy.toOutputMap());
     outputs.put("handoffReady", handoffReady);
     outputs.put("bootstrapPhase", bootstrapPhase);
     outputs.put("nextStep", "bootstrap-management-cluster-then-apply-stageb-cluster-manifests");
@@ -96,7 +97,9 @@ public final class Main {
 
   private static void runStandalone() {
     final BootstrapConfig bootstrapConfig = new BootstrapConfig.Builder().build();
-    final BootstrapOutputs outputs = bootstrapAndCollectOutputs(bootstrapConfig);
+    final ControlplanePolicy controlplanePolicy = ControlplanePolicy.defaults();
+    final BootstrapOutputs outputs =
+        bootstrapAndCollectOutputs(bootstrapConfig, controlplanePolicy);
     System.out.println(
         "Pulumi engine not detected (missing PULUMI_MONITOR). Running in standalone mode.");
     System.out.println("Bootstrap outputs:");

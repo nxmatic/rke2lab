@@ -22,6 +22,7 @@ import com.pulumi.resources.CustomResourceOptions;
 import com.pulumi.resources.Resource;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig.WorktreeHost;
 import io.nxmatic.rk2lab.controlplane.incus.image.PulumiIncusImageProvider;
+import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributorRegistry;
 import io.nxmatic.rk2lab.netplan.ClusterNetworkBlueprint;
@@ -93,6 +94,8 @@ public final class IncusResourceBootstrap {
 
   private final BootstrapConfig config;
 
+  private final ControlplanePolicy policy;
+
   private final PulumiIncusImageProvider imageProvider;
 
   private final HostMountSourceVerifier hostMountSourceVerifier;
@@ -107,8 +110,9 @@ public final class IncusResourceBootstrap {
 
   private final LaunchSecretsUpdater launchSecretsUpdater;
 
-  public IncusResourceBootstrap(BootstrapConfig config) {
+  public IncusResourceBootstrap(BootstrapConfig config, ControlplanePolicy policy) {
     this.config = config;
+    this.policy = policy;
     this.imageProvider = new PulumiIncusImageProvider(config);
     this.hostMountSourceVerifier = HostMountSourceVerifier.INSTANCE;
     this.nodeConfigRegenerator = new NodeConfigRegenerator(CloudConfigSecretRenderer.INSTANCE);
@@ -167,7 +171,7 @@ public final class IncusResourceBootstrap {
           localPaths.manifestsRoot().resolve("host"));
       LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
       runtimeEnvControlplaneOverlayWriter.write(
-          localPaths.runtimeEnvConfigRoot(), layerContext, config);
+          localPaths.runtimeEnvConfigRoot(), layerContext, policy);
       hostMountSourceVerifier.ensureSources(localPaths);
       nodeConfigRegenerator.regenerateCloudConfigDir(
           localPaths.runtimeCloudConfigRoot(), localPaths.cloudSeedRoot());
@@ -352,7 +356,7 @@ public final class IncusResourceBootstrap {
     private RuntimeEnvControlplaneOverlayWriter() {}
 
     private void write(
-        Path runtimeEnvConfigRoot, LayerEnvContext layerContext, BootstrapConfig bootstrapConfig) {
+        Path runtimeEnvConfigRoot, LayerEnvContext layerContext, ControlplanePolicy policy) {
       try {
         Files.createDirectories(runtimeEnvConfigRoot);
 
@@ -365,7 +369,7 @@ public final class IncusResourceBootstrap {
 
         // Add bootstrap-only constants first; contributor-owned sections override as needed
         aggregatedVars.put("RKE2LAB_REPO_ROOT", HOST_WORKTREE_PATH);
-        aggregatedVars.putAll(controlplaneOverrides(bootstrapConfig));
+        aggregatedVars.putAll(policy.toEnvMap());
 
         // Add layer contributions (later ones override earlier)
         aggregatedVars.putAll(registry.aggregateContributions());
@@ -404,16 +408,6 @@ public final class IncusResourceBootstrap {
             "Failed to write controlplane runtime env override ConfigMap: " + runtimeEnvConfigRoot,
             ex);
       }
-    }
-
-    private static Map<String, String> controlplaneOverrides(BootstrapConfig bootstrapConfig) {
-      final boolean kdnsDebugEnabled = bootstrapConfig.kdnsDebugEnabled();
-      final boolean floxShimWrapperDebugEnabled = bootstrapConfig.floxShimWrapperDebugEnabled();
-
-      return Map.of(
-          "RKE2LAB_KDNS_DEBUG_ENABLED", Boolean.toString(kdnsDebugEnabled),
-          "RKE2LAB_KDNS_FLOX_ENV", kdnsDebugEnabled ? "nxmatic/kdns-debug" : "nxmatic/kdns",
-          "RKE2LAB_FLOX_SHIM_WRAPPER_DEBUG_ENABLED", Boolean.toString(floxShimWrapperDebugEnabled));
     }
 
     private static String quoteYamlIfNeeded(String value) {

@@ -24,9 +24,7 @@ public record BootstrapConfig(
     String lanBridgeParent,
     String vmnetNetworkName,
     URI apiEndpoint,
-    Path kubeconfigRef,
-    boolean kdnsDebugEnabled,
-    boolean floxShimWrapperDebugEnabled) {
+    Path kubeconfigRef) {
 
   public String imageBuilderBinary() {
     return "distrobuilder";
@@ -79,9 +77,7 @@ public record BootstrapConfig(
         lanBridgeParent,
         vmnetNetworkName,
         apiEndpoint,
-        kubeconfigRef,
-        kdnsDebugEnabled,
-        floxShimWrapperDebugEnabled);
+        kubeconfigRef);
   }
 
   public Path localWorktreePath() {
@@ -99,11 +95,6 @@ public record BootstrapConfig(
   private static final String WORKTREE_REPO_PATH_FALLBACK = "/private/var/lib/git/nxmatic/rke2lab";
 
   public static final class Builder {
-    @FunctionalInterface
-    private interface BooleanSetter {
-      void accept(boolean value);
-    }
-
     private final Defaults defaults = new Defaults();
 
     private Path worktree = defaults.worktree();
@@ -139,10 +130,6 @@ public record BootstrapConfig(
     private URI apiEndpoint = URI.create("https://10.66.106.10:6443");
 
     private Path kubeconfigRef;
-
-    private boolean kdnsDebugEnabled;
-
-    private boolean floxShimWrapperDebugEnabled;
 
     public Builder worktree(Path value) {
       this.worktree = normalizeAbsolutePath(value);
@@ -224,16 +211,6 @@ public record BootstrapConfig(
       return this;
     }
 
-    public Builder kdnsDebugEnabled(boolean value) {
-      this.kdnsDebugEnabled = value;
-      return this;
-    }
-
-    public Builder floxShimWrapperDebugEnabled(boolean value) {
-      this.floxShimWrapperDebugEnabled = value;
-      return this;
-    }
-
     public Builder applyConfig(Config config) {
       final EnvironmentValues environment = new EnvironmentValues(config);
       override(environment, "worktree.dir", value -> this.worktree(parsePath(value)));
@@ -257,9 +234,6 @@ public record BootstrapConfig(
       override(environment, "network.vmnetNetworkName", this::vmnetNetworkName);
       override(environment, "api.endpoint", value -> this.apiEndpoint(parseUri(value)));
       override(environment, "kubeconfig.ref", value -> this.kubeconfigRef(parsePath(value)));
-      overrideBoolean(environment, "kdns.debug", this::kdnsDebugEnabled);
-      overrideBoolean(
-          environment, "runtime.floxShimWrapper.debug", this::floxShimWrapperDebugEnabled);
       return this;
     }
 
@@ -267,14 +241,6 @@ public record BootstrapConfig(
       final String value = environment.raw(key);
       if (!value.isBlank()) {
         consumer.accept(value);
-      }
-    }
-
-    private void overrideBoolean(
-        EnvironmentValues environment, String key, BooleanSetter consumer) {
-      final String value = environment.raw(key);
-      if (!value.isBlank()) {
-        consumer.accept(parseBoolean(key, value));
       }
     }
 
@@ -304,9 +270,7 @@ public record BootstrapConfig(
           lanBridgeParent,
           vmnetNetworkName,
           apiEndpoint,
-          resolvedKubeconfigRef,
-          kdnsDebugEnabled,
-          floxShimWrapperDebugEnabled);
+          resolvedKubeconfigRef);
     }
 
     private Path parsePath(String value) {
@@ -321,14 +285,6 @@ public record BootstrapConfig(
         return null;
       }
       return URI.create(value.trim());
-    }
-
-    private boolean parseBoolean(String key, String value) {
-      return switch (value.trim().toLowerCase()) {
-        case "1", "true", "yes", "on" -> true;
-        case "0", "false", "no", "off" -> false;
-        default -> throw new IllegalArgumentException("Invalid boolean for " + key + ": " + value);
-      };
     }
   }
 

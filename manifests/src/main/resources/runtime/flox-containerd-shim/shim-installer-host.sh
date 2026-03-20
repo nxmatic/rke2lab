@@ -221,7 +221,7 @@ shim::runtime:wrapper-package:build() {
 
   nix_system="$(shim::runtime:nix-system:resolve)"
   package_name="flox-shim-wrapper"
-  if rke2lab::bool:is_true "${RKE2LAB_FLOX_SHIM_WRAPPER_DEBUG_ENABLED:-false}"; then
+  if rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_FLOX_SHIM_WRAPPER_ENABLED:-false}"; then
     package_name="${package_name}-debug"
   fi
   package_attr="packages.${nix_system}.${package_name}"
