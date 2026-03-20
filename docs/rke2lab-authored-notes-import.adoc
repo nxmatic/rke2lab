@@ -430,6 +430,98 @@ Working conclusion for now:
 * the main weakness is cross-layer drift risk while the model is still being consolidated
 * the right next robustness work is to harden defaults, semantics, documentation, and policy boundary clarity before starting the broader test-coverage phase
 
+=== Working note: Flox shim problem-solving summary
+
+This section is a living working document dedicated to the actual Flox shim problem path.
+It complements the robustness review above: the goal here is not broad architecture review, but to record what is already in place for the shim, what still remains uncertain, and the most sensible order for debugging and closing the remaining gap.
+
+Current assessment:
+
+* we now appear to have the main architectural prerequisites in place to return to the Flox shim problem directly
+* the remaining work should be much less about policy/config plumbing and much more about validating actual build/install/runtime behavior end to end
+
+What now seems to be in place:
+
+* policy-controlled debug selection for both KDNS and the Flox shim wrapper
+* canonical policy propagation from Pulumi -> controlplane -> runtime env overlay -> host scripts
+* debug package selection logic in `flox-shim-build.sh`
+* debug wrapper package selection logic in `shim-installer-host.sh`
+* host install path that resolves and installs:
+** the real shim binary (`containerd-shim-flox-v2.real`)
+** the selected wrapper package binary (`containerd-shim-flox-v2`)
+** the rootfs sync helper (`flox-rootfs-sync.sh`)
+* containerd config mutation that points the `flox` runtime to `/usr/local/bin/containerd-shim-flox-v2`
+* explicit prior decision that rootfs sync remains in `copy` mode for now, with bind mode deferred intentionally
+
+What this changes compared to earlier stages:
+
+* we are no longer blocked on creating the policy knobs or propagating them
+* we are no longer blocked on naming ambiguity between controlplane and manifests policy surfaces
+* we are now in a much better position to investigate the true shim runtime behavior with fewer architectural distractions
+
+What still remains uncertain:
+
+* whether the original shim failure mode has already been eliminated, or is still present but now easier to isolate
+* whether the correct wrapper variant is not only selected logically, but also installed and executed as intended on host
+* whether the runtime binary layout under `/usr/local/bin` and `/usr/local/libexec/rke2lab/flox-shim-wrapper` is exactly what containerd expects at execution time
+* whether containerd-facing runtime behavior remains correct after the wrapper delegates to the real shim
+* whether the copy-mode rootfs sync is sufficient for the concrete workload/runtime case we are actually trying to support
+
+Important framing:
+
+* at this stage, the likely remaining problems are operational/runtime problems, not missing-configuration problems
+* this means the next work should bias toward runtime inspection, artifact verification, and reproduction of the original symptom
+
+Recommended investigation order:
+
+. *First: restate the exact original shim symptom we are trying to eliminate*
+* keep this precise (install failure, runtime launch failure, missing env, rootfs-sync issue, wrong wrapper variant, containerd integration issue, etc.)
+* without this, later checks risk proving only that the plumbing exists, not that the original problem is solved
+
+. *Second: verify selected build/install artifacts on host*
+* confirm which wrapper package variant was selected (`flox-shim-wrapper` vs `flox-shim-wrapper-debug`)
+* confirm the expected files exist and are executable:
+** `/usr/local/bin/containerd-shim-flox-v2`
+** `/usr/local/libexec/rke2lab/flox-shim-wrapper/containerd-shim-flox-v2.real`
+** `/usr/local/libexec/rke2lab/flox-shim-wrapper/flox-rootfs-sync.sh`
+* confirm symlink targets and wrapper package paths are what we expect
+
+. *Third: verify containerd integration shape*
+* confirm containerd config points to the wrapper entrypoint we intend
+* confirm the runtime name/path/options are correct after config rewrite
+* ensure we are not proving only installation while runtime configuration still points elsewhere
+
+. *Fourth: verify wrapper -> real shim delegation path*
+* inspect how the installed wrapper calls the real shim
+* confirm the real shim path the wrapper expects actually matches what the installer places on disk
+* confirm helper paths used by the wrapper also match installed layout
+
+. *Fifth: verify rootfs/environment behavior in the exact runtime case*
+* confirm the chosen copy-mode sync still provides the runtime visibility we need
+* inspect whether the relevant Flox environment/rootfs content actually lands where the shim expects it
+* only revisit mount-mode/bind-mode ideas if the real runtime symptom specifically points back there
+
+. *Sixth: rerun against the original failing scenario and capture evidence*
+* at that point, verify whether the original symptom is gone, changed, or still present
+* if still present, classify whether the remaining problem is:
+** packaging/build-time
+** install/layout-time
+** containerd configuration-time
+** runtime wrapper delegation-time
+** rootfs/environment-time
+
+Practical near-term takeaway:
+
+* we should now return to the Flox shim work as a focused runtime problem
+* we should resist reopening broad architecture changes unless the runtime investigation proves a real missing seam
+* the best next debugging pass is probably artifact-first and containerd-integration-first, because those are easiest to verify and most likely to narrow the remaining problem quickly
+
+Working conclusion for now:
+
+* the Flox shim path now looks sufficiently scaffolded to tackle directly
+* the likely next gains will come from end-to-end runtime verification rather than more policy plumbing
+* if the original issue still exists, it should now be much easier to classify and fix precisely
+
 === Future stage note: Debian -> NixOS base-system migration
 
 Capture this as a dedicated staged migration track (separate from current runtime/systemd->init-container migration work):
