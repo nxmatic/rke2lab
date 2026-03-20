@@ -190,7 +190,7 @@ shim::debug:any_enabled() {
 }
 
 shim::debug:tools:install() {
-  local source_root target_root source_path relative target_path install_mode
+  local source_root target_root source_path relative target_path install_mode force_install
 
   if ! shim::debug:any_enabled; then
     echo "debug helper installation skipped: no debug policy enabled"
@@ -199,6 +199,7 @@ shim::debug:tools:install() {
 
   source_root="${FLOX_SHIM_DEBUG_TOOLS_DIR}"
   target_root="${RKE2LAB_DEBUG_SHARE_ROOT}"
+  force_install="${RKE2LAB_DEBUG_SHARE_FORCE_INSTALL:-false}"
 
   mkdir -p "${target_root}"
 
@@ -214,6 +215,12 @@ shim::debug:tools:install() {
     esac
 
     install -d "$(dirname -- "${target_path}")"
+
+    if [[ -e "${target_path}" ]] && ! rke2lab::bool:is_true "${force_install}"; then
+      echo "preserving existing debug helper at ${target_path}"
+      continue
+    fi
+
     install -m "${install_mode}" "${source_path}" "${target_path}"
   done < <(find "${source_root}" -type f -print0 | sort -z)
 
