@@ -24,6 +24,26 @@ direnv:config:generate
 : "Load RKE2 environment manifests after yq is available"
 rke2lab::env:load
 
+kdns::manifest:patch() {
+  local deployment_manifest flox_env debug_enabled
+
+  deployment_manifest="${RKE2LAB_MANIFESTS_DIR:-/srv/host/rke2-manifests.d}/networking/kdns/02-deployment-kdns.yml"
+  [[ -f "${deployment_manifest}" ]] || return 0
+
+  flox_env="${RKE2LAB_KDNS_FLOX_ENV:-nxmatic/kdns}"
+  debug_enabled="${RKE2LAB_KDNS_DEBUG_ENABLED:-false}"
+
+  RKE2LAB_KDNS_FLOX_ENV="${flox_env}" \
+  RKE2LAB_KDNS_DEBUG_ENABLED="${debug_enabled}" \
+    yq eval -i '
+      .spec.template.metadata.annotations."flox.dev/environment" = strenv(RKE2LAB_KDNS_FLOX_ENV) |
+      .spec.template.metadata.annotations."debug.kdns.lab42/enabled" = strenv(RKE2LAB_KDNS_DEBUG_ENABLED)
+    ' "${deployment_manifest}"
+}
+
+: "Patch KDNS manifest runtime selection from controlplane env overlay"
+kdns::manifest:patch
+
 : "Preload the nocloud environment"
 nocloud:env:activate() {
 	local FLOX_ENV_DIR="/var/lib/cloud"

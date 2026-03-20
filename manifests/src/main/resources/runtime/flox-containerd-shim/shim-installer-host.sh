@@ -10,6 +10,28 @@ daemonset::logging:stderr:setup "${DAEMONSET_SCRIPT_ROOT}/shim-installer-host.sh
 # shellcheck disable=SC1090
 source <(flox activate --dir /var/lib/rancher/rke2)
 
+rke2lab::bool:is_true() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES|on|ON)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+rke2lab::env:load() {
+  local env_script
+
+  env_script="${RKE2LAB_SCRIPTS_DIR:-/srv/host/systemd-scripts.d}/rke2lab-env-load.sh"
+  [[ -r "${env_script}" ]] || return 0
+
+  # shellcheck disable=SC1090
+  source "${env_script}"
+  declare -F rke2lab::env:load >/dev/null 2>&1 && rke2lab::env:load
+}
+
 host::tooling:init() {
   : "Ensure Nix is available in the host environment for shim installer operations"
   NIX_VAR="/nix/var/nix"
@@ -195,10 +217,14 @@ shim::runtime:nix-system:resolve() {
 }
 
 shim::runtime:wrapper-package:build() {
-  local nix_system package_attr
+  local nix_system package_name package_attr
 
   nix_system="$(shim::runtime:nix-system:resolve)"
-  package_attr="packages.${nix_system}.flox-shim-wrapper"
+  package_name="flox-shim-wrapper"
+  if rke2lab::bool:is_true "${RKE2LAB_FLOX_SHIM_WRAPPER_DEBUG_ENABLED:-false}"; then
+    package_name="${package_name}-debug"
+  fi
+  package_attr="packages.${nix_system}.${package_name}"
 
   (
     cd "${FLOX_SHIM_ROOT}"
@@ -400,6 +426,7 @@ host::tooling:config-tools:resolve
 host::nix:flox-conf:ensure
 shim::assets:path:init
 shim::assets:path:validate
+rke2lab::env:load
 
 : "Initialize resolved containerd config paths"
 containerd::config:path:init

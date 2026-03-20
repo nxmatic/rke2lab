@@ -18,10 +18,14 @@
       "aarch64-linux"
     ] (system: let
       pkgs = import nixpkgs {inherit system;};
-    in {
-      packages = {
-        flox-shim-wrapper = pkgs.buildGoModule {
-          pname = "flox-shim-wrapper";
+      lib = pkgs.lib;
+
+      mkFloxShimWrapper = {
+        packageName,
+        debug ? false,
+      }:
+        pkgs.buildGoModule {
+          pname = packageName;
           version = "0.1.0";
           src = builtins.path {
             path = ./wrapper-go;
@@ -34,10 +38,15 @@
             CGO_ENABLED = "0";
           };
 
-          ldflags = [
-            "-s"
-            "-w"
-          ];
+          nativeBuildInputs = lib.optionals debug [pkgs.makeWrapper];
+
+          ldflags =
+            lib.optionals (!debug) [
+              "-s"
+              "-w"
+            ];
+
+          gcflags = lib.optionals debug ["all=-N -l"];
 
           postInstall = ''
             runHook postInstallPre
@@ -50,11 +59,29 @@
             runHook postInstallPost
           '';
 
+          postFixup = lib.optionalString debug ''
+            wrapProgram "$out/bin/containerd-shim-flox-v2" \
+              --prefix PATH : ${lib.makeBinPath [pkgs.delve]}
+          '';
+
           meta = with pkgs.lib; {
-            description = "Host-installed wrapper and helper for the Flox-backed containerd shim";
+            description =
+              if debug
+              then "Host-installed debug wrapper and helper for the Flox-backed containerd shim"
+              else "Host-installed wrapper and helper for the Flox-backed containerd shim";
             license = licenses.mit;
             platforms = platforms.unix;
           };
+        };
+    in {
+      packages = {
+        flox-shim-wrapper = mkFloxShimWrapper {
+          packageName = "flox-shim-wrapper";
+        };
+
+        flox-shim-wrapper-debug = mkFloxShimWrapper {
+          packageName = "flox-shim-wrapper-debug";
+          debug = true;
         };
       };
 

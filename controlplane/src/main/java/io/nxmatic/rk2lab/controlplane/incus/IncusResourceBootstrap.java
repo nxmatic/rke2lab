@@ -166,7 +166,8 @@ public final class IncusResourceBootstrap {
       classpathAssetMaterializer.materializeHostSystemdAssets(
           localPaths.manifestsRoot().resolve("host"));
       LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
-      runtimeEnvControlplaneOverlayWriter.write(localPaths.runtimeEnvConfigRoot(), layerContext);
+      runtimeEnvControlplaneOverlayWriter.write(
+          localPaths.runtimeEnvConfigRoot(), layerContext, config);
       hostMountSourceVerifier.ensureSources(localPaths);
       nodeConfigRegenerator.regenerateCloudConfigDir(
           localPaths.runtimeCloudConfigRoot(), localPaths.cloudSeedRoot());
@@ -350,7 +351,8 @@ public final class IncusResourceBootstrap {
 
     private RuntimeEnvControlplaneOverlayWriter() {}
 
-    private void write(Path runtimeEnvConfigRoot, LayerEnvContext layerContext) {
+    private void write(
+        Path runtimeEnvConfigRoot, LayerEnvContext layerContext, BootstrapConfig bootstrapConfig) {
       try {
         Files.createDirectories(runtimeEnvConfigRoot);
 
@@ -363,6 +365,7 @@ public final class IncusResourceBootstrap {
 
         // Add bootstrap-only constants first; contributor-owned sections override as needed
         aggregatedVars.put("RKE2LAB_REPO_ROOT", HOST_WORKTREE_PATH);
+        aggregatedVars.putAll(controlplaneOverrides(bootstrapConfig));
 
         // Add layer contributions (later ones override earlier)
         aggregatedVars.putAll(registry.aggregateContributions());
@@ -401,6 +404,16 @@ public final class IncusResourceBootstrap {
             "Failed to write controlplane runtime env override ConfigMap: " + runtimeEnvConfigRoot,
             ex);
       }
+    }
+
+    private static Map<String, String> controlplaneOverrides(BootstrapConfig bootstrapConfig) {
+      final boolean kdnsDebugEnabled = bootstrapConfig.kdnsDebugEnabled();
+      final boolean floxShimWrapperDebugEnabled = bootstrapConfig.floxShimWrapperDebugEnabled();
+
+      return Map.of(
+          "RKE2LAB_KDNS_DEBUG_ENABLED", Boolean.toString(kdnsDebugEnabled),
+          "RKE2LAB_KDNS_FLOX_ENV", kdnsDebugEnabled ? "nxmatic/kdns-debug" : "nxmatic/kdns",
+          "RKE2LAB_FLOX_SHIM_WRAPPER_DEBUG_ENABLED", Boolean.toString(floxShimWrapperDebugEnabled));
     }
 
     private static String quoteYamlIfNeeded(String value) {

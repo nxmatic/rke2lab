@@ -54,6 +54,50 @@ BUILDS_DESCRIPTOR_DIR="$(canonicalize_existing_path "${BUILDS_DESCRIPTOR_DIR}")"
 RKE2LAB_ROOT="${RKE2LAB_ROOT:-/srv/host}"
 UPDATED_FLAKE_LOCK_DIRS=""
 
+rke2lab::bool:is_true() {
+	case "${1:-}" in
+		1|true|TRUE|yes|YES|on|ON)
+			return 0
+			;;
+		*)
+			return 1
+			;;
+	esac
+}
+
+rke2lab::env:load() {
+	local env_script
+
+	env_script="${RKE2LAB_SCRIPTS_DIR:-${RKE2LAB_ROOT}/systemd-scripts.d}/rke2lab-env-load.sh"
+	[[ -r "${env_script}" ]] || return 0
+
+	# shellcheck disable=SC1090
+	source "${env_script}"
+	declare -F rke2lab::env:load >/dev/null 2>&1 && rke2lab::env:load
+}
+
+resolve_package_variant() {
+	local package_name="$1"
+	local package_attr="$2"
+
+	case "${package_name}" in
+		kdns)
+			if rke2lab::bool:is_true "${RKE2LAB_KDNS_DEBUG_ENABLED:-false}"; then
+				package_name="kdns-debug"
+				[[ "${package_attr}" == *-debug ]] || package_attr="${package_attr}-debug"
+			fi
+			;;
+		flox-shim-wrapper)
+			if rke2lab::bool:is_true "${RKE2LAB_FLOX_SHIM_WRAPPER_DEBUG_ENABLED:-false}"; then
+				package_name="flox-shim-wrapper-debug"
+				[[ "${package_attr}" == *-debug ]] || package_attr="${package_attr}-debug"
+			fi
+			;;
+	esac
+
+	printf '%s\n%s\n' "${package_name}" "${package_attr}"
+}
+
 validate_worktree_mode() {
 	case "${WORKTREE_MODE}" in
 		host|guest)
@@ -356,6 +400,7 @@ fi
 validate_worktree_mode
 : "[$(date)] Shim builder worktree mode: ${WORKTREE_MODE}"
 activate_flox_environment
+rke2lab::env:load
 
 # Check if yq is available
 if ! command -v yq &>/dev/null; then
@@ -411,6 +456,10 @@ for ((i = 0; i < num_jobs; i++)); do
 
 		package_name="${name:-}"
 		package_attr="${attr:-}"
+
+		readarray -t package_variant < <(resolve_package_variant "${package_name}" "${package_attr}")
+		package_name="${package_variant[0]}"
+		package_attr="${package_variant[1]}"
 
 		if [[ -z "${name}" || -z "${attr}" ]]; then
 			: "[WARN] [${job_name}] Missing package data at index ${j}; skipping"

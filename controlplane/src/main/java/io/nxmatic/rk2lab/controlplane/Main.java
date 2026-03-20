@@ -84,6 +84,10 @@ public final class Main {
     outputs.put("incusProject", config.incusProject());
     outputs.put("imageAlias", config.imageAlias());
     outputs.put("seedLanBridgeParent", config.lanBridgeParent());
+    outputs.put("kdnsDebugEnabled", config.kdnsDebugEnabled());
+    outputs.put(
+        "kdnsFloxEnvironment", config.kdnsDebugEnabled() ? "nxmatic/kdns-debug" : "nxmatic/kdns");
+    outputs.put("floxShimWrapperDebugEnabled", config.floxShimWrapperDebugEnabled());
     outputs.put("handoffReady", handoffReady);
     outputs.put("bootstrapPhase", bootstrapPhase);
     outputs.put("nextStep", "bootstrap-management-cluster-then-apply-stageb-cluster-manifests");
