@@ -149,6 +149,8 @@ shim::assets:path:init() {
   FLOX_ROOTFS_SYNC_SCRIPT="${FLOX_SHIM_ROOT}/flox-rootfs-sync.sh"
   FLOX_SHIM_MESH_DIR="${FLOX_SHIM_ROOT}/mesh"
   FLOX_SHIM_NETWORKING_DIR="${FLOX_SHIM_ROOT}/networking"
+  FLOX_SHIM_DEBUG_TOOLS_DIR="${FLOX_SHIM_ROOT}/debug-tools"
+  RKE2LAB_DEBUG_SHARE_ROOT="${RKE2LAB_DEBUG_SHARE_ROOT:-/srv/host/rke2lab-share.d}"
 }
 
 shim::assets:path:validate() {
@@ -176,6 +178,46 @@ shim::assets:path:validate() {
     echo "flox shim networking directory missing: ${FLOX_SHIM_NETWORKING_DIR}" >&2
     exit 1
   }
+  [[ -d "${FLOX_SHIM_DEBUG_TOOLS_DIR}" ]] || {
+    echo "flox shim debug tools directory missing: ${FLOX_SHIM_DEBUG_TOOLS_DIR}" >&2
+    exit 1
+  }
+}
+
+shim::debug:any_enabled() {
+  rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}" ||
+    rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_FLOX_SHIM_WRAPPER_ENABLED:-false}"
+}
+
+shim::debug:tools:install() {
+  local source_root target_root source_path relative target_path install_mode
+
+  if ! shim::debug:any_enabled; then
+    echo "debug helper installation skipped: no debug policy enabled"
+    return 0
+  fi
+
+  source_root="${FLOX_SHIM_DEBUG_TOOLS_DIR}"
+  target_root="${RKE2LAB_DEBUG_SHARE_ROOT}"
+
+  mkdir -p "${target_root}"
+
+  while IFS= read -r -d '' source_path; do
+    relative="${source_path#${source_root}/}"
+    target_path="${target_root%/}/${relative}"
+    install_mode="0644"
+
+    case "$(basename -- "${source_path}")" in
+      *.sh)
+        install_mode="0755"
+        ;;
+    esac
+
+    install -d "$(dirname -- "${target_path}")"
+    install -m "${install_mode}" "${source_path}" "${target_path}"
+  done < <(find "${source_root}" -type f -print0 | sort -z)
+
+  echo "installed debug helper scripts in ${target_root}"
 }
 
 shim::assets:build:run() {
@@ -436,6 +478,9 @@ shim::assets:build:run
 
 : "Install/update flox runtime shim binaries on host"
 shim::runtime:core:install
+
+: "Install repository-owned shim debug helpers into the shared directory when debug policy is enabled"
+shim::debug:tools:install
 
 : "Update containerd configuration to include the flox shim runtime"
 containerd::config:flox:update
