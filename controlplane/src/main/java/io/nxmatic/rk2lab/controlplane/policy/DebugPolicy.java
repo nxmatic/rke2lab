@@ -10,16 +10,23 @@ public record DebugPolicy(boolean kdnsEnabled, boolean floxShimWrapperEnabled) {
   }
 
   public Map<String, String> toEnvMap() {
-    return Map.of(
-        "RKE2LAB_POLICY_DEBUG_KDNS_ENABLED", Boolean.toString(kdnsEnabled),
-        "RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV", kdnsFloxEnvironment(),
-        "RKE2LAB_POLICY_DEBUG_FLOX_SHIM_WRAPPER_ENABLED", Boolean.toString(floxShimWrapperEnabled));
+    final Map<String, String> env =
+        Map.of(
+            "RKE2LAB_POLICY_DEBUG_KDNS_ENABLED",
+            Boolean.toString(kdnsEnabled),
+            "RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV",
+            kdnsFloxEnvironment(),
+            "RKE2LAB_POLICY_DEBUG_FLOX_SHIM_WRAPPER_ENABLED",
+            Boolean.toString(floxShimWrapperEnabled));
+    return env;
   }
 
   public Map<String, Object> toOutputMap() {
-    return Map.of(
-        "policyDebugKdnsEnabled", kdnsEnabled,
-        "policyDebugKdnsFloxEnvironment", kdnsFloxEnvironment(),
-        "policyDebugFloxShimWrapperEnabled", floxShimWrapperEnabled);
+    final Map<String, Object> outputs =
+        Map.of(
+            "policyDebugKdnsEnabled", kdnsEnabled,
+            "policyDebugKdnsFloxEnvironment", kdnsFloxEnvironment(),
+            "policyDebugFloxShimWrapperEnabled", floxShimWrapperEnabled);
+    return outputs;
   }
 }

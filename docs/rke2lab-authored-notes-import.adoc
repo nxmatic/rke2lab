@@ -225,6 +225,211 @@ Recommended preview attributes:
 
 This document already sets both attributes at the top, so Kroki-capable renderers should resolve diagram blocks without local PlantUML execution.
 
+=== Working note: current robustness review (Stage A policy/runtime path)
+
+This section is a living working document for robustness findings discovered while iterating on the Stage A refactor.
+It is intentionally pragmatic: record what already feels solid, what still looks fragile, and what we are explicitly deferring.
+
+Current framing:
+
+* the Pulumi + cdk8s direction looks correct and is helping requirements emerge cleanly
+* the current review focus is robustness of the existing Stage A feature set, not broad test expansion yet
+* systematic test coverage is intentionally deferred until the Stage A refactor settles enough that we are not freezing transitional seams
+
+What currently looks good:
+
+* policy naming is now much more coherent (`policy.*`, `RKE2LAB_POLICY_*`)
+* manifest domain identity is shared instead of re-declared ad hoc across layers
+* controlplane policy is now first-class rather than hidden inside bootstrap config booleans
+* optional manifest-domain policy is visible in the synthesis model through an explicit interface
+* synthesis policy filtering respects dependency closure rather than naïvely dropping dependent domains
+* current builds are compiling cleanly under the Flox/JDK 25 path
+
+Current robustness gaps worth improving next:
+
+==== 1. Reduce default drift across layers
+
+The same effective defaults are still expressed in several places:
+
+* `Pulumi.dev.yaml`
+* `ControlplanePolicy.defaults()`
+* `ControlplanePolicy.from(...)` default values
+* shell-side fallback defaults in host install scripts
+
+Risk:
+
+* future changes may update one layer but leave another unchanged, causing subtle behavioral drift
+
+Desired follow-up:
+
+* converge on a smaller number of canonical Stage A default sources
+* reduce shell-side fallback duplication where controlplane-injected env is sufficient
+
+==== 2. Keep synthesis policy and live-link policy clearly distinct
+
+We now have two valid but different concepts:
+
+* synthesis policy: what manifest domains are included in cdk8s synthesis
+* Stage A link policy: what serialized host manifests are linked live into the RKE2 manifests directory
+
+Risk:
+
+* the code is now capable of representing both, but the semantic distinction could blur again in future changes
+
+Desired follow-up:
+
+* keep this distinction explicit in naming, docs, and future refactors
+* avoid treating “policy” as if it always means only one operational phase
+
+==== 3. The policy-aware synthesis path is present but not yet central to live operation
+
+The new synthesis-policy path exists and is structurally correct, but it is still mostly an available capability rather than a routine Stage A path.
+
+Current state:
+
+* `ManifestSynthesisRequest` can carry manifest-domain policy
+* `DefaultManifestSynthesisService` can filter domains with dependency closure
+* current Stage A behavior still effectively follows “synthesize everything, link selectively”
+
+Desired follow-up:
+
+* document the intended operational story clearly
+* decide later whether Stage A should pass policy directly into synthesis, or intentionally keep full synthesis as the canonical behavior
+
+==== 4. Host-side policy behavior is still more stringly than the Java model
+
+The host scripts are workable and much improved, but policy semantics are still partially represented in shell:
+
+* env var name construction
+* boolean parsing
+* domain-to-path mapping
+* local shell fallbacks
+
+Risk:
+
+* policy semantics are easier to drift in bash than in typed Java models
+
+Desired follow-up:
+
+* progressively reduce shell-only policy knowledge
+* prefer explicit mapping tables or generated machine-readable inputs where the complexity justifies it
+
+==== 5. We do not yet have drift guards across Pulumi, controlplane, manifests, and host runtime
+
+Policy now spans multiple layers cleanly, but there is still no automated guard against naming or semantic drift between:
+
+* Pulumi config keys
+* controlplane policy objects
+* exported outputs
+* runtime env overlays
+* host scripts
+* manifests-domain policy/synthesis handling
+
+Risk:
+
+* future changes could silently desynchronize one layer from the others
+
+Desired follow-up:
+
+* once Stage A shape is more stable, add focused consistency checks around names, enabled domains, and exported/runtime policy surfaces
+
+==== 6. Documentation for the new synthesis-policy input is still thin
+
+The property exists:
+
+* `rk2lab.manifests.policy.enabledDomains`
+
+But today it is mostly discoverable only by reading code.
+
+Desired follow-up:
+
+* document valid domain IDs
+* document that dependencies are auto-included
+* document whether this is intended mainly for local synthesis use, future Stage A use, or both
+
+==== Recommended sequencing and dependency order
+
+Point 1 is the immediate must-do item.
+
+Reason:
+
+* default drift is the broadest source of subtle behavior changes because it affects Pulumi, controlplane, host scripts, and operator expectations at once
+* if defaults are still duplicated, later cleanup work can easily harden the wrong layer or document behavior that is not actually canonical
+
+Recommended sequence:
+
+. *First: reduce default drift across layers* (Point 1)
+* make one smaller canonical source of Stage A defaults
+* reduce repeated shell fallbacks where controlplane-injected env should be the source of truth
+* this gives a stable behavioral baseline for all later work
+
+. *Second: keep synthesis policy and live-link policy clearly distinct* (Point 2)
+* once defaults are clearer, tighten the semantics of the two policy concepts
+* this avoids future refactors accidentally collapsing two different concerns back into one
+
+. *Third: decide the intended role of policy-aware synthesis in live operation* (Point 3)
+* after defaults and semantics are clarified, decide whether Stage A should keep “synthesize all, link selectively” as canonical behavior or start passing policy directly into synthesis
+* this decision should be taken only after Points 1 and 2, otherwise the decision will rest on moving assumptions
+
+. *Fourth: reduce shell-side stringly policy knowledge* (Point 4)
+* once the canonical defaults and policy semantics are settled, simplify or constrain the shell layer so it is consuming policy rather than partially redefining it
+* doing this earlier would risk moving bash logic before the canonical model is stable enough
+
+. *Fifth: add drift guards across layers* (Point 5)
+* only after the previous items are clearer should we add strong consistency checks
+* otherwise we risk baking transitional state into guardrails that will need to be relaxed or rewritten soon after
+
+. *Sixth: document the synthesis-policy input and the final intended operational story* (Point 6)
+* documentation should follow the semantic decisions above, not race ahead of them
+* small interim notes are fine, but the durable documentation pass should happen once the behavior is the one we intend to keep
+
+. *Seventh: begin the broader test-coverage phase after Stage A refactor stabilization* (Point 7)
+* this remains intentionally deferred
+* targeted consistency tests can start once the policy/default/semantic shape has stopped moving enough to be worth protecting
+
+Relationship summary:
+
+* Point 1 stabilizes behavior
+* Point 2 stabilizes meaning
+* Point 3 stabilizes operational intent
+* Point 4 stabilizes implementation boundaries
+* Point 5 stabilizes cross-layer guarantees
+* Point 6 stabilizes communication/documentation
+* Point 7 stabilizes protection through tests
+
+Practical takeaway for the next iteration:
+
+* treat Point 1 as the first concrete robustness hardening task
+* use Points 2 and 3 to decide what should remain canonical in Stage A
+* only after that should we spend energy on stronger guardrails and broader coverage
+
+==== 7. Full test coverage is deferred intentionally, not forgotten
+
+Current decision:
+
+* do not begin the serious codebase-wide test coverage phase until the Stage A refactor reaches a more settled implementation state
+
+Reason:
+
+* otherwise we would spend effort stabilizing and updating tests around transitional seams and temporary model shapes
+
+What we should do meanwhile:
+
+* continue hardening semantics, defaults, naming, validation, observability, and deterministic runtime behavior
+
+What should happen after Stage A settles:
+
+* add targeted unit coverage for policy objects and parsing
+* add synthesis-policy filtering tests
+* add a small set of consistency/drift checks across layers
+* then broaden from there as the architecture stops moving underfoot
+
+Working conclusion for now:
+
+* the main current weakness is not that features are conceptually wrong
+* the main weakness is cross-layer drift risk while the model is still being consolidated
+* the right next robustness work is to harden defaults, semantics, documentation, and policy boundary clarity before starting the broader test-coverage phase
+
 === Future stage note: Debian -> NixOS base-system migration
 
 Capture this as a dedicated staged migration track (separate from current runtime/systemd->init-container migration work):
