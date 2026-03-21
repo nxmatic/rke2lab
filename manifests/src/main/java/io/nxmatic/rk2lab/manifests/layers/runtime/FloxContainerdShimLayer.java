@@ -168,6 +168,28 @@ public final class FloxContainerdShimLayer extends Construct {
                     "flox-rootfs-sync.sh",
                     readResource("/runtime/flox-containerd-shim/flox-rootfs-sync.sh")),
                 Map.entry(
+                    "debug-tools-rke2lab-debug-tooling.sh",
+                    readResource(
+                        "/runtime/flox-containerd-shim/debug-tools/.sh.d/rke2lab-debug-tooling.sh")),
+                Map.entry(
+                    "debug-tools-attach-live-flox-shim-strace.sh",
+                    readResource(
+                        "/runtime/flox-containerd-shim/debug-tools/attach_live_flox_shim_strace.sh")),
+                Map.entry(
+                    "debug-tools-crictl-kdns-repro.sh",
+                    readResource("/runtime/flox-containerd-shim/debug-tools/crictl-kdns-repro.sh")),
+                Map.entry(
+                    "debug-tools-kdns-containerd-bundle-watch.sh",
+                    readResource(
+                        "/runtime/flox-containerd-shim/debug-tools/kdns-containerd-bundle-watch.sh")),
+                Map.entry(
+                    "debug-tools-kdns-containerd-remote-capture.sh",
+                    readResource(
+                        "/runtime/flox-containerd-shim/debug-tools/kdns-containerd-remote-capture.sh")),
+                Map.entry(
+                    "debug-tools-master-shim-pprof.sh",
+                    readResource("/runtime/flox-containerd-shim/debug-tools/master-shim-pprof.sh")),
+                Map.entry(
                     WrapperGoArchiveAssets.ARCHIVE_CONFIGMAP_KEY,
                     WrapperGoArchiveAssets.archiveBase64()),
                 Map.entry(
@@ -403,6 +425,36 @@ public final class FloxContainerdShimLayer extends Construct {
                                         "flox-rootfs-sync.sh",
                                         "path",
                                         "build-assets/flox-rootfs-sync.sh"),
+                                    Map.of(
+                                        "key",
+                                        "debug-tools-rke2lab-debug-tooling.sh",
+                                        "path",
+                                        "build-assets/debug-tools/.sh.d/rke2lab-debug-tooling.sh"),
+                                    Map.of(
+                                        "key",
+                                        "debug-tools-attach-live-flox-shim-strace.sh",
+                                        "path",
+                                        "build-assets/debug-tools/attach_live_flox_shim_strace.sh"),
+                                    Map.of(
+                                        "key",
+                                        "debug-tools-crictl-kdns-repro.sh",
+                                        "path",
+                                        "build-assets/debug-tools/crictl-kdns-repro.sh"),
+                                    Map.of(
+                                        "key",
+                                        "debug-tools-kdns-containerd-bundle-watch.sh",
+                                        "path",
+                                        "build-assets/debug-tools/kdns-containerd-bundle-watch.sh"),
+                                    Map.of(
+                                        "key",
+                                        "debug-tools-kdns-containerd-remote-capture.sh",
+                                        "path",
+                                        "build-assets/debug-tools/kdns-containerd-remote-capture.sh"),
+                                    Map.of(
+                                        "key",
+                                        "debug-tools-master-shim-pprof.sh",
+                                        "path",
+                                        "build-assets/debug-tools/master-shim-pprof.sh"),
                                     Map.of(
                                         "key",
                                         WrapperGoArchiveAssets.ARCHIVE_CONFIGMAP_KEY,

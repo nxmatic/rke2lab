@@ -6,7 +6,7 @@ install_deps() {
   local max_attempts=${APK_MAX_RETRIES:-5}
   while true; do
     attempt=$((attempt + 1))
-    if apk update && apk add --no-cache jq unzip util-linux >/tmp/apk.log; then
+    if apk update && apk add --no-cache jq util-linux >/tmp/apk.log; then
       return 0
     fi
     if [[ ${attempt} -ge ${max_attempts} ]]; then
@@ -26,6 +26,10 @@ SCRIPT_POLICY_DIR="${SCRIPT_POLICY_DIR:-/runtime-daemonset}"
 BUILD_ASSETS_DIR="${BUILD_ASSETS_DIR:-/build-assets}"
 DAEMONSET_ASSET_ROOT="/srv/host/k8s-daemonset.d/runtime/flox-containerd-shim"
 HOST_SCRIPT_ROOT="${HOST_ROOT}${DAEMONSET_ASSET_ROOT}"
+
+# `BUILD_ASSETS_DIR` is the runtime-installer ConfigMap mounted by Kubernetes into this init
+# container. Read archive payloads from that mount directly; only materialize extracted runtime
+# content onto the host asset root.
 
 mkdir -p "${HOST_SCRIPT_ROOT}"
 
@@ -47,8 +51,6 @@ install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/crictl-kdns-repro.sh" "${HOS
 install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/kdns-containerd-bundle-watch.sh" "${HOST_SCRIPT_ROOT}/debug-tools/kdns-containerd-bundle-watch.sh"
 install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/kdns-containerd-remote-capture.sh" "${HOST_SCRIPT_ROOT}/debug-tools/kdns-containerd-remote-capture.sh"
 install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/master-shim-pprof.sh" "${HOST_SCRIPT_ROOT}/debug-tools/master-shim-pprof.sh"
-install -D -m 0644 "${BUILD_ASSETS_DIR}/wrapper-go.zip.b64" "${HOST_SCRIPT_ROOT}/wrapper-go.zip.b64"
-install -D -m 0644 "${BUILD_ASSETS_DIR}/wrapper-go.manifest.json" "${HOST_SCRIPT_ROOT}/wrapper-go.manifest.json"
 install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/flake.nix" "${HOST_SCRIPT_ROOT}/mesh/headplane/flake.nix"
 install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/flake.nix" "${HOST_SCRIPT_ROOT}/networking/kdns/flake.nix"
 
@@ -56,8 +58,9 @@ materialize_wrapper_go_archive() {
   local archive_b64_path="$1"
   local manifest_path="$2"
   local output_root="$3"
-  local decoded_archive expected_archive_size expected_archive_sha256 actual_archive_size actual_archive_sha256
-  local unpack_dir expected_entries actual_entries
+  local expected_archive_size expected_archive_sha256 actual_archive_size actual_archive_sha256
+  local archive_size_file archive_sha256_file
+  local unpack_dir
 
   [[ -r "${archive_b64_path}" ]] || {
     echo "wrapper-go archive payload missing: ${archive_b64_path}" >&2
@@ -68,18 +71,22 @@ materialize_wrapper_go_archive() {
     return 1
   }
 
-  decoded_archive="$(mktemp)"
   unpack_dir="$(mktemp -d)"
-  expected_entries="$(mktemp)"
-  actual_entries="$(mktemp)"
-  trap 'rm -f "${decoded_archive}" "${expected_entries}" "${actual_entries}"; rm -rf "${unpack_dir}"' RETURN
-
-  base64 -d < "${archive_b64_path}" > "${decoded_archive}"
+  archive_size_file="$(mktemp)"
+  archive_sha256_file="$(mktemp)"
+  trap 'rm -f "${archive_size_file}" "${archive_sha256_file}"; rm -rf "${unpack_dir}"' RETURN
 
   expected_archive_size="$(jq -r '.archive.size' "${manifest_path}")"
   expected_archive_sha256="$(jq -r '.archive.sha256' "${manifest_path}")"
-  actual_archive_size="$(wc -c < "${decoded_archive}" | tr -d '[:space:]')"
-  actual_archive_sha256="$(sha256sum "${decoded_archive}" | awk '{print $1}')"
+
+  base64 -d < "${archive_b64_path}" \
+    | tee \
+        >(wc -c | awk '{print $1}' > "${archive_size_file}") \
+        >(sha256sum | awk '{print $1}' > "${archive_sha256_file}") \
+    | tar -xf - -C "${unpack_dir}"
+
+  actual_archive_size="$(cat "${archive_size_file}")"
+  actual_archive_sha256="$(cat "${archive_sha256_file}")"
 
   [[ "${actual_archive_size}" == "${expected_archive_size}" ]] || {
     echo "wrapper-go archive size mismatch: expected ${expected_archive_size}, got ${actual_archive_size}" >&2
@@ -89,8 +96,6 @@ materialize_wrapper_go_archive() {
     echo "wrapper-go archive checksum mismatch: expected ${expected_archive_sha256}, got ${actual_archive_sha256}" >&2
     return 1
   }
-
-  unzip -oq "${decoded_archive}" -d "${unpack_dir}"
 
   jq -r '.entries[] | [.path, (.size | tostring), .sha256] | @tsv' "${manifest_path}" |
     while IFS=$'\t' read -r relative_path expected_size expected_sha256; do
@@ -112,14 +117,14 @@ materialize_wrapper_go_archive() {
       }
     done
 
-  jq -r '.entries[].path' "${manifest_path}" | LC_ALL=C sort > "${expected_entries}"
-  find "${unpack_dir}" -type f | sed "s#^${unpack_dir}/##" | LC_ALL=C sort > "${actual_entries}"
-  cmp -s "${expected_entries}" "${actual_entries}" || {
+  cmp -s \
+    <(jq -r '.entries[].path' "${manifest_path}" | LC_ALL=C sort) \
+    <(find "${unpack_dir}" -type f | sed "s#^${unpack_dir}/##" | LC_ALL=C sort) || {
     echo "wrapper-go unpacked file set does not match manifest" >&2
     echo "expected:" >&2
-    cat "${expected_entries}" >&2
+    jq -r '.entries[].path' "${manifest_path}" | LC_ALL=C sort >&2
     echo "actual:" >&2
-    cat "${actual_entries}" >&2
+    find "${unpack_dir}" -type f | sed "s#^${unpack_dir}/##" | LC_ALL=C sort >&2
     return 1
   }
 
@@ -128,8 +133,8 @@ materialize_wrapper_go_archive() {
 }
 
 materialize_wrapper_go_archive \
-  "${HOST_SCRIPT_ROOT}/wrapper-go.zip.b64" \
-  "${HOST_SCRIPT_ROOT}/wrapper-go.manifest.json" \
+  "${BUILD_ASSETS_DIR}/wrapper-go.tar.b64" \
+  "${BUILD_ASSETS_DIR}/wrapper-go.manifest.json" \
   "${HOST_SCRIPT_ROOT}"
 
 if [[ -f "${BUILD_ASSETS_DIR}/flake.lock" ]]; then

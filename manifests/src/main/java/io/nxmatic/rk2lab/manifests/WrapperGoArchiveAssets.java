@@ -13,18 +13,18 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 
 public final class WrapperGoArchiveAssets {
 
-  public static final String ARCHIVE_CONFIGMAP_KEY = "wrapper-go.zip.b64";
+  public static final String ARCHIVE_CONFIGMAP_KEY = "wrapper-go.tar.b64";
 
   public static final String MANIFEST_CONFIGMAP_KEY = "wrapper-go.manifest.json";
 
   private static final String MANIFEST_FORMAT = "wrapper-go-archive-manifest-v1";
 
-  private static final long ZIP_ENTRY_EPOCH_MILLIS = 0L;
+  private static final long TAR_ENTRY_EPOCH_MILLIS = 0L;
 
   private static final List<SourceAsset> SOURCE_ASSETS =
       List.of(
@@ -99,14 +99,20 @@ public final class WrapperGoArchiveAssets {
 
   private static byte[] buildArchive(List<ArchiveEntry> entries) throws IOException {
     ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
-    try (ZipOutputStream zipStream = new ZipOutputStream(byteStream, StandardCharsets.UTF_8)) {
+    try (TarArchiveOutputStream tarStream =
+        new TarArchiveOutputStream(byteStream, StandardCharsets.UTF_8.name())) {
+      tarStream.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+      tarStream.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
       for (ArchiveEntry entry : entries) {
-        ZipEntry zipEntry = new ZipEntry(entry.path());
-        zipEntry.setTime(ZIP_ENTRY_EPOCH_MILLIS);
-        zipStream.putNextEntry(zipEntry);
-        zipStream.write(entry.content());
-        zipStream.closeEntry();
+        TarArchiveEntry tarEntry = new TarArchiveEntry(entry.path());
+        tarEntry.setModTime(TAR_ENTRY_EPOCH_MILLIS);
+        tarEntry.setMode(0644);
+        tarEntry.setSize(entry.size());
+        tarStream.putArchiveEntry(tarEntry);
+        tarStream.write(entry.content());
+        tarStream.closeArchiveEntry();
       }
+      tarStream.finish();
     }
     return byteStream.toByteArray();
   }

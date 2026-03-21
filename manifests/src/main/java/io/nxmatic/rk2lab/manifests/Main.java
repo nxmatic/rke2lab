@@ -45,6 +45,30 @@ public final class Main {
           new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/flox-rootfs-sync.sh", "flox-rootfs-sync.sh", true),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
+              "/runtime/flox-containerd-shim/debug-tools/.sh.d/rke2lab-debug-tooling.sh",
+              "debug-tools/.sh.d/rke2lab-debug-tooling.sh",
+              false),
+          new MaterializeShimAssetsCommand.EmbeddedAsset(
+              "/runtime/flox-containerd-shim/debug-tools/attach_live_flox_shim_strace.sh",
+              "debug-tools/attach_live_flox_shim_strace.sh",
+              true),
+          new MaterializeShimAssetsCommand.EmbeddedAsset(
+              "/runtime/flox-containerd-shim/debug-tools/crictl-kdns-repro.sh",
+              "debug-tools/crictl-kdns-repro.sh",
+              true),
+          new MaterializeShimAssetsCommand.EmbeddedAsset(
+              "/runtime/flox-containerd-shim/debug-tools/kdns-containerd-bundle-watch.sh",
+              "debug-tools/kdns-containerd-bundle-watch.sh",
+              true),
+          new MaterializeShimAssetsCommand.EmbeddedAsset(
+              "/runtime/flox-containerd-shim/debug-tools/kdns-containerd-remote-capture.sh",
+              "debug-tools/kdns-containerd-remote-capture.sh",
+              true),
+          new MaterializeShimAssetsCommand.EmbeddedAsset(
+              "/runtime/flox-containerd-shim/debug-tools/master-shim-pprof.sh",
+              "debug-tools/master-shim-pprof.sh",
+              true),
+          new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/mesh/headplane/flake.nix",
               "mesh/headplane/flake.nix",
               false),
