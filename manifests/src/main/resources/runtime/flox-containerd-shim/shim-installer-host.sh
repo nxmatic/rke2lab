@@ -107,38 +107,8 @@ host::nix:flox-conf:ensure() {
   flox_conf="/etc/nix/flox.conf"
   mkdir -p "$(dirname "${flox_conf}")"
 
-  if [[ -f "${flox_conf}" ]]; then
-    return 0
-  fi
-
-  cat > "${flox_conf}" <<'EOF'
-# Please put any custom nix.conf configurations into your /etc/nix/nix.conf.
-
-
-# Use all cores and run multiple jobs in parallel.
-max-jobs = auto
-cores = 0
-
-# Used when deploying to Darwin.
-extra-sandbox-paths = /System/Library/LaunchDaemons/com.apple.oahd.plist
-
-# Default to use the upstream cache as well as the flox public store.
-extra-trusted-substituters = https://cache.flox.dev
-extra-trusted-public-keys = flox-cache-public-1:7F4OyH7ZCnFhcze3fJdfyXYLQw/aV7GEed86nQ7IsOs= floxhub-1:0QOAlcobcEvq1mqEf4qAYCaWnTTOXpyoRv/PmqfSixM=
-
-# Note: queries to https://cache.nixos.org via Fastly sometimes encounter
-# asymetric routing and thus packet loss. Previously this would cause a very
-# long wait for a substitution to fail. Instead, fail quicker and expect the
-# user to retry.
-connect-timeout = 10
-stalled-download-timeout = 30
-
-# Start GC when free disk space is very low.
-min-free = 128000000
-max-free = 1000000000
-
-# Disable metrics
-EOF
+  [[ ! -f "${flox_conf}" ]] &&
+    touch "${flox_conf}"
 }
 
 shim::assets:path:init() {
