@@ -230,9 +230,12 @@ dasel -i toml -o yaml \
 	yq eval '.install += {"cilium-cli": {"pkg-path": "cilium-cli", "pkg-group": "k8s"}}' - |
 	yq eval '.install += {"helmfile": {"pkg-path": "helmfile", "pkg-group": "k8s"}}' - |
 	yq eval '.install += {"kubernetes-helm": {"pkg-path": "kubernetes-helm", "pkg-group": "k8s"}}' - |
-	yq eval '.install += {"nerdctl": {"pkg-path": "nerdctl", "version": "^1.7", "pkg-group": "k8s"}}' - |
+  yq eval '.install += {"nerdctl": {"pkg-path": "nerdctl", "pkg-group": "k8s"}}' - |
 	yq eval '.install += {"tektoncd-cli": {"pkg-path": "tektoncd-cli", "pkg-group": "k8s"}}' - |
-    yq eval '.install += {"kpt": {"pkg-path": "kpt", "version": "^1.0", "pkg-group": "k8s"}}' - |
+    # Flox currently exposes only a prerelease kpt v1 (1.0.0-beta.55), and its
+    # semver range resolver does not match that prerelease through a generic v1 range.
+    # Leave kpt unpinned until the catalog publishes a stable 1.x we can target.
+    yq eval '.install += {"kpt": {"pkg-path": "kpt", "pkg-group": "k8s"}}' - |
     yq eval '.install += {"krew": {"pkg-path": "krew", "pkg-group": "k8s"}}' - |
 	yq eval '.install += {"kubectl": {"pkg-path": "kubectl", "pkg-group": "k8s"}}' - |
 	yq eval '.install += {"kubectl-ai": {"pkg-path": "kubectl-ai", "pkg-group": "kubectl-plugins"}}' - |
