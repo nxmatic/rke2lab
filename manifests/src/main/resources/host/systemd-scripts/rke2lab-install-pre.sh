@@ -225,32 +225,32 @@ dasel -i toml -o yaml \
 	yq eval '.install += {"gnutar": {"pkg-path": "gnutar", "pkg-group": "system"}}' - |
 	yq eval '.install += {"xstow": {"pkg-path": "xstow", "pkg-group": "system"}}' - |
 	# k8s
-	yq eval '.install += {"etcdctl": {"pkg-path": "etcdctl", "pkg-group": "k8s"}}' - |
-	yq eval '.install += {"ceph-client": {"pkg-path": "ceph-client", "pkg-group": "k8s"}}' - |
-	yq eval '.install += {"cilium-cli": {"pkg-path": "cilium-cli", "pkg-group": "k8s"}}' - |
-	yq eval '.install += {"helmfile": {"pkg-path": "helmfile", "pkg-group": "k8s"}}' - |
-	yq eval '.install += {"kubernetes-helm": {"pkg-path": "kubernetes-helm", "pkg-group": "k8s"}}' - |
-	yq eval '.install += {"nerdctl": {"pkg-path": "nerdctl", "pkg-group": "k8s"}}' - |
-	yq eval '.install += {"tektoncd-cli": {"pkg-path": "tektoncd-cli", "pkg-group": "k8s"}}' - |
+	yq eval '.install += {"etcdctl": {"pkg-path": "etcdctl", "pkg-group": "k8s-etcd-tools"}}' - |
+	yq eval '.install += {"ceph-client": {"pkg-path": "ceph-client", "pkg-group": "k8s-kubectl-tools"}}' - |
+	yq eval '.install += {"cilium-cli": {"pkg-path": "cilium-cli", "pkg-group": "k8s-kubectl-tools"}}' - |
+	yq eval '.install += {"helmfile": {"pkg-path": "helmfile", "pkg-group": "k8s-kubectl-tools"}}' - |
+	yq eval '.install += {"kubernetes-helm": {"pkg-path": "kubernetes-helm", "pkg-group": "k8s-kubectl-tools"}}' - |
+	yq eval '.install += {"nerdctl": {"pkg-path": "nerdctl", "pkg-group": "k8s-kubectl-tools"}}' - |
+	yq eval '.install += {"tektoncd-cli": {"pkg-path": "tektoncd-cli", "pkg-group": "k8s-kubectl-tools"}}' - |
 	# Flox currently exposes only a prerelease kpt v1 (1.0.0-beta.55), and its
 	# semver range resolver does not match that prerelease through a generic v1 range.
 	# Leave kpt unpinned until the catalog publishes a stable 1.x we can target.
-	yq eval '.install += {"kpt": {"pkg-path": "kpt", "pkg-group": "k8s"}}' - |
-	yq eval '.install += {"krew": {"pkg-path": "krew", "pkg-group": "k8s"}}' - |
-	yq eval '.install += {"kubectl": {"pkg-path": "kubectl", "pkg-group": "k8s"}}' - |
-	yq eval '.install += {"kubectl-ai": {"pkg-path": "kubectl-ai", "pkg-group": "kubectl-plugins"}}' - |
-	yq eval '.install += {"kubectl-ktop": {"pkg-path": "kubectl-ktop", "pkg-group": "kubectl-plugins"}}' - |
-	yq eval '.install += {"kubectl-neat": {"pkg-path": "kubectl-neat", "pkg-group": "kubectl-plugins"}}' - |
-	yq eval '.install += {"kubectl-tree": {"pkg-path": "kubectl-tree", "pkg-group": "kubectl-plugins"}}' - |
-	yq eval '.install += {"kubectl-graph": {"pkg-path": "kubectl-graph", "pkg-group": "kubectl-plugins"}}' - |
-	yq eval '.install += {"kubectl-doctor": {"pkg-path": "kubectl-doctor", "pkg-group": "kubectl-plugins"}}' - |
-	yq eval '.install += {"kubectl-explore": {"pkg-path": "kubectl-explore", "pkg-group": "kubectl-plugins"}}' - |
-	yq eval '.install += {"kubectl-rook-ceph": {"pkg-path": "kubectl-rook-ceph", "pkg-group": "kubectl-plugins"}}' - |
-	yq eval '.install += {"kubectl-view-secret": {"pkg-path": "kubectl-view-secret", "pkg-group": "kubectl-plugins"}}' - |
-	yq eval '.install += {"tubekit": {"pkg-path": "tubekit", "pkg-group": "k8s"}}' - |
+	yq eval '.install += {"kpt": {"pkg-path": "kpt", "pkg-group": "k8s-kpt-tools"}}' - |
+	yq eval '.install += {"krew": {"pkg-path": "krew", "pkg-group": "k8s-kubectl-tools"}}' - |
+	yq eval '.install += {"kubectl": {"pkg-path": "kubectl", "pkg-group": "k8s-kubectl-tools"}}' - |
+	yq eval '.install += {"kubectl-ai": {"pkg-path": "kubectl-ai", "pkg-group": "k8s-kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-ktop": {"pkg-path": "kubectl-ktop", "pkg-group": "k8s-kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-neat": {"pkg-path": "kubectl-neat", "pkg-group": "k8s-kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-tree": {"pkg-path": "kubectl-tree", "pkg-group": "k8s-kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-graph": {"pkg-path": "kubectl-graph", "pkg-group": "k8s-kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-doctor": {"pkg-path": "kubectl-doctor", "pkg-group": "k8s-kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-explore": {"pkg-path": "kubectl-explore", "pkg-group": "k8s-kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-rook-ceph": {"pkg-path": "kubectl-rook-ceph", "pkg-group": "k8s-kubectl-plugins"}}' - |
+	yq eval '.install += {"kubectl-view-secret": {"pkg-path": "kubectl-view-secret", "pkg-group": "k8s-kubectl-plugins"}}' - |
+	yq eval '.install += {"tubekit": {"pkg-path": "tubekit", "pkg-group": "k8s-kubectl-tools"}}' - |
 	# manifests
-	yq eval '.install += {"dasel": {"pkg-path": "dasel", "pkg-group": "manifests"}}' - |
-	yq eval '.install += {"yq-go": {"pkg-path": "yq-go", "pkg-group": "manifests"}}' - |
+	yq eval '.install += {"dasel": {"pkg-path": "dasel", "pkg-group": "manifest-tools-yaml-tools"}}' - |
+	yq eval '.install += {"yq-go": {"pkg-path": "yq-go", "pkg-group": "manifest-tools-yaml-tools"}}' - |
 	# user
 	yq eval '.install += {"delta": {"pkg-path": "delta", "pkg-group": "user"}}' - |
 	yq eval '.install += {"emacs-nox": {"pkg-path": "emacs-nox", "pkg-group": "user"}}' - |
