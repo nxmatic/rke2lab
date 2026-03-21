@@ -156,18 +156,18 @@ collect_live_flox_shims() {
 
 		for token in ${argv}; do
 			case "${prev}" in
-				-id)
-					shim_id="${token}"
-					;;
-				-namespace)
-					namespace="${token}"
-					;;
-				-address)
-					address="${token}"
-					;;
-				-debug-socket)
-					debug_socket="${token}"
-					;;
+			-id)
+				shim_id="${token}"
+				;;
+			-namespace)
+				namespace="${token}"
+				;;
+			-address)
+				address="${token}"
+				;;
+			-debug-socket)
+				debug_socket="${token}"
+				;;
 			esac
 			prev="${token}"
 		done
@@ -249,14 +249,14 @@ run_pprof() {
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
-			--timeout)
-				[[ $# -ge 2 ]] || die "--timeout requires a value"
-				pprof_timeout="$2"
-				shift 2
-				;;
-			*)
-				break
-				;;
+		--timeout)
+			[[ $# -ge 2 ]] || die "--timeout requires a value"
+			pprof_timeout="$2"
+			shift 2
+			;;
+		*)
+			break
+			;;
 		esac
 	done
 
@@ -287,37 +287,37 @@ run_pprof() {
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
-		--address)
-			[[ $# -ge 2 ]] || die "--address requires a value"
-			DEFAULT_CONTAINERD_ADDRESS="$2"
-			shift 2
-			;;
-		--namespace)
-			[[ $# -ge 2 ]] || die "--namespace requires a value"
-			DEFAULT_CONTAINERD_NAMESPACE="$2"
-			shift 2
-			;;
-		--flox-dir)
-			[[ $# -ge 2 ]] || die "--flox-dir requires a value"
-			REMOTE_FLOX_DIR="$2"
-			shift 2
-			;;
-		--timeout)
-			[[ $# -ge 2 ]] || die "--timeout requires a value"
-			DEFAULT_PPROF_TIMEOUT="$2"
-			shift 2
-			;;
-		-h|--help)
-			usage
-			exit 0
-			;;
-		--)
-			shift
-			break
-			;;
-		*)
-			break
-			;;
+	--address)
+		[[ $# -ge 2 ]] || die "--address requires a value"
+		DEFAULT_CONTAINERD_ADDRESS="$2"
+		shift 2
+		;;
+	--namespace)
+		[[ $# -ge 2 ]] || die "--namespace requires a value"
+		DEFAULT_CONTAINERD_NAMESPACE="$2"
+		shift 2
+		;;
+	--flox-dir)
+		[[ $# -ge 2 ]] || die "--flox-dir requires a value"
+		REMOTE_FLOX_DIR="$2"
+		shift 2
+		;;
+	--timeout)
+		[[ $# -ge 2 ]] || die "--timeout requires a value"
+		DEFAULT_PPROF_TIMEOUT="$2"
+		shift 2
+		;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	--)
+		shift
+		break
+		;;
+	*)
+		break
+		;;
 	esac
 done
 
@@ -329,13 +329,13 @@ if [[ $# -gt 0 ]]; then
 fi
 
 case "${command_name}" in
-	list)
-		print_live_flox_shims
-		;;
-	goroutines|heap|profile|trace|block|threadcreate)
-		run_pprof "${command_name}" "$@"
-		;;
-	*)
-		die "unknown command '${command_name}'"
-		;;
+list)
+	print_live_flox_shims
+	;;
+goroutines | heap | profile | trace | block | threadcreate)
+	run_pprof "${command_name}" "$@"
+	;;
+*)
+	die "unknown command '${command_name}'"
+	;;
 esac

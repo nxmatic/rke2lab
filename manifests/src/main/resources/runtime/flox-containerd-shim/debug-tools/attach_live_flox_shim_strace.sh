@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
 		TARGET_PID="${2:-}"
 		shift 2
 		;;
-	--shim-id|--id)
+	--shim-id | --id)
 		TARGET_SHIM_ID="${2:-}"
 		shift 2
 		;;
@@ -48,7 +48,7 @@ while [[ $# -gt 0 ]]; do
 		OUTPUT_DIR="${2:-}"
 		shift 2
 		;;
-	-h|--help)
+	-h | --help)
 		usage
 		exit 0
 		;;
@@ -84,7 +84,8 @@ if [[ -z "${STRACE_BIN}" ]]; then
 fi
 
 if [[ -z "${TARGET_PID}" ]]; then
-	TARGET_PID="$(python3 - "${TARGET_SHIM_ID}" <<'PY'
+	TARGET_PID="$(
+		python3 - "${TARGET_SHIM_ID}" <<'PY'
 import os
 import sys
 
@@ -125,7 +126,7 @@ if not matches:
 matches.sort()
 print(matches[-1][0])
 PY
-)" || {
+	)" || {
 		echo "could not find a live flox shim daemon for sandbox id ${TARGET_SHIM_ID}" >&2
 		exit 1
 	}
@@ -177,7 +178,8 @@ if [[ -z "${TARGET_SHIM_ID}" ]]; then
 	done
 fi
 
-CWD="$(python3 - "${TARGET_PID}" <<'PY'
+CWD="$(
+	python3 - "${TARGET_PID}" <<'PY'
 import os
 import sys
 pid = sys.argv[1]
@@ -186,9 +188,11 @@ try:
 except OSError:
     sys.exit(1)
 PY
- 2>/dev/null || true)"
+	2>/dev/null || true
+)"
 
-PATH_VALUE="$(python3 - "${ENVIRON_FILE}" <<'PY'
+PATH_VALUE="$(
+	python3 - "${ENVIRON_FILE}" <<'PY'
 import sys
 path = sys.argv[1]
 try:
@@ -202,7 +206,8 @@ for item in data:
 PY
 )"
 
-WRAPPER_RUN_DIR="$(python3 - "${LOG_ROOT}" "${PATH_VALUE}" <<'PY'
+WRAPPER_RUN_DIR="$(
+	python3 - "${LOG_ROOT}" "${PATH_VALUE}" <<'PY'
 import os
 import sys
 log_root = os.path.realpath(sys.argv[1])
@@ -272,7 +277,7 @@ printf '\nNow reproduce the failing pod create, then stop this command with Ctrl
 
 ATTACH_ARGS=()
 for tid in "${THREAD_IDS[@]}"; do
-	ATTACH_ARGS+=( -p "${tid}" )
+	ATTACH_ARGS+=(-p "${tid}")
 done
 
 exec "${STRACE_BIN}" -f -ff -s 65535 -yy -o "${PREFIX}" "${ATTACH_ARGS[@]}"

@@ -53,11 +53,11 @@ crictl_cmd() {
 }
 
 capture_live_kdns_objects() {
-    crictl_cmd ps -a -o json >"${WORKDIR}/crictl-ps-a.json" || true
-    crictl_cmd ps -a >"${WORKDIR}/crictl-ps-a.txt" || true
+	crictl_cmd ps -a -o json >"${WORKDIR}/crictl-ps-a.json" || true
+	crictl_cmd ps -a >"${WORKDIR}/crictl-ps-a.txt" || true
 
-    read -r SOURCE_CONTAINER_ID SOURCE_SANDBOX_ID < <(
-        python3 - "${WORKDIR}/crictl-ps-a.json" <<'PY'
+	read -r SOURCE_CONTAINER_ID SOURCE_SANDBOX_ID < <(
+		python3 - "${WORKDIR}/crictl-ps-a.json" <<'PY'
 import json
 import pathlib
 import sys
@@ -81,7 +81,7 @@ for container in data.get("containers", []):
 
 print()
 PY
-    )
+	)
 
 	if [[ -n "${SOURCE_SANDBOX_ID}" ]]; then
 		crictl_cmd inspectp "${SOURCE_SANDBOX_ID}" >"${WORKDIR}/source-sandbox.json"
@@ -225,14 +225,14 @@ PY
 
 cleanup() {
 	set +e
-    mkdir -p "${ARTIFACT_DIR}"
-    cp -f "${WORKDIR}"/*.json "${ARTIFACT_DIR}/" >/dev/null 2>&1 || true
-    cp -f "${WORKDIR}"/*.txt "${ARTIFACT_DIR}/" >/dev/null 2>&1 || true
-    if [[ "${START_EC}" -ne 0 && "${PRESERVE_ON_FAILURE}" == "1" ]]; then
-        echo "preserving failed repro sandbox: POD_ID=${POD_ID:-<none>} CID=${CID:-<none>}" >&2
-        rm -rf "${WORKDIR}"
-        return 0
-    fi
+	mkdir -p "${ARTIFACT_DIR}"
+	cp -f "${WORKDIR}"/*.json "${ARTIFACT_DIR}/" >/dev/null 2>&1 || true
+	cp -f "${WORKDIR}"/*.txt "${ARTIFACT_DIR}/" >/dev/null 2>&1 || true
+	if [[ "${START_EC}" -ne 0 && "${PRESERVE_ON_FAILURE}" == "1" ]]; then
+		echo "preserving failed repro sandbox: POD_ID=${POD_ID:-<none>} CID=${CID:-<none>}" >&2
+		rm -rf "${WORKDIR}"
+		return 0
+	fi
 	if [[ -n "${CID}" ]]; then
 		crictl_cmd rm -f "${CID}" >/dev/null 2>&1 || true
 	fi
@@ -288,26 +288,26 @@ POD_ID="$(crictl_cmd runp --runtime flox "${WORKDIR}/pod.json")"
 echo "POD_ID=${POD_ID}"
 
 if [[ "${SANDBOX_ONLY}" == "1" ]]; then
-    echo
-    echo "== sandbox-only mode: immediate inspect =="
-    crictl_cmd inspectp "${POD_ID}" | tee "${WORKDIR}/sandbox-only-inspect-initial.json" || true
-    echo
-    if [[ "${SANDBOX_OBSERVE_SECONDS}" -gt 0 ]]; then
-        echo "== observing sandbox for ${SANDBOX_OBSERVE_SECONDS}s =="
-        sleep "${SANDBOX_OBSERVE_SECONDS}"
-        echo
-    fi
-    echo "== sandbox-only mode: final inspect =="
-    crictl_cmd inspectp "${POD_ID}" | tee "${WORKDIR}/sandbox-only-inspect-final.json" || true
-    echo
-    echo "== recent containerd log tail =="
-    if [[ -f "${CONTAINERD_LOG_FILE}" ]]; then
-        tail -n 120 "${CONTAINERD_LOG_FILE}" | tee "${WORKDIR}/containerd-log-tail.txt" || true
-    else
-        echo "missing containerd log file: ${CONTAINERD_LOG_FILE}" >&2
-    fi
-    echo
-    exit 0
+	echo
+	echo "== sandbox-only mode: immediate inspect =="
+	crictl_cmd inspectp "${POD_ID}" | tee "${WORKDIR}/sandbox-only-inspect-initial.json" || true
+	echo
+	if [[ "${SANDBOX_OBSERVE_SECONDS}" -gt 0 ]]; then
+		echo "== observing sandbox for ${SANDBOX_OBSERVE_SECONDS}s =="
+		sleep "${SANDBOX_OBSERVE_SECONDS}"
+		echo
+	fi
+	echo "== sandbox-only mode: final inspect =="
+	crictl_cmd inspectp "${POD_ID}" | tee "${WORKDIR}/sandbox-only-inspect-final.json" || true
+	echo
+	echo "== recent containerd log tail =="
+	if [[ -f "${CONTAINERD_LOG_FILE}" ]]; then
+		tail -n 120 "${CONTAINERD_LOG_FILE}" | tee "${WORKDIR}/containerd-log-tail.txt" || true
+	else
+		echo "missing containerd log file: ${CONTAINERD_LOG_FILE}" >&2
+	fi
+	echo
+	exit 0
 fi
 
 echo "== creating container =="
@@ -325,9 +325,9 @@ echo "START_EC=${START_EC}"
 echo
 
 if [[ "${START_EC}" -ne 0 && "${FAILURE_SETTLE_SECONDS}" -gt 0 ]]; then
-    echo "== waiting for failure to settle =="
-    sleep "${FAILURE_SETTLE_SECONDS}"
-    echo
+	echo "== waiting for failure to settle =="
+	sleep "${FAILURE_SETTLE_SECONDS}"
+	echo
 fi
 
 echo "== inspect sandbox =="
@@ -339,7 +339,7 @@ echo
 
 echo "== recent containerd log tail =="
 if [[ -f "${CONTAINERD_LOG_FILE}" ]]; then
-    tail -n 120 "${CONTAINERD_LOG_FILE}" | tee "${WORKDIR}/containerd-log-tail.txt" || true
+	tail -n 120 "${CONTAINERD_LOG_FILE}" | tee "${WORKDIR}/containerd-log-tail.txt" || true
 else
 	echo "missing containerd log file: ${CONTAINERD_LOG_FILE}" >&2
 fi

@@ -50,15 +50,15 @@ rke2lab::flox:configure_auth_from_secrets() {
 	touch "${config_file}"
 
 	if ! grep -q '^[[:space:]]*disable_metrics[[:space:]]*=' "${config_file}"; then
-		echo 'disable_metrics = true' >> "${config_file}"
+		echo 'disable_metrics = true' >>"${config_file}"
 	fi
 	if ! grep -q '^[[:space:]]*floxhub_token[[:space:]]*=' "${config_file}"; then
-		echo "floxhub_token = ''" >> "${config_file}"
+		echo "floxhub_token = ''" >>"${config_file}"
 	fi
 
 	tmp_file="$(mktemp)"
-	cat "${config_file}" | dasel query --root -i toml -o toml 'disable_metrics=true' > "${tmp_file}"
-	cat "${tmp_file}" | dasel query --root -i toml -o toml "floxhub_token=\"${flox_token}\"" > "${config_file}"
+	cat "${config_file}" | dasel query --root -i toml -o toml 'disable_metrics=true' >"${tmp_file}"
+	cat "${tmp_file}" | dasel query --root -i toml -o toml "floxhub_token=\"${flox_token}\"" >"${config_file}"
 	rm -f "${tmp_file}"
 }
 
