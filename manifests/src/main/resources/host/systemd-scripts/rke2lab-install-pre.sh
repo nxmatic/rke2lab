@@ -218,16 +218,23 @@ dasel -i toml -o yaml \
 	</var/lib/rancher/rke2/.flox/env/manifest.toml |
 	yq eval '.options = {"systems": [env(RKE2_FLOX_SYSTEM)]}' - |
 	yq eval '.include = {"environments": [{"dir": "/var/lib/cloud"}]}' - |
-	yq eval '.install += {"etcdctl": {"pkg-path": "etcdctl", "pkg-group": "etcd-tools"}}' - |
-	yq eval '.install += {"ceph-client": {"pkg-path": "ceph-client", "pkg-group": "ceph-tools"}}' - |
-	yq eval '.install += {"cilium-cli": {"pkg-path": "cilium-cli", "pkg-group": "cilium-tools"}}' - |
-	yq eval '.install += {"helmfile": {"pkg-path": "helmfile", "pkg-group": "helm-tools"}}' - |
-	yq eval '.install += {"kubernetes-helm": {"pkg-path": "kubernetes-helm", "pkg-group": "helm-tools"}}' - |
-	yq eval '.install += {"zfs": {"pkg-path": "zfs", "pkg-group": "linux"}}' - |
-	yq eval '.install += {"nerdctl": {"pkg-path": "nerdctl", "version": "1.7.5", "pkg-group": "containerd-tools"}}' - |
-	yq eval '.install += {"tektoncd-cli": {"pkg-path": "tektoncd-cli", "pkg-group": "tekton-tools"}}' - |
-	yq eval '.install += {"kubectl": {"pkg-path": "kubectl", "pkg-group": "kubectl-tools"}}' - |
-	yq eval '.install += {"krew": {"pkg-path": "krew", "pkg-group": "kubectl-tools"}}' - |
+    # linux
+    yq eval '.install += {"zfs": {"pkg-path": "zfs", "pkg-group": "linux"}}' - |
+    # system
+    yq eval '.install += {"direnv": {"pkg-path": "direnv", "pkg-group": "system"}}' - |
+  	yq eval '.install += {"gnutar": {"pkg-path": "gnutar", "pkg-group": "system"}}' - |
+	yq eval '.install += {"xstow": {"pkg-path": "xstow", "pkg-group": "system"}}' - |
+    # k8s
+	yq eval '.install += {"etcdctl": {"pkg-path": "etcdctl", "pkg-group": "k8s"}}' - |
+	yq eval '.install += {"ceph-client": {"pkg-path": "ceph-client", "pkg-group": "k8s"}}' - |
+	yq eval '.install += {"cilium-cli": {"pkg-path": "cilium-cli", "pkg-group": "k8s"}}' - |
+	yq eval '.install += {"helmfile": {"pkg-path": "helmfile", "pkg-group": "k8s"}}' - |
+	yq eval '.install += {"kubernetes-helm": {"pkg-path": "kubernetes-helm", "pkg-group": "k8s"}}' - |
+	yq eval '.install += {"nerdctl": {"pkg-path": "nerdctl", "version": "^1.7", "pkg-group": "k8s"}}' - |
+	yq eval '.install += {"tektoncd-cli": {"pkg-path": "tektoncd-cli", "pkg-group": "k8s"}}' - |
+    yq eval '.install += {"kpt": {"pkg-path": "kpt", "version": "^1.0", "pkg-group": "k8s"}}' - |
+    yq eval '.install += {"krew": {"pkg-path": "krew", "pkg-group": "k8s"}}' - |
+	yq eval '.install += {"kubectl": {"pkg-path": "kubectl", "pkg-group": "k8s"}}' - |
 	yq eval '.install += {"kubectl-ai": {"pkg-path": "kubectl-ai", "pkg-group": "kubectl-plugins"}}' - |
 	yq eval '.install += {"kubectl-ktop": {"pkg-path": "kubectl-ktop", "pkg-group": "kubectl-plugins"}}' - |
 	yq eval '.install += {"kubectl-neat": {"pkg-path": "kubectl-neat", "pkg-group": "kubectl-plugins"}}' - |
@@ -237,12 +244,13 @@ dasel -i toml -o yaml \
 	yq eval '.install += {"kubectl-explore": {"pkg-path": "kubectl-explore", "pkg-group": "kubectl-plugins"}}' - |
 	yq eval '.install += {"kubectl-rook-ceph": {"pkg-path": "kubectl-rook-ceph", "pkg-group": "kubectl-plugins"}}' - |
 	yq eval '.install += {"kubectl-view-secret": {"pkg-path": "kubectl-view-secret", "pkg-group": "kubectl-plugins"}}' - |
-	yq eval '.install += {"tubekit": {"pkg-path": "tubekit", "pkg-group": "kubectl-tools"}}' - |
-	yq eval '.install += {"yq-go": {"pkg-path": "yq-go", "pkg-group": "yaml-tools"}}' - |
-	yq eval '.install += {"kpt": {"pkg-path": "kpt", "version": "1.0.0-beta.55", "pkg-group": "kpt-tools"}}' - |
-	yq eval '.install += {"delta": {"pkg-path": "delta", "pkg-group": "diff-tools"}}' - |
-	yq eval '.install += {"direnv": {"pkg-path": "direnv", "pkg-group": "direnv-tools"}}' - |
-	yq eval '.install += {"xstow": {"pkg-path": "xstow", "pkg-group": "stow-tools"}}' - |
+	yq eval '.install += {"tubekit": {"pkg-path": "tubekit", "pkg-group": "k8s"}}' - |
+    # manifests
+  yq eval '.install += {"dasel": {"pkg-path": "dasel", "pkg-group": "manifests"}}' - |
+	yq eval '.install += {"yq-go": {"pkg-path": "yq-go", "pkg-group": "manifests"}}' - |
+    # user
+	yq eval '.install += {"delta": {"pkg-path": "delta", "pkg-group": "user"}}' - |
+	yq eval '.install += {"emacs-nox": {"pkg-path": "emacs-nox", "pkg-group": "user"}}' - |
 	yq eval '.profile = {"common": "source /var/lib/rancher/rke2/.flox/env/profile-common.sh"}' - |
 	dasel -i yaml -o toml | tee /tmp/manifest.toml.$$ &&
 	mv /tmp/manifest.toml.$$ \
