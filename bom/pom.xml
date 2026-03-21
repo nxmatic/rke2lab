@@ -18,7 +18,7 @@
     <jsr305.version>3.0.2</jsr305.version>
     <gson.version>2.8.9</gson.version>
     <jackson.version>2.20.0</jackson.version>
-    <jgit.version>7.2.0.202503040940-r</jgit.version>
+    <jgit.version>7.2.1.202505142326-r</jgit.version>
     <cdk8s.version>2.5.21</cdk8s.version>
     <cdk8s.plus33.version>2.0.0</cdk8s.plus33.version>
     <slf4j.version>2.0.16</slf4j.version>
