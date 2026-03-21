@@ -38,10 +38,10 @@ canonicalize_existing_path() {
 
 if [[ $# -gt 0 ]]; then
 	case "${1}" in
-		host|guest)
-			WORKTREE_MODE="${1}"
-			shift
-			;;
+	host | guest)
+		WORKTREE_MODE="${1}"
+		shift
+		;;
 	esac
 fi
 
@@ -56,12 +56,12 @@ UPDATED_FLAKE_LOCK_DIRS=""
 
 rke2lab::bool:is_true() {
 	case "${1:-}" in
-		1|true|TRUE|yes|YES|on|ON)
-			return 0
-			;;
-		*)
-			return 1
-			;;
+	1 | true | TRUE | yes | YES | on | ON)
+		return 0
+		;;
+	*)
+		return 1
+		;;
 	esac
 }
 
@@ -81,18 +81,18 @@ resolve_package_variant() {
 	local package_attr="$2"
 
 	case "${package_name}" in
-		kdns)
-			if rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}"; then
-				package_name="kdns-debug"
-				[[ "${package_attr}" == *-debug ]] || package_attr="${package_attr}-debug"
-			fi
-			;;
-		flox-shim-wrapper)
-			if rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_FLOX_SHIM_WRAPPER_ENABLED:-false}"; then
-				package_name="flox-shim-wrapper-debug"
-				[[ "${package_attr}" == *-debug ]] || package_attr="${package_attr}-debug"
-			fi
-			;;
+	kdns)
+		if rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}"; then
+			package_name="kdns-debug"
+			[[ "${package_attr}" == *-debug ]] || package_attr="${package_attr}-debug"
+		fi
+		;;
+	flox-shim-wrapper)
+		if rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_FLOX_SHIM_WRAPPER_ENABLED:-false}"; then
+			package_name="flox-shim-wrapper-debug"
+			[[ "${package_attr}" == *-debug ]] || package_attr="${package_attr}-debug"
+		fi
+		;;
 	esac
 
 	printf '%s\n%s\n' "${package_name}" "${package_attr}"
@@ -100,16 +100,16 @@ resolve_package_variant() {
 
 validate_worktree_mode() {
 	case "${WORKTREE_MODE}" in
-		host|guest)
-			return 0
-			;;
-		*)
-			: "[ERROR] Unsupported or missing shim builder mode: '${WORKTREE_MODE}'"
-			: "[ERROR] Usage: ${SCRIPT_BASENAME} [host|guest] [descriptor file]"
-			: "[ERROR] Default mode is 'guest' when omitted."
-			: "[ERROR] You can also set FLOX_SHIM_MODE and pass only [descriptor file]."
-			exit 1
-			;;
+	host | guest)
+		return 0
+		;;
+	*)
+		: "[ERROR] Unsupported or missing shim builder mode: '${WORKTREE_MODE}'"
+		: "[ERROR] Usage: ${SCRIPT_BASENAME} [host|guest] [descriptor file]"
+		: "[ERROR] Default mode is 'guest' when omitted."
+		: "[ERROR] You can also set FLOX_SHIM_MODE and pass only [descriptor file]."
+		exit 1
+		;;
 	esac
 }
 
@@ -258,32 +258,32 @@ resolve_flake_path() {
 
 should_update_locks() {
 	case "${FLOX_SHIM_UPDATE_LOCKS:-auto}" in
-		1|true|TRUE|yes|YES)
-			return 0
-			;;
-		0|false|FALSE|no|NO)
-			return 1
-			;;
-		auto|AUTO|"")
-			[[ "${WORKTREE_MODE}" == "host" ]]
-			return
-			;;
-		*)
-			: "[WARN] Unknown FLOX_SHIM_UPDATE_LOCKS='${FLOX_SHIM_UPDATE_LOCKS}', defaulting to auto"
-			[[ "${WORKTREE_MODE}" == "host" ]]
-			return
-			;;
+	1 | true | TRUE | yes | YES)
+		return 0
+		;;
+	0 | false | FALSE | no | NO)
+		return 1
+		;;
+	auto | AUTO | "")
+		[[ "${WORKTREE_MODE}" == "host" ]]
+		return
+		;;
+	*)
+		: "[WARN] Unknown FLOX_SHIM_UPDATE_LOCKS='${FLOX_SHIM_UPDATE_LOCKS}', defaulting to auto"
+		[[ "${WORKTREE_MODE}" == "host" ]]
+		return
+		;;
 	esac
 }
 
 should_only_update_locks() {
 	case "${FLOX_SHIM_ONLY_UPDATE_LOCKS:-false}" in
-		1|true|TRUE|yes|YES)
-			return 0
-			;;
-		*)
-			return 1
-			;;
+	1 | true | TRUE | yes | YES)
+		return 0
+		;;
+	*)
+		return 1
+		;;
 	esac
 }
 

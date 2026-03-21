@@ -67,12 +67,13 @@ common = '''
 ## ... environments to create a composed environment
 ## ------------------------------------------------------------------
 [include]
-environments = [
-  { dir = "../fleet/flox/git" },
-  { dir = "../fleet/flox/jdk" },
-  { dir = "../fleet/flox/k8s" },
-  { dir = "../fleet/flox/pulumi" }
-]
+  environments = [
+    { dir = "../fleet/flox/git" },
+    { dir = "../fleet/flox/jdk" },
+    { dir = "../fleet/flox/k8s" },
+    { dir = "../fleet/flox/pulumi" },
+    { dir = "../fleet/flox/shell" },
+  ]
 
 
 ## Build and publish your own packages ------------------------------

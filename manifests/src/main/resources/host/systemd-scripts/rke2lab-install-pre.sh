@@ -25,17 +25,17 @@ direnv:config:generate
 rke2lab::env:load
 
 kdns::manifest:patch() {
-  local deployment_manifest flox_env debug_enabled
+	local deployment_manifest flox_env debug_enabled
 
-  deployment_manifest="${RKE2LAB_MANIFESTS_DIR:-/srv/host/rke2-manifests.d}/networking/kdns/02-deployment-kdns.yml"
-  [[ -f "${deployment_manifest}" ]] || return 0
+	deployment_manifest="${RKE2LAB_MANIFESTS_DIR:-/srv/host/rke2-manifests.d}/networking/kdns/02-deployment-kdns.yml"
+	[[ -f "${deployment_manifest}" ]] || return 0
 
-  flox_env="${RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV:-nxmatic/kdns}"
-  debug_enabled="${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}"
+	flox_env="${RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV:-nxmatic/kdns}"
+	debug_enabled="${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}"
 
-  RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV="${flox_env}" \
-  RKE2LAB_POLICY_DEBUG_KDNS_ENABLED="${debug_enabled}" \
-    yq eval -i '
+	RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV="${flox_env}" \
+		RKE2LAB_POLICY_DEBUG_KDNS_ENABLED="${debug_enabled}" \
+		yq eval -i '
       .spec.template.metadata.annotations."flox.dev/environment" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV) |
       .spec.template.metadata.annotations."debug.kdns.lab42/enabled" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_ENABLED)
     ' "${deployment_manifest}"
@@ -218,25 +218,25 @@ dasel -i toml -o yaml \
 	</var/lib/rancher/rke2/.flox/env/manifest.toml |
 	yq eval '.options = {"systems": [env(RKE2_FLOX_SYSTEM)]}' - |
 	yq eval '.include = {"environments": [{"dir": "/var/lib/cloud"}]}' - |
-    # linux
-    yq eval '.install += {"zfs": {"pkg-path": "zfs", "pkg-group": "linux"}}' - |
-    # system
-    yq eval '.install += {"direnv": {"pkg-path": "direnv", "pkg-group": "system"}}' - |
-  	yq eval '.install += {"gnutar": {"pkg-path": "gnutar", "pkg-group": "system"}}' - |
+	# linux
+	yq eval '.install += {"zfs": {"pkg-path": "zfs", "pkg-group": "linux"}}' - |
+	# system
+	yq eval '.install += {"direnv": {"pkg-path": "direnv", "pkg-group": "system"}}' - |
+	yq eval '.install += {"gnutar": {"pkg-path": "gnutar", "pkg-group": "system"}}' - |
 	yq eval '.install += {"xstow": {"pkg-path": "xstow", "pkg-group": "system"}}' - |
-    # k8s
+	# k8s
 	yq eval '.install += {"etcdctl": {"pkg-path": "etcdctl", "pkg-group": "k8s"}}' - |
 	yq eval '.install += {"ceph-client": {"pkg-path": "ceph-client", "pkg-group": "k8s"}}' - |
 	yq eval '.install += {"cilium-cli": {"pkg-path": "cilium-cli", "pkg-group": "k8s"}}' - |
 	yq eval '.install += {"helmfile": {"pkg-path": "helmfile", "pkg-group": "k8s"}}' - |
 	yq eval '.install += {"kubernetes-helm": {"pkg-path": "kubernetes-helm", "pkg-group": "k8s"}}' - |
-  yq eval '.install += {"nerdctl": {"pkg-path": "nerdctl", "pkg-group": "k8s"}}' - |
+	yq eval '.install += {"nerdctl": {"pkg-path": "nerdctl", "pkg-group": "k8s"}}' - |
 	yq eval '.install += {"tektoncd-cli": {"pkg-path": "tektoncd-cli", "pkg-group": "k8s"}}' - |
-    # Flox currently exposes only a prerelease kpt v1 (1.0.0-beta.55), and its
-    # semver range resolver does not match that prerelease through a generic v1 range.
-    # Leave kpt unpinned until the catalog publishes a stable 1.x we can target.
-    yq eval '.install += {"kpt": {"pkg-path": "kpt", "pkg-group": "k8s"}}' - |
-    yq eval '.install += {"krew": {"pkg-path": "krew", "pkg-group": "k8s"}}' - |
+	# Flox currently exposes only a prerelease kpt v1 (1.0.0-beta.55), and its
+	# semver range resolver does not match that prerelease through a generic v1 range.
+	# Leave kpt unpinned until the catalog publishes a stable 1.x we can target.
+	yq eval '.install += {"kpt": {"pkg-path": "kpt", "pkg-group": "k8s"}}' - |
+	yq eval '.install += {"krew": {"pkg-path": "krew", "pkg-group": "k8s"}}' - |
 	yq eval '.install += {"kubectl": {"pkg-path": "kubectl", "pkg-group": "k8s"}}' - |
 	yq eval '.install += {"kubectl-ai": {"pkg-path": "kubectl-ai", "pkg-group": "kubectl-plugins"}}' - |
 	yq eval '.install += {"kubectl-ktop": {"pkg-path": "kubectl-ktop", "pkg-group": "kubectl-plugins"}}' - |
@@ -248,10 +248,10 @@ dasel -i toml -o yaml \
 	yq eval '.install += {"kubectl-rook-ceph": {"pkg-path": "kubectl-rook-ceph", "pkg-group": "kubectl-plugins"}}' - |
 	yq eval '.install += {"kubectl-view-secret": {"pkg-path": "kubectl-view-secret", "pkg-group": "kubectl-plugins"}}' - |
 	yq eval '.install += {"tubekit": {"pkg-path": "tubekit", "pkg-group": "k8s"}}' - |
-    # manifests
-  yq eval '.install += {"dasel": {"pkg-path": "dasel", "pkg-group": "manifests"}}' - |
+	# manifests
+	yq eval '.install += {"dasel": {"pkg-path": "dasel", "pkg-group": "manifests"}}' - |
 	yq eval '.install += {"yq-go": {"pkg-path": "yq-go", "pkg-group": "manifests"}}' - |
-    # user
+	# user
 	yq eval '.install += {"delta": {"pkg-path": "delta", "pkg-group": "user"}}' - |
 	yq eval '.install += {"emacs-nox": {"pkg-path": "emacs-nox", "pkg-group": "user"}}' - |
 	yq eval '.profile = {"common": "source /var/lib/rancher/rke2/.flox/env/profile-common.sh"}' - |

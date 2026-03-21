@@ -12,6 +12,10 @@
         "pkg-group": "keyhole",
         "outputs": "all"
       },
+      "bash": {
+        "pkg-path": "bash",
+        "outputs": "all"
+      },
       "cdk8s-cli": {
         "pkg-path": "cdk8s-cli"
       },
@@ -183,11 +187,21 @@
         "flake": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper",
         "outputs": "all"
       },
+      "pstree": {
+        "pkg-path": "pstree"
+      },
       "pulumi": {
         "pkg-path": "pulumi-bin"
       },
       "pulumictl": {
         "pkg-path": "pulumictl"
+      },
+      "shellcheck": {
+        "pkg-path": "shellcheck",
+        "outputs": "all"
+      },
+      "shfmt": {
+        "pkg-path": "shfmt"
       },
       "sops": {
         "pkg-path": "sops",
@@ -211,6 +225,10 @@
       "yq-go": {
         "pkg-path": "yq-go",
         "pkg-group": "manifest-tools-yaml-tools",
+        "outputs": "all"
+      },
+      "zsh": {
+        "pkg-path": "zsh",
         "outputs": "all"
       }
     },
@@ -2159,6 +2177,80 @@
       "priority": 5
     },
     {
+      "attr_path": "bash",
+      "broken": false,
+      "derivation": "/nix/store/0fs5f87g7ykq0k6d2kwn3lksaxz11sm9-bash-interactive-5.3p9.drv",
+      "description": "GNU Bourne-Again Shell, the de facto standard shell on Linux (for interactive use)",
+      "install_id": "bash",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "bash-interactive-5.3p9",
+      "pname": "bash",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:42:03.305614Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "5.3p9",
+      "outputs_to_install": [
+        "man",
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/c8kngjch0m8mwdqcwv2zv7yz67aw5z4k-bash-interactive-5.3p9-dev",
+        "doc": "/nix/store/y4rzpkhfs6hvh3ysicz5aqv6lyrxj3zm-bash-interactive-5.3p9-doc",
+        "info": "/nix/store/l560gnn1in8icznifirsl5my9pp4hsih-bash-interactive-5.3p9-info",
+        "man": "/nix/store/nk78ds8cx0p396vacqs4qmrfaw8ad472-bash-interactive-5.3p9-man",
+        "out": "/nix/store/zk0hi525wn70pm93gzgdbb5k07y6x2lm-bash-interactive-5.3p9"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "bash",
+      "broken": false,
+      "derivation": "/nix/store/k4rylgydagwnjnj47v4jhiajgvmzndys-bash-interactive-5.3p9.drv",
+      "description": "GNU Bourne-Again Shell, the de facto standard shell on Linux (for interactive use)",
+      "install_id": "bash",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "bash-interactive-5.3p9",
+      "pname": "bash",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:14:38.326032Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "5.3p9",
+      "outputs_to_install": [
+        "man",
+        "out",
+        "out",
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/6af5mw6av65jksgdzrs7fx97dy49zmba-bash-interactive-5.3p9-debug",
+        "dev": "/nix/store/mp96lqvw5icp8mvyz6wl55lziq6dfydy-bash-interactive-5.3p9-dev",
+        "doc": "/nix/store/s8g6q2sxp24s3a2lhvz6yq6mk015q8fd-bash-interactive-5.3p9-doc",
+        "info": "/nix/store/hny32fdj6v5yafcysk5n55dg4lsg3711-bash-interactive-5.3p9-info",
+        "man": "/nix/store/gvdc62sadciqxmwks03i0bbjhr37z4j7-bash-interactive-5.3p9-man",
+        "out": "/nix/store/91v6ncz4is4rhjcg8pyw3dgj815nw7m4-bash-interactive-5.3p9"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "cdk8s-cli",
       "broken": false,
       "derivation": "/nix/store/va9jhi49r0ansrjg60cnqd8k89zbcrch-cdk8s-cli-2.204.9.drv",
@@ -2539,6 +2631,64 @@
       "priority": 5
     },
     {
+      "attr_path": "pstree",
+      "broken": false,
+      "derivation": "/nix/store/h6rk2knq4w1pdygflxj3pn2shcv10zrj-pstree-2.39.drv",
+      "description": "Show the set of running processes as a tree",
+      "install_id": "pstree",
+      "license": "GPL-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "pstree-2.39",
+      "pname": "pstree",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:42:43.808609Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.39",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/zydl4i3ncnl6m7zz8n6g0wigsmsc8jv8-pstree-2.39"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "pstree",
+      "broken": false,
+      "derivation": "/nix/store/a94xx7vh3x6nysahi33jihf7z976bs4q-pstree-2.39.drv",
+      "description": "Show the set of running processes as a tree",
+      "install_id": "pstree",
+      "license": "GPL-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "pstree-2.39",
+      "pname": "pstree",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:15:42.523381Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.39",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/7fhzpnsvxbvsszmfp73fpj8kqm0qpl18-pstree-2.39"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "pulumi-bin",
       "broken": false,
       "derivation": "/nix/store/1gz8mvz39py5vr46i7mg58gryw68rkmh-pulumi-3.225.1.drv",
@@ -2655,6 +2805,132 @@
       "priority": 5
     },
     {
+      "attr_path": "shellcheck",
+      "broken": false,
+      "derivation": "/nix/store/qh9fq60lf5c7dvck178szqyf8p24m8mb-shellcheck-0.11.0.drv",
+      "description": "Shell script analysis tool",
+      "install_id": "shellcheck",
+      "license": "GPL-3.0-only",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "shellcheck-0.11.0",
+      "pname": "shellcheck",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:43:50.227668Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.11.0",
+      "outputs_to_install": [
+        "bin",
+        "doc",
+        "man"
+      ],
+      "outputs": {
+        "bin": "/nix/store/adhxjbq5402r6vzbjkiir7cbblc0yrh8-shellcheck-0.11.0-bin",
+        "doc": "/nix/store/41cc95q6jff4aw4lxpndvajidl1lsvdq-shellcheck-0.11.0-doc",
+        "man": "/nix/store/hr9cii9wgnabh04bahlk76ssmjc7lmsy-shellcheck-0.11.0-man",
+        "out": "/nix/store/168k09jnrsnzaj4dx2ms987ncwk6q38a-shellcheck-0.11.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "shellcheck",
+      "broken": false,
+      "derivation": "/nix/store/3sxahq5l4y93l9s0lf6nnq1fwkjxp22y-shellcheck-0.11.0.drv",
+      "description": "Shell script analysis tool",
+      "install_id": "shellcheck",
+      "license": "GPL-3.0-only",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "shellcheck-0.11.0",
+      "pname": "shellcheck",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:17:09.949083Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.11.0",
+      "outputs_to_install": [
+        "bin",
+        "doc",
+        "man"
+      ],
+      "outputs": {
+        "bin": "/nix/store/265r98p68pgj5wd7k9fdq9jq2kvikxcs-shellcheck-0.11.0-bin",
+        "doc": "/nix/store/swp7wmafcggw1ahb01lmwpvc32j0m1a2-shellcheck-0.11.0-doc",
+        "man": "/nix/store/ij1aai8kr64xjwiwz8pdfw1bg7k3bsgx-shellcheck-0.11.0-man",
+        "out": "/nix/store/cji2z7y449ga9w7w68w78h2hfbvv571g-shellcheck-0.11.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "shfmt",
+      "broken": false,
+      "derivation": "/nix/store/d32zr98kcczhs0k4b66m8wx6f1hngy8x-shfmt-3.13.0.drv",
+      "description": "Shell parser and formatter",
+      "install_id": "shfmt",
+      "license": "BSD-3-Clause",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "shfmt-3.13.0",
+      "pname": "shfmt",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:43:50.274143Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.13.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/vvfnjrbh8ij2fgrrr6raqm7bgy08l3bz-shfmt-3.13.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "shfmt",
+      "broken": false,
+      "derivation": "/nix/store/3hwrraw01wzhnvnsz3qslxqhw25c911c-shfmt-3.13.0.drv",
+      "description": "Shell parser and formatter",
+      "install_id": "shfmt",
+      "license": "BSD-3-Clause",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "shfmt-3.13.0",
+      "pname": "shfmt",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:17:10.016461Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.13.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/fxcdsnnykza75zrly0bjnj3kykgzh6zf-shfmt-3.13.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "visualvm",
       "broken": false,
       "derivation": "/nix/store/h5839c0px0rsz8qn4m5w25aq0r0bkwcf-visualvm-2.2.drv",
@@ -2707,6 +2983,72 @@
       ],
       "outputs": {
         "out": "/nix/store/argibnmaz461751m0l1iqx8q341a6qig-visualvm-2.2"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "zsh",
+      "broken": false,
+      "derivation": "/nix/store/z8aj43xx5v4jfi97gvrmg7nqgcjmk408-zsh-5.9.drv",
+      "description": "Z shell",
+      "install_id": "zsh",
+      "license": "MIT-Modern-Variant",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "zsh-5.9",
+      "pname": "zsh",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:44:47.303323Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "5.9",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "doc": "/nix/store/ksq096cip6sjc42mcg0cl18162r1cx47-zsh-5.9-doc",
+        "info": "/nix/store/k1q0c5siswhwxc3pr18x3id7lnf9ncq6-zsh-5.9-info",
+        "man": "/nix/store/9xxg2kaq9gzx7fwixlr20k4x6cin3346-zsh-5.9-man",
+        "out": "/nix/store/zf2c7aa7am9dbq9mbbpnsfs2qbv8639q-zsh-5.9"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "zsh",
+      "broken": false,
+      "derivation": "/nix/store/9z6ad84prqjlkgi0ngl3k2y35vc7n45r-zsh-5.9.drv",
+      "description": "Z shell",
+      "install_id": "zsh",
+      "license": "MIT-Modern-Variant",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "zsh-5.9",
+      "pname": "zsh",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:18:30.952052Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "5.9",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "doc": "/nix/store/11lc3p7xjkpn2fbq38i2l8b6wmxrk90y-zsh-5.9-doc",
+        "info": "/nix/store/545jr4frf4a6w1ymkkfijp2g7ixhaza9-zsh-5.9-info",
+        "man": "/nix/store/6v54ndj76z0s9pxvh0jraj7nysysrj2m-zsh-5.9-man",
+        "out": "/nix/store/l4chzgs9g2hd6d63mdr0lfhv5i6kf0vl-zsh-5.9"
       },
       "system": "aarch64-linux",
       "group": "toplevel",
@@ -2811,6 +3153,9 @@
           },
           {
             "dir": "../fleet/flox/pulumi"
+          },
+          {
+            "dir": "../fleet/flox/shell"
           }
         ]
       }
@@ -3073,6 +3418,38 @@
         "name": "pulumi",
         "descriptor": {
           "dir": "../fleet/flox/pulumi"
+        }
+      },
+      {
+        "manifest": {
+          "schema-version": "1.10.0",
+          "install": {
+            "bash": {
+              "pkg-path": "bash",
+              "outputs": "all"
+            },
+            "pstree": {
+              "pkg-path": "pstree"
+            },
+            "shellcheck": {
+              "pkg-path": "shellcheck",
+              "outputs": "all"
+            },
+            "shfmt": {
+              "pkg-path": "shfmt"
+            },
+            "zsh": {
+              "pkg-path": "zsh",
+              "outputs": "all"
+            }
+          },
+          "hook": {},
+          "profile": {},
+          "options": {}
+        },
+        "name": "shell",
+        "descriptor": {
+          "dir": "../fleet/flox/shell"
         }
       }
     ],

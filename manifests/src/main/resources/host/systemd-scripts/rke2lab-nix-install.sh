@@ -50,7 +50,7 @@ else
 		attempt=$((attempt + 1))
 	done
 
-: "Install Nix using official installer with retries"
+	: "Install Nix using official installer with retries"
 	install_attempt=1
 	while [[ "${install_attempt}" -le "${RKE2LAB_NIX_INSTALL_RETRIES}" ]]; do
 		if bash -exuo pipefail <(curl --proto '=https' --tlsv1.2 --show-error -L "${RKE2LAB_CURL_IP_FAMILY[@]}" "${RKE2LAB_NIX_INSTALL_URL}") --daemon --yes; then

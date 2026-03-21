@@ -32,6 +32,7 @@
     <maven.enforcer.plugin.version>3.5.0</maven.enforcer.plugin.version>
     <spotless.version>3.3.0</spotless.version>
     <google-java-format.version>1.35.0</google-java-format.version>
+    <shfmt.version>3.13.0</shfmt.version>
   </properties>
 
   <build>
@@ -96,11 +97,22 @@
               <version>${google-java-format.version}</version>
             </googleJavaFormat>
           </java>
+          <shell>
+            <includes>
+              <include>src/main/resources/**/*.sh</include>
+              <include>src/test/resources/**/*.sh</include>
+            </includes>
+            <shfmt>
+              <version>${shfmt.version}</version>
+            </shfmt>
+          </shell>
           <formats>
             <format>
               <includes>
-                <include>src/main/resources/**/*.sh</include>
-                <include>src/test/resources/**/*.sh</include>
+                <include>AGENTS.md</include>
+                <include>README.adoc</include>
+                <include>docs/**/*.adoc</include>
+                <include>docs/**/*.md</include>
               </includes>
               <trimTrailingWhitespace/>
               <endWithNewline/>
