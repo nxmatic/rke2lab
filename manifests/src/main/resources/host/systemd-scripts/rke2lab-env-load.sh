@@ -23,6 +23,25 @@ if ! command -v flox >/dev/null 2>&1; then
 	${RKE2LAB_SCRIPTS_DIR}/rke2lab-flox-install.sh
 fi
 
+rke2lab::flox:ensure_manifest_tools() {
+	if [[ -d /var/lib/cloud/.flox ]]; then
+		: "Activate cloud flox environment for yq and dasel availability"
+		source <(flox activate --dir /var/lib/cloud)
+	fi
+
+	if command -v yq >/dev/null 2>&1 && command -v dasel >/dev/null 2>&1; then
+		return 0
+	fi
+
+	local flox_tmpdir
+	flox_tmpdir=$(mktemp -d)
+
+	flox config --set disable_metrics true
+	flox init --dir="${flox_tmpdir}"
+	flox install --dir="${flox_tmpdir}" yq-go dasel
+	source <(flox activate --dir="${flox_tmpdir}")
+}
+
 rke2lab::flox:configure_auth_from_secrets() {
 	local repo_root secrets_file flox_token config_dir config_file tmp_file
 
@@ -30,28 +49,20 @@ rke2lab::flox:configure_auth_from_secrets() {
 	secrets_file="${repo_root}/.secrets"
 	[[ -r "${secrets_file}" ]] || return 0
 
-	flox_token="$(awk '
-		/^flox:[[:space:]]*$/ { in_flox = 1; next }
-		in_flox && /^[^[:space:]]/ { in_flox = 0 }
-		in_flox && /^[[:space:]]+token:[[:space:]]*/ {
-			line = $0
-			sub(/^[[:space:]]+token:[[:space:]]*/, "", line)
-			gsub(/^\047|\047$/, "", line)
-			gsub(/^\"|\"$/, "", line)
-			print line
-			exit
-		}
-	' "${secrets_file}" || true)"
+	flox_token="$(yq eval -r '.flox.token // ""' "${secrets_file}" 2>/dev/null || true)"
 	[[ -n "${flox_token}" ]] || return 0
-
-	if ! command -v dasel >/dev/null 2>&1; then
-		nix profile add --profile /nix/var/nix/profiles/default nixpkgs#dasel
-	fi
 
 	config_dir=${FLOX_CONFIG_DIR:-/root/.config/flox}
 	config_file="${config_dir}/flox.toml"
 	mkdir -p "${config_dir}"
 	touch "${config_file}"
+
+	if ! dasel query --root -i toml -o toml '.' <"${config_file}" >/dev/null 2>&1; then
+		cat >"${config_file}" <<'EOF'
+disable_metrics = true
+floxhub_token = ""
+EOF
+	fi
 
 	if ! grep -q '^[[:space:]]*disable_metrics[[:space:]]*=' "${config_file}"; then
 		echo 'disable_metrics = true' >>"${config_file}"
@@ -61,28 +72,23 @@ rke2lab::flox:configure_auth_from_secrets() {
 	fi
 
 	tmp_file="$(mktemp)"
-	cat "${config_file}" | dasel query --root -i toml -o toml 'disable_metrics=true' >"${tmp_file}"
-	cat "${tmp_file}" | dasel query --root -i toml -o toml "floxhub_token=\"${flox_token}\"" >"${config_file}"
+	if ! dasel query --root -i toml -o toml 'disable_metrics=true' <"${config_file}" >"${tmp_file}"; then
+		cat >"${tmp_file}" <<'EOF'
+disable_metrics = true
+floxhub_token = ""
+EOF
+	fi
+	if ! dasel query --root -i toml -o toml "floxhub_token=\"${flox_token}\"" <"${tmp_file}" >"${config_file}"; then
+		cat >"${config_file}" <<EOF
+disable_metrics = true
+floxhub_token = "${flox_token}"
+EOF
+	fi
 	rm -f "${tmp_file}"
 }
 
+rke2lab::flox:ensure_manifest_tools
 rke2lab::flox:configure_auth_from_secrets
-
-if [[ -d /var/lib/cloud/.flox ]]; then
-	: "Activate cloud flox environment for yq availability"
-	source <(flox activate --dir /var/lib/cloud)
-fi
-
-if ! command -v yq >/dev/null 2>&1; then
-	: "Preload manifest tools in a temporary flox env"
-	FLOX_TMPDIR=$(mktemp -d)
-	# trap 'rm -rf "${FLOX_TMPDIR}"' EXIT
-
-	flox config --set disable_metrics true
-	flox init --dir="${FLOX_TMPDIR}"
-	flox install --dir="${FLOX_TMPDIR}" dasel yq-go
-	source <(flox activate --dir="${FLOX_TMPDIR}")
-fi
 
 rke2lab::env:load() {
 	local root env_dir files_count yq_cmd
