@@ -134,7 +134,7 @@ resolve_remote_ctr() {
 	die "could not find ctr in the activated Flox environment"
 }
 
-collect_live_flox_shims() {
+collect_live_containerd_shim_flox_v2s() {
 	local ps_output
 	ps_output="$(ps -ww -eo pid=,args= --sort=-pid)"
 	[[ -n "${ps_output}" ]] || return 0
@@ -191,11 +191,11 @@ collect_live_flox_shims() {
 	done < <(printf '%s\n' "${ps_output}")
 }
 
-print_live_flox_shims() {
+print_live_containerd_shim_flox_v2s() {
 	local rows
-	rows="$(collect_live_flox_shims)"
+	rows="$(collect_live_containerd_shim_flox_v2s)"
 	if [[ -z "${rows}" ]]; then
-		echo "no live Flox shims found on this host"
+		echo "no live containerd-shim-flox-v2 processes found on this host"
 		return 0
 	fi
 
@@ -213,8 +213,8 @@ print_live_flox_shims() {
 select_live_shim() {
 	local selector="${1:-}"
 	local rows matches match_count
-	rows="$(collect_live_flox_shims)"
-	[[ -n "${rows}" ]] || die "no live Flox shims found on this host"
+	rows="$(collect_live_containerd_shim_flox_v2s)"
+	[[ -n "${rows}" ]] || die "no live containerd-shim-flox-v2 processes found on this host"
 
 	if [[ -z "${selector}" ]]; then
 		printf '%s\n' "${rows}" | head -n 1
@@ -226,7 +226,7 @@ select_live_shim() {
 
 	match_count="$(printf '%s\n' "${matches}" | awk 'NF { count++ } END { print count + 0 }')"
 	if [[ "${match_count}" -gt 1 ]]; then
-		printf 'matching live Flox shims for selector %q:\n' "${selector}" >&2
+		printf 'matching live containerd-shim-flox-v2 processes for selector %q:\n' "${selector}" >&2
 		printf '%s\n' "${matches}" | awk -F '\t' '{ printf "  pid=%s id=%s\n", $1, $2 }' >&2
 		die "selector '${selector}' is ambiguous"
 	fi
@@ -330,7 +330,7 @@ fi
 
 case "${command_name}" in
 list)
-	print_live_flox_shims
+	print_live_containerd_shim_flox_v2s
 	;;
 goroutines | heap | profile | trace | block | threadcreate)
 	run_pprof "${command_name}" "$@"

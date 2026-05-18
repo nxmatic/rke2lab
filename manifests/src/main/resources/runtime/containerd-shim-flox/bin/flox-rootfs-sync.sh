@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${FLOX_SHIM_SYNC_NAMESPACE:?FLOX_SHIM_SYNC_NAMESPACE is required}"
-: "${FLOX_SHIM_SYNC_ID:?FLOX_SHIM_SYNC_ID is required}"
+: "${CONTAINERD_SHIM_FLOX_V2_SYNC_NAMESPACE:?CONTAINERD_SHIM_FLOX_V2_SYNC_NAMESPACE is required}"
+: "${CONTAINERD_SHIM_FLOX_V2_SYNC_ID:?CONTAINERD_SHIM_FLOX_V2_SYNC_ID is required}"
 
-SYNC_LOG="${FLOX_SHIM_SYNC_LOG:-/var/log/rke2lab/flox-rootfs-sync.log}"
-BUNDLE_ROOT="${FLOX_SHIM_BUNDLE_ROOT:-/run/k3s/containerd/io.containerd.runtime.v2.task}"
-WAIT_TIMEOUT_SECS="${FLOX_SHIM_SYNC_TIMEOUT_SECS:-15}"
-POLL_INTERVAL_SECS="${FLOX_SHIM_SYNC_POLL_INTERVAL_SECS:-0.1}"
+SYNC_LOG="${CONTAINERD_SHIM_FLOX_V2_SYNC_LOG:-/var/log/rke2lab/flox-rootfs-sync.log}"
+BUNDLE_ROOT="${CONTAINERD_SHIM_FLOX_V2_BUNDLE_ROOT:-/run/k3s/containerd/io.containerd.runtime.v2.task}"
+WAIT_TIMEOUT_SECS="${CONTAINERD_SHIM_FLOX_V2_SYNC_TIMEOUT_SECS:-15}"
+POLL_INTERVAL_SECS="${CONTAINERD_SHIM_FLOX_V2_SYNC_POLL_INTERVAL_SECS:-0.1}"
 
 ensure_log_target() {
 	local log_dir
@@ -58,11 +58,11 @@ sync_bundle_flox_into_rootfs() {
 main() {
 	local bundle_dir rootfs_dir started_at now elapsed_secs
 
-	bundle_dir="${BUNDLE_ROOT%/}/${FLOX_SHIM_SYNC_NAMESPACE}/${FLOX_SHIM_SYNC_ID}"
+	bundle_dir="${BUNDLE_ROOT%/}/${CONTAINERD_SHIM_FLOX_V2_SYNC_NAMESPACE}/${CONTAINERD_SHIM_FLOX_V2_SYNC_ID}"
 	rootfs_dir="${bundle_dir}/rootfs"
 	started_at="$(date +%s)"
 
-	log "watching bundle namespace=${FLOX_SHIM_SYNC_NAMESPACE} id=${FLOX_SHIM_SYNC_ID} bundle=${bundle_dir}"
+	log "watching bundle namespace=${CONTAINERD_SHIM_FLOX_V2_SYNC_NAMESPACE} id=${CONTAINERD_SHIM_FLOX_V2_SYNC_ID} bundle=${bundle_dir}"
 
 	while :; do
 		if [[ -d "${bundle_dir}/.flox" && -d "${rootfs_dir}" ]]; then

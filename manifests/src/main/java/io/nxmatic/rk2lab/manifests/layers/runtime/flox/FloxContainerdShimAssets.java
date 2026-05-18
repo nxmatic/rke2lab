@@ -175,8 +175,8 @@ public final class FloxContainerdShimAssets {
           "debug-tools/.sh.d/rke2lab-debug-tooling.sh",
           false);
       addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/debug-tools/attach_live_flox_shim_strace.sh",
-          "debug-tools/attach_live_flox_shim_strace.sh",
+          FLOX_RESOURCE_ROOT + "/debug-tools/attach_live_containerd_shim_flox_v2_strace.sh",
+          "debug-tools/attach_live_containerd_shim_flox_v2_strace.sh",
           true);
       addMaterializationAsset(
           FLOX_RESOURCE_ROOT + "/debug-tools/crictl-kdns-repro.sh",
@@ -289,9 +289,9 @@ public final class FloxContainerdShimAssets {
           FLOX_RESOURCE_ROOT + "/debug-tools/.sh.d/rke2lab-debug-tooling.sh",
           "build-assets/debug-tools/.sh.d/rke2lab-debug-tooling.sh");
       addInstallerAsset(
-          "debug-tools-attach-live-flox-shim-strace.sh",
-          FLOX_RESOURCE_ROOT + "/debug-tools/attach_live_flox_shim_strace.sh",
-          "build-assets/debug-tools/attach_live_flox_shim_strace.sh");
+          "debug-tools-attach-live-containerd-shim-flox-v2-strace.sh",
+          FLOX_RESOURCE_ROOT + "/debug-tools/attach_live_containerd_shim_flox_v2_strace.sh",
+          "build-assets/debug-tools/attach_live_containerd_shim_flox_v2_strace.sh");
       addInstallerAsset(
           "debug-tools-crictl-kdns-repro.sh",
           FLOX_RESOURCE_ROOT + "/debug-tools/crictl-kdns-repro.sh",

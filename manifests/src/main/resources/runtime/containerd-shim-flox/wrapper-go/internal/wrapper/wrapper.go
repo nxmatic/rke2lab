@@ -20,13 +20,18 @@ const (
 	defaultWrapperLog    = "/var/log/rke2lab/containerd-shim-flox-v2-wrapper.log"
 	defaultSyncLog       = "/var/log/rke2lab/flox-rootfs-sync.log"
 	defaultDebugWaitFile = "/tmp/containerd-shim-flox-v2-wrapper-continue"
-	defaultDebugListen   = "127.0.0.1:43123"
+	defaultDebugListen   = "0.0.0.0:43123"
 	defaultJournalSocket = "/run/systemd/journal/socket"
 	defaultJournalTag    = "containerd-shim-flox-v2-wrapper"
 	defaultBundleRoot    = "/run/k3s/containerd/io.containerd.runtime.v2.task"
 
 	annotationDebug        = "flox.dev/debug"
 	annotationDebugSuspend = "flox.dev/debug-suspend"
+
+	debugTargetEnvVar       = "CONTAINERD_SHIM_FLOX_V2_DEBUG_TARGET"
+	debugTargetWrapper      = "wrapper"
+	debugTargetRealShim     = "real"
+	wrapperUnderDelveEnvVar = "CONTAINERD_SHIM_FLOX_V2_WRAPPER_UNDER_DLV"
 )
 
 type Config struct {
@@ -84,6 +89,10 @@ func (w *Wrapper) Run(args []string) error {
 	}
 
 	if w.cfg.DebugEnabled {
+		if parseBoolString(os.Getenv(wrapperUnderDelveEnvVar)) {
+			logger.Log("wrapper already under dlv; executing real shim directly to avoid nested debugger")
+			return w.execRealShim(args)
+		}
 		return w.execViaDelve(args, shimNamespace, shimID, logger)
 	}
 
@@ -101,11 +110,24 @@ func (w *Wrapper) execViaDelve(args []string, shimNamespace, shimID string, logg
 		return w.execRealShim(args)
 	}
 
+	targetMode := resolveDebugTarget(os.Getenv(debugTargetEnvVar))
+	targetPath := w.cfg.RealShim
+	env := os.Environ()
+	if targetMode == debugTargetWrapper {
+		currentExecutable, execErr := os.Executable()
+		if execErr != nil {
+			logger.Log("wrapper debug requested but current executable cannot be resolved: %v", execErr)
+			return w.execRealShim(args)
+		}
+		targetPath = currentExecutable
+		env = append(env, wrapperUnderDelveEnvVar+"=1")
+	}
+
 	listenAddress := perShimDebugListenAddress(shimNamespace, shimID)
 	delveArgs := []string{
 		delvePath,
 		"exec",
-		w.cfg.RealShim,
+		targetPath,
 		"--headless",
 		"--api-version=2",
 		"--accept-multiclient",
@@ -117,8 +139,21 @@ func (w *Wrapper) execViaDelve(args []string, shimNamespace, shimID string, logg
 	delveArgs = append(delveArgs, "--")
 	delveArgs = append(delveArgs, args...)
 
-	logger.Log("launching shim under dlv path=%s listen=%s continue=%t", delvePath, listenAddress, !w.cfg.DebugWait)
-	return syscall.Exec(delvePath, delveArgs, os.Environ())
+	logger.Log("launching target under dlv mode=%s path=%s listen=%s continue=%t", targetMode, targetPath, listenAddress, !w.cfg.DebugWait)
+	return syscall.Exec(delvePath, delveArgs, env)
+}
+
+func resolveDebugTarget(value string) string {
+	switch strings.TrimSpace(strings.ToLower(value)) {
+	case "":
+		return debugTargetWrapper
+	case debugTargetRealShim:
+		return debugTargetRealShim
+	case debugTargetWrapper:
+		return debugTargetWrapper
+	default:
+		return debugTargetWrapper
+	}
 }
 
 func (w *Wrapper) launchRootfsSync(logger *Logger, shimNamespace, shimID string) error {
@@ -134,9 +169,9 @@ func (w *Wrapper) launchRootfsSync(logger *Logger, shimNamespace, shimID string)
 
 	cmd := exec.Command(w.cfg.RootfsSyncHelper)
 	cmd.Env = append(os.Environ(),
-		"FLOX_SHIM_SYNC_NAMESPACE="+shimNamespace,
-		"FLOX_SHIM_SYNC_ID="+shimID,
-		"FLOX_SHIM_SYNC_LOG="+w.cfg.SyncLog,
+		"CONTAINERD_SHIM_FLOX_V2_SYNC_NAMESPACE="+shimNamespace,
+		"CONTAINERD_SHIM_FLOX_V2_SYNC_ID="+shimID,
+		"CONTAINERD_SHIM_FLOX_V2_SYNC_LOG="+w.cfg.SyncLog,
 	)
 
 	logFile, err := openAppendFile(w.cfg.WrapperLog)
@@ -176,7 +211,7 @@ func applyBundleDebugAnnotations(cfg Config, shimNamespace, shimID string, logge
 		return cfg
 	}
 
-	bundleConfigPath := filepath.Join(getenvDefault("FLOX_SHIM_BUNDLE_ROOT", defaultBundleRoot), shimNamespace, shimID, "config.json")
+	bundleConfigPath := filepath.Join(getenvDefault("CONTAINERD_SHIM_FLOX_V2_BUNDLE_ROOT", defaultBundleRoot), shimNamespace, shimID, "config.json")
 	payload, err := os.ReadFile(bundleConfigPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -229,7 +264,7 @@ func perShimDebugListenAddress(shimNamespace, shimID string) string {
 	_, _ = hasher.Write([]byte("/"))
 	_, _ = hasher.Write([]byte(sanitizedID))
 	port := 40000 + int(hasher.Sum32()%20000)
-	return "127.0.0.1:" + strconv.Itoa(port)
+	return "0.0.0.0:" + strconv.Itoa(port)
 }
 
 func sanitizePathToken(value string) string {

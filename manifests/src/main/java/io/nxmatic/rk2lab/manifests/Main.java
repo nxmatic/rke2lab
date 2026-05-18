@@ -253,8 +253,8 @@ public final class Main {
         processBuilder.environment().put("DAEMONLESS_EXEC_MODE", mode);
 
         if (lockOnly) {
-          processBuilder.environment().put("FLOX_SHIM_UPDATE_LOCKS", "true");
-          processBuilder.environment().put("FLOX_SHIM_ONLY_UPDATE_LOCKS", "true");
+          processBuilder.environment().put("CONTAINERD_SHIM_FLOX_V2_UPDATE_LOCKS", "true");
+          processBuilder.environment().put("CONTAINERD_SHIM_FLOX_V2_ONLY_UPDATE_LOCKS", "true");
         }
 
         final Process process = processBuilder.start();

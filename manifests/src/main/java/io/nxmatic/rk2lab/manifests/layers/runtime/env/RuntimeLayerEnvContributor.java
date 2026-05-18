@@ -38,10 +38,14 @@ public final class RuntimeLayerEnvContributor implements LayerEnvContributor {
       case "config" -> Map.of("RKE2LAB_DEBUG", "false");
       case "containerd" ->
           Map.of(
-              "CONTAINERD_ADDRESS", "/run/k3s/containerd/containerd.sock",
-              "CONTAINERD_NAMESPACE", "k8s.io",
-              "CONTAINERD_CONFIG_FILE", "/var/lib/rancher/rke2/agent/etc/containerd/config.toml",
-              "FLOX_SHIM_ENV_DIR", "/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox");
+              "CONTAINERD_ADDRESS",
+              "/run/k3s/containerd/containerd.sock",
+              "CONTAINERD_NAMESPACE",
+              "k8s.io",
+              "CONTAINERD_CONFIG_FILE",
+              "/var/lib/rancher/rke2/agent/etc/containerd/config.toml",
+              "CONTAINERD_SHIM_FLOX_DIR",
+              "/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox");
       case "cri" -> Map.of("CRI_CONFIG_FILE", "/var/lib/rancher/rke2/agent/etc/crictl.yaml");
       case "helm" ->
           Map.of(

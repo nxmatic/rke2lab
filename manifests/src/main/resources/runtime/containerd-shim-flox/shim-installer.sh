@@ -199,7 +199,7 @@ installer::pod:materialize_assets() {
 		"${BUILD_ASSETS_DIR}/debug-tools/.sh.d/rke2lab-debug-tooling.sh" \
 		"${HOST_SCRIPT_ROOT}/debug-tools" \
 		"rke2lab-debug-tooling.sh" >/dev/null
-	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/attach_live_flox_shim_strace.sh" "${HOST_SCRIPT_ROOT}/debug-tools/attach_live_flox_shim_strace.sh"
+	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/attach_live_containerd_shim_flox_v2_strace.sh" "${HOST_SCRIPT_ROOT}/debug-tools/attach_live_containerd_shim_flox_v2_strace.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/crictl-kdns-repro.sh" "${HOST_SCRIPT_ROOT}/debug-tools/crictl-kdns-repro.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/kdns-containerd-bundle-watch.sh" "${HOST_SCRIPT_ROOT}/debug-tools/kdns-containerd-bundle-watch.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/kdns-containerd-remote-capture.sh" "${HOST_SCRIPT_ROOT}/debug-tools/kdns-containerd-remote-capture.sh"
@@ -334,71 +334,71 @@ host::nix:flox-conf:ensure() {
 }
 
 shim::assets:path:init() {
-	FLOX_SHIM_ROOT="$(shim::assets:root:resolve)"
-	FLOX_SHIM_BIN_DIR="${FLOX_SHIM_ROOT}/bin"
-	FLOX_SHIM_ETC_DIR="${FLOX_SHIM_ROOT}/etc"
-	FLOX_SHIM_LOG_DIR="${FLOX_SHIM_ROOT}/log"
-	FLOX_BUILD_SCRIPT="${FLOX_SHIM_BIN_DIR}/shim-build.sh"
-	FLOX_BUILD_ENTRYPOINT="${FLOX_SHIM_BIN_DIR}/shim-build.sh"
-	FLOX_BUILD_DESCRIPTOR="${FLOX_SHIM_ETC_DIR}/shim-build.yaml"
-	FLOX_SHIM_PACKAGE_FLAKE="${FLOX_SHIM_ROOT}/flake.nix"
-	FLOX_ROOTFS_SYNC_SCRIPT="${FLOX_SHIM_BIN_DIR}/flox-rootfs-sync.sh"
-	FLOX_SHIM_MESH_DIR="${FLOX_SHIM_ROOT}/mesh"
-	FLOX_SHIM_NETWORKING_DIR="${FLOX_SHIM_ROOT}/networking"
-	FLOX_SHIM_DEBUG_TOOLS_DIR="${FLOX_SHIM_ROOT}/debug-tools"
+	CONTAINERD_SHIM_FLOX_V2_ROOT="$(shim::assets:root:resolve)"
+	CONTAINERD_SHIM_FLOX_V2_BIN_DIR="${CONTAINERD_SHIM_FLOX_V2_ROOT}/bin"
+	CONTAINERD_SHIM_FLOX_V2_ETC_DIR="${CONTAINERD_SHIM_FLOX_V2_ROOT}/etc"
+	CONTAINERD_SHIM_FLOX_V2_LOG_DIR="${CONTAINERD_SHIM_FLOX_V2_ROOT}/log"
+	CONTAINERD_SHIM_FLOX_V2_BUILD_SCRIPT="${CONTAINERD_SHIM_FLOX_V2_BIN_DIR}/shim-build.sh"
+	CONTAINERD_SHIM_FLOX_V2_BUILD_ENTRYPOINT="${CONTAINERD_SHIM_FLOX_V2_BIN_DIR}/shim-build.sh"
+	CONTAINERD_SHIM_FLOX_V2_BUILD_DESCRIPTOR="${CONTAINERD_SHIM_FLOX_V2_ETC_DIR}/shim-build.yaml"
+	CONTAINERD_SHIM_FLOX_V2_PACKAGE_FLAKE="${CONTAINERD_SHIM_FLOX_V2_ROOT}/flake.nix"
+	CONTAINERD_SHIM_FLOX_V2_ROOTFS_SYNC_SCRIPT="${CONTAINERD_SHIM_FLOX_V2_BIN_DIR}/flox-rootfs-sync.sh"
+	CONTAINERD_SHIM_FLOX_V2_MESH_DIR="${CONTAINERD_SHIM_FLOX_V2_ROOT}/mesh"
+	CONTAINERD_SHIM_FLOX_V2_NETWORKING_DIR="${CONTAINERD_SHIM_FLOX_V2_ROOT}/networking"
+	CONTAINERD_SHIM_FLOX_V2_DEBUG_TOOLS_DIR="${CONTAINERD_SHIM_FLOX_V2_ROOT}/debug-tools"
 	RKE2LAB_DEBUG_SHARE_ROOT="${RKE2LAB_DEBUG_SHARE_ROOT:-/srv/host/rke2lab-share.d}"
 }
 
 shim::assets:path:validate() {
-	[[ -d "${FLOX_SHIM_BIN_DIR}" ]] || {
-		echo "flox shim bin directory missing: ${FLOX_SHIM_BIN_DIR}" >&2
+	[[ -d "${CONTAINERD_SHIM_FLOX_V2_BIN_DIR}" ]] || {
+		echo "flox shim bin directory missing: ${CONTAINERD_SHIM_FLOX_V2_BIN_DIR}" >&2
 		exit 1
 	}
-	[[ -d "${FLOX_SHIM_ETC_DIR}" ]] || {
-		echo "flox shim etc directory missing: ${FLOX_SHIM_ETC_DIR}" >&2
+	[[ -d "${CONTAINERD_SHIM_FLOX_V2_ETC_DIR}" ]] || {
+		echo "flox shim etc directory missing: ${CONTAINERD_SHIM_FLOX_V2_ETC_DIR}" >&2
 		exit 1
 	}
-	[[ -d "${FLOX_SHIM_LOG_DIR}" ]] || {
-		echo "flox shim log directory missing: ${FLOX_SHIM_LOG_DIR}" >&2
+	[[ -d "${CONTAINERD_SHIM_FLOX_V2_LOG_DIR}" ]] || {
+		echo "flox shim log directory missing: ${CONTAINERD_SHIM_FLOX_V2_LOG_DIR}" >&2
 		exit 1
 	}
-	[[ -x "${FLOX_BUILD_ENTRYPOINT}" ]] || {
-		echo "flox build entrypoint missing or not executable: ${FLOX_BUILD_ENTRYPOINT}" >&2
+	[[ -x "${CONTAINERD_SHIM_FLOX_V2_BUILD_ENTRYPOINT}" ]] || {
+		echo "flox build entrypoint missing or not executable: ${CONTAINERD_SHIM_FLOX_V2_BUILD_ENTRYPOINT}" >&2
 		exit 1
 	}
-	[[ -x "${FLOX_BUILD_SCRIPT}" ]] || {
-		echo "flox build script missing or not executable: ${FLOX_BUILD_SCRIPT}" >&2
+	[[ -x "${CONTAINERD_SHIM_FLOX_V2_BUILD_SCRIPT}" ]] || {
+		echo "flox build script missing or not executable: ${CONTAINERD_SHIM_FLOX_V2_BUILD_SCRIPT}" >&2
 		exit 1
 	}
-	[[ -r "${FLOX_BUILD_DESCRIPTOR}" ]] || {
-		echo "flox build descriptor missing or unreadable: ${FLOX_BUILD_DESCRIPTOR}" >&2
+	[[ -r "${CONTAINERD_SHIM_FLOX_V2_BUILD_DESCRIPTOR}" ]] || {
+		echo "flox build descriptor missing or unreadable: ${CONTAINERD_SHIM_FLOX_V2_BUILD_DESCRIPTOR}" >&2
 		exit 1
 	}
-	[[ -r "${FLOX_SHIM_PACKAGE_FLAKE}" ]] || {
-		echo "flox shim package flake missing or unreadable: ${FLOX_SHIM_PACKAGE_FLAKE}" >&2
+	[[ -r "${CONTAINERD_SHIM_FLOX_V2_PACKAGE_FLAKE}" ]] || {
+		echo "flox shim package flake missing or unreadable: ${CONTAINERD_SHIM_FLOX_V2_PACKAGE_FLAKE}" >&2
 		exit 1
 	}
-	[[ -x "${FLOX_ROOTFS_SYNC_SCRIPT}" ]] || {
-		echo "flox rootfs sync helper missing or not executable: ${FLOX_ROOTFS_SYNC_SCRIPT}" >&2
+	[[ -x "${CONTAINERD_SHIM_FLOX_V2_ROOTFS_SYNC_SCRIPT}" ]] || {
+		echo "flox rootfs sync helper missing or not executable: ${CONTAINERD_SHIM_FLOX_V2_ROOTFS_SYNC_SCRIPT}" >&2
 		exit 1
 	}
-	[[ -d "${FLOX_SHIM_MESH_DIR}" ]] || {
-		echo "flox shim mesh directory missing: ${FLOX_SHIM_MESH_DIR}" >&2
+	[[ -d "${CONTAINERD_SHIM_FLOX_V2_MESH_DIR}" ]] || {
+		echo "flox shim mesh directory missing: ${CONTAINERD_SHIM_FLOX_V2_MESH_DIR}" >&2
 		exit 1
 	}
-	[[ -d "${FLOX_SHIM_NETWORKING_DIR}" ]] || {
-		echo "flox shim networking directory missing: ${FLOX_SHIM_NETWORKING_DIR}" >&2
+	[[ -d "${CONTAINERD_SHIM_FLOX_V2_NETWORKING_DIR}" ]] || {
+		echo "flox shim networking directory missing: ${CONTAINERD_SHIM_FLOX_V2_NETWORKING_DIR}" >&2
 		exit 1
 	}
-	[[ -d "${FLOX_SHIM_DEBUG_TOOLS_DIR}" ]] || {
-		echo "flox shim debug tools directory missing: ${FLOX_SHIM_DEBUG_TOOLS_DIR}" >&2
+	[[ -d "${CONTAINERD_SHIM_FLOX_V2_DEBUG_TOOLS_DIR}" ]] || {
+		echo "flox shim debug tools directory missing: ${CONTAINERD_SHIM_FLOX_V2_DEBUG_TOOLS_DIR}" >&2
 		exit 1
 	}
 }
 
 shim::debug:any_enabled() {
 	rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}" ||
-		rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_FLOX_SHIM_WRAPPER_ENABLED:-false}"
+		rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_CONTAINERD_SHIM_FLOX_V2_WRAPPER_ENABLED:-false}"
 }
 
 shim::debug:tools:install() {
@@ -409,7 +409,7 @@ shim::debug:tools:install() {
 		return 0
 	fi
 
-	source_root="${FLOX_SHIM_DEBUG_TOOLS_DIR}"
+	source_root="${CONTAINERD_SHIM_FLOX_V2_DEBUG_TOOLS_DIR}"
 	target_root="${RKE2LAB_DEBUG_SHARE_ROOT}"
 	force_install="${RKE2LAB_DEBUG_SHARE_FORCE_INSTALL:-false}"
 
@@ -441,29 +441,29 @@ shim::debug:tools:install() {
 
 shim::assets:build:run() {
 	: "Ensure we have a git repository in the flox shim root for build operations, and set a default user if not already configured"
-	if [[ ! -d "${FLOX_SHIM_ROOT}/.git" ]]; then
-		git -C "${FLOX_SHIM_ROOT}" init --initial-branch=main
+	if [[ ! -d "${CONTAINERD_SHIM_FLOX_V2_ROOT}/.git" ]]; then
+		git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" init --initial-branch=main
 	fi
 
-	if [[ -z "$(git -C "${FLOX_SHIM_ROOT}" config --get user.name || true)" ]]; then
-		git -C "${FLOX_SHIM_ROOT}" config user.name "rke2lab-flox-shim"
+	if [[ -z "$(git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" config --get user.name || true)" ]]; then
+		git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" config user.name "rke2lab-flox-shim"
 	fi
-	if [[ -z "$(git -C "${FLOX_SHIM_ROOT}" config --get user.email || true)" ]]; then
-		git -C "${FLOX_SHIM_ROOT}" config user.email "rke2lab-flox-shim@localhost"
+	if [[ -z "$(git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" config --get user.email || true)" ]]; then
+		git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" config user.email "rke2lab-flox-shim@localhost"
 	fi
 
 	: "Run the flox build script to materialize the shim build output onto the host filesystem for use in installation"
 	DAEMONLESS_EXEC_MODE=host \
-		DAEMONLESS_HOST_SCRIPT_ROOT="${FLOX_SHIM_ROOT}" \
-		DAEMONLESS_HOST_SCRIPT_BIN="${FLOX_SHIM_BIN_DIR}" \
-		DAEMONSET_SCRIPT_LOG_DIR="${FLOX_SHIM_LOG_DIR}" \
-		PATH="${FLOX_SHIM_BIN_DIR}:${PATH}" \
-		"${FLOX_BUILD_ENTRYPOINT}" "${FLOX_BUILD_DESCRIPTOR}"
+		DAEMONLESS_HOST_SCRIPT_ROOT="${CONTAINERD_SHIM_FLOX_V2_ROOT}" \
+		DAEMONLESS_HOST_SCRIPT_BIN="${CONTAINERD_SHIM_FLOX_V2_BIN_DIR}" \
+		DAEMONSET_SCRIPT_LOG_DIR="${CONTAINERD_SHIM_FLOX_V2_LOG_DIR}" \
+		PATH="${CONTAINERD_SHIM_FLOX_V2_BIN_DIR}:${PATH}" \
+		"${CONTAINERD_SHIM_FLOX_V2_BUILD_ENTRYPOINT}" "${CONTAINERD_SHIM_FLOX_V2_BUILD_DESCRIPTOR}"
 
 	: "Commit any changes to the flox shim build assets to the git repository for tracking"
-	git -C "${FLOX_SHIM_ROOT}" add --all .
-	if ! git -C "${FLOX_SHIM_ROOT}" diff --cached --quiet; then
-		git -C "${FLOX_SHIM_ROOT}" commit -m "chore(flox-shim): refresh packaged flakes"
+	git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" add --all .
+	if ! git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" diff --cached --quiet; then
+		git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" commit -m "chore(flox-shim): refresh packaged flakes"
 	fi
 }
 
@@ -493,7 +493,7 @@ shim::runtime:wrapper-package:build() {
 		nix build \
 			--no-link \
 			--print-out-paths \
-			"${FLOX_SHIM_ROOT}#${package_attr}"
+			"${CONTAINERD_SHIM_FLOX_V2_ROOT}#${package_attr}"
 	)
 }
 

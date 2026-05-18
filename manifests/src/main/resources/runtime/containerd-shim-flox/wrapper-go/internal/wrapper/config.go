@@ -99,7 +99,7 @@ func defaultStoredConfig() storedConfig {
 }
 
 func resolveRuntimeConfig() (Config, error) {
-	configPath := getenvDefault("FLOX_SHIM_CONFIG_PATH", defaultConfigPath)
+	configPath := getenvDefault("CONTAINERD_SHIM_FLOX_V2_CONFIG_PATH", defaultConfigPath)
 	if err := ensureConfigFile(configPath, defaultStoredConfig()); err != nil {
 		return Config{}, fmt.Errorf("ensure wrapper config file %s: %w", configPath, err)
 	}
@@ -229,12 +229,12 @@ func runtimeConfigFromStored(stored storedConfig, configPath string) (Config, er
 }
 
 func applyEnvOverrides(cfg Config) Config {
-	cfg.RealShim = getenvDefault("FLOX_SHIM_REAL", cfg.RealShim)
+	cfg.RealShim = getenvDefault("CONTAINERD_SHIM_FLOX_V2_REAL", cfg.RealShim)
 	cfg.RootfsSyncHelper = getenvDefault("FLOX_ROOTFS_SYNC_HELPER", cfg.RootfsSyncHelper)
-	cfg.RootfsSyncEnable = getenvBoolDefault("FLOX_SHIM_ROOTFS_SYNC", cfg.RootfsSyncEnable)
-	cfg.WrapperLog = getenvDefault("FLOX_SHIM_WRAPPER_LOG", cfg.WrapperLog)
-	cfg.SyncLog = getenvDefault("FLOX_SHIM_SYNC_LOG", cfg.SyncLog)
-	cfg.JournalSocket = getenvDefault("FLOX_SHIM_JOURNAL_SOCKET", cfg.JournalSocket)
-	cfg.JournalIdentifier = getenvDefault("FLOX_SHIM_JOURNAL_IDENTIFIER", cfg.JournalIdentifier)
+	cfg.RootfsSyncEnable = getenvBoolDefault("CONTAINERD_SHIM_FLOX_V2_ROOTFS_SYNC", cfg.RootfsSyncEnable)
+	cfg.WrapperLog = getenvDefault("CONTAINERD_SHIM_FLOX_V2_WRAPPER_LOG", cfg.WrapperLog)
+	cfg.SyncLog = getenvDefault("CONTAINERD_SHIM_FLOX_V2_SYNC_LOG", cfg.SyncLog)
+	cfg.JournalSocket = getenvDefault("CONTAINERD_SHIM_FLOX_V2_JOURNAL_SOCKET", cfg.JournalSocket)
+	cfg.JournalIdentifier = getenvDefault("CONTAINERD_SHIM_FLOX_V2_JOURNAL_IDENTIFIER", cfg.JournalIdentifier)
 	return cfg
 }
