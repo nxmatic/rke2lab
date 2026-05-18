@@ -21,6 +21,9 @@ public final class SeedSystemdAdapterEndpointGate {
   private static final String KIND = "SystemdAdapterEndpointGateStatus";
   private static final String ADAPTER_SERVICE_UNIT = "rke2lab-systemd-adapter.service";
   private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(20);
+  private static final Duration RUNTIME_PROBE_TOLERANCE = Duration.ofSeconds(45);
+  private static final Duration RUNTIME_PROBE_RETRY_INTERVAL = Duration.ofSeconds(2);
+  private static final Duration PROGRESS_LOG_INTERVAL = Duration.ofSeconds(10);
 
   private SeedSystemdAdapterEndpointGate() {
     // Utility class
@@ -51,17 +54,8 @@ public final class SeedSystemdAdapterEndpointGate {
               + ")");
     }
 
-    final Map<String, Object> runtimeSnapshot =
-        SeedSystemdAdapterRuntimeStatusSnapshot.snapshot(config, logger);
+    final Map<String, Object> runtimeSnapshot = waitForRuntimeProbe(config, logger);
     final String runtimeStatus = String.valueOf(runtimeSnapshot.getOrDefault("status", "unknown"));
-    if (!"ok".equalsIgnoreCase(runtimeStatus)) {
-      throw new IllegalStateException(
-          "Adapter runtime probe failed for service "
-              + ADAPTER_SERVICE_UNIT
-              + " ("
-              + runtimeSnapshot.getOrDefault("summary", "unknown failure")
-              + ")");
-    }
 
     final String summary =
         "serviceUnit="
@@ -85,6 +79,63 @@ public final class SeedSystemdAdapterEndpointGate {
             "systemd-adapter-http",
             "adapterStatus",
             Map.copyOf(runtimeSnapshot)));
+  }
+
+  private static Map<String, Object> waitForRuntimeProbe(
+      BootstrapConfig config, Consumer<String> logger) {
+    final long startedAt = System.nanoTime();
+    final long deadlineNanos = startedAt + RUNTIME_PROBE_TOLERANCE.toNanos();
+    long nextProgressLogAt = startedAt;
+
+    Map<String, Object> lastSnapshot = Map.of();
+    while (System.nanoTime() < deadlineNanos) {
+      final Map<String, Object> runtimeSnapshot =
+          SeedSystemdAdapterRuntimeStatusSnapshot.snapshot(config, null);
+      final String runtimeStatus =
+          String.valueOf(runtimeSnapshot.getOrDefault("status", "unknown")).trim();
+
+      if ("ok".equalsIgnoreCase(runtimeStatus)) {
+        return runtimeSnapshot;
+      }
+
+      lastSnapshot = runtimeSnapshot;
+
+      final long now = System.nanoTime();
+      if (logger != null && now >= nextProgressLogAt) {
+        logger.accept(
+            "systemd adapter runtime probe not ready yet; status="
+                + runtimeStatus
+                + ", summary="
+                + runtimeSnapshot.getOrDefault("summary", "n/a")
+                + " (retrying for up to "
+                + RUNTIME_PROBE_TOLERANCE
+                + ")");
+        nextProgressLogAt = now + PROGRESS_LOG_INTERVAL.toNanos();
+      }
+
+      sleep(RUNTIME_PROBE_RETRY_INTERVAL);
+    }
+
+    final String lastSummary = String.valueOf(lastSnapshot.getOrDefault("summary", "unknown"));
+    final String lastStatus = String.valueOf(lastSnapshot.getOrDefault("status", "unknown"));
+    throw new IllegalStateException(
+        "Adapter runtime probe failed for service "
+            + ADAPTER_SERVICE_UNIT
+            + " after "
+            + RUNTIME_PROBE_TOLERANCE
+            + " (last status="
+            + lastStatus
+            + ", summary="
+            + lastSummary
+            + ")");
+  }
+
+  private static void sleep(Duration duration) {
+    try {
+      Thread.sleep(duration.toMillis());
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   private static CommandResult ensureServiceStarted(BootstrapConfig config) {
