@@ -1,7 +1,5 @@
 package io.nxmatic.rk2lab.controlplane;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -14,14 +12,15 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-/** Pulumi-side gate that starts the adapter service and verifies endpoint reachability via REST. */
+/**
+ * Pulumi-side gate that starts the adapter service and verifies host-local runtime probe output.
+ */
 public final class SeedSystemdAdapterEndpointGate {
 
   private static final String API_VERSION = "rk2lab.nxmatic.io/v1alpha1";
   private static final String KIND = "SystemdAdapterEndpointGateStatus";
   private static final String ADAPTER_SERVICE_UNIT = "rke2lab-systemd-adapter.service";
   private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(20);
-  private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
   private SeedSystemdAdapterEndpointGate() {
     // Utility class
@@ -30,12 +29,14 @@ public final class SeedSystemdAdapterEndpointGate {
   public static Map<String, Object> deferredPreview(BootstrapConfig config) {
     return envelope(
         "deferred-preview",
-        "adapter endpoint gate deferred during preview",
+        "adapter service gate deferred during preview",
         Map.of(
             "source",
             "systemd-adapter-endpoint-gate",
-            "endpoint",
-            config.systemdAdapterStatusEndpoint().toString()));
+            "serviceUnit",
+            ADAPTER_SERVICE_UNIT,
+            "probeMode",
+            "host-local-systemd"));
   }
 
   public static Map<String, Object> ensureReachable(
@@ -50,55 +51,24 @@ public final class SeedSystemdAdapterEndpointGate {
               + ")");
     }
 
-    final CommandResult probeResult =
-        runCommand(
-            incusExec(
-                config,
-                "sh",
-                "-lc",
-                "curl --silent --show-error --fail --max-time 5 "
-                    + shellQuote(config.systemdAdapterStatusEndpoint().toString())));
-
-    if (probeResult.exitCode() != 0) {
+    final Map<String, Object> runtimeSnapshot =
+        SeedSystemdAdapterRuntimeStatusSnapshot.snapshot(config, logger);
+    final String runtimeStatus = String.valueOf(runtimeSnapshot.getOrDefault("status", "unknown"));
+    if (!"ok".equalsIgnoreCase(runtimeStatus)) {
       throw new IllegalStateException(
-          "Adapter endpoint unreachable: "
-              + config.systemdAdapterStatusEndpoint()
+          "Adapter runtime probe failed for service "
+              + ADAPTER_SERVICE_UNIT
               + " ("
-              + probeResult.summary()
+              + runtimeSnapshot.getOrDefault("summary", "unknown failure")
               + ")");
     }
 
-    final String stdout = probeResult.stdout();
-    if (!looksLikeJsonObject(stdout)) {
-      return envelope(
-          "non-json-response",
-          "adapter endpoint returned non-JSON payload",
-          Map.of(
-              "source", "systemd-adapter-endpoint-gate",
-              "endpoint", config.systemdAdapterStatusEndpoint().toString(),
-              "payloadFirstLine", firstNonBlankLine(stdout)));
-    }
-
-    LinkedHashMap<String, Object> parsed;
-    try {
-      parsed =
-          new LinkedHashMap<>(
-              JSON_MAPPER.readValue(stdout, new TypeReference<Map<String, Object>>() {}));
-    } catch (IOException ex) {
-      return envelope(
-          "non-json-response",
-          "adapter endpoint JSON parse failed: " + ex.getMessage(),
-          Map.of(
-              "source", "systemd-adapter-endpoint-gate",
-              "endpoint", config.systemdAdapterStatusEndpoint().toString(),
-              "payloadFirstLine", firstNonBlankLine(stdout)));
-    }
-
     final String summary =
-        "endpoint="
-            + config.systemdAdapterStatusEndpoint()
+        "serviceUnit="
+            + ADAPTER_SERVICE_UNIT
             + " status="
-            + parsed.getOrDefault("status", "unknown");
+            + runtimeStatus
+            + " probeMode=host-local-systemd";
     if (logger != null) {
       logger.accept("systemd adapter endpoint gate: " + summary);
     }
@@ -111,10 +81,10 @@ public final class SeedSystemdAdapterEndpointGate {
             "systemd-adapter-endpoint-gate",
             "serviceUnit",
             ADAPTER_SERVICE_UNIT,
-            "endpoint",
-            config.systemdAdapterStatusEndpoint().toString(),
+            "probeMode",
+            "host-local-systemd",
             "adapterStatus",
-            Map.copyOf(parsed)));
+            Map.copyOf(runtimeSnapshot)));
   }
 
   private static CommandResult ensureServiceStarted(BootstrapConfig config) {
@@ -194,14 +164,6 @@ public final class SeedSystemdAdapterEndpointGate {
 
   private static String shellQuote(String value) {
     return "'" + value.replace("'", "'\"'\"'") + "'";
-  }
-
-  private static boolean looksLikeJsonObject(String value) {
-    if (value == null) {
-      return false;
-    }
-    final String trimmed = value.trim();
-    return trimmed.startsWith("{") && trimmed.endsWith("}");
   }
 
   private static String firstNonBlankLine(String value) {

@@ -176,13 +176,14 @@ public final class IncusResourceBootstrap {
       classpathAssetMaterializer.materializeManifests(localPaths.manifestsRoot());
       classpathAssetMaterializer.materializeHostSystemdAssets(
           localPaths.manifestsRoot().resolve("host"));
-      this.systemdProvisioningSummary = SystemdProvisioningInventory.summarize(localPaths);
+      final List<String> hostMountNotes = hostMountSourceVerifier.ensureSources(localPaths);
+      this.systemdProvisioningSummary =
+          SystemdProvisioningInventory.summarize(localPaths, hostMountNotes);
       clearStaleBootstrapKubeconfig();
       LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
       this.layerEnvRegistrySummary =
           runtimeEnvControlplaneOverlayWriter.write(
               localPaths.runtimeEnvConfigRoot(), layerContext, policy);
-      hostMountSourceVerifier.ensureSources(localPaths);
       nodeConfigRegenerator.regenerateCloudConfigDir(
           localPaths.runtimeCloudConfigRoot(), localPaths.cloudSeedRoot());
       this.provisioningChecksum = ProvisioningResourceInventory.checksum(localPaths);
@@ -967,21 +968,20 @@ public final class IncusResourceBootstrap {
 
     private HostMountSourceVerifier() {}
 
-    private void ensureSources(BootstrapPaths paths) {
+    private List<String> ensureSources(BootstrapPaths paths) {
       ensureDirectories(
           List.of(
               paths.clusterNodeRoot(),
               paths.cloudSeedRoot(),
               paths.shareRoot(),
               paths.kubeconfigRoot(),
-              paths.daemonsetRoot()));
+              paths.daemonsetRoot(),
+              paths.systemdLibexecRoot()));
 
       final List<String> missingPaths = new ArrayList<>();
 
       requirePathExists(paths.secretsFile(), "required secrets file", missingPaths);
       requirePathExists(paths.scriptsRoot(), "required scripts directory", missingPaths);
-      requirePathExists(
-          paths.systemdLibexecRoot(), "required systemd libexec directory", missingPaths);
       requirePathExists(paths.systemdRoot(), "required systemd directory", missingPaths);
       requirePathExists(
           paths.manifestsRoot(), "required generated manifests directory", missingPaths);
@@ -997,6 +997,13 @@ public final class IncusResourceBootstrap {
             "Missing required Stage A host source paths for Incus disk devices:\n- "
                 + String.join("\n- ", missingPaths));
       }
+
+      final List<String> hostMountNotes = new ArrayList<>();
+      addEmptyContributionNote(
+          paths.systemdLibexecRoot(),
+          "systemd-libexec contribution directory is present but empty; continuing with canonical placeholder behavior",
+          hostMountNotes);
+      return List.copyOf(hostMountNotes);
     }
 
     private void ensureDirectories(List<Path> directories) {
@@ -1012,6 +1019,21 @@ public final class IncusResourceBootstrap {
     private void requirePathExists(Path path, String purpose, List<String> missingPaths) {
       if (!Files.exists(path)) {
         missingPaths.add(path + " (" + purpose + ")");
+      }
+    }
+
+    private void addEmptyContributionNote(Path directory, String note, List<String> notes) {
+      if (directory == null || note == null || notes == null) {
+        return;
+      }
+
+      try (Stream<Path> stream = Files.list(directory)) {
+        final boolean hasRegularFiles = stream.anyMatch(Files::isRegularFile);
+        if (!hasRegularFiles) {
+          notes.add(note);
+        }
+      } catch (IOException ex) {
+        throw new IllegalStateException("Failed to inspect contribution root: " + directory, ex);
       }
     }
   }
@@ -1857,33 +1879,35 @@ public final class IncusResourceBootstrap {
 
     private SystemdProvisioningInventory() {}
 
-    private static Map<String, Object> summarize(BootstrapPaths paths) {
+    private static Map<String, Object> summarize(
+        BootstrapPaths paths, List<String> hostMountNotes) {
       final List<String> scripts = listRegularFileNames(paths.scriptsRoot());
       final List<String> units = listRegularFileNames(paths.systemdRoot());
+      final List<String> systemdLibexecContributions =
+          listRegularFileNames(paths.systemdLibexecRoot());
       final Map<String, List<String>> scriptsByPhase = classifyByPhase(scripts);
       final Map<String, List<String>> unitsByPhase = classifyByPhase(units);
+      final List<String> normalizedHostMountNotes =
+          hostMountNotes == null ? List.of() : List.copyOf(hostMountNotes);
 
-      return Map.of(
-          "scriptsMountPath",
-          HOST_SCRIPTS_DIR_PATH,
-          "unitsMountPath",
-          HOST_SYSTEMD_DIR_PATH,
-          "scriptsSourcePath",
-          paths.scriptsRoot().toString(),
-          "unitsSourcePath",
-          paths.systemdRoot().toString(),
-          "scriptCount",
-          scripts.size(),
-          "unitCount",
-          units.size(),
-          "scripts",
-          scripts,
-          "units",
-          units,
-          "scriptsByPhase",
-          scriptsByPhase,
-          "unitsByPhase",
-          unitsByPhase);
+      final LinkedHashMap<String, Object> summary = new LinkedHashMap<>();
+      summary.put("scriptsMountPath", HOST_SCRIPTS_DIR_PATH);
+      summary.put("unitsMountPath", HOST_SYSTEMD_DIR_PATH);
+      summary.put("systemdLibexecMountPath", HOST_SYSTEMD_LIBEXEC_DIR_PATH);
+      summary.put("scriptsSourcePath", paths.scriptsRoot().toString());
+      summary.put("unitsSourcePath", paths.systemdRoot().toString());
+      summary.put("systemdLibexecSourcePath", paths.systemdLibexecRoot().toString());
+      summary.put("scriptCount", scripts.size());
+      summary.put("unitCount", units.size());
+      summary.put("systemdLibexecContributionCount", systemdLibexecContributions.size());
+      summary.put("scripts", scripts);
+      summary.put("units", units);
+      summary.put("systemdLibexecContributions", systemdLibexecContributions);
+      summary.put("systemdLibexecNotes", normalizedHostMountNotes);
+      summary.put("hostMountNotes", normalizedHostMountNotes);
+      summary.put("scriptsByPhase", scriptsByPhase);
+      summary.put("unitsByPhase", unitsByPhase);
+      return Map.copyOf(summary);
     }
 
     private static List<String> listRegularFileNames(Path directory) {

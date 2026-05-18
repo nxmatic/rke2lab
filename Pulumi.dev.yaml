@@ -1,4 +1,4 @@
-encryptionsalt: v1:Km/x/GsnihM=:v1:qR0B89B+HsPKYeqn:h8q+cfrtHMFA+mQEVfxqN+X++nRsCQ==
+encryptionsalt: v1:xMDtRI3wyG0=:v1:ICt2WTzvSKh6RHMl:uybaGDMimJ3BrdAvp5drV+inZrLVTA==
 config:
   "rke2lab:cluster.name": bioskop
   "rke2lab:node.name": master
