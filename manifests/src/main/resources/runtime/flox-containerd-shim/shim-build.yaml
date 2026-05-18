@@ -6,14 +6,13 @@ version: "1"
 
 jobs:
   - name: runtime
-    description: "Build runtime shim helper package from packaged flake"
+    description: "Build containerd shim flox wrapper package from packaged flake"
     enabled: true
     flakePath: "."
     outputDir: /tmp/runtime-shim-build
     logFile: /var/log/rke2-runtime-shim-build.log
     packages:
-      - name: containerd-shim-flox-v2-wrapper
-        attr: "packages.aarch64-linux.containerd-shim-flox-v2-wrapper"
+      - name: go-wrapper
 
   - name: mesh
     description: "Build mesh packages (headplane + headscale) from packaged flake"
@@ -23,11 +22,8 @@ jobs:
     logFile: /var/log/rke2-mesh-build.log
     packages:
       - name: headplane
-        attr: "packages.aarch64-linux.headplane"
       - name: headplane-agent
-        attr: "packages.aarch64-linux.headplane-agent"
       - name: headscale
-        attr: "packages.aarch64-linux.headscale"
 
   - name: networking
     description: "Build networking packages (kdns) from packaged flake"
@@ -37,4 +33,3 @@ jobs:
     logFile: /var/log/rke2-networking-build.log
     packages:
       - name: kdns
-        attr: "packages.aarch64-linux.kdns"

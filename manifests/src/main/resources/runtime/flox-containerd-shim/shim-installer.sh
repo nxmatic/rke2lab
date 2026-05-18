@@ -44,18 +44,21 @@ installer::policy:source() {
 }
 
 installer::logging:setup() {
-	local script_path
+	local script_path script_log_dir
 
 	case "${DAEMONLESS_EXEC_MODE}" in
 	pod)
-		script_path="${HOST_SCRIPT_ROOT}/shim-installer.sh"
+		script_path="${HOST_SCRIPT_ROOT}/bin/shim-installer.sh"
+		script_log_dir="${HOST_SCRIPT_ROOT}/log"
 		;;
 	host)
-		script_path="${DAEMONSET_SCRIPT_ROOT}/shim-installer.sh"
+		script_path="${DAEMONSET_SCRIPT_ROOT}/bin/shim-installer.sh"
+		script_log_dir="${DAEMONSET_SCRIPT_ROOT}/log"
 		;;
 	esac
 
-	daemonset::logging:stderr:setup "${script_path}"
+	DAEMONSET_SCRIPT_LOG_DIR="${script_log_dir}" \
+		daemonset::logging:stderr:setup "${script_path}"
 }
 
 install_deps() {
@@ -102,13 +105,9 @@ installer::pod:materialize_assets() {
 	# daemonless::host_shell:binary:install, while sourced shell helper files go through
 	# daemonless::host_shell:library:install into <asset-root>/.sh.d.
 
-	mkdir -p "${HOST_SCRIPT_ROOT}"
+	mkdir -p "${HOST_SCRIPT_ROOT}" "${HOST_SCRIPT_ROOT}/etc" "${HOST_SCRIPT_ROOT}/log"
 
-	daemonless::host_shell:binary:install \
-		"${SCRIPT_MOUNT_DIR}/shim-installer.sh" \
-		"${HOST_SCRIPT_ROOT}" \
-		"shim-installer.sh" \
-		"shim-installer.sh" >/dev/null
+	install -D -m 0755 "${SCRIPT_MOUNT_DIR}/shim-installer.sh" "${HOST_SCRIPT_ROOT}/bin/shim-installer.sh"
 	daemonless::host_shell:library:install \
 		"${SCRIPT_POLICY_LIB_DIR}/daemonset-logging.sh" \
 		"${HOST_SCRIPT_ROOT}" \
@@ -126,14 +125,10 @@ installer::pod:materialize_assets() {
 		"${HOST_SCRIPT_ROOT}" \
 		"daemonless-host-shell-policy.sh" >/dev/null
 
-	daemonless::host_shell:binary:install \
-		"${BUILD_ASSETS_DIR}/shim-build.sh" \
-		"${HOST_SCRIPT_ROOT}" \
-		"shim-build.sh" \
-		"shim-build.sh" >/dev/null
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/shim-build.yaml" "${HOST_SCRIPT_ROOT}/shim-build.yaml"
+	install -D -m 0755 "${BUILD_ASSETS_DIR}/shim-build.sh" "${HOST_SCRIPT_ROOT}/bin/shim-build.sh"
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/shim-build.yaml" "${HOST_SCRIPT_ROOT}/etc/shim-build.yaml"
 	install -D -m 0644 "${BUILD_ASSETS_DIR}/flake.nix" "${HOST_SCRIPT_ROOT}/flake.nix"
-	install -D -m 0755 "${BUILD_ASSETS_DIR}/flox-rootfs-sync.sh" "${HOST_SCRIPT_ROOT}/flox-rootfs-sync.sh"
+	install -D -m 0755 "${BUILD_ASSETS_DIR}/flox-rootfs-sync.sh" "${HOST_SCRIPT_ROOT}/bin/flox-rootfs-sync.sh"
 	daemonless::host_shell:library:install \
 		"${BUILD_ASSETS_DIR}/debug-tools/.sh.d/rke2lab-debug-tooling.sh" \
 		"${HOST_SCRIPT_ROOT}/debug-tools" \
@@ -274,11 +269,13 @@ host::nix:flox-conf:ensure() {
 shim::assets:path:init() {
 	FLOX_SHIM_ROOT="$(shim::assets:root:resolve)"
 	FLOX_SHIM_BIN_DIR="${FLOX_SHIM_ROOT}/bin"
-	FLOX_BUILD_SCRIPT="${FLOX_SHIM_ROOT}/shim-build.sh"
+	FLOX_SHIM_ETC_DIR="${FLOX_SHIM_ROOT}/etc"
+	FLOX_SHIM_LOG_DIR="${FLOX_SHIM_ROOT}/log"
+	FLOX_BUILD_SCRIPT="${FLOX_SHIM_BIN_DIR}/shim-build.sh"
 	FLOX_BUILD_ENTRYPOINT="${FLOX_SHIM_BIN_DIR}/shim-build.sh"
-	FLOX_BUILD_DESCRIPTOR="${FLOX_SHIM_ROOT}/shim-build.yaml"
+	FLOX_BUILD_DESCRIPTOR="${FLOX_SHIM_ETC_DIR}/shim-build.yaml"
 	FLOX_SHIM_PACKAGE_FLAKE="${FLOX_SHIM_ROOT}/flake.nix"
-	FLOX_ROOTFS_SYNC_SCRIPT="${FLOX_SHIM_ROOT}/flox-rootfs-sync.sh"
+	FLOX_ROOTFS_SYNC_SCRIPT="${FLOX_SHIM_BIN_DIR}/flox-rootfs-sync.sh"
 	FLOX_SHIM_MESH_DIR="${FLOX_SHIM_ROOT}/mesh"
 	FLOX_SHIM_NETWORKING_DIR="${FLOX_SHIM_ROOT}/networking"
 	FLOX_SHIM_DEBUG_TOOLS_DIR="${FLOX_SHIM_ROOT}/debug-tools"
@@ -288,6 +285,14 @@ shim::assets:path:init() {
 shim::assets:path:validate() {
 	[[ -d "${FLOX_SHIM_BIN_DIR}" ]] || {
 		echo "flox shim bin directory missing: ${FLOX_SHIM_BIN_DIR}" >&2
+		exit 1
+	}
+	[[ -d "${FLOX_SHIM_ETC_DIR}" ]] || {
+		echo "flox shim etc directory missing: ${FLOX_SHIM_ETC_DIR}" >&2
+		exit 1
+	}
+	[[ -d "${FLOX_SHIM_LOG_DIR}" ]] || {
+		echo "flox shim log directory missing: ${FLOX_SHIM_LOG_DIR}" >&2
 		exit 1
 	}
 	[[ -x "${FLOX_BUILD_ENTRYPOINT}" ]] || {
@@ -384,6 +389,7 @@ shim::assets:build:run() {
 	DAEMONLESS_EXEC_MODE=host \
 		DAEMONLESS_HOST_SCRIPT_ROOT="${FLOX_SHIM_ROOT}" \
 		DAEMONLESS_HOST_SCRIPT_BIN="${FLOX_SHIM_BIN_DIR}" \
+		DAEMONSET_SCRIPT_LOG_DIR="${FLOX_SHIM_LOG_DIR}" \
 		PATH="${FLOX_SHIM_BIN_DIR}:${PATH}" \
 		"${FLOX_BUILD_ENTRYPOINT}" "${FLOX_BUILD_DESCRIPTOR}"
 

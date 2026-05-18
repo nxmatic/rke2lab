@@ -11,14 +11,23 @@ SCRIPT_DIR="${SCRIPT_PATH%/*}"
 if [[ "${SCRIPT_DIR}" == "${SCRIPT_PATH}" ]]; then
 	SCRIPT_DIR='.'
 fi
+
+SCRIPT_ROOT="${SCRIPT_DIR}"
+if [[ "$(basename "${SCRIPT_DIR}")" == "bin" ]]; then
+	SCRIPT_ROOT="$(dirname "${SCRIPT_DIR}")"
+fi
+
+SCRIPT_LIB_DIR="${DAEMONLESS_HOST_SCRIPT_LIB_DIR:-${SCRIPT_ROOT%/}/.sh.d}"
 SCRIPT_BASENAME="$(basename "${SCRIPT_PATH}")"
 SCRIPT_STEM="${SCRIPT_BASENAME%.sh}"
 EXECUTION_MODE="${DAEMONLESS_EXEC_MODE:-guest}"
 
 # shellcheck disable=SC1091
-[[ -r "${SCRIPT_DIR}/.sh.d/daemonless-trampoline.sh" ]] && source "${SCRIPT_DIR}/.sh.d/daemonless-trampoline.sh"
+[[ -r "${SCRIPT_LIB_DIR}/daemonless-trampoline.sh" ]] && source "${SCRIPT_LIB_DIR}/daemonless-trampoline.sh"
 # shellcheck disable=SC1091
-[[ -r "${SCRIPT_DIR}/.sh.d/daemonset-logging.sh" ]] && source "${SCRIPT_DIR}/.sh.d/daemonset-logging.sh"
+[[ -r "${SCRIPT_LIB_DIR}/daemonset-logging.sh" ]] && source "${SCRIPT_LIB_DIR}/daemonset-logging.sh"
+
+: "${DAEMONSET_SCRIPT_LOG_DIR:=${SCRIPT_ROOT%/}/log}"
 
 declare -F daemonset::logging:stderr:setup >/dev/null 2>&1 && daemonset::logging:stderr:setup "${SCRIPT_PATH}"
 
@@ -43,10 +52,40 @@ canonicalize_existing_path() {
 	echo "$(cd "${input_dir}" && pwd -P)/${input_base}"
 }
 
-BUILDS_DESCRIPTOR="${1:-${FLOX_SHIM_DESCRIPTOR_PATH:-${SCRIPT_DIR}/${SCRIPT_STEM}.yaml}}"
+BUILDS_DESCRIPTOR="${1:-${FLOX_SHIM_DESCRIPTOR_PATH:-${SCRIPT_ROOT%/}/etc/${SCRIPT_STEM}.yaml}}"
 BUILDS_DESCRIPTOR="$(canonicalize_existing_path "${BUILDS_DESCRIPTOR}")"
 BUILDS_DESCRIPTOR_DIR="$(dirname "${BUILDS_DESCRIPTOR}")"
 BUILDS_DESCRIPTOR_DIR="$(canonicalize_existing_path "${BUILDS_DESCRIPTOR_DIR}")"
+
+resolve_build_content_root() {
+	local descriptor_dir="$1"
+	local -a candidates=()
+
+	if [[ -n "${FLOX_SHIM_ENV_DIR:-}" ]]; then
+		candidates+=("${FLOX_SHIM_ENV_DIR}")
+	fi
+
+	if [[ "$(basename "${descriptor_dir}")" == "bin" ]]; then
+		candidates+=("$(dirname "${descriptor_dir}")")
+	fi
+
+	candidates+=("${descriptor_dir}")
+
+	local candidate resolved_candidate
+	for candidate in "${candidates[@]}"; do
+		[[ -n "${candidate}" ]] || continue
+		[[ -d "${candidate}" ]] || continue
+		resolved_candidate="$(canonicalize_existing_path "${candidate}")"
+		if [[ -f "${resolved_candidate}/flake.nix" || -d "${resolved_candidate}/mesh" || -d "${resolved_candidate}/networking" ]]; then
+			echo "${resolved_candidate}"
+			return 0
+		fi
+	done
+
+	echo "${BUILDS_DESCRIPTOR_DIR}"
+}
+
+BUILDS_CONTENT_ROOT="$(resolve_build_content_root "${BUILDS_DESCRIPTOR_DIR}")"
 
 # Environment variables
 RKE2LAB_ROOT="${RKE2LAB_ROOT:-/srv/host}"
@@ -103,6 +142,8 @@ find_flox_activation_dir() {
 
 	if [[ -n "${FLOX_SHIM_ENV_DIR:-}" ]]; then
 		candidates+=("${FLOX_SHIM_ENV_DIR}")
+		candidates+=("$(dirname "${FLOX_SHIM_ENV_DIR}")")
+		candidates+=("$(dirname "$(dirname "${FLOX_SHIM_ENV_DIR}")")")
 	fi
 
 	if [[ "${EXECUTION_MODE}" == "host" ]]; then
@@ -235,7 +276,7 @@ resolve_flake_path() {
 	if [[ "${flake_path}" == /* ]]; then
 		resolved_path="${flake_path}"
 	else
-		resolved_path="${BUILDS_DESCRIPTOR_DIR}/${flake_path}"
+		resolved_path="${BUILDS_CONTENT_ROOT}/${flake_path}"
 	fi
 
 	canonicalize_existing_path "${resolved_path}"
