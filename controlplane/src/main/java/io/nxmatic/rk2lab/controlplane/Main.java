@@ -69,6 +69,9 @@ public final class Main {
       boolean readinessEnabled,
       Consumer<String> readinessLogger) {
     enforceEntryGatePolicies(config.localWorktreePath());
+    RuntimeCommandPreflight.enforceRequiredCommands(List.of("ssh", "kubectl"), readinessLogger);
+    RuntimeCommandPreflight.enforceRemoteCommandAvailable(
+        config.imageBuilderHost(), "incus", readinessLogger);
 
     final IncusResourceBootstrap.BootstrapResult bootstrapResult =
         new IncusResourceBootstrap(config, policy).apply();

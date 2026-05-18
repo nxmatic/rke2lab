@@ -125,12 +125,18 @@ public final class SeedSystemdRuntimeStatusResource extends ComponentResource {
             "echo failedUnitCount=$(systemctl show --property=NFailedUnits --value 2>/dev/null || true)",
             "echo capturedAt=$(date -u +%Y-%m-%dT%H:%M:%SZ)");
 
-    return "incus exec --project "
-        + shellQuote(config.incusProject())
-        + " "
-        + shellQuote(config.nodeName())
-        + " -- sh -lc "
-        + shellQuote(script);
+    final String remoteIncusCommand =
+        "incus exec --project "
+            + shellQuote(config.incusProject())
+            + " "
+            + shellQuote(config.nodeName())
+            + " -- sh -lc "
+            + shellQuote(script);
+
+    return "ssh -o BatchMode=yes -o ConnectTimeout=10 "
+        + shellQuote(config.imageBuilderHost())
+        + " sh -lc "
+        + shellQuote(remoteIncusCommand);
   }
 
   private static ComponentResourceOptions buildOptions(Resource dependsOnResource) {

@@ -506,15 +506,40 @@ public final class ClusterBootstrapReadinessVerifier {
   }
 
   private static List<String> incusExec(BootstrapConfig config, String... args) {
-    final ArrayList<String> command = new ArrayList<>();
-    command.add("incus");
-    command.add("exec");
-    command.add("--project");
-    command.add(config.incusProject());
-    command.add(config.nodeName());
-    command.add("--");
-    command.addAll(List.of(args));
-    return List.copyOf(command);
+    final String remoteIncusCommand =
+        "incus exec --project "
+            + shellQuote(config.incusProject())
+            + " "
+            + shellQuote(config.nodeName())
+            + " -- "
+            + joinShellQuoted(args);
+
+    return List.of(
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        config.imageBuilderHost(),
+        "sh",
+        "-lc",
+        remoteIncusCommand);
+  }
+
+  private static String joinShellQuoted(String... values) {
+    if (values == null || values.length == 0) {
+      return "";
+    }
+
+    final ArrayList<String> quoted = new ArrayList<>(values.length);
+    for (String value : values) {
+      quoted.add(shellQuote(value == null ? "" : value));
+    }
+    return String.join(" ", quoted);
+  }
+
+  private static String shellQuote(String value) {
+    return "'" + value.replace("'", "'\"'\"'") + "'";
   }
 
   private static String firstLineOrFallback(String value, String fallback) {
