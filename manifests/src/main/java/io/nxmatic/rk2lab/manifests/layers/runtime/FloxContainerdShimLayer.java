@@ -165,6 +165,8 @@ public final class FloxContainerdShimLayer extends Construct {
                 Map.entry(
                     "runtime-flake.nix", readResource("/runtime/flox-containerd-shim/flake.nix")),
                 Map.entry(
+                    "runtime-flake.lock", readResource("/runtime/flox-containerd-shim/flake.lock")),
+                Map.entry(
                     "flox-rootfs-sync.sh",
                     readResource("/runtime/flox-containerd-shim/flox-rootfs-sync.sh")),
                 Map.entry(
@@ -199,8 +201,14 @@ public final class FloxContainerdShimLayer extends Construct {
                     "mesh-headplane-flake.nix",
                     readResource("/runtime/flox-containerd-shim/mesh/headplane/flake.nix")),
                 Map.entry(
+                    "mesh-headplane-flake.lock",
+                    readResource("/runtime/flox-containerd-shim/mesh/headplane/flake.lock")),
+                Map.entry(
                     "networking-kdns-flake.nix",
-                    readResource("/runtime/flox-containerd-shim/networking/kdns/flake.nix")))));
+                    readResource("/runtime/flox-containerd-shim/networking/kdns/flake.nix")),
+                Map.entry(
+                    "networking-kdns-flake.lock",
+                    readResource("/runtime/flox-containerd-shim/networking/kdns/flake.lock")))));
     return configMap;
   }
 
@@ -422,6 +430,11 @@ public final class FloxContainerdShimLayer extends Construct {
                                         "build-assets/flake.nix"),
                                     Map.of(
                                         "key",
+                                        "runtime-flake.lock",
+                                        "path",
+                                        "build-assets/flake.lock"),
+                                    Map.of(
+                                        "key",
                                         "flox-rootfs-sync.sh",
                                         "path",
                                         "build-assets/flox-rootfs-sync.sh"),
@@ -474,9 +487,19 @@ public final class FloxContainerdShimLayer extends Construct {
                                         "build-assets/mesh/headplane/flake.nix"),
                                     Map.of(
                                         "key",
+                                        "mesh-headplane-flake.lock",
+                                        "path",
+                                        "build-assets/mesh/headplane/flake.lock"),
+                                    Map.of(
+                                        "key",
                                         "networking-kdns-flake.nix",
                                         "path",
-                                        "build-assets/networking/kdns/flake.nix")
+                                        "build-assets/networking/kdns/flake.nix"),
+                                    Map.of(
+                                        "key",
+                                        "networking-kdns-flake.lock",
+                                        "path",
+                                        "build-assets/networking/kdns/flake.lock")
                                   },
                                   "name",
                                   RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP.name()),

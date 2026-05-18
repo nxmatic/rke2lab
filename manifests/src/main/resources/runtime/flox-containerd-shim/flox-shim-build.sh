@@ -257,7 +257,7 @@ resolve_flake_path() {
 }
 
 should_update_locks() {
-	case "${FLOX_SHIM_UPDATE_LOCKS:-auto}" in
+	case "${FLOX_SHIM_UPDATE_LOCKS:-false}" in
 	1 | true | TRUE | yes | YES)
 		return 0
 		;;
@@ -285,6 +285,22 @@ should_only_update_locks() {
 		return 1
 		;;
 	esac
+}
+
+stage_git_flake_inputs_if_needed() {
+	local job_name="$1"
+	local resolved_path="$2"
+	local repo_root
+
+	[[ "${WORKTREE_MODE}" == "host" ]] || return 0
+	command -v git >/dev/null 2>&1 || return 0
+
+	if ! repo_root="$(git -C "${resolved_path}" rev-parse --show-toplevel 2>/dev/null)"; then
+		return 0
+	fi
+
+	: "[$(date)] [${job_name}] Staging Git-backed flake inputs from ${repo_root}"
+	git -C "${repo_root}" add --all .
 }
 
 refresh_flake_lock_if_needed() {
@@ -357,6 +373,8 @@ build_package() {
 		"--extra-experimental-features" "flakes"
 		"--no-link"
 	)
+
+	stage_git_flake_inputs_if_needed "${job_name}" "${resolved_path}"
 
 	if ! refresh_flake_lock_if_needed "${job_name}" "${resolved_path}" "${log_file}"; then
 		return 1
