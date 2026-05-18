@@ -17,7 +17,7 @@ Canonical network addressing derivation and integration contracts for rke2lab cl
 ## Nix integration note (`nix-darwin-home`)
 
 `rke2lab-netplan` is now the canonical source of truth for cluster underlay addressing that is
-mirrored into the `nix-darwin-home` network catalog (`catalog.networks.rke2labNetplan`).
+mirrored into the `nix-darwin-home` network catalog (`catalog.netplan.rke2lab`).
 
 Integration intent:
 
