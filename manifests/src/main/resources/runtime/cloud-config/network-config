@@ -16,16 +16,8 @@ network:
     # Home router provides reliable NAT for internet access
     lan0:
       macaddress: "10:66:6a:4c:00:00" # Quote to avoid YAML 1.1 sexagesimal parsing (@codebase)
-      # Static LAN addressing to avoid DHCP pool conflicts
-      dhcp4: false
-      addresses:
-        - "192.168.1.131/24"
-      routes:
-        - to: default
-          via: "192.168.1.254"
-      nameservers:
-        addresses:
-          - "192.168.1.254"
+      # DHCP LAN addressing from home router
+      dhcp4: true
       dhcp6: false # Disable IPv6 DHCP
       dhcp-identifier: mac
       accept-ra: false # Disable IPv6 Router Advertisements
