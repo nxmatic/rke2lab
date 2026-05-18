@@ -28,9 +28,6 @@ systemctl enable --now rke2lab-tools.target
 : "Enable RKE2 Lab target and all associated services"
 systemctl enable --now rke2lab.target zfs-early-umount.service rke2lab-install.service
 
-: "Configure DBus system bus TCP listener on master node"
-$RKE2LAB_SCRIPTS_DIR/rke2lab-dbus-tcp-system-bus.sh
-
 : "Load the RKE2 environment"
 source <(flox activate --dir /var/lib/rancher/rke2)
 
