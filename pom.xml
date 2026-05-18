@@ -16,7 +16,7 @@
     <module>systemd-contract</module>
     <module>systemd-adapter</module>
     <module>sdks/incus</module>
-    <module>controlplane</module>
+    <module>seed-bootstrap</module>
     <module>manifests</module>
   </modules>
 

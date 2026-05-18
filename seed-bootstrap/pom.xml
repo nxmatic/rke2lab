@@ -10,8 +10,8 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <artifactId>rke2lab-controlplane</artifactId>
-  <name>rke2lab k8s control plane</name>
+  <artifactId>rke2lab-seed-bootstrap</artifactId>
+  <name>rke2lab seed bootstrap</name>
 
   <properties>
     <rk2lab.manifests.unpack.skip>false</rk2lab.manifests.unpack.skip>

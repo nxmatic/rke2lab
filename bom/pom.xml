@@ -63,12 +63,12 @@
       <!-- rke2lab dependencies -->
       <dependency>
         <groupId>io.nxmatic</groupId>
-        <artifactId>rke2lab-controlplane</artifactId>
+        <artifactId>rke2lab-seed-bootstrap</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
         <groupId>io.nxmatic</groupId>
-        <artifactId>rke2lab-controlplane</artifactId>
+        <artifactId>rke2lab-seed-bootstrap</artifactId>
         <version>${rke2lab.version}</version>
         <classifier>exec</classifier>
       </dependency>
