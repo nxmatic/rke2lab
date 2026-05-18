@@ -130,6 +130,150 @@ So:
 * the *workflow asset layer* delivers it into Kubernetes
 * the *daemonless host-asset materializer* verifies and materializes it on host
 
+== Shared policy model: `HostAssetDeliveryPolicy`
+
+The current codebase already has a concrete host-asset runtime contract:
+
+* canonical host asset roots
+* shared daemonless helper delivery
+* workflow-specific installer asset delivery
+* host asset root lifecycle handling in the bootstrap path
+
+What it previously did not have was a single shared policy model that describes *how* a workflow delivers host assets.
+
+`HostAssetDeliveryPolicy` is now implemented as a shared Java type in `manifests/src/main/java/io/nxmatic/rk2lab/manifests/api/` alongside:
+
+* `HostAssetDeliveryBackend`
+* `HostAssetMaterializationMode`
+
+The shared model currently provides:
+
+* validated policy identifiers and owner domain ids
+* canonical host asset root declaration
+* explicit delivery backend and materialization mode enums
+* convenience helpers such as `usesDaemonsetDelivery()` and `materializesEncodedArchives()`
+* a concrete `floxContainerdShim()` factory for the current runtime workflow
+
+At the time of writing, the shared model is implemented but not yet threaded all the way through `ControlplanePolicy` as a first-class aggregated field.
+
+The purpose of the model would be to connect:
+
+* controlplane policy intent
+* workflow-specific host asset delivery
+* shared daemonless helper usage
+* host asset root lifecycle rules
+
+[mermaid,host-asset-delivery-policy-uml,svg]
+----
+classDiagram
+    direction LR
+
+    class ControlplanePolicy {
+      +DebugPolicy debug
+      +ManifestLinkPolicy manifestLink
+      +HostAssetDeliveryPolicy hostAssetDelivery
+    }
+
+    class DebugPolicy {
+      +kdnsEnabled : boolean
+      +floxShimWrapperEnabled : boolean
+    }
+
+    class ManifestLinkPolicy {
+      +domains : ManifestDomainPolicy
+      +highAvailabilityEnabled() boolean
+      +networkingEnabled() boolean
+      +replicationEnabled() boolean
+      +storageEnabled() boolean
+      +meshEnabled() boolean
+    }
+
+    class HostAssetDeliveryPolicy {
+      +ownerDomainId : String
+      +hostAssetRoot : String
+      +deliveryBackend : HostAssetDeliveryBackend
+      +materializationMode : HostAssetMaterializationMode
+      +verificationRequired : boolean
+      +rotateExistingRoot : boolean
+      +enabled : boolean
+    }
+
+    class ManifestDomainPolicy {
+      +enabledByDomainId : Map~String,Boolean~
+      +isEnabled(domainId) boolean
+    }
+
+    class ManifestDomainIds {
+      <<constants>>
+      +HIGH_AVAILABILITY : String
+      +RUNTIME : String
+      +NETWORKING : String
+    }
+
+    class FloxContainerdShimLayer {
+      +createInstallerAssetsConfigMap()
+      +createInstallerDaemonSet()
+    }
+
+    class RuntimeDaemonsetScriptPolicyLayer {
+      +createScriptPolicyConfigMap()
+    }
+
+    class WrapperGoArchiveAssets {
+      +archiveBase64()
+      +manifestJson()
+    }
+
+    class ShimInstaller {
+      <<script>>
+      +installer::pod:materialize_assets()
+      +installer::pod:run()
+      +installer::host:run()
+    }
+
+    class DaemonlessHostAssetMaterializer {
+      <<script>>
+      +materialize_encoded_tar()
+    }
+
+    class HostAssetRootLifecycle {
+      +prepareCleanHostAssetRoot(hostAssetRoot)
+    }
+
+    ControlplanePolicy --> DebugPolicy : aggregates
+    ControlplanePolicy --> ManifestLinkPolicy : aggregates
+    ControlplanePolicy --> HostAssetDeliveryPolicy : would aggregate
+
+    ManifestLinkPolicy --> ManifestDomainPolicy : uses
+    HostAssetDeliveryPolicy --> ManifestDomainIds : ownerDomainId
+    ManifestLinkPolicy --> ManifestDomainIds : domain flags
+
+    FloxContainerdShimLayer --> WrapperGoArchiveAssets : packages payload
+    FloxContainerdShimLayer --> ShimInstaller : delivers installer asset
+    RuntimeDaemonsetScriptPolicyLayer --> DaemonlessHostAssetMaterializer : delivers helper
+    ShimInstaller --> DaemonlessHostAssetMaterializer : sources helper
+    ShimInstaller --> HostAssetDeliveryPolicy : would follow delivery contract
+    ShimInstaller --> HostAssetRootLifecycle : aligns with root lifecycle
+
+    HostAssetDeliveryPolicy --> FloxContainerdShimLayer : constrains delivery target
+    HostAssetDeliveryPolicy --> RuntimeDaemonsetScriptPolicyLayer : constrains helper usage
+
+    note for HostAssetDeliveryPolicy "Implemented shared policy model:\nexplains how a workflow delivers\nand materializes host assets"
+    note for FloxContainerdShimLayer "Current workflow-specific\nFlox shim delivery layer"
+    note for RuntimeDaemonsetScriptPolicyLayer "Current shared daemonless\npolicy/helper delivery layer"
+----
+
+Reading this diagram from left to right:
+
+* `ControlplanePolicy` already owns `DebugPolicy` and `ManifestLinkPolicy`
+* `HostAssetDeliveryPolicy` is the implemented shared model for host-asset delivery rules
+* `FloxContainerdShimLayer` remains the current workflow-specific delivery layer for Flox shim assets
+* `RuntimeDaemonsetScriptPolicyLayer` remains the current shared helper delivery layer
+* `shim-installer.sh` remains the runtime execution point where those two delivery surfaces meet
+
+In other words, the shared policy does not replace the current daemonless host-asset runtime flow.
+It gives that flow an explicit, human-readable policy model while the wider controlplane wiring can still be layered in incrementally.
+
 == C4-style context view
 
 [mermaid,daemonless-host-assets-context,svg]
