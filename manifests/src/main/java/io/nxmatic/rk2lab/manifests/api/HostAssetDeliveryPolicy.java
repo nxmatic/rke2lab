@@ -42,9 +42,9 @@ public record HostAssetDeliveryPolicy(
 
   public static HostAssetDeliveryPolicy floxContainerdShim() {
     return new HostAssetDeliveryPolicy(
-        "runtime/flox-containerd-shim",
+        "runtime/containerd-shim-flox",
         ManifestDomainIds.RUNTIME,
-        "/srv/host/k8s-daemonset.d/runtime/flox-containerd-shim",
+        "/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox",
         HostAssetDeliveryBackend.DAEMONSET,
         HostAssetMaterializationMode.MIXED,
         true,

@@ -11,7 +11,7 @@ import org.cdk8s.Chart;
 
 public final class FloxContainerdShimManifestUnit extends AbstractManifestUnit {
 
-  public static final String MANIFEST_UNIT_ID = "runtime/flox-containerd-shim";
+  public static final String MANIFEST_UNIT_ID = "runtime/containerd-shim-flox";
 
   public FloxContainerdShimManifestUnit() {
     super(
@@ -25,12 +25,12 @@ public final class FloxContainerdShimManifestUnit extends AbstractManifestUnit {
 
   @Override
   public void apply(final Chart chart) {
-    new FloxContainerdShimLayer(chart, "layer-runtime-flox-containerd-shim");
+    new FloxContainerdShimLayer(chart, "layer-runtime-containerd-shim-flox");
   }
 
   @Override
   public void apply(final ManifestUnitContext context) {
     new FloxContainerdShimLayer(
-        context.chart(), "layer-runtime-flox-containerd-shim", context.registry());
+        context.chart(), "layer-runtime-containerd-shim-flox", context.registry());
   }
 }

@@ -272,12 +272,12 @@ public final class PorchResourcesLayer extends Construct {
         "packagevariant-runtime-flox",
         "runtime-flox",
         "config.porch.kpt.dev|PackageVariant|porch-system|runtime-flox",
-        "runtime/flox-containerd-shim",
+        "runtime/containerd-shim-flox",
         Map.of(
             "cluster-name",
             CLUSTER_NAME,
             "nxmatic.dev/app",
-            "flox-containerd-shim",
+            "containerd-shim-flox",
             "nxmatic.dev/component",
             "runtime"),
         Map.of(

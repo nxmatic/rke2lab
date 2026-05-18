@@ -23,7 +23,7 @@ The following terms are canonical in the current model:
 
 For the Flox shim runtime path, the canonical host asset root is:
 
-* `/srv/host/k8s-daemonset.d/runtime/flox-containerd-shim`
+* `/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox`
 
 This host asset root is intentionally *not* the developer worktree.
 The worktree remains an upstream source input that originates on the macOS workstation running the NixOS VM through Tart/VZ.
@@ -328,7 +328,7 @@ flowchart LR
     subgraph Node[Kubernetes node runtime path]
       podInstaller[shim-installer.sh<br/>pod mode]
       hostInstaller[shim-installer.sh<br/>host mode]
-      hostAssets["Host asset root<br/>/srv/host/k8s-daemonset.d/runtime/flox-containerd-shim"]
+      hostAssets["Host asset root<br/>/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox"]
     end
     end
 

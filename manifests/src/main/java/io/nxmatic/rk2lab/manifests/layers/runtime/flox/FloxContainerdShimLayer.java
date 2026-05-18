@@ -16,11 +16,11 @@ import software.constructs.Construct;
 
 public final class FloxContainerdShimLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "runtime/flox-containerd-shim/";
+  public static final String LEGACY_PATH_PREFIX = "runtime/containerd-shim-flox/";
 
   private static final String LAYER_NAME = "runtime";
 
-  private static final String PACKAGE_NAME = "flox-containerd-shim";
+  private static final String PACKAGE_NAME = "containerd-shim-flox";
 
   private final KptMetadata kptMetadata = new KptMetadata();
 
@@ -276,7 +276,7 @@ public final class FloxContainerdShimLayer extends Construct {
                                     "name",
                                     "DAEMONLESS_HOST_SCRIPT_ROOT",
                                     "value",
-                                    "/srv/host/k8s-daemonset.d/runtime/flox-containerd-shim"),
+                                    "/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox"),
                                 Map.of(
                                     "name",
                                     "CONTAINERD_ADDRESS",

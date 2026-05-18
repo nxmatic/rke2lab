@@ -29,16 +29,16 @@ public final class WrapperGoArchiveAssets {
 
   private static final List<SourceAsset> SOURCE_ASSETS =
       List.of(
-          new SourceAsset("/runtime/flox-containerd-shim/wrapper-go/go.mod", "wrapper-go/go.mod"),
-          new SourceAsset("/runtime/flox-containerd-shim/wrapper-go/go.sum", "wrapper-go/go.sum"),
+          new SourceAsset("/runtime/containerd-shim-flox/wrapper-go/go.mod", "wrapper-go/go.mod"),
+          new SourceAsset("/runtime/containerd-shim-flox/wrapper-go/go.sum", "wrapper-go/go.sum"),
           new SourceAsset(
-              "/runtime/flox-containerd-shim/wrapper-go/cmd/containerd-shim-flox-v2/main.go",
+              "/runtime/containerd-shim-flox/wrapper-go/cmd/containerd-shim-flox-v2/main.go",
               "wrapper-go/cmd/containerd-shim-flox-v2/main.go"),
           new SourceAsset(
-              "/runtime/flox-containerd-shim/wrapper-go/internal/wrapper/config.go",
+              "/runtime/containerd-shim-flox/wrapper-go/internal/wrapper/config.go",
               "wrapper-go/internal/wrapper/config.go"),
           new SourceAsset(
-              "/runtime/flox-containerd-shim/wrapper-go/internal/wrapper/wrapper.go",
+              "/runtime/containerd-shim-flox/wrapper-go/internal/wrapper/wrapper.go",
               "wrapper-go/internal/wrapper/wrapper.go"));
 
   private static final ArchiveBundle ARCHIVE_BUNDLE = buildArchiveBundle();

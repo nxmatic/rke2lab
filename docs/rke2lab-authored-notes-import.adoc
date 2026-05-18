@@ -88,7 +88,7 @@ This note captures the migration baseline after runtime shim packaging and check
 Current implementation facts to preserve:
 
 * host bootstrap scripts and units are still sourced from `manifests/src/main/resources/host/systemd-{scripts,units}` and materialized by `controlplane/incus`
-* runtime host mutation already has a proven Kubernetes pattern in `runtime/flox-containerd-shim` using init-container + `nsenter`
+* runtime host mutation already has a proven Kubernetes pattern in `runtime/containerd-shim-flox` using init-container + `nsenter`
 * seed replacement is currently tied to Stage A provisioning checksum (`user.rke2lab.provisioningChecksum`) and image build checksum (`user.rke2lab.imageBuildChecksum`)
 
 Phased migration intent:

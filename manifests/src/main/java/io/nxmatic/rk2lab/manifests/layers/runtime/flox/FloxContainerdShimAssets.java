@@ -15,7 +15,7 @@ import java.util.Map;
 
 public final class FloxContainerdShimAssets {
 
-  private static final String FLOX_RESOURCE_ROOT = "/runtime/flox-containerd-shim";
+  private static final String FLOX_RESOURCE_ROOT = "/runtime/containerd-shim-flox";
 
   private static final List<EmbeddedAsset> FLOX_MATERIALIZATION_ASSETS =
       List.of(
@@ -165,7 +165,7 @@ public final class FloxContainerdShimAssets {
   }
 
   public static Path worktreeShimAssetsRelativePath() {
-    return Path.of("manifests", "src", "main", "resources", "runtime", "flox-containerd-shim");
+    return Path.of("manifests", "src", "main", "resources", "runtime", "containerd-shim-flox");
   }
 
   public static Map<String, String> installerConfigMapData() {
@@ -246,12 +246,12 @@ public final class FloxContainerdShimAssets {
   private static String readResource(String resourcePath) {
     try (InputStream input = FloxContainerdShimAssets.class.getResourceAsStream(resourcePath)) {
       if (input == null) {
-        throw new IllegalStateException("Missing flox-containerd-shim resource: " + resourcePath);
+        throw new IllegalStateException("Missing containerd-shim-flox resource: " + resourcePath);
       }
       return new String(input.readAllBytes(), StandardCharsets.UTF_8);
     } catch (IOException ex) {
       throw new UncheckedIOException(
-          "Failed reading flox-containerd-shim resource: " + resourcePath, ex);
+          "Failed reading containerd-shim-flox resource: " + resourcePath, ex);
     }
   }
 

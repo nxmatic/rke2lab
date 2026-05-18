@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/nxmatic/rke2lab/flox-containerd-shim-wrapper/internal/wrapper"
+	"github.com/nxmatic/rke2lab/containerd-shim-flox-wrapper/internal/wrapper"
 )
 
 func main() {
