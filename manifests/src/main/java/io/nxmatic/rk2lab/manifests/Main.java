@@ -125,6 +125,10 @@ public final class Main {
               ".sh.d/daemonless-host-asset-materializer.sh",
               false),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
+              "/runtime/daemonset/.sh.d/daemonless-host-shell-policy.sh",
+              ".sh.d/daemonless-host-shell-policy.sh",
+              false),
+          new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/daemonset/.sh.d/daemonless-trampoline.sh",
               ".sh.d/daemonless-trampoline.sh",
               false),

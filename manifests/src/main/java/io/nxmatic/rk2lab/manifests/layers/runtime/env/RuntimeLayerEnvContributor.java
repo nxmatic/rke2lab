@@ -1,4 +1,4 @@
-package io.nxmatic.rk2lab.manifests.layers.runtime;
+package io.nxmatic.rk2lab.manifests.layers.runtime.env;
 
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
@@ -10,7 +10,7 @@ import java.util.Map;
  * Runtime layer environment variable contributor. Contributes: rke2, config, containerd, cri, helm,
  * kubectl, user, daemonset-script-policy
  */
-public class RuntimeLayerEnvContributor implements LayerEnvContributor {
+public final class RuntimeLayerEnvContributor implements LayerEnvContributor {
 
   @Override
   public String layerId() {
@@ -63,7 +63,7 @@ public class RuntimeLayerEnvContributor implements LayerEnvContributor {
       case "daemonset-script-policy" ->
           Map.of(
               "DAEMONSET_SCRIPT_ROOT", "/var/lib/rke2lab/daemonset-scripts.d",
-              "SCRIPT_POLICY_DIR", "/var/lib/rke2lab/script-policy.d");
+              "SCRIPT_POLICY_ROOT", "/var/lib/rke2lab/script-policy.d");
       default -> Map.of();
     };
   }

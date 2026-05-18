@@ -3,6 +3,11 @@ package io.nxmatic.rk2lab.manifests.layers.runtime;
 
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomain;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistrar;
+import io.nxmatic.rk2lab.manifests.layers.runtime.cloudinit.CloudConfigManifestUnit;
+import io.nxmatic.rk2lab.manifests.layers.runtime.daemonset.RuntimeDaemonsetScriptPolicyManifestUnit;
+import io.nxmatic.rk2lab.manifests.layers.runtime.env.RKE2LabEnvConfigManifestUnit;
+import io.nxmatic.rk2lab.manifests.layers.runtime.flox.FloxContainerdShimManifestUnit;
+import io.nxmatic.rk2lab.manifests.layers.runtime.rke2.RKE2ConfigManifestUnit;
 import java.util.List;
 
 public final class RuntimeDomainRegistrar implements LayerDomainRegistrar {

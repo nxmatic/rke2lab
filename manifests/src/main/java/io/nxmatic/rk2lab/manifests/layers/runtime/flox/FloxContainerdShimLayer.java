@@ -1,11 +1,12 @@
 // @codebase
-package io.nxmatic.rk2lab.manifests.layers.runtime;
+package io.nxmatic.rk2lab.manifests.layers.runtime.flox;
 
 import io.nxmatic.rk2lab.manifests.WrapperGoArchiveAssets;
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterLayerRefs;
 import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import io.nxmatic.rk2lab.manifests.layers.mesh.MeshLayerRefs;
+import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -354,7 +355,7 @@ public final class FloxContainerdShimLayer extends Construct {
                                     "value",
                                     "/run/k3s/containerd/containerd.sock"),
                                 Map.of("name", "SCRIPT_MOUNT_DIR", "value", "/.sh"),
-                                Map.of("name", "SCRIPT_POLICY_DIR", "value", "/runtime-daemonset"),
+                                Map.of("name", "SCRIPT_POLICY_ROOT", "value", "/runtime-daemonset"),
                                 Map.of("name", "BUILD_ASSETS_DIR", "value", "/.sh/build-assets"),
                                 Map.of("name", "HOST_ROOT", "value", "/host-root")
                               },
@@ -501,17 +502,22 @@ public final class FloxContainerdShimLayer extends Construct {
                                         "key",
                                         "daemonset-logging.sh",
                                         "path",
-                                        "daemonset-logging.sh"),
+                                        ".sh.d/daemonset-logging.sh"),
                                     Map.of(
                                         "key",
                                         "daemonless-host-asset-materializer.sh",
                                         "path",
-                                        "daemonless-host-asset-materializer.sh"),
+                                        ".sh.d/daemonless-host-asset-materializer.sh"),
+                                    Map.of(
+                                        "key",
+                                        "daemonless-host-shell-policy.sh",
+                                        "path",
+                                        ".sh.d/daemonless-host-shell-policy.sh"),
                                     Map.of(
                                         "key",
                                         "daemonless-trampoline.sh",
                                         "path",
-                                        "daemonless-trampoline.sh")
+                                        ".sh.d/daemonless-trampoline.sh")
                                   },
                                   "name",
                                   RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name()),

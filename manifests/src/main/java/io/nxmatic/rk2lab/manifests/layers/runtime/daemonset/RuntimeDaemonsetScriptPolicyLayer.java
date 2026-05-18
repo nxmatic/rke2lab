@@ -1,9 +1,10 @@
 // @codebase
-package io.nxmatic.rk2lab.manifests.layers.runtime;
+package io.nxmatic.rk2lab.manifests.layers.runtime.daemonset;
 
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterLayerRefs;
 import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
+import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -76,6 +77,8 @@ public final class RuntimeDaemonsetScriptPolicyLayer extends Construct {
                 readResource("/runtime/daemonset/.sh.d/daemonset-logging.sh"),
                 "daemonless-host-asset-materializer.sh",
                 readResource("/runtime/daemonset/.sh.d/daemonless-host-asset-materializer.sh"),
+                "daemonless-host-shell-policy.sh",
+                readResource("/runtime/daemonset/.sh.d/daemonless-host-shell-policy.sh"),
                 "daemonless-trampoline.sh",
                 readResource("/runtime/daemonset/.sh.d/daemonless-trampoline.sh"))));
   }

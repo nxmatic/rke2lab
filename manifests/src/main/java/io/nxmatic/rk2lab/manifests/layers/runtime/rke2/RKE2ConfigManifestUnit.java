@@ -1,5 +1,5 @@
 // @codebase
-package io.nxmatic.rk2lab.manifests.layers.runtime;
+package io.nxmatic.rk2lab.manifests.layers.runtime.rke2;
 
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
 import java.util.List;

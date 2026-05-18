@@ -1,5 +1,5 @@
 // @codebase
-package io.nxmatic.rk2lab.manifests.layers.runtime;
+package io.nxmatic.rk2lab.manifests.layers.runtime.daemonset;
 
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterRuntimeNamespaceManifestUnit;
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;

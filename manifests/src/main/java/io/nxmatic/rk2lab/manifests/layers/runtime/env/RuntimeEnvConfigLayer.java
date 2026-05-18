@@ -1,5 +1,5 @@
 // @codebase
-package io.nxmatic.rk2lab.manifests.layers.runtime;
+package io.nxmatic.rk2lab.manifests.layers.runtime.env;
 
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
