@@ -26,6 +26,8 @@ import java.util.function.Consumer;
  */
 public final class ClusterBootstrapReadinessVerifier {
 
+  private static final String MANDATORY_TARGET = "rke2lab.target";
+
   private static final Duration KUBECONFIG_WAIT_TIMEOUT = Duration.ofMinutes(10);
 
   private static final Duration API_READY_TIMEOUT = Duration.ofMinutes(10);
@@ -208,13 +210,14 @@ public final class ClusterBootstrapReadinessVerifier {
               Duration.ofSeconds(8));
       final boolean envDirReady = envDirCheck.exitCode() == 0;
 
-      final CommandResult rke2ActiveCheck =
+      final CommandResult mandatoryTargetCheck =
           runCommand(
-              incusExec(config, "systemctl", "is-active", "rke2-server.service"),
-              Duration.ofSeconds(8));
-      final boolean rke2Active =
-          rke2ActiveCheck.exitCode() == 0
-              && rke2ActiveCheck.stdout().trim().equalsIgnoreCase("active");
+              incusExec(config, "systemctl", "is-active", MANDATORY_TARGET), Duration.ofSeconds(8));
+      final String mandatoryTargetState =
+          firstLineOrFallback(
+              mandatoryTargetCheck.stdout(),
+              firstLineOrFallback(mandatoryTargetCheck.stderr(), "unknown"));
+      final boolean mandatoryTargetHealthy = isMandatoryTargetHealthy(mandatoryTargetState);
 
       final CommandResult jobsSnapshot =
           runCommand(
@@ -224,11 +227,16 @@ public final class ClusterBootstrapReadinessVerifier {
 
       final CommandResult failedUnitsSnapshot =
           runCommand(
-              incusExec(config, "systemctl", "show", "--property=NFailedUnits", "--value"),
+              incusExec(
+                  config,
+                  "sh",
+                  "-lc",
+                  "systemctl list-units --failed --no-legend --no-pager 2>/dev/null | wc -l"),
               Duration.ofSeconds(8));
       final int failedUnitCount = parseIntOrDefault(failedUnitsSnapshot.stdout().trim(), -1);
+      final String jobsTopSummary = summarizeJobsWithState(jobsSnapshot.stdout(), 5);
 
-      if (envDirReady && rke2Active && pendingJobCount == 0 && failedUnitCount == 0) {
+      if (envDirReady && mandatoryTargetHealthy && pendingJobCount == 0 && failedUnitCount == 0) {
         logInfo("seed node bootstrap preconditions ready after " + elapsedSince(startedAt));
         return true;
       }
@@ -245,10 +253,12 @@ public final class ClusterBootstrapReadinessVerifier {
       lastSummary =
           "envDir="
               + (envDirReady ? "ready" : "missing")
-              + ", rke2="
-              + (rke2Active ? "active" : rke2ActiveCheck.summary())
+              + ", mandatoryTarget="
+              + summarizeMandatoryTarget(mandatoryTargetState)
               + ", pendingJobs="
               + jobsSummary
+              + ", jobsTop="
+              + jobsTopSummary
               + ", failedUnits="
               + failedUnitsSummary;
 
@@ -291,6 +301,49 @@ public final class ClusterBootstrapReadinessVerifier {
     } catch (NumberFormatException ignored) {
       return fallback;
     }
+  }
+
+  private static String summarizeJobsWithState(String jobsOutput, int maxEntries) {
+    if (jobsOutput == null || jobsOutput.isBlank() || maxEntries <= 0) {
+      return "none";
+    }
+
+    final ArrayList<String> tokens = new ArrayList<>();
+    for (String line : jobsOutput.lines().toList()) {
+      final String trimmed = line.trim();
+      if (trimmed.isBlank()) {
+        continue;
+      }
+
+      final String[] parts = trimmed.split("\\s+");
+      if (parts.length >= 4) {
+        tokens.add(parts[1] + "(" + parts[3] + ")");
+      } else {
+        tokens.add(trimmed);
+      }
+      if (tokens.size() == maxEntries) {
+        break;
+      }
+    }
+
+    if (tokens.isEmpty()) {
+      return "none";
+    }
+    return String.join(",", tokens);
+  }
+
+  private static String summarizeMandatoryTarget(String mandatoryTargetState) {
+    final String state =
+        mandatoryTargetState == null || mandatoryTargetState.isBlank()
+            ? "unknown"
+            : mandatoryTargetState;
+    return MANDATORY_TARGET + "=" + state;
+  }
+
+  private static boolean isMandatoryTargetHealthy(String mandatoryTargetState) {
+    final String normalizedState =
+        mandatoryTargetState == null ? "" : mandatoryTargetState.trim().toLowerCase();
+    return "active".equals(normalizedState);
   }
 
   private static boolean waitForApiReady(Path kubeconfigPath) {

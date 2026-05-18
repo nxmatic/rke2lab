@@ -54,11 +54,16 @@ public final class Main {
               new BootstrapConfig.Builder().applyConfig(config).build();
           final ControlplanePolicy controlplanePolicy = ControlplanePolicy.from(config);
           final boolean readinessEnabled = resolveReadinessEnabled(config);
+          final boolean cleanWorktreeRequired = resolveCleanWorktreeRequired(config);
           final Consumer<String> readinessLogger =
               message -> context.log().info("[readiness] " + message);
           final BootstrapOutputs outputs =
               bootstrapAndCollectOutputs(
-                  bootstrapConfig, controlplanePolicy, readinessEnabled, readinessLogger);
+                  bootstrapConfig,
+                  controlplanePolicy,
+                  readinessEnabled,
+                  cleanWorktreeRequired,
+                  readinessLogger);
           outputs.values().forEach(context::export);
         });
   }
@@ -67,8 +72,9 @@ public final class Main {
       BootstrapConfig config,
       ControlplanePolicy policy,
       boolean readinessEnabled,
+      boolean cleanWorktreeRequired,
       Consumer<String> readinessLogger) {
-    enforceEntryGatePolicies(config.localWorktreePath());
+    enforceEntryGatePolicies(config.localWorktreePath(), cleanWorktreeRequired);
     RuntimeCommandPreflight.enforceRequiredCommands(List.of("ssh", "kubectl"), readinessLogger);
     RuntimeCommandPreflight.enforceRemoteCommandAvailable(
         config.imageBuilderHost(), "incus", readinessLogger);
@@ -256,7 +262,8 @@ public final class Main {
     final Consumer<String> readinessLogger =
         message -> System.out.println("[readiness] " + message);
     final BootstrapOutputs outputs =
-        bootstrapAndCollectOutputs(bootstrapConfig, controlplanePolicy, true, readinessLogger);
+        bootstrapAndCollectOutputs(
+            bootstrapConfig, controlplanePolicy, true, true, readinessLogger);
     System.out.println(
         "Pulumi engine not detected (missing PULUMI_MONITOR). Running in standalone mode.");
     System.out.println("Bootstrap outputs:");
@@ -360,9 +367,12 @@ public final class Main {
     return truncated;
   }
 
-  private static void enforceEntryGatePolicies(Path worktreePath) {
+  private static void enforceEntryGatePolicies(Path worktreePath, boolean cleanWorktreeRequired) {
     final Path normalizedWorktreePath = worktreePath.toAbsolutePath().normalize();
     for (EntryGatePolicy policy : ENTRY_GATE_POLICIES) {
+      if ("clean-git-worktree".equals(policy.name()) && !cleanWorktreeRequired) {
+        continue;
+      }
       try {
         policy.check().run(normalizedWorktreePath);
       } catch (IllegalStateException ex) {
@@ -370,6 +380,25 @@ public final class Main {
             "Entry-gate policy failed (" + policy.name() + "): " + ex.getMessage(), ex);
       }
     }
+  }
+
+  private static boolean resolveCleanWorktreeRequired(Config config) {
+    if (config == null) {
+      return true;
+    }
+
+    final String raw = config.get("entryGate.cleanWorktree.required").orElse("").trim();
+    if (raw.isBlank()) {
+      return true;
+    }
+
+    return switch (raw.toLowerCase()) {
+      case "1", "true", "yes", "on" -> true;
+      case "0", "false", "no", "off" -> false;
+      default ->
+          throw new IllegalArgumentException(
+              "Invalid boolean for entryGate.cleanWorktree.required: " + raw);
+    };
   }
 
   private static void enforceFlakeLockCoherence(Path worktreePath) {

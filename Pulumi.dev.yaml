@@ -22,3 +22,4 @@ config:
   "rke2lab:policy.link.mesh.enabled": "false"
   "rke2lab:bootstrap.skipRecipes": "false"
   "rke2lab:readiness.enabled": "true"
+  "rke2lab:entryGate.cleanWorktree.required": "false"
