@@ -15,14 +15,14 @@ public record ManifestDomainPolicy(Map<String, Boolean> enabledByDomainId) {
   }
 
   public static ManifestDomainPolicy stageALinkPolicy(
-      boolean haEnabled,
+      boolean highAvailabilityEnabled,
       boolean networkingEnabled,
       boolean replicationEnabled,
       boolean storageEnabled,
       boolean meshEnabled) {
     return new ManifestDomainPolicy(
         Map.of(
-            ManifestDomainIds.HA, haEnabled,
+            ManifestDomainIds.HIGH_AVAILABILITY, highAvailabilityEnabled,
             ManifestDomainIds.NETWORKING, networkingEnabled,
             ManifestDomainIds.REPLICATION, replicationEnabled,
             ManifestDomainIds.STORAGE, storageEnabled,

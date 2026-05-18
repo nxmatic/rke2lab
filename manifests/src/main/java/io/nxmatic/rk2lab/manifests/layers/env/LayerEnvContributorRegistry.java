@@ -30,7 +30,7 @@ public class LayerEnvContributorRegistry {
 
   /**
    * Order contributors by layer priority (deterministic). Execution order: cluster → node → storage
-   * → networking → ha → runtime → gitops.
+   * → networking → high-availability → runtime → gitops.
    */
   public List<LayerEnvContributor> orderedContributors() {
     var order =
@@ -39,7 +39,7 @@ public class LayerEnvContributorRegistry {
             "node", 2,
             "storage", 3,
             "networking", 4,
-            "ha", 5,
+            "high-availability", 5,
             "runtime", 6,
             "gitops", 7);
     contributors.sort(
@@ -50,7 +50,8 @@ public class LayerEnvContributorRegistry {
 
   /**
    * Aggregate all layer contributions into a merged env map (for 99-configmap generation). Later
-   * layers override earlier ones (cluster < node < storage < networking < ha < runtime < gitops).
+   * layers override earlier ones (cluster < node < storage < networking < high-availability <
+   * runtime < gitops).
    */
   public Map<String, String> aggregateContributions() throws IOException {
     var aggregated = new HashMap<String, String>();

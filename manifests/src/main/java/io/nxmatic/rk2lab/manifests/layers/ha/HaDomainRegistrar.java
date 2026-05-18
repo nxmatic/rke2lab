@@ -11,7 +11,7 @@ public final class HaDomainRegistrar implements LayerDomainRegistrar {
   @Override
   public LayerDomain domain() {
     return new LayerDomain(
-        ManifestDomainIds.HA,
+        ManifestDomainIds.HIGH_AVAILABILITY,
         List.of(ManifestDomainIds.NETWORKING),
         List.of(new KubeVipManifestUnit()));
   }

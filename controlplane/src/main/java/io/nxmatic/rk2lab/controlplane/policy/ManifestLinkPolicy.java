@@ -13,18 +13,22 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains) {
   }
 
   public static ManifestLinkPolicy stageA(
-      boolean haEnabled,
+      boolean highAvailabilityEnabled,
       boolean networkingEnabled,
       boolean replicationEnabled,
       boolean storageEnabled,
       boolean meshEnabled) {
     return new ManifestLinkPolicy(
         ManifestDomainPolicy.stageALinkPolicy(
-            haEnabled, networkingEnabled, replicationEnabled, storageEnabled, meshEnabled));
+            highAvailabilityEnabled,
+            networkingEnabled,
+            replicationEnabled,
+            storageEnabled,
+            meshEnabled));
   }
 
-  public boolean haEnabled() {
-    return domains.isEnabled(ManifestDomainIds.HA);
+  public boolean highAvailabilityEnabled() {
+    return domains.isEnabled(ManifestDomainIds.HIGH_AVAILABILITY);
   }
 
   public boolean networkingEnabled() {
@@ -45,16 +49,21 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains) {
 
   public Map<String, String> toEnvMap() {
     return Map.of(
-        "RKE2LAB_POLICY_LINK_HA_ENABLED", Boolean.toString(haEnabled()),
-        "RKE2LAB_POLICY_LINK_NETWORKING_ENABLED", Boolean.toString(networkingEnabled()),
-        "RKE2LAB_POLICY_LINK_REPLICATION_ENABLED", Boolean.toString(replicationEnabled()),
-        "RKE2LAB_POLICY_LINK_STORAGE_ENABLED", Boolean.toString(storageEnabled()),
-        "RKE2LAB_POLICY_LINK_MESH_ENABLED", Boolean.toString(meshEnabled()));
+        "RKE2LAB_POLICY_LINK_HIGH_AVAILABILITY_ENABLED",
+        Boolean.toString(highAvailabilityEnabled()),
+        "RKE2LAB_POLICY_LINK_NETWORKING_ENABLED",
+        Boolean.toString(networkingEnabled()),
+        "RKE2LAB_POLICY_LINK_REPLICATION_ENABLED",
+        Boolean.toString(replicationEnabled()),
+        "RKE2LAB_POLICY_LINK_STORAGE_ENABLED",
+        Boolean.toString(storageEnabled()),
+        "RKE2LAB_POLICY_LINK_MESH_ENABLED",
+        Boolean.toString(meshEnabled()));
   }
 
   public Map<String, Object> toOutputMap() {
     return Map.of(
-        "policyLinkHaEnabled", haEnabled(),
+        "policyLinkHighAvailabilityEnabled", highAvailabilityEnabled(),
         "policyLinkNetworkingEnabled", networkingEnabled(),
         "policyLinkReplicationEnabled", replicationEnabled(),
         "policyLinkStorageEnabled", storageEnabled(),

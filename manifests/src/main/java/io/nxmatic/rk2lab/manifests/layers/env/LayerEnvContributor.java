@@ -13,8 +13,8 @@ import java.util.Map;
 public interface LayerEnvContributor {
 
   /**
-   * Unique identifier for this contributor (e.g., "networking", "storage", "ha"). Used for
-   * ConfigMap naming and override ordering.
+   * Unique identifier for this contributor (e.g., "networking", "storage", "high-availability").
+   * Used for ConfigMap naming and override ordering.
    */
   String layerId();
 

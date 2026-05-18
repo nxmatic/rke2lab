@@ -24,7 +24,7 @@ public record ControlplanePolicy(DebugPolicy debug, ManifestLinkPolicy manifestL
     ManifestLinkPolicy manifestLinkPolicy =
         new ManifestLinkPolicy(
             ManifestDomainPolicy.stageALinkPolicy(
-                environment.bool("policy.link.ha.enabled", true),
+                environment.bool("policy.link.highAvailability.enabled", true),
                 environment.bool("policy.link.networking.enabled", true),
                 environment.bool("policy.link.replication.enabled", true),
                 environment.bool("policy.link.storage.enabled", true),

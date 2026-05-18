@@ -66,7 +66,7 @@ link_layer_if_enabled() {
 	fi
 }
 
-link_layer_if_enabled "ha" "ha" "ha" "true"
+link_layer_if_enabled "high-availability" "high-availability" "high-availability" "true"
 
 : "Do not pre-link post-server layer trees into the live RKE2 manifests directory here."
 : "Those layers are installed by dedicated rke2lab-*-manifests services that impose their own"

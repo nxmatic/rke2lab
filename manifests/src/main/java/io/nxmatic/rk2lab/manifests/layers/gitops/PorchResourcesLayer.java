@@ -180,17 +180,17 @@ public final class PorchResourcesLayer extends Construct {
   private void createHaKubeVipPackageVariant(
       final ApiObject catalogRepo, final ApiObject stateRepo) {
     createPackageVariant(
-        "packagevariant-ha-kube-vip",
-        "ha-kube-vip",
-        "config.porch.kpt.dev|PackageVariant|porch-system|ha-kube-vip",
-        "ha/kube-vip",
+        "packagevariant-high-availability-kube-vip",
+        "high-availability-kube-vip",
+        "config.porch.kpt.dev|PackageVariant|porch-system|high-availability-kube-vip",
+        "high-availability/kube-vip",
         Map.of(
             "cluster-name",
             CLUSTER_NAME,
             "nxmatic.dev/app",
             "kube-vip",
             "nxmatic.dev/component",
-            "ha"),
+            "high-availability"),
         Map.of(
             "cluster-node-vip-inetaddr",
             "10.80.7.10",

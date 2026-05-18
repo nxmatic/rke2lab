@@ -1,17 +1,18 @@
 package io.nxmatic.rk2lab.manifests.layers.ha;
 
+import io.nxmatic.rk2lab.manifests.api.ManifestDomainIds;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-/** HA (High Availability) layer environment variable contributor. Contributes: network-vip */
+/** HighAvailability layer environment variable contributor. Contributes: network-vip */
 public class HaLayerEnvContributor implements LayerEnvContributor {
 
   @Override
   public String layerId() {
-    return "ha";
+    return ManifestDomainIds.HIGH_AVAILABILITY;
   }
 
   @Override

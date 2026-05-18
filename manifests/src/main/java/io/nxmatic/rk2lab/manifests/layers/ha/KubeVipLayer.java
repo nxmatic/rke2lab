@@ -12,10 +12,10 @@ import software.constructs.Construct;
 
 public final class KubeVipLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "ha/kube-vip/";
+  public static final String PATH_PREFIX = "high-availability/kube-vip/";
 
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile("ha", "kube-vip");
+      new PackageMetadataProfile("high-availability", "kube-vip");
 
   public KubeVipLayer(final Construct scope, final String id) {
     super(scope, id);
@@ -85,7 +85,7 @@ public final class KubeVipLayer extends Construct {
                                 "internal.kpt.dev/upstream-identifier",
                                 "rbac.authorization.k8s.io|ClusterRole|default|system:kube-vip-role",
                                 "kpt.dev/package-layer",
-                                "ha",
+                                "high-availability",
                                 "kpt.dev/package-name",
                                 "kube-vip",
                                 "rbac.authorization.kubernetes.io/autoupdate",

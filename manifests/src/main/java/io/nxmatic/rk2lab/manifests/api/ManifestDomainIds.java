@@ -19,15 +19,24 @@ public final class ManifestDomainIds {
 
   public static final String MESH = "mesh";
 
-  public static final String HA = "ha";
+  public static final String HIGH_AVAILABILITY = "high-availability";
 
   public static final String CICD = "cicd";
 
   private static final List<String> ALL =
-      List.of(CLUSTER, STORAGE, REPLICATION, GITOPS, RUNTIME, NETWORKING, MESH, HA, CICD);
+      List.of(
+          CLUSTER,
+          STORAGE,
+          REPLICATION,
+          GITOPS,
+          RUNTIME,
+          NETWORKING,
+          MESH,
+          HIGH_AVAILABILITY,
+          CICD);
 
   private static final List<String> STAGE_A_LINKABLE_DOMAINS =
-      List.of(HA, NETWORKING, REPLICATION, STORAGE, MESH);
+      List.of(HIGH_AVAILABILITY, NETWORKING, REPLICATION, STORAGE, MESH);
 
   private ManifestDomainIds() {}
 
