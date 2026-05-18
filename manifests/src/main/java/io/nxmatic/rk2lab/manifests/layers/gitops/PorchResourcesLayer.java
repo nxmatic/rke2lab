@@ -29,7 +29,7 @@ public final class PorchResourcesLayer extends Construct {
 
     createNetworkingCiliumPackageVariant(catalogRepo, stateRepo);
     createNetworkingEnvoyGatewayPackageVariant(catalogRepo, stateRepo);
-    createHaKubeVipPackageVariant(catalogRepo, stateRepo);
+    createHighAvailabilityKubeVipPackageVariant(catalogRepo, stateRepo);
     createMeshHeadscalePackageVariant(catalogRepo, stateRepo);
     createMeshTailscalePackageVariant(catalogRepo, stateRepo);
     createRuntimeFloxPackageVariant(catalogRepo, stateRepo);
@@ -177,7 +177,7 @@ public final class PorchResourcesLayer extends Construct {
         stateRepo);
   }
 
-  private void createHaKubeVipPackageVariant(
+  private void createHighAvailabilityKubeVipPackageVariant(
       final ApiObject catalogRepo, final ApiObject stateRepo) {
     createPackageVariant(
         "packagevariant-high-availability-kube-vip",

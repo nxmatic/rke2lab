@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 /** HighAvailability layer environment variable contributor. Contributes: network-vip */
-public class HaLayerEnvContributor implements LayerEnvContributor {
+public class HighAvailabilityLayerEnvContributor implements LayerEnvContributor {
 
   @Override
   public String layerId() {

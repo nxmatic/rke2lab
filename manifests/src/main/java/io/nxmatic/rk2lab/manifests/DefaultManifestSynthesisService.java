@@ -16,7 +16,7 @@ import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitRegistry;
 import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitVisitor;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestAssemblyRegistry;
 import io.nxmatic.rk2lab.manifests.layers.gitops.GitopsDomainRegistrar;
-import io.nxmatic.rk2lab.manifests.layers.ha.HaDomainRegistrar;
+import io.nxmatic.rk2lab.manifests.layers.ha.HighAvailabilityDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.mesh.MeshDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.networking.NetworkingDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.replication.ReplicationDomainRegistrar;
@@ -67,7 +67,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             .register(new RuntimeDomainRegistrar())
             .register(new NetworkingDomainRegistrar())
             .register(new MeshDomainRegistrar())
-            .register(new HaDomainRegistrar())
+            .register(new HighAvailabilityDomainRegistrar())
             .register(new CicdDomainRegistrar())
             .build();
 

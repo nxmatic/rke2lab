@@ -6,7 +6,7 @@ import io.nxmatic.rk2lab.manifests.layers.common.LayerDomain;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistrar;
 import java.util.List;
 
-public final class HaDomainRegistrar implements LayerDomainRegistrar {
+public final class HighAvailabilityDomainRegistrar implements LayerDomainRegistrar {
 
   @Override
   public LayerDomain domain() {
