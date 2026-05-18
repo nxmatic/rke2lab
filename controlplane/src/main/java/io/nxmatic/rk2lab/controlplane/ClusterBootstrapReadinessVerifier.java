@@ -1,7 +1,5 @@
 package io.nxmatic.rk2lab.controlplane;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
 import java.io.IOException;
@@ -9,7 +7,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,8 +25,6 @@ import java.util.function.Consumer;
  * </ol>
  */
 public final class ClusterBootstrapReadinessVerifier {
-
-  private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
   private static final Duration KUBECONFIG_WAIT_TIMEOUT = Duration.ofMinutes(10);
 
@@ -266,46 +261,7 @@ public final class ClusterBootstrapReadinessVerifier {
   }
 
   private static Map<String, Object> readSystemdAdapterSnapshot(BootstrapConfig config) {
-    final CommandResult result =
-        runCommand(
-            incusExec(config, "sh", "-lc", adapterStatusCommand(config)), Duration.ofSeconds(8));
-
-    if (result.exitCode() != 0) {
-      return Map.of(
-          "status",
-          "command-failed",
-          "summary",
-          result.summary(),
-          "capturedAt",
-          Instant.now().toString(),
-          "endpoint",
-          config.systemdAdapterStatusEndpoint().toString());
-    }
-
-    try {
-      final LinkedHashMap<String, Object> parsed =
-          new LinkedHashMap<>(
-              JSON_MAPPER.readValue(result.stdout(), new TypeReference<Map<String, Object>>() {}));
-      parsed.put("status", "ok");
-      parsed.putIfAbsent("capturedAt", Instant.now().toString());
-      parsed.put("endpoint", config.systemdAdapterStatusEndpoint().toString());
-      return Map.copyOf(parsed);
-    } catch (IOException ex) {
-      return Map.of(
-          "status",
-          "parse-error",
-          "summary",
-          "failed to parse adapter status JSON: " + ex.getMessage(),
-          "capturedAt",
-          Instant.now().toString(),
-          "endpoint",
-          config.systemdAdapterStatusEndpoint().toString());
-    }
-  }
-
-  private static String adapterStatusCommand(BootstrapConfig config) {
-    return "curl --silent --show-error --fail --max-time 5 "
-        + shellQuote(config.systemdAdapterStatusEndpoint().toString());
+    return SeedSystemdAdapterRuntimeStatusSnapshot.snapshot(config, null);
   }
 
   private static boolean toBoolean(Object value) {
@@ -544,44 +500,6 @@ public final class ClusterBootstrapReadinessVerifier {
     } catch (IOException ex) {
       return new CommandResult(-1, "", "failed to execute command: " + ex.getMessage());
     }
-  }
-
-  private static List<String> incusExec(BootstrapConfig config, String... args) {
-    final String remoteIncusCommand =
-        "incus --project "
-            + shellQuote(config.incusProject())
-            + " exec "
-            + " "
-            + shellQuote(config.nodeName())
-            + " -- "
-            + joinShellQuoted(args);
-
-    return List.of(
-        "ssh",
-        "-o",
-        "BatchMode=yes",
-        "-o",
-        "ConnectTimeout=10",
-        config.imageBuilderHost(),
-        "sh",
-        "-lc",
-        remoteIncusCommand);
-  }
-
-  private static String joinShellQuoted(String... values) {
-    if (values == null || values.length == 0) {
-      return "";
-    }
-
-    final ArrayList<String> quoted = new ArrayList<>(values.length);
-    for (String value : values) {
-      quoted.add(shellQuote(value == null ? "" : value));
-    }
-    return String.join(" ", quoted);
-  }
-
-  private static String shellQuote(String value) {
-    return "'" + value.replace("'", "'\"'\"'") + "'";
   }
 
   private static void sleep(Duration duration) {

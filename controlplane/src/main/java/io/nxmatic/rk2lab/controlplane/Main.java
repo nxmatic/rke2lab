@@ -91,12 +91,20 @@ public final class Main {
     }
     final Object readinessOutput;
     final Object clusterReadinessResourceUrn;
+    final Object systemdAdapterResourceUrn;
     final Object registryResourceUrn;
     final Object imageBuildResourceUrn;
     final Map<String, Object> registrySummary;
     final Map<String, Object> imageBuildSummary;
     final Object systemdRuntimeStatusSummary;
     if (isPulumiEngineAvailable()) {
+      final SystemdAdapterResource systemdAdapterResource =
+          new SystemdAdapterResource(
+              "seed-systemd-adapter",
+              systemdAdapterLaunchSummary,
+              bootstrapResult.readinessDependency());
+      systemdAdapterResourceUrn = systemdAdapterResource.urn();
+
       final ClusterReadinessResource readinessResource =
           new ClusterReadinessResource(
               "seed-cluster-readiness",
@@ -145,6 +153,7 @@ public final class Main {
               ? ClusterBootstrapReadinessVerifier.verify(config, policy, readinessLogger)
               : ClusterBootstrapReadinessVerifier.skipped(policy, readinessLogger);
       clusterReadinessResourceUrn = "";
+      systemdAdapterResourceUrn = "";
       registryResourceUrn = "";
       imageBuildResourceUrn = "";
       registrySummary =
@@ -252,6 +261,7 @@ public final class Main {
               : "wait-for-cluster-readiness");
     }
     outputs.put("clusterReadinessResourceUrn", clusterReadinessResourceUrn);
+    outputs.put("systemdAdapterResourceUrn", systemdAdapterResourceUrn);
     outputs.put("registryResourceUrn", registryResourceUrn);
     outputs.put("seedImageBuildResourceUrn", imageBuildResourceUrn);
     outputs.put("registrySummary", registrySummary);

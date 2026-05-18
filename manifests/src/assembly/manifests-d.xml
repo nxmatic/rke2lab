@@ -23,5 +23,12 @@
         <include>**/*</include>
       </includes>
     </fileSet>
+    <fileSet>
+      <directory>${project.build.directory}/generated-resources/host</directory>
+      <outputDirectory>manifests.d/host</outputDirectory>
+      <includes>
+        <include>**/*</include>
+      </includes>
+    </fileSet>
   </fileSets>
 </assembly>

@@ -9,15 +9,15 @@ package "systemd-adapter" {
   rectangle "SystemdAdapterApplication\nSpring bootstrap" as app
   rectangle "SystemdStatusController\n/status/systemd\n/healthz/systemd" as controller
   rectangle "SystemdStatusSnapshotProvider\ninterface" as provider
-  rectangle "ShellSystemdStatusSnapshotProvider\ncurrent implementation" as shellProvider
+  rectangle "DbusSystemdStatusSnapshotProvider\ncurrent implementation" as dbusProvider
   rectangle "SystemdAdapterProperties\nmandatoryTarget + timeout" as props
 }
 
-rectangle "systemctl + systemd" as systemctl
+rectangle "systemd D-Bus\norg.freedesktop.systemd1" as systemdDbus
 
 app --> controller
 controller --> provider
-provider <|.. shellProvider
-shellProvider --> props
-shellProvider --> systemctl
+provider <|.. dbusProvider
+dbusProvider --> props
+dbusProvider --> systemdDbus
 @enduml

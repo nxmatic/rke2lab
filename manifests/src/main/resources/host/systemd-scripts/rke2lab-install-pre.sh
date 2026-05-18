@@ -251,6 +251,8 @@ dasel -i toml -o yaml \
 	yq eval '.install += {"kubectl-rook-ceph": {"pkg-path": "kubectl-rook-ceph", "pkg-group": "k8s-plugins"}}' - |
 	yq eval '.install += {"kubectl-view-secret": {"pkg-path": "kubectl-view-secret", "pkg-group": "k8s-plugins"}}' - |
 	yq eval '.install += {"tubekit": {"pkg-path": "tubekit", "pkg-group": "k8s-clients"}}' - |
+	# runtime-java
+	yq eval '.install += {"jdk25": {"pkg-path": "jdk25", "pkg-group": "runtime-java"}}' - |
 	# manifests
 	yq eval '.install += {"dasel": {"pkg-path": "dasel", "pkg-group": "manifest-yaml"}}' - |
 	yq eval '.install += {"yq-go": {"pkg-path": "yq-go", "pkg-group": "manifest-yaml"}}' - |

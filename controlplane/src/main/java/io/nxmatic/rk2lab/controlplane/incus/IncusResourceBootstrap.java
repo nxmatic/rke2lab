@@ -80,6 +80,8 @@ public final class IncusResourceBootstrap {
 
   private static final String HOST_GIT_WORKTREE_DIR_PATH = "/srv/host/git-worktree.d";
 
+  private static final String HOST_SYSTEMD_LIBEXEC_DIR_PATH = "/srv/host/systemd-libexec.d";
+
   private static final String HOST_SYSTEMD_DIR_PATH = "/srv/host/systemd-units.d";
 
   private static final String HOST_MANIFESTS_DIR_PATH = "/srv/host/rke2-manifests.d";
@@ -360,6 +362,10 @@ public final class IncusResourceBootstrap {
         .disk("rke2lab.env.dir", hostPaths.runtimeEnvConfigRoot(), HOST_ENV_DIR_PATH)
         .disk("rke2lab.scripts.dir", hostPaths.scriptsRoot(), HOST_SCRIPTS_DIR_PATH)
         .disk("git.dir", hostPaths.gitRoot(), HOST_GIT_WORKTREE_DIR_PATH)
+        .disk(
+            "rke2lab.systemd.libexec.dir",
+            hostPaths.systemdLibexecRoot(),
+            HOST_SYSTEMD_LIBEXEC_DIR_PATH)
         .disk("rke2lab.system.dir", hostPaths.systemdRoot(), HOST_SYSTEMD_DIR_PATH)
         .disk("manifests.dir", hostPaths.manifestsRoot(), HOST_MANIFESTS_DIR_PATH)
         .disk("rke2.config.dir", hostPaths.runtimeRke2ConfigRoot(), HOST_RKE2_CONFIG_DIR_PATH)
@@ -609,6 +615,7 @@ public final class IncusResourceBootstrap {
       Path assetsRoot,
       Path daemonsetRoot,
       Path scriptsRoot,
+      Path systemdLibexecRoot,
       Path systemdRoot,
       Path gitRoot,
       Path shareRoot,
@@ -641,6 +648,7 @@ public final class IncusResourceBootstrap {
       final Path runtimeRoot = manifestsRoot.resolve("runtime");
       final Path hostRoot = manifestsRoot.resolve("host");
       final Path scriptsRoot = hostRoot.resolve("systemd-scripts");
+      final Path systemdLibexecRoot = hostRoot.resolve("systemd-libexec");
       final Path systemdRoot = hostRoot.resolve("systemd-units");
 
       return BootstrapPaths.builder()
@@ -655,6 +663,7 @@ public final class IncusResourceBootstrap {
           .assetsRoot(hostResourceRoot)
           .daemonsetRoot(hostResourceRoot.resolve(DaemonsetLogPolicy.HOST_SOURCE_DIRECTORY_NAME))
           .scriptsRoot(scriptsRoot)
+          .systemdLibexecRoot(systemdLibexecRoot)
           .systemdRoot(systemdRoot)
           .gitRoot(worktreeRoot.getParent().getParent())
           .shareRoot(stateRoot.resolve("share"))
@@ -676,6 +685,7 @@ public final class IncusResourceBootstrap {
           .assetsRoot(config.pathOn(host, assetsRoot))
           .daemonsetRoot(config.pathOn(host, daemonsetRoot))
           .scriptsRoot(config.pathOn(host, scriptsRoot))
+          .systemdLibexecRoot(config.pathOn(host, systemdLibexecRoot))
           .systemdRoot(config.pathOn(host, systemdRoot))
           .gitRoot(config.pathOn(host, gitRoot))
           .shareRoot(config.pathOn(host, shareRoot))
@@ -696,6 +706,7 @@ public final class IncusResourceBootstrap {
       private Path assetsRoot;
       private Path daemonsetRoot;
       private Path scriptsRoot;
+      private Path systemdLibexecRoot;
       private Path systemdRoot;
       private Path gitRoot;
       private Path shareRoot;
@@ -757,6 +768,11 @@ public final class IncusResourceBootstrap {
         return this;
       }
 
+      private Builder systemdLibexecRoot(Path value) {
+        this.systemdLibexecRoot = value;
+        return this;
+      }
+
       private Builder systemdRoot(Path value) {
         this.systemdRoot = value;
         return this;
@@ -795,6 +811,7 @@ public final class IncusResourceBootstrap {
             assetsRoot,
             daemonsetRoot,
             scriptsRoot,
+            systemdLibexecRoot,
             systemdRoot,
             gitRoot,
             shareRoot,
@@ -963,6 +980,8 @@ public final class IncusResourceBootstrap {
 
       requirePathExists(paths.secretsFile(), "required secrets file", missingPaths);
       requirePathExists(paths.scriptsRoot(), "required scripts directory", missingPaths);
+      requirePathExists(
+          paths.systemdLibexecRoot(), "required systemd libexec directory", missingPaths);
       requirePathExists(paths.systemdRoot(), "required systemd directory", missingPaths);
       requirePathExists(
           paths.manifestsRoot(), "required generated manifests directory", missingPaths);

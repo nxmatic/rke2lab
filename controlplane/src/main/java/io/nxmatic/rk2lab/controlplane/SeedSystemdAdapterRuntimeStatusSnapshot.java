@@ -15,6 +15,8 @@ import java.util.function.Consumer;
 /** Canonical runtime status snapshot probe backed by the systemd adapter endpoint. */
 public final class SeedSystemdAdapterRuntimeStatusSnapshot {
 
+  private static final String API_VERSION = "rk2lab.nxmatic.io/v1alpha1";
+  private static final String KIND = "SystemdAdapterRuntimeStatus";
   private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(20);
   private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
@@ -23,15 +25,14 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
   }
 
   public static Map<String, Object> deferredPreview(BootstrapConfig config) {
-    return Map.of(
-        "source",
-        "systemd-adapter",
-        "status",
+    return envelope(
         "deferred-preview",
-        "summary",
         "runtime status deferred during preview; endpoint=" + config.systemdAdapterStatusEndpoint(),
-        "capturedAt",
-        Instant.now().toString());
+        Map.of(
+            "source",
+            "systemd-adapter",
+            "endpoint",
+            config.systemdAdapterStatusEndpoint().toString()));
   }
 
   public static Map<String, Object> snapshot(BootstrapConfig config, Consumer<String> logger) {
@@ -44,15 +45,10 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
       final boolean exited = process.waitFor(PROBE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
       if (!exited) {
         process.destroyForcibly();
-        return Map.of(
-            "source",
-            "systemd-adapter",
-            "status",
+        return envelope(
             "timeout",
-            "summary",
             "adapter probe timed out after " + PROBE_TIMEOUT,
-            "capturedAt",
-            Instant.now().toString());
+            Map.of("source", "systemd-adapter", "timeout", PROBE_TIMEOUT.toString()));
       }
 
       final String stdout =
@@ -61,28 +57,36 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
           new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
 
       if (process.exitValue() != 0) {
-        return Map.of(
-            "source",
-            "systemd-adapter",
-            "status",
+        return envelope(
             "command-failed",
-            "exitCode",
-            process.exitValue(),
-            "stderr",
-            summarizeFirstLine(stderr),
-            "summary",
             "adapter probe command failed",
-            "capturedAt",
-            Instant.now().toString());
+            Map.of(
+                "source", "systemd-adapter",
+                "exitCode", process.exitValue(),
+                "stderr", summarizeFirstLine(stderr),
+                "stdout", summarizeFirstLine(stdout)));
+      }
+
+      if (!looksLikeJsonObject(stdout)) {
+        return envelope(
+            "non-json-response",
+            "adapter probe returned non-JSON payload",
+            Map.of(
+                "source", "systemd-adapter",
+                "endpoint", config.systemdAdapterStatusEndpoint().toString(),
+                "payloadFirstLine", summarizeFirstLine(stdout)));
       }
 
       final LinkedHashMap<String, Object> parsed =
           new LinkedHashMap<>(
               JSON_MAPPER.readValue(stdout, new TypeReference<Map<String, Object>>() {}));
+      parsed.put("apiVersion", API_VERSION);
+      parsed.put("kind", KIND);
       parsed.put("source", "systemd-adapter");
       parsed.put("status", "ok");
       parsed.put("endpoint", config.systemdAdapterStatusEndpoint().toString());
       parsed.putIfAbsent("capturedAt", Instant.now().toString());
+      parsed.putIfAbsent("summary", "adapter probe returned JSON payload");
 
       if (logger != null) {
         logger.accept("systemd adapter runtime summary: " + parsed.getOrDefault("summary", "n/a"));
@@ -90,25 +94,13 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
       return Map.copyOf(parsed);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
-      return Map.of(
-          "source",
-          "systemd-adapter",
-          "status",
-          "interrupted",
-          "summary",
-          "adapter probe interrupted",
-          "capturedAt",
-          Instant.now().toString());
+      return envelope(
+          "interrupted", "adapter probe interrupted", Map.of("source", "systemd-adapter"));
     } catch (IOException ex) {
-      return Map.of(
-          "source",
-          "systemd-adapter",
-          "status",
+      return envelope(
           "execution-error",
-          "summary",
           "adapter probe execution error: " + ex.getMessage(),
-          "capturedAt",
-          Instant.now().toString());
+          Map.of("source", "systemd-adapter"));
     }
   }
 
@@ -145,7 +137,29 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
     return value.lines().map(String::trim).filter(line -> !line.isBlank()).findFirst().orElse("");
   }
 
+  private static boolean looksLikeJsonObject(String value) {
+    if (value == null) {
+      return false;
+    }
+    final String trimmed = value.trim();
+    return trimmed.startsWith("{") && trimmed.endsWith("}");
+  }
+
   private static String shellQuote(String value) {
     return "'" + value.replace("'", "'\"'\"'") + "'";
+  }
+
+  private static Map<String, Object> envelope(
+      String status, String summary, Map<String, Object> details) {
+    final LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
+    payload.put("apiVersion", API_VERSION);
+    payload.put("kind", KIND);
+    payload.put("status", status);
+    payload.put("summary", summary);
+    payload.put("capturedAt", Instant.now().toString());
+    if (details != null && !details.isEmpty()) {
+      payload.putAll(details);
+    }
+    return Map.copyOf(payload);
   }
 }

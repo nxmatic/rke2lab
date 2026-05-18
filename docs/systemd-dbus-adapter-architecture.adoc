@@ -6,8 +6,8 @@
 
 This document defines the architecture for the new `systemd-adapter` module and intentionally splits diagrams into small reviewable units.
 
-IMPORTANT: current implementation is shell-backed (`systemctl` via `ShellSystemdStatusSnapshotProvider`).
-Native D-Bus client integration is a follow-up evolution, not the current runtime path.
+IMPORTANT: current implementation is D-Bus-backed (`dbus-java` via `DbusSystemdStatusSnapshotProvider`).
+Shell-backed probing is legacy and no longer the canonical runtime path.
 
 == Runtime placement and Pulumi ownership
 
@@ -16,7 +16,7 @@ not on the operator workstation and not inside the Pulumi controlplane process.
 
 Its architectural role is a node-local proxy/adapter boundary:
 
-* reads systemd state locally from the master node (`systemctl` today; D-Bus-capable backend later)
+* reads systemd state locally from the master node (D-Bus via `org.freedesktop.systemd1`)
 * exposes normalized HTTP status endpoints (`/status/systemd`, `/healthz/systemd`)
 * provides the readiness signal consumed by Pulumi Stage A components
 
@@ -115,17 +115,17 @@ package "systemd-adapter" {
   rectangle "SystemdAdapterApplication\nSpring bootstrap" as app
   rectangle "SystemdStatusController\n/status/systemd\n/healthz/systemd" as controller
   rectangle "SystemdStatusSnapshotProvider\ninterface" as provider
-  rectangle "ShellSystemdStatusSnapshotProvider\ncurrent implementation" as shellProvider
+  rectangle "DbusSystemdStatusSnapshotProvider\ncurrent implementation" as dbusProvider
   rectangle "SystemdAdapterProperties\nmandatoryTarget + timeout" as props
 }
 
-rectangle "systemctl + systemd" as systemctl
+rectangle "systemd D-Bus\norg.freedesktop.systemd1" as systemdDbus
 
 app --> controller
 controller --> provider
-provider <|.. shellProvider
-shellProvider --> props
-shellProvider --> systemctl
+provider <|.. dbusProvider
+dbusProvider --> props
+dbusProvider --> systemdDbus
 @enduml
 ----
 
@@ -142,20 +142,20 @@ title Systemd Adapter - /status/systemd sequence
 
 actor Caller
 participant "SystemdStatusController" as Controller
-participant "ShellSystemdStatusSnapshotProvider" as Provider
-participant "systemctl show/list-jobs/--failed" as Systemctl
+participant "DbusSystemdStatusSnapshotProvider" as Provider
+participant "org.freedesktop.systemd1\n(Properties)" as Dbus
 
 Caller -> Controller : GET /status/systemd
 Controller -> Provider : currentSnapshot()
 
-Provider -> Systemctl : show ActiveState of mandatory target
-Systemctl --> Provider : target state
+Provider -> Dbus : Get(Unit.ActiveState)
+Dbus --> Provider : target state
 
-Provider -> Systemctl : list-jobs --no-legend
-Systemctl --> Provider : tabular jobs
+Provider -> Dbus : Get(Manager.NJobs)
+Dbus --> Provider : pending jobs
 
-Provider -> Systemctl : failed-units --no-legend
-Systemctl --> Provider : failed units listing
+Provider -> Dbus : Get(Manager.NFailedUnits)
+Dbus --> Provider : failed units count
 
 Provider --> Controller : SystemdStatusSnapshot
 Controller --> Caller : 200 + JSON snapshot

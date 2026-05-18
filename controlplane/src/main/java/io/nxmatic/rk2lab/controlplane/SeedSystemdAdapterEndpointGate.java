@@ -14,11 +14,12 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-/**
- * Pulumi-side gate that verifies adapter endpoint reachability via REST, without systemd control.
- */
+/** Pulumi-side gate that starts the adapter service and verifies endpoint reachability via REST. */
 public final class SeedSystemdAdapterEndpointGate {
 
+  private static final String API_VERSION = "rk2lab.nxmatic.io/v1alpha1";
+  private static final String KIND = "SystemdAdapterEndpointGateStatus";
+  private static final String ADAPTER_SERVICE_UNIT = "rke2lab-systemd-adapter.service";
   private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(20);
   private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
@@ -27,21 +28,28 @@ public final class SeedSystemdAdapterEndpointGate {
   }
 
   public static Map<String, Object> deferredPreview(BootstrapConfig config) {
-    return Map.of(
-        "source",
-        "systemd-adapter-endpoint-gate",
-        "status",
+    return envelope(
         "deferred-preview",
-        "endpoint",
-        config.systemdAdapterStatusEndpoint().toString(),
-        "summary",
         "adapter endpoint gate deferred during preview",
-        "capturedAt",
-        Instant.now().toString());
+        Map.of(
+            "source",
+            "systemd-adapter-endpoint-gate",
+            "endpoint",
+            config.systemdAdapterStatusEndpoint().toString()));
   }
 
   public static Map<String, Object> ensureReachable(
       BootstrapConfig config, Consumer<String> logger) {
+    final CommandResult ensureStartedResult = ensureServiceStarted(config);
+    if (ensureStartedResult.exitCode() != 0) {
+      throw new IllegalStateException(
+          "Adapter service failed to start: "
+              + ADAPTER_SERVICE_UNIT
+              + " ("
+              + ensureStartedResult.summary()
+              + ")");
+    }
+
     final CommandResult probeResult =
         runCommand(
             incusExec(
@@ -60,18 +68,30 @@ public final class SeedSystemdAdapterEndpointGate {
               + ")");
     }
 
+    final String stdout = probeResult.stdout();
+    if (!looksLikeJsonObject(stdout)) {
+      return envelope(
+          "non-json-response",
+          "adapter endpoint returned non-JSON payload",
+          Map.of(
+              "source", "systemd-adapter-endpoint-gate",
+              "endpoint", config.systemdAdapterStatusEndpoint().toString(),
+              "payloadFirstLine", firstNonBlankLine(stdout)));
+    }
+
     LinkedHashMap<String, Object> parsed;
     try {
       parsed =
           new LinkedHashMap<>(
-              JSON_MAPPER.readValue(
-                  probeResult.stdout(), new TypeReference<Map<String, Object>>() {}));
+              JSON_MAPPER.readValue(stdout, new TypeReference<Map<String, Object>>() {}));
     } catch (IOException ex) {
-      throw new IllegalStateException(
-          "Adapter endpoint returned non-JSON payload at "
-              + config.systemdAdapterStatusEndpoint()
-              + ": "
-              + ex.getMessage());
+      return envelope(
+          "non-json-response",
+          "adapter endpoint JSON parse failed: " + ex.getMessage(),
+          Map.of(
+              "source", "systemd-adapter-endpoint-gate",
+              "endpoint", config.systemdAdapterStatusEndpoint().toString(),
+              "payloadFirstLine", firstNonBlankLine(stdout)));
     }
 
     final String summary =
@@ -83,17 +103,35 @@ public final class SeedSystemdAdapterEndpointGate {
       logger.accept("systemd adapter endpoint gate: " + summary);
     }
 
-    return Map.of(
-        "source",
-        "systemd-adapter-endpoint-gate",
-        "status",
+    return envelope(
         "ok",
-        "endpoint",
-        config.systemdAdapterStatusEndpoint().toString(),
-        "summary",
         summary,
-        "capturedAt",
-        Instant.now().toString());
+        Map.of(
+            "source",
+            "systemd-adapter-endpoint-gate",
+            "serviceUnit",
+            ADAPTER_SERVICE_UNIT,
+            "endpoint",
+            config.systemdAdapterStatusEndpoint().toString(),
+            "adapterStatus",
+            Map.copyOf(parsed)));
+  }
+
+  private static CommandResult ensureServiceStarted(BootstrapConfig config) {
+    final String script =
+        "set -eu\n"
+            + "if [ -x /srv/host/systemd-scripts.d/rke2lab-systemd-adapter-install.sh ]; then\n"
+            + "  /srv/host/systemd-scripts.d/rke2lab-systemd-adapter-install.sh\n"
+            + "fi\n"
+            + "systemctl daemon-reload\n"
+            + "systemctl start "
+            + shellQuote(ADAPTER_SERVICE_UNIT)
+            + "\n"
+            + "systemctl is-active "
+            + shellQuote(ADAPTER_SERVICE_UNIT)
+            + "\n";
+
+    return runCommand(incusExec(config, "sh", "-lc", script));
   }
 
   private static CommandResult runCommand(List<String> command) {
@@ -158,11 +196,33 @@ public final class SeedSystemdAdapterEndpointGate {
     return "'" + value.replace("'", "'\"'\"'") + "'";
   }
 
+  private static boolean looksLikeJsonObject(String value) {
+    if (value == null) {
+      return false;
+    }
+    final String trimmed = value.trim();
+    return trimmed.startsWith("{") && trimmed.endsWith("}");
+  }
+
   private static String firstNonBlankLine(String value) {
     if (value == null || value.isBlank()) {
       return "";
     }
     return value.lines().map(String::trim).filter(line -> !line.isBlank()).findFirst().orElse("");
+  }
+
+  private static Map<String, Object> envelope(
+      String status, String summary, Map<String, Object> details) {
+    final LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
+    payload.put("apiVersion", API_VERSION);
+    payload.put("kind", KIND);
+    payload.put("status", status);
+    payload.put("summary", summary);
+    payload.put("capturedAt", Instant.now().toString());
+    if (details != null && !details.isEmpty()) {
+      payload.putAll(details);
+    }
+    return Map.copyOf(payload);
   }
 
   private record CommandResult(int exitCode, String stdout, String stderr) {

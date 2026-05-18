@@ -17,6 +17,7 @@
     <rk2lab.debug.sidecar.enabled>false</rk2lab.debug.sidecar.enabled>
     <rk2lab.debug.sidecar.domain.networking.enabled>${rk2lab.debug.sidecar.enabled}</rk2lab.debug.sidecar.domain.networking.enabled>
     <rk2lab.debug.sidecar.layer.networking.kdns.enabled>true</rk2lab.debug.sidecar.layer.networking.kdns.enabled>
+    <rk2lab.systemd.adapter.embed.skip>false</rk2lab.systemd.adapter.embed.skip>
   </properties>
 
   <dependencyManagement>
@@ -204,6 +205,34 @@
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-systemd-adapter-exec-host-asset</id>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <phase>prepare-package</phase>
+            <configuration>
+              <skip>${rk2lab.systemd.adapter.embed.skip}</skip>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>io.nxmatic</groupId>
+                  <artifactId>rke2lab-systemd-adapter</artifactId>
+                  <version>${project.version}</version>
+                  <classifier>exec</classifier>
+                  <type>jar</type>
+                  <outputDirectory>${project.build.directory}/generated-resources/host/systemd-libexec/rke2lab-systemd-adapter</outputDirectory>
+                  <destFileName>rke2lab-systemd-adapter-exec.jar</destFileName>
+                  <overWrite>true</overWrite>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
         <executions>
           <execution>
@@ -248,4 +277,18 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>m2e</id>
+      <activation>
+        <property>
+          <name>m2e.version</name>
+        </property>
+      </activation>
+      <properties>
+        <rk2lab.systemd.adapter.embed.skip>true</rk2lab.systemd.adapter.embed.skip>
+      </properties>
+    </profile>
+  </profiles>
 </project>
