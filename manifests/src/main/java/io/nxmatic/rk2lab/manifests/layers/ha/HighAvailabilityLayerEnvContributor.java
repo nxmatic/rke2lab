@@ -1,6 +1,6 @@
 package io.nxmatic.rk2lab.manifests.layers.ha;
 
-import io.nxmatic.rk2lab.manifests.api.ManifestDomainIds;
+import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
 import java.io.IOException;
@@ -10,9 +10,12 @@ import java.util.Map;
 /** HighAvailability layer environment variable contributor. Contributes: network-vip */
 public class HighAvailabilityLayerEnvContributor implements LayerEnvContributor {
 
+  private final ManifestDomainCatalog manifestDomainCatalog =
+      ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
+
   @Override
   public String layerId() {
-    return ManifestDomainIds.HIGH_AVAILABILITY;
+    return manifestDomainCatalog.highAvailability();
   }
 
   @Override

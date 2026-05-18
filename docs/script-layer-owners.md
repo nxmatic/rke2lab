@@ -14,7 +14,7 @@ This file is the canonical ownership map for shell script assets in this reposit
 | Script | Owner domain/layer | Owner manifest unit | Source path |
 |---|---|---|---|
 | `shim-installer.sh` | `runtime/containerd-shim-flox` | `runtime/containerd-shim-flox` | `manifests/src/main/resources/runtime/containerd-shim-flox/shim-installer.sh` |
-| `flox-rootfs-sync.sh` | `runtime/containerd-shim-flox` | `runtime/containerd-shim-flox` | `manifests/src/main/resources/runtime/containerd-shim-flox/flox-rootfs-sync.sh` |
+| `flox-rootfs-sync.sh` | `runtime/containerd-shim-flox` | `runtime/containerd-shim-flox` | `manifests/src/main/resources/runtime/containerd-shim-flox/bin/flox-rootfs-sync.sh` |
 | `shim-build.sh` | `runtime/containerd-shim-flox` | `runtime/containerd-shim-flox` | `manifests/src/main/resources/runtime/containerd-shim-flox/shim-build.sh` |
 | `shim-build.yaml` | `runtime/containerd-shim-flox` | `runtime/containerd-shim-flox` | `manifests/src/main/resources/runtime/containerd-shim-flox/shim-build.yaml` |
 | `install.sh` | `networking/envoy-gateway` | `networking/envoy-gateway` | `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/networking/EnvoyGatewayLayer.java` (inline ConfigMap data) |

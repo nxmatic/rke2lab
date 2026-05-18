@@ -11,13 +11,16 @@ public final class KdnsManifestUnit extends AbstractManifestUnit {
 
   public static final String MANIFEST_UNIT_ID = "networking/kdns";
 
+  private static final NetworkingDependencyIntents NETWORKING_DEPENDENCY_INTENTS =
+      NetworkingDependencyIntents.builder().build();
+
   public KdnsManifestUnit() {
     super(
         MANIFEST_UNIT_ID,
         List.of(KdnsLayer.LEGACY_PATH_PREFIX),
         Stream.concat(
-                NetworkingDependencyIntents.resolve(
-                    List.of(NetworkingDependencyIntents.REQUIRES_CILIUM_CONFIG))
+                NETWORKING_DEPENDENCY_INTENTS
+                    .resolve(List.of(NETWORKING_DEPENDENCY_INTENTS.requiresCiliumConfigIntent()))
                     .stream(),
                 Stream.of(ClusterRuntimeNamespaceManifestUnit.MANIFEST_UNIT_ID))
             .toList());

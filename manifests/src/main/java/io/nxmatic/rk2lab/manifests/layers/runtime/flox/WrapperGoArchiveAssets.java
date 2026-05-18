@@ -10,10 +10,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.function.Consumer;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 
@@ -27,49 +30,44 @@ public final class WrapperGoArchiveAssets {
 
   private static final long TAR_ENTRY_EPOCH_MILLIS = 0L;
 
-  private static final List<SourceAsset> SOURCE_ASSETS =
-      List.of(
-          new SourceAsset("/runtime/containerd-shim-flox/wrapper-go/go.mod", "wrapper-go/go.mod"),
-          new SourceAsset("/runtime/containerd-shim-flox/wrapper-go/go.sum", "wrapper-go/go.sum"),
-          new SourceAsset(
-              "/runtime/containerd-shim-flox/wrapper-go/cmd/containerd-shim-flox-v2/main.go",
-              "wrapper-go/cmd/containerd-shim-flox-v2/main.go"),
-          new SourceAsset(
-              "/runtime/containerd-shim-flox/wrapper-go/internal/wrapper/config.go",
-              "wrapper-go/internal/wrapper/config.go"),
-          new SourceAsset(
-              "/runtime/containerd-shim-flox/wrapper-go/internal/wrapper/wrapper.go",
-              "wrapper-go/internal/wrapper/wrapper.go"));
+  private final Class<?> resourceAnchor;
+  private final List<SourceAsset> sourceAssets;
+  private final ArchiveBundle archiveBundle;
 
-  private static final ArchiveBundle ARCHIVE_BUNDLE = buildArchiveBundle();
-
-  private WrapperGoArchiveAssets() {}
-
-  public static String archiveBase64() {
-    return ARCHIVE_BUNDLE.archiveBase64();
+  private WrapperGoArchiveAssets(Builder builder) {
+    this.resourceAnchor = builder.resourceAnchor;
+    this.sourceAssets = List.copyOf(builder.sourceAssets);
+    this.archiveBundle = buildArchiveBundle();
   }
 
-  public static String manifestJson() {
-    return ARCHIVE_BUNDLE.manifestJson();
+  public static Builder builder() {
+    return new Builder();
   }
 
-  public static void materializeTo(Path outputDir) throws IOException {
+  public String archiveBase64() {
+    return archiveBundle.archiveBase64();
+  }
+
+  public String manifestJson() {
+    return archiveBundle.manifestJson();
+  }
+
+  public void materializeTo(Path outputDir) throws IOException {
     Files.writeString(
         outputDir.resolve(ARCHIVE_CONFIGMAP_KEY), archiveBase64(), StandardCharsets.UTF_8);
     Files.writeString(
         outputDir.resolve(MANIFEST_CONFIGMAP_KEY), manifestJson(), StandardCharsets.UTF_8);
 
-    for (ArchiveEntry entry : ARCHIVE_BUNDLE.entries()) {
+    for (ArchiveEntry entry : archiveBundle.entries()) {
       Path target = outputDir.resolve(entry.path());
       Files.createDirectories(target.getParent());
       Files.write(target, entry.content());
     }
   }
 
-  private static ArchiveBundle buildArchiveBundle() {
+  private ArchiveBundle buildArchiveBundle() {
     try {
-      List<ArchiveEntry> entries =
-          SOURCE_ASSETS.stream().map(WrapperGoArchiveAssets::loadEntry).sorted().toList();
+      List<ArchiveEntry> entries = sourceAssets.stream().map(this::loadEntry).sorted().toList();
 
       byte[] archiveBytes = buildArchive(entries);
       String archiveSha256 = sha256Hex(archiveBytes);
@@ -83,9 +81,8 @@ public final class WrapperGoArchiveAssets {
     }
   }
 
-  private static ArchiveEntry loadEntry(SourceAsset asset) {
-    try (InputStream input =
-        WrapperGoArchiveAssets.class.getResourceAsStream(asset.classpathResource())) {
+  private ArchiveEntry loadEntry(SourceAsset asset) {
+    try (InputStream input = resourceAnchor.getResourceAsStream(asset.classpathResource())) {
       if (input == null) {
         throw new IllegalStateException(
             "Missing wrapper-go resource: " + asset.classpathResource());
@@ -183,7 +180,117 @@ public final class WrapperGoArchiveAssets {
     }
   }
 
-  private record SourceAsset(String classpathResource, String relativePath) {}
+  public static final class Builder {
+    private Class<?> resourceAnchor = WrapperGoArchiveAssets.class;
+
+    private final List<SourceAsset> sourceAssets = new ArrayList<>();
+
+    private Builder() {
+      addDefaultSourceAssets();
+    }
+
+    public Builder addDefaultSourceAssets() {
+      addSourceAsset(
+          source ->
+              source
+                  .classpathResource("/runtime/containerd-shim-flox/wrapper-go/go.mod")
+                  .relativePath("wrapper-go/go.mod"));
+      addSourceAsset(
+          source ->
+              source
+                  .classpathResource("/runtime/containerd-shim-flox/wrapper-go/go.sum")
+                  .relativePath("wrapper-go/go.sum"));
+      addSourceAsset(
+          source ->
+              source
+                  .classpathResource(
+                      "/runtime/containerd-shim-flox/wrapper-go/cmd/containerd-shim-flox-v2/main.go")
+                  .relativePath("wrapper-go/cmd/containerd-shim-flox-v2/main.go"));
+      addSourceAsset(
+          source ->
+              source
+                  .classpathResource(
+                      "/runtime/containerd-shim-flox/wrapper-go/internal/wrapper/config.go")
+                  .relativePath("wrapper-go/internal/wrapper/config.go"));
+      addSourceAsset(
+          source ->
+              source
+                  .classpathResource(
+                      "/runtime/containerd-shim-flox/wrapper-go/internal/wrapper/wrapper.go")
+                  .relativePath("wrapper-go/internal/wrapper/wrapper.go"));
+      return this;
+    }
+
+    public Builder resourceAnchor(Class<?> resourceAnchor) {
+      this.resourceAnchor = Objects.requireNonNull(resourceAnchor, "resourceAnchor");
+      return this;
+    }
+
+    public Builder addSourceAsset(Consumer<SourceAsset.Builder> sourceAssetBuilder) {
+      Objects.requireNonNull(sourceAssetBuilder, "sourceAssetBuilder");
+      SourceAsset.Builder builder = SourceAsset.builder();
+      sourceAssetBuilder.accept(builder);
+      return addSourceAsset(builder.build());
+    }
+
+    public Builder addSourceAsset(SourceAsset sourceAsset) {
+      sourceAssets.add(Objects.requireNonNull(sourceAsset, "sourceAsset"));
+      return this;
+    }
+
+    public Builder clearSourceAssets() {
+      sourceAssets.clear();
+      return this;
+    }
+
+    public WrapperGoArchiveAssets build() {
+      return new WrapperGoArchiveAssets(this);
+    }
+  }
+
+  public static final class SourceAsset {
+    private final String classpathResource;
+    private final String relativePath;
+
+    private SourceAsset(Builder builder) {
+      this.classpathResource =
+          Objects.requireNonNull(builder.classpathResource, "classpathResource");
+      this.relativePath = Objects.requireNonNull(builder.relativePath, "relativePath");
+    }
+
+    public static Builder builder() {
+      return new Builder();
+    }
+
+    public String classpathResource() {
+      return classpathResource;
+    }
+
+    public String relativePath() {
+      return relativePath;
+    }
+
+    public static final class Builder {
+      private String classpathResource;
+      private String relativePath;
+
+      private Builder() {}
+
+      public Builder classpathResource(String classpathResource) {
+        this.classpathResource = classpathResource;
+        return this;
+      }
+
+      public Builder relativePath(String relativePath) {
+        this.relativePath = relativePath;
+        return this;
+      }
+
+      public SourceAsset build() {
+        return new SourceAsset(this);
+      }
+    }
+  }
 
   private record ArchiveBundle(
       List<ArchiveEntry> entries,

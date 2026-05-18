@@ -15,6 +15,9 @@ public record ManifestSynthesisRequest(
 
   private static final String ENABLED_DOMAINS_PROPERTY = "rk2lab.manifests.policy.enabledDomains";
 
+  private static final ManifestDomainCatalog MANIFEST_DOMAIN_CATALOG =
+      ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
+
   public ManifestSynthesisRequest(Path synthOutdir, Path synthManifestFile) {
     this(synthOutdir, synthManifestFile, Optional.empty());
   }
@@ -85,10 +88,13 @@ public record ManifestSynthesisRequest(
     }
 
     return Optional.of(
-        ManifestDomainPolicy.enableOnly(
-            Arrays.stream(enabledDomainsProperty.split(","))
-                .map(String::trim)
-                .filter(value -> !value.isBlank())
-                .toList()));
+        ManifestDomainPolicy.builder()
+            .domainCatalog(MANIFEST_DOMAIN_CATALOG)
+            .enableOnly(
+                Arrays.stream(enabledDomainsProperty.split(","))
+                    .map(String::trim)
+                    .filter(value -> !value.isBlank())
+                    .toList())
+            .build());
   }
 }

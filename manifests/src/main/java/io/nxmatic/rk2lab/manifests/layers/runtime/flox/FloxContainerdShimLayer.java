@@ -26,6 +26,10 @@ public final class FloxContainerdShimLayer extends Construct {
 
   private final ManifestUnitReferenceRegistry registry;
 
+  private final RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets;
+
+  private final FloxContainerdShimAssets floxContainerdShimAssets;
+
   public FloxContainerdShimLayer(final Construct scope, final String id) {
     this(scope, id, null);
   }
@@ -34,6 +38,11 @@ public final class FloxContainerdShimLayer extends Construct {
       final Construct scope, final String id, final ManifestUnitReferenceRegistry registry) {
     super(scope, id);
     this.registry = registry;
+    this.runtimeDaemonsetScriptPolicyAssets = RuntimeDaemonsetScriptPolicyAssets.builder().build();
+    this.floxContainerdShimAssets =
+        FloxContainerdShimAssets.builder()
+            .runtimeDaemonsetScriptPolicyAssets(runtimeDaemonsetScriptPolicyAssets)
+            .build();
 
     createRuntimeClass("flox", "flox");
     createRuntimeClass("flox-delve", "flox-delve");
@@ -145,7 +154,7 @@ public final class FloxContainerdShimLayer extends Construct {
     }
 
     configMap.addJsonPatch(
-        JsonPatch.add("/data", FloxContainerdShimAssets.installerConfigMapData()));
+        JsonPatch.add("/data", floxContainerdShimAssets.installerConfigMapData()));
     return configMap;
   }
 
@@ -330,7 +339,7 @@ public final class FloxContainerdShimLayer extends Construct {
                                   "defaultMode",
                                   493,
                                   "items",
-                                  FloxContainerdShimAssets.installerVolumeItems(),
+                                  floxContainerdShimAssets.installerVolumeItems(),
                                   "name",
                                   RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP.name()),
                               "name",
@@ -341,7 +350,7 @@ public final class FloxContainerdShimLayer extends Construct {
                                   "defaultMode",
                                   493,
                                   "items",
-                                  RuntimeDaemonsetScriptPolicyAssets.volumeItems(),
+                                  runtimeDaemonsetScriptPolicyAssets.volumeItems(),
                                   "name",
                                   RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name()),
                               "name",

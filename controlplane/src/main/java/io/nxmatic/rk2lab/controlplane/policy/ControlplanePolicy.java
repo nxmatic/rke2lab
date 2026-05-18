@@ -1,12 +1,16 @@
 package io.nxmatic.rk2lab.controlplane.policy;
 
 import com.pulumi.Config;
+import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.api.ManifestDomainPolicy;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Canonical operational policy derived from Pulumi config for Stage A bootstrap. */
 public record ControlplanePolicy(DebugPolicy debug, ManifestLinkPolicy manifestLink) {
+
+  private static final ManifestDomainCatalog MANIFEST_DOMAIN_CATALOG =
+      ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
 
   public static ControlplanePolicy defaults() {
     return new ControlplanePolicy(
@@ -23,12 +27,15 @@ public record ControlplanePolicy(DebugPolicy debug, ManifestLinkPolicy manifestL
 
     ManifestLinkPolicy manifestLinkPolicy =
         new ManifestLinkPolicy(
-            ManifestDomainPolicy.stageALinkPolicy(
-                environment.bool("policy.link.highAvailability.enabled", true),
-                environment.bool("policy.link.networking.enabled", true),
-                environment.bool("policy.link.replication.enabled", true),
-                environment.bool("policy.link.storage.enabled", true),
-                environment.bool("policy.link.mesh.enabled", false)));
+            ManifestDomainPolicy.builder()
+                .domainCatalog(MANIFEST_DOMAIN_CATALOG)
+                .stageALinkPolicy(
+                    environment.bool("policy.link.highAvailability.enabled", true),
+                    environment.bool("policy.link.networking.enabled", true),
+                    environment.bool("policy.link.replication.enabled", true),
+                    environment.bool("policy.link.storage.enabled", true),
+                    environment.bool("policy.link.mesh.enabled", false))
+                .build());
 
     return new ControlplanePolicy(debugPolicy, manifestLinkPolicy);
   }

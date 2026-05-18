@@ -1,12 +1,15 @@
 package io.nxmatic.rk2lab.controlplane.policy;
 
-import io.nxmatic.rk2lab.manifests.api.ManifestDomainIds;
+import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.api.ManifestDomainPolicy;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Policy controlling which serialized host manifest layers are linked into live RKE2 manifests. */
 public record ManifestLinkPolicy(ManifestDomainPolicy domains) {
+
+  private static final ManifestDomainCatalog MANIFEST_DOMAIN_CATALOG =
+      ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
 
   public ManifestLinkPolicy {
     domains = new ManifestDomainPolicy(new LinkedHashMap<>(domains.asMap()));
@@ -19,32 +22,35 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains) {
       boolean storageEnabled,
       boolean meshEnabled) {
     return new ManifestLinkPolicy(
-        ManifestDomainPolicy.stageALinkPolicy(
-            highAvailabilityEnabled,
-            networkingEnabled,
-            replicationEnabled,
-            storageEnabled,
-            meshEnabled));
+        ManifestDomainPolicy.builder()
+            .domainCatalog(MANIFEST_DOMAIN_CATALOG)
+            .stageALinkPolicy(
+                highAvailabilityEnabled,
+                networkingEnabled,
+                replicationEnabled,
+                storageEnabled,
+                meshEnabled)
+            .build());
   }
 
   public boolean highAvailabilityEnabled() {
-    return domains.isEnabled(ManifestDomainIds.HIGH_AVAILABILITY);
+    return domains.isEnabled(MANIFEST_DOMAIN_CATALOG.highAvailability());
   }
 
   public boolean networkingEnabled() {
-    return domains.isEnabled(ManifestDomainIds.NETWORKING);
+    return domains.isEnabled(MANIFEST_DOMAIN_CATALOG.networking());
   }
 
   public boolean replicationEnabled() {
-    return domains.isEnabled(ManifestDomainIds.REPLICATION);
+    return domains.isEnabled(MANIFEST_DOMAIN_CATALOG.replication());
   }
 
   public boolean storageEnabled() {
-    return domains.isEnabled(ManifestDomainIds.STORAGE);
+    return domains.isEnabled(MANIFEST_DOMAIN_CATALOG.storage());
   }
 
   public boolean meshEnabled() {
-    return domains.isEnabled(ManifestDomainIds.MESH);
+    return domains.isEnabled(MANIFEST_DOMAIN_CATALOG.mesh());
   }
 
   public Map<String, String> toEnvMap() {

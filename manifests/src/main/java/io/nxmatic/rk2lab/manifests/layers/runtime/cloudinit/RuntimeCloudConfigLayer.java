@@ -16,6 +16,9 @@ public final class RuntimeCloudConfigLayer extends Construct {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("runtime", "cloud-config");
 
+  private final RuntimeCloudConfigAssets runtimeCloudConfigAssets =
+      RuntimeCloudConfigAssets.builder().build();
+
   public RuntimeCloudConfigLayer(final Construct scope, final String id) {
     super(scope, id);
     createCloudConfigManifest();
@@ -43,6 +46,6 @@ public final class RuntimeCloudConfigLayer extends Construct {
                         .build())
                 .build());
 
-    configMap.addJsonPatch(JsonPatch.add("/data", RuntimeCloudConfigAssets.configMapData()));
+    configMap.addJsonPatch(JsonPatch.add("/data", runtimeCloudConfigAssets.configMapData()));
   }
 }

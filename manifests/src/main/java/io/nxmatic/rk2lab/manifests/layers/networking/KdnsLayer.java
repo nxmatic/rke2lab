@@ -22,16 +22,17 @@ public final class KdnsLayer extends Construct {
 
   private static final String LAYER_NAME = "networking";
   private static final String PACKAGE_NAME = "kdns";
-  private static final boolean DELVE_SIDECAR_ENABLED =
-      DelveSidecarToggleResolver.resolveByDomainLayer(LAYER_NAME, PACKAGE_NAME, false);
   private static final String KDNS_NAMESPACE = ClusterLayerRefs.RUNTIME_SYSTEM_NAMESPACE.name();
 
+  private final DelveSidecarToggleResolver delveSidecarToggleResolver =
+      DelveSidecarToggleResolver.builder().build();
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile(LAYER_NAME, PACKAGE_NAME);
+  private final KdnsAssets kdnsAssets = KdnsAssets.builder().build();
   private final RuntimePodProfile runtimePodProfile = new RuntimePodProfile("flox");
   private final DelveSidecarProfile delveSidecarProfile =
       new DelveSidecarProfile(
-          DELVE_SIDECAR_ENABLED,
+          delveSidecarToggleResolver.resolveByDomainLayer(LAYER_NAME, PACKAGE_NAME, false),
           "debug.kdns.lab42/enabled",
           "false",
           "GO_DEBUG_ENABLED",
@@ -172,7 +173,7 @@ public final class KdnsLayer extends Construct {
                         .build())
                 .build());
 
-    configMap.addJsonPatch(JsonPatch.add("/data", KdnsAssets.dlvScriptConfigMapData()));
+    configMap.addJsonPatch(JsonPatch.add("/data", kdnsAssets.dlvScriptConfigMapData()));
 
     return configMap;
   }

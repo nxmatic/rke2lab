@@ -3,6 +3,7 @@ package io.nxmatic.rk2lab.manifests.api;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Canonical manifest-domain policy shared between cdk8s synthesis concepts and controlplane
@@ -14,38 +15,8 @@ public record ManifestDomainPolicy(Map<String, Boolean> enabledByDomainId) {
     enabledByDomainId = Map.copyOf(new LinkedHashMap<>(enabledByDomainId));
   }
 
-  public static ManifestDomainPolicy stageALinkPolicy(
-      boolean highAvailabilityEnabled,
-      boolean networkingEnabled,
-      boolean replicationEnabled,
-      boolean storageEnabled,
-      boolean meshEnabled) {
-    return new ManifestDomainPolicy(
-        Map.of(
-            ManifestDomainIds.HIGH_AVAILABILITY, highAvailabilityEnabled,
-            ManifestDomainIds.NETWORKING, networkingEnabled,
-            ManifestDomainIds.REPLICATION, replicationEnabled,
-            ManifestDomainIds.STORAGE, storageEnabled,
-            ManifestDomainIds.MESH, meshEnabled));
-  }
-
-  public static ManifestDomainPolicy enableOnly(Iterable<String> enabledDomainIds) {
-    final LinkedHashMap<String, Boolean> flags = new LinkedHashMap<>();
-    for (String domainId : ManifestDomainIds.all()) {
-      flags.put(domainId, false);
-    }
-    for (String domainId : enabledDomainIds) {
-      final String normalizedDomainId = domainId == null ? "" : domainId.trim();
-      if (normalizedDomainId.isBlank()) {
-        continue;
-      }
-      if (!flags.containsKey(normalizedDomainId)) {
-        throw new IllegalArgumentException(
-            "Unknown manifest domain id in policy: " + normalizedDomainId);
-      }
-      flags.put(normalizedDomainId, true);
-    }
-    return new ManifestDomainPolicy(flags);
+  public static Builder builder() {
+    return new Builder();
   }
 
   public boolean isEnabled(String domainId) {
@@ -66,5 +37,85 @@ public record ManifestDomainPolicy(Map<String, Boolean> enabledByDomainId) {
 
   public Map<String, Boolean> asMap() {
     return enabledByDomainId;
+  }
+
+  public static final class Builder {
+    private ManifestDomainCatalog domainCatalog =
+        ManifestDomainCatalog.builder()
+            .addDefaultDomains()
+            .addDefaultStageALinkableDomains()
+            .build();
+
+    private final LinkedHashMap<String, Boolean> enabledByDomainId = new LinkedHashMap<>();
+
+    private Builder() {
+      resetAllDisabled();
+    }
+
+    public Builder domainCatalog(ManifestDomainCatalog domainCatalog) {
+      this.domainCatalog = Objects.requireNonNull(domainCatalog, "domainCatalog");
+      resetAllDisabled();
+      return this;
+    }
+
+    public Builder stageALinkPolicy(
+        boolean highAvailabilityEnabled,
+        boolean networkingEnabled,
+        boolean replicationEnabled,
+        boolean storageEnabled,
+        boolean meshEnabled) {
+      resetAllDisabled();
+      put(domainCatalog.highAvailability(), highAvailabilityEnabled);
+      put(domainCatalog.networking(), networkingEnabled);
+      put(domainCatalog.replication(), replicationEnabled);
+      put(domainCatalog.storage(), storageEnabled);
+      put(domainCatalog.mesh(), meshEnabled);
+      return this;
+    }
+
+    public Builder enableOnly(Iterable<String> enabledDomainIds) {
+      resetAllDisabled();
+      for (String domainId : enabledDomainIds) {
+        final String normalizedDomainId = normalize(domainId);
+        if (normalizedDomainId.isBlank()) {
+          continue;
+        }
+        ensureKnownDomainId(normalizedDomainId);
+        put(normalizedDomainId, true);
+      }
+      return this;
+    }
+
+    public Builder setEnabled(String domainId, boolean enabled) {
+      final String normalizedDomainId = normalize(domainId);
+      ensureKnownDomainId(normalizedDomainId);
+      put(normalizedDomainId, enabled);
+      return this;
+    }
+
+    public ManifestDomainPolicy build() {
+      return new ManifestDomainPolicy(enabledByDomainId);
+    }
+
+    private void resetAllDisabled() {
+      enabledByDomainId.clear();
+      for (String domainId : domainCatalog.all()) {
+        enabledByDomainId.put(domainId, false);
+      }
+    }
+
+    private void ensureKnownDomainId(String domainId) {
+      if (!enabledByDomainId.containsKey(domainId)) {
+        throw new IllegalArgumentException("Unknown manifest domain id in policy: " + domainId);
+      }
+    }
+
+    private void put(String domainId, boolean enabled) {
+      enabledByDomainId.put(domainId, enabled);
+    }
+
+    private static String normalize(String value) {
+      return value == null ? "" : value.trim();
+    }
   }
 }

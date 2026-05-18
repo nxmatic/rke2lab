@@ -27,6 +27,9 @@ public final class Main {
 
   private final Logger logger = LoggerFactory.getLogger(Main.class);
 
+  private final FloxContainerdShimAssets floxContainerdShimAssets =
+      FloxContainerdShimAssets.builder().build();
+
   private Main() {}
 
   public static void main(String[] args) throws IOException {
@@ -84,7 +87,7 @@ public final class Main {
         return commandOf(
             new MaterializeShimAssetsCommand.Builder(this)
                 .outputDir(outputDir)
-                .assets(FloxContainerdShimAssets.materializationAssets()));
+                .assets(floxContainerdShimAssets.materializationAssets()));
       }
       default ->
           throw new IllegalArgumentException(
@@ -111,7 +114,7 @@ public final class Main {
         commandOf(
             new MaterializeShimAssetsCommand.Builder(this)
                 .outputDir(Paths.get("."))
-                .assets(FloxContainerdShimAssets.materializationAssets())),
+                .assets(floxContainerdShimAssets.materializationAssets())),
         commandOf(new HelpCommand.Builder(this).commands(List.of())));
   }
 
@@ -174,8 +177,8 @@ public final class Main {
 
   private final class ShimBuildCommand implements CliCommand {
 
-    private static final Path WORKTREE_SHIM_ASSETS_RELATIVE_PATH =
-        FloxContainerdShimAssets.worktreeShimAssetsRelativePath();
+    private final Path worktreeShimAssetsRelativePath =
+        floxContainerdShimAssets.worktreeShimAssetsRelativePath();
 
     private final String mode;
 
@@ -273,7 +276,7 @@ public final class Main {
           Files.createTempDirectory("rke2lab-shim-build-").toRealPath().normalize();
       new MaterializeShimAssetsCommand.Builder(Main.this)
           .outputDir(workDir)
-          .assets(FloxContainerdShimAssets.materializationAssets())
+          .assets(floxContainerdShimAssets.materializationAssets())
           .build()
           .run();
       return workDir;
@@ -283,7 +286,7 @@ public final class Main {
       final Path cwd = Paths.get("").toAbsolutePath().normalize();
       Path current = cwd;
       while (current != null) {
-        final Path candidate = current.resolve(WORKTREE_SHIM_ASSETS_RELATIVE_PATH).normalize();
+        final Path candidate = current.resolve(worktreeShimAssetsRelativePath).normalize();
         if (Files.isDirectory(candidate)
             && Files.isRegularFile(candidate.resolve("shim-build.sh"))) {
           logger.info("Using worktree shim assets for lock update: {}", candidate);
@@ -294,7 +297,7 @@ public final class Main {
 
       throw new IllegalStateException(
           "Unable to locate worktree shim assets at relative path '"
-              + WORKTREE_SHIM_ASSETS_RELATIVE_PATH
+              + worktreeShimAssetsRelativePath
               + "' from current working directory: "
               + cwd);
     }
@@ -545,7 +548,7 @@ public final class Main {
           }
         }
 
-        FloxContainerdShimAssets.materializeSupplementaryAssetsTo(normalizedOutputDir);
+        floxContainerdShimAssets.materializeSupplementaryAssetsTo(normalizedOutputDir);
 
         logger.info("Materialized {} shim assets to {}", assets.size(), normalizedOutputDir);
       } catch (IOException ex) {

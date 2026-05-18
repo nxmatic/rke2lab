@@ -24,6 +24,8 @@ public final class RuntimeDaemonsetScriptPolicyLayer extends Construct {
 
   private final ManifestUnitReferenceRegistry registry;
 
+  private final RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets;
+
   public RuntimeDaemonsetScriptPolicyLayer(final Construct scope, final String id) {
     this(scope, id, null);
   }
@@ -32,6 +34,7 @@ public final class RuntimeDaemonsetScriptPolicyLayer extends Construct {
       final Construct scope, final String id, final ManifestUnitReferenceRegistry registry) {
     super(scope, id);
     this.registry = registry;
+    this.runtimeDaemonsetScriptPolicyAssets = RuntimeDaemonsetScriptPolicyAssets.builder().build();
     createScriptPolicyConfigMap();
   }
 
@@ -66,6 +69,6 @@ public final class RuntimeDaemonsetScriptPolicyLayer extends Construct {
     }
 
     configMap.addJsonPatch(
-        JsonPatch.add("/data", RuntimeDaemonsetScriptPolicyAssets.configMapData()));
+        JsonPatch.add("/data", runtimeDaemonsetScriptPolicyAssets.configMapData()));
   }
 }

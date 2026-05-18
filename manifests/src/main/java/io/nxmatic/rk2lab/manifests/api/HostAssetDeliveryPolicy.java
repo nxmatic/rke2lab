@@ -13,6 +13,9 @@ public record HostAssetDeliveryPolicy(
     boolean rotateExistingRoot,
     boolean enabled) {
 
+  private static final ManifestDomainCatalog MANIFEST_DOMAIN_CATALOG =
+      ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
+
   public HostAssetDeliveryPolicy {
     policyId = requireNonBlank(policyId, "policyId");
     ownerDomainId = requireKnownDomainId(ownerDomainId);
@@ -43,7 +46,7 @@ public record HostAssetDeliveryPolicy(
   public static HostAssetDeliveryPolicy floxContainerdShim() {
     return new HostAssetDeliveryPolicy(
         "runtime/containerd-shim-flox",
-        ManifestDomainIds.RUNTIME,
+        MANIFEST_DOMAIN_CATALOG.runtime(),
         "/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox",
         HostAssetDeliveryBackend.DAEMONSET,
         HostAssetMaterializationMode.MIXED,
@@ -54,7 +57,7 @@ public record HostAssetDeliveryPolicy(
 
   private static String requireKnownDomainId(String ownerDomainId) {
     final String normalizedOwnerDomainId = requireNonBlank(ownerDomainId, "ownerDomainId");
-    if (!ManifestDomainIds.all().contains(normalizedOwnerDomainId)) {
+    if (!MANIFEST_DOMAIN_CATALOG.isKnownDomainId(normalizedOwnerDomainId)) {
       throw new IllegalArgumentException(
           "Unknown host-asset owner domain id: " + normalizedOwnerDomainId);
     }
