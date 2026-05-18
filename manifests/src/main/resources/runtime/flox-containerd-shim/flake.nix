@@ -79,8 +79,8 @@
           packageName = "flox-shim-wrapper";
         };
 
-        flox-shim-wrapper-debug = mkFloxShimWrapper {
-          packageName = "flox-shim-wrapper-debug";
+        delve-sidecar = mkFloxShimWrapper {
+          packageName = "delve-sidecar";
           debug = true;
         };
       };

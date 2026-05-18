@@ -37,32 +37,35 @@ public final class FloxContainerdShimLayer extends Construct {
     super(scope, id);
     this.registry = registry;
 
-    createRuntimeClass();
+    createRuntimeClass("flox", "flox");
+    createRuntimeClass("flox-go-debug", "flox-go-debug");
     ApiObject envConfigMap = createFloxEnvConfigMap();
     ApiObject installerAssetsConfigMap = createInstallerAssetsConfigMap();
     ApiObject serviceAccount = createServiceAccount();
     createInstallerDaemonSet(envConfigMap, installerAssetsConfigMap, serviceAccount);
   }
 
-  private void createRuntimeClass() {
+  private void createRuntimeClass(final String runtimeClassName, final String handlerName) {
     ApiObject runtimeClass =
         new ApiObject(
             this,
-            "runtimeclass-flox",
+            "runtimeclass-" + runtimeClassName,
             ApiObjectProps.builder()
                 .apiVersion("node.k8s.io/v1")
                 .kind("RuntimeClass")
                 .metadata(
                     ApiObjectMetadata.builder()
-                        .name("flox")
+                        .name(runtimeClassName)
                         .annotations(
                             kptMetadata.packageAnnotations(
-                                LAYER_NAME, PACKAGE_NAME, "node.k8s.io|RuntimeClass|default|flox"))
+                                LAYER_NAME,
+                                PACKAGE_NAME,
+                                "node.k8s.io|RuntimeClass|default|" + runtimeClassName))
                         .build())
                 .build());
 
     runtimeClass.addJsonPatch(
-        JsonPatch.add("/handler", "flox"),
+        JsonPatch.add("/handler", handlerName),
         JsonPatch.add("/scheduling", Map.of("nodeSelector", Map.of("flox.dev/enabled", "true"))));
   }
 

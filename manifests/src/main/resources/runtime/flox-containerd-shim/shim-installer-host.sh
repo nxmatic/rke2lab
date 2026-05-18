@@ -235,13 +235,10 @@ shim::runtime:nix-system:resolve() {
 }
 
 shim::runtime:wrapper-package:build() {
-	local nix_system package_name package_attr
+	local package_name="$1"
+	local nix_system package_attr
 
 	nix_system="$(shim::runtime:nix-system:resolve)"
-	package_name="flox-shim-wrapper"
-	if rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_FLOX_SHIM_WRAPPER_ENABLED:-false}"; then
-		package_name="${package_name}-debug"
-	fi
 	package_attr="packages.${nix_system}.${package_name}"
 
 	(
@@ -318,7 +315,9 @@ shim::runtime:binary:install() {
 	local flox_env_dir="$1"
 	local arch="$2"
 	local shim_run_dir shim_path
-	local install_root real_shim_path wrapper_pkg_path wrapper_bin wrapper_helper
+	local install_root real_shim_path
+	local wrapper_pkg_path wrapper_bin wrapper_helper
+	local debug_wrapper_pkg_path debug_wrapper_bin
 
 	shim_run_dir="$(find "${flox_env_dir}/.flox/run" -maxdepth 1 -name "${arch}-linux.containerd-shim*.run" -print -quit || true)"
 	if [[ -z "${shim_run_dir}" ]]; then
@@ -334,12 +333,18 @@ shim::runtime:binary:install() {
 
 	install_root="/usr/local/libexec/rke2lab/flox-shim-wrapper"
 	real_shim_path="${install_root}/containerd-shim-flox-v2.real"
-	wrapper_pkg_path="$(shim::runtime:wrapper-package:build)"
+	wrapper_pkg_path="$(shim::runtime:wrapper-package:build flox-shim-wrapper)"
 	wrapper_bin="${wrapper_pkg_path}/bin/containerd-shim-flox-v2"
 	wrapper_helper="${wrapper_pkg_path}/libexec/rke2lab/flox-shim-wrapper/flox-rootfs-sync.sh"
+	debug_wrapper_pkg_path="$(shim::runtime:wrapper-package:build delve-sidecar)"
+	debug_wrapper_bin="${debug_wrapper_pkg_path}/bin/containerd-shim-flox-v2"
 
 	[[ -x "${wrapper_bin}" ]] || {
 		echo "shim wrapper binary missing at ${wrapper_bin}" >&2
+		return 1
+	}
+	[[ -x "${debug_wrapper_bin}" ]] || {
+		echo "debug shim wrapper binary missing at ${debug_wrapper_bin}" >&2
 		return 1
 	}
 	[[ -x "${wrapper_helper}" ]] || {
@@ -349,8 +354,11 @@ shim::runtime:binary:install() {
 
 	install -D -m 0755 "${shim_path}" "${real_shim_path}"
 	install -d /usr/local/bin "${install_root}"
+	install -D -m 0755 "${wrapper_bin}" "${install_root}/containerd-shim-flox-v2"
+	install -D -m 0755 "${debug_wrapper_bin}" "${install_root}/containerd-shim-flox-go-debug-v2"
 	ln -sfn "${wrapper_helper}" "${install_root}/flox-rootfs-sync.sh"
-	ln -sfn "${wrapper_bin}" /usr/local/bin/containerd-shim-flox-v2
+	ln -sfn "${install_root}/containerd-shim-flox-v2" /usr/local/bin/containerd-shim-flox-v2
+	ln -sfn "${install_root}/containerd-shim-flox-go-debug-v2" /usr/local/bin/containerd-shim-flox-go-debug-v2
 }
 
 shim::runtime:config-template:ensure() {
@@ -426,12 +434,19 @@ containerd::config:flox:update() {
 	"${DASEL_BIN}" -i toml -o yaml <"${CONTAINERD_CONFIG_TEMPLATE}" |
 		CRI_PLUGIN_ROOT="${plugin_root}" "${YQ_BIN}" '
       del(.plugins."io.containerd.cri.v1.runtime".containerd.runtimes.flox) |
+			del(.plugins."io.containerd.cri.v1.runtime".containerd.runtimes."flox-go-debug") |
       del(.plugins."io.containerd.grpc.v1.cri".containerd.runtimes.flox) |
+			del(.plugins."io.containerd.grpc.v1.cri".containerd.runtimes."flox-go-debug") |
       .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.runtime_path = "/usr/local/bin/containerd-shim-flox-v2" |
       .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.runtime_type = "io.containerd.runc.v2" |
       .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.pod_annotations = ["flox.dev/*"] |
       .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.container_annotations = ["flox.dev/*"] |
-      .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.options.SystemdCgroup = true
+			.plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.options.SystemdCgroup = true |
+			.plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes."flox-go-debug".runtime_path = "/usr/local/bin/containerd-shim-flox-go-debug-v2" |
+			.plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes."flox-go-debug".runtime_type = "io.containerd.runc.v2" |
+			.plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes."flox-go-debug".pod_annotations = ["flox.dev/*"] |
+			.plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes."flox-go-debug".container_annotations = ["flox.dev/*"] |
+			.plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes."flox-go-debug".options.SystemdCgroup = true
     ' |
 		"${DASEL_BIN}" -i yaml -o toml >"${tmp}" &&
 		mv "${tmp}" "${CONTAINERD_CONFIG_TEMPLATE}"

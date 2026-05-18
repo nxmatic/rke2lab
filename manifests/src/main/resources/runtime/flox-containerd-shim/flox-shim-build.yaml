@@ -14,6 +14,8 @@ jobs:
     packages:
       - name: flox-shim-wrapper
         attr: "packages.aarch64-linux.flox-shim-wrapper"
+      - name: delve-sidecar
+        attr: "packages.aarch64-linux.delve-sidecar"
 
   - name: mesh
     description: "Build mesh packages (headplane + headscale) from packaged flake"

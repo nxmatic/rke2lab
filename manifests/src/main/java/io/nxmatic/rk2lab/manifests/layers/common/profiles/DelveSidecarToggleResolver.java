@@ -4,13 +4,13 @@ package io.nxmatic.rk2lab.manifests.layers.common.profiles;
 import java.util.List;
 import java.util.Optional;
 
-public final class DebugSidecarToggleResolver {
+public final class DelveSidecarToggleResolver {
 
   private static final String GLOBAL_KEY = "rk2lab.debug.sidecar.enabled";
   private static final String DOMAIN_KEY_PREFIX = "rk2lab.debug.sidecar.domain.";
   private static final String LAYER_KEY_PREFIX = "rk2lab.debug.sidecar.layer.";
 
-  private DebugSidecarToggleResolver() {}
+  private DelveSidecarToggleResolver() {}
 
   public static boolean resolveByDomainLayer(
       final String domain, final String layer, final boolean defaultValue) {

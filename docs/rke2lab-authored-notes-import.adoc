@@ -479,7 +479,7 @@ Recommended investigation order:
 * without this, later checks risk proving only that the plumbing exists, not that the original problem is solved
 
 . *Second: verify selected build/install artifacts on host*
-* confirm which wrapper package variant was selected (`flox-shim-wrapper` vs `flox-shim-wrapper-debug`)
+* confirm which wrapper package variant was selected (`flox-shim-wrapper` vs `delve-sidecar`)
 * confirm the expected files exist and are executable:
 ** `/usr/local/bin/containerd-shim-flox-v2`
 ** `/usr/local/libexec/rke2lab/flox-shim-wrapper/containerd-shim-flox-v2.real`

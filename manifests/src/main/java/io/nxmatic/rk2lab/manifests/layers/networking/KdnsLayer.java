@@ -2,10 +2,13 @@
 package io.nxmatic.rk2lab.manifests.layers.networking;
 
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterLayerRefs;
-import io.nxmatic.rk2lab.manifests.layers.common.profiles.DebugSidecarProfile;
-import io.nxmatic.rk2lab.manifests.layers.common.profiles.DebugSidecarToggleResolver;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.DelveSidecarProfile;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.DelveSidecarToggleResolver;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.RuntimePodProfile;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,16 +25,21 @@ public final class KdnsLayer extends Construct {
 
   private static final String LAYER_NAME = "networking";
   private static final String PACKAGE_NAME = "kdns";
-  private static final boolean DEBUG_SIDECAR_ENABLED =
-      DebugSidecarToggleResolver.resolveByDomainLayer(LAYER_NAME, PACKAGE_NAME, false);
+  private static final boolean DELVE_SIDECAR_ENABLED =
+      DelveSidecarToggleResolver.resolveByDomainLayer(LAYER_NAME, PACKAGE_NAME, false);
   private static final String KDNS_NAMESPACE = ClusterLayerRefs.RUNTIME_SYSTEM_NAMESPACE.name();
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile(LAYER_NAME, PACKAGE_NAME);
   private final RuntimePodProfile runtimePodProfile = new RuntimePodProfile("flox");
-  private final DebugSidecarProfile debugSidecarProfile =
-      new DebugSidecarProfile(
-          DEBUG_SIDECAR_ENABLED, "debug.kdns.lab42/enabled", "false", "KDNS_DEBUG_PORT", "40000");
+  private final DelveSidecarProfile delveSidecarProfile =
+      new DelveSidecarProfile(
+          DELVE_SIDECAR_ENABLED,
+          "debug.kdns.lab42/enabled",
+          "false",
+          "GO_DEBUG_ENABLED",
+          "KDNS_DEBUG_PORT",
+          "40000");
 
   public KdnsLayer(final Construct scope, final String id) {
     super(scope, id);
@@ -169,36 +177,22 @@ public final class KdnsLayer extends Construct {
 
     configMap.addJsonPatch(
         JsonPatch.add(
-            "/data",
-            Map.of(
-                "kdns-dlv.sh",
-                "#!/usr/bin/env -S bash -exuo pipefail\n\n"
-                    + "enabled=\"${KDNS_DEBUG_ENABLED:-}\"\n"
-                    + "if [ \"$enabled\" != \"true\" ]; then\n"
-                    + "  : \"[i] debug disabled (set annotation debug.kdns.lab42/enabled=true to enable); sleeping\"\n"
-                    + "  sleep 3650d\n"
-                    + "fi\n"
-                    + "apk add --no-cache bash wget ca-certificates >/dev/null\n"
-                    + "arch=$(uname -m)\n"
-                    + "case \"$arch\" in\n"
-                    + "  x86_64) arch=amd64 ;;\n"
-                    + "  aarch64) arch=arm64 ;;\n"
-                    + "esac\n"
-                    + "dlv_version=\"1.22.1\"\n"
-                    + "url=\"https://github.com/go-delve/delve/releases/download/v${dlv_version}/dlv_${dlv_version}_linux_${arch}.tar.gz\"\n"
-                    + "echo \"[kdns-dlv] fetching dlv ${dlv_version} from ${url}\"\n"
-                    + "wget -qO /tmp/dlv.tgz \"$url\"\n"
-                    + "tar -xzf /tmp/dlv.tgz -C /tmp\n"
-                    + "chmod +x /tmp/dlv\n"
-                    + "target_pid=$(pidof kdns || true)\n"
-                    + "if [ -z \"$target_pid\" ]; then\n"
-                    + "  : \"[i] kdns process not found; sleeping\"\n"
-                    + "  sleep 1d\n"
-                    + "fi\n"
-                    + ": \"[i] starting delve headless on :${KDNS_DEBUG_PORT} attaching to pid ${target_pid}\"\n"
-                    + "exec /tmp/dlv attach \"$target_pid\" --headless --listen=\":${KDNS_DEBUG_PORT}\" --api-version=2 --accept-multiclient --log --continue")));
+            "/data", Map.of("kdns-dlv.sh", readResource("/runtime/networking/kdns/kdns-dlv.sh"))));
 
     return configMap;
+  }
+
+  private String readResource(final String resourcePath) {
+    final InputStream input = KdnsLayer.class.getResourceAsStream(resourcePath);
+    if (input == null) {
+      throw new IllegalStateException("Missing kdns resource: " + resourcePath);
+    }
+
+    try {
+      return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+    } catch (IOException ex) {
+      throw new IllegalStateException("Failed reading kdns resource: " + resourcePath, ex);
+    }
   }
 
   private void createDeployment(
@@ -279,8 +273,8 @@ public final class KdnsLayer extends Construct {
 
     List<Object> containers = new ArrayList<>();
     containers.add(kdnsContainer);
-    debugSidecarProfile
-        .delveSidecar("kdns-dlv", "alpine:3.19", "/scripts/kdns-dlv.sh", "kdns-dlv-script")
+    delveSidecarProfile
+        .delveSidecar("kdns-dlv", "kdns-dlv.sh", "kdns-dlv-script")
         .ifPresent(containers::add);
 
     LinkedHashMap<String, Object> deploymentSpec = new LinkedHashMap<>();
@@ -296,7 +290,7 @@ public final class KdnsLayer extends Construct {
             "metadata",
             Map.of(
                 "annotations",
-                debugSidecarProfile.workloadAnnotations(
+                delveSidecarProfile.workloadAnnotations(
                     packageProfile.templateAnnotations(
                         Map.of("flox.dev/environment", "nxmatic/kdns"))),
                 "labels",

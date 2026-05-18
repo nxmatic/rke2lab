@@ -6,23 +6,29 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-public final class DebugSidecarProfile {
+public final class DelveSidecarProfile {
+
+  private static final String DEFAULT_IMAGE = "flox/empty:1.0.0";
+  private static final String DEFAULT_SCRIPT_MOUNT_PATH = "/.sh.d";
 
   private final boolean enabled;
   private final String annotationKey;
   private final String defaultEnabled;
+  private final String enabledEnvName;
   private final String portEnvName;
   private final String portValue;
 
-  public DebugSidecarProfile(
+  public DelveSidecarProfile(
       final boolean enabled,
       final String annotationKey,
       final String defaultEnabled,
+      final String enabledEnvName,
       final String portEnvName,
       final String portValue) {
     this.enabled = enabled;
     this.annotationKey = annotationKey;
     this.defaultEnabled = defaultEnabled;
+    this.enabledEnvName = enabledEnvName;
     this.portEnvName = portEnvName;
     this.portValue = portValue;
   }
@@ -38,29 +44,16 @@ public final class DebugSidecarProfile {
   }
 
   public Optional<LinkedHashMap<String, Object>> delveSidecar(
-      final String name,
-      final String image,
-      final String scriptPath,
-      final String scriptVolumeName) {
+      final String name, final String scriptFileName, final String scriptVolumeName) {
     if (!enabled) {
       return Optional.empty();
     }
     LinkedHashMap<String, Object> container = new LinkedHashMap<>();
     container.put("name", name);
-    container.put("image", image);
+    container.put("image", DEFAULT_IMAGE);
     container.put("imagePullPolicy", "IfNotPresent");
-    container.put("command", List.of(scriptPath));
-    container.put(
-        "env",
-        List.of(
-            Map.of(
-                "name",
-                "KDNS_DEBUG_ENABLED",
-                "valueFrom",
-                Map.of(
-                    "fieldRef",
-                    Map.of("fieldPath", "metadata.annotations['" + annotationKey + "']"))),
-            Map.of("name", portEnvName, "value", portValue)));
+    container.put("command", List.of(scriptPath(scriptFileName)));
+    container.put("env", buildEnv());
     container.put(
         "ports",
         List.of(
@@ -88,7 +81,26 @@ public final class DebugSidecarProfile {
             0));
     container.put(
         "volumeMounts",
-        List.of(Map.of("mountPath", "/scripts", "name", scriptVolumeName, "readOnly", true)));
+        List.of(
+            Map.of(
+                "mountPath", DEFAULT_SCRIPT_MOUNT_PATH,
+                "name", scriptVolumeName,
+                "readOnly", true)));
     return Optional.of(container);
+  }
+
+  private String scriptPath(final String scriptFileName) {
+    return DEFAULT_SCRIPT_MOUNT_PATH + "/" + scriptFileName;
+  }
+
+  private List<Map<String, Object>> buildEnv() {
+    return List.of(
+        Map.of(
+            "name",
+            enabledEnvName,
+            "valueFrom",
+            Map.of(
+                "fieldRef", Map.of("fieldPath", "metadata.annotations['" + annotationKey + "']"))),
+        Map.of("name", portEnvName, "value", portValue));
   }
 }
