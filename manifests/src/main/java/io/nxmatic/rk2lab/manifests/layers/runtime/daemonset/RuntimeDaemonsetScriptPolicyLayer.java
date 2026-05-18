@@ -5,10 +5,6 @@ import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterLayerRefs;
 import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
@@ -70,31 +66,6 @@ public final class RuntimeDaemonsetScriptPolicyLayer extends Construct {
     }
 
     configMap.addJsonPatch(
-        JsonPatch.add(
-            "/data",
-            Map.of(
-                "daemonset-logging.sh",
-                readResource("/runtime/daemonset/.sh.d/daemonset-logging.sh"),
-                "daemonless-host-asset-materializer.sh",
-                readResource("/runtime/daemonset/.sh.d/daemonless-host-asset-materializer.sh"),
-                "daemonless-host-shell-policy.sh",
-                readResource("/runtime/daemonset/.sh.d/daemonless-host-shell-policy.sh"),
-                "daemonless-trampoline.sh",
-                readResource("/runtime/daemonset/.sh.d/daemonless-trampoline.sh"))));
-  }
-
-  private String readResource(final String resourcePath) {
-    final InputStream input =
-        RuntimeDaemonsetScriptPolicyLayer.class.getResourceAsStream(resourcePath);
-    if (input == null) {
-      throw new IllegalStateException("Missing runtime daemonset resource: " + resourcePath);
-    }
-
-    try {
-      return new String(input.readAllBytes(), StandardCharsets.UTF_8);
-    } catch (IOException ex) {
-      throw new IllegalStateException(
-          "Failed reading runtime daemonset resource: " + resourcePath, ex);
-    }
+        JsonPatch.add("/data", RuntimeDaemonsetScriptPolicyAssets.configMapData()));
   }
 }

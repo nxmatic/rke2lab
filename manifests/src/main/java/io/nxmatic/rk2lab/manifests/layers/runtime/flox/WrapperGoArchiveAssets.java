@@ -1,4 +1,5 @@
-package io.nxmatic.rk2lab.manifests;
+// @codebase
+package io.nxmatic.rk2lab.manifests.layers.runtime.flox;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

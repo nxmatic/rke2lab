@@ -6,6 +6,7 @@ import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import io.nxmatic.rk2lab.manifests.layers.mesh.MeshLayerRefs;
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
+import io.nxmatic.rk2lab.manifests.layers.runtime.daemonset.RuntimeDaemonsetScriptPolicyAssets;
 import java.util.Map;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
@@ -340,28 +341,7 @@ public final class FloxContainerdShimLayer extends Construct {
                                   "defaultMode",
                                   493,
                                   "items",
-                                  new Object[] {
-                                    Map.of(
-                                        "key",
-                                        "daemonset-logging.sh",
-                                        "path",
-                                        ".sh.d/daemonset-logging.sh"),
-                                    Map.of(
-                                        "key",
-                                        "daemonless-host-asset-materializer.sh",
-                                        "path",
-                                        ".sh.d/daemonless-host-asset-materializer.sh"),
-                                    Map.of(
-                                        "key",
-                                        "daemonless-host-shell-policy.sh",
-                                        "path",
-                                        ".sh.d/daemonless-host-shell-policy.sh"),
-                                    Map.of(
-                                        "key",
-                                        "daemonless-trampoline.sh",
-                                        "path",
-                                        ".sh.d/daemonless-trampoline.sh")
-                                  },
+                                  RuntimeDaemonsetScriptPolicyAssets.volumeItems(),
                                   "name",
                                   RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name()),
                               "name",

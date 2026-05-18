@@ -6,9 +6,6 @@ import io.nxmatic.rk2lab.manifests.layers.common.profiles.DelveSidecarProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.DelveSidecarToggleResolver;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.RuntimePodProfile;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -175,24 +172,9 @@ public final class KdnsLayer extends Construct {
                         .build())
                 .build());
 
-    configMap.addJsonPatch(
-        JsonPatch.add(
-            "/data", Map.of("kdns-dlv.sh", readResource("/runtime/networking/kdns/kdns-dlv.sh"))));
+    configMap.addJsonPatch(JsonPatch.add("/data", KdnsAssets.dlvScriptConfigMapData()));
 
     return configMap;
-  }
-
-  private String readResource(final String resourcePath) {
-    final InputStream input = KdnsLayer.class.getResourceAsStream(resourcePath);
-    if (input == null) {
-      throw new IllegalStateException("Missing kdns resource: " + resourcePath);
-    }
-
-    try {
-      return new String(input.readAllBytes(), StandardCharsets.UTF_8);
-    } catch (IOException ex) {
-      throw new IllegalStateException("Failed reading kdns resource: " + resourcePath, ex);
-    }
   }
 
   private void createDeployment(

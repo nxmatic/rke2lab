@@ -2,9 +2,6 @@
 package io.nxmatic.rk2lab.manifests.layers.runtime.cloudinit;
 
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
@@ -46,29 +43,6 @@ public final class RuntimeCloudConfigLayer extends Construct {
                         .build())
                 .build());
 
-    configMap.addJsonPatch(
-        JsonPatch.add(
-            "/data",
-            Map.of(
-                "userData",
-                readResource("/runtime/cloud-config/user-data"),
-                "metaData",
-                readResource("/runtime/cloud-config/meta-data"),
-                "networkData",
-                readResource("/runtime/cloud-config/network-config"))));
-  }
-
-  private String readResource(final String resourcePath) {
-    final InputStream input = RuntimeCloudConfigLayer.class.getResourceAsStream(resourcePath);
-    if (input == null) {
-      throw new IllegalStateException("Missing runtime cloud-config resource: " + resourcePath);
-    }
-
-    try {
-      return new String(input.readAllBytes(), StandardCharsets.UTF_8);
-    } catch (IOException ex) {
-      throw new IllegalStateException(
-          "Failed reading runtime cloud-config resource: " + resourcePath, ex);
-    }
+    configMap.addJsonPatch(JsonPatch.add("/data", RuntimeCloudConfigAssets.configMapData()));
   }
 }

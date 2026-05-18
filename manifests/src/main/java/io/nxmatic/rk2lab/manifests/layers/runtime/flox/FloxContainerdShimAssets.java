@@ -2,12 +2,13 @@
 package io.nxmatic.rk2lab.manifests.layers.runtime.flox;
 
 import io.nxmatic.rk2lab.manifests.EmbeddedAsset;
-import io.nxmatic.rk2lab.manifests.WrapperGoArchiveAssets;
+import io.nxmatic.rk2lab.manifests.layers.runtime.daemonset.RuntimeDaemonsetScriptPolicyAssets;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,9 +17,7 @@ public final class FloxContainerdShimAssets {
 
   private static final String FLOX_RESOURCE_ROOT = "/runtime/flox-containerd-shim";
 
-  private static final String DAEMONSET_RESOURCE_ROOT = "/runtime/daemonset/.sh.d";
-
-  private static final List<EmbeddedAsset> MATERIALIZATION_ASSETS =
+  private static final List<EmbeddedAsset> FLOX_MATERIALIZATION_ASSETS =
       List.of(
           asset(FLOX_RESOURCE_ROOT + "/shim-build.sh", "shim-build.sh", true),
           asset(FLOX_RESOURCE_ROOT + "/shim-build.yaml", "shim-build.yaml", false),
@@ -102,25 +101,9 @@ public final class FloxContainerdShimAssets {
           asset(
               FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/manifest.lock",
               "networking/kdns/.flox/env/manifest.lock",
-              false),
-          asset(
-              DAEMONSET_RESOURCE_ROOT + "/daemonless-host-asset-materializer.sh",
-              ".sh.d/daemonless-host-asset-materializer.sh",
-              false),
-          asset(
-              DAEMONSET_RESOURCE_ROOT + "/daemonless-host-shell-policy.sh",
-              ".sh.d/daemonless-host-shell-policy.sh",
-              false),
-          asset(
-              DAEMONSET_RESOURCE_ROOT + "/daemonless-trampoline.sh",
-              ".sh.d/daemonless-trampoline.sh",
-              false),
-          asset(
-              DAEMONSET_RESOURCE_ROOT + "/daemonset-logging.sh",
-              ".sh.d/daemonset-logging.sh",
               false));
 
-  private static final List<InstallerAsset> INSTALLER_CONFIGMAP_ASSETS =
+  private static final List<InstallerAsset> FLOX_INSTALLER_CONFIGMAP_ASSETS =
       List.of(
           installerAsset(
               "shim-installer.sh", FLOX_RESOURCE_ROOT + "/shim-installer.sh", "shim-installer.sh"),
@@ -134,10 +117,6 @@ public final class FloxContainerdShimAssets {
               "shim-build.yaml",
               FLOX_RESOURCE_ROOT + "/shim-build.yaml",
               "build-assets/shim-build.yaml"),
-          installerAsset(
-              "daemonless-trampoline.sh",
-              DAEMONSET_RESOURCE_ROOT + "/daemonless-trampoline.sh",
-              "build-assets/.sh.d/daemonless-trampoline.sh"),
           installerAsset(
               "runtime-flake.nix", FLOX_RESOURCE_ROOT + "/flake.nix", "build-assets/flake.nix"),
           installerAsset(
@@ -180,7 +159,9 @@ public final class FloxContainerdShimAssets {
   private FloxContainerdShimAssets() {}
 
   public static List<EmbeddedAsset> materializationAssets() {
-    return MATERIALIZATION_ASSETS;
+    final ArrayList<EmbeddedAsset> assets = new ArrayList<>(FLOX_MATERIALIZATION_ASSETS);
+    assets.addAll(RuntimeDaemonsetScriptPolicyAssets.materializationAssets());
+    return List.copyOf(assets);
   }
 
   public static Path worktreeShimAssetsRelativePath() {
@@ -189,9 +170,10 @@ public final class FloxContainerdShimAssets {
 
   public static Map<String, String> installerConfigMapData() {
     final LinkedHashMap<String, String> data = new LinkedHashMap<>();
-    for (InstallerAsset asset : INSTALLER_CONFIGMAP_ASSETS) {
+    for (InstallerAsset asset : FLOX_INSTALLER_CONFIGMAP_ASSETS) {
       data.put(asset.configMapKey(), readResource(asset.classpathResource()));
     }
+    data.putAll(RuntimeDaemonsetScriptPolicyAssets.configMapData());
     data.put(WrapperGoArchiveAssets.ARCHIVE_CONFIGMAP_KEY, WrapperGoArchiveAssets.archiveBase64());
     data.put(WrapperGoArchiveAssets.MANIFEST_CONFIGMAP_KEY, WrapperGoArchiveAssets.manifestJson());
     return Map.copyOf(data);
@@ -214,16 +196,27 @@ public final class FloxContainerdShimAssets {
                 "build-assets/" + WrapperGoArchiveAssets.MANIFEST_CONFIGMAP_KEY));
 
     final List<Map<String, String>> items =
-        INSTALLER_CONFIGMAP_ASSETS.stream()
+        FLOX_INSTALLER_CONFIGMAP_ASSETS.stream()
             .map(asset -> Map.of("key", asset.configMapKey(), "path", asset.mountPath()))
             .toList();
 
-    final Object[] out = new Object[items.size() + 2];
+    final List<Map<String, String>> daemonsetItems =
+        RuntimeDaemonsetScriptPolicyAssets.relativePathsByKey().entrySet().stream()
+            .map(
+                entry ->
+                    Map.of(
+                        "key", entry.getKey(), "path", installerBuildAssetPath(entry.getValue())))
+            .toList();
+
+    final Object[] out = new Object[items.size() + daemonsetItems.size() + 2];
     for (int i = 0; i < items.size(); i++) {
       out[i] = items.get(i);
     }
-    out[items.size()] = archiveItem;
-    out[items.size() + 1] = manifestItem;
+    for (int i = 0; i < daemonsetItems.size(); i++) {
+      out[items.size() + i] = daemonsetItems.get(i);
+    }
+    out[items.size() + daemonsetItems.size()] = archiveItem;
+    out[items.size() + daemonsetItems.size() + 1] = manifestItem;
     return out;
   }
 
@@ -244,6 +237,10 @@ public final class FloxContainerdShimAssets {
   private static InstallerAsset installerAsset(
       String configMapKey, String classpathResource, String mountPath) {
     return new InstallerAsset(configMapKey, classpathResource, mountPath);
+  }
+
+  private static String installerBuildAssetPath(String relativePath) {
+    return "build-assets/" + relativePath;
   }
 
   private static String readResource(String resourcePath) {
