@@ -12,10 +12,8 @@ jobs:
     outputDir: /tmp/runtime-shim-build
     logFile: /var/log/rke2-runtime-shim-build.log
     packages:
-      - name: flox-shim-wrapper
-        attr: "packages.aarch64-linux.flox-shim-wrapper"
-      - name: delve-sidecar
-        attr: "packages.aarch64-linux.delve-sidecar"
+      - name: containerd-shim-flox-v2-wrapper
+        attr: "packages.aarch64-linux.containerd-shim-flox-v2-wrapper"
 
   - name: mesh
     description: "Build mesh packages (headplane + headscale) from packaged flake"

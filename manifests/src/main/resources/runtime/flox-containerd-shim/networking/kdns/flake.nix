@@ -27,7 +27,7 @@
 
       mkKdns = {
         packageName,
-        debug ? false,
+        debug ? true,
       }:
         pkgs.buildGoModule rec {
           pname = packageName;

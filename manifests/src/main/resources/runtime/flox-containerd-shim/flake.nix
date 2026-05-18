@@ -22,14 +22,14 @@
 
       mkGoWrapper = {
         packageName,
-        debug ? false,
+        debug ? true,
       }:
         pkgs.buildGoModule {
           pname = packageName;
           version = "0.1.0";
           src = builtins.path {
             path = ./wrapper-go;
-            name = "flox-shim-wrapper-src";
+            name = packageName + "-src";
           };
           subPackages = ["cmd/containerd-shim-flox-v2"];
           vendorHash = "sha256-g+yaVIx4jxpAQ/+WrGKxhVeliYx7nLQe/zsGpxV4Fn4=";
@@ -75,8 +75,8 @@
         };
     in {
       packages = {
-        flox-shim-wrapper = mkGoWrapper {
-          packageName = "flox-shim-wrapper";
+        go-wrapper = mkGoWrapper {
+          packageName = "containerd-shim-flox-v2-wrapper";
         };
 
         delve-sidecar = mkGoWrapper {
@@ -85,6 +85,6 @@
         };
       };
 
-      defaultPackage = self.packages.${system}.flox-shim-wrapper;
+      defaultPackage = self.packages.${system}.go-wrapper;
     });
 }
