@@ -35,17 +35,32 @@ daemonless::trampoline:host_script_root:resolve() {
 	printf '%s\n' "${root}"
 }
 
-daemonless::trampoline:host_script_bin:resolve() {
+daemonless::trampoline:host_script_bin:path() {
 	local host_script_root host_script_bin
 
 	host_script_root="$(daemonless::trampoline:host_script_root:resolve)" || return 1
 	host_script_bin="${DAEMONLESS_HOST_SCRIPT_BIN:-${host_script_root%/}/bin}"
+	printf '%s\n' "${host_script_bin}"
+}
+
+daemonless::trampoline:host_script_bin:resolve() {
+	local host_script_bin
+
+	host_script_bin="$(daemonless::trampoline:host_script_bin:path)" || return 1
 	[[ -d "${host_script_bin}" ]] || {
 		echo "daemonless host script bin directory not found: ${host_script_bin}" >&2
 		return 1
 	}
 
 	printf '%s\n' "${host_script_bin}"
+}
+
+daemonless::trampoline:host_command_path:path() {
+	local script_name="$1"
+	local host_script_bin
+
+	host_script_bin="$(daemonless::trampoline:host_script_bin:path)" || return 1
+	printf '%s\n' "${host_script_bin%/}/${script_name}"
 }
 
 daemonless::trampoline:host_command_path() {
@@ -71,8 +86,6 @@ daemonless::trampoline:exec_on_host() {
 	local -a script_args=()
 
 	mode="$(daemonless::trampoline:mode:resolve)" || return 1
-	host_script_bin="$(daemonless::trampoline:host_script_bin:resolve)" || return 1
-	host_command_path="$(daemonless::trampoline:host_command_path "${script_name}")" || return 1
 
 	while [[ $# -gt 0 && "$1" == *=* ]]; do
 		env_pairs+=("$1")
@@ -82,6 +95,8 @@ daemonless::trampoline:exec_on_host() {
 
 	case "${mode}" in
 	host)
+		host_script_bin="$(daemonless::trampoline:host_script_bin:resolve)" || return 1
+		host_command_path="$(daemonless::trampoline:host_command_path "${script_name}")" || return 1
 		echo "daemonless host trampoline should not be used when already on host" >&2
 		return 1
 		;;
@@ -90,6 +105,8 @@ daemonless::trampoline:exec_on_host() {
 			echo "nsenter is required for daemonless pod->host trampoline" >&2
 			return 1
 		}
+		host_script_bin="$(daemonless::trampoline:host_script_bin:path)" || return 1
+		host_command_path="$(daemonless::trampoline:host_command_path:path "${script_name}")" || return 1
 		exec nsenter --target 1 --mount --uts --ipc --net --pid -- env \
 			DAEMONLESS_EXEC_MODE=host \
 			DAEMONLESS_HOST_SCRIPT_ROOT="${DAEMONLESS_HOST_SCRIPT_ROOT}" \
@@ -104,6 +121,8 @@ daemonless::trampoline:exec_on_host() {
 			echo "DAEMONLESS_HOST_SSH_TARGET is required for daemonless guest->host trampoline" >&2
 			return 1
 		}
+		host_script_bin="$(daemonless::trampoline:host_script_bin:path)" || return 1
+		host_command_path="$(daemonless::trampoline:host_command_path:path "${script_name}")" || return 1
 
 		remote_command="env"
 		remote_command+=" $(printf '%q' 'DAEMONLESS_EXEC_MODE=host')"
