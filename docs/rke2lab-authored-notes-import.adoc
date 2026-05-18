@@ -158,7 +158,7 @@ package "rke2lab controlnode (Stage A)" {
   rectangle "ClusterReadinessResource\n<<Container>>\nPulumi component\nModels readiness gate and exports readiness contract outputs" as readinessResource
   rectangle "BootstrapRegistryResource\n<<Container>>\nPulumi component\nExports bootstrap registry summary from internal contributor registries" as registryResource
   rectangle "SeedImageBuildResource\n<<Container>>\nPulumi component\nExports seed image build metadata summary" as imageBuildResource
-  rectangle "SeedSystemdRuntimeStatusResource\n<<Container>>\nPulumi command-backed component\nExports operator-facing systemd jobs/services runtime status" as systemdRuntimeResource
+  rectangle "SystemdRuntimeStatusSummary\n<<Container>>\nAdapter endpoint-backed runtime status export\nExports operator-facing systemd jobs/services runtime status" as systemdRuntimeResource
   rectangle "ClusterBootstrapReadinessVerifier\n<<Container>>\nReadiness helper\nPerforms systemd prechecks + kubeconfig/API/controller readiness checks (or skipped mode)" as readinessVerifier
 }
 
@@ -178,7 +178,7 @@ cpMain --> systemdRuntimeResource : Creates component resource for runtime statu
 readinessResource --> readinessVerifier : verify(...) / skipped(...)
 registryResource --> incusBootstrap : Consumes layer-env registry snapshot from bootstrap result
 imageBuildResource --> incusBootstrap : Consumes image build checksum/fingerprint from bootstrap result
-systemdRuntimeResource --> incusApi : Runs runtime status probe via incus exec + systemctl
+systemdRuntimeResource --> incusApi : Runs runtime status probe via incus exec + adapter endpoint
 
 incusBootstrap --> imageProvider : Ensures seed image fingerprint/checksum
 imageProvider --> incusApi : Resolves/creates image alias + fingerprint
@@ -191,6 +191,16 @@ Quick actions for review:
 
 * link:.generated/diagrams/controlnode-m4-stagea-flow.review.png[Open review PNG variant (recommended in VS Code image preview)]
 * Run VS Code task: `docs-export-embedded-plantuml-svgs`
+
+=== Split architecture review sets (new)
+
+Large architecture updates should be maintained as split review sets, each with focused diagrams and smaller diffs.
+
+For the systemd adapter/proxy architecture, use:
+
+* link:systemd-dbus-adapter-architecture.adoc[`docs/systemd-dbus-adapter-architecture.adoc`]
+
+This keeps context/container/component/sequence updates independently reviewable and avoids one giant diagram PR.
 
 === IncusResourceBootstrap M4 C4 component view
 

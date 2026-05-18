@@ -1,5 +1,7 @@
 package io.nxmatic.rk2lab.controlplane;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
 import java.io.IOException;
@@ -7,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,7 +29,7 @@ import java.util.function.Consumer;
  */
 public final class ClusterBootstrapReadinessVerifier {
 
-  private static final String MANDATORY_TARGET = "rke2lab.target";
+  private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
   private static final Duration KUBECONFIG_WAIT_TIMEOUT = Duration.ofMinutes(10);
 
@@ -197,70 +200,47 @@ public final class ClusterBootstrapReadinessVerifier {
   }
 
   private static boolean waitForSeedNodeBootstrapState(BootstrapConfig config) {
-    logInfo("waiting for seed node systemd/bootstrap preconditions...");
+    logInfo("waiting for seed node systemd adapter runtime status...");
     final long startedAt = System.nanoTime();
     long nextProgressLogAt = startedAt + LOG_PROGRESS_INTERVAL.toNanos();
     final long deadlineNanos = System.nanoTime() + KUBECONFIG_WAIT_TIMEOUT.toNanos();
 
     String lastSummary = "not yet checked";
     while (System.nanoTime() < deadlineNanos) {
-      final CommandResult envDirCheck =
-          runCommand(
-              incusExec(config, "test", "-d", "/srv/host/rke2lab-environment.d"),
-              Duration.ofSeconds(8));
-      final boolean envDirReady = envDirCheck.exitCode() == 0;
-
-      final CommandResult mandatoryTargetCheck =
-          runCommand(
-              incusExec(config, "systemctl", "is-active", MANDATORY_TARGET), Duration.ofSeconds(8));
+      final Map<String, Object> statusSnapshot = readSystemdAdapterSnapshot(config);
+      final String probeStatus = stringValue(statusSnapshot.getOrDefault("status", "unknown"));
+      final boolean runtimeReady = toBoolean(statusSnapshot.get("runtimePrecheckReady"));
+      final int pendingJobCount = toInt(statusSnapshot.get("pendingJobs"), -1);
+      final int failedUnitCount = toInt(statusSnapshot.get("failedUnits"), -1);
+      final String mandatoryTarget =
+          stringValue(statusSnapshot.getOrDefault("mandatoryTarget", "rke2lab.target"));
       final String mandatoryTargetState =
-          firstLineOrFallback(
-              mandatoryTargetCheck.stdout(),
-              firstLineOrFallback(mandatoryTargetCheck.stderr(), "unknown"));
-      final boolean mandatoryTargetHealthy = isMandatoryTargetHealthy(mandatoryTargetState);
+          stringValue(statusSnapshot.getOrDefault("mandatoryTargetState", "unknown"));
+      final String adapterSummary = stringValue(statusSnapshot.getOrDefault("summary", "n/a"));
+      final String endpoint =
+          stringValue(
+              statusSnapshot.getOrDefault("endpoint", config.systemdAdapterStatusEndpoint()));
 
-      final CommandResult jobsSnapshot =
-          runCommand(
-              incusExec(config, "systemctl", "list-jobs", "--no-pager", "--no-legend"),
-              Duration.ofSeconds(8));
-      final int pendingJobCount = countNonBlankLines(jobsSnapshot.stdout());
-
-      final CommandResult failedUnitsSnapshot =
-          runCommand(
-              incusExec(
-                  config,
-                  "sh",
-                  "-lc",
-                  "systemctl list-units --failed --no-legend --no-pager 2>/dev/null | wc -l"),
-              Duration.ofSeconds(8));
-      final int failedUnitCount = parseIntOrDefault(failedUnitsSnapshot.stdout().trim(), -1);
-      final String jobsTopSummary = summarizeJobsWithState(jobsSnapshot.stdout(), 5);
-
-      if (envDirReady && mandatoryTargetHealthy && pendingJobCount == 0 && failedUnitCount == 0) {
+      if ("ok".equalsIgnoreCase(probeStatus) && runtimeReady) {
         logInfo("seed node bootstrap preconditions ready after " + elapsedSince(startedAt));
         return true;
       }
 
-      final String jobsSummary =
-          pendingJobCount >= 0
-              ? Integer.toString(pendingJobCount)
-              : firstLineOrFallback(jobsSnapshot.stdout(), "unknown");
-      final String failedUnitsSummary =
-          failedUnitCount >= 0
-              ? Integer.toString(failedUnitCount)
-              : firstLineOrFallback(failedUnitsSnapshot.stdout(), "unknown");
-
       lastSummary =
-          "envDir="
-              + (envDirReady ? "ready" : "missing")
+          "endpoint="
+              + endpoint
+              + ", status="
+              + probeStatus
               + ", mandatoryTarget="
-              + summarizeMandatoryTarget(mandatoryTargetState)
+              + mandatoryTarget
+              + "="
+              + mandatoryTargetState
               + ", pendingJobs="
-              + jobsSummary
-              + ", jobsTop="
-              + jobsTopSummary
+              + pendingJobCount
               + ", failedUnits="
-              + failedUnitsSummary;
+              + failedUnitCount
+              + ", summary="
+              + adapterSummary;
 
       final long now = System.nanoTime();
       if (now >= nextProgressLogAt) {
@@ -285,65 +265,73 @@ public final class ClusterBootstrapReadinessVerifier {
     return false;
   }
 
-  private static int countNonBlankLines(String value) {
-    if (value == null || value.isBlank()) {
-      return 0;
+  private static Map<String, Object> readSystemdAdapterSnapshot(BootstrapConfig config) {
+    final CommandResult result =
+        runCommand(
+            incusExec(config, "sh", "-lc", adapterStatusCommand(config)), Duration.ofSeconds(8));
+
+    if (result.exitCode() != 0) {
+      return Map.of(
+          "status",
+          "command-failed",
+          "summary",
+          result.summary(),
+          "capturedAt",
+          Instant.now().toString(),
+          "endpoint",
+          config.systemdAdapterStatusEndpoint().toString());
     }
-    return (int) value.lines().map(String::trim).filter(line -> !line.isBlank()).count();
+
+    try {
+      final LinkedHashMap<String, Object> parsed =
+          new LinkedHashMap<>(
+              JSON_MAPPER.readValue(result.stdout(), new TypeReference<Map<String, Object>>() {}));
+      parsed.put("status", "ok");
+      parsed.putIfAbsent("capturedAt", Instant.now().toString());
+      parsed.put("endpoint", config.systemdAdapterStatusEndpoint().toString());
+      return Map.copyOf(parsed);
+    } catch (IOException ex) {
+      return Map.of(
+          "status",
+          "parse-error",
+          "summary",
+          "failed to parse adapter status JSON: " + ex.getMessage(),
+          "capturedAt",
+          Instant.now().toString(),
+          "endpoint",
+          config.systemdAdapterStatusEndpoint().toString());
+    }
   }
 
-  private static int parseIntOrDefault(String value, int fallback) {
-    if (value == null || value.isBlank()) {
+  private static String adapterStatusCommand(BootstrapConfig config) {
+    return "curl --silent --show-error --fail --max-time 5 "
+        + shellQuote(config.systemdAdapterStatusEndpoint().toString());
+  }
+
+  private static boolean toBoolean(Object value) {
+    if (value instanceof Boolean boolValue) {
+      return boolValue;
+    }
+    return Boolean.parseBoolean(stringValue(value));
+  }
+
+  private static int toInt(Object value, int fallback) {
+    if (value instanceof Number numberValue) {
+      return numberValue.intValue();
+    }
+    final String raw = stringValue(value);
+    if (raw.isBlank()) {
       return fallback;
     }
     try {
-      return Integer.parseInt(value);
+      return Integer.parseInt(raw);
     } catch (NumberFormatException ignored) {
       return fallback;
     }
   }
 
-  private static String summarizeJobsWithState(String jobsOutput, int maxEntries) {
-    if (jobsOutput == null || jobsOutput.isBlank() || maxEntries <= 0) {
-      return "none";
-    }
-
-    final ArrayList<String> tokens = new ArrayList<>();
-    for (String line : jobsOutput.lines().toList()) {
-      final String trimmed = line.trim();
-      if (trimmed.isBlank()) {
-        continue;
-      }
-
-      final String[] parts = trimmed.split("\\s+");
-      if (parts.length >= 4) {
-        tokens.add(parts[1] + "(" + parts[3] + ")");
-      } else {
-        tokens.add(trimmed);
-      }
-      if (tokens.size() == maxEntries) {
-        break;
-      }
-    }
-
-    if (tokens.isEmpty()) {
-      return "none";
-    }
-    return String.join(",", tokens);
-  }
-
-  private static String summarizeMandatoryTarget(String mandatoryTargetState) {
-    final String state =
-        mandatoryTargetState == null || mandatoryTargetState.isBlank()
-            ? "unknown"
-            : mandatoryTargetState;
-    return MANDATORY_TARGET + "=" + state;
-  }
-
-  private static boolean isMandatoryTargetHealthy(String mandatoryTargetState) {
-    final String normalizedState =
-        mandatoryTargetState == null ? "" : mandatoryTargetState.trim().toLowerCase();
-    return "active".equals(normalizedState);
+  private static String stringValue(Object value) {
+    return value == null ? "" : value.toString();
   }
 
   private static boolean waitForApiReady(Path kubeconfigPath) {
@@ -593,18 +581,6 @@ public final class ClusterBootstrapReadinessVerifier {
 
   private static String shellQuote(String value) {
     return "'" + value.replace("'", "'\"'\"'") + "'";
-  }
-
-  private static String firstLineOrFallback(String value, String fallback) {
-    if (value == null || value.isBlank()) {
-      return fallback;
-    }
-    return value
-        .lines()
-        .map(String::trim)
-        .filter(line -> !line.isBlank())
-        .findFirst()
-        .orElse(fallback);
   }
 
   private static void sleep(Duration duration) {

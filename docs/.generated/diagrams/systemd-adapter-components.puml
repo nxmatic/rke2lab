@@ -1,0 +1,23 @@
+@startuml
+top to bottom direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+title Systemd Adapter - Component View
+
+package "systemd-adapter" {
+  rectangle "SystemdAdapterApplication\nSpring bootstrap" as app
+  rectangle "SystemdStatusController\n/status/systemd\n/healthz/systemd" as controller
+  rectangle "SystemdStatusSnapshotProvider\ninterface" as provider
+  rectangle "ShellSystemdStatusSnapshotProvider\ncurrent implementation" as shellProvider
+  rectangle "SystemdAdapterProperties\nmandatoryTarget + timeout" as props
+}
+
+rectangle "systemctl + systemd" as systemctl
+
+app --> controller
+controller --> provider
+provider <|.. shellProvider
+shellProvider --> props
+shellProvider --> systemctl
+@enduml

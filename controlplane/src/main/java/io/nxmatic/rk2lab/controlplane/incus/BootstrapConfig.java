@@ -24,7 +24,11 @@ public record BootstrapConfig(
     String lanBridgeParent,
     String vmnetNetworkName,
     URI apiEndpoint,
-    Path kubeconfigRef) {
+    Path kubeconfigRef,
+    URI systemdAdapterStatusEndpoint,
+    URI systemdAdapterHealthEndpoint,
+    String systemdAdapterUnitName,
+    boolean systemdAdapterLaunchRequired) {
 
   public String imageBuilderBinary() {
     return "distrobuilder";
@@ -77,7 +81,11 @@ public record BootstrapConfig(
         lanBridgeParent,
         vmnetNetworkName,
         apiEndpoint,
-        kubeconfigRef);
+        kubeconfigRef,
+        systemdAdapterStatusEndpoint,
+        systemdAdapterHealthEndpoint,
+        systemdAdapterUnitName,
+        systemdAdapterLaunchRequired);
   }
 
   public Path localWorktreePath() {
@@ -130,6 +138,14 @@ public record BootstrapConfig(
     private URI apiEndpoint = URI.create("https://10.66.106.10:6443");
 
     private Path kubeconfigRef;
+
+    private URI systemdAdapterStatusEndpoint = URI.create("http://127.0.0.1:18080/status/systemd");
+
+    private URI systemdAdapterHealthEndpoint = URI.create("http://127.0.0.1:18080/healthz/systemd");
+
+    private String systemdAdapterUnitName = "rke2lab-systemd-adapter.service";
+
+    private boolean systemdAdapterLaunchRequired = false;
 
     public Builder worktree(Path value) {
       this.worktree = normalizeAbsolutePath(value);
@@ -211,6 +227,26 @@ public record BootstrapConfig(
       return this;
     }
 
+    public Builder systemdAdapterStatusEndpoint(URI value) {
+      this.systemdAdapterStatusEndpoint = value;
+      return this;
+    }
+
+    public Builder systemdAdapterHealthEndpoint(URI value) {
+      this.systemdAdapterHealthEndpoint = value;
+      return this;
+    }
+
+    public Builder systemdAdapterUnitName(String value) {
+      this.systemdAdapterUnitName = value;
+      return this;
+    }
+
+    public Builder systemdAdapterLaunchRequired(boolean value) {
+      this.systemdAdapterLaunchRequired = value;
+      return this;
+    }
+
     public Builder applyConfig(Config config) {
       final EnvironmentValues environment = new EnvironmentValues(config);
       override(environment, "worktree.dir", value -> this.worktree(parsePath(value)));
@@ -234,6 +270,21 @@ public record BootstrapConfig(
       override(environment, "network.vmnetNetworkName", this::vmnetNetworkName);
       override(environment, "api.endpoint", value -> this.apiEndpoint(parseUri(value)));
       override(environment, "kubeconfig.ref", value -> this.kubeconfigRef(parsePath(value)));
+      override(
+          environment,
+          "systemd.adapter.statusEndpoint",
+          value -> this.systemdAdapterStatusEndpoint(parseUri(value)));
+      override(
+          environment,
+          "systemd.adapter.healthEndpoint",
+          value -> this.systemdAdapterHealthEndpoint(parseUri(value)));
+      override(environment, "systemd.adapter.unitName", this::systemdAdapterUnitName);
+      override(
+          environment,
+          "systemd.adapter.launchRequired",
+          value ->
+              this.systemdAdapterLaunchRequired(
+                  parseBoolean(value, "systemd.adapter.launchRequired")));
       return this;
     }
 
@@ -270,7 +321,11 @@ public record BootstrapConfig(
           lanBridgeParent,
           vmnetNetworkName,
           apiEndpoint,
-          resolvedKubeconfigRef);
+          resolvedKubeconfigRef,
+          systemdAdapterStatusEndpoint,
+          systemdAdapterHealthEndpoint,
+          systemdAdapterUnitName,
+          systemdAdapterLaunchRequired);
     }
 
     private Path parsePath(String value) {
@@ -285,6 +340,15 @@ public record BootstrapConfig(
         return null;
       }
       return URI.create(value.trim());
+    }
+
+    private boolean parseBoolean(String value, String key) {
+      final String normalized = value == null ? "" : value.trim().toLowerCase();
+      return switch (normalized) {
+        case "1", "true", "yes", "on" -> true;
+        case "0", "false", "no", "off" -> false;
+        default -> throw new IllegalArgumentException("Invalid boolean for " + key + ": " + value);
+      };
     }
   }
 

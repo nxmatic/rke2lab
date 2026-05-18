@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+
+title Systemd Adapter - /status/systemd sequence
+
+actor Caller
+participant "SystemdStatusController" as Controller
+participant "ShellSystemdStatusSnapshotProvider" as Provider
+participant "systemctl show/list-jobs/--failed" as Systemctl
+
+Caller -> Controller : GET /status/systemd
+Controller -> Provider : currentSnapshot()
+
+Provider -> Systemctl : show ActiveState of mandatory target
+Systemctl --> Provider : target state
+
+Provider -> Systemctl : list-jobs --no-legend
+Systemctl --> Provider : tabular jobs
+
+Provider -> Systemctl : failed-units --no-legend
+Systemctl --> Provider : failed units listing
+
+Provider --> Controller : SystemdStatusSnapshot
+Controller --> Caller : 200 + JSON snapshot
+@enduml

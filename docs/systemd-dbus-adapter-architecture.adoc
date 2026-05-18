@@ -1,0 +1,167 @@
+= Systemd D-Bus Adapter Architecture (Split Review Set)
+:toc: left
+:toclevels: 3
+:kroki-server-url: https://kroki.io
+:plantuml-server-url: {kroki-server-url}/plantuml
+
+This document defines the architecture for the new `systemd-adapter` module and intentionally splits diagrams into small reviewable units.
+
+IMPORTANT: current implementation is shell-backed (`systemctl` via `ShellSystemdStatusSnapshotProvider`).
+Native D-Bus client integration is a follow-up evolution, not the current runtime path.
+
+== Why split this architecture set
+
+The adapter spans multiple concerns:
+
+* bootstrap/runtime monitoring contract
+* systemd state probing
+* HTTP status surface consumed by operators and Pulumi
+* deployment/runtime ownership boundaries
+
+To keep reviews focused, each concern is diagrammed separately with one primary question per diagram.
+
+== Diagram set
+
+=== 1) Context view — who interacts with the adapter?
+
+Review question: are system boundaries and external actors correct?
+
+[plantuml,systemd-adapter-context,svg]
+----
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+title Systemd Adapter - C4 Context
+
+actor "Operator" as operator
+rectangle "Pulumi Stage A\n(controlplane)" as pulumi
+rectangle "Systemd Adapter\n(Spring Boot service)" as adapter
+rectangle "systemd manager\n(org.freedesktop.systemd1)" as systemd
+rectangle "Seed node runtime" as seed
+
+operator --> pulumi : run preview/up
+pulumi --> adapter : reads /status/systemd\nreads /healthz/systemd
+adapter --> systemd : queries unit/job state
+systemd --> seed : orchestrates units/targets
+operator --> adapter : direct health checks\nfor debugging
+@enduml
+----
+
+=== 2) Container view — what runs inside `rke2lab`?
+
+Review question: are module boundaries and responsibilities clear?
+
+[plantuml,systemd-adapter-container,svg]
+----
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+title Systemd Adapter - C4 Container
+
+package "rke2lab" {
+  rectangle "controlplane\nJava/Pulumi" as controlplane
+  rectangle "systemd-adapter\nSpring Boot" as adapter
+  rectangle "manifests\ncdk8s/manifests synthesis" as manifests
+}
+
+rectangle "Incus seed instance" as seed
+rectangle "systemd manager" as systemd
+
+controlplane --> adapter : optional monitor mode\n(endpoint)
+adapter --> systemd : state probe commands\n(target/jobs/failed units)
+controlplane --> seed : bootstrap + readiness
+manifests --> seed : runtime assets consumed by units
+@enduml
+----
+
+=== 3) Component view — how is adapter internals split?
+
+Review question: is code-level ownership unambiguous?
+
+[plantuml,systemd-adapter-components,svg]
+----
+@startuml
+top to bottom direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+title Systemd Adapter - Component View
+
+package "systemd-adapter" {
+  rectangle "SystemdAdapterApplication\nSpring bootstrap" as app
+  rectangle "SystemdStatusController\n/status/systemd\n/healthz/systemd" as controller
+  rectangle "SystemdStatusSnapshotProvider\ninterface" as provider
+  rectangle "ShellSystemdStatusSnapshotProvider\ncurrent implementation" as shellProvider
+  rectangle "SystemdAdapterProperties\nmandatoryTarget + timeout" as props
+}
+
+rectangle "systemctl + systemd" as systemctl
+
+app --> controller
+controller --> provider
+provider <|.. shellProvider
+shellProvider --> props
+shellProvider --> systemctl
+@enduml
+----
+
+=== 4) Sequence view — how does one status request flow?
+
+Review question: does runtime behavior and error handling match expectations?
+
+[plantuml,systemd-adapter-status-sequence,svg]
+----
+@startuml
+skinparam shadowing false
+
+title Systemd Adapter - /status/systemd sequence
+
+actor Caller
+participant "SystemdStatusController" as Controller
+participant "ShellSystemdStatusSnapshotProvider" as Provider
+participant "systemctl show/list-jobs/--failed" as Systemctl
+
+Caller -> Controller : GET /status/systemd
+Controller -> Provider : currentSnapshot()
+
+Provider -> Systemctl : show ActiveState of mandatory target
+Systemctl --> Provider : target state
+
+Provider -> Systemctl : list-jobs --no-legend
+Systemctl --> Provider : tabular jobs
+
+Provider -> Systemctl : failed-units --no-legend
+Systemctl --> Provider : failed units listing
+
+Provider --> Controller : SystemdStatusSnapshot
+Controller --> Caller : 200 + JSON snapshot
+@enduml
+----
+
+== Review and evolution policy
+
+For large updates, prefer one PR per diagram concern:
+
+. Context/container boundary updates
+. Component ownership updates
+. Sequence/runtime behavior updates
+
+This keeps architectural reviews short and allows faster approval cycles.
+
+== Rendering/export notes
+
+Use the existing exporter script to generate standalone assets from this file:
+
+* source of truth: this AsciiDoc file
+* generated files: `docs/.generated/diagrams/*.puml`, `*.svg`, `*.review.png`
+
+Recommended first pass export target names from this file:
+
+* `systemd-adapter-context`
+* `systemd-adapter-container`
+* `systemd-adapter-components`
+* `systemd-adapter-status-sequence`

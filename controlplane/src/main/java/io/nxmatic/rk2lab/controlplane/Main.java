@@ -3,6 +3,7 @@ package io.nxmatic.rk2lab.controlplane;
 import com.pulumi.Config;
 import com.pulumi.Pulumi;
 import com.pulumi.core.Output;
+import com.pulumi.deployment.Deployment;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
@@ -81,6 +82,13 @@ public final class Main {
 
     final IncusResourceBootstrap.BootstrapResult bootstrapResult =
         new IncusResourceBootstrap(config, policy).apply();
+    final Map<String, Object> systemdAdapterLaunchSummary;
+    if (isPulumiEngineAvailable() && Deployment.getInstance().isDryRun()) {
+      systemdAdapterLaunchSummary = SeedSystemdAdapterLaunchResource.deferredPreview(config);
+    } else {
+      systemdAdapterLaunchSummary =
+          SeedSystemdAdapterLaunchResource.ensureLaunched(config, readinessLogger);
+    }
     final Object readinessOutput;
     final Object clusterReadinessResourceUrn;
     final Object registryResourceUrn;
@@ -97,7 +105,11 @@ public final class Main {
               policy,
               readinessEnabled,
               readinessLogger,
-              bootstrapResult.instanceStatus(),
+              Map.of(
+                  "instanceStatus",
+                  bootstrapResult.instanceStatus(),
+                  "systemdAdapterLaunch",
+                  systemdAdapterLaunchSummary),
               bootstrapResult.readinessDependency());
       readinessOutput = readinessResource.verificationResult();
       clusterReadinessResourceUrn = readinessResource.urn();
@@ -124,15 +136,11 @@ public final class Main {
       imageBuildResourceUrn = imageBuildResource.urn();
       imageBuildSummary = imageBuildResource.summary();
 
-      final SeedSystemdRuntimeStatusResource systemdRuntimeStatusResource =
-          new SeedSystemdRuntimeStatusResource(
-              "seed-systemd-runtime-status",
-              config,
-              bootstrapResult.provisioningChecksum(),
-              bootstrapResult.imageBuildChecksum(),
-              bootstrapResult.readinessDependency());
-      systemdRuntimeStatusResourceUrn = systemdRuntimeStatusResource.urn();
-      systemdRuntimeStatusSummary = systemdRuntimeStatusResource.summary();
+      systemdRuntimeStatusResourceUrn = "";
+      systemdRuntimeStatusSummary =
+          Deployment.getInstance().isDryRun()
+              ? SeedSystemdRuntimeStatusResource.deferredPreview(config)
+              : SeedSystemdRuntimeStatusResource.snapshot(config, readinessLogger);
     } else {
       readinessOutput =
           readinessEnabled
@@ -251,6 +259,7 @@ public final class Main {
     outputs.put("systemdRuntimeStatusResourceUrn", systemdRuntimeStatusResourceUrn);
     outputs.put("registrySummary", registrySummary);
     outputs.put("systemdProvisioningSummary", bootstrapResult.systemdProvisioningSummary());
+    outputs.put("systemdAdapterLaunchSummary", systemdAdapterLaunchSummary);
     outputs.put("systemdRuntimeStatusSummary", systemdRuntimeStatusSummary);
     outputs.put("seedImageBuildSummary", imageBuildSummary);
     return new BootstrapOutputs(outputs);
