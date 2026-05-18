@@ -10,7 +10,7 @@ public final class CloudConfigManifestUnit extends AbstractManifestUnit {
   public static final String MANIFEST_UNIT_ID = "runtime/cloud-config";
 
   public CloudConfigManifestUnit() {
-    super(MANIFEST_UNIT_ID, List.of(RuntimeCloudConfigLayer.LEGACY_PATH_PREFIX), List.of());
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
   @Override

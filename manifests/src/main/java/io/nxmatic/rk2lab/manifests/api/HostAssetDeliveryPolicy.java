@@ -55,6 +55,18 @@ public record HostAssetDeliveryPolicy(
         true);
   }
 
+  public static HostAssetDeliveryPolicy systemdLibexecPlaceholder() {
+    return new HostAssetDeliveryPolicy(
+        "runtime/systemd-libexec-placeholder",
+        MANIFEST_DOMAIN_CATALOG.runtime(),
+        "/srv/host/systemd-libexec.d",
+        HostAssetDeliveryBackend.BOOTSTRAP,
+        HostAssetMaterializationMode.DIRECT_FILES,
+        false,
+        false,
+        false);
+  }
+
   private static String requireKnownDomainId(String ownerDomainId) {
     final String normalizedOwnerDomainId = requireNonBlank(ownerDomainId, "ownerDomainId");
     if (!MANIFEST_DOMAIN_CATALOG.isKnownDomainId(normalizedOwnerDomainId)) {

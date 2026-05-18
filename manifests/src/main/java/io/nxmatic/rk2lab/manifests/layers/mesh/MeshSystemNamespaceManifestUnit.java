@@ -10,7 +10,7 @@ public final class MeshSystemNamespaceManifestUnit extends AbstractManifestUnit 
   public static final String MANIFEST_UNIT_ID = "mesh/system-namespace";
 
   public MeshSystemNamespaceManifestUnit() {
-    super(MANIFEST_UNIT_ID, List.of(), List.of());
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
   @Override

@@ -8,8 +8,6 @@ public interface ManifestUnit {
 
   String manifestUnitId();
 
-  List<String> legacyPathPrefixes();
-
   List<String> dependsOnManifestUnitIds();
 
   default void apply(ManifestUnitContext context) {

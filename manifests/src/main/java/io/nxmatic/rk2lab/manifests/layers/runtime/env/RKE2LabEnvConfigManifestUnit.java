@@ -10,7 +10,7 @@ public final class RKE2LabEnvConfigManifestUnit extends AbstractManifestUnit {
   public static final String MANIFEST_UNIT_ID = "runtime/env-config";
 
   public RKE2LabEnvConfigManifestUnit() {
-    super(MANIFEST_UNIT_ID, List.of(RuntimeEnvConfigLayer.LEGACY_PATH_PREFIX), List.of());
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
   @Override

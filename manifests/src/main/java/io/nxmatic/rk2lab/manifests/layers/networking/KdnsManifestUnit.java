@@ -17,7 +17,6 @@ public final class KdnsManifestUnit extends AbstractManifestUnit {
   public KdnsManifestUnit() {
     super(
         MANIFEST_UNIT_ID,
-        List.of(KdnsLayer.LEGACY_PATH_PREFIX),
         Stream.concat(
                 NETWORKING_DEPENDENCY_INTENTS
                     .resolve(List.of(NETWORKING_DEPENDENCY_INTENTS.requiresCiliumConfigIntent()))

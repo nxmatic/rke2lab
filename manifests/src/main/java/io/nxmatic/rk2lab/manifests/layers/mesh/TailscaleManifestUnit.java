@@ -9,13 +9,9 @@ import org.cdk8s.Chart;
 public final class TailscaleManifestUnit extends AbstractManifestUnit {
 
   public static final String MANIFEST_UNIT_ID = "mesh/tailscale";
-  public static final String LEGACY_PATH_PREFIX = "mesh/tailscale/";
 
   public TailscaleManifestUnit() {
-    super(
-        MANIFEST_UNIT_ID,
-        List.of(LEGACY_PATH_PREFIX),
-        List.of(MeshSystemNamespaceManifestUnit.MANIFEST_UNIT_ID));
+    super(MANIFEST_UNIT_ID, List.of(MeshSystemNamespaceManifestUnit.MANIFEST_UNIT_ID));
   }
 
   @Override

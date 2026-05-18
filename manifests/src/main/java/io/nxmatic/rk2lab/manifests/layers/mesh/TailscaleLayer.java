@@ -13,8 +13,6 @@ import software.constructs.Construct;
 
 public final class TailscaleLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "mesh/tailscale/";
-
   private static final String TAILSCALE_NAMESPACE = MeshLayerRefs.MESH_SYSTEM_NAMESPACE.name();
 
   private final PackageMetadataProfile packageProfile =

@@ -9,12 +9,10 @@ import org.cdk8s.Chart;
 public final class HeadplaneManifestUnit extends AbstractManifestUnit {
 
   public static final String MANIFEST_UNIT_ID = "mesh/headplane";
-  public static final String LEGACY_PATH_PREFIX = "mesh/headplane/";
 
   public HeadplaneManifestUnit() {
     super(
         MANIFEST_UNIT_ID,
-        List.of(LEGACY_PATH_PREFIX),
         List.of(
             MeshSystemNamespaceManifestUnit.MANIFEST_UNIT_ID,
             HeadscaleManifestUnit.MANIFEST_UNIT_ID));

@@ -12,8 +12,6 @@ import software.constructs.Construct;
 
 public final class PorchResourcesLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "gitops/porch-resources/";
-
   private static final String CLUSTER_NAME = "${cluster-name}";
 
   private static final String CLUSTER_ENV = "${cluster-env}";

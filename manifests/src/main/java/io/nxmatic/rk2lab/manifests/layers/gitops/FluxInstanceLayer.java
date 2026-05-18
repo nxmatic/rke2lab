@@ -11,8 +11,6 @@ import software.constructs.Construct;
 
 public final class FluxInstanceLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "gitops/flux-instance/";
-
   private static final String LAYER_NAME = "gitops";
   private static final String PACKAGE_NAME = "flux-instance";
 

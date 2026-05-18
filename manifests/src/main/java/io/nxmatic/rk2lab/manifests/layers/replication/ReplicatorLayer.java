@@ -11,8 +11,6 @@ import software.constructs.Construct;
 
 public final class ReplicatorLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "replication/replicator/";
-
   private static final String LAYER_NAME = "replication";
   private static final String PACKAGE_NAME = "replicator";
 

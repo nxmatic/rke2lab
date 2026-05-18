@@ -14,8 +14,6 @@ import software.constructs.Construct;
 
 public final class HeadscaleLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "mesh/headscale/";
-
   private static final String HEADSCALE_NAMESPACE = MeshLayerRefs.MESH_SYSTEM_NAMESPACE.name();
 
   private final PackageMetadataProfile packageProfile =

@@ -8,13 +8,9 @@ import org.cdk8s.Chart;
 public final class TektonDashboardManifestUnit extends AbstractManifestUnit {
 
   public static final String MANIFEST_UNIT_ID = "cicd/tekton-dashboard";
-  public static final String LEGACY_PATH_PREFIX = "cicd/tekton-dashboard/";
 
   public TektonDashboardManifestUnit() {
-    super(
-        MANIFEST_UNIT_ID,
-        List.of(LEGACY_PATH_PREFIX),
-        List.of(TektonPipelinesManifestUnit.MANIFEST_UNIT_ID));
+    super(MANIFEST_UNIT_ID, List.of(TektonPipelinesManifestUnit.MANIFEST_UNIT_ID));
   }
 
   @Override

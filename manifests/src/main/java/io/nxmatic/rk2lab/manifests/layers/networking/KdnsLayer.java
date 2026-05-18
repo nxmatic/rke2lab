@@ -18,8 +18,6 @@ import software.constructs.Construct;
 
 public final class KdnsLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "networking/kdns/";
-
   private static final String LAYER_NAME = "networking";
   private static final String PACKAGE_NAME = "kdns";
   private static final String KDNS_NAMESPACE = ClusterLayerRefs.RUNTIME_SYSTEM_NAMESPACE.name();

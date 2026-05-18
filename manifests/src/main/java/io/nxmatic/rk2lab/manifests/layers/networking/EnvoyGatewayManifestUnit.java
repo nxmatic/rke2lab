@@ -8,13 +8,9 @@ import org.cdk8s.Chart;
 public final class EnvoyGatewayManifestUnit extends AbstractManifestUnit {
 
   public static final String MANIFEST_UNIT_ID = "networking/envoy-gateway";
-  public static final String LEGACY_PATH_PREFIX = "networking/envoy-gateway/";
 
   public EnvoyGatewayManifestUnit() {
-    super(
-        MANIFEST_UNIT_ID,
-        List.of(LEGACY_PATH_PREFIX),
-        List.of(CiliumAdvancedManifestUnit.MANIFEST_UNIT_ID));
+    super(MANIFEST_UNIT_ID, List.of(CiliumAdvancedManifestUnit.MANIFEST_UNIT_ID));
   }
 
   @Override

@@ -13,8 +13,6 @@ import software.constructs.Construct;
 
 public final class RuntimeRke2ConfigLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "runtime/rke2-config/";
-
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("runtime", "rke2-config");
 

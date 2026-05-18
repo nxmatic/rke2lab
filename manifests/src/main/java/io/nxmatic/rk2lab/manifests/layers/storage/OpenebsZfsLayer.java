@@ -11,7 +11,6 @@ import software.constructs.Construct;
 
 public final class OpenebsZfsLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "storage/openebs-zfs/";
   private static final String LAYER_NAME = "storage";
   private static final String PACKAGE_NAME = "openebs-zfs";
 

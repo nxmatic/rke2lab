@@ -10,7 +10,7 @@ public final class ReplicationReplicatorManifestUnit extends AbstractManifestUni
   public static final String MANIFEST_UNIT_ID = "replication/replicator";
 
   public ReplicationReplicatorManifestUnit() {
-    super(MANIFEST_UNIT_ID, List.of(ReplicatorLayer.LEGACY_PATH_PREFIX), List.of());
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
   @Override

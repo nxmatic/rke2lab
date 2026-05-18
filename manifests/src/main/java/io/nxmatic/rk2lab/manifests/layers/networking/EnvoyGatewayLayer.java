@@ -12,8 +12,6 @@ import software.constructs.Construct;
 
 public final class EnvoyGatewayLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "networking/envoy-gateway/";
-
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("networking", "envoy-gateway");
 

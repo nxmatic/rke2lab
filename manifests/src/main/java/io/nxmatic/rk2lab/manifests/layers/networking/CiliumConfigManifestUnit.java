@@ -8,10 +8,9 @@ import org.cdk8s.Chart;
 public final class CiliumConfigManifestUnit extends AbstractManifestUnit {
 
   public static final String MANIFEST_UNIT_ID = "networking/cilium-config";
-  public static final String LEGACY_PATH_PREFIX = "networking/cilium-config/";
 
   public CiliumConfigManifestUnit() {
-    super(MANIFEST_UNIT_ID, List.of(LEGACY_PATH_PREFIX), List.of());
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
   @Override

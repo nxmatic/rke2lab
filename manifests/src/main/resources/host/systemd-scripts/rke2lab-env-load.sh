@@ -7,12 +7,10 @@ set -euo pipefail
 
 RKE2LAB_SCRIPTS_DIR=${RKE2LAB_ROOT:=/srv/host}/systemd-scripts.d
 RKE2LAB_SYSTEMD_LIBEXEC_DIR=${RKE2LAB_SYSTEMD_LIBEXEC_DIR:-${RKE2LAB_ROOT}/systemd-libexec.d}
-RKE2LAB_SYSTEMD_ADAPTER_DIR=${RKE2LAB_SYSTEMD_ADAPTER_DIR:-${RKE2LAB_ROOT}/rke2lab-systemd-adapter.d}
 HOME=/root
 
 export RKE2LAB_SCRIPTS_DIR
 export RKE2LAB_SYSTEMD_LIBEXEC_DIR
-export RKE2LAB_SYSTEMD_ADAPTER_DIR
 
 if [[ ! -r /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]]; then
 	: "Install Nix Daemon and CLI tools to access yq"

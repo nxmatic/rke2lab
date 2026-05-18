@@ -8,10 +8,9 @@ import org.cdk8s.Chart;
 public final class TektonPipelinesManifestUnit extends AbstractManifestUnit {
 
   public static final String MANIFEST_UNIT_ID = "cicd/tekton-pipelines";
-  public static final String LEGACY_PATH_PREFIX = "cicd/tekton-pipelines/";
 
   public TektonPipelinesManifestUnit() {
-    super(MANIFEST_UNIT_ID, List.of(LEGACY_PATH_PREFIX), List.of());
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
   @Override

@@ -11,7 +11,7 @@ public final class ClusterRuntimeNamespaceManifestUnit extends AbstractManifestU
   public static final String MANIFEST_UNIT_ID = "cluster/runtime-system-namespace";
 
   public ClusterRuntimeNamespaceManifestUnit() {
-    super(MANIFEST_UNIT_ID, List.of(), List.of());
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
   @Override

@@ -10,7 +10,7 @@ public final class RKE2ConfigManifestUnit extends AbstractManifestUnit {
   public static final String MANIFEST_UNIT_ID = "runtime/rke2-config";
 
   public RKE2ConfigManifestUnit() {
-    super(MANIFEST_UNIT_ID, List.of(RuntimeRke2ConfigLayer.LEGACY_PATH_PREFIX), List.of());
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
   @Override

@@ -12,8 +12,6 @@ import software.constructs.Construct;
 
 public final class TektonPipelinesLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "cicd/tekton-pipelines/";
-
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("cicd", "tekton-pipelines");
 

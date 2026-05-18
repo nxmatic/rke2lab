@@ -11,8 +11,6 @@ import software.constructs.Construct;
 
 public final class RuntimeCloudConfigLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "runtime/cloud-config/";
-
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("runtime", "cloud-config");
 

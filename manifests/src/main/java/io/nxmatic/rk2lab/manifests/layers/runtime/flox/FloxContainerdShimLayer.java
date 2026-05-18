@@ -16,8 +16,6 @@ import software.constructs.Construct;
 
 public final class FloxContainerdShimLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "runtime/containerd-shim-flox/";
-
   private static final String LAYER_NAME = "runtime";
 
   private static final String PACKAGE_NAME = "containerd-shim-flox";

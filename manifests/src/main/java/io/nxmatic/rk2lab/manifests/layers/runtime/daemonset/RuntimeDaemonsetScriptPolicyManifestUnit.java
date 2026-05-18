@@ -12,8 +12,7 @@ public final class RuntimeDaemonsetScriptPolicyManifestUnit extends AbstractMani
   public static final String MANIFEST_UNIT_ID = "runtime/daemonset";
 
   public RuntimeDaemonsetScriptPolicyManifestUnit() {
-    super(
-        MANIFEST_UNIT_ID, List.of(), List.of(ClusterRuntimeNamespaceManifestUnit.MANIFEST_UNIT_ID));
+    super(MANIFEST_UNIT_ID, List.of(ClusterRuntimeNamespaceManifestUnit.MANIFEST_UNIT_ID));
   }
 
   @Override

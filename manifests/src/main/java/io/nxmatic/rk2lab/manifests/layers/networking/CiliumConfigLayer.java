@@ -11,8 +11,6 @@ import software.constructs.Construct;
 
 public final class CiliumConfigLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "networking/cilium-config/";
-
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("networking", "cilium-config");
 

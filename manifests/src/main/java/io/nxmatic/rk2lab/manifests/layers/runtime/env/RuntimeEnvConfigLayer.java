@@ -18,8 +18,6 @@ import software.constructs.Construct;
 
 public final class RuntimeEnvConfigLayer extends Construct {
 
-  public static final String LEGACY_PATH_PREFIX = "runtime/env-config/";
-
   private static final List<String> ENV_SECTIONS =
       List.of(
           "cilium",
