@@ -187,6 +187,11 @@ cpMain --> operator : Exports Stage A outputs\n(apiEndpoint, kubeconfigRef, seed
 @enduml
 ----
 
+Quick actions for review:
+
+* link:.generated/diagrams/controlnode-m4-stagea-flow.review.png[Open review PNG variant (recommended in VS Code image preview)]
+* Run VS Code task: `docs-export-embedded-plantuml-svgs`
+
 === IncusResourceBootstrap M4 C4 component view
 
 This component-level diagram expands the Stage A bootstrap internals around `IncusResourceBootstrap`.
@@ -236,6 +241,11 @@ applyPipeline --> incusApi : Ensure project/network/profile + create/replace see
 @enduml
 ----
 
+Quick actions for review:
+
+* link:.generated/diagrams/incus-bootstrap-m4-components.review.png[Open review PNG variant (recommended in VS Code image preview)]
+* Run VS Code task: `docs-export-embedded-plantuml-svgs`
+
 === VS Code preview note (Kroki)
 
 If the VS Code AsciiDoc preview does not render PlantUML blocks locally, use Kroki-backed preview.
@@ -246,3 +256,26 @@ Recommended preview attributes:
 * `plantuml-server-url=https://kroki.io/plantuml`
 
 This document already sets both attributes at the top, so Kroki-capable renderers should resolve diagram blocks without local PlantUML execution.
+
+=== Open diagrams as standalone SVG (better zoom/fullscreen review in VS Code)
+
+When AsciiDoc preview zoom is not sufficient, export embedded `plantuml` blocks to standalone SVG files and open those images directly in VS Code.
+
+Helper script:
+
+* `docs/bin/export_embedded_plantuml.py`
+
+Example:
+
+* `python docs/bin/export_embedded_plantuml.py docs/rke2lab-authored-notes-import.adoc`
+
+Default review-image settings:
+
+* review PNG suffix: `.review.png`
+* review PNG DPI: `220` (override with `--review-dpi <value>`)
+
+Default output directory:
+
+* `docs/.generated/diagrams/`
+
+Then open the generated `*.svg` files in VS Code and use image zoom/fit controls for fullscreen-friendly diagram review.
