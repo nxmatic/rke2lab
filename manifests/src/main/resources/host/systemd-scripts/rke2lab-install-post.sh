@@ -67,10 +67,12 @@ link_layer_if_enabled() {
 }
 
 link_layer_if_enabled "ha" "ha" "ha" "true"
-link_layer_if_enabled "networking" "networking" "networking" "true"
-link_layer_if_enabled "replication/replicator" "replication/replicator" "replication" "true"
-link_layer_if_enabled "storage" "storage" "storage" "true"
-link_layer_if_enabled "mesh" "mesh" "mesh" "false"
+
+: "Do not pre-link post-server layer trees into the live RKE2 manifests directory here."
+: "Those layers are installed by dedicated rke2lab-*-manifests services that impose their own"
+: "host-side ordering and readiness gates after the API server is up. Pre-linking them here lets"
+: "rke2-server observe lifecycle-dependent manifests too early, before prerequisites such as the"
+: "rke2lab-system namespace or Cilium/Gateway API CRDs exist."
 
 if [[ ! -d "$SRC_UNIT_DIR" ]]; then
 	log "source unit dir missing: $SRC_UNIT_DIR"
