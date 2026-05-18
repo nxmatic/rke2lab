@@ -217,5 +217,8 @@ bootcmd:
       /etc/netplan/01-nocloud.yaml,
     ]
   - [chmod, "600", /etc/netplan/01-nocloud.yaml]
+  # Materialize networkd units from netplan immediately so startup does not depend
+  # on later runcmd/systemd-link stages (which may fail on transient catalog/network issues).
+  - [netplan, generate]
   # Disable dhcpcd for vmnet0 - systemd-networkd will handle it
   - [sh, -c, "echo 'denyinterfaces vmnet0' >> /etc/dhcpcd.conf"]
