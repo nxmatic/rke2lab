@@ -17,6 +17,10 @@ EXECUTION_MODE="${DAEMONLESS_EXEC_MODE:-guest}"
 
 # shellcheck disable=SC1091
 [[ -r "${SCRIPT_DIR}/.sh.d/daemonless-trampoline.sh" ]] && source "${SCRIPT_DIR}/.sh.d/daemonless-trampoline.sh"
+# shellcheck disable=SC1091
+[[ -r "${SCRIPT_DIR}/.sh.d/daemonset-logging.sh" ]] && source "${SCRIPT_DIR}/.sh.d/daemonset-logging.sh"
+
+declare -F daemonset::logging:stderr:setup >/dev/null 2>&1 && daemonset::logging:stderr:setup "${SCRIPT_PATH}"
 
 canonicalize_existing_path() {
 	local input_path="$1"
@@ -39,7 +43,7 @@ canonicalize_existing_path() {
 	echo "$(cd "${input_dir}" && pwd -P)/${input_base}"
 }
 
-BUILDS_DESCRIPTOR="${1:-${SCRIPT_DIR}/${SCRIPT_STEM}.yaml}"
+BUILDS_DESCRIPTOR="${1:-${FLOX_SHIM_DESCRIPTOR_PATH:-${SCRIPT_DIR}/${SCRIPT_STEM}.yaml}}"
 BUILDS_DESCRIPTOR="$(canonicalize_existing_path "${BUILDS_DESCRIPTOR}")"
 BUILDS_DESCRIPTOR_DIR="$(dirname "${BUILDS_DESCRIPTOR}")"
 BUILDS_DESCRIPTOR_DIR="$(canonicalize_existing_path "${BUILDS_DESCRIPTOR_DIR}")"
@@ -47,17 +51,6 @@ BUILDS_DESCRIPTOR_DIR="$(canonicalize_existing_path "${BUILDS_DESCRIPTOR_DIR}")"
 # Environment variables
 RKE2LAB_ROOT="${RKE2LAB_ROOT:-/srv/host}"
 UPDATED_FLAKE_LOCK_DIRS=""
-
-rke2lab::bool:is_true() {
-	case "${1:-}" in
-	1 | true | TRUE | yes | YES | on | ON)
-		return 0
-		;;
-	*)
-		return 1
-		;;
-	esac
-}
 
 rke2lab::env:load() {
 	local env_script
@@ -68,22 +61,6 @@ rke2lab::env:load() {
 	# shellcheck disable=SC1090
 	source "${env_script}"
 	declare -F rke2lab::env:load >/dev/null 2>&1 && rke2lab::env:load
-}
-
-resolve_package_variant() {
-	local package_name="$1"
-	local package_attr="$2"
-
-	case "${package_name}" in
-	kdns)
-		if rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}"; then
-			package_name="kdns-debug"
-			[[ "${package_attr}" == *-debug ]] || package_attr="${package_attr}-debug"
-		fi
-		;;
-	esac
-
-	printf '%s\n%s\n' "${package_name}" "${package_attr}"
 }
 
 validate_worktree_mode() {
@@ -346,7 +323,6 @@ build_package() {
 	local output_dir="$3"
 	local log_file="$4"
 	local package_name="$5"
-	local package_attr="$6"
 
 	: "[$(date)] [${job_name}] Building ${package_name}..."
 
@@ -386,7 +362,7 @@ build_package() {
 		return 0
 	fi
 
-	local build_target="${package_attr}"
+	local build_target="${package_name}"
 	: "[$(date)] [${job_name}] Flake path: ${resolved_path}"
 
 	if nix "${nix_args[@]}" "${resolved_path}#${build_target}" >"${log_file}" 2>&1; then
@@ -430,7 +406,7 @@ clear_job_vars() {
 }
 
 clear_package_vars() {
-	unset name attr
+	unset pkg_name
 }
 
 for ((i = 0; i < num_jobs; i++)); do
@@ -471,22 +447,17 @@ for ((i = 0; i < num_jobs; i++)); do
 		# Load individual package variables
 		clear_package_vars
 		# shellcheck disable=SC1090
-		source <(yq -o shell ".jobs[$i].packages[$j]" "${BUILDS_DESCRIPTOR}")
+		source <(yq -o shell '.jobs['"${i}"'].packages['"${j}"'] | with_entries(.key = "pkg_" + .key)' "${BUILDS_DESCRIPTOR}")
 
-		package_name="${name:-}"
-		package_attr="${attr:-}"
+		package_name="${pkg_name:-}"
 
-		readarray -t package_variant < <(resolve_package_variant "${package_name}" "${package_attr}")
-		package_name="${package_variant[0]}"
-		package_attr="${package_variant[1]}"
-
-		if [[ -z "${name}" || -z "${attr}" ]]; then
+		if [[ -z "${package_name}" ]]; then
 			: "[WARN] [${job_name}] Missing package data at index ${j}; skipping"
 			continue
 		fi
 
 		if ! build_package "${job_name}" "${flake_path}" "${output_dir}" "${log_file}" \
-			"${package_name}" "${package_attr}"; then
+			"${package_name}"; then
 			job_failed=true
 		fi
 	done
