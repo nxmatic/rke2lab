@@ -4,6 +4,7 @@ package io.nxmatic.rk2lab.manifests;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisResult;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
+import io.nxmatic.rk2lab.manifests.layers.runtime.flox.FloxContainerdShimAssets;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,115 +28,6 @@ public final class Main {
   private final Logger logger = LoggerFactory.getLogger(Main.class);
 
   private Main() {}
-
-  private static final List<MaterializeShimAssetsCommand.EmbeddedAsset> SHIM_ASSETS =
-      List.of(
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/shim-build.sh", "shim-build.sh", true),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/shim-build.yaml", "shim-build.yaml", false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/flake.nix", "flake.nix", false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/shim-installer.sh", "shim-installer.sh", true),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/flox-rootfs-sync.sh", "flox-rootfs-sync.sh", true),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/debug-tools/.sh.d/rke2lab-debug-tooling.sh",
-              "debug-tools/.sh.d/rke2lab-debug-tooling.sh",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/debug-tools/attach_live_flox_shim_strace.sh",
-              "debug-tools/attach_live_flox_shim_strace.sh",
-              true),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/debug-tools/crictl-kdns-repro.sh",
-              "debug-tools/crictl-kdns-repro.sh",
-              true),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/debug-tools/kdns-containerd-bundle-watch.sh",
-              "debug-tools/kdns-containerd-bundle-watch.sh",
-              true),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/debug-tools/kdns-containerd-remote-capture.sh",
-              "debug-tools/kdns-containerd-remote-capture.sh",
-              true),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/debug-tools/master-shim-pprof.sh",
-              "debug-tools/master-shim-pprof.sh",
-              true),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/mesh/headplane/flake.nix",
-              "mesh/headplane/flake.nix",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/mesh/headplane/.flox/.gitattributes",
-              "mesh/headplane/.flox/.gitattributes",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/mesh/headplane/.flox/.gitignore",
-              "mesh/headplane/.flox/.gitignore",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/mesh/headplane/.flox/env.json",
-              "mesh/headplane/.flox/env.json",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/mesh/headplane/.flox/env.lock",
-              "mesh/headplane/.flox/env.lock",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/mesh/headplane/.flox/env/manifest.toml",
-              "mesh/headplane/.flox/env/manifest.toml",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/mesh/headplane/.flox/env/manifest.lock",
-              "mesh/headplane/.flox/env/manifest.lock",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/networking/kdns/flake.nix",
-              "networking/kdns/flake.nix",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/networking/kdns/.flox/.gitattributes",
-              "networking/kdns/.flox/.gitattributes",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/networking/kdns/.flox/.gitignore",
-              "networking/kdns/.flox/.gitignore",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/networking/kdns/.flox/env.json",
-              "networking/kdns/.flox/env.json",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/networking/kdns/.flox/env.lock",
-              "networking/kdns/.flox/env.lock",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/networking/kdns/.flox/env/manifest.toml",
-              "networking/kdns/.flox/env/manifest.toml",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/networking/kdns/.flox/env/manifest.lock",
-              "networking/kdns/.flox/env/manifest.lock",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/daemonset/.sh.d/daemonless-host-asset-materializer.sh",
-              ".sh.d/daemonless-host-asset-materializer.sh",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/daemonset/.sh.d/daemonless-host-shell-policy.sh",
-              ".sh.d/daemonless-host-shell-policy.sh",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/daemonset/.sh.d/daemonless-trampoline.sh",
-              ".sh.d/daemonless-trampoline.sh",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/daemonset/.sh.d/daemonset-logging.sh",
-              ".sh.d/daemonset-logging.sh",
-              false));
 
   public static void main(String[] args) throws IOException {
     try {
@@ -192,7 +84,7 @@ public final class Main {
         return commandOf(
             new MaterializeShimAssetsCommand.Builder(this)
                 .outputDir(outputDir)
-                .assets(SHIM_ASSETS));
+                .assets(FloxContainerdShimAssets.materializationAssets()));
       }
       default ->
           throw new IllegalArgumentException(
@@ -219,7 +111,7 @@ public final class Main {
         commandOf(
             new MaterializeShimAssetsCommand.Builder(this)
                 .outputDir(Paths.get("."))
-                .assets(SHIM_ASSETS)),
+                .assets(FloxContainerdShimAssets.materializationAssets())),
         commandOf(new HelpCommand.Builder(this).commands(List.of())));
   }
 
@@ -283,7 +175,7 @@ public final class Main {
   private final class ShimBuildCommand implements CliCommand {
 
     private static final Path WORKTREE_SHIM_ASSETS_RELATIVE_PATH =
-        Paths.get("manifests", "src", "main", "resources", "runtime", "flox-containerd-shim");
+        FloxContainerdShimAssets.worktreeShimAssetsRelativePath();
 
     private final String mode;
 
@@ -381,7 +273,7 @@ public final class Main {
           Files.createTempDirectory("rke2lab-shim-build-").toRealPath().normalize();
       new MaterializeShimAssetsCommand.Builder(Main.this)
           .outputDir(workDir)
-          .assets(SHIM_ASSETS)
+          .assets(FloxContainerdShimAssets.materializationAssets())
           .build()
           .run();
       return workDir;
@@ -653,7 +545,7 @@ public final class Main {
           }
         }
 
-        WrapperGoArchiveAssets.materializeTo(normalizedOutputDir);
+        FloxContainerdShimAssets.materializeSupplementaryAssetsTo(normalizedOutputDir);
 
         logger.info("Materialized {} shim assets to {}", assets.size(), normalizedOutputDir);
       } catch (IOException ex) {
@@ -690,9 +582,6 @@ public final class Main {
         return MaterializeShimAssetsCommand.class;
       }
     }
-
-    private record EmbeddedAsset(
-        String classpathResource, String relativePath, boolean executable) {}
   }
 
   interface CommandBuilder<T extends Runnable> {

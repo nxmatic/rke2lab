@@ -1,15 +1,11 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.runtime.flox;
 
-import io.nxmatic.rk2lab.manifests.WrapperGoArchiveAssets;
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterLayerRefs;
 import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import io.nxmatic.rk2lab.manifests.layers.mesh.MeshLayerRefs;
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
@@ -148,77 +144,8 @@ public final class FloxContainerdShimLayer extends Construct {
     }
 
     configMap.addJsonPatch(
-        JsonPatch.add(
-            "/data",
-            Map.ofEntries(
-                Map.entry(
-                    "shim-installer.sh",
-                    readResource("/runtime/flox-containerd-shim/shim-installer.sh")),
-                Map.entry(
-                    "shim-installer-entrypoint.sh",
-                    readResource("/runtime/flox-containerd-shim/shim-installer-entrypoint.sh")),
-                Map.entry(
-                    "shim-build.sh", readResource("/runtime/flox-containerd-shim/shim-build.sh")),
-                Map.entry(
-                    "shim-build.yaml",
-                    readResource("/runtime/flox-containerd-shim/shim-build.yaml")),
-                Map.entry(
-                    "daemonless-trampoline.sh",
-                    readResource("/runtime/daemonset/.sh.d/daemonless-trampoline.sh")),
-                Map.entry(
-                    "runtime-flake.nix", readResource("/runtime/flox-containerd-shim/flake.nix")),
-                Map.entry(
-                    "flox-rootfs-sync.sh",
-                    readResource("/runtime/flox-containerd-shim/flox-rootfs-sync.sh")),
-                Map.entry(
-                    "debug-tools-rke2lab-debug-tooling.sh",
-                    readResource(
-                        "/runtime/flox-containerd-shim/debug-tools/.sh.d/rke2lab-debug-tooling.sh")),
-                Map.entry(
-                    "debug-tools-attach-live-flox-shim-strace.sh",
-                    readResource(
-                        "/runtime/flox-containerd-shim/debug-tools/attach_live_flox_shim_strace.sh")),
-                Map.entry(
-                    "debug-tools-crictl-kdns-repro.sh",
-                    readResource("/runtime/flox-containerd-shim/debug-tools/crictl-kdns-repro.sh")),
-                Map.entry(
-                    "debug-tools-kdns-containerd-bundle-watch.sh",
-                    readResource(
-                        "/runtime/flox-containerd-shim/debug-tools/kdns-containerd-bundle-watch.sh")),
-                Map.entry(
-                    "debug-tools-kdns-containerd-remote-capture.sh",
-                    readResource(
-                        "/runtime/flox-containerd-shim/debug-tools/kdns-containerd-remote-capture.sh")),
-                Map.entry(
-                    "debug-tools-master-shim-pprof.sh",
-                    readResource("/runtime/flox-containerd-shim/debug-tools/master-shim-pprof.sh")),
-                Map.entry(
-                    WrapperGoArchiveAssets.ARCHIVE_CONFIGMAP_KEY,
-                    WrapperGoArchiveAssets.archiveBase64()),
-                Map.entry(
-                    WrapperGoArchiveAssets.MANIFEST_CONFIGMAP_KEY,
-                    WrapperGoArchiveAssets.manifestJson()),
-                Map.entry(
-                    "mesh-headplane-flake.nix",
-                    readResource("/runtime/flox-containerd-shim/mesh/headplane/flake.nix")),
-                Map.entry(
-                    "networking-kdns-flake.nix",
-                    readResource("/runtime/flox-containerd-shim/networking/kdns/flake.nix")))));
+        JsonPatch.add("/data", FloxContainerdShimAssets.installerConfigMapData()));
     return configMap;
-  }
-
-  private String readResource(final String resourcePath) {
-    final InputStream input = FloxContainerdShimLayer.class.getResourceAsStream(resourcePath);
-    if (input == null) {
-      throw new IllegalStateException("Missing flox-containerd-shim resource: " + resourcePath);
-    }
-
-    try {
-      return new String(input.readAllBytes(), StandardCharsets.UTF_8);
-    } catch (IOException ex) {
-      throw new IllegalStateException(
-          "Failed reading flox-containerd-shim resource: " + resourcePath, ex);
-    }
   }
 
   private ApiObject createServiceAccount() {
@@ -402,91 +329,7 @@ public final class FloxContainerdShimLayer extends Construct {
                                   "defaultMode",
                                   493,
                                   "items",
-                                  new Object[] {
-                                    Map.of("key", "shim-installer.sh", "path", "shim-installer.sh"),
-                                    Map.of(
-                                        "key",
-                                        "shim-installer-entrypoint.sh",
-                                        "path",
-                                        "shim-installer-entrypoint.sh"),
-                                    Map.of(
-                                        "key",
-                                        "shim-build.sh",
-                                        "path",
-                                        "build-assets/shim-build.sh"),
-                                    Map.of(
-                                        "key",
-                                        "shim-build.yaml",
-                                        "path",
-                                        "build-assets/shim-build.yaml"),
-                                    Map.of(
-                                        "key",
-                                        "daemonless-trampoline.sh",
-                                        "path",
-                                        "build-assets/.sh.d/daemonless-trampoline.sh"),
-                                    Map.of(
-                                        "key",
-                                        "runtime-flake.nix",
-                                        "path",
-                                        "build-assets/flake.nix"),
-                                    Map.of(
-                                        "key",
-                                        "flox-rootfs-sync.sh",
-                                        "path",
-                                        "build-assets/flox-rootfs-sync.sh"),
-                                    Map.of(
-                                        "key",
-                                        "debug-tools-rke2lab-debug-tooling.sh",
-                                        "path",
-                                        "build-assets/debug-tools/.sh.d/rke2lab-debug-tooling.sh"),
-                                    Map.of(
-                                        "key",
-                                        "debug-tools-attach-live-flox-shim-strace.sh",
-                                        "path",
-                                        "build-assets/debug-tools/attach_live_flox_shim_strace.sh"),
-                                    Map.of(
-                                        "key",
-                                        "debug-tools-crictl-kdns-repro.sh",
-                                        "path",
-                                        "build-assets/debug-tools/crictl-kdns-repro.sh"),
-                                    Map.of(
-                                        "key",
-                                        "debug-tools-kdns-containerd-bundle-watch.sh",
-                                        "path",
-                                        "build-assets/debug-tools/kdns-containerd-bundle-watch.sh"),
-                                    Map.of(
-                                        "key",
-                                        "debug-tools-kdns-containerd-remote-capture.sh",
-                                        "path",
-                                        "build-assets/debug-tools/kdns-containerd-remote-capture.sh"),
-                                    Map.of(
-                                        "key",
-                                        "debug-tools-master-shim-pprof.sh",
-                                        "path",
-                                        "build-assets/debug-tools/master-shim-pprof.sh"),
-                                    Map.of(
-                                        "key",
-                                        WrapperGoArchiveAssets.ARCHIVE_CONFIGMAP_KEY,
-                                        "path",
-                                        "build-assets/"
-                                            + WrapperGoArchiveAssets.ARCHIVE_CONFIGMAP_KEY),
-                                    Map.of(
-                                        "key",
-                                        WrapperGoArchiveAssets.MANIFEST_CONFIGMAP_KEY,
-                                        "path",
-                                        "build-assets/"
-                                            + WrapperGoArchiveAssets.MANIFEST_CONFIGMAP_KEY),
-                                    Map.of(
-                                        "key",
-                                        "mesh-headplane-flake.nix",
-                                        "path",
-                                        "build-assets/mesh/headplane/flake.nix"),
-                                    Map.of(
-                                        "key",
-                                        "networking-kdns-flake.nix",
-                                        "path",
-                                        "build-assets/networking/kdns/flake.nix")
-                                  },
+                                  FloxContainerdShimAssets.installerVolumeItems(),
                                   "name",
                                   RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP.name()),
                               "name",
