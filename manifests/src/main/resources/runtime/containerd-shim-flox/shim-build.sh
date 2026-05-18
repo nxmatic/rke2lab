@@ -313,6 +313,27 @@ should_only_update_locks() {
 	esac
 }
 
+rke2lab::cache:push:enabled() {
+	[[ -n "${CACHIX_AUTH_TOKEN:-}" ]] || return 1
+	command -v cachix >/dev/null 2>&1 || return 1
+	[[ -n "${RKE2LAB_CACHIX_CACHE_NAME:-nxmatic}" ]] || return 1
+	return 0
+}
+
+rke2lab::cache:push:run_build() {
+	local log_file="$1"
+	local cache_name="$2"
+	shift 2
+
+	if rke2lab::cache:push:enabled; then
+		: "[$(date)] [cache] Cachix push enabled via watch-exec for cache='${cache_name}'"
+		cachix watch-exec "${cache_name}" -- nix "$@" >"${log_file}" 2>&1
+		return $?
+	fi
+
+	nix "$@" >"${log_file}" 2>&1
+}
+
 stage_git_flake_inputs_if_needed() {
 	local job_name="$1"
 	local resolved_path="$2"
@@ -365,6 +386,7 @@ build_package() {
 	local output_dir="$3"
 	local log_file="$4"
 	local package_name="$5"
+	local cache_name
 
 	: "[$(date)] [${job_name}] Building ${package_name}..."
 
@@ -406,8 +428,9 @@ build_package() {
 
 	local build_target="${package_name}"
 	: "[$(date)] [${job_name}] Flake path: ${resolved_path}"
+	cache_name="${RKE2LAB_CACHIX_CACHE_NAME:-nxmatic}"
 
-	if nix "${nix_args[@]}" "${resolved_path}#${build_target}" >"${log_file}" 2>&1; then
+	if rke2lab::cache:push:run_build "${log_file}" "${cache_name}" "${nix_args[@]}" "${resolved_path}#${build_target}"; then
 		: "[$(date)] [${job_name}] ✓ Built ${package_name}"
 		return 0
 	else

@@ -43,13 +43,21 @@ rke2lab::flox:ensure_manifest_tools() {
 }
 
 rke2lab::flox:configure_auth_from_secrets() {
-	local repo_root secrets_file flox_token config_dir config_file tmp_file
+	local repo_root secrets_file flox_token cachix_token cachix_cache_name config_dir config_file tmp_file
 
 	repo_root=${RKE2LAB_REPO_ROOT:-/srv/host/rke2lab-worktree.d}
 	secrets_file="${repo_root}/.secrets"
 	[[ -r "${secrets_file}" ]] || return 0
 
 	flox_token="$(yq eval -r '.flox.token // ""' "${secrets_file}" 2>/dev/null || true)"
+	cachix_token="$(yq eval -r '.cache.nxmatic.token // ""' "${secrets_file}" 2>/dev/null || true)"
+	cachix_cache_name="$(yq eval -r '.cache.nxmatic.name // "nxmatic"' "${secrets_file}" 2>/dev/null || true)"
+
+	if [[ -n "${cachix_token}" ]]; then
+		export CACHIX_AUTH_TOKEN="${cachix_token}"
+		export RKE2LAB_CACHIX_CACHE_NAME="${cachix_cache_name}"
+	fi
+
 	[[ -n "${flox_token}" ]] || return 0
 
 	config_dir=${FLOX_CONFIG_DIR:-/root/.config/flox}
