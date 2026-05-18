@@ -15,6 +15,7 @@
 
   <properties>
     <dbus.java.version>5.2.0</dbus.java.version>
+    <grpc.version>1.80.0</grpc.version>
     <pulumi.version>1.0.0</pulumi.version>
     <pulumi.command.version>1.2.1</pulumi.command.version>
     <spring.boot.version>3.3.12</spring.boot.version>
@@ -57,6 +58,13 @@
         <groupId>com.github.hypfvieh</groupId>
         <artifactId>dbus-java-bom</artifactId>
         <version>${dbus.java.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
+        <artifactId>grpc-bom</artifactId>
+        <version>${grpc.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

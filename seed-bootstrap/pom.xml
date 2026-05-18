@@ -41,6 +41,10 @@
       </exclusions>
     </dependency>
     <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-netty</artifactId>
+    </dependency>
+    <dependency>
       <groupId>io.nxmatic</groupId>
       <artifactId>rke2lab-incus-sdk</artifactId>
       <version>${project.version}</version>
