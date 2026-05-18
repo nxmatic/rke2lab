@@ -75,7 +75,7 @@ layer_install_enabled() {
 
 manifest_is_local_config() {
 	local manifest=${1:?manifest path required}
-	grep -Eq '^[[:space:]]*config\.kubernetes\.io/local-config:[[:space:]]*"?true"?[[:space:]]*$' "${manifest}"
+	grep -Eq "^[[:space:]]*config\\.kubernetes\\.io/local-config:[[:space:]]*['\"]?true['\"]?[[:space:]]*$" "${manifest}"
 }
 
 link_manifest_tree() {

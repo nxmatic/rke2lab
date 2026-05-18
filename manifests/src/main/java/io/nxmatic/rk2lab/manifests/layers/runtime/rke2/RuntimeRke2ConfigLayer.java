@@ -2,6 +2,7 @@
 package io.nxmatic.rk2lab.manifests.layers.runtime.rke2;
 
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -9,9 +10,13 @@ import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
 import org.cdk8s.JsonPatch;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
 import software.constructs.Construct;
 
 public final class RuntimeRke2ConfigLayer extends Construct {
+
+  private static final Yaml YAML_SCALAR_SERIALIZER = createYamlScalarSerializer();
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("runtime", "rke2-config");
@@ -137,7 +142,28 @@ public final class RuntimeRke2ConfigLayer extends Construct {
                         .build())
                 .build());
 
-    configMap.addJsonPatch(JsonPatch.add("/data", data));
+    configMap.addJsonPatch(JsonPatch.add("/data", toConfigMapData(data)));
+  }
+
+  private static Map<String, String> toConfigMapData(final Map<String, Object> data) {
+    final LinkedHashMap<String, String> out = new LinkedHashMap<>();
+    for (Map.Entry<String, Object> entry : data.entrySet()) {
+      out.put(entry.getKey(), yamlScalarString(entry.getValue()));
+    }
+    return Collections.unmodifiableMap(out);
+  }
+
+  private static String yamlScalarString(final Object value) {
+    final String dumped = YAML_SCALAR_SERIALIZER.dump(value);
+    return dumped.endsWith("\n") ? dumped.substring(0, dumped.length() - 1) : dumped;
+  }
+
+  private static Yaml createYamlScalarSerializer() {
+    final DumperOptions options = new DumperOptions();
+    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+    options.setPrettyFlow(false);
+    options.setSplitLines(false);
+    return new Yaml(options);
   }
 
   @SafeVarargs

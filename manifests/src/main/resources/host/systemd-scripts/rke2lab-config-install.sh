@@ -47,7 +47,7 @@ for manifest in "${fragments[@]}"; do
 		exit 1
 	fi
 
-	yq eval -o=yaml '.data // {}' "${manifest}" >"${DEST_DIR}/${fragment_name}"
+	yq eval -o=yaml '(.data // {}) | with_entries(.value |= from_yaml)' "${manifest}" >"${DEST_DIR}/${fragment_name}"
 done
 
 exit 0
