@@ -418,9 +418,6 @@ shim::runtime:wrapper-package:build() {
 
 	(
 		nix build \
-			--system "${nix_system}" \
-			--extra-experimental-features nix-command \
-			--extra-experimental-features flakes \
 			--no-link \
 			--print-out-paths \
 			"${FLOX_SHIM_ROOT}#${package_attr}"

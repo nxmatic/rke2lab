@@ -375,8 +375,8 @@ Recommended sequence:
 * once the canonical defaults and policy semantics are settled, simplify or constrain the shell layer so it is consuming policy rather than partially redefining it
 * doing this earlier would risk moving bash logic before the canonical model is stable enough
 
-. *Fifth: add drift guards across layers* (Point 5)
-* only after the previous items are clearer should we add strong consistency checks
+** `/usr/local/bin/containerd-shim-flox-v2`
+** `/usr/local/libexec/rke2lab/flox-shim-wrapper/containerd-shim-flox-v2.real`
 * otherwise we risk baking transitional state into guardrails that will need to be relaxed or rewritten soon after
 
 . *Sixth: document the synthesis-policy input and the final intended operational story* (Point 6)

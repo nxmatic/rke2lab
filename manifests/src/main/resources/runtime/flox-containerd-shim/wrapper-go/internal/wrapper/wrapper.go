@@ -1,11 +1,14 @@
 package wrapper
 
 import (
+	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -17,8 +20,13 @@ const (
 	defaultWrapperLog    = "/var/log/rke2lab/flox-shim-wrapper.log"
 	defaultSyncLog       = "/var/log/rke2lab/flox-rootfs-sync.log"
 	defaultDebugWaitFile = "/tmp/flox-shim-wrapper-continue"
+	defaultDebugListen   = "127.0.0.1:43123"
 	defaultJournalSocket = "/run/systemd/journal/socket"
 	defaultJournalTag    = "flox-shim-wrapper"
+	defaultBundleRoot    = "/run/k3s/containerd/io.containerd.runtime.v2.task"
+
+	annotationDebug        = "flox.dev/debug"
+	annotationDebugSuspend = "flox.dev/debug-suspend"
 )
 
 type Config struct {
@@ -27,6 +35,7 @@ type Config struct {
 	RootfsSyncEnable  bool
 	WrapperLog        string
 	SyncLog           string
+	DebugEnabled      bool
 	DebugWait         bool
 	DebugWaitFile     string
 	DebugSleep        time.Duration
@@ -49,17 +58,17 @@ func (w *Wrapper) Run(args []string) error {
 	if err != nil {
 		return err
 	}
-	w.cfg = resolvedConfig
+	logger := newLogger(resolvedConfig)
 
-	logger := newLogger(w.cfg)
-
-	if stat, err := os.Stat(w.cfg.RealShim); err != nil || stat.Mode()&0o111 == 0 {
-		return fmt.Errorf("missing real shim: %s", w.cfg.RealShim)
+	if stat, err := os.Stat(resolvedConfig.RealShim); err != nil || stat.Mode()&0o111 == 0 {
+		return fmt.Errorf("missing real shim: %s", resolvedConfig.RealShim)
 	}
 
 	shimNamespace := extractFlagValue("-namespace", args)
 	shimID := extractFlagValue("-id", args)
 	subcommand := extractSubcommand(args)
+	resolvedConfig = applyBundleDebugAnnotations(resolvedConfig, shimNamespace, shimID, logger)
+	w.cfg = resolvedConfig
 
 	logger.Log("argv=%s", strings.Join(args, " "))
 	logger.Log("resolved namespace=%s id=%s subcommand=%s", emptyDefault(shimNamespace, "<unset>"), emptyDefault(shimID, "<unset>"), emptyDefault(subcommand, "<unset>"))
@@ -74,7 +83,42 @@ func (w *Wrapper) Run(args []string) error {
 		return err
 	}
 
+	if w.cfg.DebugEnabled {
+		return w.execViaDelve(args, shimNamespace, shimID, logger)
+	}
+
+	return w.execRealShim(args)
+}
+
+func (w *Wrapper) execRealShim(args []string) error {
 	return syscall.Exec(w.cfg.RealShim, append([]string{w.cfg.RealShim}, args...), os.Environ())
+}
+
+func (w *Wrapper) execViaDelve(args []string, shimNamespace, shimID string, logger *Logger) error {
+	delvePath, err := exec.LookPath("dlv")
+	if err != nil {
+		logger.Log("debug requested but dlv is unavailable; executing real shim directly realShim=%s", w.cfg.RealShim)
+		return w.execRealShim(args)
+	}
+
+	listenAddress := perShimDebugListenAddress(shimNamespace, shimID)
+	delveArgs := []string{
+		delvePath,
+		"exec",
+		w.cfg.RealShim,
+		"--headless",
+		"--api-version=2",
+		"--accept-multiclient",
+		"--listen=" + listenAddress,
+	}
+	if !w.cfg.DebugWait {
+		delveArgs = append(delveArgs, "--continue")
+	}
+	delveArgs = append(delveArgs, "--")
+	delveArgs = append(delveArgs, args...)
+
+	logger.Log("launching shim under dlv path=%s listen=%s continue=%t", delvePath, listenAddress, !w.cfg.DebugWait)
+	return syscall.Exec(delvePath, delveArgs, os.Environ())
 }
 
 func (w *Wrapper) launchRootfsSync(logger *Logger, shimNamespace, shimID string) error {
@@ -130,6 +174,101 @@ func (w *Wrapper) maybeWaitForDebugger(logger *Logger) error {
 	}
 }
 
+type bundleConfig struct {
+	Annotations map[string]string `json:"annotations"`
+}
+
+func applyBundleDebugAnnotations(cfg Config, shimNamespace, shimID string, logger *Logger) Config {
+	if strings.TrimSpace(shimNamespace) == "" || strings.TrimSpace(shimID) == "" {
+		return cfg
+	}
+
+	bundleConfigPath := filepath.Join(getenvDefault("FLOX_SHIM_BUNDLE_ROOT", defaultBundleRoot), shimNamespace, shimID, "config.json")
+	payload, err := os.ReadFile(bundleConfigPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			logger.Log("bundle annotation lookup failed path=%s err=%v", bundleConfigPath, err)
+		}
+		return cfg
+	}
+
+	var bundle bundleConfig
+	if err := json.Unmarshal(payload, &bundle); err != nil {
+		logger.Log("bundle annotation parse failed path=%s err=%v", bundleConfigPath, err)
+		return cfg
+	}
+
+	debugRequested := parseBoolString(bundle.Annotations[annotationDebug])
+	if !debugRequested {
+		return cfg
+	}
+
+	updated := cfg
+	updated.DebugEnabled = true
+	updated.DebugWaitFile = perShimDebugWaitFilePath(shimNamespace, shimID)
+	if parseBoolString(bundle.Annotations[annotationDebugSuspend]) {
+		updated.DebugWait = true
+	}
+
+	logger.Log("enabled debug mode from bundle annotation path=%s wait=%t waitFile=%s", bundleConfigPath, updated.DebugWait, updated.DebugWaitFile)
+	return updated
+}
+
+func perShimDebugWaitFilePath(shimNamespace, shimID string) string {
+	sanitizedNamespace := sanitizePathToken(shimNamespace)
+	sanitizedID := sanitizePathToken(shimID)
+	if sanitizedNamespace == "" || sanitizedID == "" {
+		return defaultDebugWaitFile
+	}
+
+	return filepath.Join(os.TempDir(), fmt.Sprintf("flox-shim-wrapper-continue-%s-%s", sanitizedNamespace, sanitizedID))
+}
+
+func perShimDebugListenAddress(shimNamespace, shimID string) string {
+	sanitizedNamespace := sanitizePathToken(shimNamespace)
+	sanitizedID := sanitizePathToken(shimID)
+	if sanitizedNamespace == "" || sanitizedID == "" {
+		return defaultDebugListen
+	}
+
+	hasher := fnv.New32a()
+	_, _ = hasher.Write([]byte(sanitizedNamespace))
+	_, _ = hasher.Write([]byte("/"))
+	_, _ = hasher.Write([]byte(sanitizedID))
+	port := 40000 + int(hasher.Sum32()%20000)
+	return "127.0.0.1:" + strconv.Itoa(port)
+}
+
+func sanitizePathToken(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+
+	var builder strings.Builder
+	for _, r := range trimmed {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+			builder.WriteRune(r)
+		case r == '-', r == '_', r == '.':
+			builder.WriteRune(r)
+		default:
+			builder.WriteRune('-')
+		}
+	}
+
+	return builder.String()
+}
+
+func parseBoolString(value string) bool {
+	switch strings.TrimSpace(value) {
+	case "1", "true", "TRUE", "yes", "YES", "on", "ON":
+		return true
+	default:
+		return false
+	}
+}
+
 func getenvDefault(key, fallback string) string {
 	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
 		return value
@@ -142,7 +281,7 @@ func getenvBoolDefault(key string, fallback bool) bool {
 	if value == "" {
 		return fallback
 	}
-	return value == "1" || strings.EqualFold(value, "true") || strings.EqualFold(value, "yes") || strings.EqualFold(value, "on")
+	return parseBoolString(value)
 }
 
 func getenvDurationDefault(key string, fallback time.Duration) time.Duration {

@@ -20,7 +20,7 @@
       pkgs = import nixpkgs {inherit system;};
       lib = pkgs.lib;
 
-      mkFloxShimWrapper = {
+      mkGoWrapper = {
         packageName,
         debug ? false,
       }:
@@ -75,11 +75,11 @@
         };
     in {
       packages = {
-        flox-shim-wrapper = mkFloxShimWrapper {
+        flox-shim-wrapper = mkGoWrapper {
           packageName = "flox-shim-wrapper";
         };
 
-        delve-sidecar = mkFloxShimWrapper {
+        delve-sidecar = mkGoWrapper {
           packageName = "delve-sidecar";
           debug = true;
         };
