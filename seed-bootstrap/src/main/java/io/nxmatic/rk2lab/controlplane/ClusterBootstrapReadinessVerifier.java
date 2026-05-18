@@ -212,10 +212,19 @@ public final class ClusterBootstrapReadinessVerifier {
       final String mandatoryTargetState =
           stringValue(statusSnapshot.getOrDefault("mandatoryTargetState", "unknown"));
       final String adapterSummary = stringValue(statusSnapshot.getOrDefault("summary", "n/a"));
-      final String endpoint =
-          stringValue(
-              statusSnapshot.getOrDefault("endpoint", config.systemdAdapterStatusEndpoint()));
       final String hostContext = describeHostContext(statusSnapshot);
+      final String currentJobs = stringValue(statusSnapshot.getOrDefault("currentJobs", "n/a"));
+      final String currentStartingService =
+          stringValue(statusSnapshot.getOrDefault("currentStartingService", "n/a"));
+      final String currentActiveUnits =
+          stringValue(statusSnapshot.getOrDefault("currentActiveUnits", "n/a"));
+      final String targetWants = stringValue(statusSnapshot.getOrDefault("targetWants", "n/a"));
+      final String cloudInitMainState =
+          stringValue(statusSnapshot.getOrDefault("cloudInitMainState", "n/a"));
+      final String cloudInitMainResult =
+          stringValue(statusSnapshot.getOrDefault("cloudInitMainResult", "n/a"));
+      final String cloudInitMainHealthy =
+          stringValue(statusSnapshot.getOrDefault("cloudInitMainHealthy", "n/a"));
 
       if ("ok".equalsIgnoreCase(probeStatus) && runtimeReady) {
         logInfo("seed node bootstrap preconditions ready after " + elapsedSince(startedAt));
@@ -223,9 +232,7 @@ public final class ClusterBootstrapReadinessVerifier {
       }
 
       lastSummary =
-          "endpoint="
-              + endpoint
-              + ", status="
+          "status="
               + probeStatus
               + ", mandatoryTarget="
               + mandatoryTarget
@@ -237,6 +244,20 @@ public final class ClusterBootstrapReadinessVerifier {
               + failedUnitCount
               + ", hostContext="
               + hostContext
+              + ", currentJobs="
+              + currentJobs
+              + ", currentStartingService="
+              + currentStartingService
+              + ", currentActiveUnits="
+              + currentActiveUnits
+              + ", targetWants="
+              + targetWants
+              + ", cloudInitMainState="
+              + cloudInitMainState
+              + ", cloudInitMainResult="
+              + cloudInitMainResult
+              + ", cloudInitMainHealthy="
+              + cloudInitMainHealthy
               + ", summary="
               + adapterSummary;
 

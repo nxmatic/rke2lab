@@ -14,11 +14,6 @@ if ! command -v ip >/dev/null 2>&1; then
 	exit 1
 fi
 
-if ! command -v perl >/dev/null 2>&1; then
-	echo "[rke2lab-dbus-tcp] missing required command: perl" >&2
-	exit 1
-fi
-
 dbus_port="${RKE2LAB_DBUS_TCP_PORT:-12434}"
 dbus_bind_address="${RKE2LAB_DBUS_TCP_BIND_ADDRESS:-}"
 
@@ -42,19 +37,24 @@ ListenStream=/run/dbus/system_bus_socket
 ListenStream=${dbus_bind_address}:${dbus_port}
 EOF
 
-dbus_system_conf="/etc/dbus-1/system.conf"
-if [[ ! -f "${dbus_system_conf}" ]]; then
-	echo "[rke2lab-dbus-tcp] missing ${dbus_system_conf}" >&2
-	exit 1
-fi
+dbus_policy_dir="/etc/dbus-1/system.d"
+dbus_policy_file="${dbus_policy_dir}/40-rke2lab-allow-all.conf"
+mkdir -p "${dbus_policy_dir}"
 
-if ! grep -q '<auth>ANONYMOUS</auth>' "${dbus_system_conf}"; then
-	perl -0777 -i -pe 's{<auth>EXTERNAL</auth>}{<auth>EXTERNAL</auth>\n  <auth>ANONYMOUS</auth>\n  <allow_anonymous/>}s' "${dbus_system_conf}"
-fi
-
-if ! grep -q 'rke2lab-allow-all-policy' "${dbus_system_conf}"; then
-	perl -0777 -i -pe 's{</busconfig>}{  <!-- rke2lab-allow-all-policy -->\n  <policy context="default">\n    <allow send_destination="*" eavesdrop="true"/>\n    <allow eavesdrop="true"/>\n    <allow own="*"/>\n  </policy>\n</busconfig>}s' "${dbus_system_conf}"
-fi
+cat >"${dbus_policy_file}" <<'EOF'
+<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+	<!-- rke2lab-allow-all-policy -->
+	<auth>ANONYMOUS</auth>
+	<allow_anonymous/>
+	<policy context="default">
+		<allow send_destination="*" eavesdrop="true"/>
+		<allow eavesdrop="true"/>
+		<allow own="*"/>
+	</policy>
+</busconfig>
+EOF
 
 systemctl daemon-reload
 systemctl restart dbus.socket

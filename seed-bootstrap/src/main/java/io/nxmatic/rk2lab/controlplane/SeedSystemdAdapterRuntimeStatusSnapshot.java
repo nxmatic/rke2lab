@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +19,8 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
   private static final String API_VERSION = "rk2lab.nxmatic.io/v1alpha1";
   private static final String KIND = "SystemdAdapterRuntimeStatus";
   private static final String MANDATORY_TARGET = "rke2lab.target";
+  private static final String MANDATORY_CLOUD_INIT_UNIT = "cloud-init-main.service";
+  private static final String UNKNOWN_STATE = "unknown";
   private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(20);
 
   private SeedSystemdAdapterRuntimeStatusSnapshot() {
@@ -38,71 +41,28 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
   }
 
   public static Map<String, Object> snapshot(BootstrapConfig config, Consumer<String> logger) {
-    final ProcessBuilder processBuilder =
-        new ProcessBuilder("sh", "-lc", buildProbeCommand(config));
-    processBuilder.environment().putIfAbsent("LANG", "C");
-
     try {
-      final Process process = processBuilder.start();
-      final boolean exited = process.waitFor(PROBE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-      if (!exited) {
-        process.destroyForcibly();
-        return envelope(
-            "timeout",
-            "adapter probe timed out after " + PROBE_TIMEOUT,
-            Map.of("source", "systemd-adapter", "timeout", PROBE_TIMEOUT.toString()));
-      }
-
-      final String stdout =
-          new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
-      final String stderr =
-          new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
-
-      if (process.exitValue() != 0) {
-        return envelope(
-            "command-failed",
-            "systemd local probe command failed",
-            Map.of(
-                "source",
-                "systemd-local-probe",
-                "exitCode",
-                process.exitValue(),
-                "stderr",
-                summarizeFirstLine(stderr),
-                "stdout",
-                summarizeFirstLine(stdout)));
-      }
-
-      final Map<String, String> parsedProbeOutput = parseProbeOutput(stdout);
-      if (parsedProbeOutput.isEmpty()) {
-        return envelope(
-            "invalid-probe-payload",
-            "systemd local probe returned invalid payload",
-            Map.of(
-                "source",
-                "systemd-local-probe",
-                "probeMode",
-                "host-local-systemd",
-                "payloadFirstLine",
-                summarizeFirstLine(stdout)));
-      }
-
-      final String observedAt =
-          parsedProbeOutput.getOrDefault("observedAt", Instant.now().toString());
-      final String mandatoryTarget =
-          parsedProbeOutput.getOrDefault("mandatoryTarget", MANDATORY_TARGET);
+      final CommandResult targetStateResult =
+          runCommandInInstance(
+              config, "systemctl show --property=ActiveState --value " + MANDATORY_TARGET);
       final String mandatoryTargetState =
-          parsedProbeOutput.getOrDefault("mandatoryTargetState", "unknown");
-      final int pendingJobs = parseNonNegativeInt(parsedProbeOutput.get("pendingJobs"), 0);
-      final int failedUnits = parseNonNegativeInt(parsedProbeOutput.get("failedUnits"), 0);
-      final boolean mandatoryTargetHealthy =
-          parseBoolean(
-              parsedProbeOutput.get("mandatoryTargetHealthy"),
-              "active".equalsIgnoreCase(mandatoryTargetState));
+          readMandatoryTargetState(config, targetStateResult, logger, UNKNOWN_STATE);
+      final int pendingJobs = readIntProperty(config, "NJobs", "pending-jobs", 0, logger);
+      final int failedUnits = readIntProperty(config, "NFailedUnits", "failed-units", 0, logger);
+      final String adapterHost =
+          sanitizeHostLabel(
+              readOptionalValue(config, "adapter-host", config.nodeName(), "hostname"),
+              config.nodeName());
+      final JobsProbe currentJobsProbe = readCurrentJobsProbe(config);
+      final String currentJobsSummary = currentJobsProbe.summary();
+      final String currentStartingService = currentJobsProbe.currentStartingService();
+      final String currentActiveUnits = readCurrentActiveUnitsSummary(config);
+      final String targetWantsSummary = readTargetWantsSummary(config);
+      final UnitHealth cloudInitMain = readMandatoryUnitHealth(config, MANDATORY_CLOUD_INIT_UNIT);
+
+      final boolean mandatoryTargetHealthy = "active".equalsIgnoreCase(mandatoryTargetState);
       final boolean runtimePrecheckReady =
-          parseBoolean(
-              parsedProbeOutput.get("runtimePrecheckReady"),
-              mandatoryTargetHealthy && pendingJobs == 0 && failedUnits == 0);
+          mandatoryTargetHealthy && pendingJobs == 0 && failedUnits == 0 && cloudInitMain.healthy();
 
       final LinkedHashMap<String, Integer> jobsByState = new LinkedHashMap<>();
       if (pendingJobs > 0) {
@@ -110,42 +70,58 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
       }
 
       final LinkedHashMap<String, String> connectionContext = new LinkedHashMap<>();
-      connectionContext.put(
-          "nixosHost", parsedProbeOutput.getOrDefault("nixosHost", config.imageBuilderHost()));
-      connectionContext.put(
-          "incusInstance", parsedProbeOutput.getOrDefault("incusInstance", config.nodeName()));
-      connectionContext.put(
-          "adapterHost", parsedProbeOutput.getOrDefault("adapterHost", "unknown"));
-      connectionContext.put(
-          "systemBusAddress",
-          parsedProbeOutput.getOrDefault(
-              "systemBusAddress", "unix:path=/var/run/dbus/system_bus_socket"));
+      connectionContext.put("nixosHost", config.imageBuilderHost());
+      connectionContext.put("incusInstance", config.nodeName());
+      connectionContext.put("adapterHost", adapterHost);
+      connectionContext.put("systemBusAddress", "unix:path=/var/run/dbus/system_bus_socket");
 
       final String summary =
-          parsedProbeOutput.getOrDefault(
-              "summary",
-              "mandatoryTarget="
-                  + mandatoryTarget
-                  + "(state="
-                  + mandatoryTargetState
-                  + "), pendingJobs="
-                  + pendingJobs
-                  + ", failedUnits="
-                  + failedUnits
-                  + ", source=host-local-systemd");
+          "mandatoryTarget="
+              + MANDATORY_TARGET
+              + "(state="
+              + mandatoryTargetState
+              + "), pendingJobs="
+              + pendingJobs
+              + ", failedUnits="
+              + failedUnits
+              + ", cloudInitMain="
+              + cloudInitMain.unitName()
+              + "(state="
+              + cloudInitMain.activeState()
+              + ",result="
+              + cloudInitMain.result()
+              + ",healthy="
+              + cloudInitMain.healthy()
+              + ")"
+              + ", nixosHost="
+              + config.imageBuilderHost()
+              + ", incusInstance="
+              + config.nodeName()
+              + ", adapterHost="
+              + adapterHost
+              + ", jobs="
+              + currentJobsSummary
+              + ", currentStartingService="
+              + currentStartingService
+              + ", activeUnits="
+              + currentActiveUnits
+              + ", wants="
+              + targetWantsSummary
+              + ", source=host-local-systemd";
 
       final SystemdStatusSnapshot statusSnapshot =
-          new SystemdStatusSnapshot(
-              observedAt,
-              mandatoryTarget,
-              mandatoryTargetState,
-              mandatoryTargetHealthy,
-              pendingJobs,
-              Map.copyOf(jobsByState),
-              failedUnits,
-              runtimePrecheckReady,
-              Map.copyOf(connectionContext),
-              summary);
+          SystemdStatusSnapshot.builder()
+              .observedAt(Instant.now().toString())
+              .mandatoryTarget(MANDATORY_TARGET)
+              .mandatoryTargetState(mandatoryTargetState)
+              .mandatoryTargetHealthy(mandatoryTargetHealthy)
+              .pendingJobs(pendingJobs)
+              .jobsByState(Map.copyOf(jobsByState))
+              .failedUnits(failedUnits)
+              .runtimePrecheckReady(runtimePrecheckReady)
+              .connectionContext(Map.copyOf(connectionContext))
+              .summary(summary)
+              .build();
 
       final LinkedHashMap<String, Object> parsed =
           new LinkedHashMap<>(statusSnapshot.toPayloadMap());
@@ -154,6 +130,13 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
       parsed.put("source", "systemd-local-probe");
       parsed.put("probeMode", "host-local-systemd");
       parsed.put("status", "ok");
+      parsed.put("currentJobs", currentJobsSummary);
+      parsed.put("currentStartingService", currentStartingService);
+      parsed.put("currentActiveUnits", currentActiveUnits);
+      parsed.put("targetWants", targetWantsSummary);
+      parsed.put("cloudInitMainState", cloudInitMain.activeState());
+      parsed.put("cloudInitMainResult", cloudInitMain.result());
+      parsed.put("cloudInitMainHealthy", cloudInitMain.healthy());
       parsed.putIfAbsent("capturedAt", Instant.now().toString());
       parsed.putIfAbsent("summary", "systemd local probe captured host runtime state");
 
@@ -161,13 +144,7 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
         logger.accept("systemd adapter runtime summary: " + parsed.getOrDefault("summary", "n/a"));
       }
       return Map.copyOf(parsed);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      return envelope(
-          "interrupted",
-          "systemd local probe interrupted",
-          Map.of("source", "systemd-local-probe"));
-    } catch (IOException ex) {
+    } catch (IllegalStateException ex) {
       return envelope(
           "execution-error",
           "systemd local probe execution error: " + ex.getMessage(),
@@ -179,53 +156,26 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
     return snapshot(config, message -> System.out.println("[readiness] " + message));
   }
 
-  private static String buildProbeCommand(BootstrapConfig config) {
-    final String script =
-        "set -eu\n"
-            + "mandatory_target="
-            + shellQuote(MANDATORY_TARGET)
-            + "\n"
-            + "mandatory_target_state=\"$(systemctl show --property=ActiveState --value \"$mandatory_target\" 2>/dev/null || true)\"\n"
-            + "if [ -z \"$mandatory_target_state\" ]; then mandatory_target_state=unknown; fi\n"
-            + "pending_jobs=\"$(systemctl show --property=NJobs --value 2>/dev/null || echo 0)\"\n"
-            + "failed_units=\"$(systemctl show --property=NFailedUnits --value 2>/dev/null || echo 0)\"\n"
-            + "adapter_host=\"$(hostname 2>/dev/null || echo unknown)\"\n"
-            + "observed_at=\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"\n"
-            + "nixos_host="
-            + shellQuote(config.imageBuilderHost())
-            + "\n"
-            + "incus_instance="
-            + shellQuote(config.nodeName())
-            + "\n"
-            + "if [ \"$mandatory_target_state\" = \"active\" ]; then mandatory_target_healthy=true; else mandatory_target_healthy=false; fi\n"
-            + "if [ \"$mandatory_target_healthy\" = \"true\" ] && [ \"${pending_jobs:-0}\" = \"0\" ] && [ \"${failed_units:-0}\" = \"0\" ]; then runtime_precheck_ready=true; else runtime_precheck_ready=false; fi\n"
-            + "summary=\"mandatoryTarget=$mandatory_target(state=$mandatory_target_state), pendingJobs=$pending_jobs, failedUnits=$failed_units, nixosHost=$nixos_host, incusInstance=$incus_instance, adapterHost=$adapter_host, source=host-local-systemd\"\n"
-            + "printf '%s\\n' \"observedAt=$observed_at\"\n"
-            + "printf '%s\\n' \"mandatoryTarget=$mandatory_target\"\n"
-            + "printf '%s\\n' \"mandatoryTargetState=$mandatory_target_state\"\n"
-            + "printf '%s\\n' \"mandatoryTargetHealthy=$mandatory_target_healthy\"\n"
-            + "printf '%s\\n' \"pendingJobs=$pending_jobs\"\n"
-            + "printf '%s\\n' \"failedUnits=$failed_units\"\n"
-            + "printf '%s\\n' \"runtimePrecheckReady=$runtime_precheck_ready\"\n"
-            + "printf '%s\\n' \"nixosHost=$nixos_host\"\n"
-            + "printf '%s\\n' \"incusInstance=$incus_instance\"\n"
-            + "printf '%s\\n' \"adapterHost=$adapter_host\"\n"
-            + "printf '%s\\n' \"systemBusAddress=unix:path=/var/run/dbus/system_bus_socket\"\n"
-            + "printf '%s\\n' \"summary=$summary\"\n";
-
-    final String remoteIncusCommand =
-        "incus --project "
-            + shellQuote(config.incusProject())
-            + " exec "
-            + " "
-            + shellQuote(config.nodeName())
-            + " -- sh -lc "
-            + shellQuote(script);
-
-    return "ssh -o BatchMode=yes -o ConnectTimeout=10 "
-        + shellQuote(config.imageBuilderHost())
-        + " sh -lc "
-        + shellQuote(remoteIncusCommand);
+  private static List<String> incusExec(BootstrapConfig config, String... args) {
+    final ArrayList<String> command = new ArrayList<>();
+    command.add("ssh");
+    command.add("-o");
+    command.add("BatchMode=yes");
+    command.add("-o");
+    command.add("ConnectTimeout=10");
+    command.add(config.imageBuilderHost());
+    command.add("incus");
+    command.add("--project");
+    command.add(config.incusProject());
+    command.add("exec");
+    command.add(config.nodeName());
+    command.add("--");
+    if (args != null) {
+      for (String arg : args) {
+        command.add(arg == null ? "" : arg);
+      }
+    }
+    return List.copyOf(command);
   }
 
   private static String summarizeFirstLine(String value) {
@@ -235,58 +185,354 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
     return value.lines().map(String::trim).filter(line -> !line.isBlank()).findFirst().orElse("");
   }
 
-  private static Map<String, String> parseProbeOutput(String stdout) {
-    if (stdout == null || stdout.isBlank()) {
-      return Map.of();
+  private static int readIntProperty(
+      BootstrapConfig config, String property, String step, int fallback, Consumer<String> logger) {
+    final CommandResult result =
+        runCommandInInstance(config, "systemctl show --property=" + property + " --value");
+    if (looksLikeIncusHelp(result.stdout())) {
+      if (logger != null) {
+        logger.accept(
+            "systemd local probe warning: got Incus CLI help while reading "
+                + property
+                + ", using fallback="
+                + fallback);
+      }
+      return fallback;
+    }
+    if (result.exitCode() != 0) {
+      if (logger != null) {
+        logger.accept(
+            "systemd local probe warning: failed reading "
+                + property
+                + " ("
+                + summarizeFirstLine(result.stderr())
+                + "), using fallback="
+                + fallback);
+      }
+      return fallback;
     }
 
-    final List<String> lines = stdout.lines().toList();
-    final LinkedHashMap<String, String> parsed = new LinkedHashMap<>();
-    for (String rawLine : lines) {
-      if (rawLine == null) {
+    final String raw = firstNonBlankLine(result.stdout(), String.valueOf(fallback));
+    try {
+      return Math.max(Integer.parseInt(raw.trim()), 0);
+    } catch (NumberFormatException ignored) {
+      if (logger != null) {
+        logger.accept(
+            "systemd local probe warning: invalid "
+                + property
+                + " value='"
+                + raw
+                + "', using fallback="
+                + fallback);
+      }
+      return fallback;
+    }
+  }
+
+  private static String readOptionalValue(
+      BootstrapConfig config, String step, String fallback, String... args) {
+    final CommandResult result = runCommand(incusExec(config, args));
+    if (looksLikeIncusHelp(result.stdout())) {
+      return fallback;
+    }
+    if (result.exitCode() != 0) {
+      return fallback;
+    }
+    return firstNonBlankLine(result.stdout(), fallback);
+  }
+
+  private static JobsProbe readCurrentJobsProbe(BootstrapConfig config) {
+    final CommandResult result = runCommandInInstance(config, "systemctl list-jobs --no-pager");
+    if (looksLikeIncusHelp(result.stdout())) {
+      return new JobsProbe("unavailable", "unavailable");
+    }
+    if (result.exitCode() != 0) {
+      return new JobsProbe("unavailable", "unavailable");
+    }
+
+    final String output = result.stdout() == null ? "" : result.stdout().trim();
+    if (output.isBlank()) {
+      return new JobsProbe("none", "none");
+    }
+    if (output.contains("No jobs running.")) {
+      return new JobsProbe("none", "none");
+    }
+
+    final List<String> allLines =
+        output.lines().map(String::trim).filter(line -> !line.isBlank()).toList();
+    if (allLines.isEmpty()) {
+      return new JobsProbe("none", "none");
+    }
+
+    final ArrayList<String> normalized = new ArrayList<>(allLines);
+    if (!normalized.isEmpty() && normalized.getFirst().toLowerCase().startsWith("job ")) {
+      normalized.removeFirst();
+    }
+    if (!normalized.isEmpty()
+        && normalized.getLast().toLowerCase().matches("^\\d+\\s+jobs?\\s+listed\\.?$")) {
+      normalized.removeLast();
+    }
+    if (normalized.isEmpty()) {
+      return new JobsProbe("none", "none");
+    }
+
+    final String summary = String.join(" | ", normalized.stream().limit(3).toList());
+    return new JobsProbe(summary, extractCurrentStartingService(normalized));
+  }
+
+  private static String extractCurrentStartingService(List<String> jobLines) {
+    if (jobLines == null || jobLines.isEmpty()) {
+      return "none";
+    }
+
+    for (String line : jobLines) {
+      final String[] parts = line.trim().split("\\s+");
+      if (parts.length < 4) {
         continue;
       }
-      final String line = rawLine.trim();
+
+      final String unit = parts[1];
+      final String type = parts[2].toLowerCase();
+      final String state = parts[3].toLowerCase();
+      if (("start".equals(type) || "restart".equals(type))
+          && ("waiting".equals(state) || "running".equals(state))) {
+        return unit;
+      }
+    }
+
+    final String[] first = jobLines.getFirst().split("\\s+");
+    if (first.length >= 2) {
+      return first[1];
+    }
+    return "unknown";
+  }
+
+  private static String readCurrentActiveUnitsSummary(BootstrapConfig config) {
+    final CommandResult result =
+        runCommandInInstance(
+            config,
+            "systemctl list-units --all --plain --no-pager --no-legend --type=service --type=target 'rke2lab*' rke2-server.service");
+    if (looksLikeIncusHelp(result.stdout())) {
+      return "unavailable";
+    }
+    if (result.exitCode() != 0) {
+      return "unavailable";
+    }
+
+    final String output = result.stdout() == null ? "" : result.stdout().trim();
+    if (output.isBlank()) {
+      return "none";
+    }
+
+    final List<String> activeUnits = new ArrayList<>();
+    for (String rawLine : output.lines().toList()) {
+      final String line = rawLine == null ? "" : rawLine.trim();
       if (line.isBlank()) {
         continue;
       }
-      final int separatorIndex = line.indexOf('=');
-      if (separatorIndex <= 0) {
+
+      final String[] parts = line.split("\\s+");
+      if (parts.length < 4) {
         continue;
       }
-      final String key = line.substring(0, separatorIndex).trim();
-      final String value = line.substring(separatorIndex + 1).trim();
-      if (key.isBlank()) {
+
+      final String unit = parts[0];
+      final String activeState = parts[2].toLowerCase();
+      final String subState = parts[3].toLowerCase();
+      if (!"active".equals(activeState) && !"activating".equals(activeState)) {
         continue;
       }
-      parsed.put(key, value);
+      if ("dead".equals(subState) || "exited".equals(subState)) {
+        continue;
+      }
+      activeUnits.add(unit + "(" + subState + ")");
+      if (activeUnits.size() >= 8) {
+        break;
+      }
     }
 
-    return parsed.isEmpty() ? Map.of() : Map.copyOf(parsed);
+    if (activeUnits.isEmpty()) {
+      return "none";
+    }
+    return String.join(", ", activeUnits);
   }
 
-  private static int parseNonNegativeInt(String rawValue, int fallback) {
-    if (rawValue == null || rawValue.isBlank()) {
-      return Math.max(fallback, 0);
+  private static String readTargetWantsSummary(BootstrapConfig config) {
+    final CommandResult result =
+        runCommandInInstance(config, "systemctl show --property=Wants --value " + MANDATORY_TARGET);
+    if (looksLikeIncusHelp(result.stdout())) {
+      return "unavailable";
+    }
+    if (result.exitCode() != 0) {
+      return "unavailable";
     }
 
-    try {
-      return Math.max(Integer.parseInt(rawValue.trim()), 0);
-    } catch (NumberFormatException ignored) {
-      return Math.max(fallback, 0);
+    final String raw = firstNonBlankLine(result.stdout(), "").trim();
+    if (raw.isBlank()) {
+      return "0";
     }
+
+    final List<String> units =
+        raw.lines()
+            .flatMap(line -> List.of(line.split("\\s+")).stream())
+            .filter(unit -> !unit.isBlank())
+            .toList();
+    return String.valueOf(units.size());
   }
 
-  private static boolean parseBoolean(String rawValue, boolean fallback) {
+  private static UnitHealth readMandatoryUnitHealth(BootstrapConfig config, String unitName) {
+    final String activeState =
+        readUnitProperty(config, unitName, "ActiveState", "unknown", false).toLowerCase();
+    final String result =
+        readUnitProperty(config, unitName, "Result", "unknown", true).toLowerCase();
+    final String loadState =
+        readUnitProperty(config, unitName, "LoadState", "not-found", false).toLowerCase();
+
+    final boolean present = !"not-found".equals(loadState);
+    final boolean activeOrCompleted =
+        "active".equals(activeState)
+            || "inactive".equals(activeState)
+            || "activating".equals(activeState);
+    final boolean successfulResult =
+        "success".equals(result) || "unknown".equals(result) || "".equals(result);
+
+    final boolean healthy = present && activeOrCompleted && successfulResult;
+    return new UnitHealth(unitName, activeState, result, healthy);
+  }
+
+  private static String readUnitProperty(
+      BootstrapConfig config,
+      String unitName,
+      String property,
+      String fallback,
+      boolean allowBlankAsSuccess) {
+    final CommandResult result =
+        runCommandInInstance(
+            config, "systemctl show --property=" + property + " --value " + unitName);
+    if (looksLikeIncusHelp(result.stdout()) || result.exitCode() != 0) {
+      return fallback;
+    }
+
+    final String raw =
+        firstNonBlankLine(result.stdout(), allowBlankAsSuccess ? "" : fallback).trim();
+    if (!allowBlankAsSuccess && raw.isBlank()) {
+      return fallback;
+    }
+    return raw;
+  }
+
+  private static String normalizeTargetState(String rawState) {
+    if (rawState == null || rawState.isBlank()) {
+      return UNKNOWN_STATE;
+    }
+
+    final String normalized = rawState.trim().toLowerCase();
+    return switch (normalized) {
+      case "active", "inactive", "failed", "activating", "deactivating", "reloading" -> normalized;
+      default -> UNKNOWN_STATE;
+    };
+  }
+
+  private static String readMandatoryTargetState(
+      BootstrapConfig config,
+      CommandResult targetStateResult,
+      Consumer<String> logger,
+      String fallback) {
+    if (looksLikeIncusHelp(targetStateResult.stdout())) {
+      if (logger != null) {
+        logger.accept(
+            "systemd local probe warning: got Incus CLI help while reading ActiveState for "
+                + MANDATORY_TARGET
+                + ", using fallback="
+                + fallback);
+      }
+      return fallback;
+    }
+
+    if (targetStateResult.exitCode() != 0) {
+      if (logger != null) {
+        logger.accept(
+            "systemd local probe warning: failed reading ActiveState for "
+                + MANDATORY_TARGET
+                + " ("
+                + summarizeFirstLine(targetStateResult.stderr())
+                + "), using fallback="
+                + fallback
+                + ", nixosHost="
+                + config.imageBuilderHost()
+                + ", incusInstance="
+                + config.nodeName());
+      }
+      return fallback;
+    }
+
+    return normalizeTargetState(firstNonBlankLine(targetStateResult.stdout(), fallback));
+  }
+
+  private static String sanitizeHostLabel(String rawValue, String fallback) {
     if (rawValue == null || rawValue.isBlank()) {
       return fallback;
     }
 
-    return Boolean.parseBoolean(rawValue.trim());
+    final String candidate = rawValue.trim();
+    if (candidate.contains(":")) {
+      return fallback;
+    }
+    if (!candidate.matches("[A-Za-z0-9._-]+")) {
+      return fallback;
+    }
+    return candidate;
   }
 
-  private static String shellQuote(String value) {
-    return "'" + value.replace("'", "'\"'\"'") + "'";
+  private static String firstNonBlankLine(String value, String fallback) {
+    if (value == null || value.isBlank()) {
+      return fallback;
+    }
+
+    return value
+        .lines()
+        .map(String::trim)
+        .filter(line -> !line.isBlank())
+        .findFirst()
+        .orElse(fallback);
+  }
+
+  private static CommandResult runCommand(List<String> command) {
+    final ProcessBuilder processBuilder = new ProcessBuilder(command);
+    processBuilder.environment().putIfAbsent("LANG", "C");
+    try {
+      final Process process = processBuilder.start();
+      final boolean exited = process.waitFor(PROBE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+      if (!exited) {
+        process.destroyForcibly();
+        return new CommandResult(-1, "", "timed out after " + PROBE_TIMEOUT);
+      }
+
+      final String stdout =
+          new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+      final String stderr =
+          new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+      return new CommandResult(process.exitValue(), stdout, stderr);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      return new CommandResult(-1, "", "command interrupted");
+    } catch (IOException ex) {
+      return new CommandResult(-1, "", "failed to execute command: " + ex.getMessage());
+    }
+  }
+
+  private static CommandResult runCommandInInstance(BootstrapConfig config, String script) {
+    return runCommand(incusExec(config, "sh", "-lc", script));
+  }
+
+  private static boolean looksLikeIncusHelp(String output) {
+    if (output == null || output.isBlank()) {
+      return false;
+    }
+
+    final String normalized = output.toLowerCase();
+    return normalized.contains("command line client for incus")
+        || (normalized.contains("usage:") && normalized.contains("incus"));
   }
 
   private static Map<String, Object> envelope(
@@ -302,4 +548,10 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
     }
     return Map.copyOf(payload);
   }
+
+  private record CommandResult(int exitCode, String stdout, String stderr) {}
+
+  private record JobsProbe(String summary, String currentStartingService) {}
+
+  private record UnitHealth(String unitName, String activeState, String result, boolean healthy) {}
 }

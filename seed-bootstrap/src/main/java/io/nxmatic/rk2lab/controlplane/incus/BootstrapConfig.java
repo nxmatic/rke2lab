@@ -1,7 +1,6 @@
 package io.nxmatic.rk2lab.controlplane.incus;
 
 import com.pulumi.Config;
-import io.nxmatic.rk2lab.systemdcontract.api.SystemdAdapterApiPaths;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.function.Consumer;
@@ -25,9 +24,7 @@ public record BootstrapConfig(
     String lanBridgeParent,
     String vmnetNetworkName,
     URI apiEndpoint,
-    Path kubeconfigRef,
-    URI systemdAdapterStatusEndpoint,
-    URI systemdAdapterHealthEndpoint) {
+    Path kubeconfigRef) {
 
   public String imageBuilderBinary() {
     return "distrobuilder";
@@ -80,9 +77,7 @@ public record BootstrapConfig(
         lanBridgeParent,
         vmnetNetworkName,
         apiEndpoint,
-        kubeconfigRef,
-        systemdAdapterStatusEndpoint,
-        systemdAdapterHealthEndpoint);
+        kubeconfigRef);
   }
 
   public Path localWorktreePath() {
@@ -135,12 +130,6 @@ public record BootstrapConfig(
     private URI apiEndpoint = URI.create("https://10.66.106.10:6443");
 
     private Path kubeconfigRef;
-
-    private URI systemdAdapterStatusEndpoint =
-        URI.create("http://127.0.0.1:18080" + SystemdAdapterApiPaths.STATUS_SYSTEMD);
-
-    private URI systemdAdapterHealthEndpoint =
-        URI.create("http://127.0.0.1:18080" + SystemdAdapterApiPaths.HEALTHZ_SYSTEMD);
 
     public Builder worktree(Path value) {
       this.worktree = normalizeAbsolutePath(value);
@@ -222,16 +211,6 @@ public record BootstrapConfig(
       return this;
     }
 
-    public Builder systemdAdapterStatusEndpoint(URI value) {
-      this.systemdAdapterStatusEndpoint = value;
-      return this;
-    }
-
-    public Builder systemdAdapterHealthEndpoint(URI value) {
-      this.systemdAdapterHealthEndpoint = value;
-      return this;
-    }
-
     public Builder applyConfig(Config config) {
       final EnvironmentValues environment = new EnvironmentValues(config);
       override(environment, "worktree.dir", value -> this.worktree(parsePath(value)));
@@ -255,14 +234,6 @@ public record BootstrapConfig(
       override(environment, "network.vmnetNetworkName", this::vmnetNetworkName);
       override(environment, "api.endpoint", value -> this.apiEndpoint(parseUri(value)));
       override(environment, "kubeconfig.ref", value -> this.kubeconfigRef(parsePath(value)));
-      override(
-          environment,
-          "systemd.adapter.statusEndpoint",
-          value -> this.systemdAdapterStatusEndpoint(parseUri(value)));
-      override(
-          environment,
-          "systemd.adapter.healthEndpoint",
-          value -> this.systemdAdapterHealthEndpoint(parseUri(value)));
       return this;
     }
 
@@ -299,9 +270,7 @@ public record BootstrapConfig(
           lanBridgeParent,
           vmnetNetworkName,
           apiEndpoint,
-          resolvedKubeconfigRef,
-          systemdAdapterStatusEndpoint,
-          systemdAdapterHealthEndpoint);
+          resolvedKubeconfigRef);
     }
 
     private Path parsePath(String value) {
