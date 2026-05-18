@@ -34,6 +34,31 @@ public record Net2PlanEndpoint(URI baseUri, String networkPlanPath) {
     networkPlanPath = normalizePath(networkPlanPath);
   }
 
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static final class Builder {
+    private URI baseUri;
+    private String networkPlanPath = DEFAULT_NETWORK_PLAN_PATH;
+
+    private Builder() {}
+
+    public Builder baseUri(URI value) {
+      this.baseUri = value;
+      return this;
+    }
+
+    public Builder networkPlanPath(String value) {
+      this.networkPlanPath = value;
+      return this;
+    }
+
+    public Net2PlanEndpoint build() {
+      return new Net2PlanEndpoint(baseUri, networkPlanPath);
+    }
+  }
+
   /** Resolve endpoint settings from system properties/environment when configured. */
   public static Optional<Net2PlanEndpoint> fromSystemProperties() {
     final String endpointValue = configuredEndpointValue();
@@ -46,7 +71,8 @@ public record Net2PlanEndpoint(URI baseUri, String networkPlanPath) {
             ? DEFAULT_NETWORK_PLAN_PATH
             : System.getProperty(PATH_PROPERTY);
 
-    return Optional.of(new Net2PlanEndpoint(URI.create(endpointValue.trim()), path));
+    return Optional.of(
+        builder().baseUri(URI.create(endpointValue.trim())).networkPlanPath(path).build());
   }
 
   /** Canonical full URL for posting/reading network plans in Net2Plan. */

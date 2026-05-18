@@ -4,4 +4,36 @@ import java.nio.file.Path;
 
 /** Result contract for canonical manifest synthesis. */
 public record ManifestSynthesisResult(
-    Path manifestFile, int manifestUnitHitCount, int domainCount) {}
+    Path manifestFile, int manifestUnitHitCount, int domainCount) {
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static final class Builder {
+    private Path manifestFile;
+    private int manifestUnitHitCount;
+    private int domainCount;
+
+    private Builder() {}
+
+    public Builder manifestFile(Path value) {
+      this.manifestFile = value;
+      return this;
+    }
+
+    public Builder manifestUnitHitCount(int value) {
+      this.manifestUnitHitCount = value;
+      return this;
+    }
+
+    public Builder domainCount(int value) {
+      this.domainCount = value;
+      return this;
+    }
+
+    public ManifestSynthesisResult build() {
+      return new ManifestSynthesisResult(manifestFile, manifestUnitHitCount, domainCount);
+    }
+  }
+}

@@ -26,9 +26,49 @@ public record NetplanSynthesisRequest(
     nodeName = nodeName.trim();
   }
 
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static final class Builder {
+    private String clusterName = "bioskop";
+    private String nodeName = "master";
+    private Optional<Net2PlanEndpoint> net2PlanEndpoint = Optional.empty();
+
+    private Builder() {}
+
+    public Builder clusterName(String value) {
+      this.clusterName = value;
+      return this;
+    }
+
+    public Builder nodeName(String value) {
+      this.nodeName = value;
+      return this;
+    }
+
+    public Builder net2PlanEndpoint(Optional<Net2PlanEndpoint> value) {
+      this.net2PlanEndpoint = value;
+      return this;
+    }
+
+    public Builder net2PlanEndpoint(Net2PlanEndpoint value) {
+      this.net2PlanEndpoint = Optional.ofNullable(value);
+      return this;
+    }
+
+    public NetplanSynthesisRequest build() {
+      return new NetplanSynthesisRequest(clusterName, nodeName, net2PlanEndpoint);
+    }
+  }
+
   public static NetplanSynthesisRequest fromSystemProperties() {
     final String cluster = System.getProperty("rk2lab.netplan.cluster", "bioskop");
     final String node = System.getProperty("rk2lab.netplan.node", "master");
-    return new NetplanSynthesisRequest(cluster, node, Net2PlanEndpoint.fromSystemProperties());
+    return builder()
+        .clusterName(cluster)
+        .nodeName(node)
+        .net2PlanEndpoint(Net2PlanEndpoint.fromSystemProperties())
+        .build();
   }
 }

@@ -28,6 +28,76 @@ public record HostAssetDeliveryPolicy(
     }
   }
 
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static final class Builder {
+    private String policyId = "";
+    private String ownerDomainId = "";
+    private String hostAssetRoot = "";
+    private HostAssetDeliveryBackend deliveryBackend = HostAssetDeliveryBackend.BOOTSTRAP;
+    private HostAssetMaterializationMode materializationMode =
+        HostAssetMaterializationMode.DIRECT_FILES;
+    private boolean verificationRequired;
+    private boolean rotateExistingRoot;
+    private boolean enabled = true;
+
+    private Builder() {}
+
+    public Builder policyId(String value) {
+      this.policyId = value;
+      return this;
+    }
+
+    public Builder ownerDomainId(String value) {
+      this.ownerDomainId = value;
+      return this;
+    }
+
+    public Builder hostAssetRoot(String value) {
+      this.hostAssetRoot = value;
+      return this;
+    }
+
+    public Builder deliveryBackend(HostAssetDeliveryBackend value) {
+      this.deliveryBackend = value;
+      return this;
+    }
+
+    public Builder materializationMode(HostAssetMaterializationMode value) {
+      this.materializationMode = value;
+      return this;
+    }
+
+    public Builder verificationRequired(boolean value) {
+      this.verificationRequired = value;
+      return this;
+    }
+
+    public Builder rotateExistingRoot(boolean value) {
+      this.rotateExistingRoot = value;
+      return this;
+    }
+
+    public Builder enabled(boolean value) {
+      this.enabled = value;
+      return this;
+    }
+
+    public HostAssetDeliveryPolicy build() {
+      return new HostAssetDeliveryPolicy(
+          policyId,
+          ownerDomainId,
+          hostAssetRoot,
+          deliveryBackend,
+          materializationMode,
+          verificationRequired,
+          rotateExistingRoot,
+          enabled);
+    }
+  }
+
   public boolean isOwnedBy(String domainId) {
     return ownerDomainId.equals(normalize(domainId));
   }
@@ -44,27 +114,29 @@ public record HostAssetDeliveryPolicy(
   }
 
   public static HostAssetDeliveryPolicy floxContainerdShim() {
-    return new HostAssetDeliveryPolicy(
-        "runtime/containerd-shim-flox",
-        MANIFEST_DOMAIN_CATALOG.runtime(),
-        "/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox",
-        HostAssetDeliveryBackend.DAEMONSET,
-        HostAssetMaterializationMode.MIXED,
-        true,
-        false,
-        true);
+    return builder()
+        .policyId("runtime/containerd-shim-flox")
+        .ownerDomainId(MANIFEST_DOMAIN_CATALOG.runtime())
+        .hostAssetRoot("/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox")
+        .deliveryBackend(HostAssetDeliveryBackend.DAEMONSET)
+        .materializationMode(HostAssetMaterializationMode.MIXED)
+        .verificationRequired(true)
+        .rotateExistingRoot(false)
+        .enabled(true)
+        .build();
   }
 
   public static HostAssetDeliveryPolicy systemdLibexecPlaceholder() {
-    return new HostAssetDeliveryPolicy(
-        "runtime/systemd-libexec-placeholder",
-        MANIFEST_DOMAIN_CATALOG.runtime(),
-        "/srv/host/systemd-libexec.d",
-        HostAssetDeliveryBackend.BOOTSTRAP,
-        HostAssetMaterializationMode.DIRECT_FILES,
-        false,
-        false,
-        false);
+    return builder()
+        .policyId("runtime/systemd-libexec-placeholder")
+        .ownerDomainId(MANIFEST_DOMAIN_CATALOG.runtime())
+        .hostAssetRoot("/srv/host/systemd-libexec.d")
+        .deliveryBackend(HostAssetDeliveryBackend.BOOTSTRAP)
+        .materializationMode(HostAssetMaterializationMode.DIRECT_FILES)
+        .verificationRequired(false)
+        .rotateExistingRoot(false)
+        .enabled(false)
+        .build();
   }
 
   private static String requireKnownDomainId(String ownerDomainId) {

@@ -28,32 +28,87 @@ public record SystemdStatusSnapshot(
     summary = normalizeString(summary, "n/a");
   }
 
-  public static SystemdStatusSnapshot fromPayloadMap(Map<String, Object> payload) {
-    if (payload == null || payload.isEmpty()) {
-      return new SystemdStatusSnapshot(
-          Instant.now().toString(),
-          "rke2lab.target",
-          "unknown",
-          false,
-          0,
-          Map.of(),
-          0,
-          false,
-          Map.of(),
-          "empty status payload");
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static final class Builder {
+    private String observedAt = Instant.now().toString();
+    private String mandatoryTarget = "rke2lab.target";
+    private String mandatoryTargetState = "unknown";
+    private boolean mandatoryTargetHealthy;
+    private int pendingJobs;
+    private Map<String, Integer> jobsByState = Map.of();
+    private int failedUnits;
+    private boolean runtimePrecheckReady;
+    private Map<String, String> connectionContext = Map.of();
+    private String summary = "n/a";
+
+    private Builder() {}
+
+    public Builder observedAt(String value) {
+      this.observedAt = value;
+      return this;
     }
 
-    return new SystemdStatusSnapshot(
-        asString(payload.get("observedAt"), Instant.now().toString()),
-        asString(payload.get("mandatoryTarget"), "rke2lab.target"),
-        asString(payload.get("mandatoryTargetState"), "unknown"),
-        asBoolean(payload.get("mandatoryTargetHealthy"), false),
-        asInt(payload.get("pendingJobs"), 0),
-        asIntegerMap(payload.get("jobsByState")),
-        asInt(payload.get("failedUnits"), 0),
-        asBoolean(payload.get("runtimePrecheckReady"), false),
-        asStringMap(payload.get("connectionContext")),
-        asString(payload.get("summary"), "n/a"));
+    public Builder mandatoryTarget(String value) {
+      this.mandatoryTarget = value;
+      return this;
+    }
+
+    public Builder mandatoryTargetState(String value) {
+      this.mandatoryTargetState = value;
+      return this;
+    }
+
+    public Builder mandatoryTargetHealthy(boolean value) {
+      this.mandatoryTargetHealthy = value;
+      return this;
+    }
+
+    public Builder pendingJobs(int value) {
+      this.pendingJobs = value;
+      return this;
+    }
+
+    public Builder jobsByState(Map<String, Integer> value) {
+      this.jobsByState = value;
+      return this;
+    }
+
+    public Builder failedUnits(int value) {
+      this.failedUnits = value;
+      return this;
+    }
+
+    public Builder runtimePrecheckReady(boolean value) {
+      this.runtimePrecheckReady = value;
+      return this;
+    }
+
+    public Builder connectionContext(Map<String, String> value) {
+      this.connectionContext = value;
+      return this;
+    }
+
+    public Builder summary(String value) {
+      this.summary = value;
+      return this;
+    }
+
+    public SystemdStatusSnapshot build() {
+      return new SystemdStatusSnapshot(
+          observedAt,
+          mandatoryTarget,
+          mandatoryTargetState,
+          mandatoryTargetHealthy,
+          pendingJobs,
+          jobsByState,
+          failedUnits,
+          runtimePrecheckReady,
+          connectionContext,
+          summary);
+    }
   }
 
   public Map<String, Object> toPayloadMap() {
@@ -83,85 +138,6 @@ public record SystemdStatusSnapshot(
       return fallback;
     }
     return value.trim();
-  }
-
-  private static String asString(Object value, String fallback) {
-    if (value == null) {
-      return fallback;
-    }
-    final String raw = value.toString().trim();
-    if (raw.isBlank()) {
-      return fallback;
-    }
-    return raw;
-  }
-
-  private static boolean asBoolean(Object value, boolean fallback) {
-    if (value instanceof Boolean booleanValue) {
-      return booleanValue;
-    }
-    if (value == null) {
-      return fallback;
-    }
-    return Boolean.parseBoolean(value.toString().trim());
-  }
-
-  private static int asInt(Object value, int fallback) {
-    if (value instanceof Number numberValue) {
-      return Math.max(numberValue.intValue(), 0);
-    }
-    if (value == null) {
-      return Math.max(fallback, 0);
-    }
-
-    final String raw = value.toString().trim();
-    if (raw.isBlank()) {
-      return Math.max(fallback, 0);
-    }
-
-    try {
-      return Math.max(Integer.parseInt(raw), 0);
-    } catch (NumberFormatException ignored) {
-      return Math.max(fallback, 0);
-    }
-  }
-
-  private static Map<String, Integer> asIntegerMap(Object value) {
-    if (!(value instanceof Map<?, ?> rawMap) || rawMap.isEmpty()) {
-      return Map.of();
-    }
-
-    final LinkedHashMap<String, Integer> parsed = new LinkedHashMap<>();
-    for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
-      if (entry.getKey() == null) {
-        continue;
-      }
-      final String key = entry.getKey().toString().trim();
-      if (key.isBlank()) {
-        continue;
-      }
-      parsed.put(key, asInt(entry.getValue(), 0));
-    }
-    return Map.copyOf(parsed);
-  }
-
-  private static Map<String, String> asStringMap(Object value) {
-    if (!(value instanceof Map<?, ?> rawMap) || rawMap.isEmpty()) {
-      return Map.of();
-    }
-
-    final LinkedHashMap<String, String> parsed = new LinkedHashMap<>();
-    for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
-      if (entry.getKey() == null) {
-        continue;
-      }
-      final String key = entry.getKey().toString().trim();
-      if (key.isBlank()) {
-        continue;
-      }
-      parsed.put(key, asString(entry.getValue(), "unknown"));
-    }
-    return Map.copyOf(parsed);
   }
 
   private static Map<String, Integer> sanitizeIntegerMap(Map<String, Integer> value) {
