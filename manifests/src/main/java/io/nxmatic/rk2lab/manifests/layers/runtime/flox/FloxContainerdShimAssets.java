@@ -194,6 +194,8 @@ public final class FloxContainerdShimAssets {
           FLOX_RESOURCE_ROOT + "/debug-tools/master-shim-pprof.sh",
           "debug-tools/master-shim-pprof.sh",
           true);
+      addMaterializationAsset(
+          FLOX_RESOURCE_ROOT + "/debug-tools/rke2lab-dlv.sh", "debug-tools/rke2lab-dlv.sh", true);
       return this;
     }
 
@@ -308,6 +310,10 @@ public final class FloxContainerdShimAssets {
           "debug-tools-master-shim-pprof.sh",
           FLOX_RESOURCE_ROOT + "/debug-tools/master-shim-pprof.sh",
           "build-assets/debug-tools/master-shim-pprof.sh");
+      addInstallerAsset(
+          "debug-tools-rke2lab-dlv.sh",
+          FLOX_RESOURCE_ROOT + "/debug-tools/rke2lab-dlv.sh",
+          "build-assets/debug-tools/rke2lab-dlv.sh");
       return this;
     }
 

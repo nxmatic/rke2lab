@@ -140,9 +140,11 @@ reexec_on_host_if_needed() {
 find_flox_activation_dir() {
 	local -a candidates=()
 
-	# Prefer canonical host runtime Flox environment first when running on host.
+	# Canonical host policy: runtime Flox environments only; do not fallback to worktree envs.
 	if [[ "${EXECUTION_MODE}" == "host" ]]; then
 		candidates+=("/var/lib/rancher/rke2")
+		candidates+=("/var/lib/flox-runtime/containerd-shim")
+		candidates+=("/var/lib/flox-runtime/containerd-shim-build")
 	fi
 
 	if [[ -n "${CONTAINERD_SHIM_FLOX_DIR:-}" ]]; then
@@ -151,10 +153,12 @@ find_flox_activation_dir() {
 		candidates+=("$(dirname "$(dirname "${CONTAINERD_SHIM_FLOX_DIR}")")")
 	fi
 
-	candidates+=(
-		"/var/lib/git/nxmatic/rke2lab"
-		"/srv/host/git-worktree.d/nxmatic/rke2lab"
-	)
+	if [[ "${EXECUTION_MODE}" != "host" ]]; then
+		candidates+=(
+			"/var/lib/git/nxmatic/rke2lab"
+			"/srv/host/git-worktree.d/nxmatic/rke2lab"
+		)
+	fi
 
 	local candidate
 	for candidate in "${candidates[@]}"; do

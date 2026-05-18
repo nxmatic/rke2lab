@@ -29,7 +29,7 @@
           version = "0.1.0";
           src = builtins.path {
             path = ./wrapper-go;
-            name = packageName + "-src";
+            name = "wrapper-go-src";
           };
           subPackages = ["cmd/containerd-shim-flox-v2"];
           vendorHash = "sha256-g+yaVIx4jxpAQ/+WrGKxhVeliYx7nLQe/zsGpxV4Fn4=";
