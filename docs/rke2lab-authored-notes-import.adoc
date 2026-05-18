@@ -137,40 +137,85 @@ This M4 C4 container view models the Stage A architecture and key runtime relati
 @startuml
 title Controlnode M4 C4 container view (policy-first + Pulumi initial provisioning)
 
-!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
 
-LAYOUT_LEFT_RIGHT()
+actor "Operator" as operator
 
-Person(operator, "Operator", "Runs preview/up and reviews bootstrap outputs")
+rectangle "Pulumi Engine\n<<external>>\nOrchestrates resource plan/apply" as pulumiEngine
+rectangle "Incus API/Daemon\n<<external>>\nProject/profile/network/image/instance lifecycle" as incusApi
+rectangle "Git Worktree\n<<external>>\nPolicy checks: clean worktree + flake lock coherence" as gitWorktree
+rectangle "Shim flake worktree\n<<external>>\nShim build inputs and lock/package outputs" as shimFlakes
 
-System_Ext(pulumiEngine, "Pulumi Engine", "Orchestrates resource plan/apply")
-System_Ext(incusApi, "Incus API/Daemon", "Project/profile/network/image/instance lifecycle")
-System_Ext(gitWorktree, "Git Worktree", "Policy checks: clean worktree + flake lock coherence")
-System_Ext(shimFlakes, "Shim flake worktree", "Shim build inputs and lock/package outputs")
-
-System_Boundary(controlnode, "rke2lab controlnode (Stage A)") {
-  Container(cpMain, "controlplane.Main", "Java / Pulumi", "Entry point; policy-first gate; exports deterministic Stage A outputs")
-  Container(manifestGate, "ManifestUpdateGate", "ServiceLoader API", "Enforces manifest synthesis update gate")
-  Container(manifestSynth, "ManifestSynthesisService", "ServiceLoader provider", "Synthesizes and validates manifests for gate smoke checks")
-  Container(bootstrapCfg, "BootstrapConfig", "Java config model", "Resolves canonical Stage A runtime config")
-  Container(incusBootstrap, "IncusResourceBootstrap", "Java orchestration", "Applies Stage A bootstrap: provider resources, seed image, seed instance")
-  Container(imageProvider, "PulumiIncusImageProvider", "Java helper", "Ensures image fingerprint and checksum-aware image lifecycle")
+package "rke2lab controlnode (Stage A)" {
+  rectangle "controlplane.Main\n<<Container>>\nJava / Pulumi\nEntry point; policy-first gate; exports deterministic Stage A outputs" as cpMain
+  rectangle "ManifestUpdateGate\n<<Container>>\nServiceLoader API\nEnforces manifest synthesis update gate" as manifestGate
+  rectangle "ManifestSynthesisService\n<<Container>>\nServiceLoader provider\nSynthesizes and validates manifests for gate smoke checks" as manifestSynth
+  rectangle "BootstrapConfig\n<<Container>>\nJava config model\nResolves canonical Stage A runtime config" as bootstrapCfg
+  rectangle "IncusResourceBootstrap\n<<Container>>\nJava orchestration\nApplies Stage A bootstrap: provider resources, seed image, seed instance" as incusBootstrap
+  rectangle "PulumiIncusImageProvider\n<<Container>>\nJava helper\nEnsures image fingerprint and checksum-aware image lifecycle" as imageProvider
 }
 
-Rel(operator, cpMain, "Runs preview/up or standalone")
-Rel(operator, shimFlakes, "Runs shim-build + commits lock updates when inputs change")
+operator --> cpMain : Runs preview/up or standalone
+operator --> shimFlakes : Runs shim-build + commits lock updates
 
-Rel(cpMain, pulumiEngine, "Uses Pulumi.run(...) when monitor is present")
-Rel(cpMain, bootstrapCfg, "Builds effective bootstrap config")
-Rel(cpMain, manifestGate, "Enforces update gate")
-Rel(manifestGate, manifestSynth, "Loads provider and performs synthesis smoke validation")
-Rel(cpMain, gitWorktree, "Enforces clean worktree + flake-lock coherence")
-Rel(cpMain, incusBootstrap, "Invokes apply() after gates pass")
+cpMain --> pulumiEngine : Uses Pulumi.run(...) when monitor is present
+cpMain --> bootstrapCfg : Builds effective bootstrap config
+cpMain --> manifestGate : Enforces update gate
+manifestGate --> manifestSynth : Loads provider + performs synthesis smoke validation
+cpMain --> gitWorktree : Enforces clean worktree + flake-lock coherence
+cpMain --> incusBootstrap : Invokes apply() after gates pass
 
-Rel(incusBootstrap, imageProvider, "Ensures seed image fingerprint/checksum")
-Rel(imageProvider, incusApi, "Resolves/creates image alias and fingerprint")
-Rel(incusBootstrap, incusApi, "Ensures project/network/profile and creates/replaces seed instance")
-Rel(cpMain, operator, "Exports Stage A outputs\n(apiEndpoint, kubeconfigRef, seed ids, checksums, handoffReady)")
+incusBootstrap --> imageProvider : Ensures seed image fingerprint/checksum
+imageProvider --> incusApi : Resolves/creates image alias + fingerprint
+incusBootstrap --> incusApi : Ensures project/network/profile + creates/replaces seed instance
+cpMain --> operator : Exports Stage A outputs\n(apiEndpoint, kubeconfigRef, seed ids, checksums, handoffReady)
+@enduml
+----
+
+=== IncusResourceBootstrap M4 C4 component view
+
+This component-level diagram expands the Stage A bootstrap internals around `IncusResourceBootstrap`.
+
+[plantuml,incus-bootstrap-m4-components,svg]
+----
+@startuml
+title IncusResourceBootstrap M4 C4 component view
+
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+rectangle "controlplane.Main\n<<Container>>\nJava / Pulumi\nPolicy-first entry point" as cpMain
+rectangle "Incus API/Daemon\n<<external>>\nProject/network/profile/image/instance lifecycle" as incusApi
+
+package "Incus bootstrap orchestration" {
+  rectangle "ApplyPipeline\n<<Component>>\nIncusResourceBootstrap\nCoordinates Stage A steps: resolve paths, host prep, provider resources, seed instance" as applyPipeline
+  rectangle "ClasspathAssetMaterializer\n<<Component>>\nBootstrap helper\nMaterializes classpath assets/manifests to local runtime tree" as assetMaterializer
+  rectangle "NodeConfigRegenerator\n<<Component>>\nBootstrap helper\nRegenerates cloud-init payload from runtime secrets" as nodeConfigRegenerator
+  rectangle "HostMountSourceVerifier\n<<Component>>\nBootstrap helper\nValidates required host mount sources for Incus disk devices" as sourceVerifier
+  rectangle "LaunchSecretsUpdater\n<<Component>>\nBootstrap helper\nEnsures launch secrets token before provisioning" as secretsUpdater
+  rectangle "IncusProviderContext\n<<Component>>\nBootstrap helper\nBuilds explicit incus.Provider + invoke options" as providerContext
+  rectangle "IncusImportLookup\n<<Component>>\nBootstrap helper\nFinds existing project/network/profile IDs for import/adopt" as importLookup
+  rectangle "PulumiIncusImageProvider\n<<Component>>\nImage helper\nEnsures seed image alias/fingerprint and image build checksum" as imageProvider
+  rectangle "ProvisioningResourceInventory\n<<Component>>\nBootstrap helper\nComputes deterministic provisioning checksum" as inventoryChecksum
+}
+
+cpMain --> applyPipeline : Invokes apply()
+
+applyPipeline --> assetMaterializer : materializeIncusAssets / manifests / host units
+applyPipeline --> nodeConfigRegenerator : regenerateCloudConfigDir
+applyPipeline --> sourceVerifier : ensureSources
+applyPipeline --> secretsUpdater : ensureGithubTokenPresent (non-dry-run)
+applyPipeline --> inventoryChecksum : Compute seed provisioning checksum
+
+applyPipeline --> providerContext : Create provider context
+applyPipeline --> importLookup : Resolve import IDs for adoption
+applyPipeline --> imageProvider : ensureSeedImageFingerprint
+
+imageProvider --> incusApi : Read/create image alias + fingerprint
+applyPipeline --> incusApi : Ensure project/network/profile + create/replace seed instance
 @enduml
 ----
 
