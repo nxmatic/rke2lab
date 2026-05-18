@@ -3,12 +3,10 @@ package wrapper
 import (
 	"encoding/json"
 	"fmt"
-	"hash/fnv"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -20,18 +18,12 @@ const (
 	defaultWrapperLog    = "/var/log/rke2lab/containerd-shim-flox-v2-wrapper.log"
 	defaultSyncLog       = "/var/log/rke2lab/flox-rootfs-sync.log"
 	defaultDebugWaitFile = "/tmp/containerd-shim-flox-v2-wrapper-continue"
-	defaultDebugListen   = "0.0.0.0:43123"
 	defaultJournalSocket = "/run/systemd/journal/socket"
 	defaultJournalTag    = "containerd-shim-flox-v2-wrapper"
 	defaultBundleRoot    = "/run/k3s/containerd/io.containerd.runtime.v2.task"
 
 	annotationDebug        = "flox.dev/debug"
 	annotationDebugSuspend = "flox.dev/debug-suspend"
-
-	debugTargetEnvVar       = "CONTAINERD_SHIM_FLOX_V2_DEBUG_TARGET"
-	debugTargetWrapper      = "wrapper"
-	debugTargetRealShim     = "real"
-	wrapperUnderDelveEnvVar = "CONTAINERD_SHIM_FLOX_V2_WRAPPER_UNDER_DLV"
 )
 
 type Config struct {
@@ -84,76 +76,18 @@ func (w *Wrapper) Run(args []string) error {
 		}
 	}
 
-	if err := w.maybeWaitForDebugger(logger); err != nil {
-		return err
-	}
-
 	if w.cfg.DebugEnabled {
-		if parseBoolString(os.Getenv(wrapperUnderDelveEnvVar)) {
-			logger.Log("wrapper already under dlv; executing real shim directly to avoid nested debugger")
-			return w.execRealShim(args)
+		if err := w.waitForDebugContinueGate(logger); err != nil {
+			return err
 		}
-		return w.execViaDelve(args, shimNamespace, shimID, logger)
+		logger.Log("debug enabled in manual-attach mode; executing target without embedded dlv pid=%d", os.Getpid())
+		return w.execRealShim(args)
 	}
 
 	return w.execRealShim(args)
 }
-
 func (w *Wrapper) execRealShim(args []string) error {
 	return syscall.Exec(w.cfg.RealShim, append([]string{w.cfg.RealShim}, args...), os.Environ())
-}
-
-func (w *Wrapper) execViaDelve(args []string, shimNamespace, shimID string, logger *Logger) error {
-	delvePath, err := exec.LookPath("dlv")
-	if err != nil {
-		logger.Log("debug requested but dlv is unavailable; executing real shim directly realShim=%s", w.cfg.RealShim)
-		return w.execRealShim(args)
-	}
-
-	targetMode := resolveDebugTarget(os.Getenv(debugTargetEnvVar))
-	targetPath := w.cfg.RealShim
-	env := os.Environ()
-	if targetMode == debugTargetWrapper {
-		currentExecutable, execErr := os.Executable()
-		if execErr != nil {
-			logger.Log("wrapper debug requested but current executable cannot be resolved: %v", execErr)
-			return w.execRealShim(args)
-		}
-		targetPath = currentExecutable
-		env = append(env, wrapperUnderDelveEnvVar+"=1")
-	}
-
-	listenAddress := perShimDebugListenAddress(shimNamespace, shimID)
-	delveArgs := []string{
-		delvePath,
-		"exec",
-		targetPath,
-		"--headless",
-		"--api-version=2",
-		"--accept-multiclient",
-		"--listen=" + listenAddress,
-	}
-	if !w.cfg.DebugWait {
-		delveArgs = append(delveArgs, "--continue")
-	}
-	delveArgs = append(delveArgs, "--")
-	delveArgs = append(delveArgs, args...)
-
-	logger.Log("launching target under dlv mode=%s path=%s listen=%s continue=%t", targetMode, targetPath, listenAddress, !w.cfg.DebugWait)
-	return syscall.Exec(delvePath, delveArgs, env)
-}
-
-func resolveDebugTarget(value string) string {
-	switch strings.TrimSpace(strings.ToLower(value)) {
-	case "":
-		return debugTargetWrapper
-	case debugTargetRealShim:
-		return debugTargetRealShim
-	case debugTargetWrapper:
-		return debugTargetWrapper
-	default:
-		return debugTargetWrapper
-	}
 }
 
 func (w *Wrapper) launchRootfsSync(logger *Logger, shimNamespace, shimID string) error {
@@ -189,17 +123,30 @@ func (w *Wrapper) launchRootfsSync(logger *Logger, shimNamespace, shimID string)
 	return cmd.Process.Release()
 }
 
-func (w *Wrapper) maybeWaitForDebugger(logger *Logger) error {
-	if w.cfg.DebugSleep > 0 {
-		logger.Log("sleeping for debug attachment duration=%s", w.cfg.DebugSleep)
-		time.Sleep(w.cfg.DebugSleep)
+func (w *Wrapper) waitForDebugContinueGate(logger *Logger) error {
+	if !w.cfg.DebugWait {
+		return nil
 	}
 
-	if w.cfg.DebugWait {
-		logger.Log("debug suspend requested; launching dlv without --continue so target waits for debugger attach")
+	waitFile := strings.TrimSpace(w.cfg.DebugWaitFile)
+	if waitFile == "" {
+		waitFile = defaultDebugWaitFile
 	}
 
-	return nil
+	logger.Log("debug suspend requested; waiting for continue file=%s", waitFile)
+	for {
+		if _, err := os.Stat(waitFile); err == nil {
+			if removeErr := os.Remove(waitFile); removeErr != nil && !os.IsNotExist(removeErr) {
+				logger.Log("continue file cleanup failed path=%s err=%v", waitFile, removeErr)
+			}
+			logger.Log("continue file observed; resuming execution path=%s", waitFile)
+			return nil
+		} else if !os.IsNotExist(err) {
+			logger.Log("continue file check failed path=%s err=%v", waitFile, err)
+		}
+
+		time.Sleep(250 * time.Millisecond)
+	}
 }
 
 type bundleConfig struct {
@@ -250,21 +197,6 @@ func perShimDebugWaitFilePath(shimNamespace, shimID string) string {
 	}
 
 	return filepath.Join(os.TempDir(), fmt.Sprintf("containerd-shim-flox-v2-wrapper-continue-%s-%s", sanitizedNamespace, sanitizedID))
-}
-
-func perShimDebugListenAddress(shimNamespace, shimID string) string {
-	sanitizedNamespace := sanitizePathToken(shimNamespace)
-	sanitizedID := sanitizePathToken(shimID)
-	if sanitizedNamespace == "" || sanitizedID == "" {
-		return defaultDebugListen
-	}
-
-	hasher := fnv.New32a()
-	_, _ = hasher.Write([]byte(sanitizedNamespace))
-	_, _ = hasher.Write([]byte("/"))
-	_, _ = hasher.Write([]byte(sanitizedID))
-	port := 40000 + int(hasher.Sum32()%20000)
-	return "0.0.0.0:" + strconv.Itoa(port)
 }
 
 func sanitizePathToken(value string) string {

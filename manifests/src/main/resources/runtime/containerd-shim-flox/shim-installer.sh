@@ -204,6 +204,7 @@ installer::pod:materialize_assets() {
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/kdns-containerd-bundle-watch.sh" "${HOST_SCRIPT_ROOT}/debug-tools/kdns-containerd-bundle-watch.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/kdns-containerd-remote-capture.sh" "${HOST_SCRIPT_ROOT}/debug-tools/kdns-containerd-remote-capture.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/master-shim-pprof.sh" "${HOST_SCRIPT_ROOT}/debug-tools/master-shim-pprof.sh"
+	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/rke2lab-dlv.sh" "${HOST_SCRIPT_ROOT}/debug-tools/rke2lab-dlv.sh"
 	install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/flake.nix" "${HOST_SCRIPT_ROOT}/mesh/headplane/flake.nix"
 	install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/flake.nix" "${HOST_SCRIPT_ROOT}/networking/kdns/flake.nix"
 }

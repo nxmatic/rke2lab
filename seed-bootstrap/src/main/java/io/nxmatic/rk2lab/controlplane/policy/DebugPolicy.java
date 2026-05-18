@@ -3,7 +3,8 @@ package io.nxmatic.rk2lab.controlplane.policy;
 import java.util.Map;
 
 /** Debug policy for controlplane-managed runtime features. */
-public record DebugPolicy(boolean kdnsEnabled, boolean containerdShimFloxV2WrapperEnabled) {
+public record DebugPolicy(
+    boolean kdnsEnabled, boolean kdnsSuspend, boolean containerdShimFloxV2WrapperEnabled) {
 
   public String kdnsFloxEnvironment() {
     return "nxmatic/kdns";
@@ -18,6 +19,8 @@ public record DebugPolicy(boolean kdnsEnabled, boolean containerdShimFloxV2Wrapp
         Map.of(
             "RKE2LAB_POLICY_DEBUG_KDNS_ENABLED",
             Boolean.toString(kdnsEnabled),
+            "RKE2LAB_POLICY_DEBUG_KDNS_SUSPEND",
+            Boolean.toString(kdnsSuspend),
             "RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV",
             kdnsFloxEnvironment(),
             "RKE2LAB_POLICY_DEBUG_KDNS_RUNTIME_CLASS",
@@ -32,6 +35,8 @@ public record DebugPolicy(boolean kdnsEnabled, boolean containerdShimFloxV2Wrapp
         Map.of(
             "policyDebugKdnsEnabled",
             kdnsEnabled,
+            "policyDebugKdnsSuspend",
+            kdnsSuspend,
             "policyDebugKdnsFloxEnvironment",
             kdnsFloxEnvironment(),
             "policyDebugKdnsRuntimeClass",
