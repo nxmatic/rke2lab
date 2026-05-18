@@ -6,6 +6,7 @@ import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rk2lab.manifests.api.ManifestUpdateGate;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -18,10 +19,12 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
+import org.eclipse.jgit.treewalk.TreeWalk;
 
 /** Entry point for the Pulumi management-cluster bootstrap program. */
 public final class Main {
@@ -227,16 +230,25 @@ public final class Main {
           collectFlakeDirs(diff.getNewPath(), flakeNixDirs, flakeLockDirs);
         }
 
-        flakeNixDirs.removeAll(flakeLockDirs);
-        if (flakeNixDirs.isEmpty()) {
+        final LinkedHashSet<String> violatingDirs = new LinkedHashSet<>();
+        for (String flakeNixDir : flakeNixDirs) {
+          if (flakeLockDirs.contains(flakeNixDir)) {
+            continue;
+          }
+          if (hasFlakeInputsChanged(repository, oldTreeId, newTreeId, flakeNixDir)) {
+            violatingDirs.add(flakeNixDir);
+          }
+        }
+
+        if (violatingDirs.isEmpty()) {
           return;
         }
 
         throw new IllegalStateException(
-            "Flake lock coherence policy violation: detected changes to flake.nix without matching flake.lock "
-                + "changes in the latest commit. Update locks and commit again. "
+            "Flake lock coherence policy violation: detected flake.nix inputs changes without "
+                + "matching flake.lock changes in the latest commit. Update locks and commit again. "
                 + "Affected flake directories:\n- "
-                + String.join("\n- ", flakeNixDirs));
+                + String.join("\n- ", violatingDirs));
       }
     } catch (IllegalStateException ex) {
       throw ex;
@@ -256,6 +268,108 @@ public final class Main {
       newTree.reset(reader, newTreeId);
       return git.diff().setOldTree(oldTree).setNewTree(newTree).call();
     }
+  }
+
+  private static boolean hasFlakeInputsChanged(
+      Repository repository, ObjectId oldTreeId, ObjectId newTreeId, String flakeDir) {
+    final String flakePath = ".".equals(flakeDir) ? "flake.nix" : flakeDir + "/flake.nix";
+    final String oldFlakeNix = readTreeFile(repository, oldTreeId, flakePath);
+    final String newFlakeNix = readTreeFile(repository, newTreeId, flakePath);
+
+    final String oldInputs = extractInputsBlock(oldFlakeNix);
+    final String newInputs = extractInputsBlock(newFlakeNix);
+    return !oldInputs.equals(newInputs);
+  }
+
+  private static String readTreeFile(Repository repository, ObjectId treeId, String path) {
+    if (treeId == null || path == null || path.isBlank()) {
+      return "";
+    }
+    try {
+      final TreeWalk treeWalk = TreeWalk.forPath(repository, path, treeId);
+      if (treeWalk == null) {
+        return "";
+      }
+      try (treeWalk) {
+        final ObjectLoader loader = repository.open(treeWalk.getObjectId(0));
+        return new String(loader.getBytes(), StandardCharsets.UTF_8);
+      }
+    } catch (Exception ex) {
+      throw new IllegalStateException("Failed to read " + path + " from git tree", ex);
+    }
+  }
+
+  private static String extractInputsBlock(String flakeNixText) {
+    if (flakeNixText == null || flakeNixText.isBlank()) {
+      return "";
+    }
+
+    int searchFrom = 0;
+    while (searchFrom >= 0 && searchFrom < flakeNixText.length()) {
+      final int candidateIndex = flakeNixText.indexOf("inputs", searchFrom);
+      if (candidateIndex < 0) {
+        return "";
+      }
+
+      if (isIdentifierBoundary(flakeNixText, candidateIndex - 1)
+          && isIdentifierBoundary(flakeNixText, candidateIndex + "inputs".length())) {
+        final int afterKeyword = candidateIndex + "inputs".length();
+        final int equalsIndex = skipWhitespaceAndFind(flakeNixText, afterKeyword, '=');
+        if (equalsIndex >= 0) {
+          final int openBraceIndex = skipWhitespaceAndFind(flakeNixText, equalsIndex + 1, '{');
+          if (openBraceIndex >= 0) {
+            final int closeBraceIndex = findMatchingBrace(flakeNixText, openBraceIndex);
+            if (closeBraceIndex > openBraceIndex) {
+              return normalizeWhitespace(
+                  flakeNixText.substring(openBraceIndex, closeBraceIndex + 1));
+            }
+          }
+        }
+      }
+
+      searchFrom = candidateIndex + 1;
+    }
+
+    return "";
+  }
+
+  private static int skipWhitespaceAndFind(String value, int start, char target) {
+    int index = start;
+    while (index < value.length() && Character.isWhitespace(value.charAt(index))) {
+      index++;
+    }
+    if (index < value.length() && value.charAt(index) == target) {
+      return index;
+    }
+    return -1;
+  }
+
+  private static int findMatchingBrace(String value, int openBraceIndex) {
+    int depth = 0;
+    for (int index = openBraceIndex; index < value.length(); index++) {
+      final char ch = value.charAt(index);
+      if (ch == '{') {
+        depth++;
+      } else if (ch == '}') {
+        depth--;
+        if (depth == 0) {
+          return index;
+        }
+      }
+    }
+    return -1;
+  }
+
+  private static boolean isIdentifierBoundary(String value, int index) {
+    if (index < 0 || index >= value.length()) {
+      return true;
+    }
+    final char ch = value.charAt(index);
+    return !(Character.isLetterOrDigit(ch) || ch == '_' || ch == '-');
+  }
+
+  private static String normalizeWhitespace(String value) {
+    return value.replaceAll("\\s+", " ").trim();
   }
 
   private static void collectFlakeDirs(
