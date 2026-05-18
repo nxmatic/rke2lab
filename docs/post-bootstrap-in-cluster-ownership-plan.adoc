@@ -1,0 +1,196 @@
+= Post-Bootstrap In-Cluster Ownership Plan
+:toc: left
+:toclevels: 3
+:kroki-server-url: https://kroki.io
+:plantuml-server-url: {kroki-server-url}/plantuml
+
+This note replaces the earlier operator-centered next-plan note with the current intended in-cluster ownership model.
+
+It keeps one canonical owner per concern and records earlier wrong assumptions only as footnotes, not as the active design.
+
+== Current intent
+
+The active plan after Stage A is:
+
+* keep `controlplane` as the external bootstrap authority for the seed management cluster
+* hand off non-seed machine lifecycle to CAPI + CAPN + CAPRKE2 inside the management cluster
+* install GitOps controllers for declarative cluster add-on reconciliation
+* install a workflow/pipeline controller inside the cluster for build, promotion, and delivery workflows
+* move long-lived host-local runtime mutation out of staged bootstrap/systemd flows and into node-local reconcilers
+
+This means the target in-cluster control plane is not “Pulumi Operator plus everything else”.footnote:[Earlier planning treated the Pulumi Operator as the likely in-cluster provisioning brain after bootstrap. That assumption is no longer the active plan because it overlaps too broadly with the already-declared Stage B ownership of CAPI/CAPN/CAPRKE2 for ongoing machine lifecycle.] It is a split of specialized controllers with clearly separated ownership.
+
+== Canonical ownership split
+
+[cols="1,3",options="header"]
+|===
+| Concern | Canonical owner
+
+| Seed bootstrap and handoff outputs
+| `controlplane` outside cluster
+
+| Non-seed machine lifecycle (scale, replacement, rollout, remediation)
+| CAPI + CAPN + CAPRKE2
+
+| Declarative in-cluster add-ons and desired cluster services
+| GitOps controllers
+
+| Build, promotion, delivery, and workflow orchestration
+| workflow/pipeline controller
+
+| Ongoing host-local runtime mutation and node drift correction
+| node-local controller / privileged DaemonSet patterns
+|===
+
+This is the core design rule:
+
+* CAPI owns machine lifecycle.
+* GitOps owns declarative add-ons.
+* The workflow/pipeline controller owns build and delivery workflows.
+* Node-local reconcilers own host mutation on already-running nodes.
+
+That split is deliberate because CAPI is not the natural owner of ongoing host-local runtime mutationfootnote:[A second wrong assumption was that CAPI might absorb the host-local runtime mutation currently expressed through staged systemd services and daemonless host workflows. CAPI can bootstrap machines, but the active plan treats ongoing host-runtime reconciliation as a node-local controller concern, not as generic machine lifecycle.] and the workflow/pipeline controller is not the natural owner of either node lifecycle or host drift correction.footnote:[A third wrong assumption was that the workflow/pipeline controller might become a general post-bootstrap orchestrator. The corrected plan keeps it focused on build, promotion, delivery, and workflow execution, not node reconciliation or bootstrap authority.]
+
+== Role of the workflow/pipeline controller
+
+The workflow/pipeline controller is part of the real plan, but its role is intentionally narrow.
+
+It should own:
+
+* build/test/package workflows
+* promotion workflows across environments or artifact states
+* delivery workflows that prepare artifacts or manifests for GitOps consumption
+* explicit multi-step operational workflows that are reviewable as pipelines
+
+It should not own:
+
+* machine lifecycle already owned by CAPI
+* declarative steady-state reconciliation already owned by GitOps
+* long-lived host-local reconciliation already owned by node-local controllers
+* seed bootstrap authority already owned by `controlplane`
+
+The workflow/pipeline controller sits in the flow as the system that produces or promotes deployable outputs; GitOps consumes those outputs to reconcile cluster state.
+
+== Bootstrap-to-handoff flow
+
+The active sequence is:
+
+. `controlplane` provisions the seed management cluster and emits the Stage A -> Stage B handoff assets.
+. The cluster becomes healthy enough to host in-cluster controllers.
+. CAPI + CAPN + CAPRKE2 are installed and become the only owners of non-seed machine lifecycle.
+. GitOps controllers are installed and become the owners of declarative add-on state.
+. The workflow/pipeline controller is installed and becomes the owner of build/promotion/delivery workflows.
+. Node-local reconcilers gradually replace staged systemd/bootstrap host mutation for long-lived runtime concerns.
+
+The bootstrap layer should become smaller over time; it should not remain the permanent owner of everything.
+
+== Design guardrails
+
+The following guardrails remain strict:
+
+* no overlapping controller ownership for the same concern
+* no backward-compatibility orchestration aliases just to bridge old assumptions
+* one canonical owner per lifecycle surface
+* systemd is a current bootstrap backend, not the long-term architecture concept
+* node-local reconciliation should replace durable host-mutation shell flows once the cluster can host that control loop
+
+== C4 context view
+
+[plantuml,post-bootstrap-ownership-context,svg]
+....
+@startuml
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title Post-bootstrap ownership context
+
+Person(operator, "Operator", "Runs bootstrap, reviews pipelines, approves operational changes")
+System_Ext(controlplane, "controlplane (Stage A)", "External Pulumi bootstrap authority")
+System(cluster, "Management cluster", "In-cluster controllers and managed workloads")
+System_Ext(artifactStore, "Artifact + source systems", "Git repositories, registries, release inputs")
+System_Ext(nodeHosts, "Cluster nodes", "Node hosts that require local runtime reconciliation")
+
+Rel(operator, controlplane, "Runs Stage A bootstrap and reviews handoff")
+Rel(controlplane, cluster, "Provisions seed cluster and installs in-cluster controllers")
+Rel(cluster, artifactStore, "Consumes source, manifests, and artifacts")
+Rel(cluster, nodeHosts, "Reconciles machines, add-ons, workflows, and host-local runtime state")
+
+SHOW_LEGEND()
+@enduml
+....
+
+== C4 container view
+
+[plantuml,post-bootstrap-ownership-container,svg]
+....
+@startuml
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Post-bootstrap ownership container view
+
+Person(operator, "Operator", "Runs bootstrap and reviews cluster operations")
+System_Ext(controlplane, "controlplane (Stage A)", "External Pulumi bootstrap authority")
+System_Ext(artifactStore, "Artifact + source systems", "Git repos, registries, release inputs")
+
+System_Boundary(cluster, "Management cluster") {
+  Container(capi, "CAPI + CAPN + CAPRKE2", "Kubernetes controllers", "Owns non-seed machine lifecycle")
+  Container(gitops, "GitOps controller", "Kubernetes controller", "Owns declarative add-on reconciliation")
+  Container(workflows, "Workflow/pipeline controller", "Kubernetes controller", "Owns build, promotion, and delivery workflows")
+  Container(nodelocal, "Node-local reconcilers", "DaemonSet / privileged controller", "Own ongoing host-local runtime reconciliation")
+}
+
+Rel(operator, controlplane, "Runs Stage A bootstrap")
+Rel(controlplane, capi, "Installs and hands off machine lifecycle")
+Rel(controlplane, gitops, "Installs declarative reconciliation layer")
+Rel(controlplane, workflows, "Installs workflow execution layer")
+Rel(controlplane, nodelocal, "Installs node-local reconciliation layer")
+
+Rel(capi, nodelocal, "Provides nodes that host local reconcilers")
+Rel(gitops, artifactStore, "Pulls declarative add-on sources")
+Rel(workflows, artifactStore, "Builds, tests, promotes, and publishes outputs")
+Rel(workflows, gitops, "Produces inputs consumed by declarative reconciliation")
+
+SHOW_LEGEND()
+@enduml
+....
+
+== C4 dynamic view
+
+[plantuml,post-bootstrap-ownership-dynamic,svg]
+....
+@startuml
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Dynamic.puml
+
+title Post-bootstrap handoff dynamic view
+
+Person(operator, "Operator", "Runs bootstrap and approves transitions")
+System_Ext(controlplane, "controlplane (Stage A)", "External bootstrap authority")
+Container_Boundary(cluster, "Management cluster") {
+  Container(capi, "CAPI + CAPN + CAPRKE2", "Controllers", "Node lifecycle owner")
+  Container(gitops, "GitOps controller", "Controller", "Declarative add-on owner")
+  Container(workflows, "Workflow/pipeline controller", "Controller", "Build/promotion/delivery owner")
+  Container(nodelocal, "Node-local reconcilers", "DaemonSet/controller", "Host-local reconciliation owner")
+}
+
+Rel(operator, controlplane, "1. Runs Stage A bootstrap")
+Rel(controlplane, capi, "2. Installs CAPI stack and hands off non-seed machine lifecycle")
+Rel(controlplane, gitops, "3. Installs GitOps controllers")
+Rel(controlplane, workflows, "4. Installs workflow/pipeline controller")
+Rel(controlplane, nodelocal, "5. Installs node-local reconcilers for durable host runtime concerns")
+Rel(workflows, gitops, "6. Produces promoted outputs for declarative rollout")
+Rel(gitops, nodelocal, "7. Reconciles desired add-ons that shape node-local policy inputs")
+
+SHOW_LEGEND()
+@enduml
+....
+
+== Summary
+
+The real plan is now:
+
+* external `controlplane` for seed bootstrap only
+* CAPI + CAPN + CAPRKE2 for non-seed machine lifecycle
+* GitOps for declarative cluster add-ons
+* workflow/pipeline controller for build, promotion, and delivery workflows
+* node-local reconcilers for ongoing host-local runtime mutation
+
+The earlier Pulumi-operator-centered idea remains only as historical context in footnotes, not as the active architecture.

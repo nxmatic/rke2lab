@@ -5,6 +5,8 @@ DAEMONSET_ASSET_ROOT="/srv/host/k8s-daemonset.d/runtime/flox-containerd-shim"
 DAEMONLESS_EXEC_MODE="${DAEMONLESS_EXEC_MODE:-pod}"
 DAEMONSET_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT:-${DAEMONLESS_HOST_SCRIPT_ROOT:-${DAEMONSET_ASSET_ROOT}}}"
 DAEMONLESS_HOST_SCRIPT_ROOT="${DAEMONLESS_HOST_SCRIPT_ROOT:-${DAEMONSET_SCRIPT_ROOT}}"
+DAEMONLESS_HOST_SCRIPT_LIB_DIR="${DAEMONLESS_HOST_SCRIPT_LIB_DIR:-${DAEMONLESS_HOST_SCRIPT_ROOT%/}/.sh.d}"
+DAEMONLESS_HOST_SCRIPT_BIN="${DAEMONLESS_HOST_SCRIPT_BIN:-${DAEMONLESS_HOST_SCRIPT_ROOT%/}/bin}"
 
 installer::mode:validate() {
 	case "${DAEMONLESS_EXEC_MODE}" in
@@ -19,25 +21,26 @@ installer::mode:validate() {
 }
 
 installer::policy:source() {
-	local policy_root
+	local policy_lib_dir
 
 	case "${DAEMONLESS_EXEC_MODE}" in
 	pod)
-		policy_root="${SCRIPT_POLICY_DIR}"
+		policy_lib_dir="${SCRIPT_POLICY_LIB_DIR}"
 		;;
 	host)
-		policy_root="${DAEMONSET_SCRIPT_ROOT}/.sh.d"
+		policy_lib_dir="${DAEMONLESS_HOST_SCRIPT_LIB_DIR}"
 		;;
 	esac
 
 	# shellcheck disable=SC1091
-	source "${policy_root}/daemonset-logging.sh"
+	source "${policy_lib_dir}/daemonset-logging.sh"
+	installer::logging:setup
 	# shellcheck disable=SC1091
-	source "${policy_root}/daemonless-trampoline.sh"
+	source "${policy_lib_dir}/daemonless-trampoline.sh"
 	# shellcheck disable=SC1091
-	source "${policy_root}/daemonless-host-asset-materializer.sh"
+	source "${policy_lib_dir}/daemonless-host-asset-materializer.sh"
 	# shellcheck disable=SC1091
-	source "${policy_root}/daemonless-host-shell-policy.sh"
+	source "${policy_lib_dir}/daemonless-host-shell-policy.sh"
 }
 
 installer::logging:setup() {
@@ -74,7 +77,8 @@ install_deps() {
 : "Materialize bundled flox build resources onto host filesystem"
 HOST_ROOT="${HOST_ROOT:-/host-root}"
 SCRIPT_MOUNT_DIR="${SCRIPT_MOUNT_DIR:-/scripts}"
-SCRIPT_POLICY_DIR="${SCRIPT_POLICY_DIR:-/runtime-daemonset}"
+SCRIPT_POLICY_ROOT="${SCRIPT_POLICY_ROOT:-/runtime-daemonset}"
+SCRIPT_POLICY_LIB_DIR="${SCRIPT_POLICY_LIB_DIR:-${SCRIPT_POLICY_ROOT%/}/.sh.d}"
 BUILD_ASSETS_DIR="${BUILD_ASSETS_DIR:-/build-assets}"
 HOST_SCRIPT_ROOT="${HOST_ROOT}${DAEMONSET_SCRIPT_ROOT}"
 
@@ -106,19 +110,19 @@ installer::pod:materialize_assets() {
 		"shim-installer.sh" \
 		"shim-installer.sh" >/dev/null
 	daemonless::host_shell:library:install \
-		"${SCRIPT_POLICY_DIR}/daemonset-logging.sh" \
+		"${SCRIPT_POLICY_LIB_DIR}/daemonset-logging.sh" \
 		"${HOST_SCRIPT_ROOT}" \
 		"daemonset-logging.sh" >/dev/null
 	daemonless::host_shell:library:install \
-		"${SCRIPT_POLICY_DIR}/daemonless-host-asset-materializer.sh" \
+		"${SCRIPT_POLICY_LIB_DIR}/daemonless-host-asset-materializer.sh" \
 		"${HOST_SCRIPT_ROOT}" \
 		"daemonless-host-asset-materializer.sh" >/dev/null
 	daemonless::host_shell:library:install \
-		"${SCRIPT_POLICY_DIR}/daemonless-trampoline.sh" \
+		"${SCRIPT_POLICY_LIB_DIR}/daemonless-trampoline.sh" \
 		"${HOST_SCRIPT_ROOT}" \
 		"daemonless-trampoline.sh" >/dev/null
 	daemonless::host_shell:library:install \
-		"${SCRIPT_POLICY_DIR}/daemonless-host-shell-policy.sh" \
+		"${SCRIPT_POLICY_LIB_DIR}/daemonless-host-shell-policy.sh" \
 		"${HOST_SCRIPT_ROOT}" \
 		"daemonless-host-shell-policy.sh" >/dev/null
 
@@ -147,7 +151,6 @@ installer::pod:run() {
 	install_deps
 	installer::policy:source
 	installer::pod:materialize_assets
-	installer::logging:setup
 
 	daemonless::host_asset:materialize_encoded_tar \
 		"${BUILD_ASSETS_DIR}/wrapper-go.tar.b64" \
@@ -158,6 +161,7 @@ installer::pod:run() {
 	daemonless::trampoline:exec_on_host \
 		"shim-installer.sh" \
 		"CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE}" \
+		"DAEMONLESS_HOST_SCRIPT_LIB_DIR=${DAEMONLESS_HOST_SCRIPT_LIB_DIR}" \
 		"DAEMONLESS_HOST_SCRIPT_BIN=${DAEMONSET_SCRIPT_ROOT%/}/bin" \
 		"DAEMONSET_SCRIPT_ROOT=${DAEMONSET_SCRIPT_ROOT}"
 }
@@ -620,7 +624,6 @@ containerd::config:flox:update() {
 
 installer::host:run() {
 	installer::policy:source
-	installer::logging:setup
 	installer::host:activate_flox
 
 	: "Initialize host tooling and shim asset paths"

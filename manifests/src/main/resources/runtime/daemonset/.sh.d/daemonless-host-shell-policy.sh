@@ -6,8 +6,42 @@
 # - executable shell entrypoints delegate to the generic host-binary policy
 # - sourced shell helper files live under <asset-root>/.sh.d
 #
+# Canonical environment contract:
+# - DAEMONLESS_HOST_SCRIPT_ROOT=/srv/host/... (required for host-side resolution)
+# - DAEMONLESS_HOST_SCRIPT_BIN=/srv/host/.../bin (defaults to <root>/bin)
+# - DAEMONLESS_HOST_SCRIPT_LIB_DIR=/srv/host/.../.sh.d (defaults to <root>/.sh.d)
+#
 # Use daemonless::host_shell:binary:install for host-reexec-capable shell entrypoints.
 # Use daemonless::host_shell:library:install for sourced shell helper files.
+
+daemonless::host_shell:root:resolve() {
+	local shell_root="${DAEMONLESS_HOST_SCRIPT_ROOT:-}"
+
+	[[ -n "${shell_root}" ]] || {
+		echo "DAEMONLESS_HOST_SCRIPT_ROOT is required for daemonless host shell policy" >&2
+		return 1
+	}
+
+	printf '%s\n' "${shell_root}"
+}
+
+daemonless::host_shell:bin:resolve() {
+	local shell_root shell_bin
+
+	shell_root="$(daemonless::host_shell:root:resolve)" || return 1
+	shell_bin="${DAEMONLESS_HOST_SCRIPT_BIN:-${shell_root%/}/bin}"
+
+	printf '%s\n' "${shell_bin}"
+}
+
+daemonless::host_shell:library:resolve() {
+	local shell_root shell_library_dir
+
+	shell_root="$(daemonless::host_shell:root:resolve)" || return 1
+	shell_library_dir="${DAEMONLESS_HOST_SCRIPT_LIB_DIR:-${shell_root%/}/.sh.d}"
+
+	printf '%s\n' "${shell_library_dir}"
+}
 
 daemonless::host_shell:library:dir() {
 	local shell_root="${1:?shell root required}"
