@@ -151,6 +151,31 @@ So the clean mental model is:
 .. the debug runtime class
 .. the debug annotation consumed by the sidecar behavior
 
+== Shim wrapper debugger attach (VS Code)
+
+When validating shim-level behavior (before application-level debugging), use the dedicated VS Code
+launch configuration:
+
+* `Attach to Shim Wrapper Delve (remote)`
+
+Expected flow:
+
+. Ensure shim debug annotations are enabled on the workload (`flox.dev/debug=true`, optional
+  `flox.dev/debug-suspend=true`).
+. Confirm Delve is running on `bioskop-master`:
+  `ss -ltnp | grep dlv`
+. Provide the discovered host/port to the launch input prompts.
+. Attach from VS Code and debug the wrapper source under:
+  `manifests/src/main/resources/runtime/containerd-shim-flox/wrapper-go`
+
+Source path mapping is preconfigured from host runtime path:
+
+* `/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox/wrapper-go`
+
+to local workspace path:
+
+* `${workspaceFolder:rke2lab}/manifests/src/main/resources/runtime/containerd-shim-flox/wrapper-go`
+
 == Example stack configuration
 
 The current dev stack uses:
