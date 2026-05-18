@@ -176,7 +176,7 @@ classDiagram
 
     class DebugPolicy {
       +kdnsEnabled : boolean
-      +floxShimWrapperEnabled : boolean
+      +containerdShimFloxV2WrapperEnabled : boolean
     }
 
     class ManifestLinkPolicy {
