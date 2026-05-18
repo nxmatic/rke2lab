@@ -1,0 +1,134 @@
+= Post-Bootstrap Operator Handoff Plan
+:toc: left
+:toclevels: 3
+
+This note captures the intended next plan *after* Stage A has produced a well-provisioned cluster that is aligned with the current system behavior and is ready to host GitOps and CI/CD components.
+
+It does not redefine the current bootstrap ownership.
+For the current stage, the `controlplane` application remains the canonical bootstrap authority.
+
+== Current position
+
+The current target remains:
+
+* finish Stage A bootstrap with the `controlplane` application
+* keep provisioning behavior aligned with the previous working cluster behavior
+* produce a cluster that is ready for:
+** GitOps components
+** CI/CD components
+* keep bootstrap concerns understandable and reviewable before introducing a second provisioning brain
+
+This means the near-term architecture is still:
+
+* `controlplane` owns bootstrap and provisioning knowledge
+* host/systemd resources provide the current activation backend for early cluster bring-up
+* GitOps and CI/CD are installed only after the cluster is sufficiently provisioned to host them
+
+== Why the handoff is deferred
+
+The Pulumi Operator is attractive because Pulumi already models provisioning constraints and dependency knowledge well.
+However, the operator is an in-cluster controller.
+That means it cannot be the primary owner of the earliest bootstrap steps that are required to create the cluster capable of hosting the operator itself.
+
+The handoff is therefore intentionally deferred until the cluster is already healthy enough to host:
+
+* GitOps controllers
+* CI/CD controllers
+* the Pulumi Operator
+
+== Future split of responsibilities
+
+Once the cluster is well provisioned, responsibilities are expected to split into two major phases.
+
+=== Phase 1: bootstrap authority remains out of cluster
+
+The `controlplane` application continues to own:
+
+* infrastructure/bootstrap provisioning
+* seed cluster bring-up
+* early host mutation and policy wiring
+* installation of in-cluster control machinery
+* exported outputs that define the handoff point
+
+=== Phase 2: provisioning authority is extended into the cluster
+
+After the cluster is stable, the in-cluster side is expected to take over selected longer-lived reconciliation concerns.
+
+Expected in-cluster responsibilities:
+
+* Pulumi Operator for provisioning workflows that benefit from Pulumi's dependency model
+* GitOps controllers for declarative cluster-state reconciliation
+* CI/CD controllers for build, promotion, and delivery workflows
+* node-local controller/DaemonSet patterns for host-side reconciliation that should not remain in bootstrap shell flows
+
+== Intended handoff boundary
+
+The intended boundary is:
+
+* bootstrap first
+* stabilize second
+* hand off third
+
+More concretely:
+
+. `controlplane` creates a cluster that is operational and policy-aligned.
+. The cluster becomes capable of hosting GitOps and CI/CD safely.
+. The Pulumi Operator is installed into that cluster.
+. Selected provisioning responsibilities are transferred to in-cluster reconciliation.
+. The bootstrap layer becomes smaller over time rather than remaining the permanent owner of all lifecycle concerns.
+
+== Design guardrails for the handoff
+
+The following guardrails are intentional:
+
+* do not introduce backward-compatibility aliases just to bridge old and new orchestration paths
+* keep one canonical owner per concern
+* avoid overlapping ownership between GitOps, Pulumi Operator, systemd, and node-local reconcilers
+* treat systemd as a current backend for bootstrap, not the permanent architecture concept
+* keep manifest domains and their owned layers as the primary architectural model
+
+== Ownership direction
+
+The long-term ownership direction is expected to look like this:
+
+[cols="1,1,2",options="header"]
+|===
+| Concern | Near-term owner | Expected later owner
+
+| Cluster bootstrap
+| `controlplane`
+| `controlplane`
+
+| Early host provisioning
+| `controlplane` + host/systemd resources
+| reduced bootstrap surface, with some work moved to node-local reconcilers
+
+| Declarative cluster add-ons
+| staged bootstrap installation
+| GitOps
+
+| Provisioning workflows with richer dependency logic
+| `controlplane`
+| Pulumi Operator
+
+| Host/node reconciliation
+| bootstrap scripts and staged host units
+| controller + DaemonSet patterns
+|===
+
+== What “done enough for handoff” means
+
+The handoff should not begin merely because the cluster exists.
+The intended readiness bar is higher.
+
+The cluster should be:
+
+* reproducibly provisioned
+* aligned with the previous expected behavior
+* ready to host GitOps and CI/CD components cleanly
+* sufficiently stable that provisioning knowledge can begin to move inward without creating split-brain bootstrap ownership
+
+== Summary
+
+The next plan is not to replace the `controlplane` bootstrap path immediately.
+It is to finish the current stage, reach a well-provisioned cluster ready for GitOps and CI/CD, and only then introduce a deliberate handoff to an in-cluster provisioning model centered around the Pulumi Operator.

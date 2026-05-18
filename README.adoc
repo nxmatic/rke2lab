@@ -26,6 +26,7 @@ Initial scaffold created. First implementation target is the Stage A bootstrap c
 * `docs/daemonless-host-assets-architecture.adoc` — daemonless execution contract, shared policy helpers, host asset materialization flow, and encoded payload ownership for host-mutating runtime workflows
 * `docs/incus-distribution-contract.adoc` — reverse-engineered Incus distribution contract for seed/control-node provisioning
 * `docs/stagea-stageb-handoff-contract.adoc` — explicit handoff assets between Stage A bootstrap and Stage B CAPI/CAPN reconciliation
+* `docs/post-bootstrap-operator-handoff-plan.adoc` — planned next-step split between bootstrap ownership in `controlplane` and later in-cluster provisioning handoff to the Pulumi Operator once the cluster is ready for GitOps and CI/CD
 * `docs/kdns-debug-operator-view.adoc` — operator-focused note describing how KDNS debugability is selected through Pulumi policy and applied to the rendered workload
 * `docs/rke2lab-authored-notes-import.adoc` — imported historical planning notes from `rke2lab` carried forward as curated context
 * `src/main/java/` — Java Pulumi application
