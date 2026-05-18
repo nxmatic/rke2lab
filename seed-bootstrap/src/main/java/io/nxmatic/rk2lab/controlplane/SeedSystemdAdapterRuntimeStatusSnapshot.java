@@ -58,7 +58,8 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
       final String currentStartingService = currentJobsProbe.currentStartingService();
       final String currentActiveUnits = readCurrentActiveUnitsSummary(config);
       final String targetWantsSummary = readTargetWantsSummary(config);
-      final UnitHealth cloudInitMain = readMandatoryUnitHealth(config, MANDATORY_CLOUD_INIT_UNIT);
+      final UnitHealth cloudInitMain =
+          readMandatoryUnitHealth(config, MANDATORY_CLOUD_INIT_UNIT, logger);
 
       final boolean mandatoryTargetHealthy = "active".equalsIgnoreCase(mandatoryTargetState);
       final boolean runtimePrecheckReady =
@@ -380,13 +381,38 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
     return String.valueOf(units.size());
   }
 
-  private static UnitHealth readMandatoryUnitHealth(BootstrapConfig config, String unitName) {
+  private static UnitHealth readMandatoryUnitHealth(
+      BootstrapConfig config, String unitName, Consumer<String> logger) {
+    final CommandResult combinedResult =
+        runCommandInInstance(
+            config,
+            "systemctl show --property=ActiveState --property=Result --property=LoadState --value "
+                + unitName);
+
+    if (looksLikeIncusHelp(combinedResult.stdout()) || combinedResult.exitCode() != 0) {
+      if (logger != null) {
+        logger.accept(
+            "systemd local probe warning: failed reading cloud-init unit health for "
+                + unitName
+                + " ("
+                + summarizeFirstLine(combinedResult.stderr())
+                + "), using fallback state/result=unknown");
+      }
+      return new UnitHealth(unitName, "unknown", "unknown", false);
+    }
+
+    final List<String> values =
+        (combinedResult.stdout() == null ? "" : combinedResult.stdout())
+            .lines()
+            .map(String::trim)
+            .filter(line -> !line.isBlank())
+            .toList();
+
     final String activeState =
-        readUnitProperty(config, unitName, "ActiveState", "unknown", false).toLowerCase();
-    final String result =
-        readUnitProperty(config, unitName, "Result", "unknown", true).toLowerCase();
+        (values.size() >= 1 ? values.get(0) : "unknown").trim().toLowerCase();
+    final String result = (values.size() >= 2 ? values.get(1) : "unknown").trim().toLowerCase();
     final String loadState =
-        readUnitProperty(config, unitName, "LoadState", "not-found", false).toLowerCase();
+        (values.size() >= 3 ? values.get(2) : "not-found").trim().toLowerCase();
 
     final boolean present = !"not-found".equals(loadState);
     final boolean activeOrCompleted =
