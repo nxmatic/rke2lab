@@ -29,10 +29,10 @@ public class HighAvailabilityLayerEnvContributor implements LayerEnvContributor 
     return switch (sectionName) {
       case "network-vip" ->
           Map.of(
-              "RKE2LAB_NETWORK_VIP_INTERFACE", "rke2-vip0",
-              "RKE2LAB_NETWORK_VIP_CIDR", "10.80.7.0/24",
-              "RKE2LAB_NETWORK_VIP_GATEWAY_INETADDR", "10.80.7.1",
-              "RKE2LAB_NETWORK_VIP_HOST_INETADDR", "10.80.7.10");
+              "RKE2LAB_NETWORK_VIP_INTERFACE", context.vipInterface(),
+              "RKE2LAB_NETWORK_VIP_CIDR", context.vipCidr(),
+              "RKE2LAB_NETWORK_VIP_GATEWAY_INETADDR", context.vipGatewayInetAddr(),
+              "RKE2LAB_NETWORK_VIP_HOST_INETADDR", context.vipHostInetAddr());
       default -> Map.of();
     };
   }

@@ -2,6 +2,8 @@
 package io.nxmatic.rk2lab.manifests.layers.runtime.rke2;
 
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
+import io.nxmatic.rk2lab.manifests.layers.env.DefaultLayerEnvContext;
+import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,19 +26,21 @@ public final class RuntimeRke2ConfigLayer extends Construct {
   public RuntimeRke2ConfigLayer(final Construct scope, final String id) {
     super(scope, id);
 
+    final LayerEnvContext context = new DefaultLayerEnvContext();
+
     createConfigMap(
         "advertise-address.yaml",
         "Advertise address fragment",
         "|ConfigMap|default|rke2-advertise-address",
-        Map.of("advertise-address", "10.80.0.10"));
+        Map.of("advertise-address", context.nodeHostInetAddr()));
     createConfigMap(
         "cidrs.yaml",
         "Network CIDRs fragment",
         "|ConfigMap|default|rke2-cidrs",
         orderedMap(
             entry("kube-controller-manager-arg", List.of("node-cidr-mask-size-ipv4=24")),
-            entry("service-cidr", "10.43.0.0/16"),
-            entry("cluster-cidr", "10.42.0.0/16")));
+            entry("service-cidr", context.clusterServiceCidr()),
+            entry("cluster-cidr", context.clusterPodCidr())));
     createConfigMap(
         "cluster-init.yaml",
         "Cluster init flag (only true on first master)",
@@ -84,7 +88,7 @@ public final class RuntimeRke2ConfigLayer extends Construct {
         "node-inetaddr.yaml",
         "Node IP fragment",
         "|ConfigMap|default|rke2-node-inetaddr",
-        Map.of("node-ip", "10.80.0.10"));
+        Map.of("node-ip", context.nodeHostInetAddr()));
     createConfigMap(
         "node-labels.yaml",
         "Node labels fragment",
@@ -106,9 +110,10 @@ public final class RuntimeRke2ConfigLayer extends Construct {
                 "gateway",
                 "0.0.0.0",
                 "127.0.0.1",
-                "10.80.7.1",
-                "10.80.0.1",
-                "10.80.0.10")));
+                context.vipGatewayInetAddr(),
+                context.nodeNetworkGatewayAddr(),
+                context.nodeHostInetAddr(),
+                context.lanHostInetAddr())));
     createConfigMap(
         "token.yaml",
         "RKE2 token fragment",

@@ -34,12 +34,18 @@ public class NetworkingLayerEnvContributor implements LayerEnvContributor {
               "HUBBLE_TLS", "false");
       case "network-cluster" ->
           Map.of(
-              "RKE2LAB_NETWORK_CLUSTER_CIDR", context.clusterCidr(),
-              "RKE2LAB_NETWORK_CLUSTER_LB_CIDR", "10.80.0.64/26",
-              "RKE2LAB_NETWORK_CLUSTER_LB_GATEWAY_INETADDR", "10.80.0.65",
-              "RKE2LAB_NETWORK_CLUSTER_POD_CIDR", context.clusterPodCidr(),
-              "RKE2LAB_NETWORK_CLUSTER_SERVICE_CIDR", context.clusterServiceCidr(),
-              "RKE2LAB_NETWORK_CLUSTER_GATEWAY_INETADDR", context.nodeNetworkGatewayAddr());
+              "RKE2LAB_NETWORK_CLUSTER_CIDR",
+              context.clusterCidr(),
+              "RKE2LAB_NETWORK_CLUSTER_LB_CIDR",
+              context.clusterLoadBalancerCidr(),
+              "RKE2LAB_NETWORK_CLUSTER_LB_GATEWAY_INETADDR",
+              context.clusterLoadBalancerGatewayAddr(),
+              "RKE2LAB_NETWORK_CLUSTER_POD_CIDR",
+              context.clusterPodCidr(),
+              "RKE2LAB_NETWORK_CLUSTER_SERVICE_CIDR",
+              context.clusterServiceCidr(),
+              "RKE2LAB_NETWORK_CLUSTER_GATEWAY_INETADDR",
+              context.nodeNetworkGatewayAddr());
       case "network-node" ->
           Map.of(
               "RKE2LAB_NETWORK_NODE_HOST_INETADDR", context.nodeHostInetAddr(),
@@ -47,10 +53,10 @@ public class NetworkingLayerEnvContributor implements LayerEnvContributor {
               "RKE2LAB_NETWORK_NODE_GATEWAY_INETADDR", context.nodeNetworkGatewayAddr());
       case "network-lan-wan" ->
           Map.of(
-              "RKE2LAB_NETWORK_LAN_INTERFACE", "master-lan0",
-              "RKE2LAB_NETWORK_LAN_HOST_INETADDR", "192.168.1.131",
-              "RKE2LAB_NETWORK_LAN_LB_CIDR", "192.168.1.192/27",
-              "RKE2LAB_NETWORK_WAN_INTERFACE", "master-vmnet0");
+              "RKE2LAB_NETWORK_LAN_INTERFACE", context.lanInterface(),
+              "RKE2LAB_NETWORK_LAN_HOST_INETADDR", context.lanHostInetAddr(),
+              "RKE2LAB_NETWORK_LAN_LB_CIDR", context.lanLoadBalancerCidr(),
+              "RKE2LAB_NETWORK_WAN_INTERFACE", context.wanInterface());
       default -> Map.of();
     };
   }

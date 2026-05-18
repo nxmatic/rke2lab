@@ -55,4 +55,24 @@ public interface LayerEnvContext {
   String nodeNetworkCidr(); // "10.80.0.0/23"
 
   String nodeNetworkGatewayAddr(); // "10.80.0.1"
+
+  String clusterLoadBalancerCidr(); // "10.80.0.64/26"
+
+  String clusterLoadBalancerGatewayAddr(); // "10.80.0.65"
+
+  String lanInterface(); // "master-lan0"
+
+  String lanHostInetAddr(); // "192.168.1.131"
+
+  String lanLoadBalancerCidr(); // "192.168.1.192/27"
+
+  String wanInterface(); // "master-vmnet0"
+
+  String vipInterface(); // "rke2-vip0"
+
+  String vipCidr(); // "10.80.7.0/24"
+
+  String vipGatewayInetAddr(); // "10.80.7.1"
+
+  String vipHostInetAddr(); // "10.80.7.10"
 }

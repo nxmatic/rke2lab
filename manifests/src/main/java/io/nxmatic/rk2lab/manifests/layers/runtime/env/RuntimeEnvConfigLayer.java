@@ -2,11 +2,11 @@
 package io.nxmatic.rk2lab.manifests.layers.runtime.env;
 
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
+import io.nxmatic.rk2lab.manifests.layers.env.DefaultLayerEnvContext;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributorRegistry;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +49,7 @@ public final class RuntimeEnvConfigLayer extends Construct {
   public RuntimeEnvConfigLayer(final Construct scope, final String id) {
     super(scope, id);
 
-    this.layerEnvContext = new DefaultSynthesisLayerEnvContext();
+    this.layerEnvContext = new DefaultLayerEnvContext();
     this.envContributorRegistry = new LayerEnvContributorRegistry(layerEnvContext);
 
     for (String section : ENV_SECTIONS) {
@@ -124,120 +124,5 @@ public final class RuntimeEnvConfigLayer extends Construct {
       case "kpt" -> Map.of("KRM_FN_RUNTIME", "nerdctl");
       default -> Map.of();
     };
-  }
-
-  private static final class DefaultSynthesisLayerEnvContext implements LayerEnvContext {
-
-    private static final Path ROOT_PATH = Path.of("/srv/host");
-
-    @Override
-    public Path rootPath() {
-      return ROOT_PATH;
-    }
-
-    @Override
-    public Path envDirPath() {
-      return ROOT_PATH.resolve("rke2lab-environment.d");
-    }
-
-    @Override
-    public Path scriptsDirPath() {
-      return ROOT_PATH.resolve("systemd-scripts.d");
-    }
-
-    @Override
-    public Path systemdDirPath() {
-      return ROOT_PATH.resolve("systemd-units.d");
-    }
-
-    @Override
-    public Path configDirPath() {
-      return ROOT_PATH.resolve("rke2-config.d");
-    }
-
-    @Override
-    public Path cloudconfigNocloudDirPath() {
-      return ROOT_PATH.resolve("cloudconfig-nocloud.d");
-    }
-
-    @Override
-    public Path manifestsDirPath() {
-      return ROOT_PATH.resolve("rke2-manifests.d");
-    }
-
-    @Override
-    public Path sharedDirPath() {
-      return ROOT_PATH.resolve("rke2lab-share.d");
-    }
-
-    @Override
-    public Path kubeconfigDirPath() {
-      return ROOT_PATH.resolve("rke2lab-kube.d");
-    }
-
-    @Override
-    public int nodeId() {
-      return 0;
-    }
-
-    @Override
-    public String nodeName() {
-      return "master";
-    }
-
-    @Override
-    public String nodeKind() {
-      return "server";
-    }
-
-    @Override
-    public int clusterId() {
-      return 0;
-    }
-
-    @Override
-    public String clusterName() {
-      return "bioskop";
-    }
-
-    @Override
-    public String clusterToken() {
-      return clusterName();
-    }
-
-    @Override
-    public String clusterDomain() {
-      return "cluster.local";
-    }
-
-    @Override
-    public String clusterCidr() {
-      return "10.80.0.0/21";
-    }
-
-    @Override
-    public String clusterPodCidr() {
-      return "10.42.0.0/16";
-    }
-
-    @Override
-    public String clusterServiceCidr() {
-      return "10.43.0.0/16";
-    }
-
-    @Override
-    public String nodeHostInetAddr() {
-      return "10.80.0.10";
-    }
-
-    @Override
-    public String nodeNetworkCidr() {
-      return "10.80.0.0/23";
-    }
-
-    @Override
-    public String nodeNetworkGatewayAddr() {
-      return "10.80.0.1";
-    }
   }
 }

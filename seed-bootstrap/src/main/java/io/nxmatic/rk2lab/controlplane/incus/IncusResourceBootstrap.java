@@ -591,6 +591,56 @@ public final class IncusResourceBootstrap {
     public String nodeNetworkGatewayAddr() {
       return managementNodeBlueprint.nodeNetwork().nodeGatewayInetaddr().getHostAddress();
     }
+
+    @Override
+    public String clusterLoadBalancerCidr() {
+      return managementNodeBlueprint.loadBalancer().lbCidr().toString();
+    }
+
+    @Override
+    public String clusterLoadBalancerGatewayAddr() {
+      return managementNodeBlueprint.lan().headscaleInetaddr().getHostAddress();
+    }
+
+    @Override
+    public String lanInterface() {
+      return managementNodeBlueprint.interfaces().lanInterface();
+    }
+
+    @Override
+    public String lanHostInetAddr() {
+      return managementNodeBlueprint.lan().hostInetaddr().getHostAddress();
+    }
+
+    @Override
+    public String lanLoadBalancerCidr() {
+      return managementNodeBlueprint.lan().lbCidr().toString();
+    }
+
+    @Override
+    public String wanInterface() {
+      return managementNodeBlueprint.interfaces().wanInterface();
+    }
+
+    @Override
+    public String vipInterface() {
+      return managementNodeBlueprint.interfaces().vipInterface();
+    }
+
+    @Override
+    public String vipCidr() {
+      return managementNodeBlueprint.vip().vipCidr().toString();
+    }
+
+    @Override
+    public String vipGatewayInetAddr() {
+      return managementNodeBlueprint.vip().vipGatewayInetaddr().getHostAddress();
+    }
+
+    @Override
+    public String vipHostInetAddr() {
+      return managementNodeBlueprint.vip().vipHostInetaddr().getHostAddress();
+    }
   }
 
   private record BootstrapPaths(
