@@ -303,32 +303,21 @@ public final class IncusResourceBootstrap {
   }
 
   private Output<String> ensureProfile(IncusProviderContext context, Resource projectDependency) {
-    final String existingProfileId =
-        incusImportLookup.normalizeImportId(
-            incusImportLookup.existingProfileId(
-                context, config.profileName(), config.incusProject()));
-    final boolean profileExists = !existingProfileId.isBlank();
-
     final CustomResourceOptions.Builder optionsBuilder =
         CustomResourceOptions.builder()
             .provider(context.provider())
             .retainOnDelete(true)
             .dependsOn(List.of(projectDependency))
             .ignoreChanges(List.of("name", "project", "devices", "config", "description"));
-    if (profileExists) {
-      optionsBuilder.importId(existingProfileId);
-    }
 
     final ProfileArgs.Builder profileArgsBuilder =
         ProfileArgs.builder().name(config.profileName()).project(config.incusProject());
-    if (!profileExists) {
-      profileArgsBuilder.devices(
-          ProfileDeviceArgs.builder()
-              .name("root")
-              .type("disk")
-              .properties(Map.of("path", "/", "pool", "default"))
-              .build());
-    }
+    profileArgsBuilder.devices(
+        ProfileDeviceArgs.builder()
+            .name("root")
+            .type("disk")
+            .properties(Map.of("path", "/", "pool", "default"))
+            .build());
 
     final Profile profile =
         new Profile("seed-profile", profileArgsBuilder.build(), optionsBuilder.build());
