@@ -36,7 +36,7 @@ public final class SeedSystemdAdapterEndpointGate {
             "serviceUnit",
             ADAPTER_SERVICE_UNIT,
             "probeMode",
-            "host-local-systemd"));
+            "systemd-adapter-http"));
   }
 
   public static Map<String, Object> ensureReachable(
@@ -68,7 +68,7 @@ public final class SeedSystemdAdapterEndpointGate {
             + ADAPTER_SERVICE_UNIT
             + " status="
             + runtimeStatus
-            + " probeMode=host-local-systemd";
+            + " probeMode=systemd-adapter-http";
     if (logger != null) {
       logger.accept("systemd adapter endpoint gate: " + summary);
     }
@@ -82,7 +82,7 @@ public final class SeedSystemdAdapterEndpointGate {
             "serviceUnit",
             ADAPTER_SERVICE_UNIT,
             "probeMode",
-            "host-local-systemd",
+            "systemd-adapter-http",
             "adapterStatus",
             Map.copyOf(runtimeSnapshot)));
   }
