@@ -17,7 +17,7 @@ usage() {
 
 layer=""
 package_filter=""
-timeout="${RKE2_LAYER_READY_TIMEOUT:-300s}"
+timeout="${RKE2_LAYER_READY_TIMEOUT:-}"
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -70,6 +70,18 @@ if [[ -z "${layer}" ]]; then
 fi
 
 layer="${layer%/}"
+
+if [[ -z "${timeout}" ]]; then
+	case "${layer}" in
+	runtime)
+		timeout="900s"
+		;;
+	*)
+		timeout="300s"
+		;;
+	esac
+fi
+
 base_dir="${RKE2LAB_MANIFESTS_DIR:-/srv/host/rke2-manifests.d}"
 src_dir="${base_dir}/${layer}"
 
