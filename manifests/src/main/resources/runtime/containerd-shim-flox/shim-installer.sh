@@ -49,9 +49,9 @@ installer::logging:setup() {
 	case "${DAEMONLESS_EXEC_MODE}" in
 	pod)
 		script_path="${HOST_SCRIPT_ROOT}/bin/shim-installer.sh"
-		DAEMONLESS_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT}"
-		DAEMONLESS_HOST_SCRIPT_BIN="${DAEMONSET_SCRIPT_ROOT%/}/bin"
-		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${DAEMONSET_SCRIPT_ROOT%/}/.sh.d"
+		DAEMONLESS_HOST_SCRIPT_ROOT="${HOST_SCRIPT_ROOT}"
+		DAEMONLESS_HOST_SCRIPT_BIN="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/bin"
+		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/.sh.d"
 		DAEMONSET_SCRIPT_LOG_DIR="${HOST_SCRIPT_ROOT%/}/log"
 		script_log_dir="$(daemonless::host_shell:log:resolve)"
 		;;
@@ -105,6 +105,13 @@ shim::assets:root:resolve() {
 }
 
 installer::pod:materialize_assets() {
+	local policy_shell_root policy_shell_bin policy_shell_lib_dir policy_shell_log_dir
+
+	policy_shell_root="${HOST_SCRIPT_ROOT}"
+	policy_shell_bin="${HOST_SCRIPT_ROOT%/}/bin"
+	policy_shell_lib_dir="${HOST_SCRIPT_ROOT%/}/.sh.d"
+	policy_shell_log_dir="${HOST_SCRIPT_ROOT%/}/log"
+
 	# `BUILD_ASSETS_DIR` is the runtime-installer ConfigMap mounted by Kubernetes into this init
 	# container. Read archive payloads from that mount directly; only materialize extracted runtime
 	# content onto the host asset root.
@@ -112,43 +119,83 @@ installer::pod:materialize_assets() {
 	# daemonless::host_shell:binary:install, while sourced shell helper files go through
 	# daemonless::host_shell:library:install into <asset-root>/.sh.d.
 
-	daemonless::host_shell:layout:ensure "${HOST_SCRIPT_ROOT}"
+	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
+		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
+		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
+		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
+		daemonless::host_shell:layout:ensure "${HOST_SCRIPT_ROOT}"
 
-	daemonless::host_shell:executable:install \
+	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
+		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
+		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
+		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
+		daemonless::host_shell:executable:install \
 		"${SCRIPT_MOUNT_DIR}/bin/shim-installer.sh" \
 		"${HOST_SCRIPT_ROOT}" \
 		"shim-installer.sh" >/dev/null
-	daemonless::host_shell:library:install \
+	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
+		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
+		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
+		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
+		daemonless::host_shell:library:install \
 		"${SCRIPT_POLICY_LIB_DIR}/daemonset-logging.sh" \
 		"${HOST_SCRIPT_ROOT}" \
 		"daemonset-logging.sh" >/dev/null
-	daemonless::host_shell:library:install \
+	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
+		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
+		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
+		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
+		daemonless::host_shell:library:install \
 		"${SCRIPT_POLICY_LIB_DIR}/daemonless-host-asset-materializer.sh" \
 		"${HOST_SCRIPT_ROOT}" \
 		"daemonless-host-asset-materializer.sh" >/dev/null
-	daemonless::host_shell:library:install \
+	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
+		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
+		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
+		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
+		daemonless::host_shell:library:install \
 		"${SCRIPT_POLICY_LIB_DIR}/daemonless-trampoline.sh" \
 		"${HOST_SCRIPT_ROOT}" \
 		"daemonless-trampoline.sh" >/dev/null
-	daemonless::host_shell:library:install \
+	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
+		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
+		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
+		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
+		daemonless::host_shell:library:install \
 		"${SCRIPT_POLICY_LIB_DIR}/daemonless-host-shell-policy.sh" \
 		"${HOST_SCRIPT_ROOT}" \
 		"daemonless-host-shell-policy.sh" >/dev/null
 
-	daemonless::host_shell:executable:install \
+	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
+		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
+		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
+		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
+		daemonless::host_shell:executable:install \
 		"${BUILD_ASSETS_DIR}/bin/shim-build.sh" \
 		"${HOST_SCRIPT_ROOT}" \
 		"shim-build.sh" >/dev/null
-	daemonless::host_shell:config:install \
+	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
+		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
+		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
+		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
+		daemonless::host_shell:config:install \
 		"${BUILD_ASSETS_DIR}/shim-build.yaml" \
 		"${HOST_SCRIPT_ROOT}" \
 		"shim-build.yaml" >/dev/null
 	install -D -m 0644 "${BUILD_ASSETS_DIR}/flake.nix" "${HOST_SCRIPT_ROOT}/flake.nix"
-	daemonless::host_shell:executable:install \
+	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
+		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
+		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
+		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
+		daemonless::host_shell:executable:install \
 		"${BUILD_ASSETS_DIR}/bin/flox-rootfs-sync.sh" \
 		"${HOST_SCRIPT_ROOT}" \
 		"flox-rootfs-sync.sh" >/dev/null
-	daemonless::host_shell:library:install \
+	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
+		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
+		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
+		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
+		daemonless::host_shell:library:install \
 		"${BUILD_ASSETS_DIR}/debug-tools/.sh.d/rke2lab-debug-tooling.sh" \
 		"${HOST_SCRIPT_ROOT}/debug-tools" \
 		"rke2lab-debug-tooling.sh" >/dev/null
@@ -172,11 +219,12 @@ installer::pod:run() {
 		"${HOST_SCRIPT_ROOT}" \
 		"wrapper-go"
 
-	daemonless::trampoline:exec_on_host \
+	DAEMONLESS_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT}" \
+		DAEMONLESS_HOST_SCRIPT_BIN="${DAEMONSET_SCRIPT_ROOT%/}/bin" \
+		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${DAEMONSET_SCRIPT_ROOT%/}/.sh.d" \
+		daemonless::trampoline:exec_on_host \
 		"shim-installer.sh" \
 		"CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE}" \
-		"DAEMONLESS_HOST_SCRIPT_LIB_DIR=${DAEMONSET_SCRIPT_ROOT%/}/.sh.d" \
-		"DAEMONLESS_HOST_SCRIPT_BIN=${DAEMONSET_SCRIPT_ROOT%/}/bin" \
 		"DAEMONSET_SCRIPT_ROOT=${DAEMONSET_SCRIPT_ROOT}"
 }
 
