@@ -147,7 +147,7 @@ public class DbusSystemdStatusSnapshotProvider implements SystemdStatusSnapshotP
   private Map<String, String> connectionContext() {
     final String hostName = detectHostName();
     final String nixosHost =
-        firstNonBlank(System.getenv("RK2LAB_NIXOS_HOST"), System.getenv("LIMA_HOSTNAME"));
+        firstNonBlank(System.getenv("RK2LAB_NIXOS_HOST"), System.getenv("RKE2LAB_ACCESS_HOST"));
     final String incusInstance =
         firstNonBlank(System.getenv("RKE2LAB_NODE_NAME"), System.getenv("HOSTNAME"), hostName);
     final String systemBusAddress =
