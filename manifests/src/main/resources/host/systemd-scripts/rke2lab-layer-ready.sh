@@ -13,6 +13,176 @@ usage() {
 	echo "         $(basename "$0") mesh" >&2
 	echo "         $(basename "$0") storage --package openebs-zfs" >&2
 	echo "         $(basename "$0") replication --timeout 600s" >&2
+	echo "         $(basename "$0") runtime --timeout infinite" >&2
+}
+
+timeout_is_infinite() {
+	[[ "${timeout}" == "infinite" ]]
+}
+
+log_command_output() {
+	local output="${1:-}"
+
+	[[ -n "${output}" ]] || return 0
+	while IFS= read -r line; do
+		[[ -n "${line}" ]] || continue
+		log "${line}"
+	done <<<"${output}"
+}
+
+resource_status_snapshot() {
+	local namespace="${1:?namespace required}"
+	local resource="${2:?resource required}"
+	local name="${3:?resource name required}"
+	local output
+
+	log "Snapshot for ${resource}/${name} in namespace ${namespace}"
+	output="$(kubectl -n "${namespace}" get "${resource}/${name}" -o wide 2>&1 || true)"
+	log_command_output "${output}"
+
+	log "Pods currently visible in namespace ${namespace}"
+	output="$(kubectl -n "${namespace}" get pods -o wide 2>&1 || true)"
+	log_command_output "${output}"
+
+	log "Recent warning events in namespace ${namespace}"
+	output="$({ kubectl -n "${namespace}" get events --sort-by=.lastTimestamp --field-selector type=Warning 2>&1 || true; } | tail -n 20)"
+	log_command_output "${output}"
+}
+
+wait_for_crd_established() {
+	local crd="${1:?crd name required}"
+	local output=""
+	local last_snapshot_epoch=0
+	local now_epoch
+
+	if ! timeout_is_infinite; then
+		kubectl wait --for=condition=established "crd/${crd}" --timeout="${timeout}"
+		return 0
+	fi
+
+	while true; do
+		if output="$(kubectl wait --for=condition=established "crd/${crd}" --timeout=10s 2>&1)"; then
+			log_command_output "${output}"
+			return 0
+		fi
+
+		now_epoch="$(date +%s)"
+		if ((now_epoch - last_snapshot_epoch >= 60)); then
+			log "CRD ${crd} is not established yet; continuing to wait indefinitely"
+			log_command_output "${output}"
+			last_snapshot_epoch="${now_epoch}"
+		fi
+
+		sleep 10
+	done
+}
+
+wait_for_namespace_ready() {
+	local namespace="${1:?namespace required}"
+	local output=""
+	local last_snapshot_epoch=0
+	local now_epoch
+
+	if ! timeout_is_infinite; then
+		kubectl wait --for=create "namespace/${namespace}" --timeout=30s
+		kubectl wait --for=jsonpath='{.status.phase}'=Active "namespace/${namespace}" --timeout="10s"
+		return 0
+	fi
+
+	while true; do
+		if output="$(kubectl wait --for=create "namespace/${namespace}" --timeout=10s 2>&1)"; then
+			log_command_output "${output}"
+			break
+		fi
+
+		now_epoch="$(date +%s)"
+		if ((now_epoch - last_snapshot_epoch >= 60)); then
+			log "Namespace ${namespace} has not been created yet; continuing to wait indefinitely"
+			log_command_output "${output}"
+			last_snapshot_epoch="${now_epoch}"
+		fi
+
+		sleep 10
+	done
+
+	last_snapshot_epoch=0
+	while true; do
+		if output="$(kubectl wait --for=jsonpath='{.status.phase}'=Active "namespace/${namespace}" --timeout=10s 2>&1)"; then
+			log_command_output "${output}"
+			return 0
+		fi
+
+		now_epoch="$(date +%s)"
+		if ((now_epoch - last_snapshot_epoch >= 60)); then
+			log "Namespace ${namespace} is not Active yet; continuing to wait indefinitely"
+			log_command_output "${output}"
+			last_snapshot_epoch="${now_epoch}"
+		fi
+
+		sleep 10
+	done
+}
+
+wait_for_resource_created() {
+	local namespace="${1:?namespace required}"
+	local resource="${2:?resource required}"
+	local name="${3:?resource name required}"
+	local output=""
+	local last_snapshot_epoch=0
+	local now_epoch
+
+	if ! timeout_is_infinite; then
+		kubectl -n "${namespace}" wait --for=create "${resource}/${name}" --timeout="${timeout}"
+		return 0
+	fi
+
+	while true; do
+		if output="$(kubectl -n "${namespace}" wait --for=create "${resource}/${name}" --timeout=10s 2>&1)"; then
+			log_command_output "${output}"
+			return 0
+		fi
+
+		now_epoch="$(date +%s)"
+		if ((now_epoch - last_snapshot_epoch >= 60)); then
+			log "${resource}/${name} has not been created yet in namespace ${namespace}; continuing to wait indefinitely"
+			log_command_output "${output}"
+			resource_status_snapshot "${namespace}" "${resource}" "${name}"
+			last_snapshot_epoch="${now_epoch}"
+		fi
+
+		sleep 10
+	done
+}
+
+wait_for_workload_rollout() {
+	local namespace="${1:?namespace required}"
+	local resource="${2:?resource required}"
+	local name="${3:?resource name required}"
+	local output=""
+	local last_snapshot_epoch=0
+	local now_epoch
+
+	if ! timeout_is_infinite; then
+		kubectl -n "${namespace}" rollout status "${resource}/${name}" --timeout="${timeout}"
+		return 0
+	fi
+
+	while true; do
+		if output="$(kubectl -n "${namespace}" rollout status "${resource}/${name}" --timeout=10s 2>&1)"; then
+			log_command_output "${output}"
+			return 0
+		fi
+
+		now_epoch="$(date +%s)"
+		if ((now_epoch - last_snapshot_epoch >= 60)); then
+			log "${resource}/${name} rollout is still pending in namespace ${namespace}; continuing to wait indefinitely"
+			log_command_output "${output}"
+			resource_status_snapshot "${namespace}" "${resource}" "${name}"
+			last_snapshot_epoch="${now_epoch}"
+		fi
+
+		sleep 10
+	done
 }
 
 layer=""
@@ -74,7 +244,7 @@ layer="${layer%/}"
 if [[ -z "${timeout}" ]]; then
 	case "${layer}" in
 	runtime)
-		timeout="900s"
+		timeout="infinite"
 		;;
 	*)
 		timeout="300s"
@@ -140,7 +310,7 @@ loadMetadataFromManifestFiles
 if [[ ${#crds[@]} -gt 0 ]]; then
 	log "Waiting for CRDs to be established"
 	for crd in "${crds[@]}"; do
-		kubectl wait --for=condition=established "crd/${crd}" --timeout="${timeout}"
+		wait_for_crd_established "${crd}"
 	done
 fi
 
@@ -150,8 +320,7 @@ if [[ ${#namespaces[@]} -eq 0 ]]; then
 	exit 0
 fi
 for namespace in "${namespaces[@]}"; do
-	kubectl wait --for=create "namespace/${namespace}" --timeout=30s
-	kubectl wait --for=jsonpath='{.status.phase}'=Active "namespace/${namespace}" --timeout="10s"
+	wait_for_namespace_ready "${namespace}"
 done
 
 log "Waiting for workloads in layer ${layer}${package_filter:+ (package ${package_filter})}"
@@ -163,11 +332,11 @@ for entry in "${workloads[@]}"; do
 
 	# Wait for resource to be created by RKE2 from manifest directory
 	log "Waiting for ${resource}/${name} to be created in namespace ${namespace}"
-	kubectl -n "${namespace}" wait --for=create "${resource}/${name}" --timeout="${timeout}"
+	wait_for_resource_created "${namespace}" "${resource}" "${name}"
 
 	# Wait for rollout to complete
 	log "Waiting for ${resource}/${name} rollout to complete"
-	kubectl -n "${namespace}" rollout status "${resource}/${name}" --timeout="${timeout}"
+	wait_for_workload_rollout "${namespace}" "${resource}" "${name}"
 done
 
 log "Layer ${layer} workloads are ready"
