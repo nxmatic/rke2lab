@@ -20,6 +20,16 @@ Stage B requirements are intentionally deferred until Stage A bootstrap behavior
 
 The Stage B entry point is already established through exported Stage A handoff/orchestration outputs (`nextStep`, readiness status, registry summary, and image build summary), which are expected to be consumed by a later Stage B manifest producer/apply flow.
 
+== Future integration note (NixOS host deployment resources)
+
+Planned direction after Stage A stabilization:
+
+* Integrate NixOS host deployment into cluster bootstrap as explicit resources (instead of ad-hoc host-side imperative orchestration).
+* Keep Pulumi as top-level orchestrator for dependency ordering, readiness gates, and output contracts.
+* Introduce a new adapter module that maps NixOps4 components/resources into Pulumi-managed resources for bootstrap-time host deployment convergence.
+
+This is a forward-looking plan and does not change current Stage A delivery scope.
+
 == Non-goals
 
 The following are explicitly out of scope for Stage A:

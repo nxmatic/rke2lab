@@ -260,6 +260,7 @@ These must be resolved before GA of the contract:
 * Should Flox config remain host-mounted or be replaced by workload identity/secret flow?
 * What is the final strategy for image version pinning (semantic version, timestamp, or content-addressed labels)?
 * Which distribution fields should live in Pulumi config vs Kubernetes CRDs in Stage B?
+* SSH server host-key provisioning for Incus guest nodes should align with the same role-scoped logic used by the VM runtime path in `nix-darwin-home` (single canonical management path, no legacy aliases). Track and update the C4 model note in `nix-darwin-home/docs/vm-configuration-models-c4.adoc` (especially shared contract + runtime adapter sections) when this contract is implemented here.
 
 == Acceptance checks (for this contract)
 
