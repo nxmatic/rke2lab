@@ -36,6 +36,8 @@ installer::policy:source() {
 	source "${policy_root}/daemonless-trampoline.sh"
 	# shellcheck disable=SC1091
 	source "${policy_root}/daemonless-host-asset-materializer.sh"
+	# shellcheck disable=SC1091
+	source "${policy_root}/daemonless-host-shell-policy.sh"
 }
 
 installer::logging:setup() {
@@ -76,23 +78,62 @@ SCRIPT_POLICY_DIR="${SCRIPT_POLICY_DIR:-/runtime-daemonset}"
 BUILD_ASSETS_DIR="${BUILD_ASSETS_DIR:-/build-assets}"
 HOST_SCRIPT_ROOT="${HOST_ROOT}${DAEMONSET_SCRIPT_ROOT}"
 
+shim::assets:root:resolve() {
+	local resolved_root
+
+	resolved_root="${DAEMONLESS_HOST_SCRIPT_ROOT:-${DAEMONSET_ASSET_ROOT}}"
+	[[ -n "${resolved_root}" ]] || {
+		echo "flox shim asset root is not defined" >&2
+		exit 1
+	}
+
+	printf '%s\n' "${resolved_root}"
+}
+
 installer::pod:materialize_assets() {
 	# `BUILD_ASSETS_DIR` is the runtime-installer ConfigMap mounted by Kubernetes into this init
 	# container. Read archive payloads from that mount directly; only materialize extracted runtime
 	# content onto the host asset root.
+	# Canonical pattern: host-reexec-capable shell entrypoints go through
+	# daemonless::host_shell:binary:install, while sourced shell helper files go through
+	# daemonless::host_shell:library:install into <asset-root>/.sh.d.
 
 	mkdir -p "${HOST_SCRIPT_ROOT}"
 
-	install -D -m 0755 "${SCRIPT_MOUNT_DIR}/shim-installer.sh" "${HOST_SCRIPT_ROOT}/shim-installer.sh"
-	install -D -m 0644 "${SCRIPT_POLICY_DIR}/daemonset-logging.sh" "${HOST_SCRIPT_ROOT}/.sh.d/daemonset-logging.sh"
-	install -D -m 0644 "${SCRIPT_POLICY_DIR}/daemonless-host-asset-materializer.sh" "${HOST_SCRIPT_ROOT}/.sh.d/daemonless-host-asset-materializer.sh"
-	install -D -m 0644 "${SCRIPT_POLICY_DIR}/daemonless-trampoline.sh" "${HOST_SCRIPT_ROOT}/.sh.d/daemonless-trampoline.sh"
+	daemonless::host_shell:binary:install \
+		"${SCRIPT_MOUNT_DIR}/shim-installer.sh" \
+		"${HOST_SCRIPT_ROOT}" \
+		"shim-installer.sh" \
+		"shim-installer.sh" >/dev/null
+	daemonless::host_shell:library:install \
+		"${SCRIPT_POLICY_DIR}/daemonset-logging.sh" \
+		"${HOST_SCRIPT_ROOT}" \
+		"daemonset-logging.sh" >/dev/null
+	daemonless::host_shell:library:install \
+		"${SCRIPT_POLICY_DIR}/daemonless-host-asset-materializer.sh" \
+		"${HOST_SCRIPT_ROOT}" \
+		"daemonless-host-asset-materializer.sh" >/dev/null
+	daemonless::host_shell:library:install \
+		"${SCRIPT_POLICY_DIR}/daemonless-trampoline.sh" \
+		"${HOST_SCRIPT_ROOT}" \
+		"daemonless-trampoline.sh" >/dev/null
+	daemonless::host_shell:library:install \
+		"${SCRIPT_POLICY_DIR}/daemonless-host-shell-policy.sh" \
+		"${HOST_SCRIPT_ROOT}" \
+		"daemonless-host-shell-policy.sh" >/dev/null
 
-	install -D -m 0755 "${BUILD_ASSETS_DIR}/shim-build.sh" "${HOST_SCRIPT_ROOT}/shim-build.sh"
+	daemonless::host_shell:binary:install \
+		"${BUILD_ASSETS_DIR}/shim-build.sh" \
+		"${HOST_SCRIPT_ROOT}" \
+		"shim-build.sh" \
+		"shim-build.sh" >/dev/null
 	install -D -m 0644 "${BUILD_ASSETS_DIR}/shim-build.yaml" "${HOST_SCRIPT_ROOT}/shim-build.yaml"
 	install -D -m 0644 "${BUILD_ASSETS_DIR}/flake.nix" "${HOST_SCRIPT_ROOT}/flake.nix"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/flox-rootfs-sync.sh" "${HOST_SCRIPT_ROOT}/flox-rootfs-sync.sh"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/debug-tools/.sh.d/rke2lab-debug-tooling.sh" "${HOST_SCRIPT_ROOT}/debug-tools/.sh.d/rke2lab-debug-tooling.sh"
+	daemonless::host_shell:library:install \
+		"${BUILD_ASSETS_DIR}/debug-tools/.sh.d/rke2lab-debug-tooling.sh" \
+		"${HOST_SCRIPT_ROOT}/debug-tools" \
+		"rke2lab-debug-tooling.sh" >/dev/null
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/attach_live_flox_shim_strace.sh" "${HOST_SCRIPT_ROOT}/debug-tools/attach_live_flox_shim_strace.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/crictl-kdns-repro.sh" "${HOST_SCRIPT_ROOT}/debug-tools/crictl-kdns-repro.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/kdns-containerd-bundle-watch.sh" "${HOST_SCRIPT_ROOT}/debug-tools/kdns-containerd-bundle-watch.sh"
@@ -117,6 +158,7 @@ installer::pod:run() {
 	daemonless::trampoline:exec_on_host \
 		"shim-installer.sh" \
 		"CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE}" \
+		"DAEMONLESS_HOST_SCRIPT_BIN=${DAEMONSET_SCRIPT_ROOT%/}/bin" \
 		"DAEMONSET_SCRIPT_ROOT=${DAEMONSET_SCRIPT_ROOT}"
 }
 
@@ -226,8 +268,10 @@ host::nix:flox-conf:ensure() {
 }
 
 shim::assets:path:init() {
-	FLOX_SHIM_ROOT="${DAEMONSET_SCRIPT_ROOT}"
+	FLOX_SHIM_ROOT="$(shim::assets:root:resolve)"
+	FLOX_SHIM_BIN_DIR="${FLOX_SHIM_ROOT}/bin"
 	FLOX_BUILD_SCRIPT="${FLOX_SHIM_ROOT}/shim-build.sh"
+	FLOX_BUILD_ENTRYPOINT="${FLOX_SHIM_BIN_DIR}/shim-build.sh"
 	FLOX_BUILD_DESCRIPTOR="${FLOX_SHIM_ROOT}/shim-build.yaml"
 	FLOX_SHIM_PACKAGE_FLAKE="${FLOX_SHIM_ROOT}/flake.nix"
 	FLOX_ROOTFS_SYNC_SCRIPT="${FLOX_SHIM_ROOT}/flox-rootfs-sync.sh"
@@ -238,6 +282,14 @@ shim::assets:path:init() {
 }
 
 shim::assets:path:validate() {
+	[[ -d "${FLOX_SHIM_BIN_DIR}" ]] || {
+		echo "flox shim bin directory missing: ${FLOX_SHIM_BIN_DIR}" >&2
+		exit 1
+	}
+	[[ -x "${FLOX_BUILD_ENTRYPOINT}" ]] || {
+		echo "flox build entrypoint missing or not executable: ${FLOX_BUILD_ENTRYPOINT}" >&2
+		exit 1
+	}
 	[[ -x "${FLOX_BUILD_SCRIPT}" ]] || {
 		echo "flox build script missing or not executable: ${FLOX_BUILD_SCRIPT}" >&2
 		exit 1
@@ -326,8 +378,10 @@ shim::assets:build:run() {
 
 	: "Run the flox build script to materialize the shim build output onto the host filesystem for use in installation"
 	DAEMONLESS_EXEC_MODE=host \
-		DAEMONLESS_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT}" \
-		"${FLOX_BUILD_SCRIPT}" "${FLOX_BUILD_DESCRIPTOR}"
+		DAEMONLESS_HOST_SCRIPT_ROOT="${FLOX_SHIM_ROOT}" \
+		DAEMONLESS_HOST_SCRIPT_BIN="${FLOX_SHIM_BIN_DIR}" \
+		PATH="${FLOX_SHIM_BIN_DIR}:${PATH}" \
+		"${FLOX_BUILD_ENTRYPOINT}" "${FLOX_BUILD_DESCRIPTOR}"
 
 	: "Commit any changes to the flox shim build assets to the git repository for tracking"
 	git -C "${FLOX_SHIM_ROOT}" add --all .
