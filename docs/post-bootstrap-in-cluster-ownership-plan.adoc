@@ -19,6 +19,47 @@ The active plan after Stage A is:
 
 This means the target in-cluster control plane is not “Pulumi Operator plus everything else”.footnote:[Earlier planning treated the Pulumi Operator as the likely in-cluster provisioning brain after bootstrap. That assumption is no longer the active plan because it overlaps too broadly with the already-declared Stage B ownership of CAPI/CAPN/CAPRKE2 for ongoing machine lifecycle.] It is a split of specialized controllers with clearly separated ownership.
 
+== Concrete environment anchors
+
+The current intended environment is not purely abstract; two named Darwin environments matter to the plan:
+
+* `bioskop` — the Darwin bare-metal host on the home network (`mac-mini m4 pro`)
+** runs the NixOS Tart/VZ VM that hosts the Incus server used for Stage A seed bootstrap
+** is the place where `controlplane` bootstraps the seed management cluster
+** owns the seed management cluster bootstrap path
+* the Hyland enterprise MacBook Pro bare-metal host — the enterprise-managed Darwin laptop (`macos m4 pro`)
+** remains a separate Darwin host boundary outside the managed-cluster guest
+** runs the Tart/VZ guest named `nikopol`
+* `nikopol` — the isolated NixOS Tart/VZ guest running inside the enterprise-managed Darwin MacBook Pro host
+** provides the required Incus server inside that guest boundary
+** is intended to host a managed cluster whose lifecycle is owned by the management cluster bootstrapped from `bioskop`
+
+In other words:
+
+* `bioskop` is the concrete Stage A bootstrap site for the seed management cluster
+* the enterprise-managed MacBook Pro is a separate Darwin host boundary and should not be conflated with the guest
+* `nikopol` is the concrete downstream NixOS guest site that should be reconciled by the in-cluster control plane after handoff
+
+== Worktree distribution path
+
+The `rke2lab` Git worktree is also part of the concrete system shape.
+
+Current intent:
+
+* `bioskop` holds an `rke2lab` worktree on the Darwin host side
+* the enterprise-managed MacBook Pro also holds an `rke2lab` worktree on the Darwin host side
+* each Darwin host projects that worktree into its NixOS Tart/VZ guest via NFS
+* the NixOS guests consume that projected worktree as a source input rather than as a generated runtime asset
+* Incus instances and cluster nodes then receive access to selected worktree folders through bind mounts sourced from the projected worktree inside the NixOS guest
+
+That gives the system a layered path:
+
+. Darwin host worktree
+. NFS-mounted worktree inside the NixOS Tart/VZ guest
+. bind-mounted worktree folders inside Incus instances or nodes
+
+This matters because the worktree is neither a cluster-owned runtime output nor a daemonless host-asset root. It is an upstream source input projected across multiple boundaries.
+
 == Canonical ownership split
 
 [cols="1,3",options="header"]
@@ -99,18 +140,39 @@ The following guardrails remain strict:
 ----
 flowchart LR
     operator[Operator]
+    bioskop[bioskop<br/>Darwin bare-metal host<br/>mac-mini m4 pro]
+    bioskopTree[bioskop rke2lab worktree<br/>Darwin-side source checkout]
+    bioskopVm[bioskop NixOS Tart/VZ VM<br/>Incus server + seed bootstrap site]
+    bioskopNfs[bioskop guest worktree<br/>NFS-mounted source input]
     controlplane[controlplane<br/>Stage A external bootstrap]
-    cluster[Management cluster<br/>In-cluster controllers and workloads]
+    cluster[Management cluster<br/>Seed cluster bootstrapped from bioskop]
+    enterpriseHost[Enterprise MacBook Pro<br/>Darwin bare-metal host<br/>macos m4 pro]
+    enterpriseTree[enterprise rke2lab worktree<br/>Darwin-side source checkout]
+    nikopol[nikopol<br/>Isolated NixOS Tart/VZ guest<br/>Incus server for managed cluster]
+    nikopolNfs[nikopol guest worktree<br/>NFS-mounted source input]
     artifactStore[Artifact + source systems<br/>Git repos, registries, release inputs]
-    nodeHosts[Cluster nodes<br/>Host-local runtime surface]
+    nodeHosts[Managed node hosts<br/>Bind-mounted worktree folders + host-local runtime surface]
 
-    operator --> controlplane
-    controlplane --> cluster
+    operator --> bioskop
+    bioskop --> bioskopTree
+    bioskop --> bioskopVm
+    bioskopTree --> bioskopNfs
+    bioskopVm --> bioskopNfs
+    bioskop --> controlplane
+    controlplane --> bioskopVm
+    controlplane --> bioskopNfs
+    bioskopVm --> cluster
     cluster --> artifactStore
+    cluster --> enterpriseHost
+    enterpriseHost --> enterpriseTree
+    enterpriseHost --> nikopol
+    enterpriseTree --> nikopolNfs
+    nikopol --> nikopolNfs
+    nikopolNfs --> nodeHosts
     cluster --> nodeHosts
 ----
 
-At the context level, the important point is that `controlplane` remains outside the cluster for Stage A bootstrap, while the management cluster becomes the home of the long-lived controllers that own machine lifecycle, declarative rollout, workflow execution, and node-local reconciliation.
+At the context level, the important point is that `bioskop` is the concrete Stage A bootstrap site, while both Darwin hosts project the `rke2lab` worktree into their NixOS guests via NFS and the downstream nodes consume selected folders from that projected worktree through bind mounts.
 
 == C4 container view
 
@@ -118,8 +180,18 @@ At the context level, the important point is that `controlplane` remains outside
 ----
 flowchart LR
     operator[Operator]
-        controlplane[controlplane<br/>Stage A external bootstrap]
-        artifactStore[Artifact + source systems<br/>Git repos, registries, release inputs]
+    bioskop[bioskop<br/>Darwin bare-metal host<br/>mac-mini m4 pro]
+    bioskopTree[bioskop rke2lab worktree<br/>Darwin-side source checkout]
+    bioskopVm[bioskop NixOS Tart/VZ VM<br/>Incus server + seed cluster host]
+    bioskopNfs[bioskop guest worktree<br/>NFS-mounted source input]
+    controlplane[controlplane<br/>Stage A external bootstrap]
+    artifactStore[Artifact + source systems<br/>Git repos, registries, release inputs]
+    enterpriseHost[Enterprise MacBook Pro<br/>Darwin bare-metal host<br/>macos m4 pro]
+    enterpriseTree[enterprise rke2lab worktree<br/>Darwin-side source checkout]
+    nikopol[nikopol<br/>Isolated NixOS Tart/VZ guest<br/>Incus server for downstream managed cluster]
+    nikopolNfs[nikopol guest worktree<br/>NFS-mounted source input]
+    managedCluster[Managed cluster inside nikopol<br/>Owned by bioskop management cluster]
+    nodeWorktree[Incus node worktree folders<br/>Bind-mounted from guest worktree]
 
     subgraph Cluster[Management cluster]
             capi[CAPI + CAPN + CAPRKE2<br/>Non-seed machine lifecycle]
@@ -129,35 +201,60 @@ flowchart LR
     end
 
     operator --> controlplane
+    bioskop --> bioskopTree
+    bioskop --> bioskopVm
+    bioskopTree --> bioskopNfs
+    bioskopVm --> bioskopNfs
+    bioskop --> controlplane
+    controlplane --> bioskopVm
+    controlplane --> bioskopNfs
     controlplane --> capi
     controlplane --> gitops
     controlplane --> workflows
     controlplane --> nodelocal
+    bioskopVm --> capi
+    bioskopVm --> gitops
+    bioskopVm --> workflows
+    bioskopVm --> nodelocal
     gitops --> artifactStore
     workflows --> artifactStore
     workflows --> gitops
     capi --> nodelocal
+    capi --> managedCluster
+    gitops --> managedCluster
+    workflows --> managedCluster
+    managedCluster --> enterpriseHost
+    enterpriseHost --> enterpriseTree
+    enterpriseHost --> nikopol
+    enterpriseTree --> nikopolNfs
+    nikopol --> nikopolNfs
+    nikopolNfs --> nodeWorktree
+    nodeWorktree --> managedCluster
 ----
 
-This container view keeps the same ownership logic used elsewhere in the repo: Stage A installs the in-cluster control surfaces, then each controller owns a narrow concern instead of creating a single giant post-bootstrap brain.
+This container view keeps the same ownership logic used elsewhere in the repo: `bioskop` hosts the seed management cluster bootstrap path, both Darwin hosts project their `rke2lab` worktrees into the NixOS guests via NFS, and the Incus-managed nodes receive selected worktree folders through guest-side bind mounts rather than by owning the worktree directly.
 
 == C4 dynamic view
 
 [mermaid,post-bootstrap-ownership-dynamic,svg]
 ----
 flowchart TD
-    step1[1. Operator runs Stage A bootstrap<br/>through controlplane]
-    step2[2. controlplane provisions seed cluster<br/>and emits handoff outputs]
-    step3[3. CAPI + CAPN + CAPRKE2 take over<br/>non-seed machine lifecycle]
-    step4[4. GitOps controllers take over<br/>declarative add-on reconciliation]
-    step5[5. Workflow/pipeline controller takes over<br/>build, promotion, and delivery workflows]
-    step6[6. Node-local reconcilers replace durable<br/>host-mutation shell flows over time]
-    step7[7. Workflow outputs feed GitOps and<br/>GitOps policy shapes node-local behavior]
+    step1[1. Operator runs Stage A bootstrap on bioskop<br/>through controlplane]
+    step2[2. bioskop projects the rke2lab worktree<br/>into its NixOS guest via NFS]
+    step3[3. bioskop provisions the seed management cluster<br/>inside its NixOS Tart/VZ VM and emits handoff outputs]
+    step4[4. CAPI + CAPN + CAPRKE2 take over<br/>non-seed machine lifecycle]
+    step5[5. GitOps controllers take over<br/>declarative add-on reconciliation]
+    step6[6. Workflow/pipeline controller takes over<br/>build, promotion, and delivery workflows]
+    step7[7. The management cluster starts owning<br/>downstream guests such as nikopol]
+    step8[8. nikopol receives the rke2lab worktree<br/>inside its guest via NFS from the enterprise Darwin host]
+    step9[9. Incus nodes receive selected worktree folders<br/>through bind mounts from the guest worktree]
+    step10[10. Node-local reconcilers replace durable<br/>host-mutation shell flows over time]
+    step11[11. Workflow outputs feed GitOps and<br/>GitOps policy shapes node-local behavior]
 
-    step1 --> step2 --> step3 --> step4 --> step5 --> step6 --> step7
+    step1 --> step2 --> step3 --> step4 --> step5 --> step6 --> step7 --> step8 --> step9 --> step10 --> step11
 ----
 
-The dynamic view is intentionally simple: bootstrap first, hand off machine lifecycle second, bring declarative and workflow control inward third, and then progressively replace durable host-mutation shell flows with node-local reconciliation.
+The dynamic view is intentionally simple: bootstrap the seed on `bioskop` first, project the `rke2lab` worktree into the NixOS guests via NFS, hand off ongoing lifecycle to in-cluster controllers, then let downstream Incus nodes consume selected worktree folders through bind mounts while the Darwin hosts remain the source-of-truth worktree owners.
 
 == Summary
 
