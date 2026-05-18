@@ -1,6 +1,7 @@
 package io.nxmatic.rk2lab.controlplane;
 
 import com.pulumi.core.Output;
+import com.pulumi.deployment.Deployment;
 import com.pulumi.resources.ComponentResource;
 import com.pulumi.resources.ComponentResourceOptions;
 import com.pulumi.resources.Resource;
@@ -16,7 +17,7 @@ public final class ClusterReadinessResource extends ComponentResource {
 
   private static final String TYPE_TOKEN = "rk2lab:controlplane:ClusterReadiness";
 
-  private final ClusterBootstrapReadinessVerifier.VerificationResult verificationResult;
+  private final Output<ClusterBootstrapReadinessVerifier.VerificationResult> verificationResult;
 
   public ClusterReadinessResource(
       String name,
@@ -24,18 +25,25 @@ public final class ClusterReadinessResource extends ComponentResource {
       ControlplanePolicy policy,
       boolean readinessEnabled,
       Consumer<String> readinessLogger,
+      Object readinessTrigger,
       Resource dependsOnResource) {
     super(TYPE_TOKEN, name, buildOptions(dependsOnResource));
 
     this.verificationResult =
-        readinessEnabled
-            ? ClusterBootstrapReadinessVerifier.verify(config, policy, readinessLogger)
-            : ClusterBootstrapReadinessVerifier.skipped(policy, readinessLogger);
+        Output.of(readinessTrigger)
+            .applyValue(
+                ignored ->
+                    Deployment.getInstance().isDryRun()
+                        ? ClusterBootstrapReadinessVerifier.deferredPreview(policy, readinessLogger)
+                        : readinessEnabled
+                            ? ClusterBootstrapReadinessVerifier.verify(
+                                config, policy, readinessLogger)
+                            : ClusterBootstrapReadinessVerifier.skipped(policy, readinessLogger));
 
     registerOutputs(asResourceOutputs(verificationResult));
   }
 
-  public ClusterBootstrapReadinessVerifier.VerificationResult verificationResult() {
+  public Output<ClusterBootstrapReadinessVerifier.VerificationResult> verificationResult() {
     return verificationResult;
   }
 
@@ -48,13 +56,28 @@ public final class ClusterReadinessResource extends ComponentResource {
   }
 
   private static Map<String, Output<?>> asResourceOutputs(
-      ClusterBootstrapReadinessVerifier.VerificationResult verificationResult) {
+      Output<ClusterBootstrapReadinessVerifier.VerificationResult> verificationResult) {
     final LinkedHashMap<String, Output<?>> outputs = new LinkedHashMap<>();
 
-    verificationResult.asOutputs().forEach((key, value) -> outputs.put(key, Output.of(value)));
-
-    outputs.put("handoffReady", Output.of(verificationResult.handoffReady()));
-    outputs.put("bootstrapStatus", Output.of(verificationResult.bootstrapStatus()));
+    outputs.put(
+        "clusterReadinessEnabled",
+        verificationResult.applyValue(value -> value.readinessEnabled()));
+    outputs.put(
+        "clusterReadinessSkipped",
+        verificationResult.applyValue(value -> !value.readinessEnabled()));
+    outputs.put(
+        "clusterKubeconfigPublished",
+        verificationResult.applyValue(value -> value.kubeconfigPublished()));
+    outputs.put("clusterApiReady", verificationResult.applyValue(value -> value.apiReady()));
+    outputs.put(
+        "clusterControllersEffective",
+        verificationResult.applyValue(value -> value.controllersEffective()));
+    outputs.put(
+        "clusterRequiredControllers",
+        verificationResult.applyValue(value -> value.requiredControllerRefs()));
+    outputs.put("clusterReadinessSummary", verificationResult.applyValue(value -> value.summary()));
+    outputs.put("handoffReady", verificationResult.applyValue(value -> value.handoffReady()));
+    outputs.put("bootstrapStatus", verificationResult.applyValue(value -> value.bootstrapStatus()));
 
     return outputs;
   }

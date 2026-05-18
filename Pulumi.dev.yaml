@@ -21,4 +21,4 @@ config:
   "rke2lab:policy.link.storage.enabled": "true"
   "rke2lab:policy.link.mesh.enabled": "false"
   "rke2lab:bootstrap.skipRecipes": "false"
-  "rke2lab:readiness.enabled": "false"
+  "rke2lab:readiness.enabled": "true"

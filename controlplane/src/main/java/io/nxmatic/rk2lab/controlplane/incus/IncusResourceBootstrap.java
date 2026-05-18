@@ -155,6 +155,8 @@ public final class IncusResourceBootstrap {
 
     private Map<String, Object> layerEnvRegistrySummary;
 
+    private Map<String, Object> systemdProvisioningSummary;
+
     private Instance instance;
 
     private ApplyPipeline resolvePaths() {
@@ -172,6 +174,8 @@ public final class IncusResourceBootstrap {
       classpathAssetMaterializer.materializeManifests(localPaths.manifestsRoot());
       classpathAssetMaterializer.materializeHostSystemdAssets(
           localPaths.manifestsRoot().resolve("host"));
+      this.systemdProvisioningSummary = SystemdProvisioningInventory.summarize(localPaths);
+      clearStaleBootstrapKubeconfig();
       LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
       this.layerEnvRegistrySummary =
           runtimeEnvControlplaneOverlayWriter.write(
@@ -182,6 +186,21 @@ public final class IncusResourceBootstrap {
       this.provisioningChecksum = ProvisioningResourceInventory.checksum(localPaths);
       ensureLaunchSecretsToken(localPaths.secretsFile());
       return this;
+    }
+
+    private void clearStaleBootstrapKubeconfig() {
+      if (Deployment.getInstance().isDryRun()) {
+        return;
+      }
+
+      final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
+      try {
+        Files.deleteIfExists(kubeconfigPath);
+      } catch (IOException ex) {
+        throw new IllegalStateException(
+            "Failed to clear stale bootstrap kubeconfig before readiness gating: " + kubeconfigPath,
+            ex);
+      }
     }
 
     private ApplyPipeline prepareProviderResources() {
@@ -211,6 +230,8 @@ public final class IncusResourceBootstrap {
       instanceConfig.put("security.nesting", "true");
       instanceConfig.put("security.syscalls.intercept.bpf", "true");
       instanceConfig.put("security.syscalls.intercept.bpf.devices", "true");
+      instanceConfig.put("user.rke2lab.provisioningChecksum", provisioningChecksum);
+      instanceConfig.put("user.rke2lab.imageBuildChecksum", imageBuildChecksum);
 
       this.instance =
           new Instance(
@@ -227,6 +248,8 @@ public final class IncusResourceBootstrap {
               CustomResourceOptions.builder()
                   .provider(providerContext.provider())
                   .ignoreChanges(List.of("image"))
+                  .replaceOnChanges(List.of("config"))
+                  .deleteBeforeReplace(true)
                   .build());
       return this;
     }
@@ -244,6 +267,7 @@ public final class IncusResourceBootstrap {
           imageBuildChecksum,
           hostSourceDirRelative,
           layerEnvRegistrySummary,
+          systemdProvisioningSummary,
           instance);
     }
 
@@ -1810,6 +1834,139 @@ public final class IncusResourceBootstrap {
     }
   }
 
+  private static final class SystemdProvisioningInventory {
+
+    private SystemdProvisioningInventory() {}
+
+    private static Map<String, Object> summarize(BootstrapPaths paths) {
+      final List<String> scripts = listRegularFileNames(paths.scriptsRoot());
+      final List<String> units = listRegularFileNames(paths.systemdRoot());
+      final Map<String, List<String>> scriptsByPhase = classifyByPhase(scripts);
+      final Map<String, List<String>> unitsByPhase = classifyByPhase(units);
+
+      return Map.of(
+          "scriptsMountPath",
+          HOST_SCRIPTS_DIR_PATH,
+          "unitsMountPath",
+          HOST_SYSTEMD_DIR_PATH,
+          "scriptsSourcePath",
+          paths.scriptsRoot().toString(),
+          "unitsSourcePath",
+          paths.systemdRoot().toString(),
+          "scriptCount",
+          scripts.size(),
+          "unitCount",
+          units.size(),
+          "scripts",
+          scripts,
+          "units",
+          units,
+          "scriptsByPhase",
+          scriptsByPhase,
+          "unitsByPhase",
+          unitsByPhase);
+    }
+
+    private static List<String> listRegularFileNames(Path directory) {
+      if (directory == null || !Files.exists(directory) || !Files.isDirectory(directory)) {
+        return List.of();
+      }
+
+      try (Stream<Path> stream = Files.list(directory)) {
+        return stream
+            .filter(Files::isRegularFile)
+            .map(path -> path.getFileName().toString())
+            .sorted()
+            .toList();
+      } catch (IOException ex) {
+        throw new IllegalStateException(
+            "Failed to inspect systemd provisioning inventory at: " + directory, ex);
+      }
+    }
+
+    private static Map<String, List<String>> classifyByPhase(List<String> names) {
+      final LinkedHashMap<String, List<String>> phased = new LinkedHashMap<>();
+      phased.put("network", new ArrayList<>());
+      phased.put("install", new ArrayList<>());
+      phased.put("runtime", new ArrayList<>());
+      phased.put("manifests", new ArrayList<>());
+      phased.put("storage", new ArrayList<>());
+      phased.put("cluster-api", new ArrayList<>());
+      phased.put("gitops", new ArrayList<>());
+      phased.put("mesh", new ArrayList<>());
+      phased.put("replication", new ArrayList<>());
+      phased.put("cicd", new ArrayList<>());
+      phased.put("tools", new ArrayList<>());
+      phased.put("other", new ArrayList<>());
+
+      for (String name : names) {
+        phased.get(phaseForName(name)).add(name);
+      }
+
+      final LinkedHashMap<String, List<String>> result = new LinkedHashMap<>();
+      for (Map.Entry<String, List<String>> entry : phased.entrySet()) {
+        if (entry.getValue().isEmpty()) {
+          continue;
+        }
+        result.put(entry.getKey(), List.copyOf(entry.getValue()));
+      }
+      return Map.copyOf(result);
+    }
+
+    private static String phaseForName(String name) {
+      final String normalized = name == null ? "" : name.toLowerCase();
+
+      if (normalized.contains("network")
+          || normalized.contains("route")
+          || normalized.contains("vip")) {
+        return "network";
+      }
+      if (normalized.contains("install")
+          || normalized.contains("activate")
+          || normalized.contains("nix")
+          || normalized.contains("flox")) {
+        return "install";
+      }
+      if (normalized.contains("runtime")
+          || normalized.contains("containerd")
+          || normalized.contains("cri")
+          || normalized.contains("server-")) {
+        return "runtime";
+      }
+      if (normalized.contains("manifest")) {
+        return "manifests";
+      }
+      if (normalized.contains("storage")
+          || normalized.contains("openebs")
+          || normalized.contains("zfs")) {
+        return "storage";
+      }
+      if (normalized.contains("cluster-api") || normalized.contains("capn")) {
+        return "cluster-api";
+      }
+      if (normalized.contains("gitops")) {
+        return "gitops";
+      }
+      if (normalized.contains("mesh")
+          || normalized.contains("headscale")
+          || normalized.contains("headplane")) {
+        return "mesh";
+      }
+      if (normalized.contains("replication") || normalized.contains("replicator")) {
+        return "replication";
+      }
+      if (normalized.contains("cicd") || normalized.contains("tekton")) {
+        return "cicd";
+      }
+      if (normalized.contains("tool")
+          || normalized.contains("kubectl")
+          || normalized.contains("helm")) {
+        return "tools";
+      }
+      return "other";
+    }
+  }
+
   public record BootstrapResult(
       String seedNodeId,
       Object imageFingerprint,
@@ -1820,5 +1977,6 @@ public final class IncusResourceBootstrap {
       String imageBuildChecksum,
       String hostSourceDirRelative,
       Map<String, Object> layerEnvRegistrySummary,
+      Map<String, Object> systemdProvisioningSummary,
       Resource readinessDependency) {}
 }

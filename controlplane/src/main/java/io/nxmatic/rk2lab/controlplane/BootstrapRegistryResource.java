@@ -22,6 +22,7 @@ public final class BootstrapRegistryResource extends ComponentResource {
       String provisioningChecksum,
       String hostSourceDirRelative,
       Map<String, Object> layerEnvRegistrySummary,
+      Map<String, Object> systemdProvisioningSummary,
       Resource dependsOnResource) {
     super(TYPE_TOKEN, name, buildOptions(dependsOnResource));
 
@@ -30,6 +31,7 @@ public final class BootstrapRegistryResource extends ComponentResource {
     values.put("hostSourceDirRelative", hostSourceDirRelative);
     values.put("localWorktreePath", config.localWorktreePath().toString());
     values.put("layerEnvRegistry", layerEnvRegistrySummary);
+    values.put("systemdProvisioning", systemdProvisioningSummary);
     this.summary = Map.copyOf(values);
 
     registerOutputs(asResourceOutputs(summary));

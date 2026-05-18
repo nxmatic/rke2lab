@@ -16,6 +16,12 @@ Stage ownership is strict:
 * Stage A creates and validates only the seed control-plane node(s) required to establish management API reachability.
 * Stage B owns all ongoing node lifecycle (scale, replacement, rollout, remediation) through Kubernetes controllers.
 
+== Delivery sequencing note (Mar 2026)
+
+Current implementation focus is to finish and validate Stage A bootstrap behavior before implementing additional Stage B requirements.
+
+Stage B enablement is not blocked: Stage A already exports the planned handoff entry points (`nextStep`, readiness outputs, registry summary, image build summary), which will be consumed by a later Stage B manifest publication/application flow.
+
 == Required handoff assets
 
 The following assets are considered the minimum shared contract.

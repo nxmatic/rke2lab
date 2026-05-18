@@ -50,6 +50,7 @@ public final class ClusterBootstrapReadinessVerifier {
     final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
 
     logInfo("readiness check enabled");
+    logInfo("seed node: " + config.nodeName() + " (project=" + config.incusProject() + ")");
     logInfo("kubeconfig path: " + kubeconfigPath);
     logInfo(
         "timeouts: kubeconfig="
@@ -58,6 +59,19 @@ public final class ClusterBootstrapReadinessVerifier {
             + API_READY_TIMEOUT
             + ", controllers="
             + CONTROLLER_WAIT_TIMEOUT);
+
+    if (!waitForSeedNodeBootstrapState(config)) {
+      logInfo("readiness failed: seed node systemd/bootstrap gate did not converge in time");
+      return VerificationResult.failed(
+          false,
+          false,
+          false,
+          "seed node bootstrap gate did not converge (systemd/rke2 preconditions) for "
+              + config.nodeName()
+              + " in project "
+              + config.incusProject(),
+          requiredControllerRefs(policy));
+    }
 
     if (!waitForKubeconfigPublished(kubeconfigPath)) {
       logInfo("readiness failed: kubeconfig was not published in time");
@@ -121,6 +135,22 @@ public final class ClusterBootstrapReadinessVerifier {
     }
   }
 
+  public static VerificationResult deferredPreview(ControlplanePolicy policy) {
+    logInfo("readiness check deferred during preview; live checks run during apply");
+    return VerificationResult.deferredPreview(requiredControllerRefs(policy));
+  }
+
+  public static VerificationResult deferredPreview(
+      ControlplanePolicy policy, Consumer<String> logger) {
+    final Consumer<String> previous = ACTIVE_LOGGER.get();
+    ACTIVE_LOGGER.set(logger == null ? DEFAULT_LOGGER : logger);
+    try {
+      return deferredPreview(policy);
+    } finally {
+      ACTIVE_LOGGER.set(previous);
+    }
+  }
+
   private static boolean waitForKubeconfigPublished(Path kubeconfigPath) {
     logInfo("waiting for kubeconfig publication...");
     final long startedAt = System.nanoTime();
@@ -160,6 +190,70 @@ public final class ClusterBootstrapReadinessVerifier {
             + KUBECONFIG_WAIT_TIMEOUT
             + " ("
             + describeKubeconfigState(kubeconfigPath)
+            + ")");
+    return false;
+  }
+
+  private static boolean waitForSeedNodeBootstrapState(BootstrapConfig config) {
+    logInfo("waiting for seed node systemd/bootstrap preconditions...");
+    final long startedAt = System.nanoTime();
+    long nextProgressLogAt = startedAt + LOG_PROGRESS_INTERVAL.toNanos();
+    final long deadlineNanos = System.nanoTime() + KUBECONFIG_WAIT_TIMEOUT.toNanos();
+
+    String lastSummary = "not yet checked";
+    while (System.nanoTime() < deadlineNanos) {
+      final CommandResult envDirCheck =
+          runCommand(
+              incusExec(config, "test", "-d", "/srv/host/rke2lab-environment.d"),
+              Duration.ofSeconds(8));
+      final boolean envDirReady = envDirCheck.exitCode() == 0;
+
+      final CommandResult rke2ActiveCheck =
+          runCommand(
+              incusExec(config, "systemctl", "is-active", "rke2-server.service"),
+              Duration.ofSeconds(8));
+      final boolean rke2Active =
+          rke2ActiveCheck.exitCode() == 0
+              && rke2ActiveCheck.stdout().trim().equalsIgnoreCase("active");
+
+      if (envDirReady && rke2Active) {
+        logInfo("seed node bootstrap preconditions ready after " + elapsedSince(startedAt));
+        return true;
+      }
+
+      final CommandResult jobsSnapshot =
+          runCommand(
+              incusExec(config, "systemctl", "list-jobs", "--no-pager", "--no-legend"),
+              Duration.ofSeconds(8));
+      final String jobsSummary = firstLineOrFallback(jobsSnapshot.stdout(), "no-jobs-visible");
+
+      lastSummary =
+          "envDir="
+              + (envDirReady ? "ready" : "missing")
+              + ", rke2="
+              + (rke2Active ? "active" : rke2ActiveCheck.summary())
+              + ", jobs="
+              + jobsSummary;
+
+      final long now = System.nanoTime();
+      if (now >= nextProgressLogAt) {
+        logInfo(
+            "still waiting for seed node bootstrap preconditions after "
+                + elapsedSince(startedAt)
+                + " ("
+                + lastSummary
+                + ")");
+        nextProgressLogAt = now + LOG_PROGRESS_INTERVAL.toNanos();
+      }
+
+      sleep(RETRY_INTERVAL);
+    }
+
+    logInfo(
+        "seed node bootstrap precondition wait timed out after "
+            + KUBECONFIG_WAIT_TIMEOUT
+            + " (last result: "
+            + lastSummary
             + ")");
     return false;
   }
@@ -376,6 +470,30 @@ public final class ClusterBootstrapReadinessVerifier {
     }
   }
 
+  private static List<String> incusExec(BootstrapConfig config, String... args) {
+    final ArrayList<String> command = new ArrayList<>();
+    command.add("incus");
+    command.add("exec");
+    command.add("--project");
+    command.add(config.incusProject());
+    command.add(config.nodeName());
+    command.add("--");
+    command.addAll(List.of(args));
+    return List.copyOf(command);
+  }
+
+  private static String firstLineOrFallback(String value, String fallback) {
+    if (value == null || value.isBlank()) {
+      return fallback;
+    }
+    return value
+        .lines()
+        .map(String::trim)
+        .filter(line -> !line.isBlank())
+        .findFirst()
+        .orElse(fallback);
+  }
+
   private static void sleep(Duration duration) {
     try {
       Thread.sleep(duration.toMillis());
@@ -415,6 +533,18 @@ public final class ClusterBootstrapReadinessVerifier {
           true,
           "Skipped",
           "cluster readiness checks disabled by configuration (rke2lab:readiness.enabled=false)",
+          List.copyOf(requiredControllerRefs));
+    }
+
+    private static VerificationResult deferredPreview(List<String> requiredControllerRefs) {
+      return new VerificationResult(
+          true,
+          false,
+          false,
+          false,
+          false,
+          "Deferred",
+          "cluster readiness checks deferred during preview; execute 'pulumi up' for live verification",
           List.copyOf(requiredControllerRefs));
     }
 

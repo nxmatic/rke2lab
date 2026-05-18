@@ -2,6 +2,7 @@ package io.nxmatic.rk2lab.controlplane;
 
 import com.pulumi.Config;
 import com.pulumi.Pulumi;
+import com.pulumi.core.Output;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
@@ -71,7 +72,7 @@ public final class Main {
 
     final IncusResourceBootstrap.BootstrapResult bootstrapResult =
         new IncusResourceBootstrap(config, policy).apply();
-    final ClusterBootstrapReadinessVerifier.VerificationResult readiness;
+    final Object readinessOutput;
     final Object clusterReadinessResourceUrn;
     final Object registryResourceUrn;
     final Object imageBuildResourceUrn;
@@ -85,8 +86,9 @@ public final class Main {
               policy,
               readinessEnabled,
               readinessLogger,
+              bootstrapResult.instanceStatus(),
               bootstrapResult.readinessDependency());
-      readiness = readinessResource.verificationResult();
+      readinessOutput = readinessResource.verificationResult();
       clusterReadinessResourceUrn = readinessResource.urn();
 
       final BootstrapRegistryResource registryResource =
@@ -96,6 +98,7 @@ public final class Main {
               bootstrapResult.provisioningChecksum(),
               bootstrapResult.hostSourceDirRelative(),
               bootstrapResult.layerEnvRegistrySummary(),
+              bootstrapResult.systemdProvisioningSummary(),
               bootstrapResult.readinessDependency());
       registryResourceUrn = registryResource.urn();
       registrySummary = registryResource.summary();
@@ -110,7 +113,7 @@ public final class Main {
       imageBuildResourceUrn = imageBuildResource.urn();
       imageBuildSummary = imageBuildResource.summary();
     } else {
-      readiness =
+      readinessOutput =
           readinessEnabled
               ? ClusterBootstrapReadinessVerifier.verify(config, policy, readinessLogger)
               : ClusterBootstrapReadinessVerifier.skipped(policy, readinessLogger);
@@ -126,7 +129,9 @@ public final class Main {
               "localWorktreePath",
               config.localWorktreePath().toString(),
               "layerEnvRegistry",
-              bootstrapResult.layerEnvRegistrySummary());
+              bootstrapResult.layerEnvRegistrySummary(),
+              "systemdProvisioning",
+              bootstrapResult.systemdProvisioningSummary());
       imageBuildSummary =
           Map.of(
               "checksum", bootstrapResult.imageBuildChecksum(),
@@ -159,19 +164,70 @@ public final class Main {
     outputs.put("imageAlias", config.imageAlias());
     outputs.put("seedLanBridgeParent", config.lanBridgeParent());
     outputs.putAll(policy.toOutputMap());
-    outputs.putAll(readiness.asOutputs());
+    if (readinessOutput instanceof Output<?> readinessAsOutput) {
+      @SuppressWarnings("unchecked")
+      final Output<ClusterBootstrapReadinessVerifier.VerificationResult> readinessResultOutput =
+          (Output<ClusterBootstrapReadinessVerifier.VerificationResult>) readinessAsOutput;
+      outputs.put(
+          "clusterReadinessEnabled",
+          readinessResultOutput.applyValue(
+              ClusterBootstrapReadinessVerifier.VerificationResult::readinessEnabled));
+      outputs.put(
+          "clusterReadinessSkipped",
+          readinessResultOutput.applyValue(value -> !value.readinessEnabled()));
+      outputs.put(
+          "clusterKubeconfigPublished",
+          readinessResultOutput.applyValue(
+              ClusterBootstrapReadinessVerifier.VerificationResult::kubeconfigPublished));
+      outputs.put(
+          "clusterApiReady",
+          readinessResultOutput.applyValue(
+              ClusterBootstrapReadinessVerifier.VerificationResult::apiReady));
+      outputs.put(
+          "clusterControllersEffective",
+          readinessResultOutput.applyValue(
+              ClusterBootstrapReadinessVerifier.VerificationResult::controllersEffective));
+      outputs.put(
+          "clusterRequiredControllers",
+          readinessResultOutput.applyValue(
+              ClusterBootstrapReadinessVerifier.VerificationResult::requiredControllerRefs));
+      outputs.put(
+          "clusterReadinessSummary",
+          readinessResultOutput.applyValue(
+              ClusterBootstrapReadinessVerifier.VerificationResult::summary));
+      outputs.put(
+          "handoffReady",
+          readinessResultOutput.applyValue(
+              ClusterBootstrapReadinessVerifier.VerificationResult::handoffReady));
+      outputs.put(
+          "bootstrapStatus",
+          readinessResultOutput.applyValue(
+              ClusterBootstrapReadinessVerifier.VerificationResult::bootstrapStatus));
+      outputs.put(
+          "nextStep",
+          readinessResultOutput.applyValue(
+              value ->
+                  value.handoffReady()
+                      ? "bootstrap-management-cluster-then-apply-stageb-cluster-manifests"
+                      : "wait-for-cluster-readiness"));
+    } else {
+      final ClusterBootstrapReadinessVerifier.VerificationResult readiness =
+          (ClusterBootstrapReadinessVerifier.VerificationResult) readinessOutput;
+      outputs.putAll(readiness.asOutputs());
+      outputs.put("handoffReady", readiness.handoffReady());
+      outputs.put("bootstrapStatus", readiness.bootstrapStatus());
+      outputs.put(
+          "nextStep",
+          readiness.handoffReady()
+              ? "bootstrap-management-cluster-then-apply-stageb-cluster-manifests"
+              : "wait-for-cluster-readiness");
+    }
     outputs.put("clusterReadinessResourceUrn", clusterReadinessResourceUrn);
     outputs.put("registryResourceUrn", registryResourceUrn);
     outputs.put("seedImageBuildResourceUrn", imageBuildResourceUrn);
     outputs.put("registrySummary", registrySummary);
+    outputs.put("systemdProvisioningSummary", bootstrapResult.systemdProvisioningSummary());
     outputs.put("seedImageBuildSummary", imageBuildSummary);
-    outputs.put("handoffReady", readiness.handoffReady());
-    outputs.put("bootstrapStatus", readiness.bootstrapStatus());
-    outputs.put(
-        "nextStep",
-        readiness.handoffReady()
-            ? "bootstrap-management-cluster-then-apply-stageb-cluster-manifests"
-            : "wait-for-cluster-readiness");
     return new BootstrapOutputs(outputs);
   }
 

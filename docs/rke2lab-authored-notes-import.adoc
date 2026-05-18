@@ -155,6 +155,10 @@ package "rke2lab controlnode (Stage A)" {
   rectangle "BootstrapConfig\n<<Container>>\nJava config model\nResolves canonical Stage A runtime config" as bootstrapCfg
   rectangle "IncusResourceBootstrap\n<<Container>>\nJava orchestration\nApplies Stage A bootstrap: provider resources, seed image, seed instance" as incusBootstrap
   rectangle "PulumiIncusImageProvider\n<<Container>>\nJava helper\nEnsures image fingerprint and checksum-aware image lifecycle" as imageProvider
+  rectangle "ClusterReadinessResource\n<<Container>>\nPulumi component\nModels readiness gate and exports readiness contract outputs" as readinessResource
+  rectangle "BootstrapRegistryResource\n<<Container>>\nPulumi component\nExports bootstrap registry summary from internal contributor registries" as registryResource
+  rectangle "SeedImageBuildResource\n<<Container>>\nPulumi component\nExports seed image build metadata summary" as imageBuildResource
+  rectangle "ClusterBootstrapReadinessVerifier\n<<Container>>\nReadiness helper\nPerforms kubeconfig/API/controller readiness checks (or skipped mode)" as readinessVerifier
 }
 
 operator --> cpMain : Runs preview/up or standalone
@@ -166,11 +170,17 @@ cpMain --> manifestGate : Enforces update gate
 manifestGate --> manifestSynth : Loads provider + performs synthesis smoke validation
 cpMain --> gitWorktree : Enforces clean worktree + flake-lock coherence
 cpMain --> incusBootstrap : Invokes apply() after gates pass
+cpMain --> readinessResource : Creates component resource for readiness contract
+cpMain --> registryResource : Creates component resource for registry summary contract
+cpMain --> imageBuildResource : Creates component resource for image metadata contract
+readinessResource --> readinessVerifier : verify(...) / skipped(...)
+registryResource --> incusBootstrap : Consumes layer-env registry snapshot from bootstrap result
+imageBuildResource --> incusBootstrap : Consumes image build checksum/fingerprint from bootstrap result
 
 incusBootstrap --> imageProvider : Ensures seed image fingerprint/checksum
 imageProvider --> incusApi : Resolves/creates image alias + fingerprint
 incusBootstrap --> incusApi : Ensures project/network/profile + creates/replaces seed instance
-cpMain --> operator : Exports Stage A outputs\n(apiEndpoint, kubeconfigRef, seed ids, checksums, handoffReady)
+cpMain --> operator : Exports Stage A outputs\n(apiEndpoint, kubeconfigRef, seed ids, checksums, handoffReady, readiness/registry/image summaries)
 @enduml
 ----
 
@@ -193,6 +203,7 @@ rectangle "Incus API/Daemon\n<<external>>\nProject/network/profile/image/instanc
 package "Incus bootstrap orchestration" {
   rectangle "ApplyPipeline\n<<Component>>\nIncusResourceBootstrap\nCoordinates Stage A steps: resolve paths, host prep, provider resources, seed instance" as applyPipeline
   rectangle "ClasspathAssetMaterializer\n<<Component>>\nBootstrap helper\nMaterializes classpath assets/manifests to local runtime tree" as assetMaterializer
+  rectangle "RuntimeEnvControlplaneOverlayWriter\n<<Component>>\nBootstrap helper\nWrites env overlay and captures LayerEnv contributor registry snapshot" as overlayWriter
   rectangle "NodeConfigRegenerator\n<<Component>>\nBootstrap helper\nRegenerates cloud-init payload from runtime secrets" as nodeConfigRegenerator
   rectangle "HostMountSourceVerifier\n<<Component>>\nBootstrap helper\nValidates required host mount sources for Incus disk devices" as sourceVerifier
   rectangle "LaunchSecretsUpdater\n<<Component>>\nBootstrap helper\nEnsures launch secrets token before provisioning" as secretsUpdater
@@ -200,15 +211,18 @@ package "Incus bootstrap orchestration" {
   rectangle "IncusImportLookup\n<<Component>>\nBootstrap helper\nFinds existing project/network/profile IDs for import/adopt" as importLookup
   rectangle "PulumiIncusImageProvider\n<<Component>>\nImage helper\nEnsures seed image alias/fingerprint and image build checksum" as imageProvider
   rectangle "ProvisioningResourceInventory\n<<Component>>\nBootstrap helper\nComputes deterministic provisioning checksum" as inventoryChecksum
+  rectangle "LayerEnvContributorRegistry\n<<Component>>\nManifest layer registry\nDiscovers contributors, orders sections, aggregates env variables" as layerEnvRegistry
 }
 
 cpMain --> applyPipeline : Invokes apply()
 
 applyPipeline --> assetMaterializer : materializeIncusAssets / manifests / host units
+applyPipeline --> overlayWriter : write env overlay + collect registry snapshot
 applyPipeline --> nodeConfigRegenerator : regenerateCloudConfigDir
 applyPipeline --> sourceVerifier : ensureSources
 applyPipeline --> secretsUpdater : ensureGithubTokenPresent (non-dry-run)
 applyPipeline --> inventoryChecksum : Compute seed provisioning checksum
+overlayWriter --> layerEnvRegistry : orderedContributors / aggregateContributions
 
 applyPipeline --> providerContext : Create provider context
 applyPipeline --> importLookup : Resolve import IDs for adoption

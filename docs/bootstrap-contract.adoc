@@ -12,6 +12,14 @@ Stage A is intentionally limited to bootstrap responsibilities and is *not* the 
 
 After Stage A reaches readiness, Stage B controllers (CAPI + CAPN + CAPRKE2) own lifecycle management for additional control-plane and worker nodes.
 
+== Sequencing decision (Mar 2026)
+
+Stage A completion is the current delivery priority.
+
+Stage B requirements are intentionally deferred until Stage A bootstrap behavior is fully validated end-to-end.
+
+The Stage B entry point is already established through exported Stage A handoff/orchestration outputs (`nextStep`, readiness status, registry summary, and image build summary), which are expected to be consumed by a later Stage B manifest producer/apply flow.
+
 == Non-goals
 
 The following are explicitly out of scope for Stage A:
