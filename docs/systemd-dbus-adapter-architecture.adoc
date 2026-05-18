@@ -9,6 +9,26 @@ This document defines the architecture for the new `systemd-adapter` module and 
 IMPORTANT: current implementation is shell-backed (`systemctl` via `ShellSystemdStatusSnapshotProvider`).
 Native D-Bus client integration is a follow-up evolution, not the current runtime path.
 
+== Runtime placement and Pulumi ownership
+
+The `systemd-adapter` is designed to run on the master node itself (inside the management-cluster node runtime),
+not on the operator workstation and not inside the Pulumi controlplane process.
+
+Its architectural role is a node-local proxy/adapter boundary:
+
+* reads systemd state locally from the master node (`systemctl` today; D-Bus-capable backend later)
+* exposes normalized HTTP status endpoints (`/status/systemd`, `/healthz/systemd`)
+* provides the readiness signal consumed by Pulumi Stage A components
+
+Pulumi owns orchestration of this component lifecycle during bootstrap:
+
+* ensures the adapter unit is launched/verified early on the master node
+* consumes adapter status endpoints for runtime/readiness decisions
+* exports launch/readiness summaries as controlplane outputs
+
+This keeps the contract clear: systemd introspection is local to the master node,
+while Pulumi remains the external orchestrator and policy owner.
+
 == Why split this architecture set
 
 The adapter spans multiple concerns:

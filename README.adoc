@@ -26,6 +26,7 @@ Initial scaffold created. First implementation target is the Stage A bootstrap c
 * `docs/daemonless-host-assets-architecture.adoc` — daemonless execution contract, shared policy helpers, host asset materialization flow, and encoded payload ownership for host-mutating runtime workflows
 * `docs/troubleshooting-workflow.adoc` — canonical troubleshooting workflow covering operation-mode notes, `.local.d/share` helper scripts, `RKE2LAB_SHARED_DIR` execution, and repo promotion rules for durable diagnostics
 * `docs/systemd-dbus-adapter-architecture.adoc` — split, review-oriented architecture set for the systemd adapter/proxy (`context`/`container`/`component`/`sequence` diagrams)
+** See also `xref:docs/systemd-dbus-adapter-architecture.adoc#_runtime_placement_and_pulumi_ownership[Runtime placement and Pulumi ownership]` for the explicit master-node proxy placement and Pulumi lifecycle ownership model.
 * `docs/incus-distribution-contract.adoc` — reverse-engineered Incus distribution contract for seed/control-node provisioning
 * `docs/stagea-stageb-handoff-contract.adoc` — explicit handoff assets between Stage A bootstrap and Stage B CAPI/CAPN reconciliation
 * `docs/post-bootstrap-in-cluster-ownership-plan.adoc` — canonical post-bootstrap ownership plan covering CAPI machine lifecycle, GitOps add-on reconciliation, workflow/pipeline controller responsibilities, node-local reconcilers, and C4 review diagrams
