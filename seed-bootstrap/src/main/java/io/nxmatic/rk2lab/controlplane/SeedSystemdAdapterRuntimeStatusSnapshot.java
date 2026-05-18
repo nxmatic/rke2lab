@@ -37,14 +37,8 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
   public static Map<String, Object> deferredPreview(BootstrapConfig config) {
     return envelope(
         "deferred-preview",
-        "runtime status deferred during preview; probe=systemd-adapter-http",
-        Map.of(
-            "source",
-            "systemd-adapter-http-probe",
-            "probeMode",
-            "systemd-adapter-http",
-            "adapterEndpoint",
-            ADAPTER_ENDPOINT_URL));
+        "runtime status deferred during preview; probe=systemd-adapter-runtime",
+        Map.of("source", "systemd-adapter-runtime-probe", "probeMode", "systemd-adapter-runtime"));
   }
 
   public static Map<String, Object> snapshot(BootstrapConfig config, Consumer<String> logger) {
@@ -56,9 +50,8 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
           new LinkedHashMap<>(statusSnapshot.toPayloadMap());
       parsed.put("apiVersion", API_VERSION);
       parsed.put("kind", KIND);
-      parsed.put("source", "systemd-adapter-http-probe");
-      parsed.put("probeMode", "systemd-adapter-http");
-      parsed.put("adapterEndpoint", ADAPTER_ENDPOINT_URL);
+      parsed.put("source", "systemd-adapter-runtime-probe");
+      parsed.put("probeMode", "systemd-adapter-runtime");
       parsed.put("status", "ok");
       parsed.putIfAbsent("capturedAt", Instant.now().toString());
       parsed.putIfAbsent("summary", "systemd adapter api probe captured runtime state");
@@ -71,7 +64,8 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
       return envelope(
           "execution-error",
           "systemd adapter api probe execution error: " + ex.getMessage(),
-          Map.of("source", "systemd-adapter-http-probe", "adapterEndpoint", ADAPTER_ENDPOINT_URL));
+          Map.of(
+              "source", "systemd-adapter-runtime-probe", "probeMode", "systemd-adapter-runtime"));
     }
   }
 
@@ -85,27 +79,21 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
 
     if (looksLikeIncusHelp(result.stdout())) {
       throw new IllegalStateException(
-          "received Incus CLI help while querying adapter endpoint " + ADAPTER_ENDPOINT_URL);
+          "received Incus CLI help while querying systemd adapter status");
     }
     if (result.exitCode() != 0) {
       throw new IllegalStateException(
-          "failed querying adapter endpoint "
-              + ADAPTER_ENDPOINT_URL
-              + " ("
-              + summarizeCommandFailure(result)
-              + ")");
+          "failed querying systemd adapter status (" + summarizeCommandFailure(result) + ")");
     }
 
     final String stdout = result.stdout() == null ? "" : result.stdout().trim();
     if (stdout.isBlank()) {
-      throw new IllegalStateException(
-          "empty response from adapter endpoint " + ADAPTER_ENDPOINT_URL);
+      throw new IllegalStateException("empty response from systemd adapter status");
     }
 
     final Map<String, Object> parsed = GSON.fromJson(stdout, MAP_TYPE);
     if (parsed == null || parsed.isEmpty()) {
-      throw new IllegalStateException(
-          "invalid/empty JSON payload from adapter endpoint " + ADAPTER_ENDPOINT_URL);
+      throw new IllegalStateException("invalid/empty JSON payload from systemd adapter status");
     }
     return Map.copyOf(parsed);
   }
