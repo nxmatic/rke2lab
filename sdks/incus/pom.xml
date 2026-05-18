@@ -13,21 +13,26 @@
   <artifactId>rke2lab-incus-sdk</artifactId>
   <name>rke2lab-incus-sdk</name>
 
-  <properties>
-    <pulumi.version>1.0.0</pulumi.version>
-    <jsr305.version>3.0.2</jsr305.version>
-  </properties>
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.nxmatic</groupId>
+        <artifactId>rke2lab-bom</artifactId>
+        <version>${project.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <dependency>
       <groupId>com.pulumi</groupId>
       <artifactId>pulumi</artifactId>
-      <version>${pulumi.version}</version>
     </dependency>
     <dependency>
       <groupId>com.google.code.findbugs</groupId>
       <artifactId>jsr305</artifactId>
-      <version>${jsr305.version}</version>
     </dependency>
   </dependencies>
 
