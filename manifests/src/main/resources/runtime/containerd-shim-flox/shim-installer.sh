@@ -50,11 +50,15 @@ installer::logging:setup() {
 	pod)
 		script_path="${HOST_SCRIPT_ROOT}/bin/shim-installer.sh"
 		DAEMONLESS_HOST_SCRIPT_ROOT="${HOST_SCRIPT_ROOT}"
+		DAEMONLESS_HOST_SCRIPT_BIN="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/bin"
+		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/.sh.d"
 		script_log_dir="$(daemonless::host_shell:log:resolve)"
 		;;
 	host)
 		script_path="${DAEMONSET_SCRIPT_ROOT}/bin/shim-installer.sh"
 		DAEMONLESS_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT}"
+		DAEMONLESS_HOST_SCRIPT_BIN="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/bin"
+		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/.sh.d"
 		script_log_dir="$(daemonless::host_shell:log:resolve)"
 		;;
 	esac
@@ -170,7 +174,7 @@ installer::pod:run() {
 	daemonless::trampoline:exec_on_host \
 		"shim-installer.sh" \
 		"CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE}" \
-		"DAEMONLESS_HOST_SCRIPT_LIB_DIR=${DAEMONLESS_HOST_SCRIPT_LIB_DIR}" \
+		"DAEMONLESS_HOST_SCRIPT_LIB_DIR=${DAEMONSET_SCRIPT_ROOT%/}/.sh.d" \
 		"DAEMONLESS_HOST_SCRIPT_BIN=${DAEMONSET_SCRIPT_ROOT%/}/bin" \
 		"DAEMONSET_SCRIPT_ROOT=${DAEMONSET_SCRIPT_ROOT}"
 }
