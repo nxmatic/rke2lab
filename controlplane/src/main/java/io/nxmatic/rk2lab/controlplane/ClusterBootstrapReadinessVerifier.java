@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * Deterministic bootstrap readiness verification contract.
@@ -33,6 +34,14 @@ public final class ClusterBootstrapReadinessVerifier {
 
   private static final Duration RETRY_INTERVAL = Duration.ofSeconds(2);
 
+  private static final Duration LOG_PROGRESS_INTERVAL = Duration.ofSeconds(30);
+
+  private static final Consumer<String> DEFAULT_LOGGER =
+      message -> System.out.println("[readiness] " + message);
+
+  private static final ThreadLocal<Consumer<String>> ACTIVE_LOGGER =
+      ThreadLocal.withInitial(() -> DEFAULT_LOGGER);
+
   private ClusterBootstrapReadinessVerifier() {
     // Utility class
   }
@@ -40,7 +49,18 @@ public final class ClusterBootstrapReadinessVerifier {
   public static VerificationResult verify(BootstrapConfig config, ControlplanePolicy policy) {
     final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
 
+    logInfo("readiness check enabled");
+    logInfo("kubeconfig path: " + kubeconfigPath);
+    logInfo(
+        "timeouts: kubeconfig="
+            + KUBECONFIG_WAIT_TIMEOUT
+            + ", api="
+            + API_READY_TIMEOUT
+            + ", controllers="
+            + CONTROLLER_WAIT_TIMEOUT);
+
     if (!waitForKubeconfigPublished(kubeconfigPath)) {
+      logInfo("readiness failed: kubeconfig was not published in time");
       return VerificationResult.failed(
           false,
           false,
@@ -50,6 +70,7 @@ public final class ClusterBootstrapReadinessVerifier {
     }
 
     if (!waitForApiReady(kubeconfigPath)) {
+      logInfo("readiness failed: kubernetes API did not become ready in time");
       return VerificationResult.failed(
           true,
           false,
@@ -61,6 +82,7 @@ public final class ClusterBootstrapReadinessVerifier {
 
     final ControllerVerification controllers = verifyRequiredControllers(kubeconfigPath, policy);
     if (!controllers.ready()) {
+      logInfo("readiness failed: " + controllers.detail());
       return VerificationResult.failed(
           true,
           true,
@@ -69,10 +91,40 @@ public final class ClusterBootstrapReadinessVerifier {
           controllers.requiredControllerRefs());
     }
 
+    logInfo("readiness complete: kubeconfig published, API ready, required controllers effective");
     return VerificationResult.ready(controllers.requiredControllerRefs());
   }
 
+  public static VerificationResult verify(
+      BootstrapConfig config, ControlplanePolicy policy, Consumer<String> logger) {
+    final Consumer<String> previous = ACTIVE_LOGGER.get();
+    ACTIVE_LOGGER.set(logger == null ? DEFAULT_LOGGER : logger);
+    try {
+      return verify(config, policy);
+    } finally {
+      ACTIVE_LOGGER.set(previous);
+    }
+  }
+
+  public static VerificationResult skipped(ControlplanePolicy policy) {
+    logInfo("readiness check disabled by configuration (rke2lab:readiness.enabled=false)");
+    return VerificationResult.skipped(requiredControllerRefs(policy));
+  }
+
+  public static VerificationResult skipped(ControlplanePolicy policy, Consumer<String> logger) {
+    final Consumer<String> previous = ACTIVE_LOGGER.get();
+    ACTIVE_LOGGER.set(logger == null ? DEFAULT_LOGGER : logger);
+    try {
+      return skipped(policy);
+    } finally {
+      ACTIVE_LOGGER.set(previous);
+    }
+  }
+
   private static boolean waitForKubeconfigPublished(Path kubeconfigPath) {
+    logInfo("waiting for kubeconfig publication...");
+    final long startedAt = System.nanoTime();
+    long nextProgressLogAt = startedAt + LOG_PROGRESS_INTERVAL.toNanos();
     final long deadlineNanos = System.nanoTime() + KUBECONFIG_WAIT_TIMEOUT.toNanos();
     while (System.nanoTime() < deadlineNanos) {
       try {
@@ -81,6 +133,7 @@ public final class ClusterBootstrapReadinessVerifier {
             && Files.size(kubeconfigPath) > 0) {
           final String content = Files.readString(kubeconfigPath, StandardCharsets.UTF_8);
           if (content.contains("apiVersion:") && content.contains("clusters:")) {
+            logInfo("kubeconfig is published after " + elapsedSince(startedAt));
             return true;
           }
         }
@@ -88,12 +141,34 @@ public final class ClusterBootstrapReadinessVerifier {
         // keep retrying until timeout
       }
 
+      final long now = System.nanoTime();
+      if (now >= nextProgressLogAt) {
+        logInfo(
+            "still waiting for kubeconfig after "
+                + elapsedSince(startedAt)
+                + " ("
+                + describeKubeconfigState(kubeconfigPath)
+                + ")");
+        nextProgressLogAt = now + LOG_PROGRESS_INTERVAL.toNanos();
+      }
+
       sleep(RETRY_INTERVAL);
     }
+
+    logInfo(
+        "kubeconfig wait timed out after "
+            + KUBECONFIG_WAIT_TIMEOUT
+            + " ("
+            + describeKubeconfigState(kubeconfigPath)
+            + ")");
     return false;
   }
 
   private static boolean waitForApiReady(Path kubeconfigPath) {
+    logInfo("waiting for kubernetes API readiness (/readyz)...");
+    final long startedAt = System.nanoTime();
+    long nextProgressLogAt = startedAt + LOG_PROGRESS_INTERVAL.toNanos();
+    String lastSummary = "not yet checked";
     final long deadlineNanos = System.nanoTime() + API_READY_TIMEOUT.toNanos();
     while (System.nanoTime() < deadlineNanos) {
       final CommandResult readyzResult =
@@ -102,15 +177,37 @@ public final class ClusterBootstrapReadinessVerifier {
                   "kubectl",
                   "--kubeconfig",
                   kubeconfigPath.toString(),
+                  "--insecure-skip-tls-verify=true",
                   "--request-timeout=5s",
                   "get",
                   "--raw=/readyz"),
               Duration.ofSeconds(8));
       if (readyzResult.exitCode() == 0 && readyzResult.stdout().trim().contains("ok")) {
+        logInfo("kubernetes API ready after " + elapsedSince(startedAt));
         return true;
       }
+
+      lastSummary = readyzResult.summary();
+      final long now = System.nanoTime();
+      if (now >= nextProgressLogAt) {
+        logInfo(
+            "still waiting for API readyz after "
+                + elapsedSince(startedAt)
+                + " (last result: "
+                + lastSummary
+                + ")");
+        nextProgressLogAt = now + LOG_PROGRESS_INTERVAL.toNanos();
+      }
+
       sleep(RETRY_INTERVAL);
     }
+
+    logInfo(
+        "API readiness wait timed out after "
+            + API_READY_TIMEOUT
+            + " (last result: "
+            + lastSummary
+            + ")");
     return false;
   }
 
@@ -118,17 +215,20 @@ public final class ClusterBootstrapReadinessVerifier {
       Path kubeconfigPath, ControlplanePolicy policy) {
     final List<ControllerRef> requiredControllers = requiredControllers(policy);
     if (requiredControllers.isEmpty()) {
+      logInfo("no required controllers configured for readiness gate");
       return new ControllerVerification(true, "no required controllers", List.of());
     }
 
     for (ControllerRef controllerRef : requiredControllers) {
       final String resourceRef = controllerRef.kind() + "/" + controllerRef.name();
+      logInfo("waiting for controller create: " + controllerRef.ref());
       final CommandResult createdResult =
           runCommand(
               List.of(
                   "kubectl",
                   "--kubeconfig",
                   kubeconfigPath.toString(),
+                  "--insecure-skip-tls-verify=true",
                   "-n",
                   controllerRef.namespace(),
                   "wait",
@@ -137,6 +237,7 @@ public final class ClusterBootstrapReadinessVerifier {
                   "--timeout=" + CONTROLLER_WAIT_TIMEOUT.toSeconds() + "s"),
               CONTROLLER_WAIT_TIMEOUT.plusSeconds(5));
       if (createdResult.exitCode() != 0) {
+        logInfo("controller create wait failed: " + controllerRef.ref());
         return new ControllerVerification(
             false,
             "failed waiting for resource create "
@@ -147,12 +248,14 @@ public final class ClusterBootstrapReadinessVerifier {
             requiredControllerRefs(policy));
       }
 
+      logInfo("waiting for controller rollout: " + controllerRef.ref());
       final CommandResult rolloutResult =
           runCommand(
               List.of(
                   "kubectl",
                   "--kubeconfig",
                   kubeconfigPath.toString(),
+                  "--insecure-skip-tls-verify=true",
                   "-n",
                   controllerRef.namespace(),
                   "rollout",
@@ -161,6 +264,7 @@ public final class ClusterBootstrapReadinessVerifier {
                   "--timeout=" + CONTROLLER_WAIT_TIMEOUT.toSeconds() + "s"),
               CONTROLLER_WAIT_TIMEOUT.plusSeconds(5));
       if (rolloutResult.exitCode() != 0) {
+        logInfo("controller rollout wait failed: " + controllerRef.ref());
         return new ControllerVerification(
             false,
             "failed rollout status for "
@@ -170,10 +274,44 @@ public final class ClusterBootstrapReadinessVerifier {
                 + ")",
             requiredControllerRefs(policy));
       }
+
+      logInfo("controller ready: " + controllerRef.ref());
     }
 
+    logInfo("all required controllers are effective");
     return new ControllerVerification(
         true, "all required controllers rolled out", requiredControllerRefs(policy));
+  }
+
+  private static String describeKubeconfigState(Path kubeconfigPath) {
+    try {
+      if (!Files.exists(kubeconfigPath)) {
+        return "missing";
+      }
+      if (!Files.isRegularFile(kubeconfigPath)) {
+        return "not-a-regular-file";
+      }
+
+      final long size = Files.size(kubeconfigPath);
+      if (size <= 0) {
+        return "empty-file";
+      }
+
+      final String content = Files.readString(kubeconfigPath, StandardCharsets.UTF_8);
+      final boolean hasApiVersion = content.contains("apiVersion:");
+      final boolean hasClusters = content.contains("clusters:");
+      return "size=" + size + ", apiVersion=" + hasApiVersion + ", clusters=" + hasClusters;
+    } catch (IOException ex) {
+      return "unreadable: " + ex.getMessage();
+    }
+  }
+
+  private static String elapsedSince(long startedAtNanos) {
+    return Duration.ofNanos(Math.max(0L, System.nanoTime() - startedAtNanos)).toString();
+  }
+
+  private static void logInfo(String message) {
+    ACTIVE_LOGGER.get().accept(message);
   }
 
   private static List<ControllerRef> requiredControllers(ControlplanePolicy policy) {
@@ -247,6 +385,7 @@ public final class ClusterBootstrapReadinessVerifier {
   }
 
   public record VerificationResult(
+      boolean readinessEnabled,
       boolean kubeconfigPublished,
       boolean apiReady,
       boolean controllersEffective,
@@ -261,8 +400,21 @@ public final class ClusterBootstrapReadinessVerifier {
           true,
           true,
           true,
+          true,
           "Ready",
           "cluster readiness verified (kubeconfig published, API ready, required controllers effective)",
+          List.copyOf(requiredControllerRefs));
+    }
+
+    private static VerificationResult skipped(List<String> requiredControllerRefs) {
+      return new VerificationResult(
+          false,
+          false,
+          false,
+          false,
+          true,
+          "Skipped",
+          "cluster readiness checks disabled by configuration (rke2lab:readiness.enabled=false)",
           List.copyOf(requiredControllerRefs));
     }
 
@@ -273,6 +425,7 @@ public final class ClusterBootstrapReadinessVerifier {
         String summary,
         List<String> requiredControllerRefs) {
       return new VerificationResult(
+          true,
           kubeconfigPublished,
           apiReady,
           controllersEffective,
@@ -284,6 +437,8 @@ public final class ClusterBootstrapReadinessVerifier {
 
     public Map<String, Object> asOutputs() {
       final LinkedHashMap<String, Object> outputs = new LinkedHashMap<>();
+      outputs.put("clusterReadinessEnabled", readinessEnabled);
+      outputs.put("clusterReadinessSkipped", !readinessEnabled);
       outputs.put("clusterKubeconfigPublished", kubeconfigPublished);
       outputs.put("clusterApiReady", apiReady);
       outputs.put("clusterControllersEffective", controllersEffective);

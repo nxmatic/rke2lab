@@ -24,6 +24,7 @@ import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig.WorktreeHost;
 import io.nxmatic.rk2lab.controlplane.incus.image.PulumiIncusImageProvider;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
+import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributorRegistry;
 import io.nxmatic.rk2lab.netplan.ClusterNetworkBlueprint;
 import java.io.IOException;
@@ -152,6 +153,8 @@ public final class IncusResourceBootstrap {
 
     private String imageBuildChecksum;
 
+    private Map<String, Object> layerEnvRegistrySummary;
+
     private Instance instance;
 
     private ApplyPipeline resolvePaths() {
@@ -170,8 +173,9 @@ public final class IncusResourceBootstrap {
       classpathAssetMaterializer.materializeHostSystemdAssets(
           localPaths.manifestsRoot().resolve("host"));
       LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
-      runtimeEnvControlplaneOverlayWriter.write(
-          localPaths.runtimeEnvConfigRoot(), layerContext, policy);
+      this.layerEnvRegistrySummary =
+          runtimeEnvControlplaneOverlayWriter.write(
+              localPaths.runtimeEnvConfigRoot(), layerContext, policy);
       hostMountSourceVerifier.ensureSources(localPaths);
       nodeConfigRegenerator.regenerateCloudConfigDir(
           localPaths.runtimeCloudConfigRoot(), localPaths.cloudSeedRoot());
@@ -238,7 +242,9 @@ public final class IncusResourceBootstrap {
           providerContext.provider().urn(),
           provisioningChecksum,
           imageBuildChecksum,
-          hostSourceDirRelative);
+          hostSourceDirRelative,
+          layerEnvRegistrySummary,
+          instance);
     }
 
     private String relativizeAgainstWorktree(Path worktreeRoot, Path path) {
@@ -351,13 +357,14 @@ public final class IncusResourceBootstrap {
 
     private RuntimeEnvControlplaneOverlayWriter() {}
 
-    private void write(
+    private Map<String, Object> write(
         Path runtimeEnvConfigRoot, LayerEnvContext layerContext, ControlplanePolicy policy) {
       try {
         Files.createDirectories(runtimeEnvConfigRoot);
 
         // Write layer contributions first
         LayerEnvContributorRegistry registry = new LayerEnvContributorRegistry(layerContext);
+        final List<LayerEnvContributor> orderedContributors = registry.orderedContributors();
         registry.writeAllContributions(runtimeEnvConfigRoot);
 
         // Aggregate all layer contributions and create 99-configmap with merged vars
@@ -368,7 +375,8 @@ public final class IncusResourceBootstrap {
         aggregatedVars.putAll(policy.toEnvMap());
 
         // Add layer contributions (later ones override earlier)
-        aggregatedVars.putAll(registry.aggregateContributions());
+        final Map<String, String> layerContributionVars = registry.aggregateContributions();
+        aggregatedVars.putAll(layerContributionVars);
 
         // Build ConfigMap YAML with all aggregated variables
         StringBuilder yaml = new StringBuilder();
@@ -398,12 +406,40 @@ public final class IncusResourceBootstrap {
             runtimeEnvConfigRoot.resolve(
                 "99-configmap-env-section-controlplane-layer-contributions.yml");
         Files.writeString(overlayPath, yaml.toString(), StandardCharsets.UTF_8);
+        return buildRegistrySnapshot(orderedContributors, layerContributionVars);
 
       } catch (IOException ex) {
         throw new IllegalStateException(
             "Failed to write controlplane runtime env override ConfigMap: " + runtimeEnvConfigRoot,
             ex);
       }
+    }
+
+    private static Map<String, Object> buildRegistrySnapshot(
+        List<LayerEnvContributor> orderedContributors, Map<String, String> layerContributionVars) {
+      final List<Map<String, Object>> contributors = new ArrayList<>();
+      final List<String> orderedLayers = new ArrayList<>();
+      final List<String> contributedSections = new ArrayList<>();
+
+      for (LayerEnvContributor contributor : orderedContributors) {
+        final List<String> sections = List.copyOf(contributor.contributedSections());
+        orderedLayers.add(contributor.layerId());
+        contributedSections.addAll(sections);
+        contributors.add(
+            Map.of(
+                "layerId", contributor.layerId(),
+                "contributorClass", contributor.getClass().getName(),
+                "sections", sections,
+                "sectionCount", sections.size()));
+      }
+
+      return Map.of(
+          "contributorCount", contributors.size(),
+          "contributors", contributors,
+          "orderedLayers", List.copyOf(orderedLayers),
+          "contributedSections", List.copyOf(contributedSections),
+          "contributedSectionCount", contributedSections.size(),
+          "aggregatedVariableCount", layerContributionVars.size());
     }
 
     private static String quoteYamlIfNeeded(String value) {
@@ -749,6 +785,12 @@ public final class IncusResourceBootstrap {
     final String existingNetworkId =
         incusImportLookup.normalizeImportId(
             incusImportLookup.existingNetworkId(context, networkName, config.incusProject()));
+
+    if (!existingNetworkId.isBlank() && networkName.equals(config.vmnetNetworkName())) {
+      // Existing vmnet bridge is the canonical source of truth for Stage A.
+      // Managing it via import causes persistent provider import-replacement churn.
+      return;
+    }
 
     final NetworkArgs.Builder builder = NetworkArgs.builder().name(networkName).type("bridge");
 
@@ -1776,5 +1818,7 @@ public final class IncusResourceBootstrap {
       Object providerUrn,
       String provisioningChecksum,
       String imageBuildChecksum,
-      String hostSourceDirRelative) {}
+      String hostSourceDirRelative,
+      Map<String, Object> layerEnvRegistrySummary,
+      Resource readinessDependency) {}
 }

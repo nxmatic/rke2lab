@@ -15,6 +15,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.function.Consumer;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.diff.DiffEntry;
@@ -51,20 +52,88 @@ public final class Main {
           final BootstrapConfig bootstrapConfig =
               new BootstrapConfig.Builder().applyConfig(config).build();
           final ControlplanePolicy controlplanePolicy = ControlplanePolicy.from(config);
+          final boolean readinessEnabled = resolveReadinessEnabled(config);
+          final Consumer<String> readinessLogger =
+              message -> context.log().info("[readiness] " + message);
           final BootstrapOutputs outputs =
-              bootstrapAndCollectOutputs(bootstrapConfig, controlplanePolicy);
+              bootstrapAndCollectOutputs(
+                  bootstrapConfig, controlplanePolicy, readinessEnabled, readinessLogger);
           outputs.values().forEach(context::export);
         });
   }
 
   private static BootstrapOutputs bootstrapAndCollectOutputs(
-      BootstrapConfig config, ControlplanePolicy policy) {
+      BootstrapConfig config,
+      ControlplanePolicy policy,
+      boolean readinessEnabled,
+      Consumer<String> readinessLogger) {
     enforceEntryGatePolicies(config.localWorktreePath());
 
     final IncusResourceBootstrap.BootstrapResult bootstrapResult =
         new IncusResourceBootstrap(config, policy).apply();
-    final ClusterBootstrapReadinessVerifier.VerificationResult readiness =
-        ClusterBootstrapReadinessVerifier.verify(config, policy);
+    final ClusterBootstrapReadinessVerifier.VerificationResult readiness;
+    final Object clusterReadinessResourceUrn;
+    final Object registryResourceUrn;
+    final Object imageBuildResourceUrn;
+    final Map<String, Object> registrySummary;
+    final Map<String, Object> imageBuildSummary;
+    if (isPulumiEngineAvailable()) {
+      final ClusterReadinessResource readinessResource =
+          new ClusterReadinessResource(
+              "seed-cluster-readiness",
+              config,
+              policy,
+              readinessEnabled,
+              readinessLogger,
+              bootstrapResult.readinessDependency());
+      readiness = readinessResource.verificationResult();
+      clusterReadinessResourceUrn = readinessResource.urn();
+
+      final BootstrapRegistryResource registryResource =
+          new BootstrapRegistryResource(
+              "seed-bootstrap-registry",
+              config,
+              bootstrapResult.provisioningChecksum(),
+              bootstrapResult.hostSourceDirRelative(),
+              bootstrapResult.layerEnvRegistrySummary(),
+              bootstrapResult.readinessDependency());
+      registryResourceUrn = registryResource.urn();
+      registrySummary = registryResource.summary();
+
+      final SeedImageBuildResource imageBuildResource =
+          new SeedImageBuildResource(
+              "seed-image-build",
+              config,
+              bootstrapResult.imageBuildChecksum(),
+              bootstrapResult.imageFingerprint(),
+              bootstrapResult.readinessDependency());
+      imageBuildResourceUrn = imageBuildResource.urn();
+      imageBuildSummary = imageBuildResource.summary();
+    } else {
+      readiness =
+          readinessEnabled
+              ? ClusterBootstrapReadinessVerifier.verify(config, policy, readinessLogger)
+              : ClusterBootstrapReadinessVerifier.skipped(policy, readinessLogger);
+      clusterReadinessResourceUrn = "";
+      registryResourceUrn = "";
+      imageBuildResourceUrn = "";
+      registrySummary =
+          Map.of(
+              "checksum",
+              bootstrapResult.provisioningChecksum(),
+              "hostSourceDirRelative",
+              bootstrapResult.hostSourceDirRelative(),
+              "localWorktreePath",
+              config.localWorktreePath().toString(),
+              "layerEnvRegistry",
+              bootstrapResult.layerEnvRegistrySummary());
+      imageBuildSummary =
+          Map.of(
+              "checksum", bootstrapResult.imageBuildChecksum(),
+              "imageAlias", config.imageAlias(),
+              "imageFingerprint", bootstrapResult.imageFingerprint(),
+              "incusProject", config.incusProject());
+    }
     final String seedNodeId = bootstrapResult.seedNodeId();
     final Object imageFingerprint = bootstrapResult.imageFingerprint();
     final Object seedInstanceStatus = bootstrapResult.instanceStatus();
@@ -91,6 +160,11 @@ public final class Main {
     outputs.put("seedLanBridgeParent", config.lanBridgeParent());
     outputs.putAll(policy.toOutputMap());
     outputs.putAll(readiness.asOutputs());
+    outputs.put("clusterReadinessResourceUrn", clusterReadinessResourceUrn);
+    outputs.put("registryResourceUrn", registryResourceUrn);
+    outputs.put("seedImageBuildResourceUrn", imageBuildResourceUrn);
+    outputs.put("registrySummary", registrySummary);
+    outputs.put("seedImageBuildSummary", imageBuildSummary);
     outputs.put("handoffReady", readiness.handoffReady());
     outputs.put("bootstrapStatus", readiness.bootstrapStatus());
     outputs.put(
@@ -104,12 +178,28 @@ public final class Main {
   private static void runStandalone() {
     final BootstrapConfig bootstrapConfig = new BootstrapConfig.Builder().build();
     final ControlplanePolicy controlplanePolicy = ControlplanePolicy.defaults();
+    final Consumer<String> readinessLogger =
+        message -> System.out.println("[readiness] " + message);
     final BootstrapOutputs outputs =
-        bootstrapAndCollectOutputs(bootstrapConfig, controlplanePolicy);
+        bootstrapAndCollectOutputs(bootstrapConfig, controlplanePolicy, true, readinessLogger);
     System.out.println(
         "Pulumi engine not detected (missing PULUMI_MONITOR). Running in standalone mode.");
     System.out.println("Bootstrap outputs:");
     outputs.values().forEach((key, value) -> System.out.println(key + "=" + value));
+  }
+
+  private static boolean resolveReadinessEnabled(Config config) {
+    final String raw = config.get("readiness.enabled").orElse("").trim();
+    if (raw.isBlank()) {
+      return true;
+    }
+
+    return switch (raw.toLowerCase()) {
+      case "1", "true", "yes", "on" -> true;
+      case "0", "false", "no", "off" -> false;
+      default ->
+          throw new IllegalArgumentException("Invalid boolean for readiness.enabled: " + raw);
+    };
   }
 
   private static boolean isPulumiEngineAvailable() {
