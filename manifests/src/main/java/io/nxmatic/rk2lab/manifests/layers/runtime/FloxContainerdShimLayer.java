@@ -38,7 +38,7 @@ public final class FloxContainerdShimLayer extends Construct {
     this.registry = registry;
 
     createRuntimeClass("flox", "flox");
-    createRuntimeClass("flox-go-debug", "flox-go-debug");
+    createRuntimeClass("flox-delve", "flox-delve");
     ApiObject envConfigMap = createFloxEnvConfigMap();
     ApiObject installerAssetsConfigMap = createInstallerAssetsConfigMap();
     ApiObject serviceAccount = createServiceAccount();

@@ -10,7 +10,7 @@ public record DebugPolicy(boolean kdnsEnabled, boolean floxShimWrapperEnabled) {
   }
 
   public String kdnsRuntimeClass() {
-    return kdnsEnabled ? "flox-go-debug" : "flox";
+    return kdnsEnabled ? "flox-delve" : "flox";
   }
 
   public Map<String, String> toEnvMap() {
