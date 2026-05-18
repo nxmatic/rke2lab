@@ -26,3 +26,9 @@
 - Always split checkpoints by subject; do not mix unrelated changes into the same commit.
 - Prefer small, reviewable conventional commits with `@codebase` and `@copilot` tags.
 - Use the AI commit author identity `GitHub Copilot <copilot@github.com>` unless the user explicitly requests a different author.
+
+## Formatting-before-commit policy
+
+- Before committing any changes, ensure Spotless has been run successfully.
+- Prefer a command path that executes `spotless:apply` as part of the normal project verification flow.
+- Do not create a commit until the formatting pass has completed.
