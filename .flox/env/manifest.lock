@@ -238,7 +238,7 @@
       "PULUMI_HOME": "${XDG_STATE_HOME:-$HOME/.local/state}/pulumi"
     },
     "hook": {
-      "on-activate": "    if [ -d \"${FLOX_ENV_PROJECT}/.github\" ]; then\n      remote=$(git -C \"${FLOX_ENV_PROJECT}\" remote get-url origin 2>/dev/null || true)\n      if [ -n \"${remote}\" ]; then\n        remote_host=\"github.com\"\n        case \"${remote}\" in\n          git@*:* )\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'@' -f 2 | cut -d':' -f 1)\n            ;;\n          http://*|https://*)\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'/' -f 3)\n            ;;\n          ssh://*)\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'/' -f 3 | cut -d':' -f 1)\n            ;;\n        esac\n    \n        if [ -n \"${GH_TOKEN:-}\" ] && ! gh auth status --hostname \"${remote_host}\" >/dev/null 2>&1; then\n          echo \"Detected GH_TOKEN, logging in gh for ${remote_host}...\" >&2\n          printf '%s' \"${GH_TOKEN}\" | gh auth login --with-token --hostname \"${remote_host}\" >/dev/null 2>&1 || true\n        fi\n    \n        if gh auth status --hostname \"${remote_host}\" >/dev/null 2>&1; then\n          gh auth setup-git --hostname \"${remote_host}\" >/dev/null 2>&1 || true\n        fi\n      fi\n    fi\n  \n  mkdir -p \"${PULUMI_HOME}\"\n  mkdir -p \"${FLOX_ENV_PROJECT}/.pulumi-state\"\n"
+      "on-activate": "    if [ -d \"${FLOX_ENV_PROJECT}/.github\" ]; then\n      remote=$(git -C \"${FLOX_ENV_PROJECT}\" remote get-url origin 2>/dev/null || true)\n      if [ -n \"${remote}\" ]; then\n        remote_host=\"github.com\"\n        case \"${remote}\" in\n          git@*:* )\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'@' -f 2 | cut -d':' -f 1)\n            ;;\n          http://*|https://*)\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'/' -f 3)\n            ;;\n          ssh://*)\n            remote_host=$(printf '%s' \"${remote}\" | cut -d'/' -f 3 | cut -d':' -f 1)\n            ;;\n        esac\n    \n        if [ -n \"${GH_TOKEN:-}\" ] && ! gh auth status --hostname \"${remote_host}\" >/dev/null 2>&1; then\n          echo \"Detected GH_TOKEN, logging in gh for ${remote_host}...\" >&2\n          printf '%s' \"${GH_TOKEN}\" | gh auth login --with-token --hostname \"${remote_host}\" >/dev/null 2>&1 || true\n        fi\n    \n        if gh auth status --hostname \"${remote_host}\" >/dev/null 2>&1; then\n          gh auth setup-git --hostname \"${remote_host}\" >/dev/null 2>&1 || true\n        fi\n      fi\n    fi\n  \n    mkdir -p \"$PULUMI_HOME\"\n  \n  mkdir -p \"${PULUMI_HOME}\"\n  mkdir -p \"${FLOX_ENV_PROJECT}/.pulumi-state\"\n"
     },
     "profile": {
       "common": "    GITHUB_SIGNING_KEYFILE=\"$HOME\"/.ssh/keys.d/github-signing\n    if [[ -r \"$GITHUB_SIGNING_KEYFILE\" ]]; then\n      set -a\n      SOPS_AGE_KEY=$( ssh-to-age -private-key < \"$GITHUB_SIGNING_KEYFILE\" )\n      set +a\n    else\n      echo no signing key\n    fi\n  \n    if [ -d \"${FLOX_ENV_PROJECT}/.github\" ]; then\n      gh_login=\"\"\n      if [ -n \"${GH_TOKEN:-}\" ]; then\n        gh_login=$(gh api user --jq '.login' 2>/dev/null || true)\n      elif command -v pass >/dev/null 2>&1; then\n        gh_secret=$(pass show coding/github@work 2>/dev/null | head -n 1 || true)\n        if [ -n \"${gh_secret}\" ]; then\n          gh_login=$(env GH_TOKEN=\"${gh_secret}\" gh api user --jq '.login' 2>/dev/null || true)\n        fi\n      fi\n      if [ -n \"${gh_login}\" ]; then\n        remote=$(git -C \"${FLOX_ENV_PROJECT}\" remote get-url origin 2>/dev/null || true)\n        if [ -n \"${remote}\" ]; then\n          owner=$(printf '%s' \"${remote}\" | cut -d'/' -f 4)\n          repo_name=$(printf '%s' \"${remote}\" | cut -d'/' -f 5 | cut -d'.' -f 1)\n          export GITHUB_LOGIN=\"${gh_login}\"\n          export GITHUB_OWNER=\"${owner}\"\n          export GITHUB_REPOSITORY=\"${owner}/${repo_name}\"\n        fi\n      fi\n    fi\n  \n  if command -v javac >/dev/null 2>&1; then\n    export JAVA_HOME=\"$(dirname \"$(dirname \"$(command -v javac)\")\")\"\n  fi\n"
@@ -266,6 +266,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:24.320443Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -295,6 +296,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:13:48.343384Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -324,6 +326,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:24.359700Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -355,6 +358,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:13:48.394887Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -386,6 +390,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:24.399473Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -415,6 +420,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:13:48.440639Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -444,6 +450,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:24.409524Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -473,6 +480,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:13:48.453202Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -502,9 +510,9 @@
       "rev_date": "2022-01-25T03:21:06Z",
       "scrape_date": "2024-08-15T20:52:42Z",
       "stabilities": [
-        "stable",
         "staging",
-        "unstable"
+        "unstable",
+        "stable"
       ],
       "unfree": false,
       "version": "3.3.27",
@@ -533,9 +541,9 @@
       "rev_date": "2022-01-25T03:21:06Z",
       "scrape_date": "2024-08-15T20:52:42Z",
       "stabilities": [
-        "stable",
         "staging",
-        "unstable"
+        "unstable",
+        "stable"
       ],
       "unfree": false,
       "version": "3.3.27",
@@ -564,6 +572,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:40.952872Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -593,6 +602,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:14:11.130286Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -622,6 +632,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:41.023362Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -651,6 +662,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:14:11.244317Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -680,6 +692,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:41.018199Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -709,6 +722,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:14:11.238192Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -738,6 +752,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:41.027254Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -767,6 +782,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:14:11.249300Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -796,6 +812,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:41.029800Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -825,6 +842,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:14:11.252085Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -854,6 +872,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:41.034829Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -883,6 +902,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:14:11.257759Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -912,6 +932,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:41.037289Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -941,6 +962,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:14:11.260792Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -970,6 +992,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:41.041142Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -999,6 +1022,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:14:11.265167Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1028,6 +1052,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:41.042449Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1057,6 +1082,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:14:11.266899Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1086,6 +1112,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:41.046124Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1115,6 +1142,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:14:11.271688Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1591,6 +1619,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:22.928906Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1620,6 +1649,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:13:46.378804Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1649,6 +1679,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:24.485304Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1682,6 +1713,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:13:49.088437Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1716,6 +1748,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:40.713976Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1745,6 +1778,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:14:10.697514Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1774,6 +1808,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:53.916676Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1806,6 +1841,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:14:33.856976Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1838,6 +1874,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:53.928710Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1872,6 +1909,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:14:33.871672Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1908,6 +1946,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:38:54.514162Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1937,6 +1976,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:14:35.110899Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1966,6 +2006,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:40:17.225861Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -1995,6 +2036,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:16:18.111783Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2024,6 +2066,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:40:17.986367Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2053,6 +2096,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:16:19.179226Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2082,6 +2126,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T03:41:15.250474Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -2111,6 +2156,7 @@
       "rev_date": "2026-03-24T21:09:33Z",
       "scrape_date": "2026-03-27T04:17:36.775030Z",
       "stabilities": [
+        "staging",
         "unstable"
       ],
       "unfree": false,
@@ -3110,7 +3156,7 @@
   ],
   "compose": {
     "composer": {
-      "schema-version": "1.10.0",
+      "schema-version": "1.11.0",
       "install": {
         "cdk8s-cli": {
           "pkg-path": "cdk8s-cli"
@@ -3412,13 +3458,19 @@
           "schema-version": "1.10.0",
           "install": {
             "pulumi": {
-              "pkg-path": "pulumi"
+              "pkg-path": "pulumi-bin"
             },
             "pulumictl": {
               "pkg-path": "pulumictl"
             }
           },
-          "hook": {},
+          "vars": {
+            "PULUMI_CONFIG_PASSPHRASE": "",
+            "PULUMI_HOME": "${XDG_STATE_HOME:-$HOME/.local/state}/pulumi"
+          },
+          "hook": {
+            "on-activate": "    mkdir -p \"$PULUMI_HOME\"\n  "
+          },
           "profile": {},
           "options": {}
         },
@@ -3484,6 +3536,24 @@
           "Overriding": [
             "install",
             "pulumictl"
+          ]
+        },
+        "higher_priority_name": "Current manifest"
+      },
+      {
+        "warning": {
+          "Overriding": [
+            "vars",
+            "PULUMI_CONFIG_PASSPHRASE"
+          ]
+        },
+        "higher_priority_name": "Current manifest"
+      },
+      {
+        "warning": {
+          "Overriding": [
+            "vars",
+            "PULUMI_HOME"
           ]
         },
         "higher_priority_name": "Current manifest"
