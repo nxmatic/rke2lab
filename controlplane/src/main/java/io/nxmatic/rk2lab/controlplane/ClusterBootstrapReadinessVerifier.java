@@ -66,7 +66,7 @@ public final class ClusterBootstrapReadinessVerifier {
           false,
           false,
           false,
-          "seed node bootstrap gate did not converge (systemd/rke2 preconditions) for "
+          "seed node bootstrap gate did not converge (systemd jobs/services + rke2 preconditions) for "
               + config.nodeName()
               + " in project "
               + config.incusProject(),
@@ -216,24 +216,41 @@ public final class ClusterBootstrapReadinessVerifier {
           rke2ActiveCheck.exitCode() == 0
               && rke2ActiveCheck.stdout().trim().equalsIgnoreCase("active");
 
-      if (envDirReady && rke2Active) {
-        logInfo("seed node bootstrap preconditions ready after " + elapsedSince(startedAt));
-        return true;
-      }
-
       final CommandResult jobsSnapshot =
           runCommand(
               incusExec(config, "systemctl", "list-jobs", "--no-pager", "--no-legend"),
               Duration.ofSeconds(8));
-      final String jobsSummary = firstLineOrFallback(jobsSnapshot.stdout(), "no-jobs-visible");
+      final int pendingJobCount = countNonBlankLines(jobsSnapshot.stdout());
+
+      final CommandResult failedUnitsSnapshot =
+          runCommand(
+              incusExec(config, "systemctl", "show", "--property=NFailedUnits", "--value"),
+              Duration.ofSeconds(8));
+      final int failedUnitCount = parseIntOrDefault(failedUnitsSnapshot.stdout().trim(), -1);
+
+      if (envDirReady && rke2Active && pendingJobCount == 0 && failedUnitCount == 0) {
+        logInfo("seed node bootstrap preconditions ready after " + elapsedSince(startedAt));
+        return true;
+      }
+
+      final String jobsSummary =
+          pendingJobCount >= 0
+              ? Integer.toString(pendingJobCount)
+              : firstLineOrFallback(jobsSnapshot.stdout(), "unknown");
+      final String failedUnitsSummary =
+          failedUnitCount >= 0
+              ? Integer.toString(failedUnitCount)
+              : firstLineOrFallback(failedUnitsSnapshot.stdout(), "unknown");
 
       lastSummary =
           "envDir="
               + (envDirReady ? "ready" : "missing")
               + ", rke2="
               + (rke2Active ? "active" : rke2ActiveCheck.summary())
-              + ", jobs="
-              + jobsSummary;
+              + ", pendingJobs="
+              + jobsSummary
+              + ", failedUnits="
+              + failedUnitsSummary;
 
       final long now = System.nanoTime();
       if (now >= nextProgressLogAt) {
@@ -256,6 +273,24 @@ public final class ClusterBootstrapReadinessVerifier {
             + lastSummary
             + ")");
     return false;
+  }
+
+  private static int countNonBlankLines(String value) {
+    if (value == null || value.isBlank()) {
+      return 0;
+    }
+    return (int) value.lines().map(String::trim).filter(line -> !line.isBlank()).count();
+  }
+
+  private static int parseIntOrDefault(String value, int fallback) {
+    if (value == null || value.isBlank()) {
+      return fallback;
+    }
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException ignored) {
+      return fallback;
+    }
   }
 
   private static boolean waitForApiReady(Path kubeconfigPath) {

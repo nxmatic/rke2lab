@@ -122,6 +122,7 @@ public final class SeedSystemdRuntimeStatusResource extends ComponentResource {
             "if test -d /srv/host/rke2lab-environment.d; then echo envDirPresent=true; else echo envDirPresent=false; fi",
             "echo rke2ServerState=$(systemctl is-active rke2-server.service 2>/dev/null || true)",
             "echo pendingJobCount=$(systemctl list-jobs --no-legend --no-pager 2>/dev/null | wc -l | tr -d ' ')",
+            "echo failedUnitCount=$(systemctl show --property=NFailedUnits --value 2>/dev/null || true)",
             "echo capturedAt=$(date -u +%Y-%m-%dT%H:%M:%SZ)");
 
     return "incus exec --project "
@@ -159,6 +160,8 @@ public final class SeedSystemdRuntimeStatusResource extends ComponentResource {
     outputs.put(
         "pendingJobCount", summary.applyValue(value -> value.getOrDefault("pendingJobCount", -1)));
     outputs.put(
+        "failedUnitCount", summary.applyValue(value -> value.getOrDefault("failedUnitCount", -1)));
+    outputs.put(
         "runtimePrecheckReady",
         summary.applyValue(value -> value.getOrDefault("runtimePrecheckReady", false)));
     return outputs;
@@ -191,13 +194,18 @@ public final class SeedSystemdRuntimeStatusResource extends ComponentResource {
     final boolean envDirPresent = Boolean.parseBoolean(stringValue(parsed.get("envDirPresent")));
     final String rke2ServerState = stringValue(parsed.get("rke2ServerState"));
     final int pendingJobCount = parseIntOrDefault(stringValue(parsed.get("pendingJobCount")), -1);
+    final int failedUnitCount = parseIntOrDefault(stringValue(parsed.get("failedUnitCount")), -1);
     final boolean rke2ServerActive = "active".equalsIgnoreCase(rke2ServerState);
 
     parsed.put("envDirPresent", envDirPresent);
     parsed.put("pendingJobCount", pendingJobCount);
+    parsed.put("failedUnitCount", failedUnitCount);
     parsed.put("rke2ServerActive", rke2ServerActive);
-    parsed.put("runtimePrecheckReady", envDirPresent && rke2ServerActive && (pendingJobCount == 0));
-    parsed.put("summary", buildSummary(envDirPresent, rke2ServerState, pendingJobCount));
+    parsed.put(
+        "runtimePrecheckReady",
+        envDirPresent && rke2ServerActive && (pendingJobCount == 0) && (failedUnitCount == 0));
+    parsed.put(
+        "summary", buildSummary(envDirPresent, rke2ServerState, pendingJobCount, failedUnitCount));
 
     if (!parsed.containsKey("capturedAt")) {
       parsed.put("capturedAt", Instant.now().toString());
@@ -207,13 +215,15 @@ public final class SeedSystemdRuntimeStatusResource extends ComponentResource {
   }
 
   private static String buildSummary(
-      boolean envDirPresent, String rke2ServerState, int pendingJobCount) {
+      boolean envDirPresent, String rke2ServerState, int pendingJobCount, int failedUnitCount) {
     return "envDir="
         + (envDirPresent ? "ready" : "missing")
         + ", rke2="
         + (rke2ServerState.isBlank() ? "unknown" : rke2ServerState)
         + ", pendingJobs="
-        + pendingJobCount;
+        + pendingJobCount
+        + ", failedUnits="
+        + failedUnitCount;
   }
 
   private static String summarizeFirstLine(String value) {

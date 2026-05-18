@@ -70,9 +70,14 @@ A successful Stage A run must provide enough information to install and reconcil
 == Readiness gates
 
 . Seed node provisioned and reachable.
+. Seed host systemd preconditions converged (environment mount present, no pending jobs, no failed units).
 . RKE2 server active and healthy on seed.
 . Kubernetes API reachable and responsive.
 . Minimum bootstrap manifests applied successfully.
+
+Operator observability improvement:
+
+* Stage A exports `systemdRuntimeStatusSummary` as an explicit runtime-status contract so operators can see why readiness is blocked without ad-hoc host shelling.
 
 == Failure semantics
 

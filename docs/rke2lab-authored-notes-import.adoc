@@ -158,7 +158,8 @@ package "rke2lab controlnode (Stage A)" {
   rectangle "ClusterReadinessResource\n<<Container>>\nPulumi component\nModels readiness gate and exports readiness contract outputs" as readinessResource
   rectangle "BootstrapRegistryResource\n<<Container>>\nPulumi component\nExports bootstrap registry summary from internal contributor registries" as registryResource
   rectangle "SeedImageBuildResource\n<<Container>>\nPulumi component\nExports seed image build metadata summary" as imageBuildResource
-  rectangle "ClusterBootstrapReadinessVerifier\n<<Container>>\nReadiness helper\nPerforms kubeconfig/API/controller readiness checks (or skipped mode)" as readinessVerifier
+  rectangle "SeedSystemdRuntimeStatusResource\n<<Container>>\nPulumi command-backed component\nExports operator-facing systemd jobs/services runtime status" as systemdRuntimeResource
+  rectangle "ClusterBootstrapReadinessVerifier\n<<Container>>\nReadiness helper\nPerforms systemd prechecks + kubeconfig/API/controller readiness checks (or skipped mode)" as readinessVerifier
 }
 
 operator --> cpMain : Runs preview/up or standalone
@@ -173,14 +174,16 @@ cpMain --> incusBootstrap : Invokes apply() after gates pass
 cpMain --> readinessResource : Creates component resource for readiness contract
 cpMain --> registryResource : Creates component resource for registry summary contract
 cpMain --> imageBuildResource : Creates component resource for image metadata contract
+cpMain --> systemdRuntimeResource : Creates component resource for runtime status contract
 readinessResource --> readinessVerifier : verify(...) / skipped(...)
 registryResource --> incusBootstrap : Consumes layer-env registry snapshot from bootstrap result
 imageBuildResource --> incusBootstrap : Consumes image build checksum/fingerprint from bootstrap result
+systemdRuntimeResource --> incusApi : Runs runtime status probe via incus exec + systemctl
 
 incusBootstrap --> imageProvider : Ensures seed image fingerprint/checksum
 imageProvider --> incusApi : Resolves/creates image alias + fingerprint
 incusBootstrap --> incusApi : Ensures project/network/profile + creates/replaces seed instance
-cpMain --> operator : Exports Stage A outputs\n(apiEndpoint, kubeconfigRef, seed ids, checksums, handoffReady, readiness/registry/image summaries)
+cpMain --> operator : Exports Stage A outputs\n(apiEndpoint, kubeconfigRef, seed ids, checksums, handoffReady, readiness/registry/image summaries, systemdRuntimeStatusSummary)
 @enduml
 ----
 

@@ -77,6 +77,10 @@ The following assets are considered the minimum shared contract.
 |Handoff readiness marker
 |`handoffReady`
 |Explicit gate that Stage B prerequisites are complete.
+
+|Systemd runtime status summary
+|`systemdRuntimeStatusSummary`
+|Operator-facing runtime signal for Stage A convergence diagnostics (pending jobs, failed units, seed service state).
 |===
 
 == CAPN-aligned machine class surface
