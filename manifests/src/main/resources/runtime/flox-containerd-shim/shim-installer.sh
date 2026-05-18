@@ -41,8 +41,8 @@ install -D -m 0644 "${SCRIPT_POLICY_DIR}/daemonset-logging.sh" "${HOST_SCRIPT_RO
 source "${SCRIPT_POLICY_DIR}/daemonset-logging.sh"
 daemonset::logging:stderr:setup "${HOST_SCRIPT_ROOT}/shim-installer.sh"
 
-install -D -m 0755 "${BUILD_ASSETS_DIR}/flox-shim-build.sh" "${HOST_SCRIPT_ROOT}/flox-shim-build.sh"
-install -D -m 0644 "${BUILD_ASSETS_DIR}/flox-shim-build.yaml" "${HOST_SCRIPT_ROOT}/flox-shim-build.yaml"
+install -D -m 0755 "${BUILD_ASSETS_DIR}/shim-build.sh" "${HOST_SCRIPT_ROOT}/shim-build.sh"
+install -D -m 0644 "${BUILD_ASSETS_DIR}/shim-build.yaml" "${HOST_SCRIPT_ROOT}/shim-build.yaml"
 install -D -m 0644 "${BUILD_ASSETS_DIR}/flake.nix" "${HOST_SCRIPT_ROOT}/flake.nix"
 install -D -m 0755 "${BUILD_ASSETS_DIR}/flox-rootfs-sync.sh" "${HOST_SCRIPT_ROOT}/flox-rootfs-sync.sh"
 install -D -m 0644 "${BUILD_ASSETS_DIR}/debug-tools/.sh.d/rke2lab-debug-tooling.sh" "${HOST_SCRIPT_ROOT}/debug-tools/.sh.d/rke2lab-debug-tooling.sh"

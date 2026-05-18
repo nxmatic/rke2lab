@@ -1,9 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -exuo pipefail
 
 # Flox shim package build script
 # Builds packages from local packaged flakes defined in YAML descriptor
-# Usage: flox-shim-build.sh [mode] [descriptor file]
+# Usage: shim-build.sh [mode] [descriptor file]
 # Set FLOX_SHIM_ONLY_UPDATE_LOCKS=true to refresh flake.lock files only.
 
 SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
@@ -154,6 +154,7 @@ activate_flox_environment() {
 		return 0
 	fi
 
+	# shellcheck disable=SC1090
 	if source <(flox activate --dir "${activation_dir}"); then
 		: "[$(date)] Activated Flox environment from: ${activation_dir}"
 		return 0
@@ -252,7 +253,7 @@ resolve_flake_path() {
 		resolved_path="${BUILDS_DESCRIPTOR_DIR}/${flake_path}"
 	fi
 
-	echo "$(canonicalize_existing_path "${resolved_path}")"
+	canonicalize_existing_path "${resolved_path}"
 	return 0
 }
 
@@ -320,13 +321,12 @@ refresh_flake_lock_if_needed() {
 	)
 	: "[$(date)] [${job_name}] Refreshing flake.lock"
 
-	if (
-		cd "${resolved_path}"
-		nix "${lock_args[@]}"
-	) 2>&1 | tee "${log_file}"; then
-		mark_flake_lock_refreshed "${resolved_path}"
-		: "[$(date)] [${job_name}] ✓ Refreshed flake.lock at ${resolved_path}"
-		return 0
+	if [[ -f "${resolved_path}/flake.nix" ]]; then
+		if nix "${lock_args[@]}" "${resolved_path}" >"${log_file}" 2>&1; then
+			mark_flake_lock_refreshed "${resolved_path}"
+			: "[$(date)] [${job_name}] ✓ Refreshed flake.lock at ${resolved_path}"
+			return 0
+		fi
 	fi
 
 	: "[ERROR] [${job_name}] Failed to refresh flake.lock at ${resolved_path}"
@@ -383,13 +383,10 @@ build_package() {
 		return 0
 	fi
 
-	local build_target=".#${package_attr}"
+	local build_target="${package_attr}"
 	: "[$(date)] [${job_name}] Flake path: ${resolved_path}"
 
-	if (
-		cd "${resolved_path}"
-		nix "${nix_args[@]}" "${build_target}"
-	) 2>&1 | tee "${log_file}"; then
+	if nix "${nix_args[@]}" "${resolved_path}#${build_target}" >"${log_file}" 2>&1; then
 		: "[$(date)] [${job_name}] ✓ Built ${package_name}"
 		return 0
 	else
@@ -435,6 +432,7 @@ clear_package_vars() {
 for ((i = 0; i < num_jobs; i++)); do
 	# Extract job configuration (excluding packages array)
 	clear_job_vars
+	# shellcheck disable=SC1090
 	source <(yq -o shell ".jobs[$i] | del(.packages)" "${BUILDS_DESCRIPTOR}")
 
 	job_name="${name:-}"
@@ -443,6 +441,8 @@ for ((i = 0; i < num_jobs; i++)); do
 	flake_path="${flakePath:-}"
 	output_dir="${outputDir:-}"
 	log_file="$(resolve_log_file_path "${logFile:-}" "${job_name:-unnamed-job}")"
+
+	((total_jobs += 1))
 
 	# Skip disabled jobs
 	if [[ "${job_enabled}" != "true" ]]; then
@@ -458,8 +458,6 @@ for ((i = 0; i < num_jobs; i++)); do
 	: "║ Output: ${output_dir}"
 	: "╚═══════════════════════════════════════════════════════════════="
 
-	((total_jobs += 1))
-
 	# Get number of packages in this job
 	num_packages=$(yq eval ".jobs[$i].packages | length" "${BUILDS_DESCRIPTOR}" 2>/dev/null || echo "0")
 	: "[$(date)] [${job_name}] Packages: ${num_packages}"
@@ -468,6 +466,7 @@ for ((i = 0; i < num_jobs; i++)); do
 	for ((j = 0; j < num_packages; j++)); do
 		# Load individual package variables
 		clear_package_vars
+		# shellcheck disable=SC1090
 		source <(yq -o shell ".jobs[$i].packages[$j]" "${BUILDS_DESCRIPTOR}")
 
 		package_name="${name:-}"
@@ -494,7 +493,6 @@ for ((i = 0; i < num_jobs; i++)); do
 	else
 		: "[$(date)] [${job_name}] ✓ All packages built successfully"
 	fi
-	: ""
 done
 
 : "Build Summary:"

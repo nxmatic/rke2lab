@@ -160,11 +160,10 @@ public final class FloxContainerdShimLayer extends Construct {
                     "shim-installer-entrypoint.sh",
                     readResource("/runtime/flox-containerd-shim/shim-installer-entrypoint.sh")),
                 Map.entry(
-                    "flox-shim-build.sh",
-                    readResource("/runtime/flox-containerd-shim/flox-shim-build.sh")),
+                    "shim-build.sh", readResource("/runtime/flox-containerd-shim/shim-build.sh")),
                 Map.entry(
-                    "flox-shim-build.yaml",
-                    readResource("/runtime/flox-containerd-shim/flox-shim-build.yaml")),
+                    "shim-build.yaml",
+                    readResource("/runtime/flox-containerd-shim/shim-build.yaml")),
                 Map.entry(
                     "runtime-flake.nix", readResource("/runtime/flox-containerd-shim/flake.nix")),
                 Map.entry(
@@ -410,14 +409,14 @@ public final class FloxContainerdShimLayer extends Construct {
                                         "shim-installer-entrypoint.sh"),
                                     Map.of(
                                         "key",
-                                        "flox-shim-build.sh",
+                                        "shim-build.sh",
                                         "path",
-                                        "build-assets/flox-shim-build.sh"),
+                                        "build-assets/shim-build.sh"),
                                     Map.of(
                                         "key",
-                                        "flox-shim-build.yaml",
+                                        "shim-build.yaml",
                                         "path",
-                                        "build-assets/flox-shim-build.yaml"),
+                                        "build-assets/shim-build.yaml"),
                                     Map.of(
                                         "key",
                                         "runtime-flake.nix",

@@ -16,8 +16,8 @@ This file is the canonical ownership map for shell script assets in this reposit
 | `shim-installer.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/shim-installer.sh` |
 | `shim-installer-host.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/shim-installer-host.sh` |
 | `flox-rootfs-sync.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/flox-rootfs-sync.sh` |
-| `flox-shim-build.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/flox-shim-build.sh` |
-| `flox-shim-build.yaml` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/flox-shim-build.yaml` |
+| `shim-build.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/shim-build.sh` |
+| `shim-build.yaml` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/shim-build.yaml` |
 | `install.sh` | `networking/envoy-gateway` | `networking/envoy-gateway` | `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/networking/EnvoyGatewayLayer.java` (inline ConfigMap data) |
 | `kdns-dlv.sh` | `networking/kdns` | `networking/kdns` | `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/networking/KdnsLayer.java` (inline ConfigMap data) |
 | `agent-sync.sh` | `mesh/headplane` | `mesh/headplane` | `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/mesh/HeadplaneLayer.java` (inline ConfigMap data) |
@@ -77,7 +77,7 @@ Scripts in this owner set:
 
 - `runtime/flox-containerd-shim` is the canonical owner for both installer and build-assets ConfigMaps mounted at `/scripts` and `/build-assets`.
 - Shim builder execution supports two canonical modes: `guest` (repository/local worktree) and `host` (node provisioning worktree under `/srv/host/flox-shim.d`).
-- Shim builder mode is explicit when passed: `flox-shim-build.sh [host|guest] [descriptor]`.
+- Shim builder mode is explicit when passed: `shim-build.sh [host|guest] [descriptor]`.
 - Default mode is `guest` when mode is omitted.
 - `kdns` source resolution is worktree-based (`path:` input), with subtree mode preferred at `networking/kdns/src` and explicit override available via `KDNS_SRC_WORKTREE`.
 - Deferred cleanup note: some inline mesh/runtime ConfigMaps (for example `mesh/headplane` Flox env payloads) are candidates to adopt the same deterministic serialized-asset/archive pattern now used by the Flox shim wrapper.

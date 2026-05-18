@@ -5,8 +5,8 @@ import java.nio.file.Path;
 import java.util.*;
 
 /**
- * Aggregates all LayerEnvContributor implementations and manages env var generation. Used by
- * IncusResourceBootstrap to orchestrate layer contributions.
+ * Aggregates all {@link LayerEnvContributor} implementations discovered via {@link
+ * java.util.ServiceLoader} and manages env var generation for runtime env-config synthesis.
  */
 public class LayerEnvContributorRegistry {
 

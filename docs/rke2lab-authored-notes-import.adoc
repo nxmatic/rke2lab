@@ -444,7 +444,7 @@ What now seems to be in place:
 
 * policy-controlled debug selection for both KDNS and the Flox shim wrapper
 * canonical policy propagation from Pulumi -> controlplane -> runtime env overlay -> host scripts
-* debug package selection logic in `flox-shim-build.sh`
+* debug package selection logic in `shim-build.sh`
 * debug wrapper package selection logic in `shim-installer-host.sh`
 * host install path that resolves and installs:
 ** the real shim binary (`containerd-shim-flox-v2.real`)

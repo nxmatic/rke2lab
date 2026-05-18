@@ -112,8 +112,8 @@ host::nix:flox-conf:ensure() {
 
 shim::assets:path:init() {
 	FLOX_SHIM_ROOT="/srv/host/k8s-daemonset.d/runtime/flox-containerd-shim"
-	FLOX_BUILD_SCRIPT="${FLOX_SHIM_ROOT}/flox-shim-build.sh"
-	FLOX_BUILD_DESCRIPTOR="${FLOX_SHIM_ROOT}/flox-shim-build.yaml"
+	FLOX_BUILD_SCRIPT="${FLOX_SHIM_ROOT}/shim-build.sh"
+	FLOX_BUILD_DESCRIPTOR="${FLOX_SHIM_ROOT}/shim-build.yaml"
 	FLOX_SHIM_PACKAGE_FLAKE="${FLOX_SHIM_ROOT}/flake.nix"
 	FLOX_ROOTFS_SYNC_SCRIPT="${FLOX_SHIM_ROOT}/flox-rootfs-sync.sh"
 	FLOX_SHIM_MESH_DIR="${FLOX_SHIM_ROOT}/mesh"
@@ -242,14 +242,13 @@ shim::runtime:wrapper-package:build() {
 	package_attr="packages.${nix_system}.${package_name}"
 
 	(
-		cd "${FLOX_SHIM_ROOT}"
 		nix build \
 			--system "${nix_system}" \
 			--extra-experimental-features nix-command \
 			--extra-experimental-features flakes \
 			--no-link \
 			--print-out-paths \
-			".#${package_attr}"
+			"${FLOX_SHIM_ROOT}#${package_attr}"
 	)
 }
 

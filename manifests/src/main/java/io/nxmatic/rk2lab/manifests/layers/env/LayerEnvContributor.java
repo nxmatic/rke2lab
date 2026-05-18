@@ -7,7 +7,8 @@ import java.util.Map;
 
 /**
  * Contract for layer domains to contribute environment variables. Implementations are registered
- * via ServiceLoader and aggregated by IncusResourceBootstrap.
+ * via Java Service Provider Interface metadata, discovered through {@link java.util.ServiceLoader},
+ * and aggregated by {@link LayerEnvContributorRegistry} for runtime env-config synthesis.
  */
 public interface LayerEnvContributor {
 

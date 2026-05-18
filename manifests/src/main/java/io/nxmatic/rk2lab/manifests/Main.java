@@ -31,9 +31,9 @@ public final class Main {
   private static final List<MaterializeShimAssetsCommand.EmbeddedAsset> SHIM_ASSETS =
       List.of(
           new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/flox-shim-build.sh", "flox-shim-build.sh", true),
+              "/runtime/flox-containerd-shim/shim-build.sh", "shim-build.sh", true),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/flox-shim-build.yaml", "flox-shim-build.yaml", false),
+              "/runtime/flox-containerd-shim/shim-build.yaml", "shim-build.yaml", false),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/flake.nix", "flake.nix", false),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
@@ -325,13 +325,13 @@ public final class Main {
         final Path scriptRoot =
             lockOnly ? resolveWorktreeShimAssetsRoot() : materializeShimAssetsToTemporaryRoot();
 
-        final Path buildScript = scriptRoot.resolve("flox-shim-build.sh");
+        final Path buildScript = scriptRoot.resolve("shim-build.sh");
         if (!Files.isRegularFile(buildScript)) {
           throw new IllegalStateException("Shim build script not found at: " + buildScript);
         }
 
         final Path descriptorPath =
-            (descriptor == null ? scriptRoot.resolve("flox-shim-build.yaml") : descriptor)
+            (descriptor == null ? scriptRoot.resolve("shim-build.yaml") : descriptor)
                 .toAbsolutePath()
                 .normalize();
         final String bashInterpreter = resolveBashInterpreter();
@@ -369,7 +369,7 @@ public final class Main {
 
     private Path materializeShimAssetsToTemporaryRoot() throws IOException {
       final Path workDir =
-          Files.createTempDirectory("rke2lab-flox-shim-build-").toRealPath().normalize();
+          Files.createTempDirectory("rke2lab-shim-build-").toRealPath().normalize();
       new MaterializeShimAssetsCommand.Builder(Main.this)
           .outputDir(workDir)
           .assets(SHIM_ASSETS)
@@ -384,7 +384,7 @@ public final class Main {
       while (current != null) {
         final Path candidate = current.resolve(WORKTREE_SHIM_ASSETS_RELATIVE_PATH).normalize();
         if (Files.isDirectory(candidate)
-            && Files.isRegularFile(candidate.resolve("flox-shim-build.sh"))) {
+            && Files.isRegularFile(candidate.resolve("shim-build.sh"))) {
           logger.info("Using worktree shim assets for lock update: {}", candidate);
           return candidate;
         }
