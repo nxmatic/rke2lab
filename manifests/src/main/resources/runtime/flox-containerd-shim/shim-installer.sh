@@ -85,6 +85,7 @@ installer::pod:materialize_assets() {
 
 	install -D -m 0755 "${SCRIPT_MOUNT_DIR}/shim-installer.sh" "${HOST_SCRIPT_ROOT}/shim-installer.sh"
 	install -D -m 0644 "${SCRIPT_POLICY_DIR}/daemonset-logging.sh" "${HOST_SCRIPT_ROOT}/.sh.d/daemonset-logging.sh"
+	install -D -m 0644 "${SCRIPT_POLICY_DIR}/daemonless-host-asset-materializer.sh" "${HOST_SCRIPT_ROOT}/.sh.d/daemonless-host-asset-materializer.sh"
 	install -D -m 0644 "${SCRIPT_POLICY_DIR}/daemonless-trampoline.sh" "${HOST_SCRIPT_ROOT}/.sh.d/daemonless-trampoline.sh"
 
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/shim-build.sh" "${HOST_SCRIPT_ROOT}/shim-build.sh"
