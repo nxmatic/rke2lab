@@ -2,7 +2,6 @@
 :toc: left
 :toclevels: 3
 :kroki-server-url: https://kroki.io
-:plantuml-server-url: {kroki-server-url}/plantuml
 
 This note replaces the earlier operator-centered next-plan note with the current intended in-cluster ownership model.
 
@@ -96,92 +95,69 @@ The following guardrails remain strict:
 
 == C4 context view
 
-[plantuml,post-bootstrap-ownership-context,svg]
-....
-@startuml
-!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+[mermaid,post-bootstrap-ownership-context,svg]
+----
+flowchart LR
+    operator[Operator]
+    controlplane[controlplane<br/>Stage A external bootstrap]
+    cluster[Management cluster<br/>In-cluster controllers and workloads]
+    artifactStore[Artifact + source systems<br/>Git repos, registries, release inputs]
+    nodeHosts[Cluster nodes<br/>Host-local runtime surface]
 
-title Post-bootstrap ownership context
+    operator --> controlplane
+    controlplane --> cluster
+    cluster --> artifactStore
+    cluster --> nodeHosts
+----
 
-Person(operator, "Operator", "Runs bootstrap, reviews pipelines, approves operational changes")
-System_Ext(controlplane, "controlplane (Stage A)", "External Pulumi bootstrap authority")
-System(cluster, "Management cluster", "In-cluster controllers and managed workloads")
-System_Ext(artifactStore, "Artifact + source systems", "Git repositories, registries, release inputs")
-System_Ext(nodeHosts, "Cluster nodes", "Node hosts that require local runtime reconciliation")
-
-Rel(operator, controlplane, "Runs Stage A bootstrap and reviews handoff")
-Rel(controlplane, cluster, "Provisions seed cluster and installs in-cluster controllers")
-Rel(cluster, artifactStore, "Consumes source, manifests, and artifacts")
-Rel(cluster, nodeHosts, "Reconciles machines, add-ons, workflows, and host-local runtime state")
-
-SHOW_LEGEND()
-@enduml
-....
+At the context level, the important point is that `controlplane` remains outside the cluster for Stage A bootstrap, while the management cluster becomes the home of the long-lived controllers that own machine lifecycle, declarative rollout, workflow execution, and node-local reconciliation.
 
 == C4 container view
 
-[plantuml,post-bootstrap-ownership-container,svg]
-....
-@startuml
-!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+[mermaid,post-bootstrap-ownership-container,svg]
+----
+flowchart LR
+    operator[Operator]
+        controlplane[controlplane<br/>Stage A external bootstrap]
+        artifactStore[Artifact + source systems<br/>Git repos, registries, release inputs]
 
-title Post-bootstrap ownership container view
+    subgraph Cluster[Management cluster]
+            capi[CAPI + CAPN + CAPRKE2<br/>Non-seed machine lifecycle]
+            gitops[GitOps controller<br/>Declarative add-on reconciliation]
+            workflows[Workflow/pipeline controller<br/>Build, promotion, delivery workflows]
+            nodelocal[Node-local reconcilers<br/>Host-local runtime reconciliation]
+    end
 
-Person(operator, "Operator", "Runs bootstrap and reviews cluster operations")
-System_Ext(controlplane, "controlplane (Stage A)", "External Pulumi bootstrap authority")
-System_Ext(artifactStore, "Artifact + source systems", "Git repos, registries, release inputs")
+    operator --> controlplane
+    controlplane --> capi
+    controlplane --> gitops
+    controlplane --> workflows
+    controlplane --> nodelocal
+    gitops --> artifactStore
+    workflows --> artifactStore
+    workflows --> gitops
+    capi --> nodelocal
+----
 
-System_Boundary(cluster, "Management cluster") {
-  Container(capi, "CAPI + CAPN + CAPRKE2", "Kubernetes controllers", "Owns non-seed machine lifecycle")
-  Container(gitops, "GitOps controller", "Kubernetes controller", "Owns declarative add-on reconciliation")
-  Container(workflows, "Workflow/pipeline controller", "Kubernetes controller", "Owns build, promotion, and delivery workflows")
-  Container(nodelocal, "Node-local reconcilers", "DaemonSet / privileged controller", "Own ongoing host-local runtime reconciliation")
-}
-
-Rel(operator, controlplane, "Runs Stage A bootstrap")
-Rel(controlplane, capi, "Installs and hands off machine lifecycle")
-Rel(controlplane, gitops, "Installs declarative reconciliation layer")
-Rel(controlplane, workflows, "Installs workflow execution layer")
-Rel(controlplane, nodelocal, "Installs node-local reconciliation layer")
-
-Rel(capi, nodelocal, "Provides nodes that host local reconcilers")
-Rel(gitops, artifactStore, "Pulls declarative add-on sources")
-Rel(workflows, artifactStore, "Builds, tests, promotes, and publishes outputs")
-Rel(workflows, gitops, "Produces inputs consumed by declarative reconciliation")
-
-SHOW_LEGEND()
-@enduml
-....
+This container view keeps the same ownership logic used elsewhere in the repo: Stage A installs the in-cluster control surfaces, then each controller owns a narrow concern instead of creating a single giant post-bootstrap brain.
 
 == C4 dynamic view
 
-[plantuml,post-bootstrap-ownership-dynamic,svg]
-....
-@startuml
-!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Dynamic.puml
+[mermaid,post-bootstrap-ownership-dynamic,svg]
+----
+flowchart TD
+    step1[1. Operator runs Stage A bootstrap<br/>through controlplane]
+    step2[2. controlplane provisions seed cluster<br/>and emits handoff outputs]
+    step3[3. CAPI + CAPN + CAPRKE2 take over<br/>non-seed machine lifecycle]
+    step4[4. GitOps controllers take over<br/>declarative add-on reconciliation]
+    step5[5. Workflow/pipeline controller takes over<br/>build, promotion, and delivery workflows]
+    step6[6. Node-local reconcilers replace durable<br/>host-mutation shell flows over time]
+    step7[7. Workflow outputs feed GitOps and<br/>GitOps policy shapes node-local behavior]
 
-title Post-bootstrap handoff dynamic view
+    step1 --> step2 --> step3 --> step4 --> step5 --> step6 --> step7
+----
 
-Person(operator, "Operator", "Runs bootstrap and approves transitions")
-System_Ext(controlplane, "controlplane (Stage A)", "External bootstrap authority")
-Container_Boundary(cluster, "Management cluster") {
-  Container(capi, "CAPI + CAPN + CAPRKE2", "Controllers", "Node lifecycle owner")
-  Container(gitops, "GitOps controller", "Controller", "Declarative add-on owner")
-  Container(workflows, "Workflow/pipeline controller", "Controller", "Build/promotion/delivery owner")
-  Container(nodelocal, "Node-local reconcilers", "DaemonSet/controller", "Host-local reconciliation owner")
-}
-
-Rel(operator, controlplane, "1. Runs Stage A bootstrap")
-Rel(controlplane, capi, "2. Installs CAPI stack and hands off non-seed machine lifecycle")
-Rel(controlplane, gitops, "3. Installs GitOps controllers")
-Rel(controlplane, workflows, "4. Installs workflow/pipeline controller")
-Rel(controlplane, nodelocal, "5. Installs node-local reconcilers for durable host runtime concerns")
-Rel(workflows, gitops, "6. Produces promoted outputs for declarative rollout")
-Rel(gitops, nodelocal, "7. Reconciles desired add-ons that shape node-local policy inputs")
-
-SHOW_LEGEND()
-@enduml
-....
+The dynamic view is intentionally simple: bootstrap first, hand off machine lifecycle second, bring declarative and workflow control inward third, and then progressively replace durable host-mutation shell flows with node-local reconciliation.
 
 == Summary
 
