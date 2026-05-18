@@ -13,6 +13,7 @@ import com.pulumi.incus.Profile;
 import com.pulumi.incus.ProfileArgs;
 import com.pulumi.incus.Project;
 import com.pulumi.incus.ProjectArgs;
+import com.pulumi.incus.inputs.GetInstancePlainArgs;
 import com.pulumi.incus.inputs.GetNetworkPlainArgs;
 import com.pulumi.incus.inputs.GetProfilePlainArgs;
 import com.pulumi.incus.inputs.GetProjectPlainArgs;
@@ -20,6 +21,7 @@ import com.pulumi.incus.inputs.InstanceDeviceArgs;
 import com.pulumi.incus.inputs.ProfileDeviceArgs;
 import com.pulumi.resources.CustomResourceOptions;
 import com.pulumi.resources.Resource;
+import io.nxmatic.rk2lab.controlplane.SeedLog;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig.WorktreeHost;
 import io.nxmatic.rk2lab.controlplane.incus.image.PulumiIncusImageProvider;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
@@ -40,6 +42,7 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Enumeration;
@@ -47,6 +50,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Matcher;
@@ -162,15 +166,23 @@ public final class IncusResourceBootstrap {
     private Instance instance;
 
     private ApplyPipeline resolvePaths() {
+      final long startedAt = System.nanoTime();
+      logInfo("phase resolvePaths: starting");
       final Path localWorktreeRoot = config.worktreeDirOn(WorktreeHost.DARWIN);
       this.localPaths =
           BootstrapPaths.fromLocalWorktree(
               localWorktreeRoot, config.clusterName(), config.nodeName());
       this.nixosPaths = localPaths.asHostView(config, WorktreeHost.NIXOS);
+      logInfo("phase resolvePaths: complete after " + elapsedSince(startedAt));
       return this;
     }
 
     private ApplyPipeline prepareHostState() {
+      final long startedAt = System.nanoTime();
+      logInfo(
+          "phase prepareHostState: starting (mode="
+              + (Deployment.getInstance().isDryRun() ? "preview" : "apply")
+              + ")");
       HostAssetRootLifecycle.prepareCleanHostAssetRoot(localPaths.assetsRoot());
       classpathAssetMaterializer.materializeIncusAssets(localPaths.assetsRoot());
       classpathAssetMaterializer.materializeManifests(localPaths.manifestsRoot());
@@ -188,6 +200,12 @@ public final class IncusResourceBootstrap {
           localPaths.runtimeCloudConfigRoot(), localPaths.cloudSeedRoot());
       this.provisioningChecksum = ProvisioningResourceInventory.checksum(localPaths);
       ensureLaunchSecretsToken(localPaths.secretsFile());
+      logInfo(
+          "phase prepareHostState: complete after "
+              + elapsedSince(startedAt)
+              + " (provisioningChecksum="
+              + provisioningChecksum
+              + ")");
       return this;
     }
 
@@ -207,20 +225,34 @@ public final class IncusResourceBootstrap {
     }
 
     private ApplyPipeline prepareProviderResources() {
+      final long startedAt = System.nanoTime();
+      logInfo("phase prepareProviderResources: starting");
       this.providerContext = IncusProviderContext.forBootstrap("seed-incus-provider", config);
       this.ensuredProject = ensureProject(providerContext);
       this.ensuredProjectName = ensuredProject.name();
       ensureNetwork(providerContext, config.lanBridgeParent(), ensuredProject);
       ensureNetwork(providerContext, config.vmnetNetworkName(), ensuredProject);
       this.ensuredProfileName = ensureProfile(providerContext, ensuredProject);
+      final long imageStartAt = System.nanoTime();
+      logInfo(
+          "phase prepareProviderResources: ensuring seed image fingerprint "
+              + "(mode="
+              + (Deployment.getInstance().isDryRun() ? "preview" : "apply")
+              + ")");
       this.ensuredImageFingerprint =
           imageProvider.ensureSeedImageFingerprint(
               providerContext.invokeOptions(), providerContext.provider(), ensuredProject);
+      logInfo(
+          "phase prepareProviderResources: seed image fingerprint scheduled after "
+              + elapsedSince(imageStartAt));
       this.imageBuildChecksum = imageProvider.buildChecksum();
+      logInfo("phase prepareProviderResources: complete after " + elapsedSince(startedAt));
       return this;
     }
 
     private ApplyPipeline createInstance() {
+      final long startedAt = System.nanoTime();
+      logInfo("phase createInstance: starting");
       final Map<String, String> instanceConfig = new LinkedHashMap<>();
       instanceConfig.put(
           "raw.lxc",
@@ -248,13 +280,16 @@ public final class IncusResourceBootstrap {
                   .running(true)
                   .devices(seedInstanceDevices(nixosPaths))
                   .build(),
-              CustomResourceOptions.builder()
-                  .provider(providerContext.provider())
-                  .ignoreChanges(List.of("image"))
-                  .replaceOnChanges(List.of("config"))
-                  .deleteBeforeReplace(true)
-                  .build());
+              instanceOptions());
+      logInfo("phase createInstance: complete after " + elapsedSince(startedAt));
       return this;
+    }
+
+    private CustomResourceOptions instanceOptions() {
+      return CustomResourceOptions.builder()
+          .provider(providerContext.provider())
+          .ignoreChanges(List.of("image"))
+          .build();
     }
 
     private BootstrapResult toResult() {
@@ -283,6 +318,14 @@ public final class IncusResourceBootstrap {
         return normalizedPath.toString();
       }
     }
+  }
+
+  private static void logInfo(String message) {
+    SeedLog.debug("bootstrap", message);
+  }
+
+  private static String elapsedSince(long startedAtNanos) {
+    return Duration.ofNanos(System.nanoTime() - startedAtNanos).toString();
   }
 
   private Project ensureProject(IncusProviderContext context) {
@@ -863,6 +906,26 @@ public final class IncusResourceBootstrap {
 
   private void ensureNetwork(
       IncusProviderContext context, String networkName, Resource projectDependency) {
+    if (networkName.equals(config.lanBridgeParent())
+        || networkName.equals(config.vmnetNetworkName())) {
+      // Canonical Stage A policy: host-provided bridges are external/unmanaged.
+      // Never declare them as provider-managed resources in the stack.
+      logInfo(
+          "incus network ensure: skipping canonical host-provided bridge (name="
+              + networkName
+              + ")");
+      return;
+    }
+
+    if (incusImportLookup.isUnmanagedNetwork(context, networkName, config.incusProject())) {
+      // Additional safeguard for any non-canonical network that provider reports unmanaged.
+      logInfo(
+          "incus network ensure: skipping unmanaged bridge reported by provider (name="
+              + networkName
+              + ")");
+      return;
+    }
+
     final String existingNetworkId =
         incusImportLookup.normalizeImportId(
             incusImportLookup.existingNetworkId(context, networkName, config.incusProject()));
@@ -1373,42 +1436,190 @@ public final class IncusResourceBootstrap {
 
     private static final IncusImportLookup INSTANCE = new IncusImportLookup();
 
+    private static final long PREVIEW_INVOKE_TIMEOUT_SECONDS = 10;
+
+    private static final long APPLY_INVOKE_TIMEOUT_SECONDS = 20;
+
+    private enum LookupState {
+      FOUND,
+      NOT_FOUND,
+      FAILED
+    }
+
+    private record LookupResult(String importId, LookupState state, Boolean managed) {
+
+      private static LookupResult found(String importId, Boolean managed) {
+        return new LookupResult(importId, LookupState.FOUND, managed);
+      }
+
+      private static LookupResult notFound() {
+        return new LookupResult("", LookupState.NOT_FOUND, null);
+      }
+
+      private static LookupResult failed() {
+        return new LookupResult("", LookupState.FAILED, null);
+      }
+    }
+
     private IncusImportLookup() {}
 
+    private long invokeTimeoutSeconds() {
+      try {
+        return Deployment.getInstance().isDryRun()
+            ? PREVIEW_INVOKE_TIMEOUT_SECONDS
+            : APPLY_INVOKE_TIMEOUT_SECONDS;
+      } catch (Exception ignored) {
+        return APPLY_INVOKE_TIMEOUT_SECONDS;
+      }
+    }
+
     private String existingProjectId(IncusProviderContext context, String projectName) {
+      final long startedAt = System.nanoTime();
+      logInfo("incus lookup getProject: start name=" + projectName);
       try {
         final var project =
             IncusFunctions.getProjectPlain(
                     GetProjectPlainArgs.builder().name(projectName).build(),
                     context.invokeOptions())
+                .orTimeout(invokeTimeoutSeconds(), TimeUnit.SECONDS)
                 .join();
         if (project == null) {
+          logInfo(
+              "incus lookup getProject: complete after "
+                  + elapsedSince(startedAt)
+                  + " (result=not-found)");
           return "";
         }
 
         final String providerId = normalizeImportId(project.id());
         if (!providerId.isBlank()) {
+          logInfo(
+              "incus lookup getProject: complete after "
+                  + elapsedSince(startedAt)
+                  + " (result=id)");
           return providerId;
         }
 
+        logInfo(
+            "incus lookup getProject: complete after "
+                + elapsedSince(startedAt)
+                + " (result=name)");
         return normalizeImportId(project.name());
-      } catch (Exception ignored) {
+      } catch (Exception ex) {
+        logInfo(
+            "incus lookup getProject: failed after "
+                + elapsedSince(startedAt)
+                + " ("
+                + summarizeLookupFailure(ex)
+                + ")");
         return "";
       }
     }
 
     private String existingNetworkId(
         IncusProviderContext context, String networkName, String incusProject) {
-      final String projectScoped =
+      final LookupResult projectScoped =
           resolveNetworkImportId(
               context,
               GetNetworkPlainArgs.builder().name(networkName).project(incusProject).build());
-      if (!projectScoped.isBlank()) {
-        return projectScoped;
+      if (projectScoped.state() == LookupState.FOUND) {
+        return projectScoped.importId();
+      }
+      if (projectScoped.state() == LookupState.FAILED) {
+        final String fallbackImportId = normalizeImportId(networkName);
+        logInfo(
+            "incus lookup getNetwork: using deterministic fallback import ID after scoped lookup"
+                + " failure"
+                + " (name="
+                + networkName
+                + ", fallbackImportId="
+                + fallbackImportId
+                + ")");
+        return fallbackImportId;
       }
 
       return resolveNetworkImportId(
-          context, GetNetworkPlainArgs.builder().name(networkName).build());
+              context, GetNetworkPlainArgs.builder().name(networkName).build())
+          .importId();
+    }
+
+    private String existingInstanceId(
+        IncusProviderContext context, String instanceName, String incusProject) {
+      final long startedAt = System.nanoTime();
+      logInfo("incus lookup getInstance: start name=" + instanceName);
+      try {
+        final var instance =
+            IncusFunctions.getInstancePlain(
+                    GetInstancePlainArgs.builder().name(instanceName).project(incusProject).build(),
+                    context.invokeOptions())
+                .orTimeout(invokeTimeoutSeconds(), TimeUnit.SECONDS)
+                .join();
+        if (instance == null) {
+          logInfo(
+              "incus lookup getInstance: complete after "
+                  + elapsedSince(startedAt)
+                  + " (result=not-found)");
+          return "";
+        }
+
+        final String providerId = normalizeImportId(instance.id());
+        if (!providerId.isBlank()) {
+          logInfo(
+              "incus lookup getInstance: complete after "
+                  + elapsedSince(startedAt)
+                  + " (result=id)");
+          return providerId;
+        }
+
+        logInfo(
+            "incus lookup getInstance: complete after "
+                + elapsedSince(startedAt)
+                + " (result=name)");
+        return normalizeImportId(instance.name());
+      } catch (Exception ex) {
+        logInfo(
+            "incus lookup getInstance: failed after "
+                + elapsedSince(startedAt)
+                + " ("
+                + summarizeLookupFailure(ex)
+                + ")");
+        return "";
+      }
+    }
+
+    private boolean isUnmanagedNetwork(
+        IncusProviderContext context, String networkName, String incusProject) {
+      final LookupResult projectScoped =
+          resolveNetworkImportId(
+              context,
+              GetNetworkPlainArgs.builder().name(networkName).project(incusProject).build());
+      if (projectScoped.state() == LookupState.FOUND) {
+        return Boolean.FALSE.equals(projectScoped.managed());
+      }
+      if (projectScoped.state() == LookupState.FAILED) {
+        logInfo(
+            "incus lookup getNetwork(managed): unable to determine managed state after scoped"
+                + " lookup failure"
+                + " (name="
+                + networkName
+                + ")");
+        return false;
+      }
+
+      final LookupResult unscoped =
+          resolveNetworkImportId(context, GetNetworkPlainArgs.builder().name(networkName).build());
+      if (unscoped.state() == LookupState.FOUND) {
+        return Boolean.FALSE.equals(unscoped.managed());
+      }
+      if (unscoped.state() == LookupState.FAILED) {
+        logInfo(
+            "incus lookup getNetwork(managed): unable to determine managed state after unscoped"
+                + " lookup failure"
+                + " (name="
+                + networkName
+                + ")");
+      }
+      return false;
     }
 
     private String existingProfileId(
@@ -1417,40 +1628,105 @@ public final class IncusResourceBootstrap {
           context, GetProfilePlainArgs.builder().name(profileName).project(incusProject).build());
     }
 
-    private String resolveNetworkImportId(IncusProviderContext context, GetNetworkPlainArgs args) {
+    private LookupResult resolveNetworkImportId(
+        IncusProviderContext context, GetNetworkPlainArgs args) {
+      final long startedAt = System.nanoTime();
+      logInfo("incus lookup getNetwork: start name=" + args.name());
       try {
-        final var network = IncusFunctions.getNetworkPlain(args, context.invokeOptions()).join();
+        final var network =
+            IncusFunctions.getNetworkPlain(args, context.invokeOptions())
+                .orTimeout(invokeTimeoutSeconds(), TimeUnit.SECONDS)
+                .join();
         if (network == null) {
-          return "";
+          logInfo(
+              "incus lookup getNetwork: complete after "
+                  + elapsedSince(startedAt)
+                  + " (result=not-found)");
+          return LookupResult.notFound();
         }
 
         final String providerId = normalizeImportId(network.id());
+        final Boolean managed = network.managed();
         if (!providerId.isBlank()) {
-          return providerId;
+          logInfo(
+              "incus lookup getNetwork: complete after "
+                  + elapsedSince(startedAt)
+                  + " (result=id)");
+          return LookupResult.found(providerId, managed);
         }
 
-        return normalizeImportId(network.name());
-      } catch (Exception ignored) {
-        return "";
+        logInfo(
+            "incus lookup getNetwork: complete after "
+                + elapsedSince(startedAt)
+                + " (result=name)");
+        return LookupResult.found(normalizeImportId(network.name()), managed);
+      } catch (Exception ex) {
+        logInfo(
+            "incus lookup getNetwork: failed after "
+                + elapsedSince(startedAt)
+                + " ("
+                + summarizeLookupFailure(ex)
+                + ")");
+        return LookupResult.failed();
       }
     }
 
     private String resolveProfileImportId(IncusProviderContext context, GetProfilePlainArgs args) {
+      final long startedAt = System.nanoTime();
+      logInfo("incus lookup getProfile: start name=" + args.name());
       try {
-        final var profile = IncusFunctions.getProfilePlain(args, context.invokeOptions()).join();
+        final var profile =
+            IncusFunctions.getProfilePlain(args, context.invokeOptions())
+                .orTimeout(invokeTimeoutSeconds(), TimeUnit.SECONDS)
+                .join();
         if (profile == null) {
+          logInfo(
+              "incus lookup getProfile: complete after "
+                  + elapsedSince(startedAt)
+                  + " (result=not-found)");
           return "";
         }
 
         final String providerId = normalizeImportId(profile.id());
         if (!providerId.isBlank()) {
+          logInfo(
+              "incus lookup getProfile: complete after "
+                  + elapsedSince(startedAt)
+                  + " (result=id)");
           return providerId;
         }
 
+        logInfo(
+            "incus lookup getProfile: complete after "
+                + elapsedSince(startedAt)
+                + " (result=name)");
         return normalizeImportId(profile.name());
-      } catch (Exception ignored) {
+      } catch (Exception ex) {
+        logInfo(
+            "incus lookup getProfile: failed after "
+                + elapsedSince(startedAt)
+                + " ("
+                + summarizeLookupFailure(ex)
+                + ")");
         return "";
       }
+    }
+
+    private String summarizeLookupFailure(Exception ex) {
+      if (ex == null) {
+        return "unknown";
+      }
+
+      Throwable root = ex;
+      while (root.getCause() != null
+          && (root instanceof java.util.concurrent.CompletionException
+              || root instanceof java.util.concurrent.ExecutionException)) {
+        root = root.getCause();
+      }
+
+      final String type = root.getClass().getSimpleName();
+      final String message = root.getMessage() == null ? "" : root.getMessage().trim();
+      return message.isBlank() ? type : type + ": " + message;
     }
 
     private String normalizeImportId(String value) {

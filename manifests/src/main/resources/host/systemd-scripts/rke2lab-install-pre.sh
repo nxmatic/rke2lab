@@ -39,6 +39,7 @@ kdns::manifest:patch() {
 		RKE2LAB_POLICY_DEBUG_KDNS_RUNTIME_CLASS="${runtime_class}" \
 		yq eval -i '
       .spec.template.metadata.annotations."flox.dev/environment" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV) |
+       .spec.template.metadata.annotations."flox.dev/debug" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_ENABLED) |
       .spec.template.metadata.annotations."debug.kdns.lab42/enabled" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_ENABLED) |
       .spec.template.spec.runtimeClassName = strenv(RKE2LAB_POLICY_DEBUG_KDNS_RUNTIME_CLASS)
     ' "${deployment_manifest}"

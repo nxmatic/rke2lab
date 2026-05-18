@@ -1,13 +1,13 @@
-encryptionsalt: v1:xMDtRI3wyG0=:v1:ICt2WTzvSKh6RHMl:uybaGDMimJ3BrdAvp5drV+inZrLVTA==
+encryptionsalt: v1:egSmVjEn+Rc=:v1:tDy9P3PFPKGpSmW7:ohDWaFDPxvO+kWbTRVEh6BJCDHHuag==
 config:
   "rke2lab:cluster.name": bioskop
   "rke2lab:node.name": master
   "rke2lab:incus.project": rke2lab
   "rke2lab:incus.defaultRemote": bioskop-nixos
-  "rke2lab:incus.remoteAddress": https://bioskop-nixos.local:8443
+  "rke2lab:incus.remoteAddress": https://bioskop-nixos:8443
   "rke2lab:image.alias": control-node
   "rke2lab:image.builderBinary": distrobuilder
-  "rke2lab:image.builderHost": bioskop-nixos.local
+  "rke2lab:image.builderHost": bioskop-nixos
   "rke2lab:image.distrobuilderConfig": classpath:/incus/incus-distrobuilder.yaml
   "rke2lab:image.sharedFolder": .local.d/var/lib/distrobuilder
   "rke2lab:network.lanBridgeParent": lan-br

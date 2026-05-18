@@ -14,6 +14,23 @@ Canonical network addressing derivation and integration contracts for rke2lab cl
 - `controlplane` may contribute provider/runtime orchestration, but network derivation semantics
 	remain centralized in `netplan`.
 
+## Nix integration note (`nix-darwin-home`)
+
+`rke2lab-netplan` is now the canonical source of truth for cluster underlay addressing that is
+mirrored into the `nix-darwin-home` network catalog (`catalog.networks.rke2labNetplan`).
+
+Integration intent:
+
+- Keep one canonical network model in `rke2lab-netplan` (supernet, per-cluster slice CIDRs,
+	gateway conventions, and stable cluster indexing).
+- Consume those values in `nix-darwin-home` host modules for static routes, Lima cluster mapping,
+	and D-Bus TCP bind addresses.
+- Avoid hand-maintained duplicate CIDRs in host-specific Nix code paths; derive from the shared
+	catalog shape instead.
+
+When netplan blueprint semantics change, update this module first and then propagate catalog
+consumers in `nix-darwin-home` so both repos remain contract-aligned.
+
 ## Net2Plan endpoint contract (future integration)
 
 The netplan API already accepts an optional Net2Plan endpoint contract so mesh/topology planner integration can be added without changing request contracts.

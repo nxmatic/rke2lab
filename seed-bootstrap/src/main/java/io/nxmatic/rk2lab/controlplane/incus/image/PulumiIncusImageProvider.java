@@ -12,6 +12,7 @@ import com.pulumi.incus.inputs.ImageAliasArgs;
 import com.pulumi.incus.inputs.ImageSourceFileArgs;
 import com.pulumi.resources.CustomResourceOptions;
 import com.pulumi.resources.Resource;
+import io.nxmatic.rk2lab.controlplane.SeedLog;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig.WorktreeHost;
 import java.io.IOException;
@@ -24,6 +25,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
@@ -62,27 +64,53 @@ public final class PulumiIncusImageProvider {
 
   public Output<String> ensureSeedImageFingerprint(
       InvokeOptions invokeOptions, Provider provider, Resource projectDependency) {
+    final long startedAt = System.nanoTime();
+    logInfo("ensureSeedImageFingerprint: starting");
     final Path workspace = config.worktreeDirOn(WorktreeHost.DARWIN);
     final Path distrobuilderConfigPath = materializeDistrobuilderConfig(workspace);
     this.lastBuildChecksum = computeBuildChecksum(distrobuilderConfigPath);
+    logInfo("ensureSeedImageFingerprint: computed build checksum after " + elapsedSince(startedAt));
 
+    final long existingLookupStartedAt = System.nanoTime();
     final String existingFingerprint = resolveExistingImageFingerprint(invokeOptions);
     if (!existingFingerprint.isBlank()) {
+      logInfo(
+          "ensureSeedImageFingerprint: reusing existing image fingerprint after "
+              + elapsedSince(existingLookupStartedAt)
+              + " (fingerprint="
+              + existingFingerprint
+              + ")");
       return Output.of(existingFingerprint);
     }
+    logInfo(
+        "ensureSeedImageFingerprint: existing image lookup completed after "
+            + elapsedSince(existingLookupStartedAt)
+            + " (no reusable alias found)");
 
     final boolean preview = isDryRun();
     if (preview) {
+      final long previewArtifactsStartedAt = System.nanoTime();
       final Path artifactDir = resolveReadableLocalArtifactDir(resolveArtifactDir(workspace));
+      logInfo(
+          "ensureSeedImageFingerprint: preview artifact directory resolved after "
+              + elapsedSince(previewArtifactsStartedAt)
+              + " (artifactDir="
+              + artifactDir
+              + ")");
       final BuiltImageArtifacts previewArtifacts =
           new BuiltImageArtifacts(
               artifactDir.resolve(INCUS_METADATA_FILENAME),
               artifactDir.resolve(INCUS_ROOTFS_FILENAME));
+      logInfo("ensureSeedImageFingerprint: preview mode scheduling image resource from artifacts");
       return createSeedImageFromArtifacts(provider, previewArtifacts, projectDependency)
           .fingerprint();
     }
 
+    final long localArtifactsStartedAt = System.nanoTime();
     final BuiltImageArtifacts artifacts = ensureLocalImageArtifacts();
+    logInfo(
+        "ensureSeedImageFingerprint: local artifacts ensured after "
+            + elapsedSince(localArtifactsStartedAt));
     return createSeedImageFromArtifacts(provider, artifacts, projectDependency).fingerprint();
   }
 
@@ -139,6 +167,8 @@ public final class PulumiIncusImageProvider {
   }
 
   private BuiltImageArtifacts ensureLocalImageArtifacts() {
+    final long startedAt = System.nanoTime();
+    logInfo("ensureLocalImageArtifacts: starting");
     final Path workspace = config.worktreeDirOn(WorktreeHost.DARWIN);
     final Path artifactDir = resolveArtifactDir(workspace);
     final Path distrobuilderConfigPath = materializeDistrobuilderConfig(workspace);
@@ -152,6 +182,8 @@ public final class PulumiIncusImageProvider {
     if (Files.exists(metadataPath)
         && Files.exists(dataPath)
         && checksumMarkerMatches(checksumMarkerPath, expectedBuildChecksum)) {
+      logInfo(
+          "ensureLocalImageArtifacts: reusing existing artifacts after " + elapsedSince(startedAt));
       return new BuiltImageArtifacts(metadataPath, dataPath);
     }
 
@@ -187,7 +219,16 @@ public final class PulumiIncusImageProvider {
               + artifactDir);
     }
 
+    logInfo("ensureLocalImageArtifacts: complete after " + elapsedSince(startedAt));
     return new BuiltImageArtifacts(metadataPath, dataPath);
+  }
+
+  private static void logInfo(String message) {
+    SeedLog.debug("seed-image", message);
+  }
+
+  private static String elapsedSince(long startedAtNanos) {
+    return Duration.ofNanos(System.nanoTime() - startedAtNanos).toString();
   }
 
   private String computeBuildChecksum(Path distrobuilderConfigPath) {

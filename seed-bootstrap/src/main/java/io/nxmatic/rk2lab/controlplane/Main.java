@@ -50,22 +50,34 @@ public final class Main {
 
     Pulumi.run(
         context -> {
-          final Config config = context.config("rke2lab");
-          final BootstrapConfig bootstrapConfig =
-              new BootstrapConfig.Builder().applyConfig(config).build();
-          final ControlplanePolicy controlplanePolicy = ControlplanePolicy.from(config);
-          final boolean readinessEnabled = resolveReadinessEnabled(config);
-          final boolean cleanWorktreeRequired = resolveCleanWorktreeRequired(config);
-          final Consumer<String> readinessLogger =
-              message -> context.log().info("[readiness] " + message);
-          final BootstrapOutputs outputs =
-              bootstrapAndCollectOutputs(
-                  bootstrapConfig,
-                  controlplanePolicy,
-                  readinessEnabled,
-                  cleanWorktreeRequired,
-                  readinessLogger);
-          outputs.values().forEach(context::export);
+          SeedLog.installPulumiLogSink(
+              (event, message) -> {
+                switch (event) {
+                  case ERROR -> context.log().error(message);
+                  case WARN -> context.log().warn(message);
+                  case INFO -> context.log().info(message);
+                  case DEBUG, TRACE -> context.log().debug(message);
+                }
+              });
+          try {
+            final Config config = context.config("rke2lab");
+            final BootstrapConfig bootstrapConfig =
+                new BootstrapConfig.Builder().applyConfig(config).build();
+            final ControlplanePolicy controlplanePolicy = ControlplanePolicy.from(config);
+            final boolean readinessEnabled = resolveReadinessEnabled(config);
+            final boolean cleanWorktreeRequired = resolveCleanWorktreeRequired(config);
+            final Consumer<String> readinessLogger = message -> SeedLog.info("readiness", message);
+            final BootstrapOutputs outputs =
+                bootstrapAndCollectOutputs(
+                    bootstrapConfig,
+                    controlplanePolicy,
+                    readinessEnabled,
+                    cleanWorktreeRequired,
+                    readinessLogger);
+            outputs.values().forEach(context::export);
+          } finally {
+            SeedLog.clearPulumiLogSink();
+          }
         });
   }
 
@@ -275,15 +287,15 @@ public final class Main {
   private static void runStandalone() {
     final BootstrapConfig bootstrapConfig = new BootstrapConfig.Builder().build();
     final ControlplanePolicy controlplanePolicy = ControlplanePolicy.defaults();
-    final Consumer<String> readinessLogger =
-        message -> System.out.println("[readiness] " + message);
+    final Consumer<String> readinessLogger = message -> SeedLog.info("readiness", message);
     final BootstrapOutputs outputs =
         bootstrapAndCollectOutputs(
             bootstrapConfig, controlplanePolicy, true, true, readinessLogger);
-    System.out.println(
+    SeedLog.info(
+        "standalone",
         "Pulumi engine not detected (missing PULUMI_MONITOR). Running in standalone mode.");
-    System.out.println("Bootstrap outputs:");
-    outputs.values().forEach((key, value) -> System.out.println(key + "=" + value));
+    SeedLog.info("standalone", "Bootstrap outputs:");
+    outputs.values().forEach((key, value) -> SeedLog.info("standalone", key + "=" + value));
   }
 
   private static boolean resolveReadinessEnabled(Config config) {

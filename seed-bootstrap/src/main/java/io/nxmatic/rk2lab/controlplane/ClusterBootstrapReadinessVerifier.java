@@ -37,7 +37,7 @@ public final class ClusterBootstrapReadinessVerifier {
   private static final Duration LOG_PROGRESS_INTERVAL = Duration.ofSeconds(30);
 
   private static final Consumer<String> DEFAULT_LOGGER =
-      message -> System.out.println("[readiness] " + message);
+      message -> SeedLog.info("readiness", message);
 
   private static final ThreadLocal<Consumer<String>> ACTIVE_LOGGER =
       ThreadLocal.withInitial(() -> DEFAULT_LOGGER);

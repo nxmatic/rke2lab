@@ -6,7 +6,7 @@ import java.util.Map;
 public record DebugPolicy(boolean kdnsEnabled, boolean floxShimWrapperEnabled) {
 
   public String kdnsFloxEnvironment() {
-    return kdnsEnabled ? "nxmatic/kdns-debug" : "nxmatic/kdns";
+    return "nxmatic/kdns";
   }
 
   public String kdnsRuntimeClass() {

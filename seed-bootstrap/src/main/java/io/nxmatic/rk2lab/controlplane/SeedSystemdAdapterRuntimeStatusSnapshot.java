@@ -96,11 +96,12 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
   }
 
   public static Map<String, Object> snapshotStandalone(BootstrapConfig config) {
-    return snapshot(config, message -> System.out.println("[readiness] " + message));
+    return snapshot(config, message -> SeedLog.info("readiness", message));
   }
 
   private static Map<String, Object> readStatusPayload(BootstrapConfig config) {
-    final CommandResult result = runCommandInInstance(config, buildLocalSystemdSnapshotScript());
+    final CommandResult result =
+        runCommandInInstance(config, buildLocalSystemdSnapshotScript(config));
 
     if (looksLikeIncusHelp(result.stdout())) {
       throw new IllegalStateException("received Incus CLI help while querying runtime snapshot");
@@ -187,13 +188,27 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
     return payload.substring(start, end + 1).trim();
   }
 
-  private static String buildLocalSystemdSnapshotScript() {
+  private static String buildLocalSystemdSnapshotScript(BootstrapConfig config) {
+    final String nixosHost = normalizeString(config.imageBuilderHost(), "unknown");
+    final String nixosHostShort =
+        nixosHost.contains(".") ? nixosHost.substring(0, nixosHost.indexOf('.')) : nixosHost;
+    final String configuredIncusInstance = normalizeString(config.nodeName(), "unknown");
+
     return "set -eu\n"
         + "mandatory_target="
         + shellQuote(MANDATORY_TARGET_UNIT)
         + "\n"
         + "cloud_init_main="
         + shellQuote(CLOUD_INIT_MAIN_UNIT)
+        + "\n"
+        + "configured_nixos_host="
+        + shellQuote(nixosHost)
+        + "\n"
+        + "configured_nixos_host_short="
+        + shellQuote(nixosHostShort)
+        + "\n"
+        + "configured_incus_instance="
+        + shellQuote(configuredIncusInstance)
         + "\n"
         + "observed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown)\n"
         + "target_state=$(systemctl is-active \"$mandatory_target\" 2>/dev/null || true)\n"
@@ -220,6 +235,10 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
         + "current_starting_service=$(sanitize_text \"$current_starting_service\")\n"
         + "current_active_units=$(sanitize_text \"$current_active_units\")\n"
         + "instance_host=$(hostname 2>/dev/null || echo unknown)\n"
+        + "if [ \"$instance_host\" = \"$configured_nixos_host\" ] || [ \"$instance_host\" = \"$configured_nixos_host_short\" ]; then\n"
+        + "  echo \"probe executed on nixos host ($instance_host), expected incus instance context\" >&2\n"
+        + "  exit 42\n"
+        + "fi\n"
         + "summary=mandatoryTarget=$mandatory_target(state=$target_state),\n"
         + "summary=\"$summary pendingJobs=$pending_jobs, failedUnits=$failed_units, cloudInitMain=$cloud_init_main(state=$cloud_init_state,result=$cloud_init_result,healthy=$cloud_init_healthy), source=systemd-local-probe\"\n"
         + "cat <<JSON\n"
@@ -234,8 +253,8 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
         + "  \"runtimePrecheckReady\": $runtime_precheck_ready,\n"
         + "  \"connectionContext\": {\n"
         + "    \"adapterHost\": \"$instance_host\",\n"
-        + "    \"incusInstance\": \"$instance_host\",\n"
-        + "    \"nixosHost\": \"$instance_host\",\n"
+        + "    \"incusInstance\": \"$configured_incus_instance\",\n"
+        + "    \"nixosHost\": \"$configured_nixos_host\",\n"
         + "    \"systemBusAddress\": \"unix:path=/var/run/dbus/system_bus_socket\"\n"
         + "  },\n"
         + "  \"summary\": \"$summary\",\n"

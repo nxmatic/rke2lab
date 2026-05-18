@@ -160,18 +160,11 @@ func (w *Wrapper) maybeWaitForDebugger(logger *Logger) error {
 		time.Sleep(w.cfg.DebugSleep)
 	}
 
-	if !w.cfg.DebugWait {
-		return nil
+	if w.cfg.DebugWait {
+		logger.Log("debug suspend requested; launching dlv without --continue so target waits for debugger attach")
 	}
 
-	logger.Log("waiting for debug gate file=%s", w.cfg.DebugWaitFile)
-	for {
-		if _, err := os.Stat(w.cfg.DebugWaitFile); err == nil {
-			logger.Log("debug gate opened file=%s", w.cfg.DebugWaitFile)
-			return nil
-		}
-		time.Sleep(250 * time.Millisecond)
-	}
+	return nil
 }
 
 type bundleConfig struct {
