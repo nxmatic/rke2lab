@@ -234,9 +234,6 @@ func applyEnvOverrides(cfg Config) Config {
 	cfg.RootfsSyncEnable = getenvBoolDefault("FLOX_SHIM_ROOTFS_SYNC", cfg.RootfsSyncEnable)
 	cfg.WrapperLog = getenvDefault("FLOX_SHIM_WRAPPER_LOG", cfg.WrapperLog)
 	cfg.SyncLog = getenvDefault("FLOX_SHIM_SYNC_LOG", cfg.SyncLog)
-	cfg.DebugWait = getenvBoolDefault("FLOX_SHIM_DEBUG_WAIT", cfg.DebugWait)
-	cfg.DebugWaitFile = getenvDefault("FLOX_SHIM_DEBUG_WAIT_FILE", cfg.DebugWaitFile)
-	cfg.DebugSleep = getenvDurationDefault("FLOX_SHIM_DEBUG_SLEEP", cfg.DebugSleep)
 	cfg.JournalSocket = getenvDefault("FLOX_SHIM_JOURNAL_SOCKET", cfg.JournalSocket)
 	cfg.JournalIdentifier = getenvDefault("FLOX_SHIM_JOURNAL_IDENTIFIER", cfg.JournalIdentifier)
 	return cfg

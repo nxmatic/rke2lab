@@ -81,12 +81,6 @@ resolve_package_variant() {
 			[[ "${package_attr}" == *-debug ]] || package_attr="${package_attr}-debug"
 		fi
 		;;
-	flox-shim-wrapper)
-		if rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_FLOX_SHIM_WRAPPER_ENABLED:-false}"; then
-			package_name="delve-sidecar"
-			[[ "${package_attr}" == *-debug ]] || package_attr="${package_attr}-debug"
-		fi
-		;;
 	esac
 
 	printf '%s\n%s\n' "${package_name}" "${package_attr}"
@@ -330,8 +324,6 @@ refresh_flake_lock_if_needed() {
 	local -a lock_args=(
 		"flake"
 		"lock"
-		"--extra-experimental-features" "nix-command"
-		"--extra-experimental-features" "flakes"
 	)
 	: "[$(date)] [${job_name}] Refreshing flake.lock"
 
@@ -380,9 +372,6 @@ build_package() {
 	# Build nix command with optional input overrides
 	local -a nix_args=(
 		"build"
-		"--system" "aarch64-linux"
-		"--extra-experimental-features" "nix-command"
-		"--extra-experimental-features" "flakes"
 		"--no-link"
 	)
 
