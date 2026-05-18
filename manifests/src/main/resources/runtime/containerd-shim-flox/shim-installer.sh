@@ -571,11 +571,11 @@ shim::runtime:binary:install() {
 		return 1
 	fi
 
-	install_root="/usr/local/libexec/rke2lab/flox-shim-wrapper"
+	install_root="/usr/local/libexec/rke2lab/containerd-shim-flox-v2-wrapper"
 	real_shim_path="${install_root}/containerd-shim-flox-v2.real"
-	wrapper_pkg_path="$(shim::runtime:wrapper-package:build flox-shim-wrapper)"
+	wrapper_pkg_path="$(shim::runtime:wrapper-package:build go-wrapper)"
 	wrapper_bin="${wrapper_pkg_path}/bin/containerd-shim-flox-v2"
-	wrapper_helper="${wrapper_pkg_path}/libexec/rke2lab/flox-shim-wrapper/flox-rootfs-sync.sh"
+	wrapper_helper="${wrapper_pkg_path}/libexec/rke2lab/containerd-shim-flox-v2-wrapper/flox-rootfs-sync.sh"
 	debug_wrapper_pkg_path="$(shim::runtime:wrapper-package:build delve-sidecar)"
 	debug_wrapper_bin="${debug_wrapper_pkg_path}/bin/containerd-shim-flox-v2"
 

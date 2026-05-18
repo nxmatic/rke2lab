@@ -11,7 +11,7 @@ import (
 
 const (
 	configVersion     = 1
-	defaultConfigPath = "/etc/rke2lab/flox-shim-wrapper.yaml"
+	defaultConfigPath = "/etc/rke2lab/containerd-shim-flox-v2-wrapper.yaml"
 )
 
 type storedConfig struct {
@@ -146,7 +146,7 @@ func ensureConfigFile(path string, cfg storedConfig) error {
 		return err
 	}
 
-	tempFile, err := os.CreateTemp(filepath.Dir(path), ".flox-shim-wrapper-*.yaml")
+	tempFile, err := os.CreateTemp(filepath.Dir(path), ".containerd-shim-flox-v2-wrapper-*.yaml")
 	if err != nil {
 		return err
 	}

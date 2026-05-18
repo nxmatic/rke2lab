@@ -52,9 +52,9 @@
             runHook postInstallPre
 
             install -D -m 0755 ${./bin/flox-rootfs-sync.sh} \
-              "$out/libexec/rke2lab/flox-shim-wrapper/flox-rootfs-sync.sh"
+              "$out/libexec/rke2lab/containerd-shim-flox-v2-wrapper/flox-rootfs-sync.sh"
 
-            patchShebangs "$out/libexec/rke2lab/flox-shim-wrapper/flox-rootfs-sync.sh"
+            patchShebangs "$out/libexec/rke2lab/containerd-shim-flox-v2-wrapper/flox-rootfs-sync.sh"
 
             runHook postInstallPost
           '';

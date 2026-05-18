@@ -15,14 +15,14 @@ import (
 )
 
 const (
-	defaultRealShim      = "/usr/local/libexec/rke2lab/flox-shim-wrapper/containerd-shim-flox-v2.real"
-	defaultSyncHelper    = "/usr/local/libexec/rke2lab/flox-shim-wrapper/flox-rootfs-sync.sh"
-	defaultWrapperLog    = "/var/log/rke2lab/flox-shim-wrapper.log"
+	defaultRealShim      = "/usr/local/libexec/rke2lab/containerd-shim-flox-v2-wrapper/containerd-shim-flox-v2.real"
+	defaultSyncHelper    = "/usr/local/libexec/rke2lab/containerd-shim-flox-v2-wrapper/flox-rootfs-sync.sh"
+	defaultWrapperLog    = "/var/log/rke2lab/containerd-shim-flox-v2-wrapper.log"
 	defaultSyncLog       = "/var/log/rke2lab/flox-rootfs-sync.log"
-	defaultDebugWaitFile = "/tmp/flox-shim-wrapper-continue"
+	defaultDebugWaitFile = "/tmp/containerd-shim-flox-v2-wrapper-continue"
 	defaultDebugListen   = "127.0.0.1:43123"
 	defaultJournalSocket = "/run/systemd/journal/socket"
-	defaultJournalTag    = "flox-shim-wrapper"
+	defaultJournalTag    = "containerd-shim-flox-v2-wrapper"
 	defaultBundleRoot    = "/run/k3s/containerd/io.containerd.runtime.v2.task"
 
 	annotationDebug        = "flox.dev/debug"
@@ -221,7 +221,7 @@ func perShimDebugWaitFilePath(shimNamespace, shimID string) string {
 		return defaultDebugWaitFile
 	}
 
-	return filepath.Join(os.TempDir(), fmt.Sprintf("flox-shim-wrapper-continue-%s-%s", sanitizedNamespace, sanitizedID))
+	return filepath.Join(os.TempDir(), fmt.Sprintf("containerd-shim-flox-v2-wrapper-continue-%s-%s", sanitizedNamespace, sanitizedID))
 }
 
 func perShimDebugListenAddress(shimNamespace, shimID string) string {
