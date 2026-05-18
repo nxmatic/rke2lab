@@ -23,6 +23,7 @@ import io.nxmatic.rk2lab.manifests.layers.replication.ReplicationDomainRegistrar
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.storage.StorageDomainRegistrar;
 import java.io.IOException;
+import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -32,16 +33,31 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.cdk8s.App;
 import org.cdk8s.AppProps;
 import org.cdk8s.Chart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.nodes.Tag;
+import org.yaml.snakeyaml.representer.Represent;
+import org.yaml.snakeyaml.representer.Representer;
 
 /** Default SPI implementation for canonical manifest synthesis. */
 public final class DefaultManifestSynthesisService implements ManifestSynthesisService {
 
   private static final Logger LOG = LoggerFactory.getLogger(DefaultManifestSynthesisService.class);
+
+  private static final Set<String> SCRIPT_DATA_SUFFIXES =
+      Set.of(".sh", ".bash", ".env", ".yaml", ".yml", ".conf", ".policy");
+
+  private static final Pattern QUOTED_SCALAR_LINE_PATTERN =
+      Pattern.compile("^(\\s*)([A-Za-z0-9._-]+):\\s*\"(.*)\"\\s*$");
 
   @Override
   public String providerId() {
@@ -106,6 +122,8 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
       throw new IllegalStateException(
           "Expected synthesized manifest file is missing: " + synthesizedFile);
     }
+
+    enforceLiteralBlockStyleForConfigMapScripts(synthesizedFile);
 
     Files.createDirectories(synthManifestFile.getParent());
     Files.move(synthesizedFile, synthManifestFile, StandardCopyOption.REPLACE_EXISTING);
@@ -187,6 +205,183 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
     for (String dependencyDomainId : domain.dependsOnDomainIds()) {
       collectDomainDependencies(dependencyDomainId, configuredDomainsById, effectiveDomainIds);
+    }
+  }
+
+  private void enforceLiteralBlockStyleForConfigMapScripts(Path synthesizedFile)
+      throws IOException {
+    final String yamlSource = Files.readString(synthesizedFile);
+    final Iterable<Object> loadedDocuments =
+        new Yaml(new SafeConstructor(new LoaderOptions())).loadAll(yamlSource);
+    final List<Object> documents = new java.util.ArrayList<>();
+    for (Object loadedDocument : loadedDocuments) {
+      documents.add(applyConfigMapScriptLiteralBlocks(loadedDocument));
+    }
+
+    final DumperOptions dumperOptions = new DumperOptions();
+    dumperOptions.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+    dumperOptions.setSplitLines(false);
+    dumperOptions.setPrettyFlow(true);
+    dumperOptions.setIndent(2);
+
+    final Representer representer = new LiteralBlockRepresenter(dumperOptions);
+
+    final Yaml yaml = new Yaml(representer, dumperOptions);
+    final StringWriter writer = new StringWriter();
+    yaml.dumpAll(documents.iterator(), writer);
+    final String normalizedYaml = coerceQuotedScriptScalarsToLiteralBlocks(writer.toString());
+    Files.writeString(synthesizedFile, normalizedYaml);
+  }
+
+  private String coerceQuotedScriptScalarsToLiteralBlocks(String yamlText) {
+    final StringBuilder rewritten = new StringBuilder(yamlText.length());
+    final String[] lines = yamlText.split("\\n", -1);
+    for (String line : lines) {
+      final Matcher matcher = QUOTED_SCALAR_LINE_PATTERN.matcher(line);
+      if (!matcher.matches()) {
+        rewritten.append(line).append('\n');
+        continue;
+      }
+
+      final String indent = matcher.group(1);
+      final String key = matcher.group(2);
+      final String value = matcher.group(3);
+      if (!isScriptLikeConfigMapKey(key) || !value.contains("\\n")) {
+        rewritten.append(line).append('\n');
+        continue;
+      }
+
+      final String decoded = normalizeScriptConfigMapText(decodeEscapedQuotedScalar(value));
+      rewritten.append(indent).append(key).append(": |\n");
+      final String blockIndent = indent + "  ";
+      final String[] blockLines = decoded.split("\\n", -1);
+      for (int i = 0; i < blockLines.length; i++) {
+        final String blockLine = blockLines[i];
+        if (i == blockLines.length - 1 && blockLine.isEmpty()) {
+          continue;
+        }
+        rewritten.append(blockIndent).append(blockLine).append('\n');
+      }
+    }
+    return rewritten.toString();
+  }
+
+  private String decodeEscapedQuotedScalar(String escaped) {
+    final StringBuilder decoded = new StringBuilder(escaped.length());
+    for (int i = 0; i < escaped.length(); i++) {
+      final char ch = escaped.charAt(i);
+      if (ch != '\\' || i + 1 >= escaped.length()) {
+        decoded.append(ch);
+        continue;
+      }
+
+      final char next = escaped.charAt(++i);
+      switch (next) {
+        case 'n' -> decoded.append('\n');
+        case 'r' -> decoded.append('\r');
+        case 't' -> decoded.append('\t');
+        case '"' -> decoded.append('"');
+        case '\\' -> decoded.append('\\');
+        default -> decoded.append(next);
+      }
+    }
+    return decoded.toString();
+  }
+
+  @SuppressWarnings("unchecked")
+  private Object applyConfigMapScriptLiteralBlocks(Object document) {
+    if (document instanceof List<?> list) {
+      return list.stream().map(this::applyConfigMapScriptLiteralBlocks).toList();
+    }
+    if (!(document instanceof Map<?, ?> map)) {
+      return document;
+    }
+
+    final LinkedHashMap<Object, Object> rewritten = new LinkedHashMap<>();
+    for (Map.Entry<?, ?> entry : map.entrySet()) {
+      rewritten.put(entry.getKey(), applyConfigMapScriptLiteralBlocks(entry.getValue()));
+    }
+
+    final Object kind = rewritten.get("kind");
+    if (!"ConfigMap".equals(kind)) {
+      return rewritten;
+    }
+
+    final Object data = rewritten.get("data");
+    if (!(data instanceof Map<?, ?> dataMap)) {
+      return rewritten;
+    }
+
+    final LinkedHashMap<Object, Object> rewrittenData = new LinkedHashMap<>();
+    for (Map.Entry<?, ?> entry : dataMap.entrySet()) {
+      final Object key = entry.getKey();
+      final Object value = entry.getValue();
+      if (key instanceof String dataKey
+          && value instanceof String textValue
+          && isScriptLikeConfigMapKey(dataKey)) {
+        final String normalized = normalizeScriptConfigMapText(textValue);
+        if (shouldRenderAsLiteralBlock(dataKey, normalized)) {
+          rewrittenData.put(dataKey, new LiteralBlockString(normalized));
+          continue;
+        }
+      }
+      if (key instanceof String dataKey
+          && value instanceof String textValue
+          && shouldRenderAsLiteralBlock(dataKey, textValue)) {
+        rewrittenData.put(dataKey, new LiteralBlockString(textValue));
+      } else {
+        rewrittenData.put(key, value);
+      }
+    }
+    rewritten.put("data", rewrittenData);
+    return rewritten;
+  }
+
+  private boolean shouldRenderAsLiteralBlock(String dataKey, String textValue) {
+    return textValue.contains("\n") && isScriptLikeConfigMapKey(dataKey);
+  }
+
+  private boolean isScriptLikeConfigMapKey(String dataKey) {
+    final String key = dataKey.toLowerCase(java.util.Locale.ROOT);
+    return SCRIPT_DATA_SUFFIXES.stream().anyMatch(key::endsWith) || key.contains("script");
+  }
+
+  private String normalizeScriptConfigMapText(String textValue) {
+    String normalized = textValue.replace("\r\n", "\n").replace("\r", "\n");
+    if (!normalized.contains("\n") && normalized.contains("\\n")) {
+      normalized = normalized.replace("\\r\\n", "\n").replace("\\n", "\n");
+    }
+    if (!normalized.endsWith("\n")) {
+      normalized = normalized + "\n";
+    }
+    return normalized;
+  }
+
+  private static final class LiteralBlockString {
+    private final String value;
+
+    private LiteralBlockString(String value) {
+      this.value = value;
+    }
+
+    @Override
+    public String toString() {
+      return value;
+    }
+  }
+
+  private static final class LiteralBlockRepresenter extends Representer {
+    private LiteralBlockRepresenter(DumperOptions dumperOptions) {
+      super(dumperOptions);
+      this.addClassTag(LiteralBlockString.class, Tag.STR);
+      this.representers.put(
+          LiteralBlockString.class,
+          new Represent() {
+            @Override
+            public org.yaml.snakeyaml.nodes.Node representData(Object data) {
+              return representScalar(Tag.STR, data.toString(), DumperOptions.ScalarStyle.LITERAL);
+            }
+          });
     }
   }
 }

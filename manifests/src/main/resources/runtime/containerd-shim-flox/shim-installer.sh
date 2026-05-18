@@ -34,13 +34,13 @@ installer::policy:source() {
 
 	# shellcheck disable=SC1091
 	source "${policy_lib_dir}/daemonset-logging.sh"
+	# shellcheck disable=SC1091
+	source "${policy_lib_dir}/daemonless-host-shell-policy.sh"
 	installer::logging:setup
 	# shellcheck disable=SC1091
 	source "${policy_lib_dir}/daemonless-trampoline.sh"
 	# shellcheck disable=SC1091
 	source "${policy_lib_dir}/daemonless-host-asset-materializer.sh"
-	# shellcheck disable=SC1091
-	source "${policy_lib_dir}/daemonless-host-shell-policy.sh"
 }
 
 installer::logging:setup() {

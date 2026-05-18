@@ -31,7 +31,8 @@ public final class RuntimeDaemonsetScriptPolicyAssets {
   public Map<String, String> configMapData() {
     final LinkedHashMap<String, String> data = new LinkedHashMap<>();
     for (ScriptAsset asset : scriptAssets) {
-      data.put(asset.configMapKey(), readResource(asset.classpathResource()));
+      data.put(
+          asset.configMapKey(), normalizeConfigMapText(readResource(asset.classpathResource())));
     }
     return Map.copyOf(data);
   }
@@ -66,6 +67,18 @@ public final class RuntimeDaemonsetScriptPolicyAssets {
       throw new UncheckedIOException(
           "Failed reading runtime daemonset resource: " + resourcePath, ex);
     }
+  }
+
+  private static String normalizeConfigMapText(String value) {
+    if (value == null || value.isEmpty()) {
+      return "";
+    }
+
+    final String normalizedLineEndings = value.replace("\r\n", "\n").replace('\r', '\n');
+    if (normalizedLineEndings.endsWith("\n")) {
+      return normalizedLineEndings;
+    }
+    return normalizedLineEndings + "\n";
   }
 
   public static final class Builder {

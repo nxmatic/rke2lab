@@ -50,7 +50,8 @@ public final class FloxContainerdShimAssets {
   public Map<String, String> installerConfigMapData() {
     final LinkedHashMap<String, String> data = new LinkedHashMap<>();
     for (InstallerAsset asset : floxInstallerConfigMapAssets) {
-      data.put(asset.configMapKey(), readResource(asset.classpathResource()));
+      data.put(
+          asset.configMapKey(), normalizeConfigMapText(readResource(asset.classpathResource())));
     }
     data.putAll(runtimeDaemonsetScriptPolicyAssets.configMapData());
     data.put(WrapperGoArchiveAssets.ARCHIVE_CONFIGMAP_KEY, wrapperGoArchiveAssets.archiveBase64());
@@ -122,6 +123,18 @@ public final class FloxContainerdShimAssets {
       throw new UncheckedIOException(
           "Failed reading containerd-shim-flox resource: " + resourcePath, ex);
     }
+  }
+
+  private static String normalizeConfigMapText(String value) {
+    if (value == null || value.isEmpty()) {
+      return "";
+    }
+
+    final String normalizedLineEndings = value.replace("\r\n", "\n").replace('\r', '\n');
+    if (normalizedLineEndings.endsWith("\n")) {
+      return normalizedLineEndings;
+    }
+    return normalizedLineEndings + "\n";
   }
 
   public static final class Builder {
