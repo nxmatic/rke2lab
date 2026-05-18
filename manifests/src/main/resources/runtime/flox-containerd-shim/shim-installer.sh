@@ -44,7 +44,6 @@ daemonset::logging:stderr:setup "${HOST_SCRIPT_ROOT}/shim-installer.sh"
 install -D -m 0755 "${BUILD_ASSETS_DIR}/flox-shim-build.sh" "${HOST_SCRIPT_ROOT}/flox-shim-build.sh"
 install -D -m 0644 "${BUILD_ASSETS_DIR}/flox-shim-build.yaml" "${HOST_SCRIPT_ROOT}/flox-shim-build.yaml"
 install -D -m 0644 "${BUILD_ASSETS_DIR}/flake.nix" "${HOST_SCRIPT_ROOT}/flake.nix"
-install -D -m 0644 "${BUILD_ASSETS_DIR}/flake.lock" "${HOST_SCRIPT_ROOT}/flake.lock"
 install -D -m 0755 "${BUILD_ASSETS_DIR}/flox-rootfs-sync.sh" "${HOST_SCRIPT_ROOT}/flox-rootfs-sync.sh"
 install -D -m 0644 "${BUILD_ASSETS_DIR}/debug-tools/.sh.d/rke2lab-debug-tooling.sh" "${HOST_SCRIPT_ROOT}/debug-tools/.sh.d/rke2lab-debug-tooling.sh"
 install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/attach_live_flox_shim_strace.sh" "${HOST_SCRIPT_ROOT}/debug-tools/attach_live_flox_shim_strace.sh"
@@ -53,9 +52,7 @@ install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/kdns-containerd-bundle-watch
 install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/kdns-containerd-remote-capture.sh" "${HOST_SCRIPT_ROOT}/debug-tools/kdns-containerd-remote-capture.sh"
 install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/master-shim-pprof.sh" "${HOST_SCRIPT_ROOT}/debug-tools/master-shim-pprof.sh"
 install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/flake.nix" "${HOST_SCRIPT_ROOT}/mesh/headplane/flake.nix"
-install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/flake.lock" "${HOST_SCRIPT_ROOT}/mesh/headplane/flake.lock"
 install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/flake.nix" "${HOST_SCRIPT_ROOT}/networking/kdns/flake.nix"
-install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/flake.lock" "${HOST_SCRIPT_ROOT}/networking/kdns/flake.lock"
 
 materialize_wrapper_go_archive() {
 	local archive_b64_path="$1"

@@ -37,8 +37,6 @@ public final class Main {
           new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/flake.nix", "flake.nix", false),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/flake.lock", "flake.lock", false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/shim-installer.sh", "shim-installer.sh", true),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/shim-installer-host.sh",
@@ -75,10 +73,6 @@ public final class Main {
               "mesh/headplane/flake.nix",
               false),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/mesh/headplane/flake.lock",
-              "mesh/headplane/flake.lock",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/mesh/headplane/.flox/.gitattributes",
               "mesh/headplane/.flox/.gitattributes",
               false),
@@ -105,10 +99,6 @@ public final class Main {
           new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/networking/kdns/flake.nix",
               "networking/kdns/flake.nix",
-              false),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/networking/kdns/flake.lock",
-              "networking/kdns/flake.lock",
               false),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/networking/kdns/.flox/.gitattributes",

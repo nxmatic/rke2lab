@@ -265,13 +265,11 @@ should_update_locks() {
 		return 1
 		;;
 	auto | AUTO | "")
-		[[ "${WORKTREE_MODE}" == "host" ]]
-		return
+		return 1
 		;;
 	*)
-		: "[WARN] Unknown FLOX_SHIM_UPDATE_LOCKS='${FLOX_SHIM_UPDATE_LOCKS}', defaulting to auto"
-		[[ "${WORKTREE_MODE}" == "host" ]]
-		return
+		: "[WARN] Unknown FLOX_SHIM_UPDATE_LOCKS='${FLOX_SHIM_UPDATE_LOCKS}', defaulting to disabled"
+		return 1
 		;;
 	esac
 }
@@ -309,6 +307,7 @@ refresh_flake_lock_if_needed() {
 	local log_file="$3"
 
 	should_update_locks || return 0
+	stage_git_flake_inputs_if_needed "${job_name}" "${resolved_path}"
 
 	if is_flake_lock_refreshed "${resolved_path}"; then
 		return 0
@@ -373,8 +372,6 @@ build_package() {
 		"--extra-experimental-features" "flakes"
 		"--no-link"
 	)
-
-	stage_git_flake_inputs_if_needed "${job_name}" "${resolved_path}"
 
 	if ! refresh_flake_lock_if_needed "${job_name}" "${resolved_path}" "${log_file}"; then
 		return 1
