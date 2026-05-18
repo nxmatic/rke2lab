@@ -14,6 +14,7 @@
   <name>rke2lab-bom</name>
 
   <properties>
+    <dbus.java.version>5.2.0</dbus.java.version>
     <pulumi.version>1.0.0</pulumi.version>
     <pulumi.command.version>1.2.1</pulumi.command.version>
     <spring.boot.version>3.3.12</spring.boot.version>
@@ -52,6 +53,13 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <dependency>
+        <groupId>com.github.hypfvieh</groupId>
+        <artifactId>dbus-java-bom</artifactId>
+        <version>${dbus.java.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <!-- rke2lab dependencies -->
       <dependency>
         <groupId>io.nxmatic</groupId>
@@ -72,6 +80,11 @@
       <dependency>
         <groupId>io.nxmatic</groupId>
         <artifactId>rke2lab-netplan</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic</groupId>
+        <artifactId>rke2lab-systemd-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>

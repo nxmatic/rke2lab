@@ -215,6 +215,7 @@ public final class ClusterBootstrapReadinessVerifier {
       final String endpoint =
           stringValue(
               statusSnapshot.getOrDefault("endpoint", config.systemdAdapterStatusEndpoint()));
+      final String hostContext = describeHostContext(statusSnapshot);
 
       if ("ok".equalsIgnoreCase(probeStatus) && runtimeReady) {
         logInfo("seed node bootstrap preconditions ready after " + elapsedSince(startedAt));
@@ -234,6 +235,8 @@ public final class ClusterBootstrapReadinessVerifier {
               + pendingJobCount
               + ", failedUnits="
               + failedUnitCount
+              + ", hostContext="
+              + hostContext
               + ", summary="
               + adapterSummary;
 
@@ -288,6 +291,54 @@ public final class ClusterBootstrapReadinessVerifier {
 
   private static String stringValue(Object value) {
     return value == null ? "" : value.toString();
+  }
+
+  private static String describeHostContext(Map<String, Object> statusSnapshot) {
+    final Object rawConnectionContext = statusSnapshot.get("connectionContext");
+    if (!(rawConnectionContext instanceof Map<?, ?> connectionContext)) {
+      return "nixosHost="
+          + configFallbackString(statusSnapshot, "nixosHost")
+          + ",incusInstance="
+          + configFallbackString(statusSnapshot, "incusInstance")
+          + ",adapterHost="
+          + configFallbackString(statusSnapshot, "adapterHost");
+    }
+
+    return "nixosHost="
+        + mapStringValue(connectionContext, "nixosHost")
+        + ",incusInstance="
+        + mapStringValue(connectionContext, "incusInstance")
+        + ",adapterHost="
+        + mapStringValue(connectionContext, "adapterHost");
+  }
+
+  private static String configFallbackString(Map<String, Object> statusSnapshot, String key) {
+    final Object value = statusSnapshot.get(key);
+    if (value == null) {
+      return "unknown";
+    }
+    final String raw = value.toString().trim();
+    if (raw.isBlank()) {
+      return "unknown";
+    }
+    return raw;
+  }
+
+  private static String mapStringValue(Map<?, ?> map, String key) {
+    if (map == null || key == null || key.isBlank()) {
+      return "unknown";
+    }
+
+    final Object rawValue = map.get(key);
+    if (rawValue == null) {
+      return "unknown";
+    }
+
+    final String value = rawValue.toString().trim();
+    if (value.isBlank()) {
+      return "unknown";
+    }
+    return value;
   }
 
   private static boolean waitForApiReady(Path kubeconfigPath) {

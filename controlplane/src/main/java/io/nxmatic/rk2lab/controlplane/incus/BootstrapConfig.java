@@ -1,6 +1,7 @@
 package io.nxmatic.rk2lab.controlplane.incus;
 
 import com.pulumi.Config;
+import io.nxmatic.rk2lab.systemdcontract.api.SystemdAdapterApiPaths;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.function.Consumer;
@@ -135,9 +136,11 @@ public record BootstrapConfig(
 
     private Path kubeconfigRef;
 
-    private URI systemdAdapterStatusEndpoint = URI.create("http://127.0.0.1:18080/status/systemd");
+    private URI systemdAdapterStatusEndpoint =
+        URI.create("http://127.0.0.1:18080" + SystemdAdapterApiPaths.STATUS_SYSTEMD);
 
-    private URI systemdAdapterHealthEndpoint = URI.create("http://127.0.0.1:18080/healthz/systemd");
+    private URI systemdAdapterHealthEndpoint =
+        URI.create("http://127.0.0.1:18080" + SystemdAdapterApiPaths.HEALTHZ_SYSTEMD);
 
     public Builder worktree(Path value) {
       this.worktree = normalizeAbsolutePath(value);

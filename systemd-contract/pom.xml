@@ -10,12 +10,8 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <artifactId>rke2lab-systemd-adapter</artifactId>
-  <name>rke2lab-systemd-adapter</name>
-
-  <properties>
-    <spring.boot.version>3.3.12</spring.boot.version>
-  </properties>
+  <artifactId>rke2lab-systemd-contract</artifactId>
+  <name>rke2lab-systemd-contract</name>
 
   <dependencyManagement>
     <dependencies>
@@ -28,35 +24,6 @@
       </dependency>
     </dependencies>
   </dependencyManagement>
-
-  <dependencies>
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-actuator</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.github.hypfvieh</groupId>
-      <artifactId>dbus-java-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.github.hypfvieh</groupId>
-      <artifactId>dbus-java-transport-native-unixsocket</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.nxmatic</groupId>
-      <artifactId>rke2lab-systemd-contract</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-  </dependencies>
 
   <build>
     <plugins>
@@ -102,22 +69,6 @@
                   <version>[3.9.0,)</version>
                 </requireMavenVersion>
               </rules>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-maven-plugin</artifactId>
-        <version>${spring.boot.version}</version>
-        <executions>
-          <execution>
-            <goals>
-              <goal>repackage</goal>
-            </goals>
-            <configuration>
-              <classifier>exec</classifier>
-              <mainClass>io.nxmatic.rk2lab.systemdadapter.SystemdAdapterApplication</mainClass>
             </configuration>
           </execution>
         </executions>

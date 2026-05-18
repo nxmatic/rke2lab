@@ -3,6 +3,7 @@ package io.nxmatic.rk2lab.controlplane;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rk2lab.systemdcontract.api.SystemdStatusSnapshot;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -80,6 +81,10 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
       final LinkedHashMap<String, Object> parsed =
           new LinkedHashMap<>(
               JSON_MAPPER.readValue(stdout, new TypeReference<Map<String, Object>>() {}));
+      final SystemdStatusSnapshot statusSnapshot = SystemdStatusSnapshot.fromPayloadMap(parsed);
+
+      parsed.clear();
+      parsed.putAll(statusSnapshot.toPayloadMap());
       parsed.put("apiVersion", API_VERSION);
       parsed.put("kind", KIND);
       parsed.put("source", "systemd-adapter");

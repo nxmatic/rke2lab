@@ -1,10 +1,11 @@
 package io.nxmatic.rk2lab.systemdadapter.service;
 
 import io.nxmatic.rk2lab.systemdadapter.SystemdAdapterProperties;
-import io.nxmatic.rk2lab.systemdadapter.api.SystemdStatusSnapshot;
+import io.nxmatic.rk2lab.systemdcontract.api.SystemdStatusSnapshot;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.freedesktop.dbus.connections.impl.DBusConnection;
@@ -20,6 +21,8 @@ public class DbusSystemdStatusSnapshotProvider implements SystemdStatusSnapshotP
   private static final String SYSTEMD_MANAGER_PATH = "/org/freedesktop/systemd1";
   private static final String SYSTEMD_MANAGER_INTERFACE = "org.freedesktop.systemd1.Manager";
   private static final String SYSTEMD_UNIT_INTERFACE = "org.freedesktop.systemd1.Unit";
+  private static final String DEFAULT_SYSTEM_BUS_ADDRESS =
+      "unix:path=/var/run/dbus/system_bus_socket";
 
   private final SystemdAdapterProperties properties;
 
@@ -54,6 +57,10 @@ public class DbusSystemdStatusSnapshotProvider implements SystemdStatusSnapshotP
       }
 
       final boolean runtimeReady = mandatoryHealthy && pendingJobs == 0 && failedUnits == 0;
+      final Map<String, String> connectionContext = connectionContext();
+      final String nixosHost = connectionContext.getOrDefault("nixosHost", "unknown");
+      final String incusInstance = connectionContext.getOrDefault("incusInstance", "unknown");
+      final String systemBusAddress = connectionContext.getOrDefault("systemBusAddress", "unknown");
 
       final String summary =
           "mandatoryTarget="
@@ -64,10 +71,16 @@ public class DbusSystemdStatusSnapshotProvider implements SystemdStatusSnapshotP
               + pendingJobs
               + ", failedUnits="
               + failedUnits
+              + ", nixosHost="
+              + nixosHost
+              + ", incusInstance="
+              + incusInstance
+              + ", systemBusAddress="
+              + systemBusAddress
               + ", source=dbus-java";
 
       return new SystemdStatusSnapshot(
-          Instant.now(),
+          java.time.Instant.now().toString(),
           mandatoryTarget,
           targetState,
           mandatoryHealthy,
@@ -75,6 +88,7 @@ public class DbusSystemdStatusSnapshotProvider implements SystemdStatusSnapshotP
           jobsByState,
           failedUnits,
           runtimeReady,
+          connectionContext,
           summary);
     } catch (DBusException | IOException ex) {
       throw new IllegalStateException("Failed to query systemd state over D-Bus", ex);
@@ -128,5 +142,50 @@ public class DbusSystemdStatusSnapshotProvider implements SystemdStatusSnapshotP
       return "unknown";
     }
     return trimmed;
+  }
+
+  private Map<String, String> connectionContext() {
+    final String hostName = detectHostName();
+    final String nixosHost =
+        firstNonBlank(System.getenv("RK2LAB_NIXOS_HOST"), System.getenv("LIMA_HOSTNAME"));
+    final String incusInstance =
+        firstNonBlank(System.getenv("RKE2LAB_NODE_NAME"), System.getenv("HOSTNAME"), hostName);
+    final String systemBusAddress =
+        firstNonBlank(System.getenv("DBUS_SYSTEM_BUS_ADDRESS"), DEFAULT_SYSTEM_BUS_ADDRESS);
+
+    final LinkedHashMap<String, String> context = new LinkedHashMap<>();
+    context.put("nixosHost", normalizeLabel(nixosHost));
+    context.put("incusInstance", normalizeLabel(incusInstance));
+    context.put("adapterHost", normalizeLabel(hostName));
+    context.put("systemBusAddress", normalizeLabel(systemBusAddress));
+    return Map.copyOf(context);
+  }
+
+  private String detectHostName() {
+    try {
+      return normalizeLabel(InetAddress.getLocalHost().getHostName());
+    } catch (UnknownHostException ignored) {
+      return normalizeLabel(System.getenv("HOSTNAME"));
+    }
+  }
+
+  private String normalizeLabel(String value) {
+    if (value == null || value.isBlank()) {
+      return "unknown";
+    }
+    return value.trim();
+  }
+
+  private String firstNonBlank(String... values) {
+    if (values == null) {
+      return "";
+    }
+
+    for (String value : values) {
+      if (value != null && !value.isBlank()) {
+        return value.trim();
+      }
+    }
+    return "";
   }
 }
