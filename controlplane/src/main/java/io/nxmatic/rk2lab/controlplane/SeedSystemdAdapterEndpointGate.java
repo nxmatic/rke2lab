@@ -1,128 +1,95 @@
 package io.nxmatic.rk2lab.controlplane;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-/** Pulumi-side launch gate for the seed systemd adapter unit. */
-public final class SeedSystemdAdapterLaunchResource {
+/**
+ * Pulumi-side gate that verifies adapter endpoint reachability via REST, without systemd control.
+ */
+public final class SeedSystemdAdapterEndpointGate {
 
   private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(20);
+  private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
-  private SeedSystemdAdapterLaunchResource() {
+  private SeedSystemdAdapterEndpointGate() {
     // Utility class
   }
 
   public static Map<String, Object> deferredPreview(BootstrapConfig config) {
     return Map.of(
         "source",
-        "systemd-adapter-launch",
+        "systemd-adapter-endpoint-gate",
         "status",
         "deferred-preview",
-        "unit",
-        config.systemdAdapterUnitName(),
+        "endpoint",
+        config.systemdAdapterStatusEndpoint().toString(),
         "summary",
-        "adapter launch gate deferred during preview",
+        "adapter endpoint gate deferred during preview",
         "capturedAt",
         Instant.now().toString());
   }
 
-  public static Map<String, Object> ensureLaunched(
+  public static Map<String, Object> ensureReachable(
       BootstrapConfig config, Consumer<String> logger) {
-    final String unitName = config.systemdAdapterUnitName();
-    if (unitName == null || unitName.isBlank()) {
-      throw new IllegalStateException(
-          "Missing required configuration: systemd.adapter.unitName (BootstrapConfig.systemdAdapterUnitName)");
-    }
-
-    final CommandResult loadStateResult =
+    final CommandResult probeResult =
         runCommand(
             incusExec(
                 config,
                 "sh",
                 "-lc",
-                "systemctl show --property=LoadState --value " + shellQuote(unitName)));
-    final String loadState = firstNonBlankLine(loadStateResult.stdout()).toLowerCase();
+                "curl --silent --show-error --fail --max-time 5 "
+                    + shellQuote(config.systemdAdapterStatusEndpoint().toString())));
 
-    if (loadStateResult.exitCode() != 0 || loadState.isBlank() || "not-found".equals(loadState)) {
-      final String summary =
-          "adapter unit not found: " + unitName + " (" + loadStateResult.summary() + ")";
-      if (config.systemdAdapterLaunchRequired()) {
-        throw new IllegalStateException(summary);
-      }
-      if (logger != null) {
-        logger.accept(summary + " ; continuing because launchRequired=false");
-      }
-      return Map.of(
-          "source",
-          "systemd-adapter-launch",
-          "status",
-          "unit-missing",
-          "unit",
-          unitName,
-          "summary",
-          summary,
-          "capturedAt",
-          Instant.now().toString());
-    }
-
-    final CommandResult enableNowResult =
-        runCommand(
-            incusExec(config, "sh", "-lc", "systemctl enable --now " + shellQuote(unitName)));
-    if (enableNowResult.exitCode() != 0) {
+    if (probeResult.exitCode() != 0) {
       throw new IllegalStateException(
-          "Failed to launch systemd adapter unit " + unitName + ": " + enableNowResult.summary());
-    }
-
-    final CommandResult stateResult =
-        runCommand(
-            incusExec(
-                config,
-                "sh",
-                "-lc",
-                "systemctl show --property=ActiveState --property=SubState --value "
-                    + shellQuote(unitName)));
-    final List<String> stateLines = nonBlankLines(stateResult.stdout());
-    final String activeState = stateLines.size() >= 1 ? stateLines.get(0) : "unknown";
-    final String subState = stateLines.size() >= 2 ? stateLines.get(1) : "unknown";
-    final boolean active = "active".equalsIgnoreCase(activeState);
-
-    if (!active && config.systemdAdapterLaunchRequired()) {
-      throw new IllegalStateException(
-          "Adapter unit "
-              + unitName
-              + " is not active after launch (activeState="
-              + activeState
-              + ", subState="
-              + subState
+          "Adapter endpoint unreachable: "
+              + config.systemdAdapterStatusEndpoint()
+              + " ("
+              + probeResult.summary()
               + ")");
     }
 
-    final String status = active ? "ok" : "not-active";
+    LinkedHashMap<String, Object> parsed;
+    try {
+      parsed =
+          new LinkedHashMap<>(
+              JSON_MAPPER.readValue(
+                  probeResult.stdout(), new TypeReference<Map<String, Object>>() {}));
+    } catch (IOException ex) {
+      throw new IllegalStateException(
+          "Adapter endpoint returned non-JSON payload at "
+              + config.systemdAdapterStatusEndpoint()
+              + ": "
+              + ex.getMessage());
+    }
+
     final String summary =
-        "unit=" + unitName + " activeState=" + activeState + " subState=" + subState;
+        "endpoint="
+            + config.systemdAdapterStatusEndpoint()
+            + " status="
+            + parsed.getOrDefault("status", "unknown");
     if (logger != null) {
-      logger.accept("systemd adapter launch gate: " + summary);
+      logger.accept("systemd adapter endpoint gate: " + summary);
     }
 
     return Map.of(
         "source",
-        "systemd-adapter-launch",
+        "systemd-adapter-endpoint-gate",
         "status",
-        status,
-        "unit",
-        unitName,
-        "activeState",
-        activeState,
-        "subState",
-        subState,
+        "ok",
+        "endpoint",
+        config.systemdAdapterStatusEndpoint().toString(),
         "summary",
         summary,
         "capturedAt",
@@ -155,8 +122,9 @@ public final class SeedSystemdAdapterLaunchResource {
 
   private static List<String> incusExec(BootstrapConfig config, String... args) {
     final String remoteIncusCommand =
-        "incus exec --project "
+        "incus --project "
             + shellQuote(config.incusProject())
+            + " exec "
             + " "
             + shellQuote(config.nodeName())
             + " -- "
@@ -195,13 +163,6 @@ public final class SeedSystemdAdapterLaunchResource {
       return "";
     }
     return value.lines().map(String::trim).filter(line -> !line.isBlank()).findFirst().orElse("");
-  }
-
-  private static List<String> nonBlankLines(String value) {
-    if (value == null || value.isBlank()) {
-      return List.of();
-    }
-    return value.lines().map(String::trim).filter(line -> !line.isBlank()).toList();
   }
 
   private record CommandResult(int exitCode, String stdout, String stderr) {

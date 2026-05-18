@@ -12,13 +12,13 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-/** Canonical runtime status probe backed by the systemd adapter endpoint. */
-public final class SeedSystemdRuntimeStatusResource {
+/** Canonical runtime status snapshot probe backed by the systemd adapter endpoint. */
+public final class SeedSystemdAdapterRuntimeStatusSnapshot {
 
   private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(20);
   private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
-  private SeedSystemdRuntimeStatusResource() {
+  private SeedSystemdAdapterRuntimeStatusSnapshot() {
     // Utility class
   }
 
@@ -124,8 +124,9 @@ public final class SeedSystemdRuntimeStatusResource {
             + shellQuote(statusEndpoint);
 
     final String remoteIncusCommand =
-        "incus exec --project "
+        "incus --project "
             + shellQuote(config.incusProject())
+            + " exec "
             + " "
             + shellQuote(config.nodeName())
             + " -- sh -lc "

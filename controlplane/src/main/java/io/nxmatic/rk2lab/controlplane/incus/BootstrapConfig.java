@@ -26,9 +26,7 @@ public record BootstrapConfig(
     URI apiEndpoint,
     Path kubeconfigRef,
     URI systemdAdapterStatusEndpoint,
-    URI systemdAdapterHealthEndpoint,
-    String systemdAdapterUnitName,
-    boolean systemdAdapterLaunchRequired) {
+    URI systemdAdapterHealthEndpoint) {
 
   public String imageBuilderBinary() {
     return "distrobuilder";
@@ -83,9 +81,7 @@ public record BootstrapConfig(
         apiEndpoint,
         kubeconfigRef,
         systemdAdapterStatusEndpoint,
-        systemdAdapterHealthEndpoint,
-        systemdAdapterUnitName,
-        systemdAdapterLaunchRequired);
+        systemdAdapterHealthEndpoint);
   }
 
   public Path localWorktreePath() {
@@ -142,10 +138,6 @@ public record BootstrapConfig(
     private URI systemdAdapterStatusEndpoint = URI.create("http://127.0.0.1:18080/status/systemd");
 
     private URI systemdAdapterHealthEndpoint = URI.create("http://127.0.0.1:18080/healthz/systemd");
-
-    private String systemdAdapterUnitName = "rke2lab-systemd-adapter.service";
-
-    private boolean systemdAdapterLaunchRequired = false;
 
     public Builder worktree(Path value) {
       this.worktree = normalizeAbsolutePath(value);
@@ -237,16 +229,6 @@ public record BootstrapConfig(
       return this;
     }
 
-    public Builder systemdAdapterUnitName(String value) {
-      this.systemdAdapterUnitName = value;
-      return this;
-    }
-
-    public Builder systemdAdapterLaunchRequired(boolean value) {
-      this.systemdAdapterLaunchRequired = value;
-      return this;
-    }
-
     public Builder applyConfig(Config config) {
       final EnvironmentValues environment = new EnvironmentValues(config);
       override(environment, "worktree.dir", value -> this.worktree(parsePath(value)));
@@ -278,13 +260,6 @@ public record BootstrapConfig(
           environment,
           "systemd.adapter.healthEndpoint",
           value -> this.systemdAdapterHealthEndpoint(parseUri(value)));
-      override(environment, "systemd.adapter.unitName", this::systemdAdapterUnitName);
-      override(
-          environment,
-          "systemd.adapter.launchRequired",
-          value ->
-              this.systemdAdapterLaunchRequired(
-                  parseBoolean(value, "systemd.adapter.launchRequired")));
       return this;
     }
 
@@ -323,9 +298,7 @@ public record BootstrapConfig(
           apiEndpoint,
           resolvedKubeconfigRef,
           systemdAdapterStatusEndpoint,
-          systemdAdapterHealthEndpoint,
-          systemdAdapterUnitName,
-          systemdAdapterLaunchRequired);
+          systemdAdapterHealthEndpoint);
     }
 
     private Path parsePath(String value) {
@@ -340,15 +313,6 @@ public record BootstrapConfig(
         return null;
       }
       return URI.create(value.trim());
-    }
-
-    private boolean parseBoolean(String value, String key) {
-      final String normalized = value == null ? "" : value.trim().toLowerCase();
-      return switch (normalized) {
-        case "1", "true", "yes", "on" -> true;
-        case "0", "false", "no", "off" -> false;
-        default -> throw new IllegalArgumentException("Invalid boolean for " + key + ": " + value);
-      };
     }
   }
 

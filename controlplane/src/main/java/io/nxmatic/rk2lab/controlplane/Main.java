@@ -84,16 +84,15 @@ public final class Main {
         new IncusResourceBootstrap(config, policy).apply();
     final Map<String, Object> systemdAdapterLaunchSummary;
     if (isPulumiEngineAvailable() && Deployment.getInstance().isDryRun()) {
-      systemdAdapterLaunchSummary = SeedSystemdAdapterLaunchResource.deferredPreview(config);
+      systemdAdapterLaunchSummary = SeedSystemdAdapterEndpointGate.deferredPreview(config);
     } else {
       systemdAdapterLaunchSummary =
-          SeedSystemdAdapterLaunchResource.ensureLaunched(config, readinessLogger);
+          SeedSystemdAdapterEndpointGate.ensureReachable(config, readinessLogger);
     }
     final Object readinessOutput;
     final Object clusterReadinessResourceUrn;
     final Object registryResourceUrn;
     final Object imageBuildResourceUrn;
-    final Object systemdRuntimeStatusResourceUrn;
     final Map<String, Object> registrySummary;
     final Map<String, Object> imageBuildSummary;
     final Object systemdRuntimeStatusSummary;
@@ -136,11 +135,10 @@ public final class Main {
       imageBuildResourceUrn = imageBuildResource.urn();
       imageBuildSummary = imageBuildResource.summary();
 
-      systemdRuntimeStatusResourceUrn = "";
       systemdRuntimeStatusSummary =
           Deployment.getInstance().isDryRun()
-              ? SeedSystemdRuntimeStatusResource.deferredPreview(config)
-              : SeedSystemdRuntimeStatusResource.snapshot(config, readinessLogger);
+              ? SeedSystemdAdapterRuntimeStatusSnapshot.deferredPreview(config)
+              : SeedSystemdAdapterRuntimeStatusSnapshot.snapshot(config, readinessLogger);
     } else {
       readinessOutput =
           readinessEnabled
@@ -149,7 +147,6 @@ public final class Main {
       clusterReadinessResourceUrn = "";
       registryResourceUrn = "";
       imageBuildResourceUrn = "";
-      systemdRuntimeStatusResourceUrn = "";
       registrySummary =
           Map.of(
               "checksum",
@@ -168,7 +165,8 @@ public final class Main {
               "imageAlias", config.imageAlias(),
               "imageFingerprint", bootstrapResult.imageFingerprint(),
               "incusProject", config.incusProject());
-      systemdRuntimeStatusSummary = SeedSystemdRuntimeStatusResource.snapshotStandalone(config);
+      systemdRuntimeStatusSummary =
+          SeedSystemdAdapterRuntimeStatusSnapshot.snapshotStandalone(config);
     }
     final String seedNodeId = bootstrapResult.seedNodeId();
     final Object imageFingerprint = bootstrapResult.imageFingerprint();
@@ -256,7 +254,6 @@ public final class Main {
     outputs.put("clusterReadinessResourceUrn", clusterReadinessResourceUrn);
     outputs.put("registryResourceUrn", registryResourceUrn);
     outputs.put("seedImageBuildResourceUrn", imageBuildResourceUrn);
-    outputs.put("systemdRuntimeStatusResourceUrn", systemdRuntimeStatusResourceUrn);
     outputs.put("registrySummary", registrySummary);
     outputs.put("systemdProvisioningSummary", bootstrapResult.systemdProvisioningSummary());
     outputs.put("systemdAdapterLaunchSummary", systemdAdapterLaunchSummary);

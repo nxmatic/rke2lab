@@ -548,8 +548,9 @@ public final class ClusterBootstrapReadinessVerifier {
 
   private static List<String> incusExec(BootstrapConfig config, String... args) {
     final String remoteIncusCommand =
-        "incus exec --project "
+        "incus --project "
             + shellQuote(config.incusProject())
+            + " exec "
             + " "
             + shellQuote(config.nodeName())
             + " -- "
