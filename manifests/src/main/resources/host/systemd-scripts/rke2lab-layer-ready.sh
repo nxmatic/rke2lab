@@ -3,6 +3,12 @@
 : "Load RKE2 environment for kubectl and tooling"
 source <(flox activate --dir /var/lib/rancher/rke2)
 
+RKE2LAB_ROOT=${RKE2LAB_ROOT:-/srv/host}
+if [[ -r "${RKE2LAB_ROOT}/systemd-scripts.d/rke2lab-env-load.sh" ]]; then
+	source "${RKE2LAB_ROOT}/systemd-scripts.d/rke2lab-env-load.sh"
+	rke2lab::env:load
+fi
+
 log() {
 	echo "[rke2-layer-ready] $*"
 }
@@ -14,6 +20,51 @@ usage() {
 	echo "         $(basename "$0") storage --package openebs-zfs" >&2
 	echo "         $(basename "$0") replication --timeout 600s" >&2
 	echo "         $(basename "$0") runtime --timeout infinite" >&2
+}
+
+bool_is_true() {
+	case "${1:-}" in
+	1 | true | TRUE | yes | YES | on | ON)
+		return 0
+		;;
+	*)
+		return 1
+		;;
+	esac
+}
+
+policy_link_var_name() {
+	local layer_key="${1:?layer key required}"
+	printf 'RKE2LAB_POLICY_LINK_%s_ENABLED\n' "$(printf '%s' "${layer_key}" | tr '[:lower:]-/' '[:upper:]__')"
+}
+
+layer_is_policy_linkable() {
+	case "${1:-}" in
+	high-availability | networking | replication | storage | mesh)
+		return 0
+		;;
+	*)
+		return 1
+		;;
+	esac
+}
+
+layer_readiness_enabled() {
+	local layer_key="${1:?layer key required}"
+	local var_name value
+
+	if ! layer_is_policy_linkable "${layer_key}"; then
+		return 0
+	fi
+
+	var_name="$(policy_link_var_name "${layer_key}")"
+	value="${!var_name:-}"
+	if [[ -z "${value}" ]]; then
+		log "Missing required policy variable for layer ${layer_key}: ${var_name}"
+		return 1
+	fi
+
+	bool_is_true "${value}"
 }
 
 timeout_is_infinite() {
@@ -240,6 +291,12 @@ if [[ -z "${layer}" ]]; then
 fi
 
 layer="${layer%/}"
+
+policy_layer_key="${layer%%/*}"
+if ! layer_readiness_enabled "${policy_layer_key}"; then
+	log "Policy disables layer ${policy_layer_key}; skipping readiness checks"
+	exit 0
+fi
 
 if [[ -z "${timeout}" ]]; then
 	case "${layer}" in

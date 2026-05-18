@@ -61,10 +61,10 @@ public final class Main {
       BootstrapConfig config, ControlplanePolicy policy) {
     enforceEntryGatePolicies(config.localWorktreePath());
 
-    final String bootstrapPhase;
-    final boolean handoffReady;
     final IncusResourceBootstrap.BootstrapResult bootstrapResult =
         new IncusResourceBootstrap(config, policy).apply();
+    final ClusterBootstrapReadinessVerifier.VerificationResult readiness =
+        ClusterBootstrapReadinessVerifier.verify(config, policy);
     final String seedNodeId = bootstrapResult.seedNodeId();
     final Object imageFingerprint = bootstrapResult.imageFingerprint();
     final Object seedInstanceStatus = bootstrapResult.instanceStatus();
@@ -73,8 +73,6 @@ public final class Main {
     final String provisioningChecksum = bootstrapResult.provisioningChecksum();
     final String imageBuildChecksum = bootstrapResult.imageBuildChecksum();
     final String hostSourceDirRelative = bootstrapResult.hostSourceDirRelative();
-    bootstrapPhase = "Ready";
-    handoffReady = true;
 
     final Map<String, Object> outputs = new LinkedHashMap<>();
     outputs.put("managementClusterName", config.clusterName());
@@ -92,9 +90,14 @@ public final class Main {
     outputs.put("imageAlias", config.imageAlias());
     outputs.put("seedLanBridgeParent", config.lanBridgeParent());
     outputs.putAll(policy.toOutputMap());
-    outputs.put("handoffReady", handoffReady);
-    outputs.put("bootstrapPhase", bootstrapPhase);
-    outputs.put("nextStep", "bootstrap-management-cluster-then-apply-stageb-cluster-manifests");
+    outputs.putAll(readiness.asOutputs());
+    outputs.put("handoffReady", readiness.handoffReady());
+    outputs.put("bootstrapStatus", readiness.bootstrapStatus());
+    outputs.put(
+        "nextStep",
+        readiness.handoffReady()
+            ? "bootstrap-management-cluster-then-apply-stageb-cluster-manifests"
+            : "wait-for-cluster-readiness");
     return new BootstrapOutputs(outputs);
   }
 

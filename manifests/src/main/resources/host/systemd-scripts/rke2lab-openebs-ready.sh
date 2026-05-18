@@ -2,6 +2,12 @@
 
 source <(flox activate --dir /var/lib/rancher/rke2)
 
+RKE2LAB_ROOT=${RKE2LAB_ROOT:-/srv/host}
+if [[ -r "${RKE2LAB_ROOT}/systemd-scripts.d/rke2lab-env-load.sh" ]]; then
+	source "${RKE2LAB_ROOT}/systemd-scripts.d/rke2lab-env-load.sh"
+	rke2lab::env:load
+fi
+
 log() {
 	echo "[rke2-openebs-ready] $*"
 }
@@ -23,6 +29,22 @@ wait_for_storageclass() {
 	log "StorageClass ${sc} detected"
 	kubectl get storageclass "${sc}"
 }
+
+bool_is_true() {
+	case "${1:-}" in
+	1 | true | TRUE | yes | YES | on | ON)
+		return 0
+		;;
+	*)
+		return 1
+		;;
+	esac
+}
+
+if [[ -n "${RKE2LAB_POLICY_LINK_STORAGE_ENABLED:-}" ]] && ! bool_is_true "${RKE2LAB_POLICY_LINK_STORAGE_ENABLED}"; then
+	log "Policy disables storage layer; skipping OpenEBS readiness checks"
+	exit 0
+fi
 
 log "Waiting for OpenEBS components..."
 

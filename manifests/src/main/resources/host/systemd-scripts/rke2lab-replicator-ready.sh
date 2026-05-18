@@ -2,6 +2,28 @@
 
 source <(flox activate --dir /var/lib/rancher/rke2)
 
+RKE2LAB_ROOT=${RKE2LAB_ROOT:-/srv/host}
+if [[ -r "${RKE2LAB_ROOT}/systemd-scripts.d/rke2lab-env-load.sh" ]]; then
+	source "${RKE2LAB_ROOT}/systemd-scripts.d/rke2lab-env-load.sh"
+	rke2lab::env:load
+fi
+
+bool_is_true() {
+	case "${1:-}" in
+	1 | true | TRUE | yes | YES | on | ON)
+		return 0
+		;;
+	*)
+		return 1
+		;;
+	esac
+}
+
+if [[ -n "${RKE2LAB_POLICY_LINK_REPLICATION_ENABLED:-}" ]] && ! bool_is_true "${RKE2LAB_POLICY_LINK_REPLICATION_ENABLED}"; then
+	echo "[rke2-replicator-ready] policy disables replication layer; skipping replicator readiness checks"
+	exit 0
+fi
+
 : "Waiting for kubernetes-replicator components..."
 
 # Wait for kube-system namespace (should already exist but ensure it)
