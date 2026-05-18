@@ -7,14 +7,17 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Canonical operational policy derived from Pulumi config for Stage A bootstrap. */
-public record ControlplanePolicy(DebugPolicy debug, ManifestLinkPolicy manifestLink) {
+public record ControlplanePolicy(
+    DebugPolicy debug, NetworkPolicy network, ManifestLinkPolicy manifestLink) {
 
   private static final ManifestDomainCatalog MANIFEST_DOMAIN_CATALOG =
       ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
 
   public static ControlplanePolicy defaults() {
     return new ControlplanePolicy(
-        new DebugPolicy(false, false), ManifestLinkPolicy.stageA(true, true, true, true, false));
+        new DebugPolicy(false, false),
+        new NetworkPolicy(true),
+        ManifestLinkPolicy.stageA(true, true, true, true, false));
   }
 
   public static ControlplanePolicy from(Config config) {
@@ -23,7 +26,10 @@ public record ControlplanePolicy(DebugPolicy debug, ManifestLinkPolicy manifestL
     DebugPolicy debugPolicy =
         new DebugPolicy(
             environment.bool("policy.debug.kdns.enabled", false),
-            environment.bool("policy.debug.floxShimWrapper.enabled", false));
+            environment.bool("policy.debug.containerdShimFloxV2Wrapper.enabled", false));
+
+    NetworkPolicy networkPolicy =
+        new NetworkPolicy(environment.bool("policy.network.lan.binding.enabled", true));
 
     ManifestLinkPolicy manifestLinkPolicy =
         new ManifestLinkPolicy(
@@ -37,12 +43,13 @@ public record ControlplanePolicy(DebugPolicy debug, ManifestLinkPolicy manifestL
                     environment.bool("policy.link.mesh.enabled", false))
                 .build());
 
-    return new ControlplanePolicy(debugPolicy, manifestLinkPolicy);
+    return new ControlplanePolicy(debugPolicy, networkPolicy, manifestLinkPolicy);
   }
 
   public Map<String, String> toEnvMap() {
     Map<String, String> env = new LinkedHashMap<>();
     env.putAll(debug.toEnvMap());
+    env.putAll(network.toEnvMap());
     env.putAll(manifestLink.toEnvMap());
     return env;
   }
@@ -50,6 +57,7 @@ public record ControlplanePolicy(DebugPolicy debug, ManifestLinkPolicy manifestL
   public Map<String, Object> toOutputMap() {
     Map<String, Object> outputs = new LinkedHashMap<>();
     outputs.putAll(debug.toOutputMap());
+    outputs.putAll(network.toOutputMap());
     outputs.putAll(manifestLink.toOutputMap());
     return outputs;
   }

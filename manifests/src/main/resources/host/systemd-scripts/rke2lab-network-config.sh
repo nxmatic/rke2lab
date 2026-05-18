@@ -3,8 +3,39 @@
 # Log all operations
 exec > >(logger -t rke2-network-config) 2>&1
 
+: "Load environment variables from mounted section manifests"
+source /srv/host/systemd-scripts.d/rke2lab-env-load.sh
+rke2lab::env:load
+
 : "Load flox environment for yq and other tools"
 source <(flox activate --dir /var/lib/cloud/seed/nocloud)
+
+: "Resolve policy toggle for LAN binding (default enabled)"
+lan_binding_enabled="${RKE2LAB_POLICY_NETWORK_LAN_BINDING_ENABLED:-true}"
+
+: "Apply policy override when LAN binding is disabled"
+case "${lan_binding_enabled,,}" in
+1 | true | yes | on)
+	# Canonical default: LAN binding remains enabled.
+	rm -f /etc/netplan/90-rke2lab-lan-disable.yaml
+	;;
+0 | false | no | off)
+	cat >/etc/netplan/90-rke2lab-lan-disable.yaml <<'EOF'
+network:
+  version: 2
+  ethernets:
+    lan0:
+      dhcp4: false
+      dhcp6: false
+      optional: true
+      link-local: []
+EOF
+	;;
+*)
+	echo "[!] Invalid RKE2LAB_POLICY_NETWORK_LAN_BINDING_ENABLED='${lan_binding_enabled}', expected boolean" >&2
+	exit 1
+	;;
+esac
 
 : "=== Stopping dhcpcd for vmnet0 (systemd-networkd will manage it) ==="
 # Kill dhcpcd processes for vmnet0 to prevent route conflicts
