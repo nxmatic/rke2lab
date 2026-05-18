@@ -289,9 +289,9 @@ public record BootstrapConfig(
   }
 
   private static final class Defaults {
-    private static final String LIMA_HOSTNAME_ENV = "LIMA_HOSTNAME";
+    private static final String ACCESS_HOST_ENV = "RKE2LAB_ACCESS_HOST";
 
-    private static final String DEFAULT_LIMA_HOSTNAME = "bioskop-nixos.local";
+    private static final String DEFAULT_ACCESS_HOST = "bioskop-nixos.local";
 
     private static final int INCUS_REMOTE_PORT = 8443;
 
@@ -328,11 +328,11 @@ public record BootstrapConfig(
     }
 
     String imageBuilderHost() {
-      return limaHostname();
+      return accessHost();
     }
 
     String incusDefaultRemote() {
-      final String hostname = limaHostname();
+      final String hostname = accessHost();
       final int dotIndex = hostname.indexOf('.');
       if (dotIndex <= 0) {
         return hostname;
@@ -341,13 +341,13 @@ public record BootstrapConfig(
     }
 
     URI incusRemoteAddress() {
-      return URI.create("https://" + limaHostname() + ":" + INCUS_REMOTE_PORT);
+      return URI.create("https://" + accessHost() + ":" + INCUS_REMOTE_PORT);
     }
 
-    String limaHostname() {
-      final String env = System.getenv(LIMA_HOSTNAME_ENV);
+    String accessHost() {
+      final String env = System.getenv(ACCESS_HOST_ENV);
       if (env == null || env.isBlank()) {
-        return DEFAULT_LIMA_HOSTNAME;
+        return DEFAULT_ACCESS_HOST;
       }
       return env.trim();
     }
