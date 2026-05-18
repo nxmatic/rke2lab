@@ -256,10 +256,6 @@ public final class FloxContainerdShimAssets {
       addInstallerAsset(
           "shim-installer.sh", FLOX_RESOURCE_ROOT + "/shim-installer.sh", "bin/shim-installer.sh");
       addInstallerAsset(
-          "shim-installer-entrypoint.sh",
-          FLOX_RESOURCE_ROOT + "/shim-installer-entrypoint.sh",
-          "shim-installer-entrypoint.sh");
-      addInstallerAsset(
           "shim-build.sh", FLOX_RESOURCE_ROOT + "/shim-build.sh", "build-assets/bin/shim-build.sh");
       addInstallerAsset(
           "shim-build.yaml",

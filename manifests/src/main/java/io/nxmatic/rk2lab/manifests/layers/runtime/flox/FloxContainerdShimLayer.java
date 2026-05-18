@@ -272,7 +272,11 @@ public final class FloxContainerdShimLayer extends Construct {
                         new Object[] {
                           Map.of(
                               "command",
-                              new Object[] {"/.sh/shim-installer-entrypoint.sh"},
+                              new Object[] {
+                                "/bin/sh",
+                                "-ec",
+                                "apk add --no-cache bash coreutils && /.sh/bin/shim-installer.sh"
+                              },
                               "env",
                               new Object[] {
                                 Map.of(
