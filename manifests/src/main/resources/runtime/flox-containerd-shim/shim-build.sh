@@ -3,7 +3,7 @@ set -exuo pipefail
 
 # Flox shim package build script
 # Builds packages from local packaged flakes defined in YAML descriptor
-# Usage: shim-build.sh [mode] [descriptor file]
+# Usage: DAEMONLESS_EXEC_MODE=[host|guest|pod] shim-build.sh [descriptor file]
 # Set FLOX_SHIM_ONLY_UPDATE_LOCKS=true to refresh flake.lock files only.
 
 SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
@@ -13,7 +13,10 @@ if [[ "${SCRIPT_DIR}" == "${SCRIPT_PATH}" ]]; then
 fi
 SCRIPT_BASENAME="$(basename "${SCRIPT_PATH}")"
 SCRIPT_STEM="${SCRIPT_BASENAME%.sh}"
-WORKTREE_MODE="${FLOX_SHIM_MODE:-guest}"
+EXECUTION_MODE="${DAEMONLESS_EXEC_MODE:-guest}"
+
+# shellcheck disable=SC1091
+[[ -r "${SCRIPT_DIR}/.sh.d/daemonless-trampoline.sh" ]] && source "${SCRIPT_DIR}/.sh.d/daemonless-trampoline.sh"
 
 canonicalize_existing_path() {
 	local input_path="$1"
@@ -35,15 +38,6 @@ canonicalize_existing_path() {
 	input_base="$(basename "${input_path}")"
 	echo "$(cd "${input_dir}" && pwd -P)/${input_base}"
 }
-
-if [[ $# -gt 0 ]]; then
-	case "${1}" in
-	host | guest)
-		WORKTREE_MODE="${1}"
-		shift
-		;;
-	esac
-fi
 
 BUILDS_DESCRIPTOR="${1:-${SCRIPT_DIR}/${SCRIPT_STEM}.yaml}"
 BUILDS_DESCRIPTOR="$(canonicalize_existing_path "${BUILDS_DESCRIPTOR}")"
@@ -99,18 +93,38 @@ resolve_package_variant() {
 }
 
 validate_worktree_mode() {
-	case "${WORKTREE_MODE}" in
-	host | guest)
+	case "${EXECUTION_MODE}" in
+	host | guest | pod)
 		return 0
 		;;
 	*)
-		: "[ERROR] Unsupported or missing shim builder mode: '${WORKTREE_MODE}'"
-		: "[ERROR] Usage: ${SCRIPT_BASENAME} [host|guest] [descriptor file]"
+		: "[ERROR] Unsupported or missing daemonless execution mode: '${EXECUTION_MODE}'"
+		: "[ERROR] Usage: DAEMONLESS_EXEC_MODE=[host|guest|pod] ${SCRIPT_BASENAME} [descriptor file]"
 		: "[ERROR] Default mode is 'guest' when omitted."
-		: "[ERROR] You can also set FLOX_SHIM_MODE and pass only [descriptor file]."
 		exit 1
 		;;
 	esac
+}
+
+reexec_on_host_if_needed() {
+	local default_descriptor host_script_root mode
+
+	declare -F daemonless::trampoline:exec_on_host >/dev/null 2>&1 || return 0
+	mode="$(daemonless::trampoline:mode:resolve)" || return 1
+	[[ "${mode}" == "host" ]] && return 0
+
+	default_descriptor="$(canonicalize_existing_path "${SCRIPT_DIR}/${SCRIPT_STEM}.yaml")"
+	[[ "${BUILDS_DESCRIPTOR}" == "${default_descriptor}" ]] || return 0
+
+	host_script_root="${DAEMONLESS_HOST_SCRIPT_ROOT:-}"
+	[[ -n "${host_script_root}" ]] || return 0
+
+	if [[ "${mode}" == "guest" && -z "${DAEMONLESS_HOST_SSH_TARGET:-}" ]]; then
+		return 0
+	fi
+
+	daemonless::trampoline:exec_on_host "${SCRIPT_BASENAME}"
+	return 1
 }
 
 find_flox_activation_dir() {
@@ -120,7 +134,7 @@ find_flox_activation_dir() {
 		candidates+=("${FLOX_SHIM_ENV_DIR}")
 	fi
 
-	if [[ "${WORKTREE_MODE}" == "host" ]]; then
+	if [[ "${EXECUTION_MODE}" == "host" ]]; then
 		candidates+=("/var/lib/rancher/rke2")
 	fi
 
@@ -150,7 +164,7 @@ activate_flox_environment() {
 
 	local activation_dir
 	if ! activation_dir="$(find_flox_activation_dir)"; then
-		: "[WARN] No Flox activation directory found for mode '${WORKTREE_MODE}'; continuing with existing shell environment"
+		: "[WARN] No Flox activation directory found for mode '${EXECUTION_MODE}'; continuing with existing shell environment"
 		return 0
 	fi
 
@@ -291,7 +305,7 @@ stage_git_flake_inputs_if_needed() {
 	local resolved_path="$2"
 	local repo_root
 
-	[[ "${WORKTREE_MODE}" == "host" ]] || return 0
+	[[ "${EXECUTION_MODE}" == "host" ]] || return 0
 	command -v git >/dev/null 2>&1 || return 0
 
 	if ! repo_root="$(git -C "${resolved_path}" rev-parse --show-toplevel 2>/dev/null)"; then
@@ -411,7 +425,8 @@ fi
 : "[$(date)] Found ${num_jobs} build job(s)"
 
 validate_worktree_mode
-: "[$(date)] Shim builder worktree mode: ${WORKTREE_MODE}"
+: "[$(date)] Shim builder execution mode: ${EXECUTION_MODE}"
+reexec_on_host_if_needed
 activate_flox_environment
 rke2lab::env:load
 

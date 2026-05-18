@@ -39,10 +39,6 @@ public final class Main {
           new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/shim-installer.sh", "shim-installer.sh", true),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
-              "/runtime/flox-containerd-shim/shim-installer-host.sh",
-              "shim-installer-host.sh",
-              true),
-          new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/flox-rootfs-sync.sh", "flox-rootfs-sync.sh", true),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/flox-containerd-shim/debug-tools/.sh.d/rke2lab-debug-tooling.sh",
@@ -125,6 +121,14 @@ public final class Main {
               "networking/kdns/.flox/env/manifest.lock",
               false),
           new MaterializeShimAssetsCommand.EmbeddedAsset(
+              "/runtime/daemonset/.sh.d/daemonless-host-asset-materializer.sh",
+              ".sh.d/daemonless-host-asset-materializer.sh",
+              false),
+          new MaterializeShimAssetsCommand.EmbeddedAsset(
+              "/runtime/daemonset/.sh.d/daemonless-trampoline.sh",
+              ".sh.d/daemonless-trampoline.sh",
+              false),
+          new MaterializeShimAssetsCommand.EmbeddedAsset(
               "/runtime/daemonset/.sh.d/daemonset-logging.sh",
               ".sh.d/daemonset-logging.sh",
               false));
@@ -163,7 +167,7 @@ public final class Main {
             new ShimBuildCommand.Builder(this)
                 .invocationName("shim-build")
                 .description("Build shim packages from descriptor")
-                .usage("shim-build [host|guest] [descriptor-file]")
+                .usage("shim-build [host|guest|pod] [descriptor-file]")
                 .mode(mode)
                 .descriptor(descriptor));
       }
@@ -174,7 +178,7 @@ public final class Main {
             new ShimBuildCommand.Builder(this)
                 .invocationName("nix-flake-update")
                 .description("Update flake locks only (skip package builds)")
-                .usage("nix-flake-update [host|guest] [descriptor-file]")
+                .usage("nix-flake-update [host|guest|pod] [descriptor-file]")
                 .mode(mode)
                 .descriptor(descriptor)
                 .lockOnly(true));
@@ -201,12 +205,12 @@ public final class Main {
             new ShimBuildCommand.Builder(this)
                 .invocationName("shim-build")
                 .description("Build shim packages from descriptor")
-                .usage("shim-build [host|guest] [descriptor-file]")),
+                .usage("shim-build [host|guest|pod] [descriptor-file]")),
         commandOf(
             new ShimBuildCommand.Builder(this)
                 .invocationName("nix-flake-update")
                 .description("Update flake locks only (skip package builds)")
-                .usage("nix-flake-update [host|guest] [descriptor-file]")
+                .usage("nix-flake-update [host|guest|pod] [descriptor-file]")
                 .lockOnly(true)),
         commandOf(
             new MaterializeShimAssetsCommand.Builder(this)
@@ -316,9 +320,9 @@ public final class Main {
 
     @Override
     public void run() {
-      if (!"host".equals(mode) && !"guest".equals(mode)) {
+      if (!"host".equals(mode) && !"guest".equals(mode) && !"pod".equals(mode)) {
         throw new IllegalArgumentException(
-            "Unsupported shim-build mode: " + mode + ". Supported modes: host, guest");
+            "Unsupported shim-build mode: " + mode + ". Supported modes: host, guest, pod");
       }
 
       try {
@@ -343,10 +347,11 @@ public final class Main {
         }
 
         final ProcessBuilder processBuilder =
-            new ProcessBuilder(
-                    bashInterpreter, buildScript.toString(), mode, descriptorPath.toString())
+            new ProcessBuilder(bashInterpreter, buildScript.toString(), descriptorPath.toString())
                 .directory(scriptRoot.toFile())
                 .inheritIO();
+
+        processBuilder.environment().put("DAEMONLESS_EXEC_MODE", mode);
 
         if (lockOnly) {
           processBuilder.environment().put("FLOX_SHIM_UPDATE_LOCKS", "true");

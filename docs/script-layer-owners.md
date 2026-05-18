@@ -14,7 +14,6 @@ This file is the canonical ownership map for shell script assets in this reposit
 | Script | Owner domain/layer | Owner manifest unit | Source path |
 |---|---|---|---|
 | `shim-installer.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/shim-installer.sh` |
-| `shim-installer-host.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/shim-installer-host.sh` |
 | `flox-rootfs-sync.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/flox-rootfs-sync.sh` |
 | `shim-build.sh` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/shim-build.sh` |
 | `shim-build.yaml` | `runtime/flox-containerd-shim` | `runtime/flox-containerd-shim` | `manifests/src/main/resources/runtime/flox-containerd-shim/shim-build.yaml` |
@@ -75,10 +74,11 @@ Scripts in this owner set:
 
 ## Notes
 
+- Runtime daemonset policy scripts currently include `daemonset-logging.sh`, `daemonless-trampoline.sh`, and `daemonless-host-asset-materializer.sh` under `manifests/src/main/resources/runtime/daemonset/.sh.d/`.
 - `runtime/flox-containerd-shim` is the canonical owner for both installer and build-assets ConfigMaps mounted at `/scripts` and `/build-assets`.
-- Shim builder execution supports two canonical modes: `guest` (repository/local worktree) and `host` (node provisioning worktree under `/srv/host/flox-shim.d`).
-- Shim builder mode is explicit when passed: `shim-build.sh [host|guest] [descriptor]`.
-- Default mode is `guest` when mode is omitted.
+- Shim builder execution is controlled by the canonical daemonless execution contract (`DAEMONLESS_EXEC_MODE=guest|host|pod`).
+- `shim-build.sh` accepts `host|guest|pod` through its CLI entrypoints, which in turn set the daemonless execution mode explicitly.
+- Default execution mode remains `guest` when omitted.
 - `kdns` source resolution is worktree-based (`path:` input), with subtree mode preferred at `networking/kdns/src` and explicit override available via `KDNS_SRC_WORKTREE`.
 - Deferred cleanup note: some inline mesh/runtime ConfigMaps (for example `mesh/headplane` Flox env payloads) are candidates to adopt the same deterministic serialized-asset/archive pattern now used by the Flox shim wrapper.
 - Next-stage migration guidance is tracked in `docs/rke2lab-authored-notes-import.adoc` under `=== Next-stage migration note`.

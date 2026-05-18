@@ -73,7 +73,11 @@ public final class RuntimeDaemonsetScriptPolicyLayer extends Construct {
             "/data",
             Map.of(
                 "daemonset-logging.sh",
-                readResource("/runtime/daemonset/.sh.d/daemonset-logging.sh"))));
+                readResource("/runtime/daemonset/.sh.d/daemonset-logging.sh"),
+                "daemonless-host-asset-materializer.sh",
+                readResource("/runtime/daemonset/.sh.d/daemonless-host-asset-materializer.sh"),
+                "daemonless-trampoline.sh",
+                readResource("/runtime/daemonset/.sh.d/daemonless-trampoline.sh"))));
   }
 
   private String readResource(final String resourcePath) {

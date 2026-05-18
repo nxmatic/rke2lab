@@ -1,0 +1,309 @@
+= Daemonless Host Assets Architecture
+:toc: left
+:toclevels: 3
+:kroki-server-url: https://kroki.io
+
+This note captures the current daemonless runtime pattern for host-mutating workflows that begin in a Kubernetes pod and complete on the node host.
+
+It is specifically concerned with:
+
+* the daemonless execution contract
+* the host asset materialization path
+* the ownership boundary between shared daemonless policy and workflow-specific installer assets
+* the current encoded archive provider used by the Flox shim runtime path
+
+== Canonical terminology
+
+The following terms are canonical in the current model:
+
+* *daemonless execution mode* — explicit execution context selected through `DAEMONLESS_EXEC_MODE`
+* *host asset root* — the canonical host-side materialization directory for a workflow
+* *daemonless policy scripts* — shared helper scripts mounted from the runtime daemonset policy ConfigMap
+* *workflow installer assets* — workflow-specific scripts, manifests, and payload files mounted from the runtime installer assets ConfigMap
+
+For the Flox shim runtime path, the canonical host asset root is:
+
+* `/srv/host/k8s-daemonset.d/runtime/flox-containerd-shim`
+
+This host asset root is intentionally *not* the developer worktree.
+The worktree remains an upstream source input that originates on the macOS workstation running the NixOS VM through Tart/VZ.
+The daemonless workflow materializes verified host assets from delivered payloads; it does not redefine the repository checkout as a host-owned runtime asset.
+
+== Execution contract
+
+Daemonless workflows do not infer whether they are running in a pod or on the host.
+The caller declares the execution context explicitly.
+
+Current canonical values:
+
+* `DAEMONLESS_EXEC_MODE=pod`
+* `DAEMONLESS_EXEC_MODE=host`
+* `DAEMONLESS_EXEC_MODE=guest` (supported by the trampoline contract, though not used by the Flox runtime installer DaemonSet path)
+
+The important rule is:
+
+* execution context is *declared*, not auto-detected
+
+This keeps behavior deterministic, observable in logs, and stable across environment changes.
+
+== Worktree provenance
+
+The authoritative repository worktree for local iteration comes from the macOS machine where development happens.
+That macOS machine is also the machine that runs the NixOS VM through Tart/VZ.
+
+So the architecture boundary is:
+
+* macOS workstation: authoritative repo checkout and editing surface
+* NixOS VM: execution environment that consumes a projected/shared view of that checkout
+* daemonless host assets: generated runtime outputs materialized under `/srv/host/*`
+
+This distinction matters because the worktree is a source input, while daemonless host assets are provisioned outputs.
+They should not be modeled as the same class of path.
+
+== Shared daemonless policy surface
+
+The shared daemonless policy is currently provided by `RuntimeDaemonsetScriptPolicyLayer` through the `runtime-daemonset-script-policy` ConfigMap.
+
+At the time of writing, that policy surface includes:
+
+* `daemonset-logging.sh`
+* `daemonless-trampoline.sh`
+* `daemonless-host-asset-materializer.sh`
+
+Responsibilities:
+
+=== `daemonset-logging.sh`
+
+* configures colocated stderr log mirroring for daemonless scripts
+
+=== `daemonless-trampoline.sh`
+
+* owns pod→host and guest→host re-exec behavior
+* consumes the explicit daemonless execution contract
+
+=== `daemonless-host-asset-materializer.sh`
+
+* owns deterministic host-asset materialization for encoded archive payloads
+* verifies archive and entry checksums from a manifest before moving payloads into the host asset root
+
+== Workflow-specific installer assets
+
+The Flox runtime path is provided by `FloxContainerdShimLayer` through the `flox-runtime-installer-assets` ConfigMap.
+
+This workflow-specific asset set includes:
+
+* `shim-installer.sh`
+* `shim-build.sh`
+* `shim-build.yaml`
+* `flake.nix`
+* `flox-rootfs-sync.sh`
+* debug helper scripts
+* encoded wrapper-go payload files:
+** `wrapper-go.tar.b64`
+** `wrapper-go.manifest.json`
+
+This means the ownership split is:
+
+* shared daemonless behavior → `runtime-daemonset-script-policy`
+* workflow-specific payloads and scripts → `flox-runtime-installer-assets`
+
+== Who provides the encoded archive
+
+The current encoded wrapper-go archive is provided by `WrapperGoArchiveAssets`.
+
+More precisely:
+
+. `WrapperGoArchiveAssets` loads embedded `wrapper-go` source resources from the `manifests` module.
+. It builds a deterministic tar archive.
+. It base64-encodes that archive.
+. It emits the accompanying JSON manifest containing:
+* archive size
+* archive checksum
+* per-entry size and checksum metadata
+. `FloxContainerdShimLayer` places those outputs into the installer assets ConfigMap.
+. `shim-installer.sh` consumes those files through the shared daemonless host-asset materializer.
+
+So:
+
+* the *policy* layer does not provide the encoded archive payload
+* the *wrapper-go asset generator* provides the payload
+* the *workflow asset layer* delivers it into Kubernetes
+* the *daemonless host-asset materializer* verifies and materializes it on host
+
+== C4-style context view
+
+[mermaid,daemonless-host-assets-context,svg]
+----
+flowchart LR
+    operator[Operator]
+  mac[macOS workstation\nAuthoritative repo checkout]
+  repo[rke2lab worktree]
+  vm[NixOS VM\nTart/VZ guest]
+  cluster[Kubernetes cluster in VM]
+  node[Enabled node host in VM]
+    runtime[Daemonless host-mutating workflow]
+
+  operator --> mac
+  mac --> repo
+  mac --> vm
+  repo --> vm
+  vm --> cluster
+    cluster --> runtime
+    runtime --> node
+----
+
+At the context level, the important point is that the authoritative worktree lives on the macOS workstation, is projected into the NixOS VM that macOS runs via Tart/VZ, and only then feeds the Kubernetes-delivered workflow that performs its durable mutation on the node host.
+
+== C4-style container view
+
+[mermaid,daemonless-host-assets-container,svg]
+----
+flowchart LR
+    operator[Operator]
+
+    subgraph Workstation[macOS workstation]
+      worktree[rke2lab worktree\nAuthoritative editable checkout]
+      vmBoundary[Tart/VZ virtualization boundary\nProjects worktree into guest]
+    end
+
+    subgraph Repo[Projected repo inside NixOS VM]
+      policyLayer[RuntimeDaemonsetScriptPolicyLayer<br/>Java/CDK8s]
+      shimLayer[FloxContainerdShimLayer<br/>Java/CDK8s]
+      wrapperProvider[WrapperGoArchiveAssets<br/>Java resource packer]
+    end
+
+    subgraph VM[NixOS VM]
+      projectedTree[Projected macOS-backed worktree<br/>Source input, not runtime asset]
+
+    subgraph Cluster[Kubernetes delivery surface]
+      policyConfig[runtime-daemonset-script-policy<br/>ConfigMap]
+      installerConfig[flox-runtime-installer-assets<br/>ConfigMap]
+      daemonSet[flox-runtime-installer<br/>DaemonSet]
+    end
+
+    subgraph Node[Kubernetes node runtime path]
+      podInstaller[shim-installer.sh<br/>pod mode]
+      hostInstaller[shim-installer.sh<br/>host mode]
+      hostAssets["Host asset root<br/>/srv/host/k8s-daemonset.d/runtime/flox-containerd-shim"]
+    end
+    end
+
+    operator --> worktree
+    worktree --> vmBoundary
+    vmBoundary --> projectedTree
+    projectedTree --> policyLayer
+    projectedTree --> shimLayer
+    projectedTree --> wrapperProvider
+    policyLayer --> policyConfig
+    shimLayer --> installerConfig
+    shimLayer --> daemonSet
+    wrapperProvider --> installerConfig
+    daemonSet --> policyConfig
+    daemonSet --> installerConfig
+    daemonSet --> podInstaller
+    podInstaller --> hostAssets
+    podInstaller --> hostInstaller
+    hostInstaller --> hostAssets
+----
+
+This container view makes the ownership split explicit:
+
+* the authoritative worktree lives on the macOS workstation
+* Tart/VZ projects that worktree into the NixOS VM as a source input
+* `RuntimeDaemonsetScriptPolicyLayer` owns shared daemonless behavior
+* `FloxContainerdShimLayer` owns workflow-specific asset delivery
+* `WrapperGoArchiveAssets` owns the encoded wrapper-go payload generation
+* `shim-installer.sh` is the single installer entrypoint in both pod and host modes
+* `/srv/host/*` remains the runtime output space, not the source worktree
+
+== C4-style component view
+
+[mermaid,daemonless-host-assets-components,svg]
+----
+flowchart TB
+    subgraph SourceInput[macOS-backed source input]
+      macTree[Authoritative macOS worktree]
+      projectedTree[Projected worktree inside NixOS VM]
+    end
+
+    subgraph SharedPolicy[runtime-daemonset-script-policy]
+      logging[daemonset-logging.sh]
+      trampoline[daemonless-trampoline.sh]
+      materializer[daemonless-host-asset-materializer.sh]
+    end
+
+    subgraph WorkflowAssets[flox-runtime-installer-assets]
+      installer[shim-installer.sh]
+      build[shim-build.sh + shim-build.yaml]
+      payload[wrapper-go.tar.b64 + wrapper-go.manifest.json]
+    end
+
+    subgraph Providers[Payload provider]
+      wrapperGen[WrapperGoArchiveAssets]
+    end
+
+    subgraph HostOutcome[Host-side outcome]
+      root[Canonical host asset root]
+      unpacked[wrapper-go/ tree]
+      installResult[host-side shim build/install]
+    end
+
+    macTree --> projectedTree
+    projectedTree --> wrapperGen
+    projectedTree --> installer
+    logging --> installer
+    trampoline --> installer
+    materializer --> installer
+    installer --> build
+    payload --> materializer
+    wrapperGen --> payload
+    installer --> root
+    materializer --> unpacked
+    installer --> installResult
+----
+
+The component view shows the sharp boundary that matters for maintenance:
+
+* the editable worktree is an upstream macOS-backed source input
+* policy helpers define the reusable behavior surface
+* workflow assets provide the installer and payload files
+* the wrapper-go provider emits the encoded content
+* host mutation happens only after policy-driven verification and materialization
+* the source worktree is visible to the workflow but is not itself reclassified as a host asset root
+
+== Current Flox shim daemonless flow
+
+== Sequence summary
+
+. The DaemonSet launches `shim-installer.sh` in pod mode.
+. Pod mode sources shared daemonless policy helpers from `/runtime-daemonset`.
+. Pod mode materializes workflow assets into the host asset root.
+. Pod mode uses `daemonless::host_asset:materialize_encoded_tar` to verify and unpack the encoded wrapper-go payload into the host asset root.
+. Pod mode trampolines onto the host and re-execs the same `shim-installer.sh` with `DAEMONLESS_EXEC_MODE=host`.
+. Host mode sources the same policy helpers from the host asset root and performs build/install/runtime reconfiguration work.
+
+== Design guardrails
+
+The current daemonless host-assets model keeps the following invariants:
+
+* one canonical installer script per workflow (`shim-installer.sh` in this case)
+* one canonical host asset root per workflow
+* explicit execution mode rather than heuristic environment detection
+* shared daemonless behavior isolated from workflow payload ownership
+* deterministic archive verification before host mutation
+
+== Expected extension path
+
+The current naming intentionally leaves room for future host-delivered payload types beyond archives.
+
+Expected future uses of the host-asset materializer surface may include:
+
+* additional encoded trees
+* plain configuration files
+* checksum-validated generated assets
+* manifest-driven host asset layouts for other daemonless workflows
+
+If that expansion happens, keep the ownership split intact:
+
+* policy helpers define *how* host assets are materialized and re-executed
+* workflow asset layers define *which* payloads are delivered

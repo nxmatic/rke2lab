@@ -154,9 +154,6 @@ public final class FloxContainerdShimLayer extends Construct {
                     "shim-installer.sh",
                     readResource("/runtime/flox-containerd-shim/shim-installer.sh")),
                 Map.entry(
-                    "shim-installer-host.sh",
-                    readResource("/runtime/flox-containerd-shim/shim-installer-host.sh")),
-                Map.entry(
                     "shim-installer-entrypoint.sh",
                     readResource("/runtime/flox-containerd-shim/shim-installer-entrypoint.sh")),
                 Map.entry(
@@ -164,6 +161,9 @@ public final class FloxContainerdShimLayer extends Construct {
                 Map.entry(
                     "shim-build.yaml",
                     readResource("/runtime/flox-containerd-shim/shim-build.yaml")),
+                Map.entry(
+                    "daemonless-trampoline.sh",
+                    readResource("/runtime/daemonset/.sh.d/daemonless-trampoline.sh")),
                 Map.entry(
                     "runtime-flake.nix", readResource("/runtime/flox-containerd-shim/flake.nix")),
                 Map.entry(
@@ -342,6 +342,12 @@ public final class FloxContainerdShimLayer extends Construct {
                                     "CONTAINERD_CONFIG_FILE",
                                     "value",
                                     "/var/lib/rancher/rke2/agent/etc/containerd/config.toml"),
+                                Map.of("name", "DAEMONLESS_EXEC_MODE", "value", "pod"),
+                                Map.of(
+                                    "name",
+                                    "DAEMONLESS_HOST_SCRIPT_ROOT",
+                                    "value",
+                                    "/srv/host/k8s-daemonset.d/runtime/flox-containerd-shim"),
                                 Map.of(
                                     "name",
                                     "CONTAINERD_ADDRESS",
@@ -399,11 +405,6 @@ public final class FloxContainerdShimLayer extends Construct {
                                     Map.of("key", "shim-installer.sh", "path", "shim-installer.sh"),
                                     Map.of(
                                         "key",
-                                        "shim-installer-host.sh",
-                                        "path",
-                                        "shim-installer-host.sh"),
-                                    Map.of(
-                                        "key",
                                         "shim-installer-entrypoint.sh",
                                         "path",
                                         "shim-installer-entrypoint.sh"),
@@ -417,6 +418,11 @@ public final class FloxContainerdShimLayer extends Construct {
                                         "shim-build.yaml",
                                         "path",
                                         "build-assets/shim-build.yaml"),
+                                    Map.of(
+                                        "key",
+                                        "daemonless-trampoline.sh",
+                                        "path",
+                                        "build-assets/.sh.d/daemonless-trampoline.sh"),
                                     Map.of(
                                         "key",
                                         "runtime-flake.nix",
@@ -495,7 +501,17 @@ public final class FloxContainerdShimLayer extends Construct {
                                         "key",
                                         "daemonset-logging.sh",
                                         "path",
-                                        "daemonset-logging.sh")
+                                        "daemonset-logging.sh"),
+                                    Map.of(
+                                        "key",
+                                        "daemonless-host-asset-materializer.sh",
+                                        "path",
+                                        "daemonless-host-asset-materializer.sh"),
+                                    Map.of(
+                                        "key",
+                                        "daemonless-trampoline.sh",
+                                        "path",
+                                        "daemonless-trampoline.sh")
                                   },
                                   "name",
                                   RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name()),
