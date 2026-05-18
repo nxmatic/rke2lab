@@ -1,0 +1,182 @@
+= KDNS Debugability from the Operator Point of View
+:toc: left
+:toclevels: 3
+:kroki-server-url: https://kroki.io
+
+This note explains how an operator makes `kdns` debug-able in the current design, and where the ownership boundary sits between:
+
+* *operator-controlled policy* via Pulumi stack configuration
+* *code-controlled structure* in the manifests/controlplane codebase
+
+The short answer is:
+
+* *day-to-day operation*: update Pulumi stack config
+* *design changes*: update the controlplane/manifests codebase
+
+== Operator-first answer
+
+If the goal is:
+
+[quote]
+____
+make KDNS debug-able in this environment
+____
+
+then the canonical operator path is to set Pulumi policy values, not to edit Java code.
+
+Today, `ControlplanePolicy` reads these stack keys:
+
+* `rke2lab:policy.debug.kdns.enabled`
+* `rke2lab:policy.debug.floxShimWrapper.enabled`
+
+Those values feed `DebugPolicy`, which in turn exports the environment consumed during host-side manifest patching.
+
+== C4-style context diagram
+
+[mermaid,kdns-debug-operator-context,svg]
+----
+flowchart TB
+    operator[Operator]
+  pulumi[Pulumi stack config<br/>Pulumi.dev.yaml]
+  controlplane[Controlplane program<br/>ControlplanePolicy -> DebugPolicy]
+  hostpatch[Host patch step<br/>rke2lab-install-pre.sh]
+    deployment[KDNS Deployment]
+  runtime[Flox runtime selection<br/>flox or flox-go-debug]
+  sidecar[Delve sidecar behavior<br/>annotation/env driven]
+
+    operator --> pulumi
+    pulumi --> controlplane
+    controlplane --> hostpatch
+    hostpatch --> deployment
+    deployment --> runtime
+    deployment --> sidecar
+----
+
+== What the operator actually controls
+
+From the operator perspective, enabling KDNS debugability means supplying the right policy inputs before applying the controlplane update.
+
+=== Main policy knobs
+
+* `rke2lab:policy.debug.kdns.enabled`
+** enables KDNS debug mode
+** switches the selected Flox environment from `nxmatic/kdns` to `nxmatic/kdns-debug`
+** switches the runtime class from `flox` to `flox-go-debug`
+** causes the rendered KDNS Deployment to carry the debug annotation
+* `rke2lab:policy.debug.floxShimWrapper.enabled`
+** enables the debug shim/wrapper path required by the dedicated Go debug runtime flow
+
+In practical terms, an operator normally wants both values aligned.
+
+== What gets patched into the workload
+
+The operator does not patch the KDNS Deployment by hand.
+
+Instead, `DebugPolicy` exports values that are consumed by `rke2lab-install-pre.sh`, which patches the rendered Deployment with:
+
+* annotation `flox.dev/environment`
+* annotation `debug.kdns.lab42/enabled`
+* `spec.template.spec.runtimeClassName`
+
+That is the operational handoff from stack configuration to workload behavior.
+
+== Responsibility split
+
+[mermaid,kdns-debug-operator-split,svg]
+----
+flowchart LR
+    subgraph Ops[Operator-owned]
+      cfg[Pulumi config<br/>policy.debug.kdns.enabled<br/>policy.debug.floxShimWrapper.enabled]
+      run[Run controlplane update]
+    end
+
+    subgraph Code[Code-owned]
+      kdns[KdnsLayer]
+      profile[DelveSidecarProfile]
+      resolver[DelveSidecarToggleResolver]
+    end
+
+    subgraph Runtime[Rendered outcome]
+      anno[debug.kdns.lab42/enabled]
+      env[flox.dev/environment]
+      rc[runtimeClassName]
+    end
+
+    cfg --> run
+    run --> anno
+    run --> env
+    run --> rc
+    resolver --> kdns
+    profile --> kdns
+    kdns --> anno
+----
+
+== Important nuance: debug mode vs sidecar structure
+
+It is useful to distinguish two related but different concerns.
+
+=== 1. Operator-controlled runtime mode
+
+The operator controls whether KDNS is put into debug mode by changing Pulumi policy.
+
+That affects the rendered workload values, especially:
+
+* which Flox environment is selected
+* which runtime class is selected
+* which debug annotation value is injected
+
+=== 2. Code-controlled manifest structure
+
+The codebase still decides the structural shape of the manifest.
+
+In particular, `KdnsLayer` together with:
+
+* `DelveSidecarProfile`
+* `DelveSidecarToggleResolver`
+
+controls whether the Delve sidecar container is part of the synthesized manifest model at all.
+
+So the clean mental model is:
+
+* *operator* chooses whether KDNS should run in debug mode
+* *codebase* defines what a debug-capable KDNS workload looks like
+
+== Current operator workflow
+
+. Set the desired values in the active Pulumi stack configuration.
+. Run the controlplane update for that stack.
+. Let the generated host-side patching update the rendered KDNS Deployment.
+. Verify that KDNS now uses:
+.. the debug Flox environment
+.. the debug runtime class
+.. the debug annotation consumed by the sidecar behavior
+
+== Example stack configuration
+
+The current dev stack uses:
+
+[source,yaml]
+----
+# @codebase
+config:
+  "rke2lab:policy.debug.kdns.enabled": "true"
+  "rke2lab:policy.debug.floxShimWrapper.enabled": "true"
+----
+
+== When the operator should edit code instead
+
+Pulumi config is the correct path for routine operation.
+
+The controlplane/manifests codebase should be edited only when changing the policy model itself, for example:
+
+* renaming the policy keys
+* changing defaults
+* changing which runtime class is chosen
+* changing which Flox environment is chosen
+* changing how the Delve sidecar is structurally synthesized
+
+== Bottom line
+
+For operators, KDNS debugability is primarily a *Pulumi policy concern*, not a manual manifest-editing or Java-editing task.
+
+The codebase supplies the mechanism; the stack config selects whether that mechanism is active in a given environment.
