@@ -288,6 +288,8 @@ public final class IncusResourceBootstrap {
     private CustomResourceOptions instanceOptions() {
       return CustomResourceOptions.builder()
           .provider(providerContext.provider())
+          .deleteBeforeReplace(true)
+          .replaceOnChanges(List.of("config", "config.*"))
           .ignoreChanges(List.of("image"))
           .build();
     }
