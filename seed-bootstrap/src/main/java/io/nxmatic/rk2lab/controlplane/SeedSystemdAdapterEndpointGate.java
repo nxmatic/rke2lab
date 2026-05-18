@@ -21,9 +21,9 @@ public final class SeedSystemdAdapterEndpointGate {
   private static final String KIND = "SystemdAdapterEndpointGateStatus";
   private static final String ADAPTER_SERVICE_UNIT = "rke2lab-systemd-adapter.service";
   private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(20);
-  private static final Duration RUNTIME_PROBE_TOLERANCE = Duration.ofSeconds(45);
+  private static final Duration RUNTIME_PROBE_TOLERANCE = Duration.ofMinutes(4);
   private static final Duration RUNTIME_PROBE_RETRY_INTERVAL = Duration.ofSeconds(2);
-  private static final Duration PROGRESS_LOG_INTERVAL = Duration.ofSeconds(10);
+  private static final Duration PROGRESS_LOG_INTERVAL = Duration.ofSeconds(15);
 
   private SeedSystemdAdapterEndpointGate() {
     // Utility class
