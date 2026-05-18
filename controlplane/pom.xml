@@ -41,6 +41,10 @@
       </exclusions>
     </dependency>
     <dependency>
+      <groupId>com.pulumi</groupId>
+      <artifactId>command</artifactId>
+    </dependency>
+    <dependency>
       <groupId>io.nxmatic</groupId>
       <artifactId>rke2lab-incus-sdk</artifactId>
       <version>${project.version}</version>

@@ -76,8 +76,10 @@ public final class Main {
     final Object clusterReadinessResourceUrn;
     final Object registryResourceUrn;
     final Object imageBuildResourceUrn;
+    final Object systemdRuntimeStatusResourceUrn;
     final Map<String, Object> registrySummary;
     final Map<String, Object> imageBuildSummary;
+    final Object systemdRuntimeStatusSummary;
     if (isPulumiEngineAvailable()) {
       final ClusterReadinessResource readinessResource =
           new ClusterReadinessResource(
@@ -112,6 +114,16 @@ public final class Main {
               bootstrapResult.readinessDependency());
       imageBuildResourceUrn = imageBuildResource.urn();
       imageBuildSummary = imageBuildResource.summary();
+
+      final SeedSystemdRuntimeStatusResource systemdRuntimeStatusResource =
+          new SeedSystemdRuntimeStatusResource(
+              "seed-systemd-runtime-status",
+              config,
+              bootstrapResult.provisioningChecksum(),
+              bootstrapResult.imageBuildChecksum(),
+              bootstrapResult.readinessDependency());
+      systemdRuntimeStatusResourceUrn = systemdRuntimeStatusResource.urn();
+      systemdRuntimeStatusSummary = systemdRuntimeStatusResource.summary();
     } else {
       readinessOutput =
           readinessEnabled
@@ -120,6 +132,7 @@ public final class Main {
       clusterReadinessResourceUrn = "";
       registryResourceUrn = "";
       imageBuildResourceUrn = "";
+      systemdRuntimeStatusResourceUrn = "";
       registrySummary =
           Map.of(
               "checksum",
@@ -138,6 +151,7 @@ public final class Main {
               "imageAlias", config.imageAlias(),
               "imageFingerprint", bootstrapResult.imageFingerprint(),
               "incusProject", config.incusProject());
+      systemdRuntimeStatusSummary = SeedSystemdRuntimeStatusResource.snapshotStandalone(config);
     }
     final String seedNodeId = bootstrapResult.seedNodeId();
     final Object imageFingerprint = bootstrapResult.imageFingerprint();
@@ -225,8 +239,10 @@ public final class Main {
     outputs.put("clusterReadinessResourceUrn", clusterReadinessResourceUrn);
     outputs.put("registryResourceUrn", registryResourceUrn);
     outputs.put("seedImageBuildResourceUrn", imageBuildResourceUrn);
+    outputs.put("systemdRuntimeStatusResourceUrn", systemdRuntimeStatusResourceUrn);
     outputs.put("registrySummary", registrySummary);
     outputs.put("systemdProvisioningSummary", bootstrapResult.systemdProvisioningSummary());
+    outputs.put("systemdRuntimeStatusSummary", systemdRuntimeStatusSummary);
     outputs.put("seedImageBuildSummary", imageBuildSummary);
     return new BootstrapOutputs(outputs);
   }
