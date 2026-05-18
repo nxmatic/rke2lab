@@ -207,8 +207,6 @@ public final class IncusResourceBootstrap {
       instanceConfig.put("security.nesting", "true");
       instanceConfig.put("security.syscalls.intercept.bpf", "true");
       instanceConfig.put("security.syscalls.intercept.bpf.devices", "true");
-      instanceConfig.put("user.rke2lab.provisioningChecksum", provisioningChecksum);
-      instanceConfig.put("user.rke2lab.imageBuildChecksum", imageBuildChecksum);
 
       this.instance =
           new Instance(
@@ -225,8 +223,6 @@ public final class IncusResourceBootstrap {
               CustomResourceOptions.builder()
                   .provider(providerContext.provider())
                   .ignoreChanges(List.of("image"))
-                  .deleteBeforeReplace(true)
-                  .replaceOnChanges(List.of("config"))
                   .build());
       return this;
     }
@@ -766,12 +762,19 @@ public final class IncusResourceBootstrap {
       builder.config(vmnetBridgeConfig());
     }
 
+    final List<String> networkIgnoreChanges = new ArrayList<>(List.of("project"));
+    if (!existingNetworkId.isBlank()) {
+      networkIgnoreChanges.add("config");
+      networkIgnoreChanges.add("remote");
+      networkIgnoreChanges.add("target");
+    }
+
     final CustomResourceOptions.Builder optionsBuilder =
         CustomResourceOptions.builder()
             .provider(context.provider())
             .retainOnDelete(true)
             .dependsOn(List.of(projectDependency))
-            .ignoreChanges(List.of("project"));
+            .ignoreChanges(networkIgnoreChanges);
     if (!existingNetworkId.isBlank()) {
       optionsBuilder.importId(existingNetworkId);
     }
