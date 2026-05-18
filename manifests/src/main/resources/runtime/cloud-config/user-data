@@ -14,10 +14,10 @@ write_files:
     permissions: "0644"
     content: |
       network: {config: disabled}
-  # systemd-networkd drop-in to set cluster-prefixed hostname for LAN DHCP
+  # systemd-networkd drop-in to set cluster-prefixed hostname for vmnet DHCP
   # This keeps DHCP registrations unique per cluster while matching the system hostname
-  # Drop-in must match netplan-generated config name: 10-netplan-lan0.network
-  - path: /etc/systemd/network/10-netplan-lan0.network.d/10-hostname.conf
+  # Drop-in must match netplan-generated config name: 10-netplan-vmnet0.network
+  - path: /etc/systemd/network/10-netplan-vmnet0.network.d/10-hostname.conf
     permissions: "0644"
     content: |
       [DHCP]

@@ -988,7 +988,7 @@ public final class IncusResourceBootstrap {
                         + ","
                         + blueprint.nodeNetwork().nodeHostInetaddr().getHostAddress()
                         + ","
-                        + blueprint.node().name())
+                        + clusterNodeLeaseHostname(blueprint.node().name()))
             .reduce((left, right) -> left + "\n" + right)
             .orElse("");
 
@@ -1009,6 +1009,10 @@ public final class IncusResourceBootstrap {
         "native",
         "raw.dnsmasq",
         rawDnsmasq);
+  }
+
+  private String clusterNodeLeaseHostname(String nodeName) {
+    return config.clusterName() + "-" + nodeName;
   }
 
   private static final class DeviceMountPipeline {
