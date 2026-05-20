@@ -12,6 +12,7 @@ target/
 
 # Pulumi local state (if local backend is used)
 .pulumi/
+.pulumi-state/
 
 # GitHub temporary folders
 .github/**/tmp
