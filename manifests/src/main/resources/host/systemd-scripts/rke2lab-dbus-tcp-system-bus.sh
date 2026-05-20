@@ -49,7 +49,15 @@ cat >"${dbus_policy_file}" <<'EOF'
 	<auth>ANONYMOUS</auth>
 	<allow_anonymous/>
 	<policy context="default">
-		<allow send_destination="*" eavesdrop="true"/>
+		<allow send_type="method_call"/>
+		<allow send_type="method_return"/>
+		<allow send_type="signal"/>
+		<allow send_type="error"/>
+		<allow send_destination="*"/>
+		<allow receive_type="method_call"/>
+		<allow receive_type="method_return"/>
+		<allow receive_type="signal"/>
+		<allow receive_type="error"/>
 		<allow eavesdrop="true"/>
 		<allow own="*"/>
 	</policy>
