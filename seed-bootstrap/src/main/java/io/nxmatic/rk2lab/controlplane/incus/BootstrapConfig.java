@@ -24,7 +24,8 @@ public record BootstrapConfig(
     String lanBridgeParent,
     String vmnetNetworkName,
     URI apiEndpoint,
-    Path kubeconfigRef) {
+    Path kubeconfigRef,
+    boolean nfsAutomount) {
 
   public String imageBuilderBinary() {
     return "distrobuilder";
@@ -41,7 +42,7 @@ public record BootstrapConfig(
 
   public Path pathOn(WorktreeHost host, Path rawPath) {
     final Path normalizedPath = normalizeAbsolutePath(rawPath);
-    if (host == WorktreeHost.DARWIN) {
+    if (host == WorktreeHost.DARWIN || !nfsAutomount) {
       return normalizedPath;
     }
 
@@ -77,7 +78,8 @@ public record BootstrapConfig(
         lanBridgeParent,
         vmnetNetworkName,
         apiEndpoint,
-        kubeconfigRef);
+        kubeconfigRef,
+        nfsAutomount);
   }
 
   public Path localWorktreePath() {
@@ -130,6 +132,8 @@ public record BootstrapConfig(
     private URI apiEndpoint = URI.create("https://10.66.106.10:6443");
 
     private Path kubeconfigRef;
+
+    private boolean nfsAutomount = true;
 
     public Builder worktree(Path value) {
       this.worktree = normalizeAbsolutePath(value);
@@ -211,6 +215,11 @@ public record BootstrapConfig(
       return this;
     }
 
+    public Builder nfsAutomount(boolean value) {
+      this.nfsAutomount = value;
+      return this;
+    }
+
     public Builder applyConfig(Config config) {
       final EnvironmentValues environment = new EnvironmentValues(config);
       override(environment, "worktree.dir", value -> this.worktree(parsePath(value)));
@@ -234,6 +243,7 @@ public record BootstrapConfig(
       override(environment, "network.vmnetNetworkName", this::vmnetNetworkName);
       override(environment, "api.endpoint", value -> this.apiEndpoint(parseUri(value)));
       override(environment, "kubeconfig.ref", value -> this.kubeconfigRef(parsePath(value)));
+      override(environment, "nfs.automount", value -> this.nfsAutomount(parseBoolean(value)));
       return this;
     }
 
@@ -270,7 +280,8 @@ public record BootstrapConfig(
           lanBridgeParent,
           vmnetNetworkName,
           apiEndpoint,
-          resolvedKubeconfigRef);
+          resolvedKubeconfigRef,
+          nfsAutomount);
     }
 
     private Path parsePath(String value) {
@@ -285,6 +296,10 @@ public record BootstrapConfig(
         return null;
       }
       return URI.create(value.trim());
+    }
+
+    private boolean parseBoolean(String value) {
+      return Boolean.parseBoolean(value.trim());
     }
   }
 
