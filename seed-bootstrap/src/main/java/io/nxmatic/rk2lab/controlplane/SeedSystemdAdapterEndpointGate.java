@@ -24,6 +24,8 @@ public final class SeedSystemdAdapterEndpointGate {
   private static final Duration RUNTIME_PROBE_TOLERANCE = Duration.ofMinutes(4);
   private static final Duration RUNTIME_PROBE_RETRY_INTERVAL = Duration.ofSeconds(2);
   private static final Duration PROGRESS_LOG_INTERVAL = Duration.ofSeconds(15);
+  private static final Duration INSTANCE_READY_TOLERANCE = Duration.ofMinutes(4);
+  private static final Duration INSTANCE_READY_RETRY_INTERVAL = Duration.ofSeconds(2);
 
   private SeedSystemdAdapterEndpointGate() {
     // Utility class
@@ -44,6 +46,7 @@ public final class SeedSystemdAdapterEndpointGate {
 
   public static Map<String, Object> ensureReachable(
       BootstrapConfig config, Consumer<String> logger) {
+    waitForInstanceReachable(config, logger);
     final CommandResult ensureStartedResult = ensureServiceStarted(config);
     if (ensureStartedResult.exitCode() != 0) {
       throw new IllegalStateException(
@@ -138,6 +141,49 @@ public final class SeedSystemdAdapterEndpointGate {
     }
   }
 
+  // Wait for the seed instance to be reachable via `incus exec`. Pulumi
+  // registers the instance resource concurrently with this Main-driven gate
+  // call, so on first apply the instance may not yet exist when ensureReachable
+  // runs. Retry the cheapest no-op probe until incus exec succeeds.
+  private static void waitForInstanceReachable(
+      BootstrapConfig config, Consumer<String> logger) {
+    final long startedAt = System.nanoTime();
+    final long deadlineNanos = startedAt + INSTANCE_READY_TOLERANCE.toNanos();
+    long nextProgressLogAt = startedAt;
+    CommandResult lastResult = null;
+    while (System.nanoTime() < deadlineNanos) {
+      lastResult = runCommand(incusExec(config, "true"));
+      if (lastResult.exitCode() == 0) {
+        return;
+      }
+      final long now = System.nanoTime();
+      if (logger != null && now >= nextProgressLogAt) {
+        logger.accept(
+            "instance "
+                + config.nodeName()
+                + " in project "
+                + config.incusProject()
+                + " not reachable yet via incus exec; "
+                + lastResult.summary()
+                + " (retrying for up to "
+                + INSTANCE_READY_TOLERANCE
+                + ")");
+        nextProgressLogAt = now + PROGRESS_LOG_INTERVAL.toNanos();
+      }
+      sleep(INSTANCE_READY_RETRY_INTERVAL);
+    }
+    throw new IllegalStateException(
+        "Instance "
+            + config.nodeName()
+            + " in project "
+            + config.incusProject()
+            + " did not become reachable via incus exec within "
+            + INSTANCE_READY_TOLERANCE
+            + " (last result: "
+            + (lastResult == null ? "<no attempts>" : lastResult.summary())
+            + ")");
+  }
+
   private static CommandResult ensureServiceStarted(BootstrapConfig config) {
     final String script =
         "set -eu\n"
@@ -180,11 +226,14 @@ public final class SeedSystemdAdapterEndpointGate {
   }
 
   private static List<String> incusExec(BootstrapConfig config, String... args) {
+    // ssh joins post-destination argv with spaces and re-parses on the remote
+    // side, so a multi-line script passed as a separate `sh -lc <script>` argv
+    // entry would be split on whitespace. Build the entire remote command as a
+    // single shell-quoted string and hand it to ssh as one argument.
     final String remoteIncusCommand =
         "incus --project "
             + shellQuote(config.incusProject())
             + " exec "
-            + " "
             + shellQuote(config.nodeName())
             + " -- "
             + joinShellQuoted(args);
@@ -196,8 +245,6 @@ public final class SeedSystemdAdapterEndpointGate {
         "-o",
         "ConnectTimeout=10",
         config.imageBuilderHost(),
-        "sh",
-        "-lc",
         remoteIncusCommand);
   }
 

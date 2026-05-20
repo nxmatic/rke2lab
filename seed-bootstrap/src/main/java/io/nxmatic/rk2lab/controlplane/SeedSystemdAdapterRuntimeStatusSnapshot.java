@@ -297,25 +297,38 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
   }
 
   private static List<String> incusExec(BootstrapConfig config, String... args) {
-    final ArrayList<String> command = new ArrayList<>();
-    command.add("ssh");
-    command.add("-o");
-    command.add("BatchMode=yes");
-    command.add("-o");
-    command.add("ConnectTimeout=10");
-    command.add(config.imageBuilderHost());
-    command.add("incus");
-    command.add("--project");
-    command.add(config.incusProject());
-    command.add("exec");
-    command.add(config.nodeName());
-    command.add("--");
-    if (args != null) {
-      for (String arg : args) {
-        command.add(arg == null ? "" : arg);
-      }
+    // ssh joins post-destination argv with spaces and re-parses on the remote
+    // side, so a multi-line script passed as a separate `sh -lc <script>` argv
+    // entry would be split on whitespace. Build the entire remote command as a
+    // single shell-quoted string and hand it to ssh as one argument.
+    final String remoteIncusCommand =
+        "incus --project "
+            + shellQuote(config.incusProject())
+            + " exec "
+            + shellQuote(config.nodeName())
+            + " -- "
+            + joinShellQuoted(args);
+
+    return List.of(
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        config.imageBuilderHost(),
+        remoteIncusCommand);
+  }
+
+  private static String joinShellQuoted(String... values) {
+    if (values == null || values.length == 0) {
+      return "";
     }
-    return List.copyOf(command);
+
+    final ArrayList<String> quoted = new ArrayList<>(values.length);
+    for (String value : values) {
+      quoted.add(shellQuote(value == null ? "" : value));
+    }
+    return String.join(" ", quoted);
   }
 
   private static int toInt(Object value, int fallback) {
