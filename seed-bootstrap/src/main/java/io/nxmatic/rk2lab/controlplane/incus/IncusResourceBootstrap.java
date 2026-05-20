@@ -343,7 +343,14 @@ public final class IncusResourceBootstrap {
 
     return new Project(
         "seed-project",
-        ProjectArgs.builder().name(config.incusProject()).build(),
+        ProjectArgs.builder()
+            .name(config.incusProject())
+            // Enable per-project network namespacing so instance NIC parent
+            // references resolve under this project even though the actual
+            // bridges (lan-br, vmnet-br) are created in the default project
+            // (incus only allows OVN networks in non-default projects).
+            .config(Map.of("features.networks", "true"))
+            .build(),
         optionsBuilder.build());
   }
 
@@ -908,10 +915,11 @@ public final class IncusResourceBootstrap {
 
   private void ensureNetwork(
       IncusProviderContext context, String networkName, Resource projectDependency) {
-    if (networkName.equals(config.lanBridgeParent())
-        || networkName.equals(config.vmnetNetworkName())) {
-      // Canonical Stage A policy: host-provided bridges are external/unmanaged.
-      // Never declare them as provider-managed resources in the stack.
+    if (networkName.equals(config.lanBridgeParent())) {
+      // lan-br is provisioned by the host (NixOS systemd-networkd in
+      // nix-darwin-home/modules/nixos/incus.nix);
+      // is incus-managed
+      // by this bootstrap and falls through to the create path below.
       logInfo(
           "incus network ensure: skipping canonical host-provided bridge (name="
               + networkName
@@ -919,7 +927,10 @@ public final class IncusResourceBootstrap {
       return;
     }
 
-    if (incusImportLookup.isUnmanagedNetwork(context, networkName, config.incusProject())) {
+    final String networkProject =
+        networkName.equals(config.vmnetNetworkName()) ? "default" : config.incusProject();
+
+    if (incusImportLookup.isUnmanagedNetwork(context, networkName, networkProject)) {
       // Additional safeguard for any non-canonical network that provider reports unmanaged.
       logInfo(
           "incus network ensure: skipping unmanaged bridge reported by provider (name="
@@ -930,7 +941,7 @@ public final class IncusResourceBootstrap {
 
     final String existingNetworkId =
         incusImportLookup.normalizeImportId(
-            incusImportLookup.existingNetworkId(context, networkName, config.incusProject()));
+            incusImportLookup.existingNetworkId(context, networkName, networkProject));
 
     if (!existingNetworkId.isBlank() && networkName.equals(config.vmnetNetworkName())) {
       // Existing vmnet bridge is the canonical source of truth for Stage A.
@@ -941,7 +952,11 @@ public final class IncusResourceBootstrap {
     final NetworkArgs.Builder builder = NetworkArgs.builder().name(networkName).type("bridge");
 
     if (networkName.equals(config.vmnetNetworkName())) {
-      builder.project(config.incusProject());
+      // Incus restricts non-default projects to OVN networks only; bridges must
+      // live in the default project. Since the rke2lab project inherits
+      // networks from default (features.networks=NO), instances in rke2lab can
+      // still reference vmnet-br as a NIC parent.
+      builder.project("default");
     } else if (existingNetworkId.isBlank()) {
       builder.project(config.incusProject());
     }
@@ -999,8 +1014,6 @@ public final class IncusResourceBootstrap {
         clusterGatewayWithPrefix,
         "ipv4.nat",
         "false",
-        "ipv4.routing",
-        "false",
         "ipv4.dhcp",
         "true",
         "ipv4.dhcp.ranges",
@@ -1034,7 +1047,13 @@ public final class IncusResourceBootstrap {
     }
 
     private DeviceMountPipeline vmnetNic(String networkName, String hwaddr) {
-      return nic("vmnet0", Map.of("hwaddr", hwaddr, "name", "vmnet0", "network", networkName));
+      // Reference vmnet-br as a host-interface bridge (parent + nictype) rather
+      // than via "network" — vmnet-br lives in the default incus project (only
+      // OVN networks are allowed in non-default projects), so a project-scoped
+      // network reference would not resolve from this project.
+      return nic(
+          "vmnet0",
+          Map.of("hwaddr", hwaddr, "name", "vmnet0", "nictype", "bridged", "parent", networkName));
     }
 
     private DeviceMountPipeline kmsgDevice() {
@@ -1667,14 +1686,32 @@ public final class IncusResourceBootstrap {
                 + " (result=name)");
         return LookupResult.found(normalizeImportId(network.name()), managed);
       } catch (Exception ex) {
+        final String summary = summarizeLookupFailure(ex);
+        if (isNotFoundFailure(summary)) {
+          logInfo(
+              "incus lookup getNetwork: complete after "
+                  + elapsedSince(startedAt)
+                  + " (result=not-found, source=error: "
+                  + summary
+                  + ")");
+          return LookupResult.notFound();
+        }
         logInfo(
             "incus lookup getNetwork: failed after "
                 + elapsedSince(startedAt)
                 + " ("
-                + summarizeLookupFailure(ex)
+                + summary
                 + ")");
         return LookupResult.failed();
       }
+    }
+
+    private boolean isNotFoundFailure(String summary) {
+      if (summary == null) {
+        return false;
+      }
+      final String lower = summary.toLowerCase(java.util.Locale.ROOT);
+      return lower.contains("not found");
     }
 
     private String resolveProfileImportId(IncusProviderContext context, GetProfilePlainArgs args) {
