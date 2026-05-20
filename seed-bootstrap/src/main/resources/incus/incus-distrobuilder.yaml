@@ -297,6 +297,8 @@ actions:
       systemctl mask zfs-load-module
       systemctl mask zfs-volume-wait.service
       systemctl mask systemd-rfkill.service
+      systemctl mask wpa_supplicant.service
+      systemctl mask zfs-mount.service
 
 files:
   # Cloud init nocloud datasource configuration
