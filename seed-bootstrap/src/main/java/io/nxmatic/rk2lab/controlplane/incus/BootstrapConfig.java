@@ -25,7 +25,9 @@ public record BootstrapConfig(
     String vmnetNetworkName,
     URI apiEndpoint,
     Path kubeconfigRef,
-    boolean nfsAutomount) {
+    boolean nfsAutomount,
+    String systemdAdapterDbusHost,
+    int systemdAdapterDbusPort) {
 
   public String imageBuilderBinary() {
     return "distrobuilder";
@@ -79,7 +81,9 @@ public record BootstrapConfig(
         vmnetNetworkName,
         apiEndpoint,
         kubeconfigRef,
-        nfsAutomount);
+        nfsAutomount,
+        systemdAdapterDbusHost,
+        systemdAdapterDbusPort);
   }
 
   public Path localWorktreePath() {
@@ -134,6 +138,10 @@ public record BootstrapConfig(
     private Path kubeconfigRef;
 
     private boolean nfsAutomount = true;
+
+    private String systemdAdapterDbusHost = defaults.systemdAdapterDbusHost();
+
+    private int systemdAdapterDbusPort = defaults.systemdAdapterDbusPort();
 
     public Builder worktree(Path value) {
       this.worktree = normalizeAbsolutePath(value);
@@ -220,6 +228,16 @@ public record BootstrapConfig(
       return this;
     }
 
+    public Builder systemdAdapterDbusHost(String value) {
+      this.systemdAdapterDbusHost = value;
+      return this;
+    }
+
+    public Builder systemdAdapterDbusPort(int value) {
+      this.systemdAdapterDbusPort = value;
+      return this;
+    }
+
     public Builder applyConfig(Config config) {
       final EnvironmentValues environment = new EnvironmentValues(config);
       override(environment, "worktree.dir", value -> this.worktree(parsePath(value)));
@@ -244,6 +262,11 @@ public record BootstrapConfig(
       override(environment, "api.endpoint", value -> this.apiEndpoint(parseUri(value)));
       override(environment, "kubeconfig.ref", value -> this.kubeconfigRef(parsePath(value)));
       override(environment, "nfs.automount", value -> this.nfsAutomount(parseBoolean(value)));
+      override(environment, "systemdAdapter.dbus.host", this::systemdAdapterDbusHost);
+      override(
+          environment,
+          "systemdAdapter.dbus.port",
+          value -> this.systemdAdapterDbusPort(Integer.parseInt(value.trim())));
       return this;
     }
 
@@ -281,7 +304,9 @@ public record BootstrapConfig(
           vmnetNetworkName,
           apiEndpoint,
           resolvedKubeconfigRef,
-          nfsAutomount);
+          nfsAutomount,
+          systemdAdapterDbusHost,
+          systemdAdapterDbusPort);
     }
 
     private Path parsePath(String value) {
@@ -309,6 +334,34 @@ public record BootstrapConfig(
     private static final String DEFAULT_ACCESS_HOST = "bioskop-nixos.local";
 
     private static final int INCUS_REMOTE_PORT = 8443;
+
+    private static final String SYSTEMD_ADAPTER_DBUS_HOST_ENV = "RKE2LAB_SYSTEMD_ADAPTER_DBUS_HOST";
+
+    private static final String SYSTEMD_ADAPTER_DBUS_PORT_ENV = "RKE2LAB_SYSTEMD_ADAPTER_DBUS_PORT";
+
+    private static final String DEFAULT_SYSTEMD_ADAPTER_DBUS_HOST = "10.80.0.10";
+
+    private static final int DEFAULT_SYSTEMD_ADAPTER_DBUS_PORT = 12434;
+
+    String systemdAdapterDbusHost() {
+      final String env = System.getenv(SYSTEMD_ADAPTER_DBUS_HOST_ENV);
+      if (env == null || env.isBlank()) {
+        return DEFAULT_SYSTEMD_ADAPTER_DBUS_HOST;
+      }
+      return env.trim();
+    }
+
+    int systemdAdapterDbusPort() {
+      final String env = System.getenv(SYSTEMD_ADAPTER_DBUS_PORT_ENV);
+      if (env == null || env.isBlank()) {
+        return DEFAULT_SYSTEMD_ADAPTER_DBUS_PORT;
+      }
+      try {
+        return Integer.parseInt(env.trim());
+      } catch (NumberFormatException ex) {
+        return DEFAULT_SYSTEMD_ADAPTER_DBUS_PORT;
+      }
+    }
 
     Path incusConfigDir() {
       final String env = System.getenv("INCUS_CONFIG_DIR");

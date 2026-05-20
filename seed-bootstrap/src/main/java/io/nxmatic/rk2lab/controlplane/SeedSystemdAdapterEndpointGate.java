@@ -145,8 +145,7 @@ public final class SeedSystemdAdapterEndpointGate {
   // registers the instance resource concurrently with this Main-driven gate
   // call, so on first apply the instance may not yet exist when ensureReachable
   // runs. Retry the cheapest no-op probe until incus exec succeeds.
-  private static void waitForInstanceReachable(
-      BootstrapConfig config, Consumer<String> logger) {
+  private static void waitForInstanceReachable(BootstrapConfig config, Consumer<String> logger) {
     final long startedAt = System.nanoTime();
     final long deadlineNanos = startedAt + INSTANCE_READY_TOLERANCE.toNanos();
     long nextProgressLogAt = startedAt;

@@ -87,6 +87,47 @@
     </pluginManagement>
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-toolchains-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>select-jdk-toolchain</id>
+            <goals>
+              <goal>toolchain</goal>
+            </goals>
+            <configuration>
+              <toolchains>
+                <jdk>
+                  <version>${maven.compiler.release}</version>
+                </jdk>
+              </toolchains>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-build-tooling</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[${maven.compiler.release},)</version>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.9.0,)</version>
+                </requireMavenVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>com.diffplug.spotless</groupId>
         <artifactId>spotless-maven-plugin</artifactId>
         <configuration>

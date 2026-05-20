@@ -69,48 +69,6 @@
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-toolchains-plugin</artifactId>
-        <configuration>
-          <toolchains>
-            <jdk>
-              <version>25</version>
-              <vendor>any</vendor>
-            </jdk>
-          </toolchains>
-        </configuration>
-        <executions>
-          <execution>
-            <id>select-jdk25-toolchain</id>
-            <goals>
-              <goal>toolchain</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>enforce-build-tooling</id>
-            <goals>
-              <goal>enforce</goal>
-            </goals>
-            <configuration>
-              <rules>
-                <requireJavaVersion>
-                  <version>[25,)</version>
-                </requireJavaVersion>
-                <requireMavenVersion>
-                  <version>[3.9.0,)</version>
-                </requireMavenVersion>
-              </rules>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
         <configuration>

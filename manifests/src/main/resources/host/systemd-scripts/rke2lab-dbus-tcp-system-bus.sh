@@ -4,8 +4,12 @@
 # Enable DBus system bus TCP access on the master node for private-lab diagnostics.
 # Canonical behavior only: unix socket remains active, tcp listener is added on vmnet0.
 
+: "Load environment variables from mounted section manifests"
+source /srv/host/systemd-scripts.d/rke2lab-env-load.sh
+rke2lab::env:load
+
 if [[ "${RKE2LAB_NODE_NAME:-}" != "master" ]]; then
-	: "[rke2lab-dbus-tcp] skipping non-master node (${RKE2LAB_NODE_NAME:-unknown})"
+	echo "[rke2lab-dbus-tcp] skipping non-master node (${RKE2LAB_NODE_NAME:-unknown})"
 	exit 0
 fi
 
