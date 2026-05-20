@@ -12,14 +12,11 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-/**
- * Pulumi-side gate that starts the adapter service and verifies host-local runtime probe output.
- */
+/** Pulumi-side gate that waits for the dbus-on-TCP probe to report ok. */
 public final class SeedSystemdAdapterEndpointGate {
 
   private static final String API_VERSION = "rk2lab.nxmatic.io/v1alpha1";
   private static final String KIND = "SystemdAdapterEndpointGateStatus";
-  private static final String ADAPTER_SERVICE_UNIT = "rke2lab-systemd-adapter.service";
   private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(20);
   private static final Duration RUNTIME_PROBE_TOLERANCE = Duration.ofMinutes(4);
   private static final Duration RUNTIME_PROBE_RETRY_INTERVAL = Duration.ofSeconds(2);
@@ -34,35 +31,22 @@ public final class SeedSystemdAdapterEndpointGate {
   public static Map<String, Object> deferredPreview(BootstrapConfig config) {
     return envelope(
         "deferred-preview",
-        "adapter service gate deferred during preview",
-        Map.of(
-            "source",
-            "systemd-adapter-endpoint-gate",
-            "serviceUnit",
-            ADAPTER_SERVICE_UNIT,
-            "probeMode",
-            "systemd-adapter-runtime"));
+        "adapter endpoint gate deferred during preview",
+        Map.of("source", "systemd-adapter-endpoint-gate", "probeMode", "systemd-adapter-runtime"));
   }
 
   public static Map<String, Object> ensureReachable(
       BootstrapConfig config, Consumer<String> logger) {
     waitForInstanceReachable(config, logger);
-    final CommandResult ensureStartedResult = ensureServiceStarted(config);
-    if (ensureStartedResult.exitCode() != 0) {
-      throw new IllegalStateException(
-          "Adapter service failed to start: "
-              + ADAPTER_SERVICE_UNIT
-              + " ("
-              + ensureStartedResult.summary()
-              + ")");
-    }
 
     final Map<String, Object> runtimeSnapshot = waitForRuntimeProbe(config, logger);
     final String runtimeStatus = String.valueOf(runtimeSnapshot.getOrDefault("status", "unknown"));
 
     final String summary =
-        "serviceUnit="
-            + ADAPTER_SERVICE_UNIT
+        "dbusEndpoint="
+            + config.systemdAdapterDbusHost()
+            + ":"
+            + config.systemdAdapterDbusPort()
             + " status="
             + runtimeStatus
             + " probeMode=systemd-adapter-runtime";
@@ -76,8 +60,6 @@ public final class SeedSystemdAdapterEndpointGate {
         Map.of(
             "source",
             "systemd-adapter-endpoint-gate",
-            "serviceUnit",
-            ADAPTER_SERVICE_UNIT,
             "probeMode",
             "systemd-adapter-runtime",
             "adapterStatus",
@@ -122,8 +104,10 @@ public final class SeedSystemdAdapterEndpointGate {
     final String lastSummary = String.valueOf(lastSnapshot.getOrDefault("summary", "unknown"));
     final String lastStatus = String.valueOf(lastSnapshot.getOrDefault("status", "unknown"));
     throw new IllegalStateException(
-        "Adapter runtime probe failed for service "
-            + ADAPTER_SERVICE_UNIT
+        "Adapter runtime probe failed at "
+            + config.systemdAdapterDbusHost()
+            + ":"
+            + config.systemdAdapterDbusPort()
             + " after "
             + RUNTIME_PROBE_TOLERANCE
             + " (last status="
@@ -181,23 +165,6 @@ public final class SeedSystemdAdapterEndpointGate {
             + " (last result: "
             + (lastResult == null ? "<no attempts>" : lastResult.summary())
             + ")");
-  }
-
-  private static CommandResult ensureServiceStarted(BootstrapConfig config) {
-    final String script =
-        "set -eu\n"
-            + "if [ -x /srv/host/systemd-scripts.d/rke2lab-systemd-adapter-install.sh ]; then\n"
-            + "  /srv/host/systemd-scripts.d/rke2lab-systemd-adapter-install.sh\n"
-            + "fi\n"
-            + "systemctl daemon-reload\n"
-            + "systemctl start "
-            + shellQuote(ADAPTER_SERVICE_UNIT)
-            + "\n"
-            + "systemctl is-active "
-            + shellQuote(ADAPTER_SERVICE_UNIT)
-            + "\n";
-
-    return runCommand(incusExec(config, "sh", "-lc", script));
   }
 
   private static CommandResult runCommand(List<String> command) {
