@@ -163,29 +163,21 @@ public final class CiliumAdvancedLayer extends Construct {
   }
 
   private void createBgpClusterConfig() {
-    // BGP Configuration Strategy:
+    // BGP Configuration Strategy for Multi-Host Cluster Mesh
     //
-    // Option 1 (current): eBGP peering with external gateway (10.80.0.1, AS 65020)
-    // - Advertises pod CIDRs and services to upstream router
-    // - Useful for integrating with physical network infrastructure
+    // See docs/cilium-bgp-multi-host-topology.adoc for comprehensive documentation
+    // covering:
+    // - Multi-host topology with Incus containers
+    // - BGP Router ID allocation (automatic from InternalIP)
+    // - iBGP mesh configuration and peer discovery
+    // - Multi-homed node peering (Router ID vs Peering Address)
+    // - Implementation guide and troubleshooting
     //
-    // Option 2 (recommended for multi-host): iBGP mesh between cluster nodes
-    // - Nodes peer with each other using same AS (e.g., 65010)
-    // - Exchange pod routes dynamically within cluster
-    // - Isolated from external network - cluster manages its own routing
-    // - Works across different subnets/bare metal hosts
-    // - To enable: Set peerASN to 65010 (same as localASN) and configure
-    //   peer selectors to create full mesh between all nodes
-    //
-    // For iBGP mesh, replace static peerAddress with dynamic peer discovery:
-    // - Use peerSelector to match all nodes (e.g., matchLabels: {})
-    // - Cilium automatically discovers and peers with matching nodes
-    // - Scales automatically as nodes are added/removed
-    //
-    // Current configuration uses eBGP to external gateway. For same-LAN setup
-    // with native routing and autoDirectNodeRoutes, BGP is optional. When adding
-    // bare metal hosts on different subnets, switch to iBGP mesh or ensure
-    // node IPs are on the same L2 network (192.168.1.0/24 via lan0 interface).
+    // Quick Summary:
+    // - Nodes multi-homed: InternalIP (10.80.x) + LAN (192.168.1.x)
+    // - Router ID: Auto-assigned from InternalIP
+    // - Current: eBGP to external gateway (AS 65020)
+    // - Multi-host: Switch to iBGP mesh (same AS, peerSelector, LAN interface)
 
     ApiObject bgpClusterConfig =
         new ApiObject(
