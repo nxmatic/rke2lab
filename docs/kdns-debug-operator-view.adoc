@@ -27,7 +27,8 @@ then the canonical operator path is to set Pulumi policy values, not to edit Jav
 Today, `ControlplanePolicy` reads these stack keys:
 
 * `rke2lab:policy.debug.kdns.enabled`
-* `rke2lab:policy.debug.floxShimWrapper.enabled`
+* `rke2lab:policy.debug.kdns.suspend`
+* `rke2lab:policy.debug.containerdShimFloxV2Wrapper.enabled`
 
 Those values feed `DebugPolicy`, which in turn exports the environment consumed during host-side manifest patching.
 
@@ -41,7 +42,7 @@ flowchart TB
   controlplane[Controlplane program<br/>ControlplanePolicy -> DebugPolicy]
   hostpatch[Host patch step<br/>rke2lab-install-pre.sh]
     deployment[KDNS Deployment]
-  runtime[Flox runtime selection<br/>flox or flox-go-debug]
+  runtime[Flox runtime selection<br/>flox or flox-delve]
   sidecar[Delve sidecar behavior<br/>annotation/env driven]
 
     operator --> pulumi
@@ -60,13 +61,16 @@ From the operator perspective, enabling KDNS debugability means supplying the ri
 
 * `rke2lab:policy.debug.kdns.enabled`
 ** enables KDNS debug mode
-** switches the selected Flox environment from `nxmatic/kdns` to `nxmatic/kdns-debug`
-** switches the runtime class from `flox` to `flox-go-debug`
-** causes the rendered KDNS Deployment to carry the debug annotation
-* `rke2lab:policy.debug.floxShimWrapper.enabled`
-** enables the debug shim/wrapper path required by the dedicated Go debug runtime flow
+** switches the runtime class from `flox` to `flox-delve` (selected by `DebugPolicy.kdnsRuntimeClass()`)
+** flips the `flox.dev/debug` and `debug.kdns.lab42/enabled` annotations on the KDNS Deployment to `true`
+* `rke2lab:policy.debug.kdns.suspend`
+** sets the `flox.dev/debug-suspend` annotation, which causes the wrapper-go shim to start the workload paused under Delve so a debugger can attach before the entrypoint runs
+* `rke2lab:policy.debug.containerdShimFloxV2Wrapper.enabled`
+** enables the debug shim/wrapper installation path required for the `flox-delve` runtime class to have a wrapper to dispatch to
 
-In practical terms, an operator normally wants both values aligned.
+The Flox environment value is *not* part of the operator surface today: `DebugPolicy.kdnsFloxEnvironment()` is hardcoded to `nxmatic/kdns` regardless of debug state. Debug differentiation happens via runtime class + annotations, not via a separate `kdns-debug` Flox env.
+
+In practical terms, an operator typically aligns the three knobs together: `kdns.enabled=true`, `kdns.suspend=true`, `containerdShimFloxV2Wrapper.enabled=true`.
 
 == What gets patched into the workload
 
@@ -74,9 +78,11 @@ The operator does not patch the KDNS Deployment by hand.
 
 Instead, `DebugPolicy` exports values that are consumed by `rke2lab-install-pre.sh`, which patches the rendered Deployment with:
 
-* annotation `flox.dev/environment`
-* annotation `debug.kdns.lab42/enabled`
-* `spec.template.spec.runtimeClassName`
+* annotation `flox.dev/environment` (always `nxmatic/kdns` today)
+* annotation `flox.dev/debug` (mirrors `policy.debug.kdns.enabled`)
+* annotation `flox.dev/debug-suspend` (mirrors `policy.debug.kdns.suspend`)
+* annotation `debug.kdns.lab42/enabled` (mirrors `policy.debug.kdns.enabled`)
+* `spec.template.spec.runtimeClassName` (`flox` or `flox-delve`)
 
 That is the operational handoff from stack configuration to workload behavior.
 
@@ -86,7 +92,7 @@ That is the operational handoff from stack configuration to workload behavior.
 ----
 flowchart LR
     subgraph Ops[Operator-owned]
-      cfg[Pulumi config<br/>policy.debug.kdns.enabled<br/>policy.debug.floxShimWrapper.enabled]
+      cfg[Pulumi config<br/>policy.debug.kdns.enabled<br/>policy.debug.kdns.suspend<br/>policy.debug.containerdShimFloxV2Wrapper.enabled]
       run[Run controlplane update]
     end
 
@@ -119,11 +125,12 @@ It is useful to distinguish two related but different concerns.
 
 The operator controls whether KDNS is put into debug mode by changing Pulumi policy.
 
-That affects the rendered workload values, especially:
+That affects the rendered workload values, specifically:
 
-* which Flox environment is selected
-* which runtime class is selected
-* which debug annotation value is injected
+* which runtime class is selected (`flox` vs `flox-delve`)
+* whether `flox.dev/debug`, `flox.dev/debug-suspend`, and `debug.kdns.lab42/enabled` are set to `true`
+
+The Flox environment annotation is currently fixed at `nxmatic/kdns` and is not toggled by the debug knob.
 
 === 2. Code-controlled manifest structure
 
@@ -147,26 +154,66 @@ So the clean mental model is:
 . Run the controlplane update for that stack.
 . Let the generated host-side patching update the rendered KDNS Deployment.
 . Verify that KDNS now uses:
-.. the debug Flox environment
-.. the debug runtime class
-.. the debug annotation consumed by the sidecar behavior
+.. the debug runtime class (`flox-delve`)
+.. the debug annotations (`flox.dev/debug=true`, `flox.dev/debug-suspend=true`, `debug.kdns.lab42/enabled=true`)
+.. the wrapper-go shim binary at `/usr/local/bin/containerd-shim-flox-delve-v2` registered in containerd's runtime table
 
-== Shim wrapper debugger attach (VS Code)
+== Shim wrapper step-debug from `pulumi up`
 
-When validating shim-level behavior (before application-level debugging), use the dedicated VS Code
-launch configuration:
+When debug + suspend policy is active, every kdns sandbox creation parks the
+`flox-delve` shim wrapper at the per-pod continue-file gate
+(`/tmp/containerd-shim-flox-v2-wrapper-continue-<namespace>-<id>`). The operator
+gets the same actionable hint on three surfaces:
 
-* `Attach to Shim Wrapper Delve (remote)`
+. *Pulumi*: `ClusterBootstrapReadinessVerifier` runs `ShimDebugSuspendProbe`
+  every 15s while waiting for the kdns deployment to roll out. Each parked pod
+  is reported once via `SeedLog.info` and surfaces under the
+  `ClusterReadinessResource` row of `pulumi up`:
++
+[listing]
+----
+kdns sandbox creation paused — wrapper waiting for operator attach
+(pod=kdns-... namespace=rke2lab-system) — operator action: ssh root@<master>
+'rke2lab-shim-dlv auto-attach'; in VS Code launch "Attach to Shim Wrapper Delve
+(remote)" host=<master>; finally 'rke2lab-shim-dlv resume <namespace> <id>'
+----
 
-Expected flow:
+. *Master shell*: `rke2lab-shim-debug-notify.service` tails the
+  `containerd-shim-flox-v2-wrapper` journal tag and broadcasts every
+  `shim debug-suspend ...` line via `wall(1)`. Any logged-in shell on
+  `bioskop-master` sees the wrapper PID in real time. Use `rke2lab-shim-dlv auto-attach`
+  for quick attachment.
 
-. Ensure shim debug annotations are enabled on the workload (`flox.dev/debug=true`, optional
-  `flox.dev/debug-suspend=true`).
-. Confirm Delve is running on `bioskop-master`:
-  `ss -ltnp | grep dlv`
-. Provide the discovered host/port to the launch input prompts.
-. Attach from VS Code and debug the wrapper source under:
-  `manifests/src/main/resources/runtime/containerd-shim-flox/wrapper-go`
+. *VS Code*: launch configuration `Attach to Shim Wrapper Delve (remote)` is
+  pinned to port `59333` with full source-path mapping for the wrapper-go
+  module.
+
+Operator loop:
+
+. *Wait for the suspend hint* in `pulumi up` (or `wall` on master).
+. From master: `rke2lab-shim-dlv auto-attach` — automatically detects suspended
+  wrappers and attaches Delve to the selected one. If only one wrapper is suspended,
+  it attaches immediately. If multiple, shows an interactive menu to select which
+  container to debug. Delve listens on `0.0.0.0:59333` (paused).
+. From VS Code: launch `Attach to Shim Wrapper Delve (remote)`,
+  host = master VM IP. Set breakpoints in `wrapper-go` (e.g.
+  `internal/wrapper/wrapper.go` near the `syscall.Exec` of the real shim).
+. Hit *Continue* in VS Code, then on master:
+  `rke2lab-shim-dlv resume <namespace> <id>` — touches the per-shim continue
+  file. The wrapper exits the gate within 250 ms and `syscall.Exec`s the real
+  shim. The breakpoint fires; stepping over the exec releases the wrapper into
+  the real shim and `pulumi up` proceeds past the kdns gate.
+
+Advanced commands:
+
+* `rke2lab-shim-dlv list` — show all suspended containers with details (pid, age, namespace, id)
+* `rke2lab-shim-dlv attach <namespace> <id>` — attach to a specific container by namespace/id
+* `rke2lab-shim-dlv detach` — stop the Delve instance when done debugging
+* `rke2lab-shim-dlv resume <namespace> <id>` — resume a suspended wrapper without attaching debugger
+
+To kick a stuck pod *without* attaching a debugger (e.g. operator was AFK), run
+`rke2lab-shim-dlv resume <namespace> <id>` directly — the wrapper exits the
+gate normally and the sandbox is created.
 
 Source path mapping is preconfigured from host runtime path:
 
@@ -185,7 +232,8 @@ The current dev stack uses:
 # @codebase
 config:
   "rke2lab:policy.debug.kdns.enabled": "true"
-  "rke2lab:policy.debug.floxShimWrapper.enabled": "true"
+  "rke2lab:policy.debug.kdns.suspend": "true"
+  "rke2lab:policy.debug.containerdShimFloxV2Wrapper.enabled": "true"
 ----
 
 == When the operator should edit code instead
@@ -196,8 +244,8 @@ The controlplane/manifests codebase should be edited only when changing the poli
 
 * renaming the policy keys
 * changing defaults
-* changing which runtime class is chosen
-* changing which Flox environment is chosen
+* changing which runtime class is chosen (`DebugPolicy.kdnsRuntimeClass()`)
+* introducing a separate debug Flox environment by un-hardcoding `DebugPolicy.kdnsFloxEnvironment()`
 * changing how the Delve sidecar is structurally synthesized
 
 == Bottom line
