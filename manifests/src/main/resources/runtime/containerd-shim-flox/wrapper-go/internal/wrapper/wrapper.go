@@ -77,7 +77,7 @@ func (w *Wrapper) Run(args []string) error {
 	}
 
 	if w.cfg.DebugEnabled {
-		if err := w.waitForDebugContinueGate(logger); err != nil {
+		if err := w.waitForDebugContinueGate(logger, shimNamespace, shimID); err != nil {
 			return err
 		}
 		logger.Log("debug enabled in manual-attach mode; executing target without embedded dlv pid=%d", os.Getpid())
@@ -123,7 +123,7 @@ func (w *Wrapper) launchRootfsSync(logger *Logger, shimNamespace, shimID string)
 	return cmd.Process.Release()
 }
 
-func (w *Wrapper) waitForDebugContinueGate(logger *Logger) error {
+func (w *Wrapper) waitForDebugContinueGate(logger *Logger, shimNamespace, shimID string) error {
 	if !w.cfg.DebugWait {
 		return nil
 	}
@@ -133,6 +133,15 @@ func (w *Wrapper) waitForDebugContinueGate(logger *Logger) error {
 		waitFile = defaultDebugWaitFile
 	}
 
+	logger.Log(
+		"shim debug-suspend pid=%d namespace=%s id=%s waitFile=%s attachCmd=rke2lab-shim-dlv attach %s %s",
+		os.Getpid(),
+		emptyDefault(shimNamespace, "<unset>"),
+		emptyDefault(shimID, "<unset>"),
+		waitFile,
+		emptyDefault(shimNamespace, "<unset>"),
+		emptyDefault(shimID, "<unset>"),
+	)
 	logger.Log("debug suspend requested; waiting for continue file=%s", waitFile)
 	for {
 		if _, err := os.Stat(waitFile); err == nil {

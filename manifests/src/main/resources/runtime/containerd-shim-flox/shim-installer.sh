@@ -205,6 +205,7 @@ installer::pod:materialize_assets() {
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/kdns-containerd-remote-capture.sh" "${HOST_SCRIPT_ROOT}/debug-tools/kdns-containerd-remote-capture.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/master-shim-pprof.sh" "${HOST_SCRIPT_ROOT}/debug-tools/master-shim-pprof.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/rke2lab-dlv.sh" "${HOST_SCRIPT_ROOT}/debug-tools/rke2lab-dlv.sh"
+	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/rke2lab-shim-dlv.sh" "${HOST_SCRIPT_ROOT}/debug-tools/rke2lab-shim-dlv.sh"
 	install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/flake.nix" "${HOST_SCRIPT_ROOT}/mesh/headplane/flake.nix"
 	install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/flake.nix" "${HOST_SCRIPT_ROOT}/networking/kdns/flake.nix"
 }
@@ -253,7 +254,7 @@ rke2lab::env:load() {
 
 	# shellcheck disable=SC1090
 	source "${env_script}"
-	declare -F rke2lab::env:load >/dev/null 2>&1 && rke2lab::env:load
+	# declare -F rke2lab::env:load >/dev/null 2>&1 && rke2lab::env:load
 }
 
 host::tooling:init() {
@@ -402,6 +403,18 @@ shim::debug:any_enabled() {
 		rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_CONTAINERD_SHIM_FLOX_V2_WRAPPER_ENABLED:-false}"
 }
 
+shim::debug:dlv:ensure() {
+	if command -v dlv >/dev/null 2>&1; then
+		return 0
+	fi
+	local rke2_env_dir="/var/lib/rancher/rke2"
+	[[ -d "${rke2_env_dir}/.flox" ]] || {
+		echo "dlv install skipped: ${rke2_env_dir}/.flox not initialized" >&2
+		return 0
+	}
+	flox install --dir="${rke2_env_dir}" delve
+}
+
 shim::debug:tools:install() {
 	local source_root target_root source_path relative target_path install_mode force_install
 
@@ -409,6 +422,8 @@ shim::debug:tools:install() {
 		echo "debug helper installation skipped: no debug policy enabled"
 		return 0
 	fi
+
+	shim::debug:dlv:ensure
 
 	source_root="${CONTAINERD_SHIM_FLOX_V2_DEBUG_TOOLS_DIR}"
 	target_root="${RKE2LAB_DEBUG_SHARE_ROOT}"
@@ -436,6 +451,11 @@ shim::debug:tools:install() {
 
 		install -m "${install_mode}" "${source_path}" "${target_path}"
 	done < <(find "${source_root}" -type f -print0 | sort -z)
+
+	if [[ -x "${target_root%/}/rke2lab-shim-dlv.sh" ]]; then
+		install -d /usr/local/bin
+		ln -sfn "${target_root%/}/rke2lab-shim-dlv.sh" /usr/local/bin/rke2lab-shim-dlv
+	fi
 
 	echo "installed debug helper scripts in ${target_root}"
 }

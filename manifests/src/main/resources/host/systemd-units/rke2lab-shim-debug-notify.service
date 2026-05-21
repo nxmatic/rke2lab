@@ -1,0 +1,16 @@
+[Unit]
+Description=Broadcast containerd-shim-flox debug-suspend events via wall(1)
+Documentation=https://github.com/nxmatic/rke2lab
+After=rke2-server.service systemd-journald.service
+Wants=rke2-server.service
+
+[Service]
+Type=simple
+ExecStart=/bin/sh -c "exec journalctl -f -t containerd-shim-flox-v2-wrapper -o cat | grep --line-buffered '^shim debug-suspend ' | xargs -I{} -d '\\n' wall '[rke2lab] {}'"
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=rke2lab.target

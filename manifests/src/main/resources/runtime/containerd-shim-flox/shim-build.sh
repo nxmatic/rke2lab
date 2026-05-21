@@ -99,7 +99,7 @@ rke2lab::env:load() {
 
 	# shellcheck disable=SC1090
 	source "${env_script}"
-	declare -F rke2lab::env:load >/dev/null 2>&1 && rke2lab::env:load
+	# declare -F rke2lab::env:load >/dev/null 2>&1 && rke2lab::env:load
 }
 
 validate_worktree_mode() {
