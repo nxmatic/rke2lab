@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euxo pipefail
 
 : "${CONTAINERD_SHIM_FLOX_V2_SYNC_NAMESPACE:?CONTAINERD_SHIM_FLOX_V2_SYNC_NAMESPACE is required}"
 : "${CONTAINERD_SHIM_FLOX_V2_SYNC_ID:?CONTAINERD_SHIM_FLOX_V2_SYNC_ID is required}"

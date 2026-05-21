@@ -5,7 +5,7 @@ source "/srv/host/systemd-scripts.d/rke2lab-env-load.sh"
 rke2lab::env:load
 
 : "Disable IPv6 system-wide"
-# sysctl -p /etc/sysctl.d/99-disable-ipv6.conf
+sysctl -p /etc/sysctl.d/99-disable-ipv6.conf
 
 : "Disable getty services to free up resources and avoid unnecessary log noise"
 systemctl reset-failed console-getty.service 2>/dev/null || true

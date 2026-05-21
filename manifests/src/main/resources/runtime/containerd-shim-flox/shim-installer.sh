@@ -516,7 +516,7 @@ shim::runtime:containerd:resolve-bin() {
 	return 1
 }
 
-shim::runtime:package:resolve() {
+shim::runtime:variant:resolve() {
 	local containerd_bin="$1"
 	local containerd_version containerd_major
 
@@ -529,20 +529,70 @@ shim::runtime:package:resolve() {
 	fi
 
 	if [[ "${containerd_major}" -ge 2 ]]; then
-		printf '%s\n' "flox/containerd-shim-flox-2x"
+		printf '%s\n' "2x"
 	else
-		printf '%s\n' "flox/containerd-shim-flox-17"
+		printf '%s\n' "17"
 	fi
 }
 
+# The shim variants `flox/containerd-shim-flox-{17,2x}` are not directly
+# resolvable via `flox install`; the canonical entrypoint published on FloxHub
+# is `flox/containerd-shim-flox-installer`, whose closure carries both shim
+# variants. Pull that env, then read the shim path out of its requisites.
 shim::runtime:env:ensure() {
 	local flox_env_dir="$1"
 
 	mkdir -p "${CONTAINERD_CONFIG_DIR}"
-	mkdir -p "${flox_env_dir}"
-	if [[ ! -d "${flox_env_dir}/.flox" ]]; then
-		(cd "${flox_env_dir}" && flox init)
+
+	# `flox pull` writes `.flox/env.json` with an "owner" field; `flox init`
+	# writes the same file without one. Treat "no env.json" or "init-style
+	# env.json" (e.g. left over from earlier failed install attempts) as
+	# "needs pull".
+	if [[ ! -f "${flox_env_dir}/.flox/env.json" ]] ||
+		! grep -q '"owner"' "${flox_env_dir}/.flox/env.json"; then
+		mkdir -p "$(dirname "${flox_env_dir}")"
+		rm -rf "${flox_env_dir}"
+		flox pull --dir "${flox_env_dir}" flox/containerd-shim-flox-installer
 	fi
+
+	# Activate to materialize the env's closure (and thus the shim variants
+	# transitively referenced by the installer package) into the local store.
+	# The installer's on-activate hook expects to mutate /etc/containerd, which
+	# RKE2 doesn't use; we don't care because we don't run the hook — we just
+	# need the closure on disk so we can pick the shim binary out of it.
+	(
+		FLOX_ACTIVATE_NO_PROFILE=1 \
+			FLOX_DISABLE_HOOK_ON_ACTIVATE=1 \
+			flox activate --dir "${flox_env_dir}" -- true >/dev/null 2>&1 || true
+	)
+}
+
+# Find the containerd-shim-flox-${variant}-* store path inside the installer
+# env's closure. The upstream installer hardcodes these paths; here we let
+# nix-store discover them so version bumps land via `flox pull`.
+shim::runtime:package:store-path() {
+	local flox_env_dir="$1"
+	local variant="$2"
+	local arch="$3"
+	local installer_run installer_realpath store_path
+
+	installer_run="$(find "${flox_env_dir}/.flox/run" -maxdepth 1 \
+		-name "${arch}-linux.containerd-shim-flox-installer*.run" -print -quit || true)"
+	if [[ -z "${installer_run}" ]]; then
+		echo "unable to locate installer run directory under ${flox_env_dir}/.flox/run" >&2
+		return 1
+	fi
+
+	installer_realpath="$(realpath "${installer_run}")"
+	store_path="$(nix-store --query --requisites "${installer_realpath}" |
+		grep -E "containerd-shim-flox-${variant}-" |
+		head -n1)"
+	if [[ -z "${store_path}" ]]; then
+		echo "containerd-shim-flox-${variant} not present in installer closure (${installer_realpath})" >&2
+		return 1
+	fi
+
+	printf '%s\n' "${store_path}"
 }
 
 shim::runtime:gcroots:ensure() {
@@ -555,22 +605,25 @@ shim::runtime:gcroots:ensure() {
 shim::runtime:binary:install() {
 	local flox_env_dir="$1"
 	local arch="$2"
-	local shim_run_dir shim_path
+	local variant="$3"
+	local shim_store_path shim_path
 	local install_root real_shim_path
 	local wrapper_pkg_path wrapper_bin wrapper_helper
 	local debug_wrapper_pkg_path debug_wrapper_bin
 
-	shim_run_dir="$(find "${flox_env_dir}/.flox/run" -maxdepth 1 -name "${arch}-linux.containerd-shim*.run" -print -quit || true)"
-	if [[ -z "${shim_run_dir}" ]]; then
-		echo "unable to locate Flox shim run directory" >&2
-		return 1
-	fi
-
-	shim_path="$(realpath "${shim_run_dir}")/bin/containerd-shim-flox-v2"
+	shim_store_path="$(shim::runtime:package:store-path "${flox_env_dir}" "${variant}" "${arch}")"
+	shim_path="${shim_store_path}/bin/containerd-shim-flox-v2"
 	if [[ ! -f "${shim_path}" ]]; then
 		echo "shim binary missing at ${shim_path}" >&2
 		return 1
 	fi
+
+	# GC-root the shim closure so a later nix-collect-garbage doesn't reap it
+	# out from under containerd. Mirrors what the upstream installer hook does.
+	mkdir -p "${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/containerd-shim-flox"
+	nix-store --add-root \
+		"${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/containerd-shim-flox/containerd-shim-flox-${variant}" \
+		--indirect -r "${shim_store_path}" >/dev/null
 
 	install_root="/usr/local/libexec/rke2lab/containerd-shim-flox-v2-wrapper"
 	real_shim_path="${install_root}/containerd-shim-flox-v2.real"
@@ -610,7 +663,7 @@ shim::runtime:config-template:ensure() {
 
 shim::runtime:core:install() {
 	: "Install/refresh flox runtime shim binaries on host"
-	local flox_env_dir arch containerd_bin shim_pkg
+	local flox_env_dir arch containerd_bin variant
 
 	flox_env_dir="/var/lib/flox-runtime/containerd-shim"
 	arch="$(uname -m)"
@@ -618,9 +671,8 @@ shim::runtime:core:install() {
 	shim::runtime:env:ensure "${flox_env_dir}"
 	shim::runtime:gcroots:ensure
 	containerd_bin="$(shim::runtime:containerd:resolve-bin)"
-	shim_pkg="$(shim::runtime:package:resolve "${containerd_bin}")"
-	flox install --dir "${flox_env_dir}" "${shim_pkg}"
-	shim::runtime:binary:install "${flox_env_dir}" "${arch}"
+	variant="$(shim::runtime:variant:resolve "${containerd_bin}")"
+	shim::runtime:binary:install "${flox_env_dir}" "${arch}" "${variant}"
 	shim::runtime:config-template:ensure
 }
 
