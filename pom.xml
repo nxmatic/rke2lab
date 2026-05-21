@@ -37,6 +37,19 @@
     <shfmt.version>3.13.0</shfmt.version>
   </properties>
 
+  <repositories>
+    <repository>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <id>github-nxmatic-java-systemd</id>
+      <url>https://maven.pkg.github.com/nxmatic/java-systemd</url>
+    </repository>
+  </repositories>
+
   <build>
     <pluginManagement>
       <plugins>

@@ -81,6 +81,10 @@
       <artifactId>org.eclipse.jgit</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.github.thjomnx</groupId>
+      <artifactId>java-systemd</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.github.hypfvieh</groupId>
       <artifactId>dbus-java-core</artifactId>
     </dependency>

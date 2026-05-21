@@ -15,6 +15,7 @@
 
   <properties>
     <dbus.java.version>5.2.0</dbus.java.version>
+    <java-systemd.version>3.0.0-SNAPSHOT</java-systemd.version>
     <grpc.version>1.80.0</grpc.version>
     <pulumi.version>1.0.0</pulumi.version>
     <pulumi.command.version>1.2.1</pulumi.command.version>
@@ -101,6 +102,11 @@
         <version>${rke2lab.version}</version>
       </dependency>
       <!-- third-party dependencies -->
+      <dependency>
+        <groupId>com.github.thjomnx</groupId>
+        <artifactId>java-systemd</artifactId>
+        <version>${java-systemd.version}</version>
+      </dependency>
       <dependency>
         <groupId>com.pulumi</groupId>
         <artifactId>pulumi</artifactId>
