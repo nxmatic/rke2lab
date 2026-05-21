@@ -307,3 +307,31 @@ files:
     path: /etc/cloud/cloud.cfg.d/00-nocloud.cfg
     content: |
       datasource_list: [ NoCloud ]
+  # systemd-resolved IPv4-only DNS configuration (baked into image before first boot)
+  # This prevents IPv6 DNS from vmnet0 DHCP/RA from breaking early bootstrap
+  - name: systemd-resolved-ipv4-only
+    generator: dump
+    path: /etc/systemd/resolved.conf.d/00-ipv4-only-dns.conf
+    content: |
+      [Resolve]
+      # Accept DNS from LAN DHCP (IPv4), fallback to public IPv4 DNS
+      FallbackDNS=8.8.8.8 1.1.1.1
+      # Disable features that might introduce IPv6 DNS
+      DNSOverTLS=no
+      DNSSEC=no
+      # Apply to all domains
+      Domains=~.
+  # Disable IPv6 globally at kernel level (baked into image before first boot)
+  # This prevents IPv6 Router Advertisements from assigning IPv6 addresses/DNS
+  # before cloud-init can configure the system
+  - name: sysctl-disable-ipv6
+    generator: dump
+    path: /etc/sysctl.d/99-disable-ipv6.conf
+    content: |
+      net.ipv6.conf.all.disable_ipv6 = 1
+      net.ipv6.conf.default.disable_ipv6 = 1
+      net.ipv6.conf.lo.disable_ipv6 = 1
+      net.ipv6.conf.lan0.disable_ipv6 = 1
+      net.ipv6.conf.vmnet0.disable_ipv6 = 1
+      net.ipv6.conf.all.accept_ra = 0
+      net.ipv6.conf.default.accept_ra = 0
