@@ -54,6 +54,9 @@ write_files:
       [Resolve]
       LLMNR=yes
       MulticastDNS=yes
+  # NOTE: IPv4-only DNS configuration (00-ipv4-only-dns.conf) is baked into the
+  # disk image via incus-distrobuilder.yaml so it's present before systemd-resolved
+  # starts at first boot. No need to write it again via cloud-init.
   # Avahi configuration to advertise only on the LAN interface (IPv4 mDNS)
   - path: /etc/avahi/avahi-daemon.conf
     permissions: "0644"
@@ -70,17 +73,9 @@ write_files:
       publish-hinfo=yes
       publish-aaaa-on-ipv4=no
       publish-a-on-ipv6=no
-  # Disable IPv6 globally so nodes stay IPv4-only end-to-end (@codebase)
-  - path: /etc/sysctl.d/99-disable-ipv6.conf
-    permissions: "0644"
-    content: |
-      net.ipv6.conf.all.disable_ipv6 = 1
-      net.ipv6.conf.default.disable_ipv6 = 1
-      net.ipv6.conf.lo.disable_ipv6 = 1
-      net.ipv6.conf.lan0.disable_ipv6 = 1
-      net.ipv6.conf.vmnet0.disable_ipv6 = 1
-      net.ipv6.conf.all.accept_ra = 0
-      net.ipv6.conf.default.accept_ra = 0
+  # NOTE: IPv6 disable configuration (99-disable-ipv6.conf) is baked into the
+  # disk image via incus-distrobuilder.yaml so it's active from first boot.
+  # No need to write it again via cloud-init.
   # Set systemd as cgroup driver
   - path: /var/lib/rancher/rke2/agent/etc/kubelet.conf.d/01-cgroup-override.conf
     # =============================================================================
