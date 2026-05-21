@@ -43,12 +43,10 @@ public final class CiliumConfigLayer extends Construct {
             Map.of(
                 "valuesContent",
                 "installCRDs: true\n"
-                    + "k8s:\n"
-                    + "  apiServer:\n"
-                    + "    host: \"https://127.0.0.1\"\n"
-                    + "    port: \"6443\"\n"
+                    + "k8sServiceHost: \"127.0.0.1\"\n"
+                    + "k8sServicePort: \"6443\"\n"
                     + "bpf:\n"
-                    + "  hostLegacyRouting: true\n"
+                    + "  hostLegacyRouting: false\n"
                     + "bgpControlPlane:\n"
                     + "  enabled: true\n"
                     + "cluster:\n"
