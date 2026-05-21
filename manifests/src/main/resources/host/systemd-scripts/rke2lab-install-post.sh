@@ -3,11 +3,6 @@
 : "Activate flox environment"
 source <(flox activate --dir /var/lib/rancher/rke2)
 
-: "Load RKE2Lab environment overlays"
-RKE2LAB_ROOT=${RKE2LAB_ROOT:-/srv/host}
-source "${RKE2LAB_ROOT}/systemd-scripts.d/rke2lab-env-load.sh"
-rke2lab::env:load
-
 : "Link committed RKE2 manifests from RKE2LAB_MANIFESTS_DIR into RKE2 server manifests directory"
 MANIFESTS_DIR=/var/lib/rancher/rke2/server/manifests
 

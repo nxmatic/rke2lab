@@ -2,12 +2,6 @@
 
 source <(flox activate --dir /var/lib/rancher/rke2)
 
-RKE2LAB_ROOT=${RKE2LAB_ROOT:-/srv/host}
-if [[ -r "${RKE2LAB_ROOT}/systemd-scripts.d/rke2lab-env-load.sh" ]]; then
-	source "${RKE2LAB_ROOT}/systemd-scripts.d/rke2lab-env-load.sh"
-	rke2lab::env:load
-fi
-
 log() {
 	echo "[rke2-openebs-ready] $*"
 }

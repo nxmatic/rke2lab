@@ -5,7 +5,6 @@ exec > >(logger -t rke2-network-config) 2>&1
 
 : "Load environment variables from mounted section manifests"
 source /srv/host/systemd-scripts.d/rke2lab-env-load.sh
-rke2lab::env:load
 
 : "Load flox environment for yq and other tools"
 source <(flox activate --dir /var/lib/cloud/seed/nocloud)

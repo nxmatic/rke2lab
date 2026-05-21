@@ -1,12 +1,6 @@
 #!/usr/bin/env -S bash -xu -o pipefail
 source <(flox activate --dir /var/lib/rancher/rke2)
 
-RKE2LAB_ROOT=${RKE2LAB_ROOT:-/srv/host}
-if [[ -r "${RKE2LAB_ROOT}/systemd-scripts.d/rke2lab-env-load.sh" ]]; then
-	source "${RKE2LAB_ROOT}/systemd-scripts.d/rke2lab-env-load.sh"
-	rke2lab::env:load
-fi
-
 bool_is_true() {
 	case "${1:-}" in
 	1 | true | TRUE | yes | YES | on | ON)

@@ -140,3 +140,5 @@ rke2lab::env:load() {
 		esac
 	done
 }
+
+rke2lab::env:load

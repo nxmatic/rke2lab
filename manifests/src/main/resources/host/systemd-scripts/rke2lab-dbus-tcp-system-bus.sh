@@ -6,7 +6,6 @@
 
 : "Load environment variables from mounted section manifests"
 source /srv/host/systemd-scripts.d/rke2lab-env-load.sh
-rke2lab::env:load
 
 if [[ "${RKE2LAB_NODE_NAME:-}" != "master" ]]; then
 	echo "[rke2lab-dbus-tcp] skipping non-master node (${RKE2LAB_NODE_NAME:-unknown})"

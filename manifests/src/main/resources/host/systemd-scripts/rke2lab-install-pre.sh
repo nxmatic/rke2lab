@@ -16,9 +16,6 @@ export RKE2_FLOX_SYSTEM
 flox install --dir=/var/lib/cloud git gh@^2.86
 source <(flox activate --dir=/var/lib/cloud)
 
-: "Load RKE2 environment manifests"
-rke2lab::env:load
-
 kdns::manifest:patch() {
 	local deployment_manifest flox_env debug_enabled debug_suspend runtime_class
 

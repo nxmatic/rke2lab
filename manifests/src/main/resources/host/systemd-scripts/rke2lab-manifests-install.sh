@@ -3,12 +3,6 @@
 : "Load RKE2 flox environment for kubectl and tooling"
 source <(flox activate --dir /var/lib/rancher/rke2)
 
-RKE2LAB_ROOT=${RKE2LAB_ROOT:-/srv/host}
-if [[ -r "${RKE2LAB_ROOT}/systemd-scripts.d/rke2lab-env-load.sh" ]]; then
-	source "${RKE2LAB_ROOT}/systemd-scripts.d/rke2lab-env-load.sh"
-	rke2lab::env:load
-fi
-
 if [[ -z "${RKE2LAB_MANIFESTS_DIR:-}" ]]; then
 	echo "[rke2-manifests-install] RKE2LAB_MANIFESTS_DIR is required (exported by incus env file)" >&2
 	exit 1

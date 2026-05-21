@@ -2,7 +2,6 @@
 
 : "Load RKE2 environment" # @codebase
 source /srv/host/systemd-scripts.d/rke2lab-env-load.sh
-rke2lab::env:load
 
 log() {
 	printf '[systemd-link] %s\n' "$*"

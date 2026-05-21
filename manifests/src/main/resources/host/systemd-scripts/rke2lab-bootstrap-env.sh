@@ -170,7 +170,4 @@ nocloud:env:bootstrap
 : "Now that /var/lib/cloud/.flox exists, env-load short-circuits its tmpdir fallback"
 source "$(dirname "${BASH_SOURCE[0]}")/rke2lab-env-load.sh"
 
-: "Load RKE2 environment manifests (RKE2LAB_NODE_NAME, RKE2LAB_DBUS_TCP_*, etc.)"
-rke2lab::env:load
-
 echo "[rke2lab-bootstrap-env] ready"
