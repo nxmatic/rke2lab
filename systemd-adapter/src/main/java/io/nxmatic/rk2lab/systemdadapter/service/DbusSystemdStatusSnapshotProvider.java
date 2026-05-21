@@ -89,7 +89,8 @@ public class DbusSystemdStatusSnapshotProvider implements SystemdStatusSnapshotP
           failedUnits,
           runtimeReady,
           connectionContext,
-          summary);
+          summary,
+          Map.of());
     } catch (DBusException | IOException ex) {
       throw new IllegalStateException("Failed to query systemd state over D-Bus", ex);
     }

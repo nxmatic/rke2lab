@@ -2,11 +2,10 @@
 
 set -euxo pipefail
 
+source <(flox activate -v -v -v --dir /var/lib/cloud)
+
 # Install RKE2 config fragments from ${RKE2LAB_CONFIG_DIR}
 # into /etc/rancher/rke2/config.yaml.d before rke2-server starts.
-
-: "Load cloud flox environment for yq"
-source <(flox activate --dir /var/lib/cloud)
 
 RKE2LAB_CONFIG_DIR=${RKE2LAB_CONFIG_DIR:?RKE2LAB_CONFIG_DIR is required}
 

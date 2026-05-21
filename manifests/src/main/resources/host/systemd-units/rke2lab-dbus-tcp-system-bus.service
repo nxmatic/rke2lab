@@ -1,9 +1,9 @@
 [Unit]
 Description=Configure DBus system bus TCP listener on master node
 Documentation=https://github.com/nxmatic/rke2lab
-After=network-online.target systemd-networkd.service rke2lab-network.target dbus.socket rke2lab-install.service
+After=network-online.target systemd-networkd.service rke2lab-network.target dbus.socket rke2lab-bootstrap-env.service
 Wants=network-online.target systemd-networkd.service rke2lab-network.target
-Requires=rke2lab-install.service
+Requires=rke2lab-bootstrap-env.service
 RequiresMountsFor=/srv/host/systemd-scripts.d /srv/host/rke2lab-environment.d
 ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-dbus-tcp-system-bus.sh
 ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-env-load.sh

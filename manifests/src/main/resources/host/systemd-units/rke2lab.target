@@ -1,9 +1,9 @@
 [Unit]
 Description=RKE2 Lab Bootstrap Target
 Documentation=https://github.com/nxmatic/rke2lab
-After=rke2lab-install.service rke2-server.service
-Wants=rke2lab-install.service rke2-server.service
-Requires=rke2lab-install.service
+After=rke2lab-bootstrap-env.service rke2lab-install.service rke2-server.service
+Wants=rke2lab-bootstrap-env.service rke2lab-install.service rke2-server.service
+Requires=rke2lab-bootstrap-env.service rke2lab-install.service
 
 # This target represents the completion of all RKE2 Lab layer installations
 # Services add themselves to this target via WantedBy=rke2lab.target

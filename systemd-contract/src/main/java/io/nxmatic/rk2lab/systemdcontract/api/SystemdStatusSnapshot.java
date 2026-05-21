@@ -15,7 +15,8 @@ public record SystemdStatusSnapshot(
     int failedUnits,
     boolean runtimePrecheckReady,
     Map<String, String> connectionContext,
-    String summary) {
+    String summary,
+    Map<String, String> pendingDependencies) {
 
   public SystemdStatusSnapshot {
     observedAt = normalizeObservedAt(observedAt);
@@ -26,6 +27,7 @@ public record SystemdStatusSnapshot(
     failedUnits = Math.max(failedUnits, 0);
     connectionContext = sanitizeStringMap(connectionContext);
     summary = normalizeString(summary, "n/a");
+    pendingDependencies = sanitizeStringMap(pendingDependencies);
   }
 
   public static Builder builder() {
@@ -43,6 +45,7 @@ public record SystemdStatusSnapshot(
     private boolean runtimePrecheckReady;
     private Map<String, String> connectionContext = Map.of();
     private String summary = "n/a";
+    private Map<String, String> pendingDependencies = Map.of();
 
     private Builder() {}
 
@@ -96,6 +99,11 @@ public record SystemdStatusSnapshot(
       return this;
     }
 
+    public Builder pendingDependencies(Map<String, String> value) {
+      this.pendingDependencies = value;
+      return this;
+    }
+
     public SystemdStatusSnapshot build() {
       return new SystemdStatusSnapshot(
           observedAt,
@@ -107,7 +115,8 @@ public record SystemdStatusSnapshot(
           failedUnits,
           runtimePrecheckReady,
           connectionContext,
-          summary);
+          summary,
+          pendingDependencies);
     }
   }
 
@@ -123,6 +132,7 @@ public record SystemdStatusSnapshot(
     payload.put("runtimePrecheckReady", runtimePrecheckReady);
     payload.put("connectionContext", connectionContext);
     payload.put("summary", summary);
+    payload.put("pendingDependencies", pendingDependencies);
     return Map.copyOf(payload);
   }
 

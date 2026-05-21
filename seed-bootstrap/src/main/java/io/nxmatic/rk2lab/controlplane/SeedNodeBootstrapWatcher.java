@@ -42,18 +42,7 @@ public final class SeedNodeBootstrapWatcher {
           stringValue(statusSnapshot.getOrDefault("mandatoryTargetState", "unknown"));
       final String adapterSummary = stringValue(statusSnapshot.getOrDefault("summary", "n/a"));
       final String hostContext = describeHostContext(statusSnapshot);
-      final String currentJobs = stringValue(statusSnapshot.getOrDefault("currentJobs", "n/a"));
-      final String currentStartingService =
-          stringValue(statusSnapshot.getOrDefault("currentStartingService", "n/a"));
-      final String currentActiveUnits =
-          stringValue(statusSnapshot.getOrDefault("currentActiveUnits", "n/a"));
-      final String targetWants = stringValue(statusSnapshot.getOrDefault("targetWants", "n/a"));
-      final String cloudInitMainState =
-          stringValue(statusSnapshot.getOrDefault("cloudInitMainState", "n/a"));
-      final String cloudInitMainResult =
-          stringValue(statusSnapshot.getOrDefault("cloudInitMainResult", "n/a"));
-      final String cloudInitMainHealthy =
-          stringValue(statusSnapshot.getOrDefault("cloudInitMainHealthy", "n/a"));
+      final String pendingDependencies = describePendingDependencies(statusSnapshot);
 
       if ("ok".equalsIgnoreCase(probeStatus) && runtimeReady) {
         effectiveLogger.accept(
@@ -74,20 +63,8 @@ public final class SeedNodeBootstrapWatcher {
               + failedUnitCount
               + ", hostContext="
               + hostContext
-              + ", currentJobs="
-              + currentJobs
-              + ", currentStartingService="
-              + currentStartingService
-              + ", currentActiveUnits="
-              + currentActiveUnits
-              + ", targetWants="
-              + targetWants
-              + ", cloudInitMainState="
-              + cloudInitMainState
-              + ", cloudInitMainResult="
-              + cloudInitMainResult
-              + ", cloudInitMainHealthy="
-              + cloudInitMainHealthy
+              + ", pendingDependencies="
+              + pendingDependencies
               + ", summary="
               + adapterSummary;
 
@@ -157,6 +134,25 @@ public final class SeedNodeBootstrapWatcher {
         + mapStringValue(connectionContext, "incusInstance")
         + ",adapterHost="
         + mapStringValue(connectionContext, "adapterHost");
+  }
+
+  private static String describePendingDependencies(Map<String, Object> statusSnapshot) {
+    final Object raw = statusSnapshot.get("pendingDependencies");
+    if (!(raw instanceof Map<?, ?> map) || map.isEmpty()) {
+      return "none";
+    }
+
+    final StringBuilder builder = new StringBuilder("[");
+    boolean first = true;
+    for (Map.Entry<?, ?> entry : map.entrySet()) {
+      if (!first) {
+        builder.append(',');
+      }
+      first = false;
+      builder.append(entry.getKey()).append('=').append(entry.getValue());
+    }
+    builder.append(']');
+    return builder.toString();
   }
 
   private static String configFallbackString(Map<String, Object> statusSnapshot, String key) {

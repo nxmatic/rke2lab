@@ -4,7 +4,13 @@ import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.systemdcontract.api.SystemdStatusSnapshot;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.freedesktop.dbus.connections.impl.DBusConnection;
 import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder;
 import org.freedesktop.dbus.connections.transports.TransportBuilder.SaslAuthMode;
@@ -60,8 +66,12 @@ public final class DbusSystemdProbe {
       final String cloudInitResult =
           stringProp(cloudInitProps, SYSTEMD_SERVICE_INTERFACE, "Result");
       final boolean cloudInitHealthy =
-          "active".equals(cloudInitState) && "success".equals(cloudInitResult);
+          "success".equals(cloudInitResult)
+              && ("active".equals(cloudInitState) || "inactive".equals(cloudInitState));
       final boolean runtimePrecheckReady = targetHealthy && pendingJobs == 0 && failedUnits == 0;
+
+      final Map<String, String> pendingDependencies =
+          collectPendingDependencies(connection, targetProps);
 
       final String summary =
           "mandatoryTarget="
@@ -100,11 +110,75 @@ public final class DbusSystemdProbe {
           .runtimePrecheckReady(runtimePrecheckReady)
           .connectionContext(connectionContext)
           .summary(summary)
+          .pendingDependencies(pendingDependencies)
           .build();
     } catch (Exception ex) {
       throw new IllegalStateException(
           "systemd dbus probe failed at " + busAddress + ": " + ex.getMessage(), ex);
     }
+  }
+
+  private static Map<String, String> collectPendingDependencies(
+      DBusConnection connection, Properties targetProps) {
+    final Set<String> dependencies = new LinkedHashSet<>();
+    addDependencies(dependencies, targetProps, "Requires");
+    addDependencies(dependencies, targetProps, "Wants");
+    addDependencies(dependencies, targetProps, "BindsTo");
+
+    final LinkedHashMap<String, String> pending = new LinkedHashMap<>();
+    for (String unitName : dependencies) {
+      try {
+        final Properties depProps = unitProperties(connection, unitName);
+        final String state = stringProp(depProps, SYSTEMD_UNIT_INTERFACE, "ActiveState");
+        if (!"active".equals(state)) {
+          pending.put(unitName, state);
+        }
+      } catch (DBusException ex) {
+        pending.put(unitName, "unreadable");
+      }
+    }
+    return Map.copyOf(pending);
+  }
+
+  private static void addDependencies(Set<String> sink, Properties props, String name) {
+    try {
+      final Object value = props.Get(SYSTEMD_UNIT_INTERFACE, name);
+      for (String unit : toStringArray(value)) {
+        if (unit != null && !unit.isBlank()) {
+          sink.add(unit);
+        }
+      }
+    } catch (Exception ignored) {
+      // Property may not exist or transient DBus issue; treat as empty.
+    }
+  }
+
+  private static String[] toStringArray(Object value) {
+    if (value == null) {
+      return new String[0];
+    }
+    if (value instanceof String[] arr) {
+      return arr;
+    }
+    if (value instanceof Collection<?> col) {
+      final List<String> out = new ArrayList<>(col.size());
+      for (Object item : col) {
+        if (item != null) {
+          out.add(item.toString());
+        }
+      }
+      return out.toArray(new String[0]);
+    }
+    if (value instanceof Object[] arr) {
+      final List<String> out = new ArrayList<>(arr.length);
+      for (Object item : arr) {
+        if (item != null) {
+          out.add(item.toString());
+        }
+      }
+      return out.toArray(new String[0]);
+    }
+    return new String[] {value.toString()};
   }
 
   private static Properties unitProperties(DBusConnection connection, String unitName)

@@ -1,6 +1,6 @@
 #!/usr/bin/env -S bash -exu -o pipefail
 
-: "Load RKE2 environment" # @codebase
+: "Load RKE2 environment (Nix + Flox + nocloud env are pre-provisioned by rke2lab-bootstrap-env.service)" # @codebase
 RKE2LAB_ROOT=${RKE2LAB_ROOT:-/srv/host}
 source "$(dirname "${BASH_SOURCE[0]}")/rke2lab-env-load.sh"
 
@@ -8,20 +8,15 @@ source "$(dirname "${BASH_SOURCE[0]}")/rke2lab-env-load.sh"
 RKE2_FLOX_SYSTEM="$(uname -m)-linux"
 export RKE2_FLOX_SYSTEM
 
-: "Configure direnv to use flox"
-direnv:config:generate() {
-	mkdir -p "/root/.config/direnv/lib"
-	curl -o \
-		"/root/.config/direnv/lib/flox.sh" \
-		"https://raw.githubusercontent.com/flox/flox-direnv/v1.1.0/direnv.rc"
-	cat <<EoConfig | cut -c 3- >"/root/.config/direnv/direnv.toml"
-  [whitelist]
-  prefix= [ "/home", "/root", "/var/lib/cloud", "/var/lib/rancher/rke2", "${RKE2LAB_ROOT}" ]
-EoConfig
+: "Activate the nocloud environment provisioned by rke2lab-bootstrap-env"
+[[ -d /var/lib/cloud/.flox ]] || {
+	echo "[rke2lab-install-pre] ERROR: /var/lib/cloud/.flox missing; rke2lab-bootstrap-env.service must run first" >&2
+	exit 1
 }
-direnv:config:generate
+flox install --dir=/var/lib/cloud git gh@^2.86
+source <(flox activate --dir=/var/lib/cloud)
 
-: "Load RKE2 environment manifests after yq is available"
+: "Load RKE2 environment manifests"
 rke2lab::env:load
 
 kdns::manifest:patch() {
@@ -51,145 +46,28 @@ kdns::manifest:patch() {
 : "Patch KDNS manifest runtime selection from controlplane env overlay"
 kdns::manifest:patch
 
-: "Preload the nocloud environment"
-nocloud:env:activate() {
-	local FLOX_ENV_DIR="/var/lib/cloud"
+: "Load GitHub credentials from worktree secrets (hard-fail on missing keys)"
+rke2lab::secrets:load() {
+	local secrets_file var key val
+	secrets_file="${RKE2LAB_ROOT:-/srv/host}/rke2lab-worktree.d/.secrets"
 
-	if [[ -d "${FLOX_ENV_DIR}/.flox" ]]; then
-		: "Ensure GitHub CLI is present in nocloud flox environment"
-		flox install --dir="${FLOX_ENV_DIR}" git gh@^2.86
-		source <(flox activate --dir="${FLOX_ENV_DIR}")
+	[[ -s "${secrets_file}" ]] || {
+		echo "[rke2lab-install-pre] ERROR: secrets file missing or empty: ${secrets_file}" >&2
+		exit 1
+	}
 
-		return
-	fi
-
-	: "Initialize flox environment for nocloud"
-	mkdir -p "${FLOX_ENV_DIR}"
-	flox init --dir="${FLOX_ENV_DIR}"
-	flox install --dir="${FLOX_ENV_DIR}" dasel yq-go
-
-	: "Include common profile in manifest and activate flox environment"
-	cat <<'EoFloxCommonProfile' | cut -c 3- | tee "${FLOX_ENV_DIR}/.flox/env/profile-common.sh"
-
-  rke2lab::shell:indirect() {
-    local var="$1" value=""
-
-    set +u
-    if [[ -n "${BASH_VERSION:-}" ]]; then
-      value="${!var-}"
-    elif [[ -n "${ZSH_VERSION:-}" ]]; then
-      # shellcheck disable=SC2296
-      value="${(P)var:-}"
-    else
-      echo "ERROR: Unsupported shell for secret loading" >&2
-      set -u
-      return 1
-    fi
-    set -u
-
-    printf '%s\n' "${value}"
-  }
-
-  rke2lab::secret:value() {
-    local var="$1" key="$2" val
-
-    val="$( rke2lab::shell:indirect "${var}" )"
-
-    if [[ -z "$val" ]]; then
-      val=$( "${FLOX_ENV}/bin/yq" -r "${key}" "${RKE2LAB_SECRETS_FILE}" 2>/dev/null )
-      [[ "$val" == "null" ]] && val=""
-    fi
-
-    [[ -z "$val" ]] && return
-    export "$var=$val"
-  }
-
-  RKE2LAB_ROOT=${RKE2LAB_ROOT:-/srv/host}
-  RKE2LAB_ENV_DIR=${RKE2LAB_ENV_DIR:-${RKE2LAB_ROOT}/rke2lab-environment.d}
-  RKE2LAB_SECRETS_FILE="${RKE2LAB_ROOT}/rke2lab-worktree.d/.secrets"
-
-  : "Ensure RKE2 secrets file is present and readable (read-only source of truth)"
-  [[ -s "${RKE2LAB_SECRETS_FILE}" ]] || {
-    echo "[rke2-install-pre] ERROR: secrets file is missing or empty: ${RKE2LAB_SECRETS_FILE}" >&2
-    return 1
-  }
-  [[ -r "${RKE2LAB_SECRETS_FILE}" ]] || {
-    echo "[rke2-install-pre] ERROR: secrets file is not readable: ${RKE2LAB_SECRETS_FILE}" >&2
-    return 1
-  }
-
-  set -a
-
-  : "Source RKE2 environment manifests"
-  [[ -d "${RKE2LAB_ENV_DIR}" ]] || {
-    echo "[rke2-install-pre] ERROR: environment directory missing: ${RKE2LAB_ENV_DIR}" >&2
-    return 1
-  }
-  for env_manifest in "${RKE2LAB_ENV_DIR}"/*.yml "${RKE2LAB_ENV_DIR}"/*.yaml; do
-    [[ -f "${env_manifest}" ]] || continue
-
-    kind="$(yq -r '.kind // ""' "${env_manifest}")"
-    case "${kind}" in
-      ConfigMap)
-        source <(yq eval -o=shell '.data // {}' "${env_manifest}")
-        ;;
-      Secret)
-        source <(yq eval -o=shell '((.stringData // {}) * ((.data // {}) | with_entries(.value |= @base64d)))' "${env_manifest}")
-        ;;
-      *)
-        continue
-        ;;
-    esac
-  done
-
-  : "Load RKE2-specific dynamic environment variables"
-  ARCH="$(dpkg --print-architecture)"
-
-  : "Backfill secrets from ${RKE2LAB_ROOT}/secrets if not already set (local yq wrapper)"
-  rke2lab::secret:value GITHUB_USERNAME '.github.username'
-  rke2lab::secret:value GITHUB_PAT '.github.token'
-  rke2lab::secret:value DOCKER_CONFIG_JSON '.docker.configJson'
-  rke2lab::secret:value TEKTON_GIT_USERNAME '.tekton.git.username'
-  rke2lab::secret:value TEKTON_GIT_PASSWORD '.tekton.git.password'
-  rke2lab::secret:value TEKTON_DOCKER_CONFIG_JSON '.tekton.docker.configJson'
-  rke2lab::secret:value TEKTON_DOCKER_REGISTRY_URL '.tekton.docker.registryUrl'
-  rke2lab::secret:value TSKEY_CLIENT_ID '.tailscale.client.id'
-  rke2lab::secret:value TSKEY_CLIENT_TOKEN '.tailscale.client.token'
-  rke2lab::secret:value TSKEY_API_ID '.tailscale.api.id'
-  rke2lab::secret:value TSKEY_API_TOKEN '.tailscale.api.token'
-  rke2lab::secret:value TSKEY_OAUTH_ID '.tailscale.oauth.id'
-  rke2lab::secret:value TSKEY_OAUTH_TOKEN '.tailscale.oauth.token'
-
-  : "Determine default gateway IP for cluster networking"
-  CLUSTER_GATEWAY=$( ip route show default 2>/dev/null |
-                      awk '/default via/ { print $3; exit }' ||
-                      true )
-
-  set +a
-EoFloxCommonProfile
-
-	dasel -i toml -o yaml <"${FLOX_ENV_DIR}/.flox/env/manifest.toml" |
-		yq eval '.options = {"systems": [env(RKE2_FLOX_SYSTEM)]}' - |
-		yq eval '.profile = { "common": "source ${FLOX_ENV_PROJECT}/.flox/env/profile-common.sh" }' - |
-		dasel -i yaml -o toml | tee /tmp/manifest.toml.$$ &&
-		mv /tmp/manifest.toml.$$ "${FLOX_ENV_DIR}/.flox/env/manifest.toml"
-	source <(flox activate --dir="${FLOX_ENV_DIR}")
-
-	: "Install GitHub CLI in nocloud flox environment"
-	flox install --dir="${FLOX_ENV_DIR}" git gh@^2.86
-
-	: "Generate nocloud envrc to load environment variables"
-	cat >/var/lib/cloud/.envrc <<'EoEnvrc'
-  log_status "Loading nocloud environment variables"
-
-  [[ "$FLOX_ENV_PROJECT" != "$PWD" ]] &&
-    use flox
-EoEnvrc
-	ln -sf /var/lib/cloud/.envrc /var/lib/cloud/seed/nocloud/.envrc
+	for pair in "GITHUB_USERNAME=.github.username" "GITHUB_PAT=.github.token"; do
+		var="${pair%%=*}"
+		key="${pair#*=}"
+		val="$(yq -r "${key}" "${secrets_file}")"
+		[[ -n "${val}" && "${val}" != "null" ]] || {
+			echo "[rke2lab-install-pre] ERROR: ${key} missing in ${secrets_file}" >&2
+			exit 1
+		}
+		export "${var}=${val}"
+	done
 }
-
-: "Activate the nocloud environment"
-nocloud:env:activate
+rke2lab::secrets:load
 
 : "GitHub authentication setup"
 gh auth login --with-token <<EoF

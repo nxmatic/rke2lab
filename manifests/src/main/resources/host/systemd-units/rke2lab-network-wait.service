@@ -1,8 +1,8 @@
 [Unit]
 Description=RKE2Lab Network Wait Service
-After=systemd-networkd.service
+After=systemd-networkd.service systemd-networkd-wait-online.service
 Before=rke2lab.target
-Wants=systemd-networkd.service
+Wants=systemd-networkd.service systemd-networkd-wait-online.service
 
 [Service]
 Type=oneshot
