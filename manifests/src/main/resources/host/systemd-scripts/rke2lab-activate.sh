@@ -4,8 +4,14 @@
 source "/srv/host/systemd-scripts.d/rke2lab-env-load.sh"
 rke2lab::env:load
 
-: "Disable IPv6 system-wide"
-sysctl -p /etc/sysctl.d/99-disable-ipv6.conf
+: "Ensure IPv6 is disabled and DNS is IPv4-only"
+# Both configurations are baked into the disk image via incus-distrobuilder.yaml:
+#   - /etc/sysctl.d/99-disable-ipv6.conf (applied at boot by systemd-sysctl)
+#   - /etc/systemd/resolved.conf.d/00-ipv4-only-dns.conf (loaded by systemd-resolved)
+# Just verify and restart resolved to ensure consistency
+sysctl -p /etc/sysctl.d/99-disable-ipv6.conf 2>/dev/null || true
+resolvectl flush-caches 2>/dev/null || true
+systemctl restart systemd-resolved || true
 
 : "Disable getty services to free up resources and avoid unnecessary log noise"
 systemctl reset-failed console-getty.service 2>/dev/null || true
