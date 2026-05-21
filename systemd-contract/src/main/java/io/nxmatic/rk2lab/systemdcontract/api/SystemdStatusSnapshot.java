@@ -12,7 +12,9 @@ public record SystemdStatusSnapshot(
     boolean mandatoryTargetHealthy,
     int pendingJobs,
     Map<String, Integer> jobsByState,
+    Map<String, String> pendingJobDetails,
     int failedUnits,
+    Map<String, String> failedUnitDetails,
     boolean runtimePrecheckReady,
     Map<String, String> connectionContext,
     String summary,
@@ -24,7 +26,9 @@ public record SystemdStatusSnapshot(
     mandatoryTargetState = normalizeString(mandatoryTargetState, "unknown");
     pendingJobs = Math.max(pendingJobs, 0);
     jobsByState = sanitizeIntegerMap(jobsByState);
+    pendingJobDetails = sanitizeStringMap(pendingJobDetails);
     failedUnits = Math.max(failedUnits, 0);
+    failedUnitDetails = sanitizeStringMap(failedUnitDetails);
     connectionContext = sanitizeStringMap(connectionContext);
     summary = normalizeString(summary, "n/a");
     pendingDependencies = sanitizeStringMap(pendingDependencies);
@@ -41,7 +45,9 @@ public record SystemdStatusSnapshot(
     private boolean mandatoryTargetHealthy;
     private int pendingJobs;
     private Map<String, Integer> jobsByState = Map.of();
+    private Map<String, String> pendingJobDetails = Map.of();
     private int failedUnits;
+    private Map<String, String> failedUnitDetails = Map.of();
     private boolean runtimePrecheckReady;
     private Map<String, String> connectionContext = Map.of();
     private String summary = "n/a";
@@ -79,8 +85,18 @@ public record SystemdStatusSnapshot(
       return this;
     }
 
+    public Builder pendingJobDetails(Map<String, String> value) {
+      this.pendingJobDetails = value;
+      return this;
+    }
+
     public Builder failedUnits(int value) {
       this.failedUnits = value;
+      return this;
+    }
+
+    public Builder failedUnitDetails(Map<String, String> value) {
+      this.failedUnitDetails = value;
       return this;
     }
 
@@ -112,7 +128,9 @@ public record SystemdStatusSnapshot(
           mandatoryTargetHealthy,
           pendingJobs,
           jobsByState,
+          pendingJobDetails,
           failedUnits,
+          failedUnitDetails,
           runtimePrecheckReady,
           connectionContext,
           summary,
@@ -128,7 +146,9 @@ public record SystemdStatusSnapshot(
     payload.put("mandatoryTargetHealthy", mandatoryTargetHealthy);
     payload.put("pendingJobs", pendingJobs);
     payload.put("jobsByState", jobsByState);
+    payload.put("pendingJobDetails", pendingJobDetails);
     payload.put("failedUnits", failedUnits);
+    payload.put("failedUnitDetails", failedUnitDetails);
     payload.put("runtimePrecheckReady", runtimePrecheckReady);
     payload.put("connectionContext", connectionContext);
     payload.put("summary", summary);

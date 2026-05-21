@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
@@ -257,58 +258,78 @@ public final class ClusterBootstrapReadinessVerifier {
 
     for (ControllerRef controllerRef : requiredControllers) {
       final String resourceRef = controllerRef.kind() + "/" + controllerRef.name();
-      logInfo("waiting for controller create: " + controllerRef.ref());
-      final CommandResult createdResult =
-          runCommand(
-              List.of(
-                  "kubectl",
-                  "--kubeconfig",
-                  kubeconfigPath.toString(),
-                  "--insecure-skip-tls-verify=true",
-                  "-n",
-                  controllerRef.namespace(),
-                  "wait",
-                  "--for=create",
-                  resourceRef,
-                  "--timeout=" + CONTROLLER_WAIT_TIMEOUT.toSeconds() + "s"),
-              CONTROLLER_WAIT_TIMEOUT.plusSeconds(5));
-      if (createdResult.exitCode() != 0) {
-        logInfo("controller create wait failed: " + controllerRef.ref());
-        return new ControllerVerification(
-            false,
-            "failed waiting for resource create "
-                + controllerRef.ref()
-                + " ("
-                + createdResult.summary()
-                + ")",
-            requiredControllerRefs(policy));
+      final boolean kdnsSuspendActive =
+          isKdnsControllerRef(controllerRef) && policy.debug().kdnsSuspend();
+      final ShimDebugSuspendMonitor shimMonitor =
+          kdnsSuspendActive ? ShimDebugSuspendMonitor.start(kubeconfigPath) : null;
+
+      final ControllerVerification failure;
+      try {
+        logInfo("waiting for controller create: " + controllerRef.ref());
+        final CommandResult createdResult =
+            runCommand(
+                List.of(
+                    "kubectl",
+                    "--kubeconfig",
+                    kubeconfigPath.toString(),
+                    "--insecure-skip-tls-verify=true",
+                    "-n",
+                    controllerRef.namespace(),
+                    "wait",
+                    "--for=create",
+                    resourceRef,
+                    "--timeout=" + CONTROLLER_WAIT_TIMEOUT.toSeconds() + "s"),
+                CONTROLLER_WAIT_TIMEOUT.plusSeconds(5));
+        if (createdResult.exitCode() != 0) {
+          logInfo("controller create wait failed: " + controllerRef.ref());
+          failure =
+              new ControllerVerification(
+                  false,
+                  "failed waiting for resource create "
+                      + controllerRef.ref()
+                      + " ("
+                      + createdResult.summary()
+                      + ")",
+                  requiredControllerRefs(policy));
+        } else {
+          logInfo("waiting for controller rollout: " + controllerRef.ref());
+          final CommandResult rolloutResult =
+              runCommand(
+                  List.of(
+                      "kubectl",
+                      "--kubeconfig",
+                      kubeconfigPath.toString(),
+                      "--insecure-skip-tls-verify=true",
+                      "-n",
+                      controllerRef.namespace(),
+                      "rollout",
+                      "status",
+                      resourceRef,
+                      "--timeout=" + CONTROLLER_WAIT_TIMEOUT.toSeconds() + "s"),
+                  CONTROLLER_WAIT_TIMEOUT.plusSeconds(5));
+          if (rolloutResult.exitCode() != 0) {
+            logInfo("controller rollout wait failed: " + controllerRef.ref());
+            failure =
+                new ControllerVerification(
+                    false,
+                    "failed rollout status for "
+                        + controllerRef.ref()
+                        + " ("
+                        + rolloutResult.summary()
+                        + ")",
+                    requiredControllerRefs(policy));
+          } else {
+            failure = null;
+          }
+        }
+      } finally {
+        if (shimMonitor != null) {
+          shimMonitor.stop();
+        }
       }
 
-      logInfo("waiting for controller rollout: " + controllerRef.ref());
-      final CommandResult rolloutResult =
-          runCommand(
-              List.of(
-                  "kubectl",
-                  "--kubeconfig",
-                  kubeconfigPath.toString(),
-                  "--insecure-skip-tls-verify=true",
-                  "-n",
-                  controllerRef.namespace(),
-                  "rollout",
-                  "status",
-                  resourceRef,
-                  "--timeout=" + CONTROLLER_WAIT_TIMEOUT.toSeconds() + "s"),
-              CONTROLLER_WAIT_TIMEOUT.plusSeconds(5));
-      if (rolloutResult.exitCode() != 0) {
-        logInfo("controller rollout wait failed: " + controllerRef.ref());
-        return new ControllerVerification(
-            false,
-            "failed rollout status for "
-                + controllerRef.ref()
-                + " ("
-                + rolloutResult.summary()
-                + ")",
-            requiredControllerRefs(policy));
+      if (failure != null) {
+        return failure;
       }
 
       logInfo("controller ready: " + controllerRef.ref());
@@ -348,6 +369,12 @@ public final class ClusterBootstrapReadinessVerifier {
 
   private static void logInfo(String message) {
     ACTIVE_LOGGER.get().accept(message);
+  }
+
+  private static boolean isKdnsControllerRef(ControllerRef ref) {
+    return "deployment".equals(ref.kind())
+        && "kdns".equals(ref.name())
+        && "rke2lab-system".equals(ref.namespace());
   }
 
   private static List<ControllerRef> requiredControllers(ControlplanePolicy policy) {
@@ -504,6 +531,94 @@ public final class ClusterBootstrapReadinessVerifier {
 
   private record ControllerVerification(
       boolean ready, String detail, List<String> requiredControllerRefs) {}
+
+  /**
+   * Background poller that surfaces "shim wrapper parked at debug-suspend gate" hints in the Pulumi
+   * log while the kdns rollout is being awaited. Intended to be used as a try/finally sentinel
+   * around a single long-running {@code kubectl wait}/{@code kubectl rollout status} call.
+   */
+  private static final class ShimDebugSuspendMonitor {
+
+    private static final Duration POLL_INTERVAL = Duration.ofSeconds(15);
+
+    private final Thread thread;
+    private final java.util.concurrent.atomic.AtomicBoolean stopped =
+        new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    private ShimDebugSuspendMonitor(Thread thread) {
+      this.thread = thread;
+    }
+
+    static ShimDebugSuspendMonitor start(Path kubeconfigPath) {
+      final Map<String, Long> reportedAt = new ConcurrentHashMap<>();
+      final Thread t =
+          new Thread(
+              () -> {
+                while (!Thread.currentThread().isInterrupted()) {
+                  try {
+                    final List<ShimDebugSuspendProbe.SuspendedShim> suspended =
+                        ShimDebugSuspendProbe.probe(kubeconfigPath);
+                    final long now = System.nanoTime();
+                    for (ShimDebugSuspendProbe.SuspendedShim shim : suspended) {
+                      final String key = shim.namespace() + "/" + shim.podName();
+                      reportedAt.computeIfAbsent(
+                          key,
+                          k -> {
+                            logInfo(
+                                "kdns sandbox creation paused — wrapper waiting for operator"
+                                    + " attach (pod="
+                                    + shim.podName()
+                                    + " namespace="
+                                    + shim.namespace()
+                                    + ") — operator action: ssh root@<master>"
+                                    + " 'rke2lab-shim-dlv list && rke2lab-shim-dlv attach"
+                                    + " <namespace> <id>'; in VS Code launch \"Attach to Shim"
+                                    + " Wrapper Delve (remote)\" host=<master>; finally"
+                                    + " 'rke2lab-shim-dlv resume <namespace> <id>'");
+                            return now;
+                          });
+                    }
+                    // Drop entries for pods that left the suspended set (released or replaced).
+                    reportedAt
+                        .keySet()
+                        .removeIf(
+                            key ->
+                                suspended.stream()
+                                    .noneMatch(
+                                        s -> (s.namespace() + "/" + s.podName()).equals(key)));
+                    Thread.sleep(POLL_INTERVAL.toMillis());
+                  } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    return;
+                  } catch (RuntimeException ex) {
+                    // Probe is best-effort; never let it kill the wait.
+                    try {
+                      Thread.sleep(POLL_INTERVAL.toMillis());
+                    } catch (InterruptedException ie) {
+                      Thread.currentThread().interrupt();
+                      return;
+                    }
+                  }
+                }
+              },
+              "rke2lab-shim-debug-suspend-monitor");
+      t.setDaemon(true);
+      t.start();
+      return new ShimDebugSuspendMonitor(t);
+    }
+
+    void stop() {
+      if (stopped.getAndSet(true)) {
+        return;
+      }
+      thread.interrupt();
+      try {
+        thread.join(Duration.ofSeconds(2).toMillis());
+      } catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
 
   private record CommandResult(int exitCode, String stdout, String stderr) {
     private String summary() {

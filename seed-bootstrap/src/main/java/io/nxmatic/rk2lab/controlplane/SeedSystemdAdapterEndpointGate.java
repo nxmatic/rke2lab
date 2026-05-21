@@ -128,9 +128,9 @@ public final class SeedSystemdAdapterEndpointGate {
   }
 
   /**
-   * Compute adaptive retry interval based on bootstrap phase.
-   * Early boot (image building, first boot): slower checks to reduce CPU load.
-   * Later phases (service convergence): faster checks for responsiveness.
+   * Compute adaptive retry interval based on bootstrap phase. Early boot (image building, first
+   * boot): slower checks to reduce CPU load. Later phases (service convergence): faster checks for
+   * responsiveness.
    */
   private static Duration computeRuntimeProbeRetryInterval(long elapsedSeconds) {
     if (elapsedSeconds < PHASE_EARLY_CUTOFF_SECONDS) {

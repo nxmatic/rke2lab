@@ -1,55 +1,44 @@
 package io.nxmatic.rk2lab.systemdadapter.service;
 
+import de.thjom.java.systemd.Manager;
+import de.thjom.java.systemd.Systemd;
+import de.thjom.java.systemd.Target;
 import io.nxmatic.rk2lab.systemdadapter.SystemdAdapterProperties;
 import io.nxmatic.rk2lab.systemdcontract.api.SystemdStatusSnapshot;
-import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import org.freedesktop.dbus.connections.impl.DBusConnection;
-import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder;
 import org.freedesktop.dbus.exceptions.DBusException;
-import org.freedesktop.dbus.interfaces.Properties;
 import org.springframework.stereotype.Component;
 
 @Component
 public class DbusSystemdStatusSnapshotProvider implements SystemdStatusSnapshotProvider {
 
-  private static final String SYSTEMD_DESTINATION = "org.freedesktop.systemd1";
-  private static final String SYSTEMD_MANAGER_PATH = "/org/freedesktop/systemd1";
-  private static final String SYSTEMD_MANAGER_INTERFACE = "org.freedesktop.systemd1.Manager";
-  private static final String SYSTEMD_UNIT_INTERFACE = "org.freedesktop.systemd1.Unit";
   private static final String DEFAULT_SYSTEM_BUS_ADDRESS =
       "unix:path=/var/run/dbus/system_bus_socket";
 
   private final SystemdAdapterProperties properties;
+  private final Systemd systemd;
 
-  public DbusSystemdStatusSnapshotProvider(SystemdAdapterProperties properties) {
+  public DbusSystemdStatusSnapshotProvider(SystemdAdapterProperties properties, Systemd systemd) {
     this.properties = properties;
+    this.systemd = systemd;
   }
 
   @Override
   public SystemdStatusSnapshot currentSnapshot() {
     final String mandatoryTarget = properties.mandatoryTarget();
-    final String mandatoryTargetPath = unitObjectPath(mandatoryTarget);
 
-    try (DBusConnection connection = DBusConnectionBuilder.forSystemBus().build()) {
-      final Properties targetProps =
-          connection.getRemoteObject(SYSTEMD_DESTINATION, mandatoryTargetPath, Properties.class);
-      final Properties managerProps =
-          connection.getRemoteObject(SYSTEMD_DESTINATION, SYSTEMD_MANAGER_PATH, Properties.class);
+    try {
+      final Manager manager = systemd.getManager();
+      final Target target = manager.getTarget(mandatoryTarget);
 
-      final String targetState =
-          normalizeState(String.valueOf(targetProps.Get(SYSTEMD_UNIT_INTERFACE, "ActiveState")));
+      final String targetState = normalizeState(target.getActiveState());
       final boolean mandatoryHealthy = "active".equals(targetState);
 
-      final int pendingJobs =
-          parseNonNegativeInt(managerProps.Get(SYSTEMD_MANAGER_INTERFACE, "NJobs"), "NJobs");
-      final int failedUnits =
-          parseNonNegativeInt(
-              managerProps.Get(SYSTEMD_MANAGER_INTERFACE, "NFailedUnits"), "NFailedUnits");
+      final int pendingJobs = clampToNonNegativeInt(manager.getNJobs());
+      final int failedUnits = clampToNonNegativeInt(manager.getNFailedUnits());
 
       final Map<String, Integer> jobsByState = new LinkedHashMap<>();
       if (pendingJobs > 0) {
@@ -77,7 +66,7 @@ public class DbusSystemdStatusSnapshotProvider implements SystemdStatusSnapshotP
               + incusInstance
               + ", systemBusAddress="
               + systemBusAddress
-              + ", source=dbus-java";
+              + ", source=java-systemd";
 
       return new SystemdStatusSnapshot(
           java.time.Instant.now().toString(),
@@ -86,52 +75,23 @@ public class DbusSystemdStatusSnapshotProvider implements SystemdStatusSnapshotP
           mandatoryHealthy,
           pendingJobs,
           jobsByState,
+          Map.of(), // pendingJobDetails
           failedUnits,
+          Map.of(), // failedUnitDetails
           runtimeReady,
           connectionContext,
           summary,
           Map.of());
-    } catch (DBusException | IOException ex) {
+    } catch (DBusException ex) {
       throw new IllegalStateException("Failed to query systemd state over D-Bus", ex);
     }
   }
 
-  private int parseNonNegativeInt(Object value, String fieldName) {
-    if (value instanceof Number number) {
-      return Math.max(number.intValue(), 0);
+  private int clampToNonNegativeInt(long value) {
+    if (value <= 0L) {
+      return 0;
     }
-    if (value != null) {
-      final String raw = value.toString().trim();
-      try {
-        return Math.max(Integer.parseInt(raw), 0);
-      } catch (NumberFormatException ex) {
-        throw new IllegalStateException(
-            "Invalid integer returned for " + fieldName + ": '" + raw + "'", ex);
-      }
-    }
-    throw new IllegalStateException("Missing integer value for " + fieldName);
-  }
-
-  private String unitObjectPath(String unitName) {
-    return SYSTEMD_MANAGER_PATH + "/unit/" + escapeUnitName(unitName);
-  }
-
-  private String escapeUnitName(String value) {
-    final byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-    final StringBuilder builder = new StringBuilder(bytes.length * 3);
-    for (byte current : bytes) {
-      final int unsigned = current & 0xFF;
-      if ((unsigned >= 'A' && unsigned <= 'Z')
-          || (unsigned >= 'a' && unsigned <= 'z')
-          || (unsigned >= '0' && unsigned <= '9')) {
-        builder.append((char) unsigned);
-      } else {
-        builder.append('_');
-        builder.append(Character.forDigit((unsigned >> 4) & 0xF, 16));
-        builder.append(Character.forDigit(unsigned & 0xF, 16));
-      }
-    }
-    return builder.toString();
+    return (int) Math.min(value, Integer.MAX_VALUE);
   }
 
   private String normalizeState(String value) {

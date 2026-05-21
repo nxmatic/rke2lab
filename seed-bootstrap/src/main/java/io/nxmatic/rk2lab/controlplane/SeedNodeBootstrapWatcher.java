@@ -1,7 +1,17 @@
 package io.nxmatic.rk2lab.controlplane;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -22,7 +32,9 @@ public final class SeedNodeBootstrapWatcher {
       Duration progressLogInterval,
       Consumer<String> logger) {
     final Consumer<String> effectiveLogger = logger == null ? message -> {} : logger;
-    effectiveLogger.accept("waiting for seed node systemd adapter runtime status...");
+    final Path snapshotPath = resolveSnapshotPath(config);
+    effectiveLogger.accept(
+        "waiting for seed node systemd adapter runtime status (snapshot=" + snapshotPath + ")...");
 
     final long startedAt = System.nanoTime();
     long nextProgressLogAt = startedAt + progressLogInterval.toNanos();
@@ -42,7 +54,6 @@ public final class SeedNodeBootstrapWatcher {
           stringValue(statusSnapshot.getOrDefault("mandatoryTargetState", "unknown"));
       final String adapterSummary = stringValue(statusSnapshot.getOrDefault("summary", "n/a"));
       final String hostContext = describeHostContext(statusSnapshot);
-      final String pendingDependencies = describePendingDependencies(statusSnapshot);
 
       if ("ok".equalsIgnoreCase(probeStatus) && runtimeReady) {
         effectiveLogger.accept(
@@ -51,31 +62,34 @@ public final class SeedNodeBootstrapWatcher {
       }
 
       lastSummary =
-          "status="
-              + probeStatus
-              + ", mandatoryTarget="
-              + mandatoryTarget
-              + "="
-              + mandatoryTargetState
-              + ", pendingJobs="
-              + pendingJobCount
-              + ", failedUnits="
-              + failedUnitCount
-              + ", hostContext="
-              + hostContext
-              + ", pendingDependencies="
-              + pendingDependencies
-              + ", summary="
-              + adapterSummary;
+          renderYamlSummary(
+              probeStatus,
+              mandatoryTarget,
+              mandatoryTargetState,
+              pendingJobCount,
+              failedUnitCount,
+              hostContext,
+              statusSnapshot,
+              adapterSummary);
+      writeSnapshot(snapshotPath, lastSummary, effectiveLogger);
 
       final long now = System.nanoTime();
       if (now >= nextProgressLogAt) {
         effectiveLogger.accept(
-            "still waiting for seed node bootstrap preconditions after "
+            "still waiting after "
                 + elapsedSince(startedAt)
-                + " ("
-                + lastSummary
-                + ")");
+                + ": status="
+                + probeStatus
+                + " target="
+                + mandatoryTarget
+                + "("
+                + mandatoryTargetState
+                + ") pendingJobs="
+                + pendingJobCount
+                + " failedUnits="
+                + failedUnitCount
+                + " snapshot="
+                + snapshotPath);
         nextProgressLogAt = now + progressLogInterval.toNanos();
       }
 
@@ -85,10 +99,91 @@ public final class SeedNodeBootstrapWatcher {
     effectiveLogger.accept(
         "seed node bootstrap precondition wait timed out after "
             + timeout
-            + " (last result: "
-            + lastSummary
-            + ")");
+            + "; last snapshot: "
+            + snapshotPath);
     return false;
+  }
+
+  private static Path resolveSnapshotPath(BootstrapConfig config) {
+    final Path worktreeRoot =
+        Paths.get(System.getProperty("user.dir", ".")).toAbsolutePath().normalize();
+    final String nodeName = config == null ? "seed" : nullSafe(config.nodeName(), "seed");
+    return worktreeRoot
+        .resolve(".local.d")
+        .resolve("var")
+        .resolve("run")
+        .resolve("readiness-" + nodeName + ".yaml");
+  }
+
+  private static void writeSnapshot(Path target, String yaml, Consumer<String> logger) {
+    try {
+      Files.createDirectories(target.getParent());
+      Files.writeString(target, yaml + System.lineSeparator(), StandardCharsets.UTF_8);
+    } catch (IOException ex) {
+      logger.accept("failed to write readiness snapshot to " + target + ": " + ex.getMessage());
+    }
+  }
+
+  private static String nullSafe(String value, String fallback) {
+    if (value == null) {
+      return fallback;
+    }
+    final String trimmed = value.trim();
+    return trimmed.isEmpty() ? fallback : trimmed;
+  }
+
+  private static final ObjectMapper YAML_MAPPER =
+      new ObjectMapper(
+          new YAMLFactory()
+              .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+              .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+              .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR));
+
+  private static String renderYamlSummary(
+      String probeStatus,
+      String mandatoryTarget,
+      String mandatoryTargetState,
+      int pendingJobCount,
+      int failedUnitCount,
+      String hostContext,
+      Map<String, Object> statusSnapshot,
+      String adapterSummary) {
+    final Map<String, Object> root = new LinkedHashMap<>();
+    root.put("status", probeStatus);
+    final Map<String, Object> target = new LinkedHashMap<>();
+    target.put("unit", mandatoryTarget);
+    target.put("state", mandatoryTargetState);
+    root.put("mandatoryTarget", target);
+    root.put("pendingJobs", pendingJobCount);
+
+    final Object pendingJobsDetail = statusSnapshot.get("pendingJobDetails");
+    if (pendingJobsDetail instanceof Map<?, ?> pendingJobsMap && !pendingJobsMap.isEmpty()) {
+      root.put("pendingJobDetails", pendingJobsMap);
+    }
+
+    root.put("failedUnits", failedUnitCount);
+
+    final Object failedUnitsDetail = statusSnapshot.get("failedUnitDetails");
+    if (failedUnitsDetail instanceof Map<?, ?> failedMap && !failedMap.isEmpty()) {
+      root.put("failedUnitDetails", failedMap);
+    }
+
+    root.put("hostContext", hostContext);
+
+    final Object rawPending = statusSnapshot.get("pendingDependencies");
+    if (rawPending instanceof Map<?, ?> pendingMap && !pendingMap.isEmpty()) {
+      root.put("pendingDependencies", pendingMap);
+    } else {
+      root.put("pendingDependencies", "none");
+    }
+
+    root.put("summary", adapterSummary);
+
+    try {
+      return YAML_MAPPER.writeValueAsString(root).stripTrailing();
+    } catch (JsonProcessingException ex) {
+      return root.toString();
+    }
   }
 
   private static boolean toBoolean(Object value) {
@@ -134,25 +229,6 @@ public final class SeedNodeBootstrapWatcher {
         + mapStringValue(connectionContext, "incusInstance")
         + ",adapterHost="
         + mapStringValue(connectionContext, "adapterHost");
-  }
-
-  private static String describePendingDependencies(Map<String, Object> statusSnapshot) {
-    final Object raw = statusSnapshot.get("pendingDependencies");
-    if (!(raw instanceof Map<?, ?> map) || map.isEmpty()) {
-      return "none";
-    }
-
-    final StringBuilder builder = new StringBuilder("[");
-    boolean first = true;
-    for (Map.Entry<?, ?> entry : map.entrySet()) {
-      if (!first) {
-        builder.append(',');
-      }
-      first = false;
-      builder.append(entry.getKey()).append('=').append(entry.getValue());
-    }
-    builder.append(']');
-    return builder.toString();
   }
 
   private static String configFallbackString(Map<String, Object> statusSnapshot, String key) {

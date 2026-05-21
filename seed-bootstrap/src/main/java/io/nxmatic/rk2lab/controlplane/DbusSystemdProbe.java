@@ -1,21 +1,25 @@
 package io.nxmatic.rk2lab.controlplane;
 
+import de.thjom.java.systemd.Manager;
+import de.thjom.java.systemd.Service;
+import de.thjom.java.systemd.Systemd;
+import de.thjom.java.systemd.Target;
+import de.thjom.java.systemd.types.UnitType;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.systemdcontract.api.SystemdStatusSnapshot;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.freedesktop.dbus.annotations.DBusInterfaceName;
 import org.freedesktop.dbus.connections.impl.DBusConnection;
 import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder;
 import org.freedesktop.dbus.connections.transports.TransportBuilder.SaslAuthMode;
 import org.freedesktop.dbus.exceptions.DBusException;
-import org.freedesktop.dbus.interfaces.Properties;
+import org.freedesktop.dbus.interfaces.DBusInterface;
+import org.freedesktop.dbus.types.UInt32;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,14 +28,18 @@ public final class DbusSystemdProbe {
 
   private static final Logger LOG = LoggerFactory.getLogger(DbusSystemdProbe.class);
 
-  private static final String SYSTEMD_DESTINATION = "org.freedesktop.systemd1";
-  private static final String SYSTEMD_MANAGER_PATH = "/org/freedesktop/systemd1";
-  private static final String SYSTEMD_MANAGER_INTERFACE = "org.freedesktop.systemd1.Manager";
-  private static final String SYSTEMD_UNIT_INTERFACE = "org.freedesktop.systemd1.Unit";
-  private static final String SYSTEMD_SERVICE_INTERFACE = "org.freedesktop.systemd1.Service";
-
   private static final String MANDATORY_TARGET_UNIT = "rke2lab.target";
   private static final String CLOUD_INIT_MAIN_UNIT = "cloud-init-main.service";
+
+  private static final String SYSTEMD_DESTINATION = "org.freedesktop.systemd1";
+  private static final String SYSTEMD_MANAGER_PATH = "/org/freedesktop/systemd1";
+
+  /** Minimal binding for {@code Manager.ListJobs} (returns 6-tuples u s s s o o). */
+  @DBusInterfaceName("org.freedesktop.systemd1.Manager")
+  @SuppressWarnings("checkstyle:methodname")
+  private interface JobLister extends DBusInterface {
+    List<Object[]> ListJobs();
+  }
 
   private DbusSystemdProbe() {}
 
@@ -51,27 +59,26 @@ public final class DbusSystemdProbe {
             .back()
             .build()) {
 
-      final Properties managerProps =
-          connection.getRemoteObject(SYSTEMD_DESTINATION, SYSTEMD_MANAGER_PATH, Properties.class);
+      final Systemd systemd = Systemd.fromConnection(connection);
+      final Manager manager = systemd.getManager();
 
-      final Properties targetProps = unitProperties(connection, MANDATORY_TARGET_UNIT);
-      final Properties cloudInitProps = unitProperties(connection, CLOUD_INIT_MAIN_UNIT);
+      final Target target = manager.getTarget(MANDATORY_TARGET_UNIT);
+      final Service cloudInit = manager.getService(CLOUD_INIT_MAIN_UNIT);
 
-      final String targetState = stringProp(targetProps, SYSTEMD_UNIT_INTERFACE, "ActiveState");
+      final String targetState = nullSafeState(target.getActiveState());
       final boolean targetHealthy = "active".equals(targetState);
-      final int pendingJobs = intProp(managerProps, SYSTEMD_MANAGER_INTERFACE, "NJobs");
-      final int failedUnits = intProp(managerProps, SYSTEMD_MANAGER_INTERFACE, "NFailedUnits");
-      final String cloudInitState =
-          stringProp(cloudInitProps, SYSTEMD_UNIT_INTERFACE, "ActiveState");
-      final String cloudInitResult =
-          stringProp(cloudInitProps, SYSTEMD_SERVICE_INTERFACE, "Result");
+      final int pendingJobs = clampNonNegative(manager.getNJobs());
+      final int failedUnits = clampNonNegative(manager.getNFailedUnits());
+      final String cloudInitState = nullSafeState(cloudInit.getActiveState());
+      final String cloudInitResult = nullSafeState(cloudInit.getResult());
       final boolean cloudInitHealthy =
           "success".equals(cloudInitResult)
               && ("active".equals(cloudInitState) || "inactive".equals(cloudInitState));
       final boolean runtimePrecheckReady = targetHealthy && pendingJobs == 0 && failedUnits == 0;
 
-      final Map<String, String> pendingDependencies =
-          collectPendingDependencies(connection, targetProps);
+      final Map<String, String> pendingDependencies = collectPendingDependencies(manager, target);
+      final Map<String, String> failedUnitDetails = collectFailedUnitDetails(manager);
+      final Map<String, String> pendingJobDetails = collectPendingJobs(connection);
 
       final String summary =
           "mandatoryTarget="
@@ -90,7 +97,7 @@ public final class DbusSystemdProbe {
               + cloudInitResult
               + ",healthy="
               + cloudInitHealthy
-              + "), source=systemd-dbus-probe";
+              + "), source=java-systemd";
 
       final Map<String, String> connectionContext =
           Map.of(
@@ -106,7 +113,9 @@ public final class DbusSystemdProbe {
           .mandatoryTargetState(targetState)
           .mandatoryTargetHealthy(targetHealthy)
           .pendingJobs(pendingJobs)
+          .pendingJobDetails(pendingJobDetails)
           .failedUnits(failedUnits)
+          .failedUnitDetails(failedUnitDetails)
           .runtimePrecheckReady(runtimePrecheckReady)
           .connectionContext(connectionContext)
           .summary(summary)
@@ -118,18 +127,66 @@ public final class DbusSystemdProbe {
     }
   }
 
-  private static Map<String, String> collectPendingDependencies(
-      DBusConnection connection, Properties targetProps) {
+  private static Map<String, String> collectPendingJobs(DBusConnection connection) {
+    final LinkedHashMap<String, String> jobs = new LinkedHashMap<>();
+    try {
+      final JobLister lister =
+          connection.getRemoteObject(SYSTEMD_DESTINATION, SYSTEMD_MANAGER_PATH, JobLister.class);
+      final List<Object[]> rows = lister.ListJobs();
+      if (rows == null) {
+        return Map.of();
+      }
+      for (Object[] row : rows) {
+        if (row == null || row.length < 4) {
+          continue;
+        }
+        final long jobId = row[0] instanceof UInt32 u ? u.longValue() : 0L;
+        final String unitName = row[1] == null ? "" : row[1].toString();
+        if (unitName.isBlank()) {
+          continue;
+        }
+        final String jobType = row[2] == null ? "unknown" : row[2].toString();
+        final String jobState = row[3] == null ? "unknown" : row[3].toString();
+        jobs.put(unitName, jobType + "/" + jobState + "#" + jobId);
+      }
+    } catch (Exception ex) {
+      LOG.debug("ListJobs lookup failed: {}", ex.getMessage());
+    }
+    return Map.copyOf(jobs);
+  }
+
+  private static Map<String, String> collectFailedUnitDetails(Manager manager) {
+    final LinkedHashMap<String, String> details = new LinkedHashMap<>();
+    try {
+      for (UnitType unit : manager.listUnits()) {
+        if (unit == null) {
+          continue;
+        }
+        if (!"failed".equals(unit.getActiveState())) {
+          continue;
+        }
+        final String unitName = unit.getUnitName();
+        if (unitName == null || unitName.isBlank()) {
+          continue;
+        }
+        details.put(unitName, unit.getActiveState() + "/" + unit.getSubState());
+      }
+    } catch (Exception ex) {
+      LOG.debug("listUnits lookup failed: {}", ex.getMessage());
+    }
+    return Map.copyOf(details);
+  }
+
+  private static Map<String, String> collectPendingDependencies(Manager manager, Target target) {
     final Set<String> dependencies = new LinkedHashSet<>();
-    addDependencies(dependencies, targetProps, "Requires");
-    addDependencies(dependencies, targetProps, "Wants");
-    addDependencies(dependencies, targetProps, "BindsTo");
+    addAll(dependencies, target.getRequires());
+    addAll(dependencies, target.getWants());
+    addAll(dependencies, target.getBindsTo());
 
     final LinkedHashMap<String, String> pending = new LinkedHashMap<>();
     for (String unitName : dependencies) {
       try {
-        final Properties depProps = unitProperties(connection, unitName);
-        final String state = stringProp(depProps, SYSTEMD_UNIT_INTERFACE, "ActiveState");
+        final String state = nullSafeState(manager.getUnit(unitName).getActiveState());
         if (!"active".equals(state)) {
           pending.put(unitName, state);
         }
@@ -140,92 +197,29 @@ public final class DbusSystemdProbe {
     return Map.copyOf(pending);
   }
 
-  private static void addDependencies(Set<String> sink, Properties props, String name) {
-    try {
-      final Object value = props.Get(SYSTEMD_UNIT_INTERFACE, name);
-      for (String unit : toStringArray(value)) {
-        if (unit != null && !unit.isBlank()) {
-          sink.add(unit);
-        }
+  private static void addAll(Set<String> sink, List<String> values) {
+    if (values == null) {
+      return;
+    }
+    for (String value : values) {
+      if (value != null && !value.isBlank()) {
+        sink.add(value);
       }
-    } catch (Exception ignored) {
-      // Property may not exist or transient DBus issue; treat as empty.
     }
   }
 
-  private static String[] toStringArray(Object value) {
-    if (value == null) {
-      return new String[0];
-    }
-    if (value instanceof String[] arr) {
-      return arr;
-    }
-    if (value instanceof Collection<?> col) {
-      final List<String> out = new ArrayList<>(col.size());
-      for (Object item : col) {
-        if (item != null) {
-          out.add(item.toString());
-        }
-      }
-      return out.toArray(new String[0]);
-    }
-    if (value instanceof Object[] arr) {
-      final List<String> out = new ArrayList<>(arr.length);
-      for (Object item : arr) {
-        if (item != null) {
-          out.add(item.toString());
-        }
-      }
-      return out.toArray(new String[0]);
-    }
-    return new String[] {value.toString()};
-  }
-
-  private static Properties unitProperties(DBusConnection connection, String unitName)
-      throws DBusException {
-    final String path = SYSTEMD_MANAGER_PATH + "/unit/" + escapeUnitName(unitName);
-    return connection.getRemoteObject(SYSTEMD_DESTINATION, path, Properties.class);
-  }
-
-  private static String stringProp(Properties props, String iface, String name) {
-    final Object value = props.Get(iface, name);
-    return value == null ? "unknown" : value.toString();
-  }
-
-  private static int intProp(Properties props, String iface, String name) {
-    final Object value = props.Get(iface, name);
-    if (value instanceof Number numberValue) {
-      return Math.max(numberValue.intValue(), 0);
-    }
-    if (value == null) {
+  private static int clampNonNegative(long value) {
+    if (value <= 0L) {
       return 0;
     }
-    try {
-      return Math.max(Integer.parseInt(value.toString().trim()), 0);
-    } catch (NumberFormatException ignored) {
-      return 0;
-    }
+    return (int) Math.min(value, Integer.MAX_VALUE);
+  }
+
+  private static String nullSafeState(String value) {
+    return value == null || value.isBlank() ? "unknown" : value;
   }
 
   private static String nullSafe(String value) {
     return value == null || value.isBlank() ? "unknown" : value;
-  }
-
-  private static String escapeUnitName(String value) {
-    final byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-    final StringBuilder builder = new StringBuilder(bytes.length * 3);
-    for (byte current : bytes) {
-      final int unsigned = current & 0xFF;
-      if ((unsigned >= 'A' && unsigned <= 'Z')
-          || (unsigned >= 'a' && unsigned <= 'z')
-          || (unsigned >= '0' && unsigned <= '9')) {
-        builder.append((char) unsigned);
-      } else {
-        builder.append('_');
-        builder.append(Character.forDigit((unsigned >> 4) & 0xF, 16));
-        builder.append(Character.forDigit(unsigned & 0xF, 16));
-      }
-    }
-    return builder.toString();
   }
 }
