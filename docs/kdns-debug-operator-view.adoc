@@ -175,7 +175,7 @@ gets the same actionable hint on three surfaces:
 kdns sandbox creation paused — wrapper waiting for operator attach
 (pod=kdns-... namespace=rke2lab-system) — operator action: ssh root@<master>
 'rke2lab-shim-dlv auto-attach'; in VS Code launch "Attach to Shim Wrapper Delve
-(remote)" host=<master>; finally 'rke2lab-shim-dlv resume <namespace> <id>'
+(remote)" host=<master>; finally 'rke2lab-shim-dlv resume <id>'
 ----
 
 . *Master shell*: `rke2lab-shim-debug-notify.service` tails the
@@ -199,20 +199,23 @@ Operator loop:
   host = master VM IP. Set breakpoints in `wrapper-go` (e.g.
   `internal/wrapper/wrapper.go` near the `syscall.Exec` of the real shim).
 . Hit *Continue* in VS Code, then on master:
-  `rke2lab-shim-dlv resume <namespace> <id>` — touches the per-shim continue
+  `rke2lab-shim-dlv resume <id>` — touches the per-shim continue
   file. The wrapper exits the gate within 250 ms and `syscall.Exec`s the real
   shim. The breakpoint fires; stepping over the exec releases the wrapper into
   the real shim and `pulumi up` proceeds past the kdns gate.
 
 Advanced commands:
 
-* `rke2lab-shim-dlv list` — show all suspended containers with details (pid, age, namespace, id)
-* `rke2lab-shim-dlv attach <namespace> <id>` — attach to a specific container by namespace/id
+* `rke2lab-shim-dlv list` — show all suspended containers with details (pid, age, id)
+* `rke2lab-shim-dlv attach <id>` — attach to a specific container by id
 * `rke2lab-shim-dlv detach` — stop the Delve instance when done debugging
-* `rke2lab-shim-dlv resume <namespace> <id>` — resume a suspended wrapper without attaching debugger
+* `rke2lab-shim-dlv resume <id>` — resume a suspended wrapper without attaching debugger
+
+NOTE: All containers run in the `k8s.io` containerd namespace, so the namespace
+parameter has been removed from commands.
 
 To kick a stuck pod *without* attaching a debugger (e.g. operator was AFK), run
-`rke2lab-shim-dlv resume <namespace> <id>` directly — the wrapper exits the
+`rke2lab-shim-dlv resume <id>` directly — the wrapper exits the
 gate normally and the sandbox is created.
 
 Source path mapping is preconfigured from host runtime path:

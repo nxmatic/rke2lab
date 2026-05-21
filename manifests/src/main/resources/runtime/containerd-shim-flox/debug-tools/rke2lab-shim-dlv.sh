@@ -5,23 +5,25 @@ WRAPPER_BIN_NAME="containerd-shim-flox-delve-v2"
 CONTINUE_FILE_PREFIX="/tmp/containerd-shim-flox-v2-wrapper-continue"
 DLV_LISTEN="0.0.0.0:59333"
 RKE2LAB_DLV="${RKE2LAB_DLV:-/srv/host/rke2lab-share.d/rke2lab-dlv.sh}"
+K8S_NAMESPACE="k8s.io"
 
 usage() {
 	cat <<'EOF'
 Usage:
   rke2lab-shim-dlv list
   rke2lab-shim-dlv auto-attach
-  rke2lab-shim-dlv attach <namespace> <id>
-  rke2lab-shim-dlv resume <namespace> <id>
+  rke2lab-shim-dlv attach <container-id>
+  rke2lab-shim-dlv resume <container-id>
   rke2lab-shim-dlv detach
 
 Commands:
   list        Print one row per containerd-shim-flox wrapper currently parked at the
-              debug-suspend gate: pid, namespace, id, age, continue-file path.
+              debug-suspend gate: pid, id, age, continue-file path.
   auto-attach Automatically attach to suspended wrapper: if only one, attach immediately;
               if multiple, show interactive menu to select which one.
-  attach      Resolve the wrapper PID for <namespace>/<id> and start the singleton
+  attach      Resolve the wrapper PID for <container-id> and start the singleton
               headless Delve attached to it (paused, listen 0.0.0.0:59333).
+              Containers run in k8s.io namespace.
   resume      Touch the per-shim continue-file so the wrapper exits the gate and
               syscall.Exec()s the real shim.
   detach      Stop the singleton headless Delve.
@@ -103,6 +105,7 @@ collect_suspended_containers() {
 		# shellcheck disable=SC2086
 		id="$(extract_flag -id $cmdline || true)"
 		[[ -n "$ns" && -n "$id" ]] || continue
+		[[ "$ns" == "$K8S_NAMESPACE" ]] || continue
 		wait_file="$(continue_file_for "$ns" "$id")"
 		# Only include wrappers actively parked at the gate
 		if [[ ! -e "$wait_file" ]]; then
@@ -124,6 +127,7 @@ cmd_list() {
 		# shellcheck disable=SC2086
 		id="$(extract_flag -id $cmdline || true)"
 		[[ -n "$ns" && -n "$id" ]] || continue
+		[[ "$ns" == "$K8S_NAMESPACE" ]] || continue
 		wait_file="$(continue_file_for "$ns" "$id")"
 		# Show only wrappers actively parked at the gate (waiting for the file).
 		# Heuristic: wrapper exists but the continue-file does not yet exist —
@@ -132,8 +136,8 @@ cmd_list() {
 		if [[ ! -e "$wait_file" ]]; then
 			start_seconds="$(stat -c '%Y' "/proc/$pid" 2>/dev/null || echo "$now_seconds")"
 			age="$((now_seconds - start_seconds))s"
-			entries+="$(printf '  - pid: %s\n    namespace: %s\n    id: %s\n    age: %s\n    continueFile: %s\n' \
-				"$pid" "$ns" "$id" "$age" "$wait_file")"
+			entries+="$(printf '  - pid: %s\n    id: %s\n    age: %s\n    continueFile: %s\n' \
+				"$pid" "$id" "$age" "$wait_file")"
 			entries+=$'\n'
 		fi
 	done
@@ -160,7 +164,7 @@ cmd_auto_attach() {
 	if [[ "$count" -eq 1 ]]; then
 		# Only one container, auto-attach
 		IFS='|' read -r selected_ns selected_id <<<"${containers[0]}"
-		echo "Found 1 suspended container: $selected_ns/$selected_id"
+		echo "Found 1 suspended container: $selected_id"
 		echo "Auto-attaching..."
 	else
 		# Multiple containers, show menu
@@ -169,7 +173,7 @@ cmd_auto_attach() {
 		local i
 		for i in "${!containers[@]}"; do
 			IFS='|' read -r ns id <<<"${containers[$i]}"
-			echo "  $((i + 1)). $ns/$id"
+			echo "  $((i + 1)). $id"
 		done
 		echo
 		read -p "Select container (1-$count): " selection
@@ -182,29 +186,29 @@ cmd_auto_attach() {
 		IFS='|' read -r selected_ns selected_id <<<"${containers[$((selection - 1))]}"
 	fi
 
-	cmd_attach "$selected_ns" "$selected_id"
+	cmd_attach "$selected_id"
 }
 
 cmd_attach() {
-	local ns="$1" id="$2" pid wait_file
-	pid="$(resolve_pid "$ns" "$id" || true)"
+	local id="$1" pid wait_file
+	pid="$(resolve_pid "$K8S_NAMESPACE" "$id" || true)"
 	if [[ -z "$pid" ]]; then
-		echo "no containerd-shim-flox-delve-v2 wrapper found for namespace=$ns id=$id" >&2
+		echo "no containerd-shim-flox-delve-v2 wrapper found for id=$id" >&2
 		echo "hint: run 'rke2lab-shim-dlv list' to see currently suspended wrappers" >&2
 		exit 1
 	fi
-	wait_file="$(continue_file_for "$ns" "$id")"
+	wait_file="$(continue_file_for "$K8S_NAMESPACE" "$id")"
 	"$RKE2LAB_DLV" attach "$pid" "$DLV_LISTEN"
 	cat <<EOF
 
-Delve attached to $ns/$id (pid=$pid, listen=$DLV_LISTEN)
+Delve attached to $id (pid=$pid, listen=$DLV_LISTEN)
 
 Next steps:
   1. From your workstation: connect your debugger client to this VM's IP on port 59333
      (e.g., VS Code launch config "Attach to Shim Wrapper Delve (remote)")
   2. Set breakpoints in wrapper-go (e.g., internal/wrapper/wrapper.go)
   3. Hit Continue in your debugger, then run:
-       rke2lab-shim-dlv resume $ns $id
+       rke2lab-shim-dlv resume $id
      to release the wrapper from the suspend gate
 
 Tips:
@@ -215,8 +219,8 @@ EOF
 }
 
 cmd_resume() {
-	local ns="$1" id="$2" wait_file
-	wait_file="$(continue_file_for "$ns" "$id")"
+	local id="$1" wait_file
+	wait_file="$(continue_file_for "$K8S_NAMESPACE" "$id")"
 	mkdir -p "$(dirname "$wait_file")"
 	: >"$wait_file"
 	echo "resume requested: $wait_file"
@@ -236,18 +240,18 @@ main() {
 		cmd_auto_attach
 		;;
 	attach)
-		[[ $# -ge 3 ]] || {
+		[[ $# -ge 2 ]] || {
 			usage
 			exit 1
 		}
-		cmd_attach "$2" "$3"
+		cmd_attach "$2"
 		;;
 	resume)
-		[[ $# -ge 3 ]] || {
+		[[ $# -ge 2 ]] || {
 			usage
 			exit 1
 		}
-		cmd_resume "$2" "$3"
+		cmd_resume "$2"
 		;;
 	detach)
 		cmd_detach
