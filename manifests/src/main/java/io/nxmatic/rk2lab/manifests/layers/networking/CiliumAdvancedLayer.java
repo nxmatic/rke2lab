@@ -226,6 +226,12 @@ public final class CiliumAdvancedLayer extends Construct {
                                 "peerConfigRef",
                                 Map.of("name", "cilium-peer"))))),
                 "nodeSelector",
-                Map.of("matchLabels", Map.of("node-role.kubernetes.io/control-plane", "")))));
+                Map.of(
+                    "matchExpressions",
+                    List.of(
+                        Map.of(
+                            "key",
+                            "node-role.kubernetes.io/control-plane",
+                            "operator",
+                            "Exists"))))));
   }
-}
