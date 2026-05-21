@@ -19,7 +19,14 @@ public final class SeedSystemdAdapterEndpointGate {
   private static final String KIND = "SystemdAdapterEndpointGateStatus";
   private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(20);
   private static final Duration RUNTIME_PROBE_TOLERANCE = Duration.ofMinutes(4);
-  private static final Duration RUNTIME_PROBE_RETRY_INTERVAL = Duration.ofSeconds(2);
+  // Adaptive retry intervals based on bootstrap phase
+  private static final Duration RUNTIME_PROBE_RETRY_INTERVAL_EARLY = Duration.ofSeconds(15);
+  private static final Duration RUNTIME_PROBE_RETRY_INTERVAL_MID = Duration.ofSeconds(8);
+  private static final Duration RUNTIME_PROBE_RETRY_INTERVAL_LATE = Duration.ofSeconds(3);
+  private static final Duration RUNTIME_PROBE_RETRY_INTERVAL_FINAL = Duration.ofSeconds(2);
+  private static final long PHASE_EARLY_CUTOFF_SECONDS = 90; // Image building / first boot
+  private static final long PHASE_MID_CUTOFF_SECONDS = 150; // Systemd initialization
+  private static final long PHASE_LATE_CUTOFF_SECONDS = 210; // Service convergence
   private static final Duration PROGRESS_LOG_INTERVAL = Duration.ofSeconds(15);
   private static final Duration INSTANCE_READY_TOLERANCE = Duration.ofMinutes(4);
   private static final Duration INSTANCE_READY_RETRY_INTERVAL = Duration.ofSeconds(2);
@@ -98,7 +105,10 @@ public final class SeedSystemdAdapterEndpointGate {
         nextProgressLogAt = now + PROGRESS_LOG_INTERVAL.toNanos();
       }
 
-      sleep(RUNTIME_PROBE_RETRY_INTERVAL);
+      // Adaptive retry interval: slower during early boot, faster as we approach readiness
+      final long elapsedSeconds = Duration.ofNanos(now - startedAt).toSeconds();
+      final Duration retryInterval = computeRuntimeProbeRetryInterval(elapsedSeconds);
+      sleep(retryInterval);
     }
 
     final String lastSummary = String.valueOf(lastSnapshot.getOrDefault("summary", "unknown"));
@@ -115,6 +125,27 @@ public final class SeedSystemdAdapterEndpointGate {
             + ", summary="
             + lastSummary
             + ")");
+  }
+
+  /**
+   * Compute adaptive retry interval based on bootstrap phase.
+   * Early boot (image building, first boot): slower checks to reduce CPU load.
+   * Later phases (service convergence): faster checks for responsiveness.
+   */
+  private static Duration computeRuntimeProbeRetryInterval(long elapsedSeconds) {
+    if (elapsedSeconds < PHASE_EARLY_CUTOFF_SECONDS) {
+      // Phase 1: Image building / first boot - check every 15s
+      return RUNTIME_PROBE_RETRY_INTERVAL_EARLY;
+    } else if (elapsedSeconds < PHASE_MID_CUTOFF_SECONDS) {
+      // Phase 2: Systemd initialization - check every 8s
+      return RUNTIME_PROBE_RETRY_INTERVAL_MID;
+    } else if (elapsedSeconds < PHASE_LATE_CUTOFF_SECONDS) {
+      // Phase 3: Service convergence - check every 3s
+      return RUNTIME_PROBE_RETRY_INTERVAL_LATE;
+    } else {
+      // Phase 4: Final readiness - check every 2s
+      return RUNTIME_PROBE_RETRY_INTERVAL_FINAL;
+    }
   }
 
   private static void sleep(Duration duration) {

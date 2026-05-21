@@ -299,6 +299,8 @@ actions:
       systemctl mask systemd-rfkill.service
       systemctl mask wpa_supplicant.service
       systemctl mask zfs-mount.service
+      systemctl mask systemd-hostnamed.service
+      systemctl mask systemd-hostnamed.socket
 
 files:
   # Cloud init nocloud datasource configuration
