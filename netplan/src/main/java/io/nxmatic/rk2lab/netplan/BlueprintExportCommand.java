@@ -38,7 +38,7 @@ import java.util.Map;
  *     wan: "52:54:00:02:00:02"
  * </pre>
  */
-public class BlueprintExporter {
+public class BlueprintExportCommand implements NetplanCli.Command {
 
   // Metadata record for export
   record NetworkBlueprintMetadata(
@@ -60,7 +60,8 @@ public class BlueprintExporter {
 
   record WanLease(String mac, String dhcpRange) {}
 
-  public static void main(String[] args) throws Exception {
+  @Override
+  public void execute(String[] args) throws Exception {
     // Cluster ID mappings (nikopol was renamed from alcide, keeping cluster ID 1)
     Map<String, Integer> clusters = new LinkedHashMap<>();
     clusters.put("bioskop", 0);

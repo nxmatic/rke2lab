@@ -8,13 +8,12 @@ import java.util.ServiceLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public final class Main {
+public final class SynthesisCommand implements NetplanCli.Command {
 
-  private static final Logger LOG = LoggerFactory.getLogger(Main.class);
+  private static final Logger LOG = LoggerFactory.getLogger(SynthesisCommand.class);
 
-  private Main() {}
-
-  public static void main(String[] args) {
+  @Override
+  public void execute(String[] args) {
     final NetplanSynthesisService service = loadService();
     final NetplanSynthesisRequest request = NetplanSynthesisRequest.fromSystemProperties();
     final NetplanSynthesisResult result = service.synthesize(request);

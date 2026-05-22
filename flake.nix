@@ -50,10 +50,8 @@
           dontUnpack = true;
 
           buildPhase = ''
-            # The shaded JAR has BlueprintExporter as an alternative entry point
-            # Use -cp to specify the JAR and the main class explicitly
-            java -cp ${netplanJar}/share/java/rke2lab-netplan.jar \
-              io.nxmatic.rk2lab.netplan.BlueprintExporter > blueprint.yaml
+            # NetplanCli dispatcher routes to yamlExport command
+            java -jar ${netplanJar}/share/java/rke2lab-netplan.jar yamlExport > blueprint.yaml
           '';
 
           installPhase = ''
