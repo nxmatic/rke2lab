@@ -44,10 +44,10 @@ public class BlueprintExporter {
     Map<String, Object> blueprint = new LinkedHashMap<>();
 
     // Cluster ID mappings
+    // Note: nikopol was renamed from alcide, keeping cluster ID 1
     Map<String, Integer> clusters = new LinkedHashMap<>();
     clusters.put("bioskop", 0);
-    clusters.put("alcide", 1);
-    clusters.put("nikopol", 2);
+    clusters.put("nikopol", 1);
     blueprint.put("clusters", clusters);
 
     // Node ID mappings
