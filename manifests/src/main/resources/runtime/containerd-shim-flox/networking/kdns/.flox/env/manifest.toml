@@ -32,9 +32,8 @@ outputs = "all"
 outputs = "all"
   
   [install.kdns]
-    store-path = "/nix/store/kpj4iwpz5v3s7b9ln1q532syjj294ib9-kdns-0.2.15"
-
-
+    # flake = "git+https://github.com/nxmatic/rke2lab?dir=manifests/src/main/resources/runtime/containerd-shim-flox/networking/kdns#kdns-debug"
+    store-path = "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15"
 
 ## Environment Variables ---------------------------------------------
 ##  ... available for use in the activated environment
