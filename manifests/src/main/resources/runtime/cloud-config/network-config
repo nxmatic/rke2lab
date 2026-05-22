@@ -23,6 +23,10 @@ network:
       accept-ra: false # Disable IPv6 Router Advertisements
       ipv6-privacy: false # Disable IPv6 privacy extensions
       link-local: [] # Disable link-local addressing
+      # DNS configuration for LAN
+      nameservers:
+        search: [lan]
+        addresses: [192.168.1.254]
       # Interface Options
       optional: false
     # ===== VMNET INTERFACE (DHCP from Incus bridge) =====
