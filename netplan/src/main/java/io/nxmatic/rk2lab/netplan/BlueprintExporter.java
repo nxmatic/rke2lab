@@ -46,9 +46,19 @@ public class BlueprintExporter {
       Map<String, Integer> nodes,
       Map<String, String> macPatterns,
       Map<String, Integer> nodeTypes,
-      Map<String, Map<String, NodeMacs>> macs) {}
+      Map<String, Map<String, NodeAddressing>> addressing) {}
+
+  record NodeAddressing(NodeMacs macs, NodeIPs ips, NodeLeases leases) {}
 
   record NodeMacs(String lan, String wan, String lanBridge) {}
+
+  record NodeIPs(String lanHost, String nodeHost, String lanGateway, String nodeGateway) {}
+
+  record NodeLeases(LanLease lan, WanLease wan) {}
+
+  record LanLease(String mac, String ip, String cidr) {}
+
+  record WanLease(String mac, String dhcpRange) {}
 
   public static void main(String[] args) throws Exception {
     // Cluster ID mappings (nikopol was renamed from alcide, keeping cluster ID 1)
@@ -76,11 +86,11 @@ public class BlueprintExporter {
     nodeTypes.put("SERVER", 0); // master, peer1-3
     nodeTypes.put("AGENT", 1); // worker1-2
 
-    // Generate all MAC addresses using the blueprint POJOs
-    Map<String, Map<String, NodeMacs>> allMacs = new LinkedHashMap<>();
+    // Generate complete addressing information from the blueprint POJOs
+    Map<String, Map<String, NodeAddressing>> allAddressing = new LinkedHashMap<>();
 
     for (String cluster : clusters.keySet()) {
-      Map<String, NodeMacs> clusterMacs = new LinkedHashMap<>();
+      Map<String, NodeAddressing> clusterAddressing = new LinkedHashMap<>();
       for (String node : nodes.keySet()) {
         ClusterNetworkBlueprint bp =
             ClusterNetworkBlueprint.builder()
@@ -88,18 +98,40 @@ public class BlueprintExporter {
                 .node(node)
                 .deriveRecipeModel()
                 .build();
-        clusterMacs.put(
-            node,
+
+        // MACs
+        NodeMacs macs =
             new NodeMacs(
                 bp.lan().hostMacaddr().value(),
                 bp.wan().hostMacaddr().value(),
-                bp.lan().bridgeMacaddr().value()));
+                bp.lan().bridgeMacaddr().value());
+
+        // IPs
+        NodeIPs ips =
+            new NodeIPs(
+                bp.lan().hostInetaddr().getHostAddress(),
+                bp.nodeNetwork().nodeHostInetaddr().getHostAddress(),
+                bp.lan().gatewayInetaddr().getHostAddress(),
+                bp.nodeNetwork().nodeGatewayInetaddr().getHostAddress());
+
+        // Leases (MAC → IP mappings for DHCP)
+        LanLease lanLease =
+            new LanLease(
+                bp.lan().hostMacaddr().value(),
+                bp.lan().hostInetaddr().getHostAddress(),
+                bp.lan().nodeCidr().toString());
+
+        WanLease wanLease = new WanLease(bp.wan().hostMacaddr().value(), bp.wan().dhcpRange());
+
+        NodeLeases leases = new NodeLeases(lanLease, wanLease);
+
+        clusterAddressing.put(node, new NodeAddressing(macs, ips, leases));
       }
-      allMacs.put(cluster, clusterMacs);
+      allAddressing.put(cluster, clusterAddressing);
     }
 
     NetworkBlueprintMetadata blueprint =
-        new NetworkBlueprintMetadata(clusters, nodes, macPatterns, nodeTypes, allMacs);
+        new NetworkBlueprintMetadata(clusters, nodes, macPatterns, nodeTypes, allAddressing);
 
     // Write as YAML using Jackson serialization
     YAMLFactory yamlFactory =

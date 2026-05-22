@@ -137,7 +137,7 @@ public record ClusterNetworkBlueprint(
   private static int clusterId(String clusterName) {
     return switch (clusterName) {
       case "bioskop" -> 0;
-      case "nikopol" -> 1;  // renamed from alcide, keeping same cluster ID
+      case "nikopol" -> 1; // renamed from alcide, keeping same cluster ID
       default -> 7;
     };
   }
@@ -183,7 +183,7 @@ public record ClusterNetworkBlueprint(
   private static int lanSliceIndex(String clusterName) {
     return switch (clusterName) {
       case "bioskop" -> 4;
-      case "nikopol" -> 3;  // renamed from alcide
+      case "nikopol" -> 3; // renamed from alcide
       default -> 7;
     };
   }
@@ -191,7 +191,7 @@ public record ClusterNetworkBlueprint(
   private static int lanLbSliceIndex(String clusterName) {
     return switch (clusterName) {
       case "bioskop" -> 6;
-      case "nikopol" -> 5;  // renamed from alcide
+      case "nikopol" -> 5; // renamed from alcide
       default -> 7;
     };
   }
