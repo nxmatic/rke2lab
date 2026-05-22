@@ -444,11 +444,9 @@ shim::debug:tools:install() {
 
 		install -d "$(dirname -- "${target_path}")"
 
-		if [[ -e "${target_path}" ]] && ! rke2lab::bool:is_true "${force_install}"; then
-			echo "preserving existing debug helper at ${target_path}"
-			continue
-		fi
-
+		# Always install debug tools from ConfigMap to ensure updates are applied.
+		# The ConfigMap is the source of truth for debug tooling controlled by the
+		# manifests codebase.
 		install -m "${install_mode}" "${source_path}" "${target_path}"
 	done < <(find "${source_root}" -type f -print0 | sort -z)
 
