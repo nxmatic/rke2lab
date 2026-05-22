@@ -203,7 +203,7 @@ cmd_auto_attach() {
 }
 
 cmd_attach() {
-	local id="$1" pid wait_file
+	local id="$1" pid wait_file host_ip
 	pid="$(resolve_pid "$K8S_NAMESPACE" "$id" || true)"
 	if [[ -z "$pid" ]]; then
 		echo "no containerd-shim-flox-delve-v2 wrapper found for id=$id" >&2
@@ -211,13 +211,17 @@ cmd_attach() {
 		exit 1
 	fi
 	wait_file="$(continue_file_for "$K8S_NAMESPACE" "$id")"
+
+	# Get the node's external IP address for operator convenience
+	host_ip="$(hostname -I | awk '{print $1}' || echo '<node-ip>')"
+
 	"$RKE2LAB_DLV" attach "$pid" "$DLV_LISTEN"
 	cat <<EOF
 
 Delve attached to $id (pid=$pid, listen=$DLV_LISTEN)
 
 Next steps:
-  1. From your workstation: connect your debugger client to this VM's IP on port 59333
+  1. From your workstation: connect your debugger client to ${host_ip}:59333
      (e.g., VS Code launch config "Attach to Shim Wrapper Delve (remote)")
   2. Set breakpoints in wrapper-go (e.g., internal/wrapper/wrapper.go)
   3. Hit Continue in your debugger, then run:
