@@ -18,9 +18,9 @@ Usage:
 
 Commands:
   list        Print one row per containerd-shim-flox wrapper currently parked at the
-              debug-suspend gate: pid, id, age, continue-file path.
+              debug-suspend gate: pid, pod name, container id, age, continue-file path.
   auto-attach Automatically attach to suspended wrapper: if only one, attach immediately;
-              if multiple, show interactive menu to select which one.
+              if multiple, show interactive menu with pod names to select which one.
   attach      Resolve the wrapper PID for <container-id> and start the singleton
               headless Delve attached to it (paused, listen 0.0.0.0:59333).
               Containers run in k8s.io namespace.
@@ -93,8 +93,19 @@ resolve_pid() {
 	return 1
 }
 
+resolve_pod_name() {
+	local container_id="$1"
+	local pod_id pod_name
+	# Get the pod sandbox ID for this container
+	pod_id="$(crictl inspect "$container_id" 2>/dev/null | jq -r '.info.sandboxID // empty' || true)"
+	[[ -n "$pod_id" ]] || return 1
+	# Get the pod name from the sandbox
+	pod_name="$(crictl inspectp "$pod_id" 2>/dev/null | jq -r '.status.metadata.name // empty' || true)"
+	[[ -n "$pod_name" ]] && printf '%s\n' "$pod_name"
+}
+
 collect_suspended_containers() {
-	local pid cmdline ns id wait_file
+	local pid cmdline ns id wait_file pod_name
 	local -a containers=()
 	for pid in $(each_wrapper_pid); do
 		cmdline="$(read_cmdline "$pid" || true)"
@@ -109,14 +120,15 @@ collect_suspended_containers() {
 		wait_file="$(continue_file_for "$ns" "$id")"
 		# Only include wrappers actively parked at the gate
 		if [[ ! -e "$wait_file" ]]; then
-			containers+=("$ns|$id")
+			pod_name="$(resolve_pod_name "$id" || echo "$id")"
+			containers+=("$ns|$id|$pod_name")
 		fi
 	done
 	printf '%s\n' "${containers[@]}"
 }
 
 cmd_list() {
-	local pid cmdline ns id wait_file age start_seconds now_seconds entries=""
+	local pid cmdline ns id wait_file age start_seconds now_seconds pod_name entries=""
 	now_seconds="$(date +%s)"
 	for pid in $(each_wrapper_pid); do
 		cmdline="$(read_cmdline "$pid" || true)"
@@ -136,8 +148,9 @@ cmd_list() {
 		if [[ ! -e "$wait_file" ]]; then
 			start_seconds="$(stat -c '%Y' "/proc/$pid" 2>/dev/null || echo "$now_seconds")"
 			age="$((now_seconds - start_seconds))s"
-			entries+="$(printf '  - pid: %s\n    id: %s\n    age: %s\n    continueFile: %s\n' \
-				"$pid" "$id" "$age" "$wait_file")"
+			pod_name="$(resolve_pod_name "$id" || echo "$id")"
+			entries+="$(printf '  - pid: %s\n    pod: %s\n    id: %s\n    age: %s\n    continueFile: %s\n' \
+				"$pid" "$pod_name" "$id" "$age" "$wait_file")"
 			entries+=$'\n'
 		fi
 	done
@@ -160,11 +173,11 @@ cmd_auto_attach() {
 		exit 1
 	fi
 
-	local selected_ns selected_id
+	local selected_ns selected_id selected_pod
 	if [[ "$count" -eq 1 ]]; then
 		# Only one container, auto-attach
-		IFS='|' read -r selected_ns selected_id <<<"${containers[0]}"
-		echo "Found 1 suspended container: $selected_id"
+		IFS='|' read -r selected_ns selected_id selected_pod <<<"${containers[0]}"
+		echo "Found 1 suspended container: $selected_pod"
 		echo "Auto-attaching..."
 	else
 		# Multiple containers, show menu
@@ -172,8 +185,8 @@ cmd_auto_attach() {
 		echo
 		local i
 		for i in "${!containers[@]}"; do
-			IFS='|' read -r ns id <<<"${containers[$i]}"
-			echo "  $((i + 1)). $id"
+			IFS='|' read -r ns id pod_name <<<"${containers[$i]}"
+			echo "  $((i + 1)). $pod_name"
 		done
 		echo
 		read -p "Select container (1-$count): " selection
@@ -183,7 +196,7 @@ cmd_auto_attach() {
 			exit 1
 		fi
 
-		IFS='|' read -r selected_ns selected_id <<<"${containers[$((selection - 1))]}"
+		IFS='|' read -r selected_ns selected_id selected_pod <<<"${containers[$((selection - 1))]}"
 	fi
 
 	cmd_attach "$selected_id"
