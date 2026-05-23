@@ -562,7 +562,7 @@ containerd::config:version:detect() {
 }
 
 containerd::config:flox:update() {
-	local version plugin_root nri_plugin_root tmp
+	local version plugin_root nri_plugin_root tmp checksum_before checksum_after
 	version="$(containerd::config:version:detect)"
 	if [[ "${version}" == "3" ]]; then
 		plugin_root="io.containerd.cri.v1.runtime"
@@ -571,6 +571,10 @@ containerd::config:flox:update() {
 		plugin_root="io.containerd.grpc.v1.cri"
 		nri_plugin_root="io.containerd.nri.v1.nri"
 	fi
+
+	# Calculate checksum before update
+	checksum_before="$(sha256sum "${CONTAINERD_CONFIG_TEMPLATE}" 2>/dev/null | awk '{print $1}' || echo "none")"
+
 	tmp="$(mktemp)" &&
 		trap 'rm -f "${tmp}"' RETURN
 
@@ -587,6 +591,16 @@ containerd::config:flox:update() {
     ' |
 		"${DASEL_BIN}" -i yaml -o toml >"${tmp}" &&
 		mv "${tmp}" "${CONTAINERD_CONFIG_TEMPLATE}"
+
+	# Calculate checksum after update
+	checksum_after="$(sha256sum "${CONTAINERD_CONFIG_TEMPLATE}" 2>/dev/null | awk '{print $1}' || echo "none")"
+
+	# Return 0 (true) if config changed, 1 (false) if unchanged
+	if [[ "${checksum_before}" != "${checksum_after}" ]]; then
+		return 0
+	else
+		return 1
+	fi
 }
 
 installer::host:run() {
@@ -618,10 +632,17 @@ installer::host:run() {
 	runtime::debug:tools:install
 
 	: "Update containerd configuration to include the flox runtime"
-	containerd::config:flox:update
+	local config_changed=false
+	if containerd::config:flox:update; then
+		config_changed=true
+	fi
 
-	: "Restart containerd to apply runtime installation changes"
-	container::service:runtime:restart
+	: "Restart containerd only if configuration changed"
+	if [[ "${config_changed}" == "true" ]]; then
+		container::service:runtime:restart
+	else
+		echo "containerd configuration unchanged, skipping restart"
+	fi
 }
 
 installer::mode:validate
