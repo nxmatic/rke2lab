@@ -4,7 +4,7 @@ set -exuo pipefail
 # Flox shim package build script
 # Builds packages from local packaged flakes defined in YAML descriptor
 # Usage: DAEMONLESS_EXEC_MODE=[host|guest|pod] shim-build.sh [descriptor file]
-# Set CONTAINERD_SHIM_FLOX_V2_ONLY_UPDATE_LOCKS=true to refresh flake.lock files only.
+# Set FLOX_RUNTIME_ONLY_UPDATE_LOCKS=true to refresh flake.lock files only.
 
 SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR="${SCRIPT_PATH%/*}"
@@ -52,7 +52,7 @@ canonicalize_existing_path() {
 	echo "$(cd "${input_dir}" && pwd -P)/${input_base}"
 }
 
-BUILDS_DESCRIPTOR="${1:-${CONTAINERD_SHIM_FLOX_V2_DESCRIPTOR_PATH:-${SCRIPT_ROOT%/}/etc/${SCRIPT_STEM}.yaml}}"
+BUILDS_DESCRIPTOR="${1:-${FLOX_RUNTIME_DESCRIPTOR_PATH:-${SCRIPT_ROOT%/}/etc/${SCRIPT_STEM}.yaml}}"
 BUILDS_DESCRIPTOR="$(canonicalize_existing_path "${BUILDS_DESCRIPTOR}")"
 BUILDS_DESCRIPTOR_DIR="$(dirname "${BUILDS_DESCRIPTOR}")"
 BUILDS_DESCRIPTOR_DIR="$(canonicalize_existing_path "${BUILDS_DESCRIPTOR_DIR}")"
@@ -61,8 +61,8 @@ resolve_build_content_root() {
 	local descriptor_dir="$1"
 	local -a candidates=()
 
-	if [[ -n "${CONTAINERD_SHIM_FLOX_DIR:-}" ]]; then
-		candidates+=("${CONTAINERD_SHIM_FLOX_DIR}")
+	if [[ -n "${FLOX_RUNTIME_DIR:-}" ]]; then
+		candidates+=("${FLOX_RUNTIME_DIR}")
 	fi
 
 	if [[ "$(basename "${descriptor_dir}")" == "bin" ]]; then
@@ -147,10 +147,10 @@ find_flox_activation_dir() {
 		candidates+=("/var/lib/flox-runtime/containerd-shim-build")
 	fi
 
-	if [[ -n "${CONTAINERD_SHIM_FLOX_DIR:-}" ]]; then
-		candidates+=("${CONTAINERD_SHIM_FLOX_DIR}")
-		candidates+=("$(dirname "${CONTAINERD_SHIM_FLOX_DIR}")")
-		candidates+=("$(dirname "$(dirname "${CONTAINERD_SHIM_FLOX_DIR}")")")
+	if [[ -n "${FLOX_RUNTIME_DIR:-}" ]]; then
+		candidates+=("${FLOX_RUNTIME_DIR}")
+		candidates+=("$(dirname "${FLOX_RUNTIME_DIR}")")
+		candidates+=("$(dirname "$(dirname "${FLOX_RUNTIME_DIR}")")")
 	fi
 
 	if [[ "${EXECUTION_MODE}" != "host" ]]; then
@@ -289,7 +289,7 @@ resolve_flake_path() {
 }
 
 should_update_locks() {
-	case "${CONTAINERD_SHIM_FLOX_V2_UPDATE_LOCKS:-false}" in
+	case "${FLOX_RUNTIME_UPDATE_LOCKS:-false}" in
 	1 | true | TRUE | yes | YES)
 		return 0
 		;;
@@ -300,14 +300,14 @@ should_update_locks() {
 		return 1
 		;;
 	*)
-		: "[WARN] Unknown CONTAINERD_SHIM_FLOX_V2_UPDATE_LOCKS='${CONTAINERD_SHIM_FLOX_V2_UPDATE_LOCKS}', defaulting to disabled"
+		: "[WARN] Unknown FLOX_RUNTIME_UPDATE_LOCKS='${FLOX_RUNTIME_UPDATE_LOCKS}', defaulting to disabled"
 		return 1
 		;;
 	esac
 }
 
 should_only_update_locks() {
-	case "${CONTAINERD_SHIM_FLOX_V2_ONLY_UPDATE_LOCKS:-false}" in
+	case "${FLOX_RUNTIME_ONLY_UPDATE_LOCKS:-false}" in
 	1 | true | TRUE | yes | YES)
 		return 0
 		;;

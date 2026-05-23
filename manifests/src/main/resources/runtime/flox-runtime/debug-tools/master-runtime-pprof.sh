@@ -146,7 +146,7 @@ collect_live_containerd_shim_flox_v2s() {
 		[[ -n "${trimmed}" ]] || continue
 		read -r pid argv <<<"${trimmed}"
 		[[ -n "${pid}" && -n "${argv}" ]] || continue
-		[[ "${argv}" == *containerd-shim-flox-v2* ]] || continue
+		[[ "${argv}" == *flox-runtime-v2* ]] || continue
 
 		shim_id=""
 		namespace="${DEFAULT_CONTAINERD_NAMESPACE}"
@@ -195,7 +195,7 @@ print_live_containerd_shim_flox_v2s() {
 	local rows
 	rows="$(collect_live_containerd_shim_flox_v2s)"
 	if [[ -z "${rows}" ]]; then
-		echo "no live containerd-shim-flox-v2 processes found on this host"
+		echo "no live flox-runtime-v2 processes found on this host"
 		return 0
 	fi
 
@@ -214,7 +214,7 @@ select_live_shim() {
 	local selector="${1:-}"
 	local rows matches match_count
 	rows="$(collect_live_containerd_shim_flox_v2s)"
-	[[ -n "${rows}" ]] || die "no live containerd-shim-flox-v2 processes found on this host"
+	[[ -n "${rows}" ]] || die "no live flox-runtime-v2 processes found on this host"
 
 	if [[ -z "${selector}" ]]; then
 		printf '%s\n' "${rows}" | head -n 1
@@ -226,7 +226,7 @@ select_live_shim() {
 
 	match_count="$(printf '%s\n' "${matches}" | awk 'NF { count++ } END { print count + 0 }')"
 	if [[ "${match_count}" -gt 1 ]]; then
-		printf 'matching live containerd-shim-flox-v2 processes for selector %q:\n' "${selector}" >&2
+		printf 'matching live flox-runtime-v2 processes for selector %q:\n' "${selector}" >&2
 		printf '%s\n' "${matches}" | awk -F '\t' '{ printf "  pid=%s id=%s\n", $1, $2 }' >&2
 		die "selector '${selector}' is ambiguous"
 	fi

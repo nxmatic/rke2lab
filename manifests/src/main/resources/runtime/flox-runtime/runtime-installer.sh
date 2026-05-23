@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -exuo pipefail
 
-DAEMONSET_ASSET_ROOT="/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox"
+DAEMONSET_ASSET_ROOT="/srv/host/k8s-daemonset.d/runtime/flox-runtime"
 DAEMONLESS_EXEC_MODE="${DAEMONLESS_EXEC_MODE:-pod}"
 DAEMONSET_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT:-${DAEMONLESS_HOST_SCRIPT_ROOT:-${DAEMONSET_ASSET_ROOT}}}"
 DAEMONLESS_HOST_SCRIPT_ROOT="${DAEMONLESS_HOST_SCRIPT_ROOT:-${DAEMONSET_SCRIPT_ROOT}}"
@@ -14,7 +14,7 @@ installer::mode:validate() {
 		return 0
 		;;
 	*)
-		echo "unsupported shim-installer mode: ${DAEMONLESS_EXEC_MODE} (expected pod or host)" >&2
+		echo "unsupported runtime-installer mode: ${DAEMONLESS_EXEC_MODE} (expected pod or host)" >&2
 		exit 1
 		;;
 	esac
@@ -48,7 +48,7 @@ installer::logging:setup() {
 
 	case "${DAEMONLESS_EXEC_MODE}" in
 	pod)
-		script_path="${HOST_SCRIPT_ROOT}/bin/shim-installer.sh"
+		script_path="${HOST_SCRIPT_ROOT}/bin/runtime-installer.sh"
 		DAEMONLESS_HOST_SCRIPT_ROOT="${HOST_SCRIPT_ROOT}"
 		DAEMONLESS_HOST_SCRIPT_BIN="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/bin"
 		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/.sh.d"
@@ -56,7 +56,7 @@ installer::logging:setup() {
 		script_log_dir="$(daemonless::host_shell:log:resolve)"
 		;;
 	host)
-		script_path="${DAEMONSET_SCRIPT_ROOT}/bin/shim-installer.sh"
+		script_path="${DAEMONSET_SCRIPT_ROOT}/bin/runtime-installer.sh"
 		DAEMONLESS_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT}"
 		DAEMONLESS_HOST_SCRIPT_BIN="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/bin"
 		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/.sh.d"
@@ -92,7 +92,7 @@ SCRIPT_POLICY_LIB_DIR="${SCRIPT_POLICY_LIB_DIR:-${SCRIPT_POLICY_ROOT%/}/.sh.d}"
 BUILD_ASSETS_DIR="${BUILD_ASSETS_DIR:-/build-assets}"
 HOST_SCRIPT_ROOT="${HOST_ROOT}${DAEMONSET_SCRIPT_ROOT}"
 
-shim::assets:root:resolve() {
+runtime::assets:root:resolve() {
 	local resolved_root
 
 	resolved_root="${DAEMONLESS_HOST_SCRIPT_ROOT:-${DAEMONSET_ASSET_ROOT}}"
@@ -130,9 +130,9 @@ installer::pod:materialize_assets() {
 		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
 		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
 		daemonless::host_shell:executable:install \
-		"${SCRIPT_MOUNT_DIR}/bin/shim-installer.sh" \
+		"${SCRIPT_MOUNT_DIR}/bin/runtime-installer.sh" \
 		"${HOST_SCRIPT_ROOT}" \
-		"shim-installer.sh" >/dev/null
+		"runtime-installer.sh" >/dev/null
 	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
 		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
 		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
@@ -171,17 +171,17 @@ installer::pod:materialize_assets() {
 		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
 		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
 		daemonless::host_shell:executable:install \
-		"${BUILD_ASSETS_DIR}/bin/shim-build.sh" \
+		"${BUILD_ASSETS_DIR}/bin/runtime-build.sh" \
 		"${HOST_SCRIPT_ROOT}" \
-		"shim-build.sh" >/dev/null
+		"runtime-build.sh" >/dev/null
 	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
 		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
 		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
 		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
 		daemonless::host_shell:config:install \
-		"${BUILD_ASSETS_DIR}/shim-build.yaml" \
+		"${BUILD_ASSETS_DIR}/runtime-build.yaml" \
 		"${HOST_SCRIPT_ROOT}" \
-		"shim-build.yaml" >/dev/null
+		"runtime-build.yaml" >/dev/null
 	install -D -m 0644 "${BUILD_ASSETS_DIR}/flake.nix" "${HOST_SCRIPT_ROOT}/flake.nix"
 	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
 		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
@@ -235,7 +235,7 @@ installer::pod:run() {
 		DAEMONLESS_HOST_SCRIPT_BIN="${DAEMONSET_SCRIPT_ROOT%/}/bin" \
 		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${DAEMONSET_SCRIPT_ROOT%/}/.sh.d" \
 		daemonless::trampoline:exec_on_host \
-		"shim-installer.sh" \
+		"runtime-installer.sh" \
 		"CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE}" \
 		"DAEMONSET_SCRIPT_ROOT=${DAEMONSET_SCRIPT_ROOT}"
 }
@@ -345,75 +345,75 @@ host::nix:flox-conf:ensure() {
 	install -m 0644 -T /dev/null "${flox_conf}"
 }
 
-shim::assets:path:init() {
-	CONTAINERD_SHIM_FLOX_V2_ROOT="$(shim::assets:root:resolve)"
-	CONTAINERD_SHIM_FLOX_V2_BIN_DIR="${CONTAINERD_SHIM_FLOX_V2_ROOT}/bin"
-	CONTAINERD_SHIM_FLOX_V2_ETC_DIR="${CONTAINERD_SHIM_FLOX_V2_ROOT}/etc"
-	CONTAINERD_SHIM_FLOX_V2_LOG_DIR="${CONTAINERD_SHIM_FLOX_V2_ROOT}/log"
-	CONTAINERD_SHIM_FLOX_V2_BUILD_SCRIPT="${CONTAINERD_SHIM_FLOX_V2_BIN_DIR}/shim-build.sh"
-	CONTAINERD_SHIM_FLOX_V2_BUILD_ENTRYPOINT="${CONTAINERD_SHIM_FLOX_V2_BIN_DIR}/shim-build.sh"
-	CONTAINERD_SHIM_FLOX_V2_BUILD_DESCRIPTOR="${CONTAINERD_SHIM_FLOX_V2_ETC_DIR}/shim-build.yaml"
-	CONTAINERD_SHIM_FLOX_V2_PACKAGE_FLAKE="${CONTAINERD_SHIM_FLOX_V2_ROOT}/flake.nix"
-	CONTAINERD_SHIM_FLOX_V2_ROOTFS_SYNC_SCRIPT="${CONTAINERD_SHIM_FLOX_V2_BIN_DIR}/flox-rootfs-sync.sh"
-	CONTAINERD_SHIM_FLOX_V2_MESH_DIR="${CONTAINERD_SHIM_FLOX_V2_ROOT}/mesh"
-	CONTAINERD_SHIM_FLOX_V2_NETWORKING_DIR="${CONTAINERD_SHIM_FLOX_V2_ROOT}/networking"
-	CONTAINERD_SHIM_FLOX_V2_DEBUG_TOOLS_DIR="${CONTAINERD_SHIM_FLOX_V2_ROOT}/debug-tools"
+runtime::assets:path:init() {
+	FLOX_RUNTIME_ROOT="$(runtime::assets:root:resolve)"
+	FLOX_RUNTIME_BIN_DIR="${FLOX_RUNTIME_ROOT}/bin"
+	FLOX_RUNTIME_ETC_DIR="${FLOX_RUNTIME_ROOT}/etc"
+	FLOX_RUNTIME_LOG_DIR="${FLOX_RUNTIME_ROOT}/log"
+	FLOX_RUNTIME_BUILD_SCRIPT="${FLOX_RUNTIME_BIN_DIR}/runtime-build.sh"
+	FLOX_RUNTIME_BUILD_ENTRYPOINT="${FLOX_RUNTIME_BIN_DIR}/runtime-build.sh"
+	FLOX_RUNTIME_BUILD_DESCRIPTOR="${FLOX_RUNTIME_ETC_DIR}/runtime-build.yaml"
+	FLOX_RUNTIME_PACKAGE_FLAKE="${FLOX_RUNTIME_ROOT}/flake.nix"
+	FLOX_RUNTIME_ROOTFS_SYNC_SCRIPT="${FLOX_RUNTIME_BIN_DIR}/flox-rootfs-sync.sh"
+	FLOX_RUNTIME_MESH_DIR="${FLOX_RUNTIME_ROOT}/mesh"
+	FLOX_RUNTIME_NETWORKING_DIR="${FLOX_RUNTIME_ROOT}/networking"
+	FLOX_RUNTIME_DEBUG_TOOLS_DIR="${FLOX_RUNTIME_ROOT}/debug-tools"
 	RKE2LAB_DEBUG_SHARE_ROOT="${RKE2LAB_DEBUG_SHARE_ROOT:-/srv/host/rke2lab-share.d}"
 }
 
-shim::assets:path:validate() {
-	[[ -d "${CONTAINERD_SHIM_FLOX_V2_BIN_DIR}" ]] || {
-		echo "flox shim bin directory missing: ${CONTAINERD_SHIM_FLOX_V2_BIN_DIR}" >&2
+runtime::assets:path:validate() {
+	[[ -d "${FLOX_RUNTIME_BIN_DIR}" ]] || {
+		echo "flox shim bin directory missing: ${FLOX_RUNTIME_BIN_DIR}" >&2
 		exit 1
 	}
-	[[ -d "${CONTAINERD_SHIM_FLOX_V2_ETC_DIR}" ]] || {
-		echo "flox shim etc directory missing: ${CONTAINERD_SHIM_FLOX_V2_ETC_DIR}" >&2
+	[[ -d "${FLOX_RUNTIME_ETC_DIR}" ]] || {
+		echo "flox shim etc directory missing: ${FLOX_RUNTIME_ETC_DIR}" >&2
 		exit 1
 	}
-	[[ -d "${CONTAINERD_SHIM_FLOX_V2_LOG_DIR}" ]] || {
-		echo "flox shim log directory missing: ${CONTAINERD_SHIM_FLOX_V2_LOG_DIR}" >&2
+	[[ -d "${FLOX_RUNTIME_LOG_DIR}" ]] || {
+		echo "flox shim log directory missing: ${FLOX_RUNTIME_LOG_DIR}" >&2
 		exit 1
 	}
-	[[ -x "${CONTAINERD_SHIM_FLOX_V2_BUILD_ENTRYPOINT}" ]] || {
-		echo "flox build entrypoint missing or not executable: ${CONTAINERD_SHIM_FLOX_V2_BUILD_ENTRYPOINT}" >&2
+	[[ -x "${FLOX_RUNTIME_BUILD_ENTRYPOINT}" ]] || {
+		echo "flox build entrypoint missing or not executable: ${FLOX_RUNTIME_BUILD_ENTRYPOINT}" >&2
 		exit 1
 	}
-	[[ -x "${CONTAINERD_SHIM_FLOX_V2_BUILD_SCRIPT}" ]] || {
-		echo "flox build script missing or not executable: ${CONTAINERD_SHIM_FLOX_V2_BUILD_SCRIPT}" >&2
+	[[ -x "${FLOX_RUNTIME_BUILD_SCRIPT}" ]] || {
+		echo "flox build script missing or not executable: ${FLOX_RUNTIME_BUILD_SCRIPT}" >&2
 		exit 1
 	}
-	[[ -r "${CONTAINERD_SHIM_FLOX_V2_BUILD_DESCRIPTOR}" ]] || {
-		echo "flox build descriptor missing or unreadable: ${CONTAINERD_SHIM_FLOX_V2_BUILD_DESCRIPTOR}" >&2
+	[[ -r "${FLOX_RUNTIME_BUILD_DESCRIPTOR}" ]] || {
+		echo "flox build descriptor missing or unreadable: ${FLOX_RUNTIME_BUILD_DESCRIPTOR}" >&2
 		exit 1
 	}
-	[[ -r "${CONTAINERD_SHIM_FLOX_V2_PACKAGE_FLAKE}" ]] || {
-		echo "flox shim package flake missing or unreadable: ${CONTAINERD_SHIM_FLOX_V2_PACKAGE_FLAKE}" >&2
+	[[ -r "${FLOX_RUNTIME_PACKAGE_FLAKE}" ]] || {
+		echo "flox shim package flake missing or unreadable: ${FLOX_RUNTIME_PACKAGE_FLAKE}" >&2
 		exit 1
 	}
-	[[ -x "${CONTAINERD_SHIM_FLOX_V2_ROOTFS_SYNC_SCRIPT}" ]] || {
-		echo "flox rootfs sync helper missing or not executable: ${CONTAINERD_SHIM_FLOX_V2_ROOTFS_SYNC_SCRIPT}" >&2
+	[[ -x "${FLOX_RUNTIME_ROOTFS_SYNC_SCRIPT}" ]] || {
+		echo "flox rootfs sync helper missing or not executable: ${FLOX_RUNTIME_ROOTFS_SYNC_SCRIPT}" >&2
 		exit 1
 	}
-	[[ -d "${CONTAINERD_SHIM_FLOX_V2_MESH_DIR}" ]] || {
-		echo "flox shim mesh directory missing: ${CONTAINERD_SHIM_FLOX_V2_MESH_DIR}" >&2
+	[[ -d "${FLOX_RUNTIME_MESH_DIR}" ]] || {
+		echo "flox shim mesh directory missing: ${FLOX_RUNTIME_MESH_DIR}" >&2
 		exit 1
 	}
-	[[ -d "${CONTAINERD_SHIM_FLOX_V2_NETWORKING_DIR}" ]] || {
-		echo "flox shim networking directory missing: ${CONTAINERD_SHIM_FLOX_V2_NETWORKING_DIR}" >&2
+	[[ -d "${FLOX_RUNTIME_NETWORKING_DIR}" ]] || {
+		echo "flox shim networking directory missing: ${FLOX_RUNTIME_NETWORKING_DIR}" >&2
 		exit 1
 	}
-	[[ -d "${CONTAINERD_SHIM_FLOX_V2_DEBUG_TOOLS_DIR}" ]] || {
-		echo "flox shim debug tools directory missing: ${CONTAINERD_SHIM_FLOX_V2_DEBUG_TOOLS_DIR}" >&2
+	[[ -d "${FLOX_RUNTIME_DEBUG_TOOLS_DIR}" ]] || {
+		echo "flox shim debug tools directory missing: ${FLOX_RUNTIME_DEBUG_TOOLS_DIR}" >&2
 		exit 1
 	}
 }
 
-shim::debug:any_enabled() {
+runtime::debug:any_enabled() {
 	rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}" ||
-		rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_CONTAINERD_SHIM_FLOX_V2_WRAPPER_ENABLED:-false}"
+		rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_FLOX_RUNTIME_WRAPPER_ENABLED:-false}"
 }
 
-shim::debug:dlv:ensure() {
+runtime::debug:dlv:ensure() {
 	if command -v dlv >/dev/null 2>&1; then
 		return 0
 	fi
@@ -425,17 +425,17 @@ shim::debug:dlv:ensure() {
 	flox install --dir="${rke2_env_dir}" delve
 }
 
-shim::debug:tools:install() {
+runtime::debug:tools:install() {
 	local source_root target_root source_path relative target_path install_mode force_install
 
-	if ! shim::debug:any_enabled; then
+	if ! runtime::debug:any_enabled; then
 		echo "debug helper installation skipped: no debug policy enabled"
 		return 0
 	fi
 
-	shim::debug:dlv:ensure
+	runtime::debug:dlv:ensure
 
-	source_root="${CONTAINERD_SHIM_FLOX_V2_DEBUG_TOOLS_DIR}"
+	source_root="${FLOX_RUNTIME_DEBUG_TOOLS_DIR}"
 	target_root="${RKE2LAB_DEBUG_SHARE_ROOT}"
 	force_install="${RKE2LAB_DEBUG_SHARE_FORCE_INSTALL:-false}"
 
@@ -468,31 +468,31 @@ shim::debug:tools:install() {
 	echo "installed debug helper scripts in ${target_root}"
 }
 
-shim::assets:build:run() {
+runtime::assets:build:run() {
 	: "Ensure we have a git repository in the flox shim root for build operations, and set a default user if not already configured"
-	if [[ ! -d "${CONTAINERD_SHIM_FLOX_V2_ROOT}/.git" ]]; then
-		git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" init --initial-branch=main
+	if [[ ! -d "${FLOX_RUNTIME_ROOT}/.git" ]]; then
+		git -C "${FLOX_RUNTIME_ROOT}" init --initial-branch=main
 	fi
 
-	if [[ -z "$(git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" config --get user.name || true)" ]]; then
-		git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" config user.name "rke2lab-flox-shim"
+	if [[ -z "$(git -C "${FLOX_RUNTIME_ROOT}" config --get user.name || true)" ]]; then
+		git -C "${FLOX_RUNTIME_ROOT}" config user.name "rke2lab-flox-shim"
 	fi
-	if [[ -z "$(git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" config --get user.email || true)" ]]; then
-		git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" config user.email "rke2lab-flox-shim@localhost"
+	if [[ -z "$(git -C "${FLOX_RUNTIME_ROOT}" config --get user.email || true)" ]]; then
+		git -C "${FLOX_RUNTIME_ROOT}" config user.email "rke2lab-flox-shim@localhost"
 	fi
 
 	: "Run the flox build script to materialize the shim build output onto the host filesystem for use in installation"
 	DAEMONLESS_EXEC_MODE=host \
-		DAEMONLESS_HOST_SCRIPT_ROOT="${CONTAINERD_SHIM_FLOX_V2_ROOT}" \
-		DAEMONLESS_HOST_SCRIPT_BIN="${CONTAINERD_SHIM_FLOX_V2_BIN_DIR}" \
-		DAEMONSET_SCRIPT_LOG_DIR="${CONTAINERD_SHIM_FLOX_V2_LOG_DIR}" \
-		PATH="${CONTAINERD_SHIM_FLOX_V2_BIN_DIR}:${PATH}" \
-		"${CONTAINERD_SHIM_FLOX_V2_BUILD_ENTRYPOINT}" "${CONTAINERD_SHIM_FLOX_V2_BUILD_DESCRIPTOR}"
+		DAEMONLESS_HOST_SCRIPT_ROOT="${FLOX_RUNTIME_ROOT}" \
+		DAEMONLESS_HOST_SCRIPT_BIN="${FLOX_RUNTIME_BIN_DIR}" \
+		DAEMONSET_SCRIPT_LOG_DIR="${FLOX_RUNTIME_LOG_DIR}" \
+		PATH="${FLOX_RUNTIME_BIN_DIR}:${PATH}" \
+		"${FLOX_RUNTIME_BUILD_ENTRYPOINT}" "${FLOX_RUNTIME_BUILD_DESCRIPTOR}"
 
 	: "Commit any changes to the flox shim build assets to the git repository for tracking"
-	git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" add --all .
-	if ! git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" diff --cached --quiet; then
-		git -C "${CONTAINERD_SHIM_FLOX_V2_ROOT}" commit -m "chore(flox-shim): refresh packaged flakes"
+	git -C "${FLOX_RUNTIME_ROOT}" add --all .
+	if ! git -C "${FLOX_RUNTIME_ROOT}" diff --cached --quiet; then
+		git -C "${FLOX_RUNTIME_ROOT}" commit -m "chore(flox-shim): refresh packaged flakes"
 	fi
 }
 
@@ -544,7 +544,7 @@ flox::env:sync:run() {
 
 	: "Sync kdns flox environment with actual built store-paths"
 	env_name="networking/kdns"
-	env_dir="${CONTAINERD_SHIM_FLOX_V2_ROOT}/${env_name}"
+	env_dir="${FLOX_RUNTIME_ROOT}/${env_name}"
 
 	if [[ -d "${env_dir}/.flox" ]]; then
 		flox::env:store-path:sync \
@@ -562,7 +562,7 @@ flox::env:sync:run() {
 
 	: "Sync mesh/headplane flox environment with actual built store-paths"
 	env_name="mesh/headplane"
-	env_dir="${CONTAINERD_SHIM_FLOX_V2_ROOT}/${env_name}"
+	env_dir="${FLOX_RUNTIME_ROOT}/${env_name}"
 
 	if [[ -d "${env_dir}/.flox" ]]; then
 		: "Sync all headplane packages: headplane, headscale, headplane-agent, headplane-ssh-wasm"
@@ -582,7 +582,7 @@ flox::env:sync:run() {
 	fi
 }
 
-shim::runtime:nix-system:resolve() {
+runtime::runtime:nix-system:resolve() {
 	case "$(uname -m)" in
 	aarch64 | arm64)
 		printf '%s\n' "aarch64-linux"
@@ -597,22 +597,22 @@ shim::runtime:nix-system:resolve() {
 	esac
 }
 
-shim::runtime:wrapper-package:build() {
+runtime::runtime:wrapper-package:build() {
 	local package_name="$1"
 	local nix_system package_attr
 
-	nix_system="$(shim::runtime:nix-system:resolve)"
+	nix_system="$(runtime::runtime:nix-system:resolve)"
 	package_attr="packages.${nix_system}.${package_name}"
 
 	(
 		nix build \
 			--no-link \
 			--print-out-paths \
-			"${CONTAINERD_SHIM_FLOX_V2_ROOT}#${package_attr}"
+			"${FLOX_RUNTIME_ROOT}#${package_attr}"
 	)
 }
 
-shim::runtime:containerd:resolve-bin() {
+runtime::runtime:containerd:resolve-bin() {
 	if command -v containerd >/dev/null 2>&1; then
 		command -v containerd
 		return 0
@@ -630,7 +630,7 @@ shim::runtime:containerd:resolve-bin() {
 	return 1
 }
 
-shim::runtime:variant:resolve() {
+runtime::runtime:variant:resolve() {
 	local containerd_bin="$1"
 	local containerd_version containerd_major
 
@@ -649,11 +649,11 @@ shim::runtime:variant:resolve() {
 	fi
 }
 
-# The shim variants `flox/containerd-shim-flox-{17,2x}` are not directly
+# The shim variants `flox/flox-runtime-{17,2x}` are not directly
 # resolvable via `flox install`; the canonical entrypoint published on FloxHub
-# is `flox/containerd-shim-flox-installer`, whose closure carries both shim
+# is `flox/flox-runtime-installer`, whose closure carries both shim
 # variants. Pull that env, then read the shim path out of its requisites.
-shim::runtime:env:ensure() {
+runtime::runtime:env:ensure() {
 	local flox_env_dir="$1"
 
 	mkdir -p "${CONTAINERD_CONFIG_DIR}"
@@ -666,7 +666,7 @@ shim::runtime:env:ensure() {
 		! grep -q '"owner"' "${flox_env_dir}/.flox/env.json"; then
 		mkdir -p "$(dirname "${flox_env_dir}")"
 		rm -rf "${flox_env_dir}"
-		flox pull --dir "${flox_env_dir}" flox/containerd-shim-flox-installer
+		flox pull --dir "${flox_env_dir}" flox/flox-runtime-installer
 	fi
 
 	# Activate to materialize the env's closure (and thus the shim variants
@@ -681,17 +681,17 @@ shim::runtime:env:ensure() {
 	)
 }
 
-# Find the containerd-shim-flox-${variant}-* store path inside the installer
+# Find the flox-runtime-${variant}-* store path inside the installer
 # env's closure. The upstream installer hardcodes these paths; here we let
 # nix-store discover them so version bumps land via `flox pull`.
-shim::runtime:package:store-path() {
+runtime::runtime:package:store-path() {
 	local flox_env_dir="$1"
 	local variant="$2"
 	local arch="$3"
 	local installer_run installer_realpath store_path
 
 	installer_run="$(find "${flox_env_dir}/.flox/run" -maxdepth 1 \
-		-name "${arch}-linux.containerd-shim-flox-installer*.run" -print -quit || true)"
+		-name "${arch}-linux.flox-runtime-installer*.run" -print -quit || true)"
 	if [[ -z "${installer_run}" ]]; then
 		echo "unable to locate installer run directory under ${flox_env_dir}/.flox/run" >&2
 		return 1
@@ -699,24 +699,24 @@ shim::runtime:package:store-path() {
 
 	installer_realpath="$(realpath "${installer_run}")"
 	store_path="$(nix-store --query --requisites "${installer_realpath}" |
-		grep -E "containerd-shim-flox-${variant}-" |
+		grep -E "flox-runtime-${variant}-" |
 		head -n1)"
 	if [[ -z "${store_path}" ]]; then
-		echo "containerd-shim-flox-${variant} not present in installer closure (${installer_realpath})" >&2
+		echo "flox-runtime-${variant} not present in installer closure (${installer_realpath})" >&2
 		return 1
 	fi
 
 	printf '%s\n' "${store_path}"
 }
 
-shim::runtime:gcroots:ensure() {
+runtime::runtime:gcroots:ensure() {
 	local gcroots_dir
 
 	gcroots_dir="${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/flox"
 	mkdir -p "${gcroots_dir}"
 }
 
-shim::runtime:binary:install() {
+runtime::runtime:binary:install() {
 	local flox_env_dir="$1"
 	local arch="$2"
 	local variant="$3"
@@ -725,8 +725,8 @@ shim::runtime:binary:install() {
 	local wrapper_pkg_path wrapper_bin wrapper_helper
 	local debug_wrapper_pkg_path debug_wrapper_bin
 
-	shim_store_path="$(shim::runtime:package:store-path "${flox_env_dir}" "${variant}" "${arch}")"
-	shim_path="${shim_store_path}/bin/containerd-shim-flox-v2"
+	shim_store_path="$(runtime::runtime:package:store-path "${flox_env_dir}" "${variant}" "${arch}")"
+	shim_path="${shim_store_path}/bin/flox-runtime-v2"
 	if [[ ! -f "${shim_path}" ]]; then
 		echo "shim binary missing at ${shim_path}" >&2
 		return 1
@@ -734,18 +734,18 @@ shim::runtime:binary:install() {
 
 	# GC-root the shim closure so a later nix-collect-garbage doesn't reap it
 	# out from under containerd. Mirrors what the upstream installer hook does.
-	mkdir -p "${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/containerd-shim-flox"
+	mkdir -p "${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/flox-runtime"
 	nix-store --add-root \
-		"${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/containerd-shim-flox/containerd-shim-flox-${variant}" \
+		"${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/flox-runtime/flox-runtime-${variant}" \
 		--indirect -r "${shim_store_path}" >/dev/null
 
-	install_root="/usr/local/libexec/rke2lab/containerd-shim-flox-v2-wrapper"
-	real_shim_path="${install_root}/containerd-shim-flox-v2.real"
-	wrapper_pkg_path="$(shim::runtime:wrapper-package:build go-wrapper)"
-	wrapper_bin="${wrapper_pkg_path}/bin/containerd-shim-flox-v2"
-	wrapper_helper="${wrapper_pkg_path}/libexec/rke2lab/containerd-shim-flox-v2-wrapper/flox-rootfs-sync.sh"
-	debug_wrapper_pkg_path="$(shim::runtime:wrapper-package:build delve-sidecar)"
-	debug_wrapper_bin="${debug_wrapper_pkg_path}/bin/containerd-shim-flox-v2"
+	install_root="/usr/local/libexec/rke2lab/flox-runtime-v2-wrapper"
+	real_shim_path="${install_root}/flox-runtime-v2.real"
+	wrapper_pkg_path="$(runtime::runtime:wrapper-package:build go-wrapper)"
+	wrapper_bin="${wrapper_pkg_path}/bin/flox-runtime-v2"
+	wrapper_helper="${wrapper_pkg_path}/libexec/rke2lab/flox-runtime-v2-wrapper/flox-rootfs-sync.sh"
+	debug_wrapper_pkg_path="$(runtime::runtime:wrapper-package:build delve-sidecar)"
+	debug_wrapper_bin="${debug_wrapper_pkg_path}/bin/flox-runtime-v2"
 
 	[[ -x "${wrapper_bin}" ]] || {
 		echo "shim wrapper binary missing at ${wrapper_bin}" >&2
@@ -762,14 +762,14 @@ shim::runtime:binary:install() {
 
 	install -D -m 0755 "${shim_path}" "${real_shim_path}"
 	install -d /usr/local/bin "${install_root}"
-	install -D -m 0755 "${wrapper_bin}" "${install_root}/containerd-shim-flox-v2"
-	install -D -m 0755 "${debug_wrapper_bin}" "${install_root}/containerd-shim-flox-delve-v2"
+	install -D -m 0755 "${wrapper_bin}" "${install_root}/flox-runtime-v2"
+	install -D -m 0755 "${debug_wrapper_bin}" "${install_root}/flox-runtime-delve-v2"
 	ln -sfn "${wrapper_helper}" "${install_root}/flox-rootfs-sync.sh"
-	ln -sfn "${install_root}/containerd-shim-flox-v2" /usr/local/bin/containerd-shim-flox-v2
-	ln -sfn "${install_root}/containerd-shim-flox-delve-v2" /usr/local/bin/containerd-shim-flox-delve-v2
+	ln -sfn "${install_root}/flox-runtime-v2" /usr/local/bin/flox-runtime-v2
+	ln -sfn "${install_root}/flox-runtime-delve-v2" /usr/local/bin/flox-runtime-delve-v2
 }
 
-shim::runtime:config-template:ensure() {
+runtime::runtime:config-template:ensure() {
 	if [[ ! -f "${CONTAINERD_CONFIG_TEMPLATE}" ]]; then
 		cp "${CONTAINERD_CONFIG_FILE}" "${CONTAINERD_CONFIG_TEMPLATE}"
 	fi
@@ -778,7 +778,7 @@ shim::runtime:config-template:ensure() {
 nri::plugin:binary:install() {
 	local nri_plugin_pkg_path nri_plugin_bin install_path
 
-	nri_plugin_pkg_path="$(shim::runtime:wrapper-package:build flox-nri-plugin)"
+	nri_plugin_pkg_path="$(runtime::runtime:wrapper-package:build flox-nri-plugin)"
 	nri_plugin_bin="${nri_plugin_pkg_path}/bin/flox-nri-plugin"
 
 	[[ -x "${nri_plugin_bin}" ]] || {
@@ -791,11 +791,11 @@ nri::plugin:binary:install() {
 
 	# GC-root the NRI plugin closure
 	nix-store --add-root \
-		"${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/containerd-shim-flox/flox-nri-plugin" \
+		"${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/flox-runtime/flox-nri-plugin" \
 		--indirect -r "${nri_plugin_pkg_path}" >/dev/null
 }
 
-shim::runtime:core:install() {
+runtime::runtime:core:install() {
 	: "Install/refresh flox runtime shim binaries on host"
 	local flox_env_dir arch containerd_bin variant
 
@@ -804,12 +804,12 @@ shim::runtime:core:install() {
 
 	# NRI plugin approach: no longer install custom shim binaries
 	# The NRI plugin handles Flox environment injection instead
-	# shim::runtime:env:ensure "${flox_env_dir}"
-	# shim::runtime:gcroots:ensure
-	# containerd_bin="$(shim::runtime:containerd:resolve-bin)"
-	# variant="$(shim::runtime:variant:resolve "${containerd_bin}")"
-	# shim::runtime:binary:install "${flox_env_dir}" "${arch}" "${variant}"
-	shim::runtime:config-template:ensure
+	# runtime::runtime:env:ensure "${flox_env_dir}"
+	# runtime::runtime:gcroots:ensure
+	# containerd_bin="$(runtime::runtime:containerd:resolve-bin)"
+	# variant="$(runtime::runtime:variant:resolve "${containerd_bin}")"
+	# runtime::runtime:binary:install "${flox_env_dir}" "${arch}" "${variant}"
+	runtime::runtime:config-template:ensure
 	nri::plugin:binary:install
 }
 
@@ -886,8 +886,8 @@ installer::host:run() {
 	host::tooling:init
 	host::tooling:config-tools:resolve
 	host::nix:flox-conf:ensure
-	shim::assets:path:init
-	shim::assets:path:validate
+	runtime::assets:path:init
+	runtime::assets:path:validate
 	rke2lab::env:load
 
 	: "Initialize resolved containerd config paths"
@@ -896,15 +896,15 @@ installer::host:run() {
 	# NRI plugin approach: no longer need to pre-build or sync store-paths
 	# Flox will build packages on-demand during 'flox activate' based on flake references
 	# : "Execute the shim build before mutating containerd config"
-	# shim::assets:build:run
+	# runtime::assets:build:run
 	# : "Synchronize flox environment store-paths with actual built packages and push to FloxHub"
 	# flox::env:sync:run
 
 	: "Install/update flox runtime shim binaries on host"
-	shim::runtime:core:install
+	runtime::runtime:core:install
 
 	: "Install repository-owned shim debug helpers into the shared directory when debug policy is enabled"
-	shim::debug:tools:install
+	runtime::debug:tools:install
 
 	: "Update containerd configuration to include the flox shim runtime"
 	containerd::config:flox:update

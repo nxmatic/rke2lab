@@ -9,11 +9,11 @@ import io.nxmatic.rk2lab.manifests.layers.runtime.daemonset.RuntimeDaemonsetScri
 import java.util.List;
 import org.cdk8s.Chart;
 
-public final class FloxContainerdShimManifestUnit extends AbstractManifestUnit {
+public final class FloxRuntimeManifestUnit extends AbstractManifestUnit {
 
-  public static final String MANIFEST_UNIT_ID = "runtime/containerd-shim-flox";
+  public static final String MANIFEST_UNIT_ID = "runtime/flox-runtime";
 
-  public FloxContainerdShimManifestUnit() {
+  public FloxRuntimeManifestUnit() {
     super(
         MANIFEST_UNIT_ID,
         List.of(
@@ -24,12 +24,11 @@ public final class FloxContainerdShimManifestUnit extends AbstractManifestUnit {
 
   @Override
   public void apply(final Chart chart) {
-    new FloxContainerdShimLayer(chart, "layer-runtime-containerd-shim-flox");
+    new FloxRuntimeLayer(chart, "layer-runtime-flox-runtime");
   }
 
   @Override
   public void apply(final ManifestUnitContext context) {
-    new FloxContainerdShimLayer(
-        context.chart(), "layer-runtime-containerd-shim-flox", context.registry());
+    new FloxRuntimeLayer(context.chart(), "layer-runtime-flox-runtime", context.registry());
   }
 }

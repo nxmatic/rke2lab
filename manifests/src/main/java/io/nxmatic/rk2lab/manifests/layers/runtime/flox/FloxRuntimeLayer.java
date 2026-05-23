@@ -14,11 +14,11 @@ import org.cdk8s.ApiObjectProps;
 import org.cdk8s.JsonPatch;
 import software.constructs.Construct;
 
-public final class FloxContainerdShimLayer extends Construct {
+public final class FloxRuntimeLayer extends Construct {
 
   private static final String LAYER_NAME = "runtime";
 
-  private static final String PACKAGE_NAME = "containerd-shim-flox";
+  private static final String PACKAGE_NAME = "flox-runtime";
 
   private final KptMetadata kptMetadata = new KptMetadata();
 
@@ -26,19 +26,19 @@ public final class FloxContainerdShimLayer extends Construct {
 
   private final RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets;
 
-  private final FloxContainerdShimAssets floxContainerdShimAssets;
+  private final FloxRuntimeAssets floxRuntimeAssets;
 
-  public FloxContainerdShimLayer(final Construct scope, final String id) {
+  public FloxRuntimeLayer(final Construct scope, final String id) {
     this(scope, id, null);
   }
 
-  public FloxContainerdShimLayer(
+  public FloxRuntimeLayer(
       final Construct scope, final String id, final ManifestUnitReferenceRegistry registry) {
     super(scope, id);
     this.registry = registry;
     this.runtimeDaemonsetScriptPolicyAssets = RuntimeDaemonsetScriptPolicyAssets.builder().build();
-    this.floxContainerdShimAssets =
-        FloxContainerdShimAssets.builder()
+    this.floxRuntimeAssets =
+        FloxRuntimeAssets.builder()
             .runtimeDaemonsetScriptPolicyAssets(runtimeDaemonsetScriptPolicyAssets)
             .build();
 
@@ -151,8 +151,7 @@ public final class FloxContainerdShimLayer extends Construct {
       registry.publish(RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP, configMap);
     }
 
-    configMap.addJsonPatch(
-        JsonPatch.add("/data", floxContainerdShimAssets.installerConfigMapData()));
+    configMap.addJsonPatch(JsonPatch.add("/data", floxRuntimeAssets.installerConfigMapData()));
     return configMap;
   }
 
@@ -273,7 +272,7 @@ public final class FloxContainerdShimLayer extends Construct {
                               new Object[] {
                                 "/bin/sh",
                                 "-ec",
-                                "apk add --no-cache bash coreutils && /.sh/bin/shim-installer.sh"
+                                "apk add --no-cache bash coreutils && /.sh/bin/runtime-installer.sh"
                               },
                               "env",
                               new Object[] {
@@ -287,7 +286,7 @@ public final class FloxContainerdShimLayer extends Construct {
                                     "name",
                                     "DAEMONLESS_HOST_SCRIPT_ROOT",
                                     "value",
-                                    "/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox"),
+                                    "/srv/host/k8s-daemonset.d/runtime/flox-runtime"),
                                 Map.of(
                                     "name",
                                     "CONTAINERD_ADDRESS",
@@ -341,7 +340,7 @@ public final class FloxContainerdShimLayer extends Construct {
                                   "defaultMode",
                                   493,
                                   "items",
-                                  floxContainerdShimAssets.installerVolumeItems(),
+                                  floxRuntimeAssets.installerVolumeItems(),
                                   "name",
                                   RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP.name()),
                               "name",

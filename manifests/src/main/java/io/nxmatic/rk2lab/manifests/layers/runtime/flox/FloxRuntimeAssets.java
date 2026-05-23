@@ -15,9 +15,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-public final class FloxContainerdShimAssets {
+public final class FloxRuntimeAssets {
 
-  private static final String FLOX_RESOURCE_ROOT = "/runtime/containerd-shim-flox";
+  private static final String FLOX_RESOURCE_ROOT = "/runtime/flox-runtime";
 
   private final Class<?> resourceAnchor;
   private final List<EmbeddedAsset> floxMaterializationAssets;
@@ -25,7 +25,7 @@ public final class FloxContainerdShimAssets {
   private final RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets;
   private final WrapperGoArchiveAssets wrapperGoArchiveAssets;
 
-  private FloxContainerdShimAssets(Builder builder) {
+  private FloxRuntimeAssets(Builder builder) {
     this.resourceAnchor = builder.resourceAnchor;
     this.floxMaterializationAssets = List.copyOf(builder.floxMaterializationAssets);
     this.floxInstallerConfigMapAssets = List.copyOf(builder.floxInstallerConfigMapAssets);
@@ -44,7 +44,7 @@ public final class FloxContainerdShimAssets {
   }
 
   public Path worktreeShimAssetsRelativePath() {
-    return Path.of("manifests", "src", "main", "resources", "runtime", "containerd-shim-flox");
+    return Path.of("manifests", "src", "main", "resources", "runtime", "flox-runtime");
   }
 
   public Map<String, String> installerConfigMapData() {
@@ -116,12 +116,11 @@ public final class FloxContainerdShimAssets {
   private String readResource(String resourcePath) {
     try (InputStream input = resourceAnchor.getResourceAsStream(resourcePath)) {
       if (input == null) {
-        throw new IllegalStateException("Missing containerd-shim-flox resource: " + resourcePath);
+        throw new IllegalStateException("Missing flox-runtime resource: " + resourcePath);
       }
       return new String(input.readAllBytes(), StandardCharsets.UTF_8);
     } catch (IOException ex) {
-      throw new UncheckedIOException(
-          "Failed reading containerd-shim-flox resource: " + resourcePath, ex);
+      throw new UncheckedIOException("Failed reading flox-runtime resource: " + resourcePath, ex);
     }
   }
 
@@ -138,7 +137,7 @@ public final class FloxContainerdShimAssets {
   }
 
   public static final class Builder {
-    private Class<?> resourceAnchor = FloxContainerdShimAssets.class;
+    private Class<?> resourceAnchor = FloxRuntimeAssets.class;
     private final List<EmbeddedAsset> floxMaterializationAssets = new ArrayList<>();
     private final List<InstallerAsset> floxInstallerConfigMapAssets = new ArrayList<>();
     private RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets =
@@ -242,13 +241,17 @@ public final class FloxContainerdShimAssets {
     public Builder addDefaultCoreInstallerAssets() {
 
       addInstallerAsset(
-          "shim-installer.sh", FLOX_RESOURCE_ROOT + "/shim-installer.sh", "bin/shim-installer.sh");
+          "runtime-installer.sh",
+          FLOX_RESOURCE_ROOT + "/runtime-installer.sh",
+          "bin/runtime-installer.sh");
       addInstallerAsset(
-          "shim-build.sh", FLOX_RESOURCE_ROOT + "/shim-build.sh", "build-assets/bin/shim-build.sh");
+          "runtime-build.sh",
+          FLOX_RESOURCE_ROOT + "/runtime-build.sh",
+          "build-assets/bin/runtime-build.sh");
       addInstallerAsset(
-          "shim-build.yaml",
-          FLOX_RESOURCE_ROOT + "/shim-build.yaml",
-          "build-assets/shim-build.yaml");
+          "runtime-build.yaml",
+          FLOX_RESOURCE_ROOT + "/runtime-build.yaml",
+          "build-assets/runtime-build.yaml");
       addInstallerAsset(
           "runtime-flake.nix", FLOX_RESOURCE_ROOT + "/flake.nix", "build-assets/flake.nix");
       addInstallerAsset(
@@ -264,9 +267,9 @@ public final class FloxContainerdShimAssets {
           FLOX_RESOURCE_ROOT + "/debug-tools/.sh.d/rke2lab-debug-tooling.sh",
           "build-assets/debug-tools/.sh.d/rke2lab-debug-tooling.sh");
       addInstallerAsset(
-          "debug-tools-attach-live-containerd-shim-flox-v2-strace.sh",
-          FLOX_RESOURCE_ROOT + "/debug-tools/attach_live_containerd_shim_flox_v2_strace.sh",
-          "build-assets/debug-tools/attach_live_containerd_shim_flox_v2_strace.sh");
+          "debug-tools-attach-live-flox-runtime-strace.sh",
+          FLOX_RESOURCE_ROOT + "/debug-tools/attach_live_flox_runtime_strace.sh",
+          "build-assets/debug-tools/attach_live_flox_runtime_strace.sh");
       addInstallerAsset(
           "debug-tools-crictl-kdns-repro.sh",
           FLOX_RESOURCE_ROOT + "/debug-tools/crictl-kdns-repro.sh",
@@ -280,17 +283,17 @@ public final class FloxContainerdShimAssets {
           FLOX_RESOURCE_ROOT + "/debug-tools/kdns-containerd-remote-capture.sh",
           "build-assets/debug-tools/kdns-containerd-remote-capture.sh");
       addInstallerAsset(
-          "debug-tools-master-shim-pprof.sh",
-          FLOX_RESOURCE_ROOT + "/debug-tools/master-shim-pprof.sh",
-          "build-assets/debug-tools/master-shim-pprof.sh");
+          "debug-tools-master-runtime-pprof.sh",
+          FLOX_RESOURCE_ROOT + "/debug-tools/master-runtime-pprof.sh",
+          "build-assets/debug-tools/master-runtime-pprof.sh");
       addInstallerAsset(
           "debug-tools-rke2lab-dlv.sh",
           FLOX_RESOURCE_ROOT + "/debug-tools/rke2lab-dlv.sh",
           "build-assets/debug-tools/rke2lab-dlv.sh");
       addInstallerAsset(
-          "debug-tools-rke2lab-shim-dlv.sh",
-          FLOX_RESOURCE_ROOT + "/debug-tools/rke2lab-shim-dlv.sh",
-          "build-assets/debug-tools/rke2lab-shim-dlv.sh");
+          "debug-tools-rke2lab-runtime-dlv.sh",
+          FLOX_RESOURCE_ROOT + "/debug-tools/rke2lab-runtime-dlv.sh",
+          "build-assets/debug-tools/rke2lab-runtime-dlv.sh");
       return this;
     }
 
@@ -405,8 +408,8 @@ public final class FloxContainerdShimAssets {
       return this;
     }
 
-    public FloxContainerdShimAssets build() {
-      return new FloxContainerdShimAssets(this);
+    public FloxRuntimeAssets build() {
+      return new FloxRuntimeAssets(this);
     }
   }
 

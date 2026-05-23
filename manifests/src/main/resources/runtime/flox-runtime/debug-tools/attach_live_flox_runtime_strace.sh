@@ -13,7 +13,7 @@ Usage:
   attach_live_containerd_shim_flox_v2_strace.sh --pid <shim-pid> [--log-root <dir>] [--output-dir <dir>]
 
 Description:
-  Finds the long-lived containerd-shim-flox-v2 daemon for a sandbox and attaches strace to all
+  Finds the long-lived flox-runtime-v2 daemon for a sandbox and attaches strace to all
   currently running threads. This captures the post-start Create RPC path, which
   is where create-time spec mutation and any nix/flox subprocesses should appear.
 
@@ -106,7 +106,7 @@ for entry in os.listdir('/proc'):
     if not argv:
         continue
     joined = ' '.join(argv)
-    if 'containerd-shim-flox-v2' not in joined:
+    if 'flox-runtime-v2' not in joined:
         continue
     if '-id' not in argv:
         continue
@@ -127,7 +127,7 @@ matches.sort()
 print(matches[-1][0])
 PY
 	)" || {
-		echo "could not find a live containerd-shim-flox-v2 daemon for sandbox id ${TARGET_SHIM_ID}" >&2
+		echo "could not find a live flox-runtime-v2 daemon for sandbox id ${TARGET_SHIM_ID}" >&2
 		exit 1
 	}
 fi
@@ -264,7 +264,7 @@ fi
 	read_proc_value "${ENVIRON_FILE}" | grep -E '^(PATH|FLOX|NIX|RUST_LOG|RUST_BACKTRACE|_FLOX)' || true
 } >"${META_FILE}"
 
-printf 'Attaching to live containerd-shim-flox-v2 daemon\n'
+printf 'Attaching to live flox-runtime-v2 daemon\n'
 printf '  pid: %s\n' "${TARGET_PID}"
 printf '  shim id: %s\n' "${TARGET_SHIM_ID:-<unknown>}"
 printf '  output dir: %s\n' "${OUTPUT_DIR}"

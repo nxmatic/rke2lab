@@ -113,11 +113,11 @@ public record HostAssetDeliveryPolicy(
     };
   }
 
-  public static HostAssetDeliveryPolicy floxContainerdShim() {
+  public static HostAssetDeliveryPolicy floxRuntime() {
     return builder()
-        .policyId("runtime/containerd-shim-flox")
+        .policyId("runtime/flox-runtime")
         .ownerDomainId(MANIFEST_DOMAIN_CATALOG.runtime())
-        .hostAssetRoot("/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox")
+        .hostAssetRoot("/srv/host/k8s-daemonset.d/runtime/flox-runtime")
         .deliveryBackend(HostAssetDeliveryBackend.DAEMONSET)
         .materializationMode(HostAssetMaterializationMode.MIXED)
         .verificationRequired(true)

@@ -4,7 +4,7 @@ package io.nxmatic.rk2lab.manifests;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisResult;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
-import io.nxmatic.rk2lab.manifests.layers.runtime.flox.FloxContainerdShimAssets;
+import io.nxmatic.rk2lab.manifests.layers.runtime.flox.FloxRuntimeAssets;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,8 +27,7 @@ public final class Main {
 
   private final Logger logger = LoggerFactory.getLogger(Main.class);
 
-  private final FloxContainerdShimAssets floxContainerdShimAssets =
-      FloxContainerdShimAssets.builder().build();
+  private final FloxRuntimeAssets floxRuntimeAssets = FloxRuntimeAssets.builder().build();
 
   private Main() {}
 
@@ -87,7 +86,7 @@ public final class Main {
         return commandOf(
             new MaterializeShimAssetsCommand.Builder(this)
                 .outputDir(outputDir)
-                .assets(floxContainerdShimAssets.materializationAssets()));
+                .assets(floxRuntimeAssets.materializationAssets()));
       }
       default ->
           throw new IllegalArgumentException(
@@ -114,7 +113,7 @@ public final class Main {
         commandOf(
             new MaterializeShimAssetsCommand.Builder(this)
                 .outputDir(Paths.get("."))
-                .assets(floxContainerdShimAssets.materializationAssets())),
+                .assets(floxRuntimeAssets.materializationAssets())),
         commandOf(new HelpCommand.Builder(this).commands(List.of())));
   }
 
@@ -178,7 +177,7 @@ public final class Main {
   private final class ShimBuildCommand implements CliCommand {
 
     private final Path worktreeShimAssetsRelativePath =
-        floxContainerdShimAssets.worktreeShimAssetsRelativePath();
+        floxRuntimeAssets.worktreeShimAssetsRelativePath();
 
     private final String mode;
 
@@ -276,7 +275,7 @@ public final class Main {
           Files.createTempDirectory("rke2lab-shim-build-").toRealPath().normalize();
       new MaterializeShimAssetsCommand.Builder(Main.this)
           .outputDir(workDir)
-          .assets(floxContainerdShimAssets.materializationAssets())
+          .assets(floxRuntimeAssets.materializationAssets())
           .build()
           .run();
       return workDir;
@@ -548,7 +547,7 @@ public final class Main {
           }
         }
 
-        floxContainerdShimAssets.materializeSupplementaryAssetsTo(normalizedOutputDir);
+        floxRuntimeAssets.materializeSupplementaryAssetsTo(normalizedOutputDir);
 
         logger.info("Materialized {} shim assets to {}", assets.size(), normalizedOutputDir);
       } catch (IOException ex) {

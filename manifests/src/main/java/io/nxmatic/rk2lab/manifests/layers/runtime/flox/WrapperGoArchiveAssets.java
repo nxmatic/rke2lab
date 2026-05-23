@@ -194,25 +194,24 @@ public final class WrapperGoArchiveAssets {
       addSourceAsset(
           source ->
               source
-                  .classpathResource("/runtime/containerd-shim-flox/wrapper-go/go.mod")
+                  .classpathResource("/runtime/flox-runtime/wrapper-go/go.mod")
                   .relativePath("wrapper-go/go.mod"));
       addSourceAsset(
           source ->
               source
-                  .classpathResource("/runtime/containerd-shim-flox/wrapper-go/go.sum")
+                  .classpathResource("/runtime/flox-runtime/wrapper-go/go.sum")
                   .relativePath("wrapper-go/go.sum"));
 
       // NRI plugin (new approach - active)
       addSourceAsset(
           source ->
               source
-                  .classpathResource(
-                      "/runtime/containerd-shim-flox/wrapper-go/cmd/flox-nri-plugin/main.go")
+                  .classpathResource("/runtime/flox-runtime/wrapper-go/cmd/flox-nri-plugin/main.go")
                   .relativePath("wrapper-go/cmd/flox-nri-plugin/main.go"));
       addSourceAsset(
           source ->
               source
-                  .classpathResource("/runtime/containerd-shim-flox/wrapper-go/pkg/nri/plugin.go")
+                  .classpathResource("/runtime/flox-runtime/wrapper-go/pkg/nri/plugin.go")
                   .relativePath("wrapper-go/pkg/nri/plugin.go"));
 
       // Legacy shim wrapper (deprecated - kept for backward compatibility)
@@ -220,19 +219,17 @@ public final class WrapperGoArchiveAssets {
           source ->
               source
                   .classpathResource(
-                      "/runtime/containerd-shim-flox/wrapper-go/cmd/containerd-shim-flox-v2/main.go")
+                      "/runtime/flox-runtime/wrapper-go/cmd/containerd-shim-flox-v2/main.go")
                   .relativePath("wrapper-go/cmd/containerd-shim-flox-v2/main.go"));
       addSourceAsset(
           source ->
               source
-                  .classpathResource(
-                      "/runtime/containerd-shim-flox/wrapper-go/internal/wrapper/config.go")
+                  .classpathResource("/runtime/flox-runtime/wrapper-go/internal/wrapper/config.go")
                   .relativePath("wrapper-go/internal/wrapper/config.go"));
       addSourceAsset(
           source ->
               source
-                  .classpathResource(
-                      "/runtime/containerd-shim-flox/wrapper-go/internal/wrapper/wrapper.go")
+                  .classpathResource("/runtime/flox-runtime/wrapper-go/internal/wrapper/wrapper.go")
                   .relativePath("wrapper-go/internal/wrapper/wrapper.go"));
       return this;
     }

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-WRAPPER_BIN_NAME="containerd-shim-flox-delve-v2"
-CONTINUE_FILE_PREFIX="/tmp/containerd-shim-flox-v2-wrapper-continue"
+WRAPPER_BIN_NAME="flox-runtime-delve-v2"
+CONTINUE_FILE_PREFIX="/tmp/flox-runtime-v2-wrapper-continue"
 DLV_LISTEN="0.0.0.0:59333"
 RKE2LAB_DLV="${RKE2LAB_DLV:-/srv/host/rke2lab-share.d/rke2lab-dlv.sh}"
 K8S_NAMESPACE="k8s.io"
@@ -17,7 +17,7 @@ Usage:
   rke2lab-shim-dlv detach
 
 Commands:
-  list        Print one row per containerd-shim-flox wrapper currently parked at the
+  list        Print one row per flox-runtime wrapper currently parked at the
               debug-suspend gate: pid, pod name, container id, age, continue-file path.
   auto-attach Automatically attach to suspended wrapper: if only one, attach immediately;
               if multiple, show interactive menu with pod names to select which one.
@@ -206,7 +206,7 @@ cmd_attach() {
 	local id="$1" pid wait_file host_ip
 	pid="$(resolve_pid "$K8S_NAMESPACE" "$id" || true)"
 	if [[ -z "$pid" ]]; then
-		echo "no containerd-shim-flox-delve-v2 wrapper found for id=$id" >&2
+		echo "no flox-runtime-delve-v2 wrapper found for id=$id" >&2
 		echo "hint: run 'rke2lab-shim-dlv list' to see currently suspended wrappers" >&2
 		exit 1
 	fi

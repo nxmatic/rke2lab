@@ -44,8 +44,8 @@ public final class RuntimeLayerEnvContributor implements LayerEnvContributor {
               "k8s.io",
               "CONTAINERD_CONFIG_FILE",
               "/var/lib/rancher/rke2/agent/etc/containerd/config.toml",
-              "CONTAINERD_SHIM_FLOX_DIR",
-              "/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox");
+              "FLOX_RUNTIME_DIR",
+              "/srv/host/k8s-daemonset.d/runtime/flox-runtime");
       case "cri" -> Map.of("CRI_CONFIG_FILE", "/var/lib/rancher/rke2/agent/etc/crictl.yaml");
       case "helm" ->
           Map.of(
