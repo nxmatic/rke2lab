@@ -217,12 +217,20 @@ container_config = {
     "tty": bool(first_path(container_cfg, ("tty",)) or False),
     "working_dir": first_path(container_cfg, ("working_dir",)) or "",
 }
-container_config["annotations"]["flox.dev/environment"] = "nxmatic/kdns"
+container_config["annotations"]["flox.dev/environment"] = "networking/kdns"
 container_config["labels"]["io.kubernetes.pod.name"] = repro_name
 container_config["labels"]["io.kubernetes.pod.namespace"] = source_namespace
 container_config["labels"]["io.kubernetes.pod.uid"] = repro_uid
+
+# With NRI plugin approach, container must explicitly activate Flox environment
+# NRI plugin mounts /nix/store read-only and provides FLOX_ENV_DIR, FLOX_BIN env vars
+# Container command must run: $FLOX_BIN activate --dir $FLOX_ENV_DIR -- <actual-cmd>
 if not container_config["command"]:
-    container_config["command"] = ["kdns"]
+    container_config["command"] = [
+        "/bin/sh",
+        "-c",
+        "${FLOX_BIN} activate --dir ${FLOX_ENV_DIR} -- kdns"
+    ]
 
 (workdir / "pod.json").write_text(json.dumps(pod_config, indent=2) + "\n")
 (workdir / "container.json").write_text(json.dumps(container_config, indent=2) + "\n")
