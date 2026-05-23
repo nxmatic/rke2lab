@@ -245,19 +245,7 @@ public final class FloxRuntimeAssets {
           FLOX_RESOURCE_ROOT + "/runtime-installer.sh",
           "bin/runtime-installer.sh");
       addInstallerAsset(
-          "runtime-build.sh",
-          FLOX_RESOURCE_ROOT + "/runtime-build.sh",
-          "build-assets/bin/runtime-build.sh");
-      addInstallerAsset(
-          "runtime-build.yaml",
-          FLOX_RESOURCE_ROOT + "/runtime-build.yaml",
-          "build-assets/runtime-build.yaml");
-      addInstallerAsset(
           "runtime-flake.nix", FLOX_RESOURCE_ROOT + "/flake.nix", "build-assets/flake.nix");
-      addInstallerAsset(
-          "flox-rootfs-sync.sh",
-          FLOX_RESOURCE_ROOT + "/bin/flox-rootfs-sync.sh",
-          "build-assets/bin/flox-rootfs-sync.sh");
       return this;
     }
 

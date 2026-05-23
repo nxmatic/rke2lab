@@ -202,7 +202,7 @@ public final class WrapperGoArchiveAssets {
                   .classpathResource("/runtime/flox-runtime/wrapper-go/go.sum")
                   .relativePath("wrapper-go/go.sum"));
 
-      // NRI plugin (new approach - active)
+      // NRI plugin (only approach - shim removed)
       addSourceAsset(
           source ->
               source
@@ -213,24 +213,6 @@ public final class WrapperGoArchiveAssets {
               source
                   .classpathResource("/runtime/flox-runtime/wrapper-go/pkg/nri/plugin.go")
                   .relativePath("wrapper-go/pkg/nri/plugin.go"));
-
-      // Legacy shim wrapper (deprecated - kept for backward compatibility)
-      addSourceAsset(
-          source ->
-              source
-                  .classpathResource(
-                      "/runtime/flox-runtime/wrapper-go/cmd/containerd-shim-flox-v2/main.go")
-                  .relativePath("wrapper-go/cmd/containerd-shim-flox-v2/main.go"));
-      addSourceAsset(
-          source ->
-              source
-                  .classpathResource("/runtime/flox-runtime/wrapper-go/internal/wrapper/config.go")
-                  .relativePath("wrapper-go/internal/wrapper/config.go"));
-      addSourceAsset(
-          source ->
-              source
-                  .classpathResource("/runtime/flox-runtime/wrapper-go/internal/wrapper/wrapper.go")
-                  .relativePath("wrapper-go/internal/wrapper/wrapper.go"));
       return this;
     }
 
