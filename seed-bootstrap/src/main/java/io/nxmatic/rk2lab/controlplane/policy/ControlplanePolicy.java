@@ -27,7 +27,7 @@ public record ControlplanePolicy(
         new DebugPolicy(
             environment.bool("policy.debug.kdns.enabled", false),
             environment.bool("policy.debug.kdns.suspend", false),
-            environment.bool("policy.debug.containerdShimFloxV2Wrapper.enabled", false));
+            environment.bool("policy.debug.floxNriPlugin.enabled", false));
 
     NetworkPolicy networkPolicy =
         new NetworkPolicy(environment.bool("policy.network.lan.binding.enabled", true));

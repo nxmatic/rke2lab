@@ -368,7 +368,7 @@ runtime::assets:path:validate() {
 
 runtime::debug:any_enabled() {
 	rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}" ||
-		rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_FLOX_RUNTIME_WRAPPER_ENABLED:-false}"
+		rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_FLOX_NRI_PLUGIN_ENABLED:-false}"
 }
 
 runtime::debug:dlv:ensure() {
@@ -381,6 +381,33 @@ runtime::debug:dlv:ensure() {
 		return 0
 	}
 	flox install --dir="${rke2_env_dir}" delve
+}
+
+runtime::debug:nri:configure() {
+	local systemd_override_dir="/etc/systemd/system/rke2-server.service.d"
+	local nri_debug_conf="${systemd_override_dir}/nri-debug.conf"
+
+	if rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_FLOX_NRI_PLUGIN_ENABLED:-false}"; then
+		echo "Enabling NRI plugin debug mode via systemd environment"
+		mkdir -p "${systemd_override_dir}"
+
+		cat >"${nri_debug_conf}" <<-'EOF'
+			[Service]
+			Environment="FLOX_NRI_DEBUG_SUSPEND=true"
+			Environment="FLOX_NRI_DEBUG_PORT=2345"
+		EOF
+
+		systemctl daemon-reload
+		echo "  NRI debug mode enabled: plugin will pause at startup for debugger attachment"
+		echo "  Attach with: dlv attach \$(pgrep -f 10-flox)"
+	else
+		# Remove debug config if it exists
+		if [[ -f "${nri_debug_conf}" ]]; then
+			echo "Disabling NRI plugin debug mode"
+			rm -f "${nri_debug_conf}"
+			systemctl daemon-reload
+		fi
+	fi
 }
 
 flox::env:configmap:create() {
@@ -658,6 +685,9 @@ installer::host:run() {
 
 	: "Install repository-owned runtime debug helpers into the shared directory when debug policy is enabled"
 	runtime::debug:tools:install
+
+	: "Configure NRI plugin debug mode based on policy"
+	runtime::debug:nri:configure
 
 	: "Create/update flox-env ConfigMap with runtime-resolved paths"
 	flox::env:configmap:create
