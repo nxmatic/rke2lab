@@ -802,11 +802,13 @@ shim::runtime:core:install() {
 	flox_env_dir="/var/lib/flox-runtime/containerd-shim"
 	arch="$(uname -m)"
 
-	shim::runtime:env:ensure "${flox_env_dir}"
-	shim::runtime:gcroots:ensure
-	containerd_bin="$(shim::runtime:containerd:resolve-bin)"
-	variant="$(shim::runtime:variant:resolve "${containerd_bin}")"
-	shim::runtime:binary:install "${flox_env_dir}" "${arch}" "${variant}"
+	# NRI plugin approach: no longer install custom shim binaries
+	# The NRI plugin handles Flox environment injection instead
+	# shim::runtime:env:ensure "${flox_env_dir}"
+	# shim::runtime:gcroots:ensure
+	# containerd_bin="$(shim::runtime:containerd:resolve-bin)"
+	# variant="$(shim::runtime:variant:resolve "${containerd_bin}")"
+	# shim::runtime:binary:install "${flox_env_dir}" "${arch}" "${variant}"
 	shim::runtime:config-template:ensure
 	nri::plugin:binary:install
 }
@@ -868,16 +870,6 @@ containerd::config:flox:update() {
       del(.plugins."io.containerd.grpc.v1.cri".containerd.runtimes.flox) |
 	  del(.plugins."io.containerd.grpc.v1.cri".containerd.runtimes."flox-delve") |
       .plugins[env(CRI_PLUGIN_ROOT)].containerd.systemd_cgroup = true |
-      .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.runtime_path = "/usr/local/bin/containerd-shim-flox-v2" |
-      .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.runtime_type = "io.containerd.runc.v2" |
-      .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.pod_annotations = ["flox.dev/*"] |
-      .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.container_annotations = ["flox.dev/*"] |
-	  .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.options.SystemdCgroup = true |
-	  .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes."flox-delve".runtime_path = "/usr/local/bin/containerd-shim-flox-delve-v2" |
-	  .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes."flox-delve".runtime_type = "io.containerd.runc.v2" |
-	  .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes."flox-delve".pod_annotations = ["flox.dev/*"] |
-	  .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes."flox-delve".container_annotations = ["flox.dev/*"] |
-	  .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes."flox-delve".options.SystemdCgroup = true |
       .plugins[env(NRI_PLUGIN_ROOT)].disable = false |
       .plugins[env(NRI_PLUGIN_ROOT)].plugin_config_path = "/etc/nri/conf.d" |
       .plugins[env(NRI_PLUGIN_ROOT)].plugin_path = "/opt/nri/plugins"
