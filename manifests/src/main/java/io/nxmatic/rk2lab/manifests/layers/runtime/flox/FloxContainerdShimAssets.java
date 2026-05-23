@@ -334,6 +334,40 @@ public final class FloxContainerdShimAssets {
           "networking-kdns-flake.nix",
           FLOX_RESOURCE_ROOT + "/networking/kdns/flake.nix",
           "build-assets/networking/kdns/flake.nix");
+      // kdns flox environment files (note: .gitignore/.gitattributes excluded by Maven resource filtering)
+      addInstallerAsset(
+          "networking-kdns-flox-env-json",
+          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env.json",
+          "build-assets/networking/kdns/.flox/env.json");
+      addInstallerAsset(
+          "networking-kdns-flox-env-lock",
+          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env.lock",
+          "build-assets/networking/kdns/.flox/env.lock");
+      addInstallerAsset(
+          "networking-kdns-flox-env-manifest-toml",
+          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/manifest.toml",
+          "build-assets/networking/kdns/.flox/env/manifest.toml");
+      addInstallerAsset(
+          "networking-kdns-flox-env-manifest-lock",
+          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/manifest.lock",
+          "build-assets/networking/kdns/.flox/env/manifest.lock");
+      // mesh/headplane flox environment files (note: .gitignore/.gitattributes excluded by Maven resource filtering)
+      addInstallerAsset(
+          "mesh-headplane-flox-env-json",
+          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env.json",
+          "build-assets/mesh/headplane/.flox/env.json");
+      addInstallerAsset(
+          "mesh-headplane-flox-env-lock",
+          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env.lock",
+          "build-assets/mesh/headplane/.flox/env.lock");
+      addInstallerAsset(
+          "mesh-headplane-flox-env-manifest-toml",
+          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/manifest.toml",
+          "build-assets/mesh/headplane/.flox/env/manifest.toml");
+      addInstallerAsset(
+          "mesh-headplane-flox-env-manifest-lock",
+          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/manifest.lock",
+          "build-assets/mesh/headplane/.flox/env/manifest.lock");
       return this;
     }
 

@@ -486,6 +486,92 @@ shim::assets:build:run() {
 	fi
 }
 
+flox::env:store-path:sync() {
+	local env_dir="$1"
+	local flake_path="$2"
+	local package_attr="$3"
+	local manifest_path="${env_dir}/.flox/env/manifest.toml"
+	local store_path
+
+	[[ -f "${manifest_path}" ]] || {
+		echo "flox manifest not found: ${manifest_path}" >&2
+		return 1
+	}
+
+	: "Build the package to get its actual store-path"
+	store_path="$(nix build --no-link --print-out-paths "${flake_path}#${package_attr}" 2>/dev/null)" || {
+		echo "failed to build ${flake_path}#${package_attr}" >&2
+		return 1
+	}
+
+	[[ -n "${store_path}" ]] || {
+		echo "empty store-path for ${package_attr}" >&2
+		return 1
+	}
+
+	: "Update manifest.toml with the resolved store-path"
+	# Determine the install key from package_attr:
+	# - kdns-debug -> kdns (manifest has [install.kdns])
+	# - headplane-agent -> headplane-agent (manifest has [install.headplane-agent])
+	# - headscale -> headscale (manifest has [install.headscale])
+	local install_key="${package_attr}"
+	if [[ "${package_attr}" == "kdns-debug" ]]; then
+		install_key="kdns"
+	fi
+
+	: "Use dasel to convert TOML->YAML, yq to update, dasel to convert back to TOML"
+	local tmp="${manifest_path}.tmp"
+	"${DASEL_BIN}" -i toml -o yaml < "${manifest_path}" |
+		"${YQ_BIN}" ".install.\"${install_key}\".\"store-path\" = \"${store_path}\"" |
+		"${DASEL_BIN}" -i yaml -o toml > "${tmp}" &&
+		mv "${tmp}" "${manifest_path}"
+
+	echo "updated ${manifest_path}: ${package_attr} -> ${store_path}"
+}
+
+flox::env:sync:run() {
+	local env_name env_dir
+
+	: "Sync kdns flox environment with actual built store-paths"
+	env_name="networking/kdns"
+	env_dir="${CONTAINERD_SHIM_FLOX_V2_ROOT}/${env_name}"
+
+	if [[ -d "${env_dir}/.flox" ]]; then
+		flox::env:store-path:sync \
+			"${env_dir}" \
+			"${env_dir}" \
+			"kdns-debug" || {
+			echo "warning: failed to sync ${env_name}/kdns-debug store-path" >&2
+		}
+
+		: "Push updated environment to FloxHub"
+		(cd "${env_dir}" && flox push --force) || {
+			echo "warning: failed to push ${env_name} to FloxHub" >&2
+		}
+	fi
+
+	: "Sync mesh/headplane flox environment with actual built store-paths"
+	env_name="mesh/headplane"
+	env_dir="${CONTAINERD_SHIM_FLOX_V2_ROOT}/${env_name}"
+
+	if [[ -d "${env_dir}/.flox" ]]; then
+		: "Sync all headplane packages: headplane, headscale, headplane-agent, headplane-ssh-wasm"
+		for package_attr in headplane headscale headplane-agent headplane-ssh-wasm; do
+			flox::env:store-path:sync \
+				"${env_dir}" \
+				"${env_dir}" \
+				"${package_attr}" || {
+				echo "warning: failed to sync ${env_name}/${package_attr} store-path" >&2
+			}
+		done
+
+		: "Push updated environment to FloxHub"
+		(cd "${env_dir}" && flox push --force) || {
+			echo "warning: failed to push ${env_name} to FloxHub" >&2
+		}
+	fi
+}
+
 shim::runtime:nix-system:resolve() {
 	case "$(uname -m)" in
 	aarch64 | arm64)
@@ -780,6 +866,9 @@ installer::host:run() {
 
 	: "Execute the shim build before mutating containerd config"
 	shim::assets:build:run
+
+	: "Synchronize flox environment store-paths with actual built packages and push to FloxHub"
+	flox::env:sync:run
 
 	: "Install/update flox runtime shim binaries on host"
 	shim::runtime:core:install
