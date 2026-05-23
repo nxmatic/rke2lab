@@ -893,11 +893,12 @@ installer::host:run() {
 	: "Initialize resolved containerd config paths"
 	containerd::config:path:init
 
-	: "Execute the shim build before mutating containerd config"
-	shim::assets:build:run
-
-	: "Synchronize flox environment store-paths with actual built packages and push to FloxHub"
-	flox::env:sync:run
+	# NRI plugin approach: no longer need to pre-build or sync store-paths
+	# Flox will build packages on-demand during 'flox activate' based on flake references
+	# : "Execute the shim build before mutating containerd config"
+	# shim::assets:build:run
+	# : "Synchronize flox environment store-paths with actual built packages and push to FloxHub"
+	# flox::env:sync:run
 
 	: "Install/update flox runtime shim binaries on host"
 	shim::runtime:core:install

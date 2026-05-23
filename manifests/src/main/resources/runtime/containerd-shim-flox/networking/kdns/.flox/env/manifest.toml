@@ -32,8 +32,12 @@ outputs = "all"
 outputs = "all"
   
   [install.kdns]
-    # flake = "git+https://github.com/nxmatic/rke2lab?dir=manifests/src/main/resources/runtime/containerd-shim-flox/networking/kdns#kdns-debug"
-    store-path = "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15"
+    # Use flake reference instead of hardcoded store-path
+    # This allows Flox to build kdns from the local flake when activating
+    # The flake.nix is in the parent directory (../flake.nix relative to .flox/)
+    flake = "path:.#kdns-debug"
+    # Old approach (containerd-shim-flox): used pre-materialized store-path
+    # store-path = "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15"
 
 ## Environment Variables ---------------------------------------------
 ##  ... available for use in the activated environment
