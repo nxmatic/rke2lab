@@ -27,7 +27,7 @@ public final class KdnsLayer extends Construct {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile(LAYER_NAME, PACKAGE_NAME);
   private final KdnsAssets kdnsAssets = KdnsAssets.builder().build();
-  private final RuntimePodProfile runtimePodProfile = new RuntimePodProfile("flox");
+  private final RuntimePodProfile runtimePodProfile = new RuntimePodProfile();
   private final DelveSidecarProfile delveSidecarProfile =
       new DelveSidecarProfile(
           delveSidecarToggleResolver.resolveByDomainLayer(LAYER_NAME, PACKAGE_NAME, false),
