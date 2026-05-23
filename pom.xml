@@ -37,7 +37,29 @@
     <shfmt.version>3.13.0</shfmt.version>
   </properties>
 
+  <!--
+    Repository resolution order: Maven Central first (always), then the
+    internal GH Packages repos as a fallback for io.nxmatic artifacts.
+
+    Why explicit Central before GH Packages:
+    Maven asks every <repository> for every artifact in declaration order.
+    GH Packages returns HTTP 500 (rather than 404) for unknown artifacts,
+    and the response is slow.  Putting Central first means the vast majority
+    of dependency lookups (transitive third-party trees) succeed at Central
+    and never touch GH Packages — only io.nxmatic artifacts (which Central
+    misses) fall through.
+  -->
   <repositories>
+    <repository>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <id>central</id>
+      <url>https://repo.maven.apache.org/maven2</url>
+    </repository>
     <repository>
       <releases>
         <enabled>true</enabled>
@@ -47,6 +69,16 @@
       </snapshots>
       <id>github-nxmatic-java-systemd</id>
       <url>https://maven.pkg.github.com/nxmatic/java-systemd</url>
+    </repository>
+    <repository>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <id>github-nxmatic-java-bbox-api-client</id>
+      <url>https://maven.pkg.github.com/nxmatic/java-bbox-api-client</url>
     </repository>
   </repositories>
 

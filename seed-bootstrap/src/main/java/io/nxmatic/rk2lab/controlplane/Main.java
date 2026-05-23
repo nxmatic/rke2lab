@@ -4,6 +4,14 @@ import com.pulumi.Config;
 import com.pulumi.Pulumi;
 import com.pulumi.core.Output;
 import com.pulumi.deployment.Deployment;
+import io.nxmatic.bbox.api.BboxApiClient;
+import io.nxmatic.bbox.reconcile.Action;
+import io.nxmatic.bbox.reconcile.ReservationReconciler;
+import io.nxmatic.bbox.reconcile.ReservationReconciler.Mode;
+import io.nxmatic.rk2lab.controlplane.bbox.BboxReservationsResource;
+import io.nxmatic.rk2lab.controlplane.bbox.BboxSecretsReader;
+import io.nxmatic.rk2lab.controlplane.bbox.BlueprintRowEnumerator;
+import io.nxmatic.rk2lab.controlplane.bbox.DesiredRow;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
@@ -66,6 +74,7 @@ public final class Main {
             final ControlplanePolicy controlplanePolicy = ControlplanePolicy.from(config);
             final boolean readinessEnabled = resolveReadinessEnabled(config);
             final boolean cleanWorktreeRequired = resolveCleanWorktreeRequired(config);
+            final boolean bboxFailOnError = resolveBboxFailOnError(config);
             final Consumer<String> readinessLogger = message -> SeedLog.info("readiness", message);
             final BootstrapOutputs outputs =
                 bootstrapAndCollectOutputs(
@@ -73,6 +82,7 @@ public final class Main {
                     controlplanePolicy,
                     readinessEnabled,
                     cleanWorktreeRequired,
+                    bboxFailOnError,
                     readinessLogger);
             outputs.values().forEach(context::export);
           } finally {
@@ -86,11 +96,35 @@ public final class Main {
       ControlplanePolicy policy,
       boolean readinessEnabled,
       boolean cleanWorktreeRequired,
+      boolean bboxFailOnError,
       Consumer<String> readinessLogger) {
     enforceEntryGatePolicies(config.localWorktreePath(), cleanWorktreeRequired);
     RuntimeCommandPreflight.enforceRequiredCommands(List.of("ssh", "kubectl"), readinessLogger);
     RuntimeCommandPreflight.enforceRemoteCommandAvailable(
         config.imageBuilderHost(), "incus", readinessLogger);
+
+    // DHCP reservations on the bbox must be in place before any incus instance leases — run
+    // the reconciler now, before IncusResourceBootstrap. The Pulumi engine path constructs a
+    // BboxReservationsResource (parent) which opens the bbox session, fetches the table once,
+    // and registers one BboxReservationResource child per canonical RKE2 row — so `pulumi
+    // preview` / `pulumi up` show a per-row diff. During preview (dryRun), no writes happen.
+    final boolean bboxDryRun = isPulumiEngineAvailable() && Deployment.getInstance().isDryRun();
+    final Object bboxResourceUrn;
+    final Map<String, Object> bboxSummaryMap;
+    if (isPulumiEngineAvailable()) {
+      final BboxReservationsResource bboxResource =
+          buildBboxReservationsResource(config.localWorktreePath(), bboxDryRun, bboxFailOnError);
+      if (bboxResource != null) {
+        bboxResourceUrn = bboxResource.urn();
+        bboxSummaryMap = toBboxSummaryMap(bboxResource);
+      } else {
+        bboxResourceUrn = "";
+        bboxSummaryMap = Map.of("status", "skipped");
+      }
+    } else {
+      bboxResourceUrn = "";
+      bboxSummaryMap = runBboxReconcileStandalone(config.localWorktreePath(), bboxFailOnError);
+    }
 
     final IncusResourceBootstrap.BootstrapResult bootstrapResult =
         new IncusResourceBootstrap(config, policy).apply();
@@ -276,6 +310,8 @@ public final class Main {
     outputs.put("systemdAdapterResourceUrn", systemdAdapterResourceUrn);
     outputs.put("registryResourceUrn", registryResourceUrn);
     outputs.put("seedImageBuildResourceUrn", imageBuildResourceUrn);
+    outputs.put("bboxReservationsResourceUrn", bboxResourceUrn);
+    outputs.put("bboxReservationsSummary", bboxSummaryMap);
     outputs.put("registrySummary", registrySummary);
     outputs.put("systemdProvisioningSummary", bootstrapResult.systemdProvisioningSummary());
     outputs.put("systemdAdapterLaunchSummary", systemdAdapterLaunchSummary);
@@ -290,12 +326,167 @@ public final class Main {
     final Consumer<String> readinessLogger = message -> SeedLog.info("readiness", message);
     final BootstrapOutputs outputs =
         bootstrapAndCollectOutputs(
-            bootstrapConfig, controlplanePolicy, true, true, readinessLogger);
+            bootstrapConfig, controlplanePolicy, true, true, true, readinessLogger);
     SeedLog.info(
         "standalone",
         "Pulumi engine not detected (missing PULUMI_MONITOR). Running in standalone mode.");
     SeedLog.info("standalone", "Bootstrap outputs:");
     outputs.values().forEach((key, value) -> SeedLog.info("standalone", key + "=" + value));
+  }
+
+  private static boolean resolveBboxFailOnError(Config config) {
+    final String raw = config.get("bbox.reconcile.failOnError").orElse("").trim();
+    if (raw.isBlank()) {
+      return true;
+    }
+    return switch (raw.toLowerCase()) {
+      case "1", "true", "yes", "on" -> true;
+      case "0", "false", "no", "off" -> false;
+      default ->
+          throw new IllegalArgumentException(
+              "Invalid boolean for rke2lab:bbox.reconcile.failOnError: " + raw);
+    };
+  }
+
+  /**
+   * Build the {@link BboxReservationsResource} parent. Returns {@code null} when {@code
+   * failOnError=false} and either the secrets read or the bbox session fails — the caller then
+   * records a "skipped" summary instead of bringing down the whole {@code pulumi up}.
+   *
+   * <p>{@code failOnError=true} (the default) propagates any failure: missing reservations before
+   * the incus instance leases means the bootstrap can't succeed regardless.
+   */
+  private static BboxReservationsResource buildBboxReservationsResource(
+      Path worktreePath, boolean dryRun, boolean failOnError) {
+    final BboxSecretsReader.BboxCoordinates coordinates;
+    try {
+      coordinates = BboxSecretsReader.readBboxCoordinates(worktreePath);
+    } catch (RuntimeException ex) {
+      if (failOnError) {
+        throw ex;
+      }
+      SeedLog.warn(
+          "bbox-reconcile",
+          "skipping reconciliation: cannot read bbox coordinates (" + ex.getMessage() + ")");
+      return null;
+    }
+
+    try {
+      final BboxReservationsResource resource =
+          new BboxReservationsResource(
+              "bbox-reservations", coordinates.uri(), coordinates.password(), dryRun, null);
+      logBboxSummary(resource);
+      if (failOnError && resource.countOf(Action.FAILED) > 0) {
+        throw new IllegalStateException(
+            "bbox reconciliation completed with "
+                + resource.countOf(Action.FAILED)
+                + " failed operation(s); set rke2lab:bbox.reconcile.failOnError=false to ignore.");
+      }
+      return resource;
+    } catch (RuntimeException ex) {
+      if (failOnError) {
+        throw ex;
+      }
+      SeedLog.warn(
+          "bbox-reconcile", "skipping reconciliation: bbox call failed (" + ex.getMessage() + ")");
+      return null;
+    }
+  }
+
+  /**
+   * Standalone (no Pulumi engine) reconciliation. Walks the canonical rows directly through a
+   * stateful reconciler and returns an aggregate summary map for the standalone outputs dump.
+   * Always live (no dryRun) — standalone is "do the work without Pulumi state tracking."
+   */
+  private static Map<String, Object> runBboxReconcileStandalone(
+      Path worktreePath, boolean failOnError) {
+    final BboxSecretsReader.BboxCoordinates coordinates;
+    try {
+      coordinates = BboxSecretsReader.readBboxCoordinates(worktreePath);
+    } catch (RuntimeException ex) {
+      if (failOnError) {
+        throw ex;
+      }
+      SeedLog.warn(
+          "bbox-reconcile",
+          "standalone: skipping reconciliation: cannot read bbox coordinates ("
+              + ex.getMessage()
+              + ")");
+      return Map.of("status", "skipped", "reason", ex.getMessage());
+    }
+
+    final List<DesiredRow> rows = new BlueprintRowEnumerator().rows();
+    final java.util.EnumMap<Action, Integer> counts = new java.util.EnumMap<>(Action.class);
+    for (Action action : Action.values()) {
+      counts.put(action, 0);
+    }
+    try (BboxApiClient client = BboxApiClient.open(coordinates.uri(), coordinates.password())) {
+      final ReservationReconciler reconciler = new ReservationReconciler(client);
+      for (DesiredRow row : rows) {
+        final Action action = reconciler.apply(row.reservation(), Mode.APPLY).action();
+        counts.merge(action, 1, (a, b) -> a + b);
+      }
+    } catch (Exception ex) {
+      if (failOnError) {
+        if (ex instanceof RuntimeException re) {
+          throw re;
+        }
+        throw new IllegalStateException(
+            "bbox standalone reconciliation failed: " + ex.getMessage(), ex);
+      }
+      SeedLog.warn(
+          "bbox-reconcile",
+          "standalone: skipping reconciliation: bbox call failed (" + ex.getMessage() + ")");
+      return Map.of("status", "skipped", "reason", ex.getMessage());
+    }
+
+    if (failOnError && counts.get(Action.FAILED) > 0) {
+      throw new IllegalStateException(
+          "bbox reconciliation completed with "
+              + counts.get(Action.FAILED)
+              + " failed operation(s); set rke2lab:bbox.reconcile.failOnError=false to ignore.");
+    }
+
+    final LinkedHashMap<String, Object> out = new LinkedHashMap<>();
+    out.put("dryRun", false);
+    out.put("desiredCount", rows.size());
+    out.put("createdCount", counts.get(Action.CREATED));
+    out.put("updatedCount", counts.get(Action.UPDATED));
+    out.put("matchingCount", counts.get(Action.MATCHING));
+    out.put("failedCount", counts.get(Action.FAILED));
+    return out;
+  }
+
+  private static Map<String, Object> toBboxSummaryMap(BboxReservationsResource resource) {
+    final LinkedHashMap<String, Object> out = new LinkedHashMap<>();
+    out.put("dryRun", resource.dryRun());
+    out.put("desiredCount", resource.children().size());
+    out.put("createdCount", resource.countOf(Action.CREATED));
+    out.put("updatedCount", resource.countOf(Action.UPDATED));
+    out.put("matchingCount", resource.countOf(Action.MATCHING));
+    out.put("wouldCreateCount", resource.countOf(Action.WOULD_CREATE));
+    out.put("wouldUpdateCount", resource.countOf(Action.WOULD_UPDATE));
+    out.put("failedCount", resource.countOf(Action.FAILED));
+    return out;
+  }
+
+  private static void logBboxSummary(BboxReservationsResource resource) {
+    SeedLog.info(
+        "bbox-reconcile",
+        "summary: desired="
+            + resource.children().size()
+            + " created="
+            + resource.countOf(Action.CREATED)
+            + " updated="
+            + resource.countOf(Action.UPDATED)
+            + " matching="
+            + resource.countOf(Action.MATCHING)
+            + " wouldCreate="
+            + resource.countOf(Action.WOULD_CREATE)
+            + " wouldUpdate="
+            + resource.countOf(Action.WOULD_UPDATE)
+            + " failed="
+            + resource.countOf(Action.FAILED));
   }
 
   private static boolean resolveReadinessEnabled(Config config) {
