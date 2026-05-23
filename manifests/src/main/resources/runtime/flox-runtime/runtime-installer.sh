@@ -399,14 +399,16 @@ runtime::debug:nri:configure() {
 
 			DLV_PORT="${FLOX_NRI_DEBUG_PORT:-2345}"
 			PLUGIN_BINARY="/opt/nri/plugins/10-flox-real"
+			FLOX_ENV="/var/lib/rancher/rke2"
 
 			# Move original plugin aside if not already done
 			if [[ -f /opt/nri/plugins/10-flox ]] && [[ ! -f "${PLUGIN_BINARY}" ]]; then
 			    mv /opt/nri/plugins/10-flox "${PLUGIN_BINARY}"
 			fi
 
-			# Start plugin under dlv headless server, listening on all interfaces
-			exec dlv exec "${PLUGIN_BINARY}" \
+			# Activate Flox environment to get dlv in PATH, then start plugin under dlv
+			cd "${FLOX_ENV}"
+			exec flox activate -- dlv exec "${PLUGIN_BINARY}" \
 			    --headless \
 			    --listen=0.0.0.0:${DLV_PORT} \
 			    --api-version=2 \
