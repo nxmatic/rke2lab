@@ -775,6 +775,26 @@ shim::runtime:config-template:ensure() {
 	fi
 }
 
+nri::plugin:binary:install() {
+	local nri_plugin_pkg_path nri_plugin_bin install_path
+
+	nri_plugin_pkg_path="$(shim::runtime:wrapper-package:build flox-nri-plugin)"
+	nri_plugin_bin="${nri_plugin_pkg_path}/bin/flox-nri-plugin"
+
+	[[ -x "${nri_plugin_bin}" ]] || {
+		echo "NRI plugin binary missing at ${nri_plugin_bin}" >&2
+		return 1
+	}
+
+	install_path="/opt/nri/plugins/10-flox"
+	install -D -m 0755 "${nri_plugin_bin}" "${install_path}"
+
+	# GC-root the NRI plugin closure
+	nix-store --add-root \
+		"${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/containerd-shim-flox/flox-nri-plugin" \
+		--indirect -r "${nri_plugin_pkg_path}" >/dev/null
+}
+
 shim::runtime:core:install() {
 	: "Install/refresh flox runtime shim binaries on host"
 	local flox_env_dir arch containerd_bin variant
@@ -788,6 +808,7 @@ shim::runtime:core:install() {
 	variant="$(shim::runtime:variant:resolve "${containerd_bin}")"
 	shim::runtime:binary:install "${flox_env_dir}" "${arch}" "${variant}"
 	shim::runtime:config-template:ensure
+	nri::plugin:binary:install
 }
 
 containerd::config:path:init() {
@@ -828,18 +849,20 @@ containerd::config:version:detect() {
 }
 
 containerd::config:flox:update() {
-	local version plugin_root tmp
+	local version plugin_root nri_plugin_root tmp
 	version="$(containerd::config:version:detect)"
 	if [[ "${version}" == "3" ]]; then
 		plugin_root="io.containerd.cri.v1.runtime"
+		nri_plugin_root="io.containerd.nri.v1.nri"
 	else
 		plugin_root="io.containerd.grpc.v1.cri"
+		nri_plugin_root="io.containerd.nri.v1.nri"
 	fi
 	tmp="$(mktemp)" &&
 		trap "rm -f ${tmp}" RETURN
 
 	"${DASEL_BIN}" -i toml -o yaml <"${CONTAINERD_CONFIG_TEMPLATE}" |
-		CRI_PLUGIN_ROOT="${plugin_root}" "${YQ_BIN}" '
+		CRI_PLUGIN_ROOT="${plugin_root}" NRI_PLUGIN_ROOT="${nri_plugin_root}" "${YQ_BIN}" '
       del(.plugins."io.containerd.cri.v1.runtime".containerd.runtimes.flox) |
 	  del(.plugins."io.containerd.cri.v1.runtime".containerd.runtimes."flox-delve") |
       del(.plugins."io.containerd.grpc.v1.cri".containerd.runtimes.flox) |
@@ -854,7 +877,10 @@ containerd::config:flox:update() {
 	  .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes."flox-delve".runtime_type = "io.containerd.runc.v2" |
 	  .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes."flox-delve".pod_annotations = ["flox.dev/*"] |
 	  .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes."flox-delve".container_annotations = ["flox.dev/*"] |
-	  .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes."flox-delve".options.SystemdCgroup = true
+	  .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes."flox-delve".options.SystemdCgroup = true |
+      .plugins[env(NRI_PLUGIN_ROOT)].disable = false |
+      .plugins[env(NRI_PLUGIN_ROOT)].plugin_config_path = "/etc/nri/conf.d" |
+      .plugins[env(NRI_PLUGIN_ROOT)].plugin_path = "/opt/nri/plugins"
     ' |
 		"${DASEL_BIN}" -i yaml -o toml >"${tmp}" &&
 		mv "${tmp}" "${CONTAINERD_CONFIG_TEMPLATE}"
