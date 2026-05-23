@@ -168,6 +168,12 @@ if not cgroup_parent:
     )
 if cgroup_parent:
     linux_cfg.setdefault("cgroup_parent", cgroup_parent)
+else:
+    # Provide default cgroup_parent like kubelet does when no source pod exists
+    # Format: /kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod<UID>.slice
+    # This ensures proper 3-component systemd cgroup path generation by containerd
+    pod_uid_normalized = repro_uid.replace("-", "_")
+    linux_cfg["cgroup_parent"] = f"/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod{pod_uid_normalized}.slice"
 
 pod_config = {
     "metadata": {
