@@ -223,7 +223,7 @@ Delve attached to $id (pid=$pid, listen=$DLV_LISTEN)
 Next steps:
   1. From your workstation: connect your debugger client to ${host_ip}:59333
      (e.g., VS Code launch config "Attach to Shim Wrapper Delve (remote)")
-  2. Set breakpoints in wrapper-go (e.g., internal/wrapper/wrapper.go)
+  2. Set breakpoints in NRI plugin code (e.g., pkg/nri/plugin.go)
   3. Hit Continue in your debugger, then run:
        rke2lab-shim-dlv resume $id
      to release the wrapper from the suspend gate
