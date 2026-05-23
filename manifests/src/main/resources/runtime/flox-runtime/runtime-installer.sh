@@ -170,27 +170,7 @@ installer::pod:materialize_assets() {
 		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
 		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
 		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-		daemonless::host_shell:executable:install \
-		"${BUILD_ASSETS_DIR}/bin/runtime-build.sh" \
-		"${HOST_SCRIPT_ROOT}" \
-		"runtime-build.sh" >/dev/null
-	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
-		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
-		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
-		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-		daemonless::host_shell:config:install \
-		"${BUILD_ASSETS_DIR}/runtime-build.yaml" \
-		"${HOST_SCRIPT_ROOT}" \
-		"runtime-build.yaml" >/dev/null
 	install -D -m 0644 "${BUILD_ASSETS_DIR}/flake.nix" "${HOST_SCRIPT_ROOT}/flake.nix"
-	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
-		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
-		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
-		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-		daemonless::host_shell:executable:install \
-		"${BUILD_ASSETS_DIR}/bin/flox-rootfs-sync.sh" \
-		"${HOST_SCRIPT_ROOT}" \
-		"flox-rootfs-sync.sh" >/dev/null
 	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
 		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
 		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
@@ -350,11 +330,8 @@ runtime::assets:path:init() {
 	FLOX_RUNTIME_BIN_DIR="${FLOX_RUNTIME_ROOT}/bin"
 	FLOX_RUNTIME_ETC_DIR="${FLOX_RUNTIME_ROOT}/etc"
 	FLOX_RUNTIME_LOG_DIR="${FLOX_RUNTIME_ROOT}/log"
-	FLOX_RUNTIME_BUILD_SCRIPT="${FLOX_RUNTIME_BIN_DIR}/runtime-build.sh"
-	FLOX_RUNTIME_BUILD_ENTRYPOINT="${FLOX_RUNTIME_BIN_DIR}/runtime-build.sh"
 	FLOX_RUNTIME_BUILD_DESCRIPTOR="${FLOX_RUNTIME_ETC_DIR}/runtime-build.yaml"
 	FLOX_RUNTIME_PACKAGE_FLAKE="${FLOX_RUNTIME_ROOT}/flake.nix"
-	FLOX_RUNTIME_ROOTFS_SYNC_SCRIPT="${FLOX_RUNTIME_BIN_DIR}/flox-rootfs-sync.sh"
 	FLOX_RUNTIME_MESH_DIR="${FLOX_RUNTIME_ROOT}/mesh"
 	FLOX_RUNTIME_NETWORKING_DIR="${FLOX_RUNTIME_ROOT}/networking"
 	FLOX_RUNTIME_DEBUG_TOOLS_DIR="${FLOX_RUNTIME_ROOT}/debug-tools"
@@ -371,31 +348,13 @@ runtime::assets:path:validate() {
 		exit 1
 	}
 	[[ -d "${FLOX_RUNTIME_LOG_DIR}" ]] || {
-		echo "flox shim log directory missing: ${FLOX_RUNTIME_LOG_DIR}" >&2
-		exit 1
 	}
-	[[ -x "${FLOX_RUNTIME_BUILD_ENTRYPOINT}" ]] || {
-		echo "flox build entrypoint missing or not executable: ${FLOX_RUNTIME_BUILD_ENTRYPOINT}" >&2
-		exit 1
-	}
-	[[ -x "${FLOX_RUNTIME_BUILD_SCRIPT}" ]] || {
-		echo "flox build script missing or not executable: ${FLOX_RUNTIME_BUILD_SCRIPT}" >&2
-		exit 1
-	}
-	[[ -r "${FLOX_RUNTIME_BUILD_DESCRIPTOR}" ]] || {
-		echo "flox build descriptor missing or unreadable: ${FLOX_RUNTIME_BUILD_DESCRIPTOR}" >&2
 		exit 1
 	}
 	[[ -r "${FLOX_RUNTIME_PACKAGE_FLAKE}" ]] || {
 		echo "flox shim package flake missing or unreadable: ${FLOX_RUNTIME_PACKAGE_FLAKE}" >&2
 		exit 1
 	}
-	[[ -x "${FLOX_RUNTIME_ROOTFS_SYNC_SCRIPT}" ]] || {
-		echo "flox rootfs sync helper missing or not executable: ${FLOX_RUNTIME_ROOTFS_SYNC_SCRIPT}" >&2
-		exit 1
-	}
-	[[ -d "${FLOX_RUNTIME_MESH_DIR}" ]] || {
-		echo "flox shim mesh directory missing: ${FLOX_RUNTIME_MESH_DIR}" >&2
 		exit 1
 	}
 	[[ -d "${FLOX_RUNTIME_NETWORKING_DIR}" ]] || {
