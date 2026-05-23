@@ -208,6 +208,16 @@ installer::pod:materialize_assets() {
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/rke2lab-shim-dlv.sh" "${HOST_SCRIPT_ROOT}/debug-tools/rke2lab-shim-dlv.sh"
 	install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/flake.nix" "${HOST_SCRIPT_ROOT}/mesh/headplane/flake.nix"
 	install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/flake.nix" "${HOST_SCRIPT_ROOT}/networking/kdns/flake.nix"
+	# Install kdns flox environment files
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/.flox/env.json" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env.json"
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/.flox/env.lock" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env.lock"
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/.flox/env/manifest.toml" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env/manifest.toml"
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/.flox/env/manifest.lock" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env/manifest.lock"
+	# Install mesh/headplane flox environment files
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/.flox/env.json" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env.json"
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/.flox/env.lock" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env.lock"
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/.flox/env/manifest.toml" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env/manifest.toml"
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/.flox/env/manifest.lock" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env/manifest.lock"
 }
 
 installer::pod:run() {
@@ -521,9 +531,9 @@ flox::env:store-path:sync() {
 
 	: "Use dasel to convert TOML->YAML, yq to update, dasel to convert back to TOML"
 	local tmp="${manifest_path}.tmp"
-	"${DASEL_BIN}" -i toml -o yaml < "${manifest_path}" |
+	"${DASEL_BIN}" -i toml -o yaml <"${manifest_path}" |
 		"${YQ_BIN}" ".install.\"${install_key}\".\"store-path\" = \"${store_path}\"" |
-		"${DASEL_BIN}" -i yaml -o toml > "${tmp}" &&
+		"${DASEL_BIN}" -i yaml -o toml >"${tmp}" &&
 		mv "${tmp}" "${manifest_path}"
 
 	echo "updated ${manifest_path}: ${package_attr} -> ${store_path}"
