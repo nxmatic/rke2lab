@@ -383,6 +383,36 @@ runtime::debug:dlv:ensure() {
 	flox install --dir="${rke2_env_dir}" delve
 }
 
+flox::env:configmap:create() {
+	local nix_profile_path nix_profile_bin_path namespace kubectl_bin
+
+	echo "Creating/updating flox-env ConfigMap with runtime-resolved paths"
+
+	# Resolve the Nix default profile to get actual store path
+	nix_profile_path="$(realpath /nix/var/nix/profiles/default)"
+	nix_profile_bin_path="${nix_profile_path}/bin"
+
+	echo "  Resolved Nix profile: ${nix_profile_path}"
+	echo "  Nix profile bin path: ${nix_profile_bin_path}"
+
+	# Determine namespace (from environment or default)
+	namespace="${FLOX_ENV_CONFIGMAP_NAMESPACE:-rke2lab-system}"
+
+	# Find kubectl (should be in PATH from flox activate or host)
+	kubectl_bin="$(command -v kubectl)" || {
+		echo "ERROR: kubectl not found in PATH" >&2
+		return 1
+	}
+
+	# Create ConfigMap with resolved paths
+	"${kubectl_bin}" create configmap flox-env \
+		--namespace="${namespace}" \
+		--from-literal="NIX_DEFAULT_PROFILE_BIN_STORE_PATH=${nix_profile_bin_path}" \
+		--dry-run=client -o yaml | "${kubectl_bin}" apply -f -
+
+	echo "  flox-env ConfigMap created/updated in namespace ${namespace}"
+}
+
 runtime::debug:tools:install() {
 	local source_root target_root source_path relative target_path install_mode force_install
 
@@ -628,6 +658,9 @@ installer::host:run() {
 
 	: "Install repository-owned runtime debug helpers into the shared directory when debug policy is enabled"
 	runtime::debug:tools:install
+
+	: "Create/update flox-env ConfigMap with runtime-resolved paths"
+	flox::env:configmap:create
 
 	: "Update containerd configuration to include the flox runtime"
 	local config_changed=false
