@@ -19,7 +19,7 @@
         "version": "^1.25"
       },
       "kdns": {
-        "store-path": "/nix/store/kpj4iwpz5v3s7b9ln1q532syjj294ib9-kdns-0.2.15"
+        "store-path": "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15"
       }
     },
     "hook": {},
@@ -29,25 +29,25 @@
   "packages": [
     {
       "install_id": "kdns",
-      "store_path": "/nix/store/kpj4iwpz5v3s7b9ln1q532syjj294ib9-kdns-0.2.15",
+      "store_path": "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15",
       "system": "aarch64-darwin",
       "priority": 5
     },
     {
       "install_id": "kdns",
-      "store_path": "/nix/store/kpj4iwpz5v3s7b9ln1q532syjj294ib9-kdns-0.2.15",
+      "store_path": "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15",
       "system": "aarch64-linux",
       "priority": 5
     },
     {
       "install_id": "kdns",
-      "store_path": "/nix/store/kpj4iwpz5v3s7b9ln1q532syjj294ib9-kdns-0.2.15",
+      "store_path": "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15",
       "system": "x86_64-darwin",
       "priority": 5
     },
     {
       "install_id": "kdns",
-      "store_path": "/nix/store/kpj4iwpz5v3s7b9ln1q532syjj294ib9-kdns-0.2.15",
+      "store_path": "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15",
       "system": "x86_64-linux",
       "priority": 5
     },
