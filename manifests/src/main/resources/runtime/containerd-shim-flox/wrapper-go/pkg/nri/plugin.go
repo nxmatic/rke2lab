@@ -79,15 +79,41 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 
 	log.Printf("Flox environment %s resolved to: %s", floxEnv, floxEnvPath)
 
-	// Build container adjustments to inject the flox environment
+	// Build container adjustments to inject the flox environment with overlayfs protection
+	// Use overlayfs to layer a writable tmpfs over the read-only /nix/store
+	// This protects the host's /nix/store from container modifications while
+	// allowing containers to write to /nix (writes go to ephemeral tmpfs)
 	adjustment := &api.ContainerAdjustment{
 		Mounts: []*api.Mount{
 			{
-				// Mount /nix/store read-only so container can access all Nix store paths
+				// First, bind mount /nix/store read-only from host (will be lower layer)
 				Source:      "/nix/store",
-				Destination: "/nix/store",
+				Destination: "/nix-store-ro",
 				Type:        "bind",
 				Options:     []string{"ro", "rbind"},
+			},
+			{
+				// Create tmpfs for overlayfs upper layer (writable, ephemeral)
+				Destination: "/nix-overlay-upper",
+				Type:        "tmpfs",
+				Options:     []string{"mode=0755", "size=100m"},
+			},
+			{
+				// Create tmpfs for overlayfs work directory
+				Destination: "/nix-overlay-work",
+				Type:        "tmpfs",
+				Options:     []string{"mode=0755"},
+			},
+			{
+				// Create overlay mount at /nix with lower=/nix-store-ro, upper=/nix-overlay-upper
+				Source:      "overlay",
+				Destination: "/nix",
+				Type:        "overlay",
+				Options:     []string{
+					"lowerdir=/nix-store-ro",
+					"upperdir=/nix-overlay-upper",
+					"workdir=/nix-overlay-work",
+				},
 			},
 		},
 
