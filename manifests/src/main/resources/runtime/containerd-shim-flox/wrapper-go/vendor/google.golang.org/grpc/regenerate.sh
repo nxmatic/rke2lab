@@ -18,7 +18,7 @@ set -eu -o pipefail
 WORKDIR=$(mktemp -d)
 
 function finish {
-  rm -rf "$WORKDIR"
+	rm -rf "$WORKDIR"
 }
 trap finish EXIT
 
@@ -46,31 +46,31 @@ git clone --quiet https://github.com/protocolbuffers/protobuf ${WORKDIR}/protobu
 # Pull in code.proto as a proto dependency
 mkdir -p ${WORKDIR}/googleapis/google/rpc
 echo "curl https://raw.githubusercontent.com/googleapis/googleapis/master/google/rpc/code.proto"
-curl --silent https://raw.githubusercontent.com/googleapis/googleapis/master/google/rpc/code.proto > ${WORKDIR}/googleapis/google/rpc/code.proto
+curl --silent https://raw.githubusercontent.com/googleapis/googleapis/master/google/rpc/code.proto >${WORKDIR}/googleapis/google/rpc/code.proto
 
 mkdir -p ${WORKDIR}/out
 
 # Generates sources without the embed requirement
 LEGACY_SOURCES=(
-  ${WORKDIR}/grpc-proto/grpc/binlog/v1/binarylog.proto
-  ${WORKDIR}/grpc-proto/grpc/channelz/v1/channelz.proto
-  ${WORKDIR}/grpc-proto/grpc/health/v1/health.proto
-  ${WORKDIR}/grpc-proto/grpc/lb/v1/load_balancer.proto
-  profiling/proto/service.proto
-  ${WORKDIR}/grpc-proto/grpc/reflection/v1alpha/reflection.proto
-  ${WORKDIR}/grpc-proto/grpc/reflection/v1/reflection.proto
+	${WORKDIR}/grpc-proto/grpc/binlog/v1/binarylog.proto
+	${WORKDIR}/grpc-proto/grpc/channelz/v1/channelz.proto
+	${WORKDIR}/grpc-proto/grpc/health/v1/health.proto
+	${WORKDIR}/grpc-proto/grpc/lb/v1/load_balancer.proto
+	profiling/proto/service.proto
+	${WORKDIR}/grpc-proto/grpc/reflection/v1alpha/reflection.proto
+	${WORKDIR}/grpc-proto/grpc/reflection/v1/reflection.proto
 )
 
 # Generates only the new gRPC Service symbols
 SOURCES=(
-  $(git ls-files --exclude-standard --cached --others "*.proto" | grep -v '^\(profiling/proto/service.proto\|reflection/grpc_reflection_v1alpha/reflection.proto\)$')
-  ${WORKDIR}/grpc-proto/grpc/gcp/altscontext.proto
-  ${WORKDIR}/grpc-proto/grpc/gcp/handshaker.proto
-  ${WORKDIR}/grpc-proto/grpc/gcp/transport_security_common.proto
-  ${WORKDIR}/grpc-proto/grpc/lookup/v1/rls.proto
-  ${WORKDIR}/grpc-proto/grpc/lookup/v1/rls_config.proto
-  ${WORKDIR}/grpc-proto/grpc/testing/*.proto
-  ${WORKDIR}/grpc-proto/grpc/core/*.proto
+	$(git ls-files --exclude-standard --cached --others "*.proto" | grep -v '^\(profiling/proto/service.proto\|reflection/grpc_reflection_v1alpha/reflection.proto\)$')
+	${WORKDIR}/grpc-proto/grpc/gcp/altscontext.proto
+	${WORKDIR}/grpc-proto/grpc/gcp/handshaker.proto
+	${WORKDIR}/grpc-proto/grpc/gcp/transport_security_common.proto
+	${WORKDIR}/grpc-proto/grpc/lookup/v1/rls.proto
+	${WORKDIR}/grpc-proto/grpc/lookup/v1/rls_config.proto
+	${WORKDIR}/grpc-proto/grpc/testing/*.proto
+	${WORKDIR}/grpc-proto/grpc/core/*.proto
 )
 
 # These options of the form 'Mfoo.proto=bar' instruct the codegen to use an
@@ -80,35 +80,26 @@ SOURCES=(
 # Note that the protos listed here are all for testing purposes. All protos to
 # be used externally should have a go_package option (and they don't need to be
 # listed here).
-OPTS=Mgrpc/core/stats.proto=google.golang.org/grpc/interop/grpc_testing/core,\
-Mgrpc/testing/benchmark_service.proto=google.golang.org/grpc/interop/grpc_testing,\
-Mgrpc/testing/stats.proto=google.golang.org/grpc/interop/grpc_testing,\
-Mgrpc/testing/report_qps_scenario_service.proto=google.golang.org/grpc/interop/grpc_testing,\
-Mgrpc/testing/messages.proto=google.golang.org/grpc/interop/grpc_testing,\
-Mgrpc/testing/worker_service.proto=google.golang.org/grpc/interop/grpc_testing,\
-Mgrpc/testing/control.proto=google.golang.org/grpc/interop/grpc_testing,\
-Mgrpc/testing/test.proto=google.golang.org/grpc/interop/grpc_testing,\
-Mgrpc/testing/payloads.proto=google.golang.org/grpc/interop/grpc_testing,\
-Mgrpc/testing/empty.proto=google.golang.org/grpc/interop/grpc_testing
+OPTS=Mgrpc/core/stats.proto=google.golang.org/grpc/interop/grpc_testing/core,Mgrpc/testing/benchmark_service.proto=google.golang.org/grpc/interop/grpc_testing,Mgrpc/testing/stats.proto=google.golang.org/grpc/interop/grpc_testing,Mgrpc/testing/report_qps_scenario_service.proto=google.golang.org/grpc/interop/grpc_testing,Mgrpc/testing/messages.proto=google.golang.org/grpc/interop/grpc_testing,Mgrpc/testing/worker_service.proto=google.golang.org/grpc/interop/grpc_testing,Mgrpc/testing/control.proto=google.golang.org/grpc/interop/grpc_testing,Mgrpc/testing/test.proto=google.golang.org/grpc/interop/grpc_testing,Mgrpc/testing/payloads.proto=google.golang.org/grpc/interop/grpc_testing,Mgrpc/testing/empty.proto=google.golang.org/grpc/interop/grpc_testing
 
 for src in ${SOURCES[@]}; do
-  echo "protoc ${src}"
-  protoc --go_out=${OPTS}:${WORKDIR}/out --go-grpc_out=${OPTS}:${WORKDIR}/out \
-    -I"." \
-    -I${WORKDIR}/grpc-proto \
-    -I${WORKDIR}/googleapis \
-    -I${WORKDIR}/protobuf/src \
-    ${src}
+	echo "protoc ${src}"
+	protoc --go_out=${OPTS}:${WORKDIR}/out --go-grpc_out=${OPTS}:${WORKDIR}/out \
+		-I"." \
+		-I${WORKDIR}/grpc-proto \
+		-I${WORKDIR}/googleapis \
+		-I${WORKDIR}/protobuf/src \
+		${src}
 done
 
 for src in ${LEGACY_SOURCES[@]}; do
-  echo "protoc ${src}"
-  protoc --go_out=${OPTS}:${WORKDIR}/out --go-grpc_out=${OPTS},require_unimplemented_servers=false:${WORKDIR}/out \
-    -I"." \
-    -I${WORKDIR}/grpc-proto \
-    -I${WORKDIR}/googleapis \
-    -I${WORKDIR}/protobuf/src \
-    ${src}
+	echo "protoc ${src}"
+	protoc --go_out=${OPTS}:${WORKDIR}/out --go-grpc_out=${OPTS},require_unimplemented_servers=false:${WORKDIR}/out \
+		-I"." \
+		-I${WORKDIR}/grpc-proto \
+		-I${WORKDIR}/googleapis \
+		-I${WORKDIR}/protobuf/src \
+		${src}
 done
 
 # The go_package option in grpc/lookup/v1/rls.proto doesn't match the
