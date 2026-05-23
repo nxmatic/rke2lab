@@ -576,14 +576,10 @@ containerd::config:flox:update() {
 	checksum_before="$(sha256sum "${CONTAINERD_CONFIG_TEMPLATE}" 2>/dev/null | awk '{print $1}' || echo "none")"
 
 	tmp="$(mktemp)"
-	trap 'rm -f "${tmp}"' RETURN
+	trap "rm -f \"${tmp}\"" RETURN
 
 	"${DASEL_BIN}" -i toml -o yaml <"${CONTAINERD_CONFIG_TEMPLATE}" |
 		CRI_PLUGIN_ROOT="${plugin_root}" NRI_PLUGIN_ROOT="${nri_plugin_root}" "${YQ_BIN}" '
-      del(.plugins."io.containerd.cri.v1.runtime".containerd.runtimes.flox) |
-	  del(.plugins."io.containerd.cri.v1.runtime".containerd.runtimes."flox-delve") |
-      del(.plugins."io.containerd.grpc.v1.cri".containerd.runtimes.flox) |
-	  del(.plugins."io.containerd.grpc.v1.cri".containerd.runtimes."flox-delve") |
       .plugins[env(CRI_PLUGIN_ROOT)].containerd.systemd_cgroup = true |
       .plugins[env(NRI_PLUGIN_ROOT)].disable = false |
       .plugins[env(NRI_PLUGIN_ROOT)].plugin_config_path = "/etc/nri/conf.d" |
