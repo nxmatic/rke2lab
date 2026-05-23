@@ -134,6 +134,7 @@ nocloud:env:bootstrap() {
   rke2lab::secret:value TSKEY_API_TOKEN '.tailscale.api.token'
   rke2lab::secret:value TSKEY_OAUTH_ID '.tailscale.oauth.id'
   rke2lab::secret:value TSKEY_OAUTH_TOKEN '.tailscale.oauth.token'
+  rke2lab::secret:value CACHIX_AUTH_TOKEN '.cachix.token'
 
   : "Determine default gateway IP for cluster networking"
   CLUSTER_GATEWAY=$( ip route show default 2>/dev/null |

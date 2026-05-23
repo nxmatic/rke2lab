@@ -334,7 +334,8 @@ public final class FloxContainerdShimAssets {
           "networking-kdns-flake.nix",
           FLOX_RESOURCE_ROOT + "/networking/kdns/flake.nix",
           "build-assets/networking/kdns/flake.nix");
-      // kdns flox environment files (note: .gitignore/.gitattributes excluded by Maven resource filtering)
+      // kdns flox environment files (note: .gitignore/.gitattributes excluded by Maven resource
+      // filtering)
       addInstallerAsset(
           "networking-kdns-flox-env-json",
           FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env.json",
@@ -351,7 +352,8 @@ public final class FloxContainerdShimAssets {
           "networking-kdns-flox-env-manifest-lock",
           FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/manifest.lock",
           "build-assets/networking/kdns/.flox/env/manifest.lock");
-      // mesh/headplane flox environment files (note: .gitignore/.gitattributes excluded by Maven resource filtering)
+      // mesh/headplane flox environment files (note: .gitignore/.gitattributes excluded by Maven
+      // resource filtering)
       addInstallerAsset(
           "mesh-headplane-flox-env-json",
           FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env.json",

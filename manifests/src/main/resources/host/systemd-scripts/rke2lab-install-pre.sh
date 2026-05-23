@@ -135,6 +135,8 @@ dasel -i toml -o yaml \
 	# manifests
 	yq eval '.install += {"dasel": {"pkg-path": "dasel", "pkg-group": "manifest-yaml"}}' - |
 	yq eval '.install += {"yq-go": {"pkg-path": "yq-go", "pkg-group": "manifest-yaml"}}' - |
+	# cache
+	yq eval '.install += {"cachix": {"pkg-path": "cachix", "pkg-group": "nix-cache"}}' - |
 	# user
 	yq eval '.install += {"delta": {"pkg-path": "delta", "pkg-group": "user-tools"}}' - |
 	yq eval '.install += {"emacs-nox": {"pkg-path": "emacs-nox", "pkg-group": "user-tools"}}' - |
