@@ -3,6 +3,7 @@ Description=RKE2Lab Cachix watch-store agent
 Documentation=https://github.com/nxmatic/rke2lab
 After=nix-daemon.service rke2lab-bootstrap-env.service
 Requires=nix-daemon.service rke2lab-bootstrap-env.service
+Before=rke2-server.service rke2-agent.service
 ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-cachix-watch-store.sh
 
 [Service]
