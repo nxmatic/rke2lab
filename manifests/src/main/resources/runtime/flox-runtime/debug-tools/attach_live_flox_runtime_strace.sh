@@ -9,8 +9,8 @@ rke2lab::debug:logging:setup "${BASH_SOURCE[0]}"
 usage() {
 	cat <<'EOF'
 Usage:
-  attach_live_containerd_shim_flox_v2_strace.sh --shim-id <sandbox-id> [--log-root <dir>] [--output-dir <dir>]
-  attach_live_containerd_shim_flox_v2_strace.sh --pid <shim-pid> [--log-root <dir>] [--output-dir <dir>]
+  attach_live_flox_runtime_strace.sh --shim-id <sandbox-id> [--log-root <dir>] [--output-dir <dir>]
+  attach_live_flox_runtime_strace.sh --pid <shim-pid> [--log-root <dir>] [--output-dir <dir>]
 
 Description:
   Finds the long-lived flox-runtime-v2 daemon for a sandbox and attaches strace to all
@@ -24,7 +24,7 @@ Notes:
 EOF
 }
 
-LOG_ROOT_DEFAULT="/srv/host/rke2lab-share.d/containerd-shim-debug"
+LOG_ROOT_DEFAULT="/srv/host/rke2lab-share.d/flox-runtime-debug"
 LOG_ROOT="${LOG_ROOT_DEFAULT}"
 OUTPUT_DIR=""
 TARGET_PID=""

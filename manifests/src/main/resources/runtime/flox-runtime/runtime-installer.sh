@@ -97,7 +97,7 @@ runtime::assets:root:resolve() {
 
 	resolved_root="${DAEMONLESS_HOST_SCRIPT_ROOT:-${DAEMONSET_ASSET_ROOT}}"
 	[[ -n "${resolved_root}" ]] || {
-		echo "flox shim asset root is not defined" >&2
+		echo "flox runtime asset root is not defined" >&2
 		exit 1
 	}
 
@@ -179,13 +179,13 @@ installer::pod:materialize_assets() {
 		"${BUILD_ASSETS_DIR}/debug-tools/.sh.d/rke2lab-debug-tooling.sh" \
 		"${HOST_SCRIPT_ROOT}/debug-tools" \
 		"rke2lab-debug-tooling.sh" >/dev/null
-	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/attach_live_containerd_shim_flox_v2_strace.sh" "${HOST_SCRIPT_ROOT}/debug-tools/attach_live_containerd_shim_flox_v2_strace.sh"
+	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/attach_live_flox_runtime_strace.sh" "${HOST_SCRIPT_ROOT}/debug-tools/attach_live_flox_runtime_strace.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/crictl-kdns-repro.sh" "${HOST_SCRIPT_ROOT}/debug-tools/crictl-kdns-repro.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/kdns-containerd-bundle-watch.sh" "${HOST_SCRIPT_ROOT}/debug-tools/kdns-containerd-bundle-watch.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/kdns-containerd-remote-capture.sh" "${HOST_SCRIPT_ROOT}/debug-tools/kdns-containerd-remote-capture.sh"
-	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/master-shim-pprof.sh" "${HOST_SCRIPT_ROOT}/debug-tools/master-shim-pprof.sh"
+	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/master-runtime-pprof.sh" "${HOST_SCRIPT_ROOT}/debug-tools/master-runtime-pprof.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/rke2lab-dlv.sh" "${HOST_SCRIPT_ROOT}/debug-tools/rke2lab-dlv.sh"
-	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/rke2lab-shim-dlv.sh" "${HOST_SCRIPT_ROOT}/debug-tools/rke2lab-shim-dlv.sh"
+	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/rke2lab-runtime-dlv.sh" "${HOST_SCRIPT_ROOT}/debug-tools/rke2lab-runtime-dlv.sh"
 	install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/flake.nix" "${HOST_SCRIPT_ROOT}/mesh/headplane/flake.nix"
 	install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/flake.nix" "${HOST_SCRIPT_ROOT}/networking/kdns/flake.nix"
 	# Install kdns flox environment files
@@ -248,7 +248,7 @@ rke2lab::env:load() {
 }
 
 host::tooling:init() {
-	: "Ensure Nix is available in the host environment for shim installer operations"
+	: "Ensure Nix is available in the host environment for runtime installer operations"
 	NIX_VAR="/nix/var/nix"
 	NIX_VAR_PROFILES_DEFAULT="${NIX_VAR}/profiles/default"
 
@@ -339,11 +339,11 @@ runtime::assets:path:init() {
 
 runtime::assets:path:validate() {
 	[[ -d "${FLOX_RUNTIME_BIN_DIR}" ]] || {
-		echo "flox shim bin directory missing: ${FLOX_RUNTIME_BIN_DIR}" >&2
+		echo "flox runtime bin directory missing: ${FLOX_RUNTIME_BIN_DIR}" >&2
 		exit 1
 	}
 	[[ -d "${FLOX_RUNTIME_ETC_DIR}" ]] || {
-		echo "flox shim etc directory missing: ${FLOX_RUNTIME_ETC_DIR}" >&2
+		echo "flox runtime etc directory missing: ${FLOX_RUNTIME_ETC_DIR}" >&2
 		exit 1
 	}
 	[[ -d "${FLOX_RUNTIME_LOG_DIR}" ]] || {
@@ -351,17 +351,17 @@ runtime::assets:path:validate() {
 		exit 1
 	}
 	[[ -r "${FLOX_RUNTIME_PACKAGE_FLAKE}" ]] || {
-		echo "flox shim package flake missing or unreadable: ${FLOX_RUNTIME_PACKAGE_FLAKE}" >&2
+		echo "flox runtime package flake missing or unreadable: ${FLOX_RUNTIME_PACKAGE_FLAKE}" >&2
 		exit 1
 	}
 		exit 1
 	}
 	[[ -d "${FLOX_RUNTIME_NETWORKING_DIR}" ]] || {
-		echo "flox shim networking directory missing: ${FLOX_RUNTIME_NETWORKING_DIR}" >&2
+		echo "flox runtime networking directory missing: ${FLOX_RUNTIME_NETWORKING_DIR}" >&2
 		exit 1
 	}
 	[[ -d "${FLOX_RUNTIME_DEBUG_TOOLS_DIR}" ]] || {
-		echo "flox shim debug tools directory missing: ${FLOX_RUNTIME_DEBUG_TOOLS_DIR}" >&2
+		echo "flox runtime debug tools directory missing: ${FLOX_RUNTIME_DEBUG_TOOLS_DIR}" >&2
 		exit 1
 	}
 }
@@ -418,9 +418,9 @@ runtime::debug:tools:install() {
 		install -m "${install_mode}" "${source_path}" "${target_path}"
 	done < <(find "${source_root}" -type f -print0 | sort -z)
 
-	if [[ -x "${target_root%/}/rke2lab-shim-dlv.sh" ]]; then
+	if [[ -x "${target_root%/}/rke2lab-runtime-dlv.sh" ]]; then
 		install -d /usr/local/bin
-		ln -sfn "${target_root%/}/rke2lab-shim-dlv.sh" /usr/local/bin/rke2lab-shim-dlv
+		ln -sfn "${target_root%/}/rke2lab-runtime-dlv.sh" /usr/local/bin/rke2lab-runtime-dlv
 	fi
 
 	echo "installed debug helper scripts in ${target_root}"
@@ -516,10 +516,10 @@ nri::plugin:binary:install() {
 }
 
 runtime::runtime:core:install() {
-	: "Install/refresh flox runtime shim binaries on host"
+	: "Install/refresh flox runtime binaries on host"
 	local flox_env_dir arch containerd_bin variant
 
-	flox_env_dir="/var/lib/flox-runtime/containerd-shim"
+	flox_env_dir="/var/lib/flox-runtime"
 	arch="$(uname -m)"
 
 	# NRI plugin approach: no longer install custom shim binaries
@@ -602,7 +602,7 @@ installer::host:run() {
 	installer::policy:source
 	installer::host:activate_flox
 
-	: "Initialize host tooling and shim asset paths"
+	: "Initialize host tooling and runtime asset paths"
 	host::tooling:init
 	host::tooling:config-tools:resolve
 	host::nix:flox-conf:ensure
@@ -620,16 +620,16 @@ installer::host:run() {
 	# : "Synchronize flox environment store-paths with actual built packages and push to FloxHub"
 	# flox::env:sync:run
 
-	: "Install/update flox runtime shim binaries on host"
+	: "Install/update flox runtime binaries on host"
 	runtime::runtime:core:install
 
-	: "Install repository-owned shim debug helpers into the shared directory when debug policy is enabled"
+	: "Install repository-owned runtime debug helpers into the shared directory when debug policy is enabled"
 	runtime::debug:tools:install
 
-	: "Update containerd configuration to include the flox shim runtime"
+	: "Update containerd configuration to include the flox runtime"
 	containerd::config:flox:update
 
-	: "Restart containerd to apply shim installation changes"
+	: "Restart containerd to apply runtime installation changes"
 	container::service:runtime:restart
 }
 
