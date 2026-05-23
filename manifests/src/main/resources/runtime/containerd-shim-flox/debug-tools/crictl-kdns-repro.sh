@@ -297,8 +297,8 @@ echo "== container config =="
 cat "${WORKDIR}/container.json"
 echo
 
-echo "== creating sandbox with flox runtime handler =="
-POD_ID="$(crictl_cmd runp --runtime flox "${WORKDIR}/pod.json")"
+echo "== creating sandbox (NRI plugin will intercept based on annotations) =="
+POD_ID="$(crictl_cmd runp "${WORKDIR}/pod.json")"
 echo "POD_ID=${POD_ID}"
 
 if [[ "${SANDBOX_ONLY}" == "1" ]]; then

@@ -303,7 +303,7 @@ public final class FloxContainerdShimLayer extends Construct {
                               "imagePullPolicy",
                               "IfNotPresent",
                               "name",
-                              "shim-installer",
+                              "runtime-init",
                               "securityContext",
                               Map.of("privileged", true, "runAsGroup", 0, "runAsUser", 0),
                               "volumeMounts",
