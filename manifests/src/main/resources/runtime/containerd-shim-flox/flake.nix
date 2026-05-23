@@ -78,6 +78,31 @@
             platforms = platforms.unix;
           };
         };
+      nriPlugin = pkgs.buildGoModule {
+        pname = "flox-nri-plugin";
+        version = "0.1.0";
+        src = builtins.path {
+          path = ./wrapper-go;
+          name = "wrapper-go-src";
+        };
+        subPackages = ["cmd/flox-nri-plugin"];
+        vendorHash = null; # Will be computed on first build
+
+        env = {
+          CGO_ENABLED = "0";
+        };
+
+        ldflags = [
+          "-s"
+          "-w"
+        ];
+
+        meta = with pkgs.lib; {
+          description = "Flox NRI plugin for containerd - injects flox environments into containers";
+          license = licenses.mit;
+          platforms = platforms.unix;
+        };
+      };
     in {
       packages = {
         go-wrapper = mkGoWrapper {
@@ -88,6 +113,8 @@
           packageName = "delve-sidecar";
           debug = true;
         };
+
+        flox-nri-plugin = nriPlugin;
       };
 
       defaultPackage = self.packages.${system}.go-wrapper;
