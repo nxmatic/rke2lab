@@ -186,8 +186,49 @@ func convertCgroupPathToSystemd(cgroupfsPath string) string {
 	return result.String()
 }
 
+func (w *Wrapper) isSandboxContainer(logger *Logger, shimNamespace, shimID string) bool {
+	// Check if this is a sandbox (pause) container by inspecting the bundle config
+	bundleConfigPath := filepath.Join(getenvDefault("CONTAINERD_SHIM_FLOX_V2_BUNDLE_ROOT", defaultBundleRoot), shimNamespace, shimID, "config.json")
+
+	payload, err := os.ReadFile(bundleConfigPath)
+	if err != nil {
+		// If we can't read the config, assume it's not a sandbox (fail open for sync)
+		return false
+	}
+
+	var config map[string]interface{}
+	if err := json.Unmarshal(payload, &config); err != nil {
+		return false
+	}
+
+	// Check annotations for sandbox markers
+	annotations, ok := config["annotations"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+
+	// Sandboxes have io.kubernetes.cri.sandbox-id pointing to themselves
+	// or io.kubernetes.cri.container-type = "sandbox"
+	if containerType, ok := annotations["io.kubernetes.cri.container-type"].(string); ok && containerType == "sandbox" {
+		return true
+	}
+
+	// Another way: check if sandbox-id equals the container ID (sandboxes reference themselves)
+	if sandboxID, ok := annotations["io.kubernetes.cri.sandbox-id"].(string); ok && sandboxID == shimID {
+		return true
+	}
+
+	return false
+}
+
 func (w *Wrapper) launchRootfsSync(logger *Logger, shimNamespace, shimID string) error {
 	if !w.cfg.RootfsSyncEnable {
+		return nil
+	}
+
+	// Skip rootfs sync for sandbox (pause) containers
+	if isSandbox := w.isSandboxContainer(logger, shimNamespace, shimID); isSandbox {
+		logger.Log("skipping rootfs sync for sandbox container namespace=%s id=%s", shimNamespace, shimID)
 		return nil
 	}
 
