@@ -33,6 +33,7 @@
     <maven.toolchains.plugin.version>3.2.0</maven.toolchains.plugin.version>
     <maven.enforcer.plugin.version>3.5.0</maven.enforcer.plugin.version>
     <spotless.version>3.3.0</spotless.version>
+    <shellcheck.maven.plugin.version>0.5.1</shellcheck.maven.plugin.version>
     <google-java-format.version>1.35.0</google-java-format.version>
     <shfmt.version>3.13.0</shfmt.version>
   </properties>
@@ -127,6 +128,11 @@
           <groupId>com.diffplug.spotless</groupId>
           <artifactId>spotless-maven-plugin</artifactId>
           <version>${spotless.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>dev.dimlight</groupId>
+          <artifactId>shellcheck-maven-plugin</artifactId>
+          <version>${shellcheck.maven.plugin.version}</version>
         </plugin>
       </plugins>
     </pluginManagement>

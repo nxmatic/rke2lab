@@ -165,6 +165,38 @@
         </executions>
       </plugin>
       <plugin>
+        <groupId>dev.dimlight</groupId>
+        <artifactId>shellcheck-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>shellcheck-runtime-scripts</id>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>verify</phase>
+            <configuration>
+              <sourceDirs>
+                <sourceDir>
+                  <directory>${project.basedir}/src/main/resources</directory>
+                  <includes>
+                    <include>**/*.sh</include>
+                  </includes>
+                </sourceDir>
+              </sourceDirs>
+              <args>
+                <arg>-S</arg>
+                <arg>warning</arg>
+                <arg>-s</arg>
+                <arg>bash</arg>
+                <arg>--norc</arg>
+              </args>
+              <failBuildIfWarnings>false</failBuildIfWarnings>
+              <binaryResolutionMethod>embedded</binaryResolutionMethod>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
         <executions>

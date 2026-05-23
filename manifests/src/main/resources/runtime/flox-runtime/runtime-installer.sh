@@ -52,6 +52,7 @@ installer::logging:setup() {
 		DAEMONLESS_HOST_SCRIPT_ROOT="${HOST_SCRIPT_ROOT}"
 		DAEMONLESS_HOST_SCRIPT_BIN="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/bin"
 		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/.sh.d"
+		# shellcheck disable=SC2034  # Passed as env var to daemonless functions below
 		DAEMONSET_SCRIPT_LOG_DIR="${HOST_SCRIPT_ROOT%/}/log"
 		script_log_dir="$(daemonless::host_shell:log:resolve)"
 		;;
@@ -331,6 +332,7 @@ runtime::assets:path:init() {
 	FLOX_RUNTIME_ETC_DIR="${FLOX_RUNTIME_ROOT}/etc"
 	FLOX_RUNTIME_LOG_DIR="${FLOX_RUNTIME_ROOT}/log"
 	FLOX_RUNTIME_PACKAGE_FLAKE="${FLOX_RUNTIME_ROOT}/flake.nix"
+	# shellcheck disable=SC2034  # Used in future mesh integration
 	FLOX_RUNTIME_MESH_DIR="${FLOX_RUNTIME_ROOT}/mesh"
 	FLOX_RUNTIME_NETWORKING_DIR="${FLOX_RUNTIME_ROOT}/networking"
 	FLOX_RUNTIME_DEBUG_TOOLS_DIR="${FLOX_RUNTIME_ROOT}/debug-tools"
@@ -393,12 +395,13 @@ runtime::debug:tools:install() {
 
 	source_root="${FLOX_RUNTIME_DEBUG_TOOLS_DIR}"
 	target_root="${RKE2LAB_DEBUG_SHARE_ROOT}"
+	# shellcheck disable=SC2034  # Reserved for future force-install logic
 	force_install="${RKE2LAB_DEBUG_SHARE_FORCE_INSTALL:-false}"
 
 	mkdir -p "${target_root}"
 
 	while IFS= read -r -d '' source_path; do
-		relative="${source_path#${source_root}/}"
+		relative="${source_path#"${source_root}"/}"
 		target_path="${target_root%/}/${relative}"
 		install_mode="0644"
 
@@ -509,11 +512,6 @@ nri::plugin:binary:install() {
 
 runtime::runtime:core:install() {
 	: "Install/refresh flox runtime binaries on host"
-	local flox_env_dir arch containerd_bin variant
-
-	flox_env_dir="/var/lib/flox-runtime"
-	arch="$(uname -m)"
-
 	# NRI plugin approach: no longer install custom shim binaries
 	# The NRI plugin handles Flox environment injection instead
 	# runtime::runtime:env:ensure "${flox_env_dir}"
@@ -526,9 +524,10 @@ runtime::runtime:core:install() {
 }
 
 containerd::config:path:init() {
-	CONTAINERD_CONFIG_DIR="${CONTAINERD_CONFIG_DIR:-$(dirname ${CONTAINERD_CONFIG_FILE})}"
+	CONTAINERD_CONFIG_DIR="${CONTAINERD_CONFIG_DIR:-$(dirname "${CONTAINERD_CONFIG_FILE}")}"
 	CONTAINERD_CONFIG_FILE="${CONTAINERD_CONFIG_FILE:-${CONTAINERD_CONFIG_DIR}/config.toml}"
 	CONTAINERD_CONFIG_TEMPLATE="${CONTAINERD_CONFIG_FILE}.tmpl"
+	# shellcheck disable=SC2034  # Reserved for future template logic
 	CONTAINERD_CONFIG_BASENAME="$(basename --suffix=.toml "${CONTAINERD_CONFIG_FILE}")"
 }
 
@@ -573,7 +572,7 @@ containerd::config:flox:update() {
 		nri_plugin_root="io.containerd.nri.v1.nri"
 	fi
 	tmp="$(mktemp)" &&
-		trap "rm -f ${tmp}" RETURN
+		trap 'rm -f "${tmp}"' RETURN
 
 	"${DASEL_BIN}" -i toml -o yaml <"${CONTAINERD_CONFIG_TEMPLATE}" |
 		CRI_PLUGIN_ROOT="${plugin_root}" NRI_PLUGIN_ROOT="${nri_plugin_root}" "${YQ_BIN}" '
