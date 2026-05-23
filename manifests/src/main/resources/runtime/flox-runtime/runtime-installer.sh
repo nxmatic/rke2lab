@@ -386,27 +386,66 @@ runtime::debug:dlv:ensure() {
 runtime::debug:nri:configure() {
 	local systemd_override_dir="/etc/systemd/system/rke2-server.service.d"
 	local nri_debug_conf="${systemd_override_dir}/nri-debug.conf"
+	local nri_dlv_wrapper="/usr/local/bin/nri-plugin-dlv-wrapper"
 
 	if rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_FLOX_NRI_PLUGIN_ENABLED:-false}"; then
-		echo "Enabling NRI plugin debug mode via systemd environment"
+		echo "Enabling NRI plugin debug mode via dlv headless server"
 		mkdir -p "${systemd_override_dir}"
+
+		# Create dlv wrapper script that starts plugin under dlv headless server
+		cat >"${nri_dlv_wrapper}" <<-'EOF'
+			#!/bin/bash
+			# Wrapper to run NRI plugin under dlv headless server for remote debugging
+
+			DLV_PORT="${FLOX_NRI_DEBUG_PORT:-2345}"
+			PLUGIN_BINARY="/opt/nri/plugins/10-flox-real"
+
+			# Move original plugin aside if not already done
+			if [[ -f /opt/nri/plugins/10-flox ]] && [[ ! -f "${PLUGIN_BINARY}" ]]; then
+			    mv /opt/nri/plugins/10-flox "${PLUGIN_BINARY}"
+			fi
+
+			# Start plugin under dlv headless server, listening on all interfaces
+			exec dlv exec "${PLUGIN_BINARY}" \
+			    --headless \
+			    --listen=0.0.0.0:${DLV_PORT} \
+			    --api-version=2 \
+			    --accept-multiclient \
+			    --log \
+			    --log-output=debugger,rpc
+		EOF
+		chmod +x "${nri_dlv_wrapper}"
+
+		# Replace plugin binary with dlv wrapper
+		if [[ -f /opt/nri/plugins/10-flox ]] && [[ ! -f /opt/nri/plugins/10-flox-real ]]; then
+			mv /opt/nri/plugins/10-flox /opt/nri/plugins/10-flox-real
+			ln -sf "${nri_dlv_wrapper}" /opt/nri/plugins/10-flox
+		fi
 
 		cat >"${nri_debug_conf}" <<-'EOF'
 			[Service]
-			Environment="FLOX_NRI_DEBUG_SUSPEND=true"
 			Environment="FLOX_NRI_DEBUG_PORT=2345"
 		EOF
 
 		systemctl daemon-reload
-		echo "  NRI debug mode enabled: plugin will pause at startup for debugger attachment"
-		echo "  Attach with: dlv attach \$(pgrep -f 10-flox)"
+		echo "  NRI debug mode enabled: plugin will start under dlv headless server"
+		echo "  Connect from VS Code or: dlv connect bioskop-master.lan:2345"
 	else
+		# Restore original plugin if wrapper is in place
+		if [[ -f /opt/nri/plugins/10-flox-real ]]; then
+			echo "Disabling NRI plugin debug mode"
+			rm -f /opt/nri/plugins/10-flox
+			mv /opt/nri/plugins/10-flox-real /opt/nri/plugins/10-flox
+		fi
+
 		# Remove debug config if it exists
 		if [[ -f "${nri_debug_conf}" ]]; then
-			echo "Disabling NRI plugin debug mode"
 			rm -f "${nri_debug_conf}"
 			systemctl daemon-reload
 		fi
+
+		# Remove wrapper script
+		rm -f "${nri_dlv_wrapper}"
 	fi
 }
 
