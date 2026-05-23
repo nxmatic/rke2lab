@@ -417,10 +417,17 @@ runtime::debug:nri:configure() {
 		chmod +x "${nri_dlv_wrapper}"
 
 		# Replace plugin binary with dlv wrapper
-		if [[ -f /opt/nri/plugins/10-flox ]] && [[ ! -f /opt/nri/plugins/10-flox-real ]]; then
-			mv /opt/nri/plugins/10-flox /opt/nri/plugins/10-flox-real
-			ln -sf "${nri_dlv_wrapper}" /opt/nri/plugins/10-flox
+		# If 10-flox is a regular file (not a symlink), move it aside
+		if [[ -f /opt/nri/plugins/10-flox ]] && [[ ! -L /opt/nri/plugins/10-flox ]]; then
+			# Move the real binary if not already saved
+			if [[ ! -f /opt/nri/plugins/10-flox-real ]]; then
+				mv /opt/nri/plugins/10-flox /opt/nri/plugins/10-flox-real
+			else
+				rm -f /opt/nri/plugins/10-flox
+			fi
 		fi
+		# Ensure symlink is in place
+		ln -sf "${nri_dlv_wrapper}" /opt/nri/plugins/10-flox
 
 		cat >"${nri_debug_conf}" <<-'EOF'
 			[Service]
