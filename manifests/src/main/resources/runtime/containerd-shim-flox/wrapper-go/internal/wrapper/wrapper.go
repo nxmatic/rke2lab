@@ -76,6 +76,12 @@ func (w *Wrapper) Run(args []string) error {
 		}
 	}
 
+	if subcommand == "start" && shimNamespace != "" && shimID != "" {
+		if err := w.fixCgroupPath(logger, shimNamespace, shimID); err != nil {
+			logger.Log("cgroup path fix failed: %v", err)
+		}
+	}
+
 	if w.cfg.DebugEnabled {
 		if err := w.waitForDebugContinueGate(logger, shimNamespace, shimID); err != nil {
 			return err
@@ -88,6 +94,96 @@ func (w *Wrapper) Run(args []string) error {
 }
 func (w *Wrapper) execRealShim(args []string) error {
 	return syscall.Exec(w.cfg.RealShim, append([]string{w.cfg.RealShim}, args...), os.Environ())
+}
+
+func (w *Wrapper) fixCgroupPath(logger *Logger, shimNamespace, shimID string) error {
+	bundleConfigPath := filepath.Join(getenvDefault("CONTAINERD_SHIM_FLOX_V2_BUNDLE_ROOT", defaultBundleRoot), shimNamespace, shimID, "config.json")
+
+	payload, err := os.ReadFile(bundleConfigPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			logger.Log("cgroup fix: failed to read bundle config path=%s err=%v", bundleConfigPath, err)
+		}
+		return err
+	}
+
+	var config map[string]interface{}
+	if err := json.Unmarshal(payload, &config); err != nil {
+		logger.Log("cgroup fix: failed to parse bundle config path=%s err=%v", bundleConfigPath, err)
+		return err
+	}
+
+	linux, ok := config["linux"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	cgroupsPath, ok := linux["cgroupsPath"].(string)
+	if !ok || cgroupsPath == "" {
+		return nil
+	}
+
+	// Convert cgroupfs format to systemd format
+	// cgroupfs: /kubepods/burstable/pod<uid>/<container-id>
+	// systemd:  kubepods.slice:kubepods-burstable:pod<uid>:<container-id>
+	if !strings.HasPrefix(cgroupsPath, "/") {
+		// Already in systemd format
+		return nil
+	}
+
+	systemdPath := convertCgroupPathToSystemd(cgroupsPath)
+	if systemdPath == cgroupsPath {
+		// No conversion needed
+		return nil
+	}
+
+	linux["cgroupsPath"] = systemdPath
+
+	updatedPayload, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		logger.Log("cgroup fix: failed to marshal updated config path=%s err=%v", bundleConfigPath, err)
+		return err
+	}
+
+	if err := os.WriteFile(bundleConfigPath, updatedPayload, 0o644); err != nil {
+		logger.Log("cgroup fix: failed to write updated config path=%s err=%v", bundleConfigPath, err)
+		return err
+	}
+
+	logger.Log("cgroup fix: converted path=%s from=%s to=%s", bundleConfigPath, cgroupsPath, systemdPath)
+	return nil
+}
+
+func convertCgroupPathToSystemd(cgroupfsPath string) string {
+	// Remove leading slash and split by "/"
+	parts := strings.Split(strings.TrimPrefix(cgroupfsPath, "/"), "/")
+	if len(parts) == 0 {
+		return cgroupfsPath
+	}
+
+	// Build systemd format: slice:scope:unit
+	// /kubepods/burstable/pod<uid>/<container-id> → kubepods.slice:kubepods-burstable:pod<uid>:<container-id>
+	// /kubepods/besteffort/pod<uid>/<container-id> → kubepods.slice:kubepods-besteffort:pod<uid>:<container-id>
+	// /kubepods/pod<uid>/<container-id> → kubepods.slice:kubepods:pod<uid>:<container-id>
+
+	var result strings.Builder
+	for i, part := range parts {
+		if i == 0 {
+			// First component becomes a slice
+			result.WriteString(part)
+			result.WriteString(".slice")
+		} else if i == 1 && (part == "burstable" || part == "besteffort") {
+			// QoS class
+			result.WriteString(":kubepods-")
+			result.WriteString(part)
+		} else {
+			// Pod UID and container ID
+			result.WriteString(":")
+			result.WriteString(part)
+		}
+	}
+
+	return result.String()
 }
 
 func (w *Wrapper) launchRootfsSync(logger *Logger, shimNamespace, shimID string) error {
