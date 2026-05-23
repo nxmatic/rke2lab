@@ -844,6 +844,7 @@ containerd::config:flox:update() {
 	  del(.plugins."io.containerd.cri.v1.runtime".containerd.runtimes."flox-delve") |
       del(.plugins."io.containerd.grpc.v1.cri".containerd.runtimes.flox) |
 	  del(.plugins."io.containerd.grpc.v1.cri".containerd.runtimes."flox-delve") |
+      .plugins[env(CRI_PLUGIN_ROOT)].containerd.systemd_cgroup = true |
       .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.runtime_path = "/usr/local/bin/containerd-shim-flox-v2" |
       .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.runtime_type = "io.containerd.runc.v2" |
       .plugins[env(CRI_PLUGIN_ROOT)].containerd.runtimes.flox.pod_annotations = ["flox.dev/*"] |
