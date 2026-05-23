@@ -96,11 +96,6 @@
         <artifactId>rke2lab-systemd-contract</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
-      <dependency>
-        <groupId>io.nxmatic</groupId>
-        <artifactId>rke2lab-systemd-adapter</artifactId>
-        <version>${rke2lab.version}</version>
-      </dependency>
       <!-- third-party dependencies -->
       <dependency>
         <groupId>com.github.thjomnx</groupId>

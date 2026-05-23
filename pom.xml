@@ -14,7 +14,6 @@
     <module>bom</module>
     <module>netplan</module>
     <module>systemd-contract</module>
-    <module>systemd-adapter</module>
     <module>sdks/incus</module>
     <module>seed-bootstrap</module>
     <module>manifests</module>
