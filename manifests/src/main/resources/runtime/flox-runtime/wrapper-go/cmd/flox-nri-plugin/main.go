@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"runtime"
 	"syscall"
 
 	"github.com/containerd/nri/pkg/stub"
@@ -13,8 +12,8 @@ import (
 )
 
 const (
-	pluginName  = "flox"
-	pluginIdx   = "10" // Plugin execution order (lower runs first)
+	pluginName   = "flox"
+	pluginIdx    = "10" // Plugin execution order (lower runs first)
 	pluginSocket = "/var/run/nri/nri.sock"
 )
 
@@ -32,23 +31,6 @@ func main() {
 	}
 
 	log.Println("=== Flox NRI Plugin Starting ===")
-
-	// Check for startup debug mode
-	if os.Getenv("FLOX_NRI_DEBUG_SUSPEND") == "true" {
-		debugPort := os.Getenv("FLOX_NRI_DEBUG_PORT")
-		if debugPort == "" {
-			debugPort = "2345"
-		}
-		log.Printf("DEBUG SUSPEND MODE: Plugin paused at startup")
-		log.Printf("Attach debugger: dlv connect localhost:%s", debugPort)
-		log.Printf("Triggering breakpoint - attach debugger and continue to step through initialization")
-
-		// Trigger a breakpoint that debuggers can catch
-		// When debugger attaches and continues, execution proceeds normally
-		runtime.Breakpoint()
-
-		log.Printf("Breakpoint passed, continuing with initialization...")
-	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -82,11 +64,15 @@ func main() {
 	}
 	log.Println("NRI stub created successfully")
 
-	// Start the plugin
+	// Start the plugin (this handles registration and Configure callback)
 	log.Printf("Starting flox NRI plugin (socket: %s, index: %s)...", pluginSocket, pluginIdx)
-	if err := nriStub.Run(ctx); err != nil {
-		log.Fatalf("Plugin stopped with error: %v", err)
+	if err := nriStub.Start(ctx); err != nil {
+		log.Fatalf("Failed to start plugin: %v", err)
 	}
+	log.Println("Plugin started and registered successfully")
+
+	// Wait for plugin to stop (blocks until context cancelled or error)
+	nriStub.Wait()
 
 	log.Println("Flox NRI plugin stopped gracefully")
 }

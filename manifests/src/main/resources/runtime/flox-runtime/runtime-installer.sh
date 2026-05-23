@@ -398,7 +398,7 @@ runtime::debug:nri:configure() {
 			# Wrapper to run NRI plugin under dlv headless server for remote debugging
 
 			DLV_PORT="${FLOX_NRI_DEBUG_PORT:-2345}"
-			PLUGIN_BINARY="/opt/nri/plugins/10-flox-real"
+			PLUGIN_BINARY="/opt/nri/.flox-nri-plugin-real"
 			FLOX_ENV="/var/lib/rancher/rke2"
 
 			# Move original plugin aside if not already done
@@ -407,8 +407,7 @@ runtime::debug:nri:configure() {
 			fi
 
 			# Activate Flox environment to get dlv in PATH, then start plugin under dlv
-			cd "${FLOX_ENV}"
-			exec flox activate -- dlv exec "${PLUGIN_BINARY}" \
+			exec flox activate --dir "${FLOX_ENV}" -- dlv exec "${PLUGIN_BINARY}" \
 			    --headless \
 			    --listen=0.0.0.0:${DLV_PORT} \
 			    --api-version=2 \
@@ -422,8 +421,8 @@ runtime::debug:nri:configure() {
 		# If 10-flox is a regular file (not a symlink), move it aside
 		if [[ -f /opt/nri/plugins/10-flox ]] && [[ ! -L /opt/nri/plugins/10-flox ]]; then
 			# Move the real binary if not already saved
-			if [[ ! -f /opt/nri/plugins/10-flox-real ]]; then
-				mv /opt/nri/plugins/10-flox /opt/nri/plugins/10-flox-real
+			if [[ ! -f /opt/nri/.flox-nri-plugin-real ]]; then
+				mv /opt/nri/plugins/10-flox /opt/nri/.flox-nri-plugin-real
 			else
 				rm -f /opt/nri/plugins/10-flox
 			fi
@@ -441,10 +440,10 @@ runtime::debug:nri:configure() {
 		echo "  Connect from VS Code or: dlv connect bioskop-master.lan:2345"
 	else
 		# Restore original plugin if wrapper is in place
-		if [[ -f /opt/nri/plugins/10-flox-real ]]; then
+		if [[ -f /opt/nri/.flox-nri-plugin-real ]]; then
 			echo "Disabling NRI plugin debug mode"
 			rm -f /opt/nri/plugins/10-flox
-			mv /opt/nri/plugins/10-flox-real /opt/nri/plugins/10-flox
+			mv /opt/nri/.flox-nri-plugin-real /opt/nri/plugins/10-flox
 		fi
 
 		# Remove debug config if it exists

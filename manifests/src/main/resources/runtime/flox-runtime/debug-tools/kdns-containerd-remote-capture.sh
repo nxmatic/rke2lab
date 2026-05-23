@@ -8,7 +8,6 @@ rke2lab::debug:flox:activate_if_present
 
 CRI_CONFIG_FILE="${CRI_CONFIG_FILE:-/var/lib/rancher/rke2/agent/etc/crictl.yaml}"
 CONTAINERD_LOG_FILE="${CONTAINERD_LOG_FILE:-/var/lib/rancher/rke2/agent/containerd/containerd.log}"
-SHIM_DEBUG_ROOT="${SHIM_DEBUG_ROOT:-/srv/host/rke2lab-share.d/containerd-shim-debug}"
 REPRO_SCRIPT="${REPRO_SCRIPT:-/srv/host/rke2lab-share.d/crictl-kdns-repro.sh}"
 RUN_REPRO="${RUN_REPRO:-0}"
 REPRO_SANDBOX_ONLY="${REPRO_SANDBOX_ONLY:-0}"
@@ -143,7 +142,6 @@ capture_current_state() {
 	cat <<EOF | tee "${WORKDIR}/host-paths.txt"
 CRI_CONFIG_FILE=${CRI_CONFIG_FILE}
 CONTAINERD_LOG_FILE=${CONTAINERD_LOG_FILE}
-SHIM_DEBUG_ROOT=${SHIM_DEBUG_ROOT}
 REPRO_SCRIPT=${REPRO_SCRIPT}
 RUN_REPRO=${RUN_REPRO}
 REPRO_SANDBOX_ONLY=${REPRO_SANDBOX_ONLY}
@@ -293,36 +291,7 @@ capture_containerd_logs() {
 	fi
 }
 
-capture_shim_debug() {
-	section "latest shim debug runs"
-	if [[ ! -d "${SHIM_DEBUG_ROOT}" ]]; then
-		echo "missing shim debug root: ${SHIM_DEBUG_ROOT}" | tee "${WORKDIR}/shim-debug-missing.txt"
-		return 0
-	fi
-
-	find "${SHIM_DEBUG_ROOT}" -mindepth 1 -maxdepth 1 -type d | sort -r | head -n "${LATEST_DEBUG_RUNS}" | tee "${WORKDIR}/latest-shim-runs.txt"
-
-	while IFS= read -r run_dir; do
-		[[ -n "${run_dir}" ]] || continue
-		run_name="$(basename "${run_dir}")"
-		section "shim run ${run_name}"
-		{
-			echo "RUN_DIR=${run_dir}"
-			for f in wrapper.log shim.stdout.log shim.stderr.log live-attach.log live-attach.meta command-trace.log argv.txt env.txt; do
-				if [[ -f "${run_dir}/${f}" ]]; then
-					echo
-					echo "--- ${f} ---"
-					tail -n 120 "${run_dir}/${f}" || true
-				fi
-			done
-			echo
-			echo "--- grepped live strace ---"
-			grep -iE \
-				'ttrpc|failed|error|panic|SIG[A-Z]+|exited with|No such file|permission denied|create-time spec mutation failed|nix path-info|flox.conf' \
-				"${run_dir}"/live-strace.* 2>/dev/null | tail -n 200 || true
-		} | tee "${WORKDIR}/shim-${run_name}.txt"
-	done <"${WORKDIR}/latest-shim-runs.txt"
-}
+# capture_shim_debug removed - obsolete with NRI plugin approach
 
 run_repro_if_requested() {
 	if [[ "${RUN_REPRO}" != "1" ]]; then
@@ -348,7 +317,6 @@ full)
 	capture_current_state
 	capture_bundle_flox_views
 	capture_containerd_logs
-	capture_shim_debug
 	run_repro_if_requested
 	wait_for_bundle_watcher
 	;;

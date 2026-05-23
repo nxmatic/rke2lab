@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# OBSOLETE: This script was designed for the old containerd-shim-flox wrapper approach.
+# With the NRI plugin migration, debugging works differently:
+# - NRI plugin debug: Set policy.debug.floxNriPlugin.enabled=true via Pulumi
+# - kdns pod debug: Set policy.debug.kdns.suspend=true and attach to kdns container process
+#
+# This script is kept for historical reference only.
+
+echo "ERROR: rke2lab-runtime-dlv is obsolete." >&2
+echo "The NRI plugin approach uses different debugging mechanisms:" >&2
+echo "  - NRI plugin: policy.debug.floxNriPlugin.enabled=true" >&2
+echo "  - kdns pod: policy.debug.kdns.suspend=true + kubectl debug" >&2
+exit 1
+
 WRAPPER_BIN_NAME="flox-runtime-delve-v2"
 CONTINUE_FILE_PREFIX="/tmp/flox-runtime-v2-wrapper-continue"
 DLV_LISTEN="0.0.0.0:59333"

@@ -1,8 +1,17 @@
 # kdns CrashLoopBackOff Diagnostic
 
+> **OBSOLETE**: This document describes issues with the old containerd-shim-flox approach.
+> The cgroup path issue was **fixed by migrating to NRI (Node Resource Interface) plugin**.
+> NRI plugins do not control cgroup paths - containerd handles this correctly.
+>
+> Kept for historical reference only.
+
+---
+
 **Date**: 2026-05-23  
 **Issue**: kdns containers start but immediately crash with exit 255  
-**Tool**: `crictl-kdns-repro.sh`
+**Tool**: `crictl-kdns-repro.sh`  
+**Status**: Fixed by NRI migration
 
 ## Problem Summary
 

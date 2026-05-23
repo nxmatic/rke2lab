@@ -9,26 +9,26 @@ rke2lab::debug:logging:setup "${BASH_SOURCE[0]}"
 usage() {
 	cat <<'EOF'
 Usage:
-  attach_live_flox_runtime_strace.sh --shim-id <sandbox-id> [--log-root <dir>] [--output-dir <dir>]
-  attach_live_flox_runtime_strace.sh --pid <shim-pid> [--log-root <dir>] [--output-dir <dir>]
+  attach_live_flox_runtime_strace.sh --plugin-id <sandbox-id> [--log-root <dir>] [--output-dir <dir>]
+  attach_live_flox_runtime_strace.sh --pid <plugin-pid> [--log-root <dir>] [--output-dir <dir>]
 
 Description:
-  Finds the long-lived flox-runtime-v2 daemon for a sandbox and attaches strace to all
-  currently running threads. This captures the post-start Create RPC path, which
-  is where create-time spec mutation and any nix/flox subprocesses should appear.
+  Finds the NRI plugin process (flox-nri-plugin) for a sandbox and attaches strace to all
+  currently running threads. This captures the CreateContainer hook path, which
+  is where mount injection and Flox environment resolution happens.
 
 Notes:
-  - Run as root on the node hosting the shim.
-  - Leave the command running, then trigger the failing pod creation.
-  - Stop with Ctrl-C after the failure reproduces.
+  - Run as root on the node hosting the NRI plugin.
+  - Leave the command running, then trigger pod creation.
+  - Stop with Ctrl-C after the failure reproduces or operation completes.
 EOF
 }
 
-LOG_ROOT_DEFAULT="/srv/host/rke2lab-share.d/flox-runtime-debug"
+LOG_ROOT_DEFAULT="/srv/host/rke2lab-share.d/flox-nri-plugin-debug"
 LOG_ROOT="${LOG_ROOT_DEFAULT}"
 OUTPUT_DIR=""
 TARGET_PID=""
-TARGET_SHIM_ID=""
+TARGET_PLUGIN_ID=""
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -36,8 +36,8 @@ while [[ $# -gt 0 ]]; do
 		TARGET_PID="${2:-}"
 		shift 2
 		;;
-	--shim-id | --id)
-		TARGET_SHIM_ID="${2:-}"
+	--plugin-id | --id)
+		TARGET_PLUGIN_ID="${2:-}"
 		shift 2
 		;;
 	--log-root)
@@ -60,8 +60,8 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-if [[ -z "${TARGET_PID}" && -z "${TARGET_SHIM_ID}" ]]; then
-	echo "either --pid or --shim-id is required" >&2
+if [[ -z "${TARGET_PID}" && -z "${TARGET_PLUGIN_ID}" ]]; then
+	echo "either --pid or --plugin-id is required" >&2
 	usage >&2
 	exit 2
 fi
@@ -85,7 +85,7 @@ fi
 
 if [[ -z "${TARGET_PID}" ]]; then
 	TARGET_PID="$(
-		python3 - "${TARGET_SHIM_ID}" <<'PY'
+		python3 - "${TARGET_PLUGIN_ID}" <<'PY'
 import os
 import sys
 
@@ -106,15 +106,15 @@ for entry in os.listdir('/proc'):
     if not argv:
         continue
     joined = ' '.join(argv)
-    if 'flox-runtime-v2' not in joined:
+    if 'flox-nri-plugin' not in joined:
         continue
     if '-id' not in argv:
         continue
     try:
-        shim_id = argv[argv.index('-id') + 1]
+        plugin_id = argv[argv.index('-id') + 1]
     except (ValueError, IndexError):
         continue
-    if shim_id != target:
+    if plugin_id != target:
         continue
     if 'start' in argv:
         continue
@@ -127,7 +127,7 @@ matches.sort()
 print(matches[-1][0])
 PY
 	)" || {
-		echo "could not find a live flox-runtime-v2 daemon for sandbox id ${TARGET_SHIM_ID}" >&2
+		echo "could not find a live flox-nri-plugin daemon for sandbox id ${TARGET_PLUGIN_ID}" >&2
 		exit 1
 	}
 fi
@@ -167,11 +167,11 @@ if [[ ${#CMDLINE[@]} -eq 0 ]]; then
 	exit 1
 fi
 
-if [[ -z "${TARGET_SHIM_ID}" ]]; then
+if [[ -z "${TARGET_PLUGIN_ID}" ]]; then
 	prev=""
 	for arg in "${CMDLINE[@]}"; do
 		if [[ "${prev}" == "-id" ]]; then
-			TARGET_SHIM_ID="${arg}"
+			TARGET_PLUGIN_ID="${arg}"
 			break
 		fi
 		prev="${arg}"
@@ -247,8 +247,8 @@ fi
 
 {
 	echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-	echo "shim_pid=${TARGET_PID}"
-	echo "shim_id=${TARGET_SHIM_ID:-<unknown>}"
+	echo "plugin_pid=${TARGET_PID}"
+	echo "plugin_id=${TARGET_PLUGIN_ID:-<unknown>}"
 	echo "cwd=${CWD:-<unknown>}"
 	echo "log_root=${LOG_ROOT}"
 	echo "wrapper_run_dir=${WRAPPER_RUN_DIR:-<none>}"
@@ -264,9 +264,9 @@ fi
 	read_proc_value "${ENVIRON_FILE}" | grep -E '^(PATH|FLOX|NIX|RUST_LOG|RUST_BACKTRACE|_FLOX)' || true
 } >"${META_FILE}"
 
-printf 'Attaching to live flox-runtime-v2 daemon\n'
+printf 'Attaching to live flox-nri-plugin daemon\n'
 printf '  pid: %s\n' "${TARGET_PID}"
-printf '  shim id: %s\n' "${TARGET_SHIM_ID:-<unknown>}"
+printf '  shim id: %s\n' "${TARGET_PLUGIN_ID:-<unknown>}"
 printf '  output dir: %s\n' "${OUTPUT_DIR}"
 printf '  strace prefix: %s\n' "${PREFIX}"
 if [[ -n "${COMMAND_TRACE_HINT}" ]]; then

@@ -260,8 +260,8 @@ public final class ClusterBootstrapReadinessVerifier {
       final String resourceRef = controllerRef.kind() + "/" + controllerRef.name();
       final boolean kdnsSuspendActive =
           isKdnsControllerRef(controllerRef) && policy.debug().kdnsSuspend();
-      final ShimDebugSuspendMonitor shimMonitor =
-          kdnsSuspendActive ? ShimDebugSuspendMonitor.start(kubeconfigPath) : null;
+      final KdnsDebugMonitor debugMonitor =
+          kdnsSuspendActive ? KdnsDebugMonitor.start(kubeconfigPath) : null;
 
       final ControllerVerification failure;
       try {
@@ -323,8 +323,8 @@ public final class ClusterBootstrapReadinessVerifier {
           }
         }
       } finally {
-        if (shimMonitor != null) {
-          shimMonitor.stop();
+        if (debugMonitor != null) {
+          debugMonitor.stop();
         }
       }
 
@@ -533,11 +533,15 @@ public final class ClusterBootstrapReadinessVerifier {
       boolean ready, String detail, List<String> requiredControllerRefs) {}
 
   /**
-   * Background poller that surfaces "shim wrapper parked at debug-suspend gate" hints in the Pulumi
-   * log while the kdns rollout is being awaited. Intended to be used as a try/finally sentinel
-   * around a single long-running {@code kubectl wait}/{@code kubectl rollout status} call.
+   * Background poller that surfaces kdns pod debug suspension hints in the Pulumi log while the
+   * kdns rollout is being awaited. When {@code policy.debug.kdns.suspend=true}, kdns pods may be
+   * paused at startup waiting for debugger attach. This monitor detects such pods and provides
+   * operator guidance.
+   *
+   * <p>Intended to be used as a try/finally sentinel around a single long-running {@code kubectl
+   * wait}/{@code kubectl rollout status} call.
    */
-  private static final class ShimDebugSuspendMonitor {
+  private static final class KdnsDebugMonitor {
 
     private static final Duration POLL_INTERVAL = Duration.ofSeconds(15);
 
@@ -545,36 +549,39 @@ public final class ClusterBootstrapReadinessVerifier {
     private final java.util.concurrent.atomic.AtomicBoolean stopped =
         new java.util.concurrent.atomic.AtomicBoolean(false);
 
-    private ShimDebugSuspendMonitor(Thread thread) {
+    private KdnsDebugMonitor(Thread thread) {
       this.thread = thread;
     }
 
-    static ShimDebugSuspendMonitor start(Path kubeconfigPath) {
+    static KdnsDebugMonitor start(Path kubeconfigPath) {
       final Map<String, Long> reportedAt = new ConcurrentHashMap<>();
       final Thread t =
           new Thread(
               () -> {
                 while (!Thread.currentThread().isInterrupted()) {
                   try {
-                    final List<ShimDebugSuspendProbe.SuspendedShim> suspended =
-                        ShimDebugSuspendProbe.probe(kubeconfigPath);
+                    final List<KdnsDebugProbe.SuspendedPod> suspended =
+                        KdnsDebugProbe.probe(kubeconfigPath);
                     final long now = System.nanoTime();
-                    for (ShimDebugSuspendProbe.SuspendedShim shim : suspended) {
-                      final String key = shim.namespace() + "/" + shim.podName();
+                    for (KdnsDebugProbe.SuspendedPod pod : suspended) {
+                      final String key = pod.namespace() + "/" + pod.podName();
                       reportedAt.computeIfAbsent(
                           key,
                           k -> {
                             logInfo(
-                                "kdns sandbox creation paused — wrapper waiting for operator"
-                                    + " attach (pod="
-                                    + shim.podName()
+                                "kdns pod stuck in ContainerCreating state (pod="
+                                    + pod.podName()
                                     + " namespace="
-                                    + shim.namespace()
-                                    + ") — operator action: ssh root@<master>"
-                                    + " 'rke2lab-shim-dlv list && rke2lab-shim-dlv attach"
-                                    + " <namespace> <id>'; in VS Code launch \"Attach to Shim"
-                                    + " Wrapper Delve (remote)\" host=<master>; finally"
-                                    + " 'rke2lab-shim-dlv resume <namespace> <id>'");
+                                    + pod.namespace()
+                                    + "). If debug suspend is enabled, attach debugger to kdns container."
+                                    + " Check pod logs: kubectl -n "
+                                    + pod.namespace()
+                                    + " logs "
+                                    + pod.podName()
+                                    + " or describe pod: kubectl -n "
+                                    + pod.namespace()
+                                    + " describe pod "
+                                    + pod.podName());
                             return now;
                           });
                     }
@@ -601,10 +608,10 @@ public final class ClusterBootstrapReadinessVerifier {
                   }
                 }
               },
-              "rke2lab-shim-debug-suspend-monitor");
+              "rke2lab-kdns-debug-monitor");
       t.setDaemon(true);
       t.start();
-      return new ShimDebugSuspendMonitor(t);
+      return new KdnsDebugMonitor(t);
     }
 
     void stop() {

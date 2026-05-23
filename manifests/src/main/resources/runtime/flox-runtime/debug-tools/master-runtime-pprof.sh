@@ -9,7 +9,7 @@ DEFAULT_CONTAINERD_ADDRESS="${RKE2LAB_CONTAINERD_ADDRESS:-/run/k3s/containerd/co
 DEFAULT_CONTAINERD_NAMESPACE="${RKE2LAB_CONTAINERD_NAMESPACE:-k8s.io}"
 REMOTE_FLOX_DIR="${RKE2LAB_REMOTE_FLOX_DIR:-/var/lib/rancher/rke2}"
 DEFAULT_PPROF_TIMEOUT="${RKE2LAB_PPROF_TIMEOUT:-15s}"
-LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/master-shim-pprof.log}"
+LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/master-nri-plugin-pprof.log}"
 LOG_MODE="${LOG_MODE:-truncate}"
 
 rke2lab::debug:logging:setup "${BASH_SOURCE[0]}"
@@ -21,16 +21,16 @@ Usage:
 
 Commands:
   list
-      List live Flox shim processes seen on the master.
+      List live Flox NRI plugin processes seen on the master.
 
-  goroutines [shim-id-or-prefix] [pprof-args...]
-  heap [shim-id-or-prefix] [pprof-args...]
-  profile [shim-id-or-prefix] [pprof-args...]
-  trace [shim-id-or-prefix] [pprof-args...]
-  block [shim-id-or-prefix] [pprof-args...]
-  threadcreate [shim-id-or-prefix] [pprof-args...]
-      Run ctr shim pprof for the selected live Flox shim.
-      If no shim ID is provided, the newest live Flox shim is selected.
+  goroutines [plugin-id-or-prefix] [pprof-args...]
+  heap [plugin-id-or-prefix] [pprof-args...]
+  profile [plugin-id-or-prefix] [pprof-args...]
+  trace [plugin-id-or-prefix] [pprof-args...]
+  block [plugin-id-or-prefix] [pprof-args...]
+  threadcreate [plugin-id-or-prefix] [pprof-args...]
+      Run ctr shim pprof for the selected live Flox NRI plugin.
+      If no plugin ID is provided, the newest live Flox NRI plugin is selected.
 
 Global options:
   --address PATH         Default containerd socket path (default: ${DEFAULT_CONTAINERD_ADDRESS})
@@ -134,12 +134,12 @@ resolve_remote_ctr() {
 	die "could not find ctr in the activated Flox environment"
 }
 
-collect_live_containerd_shim_flox_v2s() {
+collect_live_nri_plugins() {
 	local ps_output
 	ps_output="$(ps -ww -eo pid=,args= --sort=-pid)"
 	[[ -n "${ps_output}" ]] || return 0
 
-	local line trimmed pid argv shim_id namespace address debug_socket main_listener debug_listener token prev
+	local line trimmed pid argv plugin_id namespace address debug_socket main_listener debug_listener token prev
 	while IFS= read -r line; do
 		[[ -n "${line}" ]] || continue
 		trimmed="${line#"${line%%[![:space:]]*}"}"
@@ -148,7 +148,7 @@ collect_live_containerd_shim_flox_v2s() {
 		[[ -n "${pid}" && -n "${argv}" ]] || continue
 		[[ "${argv}" == *flox-runtime-v2* ]] || continue
 
-		shim_id=""
+		plugin_id=""
 		namespace="${DEFAULT_CONTAINERD_NAMESPACE}"
 		address="${DEFAULT_CONTAINERD_ADDRESS}"
 		debug_socket="-"
@@ -157,7 +157,7 @@ collect_live_containerd_shim_flox_v2s() {
 		for token in ${argv}; do
 			case "${prev}" in
 			-id)
-				shim_id="${token}"
+				plugin_id="${token}"
 				;;
 			-namespace)
 				namespace="${token}"
@@ -174,14 +174,14 @@ collect_live_containerd_shim_flox_v2s() {
 
 		main_listener="-"
 		debug_listener="-"
-		if [[ "${shim_id}" =~ ^[0-9a-f]{64}$ ]]; then
-			main_listener="$(hash_logical_path "${address}/${namespace}/${shim_id}")"
-			debug_listener="$(hash_logical_path "${address}/${namespace}/${shim_id}/debug")"
+		if [[ "${plugin_id}" =~ ^[0-9a-f]{64}$ ]]; then
+			main_listener="$(hash_logical_path "${address}/${namespace}/${plugin_id}")"
+			debug_listener="$(hash_logical_path "${address}/${namespace}/${plugin_id}/debug")"
 		fi
 
 		printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
 			"${pid}" \
-			"${shim_id:--}" \
+			"${plugin_id:--}" \
 			"${namespace:--}" \
 			"${address:--}" \
 			"${debug_socket:--}" \
@@ -191,18 +191,18 @@ collect_live_containerd_shim_flox_v2s() {
 	done < <(printf '%s\n' "${ps_output}")
 }
 
-print_live_containerd_shim_flox_v2s() {
+print_live_nri_plugins() {
 	local rows
-	rows="$(collect_live_containerd_shim_flox_v2s)"
+	rows="$(collect_live_nri_plugins)"
 	if [[ -z "${rows}" ]]; then
 		echo "no live flox-runtime-v2 processes found on this host"
 		return 0
 	fi
 
 	printf 'host=%s\n' "$(hostname)"
-	printf '%-8s %-64s %-8s %s\n' "pid" "shim-id" "ns" "debug-listener"
-	while IFS=$'\t' read -r pid shim_id namespace address debug_socket main_listener debug_listener argv; do
-		printf '%-8s %-64s %-8s %s\n' "${pid}" "${shim_id}" "${namespace}" "${debug_listener:-<missing>}"
+	printf '%-8s %-64s %-8s %s\n' "pid" "plugin-id" "ns" "debug-listener"
+	while IFS=$'\t' read -r pid plugin_id namespace address debug_socket main_listener debug_listener argv; do
+		printf '%-8s %-64s %-8s %s\n' "${pid}" "${plugin_id}" "${namespace}" "${debug_listener:-<missing>}"
 		printf '  address=%s\n' "${address}"
 		printf '  debug-socket=%s\n' "${debug_socket:-<missing>}"
 		printf '  main-listener=%s\n' "${main_listener:-<missing>}"
@@ -213,7 +213,7 @@ print_live_containerd_shim_flox_v2s() {
 select_live_shim() {
 	local selector="${1:-}"
 	local rows matches match_count
-	rows="$(collect_live_containerd_shim_flox_v2s)"
+	rows="$(collect_live_nri_plugins)"
 	[[ -n "${rows}" ]] || die "no live flox-runtime-v2 processes found on this host"
 
 	if [[ -z "${selector}" ]]; then
@@ -222,7 +222,7 @@ select_live_shim() {
 	fi
 
 	matches="$(printf '%s\n' "${rows}" | awk -F '\t' -v selector="${selector}" '($2 == selector) || (index($2, selector) == 1) { print }')"
-	[[ -n "${matches}" ]] || die "no live Flox shim matches selector '${selector}'"
+	[[ -n "${matches}" ]] || die "no live Flox NRI plugin matches selector '${selector}'"
 
 	match_count="$(printf '%s\n' "${matches}" | awk 'NF { count++ } END { print count + 0 }')"
 	if [[ "${match_count}" -gt 1 ]]; then
@@ -260,15 +260,15 @@ run_pprof() {
 		esac
 	done
 
-	local target_line pid shim_id namespace address debug_socket main_listener debug_listener argv
+	local target_line pid plugin_id namespace address debug_socket main_listener debug_listener argv
 	target_line="$(select_live_shim "${selector}")"
-	IFS=$'\t' read -r pid shim_id namespace address debug_socket main_listener debug_listener argv <<<"${target_line}"
+	IFS=$'\t' read -r pid plugin_id namespace address debug_socket main_listener debug_listener argv <<<"${target_line}"
 
-	if [[ ${#shim_id} -ne 64 ]]; then
-		die "selected shim id appears truncated (${shim_id}); rerun after verifying ps output is not truncated"
+	if [[ ${#plugin_id} -ne 64 ]]; then
+		die "selected shim id appears truncated (${plugin_id}); rerun after verifying ps output is not truncated"
 	fi
 
-	printf 'selected shim pid=%s id=%s namespace=%s\n' "${pid}" "${shim_id}" "${namespace}" >&2
+	printf 'selected shim pid=%s id=%s namespace=%s\n' "${pid}" "${plugin_id}" "${namespace}" >&2
 	printf '  address=%s\n' "${address}" >&2
 	printf '  debug-socket=%s\n' "${debug_socket:-<missing>}" >&2
 	printf '  main-listener=%s\n' "${main_listener:-<missing>}" >&2
@@ -276,7 +276,7 @@ run_pprof() {
 	printf '  timeout=%s\n' "${pprof_timeout}" >&2
 
 	local ec=0
-	run_with_timeout "${pprof_timeout}" "${ctr_bin}" --address "${address}" --namespace "${namespace}" shim --id "${shim_id}" pprof "${pprof_command}" "$@" || ec=$?
+	run_with_timeout "${pprof_timeout}" "${ctr_bin}" --address "${address}" --namespace "${namespace}" shim --id "${plugin_id}" pprof "${pprof_command}" "$@" || ec=$?
 	if [[ "${ec}" -ne 0 ]]; then
 		if [[ "${ec}" -eq 124 ]]; then
 			die "pprof command timed out after ${pprof_timeout}; rerun with --timeout 0 to disable or a larger duration"
@@ -330,7 +330,7 @@ fi
 
 case "${command_name}" in
 list)
-	print_live_containerd_shim_flox_v2s
+	print_live_nri_plugins
 	;;
 goroutines | heap | profile | trace | block | threadcreate)
 	run_pprof "${command_name}" "$@"
