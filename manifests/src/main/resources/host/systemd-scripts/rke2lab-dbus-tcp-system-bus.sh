@@ -2,7 +2,7 @@
 
 # @codebase
 # Enable DBus system bus TCP access on the master node for private-lab diagnostics.
-# Canonical behavior only: unix socket remains active, tcp listener is added on vmnet0.
+# Canonical behavior: unix socket remains active, tcp listener is added on all interfaces.
 
 : "Load environment variables from mounted section manifests"
 source /srv/host/systemd-scripts.d/rke2lab-env-load.sh
@@ -12,22 +12,8 @@ if [[ "${RKE2LAB_NODE_NAME:-}" != "master" ]]; then
 	exit 0
 fi
 
-if ! command -v ip >/dev/null 2>&1; then
-	echo "[rke2lab-dbus-tcp] missing required command: ip" >&2
-	exit 1
-fi
-
 dbus_port="${RKE2LAB_DBUS_TCP_PORT:-12434}"
-dbus_bind_address="${RKE2LAB_DBUS_TCP_BIND_ADDRESS:-}"
-
-if [[ -z "${dbus_bind_address}" ]]; then
-	dbus_bind_address="$(ip -o -4 addr show dev vmnet0 | awk '{print $4}' | cut -d/ -f1 | head -n1)"
-fi
-
-if [[ -z "${dbus_bind_address}" ]]; then
-	echo "[rke2lab-dbus-tcp] unable to resolve vmnet0 ipv4 address" >&2
-	exit 1
-fi
+dbus_bind_address="${RKE2LAB_DBUS_TCP_BIND_ADDRESS:-0.0.0.0}"
 
 dbus_socket_dropin_dir="/etc/systemd/system/dbus.socket.d"
 dbus_socket_dropin_file="${dbus_socket_dropin_dir}/40-rke2lab-tcp.conf"

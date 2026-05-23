@@ -339,7 +339,7 @@ public record BootstrapConfig(
 
     private static final String SYSTEMD_ADAPTER_DBUS_PORT_ENV = "RKE2LAB_SYSTEMD_ADAPTER_DBUS_PORT";
 
-    private static final String DEFAULT_SYSTEMD_ADAPTER_DBUS_HOST = "10.80.0.10";
+    private static final String DEFAULT_SYSTEMD_ADAPTER_DBUS_HOST = "bioskop-master";
 
     private static final int DEFAULT_SYSTEMD_ADAPTER_DBUS_PORT = 12434;
 
