@@ -14,7 +14,7 @@ config:
   "rke2lab:network.vmnetNetworkName": vmnet-br
   "rke2lab:api.endpoint": https://10.66.106.10:6443
   "rke2lab:policy.debug.kdns.enabled": "true"
-  "rke2lab:policy.debug.kdns.suspend": "true"
+  "rke2lab:policy.debug.kdns.suspend": "false"
   "rke2lab:policy.debug.containerdShimFloxV2Wrapper.enabled": "true"
   "rke2lab:policy.link.highAvailability.enabled": "true"
   "rke2lab:policy.link.networking.enabled": "true"

@@ -48,6 +48,11 @@
 
           gcflags = lib.optionals debug ["all=-N -l"];
 
+          # nixpkgs's buildGoModule runs `strip` in its fixup phase by default,
+          # which removes the DWARF sections the linker just preserved.  Disable
+          # stripping in debug builds so dlv can resolve file:line breakpoints.
+          dontStrip = debug;
+
           postInstall = ''
             runHook postInstallPre
 
