@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 
 	"github.com/containerd/nri/pkg/stub"
@@ -31,6 +32,23 @@ func main() {
 	}
 
 	log.Println("=== Flox NRI Plugin Starting ===")
+
+	// Check for startup debug mode
+	if os.Getenv("FLOX_NRI_DEBUG_SUSPEND") == "true" {
+		debugPort := os.Getenv("FLOX_NRI_DEBUG_PORT")
+		if debugPort == "" {
+			debugPort = "2345"
+		}
+		log.Printf("DEBUG SUSPEND MODE: Plugin paused at startup")
+		log.Printf("Attach debugger: dlv connect localhost:%s", debugPort)
+		log.Printf("Triggering breakpoint - attach debugger and continue to step through initialization")
+
+		// Trigger a breakpoint that debuggers can catch
+		// When debugger attaches and continues, execution proceeds normally
+		runtime.Breakpoint()
+
+		log.Printf("Breakpoint passed, continuing with initialization...")
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
