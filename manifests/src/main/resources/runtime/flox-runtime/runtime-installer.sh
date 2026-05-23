@@ -367,8 +367,7 @@ runtime::assets:path:validate() {
 }
 
 runtime::debug:any_enabled() {
-	rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}" ||
-		rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_FLOX_NRI_PLUGIN_ENABLED:-false}"
+	rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}"
 }
 
 runtime::debug:dlv:ensure() {
@@ -384,77 +383,13 @@ runtime::debug:dlv:ensure() {
 }
 
 runtime::debug:nri:configure() {
-	local systemd_override_dir="/etc/systemd/system/rke2-server.service.d"
-	local nri_debug_conf="${systemd_override_dir}/nri-debug.conf"
-	local nri_dlv_wrapper="/usr/local/bin/nri-plugin-dlv-wrapper"
-
-	if rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_FLOX_NRI_PLUGIN_ENABLED:-false}"; then
-		echo "Enabling NRI plugin debug mode via dlv headless server"
-		mkdir -p "${systemd_override_dir}"
-
-		# Create dlv wrapper script that starts plugin under dlv headless server
-		cat >"${nri_dlv_wrapper}" <<-'EOF'
-			#!/bin/bash
-			# Wrapper to run NRI plugin under dlv headless server for remote debugging
-
-			DLV_PORT="${FLOX_NRI_DEBUG_PORT:-2345}"
-			PLUGIN_BINARY="/opt/nri/.flox-nri-plugin-real"
-			FLOX_ENV="/var/lib/rancher/rke2"
-
-			# Move original plugin aside if not already done
-			if [[ -f /opt/nri/plugins/10-flox ]] && [[ ! -f "${PLUGIN_BINARY}" ]]; then
-			    mv /opt/nri/plugins/10-flox "${PLUGIN_BINARY}"
-			fi
-
-			# Activate Flox environment to get dlv in PATH, then start plugin under dlv
-			exec flox activate --dir "${FLOX_ENV}" -- dlv exec "${PLUGIN_BINARY}" \
-			    --headless \
-			    --listen=0.0.0.0:${DLV_PORT} \
-			    --api-version=2 \
-			    --accept-multiclient \
-			    --log \
-			    --log-output=debugger,rpc
-		EOF
-		chmod +x "${nri_dlv_wrapper}"
-
-		# Replace plugin binary with dlv wrapper
-		# If 10-flox is a regular file (not a symlink), move it aside
-		if [[ -f /opt/nri/plugins/10-flox ]] && [[ ! -L /opt/nri/plugins/10-flox ]]; then
-			# Move the real binary if not already saved
-			if [[ ! -f /opt/nri/.flox-nri-plugin-real ]]; then
-				mv /opt/nri/plugins/10-flox /opt/nri/.flox-nri-plugin-real
-			else
-				rm -f /opt/nri/plugins/10-flox
-			fi
-		fi
-		# Ensure symlink is in place
-		ln -sf "${nri_dlv_wrapper}" /opt/nri/plugins/10-flox
-
-		cat >"${nri_debug_conf}" <<-'EOF'
-			[Service]
-			Environment="FLOX_NRI_DEBUG_PORT=2345"
-		EOF
-
-		systemctl daemon-reload
-		echo "  NRI debug mode enabled: plugin will start under dlv headless server"
-		echo "  Connect from VS Code or: dlv connect bioskop-master.lan:2345"
-	else
-		# Restore original plugin if wrapper is in place
-		if [[ -f /opt/nri/.flox-nri-plugin-real ]]; then
-			echo "Disabling NRI plugin debug mode"
-			rm -f /opt/nri/plugins/10-flox
-			mv /opt/nri/.flox-nri-plugin-real /opt/nri/plugins/10-flox
-		fi
-
-		# Remove debug config if it exists
-		if [[ -f "${nri_debug_conf}" ]]; then
-			rm -f "${nri_debug_conf}"
-			systemctl daemon-reload
-		fi
-
-		# Remove wrapper script
-		rm -f "${nri_dlv_wrapper}"
-	fi
+	# NRI plugin debug: use dlv attach to running process
+	# No special configuration needed - plugin runs normally
+	# To debug:
+	#   1. Find PID: pgrep -af 10-flox
+	#   2. Attach: dlv attach <pid>
+	#   3. Set breakpoints in CreateContainer hook
+	: # No-op, just documentation
 }
 
 flox::env:configmap:create() {
