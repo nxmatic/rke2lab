@@ -10,10 +10,6 @@ public record DebugPolicy(
     return "nxmatic/kdns";
   }
 
-  public String kdnsRuntimeClass() {
-    return kdnsEnabled ? "flox-delve" : "flox";
-  }
-
   public Map<String, String> toEnvMap() {
     final Map<String, String> env =
         Map.of(
@@ -23,8 +19,6 @@ public record DebugPolicy(
             Boolean.toString(kdnsSuspend),
             "RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV",
             kdnsFloxEnvironment(),
-            "RKE2LAB_POLICY_DEBUG_KDNS_RUNTIME_CLASS",
-            kdnsRuntimeClass(),
             "RKE2LAB_POLICY_DEBUG_CONTAINERD_SHIM_FLOX_V2_WRAPPER_ENABLED",
             Boolean.toString(containerdShimFloxV2WrapperEnabled));
     return env;
@@ -39,8 +33,6 @@ public record DebugPolicy(
             kdnsSuspend,
             "policyDebugKdnsFloxEnvironment",
             kdnsFloxEnvironment(),
-            "policyDebugKdnsRuntimeClass",
-            kdnsRuntimeClass(),
             "policyDebugContainerdShimFloxV2WrapperEnabled",
             containerdShimFloxV2WrapperEnabled);
     return outputs;

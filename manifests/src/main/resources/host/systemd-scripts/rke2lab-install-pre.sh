@@ -25,18 +25,15 @@ kdns::manifest:patch() {
 	flox_env="${RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV:-nxmatic/kdns}"
 	debug_enabled="${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}"
 	debug_suspend="${RKE2LAB_POLICY_DEBUG_KDNS_SUSPEND:-false}"
-	runtime_class="${RKE2LAB_POLICY_DEBUG_KDNS_RUNTIME_CLASS:-flox}"
 
 	RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV="${flox_env}" \
 		RKE2LAB_POLICY_DEBUG_KDNS_ENABLED="${debug_enabled}" \
 		RKE2LAB_POLICY_DEBUG_KDNS_SUSPEND="${debug_suspend}" \
-		RKE2LAB_POLICY_DEBUG_KDNS_RUNTIME_CLASS="${runtime_class}" \
 		yq eval -i '
       .spec.template.metadata.annotations."flox.dev/environment" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV) |
        .spec.template.metadata.annotations."flox.dev/debug" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_ENABLED) |
        .spec.template.metadata.annotations."flox.dev/debug-suspend" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_SUSPEND) |
-      .spec.template.metadata.annotations."debug.kdns.lab42/enabled" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_ENABLED) |
-      .spec.template.spec.runtimeClassName = strenv(RKE2LAB_POLICY_DEBUG_KDNS_RUNTIME_CLASS)
+      .spec.template.metadata.annotations."debug.kdns.lab42/enabled" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_ENABLED)
     ' "${deployment_manifest}"
 }
 

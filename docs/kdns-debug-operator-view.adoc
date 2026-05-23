@@ -82,7 +82,6 @@ Instead, `DebugPolicy` exports values that are consumed by `rke2lab-install-pre.
 * annotation `flox.dev/debug` (mirrors `policy.debug.kdns.enabled`)
 * annotation `flox.dev/debug-suspend` (mirrors `policy.debug.kdns.suspend`)
 * annotation `debug.kdns.lab42/enabled` (mirrors `policy.debug.kdns.enabled`)
-* `spec.template.spec.runtimeClassName` (`flox` or `flox-delve`)
 
 That is the operational handoff from stack configuration to workload behavior.
 
@@ -105,7 +104,6 @@ flowchart LR
     subgraph Runtime[Rendered outcome]
       anno[debug.kdns.lab42/enabled]
       env[flox.dev/environment]
-      rc[runtimeClassName]
     end
 
     cfg --> run

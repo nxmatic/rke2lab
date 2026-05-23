@@ -575,8 +575,8 @@ containerd::config:flox:update() {
 	# Calculate checksum before update
 	checksum_before="$(sha256sum "${CONTAINERD_CONFIG_TEMPLATE}" 2>/dev/null | awk '{print $1}' || echo "none")"
 
+	local tmp
 	tmp="$(mktemp)"
-	trap "rm -f \"${tmp}\"" RETURN
 
 	"${DASEL_BIN}" -i toml -o yaml <"${CONTAINERD_CONFIG_TEMPLATE}" |
 		CRI_PLUGIN_ROOT="${plugin_root}" NRI_PLUGIN_ROOT="${nri_plugin_root}" "${YQ_BIN}" '
@@ -587,6 +587,8 @@ containerd::config:flox:update() {
     ' |
 		"${DASEL_BIN}" -i yaml -o toml >"${tmp}" &&
 		mv "${tmp}" "${CONTAINERD_CONFIG_TEMPLATE}"
+
+	rm -f "${tmp}"
 
 	# Calculate checksum after update
 	checksum_after="$(sha256sum "${CONTAINERD_CONFIG_TEMPLATE}" 2>/dev/null | awk '{print $1}' || echo "none")"
