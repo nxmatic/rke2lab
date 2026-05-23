@@ -1,0 +1,20 @@
+[Unit]
+Description=RKE2Lab Cachix watch-store agent
+Documentation=https://github.com/nxmatic/rke2lab
+After=nix-daemon.service rke2lab-bootstrap-env.service
+Requires=nix-daemon.service rke2lab-bootstrap-env.service
+ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-cachix-watch-store.sh
+
+[Service]
+Type=exec
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-cachix-watch-store.sh
+Restart=on-failure
+RestartSec=30s
+# Ensure all child cachix workers are killed on stop
+KillMode=control-group
+TimeoutStopSec=10s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=rke2lab.target
