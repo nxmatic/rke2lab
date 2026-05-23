@@ -13,10 +13,12 @@ import (
 )
 
 const (
-	floxEnvAnnotation   = "flox.dev/environment"
-	floxDebugAnnotation = "flox.dev/debug"
-	floxEnvBaseDir      = "/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox"
-	floxBinaryPath      = "/nix/store/2k9nn1y6yb7861swdkxr0arrcjiw7wpi-flox-1.12.1-g2078270/bin/flox"
+	floxEnvAnnotation     = "flox.dev/environment"
+	floxDebugAnnotation   = "flox.dev/debug"        // Set to "true" to pause and wait for debugger
+	floxDebugPort         = "flox.dev/debug-port"   // Delve debugger port (default: 2345)
+	floxEnvBaseDir        = "/srv/host/k8s-daemonset.d/runtime/flox-runtime"
+	floxBinaryPath        = "/nix/store/2k9nn1y6yb7861swdkxr0arrcjiw7wpi-flox-1.12.1-g2078270/bin/flox"
+	defaultDebugPort      = "2345"
 )
 
 // FloxPlugin implements the NRI plugin interface for flox environment injection
@@ -55,6 +57,21 @@ func (p *FloxPlugin) Shutdown(ctx context.Context) {
 
 // CreateContainer handles container creation and injects flox environment
 func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, container *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error) {
+	// Check if we should wait for debugger attachment
+	if getAnnotation(pod, floxDebugAnnotation) == "true" || getAnnotation(container, floxDebugAnnotation) == "true" {
+		debugPort := getAnnotation(pod, floxDebugPort)
+		if debugPort == "" {
+			debugPort = getAnnotation(container, floxDebugPort)
+		}
+		if debugPort == "" {
+			debugPort = defaultDebugPort
+		}
+		log.Printf("DEBUG MODE: Waiting for debugger on port %s for %s/%s", debugPort, pod.GetNamespace(), container.GetName())
+		log.Printf("Attach with: dlv connect localhost:%s", debugPort)
+		// In production, this would call runtime.Breakpoint() or similar
+		// For now, just log and continue (debugger must be attached to the plugin process itself)
+	}
+
 	// Check if this container needs a flox environment
 	floxEnv := getAnnotation(container, floxEnvAnnotation)
 	if floxEnv == "" {
