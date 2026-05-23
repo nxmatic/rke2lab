@@ -152,54 +152,23 @@ public final class FloxContainerdShimAssets {
     }
 
     public Builder addDefaultMaterializationAssets() {
-      addDefaultCoreMaterializationAssets();
-      addDefaultDebugToolsMaterializationAssets();
+      // Only add Flox environment definitions - installer/debug scripts are in ConfigMap
       addDefaultMeshHeadplaneMaterializationAssets();
       addDefaultNetworkingKdnsMaterializationAssets();
       return this;
     }
 
+    @Deprecated(since = "NRI migration", forRemoval = true)
     public Builder addDefaultCoreMaterializationAssets() {
-      addMaterializationAsset(FLOX_RESOURCE_ROOT + "/shim-build.sh", "shim-build.sh", true);
-      addMaterializationAsset(FLOX_RESOURCE_ROOT + "/shim-build.yaml", "shim-build.yaml", false);
-      addMaterializationAsset(FLOX_RESOURCE_ROOT + "/flake.nix", "flake.nix", false);
-      addMaterializationAsset(FLOX_RESOURCE_ROOT + "/shim-installer.sh", "shim-installer.sh", true);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/bin/flox-rootfs-sync.sh", "bin/flox-rootfs-sync.sh", true);
+      // These are now in installer ConfigMap, not materialized separately
+      // Kept for backward compatibility - remove after migration complete
       return this;
     }
 
+    @Deprecated(since = "NRI migration", forRemoval = true)
     public Builder addDefaultDebugToolsMaterializationAssets() {
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/debug-tools/.sh.d/rke2lab-debug-tooling.sh",
-          "debug-tools/.sh.d/rke2lab-debug-tooling.sh",
-          false);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/debug-tools/attach_live_containerd_shim_flox_v2_strace.sh",
-          "debug-tools/attach_live_containerd_shim_flox_v2_strace.sh",
-          true);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/debug-tools/crictl-kdns-repro.sh",
-          "debug-tools/crictl-kdns-repro.sh",
-          true);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/debug-tools/kdns-containerd-bundle-watch.sh",
-          "debug-tools/kdns-containerd-bundle-watch.sh",
-          true);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/debug-tools/kdns-containerd-remote-capture.sh",
-          "debug-tools/kdns-containerd-remote-capture.sh",
-          true);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/debug-tools/master-shim-pprof.sh",
-          "debug-tools/master-shim-pprof.sh",
-          true);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/debug-tools/rke2lab-dlv.sh", "debug-tools/rke2lab-dlv.sh", true);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/debug-tools/rke2lab-shim-dlv.sh",
-          "debug-tools/rke2lab-shim-dlv.sh",
-          true);
+      // These are now in installer ConfigMap, not materialized separately
+      // Kept for backward compatibility - remove after migration complete
       return this;
     }
 
