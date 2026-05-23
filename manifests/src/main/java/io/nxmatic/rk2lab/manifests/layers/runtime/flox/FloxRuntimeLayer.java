@@ -42,37 +42,16 @@ public final class FloxRuntimeLayer extends Construct {
             .runtimeDaemonsetScriptPolicyAssets(runtimeDaemonsetScriptPolicyAssets)
             .build();
 
-    createRuntimeClass("flox", "flox");
-    createRuntimeClass("flox-delve", "flox-delve");
+    // RuntimeClass no longer needed with NRI plugin approach
+    // NRI plugin intercepts based on flox.dev/environment annotation
     ApiObject envConfigMap = createFloxEnvConfigMap();
     ApiObject installerAssetsConfigMap = createInstallerAssetsConfigMap();
     ApiObject serviceAccount = createServiceAccount();
     createInstallerDaemonSet(envConfigMap, installerAssetsConfigMap, serviceAccount);
   }
 
-  private void createRuntimeClass(final String runtimeClassName, final String handlerName) {
-    ApiObject runtimeClass =
-        new ApiObject(
-            this,
-            "runtimeclass-" + runtimeClassName,
-            ApiObjectProps.builder()
-                .apiVersion("node.k8s.io/v1")
-                .kind("RuntimeClass")
-                .metadata(
-                    ApiObjectMetadata.builder()
-                        .name(runtimeClassName)
-                        .annotations(
-                            kptMetadata.packageAnnotations(
-                                LAYER_NAME,
-                                PACKAGE_NAME,
-                                "node.k8s.io|RuntimeClass|default|" + runtimeClassName))
-                        .build())
-                .build());
-
-    runtimeClass.addJsonPatch(
-        JsonPatch.add("/handler", handlerName),
-        JsonPatch.add("/scheduling", Map.of("nodeSelector", Map.of("flox.dev/enabled", "true"))));
-  }
+  // RuntimeClass removed: NRI plugin approach doesn't need custom runtime handlers
+  // The NRI plugin intercepts container creation based on flox.dev/environment Pod annotation
 
   private ApiObject createFloxEnvConfigMap() {
     ApiObject configMap =
