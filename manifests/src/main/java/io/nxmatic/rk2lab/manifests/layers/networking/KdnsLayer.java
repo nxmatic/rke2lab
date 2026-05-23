@@ -215,12 +215,20 @@ public final class KdnsLayer extends Construct {
     kdnsContainer.put("name", "kdns");
     kdnsContainer.put("image", "flox/empty:1.0.0");
     kdnsContainer.put("imagePullPolicy", "IfNotPresent");
-    kdnsContainer.put("command", List.of("kdns"));
+    kdnsContainer.put("command", List.of("flox", "activate", "--", "kdns"));
     kdnsContainer.put(
         "env",
         List.of(
             Map.of("name", "KUBERNETES_SERVICE_HOST", "value", "10.80.0.10"),
-            Map.of("name", "KUBERNETES_SERVICE_PORT", "value", "6443")));
+            Map.of("name", "KUBERNETES_SERVICE_PORT", "value", "6443"),
+            Map.of(
+                "name",
+                "PATH",
+                "valueFrom",
+                Map.of(
+                    "configMapKeyRef",
+                    Map.of("name", "flox-env", "key", "NIX_DEFAULT_PROFILE_BIN_STORE_PATH"))),
+            Map.of("name", "HOME", "value", "/root")));
     kdnsContainer.put("livenessProbe", null);
     kdnsContainer.put("readinessProbe", null);
     kdnsContainer.put(
@@ -273,7 +281,11 @@ public final class KdnsLayer extends Construct {
                 "annotations",
                 delveSidecarProfile.workloadAnnotations(
                     packageProfile.templateAnnotations(
-                        Map.of("flox.dev/environment", "nxmatic/kdns"))),
+                        Map.of(
+                            "flox.dev/environment", "networking/kdns",
+                            "flox.dev/home", "/root",
+                            "flox.dev/uid", "0",
+                            "flox.dev/gid", "0"))),
                 "labels",
                 Map.of(
                     "app.kubernetes.io/instance",

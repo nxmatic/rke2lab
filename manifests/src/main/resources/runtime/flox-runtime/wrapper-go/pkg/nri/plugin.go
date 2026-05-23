@@ -13,15 +13,40 @@ import (
 )
 
 const (
-	floxEnvAnnotation     = "flox.dev/environment"
-	floxDebugAnnotation   = "flox.dev/debug"        // Set to "true" to pause and wait for debugger
-	floxDebugPort         = "flox.dev/debug-port"   // Delve debugger port (default: 2345)
-	floxEnvBaseDir        = "/srv/host/k8s-daemonset.d/runtime/flox-runtime"
-	floxBinaryPath        = "/nix/store/2k9nn1y6yb7861swdkxr0arrcjiw7wpi-flox-1.12.1-g2078270/bin/flox"
-	defaultDebugPort      = "2345"
+	floxEnvAnnotation   = "flox.dev/environment" // Flox environment name (required)
+	floxHomeAnnotation  = "flox.dev/home"        // Override HOME directory (optional, defaults to env var)
+	floxUIDAnnotation   = "flox.dev/uid"         // Desired UID for flox env ownership (optional, default: 0)
+	floxGIDAnnotation   = "flox.dev/gid"         // Desired GID for flox env ownership (optional, default: 0)
+	floxDebugAnnotation = "flox.dev/debug"       // Set to "true" to pause and wait for debugger
+	floxDebugPort       = "flox.dev/debug-port"  // Delve debugger port (default: 2345)
+	floxEnvBaseDir      = "/srv/host/k8s-daemonset.d/runtime/flox-runtime"
+	floxBinaryPath      = "/nix/store/2k9nn1y6yb7861swdkxr0arrcjiw7wpi-flox-1.12.1-g2078270/bin/flox"
+	defaultDebugPort    = "2345"
+	defaultUID          = "0"
+	defaultGID          = "0"
+	defaultHome         = "/root"
 )
 
 // FloxPlugin implements the NRI plugin interface for flox environment injection
+//
+// Supported annotations (can be set on pod or container):
+//   - flox.dev/environment: Flox environment name (required, e.g., "networking/kdns")
+//   - flox.dev/home: Override HOME directory (optional, defaults to HOME env var, then /root)
+//   - flox.dev/uid: Desired UID for flox environment ownership (optional, default: 0/root)
+//   - flox.dev/gid: Desired GID for flox environment ownership (optional, default: 0/root)
+//   - flox.dev/debug: Set to "true" to enable debug mode (optional)
+//   - flox.dev/debug-port: Delve debugger port (optional, default: 2345)
+//
+// Behavior:
+//   - Determines HOME directory: flox.dev/home annotation > HOME env var > /root
+//   - Resolves environment: "category/name" maps to /srv/host/.../runtime/flox-runtime/{category}/{name}
+//   - Mounts the requested Flox environment at $HOME/.flox
+//   - Mounts /nix/store with overlayfs protection (read-only lower, writable ephemeral upper)
+//   - Allows `flox activate` to automatically discover the environment
+//
+// Note: Since NRI doesn't expose the container's UID, pods must set the HOME env var
+//
+//	to match the user they're running as (e.g., HOME=/root for UID 0, HOME=/home/user for others)
 type FloxPlugin struct {
 	stub stub.Stub
 	ctx  context.Context
@@ -87,6 +112,46 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 	log.Printf("Container %s/%s requests flox environment: %s",
 		pod.GetNamespace(), container.GetName(), floxEnv)
 
+	// Determine HOME directory where .flox will be mounted
+	// Since NRI doesn't expose the container's UID, we rely on the HOME env var
+	// to determine the appropriate home directory for the running user
+	// Priority: flox.dev/home annotation > HOME env var > /root (default)
+	homeDir := getAnnotation(container, floxHomeAnnotation)
+	if homeDir == "" {
+		homeDir = getAnnotation(pod, floxHomeAnnotation)
+	}
+	if homeDir == "" {
+		homeDir = getEnvVar(container, "HOME")
+	}
+	if homeDir == "" {
+		// No annotation or HOME env var set - default to root
+		homeDir = defaultHome
+	}
+
+	log.Printf("Using HOME directory: %s (will mount .flox at %s/.flox)", homeDir, homeDir)
+
+	// Get desired UID/GID for the flox environment ownership (optional, defaults to root)
+	// Note: These are hints for the host filesystem ownership; bind mounts inherit source ownership
+	uid := getAnnotation(container, floxUIDAnnotation)
+	if uid == "" {
+		uid = getAnnotation(pod, floxUIDAnnotation)
+	}
+	if uid == "" {
+		// Default to root UID
+		uid = defaultUID
+	}
+
+	gid := getAnnotation(container, floxGIDAnnotation)
+	if gid == "" {
+		gid = getAnnotation(pod, floxGIDAnnotation)
+	}
+	if gid == "" {
+		// Default to root GID
+		gid = defaultGID
+	}
+
+	log.Printf("Flox environment ownership (hint): UID=%s, GID=%s", uid, gid)
+
 	// Resolve the flox environment path
 	floxEnvPath, err := p.resolveFloxEnvironment(floxEnv)
 	if err != nil {
@@ -96,14 +161,61 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 
 	log.Printf("Flox environment %s resolved to: %s", floxEnv, floxEnvPath)
 
+	// Target path where we'll mount the flox environment: $HOME/.flox
+	floxMountTarget := filepath.Join(homeDir, ".flox")
+
+	// Build mount options for the flox environment
+	// Note: UID/GID mapping for bind mounts requires idmap support (Linux 5.12+, user namespaces)
+	// For now, we log the desired ownership but rely on the source having correct permissions
+	// Future enhancement: implement idmap mount or use a helper to chown at mount time
+	floxMountOptions := []string{"ro", "rbind"}
+	if uid != defaultUID || gid != defaultGID {
+		log.Printf("WARNING: UID/GID mapping requested (uid=%s, gid=%s) but not yet implemented for bind mounts", uid, gid)
+		log.Printf("The flox environment source must have correct ownership on the host filesystem")
+		// TODO: Implement idmap mount option when available:
+		// floxMountOptions = append(floxMountOptions, fmt.Sprintf("uidmap=%s:0:1", uid), fmt.Sprintf("gidmap=%s:0:1", gid))
+	}
+
+	// Create prestart hook to ensure mount target directories exist
+	// We need to create the HOME directory and parent paths before mounting
+	hookCmd := fmt.Sprintf("mkdir -p '%s/.flox' && chown %s:%s '%s' '%s/.flox'", homeDir, uid, gid, homeDir, homeDir)
+	log.Printf("Creating prestart hook to prepare directories: %s", hookCmd)
+
+	createDirsHook := &api.Hook{
+		Path: "/bin/sh",
+		Args: []string{
+			"sh",
+			"-c",
+			hookCmd,
+		},
+	}
+
 	// Build container adjustments to inject the flox environment with overlayfs protection
 	// Use overlayfs to layer a writable tmpfs over the read-only /nix/store
 	// This protects the host's /nix/store from container modifications while
 	// allowing containers to write to /nix (writes go to ephemeral tmpfs)
+
+	floxEnvSource := filepath.Join(floxEnvPath, ".flox")
+	log.Printf("Setting up mounts:")
+	log.Printf("  - Flox environment: %s -> %s (bind, %v)", floxEnvSource, floxMountTarget, floxMountOptions)
+	log.Printf("  - Nix store: /nix/store -> /nix-store-ro (bind, ro)")
+	log.Printf("  - Overlayfs: /nix (lower=/nix-store-ro, upper=/nix-overlay-upper, work=/nix-overlay-work)")
+
 	adjustment := &api.ContainerAdjustment{
+		Hooks: &api.Hooks{
+			Prestart: []*api.Hook{createDirsHook},
+		},
 		Mounts: []*api.Mount{
 			{
-				// First, bind mount /nix/store read-only from host (will be lower layer)
+				// Mount the flox environment at $HOME/.flox
+				// This allows `flox activate` to automatically find the environment
+				Source:      floxEnvSource,
+				Destination: floxMountTarget,
+				Type:        "bind",
+				Options:     floxMountOptions,
+			},
+			{
+				// Bind mount /nix/store read-only from host (will be lower layer)
 				Source:      "/nix/store",
 				Destination: "/nix-store-ro",
 				Type:        "bind",
@@ -126,30 +238,16 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 				Source:      "overlay",
 				Destination: "/nix",
 				Type:        "overlay",
-				Options:     []string{
+				Options: []string{
 					"lowerdir=/nix-store-ro",
 					"upperdir=/nix-overlay-upper",
 					"workdir=/nix-overlay-work",
 				},
 			},
 		},
-
-		// Inject environment variables for flox activation
-		Env: []*api.KeyValue{
-			{
-				Key:   "FLOX_ENV_DIR",
-				Value: floxEnvPath,
-			},
-			{
-				Key:   "FLOX_BIN",
-				Value: floxBinaryPath,
-			},
-			{
-				Key:   "FLOX_ENV_NAME",
-				Value: floxEnv,
-			},
-		},
 	}
+
+	log.Printf("Successfully configured Flox environment injection for container %s/%s", pod.GetNamespace(), container.GetName())
 
 	return adjustment, nil, nil
 }
@@ -157,15 +255,18 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 // resolveFloxEnvironment resolves a flox environment name to its filesystem path
 func (p *FloxPlugin) resolveFloxEnvironment(floxEnv string) (string, error) {
 	// Parse flox environment
-	// Format: "category/name" or just "name" (defaults to "networking" category)
+	// Format: "category/name" (e.g., "networking/kdns")
+	// Matches the filesystem layout: /srv/host/k8s-daemonset.d/runtime/flox-runtime/{category}/{name}
+
 	var category, envName string
 
 	envParts := strings.Split(floxEnv, "/")
 	if len(envParts) == 2 {
+		// category/name format
 		category = envParts[0]
 		envName = envParts[1]
 	} else if len(envParts) == 1 {
-		// Default to networking category
+		// Just name - default to networking category
 		category = "networking"
 		envName = envParts[0]
 	} else {
@@ -174,6 +275,8 @@ func (p *FloxPlugin) resolveFloxEnvironment(floxEnv string) (string, error) {
 
 	// Build path to flox environment directory
 	floxEnvPath := filepath.Join(floxEnvBaseDir, category, envName)
+
+	log.Printf("Resolving Flox environment '%s' -> category=%s, name=%s, path=%s", floxEnv, category, envName, floxEnvPath)
 
 	// Verify the environment directory exists
 	if _, err := os.Stat(floxEnvPath); os.IsNotExist(err) {
@@ -207,4 +310,23 @@ func getAnnotation(obj interface{}, key string) string {
 	}
 
 	return annotations[key]
+}
+
+// getEnvVar retrieves an environment variable from the container spec
+func getEnvVar(container *api.Container, key string) string {
+	env := container.GetEnv()
+	if env == nil {
+		return ""
+	}
+
+	// GetEnv returns []string in "KEY=VALUE" format
+	// We need to parse it
+	prefix := key + "="
+	for _, envStr := range env {
+		if strings.HasPrefix(envStr, prefix) {
+			return strings.TrimPrefix(envStr, prefix)
+		}
+	}
+
+	return ""
 }
