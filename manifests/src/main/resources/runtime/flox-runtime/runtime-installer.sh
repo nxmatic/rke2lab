@@ -170,7 +170,7 @@ installer::pod:materialize_assets() {
 		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
 		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
 		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/flake.nix" "${HOST_SCRIPT_ROOT}/flake.nix"
+		install -D -m 0644 "${BUILD_ASSETS_DIR}/flake.nix" "${HOST_SCRIPT_ROOT}/flake.nix"
 	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
 		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
 		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
@@ -347,13 +347,11 @@ runtime::assets:path:validate() {
 		exit 1
 	}
 	[[ -d "${FLOX_RUNTIME_LOG_DIR}" ]] || {
-	}
+		echo "flox runtime log directory missing: ${FLOX_RUNTIME_LOG_DIR}" >&2
 		exit 1
 	}
 	[[ -r "${FLOX_RUNTIME_PACKAGE_FLAKE}" ]] || {
 		echo "flox runtime package flake missing or unreadable: ${FLOX_RUNTIME_PACKAGE_FLAKE}" >&2
-		exit 1
-	}
 		exit 1
 	}
 	[[ -d "${FLOX_RUNTIME_NETWORKING_DIR}" ]] || {
@@ -426,9 +424,6 @@ runtime::debug:tools:install() {
 	echo "installed debug helper scripts in ${target_root}"
 }
 
-
-
-
 runtime::runtime:nix-system:resolve() {
 	case "$(uname -m)" in
 	aarch64 | arm64)
@@ -477,7 +472,6 @@ runtime::runtime:containerd:resolve-bin() {
 	return 1
 }
 
-
 # The shim variants `flox/flox-runtime-{17,2x}` are not directly
 # resolvable via `flox install`; the canonical entrypoint published on FloxHub
 # is `flox/flox-runtime-installer`, whose closure carries both shim
@@ -486,8 +480,6 @@ runtime::runtime:containerd:resolve-bin() {
 # Find the flox-runtime-${variant}-* store path inside the installer
 # env's closure. The upstream installer hardcodes these paths; here we let
 # nix-store discover them so version bumps land via `flox pull`.
-
-
 
 runtime::runtime:config-template:ensure() {
 	if [[ ! -f "${CONTAINERD_CONFIG_TEMPLATE}" ]]; then
