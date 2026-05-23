@@ -86,7 +86,7 @@
           name = "wrapper-go-src";
         };
         subPackages = ["cmd/flox-nri-plugin"];
-        vendorHash = null; # Will be computed on first build
+        vendorHash = "sha256-KnrEpSTBwgX7/C3PozIh6dL86DJmi6+0W4gYaHYKZyo=";
 
         env = {
           CGO_ENABLED = "0";

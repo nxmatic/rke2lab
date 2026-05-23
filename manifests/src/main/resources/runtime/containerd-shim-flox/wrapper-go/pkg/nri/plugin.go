@@ -2,11 +2,9 @@ package nri
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -15,9 +13,10 @@ import (
 )
 
 const (
-	floxEnvAnnotation = "flox.dev/environment"
+	floxEnvAnnotation   = "flox.dev/environment"
 	floxDebugAnnotation = "flox.dev/debug"
-	floxEnvCacheDir   = "/var/lib/flox/nri-cache"
+	floxEnvBaseDir      = "/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox"
+	floxBinaryPath      = "/nix/store/2k9nn1y6yb7861swdkxr0arrcjiw7wpi-flox-1.12.1-g2078270/bin/flox"
 )
 
 // FloxPlugin implements the NRI plugin interface for flox environment injection
@@ -28,11 +27,6 @@ type FloxPlugin struct {
 
 // NewFloxPlugin creates a new flox NRI plugin instance
 func NewFloxPlugin(ctx context.Context) (*FloxPlugin, error) {
-	// Ensure cache directory exists
-	if err := os.MkdirAll(floxEnvCacheDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create flox cache dir: %w", err)
-	}
-
 	return &FloxPlugin{
 		ctx: ctx,
 	}, nil
@@ -44,9 +38,7 @@ func (p *FloxPlugin) Configure(ctx context.Context, config string) (stub.EventMa
 
 	// Subscribe to container lifecycle events
 	return api.MustParseEventMask(
-		"RunPodSandbox",
 		"CreateContainer",
-		"StartContainer",
 	), nil
 }
 
@@ -78,47 +70,39 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 	log.Printf("Container %s/%s requests flox environment: %s",
 		pod.GetNamespace(), container.GetName(), floxEnv)
 
-	// Activate/prepare the flox environment on the host
-	floxRoot, err := p.activateFloxEnvironment(floxEnv)
+	// Resolve the flox environment path
+	floxEnvPath, err := p.resolveFloxEnvironment(floxEnv)
 	if err != nil {
-		log.Printf("ERROR: Failed to activate flox environment %s: %v", floxEnv, err)
-		return nil, nil, fmt.Errorf("failed to activate flox environment: %w", err)
+		log.Printf("ERROR: Failed to resolve flox environment %s: %v", floxEnv, err)
+		return nil, nil, fmt.Errorf("failed to resolve flox environment: %w", err)
 	}
 
-	log.Printf("Flox environment %s activated at: %s", floxEnv, floxRoot)
+	log.Printf("Flox environment %s resolved to: %s", floxEnv, floxEnvPath)
 
 	// Build container adjustments to inject the flox environment
 	adjustment := &api.ContainerAdjustment{
-		// Use overlayfs to layer flox environment over the container's rootfs
 		Mounts: []*api.Mount{
 			{
-				// Mount flox bin directory
-				Source:      filepath.Join(floxRoot, "bin"),
-				Destination: "/flox/bin",
-				Type:        "bind",
-				Options:     []string{"ro", "rbind"},
-			},
-			{
-				// Mount flox lib directory
-				Source:      filepath.Join(floxRoot, "lib"),
-				Destination: "/flox/lib",
+				// Mount /nix/store read-only so container can access all Nix store paths
+				Source:      "/nix/store",
+				Destination: "/nix/store",
 				Type:        "bind",
 				Options:     []string{"ro", "rbind"},
 			},
 		},
 
-		// Inject environment variables for flox
+		// Inject environment variables for flox activation
 		Env: []*api.KeyValue{
 			{
-				Key:   "PATH",
-				Value: "/flox/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+				Key:   "FLOX_ENV_DIR",
+				Value: floxEnvPath,
 			},
 			{
-				Key:   "LD_LIBRARY_PATH",
-				Value: "/flox/lib",
+				Key:   "FLOX_BIN",
+				Value: floxBinaryPath,
 			},
 			{
-				Key:   "FLOX_ENV",
+				Key:   "FLOX_ENV_NAME",
 				Value: floxEnv,
 			},
 		},
@@ -127,41 +111,36 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 	return adjustment, nil, nil
 }
 
-// activateFloxEnvironment activates a flox environment and returns its root path
-func (p *FloxPlugin) activateFloxEnvironment(floxEnv string) (string, error) {
-	// Parse flox environment (format: owner/name or just name)
+// resolveFloxEnvironment resolves a flox environment name to its filesystem path
+func (p *FloxPlugin) resolveFloxEnvironment(floxEnv string) (string, error) {
+	// Parse flox environment
+	// Format: "category/name" or just "name" (defaults to "networking" category)
+	var category, envName string
+
 	envParts := strings.Split(floxEnv, "/")
-	var envName string
 	if len(envParts) == 2 {
-		envName = envParts[0] + "-" + envParts[1]
-	} else {
+		category = envParts[0]
+		envName = envParts[1]
+	} else if len(envParts) == 1 {
+		// Default to networking category
+		category = "networking"
 		envName = envParts[0]
+	} else {
+		return "", fmt.Errorf("invalid flox environment format: %s (expected 'category/name' or 'name')", floxEnv)
 	}
 
-	// Check if environment is already cached
-	envCachePath := filepath.Join(floxEnvCacheDir, envName)
-	if _, err := os.Stat(envCachePath); err == nil {
-		log.Printf("Using cached flox environment: %s", envCachePath)
-		return envCachePath, nil
-	}
+	// Build path to flox environment directory
+	floxEnvPath := filepath.Join(floxEnvBaseDir, category, envName)
 
-	log.Printf("Activating flox environment: %s", floxEnv)
-
-	// TODO: For now, assume flox environments are pre-activated at known locations
-	// In production, this should call `flox activate` or pull from FloxHub
-	// For the POC, we'll use the existing flox environment structure from the shim
-
-	// Temporary: use a well-known path based on environment name
-	// This matches the structure created by the shim installer
-	floxEnvPath := fmt.Sprintf("/srv/host/k8s-daemonset.d/runtime/containerd-shim-flox/networking/%s", envName)
-
+	// Verify the environment directory exists
 	if _, err := os.Stat(floxEnvPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("flox environment not found: %s", floxEnvPath)
+		return "", fmt.Errorf("flox environment not found: %s (path: %s)", floxEnv, floxEnvPath)
 	}
 
-	// Create symlink in cache for faster lookups
-	if err := os.Symlink(floxEnvPath, envCachePath); err != nil {
-		log.Printf("Warning: failed to create cache symlink: %v", err)
+	// Verify it has a .flox directory
+	floxMetaDir := filepath.Join(floxEnvPath, ".flox")
+	if _, err := os.Stat(floxMetaDir); os.IsNotExist(err) {
+		return "", fmt.Errorf("flox environment missing .flox metadata: %s", floxEnvPath)
 	}
 
 	return floxEnvPath, nil
