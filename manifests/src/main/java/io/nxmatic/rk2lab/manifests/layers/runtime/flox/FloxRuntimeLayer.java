@@ -248,7 +248,14 @@ public final class FloxRuntimeLayer extends Construct {
                                         true),
                                     Map.of(
                                         "mountPath", "/nix", "name", "host-nix", "readOnly", true),
-                                    Map.of("mountPath", "/var/run/nri", "name", "nri-socket")
+                                    Map.of("mountPath", "/var/run/nri", "name", "nri-socket"),
+                                    Map.of(
+                                        "mountPath",
+                                        "/srv/host/k8s-daemonset.d",
+                                        "name",
+                                        "flox-runtime-assets",
+                                        "readOnly",
+                                        true)
                                   },
                                   "resources",
                                   Map.of(
@@ -381,7 +388,12 @@ public final class FloxRuntimeLayer extends Construct {
                                   "hostPath",
                                   Map.of("path", "/var/run/nri", "type", "DirectoryOrCreate"),
                                   "name",
-                                  "nri-socket")
+                                  "nri-socket"),
+                              Map.of(
+                                  "hostPath",
+                                  Map.of("path", "/srv/host/k8s-daemonset.d", "type", "Directory"),
+                                  "name",
+                                  "flox-runtime-assets")
                             }))),
                 "updateStrategy",
                 Map.of("rollingUpdate", Map.of("maxUnavailable", 1), "type", "RollingUpdate"))));
