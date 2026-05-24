@@ -2,7 +2,7 @@
 set -eux
 
 # Entry point for running NRI plugin as main container in DaemonSet
-# Pod runs in host namespace (hostPID, hostNetwork, hostIPC) so we can access /nix/store directly
+# Pod runs with host /nix mounted, so we can access the Nix store directly
 # The init container has already built and GC-rooted the plugin
 
 echo "=== NRI Plugin Runner ==="
@@ -18,7 +18,7 @@ if [ ! -L "${GC_ROOT_PATH}" ]; then
 	exit 1
 fi
 
-# Resolve the symlink - since we're in host namespace, the store path is directly accessible
+# Resolve the symlink to get the actual Nix store path
 echo "Resolving symlink ${GC_ROOT_PATH}..."
 PLUGIN_PKG_PATH="$(readlink "${GC_ROOT_PATH}")"
 echo "Symlink points to: ${PLUGIN_PKG_PATH}"

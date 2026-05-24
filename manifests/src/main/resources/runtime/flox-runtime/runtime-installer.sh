@@ -393,7 +393,7 @@ runtime::debug:nri:configure() {
 }
 
 flox::env:configmap:create() {
-	local nix_profile_path nix_profile_bin_path namespace kubectl_bin
+	local nix_profile_path nix_profile_bin_path flox_runtime_profile_bin namespace kubectl_bin
 
 	echo "Creating/updating flox-env ConfigMap with runtime-resolved paths"
 
@@ -403,6 +403,10 @@ flox::env:configmap:create() {
 
 	echo "  Resolved Nix profile: ${nix_profile_path}"
 	echo "  Nix profile bin path: ${nix_profile_bin_path}"
+
+	# Get the Flox runtime profile bin path (created by flox::runtime:profile:ensure)
+	flox_runtime_profile_bin="${FLOX_RUNTIME_PROFILE_BIN:-/nix/var/nix/profiles/flox-runtime/bin}"
+	echo "  Flox runtime profile bin: ${flox_runtime_profile_bin}"
 
 	# Determine namespace (from environment or default)
 	namespace="${FLOX_ENV_CONFIGMAP_NAMESPACE:-rke2lab-system}"
@@ -417,6 +421,7 @@ flox::env:configmap:create() {
 	"${kubectl_bin}" create configmap flox-env \
 		--namespace="${namespace}" \
 		--from-literal="NIX_DEFAULT_PROFILE_BIN_STORE_PATH=${nix_profile_bin_path}" \
+		--from-literal="FLOX_RUNTIME_PROFILE_BIN=${flox_runtime_profile_bin}" \
 		--dry-run=client -o yaml | "${kubectl_bin}" apply -f -
 
 	echo "  flox-env ConfigMap created/updated in namespace ${namespace}"
@@ -544,6 +549,38 @@ nri::plugin:gcroot:ensure() {
 	echo "NRI plugin package GC-rooted: ${nri_plugin_pkg_path}"
 }
 
+flox::runtime:profile:ensure() {
+	local profile_path bash_pkg coreutils_pkg nix_pkg flox_pkg
+
+	# Create a dedicated Nix profile for the Flox runtime environment
+	# This profile includes all the tools needed to activate Flox environments:
+	# - bash: for running activation scripts
+	# - coreutils: for basic shell utilities
+	# - nix: for Nix operations
+	# - flox: for 'flox activate' command
+	profile_path="/nix/var/nix/profiles/flox-runtime"
+
+	# Get package paths from current environment
+	bash_pkg="$(readlink -f "$(command -v bash)" | sed 's|/bin/bash||')"
+	coreutils_pkg="$(readlink -f "$(command -v ls)" | sed 's|/bin/ls||')"
+	nix_pkg="$(readlink -f "$(command -v nix)" | sed 's|/bin/nix||')"
+	flox_pkg="${FLOX_BIN%/bin/flox}"
+
+	# Install all tools into the profile
+	nix-env --profile "${profile_path}" \
+		--install "${bash_pkg}" "${coreutils_pkg}" "${nix_pkg}" "${flox_pkg}"
+
+	echo "Flox runtime profile created: ${profile_path}"
+	echo "  - bash: ${bash_pkg}"
+	echo "  - coreutils: ${coreutils_pkg}"
+	echo "  - nix: ${nix_pkg}"
+	echo "  - flox: ${flox_pkg}"
+
+	# Store the profile bin path for later use
+	FLOX_RUNTIME_PROFILE_BIN="${profile_path}/bin"
+	export FLOX_RUNTIME_PROFILE_BIN
+}
+
 runtime::runtime:core:install() {
 	: "Install/refresh flox runtime binaries on host"
 	# NRI plugin approach: no longer install custom shim binaries
@@ -555,6 +592,7 @@ runtime::runtime:core:install() {
 	# runtime::runtime:binary:install "${flox_env_dir}" "${arch}" "${variant}"
 	runtime::runtime:config-template:ensure
 	nri::plugin:gcroot:ensure
+	flox::runtime:profile:ensure
 }
 
 containerd::config:path:init() {
