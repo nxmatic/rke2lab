@@ -550,31 +550,26 @@ nri::plugin:gcroot:ensure() {
 }
 
 flox::runtime:profile:ensure() {
-	local profile_path bash_pkg coreutils_pkg nix_pkg flox_pkg
+	local profile_path default_profile_path
 
 	# Create a dedicated Nix profile for the Flox runtime environment
-	# This profile includes all the tools needed to activate Flox environments:
-	# - bash: for running activation scripts
-	# - coreutils: for basic shell utilities
-	# - nix: for Nix operations
-	# - flox: for 'flox activate' command
+	# Instead of installing individual packages, we'll use the packages already
+	# available in the default Nix profile, which includes bash, coreutils, nix, flox
 	profile_path="/nix/var/nix/profiles/flox-runtime"
+	default_profile_path="${NIX_VAR_PROFILES_DEFAULT:-/nix/var/nix/profiles/default}"
 
-	# Get package paths from current environment
-	bash_pkg="$(readlink -f "$(command -v bash)" | sed 's|/bin/bash||')"
-	coreutils_pkg="$(readlink -f "$(command -v ls)" | sed 's|/bin/ls||')"
-	nix_pkg="$(readlink -f "$(command -v nix)" | sed 's|/bin/nix||')"
-	flox_pkg="${FLOX_BIN%/bin/flox}"
+	echo "Creating Flox runtime profile based on default profile: ${default_profile_path}"
 
-	# Install all tools into the profile
+	# Install packages by name from nixpkgs (they're already in the store via the default profile)
 	nix-env --profile "${profile_path}" \
-		--install "${bash_pkg}" "${coreutils_pkg}" "${nix_pkg}" "${flox_pkg}"
+		--install --attr nixpkgs.bash nixpkgs.coreutils nixpkgs.nix nixpkgs.flox 2>&1 || {
+		echo "WARNING: Failed to install via nixpkgs attrs, trying by derivation path..." >&2
+		# Fallback: copy the default profile's package set
+		# This ensures we get the same versions being used
+		nix-env --profile "${profile_path}" --set "${default_profile_path}"
+	}
 
 	echo "Flox runtime profile created: ${profile_path}"
-	echo "  - bash: ${bash_pkg}"
-	echo "  - coreutils: ${coreutils_pkg}"
-	echo "  - nix: ${nix_pkg}"
-	echo "  - flox: ${flox_pkg}"
 
 	# Store the profile bin path for later use
 	FLOX_RUNTIME_PROFILE_BIN="${profile_path}/bin"
