@@ -173,7 +173,9 @@ public final class FloxRuntimeAssets {
 
     public Builder addDefaultMeshHeadplaneMaterializationAssets() {
       addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/flake.nix", "mesh/headplane/flake.nix", false);
+          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/flake.nix", "mesh/headplane/.flox/env/flake.nix", false);
+      addMaterializationAsset(
+          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/flake.lock", "mesh/headplane/.flox/env/flake.lock", false);
       addMaterializationAsset(
           FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/.gitattributes",
           "mesh/headplane/.flox/.gitattributes",
@@ -185,10 +187,6 @@ public final class FloxRuntimeAssets {
       addMaterializationAsset(
           FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env.json",
           "mesh/headplane/.flox/env.json",
-          false);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env.lock",
-          "mesh/headplane/.flox/env.lock",
           false);
       addMaterializationAsset(
           FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/manifest.toml",
@@ -203,7 +201,9 @@ public final class FloxRuntimeAssets {
 
     public Builder addDefaultNetworkingKdnsMaterializationAssets() {
       addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/networking/kdns/flake.nix", "networking/kdns/flake.nix", false);
+          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/flake.nix", "networking/kdns/.flox/env/flake.nix", false);
+      addMaterializationAsset(
+          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/flake.lock", "networking/kdns/.flox/env/flake.lock", false);
       addMaterializationAsset(
           FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/.gitattributes",
           "networking/kdns/.flox/.gitattributes",
@@ -215,10 +215,6 @@ public final class FloxRuntimeAssets {
       addMaterializationAsset(
           FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env.json",
           "networking/kdns/.flox/env.json",
-          false);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env.lock",
-          "networking/kdns/.flox/env.lock",
           false);
       addMaterializationAsset(
           FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/manifest.toml",
@@ -288,24 +284,14 @@ public final class FloxRuntimeAssets {
     }
 
     public Builder addDefaultFlakeInstallerAssets() {
-      addInstallerAsset(
-          "mesh-headplane-flake.nix",
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/flake.nix",
-          "build-assets/mesh/headplane/flake.nix");
-      addInstallerAsset(
-          "networking-kdns-flake.nix",
-          FLOX_RESOURCE_ROOT + "/networking/kdns/flake.nix",
-          "build-assets/networking/kdns/flake.nix");
+      // Flox environment flake.nix/flake.lock are now materialized as part of the .flox/env structure
+      // (see addDefaultMeshHeadplaneMaterializationAssets and addDefaultNetworkingKdnsMaterializationAssets)
       // kdns flox environment files (note: .gitignore/.gitattributes excluded by Maven resource
       // filtering)
       addInstallerAsset(
           "networking-kdns-flox-env-json",
           FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env.json",
           "build-assets/networking/kdns/.flox/env.json");
-      addInstallerAsset(
-          "networking-kdns-flox-env-lock",
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env.lock",
-          "build-assets/networking/kdns/.flox/env.lock");
       addInstallerAsset(
           "networking-kdns-flox-env-manifest-toml",
           FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/manifest.toml",
@@ -320,10 +306,6 @@ public final class FloxRuntimeAssets {
           "mesh-headplane-flox-env-json",
           FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env.json",
           "build-assets/mesh/headplane/.flox/env.json");
-      addInstallerAsset(
-          "mesh-headplane-flox-env-lock",
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env.lock",
-          "build-assets/mesh/headplane/.flox/env.lock");
       addInstallerAsset(
           "mesh-headplane-flox-env-manifest-toml",
           FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/manifest.toml",
