@@ -245,6 +245,8 @@ public final class FloxRuntimeAssets {
           FLOX_RESOURCE_ROOT + "/runtime-installer.sh",
           "bin/runtime-installer.sh");
       addInstallerAsset(
+          "nri-plugin-run.sh", FLOX_RESOURCE_ROOT + "/nri-plugin-run.sh", "bin/nri-plugin-run.sh");
+      addInstallerAsset(
           "runtime-flake.nix", FLOX_RESOURCE_ROOT + "/flake.nix", "build-assets/flake.nix");
       return this;
     }

@@ -529,24 +529,19 @@ runtime::runtime:config-template:ensure() {
 	fi
 }
 
-nri::plugin:binary:install() {
-	local nri_plugin_pkg_path nri_plugin_bin install_path
+nri::plugin:gcroot:ensure() {
+	local nri_plugin_pkg_path
 
+	# Build and GC-root the NRI plugin (but don't install to /opt/nri/plugins)
+	# The main container will run it directly via nri-plugin-run.sh
 	nri_plugin_pkg_path="$(runtime::runtime:wrapper-package:build flox-nri-plugin)"
-	nri_plugin_bin="${nri_plugin_pkg_path}/bin/flox-nri-plugin"
-
-	[[ -x "${nri_plugin_bin}" ]] || {
-		echo "NRI plugin binary missing at ${nri_plugin_bin}" >&2
-		return 1
-	}
-
-	install_path="/opt/nri/plugins/10-flox"
-	install -D -m 0755 "${nri_plugin_bin}" "${install_path}"
 
 	# GC-root the NRI plugin closure
 	nix-store --add-root \
 		"${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/flox-runtime/flox-nri-plugin" \
 		--indirect -r "${nri_plugin_pkg_path}" >/dev/null
+
+	echo "NRI plugin package GC-rooted: ${nri_plugin_pkg_path}"
 }
 
 runtime::runtime:core:install() {
@@ -559,7 +554,7 @@ runtime::runtime:core:install() {
 	# variant="$(runtime::runtime:variant:resolve "${containerd_bin}")"
 	# runtime::runtime:binary:install "${flox_env_dir}" "${arch}" "${variant}"
 	runtime::runtime:config-template:ensure
-	nri::plugin:binary:install
+	nri::plugin:gcroot:ensure
 }
 
 containerd::config:path:init() {

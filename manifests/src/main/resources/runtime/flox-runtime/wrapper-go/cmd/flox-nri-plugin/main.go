@@ -12,9 +12,12 @@ import (
 )
 
 const (
-	pluginName   = "flox"
-	pluginIdx    = "10" // Plugin execution order (lower runs first)
-	pluginSocket = "/var/run/nri/nri.sock"
+	pluginName = "flox"
+	pluginIdx  = "10" // Plugin execution order (lower runs first)
+)
+
+var (
+	pluginSocket = "/var/run/nri/nri.sock" // Default for standalone mode
 )
 
 func main() {
@@ -53,12 +56,29 @@ func main() {
 	log.Println("Flox NRI plugin instance created successfully")
 
 	// Create NRI stub (handles protocol communication with containerd)
-	log.Printf("Creating NRI stub (name=%s, idx=%s, socket=%s)...", pluginName, pluginIdx, pluginSocket)
-	nriStub, err := stub.New(plugin,
+	// If NRI_PLUGIN_SOCKET env var is set, stub will use that fd automatically
+	// Otherwise it will connect to the socket path
+	socketMode := "standalone"
+	if os.Getenv("NRI_PLUGIN_SOCKET") != "" {
+		socketMode = "containerd-launched"
+	}
+	log.Printf("Creating NRI stub (name=%s, idx=%s, mode=%s)...", pluginName, pluginIdx, socketMode)
+
+	stubOpts := []stub.Option{
 		stub.WithPluginName(pluginName),
 		stub.WithPluginIdx(pluginIdx),
-		stub.WithSocketPath(pluginSocket),
-	)
+	}
+
+	// Only set socket path if not launched by containerd
+	// When containerd launches us, NRI_PLUGIN_SOCKET env var is set and stub handles it
+	if os.Getenv("NRI_PLUGIN_SOCKET") == "" {
+		log.Printf("Using socket path: %s", pluginSocket)
+		stubOpts = append(stubOpts, stub.WithSocketPath(pluginSocket))
+	} else {
+		log.Printf("Using NRI_PLUGIN_SOCKET fd from containerd")
+	}
+
+	nriStub, err := stub.New(plugin, stubOpts...)
 	if err != nil {
 		log.Fatalf("Failed to create NRI stub: %v", err)
 	}

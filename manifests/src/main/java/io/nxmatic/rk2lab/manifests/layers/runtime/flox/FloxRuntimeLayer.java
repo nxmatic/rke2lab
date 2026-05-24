@@ -223,124 +223,153 @@ public final class FloxRuntimeLayer extends Construct {
                             "app.kubernetes.io/name",
                             "flox-runtime-installer")),
                     "spec",
-                    Map.of(
-                        "automountServiceAccountToken",
-                        false,
-                        "containers",
-                        new Object[] {
-                          Map.of(
-                              "image",
-                              "registry.k8s.io/pause:3.10",
-                              "name",
-                              "pause",
-                              "resources",
+                    Map.ofEntries(
+                        Map.entry("automountServiceAccountToken", false),
+                        Map.entry(
+                            "containers",
+                            new Object[] {
                               Map.of(
-                                  "limits",
-                                  Map.of(
-                                      "cpu", "10m", "ephemeral-storage", "64Mi", "memory", "64Mi"),
-                                  "requests",
-                                  Map.of(
-                                      "cpu", "5m", "ephemeral-storage", "32Mi", "memory", "32Mi")))
-                        },
-                        "hostPID",
-                        true,
-                        "initContainers",
-                        new Object[] {
-                          Map.of(
-                              "command",
-                              new Object[] {
-                                "/bin/sh",
-                                "-ec",
-                                "apk add --no-cache bash coreutils && /.sh/bin/runtime-installer.sh"
-                              },
-                              "env",
-                              new Object[] {
-                                Map.of(
-                                    "name",
-                                    "CONTAINERD_CONFIG_FILE",
-                                    "value",
-                                    "/var/lib/rancher/rke2/agent/etc/containerd/config.toml"),
-                                Map.of("name", "DAEMONLESS_EXEC_MODE", "value", "pod"),
-                                Map.of(
-                                    "name",
-                                    "DAEMONLESS_HOST_SCRIPT_ROOT",
-                                    "value",
-                                    "/srv/host/k8s-daemonset.d/runtime/flox-runtime"),
-                                Map.of(
-                                    "name",
-                                    "CONTAINERD_ADDRESS",
-                                    "value",
-                                    "/run/k3s/containerd/containerd.sock"),
-                                Map.of("name", "SCRIPT_MOUNT_DIR", "value", "/.sh"),
-                                Map.of("name", "SCRIPT_POLICY_ROOT", "value", "/runtime-daemonset"),
-                                Map.of("name", "BUILD_ASSETS_DIR", "value", "/.sh/build-assets"),
-                                Map.of("name", "HOST_ROOT", "value", "/host-root")
-                              },
-                              "image",
-                              "alpine:3.20",
-                              "imagePullPolicy",
-                              "IfNotPresent",
-                              "name",
-                              "runtime-init",
-                              "securityContext",
-                              Map.of("privileged", true, "runAsGroup", 0, "runAsUser", 0),
-                              "volumeMounts",
-                              new Object[] {
-                                Map.of(
-                                    "mountPath",
-                                    "/.sh",
-                                    "name",
-                                    "runtime-installer-assets",
-                                    "readOnly",
-                                    true),
-                                Map.of(
-                                    "mountPath",
-                                    "/runtime-daemonset",
-                                    "name",
-                                    "runtime-daemonset-script-policy",
-                                    "readOnly",
-                                    true),
-                                Map.of("mountPath", "/host-root", "name", "host-root")
-                              })
-                        },
-                        "nodeSelector",
-                        Map.of("flox.dev/enabled", "true"),
-                        "restartPolicy",
-                        "Always",
-                        "serviceAccountName",
-                        "flox-runtime-installer",
-                        "tolerations",
-                        new Object[] {Map.of("operator", "Exists")},
-                        "volumes",
-                        new Object[] {
-                          Map.of(
-                              "configMap",
-                              Map.of(
-                                  "defaultMode",
-                                  493,
-                                  "items",
-                                  floxRuntimeAssets.installerVolumeItems(),
+                                  "command",
+                                  new Object[] {"/bin/sh", "-c", "/.sh/bin/nri-plugin-run.sh"},
+                                  "image",
+                                  "alpine:3.20",
                                   "name",
-                                  RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP.name()),
-                              "name",
-                              "runtime-installer-assets"),
-                          Map.of(
-                              "configMap",
+                                  "nri-plugin",
+                                  "securityContext",
+                                  Map.of("privileged", true, "runAsGroup", 0, "runAsUser", 0),
+                                  "volumeMounts",
+                                  new Object[] {
+                                    Map.of(
+                                        "mountPath",
+                                        "/.sh",
+                                        "name",
+                                        "runtime-installer-assets",
+                                        "readOnly",
+                                        true)
+                                  },
+                                  "resources",
+                                  Map.of(
+                                      "limits",
+                                      Map.of(
+                                          "cpu",
+                                          "100m",
+                                          "ephemeral-storage",
+                                          "128Mi",
+                                          "memory",
+                                          "128Mi"),
+                                      "requests",
+                                      Map.of(
+                                          "cpu",
+                                          "50m",
+                                          "ephemeral-storage",
+                                          "64Mi",
+                                          "memory",
+                                          "64Mi")))
+                            }),
+                        Map.entry("hostPID", true),
+                        Map.entry("hostNetwork", true),
+                        Map.entry("hostIPC", true),
+                        Map.entry(
+                            "initContainers",
+                            new Object[] {
                               Map.of(
-                                  "defaultMode",
-                                  493,
-                                  "items",
-                                  runtimeDaemonsetScriptPolicyAssets.volumeItems(),
+                                  "command",
+                                  new Object[] {
+                                    "/bin/sh",
+                                    "-ec",
+                                    "apk add --no-cache bash coreutils && /.sh/bin/runtime-installer.sh"
+                                  },
+                                  "env",
+                                  new Object[] {
+                                    Map.of(
+                                        "name",
+                                        "CONTAINERD_CONFIG_FILE",
+                                        "value",
+                                        "/var/lib/rancher/rke2/agent/etc/containerd/config.toml"),
+                                    Map.of("name", "DAEMONLESS_EXEC_MODE", "value", "pod"),
+                                    Map.of(
+                                        "name",
+                                        "DAEMONLESS_HOST_SCRIPT_ROOT",
+                                        "value",
+                                        "/srv/host/k8s-daemonset.d/runtime/flox-runtime"),
+                                    Map.of(
+                                        "name",
+                                        "CONTAINERD_ADDRESS",
+                                        "value",
+                                        "/run/k3s/containerd/containerd.sock"),
+                                    Map.of("name", "SCRIPT_MOUNT_DIR", "value", "/.sh"),
+                                    Map.of(
+                                        "name",
+                                        "SCRIPT_POLICY_ROOT",
+                                        "value",
+                                        "/runtime-daemonset"),
+                                    Map.of(
+                                        "name", "BUILD_ASSETS_DIR", "value", "/.sh/build-assets"),
+                                    Map.of("name", "HOST_ROOT", "value", "/host-root")
+                                  },
+                                  "image",
+                                  "alpine:3.20",
+                                  "imagePullPolicy",
+                                  "IfNotPresent",
                                   "name",
-                                  RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name()),
-                              "name",
-                              "runtime-daemonset-script-policy"),
-                          Map.of(
-                              "hostPath",
-                              Map.of("path", "/", "type", "Directory"),
-                              "name",
-                              "host-root")
-                        })),
+                                  "runtime-init",
+                                  "securityContext",
+                                  Map.of("privileged", true, "runAsGroup", 0, "runAsUser", 0),
+                                  "volumeMounts",
+                                  new Object[] {
+                                    Map.of(
+                                        "mountPath",
+                                        "/.sh",
+                                        "name",
+                                        "runtime-installer-assets",
+                                        "readOnly",
+                                        true),
+                                    Map.of(
+                                        "mountPath",
+                                        "/runtime-daemonset",
+                                        "name",
+                                        "runtime-daemonset-script-policy",
+                                        "readOnly",
+                                        true),
+                                    Map.of("mountPath", "/host-root", "name", "host-root")
+                                  })
+                            }),
+                        Map.entry("nodeSelector", Map.of("flox.dev/enabled", "true")),
+                        Map.entry("restartPolicy", "Always"),
+                        Map.entry("serviceAccountName", "flox-runtime-installer"),
+                        Map.entry("tolerations", new Object[] {Map.of("operator", "Exists")}),
+                        Map.entry(
+                            "volumes",
+                            new Object[] {
+                              Map.of(
+                                  "configMap",
+                                  Map.of(
+                                      "defaultMode",
+                                      493,
+                                      "items",
+                                      floxRuntimeAssets.installerVolumeItems(),
+                                      "name",
+                                      RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP
+                                          .name()),
+                                  "name",
+                                  "runtime-installer-assets"),
+                              Map.of(
+                                  "configMap",
+                                  Map.of(
+                                      "defaultMode",
+                                      493,
+                                      "items",
+                                      runtimeDaemonsetScriptPolicyAssets.volumeItems(),
+                                      "name",
+                                      RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name()),
+                                  "name",
+                                  "runtime-daemonset-script-policy"),
+                              Map.of(
+                                  "hostPath",
+                                  Map.of("path", "/", "type", "Directory"),
+                                  "name",
+                                  "host-root")
+                            }))),
                 "updateStrategy",
                 Map.of("rollingUpdate", Map.of("maxUnavailable", 1), "type", "RollingUpdate"))));
   }
