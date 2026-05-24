@@ -1,0 +1,380 @@
+# Architecture Diagrams: Flox NRI Plugin
+
+## 1. System Context - High-Level Architecture
+
+```mermaid
+flowchart TB
+    User[👤 User<br/>kubectl apply]
+
+    subgraph RKE2["RKE2 Cluster"]
+        K8s[Kubernetes API<br/>Pod Orchestration]
+        Containerd[Containerd<br/>Container Runtime]
+        NRI[NRI Plugin<br/>Flox Injector]
+    end
+
+    Nix[(Nix Store<br/>/nix/store)]
+    FloxHub[(FloxHub<br/>Environments)]
+
+    User -->|Deploy pods with<br/>flox.dev/environment| K8s
+    K8s -->|CRI: CreateContainer| Containerd
+    Containerd -->|NRI API: Events| NRI
+    NRI -->|Bind mount| Nix
+    NRI -.->|Resolve envs| FloxHub
+
+    style User fill:#326ce5,color:#fff
+    style RKE2 fill:#f9f,stroke:#333,stroke-width:2px
+    style Nix fill:#7ebae4
+    style FloxHub fill:#7ebae4
+```
+
+## 2. Flox Runtime Installer Pod Architecture
+
+```mermaid
+flowchart TB
+    subgraph K8s["Kubernetes DaemonSet"]
+        subgraph Pod["flox-runtime-installer Pod (on each node)"]
+            subgraph InitC["Init Container: runtime-installer"]
+                PodMode[Pod Mode<br/>installer::pod:run]
+                HostMode[Host Mode<br/>installer::host:run<br/>via nsenter]
+            end
+
+            subgraph MainC["Main Container: nri-plugin"]
+                Plugin[NRI Plugin Process<br/>flox-nri-plugin]
+            end
+        end
+    end
+
+    CM[ConfigMap<br/>runtime-installer-assets]
+    HostFS[(Host Filesystem<br/>/srv/host/.../flox-runtime)]
+    NixStore[(Nix Store<br/>/nix/store)]
+    Containerd[Containerd Process]
+
+    CM -->|Mount at /.sh| PodMode
+    PodMode -->|Copy assets| HostFS
+    PodMode -->|nsenter| HostMode
+    HostMode -->|Activate flox envs| NixStore
+    HostMode -->|Enable NRI config| Containerd
+    Containerd -->|Restart| Containerd
+    InitC -.->|Init complete| MainC
+    MainC -->|Run plugin binary| Plugin
+    Containerd <-->|NRI API<br/>Unix socket| Plugin
+    Plugin -->|Read env metadata| HostFS
+
+    style InitC fill:#e1f5e1
+    style MainC fill:#e1e1ff
+    style Pod stroke:#333,stroke-width:3px
+    style NixStore fill:#ffd700
+```
+
+## 3. Installation Phase - Bootstrap Flow
+
+```mermaid
+flowchart TD
+    CM[ConfigMap<br/>Runtime Assets<br/>scripts, envs, plugin<br/>Mounted at /.sh]
+
+    subgraph Init["Init Container (Pod Mode)"]
+        Pod[Pod Mode<br/>installer::pod:run]
+        InstallEnvs[Install Environments<br/>installer::flox:install_environments]
+    end
+
+    HostFS[(Host Filesystem<br/>/srv/host/.../flox-runtime)]
+
+    subgraph Host["Host Mode (nsenter)"]
+        HostMode[Host Mode<br/>installer::host:run]
+        Validate[Validate Assets]
+        Activate[Pre-activate Envs<br/>installer::host:flox:activate_environments]
+        UpdateCfg[Update containerd config]
+    end
+
+    NixStore[(Nix Store<br/>/nix/store<br/>⚠️ Host namespace only!)]
+    Containerd[Containerd<br/>Reload/Restart]
+
+    subgraph MainContainer["Main Container (DaemonSet)"]
+        NRIPlugin[NRI Plugin Process<br/>flox-nri-plugin<br/>Runs continuously]
+    end
+
+    CM -->|Mount at<br/>/.sh/build-assets| Pod
+    Pod -->|Materialize scripts<br/>Extract NRI plugin| HostFS
+    Pod --> InstallEnvs
+    InstallEnvs -->|Copy .flox files:<br/>json, flake.nix,<br/>manifest.toml| HostFS
+    Pod -->|nsenter to<br/>host namespace| HostMode
+    HostMode --> Validate
+    Validate --> Activate
+    Activate -->|cd env dir<br/>flox activate<br/>Generate flake.lock| HostFS
+    Activate -->|Build packages<br/>Populate store| NixStore
+    Activate --> UpdateCfg
+    UpdateCfg -->|Enable NRI<br/>in config.toml| Containerd
+    Init -.->|Init complete<br/>Main starts| MainContainer
+    MainContainer -->|Execute plugin binary<br/>from HostFS| NRIPlugin
+    Containerd -->|Discover & load<br/>via NRI API| NRIPlugin
+    NRIPlugin <-->|Bidirectional<br/>NRI events| Containerd
+
+    style Init fill:#e1f5e1
+    style Host fill:#ffe1e1
+    style MainContainer fill:#e1e1ff
+    style NixStore fill:#ffd700
+```
+
+## 4. Runtime Phase - Container Creation
+
+```mermaid
+flowchart LR
+    Kubelet[Kubelet]
+    Containerd[Containerd]
+    NRI[NRI Plugin<br/>flox-nri-plugin]
+
+    subgraph Pod["Application Pod"]
+        Container[Container<br/>with Flox env]
+    end
+
+    Envs[(Flox Environments<br/>networking/kdns<br/>mesh/headplane)]
+    Store[(Nix Store<br/>/nix/store)]
+
+    Kubelet -->|CRI: CreateContainer| Containerd
+    Containerd -->|NRI: CreateContainer event| NRI
+    NRI -->|Read metadata| Envs
+    NRI -->|Return ContainerAdjustment<br/>mounts + hooks| Containerd
+    Containerd -->|Apply mounts| Container
+    Container -->|Bind mount $HOME/.flox| Envs
+    Container -->|Overlayfs /nix| Store
+
+    style Pod fill:#f0f0f0,stroke:#333,stroke-width:2px
+```
+
+## 5. NRI Plugin Component Architecture
+
+```mermaid
+flowchart TB
+    Event[CreateContainer Event<br/>from containerd]
+
+    subgraph NRI["NRI Plugin Process"]
+        Handler[CreateContainer Handler]
+        Parser[Annotation Parser<br/>flox.dev/*]
+        Resolver[Environment Resolver<br/>category/name → path]
+        MountBuilder[Mount Builder<br/>bind + overlay]
+        HookBuilder[Hook Builder<br/>Prestart chown]
+    end
+
+    Catalog[(Environment Catalog<br/>/srv/host/.../)]
+    Store[(Nix Store<br/>/nix/store)]
+
+    Result[ContainerAdjustment<br/>mounts + hooks]
+
+    Event --> Handler
+    Handler --> Parser
+    Parser -->|Extract flox.dev/environment| Resolver
+    Resolver -->|Validate| Catalog
+    Resolver --> MountBuilder
+    MountBuilder -->|Reference| Store
+    MountBuilder --> HookBuilder
+    HookBuilder --> Result
+
+    style NRI fill:#e8f4f8,stroke:#333,stroke-width:2px
+```
+
+## 6. Sequence Diagram - Installation Flow
+
+```mermaid
+sequenceDiagram
+    participant CM as ConfigMap
+    participant Init as Init Container (Pod Mode)
+    participant FS as Host Filesystem
+    participant Nix as Nix Store
+    participant Host as Host Mode
+    participant Containerd as Containerd
+
+    CM->>Init: Mount at /.sh/build-assets
+
+    Note over Init: installer::pod:materialize_assets()
+    Init->>FS: Install scripts to /srv/host/.../bin
+    Init->>FS: Install debug tools
+
+    Note over Init: installer::flox:install_environments()
+    Note over Init: Traverse /.sh/build-assets/{category}/{name}
+    Init->>FS: Copy networking/kdns/.flox/env.json
+    Init->>FS: Copy networking/kdns/.flox/env/flake.nix
+    Init->>FS: Copy networking/kdns/.flox/env/manifest.toml
+    Init->>FS: Copy networking/kdns/.flox/env/manifest.lock
+    Init->>FS: Copy mesh/headplane/.flox/env.json
+    Init->>FS: Copy mesh/headplane/.flox/env/flake.nix
+    Init->>FS: Copy mesh/headplane/.flox/env/manifest.toml
+    Init->>FS: (etc...)
+    Note over Init: ⚠️ NO flox activate in pod mode<br/>(no access to /nix/store)
+
+    Init->>FS: Extract nri-plugin.tar.b64
+    Init->>Host: nsenter --target 1 (trampoline to host)
+
+    Note over Host: installer::host:run()
+    Host->>Host: Initialize tooling & validate
+
+    Note over Host: installer::host:flox:activate_environments()
+    loop For each environment discovered in FS
+        Host->>Host: cd /srv/host/.../networking/kdns
+        Host->>Nix: flox activate (resolve flake)
+        Nix-->>Host: Generate flake.lock
+        Nix->>Nix: Build packages
+        Nix->>Nix: Populate /nix/store
+        Host->>FS: Write flake.lock
+    end
+
+    Host->>Containerd: Update config.toml (enable NRI)
+    Host->>Containerd: Restart containerd
+
+    Note over Init: Init container completes
+
+    participant Main as Main Container
+    participant Plugin as NRI Plugin Process
+
+    Init->>Main: Start main container (DaemonSet)
+    Main->>Plugin: Execute /opt/nri/plugins/flox-nri-plugin
+
+    Note over Containerd: Containerd discovers NRI plugins
+    Containerd->>Plugin: Connect via NRI API (Unix socket)
+    Plugin->>Containerd: Register (Subscribe to CreateContainer events)
+
+    Note over Plugin: Plugin now running, waiting for container events
+```
+
+## 7. Sequence Diagram - Container Creation Flow
+
+```mermaid
+sequenceDiagram
+    participant K8s as Kubernetes
+    participant Containerd as Containerd
+    participant NRI as NRI Plugin
+    participant FS as Flox Environments
+    participant Container as Container
+
+    K8s->>Containerd: CreateContainer(pod, container)
+    Note over Containerd: Parse annotations: flox.dev/environment=networking/kdns
+
+    Containerd->>NRI: CreateContainer(pod, container)
+
+    Note over NRI: Check flox.dev/environment annotation
+    NRI->>NRI: Parse "networking/kdns"
+    NRI->>FS: Resolve /srv/host/.../networking/kdns
+    FS-->>NRI: Found .flox/env.json, flake.nix
+
+    NRI->>NRI: Build mount adjustments
+    Note over NRI: 1. Bind mount .flox to $HOME/.flox<br/>2. Overlay /nix (protect store)<br/>3. Prestart hook for chown
+
+    NRI-->>Containerd: ContainerAdjustment{mounts, hooks}
+
+    Containerd->>Container: Apply mounts
+    Note over Container: /networking/kdns/.flox → $HOME/.flox<br/>/nix/store → /nix-store-ro<br/>overlay → /nix
+
+    Containerd->>Container: Execute Prestart hook
+    Container->>Container: chown $HOME/.flox to container UID
+
+    Containerd->>Container: Start container
+    Container->>Container: flox activate (auto-discovers $HOME/.flox)
+```
+
+## 8. Deployment Diagram
+
+```mermaid
+C4Deployment
+    title Deployment - Flox NRI Plugin on K8s Node
+
+    Deployment_Node(node, "Kubernetes Node", "Linux Host") {
+        Deployment_Node(host_fs, "Host Filesystem") {
+            Container(runtime_assets, "/srv/host/k8s-daemonset.d/runtime/flox-runtime/", "Runtime Assets", "Scripts, envs, plugin")
+            Container(nix_store, "/nix/store/", "Nix Store", "Shared packages")
+        }
+
+        Deployment_Node(containerd_proc, "Containerd Process") {
+            Container(containerd, "containerd", "Container Runtime")
+            Container(nri_plugin, "flox-nri-plugin", "Go Process", "Loaded by containerd")
+        }
+
+        Deployment_Node(pod_ns, "Pod Namespace") {
+            Container(app_container, "Application Container", "With flox environment")
+        }
+    }
+
+    Rel(containerd, nri_plugin, "NRI API", "Unix socket")
+    Rel(nri_plugin, runtime_assets, "Reads", "File I/O")
+    Rel(app_container, runtime_assets, "Bind mount", "$HOME/.flox")
+    Rel(app_container, nix_store, "Overlayfs", "/nix")
+```
+
+## Key Flow Points
+
+### Pod Structure (DaemonSet on each node)
+
+The `flox-runtime-installer` pod has two containers:
+
+1. **Init Container** (`runtime-installer`):
+   - **Purpose**: One-time setup and configuration
+   - **Pod Mode**: Copies assets from ConfigMap to host filesystem
+   - **Host Mode**: Pre-activates flox environments, configures containerd
+   - **Lifecycle**: Runs once, exits when complete
+   - **Output**: Prepares host filesystem and configures containerd for NRI
+
+2. **Main Container** (`nri-plugin`):
+   - **Purpose**: Runs the NRI plugin process continuously
+   - **Execution**: Runs `/opt/nri/plugins/flox-nri-plugin` binary
+   - **Lifecycle**: Long-running, restarts if crashes
+   - **Communication**: Bidirectional with containerd via NRI API (Unix socket)
+   - **Function**: Intercepts container creation, injects flox environment mounts
+
+### Installation (Init Container → Host)
+
+1. **Pod Mode** (`installer::pod:run`):
+   - ConfigMap mounted at `/.sh/build-assets`
+   - Materializes scripts and debug tools to host filesystem
+   - Extracts NRI plugin tarball
+
+2. **Environment Setup** (`installer::flox:install_environments` in pod mode):
+   - Traverses mounted directory structure: `/.sh/build-assets/{category}/{name}/.flox/`
+   - Copies flox env files to host: `json`, `flake.nix`, `manifest.toml`, `manifest.lock`
+   - **⚠️ Does NOT activate** (pod has no access to /nix/store)
+
+3. **Trampoline**: `nsenter --target 1` to host namespace
+
+4. **Host Mode** (`installer::host:run`):
+   - Initialize tooling, validate assets
+
+5. **Pre-activation** (`installer::host:flox:activate_environments` in host mode):
+   - Rediscovers environments from host filesystem
+   - For each environment: `cd {env_dir} && flox activate`
+   - Generates `flake.lock` files
+   - Builds packages and populates `/nix/store`
+
+6. **Containerd Configuration**:
+   - Updates `config.toml` to enable NRI (`disable = false`, plugin paths)
+   - Restarts containerd if config changed
+   - Containerd discovers plugins in `/opt/nri/plugins/`
+   - NRI plugin (`flox-nri-plugin`) self-registers with containerd via NRI API
+
+### Runtime (Container Creation)
+1. **Annotation Detection**: NRI plugin checks `flox.dev/environment`
+2. **Environment Resolution**: Maps `networking/kdns` → `/srv/host/.../networking/kdns`
+3. **Mount Construction**: Builds bind mounts for .flox + overlay for /nix
+4. **Hook Creation**: Prestart hook to fix ownership (chown)
+5. **Injection**: Returns ContainerAdjustment to containerd
+6. **Activation**: Container starts with flox environment auto-discovered
+
+### Overlayfs Strategy
+- **Lower**: `/nix-store-ro` (read-only bind of /nix/store)
+- **Upper**: `/nix-overlay-upper` (tmpfs, writable, ephemeral)
+- **Work**: `/nix-overlay-work` (tmpfs, overlay metadata)
+- **Mount**: `/nix` (merged view)
+- **Benefit**: Protects host store, allows builds in container
+
+## Annotations Reference
+
+### Supported Annotations
+| Annotation | Required | Description | Example |
+|------------|----------|-------------|---------|
+| `flox.dev/environment` | Yes | Flox environment name | `networking/kdns` |
+| `flox.dev/home` | No | Override HOME directory | `/home/app` |
+| `flox.dev/uid` | No | Container UID (for chown) | `1000` |
+| `flox.dev/gid` | No | Container GID (for chown) | `1000` |
+| `flox.dev/debug` | No | Enable debug mode | `true` |
+| `flox.dev/debug-port` | No | Delve debugger port | `2345` |
+
+### Environment Path Resolution
+- Format: `{category}/{name}` or just `{name}` (defaults to `networking/`)
+- Maps to: `/srv/host/k8s-daemonset.d/runtime/flox-runtime/{category}/{name}`
+- Example: `networking/kdns` → `/srv/host/.../networking/kdns`

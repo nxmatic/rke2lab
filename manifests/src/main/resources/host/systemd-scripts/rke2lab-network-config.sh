@@ -39,10 +39,6 @@ esac
 : "=== Stopping dhcpcd for vmnet0 (systemd-networkd will manage it) ==="
 # Kill dhcpcd processes for vmnet0 to prevent route conflicts
 pkill -f 'dhcpcd.*vmnet0' || true
-sleep 1
-
-: "=== Process List Before Network Config ==="
-ps -ef
 
 : "=== Applying netplan configuration ==="
 if systemd-detect-virt --container >/dev/null 2>&1 || [[ -f /run/systemd/container ]]; then

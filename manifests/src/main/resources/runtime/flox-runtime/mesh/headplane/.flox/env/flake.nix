@@ -4,7 +4,7 @@
   inputs = {
     flake-commons.url = "github:nxmatic/nix-flake-commons/develop";
     nixpkgs.follows = "flake-commons/nixpkgs";
-    headplane.url = "github:tale/headplane?ref=v0.6.2";
+    headplane.url = "github:tale/headplane?ref=v0.6.3";
     headplane.inputs.flake-utils.follows = "flake-utils";
     headplane.inputs.nixpkgs.follows = "nixpkgs";
     flake-utils.follows = "flake-commons/flake-utils";
