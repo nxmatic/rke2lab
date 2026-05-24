@@ -20,13 +20,13 @@ import java.util.function.Consumer;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 
-public final class WrapperGoArchiveAssets {
+public final class NriPluginArchiveAssets {
 
-  public static final String ARCHIVE_CONFIGMAP_KEY = "wrapper-go.tar.b64";
+  public static final String ARCHIVE_CONFIGMAP_KEY = "nri-plugin.tar.b64";
 
-  public static final String MANIFEST_CONFIGMAP_KEY = "wrapper-go.manifest.json";
+  public static final String MANIFEST_CONFIGMAP_KEY = "nri-plugin.manifest.json";
 
-  private static final String MANIFEST_FORMAT = "wrapper-go-archive-manifest-v1";
+  private static final String MANIFEST_FORMAT = "nri-plugin-archive-manifest-v1";
 
   private static final long TAR_ENTRY_EPOCH_MILLIS = 0L;
 
@@ -34,7 +34,7 @@ public final class WrapperGoArchiveAssets {
   private final List<SourceAsset> sourceAssets;
   private final ArchiveBundle archiveBundle;
 
-  private WrapperGoArchiveAssets(Builder builder) {
+  private NriPluginArchiveAssets(Builder builder) {
     this.resourceAnchor = builder.resourceAnchor;
     this.sourceAssets = List.copyOf(builder.sourceAssets);
     this.archiveBundle = buildArchiveBundle();
@@ -77,7 +77,7 @@ public final class WrapperGoArchiveAssets {
       return new ArchiveBundle(
           entries, archiveBytes, archiveBase64, manifestJson, archiveSize, archiveSha256);
     } catch (IOException ex) {
-      throw new UncheckedIOException("Failed generating wrapper-go archive assets", ex);
+      throw new UncheckedIOException("Failed generating NRI plugin archive assets", ex);
     }
   }
 
@@ -85,13 +85,13 @@ public final class WrapperGoArchiveAssets {
     try (InputStream input = resourceAnchor.getResourceAsStream(asset.classpathResource())) {
       if (input == null) {
         throw new IllegalStateException(
-            "Missing wrapper-go resource: " + asset.classpathResource());
+            "Missing NRI plugin resource: " + asset.classpathResource());
       }
       byte[] content = input.readAllBytes();
       return new ArchiveEntry(asset.relativePath(), content, content.length, sha256Hex(content));
     } catch (IOException ex) {
       throw new UncheckedIOException(
-          "Failed reading wrapper-go resource: " + asset.classpathResource(), ex);
+          "Failed reading NRI plugin resource: " + asset.classpathResource(), ex);
     }
   }
 
@@ -181,7 +181,7 @@ public final class WrapperGoArchiveAssets {
   }
 
   public static final class Builder {
-    private Class<?> resourceAnchor = WrapperGoArchiveAssets.class;
+    private Class<?> resourceAnchor = NriPluginArchiveAssets.class;
 
     private final List<SourceAsset> sourceAssets = new ArrayList<>();
 
@@ -238,8 +238,8 @@ public final class WrapperGoArchiveAssets {
       return this;
     }
 
-    public WrapperGoArchiveAssets build() {
-      return new WrapperGoArchiveAssets(this);
+    public NriPluginArchiveAssets build() {
+      return new NriPluginArchiveAssets(this);
     }
   }
 

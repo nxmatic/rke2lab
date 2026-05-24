@@ -198,10 +198,10 @@ installer::pod:run() {
 	installer::pod:materialize_assets
 
 	daemonless::host_asset:materialize_encoded_tar \
-		"${BUILD_ASSETS_DIR}/wrapper-go.tar.b64" \
-		"${BUILD_ASSETS_DIR}/wrapper-go.manifest.json" \
+		"${BUILD_ASSETS_DIR}/nri-plugin.tar.b64" \
+		"${BUILD_ASSETS_DIR}/nri-plugin.manifest.json" \
 		"${HOST_SCRIPT_ROOT}" \
-		"wrapper-go"
+		"nri-plugin"
 
 	DAEMONLESS_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT}" \
 		DAEMONLESS_HOST_SCRIPT_BIN="${DAEMONSET_SCRIPT_ROOT%/}/bin" \

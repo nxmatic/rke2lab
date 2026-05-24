@@ -23,14 +23,14 @@ public final class FloxRuntimeAssets {
   private final List<EmbeddedAsset> floxMaterializationAssets;
   private final List<InstallerAsset> floxInstallerConfigMapAssets;
   private final RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets;
-  private final WrapperGoArchiveAssets wrapperGoArchiveAssets;
+  private final NriPluginArchiveAssets nriPluginArchiveAssets;
 
   private FloxRuntimeAssets(Builder builder) {
     this.resourceAnchor = builder.resourceAnchor;
     this.floxMaterializationAssets = List.copyOf(builder.floxMaterializationAssets);
     this.floxInstallerConfigMapAssets = List.copyOf(builder.floxInstallerConfigMapAssets);
     this.runtimeDaemonsetScriptPolicyAssets = builder.runtimeDaemonsetScriptPolicyAssets;
-    this.wrapperGoArchiveAssets = builder.wrapperGoArchiveAssets;
+    this.nriPluginArchiveAssets = builder.nriPluginArchiveAssets;
   }
 
   public static Builder builder() {
@@ -54,8 +54,8 @@ public final class FloxRuntimeAssets {
           asset.configMapKey(), normalizeConfigMapText(readResource(asset.classpathResource())));
     }
     data.putAll(runtimeDaemonsetScriptPolicyAssets.configMapData());
-    data.put(WrapperGoArchiveAssets.ARCHIVE_CONFIGMAP_KEY, wrapperGoArchiveAssets.archiveBase64());
-    data.put(WrapperGoArchiveAssets.MANIFEST_CONFIGMAP_KEY, wrapperGoArchiveAssets.manifestJson());
+    data.put(NriPluginArchiveAssets.ARCHIVE_CONFIGMAP_KEY, nriPluginArchiveAssets.archiveBase64());
+    data.put(NriPluginArchiveAssets.MANIFEST_CONFIGMAP_KEY, nriPluginArchiveAssets.manifestJson());
     return Map.copyOf(data);
   }
 
@@ -64,16 +64,16 @@ public final class FloxRuntimeAssets {
         new LinkedHashMap<>(
             Map.of(
                 "key",
-                WrapperGoArchiveAssets.ARCHIVE_CONFIGMAP_KEY,
+                NriPluginArchiveAssets.ARCHIVE_CONFIGMAP_KEY,
                 "path",
-                "build-assets/" + WrapperGoArchiveAssets.ARCHIVE_CONFIGMAP_KEY));
+                "build-assets/" + NriPluginArchiveAssets.ARCHIVE_CONFIGMAP_KEY));
     final LinkedHashMap<String, String> manifestItem =
         new LinkedHashMap<>(
             Map.of(
                 "key",
-                WrapperGoArchiveAssets.MANIFEST_CONFIGMAP_KEY,
+                NriPluginArchiveAssets.MANIFEST_CONFIGMAP_KEY,
                 "path",
-                "build-assets/" + WrapperGoArchiveAssets.MANIFEST_CONFIGMAP_KEY));
+                "build-assets/" + NriPluginArchiveAssets.MANIFEST_CONFIGMAP_KEY));
 
     final List<Map<String, String>> items =
         floxInstallerConfigMapAssets.stream()
@@ -102,7 +102,7 @@ public final class FloxRuntimeAssets {
 
   public void materializeSupplementaryAssetsTo(Path outputDir) {
     try {
-      wrapperGoArchiveAssets.materializeTo(outputDir);
+      nriPluginArchiveAssets.materializeTo(outputDir);
     } catch (IOException ex) {
       throw new UncheckedIOException(
           "Failed to materialize Flox supplementary assets to " + outputDir, ex);
@@ -142,8 +142,8 @@ public final class FloxRuntimeAssets {
     private final List<InstallerAsset> floxInstallerConfigMapAssets = new ArrayList<>();
     private RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets =
         RuntimeDaemonsetScriptPolicyAssets.builder().build();
-    private WrapperGoArchiveAssets wrapperGoArchiveAssets =
-        WrapperGoArchiveAssets.builder().build();
+    private NriPluginArchiveAssets nriPluginArchiveAssets =
+        NriPluginArchiveAssets.builder().build();
 
     private Builder() {
       addDefaultMaterializationAssets();
@@ -340,9 +340,9 @@ public final class FloxRuntimeAssets {
       return this;
     }
 
-    public Builder wrapperGoArchiveAssets(WrapperGoArchiveAssets wrapperGoArchiveAssets) {
-      this.wrapperGoArchiveAssets =
-          Objects.requireNonNull(wrapperGoArchiveAssets, "wrapperGoArchiveAssets");
+    public Builder nriPluginArchiveAssets(NriPluginArchiveAssets nriPluginArchiveAssets) {
+      this.nriPluginArchiveAssets =
+          Objects.requireNonNull(nriPluginArchiveAssets, "nriPluginArchiveAssets");
       return this;
     }
 
