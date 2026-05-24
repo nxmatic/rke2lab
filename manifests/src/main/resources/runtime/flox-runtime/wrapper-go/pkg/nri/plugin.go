@@ -112,10 +112,36 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 	log.Printf("Container %s/%s requests flox environment: %s",
 		pod.GetNamespace(), container.GetName(), floxEnv)
 
+	// Get UID/GID from container user (NRI v0.12.0+)
+	// Priority: 1) Container.User, 2) annotations, 3) default to root
+	var uid, gid string
+	user := container.GetUser()
+	if user != nil {
+		uid = fmt.Sprintf("%d", user.GetUid())
+		gid = fmt.Sprintf("%d", user.GetGid())
+		log.Printf("Container user UID=%s, GID=%s", uid, gid)
+	} else {
+		// Fallback to annotations
+		uid = getAnnotation(container, floxUIDAnnotation)
+		if uid == "" {
+			uid = getAnnotation(pod, floxUIDAnnotation)
+		}
+		if uid == "" {
+			uid = defaultUID
+		}
+
+		gid = getAnnotation(container, floxGIDAnnotation)
+		if gid == "" {
+			gid = getAnnotation(pod, floxGIDAnnotation)
+		}
+		if gid == "" {
+			gid = defaultGID
+		}
+		log.Printf("Using annotations/defaults: UID=%s, GID=%s", uid, gid)
+	}
+
 	// Determine HOME directory where .flox will be mounted
-	// Since NRI doesn't expose the container's UID, we rely on the HOME env var
-	// to determine the appropriate home directory for the running user
-	// Priority: flox.dev/home annotation > HOME env var > /root (default)
+	// Priority: flox.dev/home annotation > HOME env var > infer from UID
 	homeDir := getAnnotation(container, floxHomeAnnotation)
 	if homeDir == "" {
 		homeDir = getAnnotation(pod, floxHomeAnnotation)
@@ -124,33 +150,16 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 		homeDir = getEnvVar(container, "HOME")
 	}
 	if homeDir == "" {
-		// No annotation or HOME env var set - default to root
-		homeDir = defaultHome
+		// Infer home directory from UID
+		if uid == "0" {
+			homeDir = "/root"
+		} else {
+			homeDir = fmt.Sprintf("/home/user-%s", uid)
+		}
 	}
 
 	log.Printf("Using HOME directory: %s (will mount .flox at %s/.flox)", homeDir, homeDir)
-
-	// Get desired UID/GID for the flox environment ownership (optional, defaults to root)
-	// Note: These are hints for the host filesystem ownership; bind mounts inherit source ownership
-	uid := getAnnotation(container, floxUIDAnnotation)
-	if uid == "" {
-		uid = getAnnotation(pod, floxUIDAnnotation)
-	}
-	if uid == "" {
-		// Default to root UID
-		uid = defaultUID
-	}
-
-	gid := getAnnotation(container, floxGIDAnnotation)
-	if gid == "" {
-		gid = getAnnotation(pod, floxGIDAnnotation)
-	}
-	if gid == "" {
-		// Default to root GID
-		gid = defaultGID
-	}
-
-	log.Printf("Flox environment ownership (hint): UID=%s, GID=%s", uid, gid)
+	log.Printf("Flox environment ownership: UID=%s, GID=%s", uid, gid)
 
 	// Resolve the flox environment path
 	floxEnvPath, err := p.resolveFloxEnvironment(floxEnv)
@@ -177,8 +186,8 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 	}
 
 	// Create prestart hook to ensure mount target directories exist
-	// We need to create the HOME directory and parent paths before mounting
-	hookCmd := fmt.Sprintf("mkdir -p '%s/.flox' && chown %s:%s '%s' '%s/.flox'", homeDir, uid, gid, homeDir, homeDir)
+	// We need to create the HOME directory and parent paths, plus overlay mount points
+	hookCmd := fmt.Sprintf("mkdir -p '%s/.flox' /nix /nix-store-ro /nix-overlay-upper /nix-overlay-work && chown %s:%s '%s' '%s/.flox'", homeDir, uid, gid, homeDir, homeDir)
 	log.Printf("Creating prestart hook to prepare directories: %s", hookCmd)
 
 	createDirsHook := &api.Hook{
@@ -203,7 +212,7 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 
 	adjustment := &api.ContainerAdjustment{
 		Hooks: &api.Hooks{
-			Prestart: []*api.Hook{createDirsHook},
+			CreateRuntime: []*api.Hook{createDirsHook},
 		},
 		Mounts: []*api.Mount{
 			{

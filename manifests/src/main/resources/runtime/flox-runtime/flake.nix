@@ -20,7 +20,8 @@
       pkgs = import nixpkgs {inherit system;};
       lib = pkgs.lib;
 
-      nriPlugin = pkgs.buildGoModule {
+      # Common build attributes
+      commonAttrs = {
         pname = "flox-nri-plugin";
         version = "0.1.0";
         src = builtins.path {
@@ -28,16 +29,13 @@
           name = "wrapper-go-src";
         };
         subPackages = ["cmd/flox-nri-plugin"];
-        vendorHash = "sha256-KnrEpSTBwgX7/C3PozIh6dL86DJmi6+0W4gYaHYKZyo=";
+        vendorHash = "sha256-Ule4xfyW6PKTfVRPxBAZoyqp5mkvL/FKC5I/qJ8fWaY=";
 
         env = {
           CGO_ENABLED = "0";
         };
 
-        ldflags = [
-          "-s"
-          "-w"
-        ];
+        tags = ["netgo"];
 
         meta = with pkgs.lib; {
           description = "Flox NRI plugin for containerd - injects flox environments into containers";
@@ -45,9 +43,31 @@
           platforms = platforms.unix;
         };
       };
+
+      # Production build: optimized, stripped
+      nriPlugin = pkgs.buildGoModule (commonAttrs // {
+        ldflags = [
+          "-s"  # strip symbol table
+          "-w"  # strip DWARF debug info
+        ];
+      });
+
+      # Debug build: unoptimized, with debug symbols
+      nriPluginDebug = pkgs.buildGoModule (commonAttrs // {
+        pname = "flox-nri-plugin-debug";
+        dontStrip = true;
+
+        buildFlagsArray = [
+          "-gcflags=all=-N -l"  # disable optimizations and inlining
+        ];
+
+        ldflags = [];  # no stripping
+      });
     in {
       packages = {
         flox-nri-plugin = nriPlugin;
+        flox-nri-plugin-debug = nriPluginDebug;
+        default = nriPlugin;
       };
 
       defaultPackage = self.packages.${system}.flox-nri-plugin;

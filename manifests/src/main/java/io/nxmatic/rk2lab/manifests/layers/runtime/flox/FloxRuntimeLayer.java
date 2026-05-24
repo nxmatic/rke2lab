@@ -315,7 +315,17 @@ public final class FloxRuntimeLayer extends Construct {
                                         "/runtime-daemonset"),
                                     Map.of(
                                         "name", "BUILD_ASSETS_DIR", "value", "/.sh/build-assets"),
-                                    Map.of("name", "HOST_ROOT", "value", "/host-root")
+                                    Map.of("name", "HOST_ROOT", "value", "/host-root"),
+                                    Map.of(
+                                        "name",
+                                        "RKE2LAB_POLICY_DEBUG_NRI_PLUGINS_FLOX_ENABLED",
+                                        "value",
+                                        System.getenv(
+                                                    "RKE2LAB_POLICY_DEBUG_NRI_PLUGINS_FLOX_ENABLED")
+                                                != null
+                                            ? System.getenv(
+                                                "RKE2LAB_POLICY_DEBUG_NRI_PLUGINS_FLOX_ENABLED")
+                                            : "false")
                                   },
                                   "image",
                                   "alpine:3.20",

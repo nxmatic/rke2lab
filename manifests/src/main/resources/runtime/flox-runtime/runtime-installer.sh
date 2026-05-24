@@ -367,7 +367,8 @@ runtime::assets:path:validate() {
 }
 
 runtime::debug:any_enabled() {
-	rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}"
+	rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}" ||
+		rke2lab::bool:is_true "${RKE2LAB_POLICY_DEBUG_NRI_PLUGINS_FLOX_ENABLED:-false}"
 }
 
 runtime::debug:dlv:ensure() {
@@ -535,18 +536,27 @@ runtime::runtime:config-template:ensure() {
 }
 
 nri::plugin:gcroot:ensure() {
-	local nri_plugin_pkg_path
+	local nri_plugin_pkg_path package_name
+
+	# Choose debug or production build based on debug policy
+	if runtime::debug:any_enabled; then
+		package_name="flox-nri-plugin-debug"
+		echo "Debug mode enabled: building NRI plugin with debug symbols"
+	else
+		package_name="flox-nri-plugin"
+		echo "Production mode: building optimized NRI plugin"
+	fi
 
 	# Build and GC-root the NRI plugin (but don't install to /opt/nri/plugins)
 	# The main container will run it directly via nri-plugin-run.sh
-	nri_plugin_pkg_path="$(runtime::runtime:wrapper-package:build flox-nri-plugin)"
+	nri_plugin_pkg_path="$(runtime::runtime:wrapper-package:build "${package_name}")"
 
 	# GC-root the NRI plugin closure
 	nix-store --add-root \
 		"${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/flox-runtime/flox-nri-plugin" \
 		--indirect -r "${nri_plugin_pkg_path}" >/dev/null
 
-	echo "NRI plugin package GC-rooted: ${nri_plugin_pkg_path}"
+	echo "NRI plugin package GC-rooted (${package_name}): ${nri_plugin_pkg_path}"
 }
 
 flox::runtime:profile:ensure() {

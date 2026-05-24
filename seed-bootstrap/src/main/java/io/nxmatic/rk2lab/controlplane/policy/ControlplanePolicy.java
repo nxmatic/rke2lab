@@ -15,7 +15,7 @@ public record ControlplanePolicy(
 
   public static ControlplanePolicy defaults() {
     return new ControlplanePolicy(
-        new DebugPolicy(false, false),
+        new DebugPolicy(false, false, false),
         new NetworkPolicy(true),
         ManifestLinkPolicy.stageA(true, true, true, true, false));
   }
@@ -26,7 +26,8 @@ public record ControlplanePolicy(
     DebugPolicy debugPolicy =
         new DebugPolicy(
             environment.bool("policy.debug.kdns.enabled", false),
-            environment.bool("policy.debug.kdns.suspend", false));
+            environment.bool("policy.debug.kdns.suspend", false),
+            environment.bool("policy.debug.nriPlugins.flox.enabled", false));
 
     NetworkPolicy networkPolicy =
         new NetworkPolicy(environment.bool("policy.network.lan.binding.enabled", true));

@@ -21,17 +21,9 @@ var (
 )
 
 func main() {
-	// Setup file logging for debugging (NRI plugin stdout/stderr may not be captured)
-	logFile, err := os.OpenFile("/var/log/flox-nri-plugin.log",
-		os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		// Fall back to stderr if we can't open log file
-		log.Printf("Warning: could not open log file: %v", err)
-	} else {
-		defer logFile.Close()
-		log.SetOutput(logFile)
-		log.SetFlags(log.LstdFlags | log.Lshortfile)
-	}
+	// Log to stdout/stderr (captured by container runtime)
+	log.SetOutput(os.Stderr)
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	log.Println("=== Flox NRI Plugin Starting ===")
 
