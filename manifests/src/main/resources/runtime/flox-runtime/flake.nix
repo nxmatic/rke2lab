@@ -44,24 +44,32 @@
         };
       };
 
+      # Version is the single source of truth
+      version = "0.1.3";
+
       # Production build: optimized, stripped
       nriPlugin = pkgs.buildGoModule (commonAttrs // {
+        inherit version;
         ldflags = [
           "-s"  # strip symbol table
           "-w"  # strip DWARF debug info
+          "-X main.pluginVersion=${version}"
         ];
       });
 
       # Debug build: unoptimized, with debug symbols
       nriPluginDebug = pkgs.buildGoModule (commonAttrs // {
         pname = "flox-nri-plugin-debug";
+        inherit version;
         dontStrip = true;
 
         buildFlagsArray = [
           "-gcflags=all=-N -l"  # disable optimizations and inlining
         ];
 
-        ldflags = [];  # no stripping
+        ldflags = [
+          "-X main.pluginVersion=${version}-debug"
+        ];
       });
     in {
       packages = {

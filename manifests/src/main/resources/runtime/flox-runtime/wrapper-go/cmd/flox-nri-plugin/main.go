@@ -17,6 +17,10 @@ const (
 )
 
 var (
+	pluginVersion = "dev" // Set via ldflags at build time: -X main.pluginVersion=<version>
+)
+
+var (
 	pluginSocket = "/var/run/nri/nri.sock" // Default for standalone mode
 )
 
@@ -25,7 +29,7 @@ func main() {
 	log.SetOutput(os.Stderr)
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	log.Println("=== Flox NRI Plugin Starting ===")
+	log.Printf("=== Flox NRI Plugin Starting (version %s) ===", pluginVersion)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

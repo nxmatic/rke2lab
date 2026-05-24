@@ -185,12 +185,12 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 		// floxMountOptions = append(floxMountOptions, fmt.Sprintf("uidmap=%s:0:1", uid), fmt.Sprintf("gidmap=%s:0:1", gid))
 	}
 
-	// Create prestart hook to ensure mount target directories exist
-	// We need to create the HOME directory and parent paths, plus overlay mount points
-	hookCmd := fmt.Sprintf("mkdir -p '%s/.flox' /nix /nix-store-ro /nix-overlay-upper /nix-overlay-work && chown %s:%s '%s' '%s/.flox'", homeDir, uid, gid, homeDir, homeDir)
-	log.Printf("Creating prestart hook to prepare directories: %s", hookCmd)
+	// Create Prestart hook to ensure HOME and .flox directories have correct ownership
+	// This runs after mounts are set up but before container starts
+	hookCmd := fmt.Sprintf("chown %s:%s '%s' '%s/.flox'", uid, gid, homeDir, homeDir)
+	log.Printf("Creating Prestart hook to set ownership: %s", hookCmd)
 
-	createDirsHook := &api.Hook{
+	chownHook := &api.Hook{
 		Path: "/bin/sh",
 		Args: []string{
 			"sh",
@@ -210,9 +210,11 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 	log.Printf("  - Nix store: /nix/store -> /nix-store-ro (bind, ro)")
 	log.Printf("  - Overlayfs: /nix (lower=/nix-store-ro, upper=/nix-overlay-upper, work=/nix-overlay-work)")
 
+	log.Printf("Adding Prestart hook (runs AFTER mounts are applied)")
+
 	adjustment := &api.ContainerAdjustment{
 		Hooks: &api.Hooks{
-			CreateRuntime: []*api.Hook{createDirsHook},
+			Prestart: []*api.Hook{chownHook},
 		},
 		Mounts: []*api.Mount{
 			{
@@ -224,7 +226,13 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 				Options:     floxMountOptions,
 			},
 			{
-				// Bind mount /nix/store read-only from host (will be lower layer)
+				// Create tmpfs at /nix-store-ro (mount point for bind mount)
+				Destination: "/nix-store-ro",
+				Type:        "tmpfs",
+				Options:     []string{"mode=0755", "size=1m"},
+			},
+			{
+				// Bind mount /nix/store read-only from host over the tmpfs (will be lower layer)
 				Source:      "/nix/store",
 				Destination: "/nix-store-ro",
 				Type:        "bind",
@@ -240,10 +248,16 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 				// Create tmpfs for overlayfs work directory
 				Destination: "/nix-overlay-work",
 				Type:        "tmpfs",
-				Options:     []string{"mode=0755"},
+				Options:     []string{"mode=0755", "size=1m"},
 			},
 			{
-				// Create overlay mount at /nix with lower=/nix-store-ro, upper=/nix-overlay-upper
+				// Create tmpfs at /nix (mount point for overlay)
+				Destination: "/nix",
+				Type:        "tmpfs",
+				Options:     []string{"mode=0755", "size=1m"},
+			},
+			{
+				// Create overlay mount at /nix over the tmpfs
 				Source:      "overlay",
 				Destination: "/nix",
 				Type:        "overlay",
