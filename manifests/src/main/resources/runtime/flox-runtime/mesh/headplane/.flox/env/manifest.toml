@@ -33,16 +33,16 @@ outputs = "all"
 outputs = "all"
 
   [install.headplane]
-  store-path = "/nix/store/7cs76svbqrbdxig00np9dyp1f06ywqrb-headplane-0.6.2"
+  flake = "path:.flox/env#headplane"
 
   [install.headscale]
-  store-path = "/nix/store/dbcnax93bqfjxwjl7jz3yvam3v3bwpz3-headscale-0.27.1"
+  flake = "path:.flox/env#headscale"
 
   [install.headplane-agent]
-  store-path = "/nix/store/vs767haf1x0a4mr6a743jip9s384m80h-hp_agent-0.6.2"
+  flake = "path:.flox/env#headplane-agent"
 
   [install.headplane-ssh-wasm]
-  store-path = "/nix/store/9i1w97bnr8hivdr91lfq6g0pazq3f15p-headplane-ssh-wasm-0.6.2"
+  flake = "path:.flox/env#headplane-ssh-wasm"
 
 ## Other Environment Options -----------------------------------------
 [options]

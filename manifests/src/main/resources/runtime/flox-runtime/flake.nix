@@ -23,13 +23,12 @@
       # Common build attributes
       commonAttrs = {
         pname = "flox-nri-plugin";
-        version = "0.1.0";
         src = builtins.path {
           path = ./wrapper-go;
           name = "wrapper-go-src";
         };
         subPackages = ["cmd/flox-nri-plugin"];
-        vendorHash = "sha256-Ule4xfyW6PKTfVRPxBAZoyqp5mkvL/FKC5I/qJ8fWaY=";
+        vendorHash = "sha256-Ule4xfyW6PKTfVRPxBAZoyqp5mkvL/FKC5I/qJ8fWaY="; # lib.fakeHash;
 
         env = {
           CGO_ENABLED = "0";
@@ -45,7 +44,7 @@
       };
 
       # Version is the single source of truth
-      version = "0.1.3";
+      version = "0.1.6";
 
       # Production build: optimized, stripped
       nriPlugin = pkgs.buildGoModule (commonAttrs // {

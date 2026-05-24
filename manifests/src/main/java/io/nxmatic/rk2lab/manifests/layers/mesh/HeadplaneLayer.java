@@ -508,7 +508,7 @@ public final class HeadplaneLayer extends Construct {
                     Map.of(
                         "annotations",
                         packageProfile.templateAnnotations(
-                            Map.of("flox.dev/environment", "nxmatic/headplane"))),
+                            Map.of("flox.dev/environment", "mesh/headplane"))),
                     "spec",
                     Map.of(
                         "containers",
@@ -658,7 +658,7 @@ public final class HeadplaneLayer extends Construct {
                     Map.of(
                         "annotations",
                         packageProfile.templateAnnotations(
-                            Map.of("flox.dev/environment", "nxmatic/headplane")),
+                            Map.of("flox.dev/environment", "mesh/headplane")),
                         "labels",
                         Map.of("app", "headplane")),
                     "spec",

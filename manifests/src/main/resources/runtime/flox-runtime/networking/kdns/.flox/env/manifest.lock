@@ -18,8 +18,8 @@
         "pkg-path": "go",
         "version": "^1.25"
       },
-      "kdns": {
-        "store-path": "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15"
+      "kdns-debug": {
+        "flake": "path:.flox/env#kdns-debug"
       }
     },
     "hook": {},
@@ -27,30 +27,6 @@
     "options": {}
   },
   "packages": [
-    {
-      "install_id": "kdns",
-      "store_path": "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15",
-      "system": "aarch64-darwin",
-      "priority": 5
-    },
-    {
-      "install_id": "kdns",
-      "store_path": "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15",
-      "system": "aarch64-linux",
-      "priority": 5
-    },
-    {
-      "install_id": "kdns",
-      "store_path": "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15",
-      "system": "x86_64-darwin",
-      "priority": 5
-    },
-    {
-      "install_id": "kdns",
-      "store_path": "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15",
-      "system": "x86_64-linux",
-      "priority": 5
-    },
     {
       "attr_path": "bash",
       "broken": false,
@@ -569,6 +545,122 @@
       },
       "system": "x86_64-linux",
       "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "install_id": "kdns-debug",
+      "locked-url": "path:/srv/host/rke2lab-worktree.d/manifests/src/main/resources/runtime/flox-runtime/networking/kdns/.flox/env?lastModified=1779627875&narHash=sha256-CCXzkuBmMPeAY347iGkR9rZwAJwRKOHVj%2BmoSUg5Zks%3D",
+      "flake-description": "kdns - Kubernetes DNS with mDNS support",
+      "locked-flake-attr-path": "packages.aarch64-darwin.kdns-debug",
+      "derivation": "/nix/store/6zgzd9jagb0pb3zb6mskb27k2f34b76b-kdns-debug-0.2.15.drv",
+      "outputs": {
+        "out": "/nix/store/7ilcy78h82v9hn2rk44nz2yvkczbz89h-kdns-debug-0.2.15"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-darwin",
+      "system": "aarch64-darwin",
+      "name": "kdns-debug-0.2.15",
+      "pname": "kdns-debug",
+      "version": "0.2.15",
+      "description": "Kubernetes DNS controller with mDNS support (debug build)",
+      "licenses": [
+        "MIT"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "kdns-debug",
+      "locked-url": "path:/srv/host/rke2lab-worktree.d/manifests/src/main/resources/runtime/flox-runtime/networking/kdns/.flox/env?lastModified=1779627875&narHash=sha256-CCXzkuBmMPeAY347iGkR9rZwAJwRKOHVj%2BmoSUg5Zks%3D",
+      "flake-description": "kdns - Kubernetes DNS with mDNS support",
+      "locked-flake-attr-path": "packages.aarch64-linux.kdns-debug",
+      "derivation": "/nix/store/ax9wvhv8dss7kl07gy70fii6ckrgvrl1-kdns-debug-0.2.15.drv",
+      "outputs": {
+        "out": "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "kdns-debug-0.2.15",
+      "pname": "kdns-debug",
+      "version": "0.2.15",
+      "description": "Kubernetes DNS controller with mDNS support (debug build)",
+      "licenses": [
+        "MIT"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "kdns-debug",
+      "locked-url": "path:/srv/host/rke2lab-worktree.d/manifests/src/main/resources/runtime/flox-runtime/networking/kdns/.flox/env?lastModified=1779627875&narHash=sha256-CCXzkuBmMPeAY347iGkR9rZwAJwRKOHVj%2BmoSUg5Zks%3D",
+      "flake-description": "kdns - Kubernetes DNS with mDNS support",
+      "locked-flake-attr-path": "packages.x86_64-darwin.kdns-debug",
+      "derivation": "/nix/store/lzmpj3ldpmrafd6d2h6a9m0ls17wa3fa-kdns-debug-0.2.15.drv",
+      "outputs": {
+        "out": "/nix/store/a84yn9rh3398ncy20s00hx88cvv8g36x-kdns-debug-0.2.15"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "x86_64-darwin",
+      "system": "x86_64-darwin",
+      "name": "kdns-debug-0.2.15",
+      "pname": "kdns-debug",
+      "version": "0.2.15",
+      "description": "Kubernetes DNS controller with mDNS support (debug build)",
+      "licenses": [
+        "MIT"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "kdns-debug",
+      "locked-url": "path:/srv/host/rke2lab-worktree.d/manifests/src/main/resources/runtime/flox-runtime/networking/kdns/.flox/env?lastModified=1779627875&narHash=sha256-CCXzkuBmMPeAY347iGkR9rZwAJwRKOHVj%2BmoSUg5Zks%3D",
+      "flake-description": "kdns - Kubernetes DNS with mDNS support",
+      "locked-flake-attr-path": "packages.x86_64-linux.kdns-debug",
+      "derivation": "/nix/store/359hcpiw1yp5gg7y1idwjnyv1wk8llg6-kdns-debug-0.2.15.drv",
+      "outputs": {
+        "out": "/nix/store/qiclfybvk8b1z87070rrdyr4fbvj641a-kdns-debug-0.2.15"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "x86_64-linux",
+      "system": "x86_64-linux",
+      "name": "kdns-debug-0.2.15",
+      "pname": "kdns-debug",
+      "version": "0.2.15",
+      "description": "Kubernetes DNS controller with mDNS support (debug build)",
+      "licenses": [
+        "MIT"
+      ],
+      "broken": false,
+      "unfree": false,
       "priority": 5
     }
   ]

@@ -185,10 +185,10 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 		// floxMountOptions = append(floxMountOptions, fmt.Sprintf("uidmap=%s:0:1", uid), fmt.Sprintf("gidmap=%s:0:1", gid))
 	}
 
-	// Create Prestart hook to ensure HOME and .flox directories have correct ownership
-	// This runs after mounts are set up but before container starts
-	hookCmd := fmt.Sprintf("chown %s:%s '%s' '%s/.flox'", uid, gid, homeDir, homeDir)
-	log.Printf("Creating Prestart hook to set ownership: %s", hookCmd)
+	// Create Prestart hook to ensure HOME and .flox have correct ownership
+	// Runs after mounts but before container starts
+	hookCmd := fmt.Sprintf("chown %s:%s '%s' '%s/.flox' 2>/dev/null || true", uid, gid, homeDir, homeDir)
+	log.Printf("Creating Prestart hook for ownership: %s", hookCmd)
 
 	chownHook := &api.Hook{
 		Path: "/bin/sh",
@@ -207,8 +207,7 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 	floxEnvSource := filepath.Join(floxEnvPath, ".flox")
 	log.Printf("Setting up mounts:")
 	log.Printf("  - Flox environment: %s -> %s (bind, %v)", floxEnvSource, floxMountTarget, floxMountOptions)
-	log.Printf("  - Nix store: /nix/store -> /nix-store-ro (bind, ro)")
-	log.Printf("  - Overlayfs: /nix (lower=/nix-store-ro, upper=/nix-overlay-upper, work=/nix-overlay-work)")
+	log.Printf("  - Nix directory: /nix (bind, ro from host)")
 
 	log.Printf("Adding Prestart hook (runs AFTER mounts are applied)")
 
@@ -226,46 +225,12 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 				Options:     floxMountOptions,
 			},
 			{
-				// Create tmpfs at /nix-store-ro (mount point for bind mount)
-				Destination: "/nix-store-ro",
-				Type:        "tmpfs",
-				Options:     []string{"mode=0755", "size=1m"},
-			},
-			{
-				// Bind mount /nix/store read-only from host over the tmpfs (will be lower layer)
-				Source:      "/nix/store",
-				Destination: "/nix-store-ro",
+				// Bind mount entire /nix directory from host (read-only)
+				// This gives access to /nix/store and /nix/var
+				Source:      "/nix",
+				Destination: "/nix",
 				Type:        "bind",
 				Options:     []string{"ro", "rbind"},
-			},
-			{
-				// Create tmpfs for overlayfs upper layer (writable, ephemeral)
-				Destination: "/nix-overlay-upper",
-				Type:        "tmpfs",
-				Options:     []string{"mode=0755", "size=100m"},
-			},
-			{
-				// Create tmpfs for overlayfs work directory
-				Destination: "/nix-overlay-work",
-				Type:        "tmpfs",
-				Options:     []string{"mode=0755", "size=1m"},
-			},
-			{
-				// Create tmpfs at /nix (mount point for overlay)
-				Destination: "/nix",
-				Type:        "tmpfs",
-				Options:     []string{"mode=0755", "size=1m"},
-			},
-			{
-				// Create overlay mount at /nix over the tmpfs
-				Source:      "overlay",
-				Destination: "/nix",
-				Type:        "overlay",
-				Options: []string{
-					"lowerdir=/nix-store-ro",
-					"upperdir=/nix-overlay-upper",
-					"workdir=/nix-overlay-work",
-				},
 			},
 		},
 	}

@@ -31,11 +31,11 @@ outputs = "all"
     pkg-path = "coreutils"
 outputs = "all"
   
-  [install.kdns]
+  [install.kdns-debug]
     # Use flake reference instead of hardcoded store-path
     # This allows Flox to build kdns from the local flake when activating
     # The flake.nix is in the parent directory (../flake.nix relative to .flox/)
-    flake = "path:.#kdns-debug"
+    flake = "path:.flox/env#kdns-debug"
     # Old approach (containerd-shim-flox): used pre-materialized store-path
     # store-path = "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15"
 
