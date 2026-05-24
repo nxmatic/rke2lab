@@ -24,8 +24,8 @@
       commonAttrs = {
         pname = "flox-nri-plugin";
         src = builtins.path {
-          path = ./wrapper-go;
-          name = "wrapper-go-src";
+          path = ./nri-plugin;
+          name = "nri-plugin-src";
         };
         subPackages = ["cmd/flox-nri-plugin"];
         vendorHash = "sha256-Ule4xfyW6PKTfVRPxBAZoyqp5mkvL/FKC5I/qJ8fWaY="; # lib.fakeHash;
@@ -34,7 +34,7 @@
           CGO_ENABLED = "0";
         };
 
-        tags = ["netgo"];
+        tags = ["netgo"];O
 
         meta = with pkgs.lib; {
           description = "Flox NRI plugin for containerd - injects flox environments into containers";
