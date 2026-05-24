@@ -292,12 +292,16 @@ public final class FloxRuntimeAssets {
     }
 
     public Builder addDefaultFlakeInstallerAssets() {
-      // Flox environment flake.nix/flake.lock are now materialized as part of the .flox/env
-      // structure
-      // (see addDefaultMeshHeadplaneMaterializationAssets and
-      // addDefaultNetworkingKdnsMaterializationAssets)
       // kdns flox environment files (note: .gitignore/.gitattributes excluded by Maven resource
       // filtering)
+      addInstallerAsset(
+          "networking-kdns-flox-env-flake-nix",
+          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/flake.nix",
+          "build-assets/networking/kdns/.flox/env/flake.nix");
+      addInstallerAsset(
+          "networking-kdns-flox-env-flake-lock",
+          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/flake.lock",
+          "build-assets/networking/kdns/.flox/env/flake.lock");
       addInstallerAsset(
           "networking-kdns-flox-env-json",
           FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env.json",
@@ -312,6 +316,14 @@ public final class FloxRuntimeAssets {
           "build-assets/networking/kdns/.flox/env/manifest.lock");
       // mesh/headplane flox environment files (note: .gitignore/.gitattributes excluded by Maven
       // resource filtering)
+      addInstallerAsset(
+          "mesh-headplane-flox-env-flake-nix",
+          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/flake.nix",
+          "build-assets/mesh/headplane/.flox/env/flake.nix");
+      addInstallerAsset(
+          "mesh-headplane-flox-env-flake-lock",
+          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/flake.lock",
+          "build-assets/mesh/headplane/.flox/env/flake.lock");
       addInstallerAsset(
           "mesh-headplane-flox-env-json",
           FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env.json",

@@ -187,9 +187,20 @@ installer::pod:materialize_assets() {
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/master-runtime-pprof.sh" "${HOST_SCRIPT_ROOT}/debug-tools/master-runtime-pprof.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/rke2lab-dlv.sh" "${HOST_SCRIPT_ROOT}/debug-tools/rke2lab-dlv.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/rke2lab-runtime-dlv.sh" "${HOST_SCRIPT_ROOT}/debug-tools/rke2lab-runtime-dlv.sh"
-	# Flox environment files (flake.nix, env.json, manifest.toml, etc.) are now materialized
-	# via FloxRuntimeAssets.materializationAssets() to /srv/host/k8s-daemonset.d/runtime/flox-runtime/
-	# No need to install from build-assets ConfigMap anymore
+
+	# Install flox environment files from ConfigMap to host filesystem
+	# networking/kdns environment
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/networking-kdns-flox-env-flake-nix" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env/flake.nix"
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/networking-kdns-flox-env-flake-lock" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env/flake.lock"
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/networking-kdns-flox-env-json" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env.json"
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/networking-kdns-flox-env-manifest-toml" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env/manifest.toml"
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/networking-kdns-flox-env-manifest-lock" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env/manifest.lock"
+	# mesh/headplane environment
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/mesh-headplane-flox-env-flake-nix" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env/flake.nix"
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/mesh-headplane-flox-env-flake-lock" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env/flake.lock"
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/mesh-headplane-flox-env-json" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env.json"
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/mesh-headplane-flox-env-manifest-toml" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env/manifest.toml"
+	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/mesh-headplane-flox-env-manifest-lock" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env/manifest.lock"
 }
 
 installer::pod:run() {
