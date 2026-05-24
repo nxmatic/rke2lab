@@ -15,6 +15,10 @@ import software.constructs.Construct;
 public final class HeadplaneLayer extends Construct {
 
   private static final String HEADSCALE_NAMESPACE = MeshLayerRefs.MESH_SYSTEM_NAMESPACE.name();
+  private static final String FLOX_IMAGE =
+      "true".equalsIgnoreCase(System.getenv("RKE2LAB_POLICY_DEBUG_NRI_PLUGINS_FLOX_ENABLED"))
+          ? "alpine:latest"
+          : "flox/empty:1.0.0";
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("mesh", "headplane");
@@ -667,7 +671,7 @@ public final class HeadplaneLayer extends Construct {
                         List.of(
                             Map.ofEntries(
                                 Map.entry("name", "headplane"),
-                                Map.entry("image", "flox/empty:1.0.0"),
+                                Map.entry("image", "FLOX_IMAGE"),
                                 Map.entry("command", List.of("headplane")),
                                 Map.entry("args", List.of("serve")),
                                 Map.entry(
@@ -793,7 +797,7 @@ public final class HeadplaneLayer extends Construct {
                                 "name",
                                 "setup-agent",
                                 "image",
-                                "flox/empty:1.0.0",
+                                "FLOX_IMAGE",
                                 "command",
                                 List.of(
                                     "sh",

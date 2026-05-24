@@ -15,6 +15,10 @@ import software.constructs.Construct;
 public final class HeadscaleLayer extends Construct {
 
   private static final String HEADSCALE_NAMESPACE = MeshLayerRefs.MESH_SYSTEM_NAMESPACE.name();
+  private static final String FLOX_IMAGE =
+      "true".equalsIgnoreCase(System.getenv("RKE2LAB_POLICY_DEBUG_NRI_PLUGINS_FLOX_ENABLED"))
+          ? "alpine:latest"
+          : "flox/empty:1.0.0";
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("mesh", "headscale");
@@ -754,7 +758,7 @@ public final class HeadscaleLayer extends Construct {
                             List.of(
                                 Map.ofEntries(
                                     Map.entry("name", "headscale"),
-                                    Map.entry("image", "flox/empty:1.0.0"),
+                                    Map.entry("image", FLOX_IMAGE),
                                     Map.entry("command", List.of("headscale", "serve")),
                                     Map.entry(
                                         "envFrom",
@@ -855,7 +859,7 @@ public final class HeadscaleLayer extends Construct {
                                     "name",
                                     "config-init",
                                     "image",
-                                    "flox/empty:1.0.0",
+                                    FLOX_IMAGE,
                                     "command",
                                     List.of("/scripts/config-init.sh"),
                                     "volumeMounts",
@@ -1002,7 +1006,7 @@ public final class HeadscaleLayer extends Construct {
                                 "name",
                                 "bootstrap",
                                 "image",
-                                "flox/empty:1.0.0",
+                                FLOX_IMAGE,
                                 "command",
                                 List.of("/scripts/bootstrap.sh"),
                                 "envFrom",
@@ -1117,7 +1121,7 @@ public final class HeadscaleLayer extends Construct {
                                 "name",
                                 "tailscale-gateway",
                                 "image",
-                                "flox/empty:1.0.0",
+                                FLOX_IMAGE,
                                 "command",
                                 List.of("/scripts/gateway.sh"),
                                 "env",
@@ -1297,7 +1301,7 @@ public final class HeadscaleLayer extends Construct {
                                 "name",
                                 "tailscale",
                                 "image",
-                                "flox/empty:1.0.0",
+                                FLOX_IMAGE,
                                 "command",
                                 List.of("/scripts/tailscale-client.sh"),
                                 "env",
@@ -1400,7 +1404,7 @@ public final class HeadscaleLayer extends Construct {
                                 "name",
                                 "wait-for-headscale",
                                 "image",
-                                "flox/empty:1.0.0",
+                                FLOX_IMAGE,
                                 "command",
                                 List.of("/scripts/wait-for-headscale.sh"),
                                 "envFrom",

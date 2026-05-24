@@ -211,9 +211,14 @@ public final class KdnsLayer extends Construct {
     deployment.addDependency(dlvScriptConfigMap);
     deployment.addDependency(clusterRoleBinding);
 
+    // Use alpine in debug mode for easier troubleshooting with shell tools
+    boolean nriDebugEnabled =
+        "true".equalsIgnoreCase(System.getenv("RKE2LAB_POLICY_DEBUG_NRI_PLUGINS_FLOX_ENABLED"));
+    String containerImage = nriDebugEnabled ? "alpine:latest" : "flox/empty:1.0.0";
+
     LinkedHashMap<String, Object> kdnsContainer = new LinkedHashMap<>();
     kdnsContainer.put("name", "kdns");
-    kdnsContainer.put("image", "flox/empty:1.0.0");
+    kdnsContainer.put("image", containerImage);
     kdnsContainer.put("imagePullPolicy", "IfNotPresent");
     kdnsContainer.put("command", List.of("flox", "activate", "--", "kdns"));
     kdnsContainer.put(
