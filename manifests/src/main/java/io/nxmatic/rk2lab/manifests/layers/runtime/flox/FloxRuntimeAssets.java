@@ -173,9 +173,13 @@ public final class FloxRuntimeAssets {
 
     public Builder addDefaultMeshHeadplaneMaterializationAssets() {
       addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/flake.nix", "mesh/headplane/.flox/env/flake.nix", false);
+          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/flake.nix",
+          "mesh/headplane/.flox/env/flake.nix",
+          false);
       addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/flake.lock", "mesh/headplane/.flox/env/flake.lock", false);
+          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/flake.lock",
+          "mesh/headplane/.flox/env/flake.lock",
+          false);
       addMaterializationAsset(
           FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/.gitattributes",
           "mesh/headplane/.flox/.gitattributes",
@@ -201,9 +205,13 @@ public final class FloxRuntimeAssets {
 
     public Builder addDefaultNetworkingKdnsMaterializationAssets() {
       addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/flake.nix", "networking/kdns/.flox/env/flake.nix", false);
+          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/flake.nix",
+          "networking/kdns/.flox/env/flake.nix",
+          false);
       addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/flake.lock", "networking/kdns/.flox/env/flake.lock", false);
+          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/flake.lock",
+          "networking/kdns/.flox/env/flake.lock",
+          false);
       addMaterializationAsset(
           FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/.gitattributes",
           "networking/kdns/.flox/.gitattributes",
@@ -284,8 +292,10 @@ public final class FloxRuntimeAssets {
     }
 
     public Builder addDefaultFlakeInstallerAssets() {
-      // Flox environment flake.nix/flake.lock are now materialized as part of the .flox/env structure
-      // (see addDefaultMeshHeadplaneMaterializationAssets and addDefaultNetworkingKdnsMaterializationAssets)
+      // Flox environment flake.nix/flake.lock are now materialized as part of the .flox/env
+      // structure
+      // (see addDefaultMeshHeadplaneMaterializationAssets and
+      // addDefaultNetworkingKdnsMaterializationAssets)
       // kdns flox environment files (note: .gitignore/.gitattributes excluded by Maven resource
       // filtering)
       addInstallerAsset(

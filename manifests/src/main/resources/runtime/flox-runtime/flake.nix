@@ -34,7 +34,7 @@
           CGO_ENABLED = "0";
         };
 
-        tags = ["netgo"];O
+        tags = ["netgo"];
 
         meta = with pkgs.lib; {
           description = "Flox NRI plugin for containerd - injects flox environments into containers";
@@ -44,7 +44,7 @@
       };
 
       # Version is the single source of truth
-      version = "0.1.6";
+      version = "0.1.7";
 
       # Production build: optimized, stripped
       nriPlugin = pkgs.buildGoModule (commonAttrs // {

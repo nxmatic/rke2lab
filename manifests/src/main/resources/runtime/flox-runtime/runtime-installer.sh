@@ -187,18 +187,9 @@ installer::pod:materialize_assets() {
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/master-runtime-pprof.sh" "${HOST_SCRIPT_ROOT}/debug-tools/master-runtime-pprof.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/rke2lab-dlv.sh" "${HOST_SCRIPT_ROOT}/debug-tools/rke2lab-dlv.sh"
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/rke2lab-runtime-dlv.sh" "${HOST_SCRIPT_ROOT}/debug-tools/rke2lab-runtime-dlv.sh"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/flake.nix" "${HOST_SCRIPT_ROOT}/mesh/headplane/flake.nix"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/flake.nix" "${HOST_SCRIPT_ROOT}/networking/kdns/flake.nix"
-	# Install kdns flox environment files
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/.flox/env.json" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env.json"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/.flox/env.lock" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env.lock"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/.flox/env/manifest.toml" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env/manifest.toml"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/networking/kdns/.flox/env/manifest.lock" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env/manifest.lock"
-	# Install mesh/headplane flox environment files
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/.flox/env.json" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env.json"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/.flox/env.lock" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env.lock"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/.flox/env/manifest.toml" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env/manifest.toml"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/mesh/headplane/.flox/env/manifest.lock" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env/manifest.lock"
+	# Flox environment files (flake.nix, env.json, manifest.toml, etc.) are now materialized
+	# via FloxRuntimeAssets.materializationAssets() to /srv/host/k8s-daemonset.d/runtime/flox-runtime/
+	# No need to install from build-assets ConfigMap anymore
 }
 
 installer::pod:run() {

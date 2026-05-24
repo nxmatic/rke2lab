@@ -112,6 +112,18 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 	log.Printf("Container %s/%s requests flox environment: %s",
 		pod.GetNamespace(), container.GetName(), floxEnv)
 
+	// Create overlay mount point directories on host
+	// These will be bind mounted into the container to ensure the directories exist
+	// before overlay mounts are applied
+	overlayMountPointsDir := "/srv/host/k8s-daemonset.d/runtime/flox-runtime/overlay-mount-points"
+	if err := os.MkdirAll(filepath.Join(overlayMountPointsDir, "nix"), 0755); err != nil {
+		return nil, nil, fmt.Errorf("failed to create overlay mount point /nix: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Join(overlayMountPointsDir, "nix-store-ro"), 0755); err != nil {
+		return nil, nil, fmt.Errorf("failed to create overlay mount point /nix-store-ro: %w", err)
+	}
+	log.Printf("Created overlay mount point directories on host at %s", overlayMountPointsDir)
+
 	// Get UID/GID from container user (NRI v0.12.0+)
 	// Priority: 1) Container.User, 2) annotations, 3) default to root
 	var uid, gid string
@@ -207,7 +219,8 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 	floxEnvSource := filepath.Join(floxEnvPath, ".flox")
 	log.Printf("Setting up mounts:")
 	log.Printf("  - Flox environment: %s -> %s (bind, %v)", floxEnvSource, floxMountTarget, floxMountOptions)
-	log.Printf("  - Nix directory: /nix (bind, ro from host)")
+	log.Printf("  - Overlay /nix: lowerdir=/nix-store-ro (host /nix/store), upperdir=/nix-overlay-upper (tmpfs), workdir=/nix-overlay-work (tmpfs)")
+	log.Printf("  - Mount point dirs from: %s", overlayMountPointsDir)
 
 	log.Printf("Adding Prestart hook (runs AFTER mounts are applied)")
 
@@ -225,12 +238,50 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 				Options:     floxMountOptions,
 			},
 			{
-				// Bind mount entire /nix directory from host (read-only)
-				// This gives access to /nix/store and /nix/var
-				Source:      "/nix",
+				// First, bind mount empty directories to create mount points
+				// This ensures /nix and /nix-store-ro exist in the container rootfs
+				Source:      filepath.Join(overlayMountPointsDir, "nix"),
 				Destination: "/nix",
 				Type:        "bind",
+				Options:     []string{"ro"},
+			},
+			{
+				Source:      filepath.Join(overlayMountPointsDir, "nix-store-ro"),
+				Destination: "/nix-store-ro",
+				Type:        "bind",
+				Options:     []string{"ro"},
+			},
+			{
+				// Now bind mount the actual /nix/store from host to /nix-store-ro
+				// This overwrites the empty directory we just mounted
+				Source:      "/nix/store",
+				Destination: "/nix-store-ro",
+				Type:        "bind",
 				Options:     []string{"ro", "rbind"},
+			},
+			{
+				// tmpfs for overlay upperdir (writable layer)
+				Destination: "/nix-overlay-upper",
+				Type:        "tmpfs",
+				Options:     []string{"mode=0755", "size=200m"},
+			},
+			{
+				// tmpfs for overlay workdir
+				Destination: "/nix-overlay-work",
+				Type:        "tmpfs",
+				Options:     []string{"mode=0755", "size=10m"},
+			},
+			{
+				// Overlay mount at /nix
+				// This overwrites the empty /nix directory mount with the overlay
+				Source:      "overlay",
+				Destination: "/nix",
+				Type:        "overlay",
+				Options: []string{
+					"lowerdir=/nix-store-ro",
+					"upperdir=/nix-overlay-upper",
+					"workdir=/nix-overlay-work",
+				},
 			},
 		},
 	}
