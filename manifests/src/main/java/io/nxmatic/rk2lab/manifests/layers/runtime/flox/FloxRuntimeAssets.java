@@ -152,8 +152,8 @@ public final class FloxRuntimeAssets {
 
     public Builder addDefaultMaterializationAssets() {
       // Only add Flox environment definitions - installer/debug scripts are in ConfigMap
-      addDefaultMeshHeadplaneMaterializationAssets();
-      addDefaultNetworkingKdnsMaterializationAssets();
+      addFloxEnvironmentAssets("mesh", "headplane");
+      addFloxEnvironmentAssets("networking", "kdns");
       return this;
     }
 
@@ -171,6 +171,80 @@ public final class FloxRuntimeAssets {
       return this;
     }
 
+    /**
+     * Add all standard flox environment files for a given category/name.
+     * This includes flake.nix, flake.lock, env.json, manifest.toml, manifest.lock,
+     * and git metadata files.
+     *
+     * @param category the environment category (e.g., "mesh", "networking")
+     * @param name the environment name (e.g., "headplane", "kdns")
+     * @return this builder
+     */
+    public Builder addFloxEnvironmentAssets(String category, String name) {
+      String envPrefix = category + "/" + name;
+      String resourcePrefix = FLOX_RESOURCE_ROOT + "/" + envPrefix;
+
+      // Flake files
+      addMaterializationAsset(
+          resourcePrefix + "/.flox/env/flake.nix",
+          envPrefix + "/.flox/env/flake.nix",
+          false);
+      addMaterializationAsset(
+          resourcePrefix + "/.flox/env/flake.lock",
+          envPrefix + "/.flox/env/flake.lock",
+          false);
+
+      // Flox metadata
+      addMaterializationAsset(
+          resourcePrefix + "/.flox/.gitattributes",
+          envPrefix + "/.flox/.gitattributes",
+          false);
+      addMaterializationAsset(
+          resourcePrefix + "/.flox/.gitignore",
+          envPrefix + "/.flox/.gitignore",
+          false);
+      addMaterializationAsset(
+          resourcePrefix + "/.flox/env.json",
+          envPrefix + "/.flox/env.json",
+          false);
+
+      // Environment manifest
+      addMaterializationAsset(
+          resourcePrefix + "/.flox/env/manifest.toml",
+          envPrefix + "/.flox/env/manifest.toml",
+          false);
+      addMaterializationAsset(
+          resourcePrefix + "/.flox/env/manifest.lock",
+          envPrefix + "/.flox/env/manifest.lock",
+          false);
+
+      // Add to installer ConfigMap with naming pattern: {category}-{name}-flox-env-{file}
+      String configMapPrefix = category + "-" + name + "-flox-env";
+      addInstallerAsset(
+          configMapPrefix + "-flake-nix",
+          resourcePrefix + "/.flox/env/flake.nix",
+          "build-assets/" + envPrefix + "/.flox/env/flake.nix");
+      addInstallerAsset(
+          configMapPrefix + "-flake-lock",
+          resourcePrefix + "/.flox/env/flake.lock",
+          "build-assets/" + envPrefix + "/.flox/env/flake.lock");
+      addInstallerAsset(
+          configMapPrefix + "-json",
+          resourcePrefix + "/.flox/env.json",
+          "build-assets/" + envPrefix + "/.flox/env.json");
+      addInstallerAsset(
+          configMapPrefix + "-manifest-toml",
+          resourcePrefix + "/.flox/env/manifest.toml",
+          "build-assets/" + envPrefix + "/.flox/env/manifest.toml");
+      addInstallerAsset(
+          configMapPrefix + "-manifest-lock",
+          resourcePrefix + "/.flox/env/manifest.lock",
+          "build-assets/" + envPrefix + "/.flox/env/manifest.lock");
+
+      return this;
+    }
+
+    @Deprecated(since = "Replaced by addFloxEnvironmentAssets", forRemoval = true)
     public Builder addDefaultMeshHeadplaneMaterializationAssets() {
       addMaterializationAsset(
           FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/flake.nix",
@@ -291,51 +365,10 @@ public final class FloxRuntimeAssets {
       return this;
     }
 
+    @Deprecated(since = "Flox environment assets now added via addFloxEnvironmentAssets", forRemoval = true)
     public Builder addDefaultFlakeInstallerAssets() {
-      // kdns flox environment files (note: .gitignore/.gitattributes excluded by Maven resource
-      // filtering)
-      addInstallerAsset(
-          "networking-kdns-flox-env-flake-nix",
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/flake.nix",
-          "build-assets/networking/kdns/.flox/env/flake.nix");
-      addInstallerAsset(
-          "networking-kdns-flox-env-flake-lock",
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/flake.lock",
-          "build-assets/networking/kdns/.flox/env/flake.lock");
-      addInstallerAsset(
-          "networking-kdns-flox-env-json",
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env.json",
-          "build-assets/networking/kdns/.flox/env.json");
-      addInstallerAsset(
-          "networking-kdns-flox-env-manifest-toml",
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/manifest.toml",
-          "build-assets/networking/kdns/.flox/env/manifest.toml");
-      addInstallerAsset(
-          "networking-kdns-flox-env-manifest-lock",
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/manifest.lock",
-          "build-assets/networking/kdns/.flox/env/manifest.lock");
-      // mesh/headplane flox environment files (note: .gitignore/.gitattributes excluded by Maven
-      // resource filtering)
-      addInstallerAsset(
-          "mesh-headplane-flox-env-flake-nix",
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/flake.nix",
-          "build-assets/mesh/headplane/.flox/env/flake.nix");
-      addInstallerAsset(
-          "mesh-headplane-flox-env-flake-lock",
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/flake.lock",
-          "build-assets/mesh/headplane/.flox/env/flake.lock");
-      addInstallerAsset(
-          "mesh-headplane-flox-env-json",
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env.json",
-          "build-assets/mesh/headplane/.flox/env.json");
-      addInstallerAsset(
-          "mesh-headplane-flox-env-manifest-toml",
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/manifest.toml",
-          "build-assets/mesh/headplane/.flox/env/manifest.toml");
-      addInstallerAsset(
-          "mesh-headplane-flox-env-manifest-lock",
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/manifest.lock",
-          "build-assets/mesh/headplane/.flox/env/manifest.lock");
+      // Flox environment files are now added automatically by addFloxEnvironmentAssets()
+      // which is called from addDefaultMaterializationAssets()
       return this;
     }
 

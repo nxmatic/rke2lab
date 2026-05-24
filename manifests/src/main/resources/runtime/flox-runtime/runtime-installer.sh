@@ -189,18 +189,54 @@ installer::pod:materialize_assets() {
 	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/rke2lab-runtime-dlv.sh" "${HOST_SCRIPT_ROOT}/debug-tools/rke2lab-runtime-dlv.sh"
 
 	# Install flox environment files from ConfigMap to host filesystem
-	# networking/kdns environment
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/networking-kdns-flox-env-flake-nix" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env/flake.nix"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/networking-kdns-flox-env-flake-lock" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env/flake.lock"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/networking-kdns-flox-env-json" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env.json"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/networking-kdns-flox-env-manifest-toml" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env/manifest.toml"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/networking-kdns-flox-env-manifest-lock" "${HOST_SCRIPT_ROOT}/networking/kdns/.flox/env/manifest.lock"
-	# mesh/headplane environment
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/mesh-headplane-flox-env-flake-nix" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env/flake.nix"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/mesh-headplane-flox-env-flake-lock" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env/flake.lock"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/mesh-headplane-flox-env-json" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env.json"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/mesh-headplane-flox-env-manifest-toml" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env/manifest.toml"
-	install -D -m 0644 "${BUILD_ASSETS_DIR}/build-assets/mesh-headplane-flox-env-manifest-lock" "${HOST_SCRIPT_ROOT}/mesh/headplane/.flox/env/manifest.lock"
+	# Dynamically discover and install flox environments based on ConfigMap key pattern:
+	# {category}-{name}-flox-env-{file} -> {category}/{name}/.flox/env/{file}
+	installer::flox:install_environments
+}
+
+installer::flox:install_environments() {
+	local category name file_key file_name target_path
+
+	# Discover all flox environment files in ConfigMap (pattern: *-flox-env-*)
+	for asset_file in "${BUILD_ASSETS_DIR}/build-assets/"*-flox-env-*; do
+		[[ -f "${asset_file}" ]] || continue
+
+		# Extract ConfigMap key from filename
+		file_key="${asset_file##*/}"
+
+		# Parse pattern: {category}-{name}-flox-env-{file}
+		# Example: networking-kdns-flox-env-flake-nix
+		if [[ "${file_key}" =~ ^([^-]+)-([^-]+)-flox-env-(.+)$ ]]; then
+			category="${BASH_REMATCH[1]}"
+			name="${BASH_REMATCH[2]}"
+			file_name="${BASH_REMATCH[3]}"
+
+			# Map file_name to actual filename (dashes to dots/slashes)
+			case "${file_name}" in
+				flake-nix)
+					target_path="${HOST_SCRIPT_ROOT}/${category}/${name}/.flox/env/flake.nix"
+					;;
+				flake-lock)
+					target_path="${HOST_SCRIPT_ROOT}/${category}/${name}/.flox/env/flake.lock"
+					;;
+				json)
+					target_path="${HOST_SCRIPT_ROOT}/${category}/${name}/.flox/env.json"
+					;;
+				manifest-toml)
+					target_path="${HOST_SCRIPT_ROOT}/${category}/${name}/.flox/env/manifest.toml"
+					;;
+				manifest-lock)
+					target_path="${HOST_SCRIPT_ROOT}/${category}/${name}/.flox/env/manifest.lock"
+					;;
+				*)
+					echo "Warning: Unknown flox environment file type: ${file_name}" >&2
+					continue
+					;;
+			esac
+
+			install -D -m 0644 "${asset_file}" "${target_path}"
+		fi
+	done
 }
 
 installer::pod:run() {
