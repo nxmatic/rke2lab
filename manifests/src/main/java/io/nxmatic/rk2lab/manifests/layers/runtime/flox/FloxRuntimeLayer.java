@@ -230,13 +230,13 @@ public final class FloxRuntimeLayer extends Construct {
                             new Object[] {
                               Map.of(
                                   "command",
-                                  new Object[] {"/bin/sh", "-c", "/.sh/bin/nri-plugin-run.sh"},
+                                  new Object[] {"/bin/sh", "/.sh/bin/nri-plugin-run.sh"},
                                   "image",
-                                  "alpine:3.20",
+                                  "busybox:stable",
                                   "name",
-                                  "nri-plugin",
+                                  "main",
                                   "securityContext",
-                                  Map.of("privileged", true, "runAsGroup", 0, "runAsUser", 0),
+                                  Map.of("privileged", false, "runAsGroup", 0, "runAsUser", 0),
                                   "volumeMounts",
                                   new Object[] {
                                     Map.of(
@@ -312,7 +312,7 @@ public final class FloxRuntimeLayer extends Construct {
                                   "imagePullPolicy",
                                   "IfNotPresent",
                                   "name",
-                                  "runtime-init",
+                                  "init",
                                   "securityContext",
                                   Map.of("privileged", true, "runAsGroup", 0, "runAsUser", 0),
                                   "volumeMounts",
