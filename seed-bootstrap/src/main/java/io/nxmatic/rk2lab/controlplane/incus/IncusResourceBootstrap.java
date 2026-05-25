@@ -605,7 +605,7 @@ public final class IncusResourceBootstrap {
         .kmsgDevice()
         .zfsDevice()
         .disk("worktree.dir", hostPaths.worktreeRoot(), HOST_WORKTREE_PATH)
-        .disk("rke2lab.envs.dir", hostPaths.runtimeEnvConfigRoot(), HOST_ENV_DIR_PATH)
+        .disk("rke2lab.environment.dir", hostPaths.runtimeEnvConfigRoot(), HOST_ENV_DIR_PATH)
         .disk("rke2lab.scripts.dir", hostPaths.scriptsRoot(), HOST_SCRIPTS_DIR_PATH)
         .disk("git.dir", hostPaths.gitRoot(), HOST_GIT_WORKTREE_DIR_PATH)
         .disk(

@@ -154,8 +154,10 @@ cat <<'EoFloxCommonProfile' | cut -c 3- | tee /var/lib/rancher/rke2/.flox/env/pr
   [[ -r /etc/rancher/rke2/rke2.yaml ]] &&
     KUBECONFIG="/etc/rancher/rke2/rke2.yaml"
 
-  : "Default cache for kubectl/kpt"
-  KUBECACHEDIR="${KUBECACHEDIR:-${FLOX_RUNTIME_DIR:-/run/user/0}/kube-cache}"
+  : "Default cache for kubectl/kpt — explicitly NOT under FLOX_RUNTIME_DIR"
+  : "(/srv/host/k8s-daemonset.d/...) so the daemonset asset root stays"
+  : "owned by seed-bootstrap (build inputs only)."
+  KUBECACHEDIR="${KUBECACHEDIR:-/var/cache/rke2/kube-cache}"
   mkdir -p "${KUBECACHEDIR}"
 
   : "Set KREW_ROOT if not already set"

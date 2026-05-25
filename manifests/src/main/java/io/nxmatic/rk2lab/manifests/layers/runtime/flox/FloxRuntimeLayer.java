@@ -198,7 +198,7 @@ public final class FloxRuntimeLayer extends Construct {
                             new Object[] {
                               Map.of(
                                   "command",
-                                  new Object[] {"/bin/sh", "/.sh/bin/nri-plugin-run.sh"},
+                                  new Object[] {"/bin/sh", "/.sh/bin/flox-nri-plugin-run.sh"},
                                   "image",
                                   "busybox:stable",
                                   "name",
@@ -255,16 +255,43 @@ public final class FloxRuntimeLayer extends Construct {
                                   new Object[] {
                                     "/bin/sh",
                                     "-ec",
-                                    // Copy build inputs to the per-node mutable
-                                    // workspace, preserving any locks the master
-                                    // already wrote (`cp -n`). Then run the
-                                    // installer from the workspace — that's where
-                                    // `nix build` and `flox activate` will write
-                                    // their lock files.
-                                    "apk add --no-cache bash coreutils"
-                                        + " && mkdir -p /runtime-workspace"
-                                        + " && cp -an /.sh/. /runtime-workspace/"
-                                        + " && /runtime-workspace/bin/runtime-installer.sh"
+                                    // Overwrite the workspace's build-derived
+                                    // inputs from /.sh/ each pod start so a
+                                    // newly-deployed flox-k8s-runtime-installer.sh
+                                    // (or any other build asset) actually replaces
+                                    // a stale copy from a prior run.
+                                    //
+                                    // For each top-level build path, wipe and
+                                    // re-copy. Sibling paths the runtime owns
+                                    // (flake.lock, .sh.d/, log/, locks under
+                                    // environment.d/<env>/.flox/env/) survive because
+                                    // we only touch paths that exist in /.sh/.
+                                    //
+                                    // environment.d/ is special: it contains both
+                                    // build inputs (manifest.toml) and runtime
+                                    // state (manifest.lock). We rsync-style
+                                    // copy via `cp -af`, which overwrites
+                                    // matching files but leaves untouched
+                                    // anything not present in /.sh/ — so locks
+                                    // survive while manifest.toml updates.
+                                    // git is required because nix's path-flake
+                                    // fetcher uses git's index/tree to hash
+                                    // the flake source. Without a git tree
+                                    // here, nix walks every file (including
+                                    // logs, locks, and kube-cache writes) and
+                                    // the path narHash drifts on every
+                                    // activation — `flake.cc:37` assertion
+                                    // failures during realise.
+                                    "apk add --no-cache bash coreutils git"
+                                        + " && mkdir -p /.run"
+                                        + " && cp -af --no-preserve=ownership /.sh/. /.run/"
+                                        + " && cd /.run"
+                                        + " && git init -q -b main"
+                                        + " && git config user.email installer@rke2lab"
+                                        + " && git config user.name rke2lab-installer"
+                                        + " && git add -A"
+                                        + " && git commit -q -m 'flox-runtime baseline' --allow-empty"
+                                        + " && /.run/bin/flox-k8s-runtime-installer.sh"
                                   },
                                   "env",
                                   new Object[] {
@@ -284,18 +311,10 @@ public final class FloxRuntimeLayer extends Construct {
                                         "CONTAINERD_ADDRESS",
                                         "value",
                                         "/run/k3s/containerd/containerd.sock"),
+                                    Map.of("name", "SCRIPT_MOUNT_DIR", "value", "/.run"),
+                                    Map.of("name", "SCRIPT_POLICY_ROOT", "value", "/.sh-daemonset"),
                                     Map.of(
-                                        "name", "SCRIPT_MOUNT_DIR", "value", "/runtime-workspace"),
-                                    Map.of(
-                                        "name",
-                                        "SCRIPT_POLICY_ROOT",
-                                        "value",
-                                        "/runtime-daemonset"),
-                                    Map.of(
-                                        "name",
-                                        "BUILD_ASSETS_DIR",
-                                        "value",
-                                        "/runtime-workspace/build-assets"),
+                                        "name", "BUILD_ASSETS_DIR", "value", "/.run/build-assets"),
                                     Map.of("name", "HOST_ROOT", "value", "/host-root"),
                                     Map.of(
                                         "name",
@@ -327,7 +346,7 @@ public final class FloxRuntimeLayer extends Construct {
                                         "runtime-installer-assets",
                                         "readOnly",
                                         true),
-                                    // /runtime-workspace = per-node mutable workspace
+                                    // /.run = per-node mutable workspace
                                     // at /var/run/k8s-daemonset.d/... on the host.
                                     // Init container copies /.sh/* here, then `nix
                                     // build` and `flox activate` write flake.lock
@@ -336,12 +355,12 @@ public final class FloxRuntimeLayer extends Construct {
                                     // wiped on host reboot.
                                     Map.of(
                                         "mountPath",
-                                        "/runtime-workspace",
+                                        "/.run",
                                         "name",
                                         "runtime-installer-workspace"),
                                     Map.of(
                                         "mountPath",
-                                        "/runtime-daemonset",
+                                        "/.sh-daemonset",
                                         "name",
                                         "runtime-daemonset-script-policy",
                                         "readOnly",

@@ -27,7 +27,8 @@ import java.util.stream.Stream;
 public final class FloxRuntimeAssets {
 
   private static final String FLOX_RESOURCE_ROOT = "/runtime/flox-runtime";
-  private static final String ENV_RESOURCE_ROOT = FLOX_RESOURCE_ROOT + "/envs.d";
+  private static final String ENV_RESOURCE_ROOT = FLOX_RESOURCE_ROOT + "/environment.d";
+  private static final String NRI_PLUGIN_RESOURCE_ROOT = FLOX_RESOURCE_ROOT + "/nri-plugin";
 
   /**
    * The only per-env real file is {@code manifest.toml}; workload packages are produced by the
@@ -43,13 +44,11 @@ public final class FloxRuntimeAssets {
   private final Class<?> resourceAnchor;
   private final List<InstallerAsset> floxInstallerConfigMapAssets;
   private final RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets;
-  private final NriPluginArchiveAssets nriPluginArchiveAssets;
 
   private FloxRuntimeAssets(Builder builder) {
     this.resourceAnchor = builder.resourceAnchor;
     this.floxInstallerConfigMapAssets = List.copyOf(builder.floxInstallerConfigMapAssets);
     this.runtimeDaemonsetScriptPolicyAssets = builder.runtimeDaemonsetScriptPolicyAssets;
-    this.nriPluginArchiveAssets = builder.nriPluginArchiveAssets;
   }
 
   public static Builder builder() {
@@ -65,11 +64,11 @@ public final class FloxRuntimeAssets {
    * <p>Layout produced (rooted at {@code targetDir}):
    *
    * <ul>
-   *   <li>{@code bin/runtime-installer.sh}, {@code bin/nri-plugin-run.sh}
-   *   <li>{@code flox-nri-overlay-hook.sh}, {@code flox-nri-chown-hook.sh}
+   *   <li>{@code bin/flox-k8s-runtime-installer.sh}, {@code bin/flox-nri-plugin-run.sh}
+   *   <li>{@code bin/flox-nri-overlay-hook.sh}, {@code bin/flox-nri-chown-hook.sh}
    *   <li>{@code build-assets/flake.nix}
    *   <li>{@code
-   *       build-assets/envs.d/<category>/<env>/.flox/{env.json,env/flake.nix,env/manifest.toml,env/flake.lock,env/manifest.lock}}
+   *       build-assets/environment.d/<category>/<env>/.flox/{env.json,env/flake.nix,env/manifest.toml,env/flake.lock,env/manifest.lock}}
    *   <li>{@code build-assets/debug-tools/...}
    *   <li>{@code build-assets/nri-plugin.tar.b64}, {@code build-assets/nri-plugin.manifest.json}
    *   <li>{@code build-assets/<runtime-daemonset-script-policy entries>}
@@ -87,16 +86,10 @@ public final class FloxRuntimeAssets {
       final String content = runtimeDaemonsetScriptPolicyAssets.configMapData().get(entry.getKey());
       writeText(targetDir.resolve(relativePath), content == null ? "" : content);
     }
-    Files.write(
-        ensureParent(
-            targetDir.resolve(
-                installerBuildAssetPath(NriPluginArchiveAssets.ARCHIVE_CONFIGMAP_KEY))),
-        nriPluginArchiveAssets.archiveBase64().getBytes(StandardCharsets.UTF_8));
-    Files.write(
-        ensureParent(
-            targetDir.resolve(
-                installerBuildAssetPath(NriPluginArchiveAssets.MANIFEST_CONFIGMAP_KEY))),
-        nriPluginArchiveAssets.manifestJson().getBytes(StandardCharsets.UTF_8));
+    // The parent flake's `flox-nri-plugin` derivation has `src = ./nri-plugin`,
+    // so the source tree must sit next to flake.nix on disk. Walk the
+    // classpath nri-plugin/ resource tree and copy it into <targetDir>/nri-plugin/.
+    copyClasspathTreeTo(NRI_PLUGIN_RESOURCE_ROOT, targetDir.resolve("nri-plugin"));
   }
 
   private static void writeText(Path target, String content) throws IOException {
@@ -106,10 +99,10 @@ public final class FloxRuntimeAssets {
   }
 
   /**
-   * Mark shell scripts executable. The host-mode trampoline exec's {@code bin/runtime-installer.sh}
-   * directly (no chmod step in between), so files we drop to disk need their exec bit set at write
-   * time. We treat any {@code .sh} extension and any file under a {@code bin/} directory as
-   * executable — matches the layout the legacy installer assumed.
+   * Mark shell scripts executable. The host-mode trampoline exec's {@code
+   * bin/flox-k8s-runtime-installer.sh} directly (no chmod step in between), so files we drop to
+   * disk need their exec bit set at write time. We treat any {@code .sh} extension and any file
+   * under a {@code bin/} directory as executable — matches the layout the legacy installer assumed.
    */
   private static void applyExecutableBitIfNeeded(Path target) throws IOException {
     final String name = target.getFileName().toString();
@@ -133,6 +126,70 @@ public final class FloxRuntimeAssets {
       Files.createDirectories(parent);
     }
     return target;
+  }
+
+  /**
+   * Recursively copy every file under {@code classpathRoot} into {@code targetDir}, preserving
+   * relative paths. Works whether the resources sit on disk (during {@code mvn exec:java}) or
+   * inside a shaded JAR. The exec bit on shell scripts is set via {@link
+   * #applyExecutableBitIfNeeded(Path)}; everything else lands at the default {@code 0644}.
+   */
+  private void copyClasspathTreeTo(String classpathRoot, Path targetDir) throws IOException {
+    final URL rootUrl = resourceAnchor.getResource(classpathRoot);
+    if (rootUrl == null) {
+      throw new IllegalStateException("Classpath resource root not found: " + classpathRoot);
+    }
+    Files.createDirectories(targetDir);
+
+    final URLConnection connection = rootUrl.openConnection();
+    if (connection instanceof JarURLConnection jarConnection) {
+      copyTreeFromJar(jarConnection, classpathRoot, targetDir);
+      return;
+    }
+    final Path sourceDir;
+    try {
+      sourceDir = Paths.get(rootUrl.toURI());
+    } catch (java.net.URISyntaxException ex) {
+      throw new IOException("Bad classpath resource URL: " + rootUrl, ex);
+    }
+    copyTreeFromFilesystem(sourceDir, targetDir);
+  }
+
+  private void copyTreeFromFilesystem(Path sourceDir, Path targetDir) throws IOException {
+    try (Stream<Path> walk = Files.walk(sourceDir)) {
+      for (Path src : walk.toList()) {
+        if (Files.isDirectory(src)) {
+          continue;
+        }
+        final Path rel = sourceDir.relativize(src);
+        final Path dst = targetDir.resolve(rel.toString());
+        Files.createDirectories(dst.getParent());
+        Files.copy(src, dst, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        applyExecutableBitIfNeeded(dst);
+      }
+    }
+  }
+
+  private void copyTreeFromJar(JarURLConnection jarConnection, String classpathRoot, Path targetDir)
+      throws IOException {
+    final JarFile jarFile = jarConnection.getJarFile();
+    // JAR entries don't have a leading slash.
+    final String prefix = classpathRoot.substring(1) + "/";
+    final Enumeration<JarEntry> entries = jarFile.entries();
+    while (entries.hasMoreElements()) {
+      final JarEntry entry = entries.nextElement();
+      final String name = entry.getName();
+      if (!name.startsWith(prefix) || entry.isDirectory()) {
+        continue;
+      }
+      final String rel = name.substring(prefix.length());
+      final Path dst = targetDir.resolve(rel);
+      Files.createDirectories(dst.getParent());
+      try (InputStream in = jarFile.getInputStream(entry)) {
+        Files.copy(in, dst, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+      }
+      applyExecutableBitIfNeeded(dst);
+    }
   }
 
   private static String installerBuildAssetPath(String relativePath) {
@@ -171,7 +228,7 @@ public final class FloxRuntimeAssets {
 
   /**
    * A discovered Flox environment: the {@code category/name} pair (e.g. {@code networking/kdns})
-   * derived from the {@code envs.d/<category>/<name>/} directory layout on the classpath.
+   * derived from the {@code environment.d/<category>/<name>/} directory layout on the classpath.
    */
   private record DiscoveredEnvironment(String category, String name) {
     String envPrefix() {
@@ -191,7 +248,7 @@ public final class FloxRuntimeAssets {
   private static final String ENV_JSON_CONTENT = "{\"name\": \"default\", \"version\": 1}\n";
 
   /**
-   * Walk the {@code /runtime/flox-runtime/envs.d/} resource tree and return every {@code
+   * Walk the {@code /runtime/flox-runtime/environment.d/} resource tree and return every {@code
    * category/name} directory that contains both {@code flake.nix} and {@code manifest.toml}. Works
    * whether resources sit on disk (during {@code mvn exec:java}) or inside a shaded JAR.
    */
@@ -206,7 +263,7 @@ public final class FloxRuntimeAssets {
     final URL rootUrl = resourceAnchor.getResource(ENV_RESOURCE_ROOT);
     if (rootUrl == null) {
       throw new IllegalStateException(
-          "Flox envs.d resource root not found on classpath: " + ENV_RESOURCE_ROOT);
+          "Flox environment.d resource root not found on classpath: " + ENV_RESOURCE_ROOT);
     }
 
     try {
@@ -218,7 +275,7 @@ public final class FloxRuntimeAssets {
       }
     } catch (IOException ex) {
       throw new UncheckedIOException(
-          "Failed scanning Flox envs.d resource root: " + ENV_RESOURCE_ROOT, ex);
+          "Failed scanning Flox environment.d resource root: " + ENV_RESOURCE_ROOT, ex);
     }
 
     return discovered;
@@ -230,7 +287,7 @@ public final class FloxRuntimeAssets {
     try {
       rootDir = Paths.get(rootUrl.toURI());
     } catch (java.net.URISyntaxException ex) {
-      throw new IOException("Bad envs.d URL: " + rootUrl, ex);
+      throw new IOException("Bad environment.d URL: " + rootUrl, ex);
     }
 
     try (Stream<Path> categories = Files.list(rootDir)) {
@@ -260,7 +317,8 @@ public final class FloxRuntimeAssets {
       JarURLConnection jarConnection, Set<DiscoveredEnvironment> sink) throws IOException {
     final JarFile jarFile = jarConnection.getJarFile();
     // JAR entries are stored without a leading slash.
-    final String prefix = ENV_RESOURCE_ROOT.substring(1) + "/"; // "runtime/flox-runtime/envs.d/"
+    final String prefix =
+        ENV_RESOURCE_ROOT.substring(1) + "/"; // "runtime/flox-runtime/environment.d/"
     final Set<String> manifestSeen = new LinkedHashSet<>();
     final Enumeration<JarEntry> entries = jarFile.entries();
     while (entries.hasMoreElements()) {
@@ -278,7 +336,7 @@ public final class FloxRuntimeAssets {
       if (secondSlash < 0) {
         continue;
       }
-      // Only consider files at exactly envs.d/<category>/<name>/<file>.
+      // Only consider files at exactly environment.d/<category>/<name>/<file>.
       final String fileName = tail.substring(secondSlash + 1);
       if (fileName.indexOf('/') >= 0) {
         continue;
@@ -298,8 +356,6 @@ public final class FloxRuntimeAssets {
     private final List<InstallerAsset> floxInstallerConfigMapAssets = new ArrayList<>();
     private RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets =
         RuntimeDaemonsetScriptPolicyAssets.builder().build();
-    private final NriPluginArchiveAssets nriPluginArchiveAssets =
-        NriPluginArchiveAssets.builder().build();
 
     private Builder() {
       addDiscoveredEnvironmentAssets();
@@ -308,8 +364,8 @@ public final class FloxRuntimeAssets {
     }
 
     /**
-     * Discover every {@code envs.d/<category>/<name>/} directory on the classpath that has both
-     * {@code flake.nix} and {@code manifest.toml}, then register the assets the host installer
+     * Discover every {@code environment.d/<category>/<name>/} directory on the classpath that has
+     * both {@code flake.nix} and {@code manifest.toml}, then register the assets the host installer
      * needs.
      */
     private void addDiscoveredEnvironmentAssets() {
@@ -330,9 +386,9 @@ public final class FloxRuntimeAssets {
       final String resourcePrefix = ENV_RESOURCE_ROOT + "/" + envPrefix;
       final String configMapPrefix = env.configMapPrefix();
       // The runtime-installer's `flox activate --dir <env-dir>` resolves the
-      // env at <FLOX_RUNTIME_ROOT>/envs.d/<category>/<name>/, so write the env
+      // env at <FLOX_RUNTIME_ROOT>/environment.d/<category>/<name>/, so write the env
       // tree at the asset root — not under build-assets/.
-      final String mountPrefix = "envs.d/" + envPrefix;
+      final String mountPrefix = "environment.d/" + envPrefix;
 
       addInstallerAsset(
           configMapPrefix + "-manifest-toml",
@@ -350,19 +406,21 @@ public final class FloxRuntimeAssets {
 
     private void addDefaultCoreInstallerAssets() {
       addInstallerAsset(
-          "runtime-installer.sh",
-          FLOX_RESOURCE_ROOT + "/runtime-installer.sh",
-          "bin/runtime-installer.sh");
+          "flox-k8s-runtime-installer.sh",
+          FLOX_RESOURCE_ROOT + "/bin/flox-k8s-runtime-installer.sh",
+          "bin/flox-k8s-runtime-installer.sh");
       addInstallerAsset(
-          "nri-plugin-run.sh", FLOX_RESOURCE_ROOT + "/nri-plugin-run.sh", "bin/nri-plugin-run.sh");
+          "flox-nri-plugin-run.sh",
+          FLOX_RESOURCE_ROOT + "/bin/flox-nri-plugin-run.sh",
+          "bin/flox-nri-plugin-run.sh");
       addInstallerAsset(
           "flox-nri-overlay-hook.sh",
-          FLOX_RESOURCE_ROOT + "/flox-nri-overlay-hook.sh",
-          "flox-nri-overlay-hook.sh");
+          FLOX_RESOURCE_ROOT + "/bin/flox-nri-overlay-hook.sh",
+          "bin/flox-nri-overlay-hook.sh");
       addInstallerAsset(
           "flox-nri-chown-hook.sh",
-          FLOX_RESOURCE_ROOT + "/flox-nri-chown-hook.sh",
-          "flox-nri-chown-hook.sh");
+          FLOX_RESOURCE_ROOT + "/bin/flox-nri-chown-hook.sh",
+          "bin/flox-nri-chown-hook.sh");
       addInstallerAsset("runtime-flake.nix", FLOX_RESOURCE_ROOT + "/flake.nix", "flake.nix");
       // Parent flake.lock and per-env manifest.lock are NOT shipped from the
       // repo. Locks are cluster state (the master resolves them at first
