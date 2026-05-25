@@ -24,4 +24,4 @@ config:
   "rke2lab:bootstrap.skipRecipes": "false"
   "rke2lab:readiness.enabled": "true"
   "rke2lab:entryGate.cleanWorktree.required": "false"
-  rke2lab:policy.debug.floxNriPlugin.enabled: "true"
+

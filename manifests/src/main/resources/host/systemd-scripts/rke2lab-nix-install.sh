@@ -74,9 +74,17 @@ if [ ! -d /etc/nix ]; then
 	exit 1
 fi
 
+source ${NIX_DEFAULT_PROFILE:=/nix/var/nix/profiles/default}/etc/profile.d/nix-daemon.sh
+nix --extra-experimental-features "nix-command flakes ca-derivations" \
+	profile add --profile "${NIX_DEFAULT_PROFILE}" nixpkgs#yq-go nixpkgs#dasel ||
+	{
+		echo "ERROR: Failed to install yq-go via Nix" >&2
+		exit 1
+	}
+
 : "Configure Nix after installation (idempotent - only if not already configured by rke2lab)"
 if ! grep -q "BEGIN rke2lab-nix" /etc/nix/nix.conf 2>/dev/null; then
-	cat >>/etc/nix/nix.conf <<'EOF'
+	cat >>/etc/nix/nix.conf <<EOF
 # BEGIN rke2lab-nix: Custom configuration for rke2lab environment
 allowed-users = *
 auto-optimise-store = false
@@ -100,6 +108,7 @@ keep-outputs = false
 keep-derivations = false
 keep-failed = false
 accept-flake-config = true
+access-tokens = github.com=$(yq -r '.github.token' /srv/host/rke2lab-worktree.d/.secrets 2>/dev/null || true)
 # END rke2lab-nix
 EOF
 fi

@@ -1,33 +1,61 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.runtime.flox;
 
-import io.nxmatic.rk2lab.manifests.EmbeddedAsset;
 import io.nxmatic.rk2lab.manifests.layers.runtime.daemonset.RuntimeDaemonsetScriptPolicyAssets;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.JarURLConnection;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Consumer;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.stream.Stream;
 
 public final class FloxRuntimeAssets {
 
   private static final String FLOX_RESOURCE_ROOT = "/runtime/flox-runtime";
+  private static final String ENV_RESOURCE_ROOT = FLOX_RESOURCE_ROOT + "/env.d";
+
+  /**
+   * Per-env files that live in the resource tree. Everything else (env.json, .gitattributes,
+   * .gitignore) is uniform boilerplate and is synthesized in code so the resource tree only carries
+   * the parts that genuinely differ between envs.
+   */
+  private static final String FLAKE_NIX_RESOURCE = "flake.nix";
+
+  private static final String MANIFEST_TOML_RESOURCE = "manifest.toml";
+
+  /**
+   * Static .gitignore content placed inside {@code .flox/env/} — the path-flake root. The {@code
+   * *.lock} rule keeps nix's path-flake fetcher hash stable across the lock→realise phases of
+   * {@code flox activate}: flox writes {@code manifest.lock} after computing the path's narHash,
+   * which would otherwise drift the hash and trigger {@code flake.cc:37} assertion failures during
+   * realise. The activation step initializes {@code .flox/env/} as a git repo so this rule is
+   * honored by nix's gitignore-aware path-flake enumeration.
+   */
+  private static final String GITIGNORE_CONTENT = "*.lock\n";
 
   private final Class<?> resourceAnchor;
-  private final List<EmbeddedAsset> floxMaterializationAssets;
   private final List<InstallerAsset> floxInstallerConfigMapAssets;
   private final RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets;
   private final NriPluginArchiveAssets nriPluginArchiveAssets;
 
   private FloxRuntimeAssets(Builder builder) {
     this.resourceAnchor = builder.resourceAnchor;
-    this.floxMaterializationAssets = List.copyOf(builder.floxMaterializationAssets);
     this.floxInstallerConfigMapAssets = List.copyOf(builder.floxInstallerConfigMapAssets);
     this.runtimeDaemonsetScriptPolicyAssets = builder.runtimeDaemonsetScriptPolicyAssets;
     this.nriPluginArchiveAssets = builder.nriPluginArchiveAssets;
@@ -37,21 +65,10 @@ public final class FloxRuntimeAssets {
     return new Builder();
   }
 
-  public List<EmbeddedAsset> materializationAssets() {
-    final ArrayList<EmbeddedAsset> assets = new ArrayList<>(floxMaterializationAssets);
-    assets.addAll(runtimeDaemonsetScriptPolicyAssets.materializationAssets());
-    return List.copyOf(assets);
-  }
-
-  public Path worktreeShimAssetsRelativePath() {
-    return Path.of("manifests", "src", "main", "resources", "runtime", "flox-runtime");
-  }
-
   public Map<String, String> installerConfigMapData() {
     final LinkedHashMap<String, String> data = new LinkedHashMap<>();
     for (InstallerAsset asset : floxInstallerConfigMapAssets) {
-      data.put(
-          asset.configMapKey(), normalizeConfigMapText(readResource(asset.classpathResource())));
+      data.put(asset.configMapKey(), normalizeConfigMapText(resolveAssetContent(asset)));
     }
     data.putAll(runtimeDaemonsetScriptPolicyAssets.configMapData());
     data.put(NriPluginArchiveAssets.ARCHIVE_CONFIGMAP_KEY, nriPluginArchiveAssets.archiveBase64());
@@ -100,17 +117,15 @@ public final class FloxRuntimeAssets {
     return out;
   }
 
-  public void materializeSupplementaryAssetsTo(Path outputDir) {
-    try {
-      nriPluginArchiveAssets.materializeTo(outputDir);
-    } catch (IOException ex) {
-      throw new UncheckedIOException(
-          "Failed to materialize Flox supplementary assets to " + outputDir, ex);
-    }
-  }
-
   private static String installerBuildAssetPath(String relativePath) {
     return "build-assets/" + relativePath;
+  }
+
+  private String resolveAssetContent(InstallerAsset asset) {
+    if (asset.inlineContent() != null) {
+      return asset.inlineContent();
+    }
+    return readResource(asset.classpathResource());
   }
 
   private String readResource(String resourcePath) {
@@ -136,167 +151,202 @@ public final class FloxRuntimeAssets {
     return normalizedLineEndings + "\n";
   }
 
+  /**
+   * A discovered Flox environment: the {@code category/name} pair (e.g. {@code networking/kdns})
+   * derived from the {@code env.d/<category>/<name>/} directory layout on the classpath.
+   */
+  private record DiscoveredEnvironment(String category, String name) {
+    String envPrefix() {
+      return category + "/" + name;
+    }
+
+    String configMapPrefix() {
+      return category + "-" + name + "-flox-env";
+    }
+  }
+
+  /**
+   * Pre-rendered {@code env.json} content. The logical name is hardcoded to {@code "default"} so
+   * containers can activate via {@code flox activate --dir <path>} without each pod knowing the
+   * env's category/name — the directory layout already disambiguates which env is mounted.
+   */
+  private static final String ENV_JSON_CONTENT = "{\"name\": \"default\", \"version\": 1}\n";
+
+  /**
+   * Walk the {@code /runtime/flox-runtime/env.d/} resource tree and return every {@code
+   * category/name} directory that contains both {@code flake.nix} and {@code manifest.toml}. Works
+   * whether resources sit on disk (during {@code mvn exec:java}) or inside a shaded JAR.
+   */
+  private static Set<DiscoveredEnvironment> discoverEnvironments(Class<?> resourceAnchor) {
+    final TreeSet<DiscoveredEnvironment> discovered =
+        new TreeSet<>(
+            (a, b) -> {
+              int cmp = a.category().compareTo(b.category());
+              return cmp != 0 ? cmp : a.name().compareTo(b.name());
+            });
+
+    final URL rootUrl = resourceAnchor.getResource(ENV_RESOURCE_ROOT);
+    if (rootUrl == null) {
+      throw new IllegalStateException(
+          "Flox env.d resource root not found on classpath: " + ENV_RESOURCE_ROOT);
+    }
+
+    try {
+      final URLConnection connection = rootUrl.openConnection();
+      if (connection instanceof JarURLConnection jarConnection) {
+        addEnvsFromJar(jarConnection, discovered);
+      } else {
+        addEnvsFromFilesystem(rootUrl, discovered);
+      }
+    } catch (IOException ex) {
+      throw new UncheckedIOException(
+          "Failed scanning Flox env.d resource root: " + ENV_RESOURCE_ROOT, ex);
+    }
+
+    return discovered;
+  }
+
+  private static void addEnvsFromFilesystem(URL rootUrl, Set<DiscoveredEnvironment> sink)
+      throws IOException {
+    final Path rootDir;
+    try {
+      rootDir = Paths.get(rootUrl.toURI());
+    } catch (java.net.URISyntaxException ex) {
+      throw new IOException("Bad env.d URL: " + rootUrl, ex);
+    }
+
+    try (Stream<Path> categories = Files.list(rootDir)) {
+      categories
+          .filter(Files::isDirectory)
+          .forEach(
+              categoryDir -> {
+                try (Stream<Path> names = Files.list(categoryDir)) {
+                  names
+                      .filter(Files::isDirectory)
+                      .filter(name -> Files.isRegularFile(name.resolve(MANIFEST_TOML_RESOURCE)))
+                      .filter(name -> Files.isRegularFile(name.resolve(FLAKE_NIX_RESOURCE)))
+                      .forEach(
+                          name ->
+                              sink.add(
+                                  new DiscoveredEnvironment(
+                                      categoryDir.getFileName().toString(),
+                                      name.getFileName().toString())));
+                } catch (IOException ex) {
+                  throw new UncheckedIOException(
+                      "Failed listing flox env category: " + categoryDir, ex);
+                }
+              });
+    }
+  }
+
+  private static void addEnvsFromJar(
+      JarURLConnection jarConnection, Set<DiscoveredEnvironment> sink) throws IOException {
+    final JarFile jarFile = jarConnection.getJarFile();
+    // JAR entries are stored without a leading slash.
+    final String prefix = ENV_RESOURCE_ROOT.substring(1) + "/"; // "runtime/flox-runtime/env.d/"
+    final Set<String> manifestSeen = new LinkedHashSet<>();
+    final Set<String> flakeSeen = new LinkedHashSet<>();
+    final Enumeration<JarEntry> entries = jarFile.entries();
+    while (entries.hasMoreElements()) {
+      final JarEntry entry = entries.nextElement();
+      final String name = entry.getName();
+      if (!name.startsWith(prefix) || entry.isDirectory()) {
+        continue;
+      }
+      final String tail = name.substring(prefix.length());
+      final int firstSlash = tail.indexOf('/');
+      if (firstSlash < 0) {
+        continue;
+      }
+      final int secondSlash = tail.indexOf('/', firstSlash + 1);
+      if (secondSlash < 0) {
+        continue;
+      }
+      // Only consider files at exactly env.d/<category>/<name>/<file>.
+      final String fileName = tail.substring(secondSlash + 1);
+      if (fileName.indexOf('/') >= 0) {
+        continue;
+      }
+      final String envKey = tail.substring(0, secondSlash);
+      if (MANIFEST_TOML_RESOURCE.equals(fileName)) {
+        manifestSeen.add(envKey);
+      } else if (FLAKE_NIX_RESOURCE.equals(fileName)) {
+        flakeSeen.add(envKey);
+      }
+    }
+    for (String envKey : manifestSeen) {
+      if (!flakeSeen.contains(envKey)) {
+        continue;
+      }
+      final int slash = envKey.indexOf('/');
+      sink.add(new DiscoveredEnvironment(envKey.substring(0, slash), envKey.substring(slash + 1)));
+    }
+  }
+
   public static final class Builder {
-    private Class<?> resourceAnchor = FloxRuntimeAssets.class;
-    private final List<EmbeddedAsset> floxMaterializationAssets = new ArrayList<>();
+    private final Class<?> resourceAnchor = FloxRuntimeAssets.class;
     private final List<InstallerAsset> floxInstallerConfigMapAssets = new ArrayList<>();
     private RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets =
         RuntimeDaemonsetScriptPolicyAssets.builder().build();
-    private NriPluginArchiveAssets nriPluginArchiveAssets =
+    private final NriPluginArchiveAssets nriPluginArchiveAssets =
         NriPluginArchiveAssets.builder().build();
 
     private Builder() {
-      addDefaultMaterializationAssets();
-      addDefaultInstallerAssets();
-    }
-
-    public Builder addDefaultMaterializationAssets() {
-      // Only add Flox environment definitions - installer/debug scripts are in ConfigMap
-      addFloxEnvironmentAssets("mesh", "headplane");
-      addFloxEnvironmentAssets("networking", "kdns");
-      return this;
-    }
-
-    @Deprecated(since = "NRI migration", forRemoval = true)
-    public Builder addDefaultCoreMaterializationAssets() {
-      // These are now in installer ConfigMap, not materialized separately
-      // Kept for backward compatibility - remove after migration complete
-      return this;
-    }
-
-    @Deprecated(since = "NRI migration", forRemoval = true)
-    public Builder addDefaultDebugToolsMaterializationAssets() {
-      // These are now in installer ConfigMap, not materialized separately
-      // Kept for backward compatibility - remove after migration complete
-      return this;
+      addDiscoveredEnvironmentAssets();
+      addDefaultCoreInstallerAssets();
+      addDefaultDebugToolsInstallerAssets();
     }
 
     /**
-     * Add all standard flox environment files for a given category/name. This includes flake.nix,
-     * env.json, manifest.toml, and git metadata files. Lock files (flake.lock, manifest.lock) are
-     * excluded - they will be generated fresh by flox activate during installation to avoid stale
-     * narHash errors.
-     *
-     * @param category the environment category (e.g., "mesh", "networking")
-     * @param name the environment name (e.g., "headplane", "kdns")
-     * @return this builder
+     * Discover every {@code env.d/<category>/<name>/} directory on the classpath that has both
+     * {@code flake.nix} and {@code manifest.toml}, then register the assets the host installer
+     * needs.
      */
-    public Builder addFloxEnvironmentAssets(String category, String name) {
-      String envPrefix = category + "/" + name;
-      String resourcePrefix = FLOX_RESOURCE_ROOT + "/" + envPrefix;
+    private void addDiscoveredEnvironmentAssets() {
+      for (DiscoveredEnvironment env : discoverEnvironments(resourceAnchor)) {
+        addFloxEnvironmentAssets(env);
+      }
+    }
 
-      // Flake files (lock excluded - generated by flox activate)
-      addMaterializationAsset(
-          resourcePrefix + "/.flox/env/flake.nix", envPrefix + "/.flox/env/flake.nix", false);
+    /**
+     * Register installer ConfigMap entries for one Flox environment. The {@code flake.nix} and
+     * {@code manifest.toml} come from the classpath (the only per-env files in the resource tree);
+     * the rest of the {@code .flox/} layout (env.json, .gitattributes, .gitignore) is synthesized
+     * in code from the env's identity. Locks are intentionally omitted — the node regenerates them
+     * via {@code flox activate}.
+     */
+    private void addFloxEnvironmentAssets(DiscoveredEnvironment env) {
+      final String envPrefix = env.envPrefix();
+      final String resourcePrefix = ENV_RESOURCE_ROOT + "/" + envPrefix;
+      final String configMapPrefix = env.configMapPrefix();
+      final String mountPrefix = "build-assets/env.d/" + envPrefix;
 
-      // Flox metadata
-      addMaterializationAsset(
-          resourcePrefix + "/.flox/.gitattributes", envPrefix + "/.flox/.gitattributes", false);
-      addMaterializationAsset(
-          resourcePrefix + "/.flox/.gitignore", envPrefix + "/.flox/.gitignore", false);
-      addMaterializationAsset(
-          resourcePrefix + "/.flox/env.json", envPrefix + "/.flox/env.json", false);
-
-      // Environment manifest (lock excluded - generated by flox activate)
-      addMaterializationAsset(
-          resourcePrefix + "/.flox/env/manifest.toml",
-          envPrefix + "/.flox/env/manifest.toml",
-          false);
-
-      // Add to installer ConfigMap with naming pattern: {category}-{name}-flox-env-{file}
-      // Note: Lock files (flake.lock, manifest.lock) are NOT in ConfigMap
-      // They will be generated by flox activate during installation
-      String configMapPrefix = category + "-" + name + "-flox-env";
+      // Per-env real files: classpath-backed.
       addInstallerAsset(
           configMapPrefix + "-flake-nix",
-          resourcePrefix + "/.flox/env/flake.nix",
-          "build-assets/" + envPrefix + "/.flox/env/flake.nix");
-      addInstallerAsset(
-          configMapPrefix + "-json",
-          resourcePrefix + "/.flox/env.json",
-          "build-assets/" + envPrefix + "/.flox/env.json");
+          resourcePrefix + "/" + FLAKE_NIX_RESOURCE,
+          mountPrefix + "/.flox/env/flake.nix");
       addInstallerAsset(
           configMapPrefix + "-manifest-toml",
-          resourcePrefix + "/.flox/env/manifest.toml",
-          "build-assets/" + envPrefix + "/.flox/env/manifest.toml");
+          resourcePrefix + "/" + MANIFEST_TOML_RESOURCE,
+          mountPrefix + "/.flox/env/manifest.toml");
 
-      return this;
+      // Synthesized boilerplate: identical structure across envs.
+      addInstallerAsset(
+          InstallerAsset.builder()
+              .configMapKey(configMapPrefix + "-env-json")
+              .inlineContent(ENV_JSON_CONTENT)
+              .mountPath(mountPrefix + "/.flox/env.json")
+              .build());
+      addInstallerAsset(
+          InstallerAsset.builder()
+              .configMapKey(configMapPrefix + "-gitignore")
+              .inlineContent(GITIGNORE_CONTENT)
+              .mountPath(mountPrefix + "/.flox/env/.gitignore")
+              .build());
     }
 
-    @Deprecated(since = "Replaced by addFloxEnvironmentAssets", forRemoval = true)
-    public Builder addDefaultMeshHeadplaneMaterializationAssets() {
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/flake.nix",
-          "mesh/headplane/.flox/env/flake.nix",
-          false);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/flake.lock",
-          "mesh/headplane/.flox/env/flake.lock",
-          false);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/.gitattributes",
-          "mesh/headplane/.flox/.gitattributes",
-          false);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/.gitignore",
-          "mesh/headplane/.flox/.gitignore",
-          false);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env.json",
-          "mesh/headplane/.flox/env.json",
-          false);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/manifest.toml",
-          "mesh/headplane/.flox/env/manifest.toml",
-          false);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/mesh/headplane/.flox/env/manifest.lock",
-          "mesh/headplane/.flox/env/manifest.lock",
-          false);
-      return this;
-    }
-
-    public Builder addDefaultNetworkingKdnsMaterializationAssets() {
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/flake.nix",
-          "networking/kdns/.flox/env/flake.nix",
-          false);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/flake.lock",
-          "networking/kdns/.flox/env/flake.lock",
-          false);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/.gitattributes",
-          "networking/kdns/.flox/.gitattributes",
-          false);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/.gitignore",
-          "networking/kdns/.flox/.gitignore",
-          false);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env.json",
-          "networking/kdns/.flox/env.json",
-          false);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/manifest.toml",
-          "networking/kdns/.flox/env/manifest.toml",
-          false);
-      addMaterializationAsset(
-          FLOX_RESOURCE_ROOT + "/networking/kdns/.flox/env/manifest.lock",
-          "networking/kdns/.flox/env/manifest.lock",
-          false);
-      return this;
-    }
-
-    public Builder addDefaultInstallerAssets() {
-      addDefaultCoreInstallerAssets();
-      addDefaultDebugToolsInstallerAssets();
-      addDefaultFlakeInstallerAssets();
-      return this;
-    }
-
-    public Builder addDefaultCoreInstallerAssets() {
-
+    private void addDefaultCoreInstallerAssets() {
       addInstallerAsset(
           "runtime-installer.sh",
           FLOX_RESOURCE_ROOT + "/runtime-installer.sh",
@@ -304,11 +354,18 @@ public final class FloxRuntimeAssets {
       addInstallerAsset(
           "nri-plugin-run.sh", FLOX_RESOURCE_ROOT + "/nri-plugin-run.sh", "bin/nri-plugin-run.sh");
       addInstallerAsset(
+          "flox-nri-overlay-hook.sh",
+          FLOX_RESOURCE_ROOT + "/flox-nri-overlay-hook.sh",
+          "flox-nri-overlay-hook.sh");
+      addInstallerAsset(
+          "flox-nri-chown-hook.sh",
+          FLOX_RESOURCE_ROOT + "/flox-nri-chown-hook.sh",
+          "flox-nri-chown-hook.sh");
+      addInstallerAsset(
           "runtime-flake.nix", FLOX_RESOURCE_ROOT + "/flake.nix", "build-assets/flake.nix");
-      return this;
     }
 
-    public Builder addDefaultDebugToolsInstallerAssets() {
+    private void addDefaultDebugToolsInstallerAssets() {
       addInstallerAsset(
           "debug-tools-rke2lab-debug-tooling.sh",
           FLOX_RESOURCE_ROOT + "/debug-tools/.sh.d/rke2lab-debug-tooling.sh",
@@ -341,21 +398,6 @@ public final class FloxRuntimeAssets {
           "debug-tools-rke2lab-runtime-dlv.sh",
           FLOX_RESOURCE_ROOT + "/debug-tools/rke2lab-runtime-dlv.sh",
           "build-assets/debug-tools/rke2lab-runtime-dlv.sh");
-      return this;
-    }
-
-    @Deprecated(
-        since = "Flox environment assets now added via addFloxEnvironmentAssets",
-        forRemoval = true)
-    public Builder addDefaultFlakeInstallerAssets() {
-      // Flox environment files are now added automatically by addFloxEnvironmentAssets()
-      // which is called from addDefaultMaterializationAssets()
-      return this;
-    }
-
-    public Builder resourceAnchor(Class<?> resourceAnchor) {
-      this.resourceAnchor = Objects.requireNonNull(resourceAnchor, "resourceAnchor");
-      return this;
     }
 
     public Builder runtimeDaemonsetScriptPolicyAssets(
@@ -366,31 +408,9 @@ public final class FloxRuntimeAssets {
       return this;
     }
 
-    public Builder nriPluginArchiveAssets(NriPluginArchiveAssets nriPluginArchiveAssets) {
-      this.nriPluginArchiveAssets =
-          Objects.requireNonNull(nriPluginArchiveAssets, "nriPluginArchiveAssets");
-      return this;
-    }
-
-    public Builder addMaterializationAsset(
-        String classpathResource, String relativePath, boolean executable) {
-      return addMaterializationAsset(
-          new EmbeddedAsset(classpathResource, relativePath, executable));
-    }
-
-    public Builder addMaterializationAsset(EmbeddedAsset embeddedAsset) {
-      this.floxMaterializationAssets.add(Objects.requireNonNull(embeddedAsset, "embeddedAsset"));
-      return this;
-    }
-
-    public Builder clearMaterializationAssets() {
-      floxMaterializationAssets.clear();
-      return this;
-    }
-
-    public Builder addInstallerAsset(
+    private void addInstallerAsset(
         String configMapKey, String classpathResource, String mountPath) {
-      return addInstallerAsset(
+      addInstallerAsset(
           InstallerAsset.builder()
               .configMapKey(configMapKey)
               .classpathResource(classpathResource)
@@ -398,22 +418,9 @@ public final class FloxRuntimeAssets {
               .build());
     }
 
-    public Builder addInstallerAsset(Consumer<InstallerAsset.Builder> installerAssetBuilder) {
-      Objects.requireNonNull(installerAssetBuilder, "installerAssetBuilder");
-      InstallerAsset.Builder builder = InstallerAsset.builder();
-      installerAssetBuilder.accept(builder);
-      return addInstallerAsset(builder.build());
-    }
-
-    public Builder addInstallerAsset(InstallerAsset installerAsset) {
+    private void addInstallerAsset(InstallerAsset installerAsset) {
       this.floxInstallerConfigMapAssets.add(
           Objects.requireNonNull(installerAsset, "installerAsset"));
-      return this;
-    }
-
-    public Builder clearInstallerAssets() {
-      floxInstallerConfigMapAssets.clear();
-      return this;
     }
 
     public FloxRuntimeAssets build() {
@@ -421,16 +428,26 @@ public final class FloxRuntimeAssets {
     }
   }
 
+  /**
+   * Describes one entry in the runtime-installer ConfigMap. Either {@link #classpathResource()} or
+   * {@link #inlineContent()} must be set; if both are present, inline content wins so generated
+   * boilerplate (env.json etc.) doesn't need a placeholder file in the resource tree.
+   */
   public static final class InstallerAsset {
     private final String configMapKey;
     private final String classpathResource;
+    private final String inlineContent;
     private final String mountPath;
 
     private InstallerAsset(Builder builder) {
       this.configMapKey = Objects.requireNonNull(builder.configMapKey, "configMapKey");
-      this.classpathResource =
-          Objects.requireNonNull(builder.classpathResource, "classpathResource");
+      this.classpathResource = builder.classpathResource;
+      this.inlineContent = builder.inlineContent;
       this.mountPath = Objects.requireNonNull(builder.mountPath, "mountPath");
+      if (classpathResource == null && inlineContent == null) {
+        throw new IllegalArgumentException(
+            "InstallerAsset '" + configMapKey + "' must set classpathResource or inlineContent");
+      }
     }
 
     public static Builder builder() {
@@ -445,6 +462,10 @@ public final class FloxRuntimeAssets {
       return classpathResource;
     }
 
+    public String inlineContent() {
+      return inlineContent;
+    }
+
     public String mountPath() {
       return mountPath;
     }
@@ -452,6 +473,7 @@ public final class FloxRuntimeAssets {
     public static final class Builder {
       private String configMapKey;
       private String classpathResource;
+      private String inlineContent;
       private String mountPath;
 
       private Builder() {}
@@ -463,6 +485,11 @@ public final class FloxRuntimeAssets {
 
       public Builder classpathResource(String classpathResource) {
         this.classpathResource = classpathResource;
+        return this;
+      }
+
+      public Builder inlineContent(String inlineContent) {
+        this.inlineContent = inlineContent;
         return this;
       }
 

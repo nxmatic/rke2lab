@@ -1,7 +1,6 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.runtime.daemonset;
 
-import io.nxmatic.rk2lab.manifests.EmbeddedAsset;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -49,12 +48,6 @@ public final class RuntimeDaemonsetScriptPolicyAssets {
     return scriptAssets.stream()
         .map(asset -> Map.of("key", asset.configMapKey(), "path", asset.relativePath()))
         .toArray();
-  }
-
-  public List<EmbeddedAsset> materializationAssets() {
-    return scriptAssets.stream()
-        .map(asset -> new EmbeddedAsset(asset.classpathResource(), asset.relativePath(), false))
-        .toList();
   }
 
   private String readResource(String resourcePath) {

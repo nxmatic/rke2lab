@@ -39,7 +39,7 @@ link_units_fallback() {
 : "Stow unit tree from host/systemd-units into /etc/systemd/system"
 if ! command -v xstow >/dev/null 2>&1; then
 	: "Install xstow for stowing systemd unit files"
-	if ! flox install --dir="${FLOX_ENV_PROJECT}" xstow; then
+	if ! nix profile add nixpkgs#xstow; then
 		log "warning: failed to install xstow via Flox; proceeding with fallback linker"
 	fi
 fi

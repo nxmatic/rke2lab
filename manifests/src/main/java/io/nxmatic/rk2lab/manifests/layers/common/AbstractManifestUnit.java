@@ -1,6 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.common;
 
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
 import java.util.List;
 
 public abstract class AbstractManifestUnit implements ManifestUnit {
@@ -22,5 +23,13 @@ public abstract class AbstractManifestUnit implements ManifestUnit {
   @Override
   public final List<String> dependsOnManifestUnitIds() {
     return dependsOnManifestUnitIds;
+  }
+
+  /**
+   * Single accessor for the flox NRI debug toggle. Layers reach this through their owning manifest
+   * unit; the underlying singleton reads the environment once at startup.
+   */
+  protected final FloxDebugPolicy floxDebugPolicy() {
+    return FloxDebugPolicy.get();
   }
 }

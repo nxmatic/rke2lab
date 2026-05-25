@@ -6,8 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -50,19 +48,6 @@ public final class NriPluginArchiveAssets {
 
   public String manifestJson() {
     return archiveBundle.manifestJson();
-  }
-
-  public void materializeTo(Path outputDir) throws IOException {
-    Files.writeString(
-        outputDir.resolve(ARCHIVE_CONFIGMAP_KEY), archiveBase64(), StandardCharsets.UTF_8);
-    Files.writeString(
-        outputDir.resolve(MANIFEST_CONFIGMAP_KEY), manifestJson(), StandardCharsets.UTF_8);
-
-    for (ArchiveEntry entry : archiveBundle.entries()) {
-      Path target = outputDir.resolve(entry.path());
-      Files.createDirectories(target.getParent());
-      Files.write(target, entry.content());
-    }
   }
 
   private ArchiveBundle buildArchiveBundle() {

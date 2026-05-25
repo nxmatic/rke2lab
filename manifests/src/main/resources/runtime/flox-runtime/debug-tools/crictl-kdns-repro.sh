@@ -186,7 +186,7 @@ pod_config = {
     "labels": dict(labels) if isinstance(labels, dict) else {},
     "linux": linux_cfg,
 }
-pod_config["annotations"]["flox.dev/environment"] = "nxmatic/kdns"
+pod_config["annotations"]["flox.dev/environment.kdns"] = "networking/kdns"
 pod_config["labels"]["io.kubernetes.pod.name"] = repro_name
 pod_config["labels"]["io.kubernetes.pod.namespace"] = source_namespace
 pod_config["labels"]["io.kubernetes.pod.uid"] = repro_uid
@@ -217,7 +217,7 @@ container_config = {
     "tty": bool(first_path(container_cfg, ("tty",)) or False),
     "working_dir": first_path(container_cfg, ("working_dir",)) or "",
 }
-container_config["annotations"]["flox.dev/environment"] = "networking/kdns"
+container_config["annotations"]["flox.dev/environment.kdns"] = "networking/kdns"
 container_config["labels"]["io.kubernetes.pod.name"] = repro_name
 container_config["labels"]["io.kubernetes.pod.namespace"] = source_namespace
 container_config["labels"]["io.kubernetes.pod.uid"] = repro_uid

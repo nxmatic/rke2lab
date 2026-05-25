@@ -3,6 +3,7 @@ package io.nxmatic.rk2lab.manifests.layers.runtime.flox;
 
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterLayerRefs;
 import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import io.nxmatic.rk2lab.manifests.layers.mesh.MeshLayerRefs;
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
@@ -320,12 +321,7 @@ public final class FloxRuntimeLayer extends Construct {
                                         "name",
                                         "RKE2LAB_POLICY_DEBUG_NRI_PLUGINS_FLOX_ENABLED",
                                         "value",
-                                        System.getenv(
-                                                    "RKE2LAB_POLICY_DEBUG_NRI_PLUGINS_FLOX_ENABLED")
-                                                != null
-                                            ? System.getenv(
-                                                "RKE2LAB_POLICY_DEBUG_NRI_PLUGINS_FLOX_ENABLED")
-                                            : "false")
+                                        FloxDebugPolicy.get().enabled() ? "true" : "false")
                                   },
                                   "image",
                                   "alpine:3.20",

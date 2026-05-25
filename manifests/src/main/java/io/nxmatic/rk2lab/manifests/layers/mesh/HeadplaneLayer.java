@@ -1,6 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.mesh;
 
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
@@ -15,10 +16,7 @@ import software.constructs.Construct;
 public final class HeadplaneLayer extends Construct {
 
   private static final String HEADSCALE_NAMESPACE = MeshLayerRefs.MESH_SYSTEM_NAMESPACE.name();
-  private static final String FLOX_IMAGE =
-      "true".equalsIgnoreCase(System.getenv("RKE2LAB_POLICY_DEBUG_NRI_PLUGINS_FLOX_ENABLED"))
-          ? "alpine:latest"
-          : "flox/empty:1.0.0";
+  private static final String FLOX_IMAGE = FloxDebugPolicy.get().image("flox/empty:1.0.0");
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("mesh", "headplane");
@@ -512,7 +510,7 @@ public final class HeadplaneLayer extends Construct {
                     Map.of(
                         "annotations",
                         packageProfile.templateAnnotations(
-                            Map.of("flox.dev/environment", "mesh/headplane"))),
+                            Map.of("flox.dev/environment.sync", "mesh/headplane"))),
                     "spec",
                     Map.of(
                         "containers",
@@ -662,7 +660,7 @@ public final class HeadplaneLayer extends Construct {
                     Map.of(
                         "annotations",
                         packageProfile.templateAnnotations(
-                            Map.of("flox.dev/environment", "mesh/headplane")),
+                            Map.of("flox.dev/environment.headplane", "mesh/headplane")),
                         "labels",
                         Map.of("app", "headplane")),
                     "spec",
@@ -671,7 +669,7 @@ public final class HeadplaneLayer extends Construct {
                         List.of(
                             Map.ofEntries(
                                 Map.entry("name", "headplane"),
-                                Map.entry("image", "FLOX_IMAGE"),
+                                Map.entry("image", FLOX_IMAGE),
                                 Map.entry("command", List.of("headplane")),
                                 Map.entry("args", List.of("serve")),
                                 Map.entry(
@@ -797,7 +795,7 @@ public final class HeadplaneLayer extends Construct {
                                 "name",
                                 "setup-agent",
                                 "image",
-                                "FLOX_IMAGE",
+                                FLOX_IMAGE,
                                 "command",
                                 List.of(
                                     "sh",

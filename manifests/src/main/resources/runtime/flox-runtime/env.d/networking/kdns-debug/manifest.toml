@@ -1,0 +1,48 @@
+# kdns debug environment: ships kdns-debug (delve-wrapped, no-strip, no-inline)
+# alongside an interactive shell so the user can attach a debugger or poke
+# around the running container. Mounted by the flox NRI plugin under
+# `flox.dev/environment.<container-name>` = "networking/kdns-debug".
+schema-version = "1.10.0"
+
+[install]
+
+  [install.go]
+    pkg-path = "go"
+    version = "^1.25"
+
+  [install.delve]
+    pkg-path = "delve"
+
+  [install.bash]
+    pkg-path = "bash"
+    outputs = "all"
+
+  [install.coreutils]
+    pkg-path = "coreutils"
+    outputs = "all"
+
+  [install.busybox]
+    pkg-path = "busybox"
+
+  [install.strace]
+    pkg-path = "strace"
+
+  [install.curl]
+    pkg-path = "curl"
+
+  [install.kdns-debug]
+    flake = "path:.flox/env#kdns-debug"
+
+[vars]
+
+[hook]
+
+[profile]
+
+[services]
+
+[include]
+
+[build]
+
+[options]

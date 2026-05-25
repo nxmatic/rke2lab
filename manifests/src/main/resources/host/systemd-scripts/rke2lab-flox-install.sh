@@ -7,6 +7,7 @@ NIX_PROFILE=/nix/var/nix/profiles/default
 NIX_CONF_DIR=/etc/nix
 NIX_CONF_FILE="${NIX_CONF_DIR}/nix.conf"
 FLOX_CONF_FILE="${NIX_CONF_DIR}/flox.conf"
+SECRETS_FILE=/srv/host/rke2lab-worktree.d/.secrets
 
 : "Load the default Nix profile for current shell session"
 source "${NIX_PROFILE}/etc/profile.d/nix-daemon.sh"

@@ -28,7 +28,7 @@
           name = "nri-plugin-src";
         };
         subPackages = ["cmd/flox-nri-plugin"];
-        vendorHash = "sha256-Ule4xfyW6PKTfVRPxBAZoyqp5mkvL/FKC5I/qJ8fWaY="; # lib.fakeHash;
+        vendorHash = "sha256-f2tBtvXqS4XfkKsNQJnwxobVNRFCwEusKC4Et7rySEk="; # lib.fakeHash;
 
         env = {
           CGO_ENABLED = "0";

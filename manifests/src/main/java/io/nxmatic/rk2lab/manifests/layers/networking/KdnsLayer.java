@@ -4,6 +4,7 @@ package io.nxmatic.rk2lab.manifests.layers.networking;
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterLayerRefs;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.DelveSidecarProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.DelveSidecarToggleResolver;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.RuntimePodProfile;
 import java.util.ArrayList;
@@ -211,16 +212,22 @@ public final class KdnsLayer extends Construct {
     deployment.addDependency(dlvScriptConfigMap);
     deployment.addDependency(clusterRoleBinding);
 
-    // Use alpine in debug mode for easier troubleshooting with shell tools
-    boolean nriDebugEnabled =
-        "true".equalsIgnoreCase(System.getenv("RKE2LAB_POLICY_DEBUG_NRI_PLUGINS_FLOX_ENABLED"));
-    String containerImage = nriDebugEnabled ? "alpine:latest" : "flox/empty:1.0.0";
+    // Debug mode swaps the workload for a paused bash:5 shell so the container
+    // stays up while we exec in to inspect mounts, run flox by hand, attach
+    // dlv, etc. The mounted flox env is also swapped to networking/kdns-debug
+    // so delve and friends are available inside $HOME/.flox.
+    final FloxDebugPolicy debugPolicy = FloxDebugPolicy.get();
+    final String containerImage = debugPolicy.image("flox/empty:1.0.0");
+    final List<String> containerCommand =
+        debugPolicy.command(List.of("flox", "activate", "--dir", "/root", "--", "kdns"));
+    final String floxEnvironment =
+        debugPolicy.floxEnvironment("networking/kdns", "networking/kdns-debug");
 
     LinkedHashMap<String, Object> kdnsContainer = new LinkedHashMap<>();
     kdnsContainer.put("name", "kdns");
     kdnsContainer.put("image", containerImage);
     kdnsContainer.put("imagePullPolicy", "IfNotPresent");
-    kdnsContainer.put("command", List.of("flox", "activate", "--", "kdns"));
+    kdnsContainer.put("command", containerCommand);
     kdnsContainer.put(
         "env",
         List.of(
@@ -287,10 +294,10 @@ public final class KdnsLayer extends Construct {
                 delveSidecarProfile.workloadAnnotations(
                     packageProfile.templateAnnotations(
                         Map.of(
-                            "flox.dev/environment", "networking/kdns",
-                            "flox.dev/home", "/root",
-                            "flox.dev/uid", "0",
-                            "flox.dev/gid", "0"))),
+                            "flox.dev/environment.kdns", floxEnvironment,
+                            "flox.dev/home.kdns", "/root",
+                            "flox.dev/uid.kdns", "0",
+                            "flox.dev/gid.kdns", "0"))),
                 "labels",
                 Map.of(
                     "app.kubernetes.io/instance",

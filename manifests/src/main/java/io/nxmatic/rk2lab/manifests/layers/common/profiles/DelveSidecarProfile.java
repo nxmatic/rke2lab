@@ -8,10 +8,7 @@ import java.util.Optional;
 
 public final class DelveSidecarProfile {
 
-  private static final String DEFAULT_IMAGE =
-      "true".equalsIgnoreCase(System.getenv("RKE2LAB_POLICY_DEBUG_NRI_PLUGINS_FLOX_ENABLED"))
-          ? "alpine:latest"
-          : "flox/empty:1.0.0";
+  private static final String DEFAULT_IMAGE = FloxDebugPolicy.get().image("flox/empty:1.0.0");
   private static final String DEFAULT_SCRIPT_MOUNT_PATH = "/.sh.d";
 
   private final boolean enabled;
