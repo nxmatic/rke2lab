@@ -638,13 +638,6 @@ public final class Main {
   }
 
   private static void enforceFlakeLockCoherence(Path worktreePath) {
-    if (true) {
-      // Temporarily disable the flake lock coherence policy until we have a better story for
-      // managing the git worktree state in the manifests module. The current policy is too
-      // fragile and causes more pain than it solves, especially for new users who are not yet
-      // familiar with the git intricacies of the manifests module.
-      return;
-    }
     final Path normalizedWorktreePath = worktreePath.toAbsolutePath().normalize();
     try {
       final FileRepositoryBuilder builder =
