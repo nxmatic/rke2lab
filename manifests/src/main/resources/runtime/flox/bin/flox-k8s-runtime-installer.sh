@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -exuo pipefail
 
-DAEMONSET_ASSET_ROOT="/srv/host/k8s-daemonset.d/runtime/flox-runtime"
+DAEMONSET_ASSET_ROOT="/srv/host/k8s-daemonset.d/runtime/flox"
 DAEMONLESS_EXEC_MODE="${DAEMONLESS_EXEC_MODE:-pod}"
 DAEMONSET_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT:-${DAEMONLESS_HOST_SCRIPT_ROOT:-${DAEMONSET_ASSET_ROOT}}}"
 DAEMONLESS_HOST_SCRIPT_ROOT="${DAEMONLESS_HOST_SCRIPT_ROOT:-${DAEMONSET_SCRIPT_ROOT}}"
@@ -272,7 +272,7 @@ installer::pod:run() {
 
 	# nri-plugin source tree now ships as part of the build inputs (it's a
 	# `src = ./nri-plugin` reference from the parent flake), so no archive
-	# decode step is needed — `cp -af /.sh/. /.run/` already brought it into
+	# decode step is needed — `cp -af /.sh/. ${SCRIPT_MOUNT_DIR}/` already brought it into
 	# the workspace next to flake.nix.
 
 	DAEMONLESS_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT}" \

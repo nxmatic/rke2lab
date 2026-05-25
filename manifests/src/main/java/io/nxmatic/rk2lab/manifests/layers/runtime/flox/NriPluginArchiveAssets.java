@@ -187,24 +187,24 @@ public final class NriPluginArchiveAssets {
       addSourceAsset(
           source ->
               source
-                  .classpathResource("/runtime/flox-runtime/nri-plugin/go.mod")
+                  .classpathResource("/runtime/flox/nri-plugin/go.mod")
                   .relativePath("nri-plugin/go.mod"));
       addSourceAsset(
           source ->
               source
-                  .classpathResource("/runtime/flox-runtime/nri-plugin/go.sum")
+                  .classpathResource("/runtime/flox/nri-plugin/go.sum")
                   .relativePath("nri-plugin/go.sum"));
 
       // NRI plugin (only approach - shim removed)
       addSourceAsset(
           source ->
               source
-                  .classpathResource("/runtime/flox-runtime/nri-plugin/cmd/flox-nri-plugin/main.go")
+                  .classpathResource("/runtime/flox/nri-plugin/cmd/flox-nri-plugin/main.go")
                   .relativePath("nri-plugin/cmd/flox-nri-plugin/main.go"));
       addSourceAsset(
           source ->
               source
-                  .classpathResource("/runtime/flox-runtime/nri-plugin/pkg/nri/plugin.go")
+                  .classpathResource("/runtime/flox/nri-plugin/pkg/nri/plugin.go")
                   .relativePath("nri-plugin/pkg/nri/plugin.go"));
       return this;
     }

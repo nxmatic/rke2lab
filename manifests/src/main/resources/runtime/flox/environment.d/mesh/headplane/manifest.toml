@@ -32,20 +32,20 @@ outputs = "all"
 outputs = "all"
 
   # Workload packages now live in the parent runtime flake
-  # (runtime/flox-runtime/flake.nix). The host materializer bind-mounts that
+  # (runtime/flox/flake.nix). The host materializer bind-mounts that
   # flake at this absolute path on every guest.
 
   [install.headplane]
-  flake = "path:/srv/host/k8s-daemonset.d/runtime/flox-runtime#headplane"
+  flake = "path:/var/run/k8s-daemonset.d/runtime/flox#headplane"
 
   [install.headscale]
-  flake = "path:/srv/host/k8s-daemonset.d/runtime/flox-runtime#headscale"
+  flake = "path:/var/run/k8s-daemonset.d/runtime/flox#headscale"
 
   [install.headplane-agent]
-  flake = "path:/srv/host/k8s-daemonset.d/runtime/flox-runtime#headplane-agent"
+  flake = "path:/var/run/k8s-daemonset.d/runtime/flox#headplane-agent"
 
   [install.headplane-ssh-wasm]
-  flake = "path:/srv/host/k8s-daemonset.d/runtime/flox-runtime#headplane-ssh-wasm"
+  flake = "path:/var/run/k8s-daemonset.d/runtime/flox#headplane-ssh-wasm"
 
 ## Other Environment Options -----------------------------------------
 # This env activates inside Linux containers on the cluster nodes — restrict

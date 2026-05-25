@@ -26,18 +26,17 @@ import java.util.stream.Stream;
 
 public final class FloxRuntimeAssets {
 
-  private static final String FLOX_RESOURCE_ROOT = "/runtime/flox-runtime";
+  private static final String FLOX_RESOURCE_ROOT = "/runtime/flox";
   private static final String ENV_RESOURCE_ROOT = FLOX_RESOURCE_ROOT + "/environment.d";
   private static final String NRI_PLUGIN_RESOURCE_ROOT = FLOX_RESOURCE_ROOT + "/nri-plugin";
 
   /**
    * The only per-env real file is {@code manifest.toml}; workload packages are produced by the
-   * parent runtime flake (see {@code runtime/flox-runtime/flake.nix}) and referenced from each
-   * env's {@code manifest.toml} via an absolute {@code flake =
-   * "path:/srv/host/.../runtime/flox-runtime#<output>"}. {@code env.json} and {@code
-   * .gitattributes} are synthesized in code (uniform across envs). Locks (flake.lock,
-   * manifest.lock) are owned by the parent runtime flake — the node regenerates each env's
-   * manifest.lock at activation time.
+   * parent runtime flake (see {@code runtime/flox/flake.nix}) and referenced from each env's {@code
+   * manifest.toml} via an absolute {@code flake = "path:/srv/host/.../runtime/flox#<output>"}.
+   * {@code env.json} and {@code .gitattributes} are synthesized in code (uniform across envs).
+   * Locks (flake.lock, manifest.lock) are owned by the parent runtime flake — the node regenerates
+   * each env's manifest.lock at activation time.
    */
   private static final String MANIFEST_TOML_RESOURCE = "manifest.toml";
 
@@ -248,7 +247,7 @@ public final class FloxRuntimeAssets {
   private static final String ENV_JSON_CONTENT = "{\"name\": \"default\", \"version\": 1}\n";
 
   /**
-   * Walk the {@code /runtime/flox-runtime/environment.d/} resource tree and return every {@code
+   * Walk the {@code /runtime/flox/environment.d/} resource tree and return every {@code
    * category/name} directory that contains both {@code flake.nix} and {@code manifest.toml}. Works
    * whether resources sit on disk (during {@code mvn exec:java}) or inside a shaded JAR.
    */
@@ -317,8 +316,7 @@ public final class FloxRuntimeAssets {
       JarURLConnection jarConnection, Set<DiscoveredEnvironment> sink) throws IOException {
     final JarFile jarFile = jarConnection.getJarFile();
     // JAR entries are stored without a leading slash.
-    final String prefix =
-        ENV_RESOURCE_ROOT.substring(1) + "/"; // "runtime/flox-runtime/environment.d/"
+    final String prefix = ENV_RESOURCE_ROOT.substring(1) + "/"; // "runtime/flox/environment.d/"
     final Set<String> manifestSeen = new LinkedHashSet<>();
     final Enumeration<JarEntry> entries = jarFile.entries();
     while (entries.hasMoreElements()) {

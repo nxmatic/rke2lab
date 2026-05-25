@@ -19,8 +19,8 @@ import java.util.List;
  */
 public record FloxDebugPolicy(boolean enabled) {
 
-  private static final String DEBUG_IMAGE = "bash:5";
-  private static final List<String> PAUSE_COMMAND = List.of("sleep", "infinity");
+  private static final String DEBUG_IMAGE = "alpine:latest";
+  private static final List<String> PAUSE_COMMAND = List.of("/bin/sleep", "infinity");
   private static final FloxDebugPolicy DISABLED = new FloxDebugPolicy(false);
 
   /** Production-shape policy: every primitive falls through unchanged. */

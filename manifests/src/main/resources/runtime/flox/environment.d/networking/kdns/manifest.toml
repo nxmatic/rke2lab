@@ -32,9 +32,9 @@ outputs = "all"
 outputs = "all"
   
   [install.kdns-debug]
-    # Workload package now lives in the parent runtime flake (see runtime/flox-runtime/flake.nix).
+    # Workload package now lives in the parent runtime flake (see runtime/flox/flake.nix).
     # The host materializer bind-mounts that flake at this absolute path on every guest.
-    flake = "path:/srv/host/k8s-daemonset.d/runtime/flox-runtime#kdns-debug"
+    flake = "path:/var/run/k8s-daemonset.d/runtime/flox#kdns-debug"
 
 ## Environment Variables ---------------------------------------------
 ##  ... available for use in the activated environment

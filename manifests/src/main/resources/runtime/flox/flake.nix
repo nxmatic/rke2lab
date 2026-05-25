@@ -8,7 +8,7 @@
 
     # Per-workload sources. Adding a new workload package usually means a new
     # input + a new entry in `packages` below; the per-env manifest.toml then
-    # references it via `flake = path:.../runtime/flox-runtime#<output>`.
+    # references it via `flake = path:.../runtime/flox#<output>`.
     kdns-src = {
       url = "github:lab42/kdns?ref=v0.2.15";
       flake = false;

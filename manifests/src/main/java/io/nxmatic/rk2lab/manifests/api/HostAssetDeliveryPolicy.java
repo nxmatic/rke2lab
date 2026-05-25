@@ -115,9 +115,9 @@ public record HostAssetDeliveryPolicy(
 
   public static HostAssetDeliveryPolicy floxRuntime() {
     return builder()
-        .policyId("runtime/flox-runtime")
+        .policyId("runtime/flox")
         .ownerDomainId(MANIFEST_DOMAIN_CATALOG.runtime())
-        .hostAssetRoot("/srv/host/k8s-daemonset.d/runtime/flox-runtime")
+        .hostAssetRoot("/srv/host/k8s-daemonset.d/runtime/flox")
         .deliveryBackend(HostAssetDeliveryBackend.DAEMONSET)
         .materializationMode(HostAssetMaterializationMode.MIXED)
         .verificationRequired(true)

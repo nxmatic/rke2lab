@@ -21,8 +21,8 @@ schema-version = "1.10.0"
     pkg-path = "coreutils"
     outputs = "all"
 
-  [install.busybox]
-    pkg-path = "busybox"
+  # busybox dropped — its bin/sh conflicts with bash's, and we want
+  # bash (with completion + line editing) for an interactive debug shell.
 
   [install.strace]
     pkg-path = "strace"
@@ -31,9 +31,9 @@ schema-version = "1.10.0"
     pkg-path = "curl"
 
   [install.kdns-debug]
-    # Workload package now lives in the parent runtime flake (see runtime/flox-runtime/flake.nix).
+    # Workload package now lives in the parent runtime flake (see runtime/flox/flake.nix).
     # The host materializer bind-mounts that flake at this absolute path on every guest.
-    flake = "path:/srv/host/k8s-daemonset.d/runtime/flox-runtime#kdns-debug"
+    flake = "path:/var/run/k8s-daemonset.d/runtime/flox#kdns-debug"
 
 [vars]
 

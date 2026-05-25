@@ -22,7 +22,15 @@ const (
 	floxGIDAnnotationPrefix   = "flox.dev/gid"         // <prefix>.<container> = desired GID (optional, default: 0)
 	floxDebugAnnotationPrefix = "flox.dev/debug"       // <prefix>.<container> = "true" to enable debug pause
 	floxDebugPortPrefix       = "flox.dev/debug-port"  // <prefix>.<container> = delve port (default: 2345)
-	floxEnvBaseDir            = "/srv/host/k8s-daemonset.d/runtime/flox-runtime/environment.d"
+	// Per-node mutable workspace path. We deliberately do NOT use
+	// /srv/host/k8s-daemonset.d/... here because that path is NFS-backed in
+	// the bootstrap setup, and overlayfs cannot use an NFS lower layer
+	// (kernel returns EOPNOTSUPP for reads inside the resulting overlay).
+	// The runtime-installer pod populates this path (cp -af from /.sh/.) at
+	// pod startup and `flox activate` writes locks here, so it has the same
+	// content the seed-bootstrap-owned path does — but it lives on the
+	// node's local zfs and supports overlayfs as a lower layer.
+	floxEnvBaseDir = "/var/run/k8s-daemonset.d/runtime/flox/environment.d"
 	floxOverlayHookPath       = "/usr/local/sbin/flox-nri-overlay-hook.sh"
 	floxChownHookPath         = "/usr/local/sbin/flox-nri-chown-hook.sh"
 	defaultDebugPort          = "2345"
@@ -48,7 +56,7 @@ const (
 //
 // Behavior:
 //   - Determines HOME directory: flox.dev/home.<c> > HOME env var > /root
-//   - Resolves environment: "category/name" maps to /srv/host/.../runtime/flox-runtime/environment.d/{category}/{name}
+//   - Resolves environment: "category/name" maps to /srv/host/.../runtime/flox/environment.d/{category}/{name}
 //   - Mounts the requested Flox environment at $HOME/.flox
 //   - Mounts /nix/store with overlayfs protection (read-only lower, writable ephemeral upper)
 //   - Allows `flox activate --dir $HOME` to automatically discover the environment
@@ -222,7 +230,7 @@ func (p *FloxPlugin) RemoveContainer(ctx context.Context, pod *api.PodSandbox, c
 func (p *FloxPlugin) resolveFloxEnvironment(floxEnv string) (string, error) {
 	// Parse flox environment
 	// Format: "category/name" (e.g., "networking/kdns")
-	// Matches the filesystem layout: /srv/host/k8s-daemonset.d/runtime/flox-runtime/environment.d/{category}/{name}
+	// Matches the filesystem layout: /var/run/k8s-daemonset.d/runtime/flox/environment.d/{category}/{name}
 
 	var category, envName string
 

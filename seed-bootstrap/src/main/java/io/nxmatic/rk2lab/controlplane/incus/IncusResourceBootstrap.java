@@ -342,15 +342,14 @@ public final class IncusResourceBootstrap {
     }
 
     /**
-     * Lay the flox runtime-installer build inputs out under {@code
-     * <daemonsetRoot>/runtime/flox-runtime/}, which incus bind-mounts into each guest at {@code
-     * /srv/host/k8s-daemonset.d/runtime/flox-runtime/} — read-only on the pod side. The init
-     * container copies these inputs into a per-node mutable workspace at {@code
-     * /var/run/k8s-daemonset.d/runtime/flox-runtime/} at startup; nix and flox write locks there.
-     * Since this path is build-only on the pod side, the wipe can be wholesale.
+     * Lay the flox runtime-installer build inputs out under {@code <daemonsetRoot>/runtime/flox/},
+     * which incus bind-mounts into each guest at {@code /srv/host/k8s-daemonset.d/runtime/flox/} —
+     * read-only on the pod side. The init container copies these inputs into a per-node mutable
+     * workspace at {@code /var/run/k8s-daemonset.d/runtime/flox/} at startup; nix and flox write
+     * locks there. Since this path is build-only on the pod side, the wipe can be wholesale.
      */
     private void materializeFloxRuntimeInstallerAssets(Path daemonsetRoot) {
-      final Path target = daemonsetRoot.resolve("runtime").resolve("flox-runtime");
+      final Path target = daemonsetRoot.resolve("runtime").resolve("flox");
       try {
         deleteSubtree(target);
         Files.createDirectories(target);
@@ -390,6 +389,19 @@ public final class IncusResourceBootstrap {
         for (Path entry : entries) {
           Files.deleteIfExists(entry);
         }
+      }
+    }
+
+    /**
+     * Best-effort variant: swallow IOExceptions instead of propagating. Used to clean up leftover
+     * paths from prior layouts (e.g., the old {@code runtime/flox-runtime/} directory after the
+     * rename to {@code runtime/flox/}) where failure shouldn't block the apply.
+     */
+    private static void deleteSubtreeSilently(Path root) {
+      try {
+        deleteSubtree(root);
+      } catch (IOException ignored) {
+        // best-effort: leftover stays, next run retries
       }
     }
 

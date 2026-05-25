@@ -11,7 +11,7 @@ import org.cdk8s.Chart;
 
 public final class FloxRuntimeManifestUnit extends AbstractManifestUnit {
 
-  public static final String MANIFEST_UNIT_ID = "runtime/flox-runtime";
+  public static final String MANIFEST_UNIT_ID = "runtime/flox";
 
   public FloxRuntimeManifestUnit() {
     super(
