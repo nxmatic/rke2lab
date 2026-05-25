@@ -47,4 +47,8 @@ schema-version = "1.10.0"
 
 [build]
 
+# These envs activate inside Linux containers on the cluster nodes — restrict
+# resolution to Linux so darwin-incompatible packages (busybox, strace) don't
+# block flox lock/activate.
 [options]
+systems = ["aarch64-linux"]

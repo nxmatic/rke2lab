@@ -108,13 +108,10 @@ outputs = "all"
 
 
 ## Other Environment Options -----------------------------------------
+# This env activates inside Linux containers on the cluster nodes — restrict
+# resolution to Linux so darwin-incompatible packages don't block flox
+# lock/activate.
 [options]
-# Systems that environment is compatible with
-# systems = [
-#   "aarch64-darwin",
-#   "aarch64-linux",
-#   "x86_64-darwin",
-#   "x86_64-linux",
-# ]
+systems = ["aarch64-linux"]
 # Uncomment to disable CUDA detection.
 # cuda-detection = false

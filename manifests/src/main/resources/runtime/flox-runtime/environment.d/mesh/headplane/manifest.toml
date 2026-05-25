@@ -48,5 +48,8 @@ outputs = "all"
   flake = "path:/srv/host/k8s-daemonset.d/runtime/flox-runtime#headplane-ssh-wasm"
 
 ## Other Environment Options -----------------------------------------
+# This env activates inside Linux containers on the cluster nodes — restrict
+# resolution to Linux so darwin-incompatible packages don't block flox
+# lock/activate.
 [options]
-systems = ["aarch64-linux", "aarch64-darwin"]
+systems = ["aarch64-linux"]
