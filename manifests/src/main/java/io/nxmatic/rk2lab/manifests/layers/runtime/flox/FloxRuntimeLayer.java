@@ -45,10 +45,16 @@ public final class FloxRuntimeLayer extends Construct {
 
     // RuntimeClass no longer needed with NRI plugin approach
     // NRI plugin intercepts based on flox.dev/environment annotation
+    //
+    // Installer assets used to ride a single ConfigMap, but the aggregate
+    // payload (NRI archive + scripts + locks + env trees) is well over
+    // Kubernetes' per-object 1 MiB limit. The DaemonSet now mounts the
+    // assets via hostPath; seed-bootstrap materializes the same content tree
+    // to /srv/host/k8s-daemonset.d/runtime/flox-runtime/installer-assets/
+    // before the DaemonSet starts (FloxRuntimeAssets.writeInstallerAssetTree).
     ApiObject envConfigMap = createFloxEnvConfigMap();
-    ApiObject installerAssetsConfigMap = createInstallerAssetsConfigMap();
     ApiObject serviceAccount = createServiceAccount();
-    createInstallerDaemonSet(envConfigMap, installerAssetsConfigMap, serviceAccount);
+    createInstallerDaemonSet(envConfigMap, serviceAccount);
   }
 
   // RuntimeClass removed: NRI plugin approach doesn't need custom runtime handlers
@@ -99,42 +105,6 @@ public final class FloxRuntimeLayer extends Construct {
     return configMap;
   }
 
-  private ApiObject createInstallerAssetsConfigMap() {
-    ApiObject configMap =
-        new ApiObject(
-            this,
-            "configmap-" + RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP.name(),
-            ApiObjectProps.builder()
-                .apiVersion("v1")
-                .kind("ConfigMap")
-                .metadata(
-                    ApiObjectMetadata.builder()
-                        .name(RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP.name())
-                        .namespace(
-                            RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP
-                                .namespaceName())
-                        .annotations(
-                            kptMetadata.packageAnnotations(
-                                LAYER_NAME,
-                                PACKAGE_NAME,
-                                "|ConfigMap|"
-                                    + RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP
-                                        .namespaceName()
-                                    + "|"
-                                    + RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP
-                                        .name()))
-                        .build())
-                .build());
-
-    if (registry != null) {
-      configMap.addDependency(registry.require(ClusterLayerRefs.RUNTIME_SYSTEM_NAMESPACE));
-      registry.publish(RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP, configMap);
-    }
-
-    configMap.addJsonPatch(JsonPatch.add("/data", floxRuntimeAssets.installerConfigMapData()));
-    return configMap;
-  }
-
   private ApiObject createServiceAccount() {
     ApiObject serviceAccount =
         new ApiObject(
@@ -163,9 +133,7 @@ public final class FloxRuntimeLayer extends Construct {
   }
 
   private void createInstallerDaemonSet(
-      final ApiObject envConfigMap,
-      final ApiObject installerAssetsConfigMap,
-      final ApiObject serviceAccount) {
+      final ApiObject envConfigMap, final ApiObject serviceAccount) {
     ApiObject daemonSet =
         new ApiObject(
             this,
@@ -198,7 +166,6 @@ public final class FloxRuntimeLayer extends Construct {
       daemonSet.addDependency(registry.require(RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP));
     }
     daemonSet.addDependency(envConfigMap);
-    daemonSet.addDependency(installerAssetsConfigMap);
     daemonSet.addDependency(serviceAccount);
 
     daemonSet.addJsonPatch(
@@ -288,7 +255,16 @@ public final class FloxRuntimeLayer extends Construct {
                                   new Object[] {
                                     "/bin/sh",
                                     "-ec",
-                                    "apk add --no-cache bash coreutils && /.sh/bin/runtime-installer.sh"
+                                    // Copy build inputs to the per-node mutable
+                                    // workspace, preserving any locks the master
+                                    // already wrote (`cp -n`). Then run the
+                                    // installer from the workspace — that's where
+                                    // `nix build` and `flox activate` will write
+                                    // their lock files.
+                                    "apk add --no-cache bash coreutils"
+                                        + " && mkdir -p /runtime-workspace"
+                                        + " && cp -an /.sh/. /runtime-workspace/"
+                                        + " && /runtime-workspace/bin/runtime-installer.sh"
                                   },
                                   "env",
                                   new Object[] {
@@ -302,20 +278,24 @@ public final class FloxRuntimeLayer extends Construct {
                                         "name",
                                         "DAEMONLESS_HOST_SCRIPT_ROOT",
                                         "value",
-                                        "/srv/host/k8s-daemonset.d/runtime/flox-runtime"),
+                                        "/var/run/k8s-daemonset.d/runtime/flox-runtime"),
                                     Map.of(
                                         "name",
                                         "CONTAINERD_ADDRESS",
                                         "value",
                                         "/run/k3s/containerd/containerd.sock"),
-                                    Map.of("name", "SCRIPT_MOUNT_DIR", "value", "/.sh"),
+                                    Map.of(
+                                        "name", "SCRIPT_MOUNT_DIR", "value", "/runtime-workspace"),
                                     Map.of(
                                         "name",
                                         "SCRIPT_POLICY_ROOT",
                                         "value",
                                         "/runtime-daemonset"),
                                     Map.of(
-                                        "name", "BUILD_ASSETS_DIR", "value", "/.sh/build-assets"),
+                                        "name",
+                                        "BUILD_ASSETS_DIR",
+                                        "value",
+                                        "/runtime-workspace/build-assets"),
                                     Map.of("name", "HOST_ROOT", "value", "/host-root"),
                                     Map.of(
                                         "name",
@@ -337,6 +317,9 @@ public final class FloxRuntimeLayer extends Construct {
                                   Map.of("privileged", true, "runAsGroup", 0, "runAsUser", 0),
                                   "volumeMounts",
                                   new Object[] {
+                                    // /.sh = build-derived inputs from seed-bootstrap.
+                                    // Read-only: seed-bootstrap owns this path
+                                    // and the init container only reads from it.
                                     Map.of(
                                         "mountPath",
                                         "/.sh",
@@ -344,6 +327,18 @@ public final class FloxRuntimeLayer extends Construct {
                                         "runtime-installer-assets",
                                         "readOnly",
                                         true),
+                                    // /runtime-workspace = per-node mutable workspace
+                                    // at /var/run/k8s-daemonset.d/... on the host.
+                                    // Init container copies /.sh/* here, then `nix
+                                    // build` and `flox activate` write flake.lock
+                                    // and per-env manifest.lock here. Per-node, not
+                                    // shared across nodes; survives pod restarts;
+                                    // wiped on host reboot.
+                                    Map.of(
+                                        "mountPath",
+                                        "/runtime-workspace",
+                                        "name",
+                                        "runtime-installer-workspace"),
                                     Map.of(
                                         "mountPath",
                                         "/runtime-daemonset",
@@ -361,18 +356,36 @@ public final class FloxRuntimeLayer extends Construct {
                         Map.entry(
                             "volumes",
                             new Object[] {
+                              // Build-derived inputs from seed-bootstrap.
+                              // Read-only on the pod side: this path is owned
+                              // by the apply-time materializer
+                              // (FloxRuntimeAssets.writeInstallerAssetTree).
                               Map.of(
-                                  "configMap",
+                                  "hostPath",
                                   Map.of(
-                                      "defaultMode",
-                                      493,
-                                      "items",
-                                      floxRuntimeAssets.installerVolumeItems(),
-                                      "name",
-                                      RuntimeLayerRefs.FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP
-                                          .name()),
+                                      "path",
+                                      "/srv/host/k8s-daemonset.d/runtime/flox-runtime",
+                                      "type",
+                                      "Directory"),
                                   "name",
                                   "runtime-installer-assets"),
+                              // Per-node mutable workspace at /var/run/... on
+                              // the host. The init container copies the
+                              // build-derived inputs here, then `nix build` and
+                              // `flox activate` write flake.lock and per-env
+                              // manifest.lock here. Survives pod restarts,
+                              // wiped on host reboot. Cross-node lock sharing
+                              // is a future concern (single-master bootstrap
+                              // doesn't need it).
+                              Map.of(
+                                  "hostPath",
+                                  Map.of(
+                                      "path",
+                                      "/var/run/k8s-daemonset.d/runtime/flox-runtime",
+                                      "type",
+                                      "DirectoryOrCreate"),
+                                  "name",
+                                  "runtime-installer-workspace"),
                               Map.of(
                                   "configMap",
                                   Map.of(

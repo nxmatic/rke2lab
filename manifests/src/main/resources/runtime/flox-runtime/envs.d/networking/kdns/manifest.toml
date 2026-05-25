@@ -32,12 +32,9 @@ outputs = "all"
 outputs = "all"
   
   [install.kdns-debug]
-    # Use flake reference instead of hardcoded store-path
-    # This allows Flox to build kdns from the local flake when activating
-    # The flake.nix is in the parent directory (../flake.nix relative to .flox/)
-    flake = "path:.flox/env#kdns-debug"
-    # Old approach (containerd-shim-flox): used pre-materialized store-path
-    # store-path = "/nix/store/r74cv2j2wc0nbj81m904wn2gmqkv3g6r-kdns-debug-0.2.15"
+    # Workload package now lives in the parent runtime flake (see runtime/flox-runtime/flake.nix).
+    # The host materializer bind-mounts that flake at this absolute path on every guest.
+    flake = "path:/srv/host/k8s-daemonset.d/runtime/flox-runtime#kdns-debug"
 
 ## Environment Variables ---------------------------------------------
 ##  ... available for use in the activated environment

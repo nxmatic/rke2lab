@@ -14,7 +14,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -31,18 +30,15 @@ public final class FloxRuntimeAssets {
   private static final String ENV_RESOURCE_ROOT = FLOX_RESOURCE_ROOT + "/envs.d";
 
   /**
-   * Per-env files in the resource tree. {@code flake.nix} and {@code manifest.toml} are required;
-   * {@code flake.lock} and {@code manifest.lock} are shipped when present so the on-node flox
-   * activation reuses pinned inputs instead of re-locking from scratch. {@code env.json} and {@code
-   * .gitattributes} are synthesized in code (uniform across envs).
+   * The only per-env real file is {@code manifest.toml}; workload packages are produced by the
+   * parent runtime flake (see {@code runtime/flox-runtime/flake.nix}) and referenced from each
+   * env's {@code manifest.toml} via an absolute {@code flake =
+   * "path:/srv/host/.../runtime/flox-runtime#<output>"}. {@code env.json} and {@code
+   * .gitattributes} are synthesized in code (uniform across envs). Locks (flake.lock,
+   * manifest.lock) are owned by the parent runtime flake — the node regenerates each env's
+   * manifest.lock at activation time.
    */
-  private static final String FLAKE_NIX_RESOURCE = "flake.nix";
-
-  private static final String FLAKE_LOCK_RESOURCE = "flake.lock";
-
   private static final String MANIFEST_TOML_RESOURCE = "manifest.toml";
-
-  private static final String MANIFEST_LOCK_RESOURCE = "manifest.lock";
 
   private final Class<?> resourceAnchor;
   private final List<InstallerAsset> floxInstallerConfigMapAssets;
@@ -60,56 +56,83 @@ public final class FloxRuntimeAssets {
     return new Builder();
   }
 
-  public Map<String, String> installerConfigMapData() {
-    final LinkedHashMap<String, String> data = new LinkedHashMap<>();
+  /**
+   * Writes every installer asset directly to {@code targetDir}, laid out under the same relative
+   * paths the Kubernetes ConfigMap-volume mount used to expose. The DaemonSet now mounts {@code
+   * targetDir} as a hostPath instead of a ConfigMap because the aggregate asset payload is well
+   * over Kubernetes' per-object 1 MiB limit.
+   *
+   * <p>Layout produced (rooted at {@code targetDir}):
+   *
+   * <ul>
+   *   <li>{@code bin/runtime-installer.sh}, {@code bin/nri-plugin-run.sh}
+   *   <li>{@code flox-nri-overlay-hook.sh}, {@code flox-nri-chown-hook.sh}
+   *   <li>{@code build-assets/flake.nix}
+   *   <li>{@code
+   *       build-assets/envs.d/<category>/<env>/.flox/{env.json,env/flake.nix,env/manifest.toml,env/flake.lock,env/manifest.lock}}
+   *   <li>{@code build-assets/debug-tools/...}
+   *   <li>{@code build-assets/nri-plugin.tar.b64}, {@code build-assets/nri-plugin.manifest.json}
+   *   <li>{@code build-assets/<runtime-daemonset-script-policy entries>}
+   * </ul>
+   */
+  public void writeInstallerAssetTree(Path targetDir) throws IOException {
+    Files.createDirectories(targetDir);
+
     for (InstallerAsset asset : floxInstallerConfigMapAssets) {
-      data.put(asset.configMapKey(), normalizeConfigMapText(resolveAssetContent(asset)));
+      writeText(targetDir.resolve(asset.mountPath()), resolveAssetContent(asset));
     }
-    data.putAll(runtimeDaemonsetScriptPolicyAssets.configMapData());
-    data.put(NriPluginArchiveAssets.ARCHIVE_CONFIGMAP_KEY, nriPluginArchiveAssets.archiveBase64());
-    data.put(NriPluginArchiveAssets.MANIFEST_CONFIGMAP_KEY, nriPluginArchiveAssets.manifestJson());
-    return Map.copyOf(data);
+    for (Map.Entry<String, String> entry :
+        runtimeDaemonsetScriptPolicyAssets.relativePathsByKey().entrySet()) {
+      final String relativePath = installerBuildAssetPath(entry.getValue());
+      final String content = runtimeDaemonsetScriptPolicyAssets.configMapData().get(entry.getKey());
+      writeText(targetDir.resolve(relativePath), content == null ? "" : content);
+    }
+    Files.write(
+        ensureParent(
+            targetDir.resolve(
+                installerBuildAssetPath(NriPluginArchiveAssets.ARCHIVE_CONFIGMAP_KEY))),
+        nriPluginArchiveAssets.archiveBase64().getBytes(StandardCharsets.UTF_8));
+    Files.write(
+        ensureParent(
+            targetDir.resolve(
+                installerBuildAssetPath(NriPluginArchiveAssets.MANIFEST_CONFIGMAP_KEY))),
+        nriPluginArchiveAssets.manifestJson().getBytes(StandardCharsets.UTF_8));
   }
 
-  public Object[] installerVolumeItems() {
-    final LinkedHashMap<String, String> archiveItem =
-        new LinkedHashMap<>(
-            Map.of(
-                "key",
-                NriPluginArchiveAssets.ARCHIVE_CONFIGMAP_KEY,
-                "path",
-                "build-assets/" + NriPluginArchiveAssets.ARCHIVE_CONFIGMAP_KEY));
-    final LinkedHashMap<String, String> manifestItem =
-        new LinkedHashMap<>(
-            Map.of(
-                "key",
-                NriPluginArchiveAssets.MANIFEST_CONFIGMAP_KEY,
-                "path",
-                "build-assets/" + NriPluginArchiveAssets.MANIFEST_CONFIGMAP_KEY));
+  private static void writeText(Path target, String content) throws IOException {
+    final String normalized = normalizeConfigMapText(content);
+    Files.write(ensureParent(target), normalized.getBytes(StandardCharsets.UTF_8));
+    applyExecutableBitIfNeeded(target);
+  }
 
-    final List<Map<String, String>> items =
-        floxInstallerConfigMapAssets.stream()
-            .map(asset -> Map.of("key", asset.configMapKey(), "path", asset.mountPath()))
-            .toList();
-
-    final List<Map<String, String>> daemonsetItems =
-        runtimeDaemonsetScriptPolicyAssets.relativePathsByKey().entrySet().stream()
-            .map(
-                entry ->
-                    Map.of(
-                        "key", entry.getKey(), "path", installerBuildAssetPath(entry.getValue())))
-            .toList();
-
-    final Object[] out = new Object[items.size() + daemonsetItems.size() + 2];
-    for (int i = 0; i < items.size(); i++) {
-      out[i] = items.get(i);
+  /**
+   * Mark shell scripts executable. The host-mode trampoline exec's {@code bin/runtime-installer.sh}
+   * directly (no chmod step in between), so files we drop to disk need their exec bit set at write
+   * time. We treat any {@code .sh} extension and any file under a {@code bin/} directory as
+   * executable — matches the layout the legacy installer assumed.
+   */
+  private static void applyExecutableBitIfNeeded(Path target) throws IOException {
+    final String name = target.getFileName().toString();
+    final boolean nameLooksExecutable = name.endsWith(".sh");
+    final boolean underBinDir =
+        target.getParent() != null && "bin".equals(target.getParent().getFileName().toString());
+    if (!nameLooksExecutable && !underBinDir) {
+      return;
     }
-    for (int i = 0; i < daemonsetItems.size(); i++) {
-      out[items.size() + i] = daemonsetItems.get(i);
+    try {
+      Files.setPosixFilePermissions(
+          target, java.nio.file.attribute.PosixFilePermissions.fromString("rwxr-xr-x"));
+    } catch (UnsupportedOperationException ignored) {
+      // Non-POSIX filesystem (shouldn't happen on the host paths we target).
     }
-    out[items.size() + daemonsetItems.size()] = archiveItem;
-    out[items.size() + daemonsetItems.size() + 1] = manifestItem;
-    return out;
+  }
+
+  private static Path ensureParent(Path target) throws IOException {
+    final Path parent = target.getParent();
+    if (parent != null) {
+      Files.createDirectories(parent);
+    }
+    return target;
   }
 
   private static String installerBuildAssetPath(String relativePath) {
@@ -219,7 +242,6 @@ public final class FloxRuntimeAssets {
                   names
                       .filter(Files::isDirectory)
                       .filter(name -> Files.isRegularFile(name.resolve(MANIFEST_TOML_RESOURCE)))
-                      .filter(name -> Files.isRegularFile(name.resolve(FLAKE_NIX_RESOURCE)))
                       .forEach(
                           name ->
                               sink.add(
@@ -240,7 +262,6 @@ public final class FloxRuntimeAssets {
     // JAR entries are stored without a leading slash.
     final String prefix = ENV_RESOURCE_ROOT.substring(1) + "/"; // "runtime/flox-runtime/envs.d/"
     final Set<String> manifestSeen = new LinkedHashSet<>();
-    final Set<String> flakeSeen = new LinkedHashSet<>();
     final Enumeration<JarEntry> entries = jarFile.entries();
     while (entries.hasMoreElements()) {
       final JarEntry entry = entries.nextElement();
@@ -262,17 +283,11 @@ public final class FloxRuntimeAssets {
       if (fileName.indexOf('/') >= 0) {
         continue;
       }
-      final String envKey = tail.substring(0, secondSlash);
       if (MANIFEST_TOML_RESOURCE.equals(fileName)) {
-        manifestSeen.add(envKey);
-      } else if (FLAKE_NIX_RESOURCE.equals(fileName)) {
-        flakeSeen.add(envKey);
+        manifestSeen.add(tail.substring(0, secondSlash));
       }
     }
     for (String envKey : manifestSeen) {
-      if (!flakeSeen.contains(envKey)) {
-        continue;
-      }
       final int slash = envKey.indexOf('/');
       sink.add(new DiscoveredEnvironment(envKey.substring(0, slash), envKey.substring(slash + 1)));
     }
@@ -304,35 +319,25 @@ public final class FloxRuntimeAssets {
     }
 
     /**
-     * Register installer ConfigMap entries for one Flox environment. {@code flake.nix} and {@code
-     * manifest.toml} are required; {@code flake.lock} and {@code manifest.lock} are shipped when
-     * present in the resource tree (they're committed alongside the per-env flakes now that
-     * pre-built nix packages give the locks a meaningful at-rest meaning). {@code env.json} is
-     * synthesized in code from the env's identity.
+     * Register installer ConfigMap entries for one Flox environment. {@code manifest.toml} is the
+     * only per-env real file — workload packages live in the parent runtime flake and are
+     * referenced from manifest.toml by absolute path. {@code env.json} is synthesized in code from
+     * the env's identity. {@code manifest.lock} is cluster state, not a build artifact: the master
+     * writes it at first activation, peers read what's on the shared host filesystem.
      */
     private void addFloxEnvironmentAssets(DiscoveredEnvironment env) {
       final String envPrefix = env.envPrefix();
       final String resourcePrefix = ENV_RESOURCE_ROOT + "/" + envPrefix;
       final String configMapPrefix = env.configMapPrefix();
-      final String mountPrefix = "build-assets/envs.d/" + envPrefix;
+      // The runtime-installer's `flox activate --dir <env-dir>` resolves the
+      // env at <FLOX_RUNTIME_ROOT>/envs.d/<category>/<name>/, so write the env
+      // tree at the asset root — not under build-assets/.
+      final String mountPrefix = "envs.d/" + envPrefix;
 
-      // Per-env real files: classpath-backed.
-      addInstallerAsset(
-          configMapPrefix + "-flake-nix",
-          resourcePrefix + "/" + FLAKE_NIX_RESOURCE,
-          mountPrefix + "/.flox/env/flake.nix");
       addInstallerAsset(
           configMapPrefix + "-manifest-toml",
           resourcePrefix + "/" + MANIFEST_TOML_RESOURCE,
           mountPrefix + "/.flox/env/manifest.toml");
-      addOptionalInstallerAsset(
-          configMapPrefix + "-flake-lock",
-          resourcePrefix + "/" + FLAKE_LOCK_RESOURCE,
-          mountPrefix + "/.flox/env/flake.lock");
-      addOptionalInstallerAsset(
-          configMapPrefix + "-manifest-lock",
-          resourcePrefix + "/" + MANIFEST_LOCK_RESOURCE,
-          mountPrefix + "/.flox/env/manifest.lock");
 
       // Synthesized boilerplate: identical structure across envs.
       addInstallerAsset(
@@ -341,18 +346,6 @@ public final class FloxRuntimeAssets {
               .inlineContent(ENV_JSON_CONTENT)
               .mountPath(mountPrefix + "/.flox/env.json")
               .build());
-    }
-
-    /**
-     * Like {@link #addInstallerAsset(String, String, String)} but skips silently when the classpath
-     * resource is absent. Used for optional per-env files such as the lock files.
-     */
-    private void addOptionalInstallerAsset(
-        String configMapKey, String classpathResource, String mountPath) {
-      if (resourceAnchor.getResource(classpathResource) == null) {
-        return;
-      }
-      addInstallerAsset(configMapKey, classpathResource, mountPath);
     }
 
     private void addDefaultCoreInstallerAssets() {
@@ -370,8 +363,12 @@ public final class FloxRuntimeAssets {
           "flox-nri-chown-hook.sh",
           FLOX_RESOURCE_ROOT + "/flox-nri-chown-hook.sh",
           "flox-nri-chown-hook.sh");
-      addInstallerAsset(
-          "runtime-flake.nix", FLOX_RESOURCE_ROOT + "/flake.nix", "build-assets/flake.nix");
+      addInstallerAsset("runtime-flake.nix", FLOX_RESOURCE_ROOT + "/flake.nix", "flake.nix");
+      // Parent flake.lock and per-env manifest.lock are NOT shipped from the
+      // repo. Locks are cluster state (the master resolves them at first
+      // activation; peers read what the master wrote on the shared host
+      // filesystem). Pinning them at build time would conflate build artifact
+      // with cluster state and force a repo update on every input bump.
     }
 
     private void addDefaultDebugToolsInstallerAssets() {

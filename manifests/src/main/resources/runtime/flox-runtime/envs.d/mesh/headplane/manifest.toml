@@ -31,17 +31,21 @@ outputs = "all"
   pkg-path = "coreutils"
 outputs = "all"
 
+  # Workload packages now live in the parent runtime flake
+  # (runtime/flox-runtime/flake.nix). The host materializer bind-mounts that
+  # flake at this absolute path on every guest.
+
   [install.headplane]
-  flake = "path:.flox/env#headplane"
+  flake = "path:/srv/host/k8s-daemonset.d/runtime/flox-runtime#headplane"
 
   [install.headscale]
-  flake = "path:.flox/env#headscale"
+  flake = "path:/srv/host/k8s-daemonset.d/runtime/flox-runtime#headscale"
 
   [install.headplane-agent]
-  flake = "path:.flox/env#headplane-agent"
+  flake = "path:/srv/host/k8s-daemonset.d/runtime/flox-runtime#headplane-agent"
 
   [install.headplane-ssh-wasm]
-  flake = "path:.flox/env#headplane-ssh-wasm"
+  flake = "path:/srv/host/k8s-daemonset.d/runtime/flox-runtime#headplane-ssh-wasm"
 
 ## Other Environment Options -----------------------------------------
 [options]

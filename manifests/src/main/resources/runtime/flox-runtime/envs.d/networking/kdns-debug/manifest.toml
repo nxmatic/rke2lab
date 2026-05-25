@@ -31,7 +31,9 @@ schema-version = "1.10.0"
     pkg-path = "curl"
 
   [install.kdns-debug]
-    flake = "path:.flox/env#kdns-debug"
+    # Workload package now lives in the parent runtime flake (see runtime/flox-runtime/flake.nix).
+    # The host materializer bind-mounts that flake at this absolute path on every guest.
+    flake = "path:/srv/host/k8s-daemonset.d/runtime/flox-runtime#kdns-debug"
 
 [vars]
 

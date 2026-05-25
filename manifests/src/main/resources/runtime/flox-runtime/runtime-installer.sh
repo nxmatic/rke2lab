@@ -106,6 +106,17 @@ runtime::assets:root:resolve() {
 }
 
 installer::pod:materialize_assets() {
+	# /.sh and /host-root/srv/host/k8s-daemonset.d/runtime/flox-runtime are now
+	# the same directory through different mounts: seed-bootstrap wrote every
+	# build asset (bin/, build-assets/, envs.d/, debug-tools/, OCI hook scripts
+	# at the asset root, parent flake.nix at the asset root) directly to the
+	# host path before the DaemonSet started. We only materialize the things
+	# that genuinely live elsewhere:
+	#   1. Script-policy library (daemonset-logging.sh, daemonless-*.sh) — these
+	#      ride a separate ConfigMap mounted at /runtime-daemonset, so they
+	#      need to be copied into ${HOST_SCRIPT_ROOT}/.sh.d/.
+	#   2. OCI prestart hooks — runc looks them up in /usr/local/sbin on the
+	#      host, not under our daemonset asset root.
 	local policy_shell_root policy_shell_bin policy_shell_lib_dir policy_shell_log_dir
 
 	policy_shell_root="${HOST_SCRIPT_ROOT}"
@@ -113,161 +124,54 @@ installer::pod:materialize_assets() {
 	policy_shell_lib_dir="${HOST_SCRIPT_ROOT%/}/.sh.d"
 	policy_shell_log_dir="${HOST_SCRIPT_ROOT%/}/log"
 
-	# `BUILD_ASSETS_DIR` is the runtime-installer ConfigMap mounted by Kubernetes into this init
-	# container. Read archive payloads from that mount directly; only materialize extracted runtime
-	# content onto the host asset root.
-	# Canonical pattern: host-reexec-capable shell entrypoints go through
-	# daemonless::host_shell:binary:install, while sourced shell helper files go through
-	# daemonless::host_shell:library:install into <asset-root>/.sh.d.
-
 	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
 		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
 		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
 		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
 		daemonless::host_shell:layout:ensure "${HOST_SCRIPT_ROOT}"
 
-	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
-		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
-		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
-		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-		daemonless::host_shell:executable:install \
-		"${SCRIPT_MOUNT_DIR}/bin/runtime-installer.sh" \
-		"${HOST_SCRIPT_ROOT}" \
-		"runtime-installer.sh" >/dev/null
-	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
-		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
-		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
-		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-		daemonless::host_shell:library:install \
-		"${SCRIPT_POLICY_LIB_DIR}/daemonset-logging.sh" \
-		"${HOST_SCRIPT_ROOT}" \
-		"daemonset-logging.sh" >/dev/null
-	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
-		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
-		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
-		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-		daemonless::host_shell:library:install \
-		"${SCRIPT_POLICY_LIB_DIR}/daemonless-host-asset-materializer.sh" \
-		"${HOST_SCRIPT_ROOT}" \
-		"daemonless-host-asset-materializer.sh" >/dev/null
-	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
-		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
-		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
-		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-		daemonless::host_shell:library:install \
-		"${SCRIPT_POLICY_LIB_DIR}/daemonless-trampoline.sh" \
-		"${HOST_SCRIPT_ROOT}" \
-		"daemonless-trampoline.sh" >/dev/null
-	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
-		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
-		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
-		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-		daemonless::host_shell:library:install \
-		"${SCRIPT_POLICY_LIB_DIR}/daemonless-host-shell-policy.sh" \
-		"${HOST_SCRIPT_ROOT}" \
-		"daemonless-host-shell-policy.sh" >/dev/null
-
-	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
-		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
-		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
-		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-		install -D -m 0644 "${BUILD_ASSETS_DIR}/flake.nix" "${HOST_SCRIPT_ROOT}/flake.nix"
-
-	# OCI prestart hooks live on the host filesystem because runc invokes them
-	# from the host runtime, not from this init container. ${HOST_ROOT} is the
-	# bind-mounted host root.
-	install -D -m 0755 "${SCRIPT_MOUNT_DIR}/flox-nri-overlay-hook.sh" "${HOST_ROOT}/usr/local/sbin/flox-nri-overlay-hook.sh"
-	install -D -m 0755 "${SCRIPT_MOUNT_DIR}/flox-nri-chown-hook.sh" "${HOST_ROOT}/usr/local/sbin/flox-nri-chown-hook.sh"
-	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
-		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
-		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
-		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-		daemonless::host_shell:library:install \
-		"${BUILD_ASSETS_DIR}/debug-tools/.sh.d/rke2lab-debug-tooling.sh" \
-		"${HOST_SCRIPT_ROOT}/debug-tools" \
-		"rke2lab-debug-tooling.sh" >/dev/null
-	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/attach_live_flox_runtime_strace.sh" "${HOST_SCRIPT_ROOT}/debug-tools/attach_live_flox_runtime_strace.sh"
-	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/crictl-kdns-repro.sh" "${HOST_SCRIPT_ROOT}/debug-tools/crictl-kdns-repro.sh"
-	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/kdns-containerd-bundle-watch.sh" "${HOST_SCRIPT_ROOT}/debug-tools/kdns-containerd-bundle-watch.sh"
-	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/kdns-containerd-remote-capture.sh" "${HOST_SCRIPT_ROOT}/debug-tools/kdns-containerd-remote-capture.sh"
-	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/master-runtime-pprof.sh" "${HOST_SCRIPT_ROOT}/debug-tools/master-runtime-pprof.sh"
-	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/rke2lab-dlv.sh" "${HOST_SCRIPT_ROOT}/debug-tools/rke2lab-dlv.sh"
-	install -D -m 0755 "${BUILD_ASSETS_DIR}/debug-tools/rke2lab-runtime-dlv.sh" "${HOST_SCRIPT_ROOT}/debug-tools/rke2lab-runtime-dlv.sh"
-
-	# Install flox environment files from ConfigMap to host filesystem
-	# Dynamically discover and install flox environments based on ConfigMap key pattern:
-	# {category}-{name}-flox-env-{file} -> {category}/{name}/.flox/env/{file}
-	installer::flox:install_environments
-}
-
-installer::flox:install_environments() {
-	local category name file_name
-	local -a discovered_envs=()
-
-	echo "=== Installing flox environments from ConfigMap ==="
-	echo "BUILD_ASSETS_DIR: ${BUILD_ASSETS_DIR}"
-	echo "HOST_SCRIPT_ROOT: ${HOST_SCRIPT_ROOT}"
-
-	local env_root="${BUILD_ASSETS_DIR}/envs.d"
-	if [[ ! -d "${env_root}" ]]; then
-		echo "Warning: no envs.d directory at ${env_root}; nothing to install"
-		return 0
-	fi
-
-	echo "ConfigMap envs.d mount contents:"
-	find "${env_root}" -type f | head -30
-
-	# Iterate envs.d/<category>/<name>/.flox tree.
-	# Locks (flake.lock, manifest.lock, env.lock) are intentionally absent —
-	# the node regenerates them via `flox activate`.
-	for category_dir in "${env_root}"/*; do
-		[[ -d "${category_dir}" ]] || continue
-		category="${category_dir##*/}"
-
-		for name_dir in "${category_dir}"/*; do
-			[[ -d "${name_dir}" ]] || continue
-			name="${name_dir##*/}"
-
-			local flox_dir="${name_dir}/.flox"
-			[[ -d "${flox_dir}" ]] || continue
-
-			echo "Found environment: ${category}/${name}"
-			discovered_envs+=("${category}/${name}")
-
-			local target_root="${HOST_SCRIPT_ROOT}/envs.d/${category}/${name}/.flox"
-
-			[[ -f "${flox_dir}/env.json" ]] &&
-				install -D -m 0644 "${flox_dir}/env.json" "${target_root}/env.json"
-
-			if [[ -d "${flox_dir}/env" ]]; then
-				shopt -s dotglob
-				for env_file in "${flox_dir}/env"/*; do
-					[[ -f "${env_file}" ]] || continue
-					file_name="${env_file##*/}"
-					install -D -m 0644 "${env_file}" "${target_root}/env/${file_name}"
-				done
-				shopt -u dotglob
-			fi
-		done
+	# Script-policy library — separate ConfigMap mount, real cross-volume copy.
+	for lib in daemonset-logging.sh daemonless-host-asset-materializer.sh \
+		daemonless-trampoline.sh daemonless-host-shell-policy.sh; do
+		DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
+			DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
+			DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
+			DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
+			daemonless::host_shell:library:install \
+			"${SCRIPT_POLICY_LIB_DIR}/${lib}" \
+			"${HOST_SCRIPT_ROOT}" \
+			"${lib}" >/dev/null
 	done
 
-	echo "=== Installed ${#discovered_envs[@]} flox environments ==="
+	# OCI prestart hooks — runc looks them up in /usr/local/sbin on the host
+	# filesystem (bind-mounted at ${HOST_ROOT} inside this pod), not under
+	# our daemonset asset root.
+	install -D -m 0755 "${SCRIPT_MOUNT_DIR}/flox-nri-overlay-hook.sh" "${HOST_ROOT}/usr/local/sbin/flox-nri-overlay-hook.sh"
+	install -D -m 0755 "${SCRIPT_MOUNT_DIR}/flox-nri-chown-hook.sh" "${HOST_ROOT}/usr/local/sbin/flox-nri-chown-hook.sh"
 }
 
-installer::host:flox:prebuild_env_packages() {
-	local flox_env_dir="$1"
+installer::host:flox:prebuild_runtime_packages() {
+	# Pre-build every workload package the parent runtime flake exposes for the
+	# current system. Workloads live in the parent flake (kdns, kdns-debug,
+	# headplane, headscale, …); per-env manifest.toml just references them by
+	# absolute path. Doing one pre-build pass against the parent flake populates
+	# /nix/store once and means each env's `flox activate` is a cache hit.
+	#
+	# Locks are *cluster state*, not build artifacts: the master writes flake.lock
+	# next to the parent flake on first activation; peers reading from the same
+	# host filesystem see the master's lock and skip resolution. We deliberately
+	# omit `--no-write-lock-file` so that first run produces the lock; subsequent
+	# runs are idempotent because nix detects the lock is current.
+	local flake_dir="$1"
 	local nix_system="$2"
 	local pkg_names_json pkg_name
 
-	# Enumerate `packages.<system>.*` directly from the path flake. We only
-	# evaluate the attrset (not its values) so this stays cheap even when the
-	# flake exposes large overlays.
 	pkg_names_json="$(nix \
 		--extra-experimental-features 'nix-command flakes' \
 		--option pure-eval false \
-		eval --json --impure \
-		--expr "builtins.attrNames (builtins.getFlake \"path:${flox_env_dir}\").packages.${nix_system}")" || {
-		echo "  ✗ Failed to enumerate packages for ${flox_env_dir}" >&2
+		eval --json \
+		--expr "builtins.attrNames (builtins.getFlake \"path:${flake_dir}\").packages.${nix_system}")" || {
+		echo "  ✗ Failed to enumerate packages for ${flake_dir}" >&2
 		return 1
 	}
 
@@ -278,8 +182,7 @@ installer::host:flox:prebuild_env_packages() {
 			--extra-experimental-features 'nix-command flakes' \
 			--option pure-eval false --print-build-logs \
 			build --no-link \
-			--no-write-lock-file --no-update-lock-file \
-			"path:${flox_env_dir}#packages.${nix_system}.${pkg_name}^*" || {
+			"path:${flake_dir}#packages.${nix_system}.${pkg_name}^*" || {
 			echo "  ✗ Pre-build of ${pkg_name} failed" >&2
 			return 1
 		}
@@ -288,13 +191,15 @@ installer::host:flox:prebuild_env_packages() {
 
 installer::host:flox:activate_environments() {
 	echo "=== Pre-activating flox environments (host mode) ==="
-	echo "This fully evaluates each env against the current /nix/store and"
-	echo "regenerates flake.lock / manifest.lock so paths are fresh after upgrades."
+	echo "Workload packages live in the parent runtime flake; per-env manifest.toml"
+	echo "references them by absolute path. The committed flake.lock and (when"
+	echo "present) per-env manifest.lock keep every node activating from identical"
+	echo "pinned state — no node-local re-locking."
 
 	local env_root="${FLOX_RUNTIME_ROOT}/envs.d"
+	local runtime_flake_dir="${FLOX_RUNTIME_ROOT}"
 	local -a discovered_envs=()
-	local category name category_dir name_dir env_path env_path_dir flox_dir nix_system
-	local -a git_cmd=()
+	local category name category_dir name_dir env_path env_path_dir nix_system
 
 	nix_system="$(runtime::runtime:nix-system:resolve)"
 
@@ -321,41 +226,11 @@ installer::host:flox:activate_environments() {
 		return 0
 	fi
 
-	# Turn `.flox/env/` into a git working tree so nix's path-flake fetcher uses
-	# the gitignore-aware enumeration (the `*.lock` rule in .flox/env/.gitignore
-	# excludes manifest.lock/flake.lock) when computing the path's narHash. The
-	# git working tree must live at the path-flake root itself: nix's `path:`
-	# fetcher looks for `.git` at or inside the path-input root, not above it.
-	# Without git, nix walks every file under that path and the hash drifts as
-	# soon as flox writes manifest.lock, triggering `flake.cc:37` assertion
-	# failures during realise.
-	#
-	# Then `git clean -fdX` drops every gitignored file, which both forces a
-	# full re-evaluation (stale lockfiles from a previous install go away so
-	# flox rebuilds against the current store paths) and matches what nix's
-	# path-flake walker will see.
-	for env_path in "${discovered_envs[@]}"; do
-		env_path_dir="${env_root}/${env_path}"
-		flox_dir="${env_path_dir}/.flox/env"
-		git_cmd=(git -C "${flox_dir}")
-
-		if [[ ! -d "${flox_dir}/.git" ]]; then
-			"${git_cmd[@]}" init -q
-			"${git_cmd[@]}" config user.email installer@rke2lab
-			"${git_cmd[@]}" config user.name rke2lab-installer
-			"${git_cmd[@]}" add -A
-			"${git_cmd[@]}" commit -q -m "rke2lab flox env baseline" --allow-empty
-		fi
-
-		"${git_cmd[@]}" clean -fdXq
-	done
+	echo "Pre-building parent runtime flake packages once..."
+	installer::host:flox:prebuild_runtime_packages "${runtime_flake_dir}" "${nix_system}" || return 1
 
 	for env_path in "${discovered_envs[@]}"; do
 		env_path_dir="${env_root}/${env_path}"
-		flox_dir="${env_path_dir}/.flox/env"
-
-		echo "Pre-building flake packages for ${env_path}..."
-		installer::host:flox:prebuild_env_packages "${flox_dir}" "${nix_system}" || return 1
 
 		echo "Activating ${env_path}..."
 		if (cd "${env_path_dir}" && flox -vvv activate -- echo "  ✓ ${env_path} environment resolved"); then
