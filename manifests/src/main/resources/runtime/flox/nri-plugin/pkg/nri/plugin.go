@@ -33,6 +33,11 @@ const (
 	floxEnvBaseDir = "/var/run/k8s-daemonset.d/runtime/flox/environment.d"
 	floxOverlayHookPath       = "/usr/local/sbin/flox-nri-overlay-hook.sh"
 	floxChownHookPath         = "/usr/local/sbin/flox-nri-chown-hook.sh"
+	// System-wide flox config maintained on the host by rke2lab-env-load.sh.
+	// We bind-mount it read-only into every flox-injected container so the in-
+	// container `flox` invocation honors host policy (telemetry off, channel
+	// lock, ...) without each pod having to set FLOX_* env vars.
+	floxSystemConfigPath      = "/etc/flox.toml"
 	defaultDebugPort          = "2345"
 	defaultUID                = "0"
 	defaultGID                = "0"
@@ -214,6 +219,21 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 		CreateContainer: []*api.Hook{nixStoreOverlayHook, floxEnvOverlayHook},
 		Prestart:        []*api.Hook{chownHook},
 	})
+
+	// Project host /etc/flox.toml into the container if the host has one. The
+	// host file is the system-wide opt-out for flox telemetry (and any future
+	// host-wide flox policy). Read-only — pods can't shadow it. Skipping
+	// silently when the host file is absent keeps the plugin permissive on
+	// nodes that haven't run rke2lab-env-load.sh yet.
+	if _, err := os.Stat(floxSystemConfigPath); err == nil {
+		adjustment.AddMount(&api.Mount{
+			Source:      floxSystemConfigPath,
+			Destination: floxSystemConfigPath,
+			Type:        "bind",
+			Options:     []string{"bind", "ro"},
+		})
+		log.Printf("Bind-mounted host %s into container", floxSystemConfigPath)
+	}
 
 	log.Printf("Successfully configured Flox environment injection for container %s/%s", pod.GetNamespace(), container.GetName())
 

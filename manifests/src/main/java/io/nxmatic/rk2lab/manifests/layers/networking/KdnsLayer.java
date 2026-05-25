@@ -218,7 +218,7 @@ public final class KdnsLayer extends Construct {
     // dlv, etc. The mounted flox env is also swapped to networking/kdns-debug
     // so delve and friends are available inside $HOME/.flox.
     final FloxDebugPolicy debugPolicy = ManifestSynthesisContext.current().floxDebugPolicy();
-    final String containerImage = debugPolicy.image("flox/empty:1.0.0");
+    final String containerImage = debugPolicy.image();
     final List<String> containerCommand =
         debugPolicy.command(List.of("flox", "activate", "--dir", "/root", "--", "kdns"));
     final String floxEnvironment =

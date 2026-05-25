@@ -32,7 +32,7 @@ public final class DelveSidecarProfile {
     this.enabledEnvName = enabledEnvName;
     this.portEnvName = portEnvName;
     this.portValue = portValue;
-    this.image = ManifestSynthesisContext.current().floxDebugPolicy().image("flox/empty:1.0.0");
+    this.image = ManifestSynthesisContext.current().floxDebugPolicy().image();
   }
 
   public Map<String, String> workloadAnnotations(final Map<String, String> extra) {

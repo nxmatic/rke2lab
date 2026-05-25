@@ -19,6 +19,15 @@ import java.util.List;
  */
 public record FloxDebugPolicy(boolean enabled) {
 
+  /**
+   * Single source of truth for the production carrier image. Workload binaries come from the flox
+   * env overlay; the carrier just needs a {@code /bin/sh} for {@code flox activate} to bootstrap
+   * from (flox shells out to a shell as part of activation). Busybox provides that with applets at
+   * {@code /sbin} + {@code /bin}, which the installer appends to {@code
+   * NIX_DEFAULT_PROFILE_BIN_STORE_PATH} so they sit at the tail of the runtime PATH.
+   */
+  private static final String PROD_IMAGE = "busybox:stable";
+
   private static final String DEBUG_IMAGE = "alpine:latest";
   private static final List<String> PAUSE_COMMAND = List.of("/bin/sleep", "infinity");
   private static final FloxDebugPolicy DISABLED = new FloxDebugPolicy(false);
@@ -43,9 +52,14 @@ public record FloxDebugPolicy(boolean enabled) {
     return PAUSE_COMMAND;
   }
 
-  /** Returns {@code prodImage} unless debug is enabled, in which case {@link #debugImage()}. */
-  public String image(final String prodImage) {
-    return enabled ? DEBUG_IMAGE : prodImage;
+  /** The single prod-image identifier shared by every flox-injected workload carrier. */
+  public String prodImage() {
+    return PROD_IMAGE;
+  }
+
+  /** Returns {@link #prodImage()} unless debug is enabled, in which case {@link #debugImage()}. */
+  public String image() {
+    return enabled ? DEBUG_IMAGE : PROD_IMAGE;
   }
 
   /** Returns {@code prodCommand} unless debug is enabled, in which case {@link #pauseCommand()}. */

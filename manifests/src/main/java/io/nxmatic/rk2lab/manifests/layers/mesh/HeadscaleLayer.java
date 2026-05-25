@@ -16,8 +16,7 @@ import software.constructs.Construct;
 public final class HeadscaleLayer extends Construct {
 
   private static final String HEADSCALE_NAMESPACE = MeshLayerRefs.MESH_SYSTEM_NAMESPACE.name();
-  private final String floxImage =
-      ManifestSynthesisContext.current().floxDebugPolicy().image("flox/empty:1.0.0");
+  private final String floxImage = ManifestSynthesisContext.current().floxDebugPolicy().image();
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("mesh", "headscale");

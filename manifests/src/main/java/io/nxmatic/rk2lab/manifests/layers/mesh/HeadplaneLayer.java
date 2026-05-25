@@ -31,7 +31,7 @@ public final class HeadplaneLayer extends Construct {
       final Construct scope, final String id, final ManifestUnitReferenceRegistry registry) {
     super(scope, id);
     this.registry = registry;
-    this.floxImage = ManifestSynthesisContext.current().floxDebugPolicy().image("flox/empty:1.0.0");
+    this.floxImage = ManifestSynthesisContext.current().floxDebugPolicy().image();
 
     ApiObject serviceAccount = createServiceAccount();
     ApiObject envConfigMap = createEnvConfigMap();

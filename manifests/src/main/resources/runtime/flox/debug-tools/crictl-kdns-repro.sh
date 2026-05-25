@@ -202,7 +202,7 @@ container_config = {
         "name": first_path(container_cfg, ("metadata", "name")) or "kdns",
     },
     "image": {
-        "image": image_name or "flox/empty:1.0.0",
+        "image": image_name or "busybox:stable",
     },
     "command": first_path(container_cfg, ("command",)) or ["kdns"],
     "args": first_path(container_cfg, ("args",)) or [],

@@ -472,12 +472,16 @@ flox::env:configmap:create() {
 
 	echo "Creating/updating flox-env ConfigMap with runtime-resolved paths"
 
-	# Resolve the Nix default profile to get actual store path
+	# Resolve the Nix default profile to get actual store path. Append /sbin
+	# and /bin so the carrier image's busybox applets (sh, env, …) remain on
+	# PATH after `flox activate` swaps the profile in — flox needs `/bin/sh`
+	# to bootstrap activation, and busybox is the only thing in the prod
+	# carrier image (see FloxDebugPolicy.PROD_IMAGE).
 	nix_profile_path="$(realpath /nix/var/nix/profiles/default)"
-	nix_profile_bin_path="${nix_profile_path}/bin"
+	nix_profile_bin_path="${nix_profile_path}/bin:/sbin:/bin"
 
 	echo "  Resolved Nix profile: ${nix_profile_path}"
-	echo "  Nix profile bin path: ${nix_profile_bin_path}"
+	echo "  PATH (with busybox tail): ${nix_profile_bin_path}"
 
 	# Get the Flox runtime profile bin path (created by flox::runtime:profile:ensure)
 	flox_runtime_profile_bin="${FLOX_RUNTIME_PROFILE_BIN:-/nix/var/nix/profiles/flox-runtime/bin}"
