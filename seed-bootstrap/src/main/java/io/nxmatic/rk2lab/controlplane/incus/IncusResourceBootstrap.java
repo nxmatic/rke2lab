@@ -392,19 +392,6 @@ public final class IncusResourceBootstrap {
       }
     }
 
-    /**
-     * Best-effort variant: swallow IOExceptions instead of propagating. Used to clean up leftover
-     * paths from prior layouts (e.g., the old {@code runtime/flox-runtime/} directory after the
-     * rename to {@code runtime/flox/}) where failure shouldn't block the apply.
-     */
-    private static void deleteSubtreeSilently(Path root) {
-      try {
-        deleteSubtree(root);
-      } catch (IOException ignored) {
-        // best-effort: leftover stays, next run retries
-      }
-    }
-
     private static void deleteSynthScratchSilently(Path scratch) {
       try (Stream<Path> stream = Files.walk(scratch)) {
         stream
