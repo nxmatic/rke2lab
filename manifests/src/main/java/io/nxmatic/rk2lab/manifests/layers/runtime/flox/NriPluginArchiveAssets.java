@@ -46,6 +46,14 @@ public final class NriPluginArchiveAssets {
     return archiveBundle.archiveBase64();
   }
 
+  /**
+   * Raw archive bytes. Used by the hostPath materializer in seed-bootstrap to write the archive
+   * directly to disk without the base64 round-trip the ConfigMap path required.
+   */
+  public byte[] archiveBytes() {
+    return archiveBundle.archiveBytes().clone();
+  }
+
   public String manifestJson() {
     return archiveBundle.manifestJson();
   }

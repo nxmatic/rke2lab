@@ -34,6 +34,7 @@ import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributorRegistry;
+import io.nxmatic.rk2lab.manifests.layers.runtime.flox.FloxRuntimeAssets;
 import io.nxmatic.rk2lab.netplan.ClusterNetworkBlueprint;
 import java.io.IOException;
 import java.net.JarURLConnection;
@@ -198,6 +199,7 @@ public final class IncusResourceBootstrap {
       classpathAssetMaterializer.materializeHostSystemdAssets(
           localPaths.manifestsRoot().resolve("host"));
       this.manifestSynthSummary = synthesizeAndExplodeManifests(localPaths.manifestsRoot(), policy);
+      materializeFloxRuntimeInstallerAssets(localPaths.daemonsetRoot());
       final List<String> hostMountNotes = hostMountSourceVerifier.ensureSources(localPaths);
       this.systemdProvisioningSummary =
           SystemdProvisioningInventory.summarize(localPaths, hostMountNotes);
@@ -340,6 +342,27 @@ public final class IncusResourceBootstrap {
     }
 
     /**
+     * Lay the flox runtime-installer build inputs out under {@code
+     * <daemonsetRoot>/runtime/flox-runtime/}, which incus bind-mounts into each guest at {@code
+     * /srv/host/k8s-daemonset.d/runtime/flox-runtime/} — read-only on the pod side. The init
+     * container copies these inputs into a per-node mutable workspace at {@code
+     * /var/run/k8s-daemonset.d/runtime/flox-runtime/} at startup; nix and flox write locks there.
+     * Since this path is build-only on the pod side, the wipe can be wholesale.
+     */
+    private void materializeFloxRuntimeInstallerAssets(Path daemonsetRoot) {
+      final Path target = daemonsetRoot.resolve("runtime").resolve("flox-runtime");
+      try {
+        deleteSubtree(target);
+        Files.createDirectories(target);
+        FloxRuntimeAssets.builder().build().writeInstallerAssetTree(target);
+        logInfo("phase prepareHostState: flox runtime-installer inputs written to " + target);
+      } catch (IOException ex) {
+        throw new IllegalStateException(
+            "Failed to materialize flox runtime-installer asset tree at " + target, ex);
+      }
+    }
+
+    /**
      * Remove every direct child of {@code manifestsRoot} except {@code host/} (which carries the
      * non-synthesized systemd-scripts and systemd-units the materializer just wrote). Stale layer
      * directories from a prior synth would otherwise leak into the bind-mounted host view.
@@ -359,6 +382,9 @@ public final class IncusResourceBootstrap {
     }
 
     private static void deleteSubtree(Path root) throws IOException {
+      if (!Files.exists(root)) {
+        return;
+      }
       try (Stream<Path> stream = Files.walk(root)) {
         final List<Path> entries = stream.sorted(java.util.Comparator.reverseOrder()).toList();
         for (Path entry : entries) {
