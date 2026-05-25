@@ -14,9 +14,13 @@
   <name>rke2lab-manifests</name>
 
   <properties>
-    <rk2lab.debug.sidecar.enabled>false</rk2lab.debug.sidecar.enabled>
-    <rk2lab.debug.sidecar.domain.networking.enabled>${rk2lab.debug.sidecar.enabled}</rk2lab.debug.sidecar.domain.networking.enabled>
-    <rk2lab.debug.sidecar.layer.networking.kdns.enabled>true</rk2lab.debug.sidecar.layer.networking.kdns.enabled>
+    <!--
+      Build-time synthesis was removed: the cdk8s synth and explode steps now
+      run inside seed-bootstrap at pulumi-up time so ControlplanePolicy can
+      drive FloxDebugPolicy. The shaded manifests-exec.jar still exposes the
+      Main CLI for ad-hoc synthesis (`java -jar … synthesize`); pass debug
+      knobs via -D system properties on that invocation if needed.
+    -->
   </properties>
 
   <dependencyManagement>
@@ -84,65 +88,6 @@
             <exclude>logback.xml</exclude>
           </excludes>
         </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>exec-maven-plugin</artifactId>
-        <configuration>
-          <mainClass>io.nxmatic.rk2lab.manifests.Main</mainClass>
-          <systemProperties>
-            <systemProperty>
-              <key>rk2lab.manifests.outdir</key>
-              <value>${project.build.directory}</value>
-            </systemProperty>
-            <systemProperty>
-              <key>rk2lab.manifests.file</key>
-              <value>${project.build.directory}/manifests.yaml</value>
-            </systemProperty>
-            <systemProperty>
-              <key>rk2lab.debug.sidecar.enabled</key>
-              <value>${rk2lab.debug.sidecar.enabled}</value>
-            </systemProperty>
-            <systemProperty>
-              <key>rk2lab.debug.sidecar.domain.networking.enabled</key>
-              <value>${rk2lab.debug.sidecar.domain.networking.enabled}</value>
-            </systemProperty>
-            <systemProperty>
-              <key>rk2lab.debug.sidecar.layer.networking.kdns.enabled</key>
-              <value>${rk2lab.debug.sidecar.layer.networking.kdns.enabled}</value>
-            </systemProperty>
-          </systemProperties>
-        </configuration>
-        <executions>
-          <execution>
-            <id>synthesize-manifests</id>
-            <goals>
-              <goal>java</goal>
-            </goals>
-            <phase>prepare-package</phase>
-            <configuration>
-              <arguments>
-                <argument>synthesize</argument>
-              </arguments>
-            </configuration>
-          </execution>
-          <execution>
-            <id>explode-manifests</id>
-            <goals>
-              <goal>exec</goal>
-            </goals>
-            <phase>prepare-package</phase>
-            <configuration>
-              <executable>bash</executable>
-              <workingDirectory>${project.basedir}</workingDirectory>
-              <arguments>
-                <argument>${project.basedir}/bin/explode-manifests.sh</argument>
-                <argument>${project.build.directory}/manifests.yaml</argument>
-                <argument>${project.build.directory}/manifests.d</argument>
-              </arguments>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

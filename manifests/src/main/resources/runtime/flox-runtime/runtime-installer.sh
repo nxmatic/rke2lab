@@ -208,16 +208,16 @@ installer::flox:install_environments() {
 	echo "BUILD_ASSETS_DIR: ${BUILD_ASSETS_DIR}"
 	echo "HOST_SCRIPT_ROOT: ${HOST_SCRIPT_ROOT}"
 
-	local env_root="${BUILD_ASSETS_DIR}/env.d"
+	local env_root="${BUILD_ASSETS_DIR}/envs.d"
 	if [[ ! -d "${env_root}" ]]; then
-		echo "Warning: no env.d directory at ${env_root}; nothing to install"
+		echo "Warning: no envs.d directory at ${env_root}; nothing to install"
 		return 0
 	fi
 
-	echo "ConfigMap env.d mount contents:"
+	echo "ConfigMap envs.d mount contents:"
 	find "${env_root}" -type f | head -30
 
-	# Iterate env.d/<category>/<name>/.flox tree.
+	# Iterate envs.d/<category>/<name>/.flox tree.
 	# Locks (flake.lock, manifest.lock, env.lock) are intentionally absent —
 	# the node regenerates them via `flox activate`.
 	for category_dir in "${env_root}"/*; do
@@ -234,7 +234,7 @@ installer::flox:install_environments() {
 			echo "Found environment: ${category}/${name}"
 			discovered_envs+=("${category}/${name}")
 
-			local target_root="${HOST_SCRIPT_ROOT}/env.d/${category}/${name}/.flox"
+			local target_root="${HOST_SCRIPT_ROOT}/envs.d/${category}/${name}/.flox"
 
 			[[ -f "${flox_dir}/env.json" ]] &&
 				install -D -m 0644 "${flox_dir}/env.json" "${target_root}/env.json"
@@ -291,7 +291,7 @@ installer::host:flox:activate_environments() {
 	echo "This fully evaluates each env against the current /nix/store and"
 	echo "regenerates flake.lock / manifest.lock so paths are fresh after upgrades."
 
-	local env_root="${FLOX_RUNTIME_ROOT}/env.d"
+	local env_root="${FLOX_RUNTIME_ROOT}/envs.d"
 	local -a discovered_envs=()
 	local category name category_dir name_dir env_path env_path_dir flox_dir nix_system
 	local -a git_cmd=()
@@ -299,7 +299,7 @@ installer::host:flox:activate_environments() {
 	nix_system="$(runtime::runtime:nix-system:resolve)"
 
 	if [[ ! -d "${env_root}" ]]; then
-		echo "Warning: env.d not present at ${env_root}; nothing to activate"
+		echo "Warning: envs.d not present at ${env_root}; nothing to activate"
 		return 0
 	fi
 

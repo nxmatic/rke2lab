@@ -1,7 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.mesh;
 
-import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestSynthesisContext;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
@@ -16,12 +16,12 @@ import software.constructs.Construct;
 public final class HeadplaneLayer extends Construct {
 
   private static final String HEADSCALE_NAMESPACE = MeshLayerRefs.MESH_SYSTEM_NAMESPACE.name();
-  private static final String FLOX_IMAGE = FloxDebugPolicy.get().image("flox/empty:1.0.0");
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("mesh", "headplane");
 
   private final ManifestUnitReferenceRegistry registry;
+  private final String floxImage;
 
   public HeadplaneLayer(final Construct scope, final String id) {
     this(scope, id, null);
@@ -31,6 +31,7 @@ public final class HeadplaneLayer extends Construct {
       final Construct scope, final String id, final ManifestUnitReferenceRegistry registry) {
     super(scope, id);
     this.registry = registry;
+    this.floxImage = ManifestSynthesisContext.current().floxDebugPolicy().image("flox/empty:1.0.0");
 
     ApiObject serviceAccount = createServiceAccount();
     ApiObject envConfigMap = createEnvConfigMap();
@@ -669,7 +670,7 @@ public final class HeadplaneLayer extends Construct {
                         List.of(
                             Map.ofEntries(
                                 Map.entry("name", "headplane"),
-                                Map.entry("image", FLOX_IMAGE),
+                                Map.entry("image", floxImage),
                                 Map.entry("command", List.of("headplane")),
                                 Map.entry("args", List.of("serve")),
                                 Map.entry(
@@ -795,7 +796,7 @@ public final class HeadplaneLayer extends Construct {
                                 "name",
                                 "setup-agent",
                                 "image",
-                                FLOX_IMAGE,
+                                floxImage,
                                 "command",
                                 List.of(
                                     "sh",

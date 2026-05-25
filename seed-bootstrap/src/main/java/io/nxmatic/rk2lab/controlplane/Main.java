@@ -140,8 +140,10 @@ public final class Main {
     final Object systemdAdapterResourceUrn;
     final Object registryResourceUrn;
     final Object imageBuildResourceUrn;
+    final Object manifestSynthResourceUrn;
     final Map<String, Object> registrySummary;
     final Map<String, Object> imageBuildSummary;
+    final Map<String, Object> manifestSynthSummary;
     final Object systemdRuntimeStatusSummary;
     if (isPulumiEngineAvailable()) {
       final SystemdAdapterResource systemdAdapterResource =
@@ -189,6 +191,14 @@ public final class Main {
       imageBuildResourceUrn = imageBuildResource.urn();
       imageBuildSummary = imageBuildResource.summary();
 
+      final SeedManifestSynthResource manifestSynthResource =
+          new SeedManifestSynthResource(
+              "seed-manifest-synth",
+              bootstrapResult.manifestSynthSummary(),
+              bootstrapResult.readinessDependency());
+      manifestSynthResourceUrn = manifestSynthResource.urn();
+      manifestSynthSummary = manifestSynthResource.summary();
+
       systemdRuntimeStatusSummary =
           Deployment.getInstance().isDryRun()
               ? SeedSystemdAdapterRuntimeStatusSnapshot.deferredPreview(config)
@@ -202,6 +212,11 @@ public final class Main {
       systemdAdapterResourceUrn = "";
       registryResourceUrn = "";
       imageBuildResourceUrn = "";
+      manifestSynthResourceUrn = "";
+      manifestSynthSummary =
+          bootstrapResult.manifestSynthSummary() == null
+              ? Map.of()
+              : Map.copyOf(bootstrapResult.manifestSynthSummary());
       registrySummary =
           Map.of(
               "checksum",
@@ -310,6 +325,7 @@ public final class Main {
     outputs.put("systemdAdapterResourceUrn", systemdAdapterResourceUrn);
     outputs.put("registryResourceUrn", registryResourceUrn);
     outputs.put("seedImageBuildResourceUrn", imageBuildResourceUrn);
+    outputs.put("seedManifestSynthResourceUrn", manifestSynthResourceUrn);
     outputs.put("bboxReservationsResourceUrn", bboxResourceUrn);
     outputs.put("bboxReservationsSummary", bboxSummaryMap);
     outputs.put("registrySummary", registrySummary);
@@ -317,6 +333,7 @@ public final class Main {
     outputs.put("systemdAdapterLaunchSummary", systemdAdapterLaunchSummary);
     outputs.put("systemdRuntimeStatusSummary", systemdRuntimeStatusSummary);
     outputs.put("seedImageBuildSummary", imageBuildSummary);
+    outputs.put("seedManifestSynthSummary", manifestSynthSummary);
     return new BootstrapOutputs(outputs);
   }
 

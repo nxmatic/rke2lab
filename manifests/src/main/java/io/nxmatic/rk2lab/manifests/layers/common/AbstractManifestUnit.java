@@ -27,9 +27,10 @@ public abstract class AbstractManifestUnit implements ManifestUnit {
 
   /**
    * Single accessor for the flox NRI debug toggle. Layers reach this through their owning manifest
-   * unit; the underlying singleton reads the environment once at startup.
+   * unit; the policy is published by the synthesizer for the duration of one {@code synthesize}
+   * call via {@link ManifestSynthesisContext}.
    */
   protected final FloxDebugPolicy floxDebugPolicy() {
-    return FloxDebugPolicy.get();
+    return ManifestSynthesisContext.current().floxDebugPolicy();
   }
 }

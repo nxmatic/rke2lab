@@ -25,6 +25,12 @@ import io.nxmatic.rk2lab.controlplane.SeedLog;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig.WorktreeHost;
 import io.nxmatic.rk2lab.controlplane.incus.image.PulumiIncusImageProvider;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
+import io.nxmatic.rk2lab.manifests.api.ManifestExplodeRequest;
+import io.nxmatic.rk2lab.manifests.api.ManifestExplodeResult;
+import io.nxmatic.rk2lab.manifests.api.ManifestExplodeService;
+import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
+import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributorRegistry;
@@ -50,6 +56,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.concurrent.TimeUnit;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -163,6 +170,8 @@ public final class IncusResourceBootstrap {
 
     private Map<String, Object> systemdProvisioningSummary;
 
+    private Map<String, Object> manifestSynthSummary;
+
     private Instance instance;
 
     private ApplyPipeline resolvePaths() {
@@ -188,6 +197,7 @@ public final class IncusResourceBootstrap {
       classpathAssetMaterializer.materializeManifests(localPaths.manifestsRoot());
       classpathAssetMaterializer.materializeHostSystemdAssets(
           localPaths.manifestsRoot().resolve("host"));
+      this.manifestSynthSummary = synthesizeAndExplodeManifests(localPaths.manifestsRoot(), policy);
       final List<String> hostMountNotes = hostMountSourceVerifier.ensureSources(localPaths);
       this.systemdProvisioningSummary =
           SystemdProvisioningInventory.summarize(localPaths, hostMountNotes);
@@ -222,6 +232,173 @@ public final class IncusResourceBootstrap {
             "Failed to clear stale bootstrap kubeconfig before readiness gating: " + kubeconfigPath,
             ex);
       }
+    }
+
+    /**
+     * Run the cdk8s synth and split the consolidated YAML into per-resource files under {@code
+     * manifestsRoot}. The {@link FloxDebugPolicy} is derived from {@link ControlplanePolicy} so a
+     * Pulumi config flip materializes new manifests on the next {@code pulumi up} — no
+     * manifests-module rebuild required.
+     */
+    private Map<String, Object> synthesizeAndExplodeManifests(
+        Path manifestsRoot, ControlplanePolicy policy) {
+      final long startedAt = System.nanoTime();
+      Path synthScratch = null;
+      try {
+        synthScratch = Files.createTempDirectory("rke2lab-synth-");
+        final Path consolidated = synthScratch.resolve("manifests.yaml");
+
+        final FloxDebugPolicy floxDebugPolicy =
+            policy.debug().floxNriPluginEnabled()
+                ? FloxDebugPolicy.debug()
+                : FloxDebugPolicy.disabled();
+
+        // Wipe stale per-layer outputs before re-exploding so removed/renamed
+        // resources from a previous run can't survive. The host/ subtree was
+        // just (re)materialized by materializeHostSystemdAssets — leave it.
+        wipeExplodedLayers(manifestsRoot);
+
+        final ManifestSynthesisRequest synthRequest =
+            new ManifestSynthesisRequest(synthScratch, consolidated)
+                .withFloxDebugPolicy(floxDebugPolicy);
+        final ManifestSynthesisService synthesizer =
+            singleSpiProvider(ManifestSynthesisService.class);
+        synthesizer.synthesize(synthRequest);
+
+        final ManifestExplodeService exploder = singleSpiProvider(ManifestExplodeService.class);
+        final ManifestExplodeResult explodeResult =
+            exploder.explode(new ManifestExplodeRequest(consolidated, manifestsRoot));
+
+        final Map<String, Object> summary =
+            buildManifestSynthSummary(manifestsRoot, explodeResult, floxDebugPolicy);
+
+        logInfo(
+            "phase prepareHostState: manifests synthesized + exploded after "
+                + elapsedSince(startedAt)
+                + " (floxDebugPolicy.enabled="
+                + floxDebugPolicy.enabled()
+                + ", checksum="
+                + summary.get("checksum")
+                + ", fileCount="
+                + summary.get("fileCount")
+                + ")");
+
+        return summary;
+      } catch (IOException ex) {
+        throw new IllegalStateException("Failed to synthesize/explode manifests", ex);
+      } finally {
+        if (synthScratch != null) {
+          deleteSynthScratchSilently(synthScratch);
+        }
+      }
+    }
+
+    /**
+     * Build a summary of the synth output: an aggregate checksum, the total file count, a per-layer
+     * breakdown, and the resolved {@link FloxDebugPolicy} so {@code pulumi preview} can show a diff
+     * when the policy or any source resource changes.
+     */
+    private Map<String, Object> buildManifestSynthSummary(
+        Path manifestsRoot, ManifestExplodeResult explodeResult, FloxDebugPolicy floxDebugPolicy) {
+      final List<Path> writtenFiles = explodeResult.writtenFiles();
+      final LinkedHashMap<String, Integer> byLayer = new LinkedHashMap<>();
+      for (Path file : writtenFiles) {
+        final Path relative = manifestsRoot.relativize(file);
+        if (relative.getNameCount() == 0) {
+          continue;
+        }
+        final String layer = relative.getName(0).toString();
+        byLayer.merge(layer, 1, Integer::sum);
+      }
+
+      final MessageDigest digest;
+      try {
+        digest = MessageDigest.getInstance("SHA-256");
+      } catch (NoSuchAlgorithmException ex) {
+        throw new IllegalStateException("SHA-256 unavailable", ex);
+      }
+      for (Path file : writtenFiles) {
+        try {
+          digest.update(manifestsRoot.relativize(file).toString().getBytes(StandardCharsets.UTF_8));
+          digest.update((byte) 0);
+          digest.update(Files.readAllBytes(file));
+          digest.update((byte) 0);
+        } catch (IOException ex) {
+          throw new IllegalStateException("Failed reading exploded manifest: " + file, ex);
+        }
+      }
+      final String checksum = HexFormat.of().formatHex(digest.digest());
+
+      final LinkedHashMap<String, Object> summary = new LinkedHashMap<>();
+      summary.put("checksum", checksum);
+      summary.put("fileCount", writtenFiles.size());
+      summary.put("layers", byLayer.size());
+      summary.put("byLayer", Map.copyOf(byLayer));
+      summary.put("floxDebugEnabled", floxDebugPolicy.enabled());
+      summary.put("manifestsRoot", manifestsRoot.toString());
+      return Map.copyOf(summary);
+    }
+
+    /**
+     * Remove every direct child of {@code manifestsRoot} except {@code host/} (which carries the
+     * non-synthesized systemd-scripts and systemd-units the materializer just wrote). Stale layer
+     * directories from a prior synth would otherwise leak into the bind-mounted host view.
+     */
+    private static void wipeExplodedLayers(Path manifestsRoot) throws IOException {
+      if (!Files.isDirectory(manifestsRoot)) {
+        return;
+      }
+      try (Stream<Path> children = Files.list(manifestsRoot)) {
+        for (Path child : children.toList()) {
+          if ("host".equals(child.getFileName().toString())) {
+            continue;
+          }
+          deleteSubtree(child);
+        }
+      }
+    }
+
+    private static void deleteSubtree(Path root) throws IOException {
+      try (Stream<Path> stream = Files.walk(root)) {
+        final List<Path> entries = stream.sorted(java.util.Comparator.reverseOrder()).toList();
+        for (Path entry : entries) {
+          Files.deleteIfExists(entry);
+        }
+      }
+    }
+
+    private static void deleteSynthScratchSilently(Path scratch) {
+      try (Stream<Path> stream = Files.walk(scratch)) {
+        stream
+            .sorted(java.util.Comparator.reverseOrder())
+            .forEach(
+                entry -> {
+                  try {
+                    Files.deleteIfExists(entry);
+                  } catch (IOException ignored) {
+                    // best-effort cleanup; leave the entry in place
+                  }
+                });
+      } catch (IOException ignored) {
+        // synthScratch already gone or unreadable — nothing to clean
+      }
+    }
+
+    private <T> T singleSpiProvider(Class<T> serviceType) {
+      final List<T> providers =
+          ServiceLoader.load(serviceType).stream().map(ServiceLoader.Provider::get).toList();
+      if (providers.isEmpty()) {
+        throw new IllegalStateException(
+            "No " + serviceType.getSimpleName() + " provider found via ServiceLoader.");
+      }
+      if (providers.size() > 1) {
+        throw new IllegalStateException(
+            "Expected exactly one "
+                + serviceType.getSimpleName()
+                + " provider, found "
+                + providers.size());
+      }
+      return providers.getFirst();
     }
 
     private ApplyPipeline prepareProviderResources() {
@@ -308,6 +485,7 @@ public final class IncusResourceBootstrap {
           hostSourceDirRelative,
           layerEnvRegistrySummary,
           systemdProvisioningSummary,
+          manifestSynthSummary,
           instance);
     }
 
@@ -401,7 +579,7 @@ public final class IncusResourceBootstrap {
         .kmsgDevice()
         .zfsDevice()
         .disk("worktree.dir", hostPaths.worktreeRoot(), HOST_WORKTREE_PATH)
-        .disk("rke2lab.env.dir", hostPaths.runtimeEnvConfigRoot(), HOST_ENV_DIR_PATH)
+        .disk("rke2lab.envs.dir", hostPaths.runtimeEnvConfigRoot(), HOST_ENV_DIR_PATH)
         .disk("rke2lab.scripts.dir", hostPaths.scriptsRoot(), HOST_SCRIPTS_DIR_PATH)
         .disk("git.dir", hostPaths.gitRoot(), HOST_GIT_WORKTREE_DIR_PATH)
         .disk(
@@ -2379,5 +2557,6 @@ public final class IncusResourceBootstrap {
       String hostSourceDirRelative,
       Map<String, Object> layerEnvRegistrySummary,
       Map<String, Object> systemdProvisioningSummary,
+      Map<String, Object> manifestSynthSummary,
       Resource readinessDependency) {}
 }

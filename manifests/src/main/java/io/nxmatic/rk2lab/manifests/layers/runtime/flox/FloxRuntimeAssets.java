@@ -28,26 +28,21 @@ import java.util.stream.Stream;
 public final class FloxRuntimeAssets {
 
   private static final String FLOX_RESOURCE_ROOT = "/runtime/flox-runtime";
-  private static final String ENV_RESOURCE_ROOT = FLOX_RESOURCE_ROOT + "/env.d";
+  private static final String ENV_RESOURCE_ROOT = FLOX_RESOURCE_ROOT + "/envs.d";
 
   /**
-   * Per-env files that live in the resource tree. Everything else (env.json, .gitattributes,
-   * .gitignore) is uniform boilerplate and is synthesized in code so the resource tree only carries
-   * the parts that genuinely differ between envs.
+   * Per-env files in the resource tree. {@code flake.nix} and {@code manifest.toml} are required;
+   * {@code flake.lock} and {@code manifest.lock} are shipped when present so the on-node flox
+   * activation reuses pinned inputs instead of re-locking from scratch. {@code env.json} and {@code
+   * .gitattributes} are synthesized in code (uniform across envs).
    */
   private static final String FLAKE_NIX_RESOURCE = "flake.nix";
 
+  private static final String FLAKE_LOCK_RESOURCE = "flake.lock";
+
   private static final String MANIFEST_TOML_RESOURCE = "manifest.toml";
 
-  /**
-   * Static .gitignore content placed inside {@code .flox/env/} — the path-flake root. The {@code
-   * *.lock} rule keeps nix's path-flake fetcher hash stable across the lock→realise phases of
-   * {@code flox activate}: flox writes {@code manifest.lock} after computing the path's narHash,
-   * which would otherwise drift the hash and trigger {@code flake.cc:37} assertion failures during
-   * realise. The activation step initializes {@code .flox/env/} as a git repo so this rule is
-   * honored by nix's gitignore-aware path-flake enumeration.
-   */
-  private static final String GITIGNORE_CONTENT = "*.lock\n";
+  private static final String MANIFEST_LOCK_RESOURCE = "manifest.lock";
 
   private final Class<?> resourceAnchor;
   private final List<InstallerAsset> floxInstallerConfigMapAssets;
@@ -153,7 +148,7 @@ public final class FloxRuntimeAssets {
 
   /**
    * A discovered Flox environment: the {@code category/name} pair (e.g. {@code networking/kdns})
-   * derived from the {@code env.d/<category>/<name>/} directory layout on the classpath.
+   * derived from the {@code envs.d/<category>/<name>/} directory layout on the classpath.
    */
   private record DiscoveredEnvironment(String category, String name) {
     String envPrefix() {
@@ -173,7 +168,7 @@ public final class FloxRuntimeAssets {
   private static final String ENV_JSON_CONTENT = "{\"name\": \"default\", \"version\": 1}\n";
 
   /**
-   * Walk the {@code /runtime/flox-runtime/env.d/} resource tree and return every {@code
+   * Walk the {@code /runtime/flox-runtime/envs.d/} resource tree and return every {@code
    * category/name} directory that contains both {@code flake.nix} and {@code manifest.toml}. Works
    * whether resources sit on disk (during {@code mvn exec:java}) or inside a shaded JAR.
    */
@@ -188,7 +183,7 @@ public final class FloxRuntimeAssets {
     final URL rootUrl = resourceAnchor.getResource(ENV_RESOURCE_ROOT);
     if (rootUrl == null) {
       throw new IllegalStateException(
-          "Flox env.d resource root not found on classpath: " + ENV_RESOURCE_ROOT);
+          "Flox envs.d resource root not found on classpath: " + ENV_RESOURCE_ROOT);
     }
 
     try {
@@ -200,7 +195,7 @@ public final class FloxRuntimeAssets {
       }
     } catch (IOException ex) {
       throw new UncheckedIOException(
-          "Failed scanning Flox env.d resource root: " + ENV_RESOURCE_ROOT, ex);
+          "Failed scanning Flox envs.d resource root: " + ENV_RESOURCE_ROOT, ex);
     }
 
     return discovered;
@@ -212,7 +207,7 @@ public final class FloxRuntimeAssets {
     try {
       rootDir = Paths.get(rootUrl.toURI());
     } catch (java.net.URISyntaxException ex) {
-      throw new IOException("Bad env.d URL: " + rootUrl, ex);
+      throw new IOException("Bad envs.d URL: " + rootUrl, ex);
     }
 
     try (Stream<Path> categories = Files.list(rootDir)) {
@@ -243,7 +238,7 @@ public final class FloxRuntimeAssets {
       JarURLConnection jarConnection, Set<DiscoveredEnvironment> sink) throws IOException {
     final JarFile jarFile = jarConnection.getJarFile();
     // JAR entries are stored without a leading slash.
-    final String prefix = ENV_RESOURCE_ROOT.substring(1) + "/"; // "runtime/flox-runtime/env.d/"
+    final String prefix = ENV_RESOURCE_ROOT.substring(1) + "/"; // "runtime/flox-runtime/envs.d/"
     final Set<String> manifestSeen = new LinkedHashSet<>();
     final Set<String> flakeSeen = new LinkedHashSet<>();
     final Enumeration<JarEntry> entries = jarFile.entries();
@@ -262,7 +257,7 @@ public final class FloxRuntimeAssets {
       if (secondSlash < 0) {
         continue;
       }
-      // Only consider files at exactly env.d/<category>/<name>/<file>.
+      // Only consider files at exactly envs.d/<category>/<name>/<file>.
       final String fileName = tail.substring(secondSlash + 1);
       if (fileName.indexOf('/') >= 0) {
         continue;
@@ -298,7 +293,7 @@ public final class FloxRuntimeAssets {
     }
 
     /**
-     * Discover every {@code env.d/<category>/<name>/} directory on the classpath that has both
+     * Discover every {@code envs.d/<category>/<name>/} directory on the classpath that has both
      * {@code flake.nix} and {@code manifest.toml}, then register the assets the host installer
      * needs.
      */
@@ -309,17 +304,17 @@ public final class FloxRuntimeAssets {
     }
 
     /**
-     * Register installer ConfigMap entries for one Flox environment. The {@code flake.nix} and
-     * {@code manifest.toml} come from the classpath (the only per-env files in the resource tree);
-     * the rest of the {@code .flox/} layout (env.json, .gitattributes, .gitignore) is synthesized
-     * in code from the env's identity. Locks are intentionally omitted — the node regenerates them
-     * via {@code flox activate}.
+     * Register installer ConfigMap entries for one Flox environment. {@code flake.nix} and {@code
+     * manifest.toml} are required; {@code flake.lock} and {@code manifest.lock} are shipped when
+     * present in the resource tree (they're committed alongside the per-env flakes now that
+     * pre-built nix packages give the locks a meaningful at-rest meaning). {@code env.json} is
+     * synthesized in code from the env's identity.
      */
     private void addFloxEnvironmentAssets(DiscoveredEnvironment env) {
       final String envPrefix = env.envPrefix();
       final String resourcePrefix = ENV_RESOURCE_ROOT + "/" + envPrefix;
       final String configMapPrefix = env.configMapPrefix();
-      final String mountPrefix = "build-assets/env.d/" + envPrefix;
+      final String mountPrefix = "build-assets/envs.d/" + envPrefix;
 
       // Per-env real files: classpath-backed.
       addInstallerAsset(
@@ -330,6 +325,14 @@ public final class FloxRuntimeAssets {
           configMapPrefix + "-manifest-toml",
           resourcePrefix + "/" + MANIFEST_TOML_RESOURCE,
           mountPrefix + "/.flox/env/manifest.toml");
+      addOptionalInstallerAsset(
+          configMapPrefix + "-flake-lock",
+          resourcePrefix + "/" + FLAKE_LOCK_RESOURCE,
+          mountPrefix + "/.flox/env/flake.lock");
+      addOptionalInstallerAsset(
+          configMapPrefix + "-manifest-lock",
+          resourcePrefix + "/" + MANIFEST_LOCK_RESOURCE,
+          mountPrefix + "/.flox/env/manifest.lock");
 
       // Synthesized boilerplate: identical structure across envs.
       addInstallerAsset(
@@ -338,12 +341,18 @@ public final class FloxRuntimeAssets {
               .inlineContent(ENV_JSON_CONTENT)
               .mountPath(mountPrefix + "/.flox/env.json")
               .build());
-      addInstallerAsset(
-          InstallerAsset.builder()
-              .configMapKey(configMapPrefix + "-gitignore")
-              .inlineContent(GITIGNORE_CONTENT)
-              .mountPath(mountPrefix + "/.flox/env/.gitignore")
-              .build());
+    }
+
+    /**
+     * Like {@link #addInstallerAsset(String, String, String)} but skips silently when the classpath
+     * resource is absent. Used for optional per-env files such as the lock files.
+     */
+    private void addOptionalInstallerAsset(
+        String configMapKey, String classpathResource, String mountPath) {
+      if (resourceAnchor.getResource(classpathResource) == null) {
+        return;
+      }
+      addInstallerAsset(configMapKey, classpathResource, mountPath);
     }
 
     private void addDefaultCoreInstallerAssets() {

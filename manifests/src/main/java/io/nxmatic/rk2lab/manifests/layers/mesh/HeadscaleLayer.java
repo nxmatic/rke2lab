@@ -1,7 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.mesh;
 
-import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestSynthesisContext;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
@@ -16,7 +16,8 @@ import software.constructs.Construct;
 public final class HeadscaleLayer extends Construct {
 
   private static final String HEADSCALE_NAMESPACE = MeshLayerRefs.MESH_SYSTEM_NAMESPACE.name();
-  private static final String FLOX_IMAGE = FloxDebugPolicy.get().image("flox/empty:1.0.0");
+  private final String floxImage =
+      ManifestSynthesisContext.current().floxDebugPolicy().image("flox/empty:1.0.0");
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("mesh", "headscale");
@@ -756,7 +757,7 @@ public final class HeadscaleLayer extends Construct {
                             List.of(
                                 Map.ofEntries(
                                     Map.entry("name", "headscale"),
-                                    Map.entry("image", FLOX_IMAGE),
+                                    Map.entry("image", floxImage),
                                     Map.entry("command", List.of("headscale", "serve")),
                                     Map.entry(
                                         "envFrom",
@@ -857,7 +858,7 @@ public final class HeadscaleLayer extends Construct {
                                     "name",
                                     "config-init",
                                     "image",
-                                    FLOX_IMAGE,
+                                    floxImage,
                                     "command",
                                     List.of("/scripts/config-init.sh"),
                                     "volumeMounts",
@@ -1004,7 +1005,7 @@ public final class HeadscaleLayer extends Construct {
                                 "name",
                                 "bootstrap",
                                 "image",
-                                FLOX_IMAGE,
+                                floxImage,
                                 "command",
                                 List.of("/scripts/bootstrap.sh"),
                                 "envFrom",
@@ -1119,7 +1120,7 @@ public final class HeadscaleLayer extends Construct {
                                 "name",
                                 "tailscale-gateway",
                                 "image",
-                                FLOX_IMAGE,
+                                floxImage,
                                 "command",
                                 List.of("/scripts/gateway.sh"),
                                 "env",
@@ -1299,7 +1300,7 @@ public final class HeadscaleLayer extends Construct {
                                 "name",
                                 "tailscale",
                                 "image",
-                                FLOX_IMAGE,
+                                floxImage,
                                 "command",
                                 List.of("/scripts/tailscale-client.sh"),
                                 "env",
@@ -1402,7 +1403,7 @@ public final class HeadscaleLayer extends Construct {
                                 "name",
                                 "wait-for-headscale",
                                 "image",
-                                FLOX_IMAGE,
+                                floxImage,
                                 "command",
                                 List.of("/scripts/wait-for-headscale.sh"),
                                 "envFrom",

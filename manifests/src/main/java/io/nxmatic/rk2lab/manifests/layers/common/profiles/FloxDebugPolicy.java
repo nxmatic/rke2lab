@@ -4,36 +4,35 @@ package io.nxmatic.rk2lab.manifests.layers.common.profiles;
 import java.util.List;
 
 /**
- * Single source of truth for the flox NRI debug toggle. When
- * RKE2LAB_POLICY_DEBUG_NRI_PLUGINS_FLOX_ENABLED is true, layers can swap their pod-spec primitives
- * (image, entrypoint, flox env name) to a debug shape so the workload pauses for live inspection
- * while still going through the flox NRI overlay path.
+ * Synth-scoped debug policy for the flox NRI plugin. Carried on {@link
+ * io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest} and reachable from any manifest unit
+ * via {@link io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit#floxDebugPolicy()}.
  *
- * <p>Reachable from any manifest unit via {@link
- * io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit#floxDebugPolicy()}; also exposed
- * as a static singleton for direct use inside Layers.
+ * <p>When {@link #enabled()} is true, layers swap their pod-spec primitives (image, entrypoint,
+ * flox env name) to a debug shape so the workload pauses for live inspection while still going
+ * through the flox NRI overlay path.
+ *
+ * <p>This used to be a static singleton populated from a process-wide environment variable. It is
+ * now an immutable record built at the entry point that owns the synth (e.g., seed-bootstrap),
+ * which gives layer code a single, request-scoped source of truth and lets tests inject a custom
+ * shape without mutating global state.
  */
-public final class FloxDebugPolicy {
+public record FloxDebugPolicy(boolean enabled) {
 
-  private static final String ENV_VAR = "RKE2LAB_POLICY_DEBUG_NRI_PLUGINS_FLOX_ENABLED";
   private static final String DEBUG_IMAGE = "bash:5";
   private static final List<String> PAUSE_COMMAND = List.of("sleep", "infinity");
+  private static final FloxDebugPolicy DISABLED = new FloxDebugPolicy(false);
 
-  private static final FloxDebugPolicy INSTANCE =
-      new FloxDebugPolicy("true".equalsIgnoreCase(System.getenv(ENV_VAR)));
-
-  private final boolean enabled;
-
-  private FloxDebugPolicy(final boolean enabled) {
-    this.enabled = enabled;
+  /** Production-shape policy: every primitive falls through unchanged. */
+  public static FloxDebugPolicy disabled() {
+    return DISABLED;
   }
 
-  public static FloxDebugPolicy get() {
-    return INSTANCE;
-  }
-
-  public boolean enabled() {
-    return enabled;
+  /**
+   * Debug-shape policy: image becomes {@code bash:5} and command becomes {@code sleep infinity}.
+   */
+  public static FloxDebugPolicy debug() {
+    return new FloxDebugPolicy(true);
   }
 
   public String debugImage() {

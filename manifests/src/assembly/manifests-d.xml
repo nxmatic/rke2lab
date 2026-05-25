@@ -1,4 +1,17 @@
 <!-- @codebase -->
+<!--
+  Ships the non-synthesized portion of manifests.d to seed-bootstrap.
+
+  The per-layer/per-package YAML tree (e.g. manifests.d/networking/kdns/*.yml)
+  is no longer produced at build time — seed-bootstrap synthesizes it at
+  pulumi-up time via ManifestSynthesisService and explodes the result, with the
+  ControlplanePolicy driving FloxDebugPolicy. This zip only carries the host
+  systemd assets that don't go through cdk8s synthesis.
+
+  Layer-side classpath resources (e.g. runtime/flox-runtime/**) ride along on
+  the manifests jar itself; FloxRuntimeAssets and friends read them via
+  Class.getResourceAsStream from seed-bootstrap's classpath.
+-->
 <assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 https://maven.apache.org/xsd/assembly-2.2.0.xsd">
@@ -9,13 +22,6 @@
   <includeBaseDirectory>false</includeBaseDirectory>
 
   <fileSets>
-    <fileSet>
-      <directory>${project.build.directory}/manifests.d</directory>
-      <outputDirectory>manifests.d</outputDirectory>
-      <includes>
-        <include>**/*</include>
-      </includes>
-    </fileSet>
     <fileSet>
       <directory>${project.basedir}/src/main/resources/host</directory>
       <outputDirectory>manifests.d/host</outputDirectory>

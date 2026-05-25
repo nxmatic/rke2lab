@@ -1,6 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.common.profiles;
 
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestSynthesisContext;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -8,7 +9,6 @@ import java.util.Optional;
 
 public final class DelveSidecarProfile {
 
-  private static final String DEFAULT_IMAGE = FloxDebugPolicy.get().image("flox/empty:1.0.0");
   private static final String DEFAULT_SCRIPT_MOUNT_PATH = "/.sh.d";
 
   private final boolean enabled;
@@ -17,6 +17,7 @@ public final class DelveSidecarProfile {
   private final String enabledEnvName;
   private final String portEnvName;
   private final String portValue;
+  private final String image;
 
   public DelveSidecarProfile(
       final boolean enabled,
@@ -31,6 +32,7 @@ public final class DelveSidecarProfile {
     this.enabledEnvName = enabledEnvName;
     this.portEnvName = portEnvName;
     this.portValue = portValue;
+    this.image = ManifestSynthesisContext.current().floxDebugPolicy().image("flox/empty:1.0.0");
   }
 
   public Map<String, String> workloadAnnotations(final Map<String, String> extra) {
@@ -50,7 +52,7 @@ public final class DelveSidecarProfile {
     }
     LinkedHashMap<String, Object> container = new LinkedHashMap<>();
     container.put("name", name);
-    container.put("image", DEFAULT_IMAGE);
+    container.put("image", image);
     container.put("imagePullPolicy", "IfNotPresent");
     container.put("command", List.of(scriptPath(scriptFileName)));
     container.put("env", buildEnv());

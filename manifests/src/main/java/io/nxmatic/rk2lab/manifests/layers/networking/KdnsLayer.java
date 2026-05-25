@@ -2,6 +2,7 @@
 package io.nxmatic.rk2lab.manifests.layers.networking;
 
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterLayerRefs;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestSynthesisContext;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.DelveSidecarProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.DelveSidecarToggleResolver;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
@@ -216,7 +217,7 @@ public final class KdnsLayer extends Construct {
     // stays up while we exec in to inspect mounts, run flox by hand, attach
     // dlv, etc. The mounted flox env is also swapped to networking/kdns-debug
     // so delve and friends are available inside $HOME/.flox.
-    final FloxDebugPolicy debugPolicy = FloxDebugPolicy.get();
+    final FloxDebugPolicy debugPolicy = ManifestSynthesisContext.current().floxDebugPolicy();
     final String containerImage = debugPolicy.image("flox/empty:1.0.0");
     final List<String> containerCommand =
         debugPolicy.command(List.of("flox", "activate", "--dir", "/root", "--", "kdns"));

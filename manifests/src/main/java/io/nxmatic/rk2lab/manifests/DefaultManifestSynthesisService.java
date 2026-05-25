@@ -10,6 +10,7 @@ import io.nxmatic.rk2lab.manifests.layers.common.ApplyingManifestUnitVisitor;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomain;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistry;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistryBuilder;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestSynthesisContext;
 import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnit;
 import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitDependencyApplier;
 import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitRegistry;
@@ -66,8 +67,19 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
   @Override
   public ManifestSynthesisResult synthesize(ManifestSynthesisRequest request) throws IOException {
-    LOG.info("Starting manifests synthesis via provider '{}'", providerId());
+    LOG.info(
+        "Starting manifests synthesis via provider '{}' (floxDebugPolicy.enabled={})",
+        providerId(),
+        request.floxDebugPolicy().enabled());
 
+    final ManifestSynthesisContext context = ManifestSynthesisContext.of(request.floxDebugPolicy());
+    try (var ignored = ManifestSynthesisContext.bind(context)) {
+      return synthesizeInContext(request);
+    }
+  }
+
+  private ManifestSynthesisResult synthesizeInContext(ManifestSynthesisRequest request)
+      throws IOException {
     final Path synthOutdir = request.synthOutdir();
     final Path synthManifestFile = request.synthManifestFile();
 
@@ -212,7 +224,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
       throws IOException {
     final String yamlSource = Files.readString(synthesizedFile);
     final Iterable<Object> loadedDocuments =
-        new Yaml(new SafeConstructor(new LoaderOptions())).loadAll(yamlSource);
+        new Yaml(new SafeConstructor(largeDocumentLoaderOptions())).loadAll(yamlSource);
     final List<Object> documents = new java.util.ArrayList<>();
     for (Object loadedDocument : loadedDocuments) {
       documents.add(applyConfigMapScriptLiteralBlocks(loadedDocument));
@@ -231,6 +243,18 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     yaml.dumpAll(documents.iterator(), writer);
     final String normalizedYaml = coerceQuotedScriptScalarsToLiteralBlocks(writer.toString());
     Files.writeString(synthesizedFile, normalizedYaml);
+  }
+
+  /**
+   * SnakeYaml caps single-document parses at 3 MiB by default. The synthesized manifest carries the
+   * base64-encoded NRI plugin archive plus the flox installer-assets ConfigMap (now including
+   * pre-locked flake/manifest locks per env), so single ConfigMap documents can sit well above
+   * that. Bump to 64 MiB — generous headroom for the inputs we actually emit.
+   */
+  private static LoaderOptions largeDocumentLoaderOptions() {
+    final LoaderOptions options = new LoaderOptions();
+    options.setCodePointLimit(64 * 1024 * 1024);
+    return options;
   }
 
   private String coerceQuotedScriptScalarsToLiteralBlocks(String yamlText) {
