@@ -284,7 +284,10 @@ installer::pod:run() {
 		"DAEMONSET_SCRIPT_ROOT=${DAEMONSET_SCRIPT_ROOT}"
 }
 
-installer::host:activate_flox() {
+installer::host:flox:activate() {
+	: Resolve flox in the binary path
+	source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
+	: Activate the RKE2 flox env
 	# shellcheck disable=SC1090
 	source <(flox activate --dir /var/lib/rancher/rke2)
 }
@@ -613,8 +616,8 @@ containerd::config:flox:update() {
 }
 
 installer::host:run() {
+	installer::host:flox:activate
 	installer::policy:source
-	installer::host:activate_flox
 
 	: "Initialize runtime asset paths and load environment"
 	host::nix:flox-conf:ensure

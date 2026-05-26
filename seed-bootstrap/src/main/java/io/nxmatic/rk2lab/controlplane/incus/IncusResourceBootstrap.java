@@ -88,6 +88,8 @@ public final class IncusResourceBootstrap {
 
   private static final String HOST_ENV_DIR_PATH = "/srv/host/rke2lab-environment.d";
 
+  private final ManifestFileOperations manifestFileOps = ManifestFileOperations.INSTANCE;
+
   private static final String HOST_SCRIPTS_DIR_PATH = "/srv/host/systemd-scripts.d";
 
   private static final String HOST_GIT_WORKTREE_DIR_PATH = "/srv/host/git-worktree.d";
@@ -142,219 +144,70 @@ public final class IncusResourceBootstrap {
    * prepare host state, then prepare provider resources, then create the instance.
    */
   public BootstrapResult apply() {
-    final ApplyPipeline pipeline = new ApplyPipeline();
-    return new ApplyStart(pipeline)
+    final ApplyState state = new ApplyState();
+    return new ApplyStart(state)
         .onFailure((topic, cause) -> SeedLog.error("incus", topic + ": " + cause.getMessage()))
         .during("path resolution", paths -> paths.resolve())
         .then()
-        .during("host state", host -> host.prepareAll())
+        .during("host state", host -> host.materializeAssets().ensureSecrets().logSummary())
         .then()
-        .during("provider resources", provider -> provider.ensureAll())
+        .during(
+            "provider resources",
+            provider -> provider.ensureProject().ensureNetworks().ensureProfile().ensureImage())
         .then()
         .during("instance", instance -> instance.create())
         .toResult();
   }
 
-  /** Topic stages — each holds a reference to the shared ApplyPipeline state. */
-  private static final class PathStage {
-    private final ApplyPipeline pipeline;
+  /** Shared mutable state across all pipeline stages. */
+  private static final class ApplyState {
+    OnFailure onFailure;
+    BootstrapPaths localPaths;
+    BootstrapPaths nixosPaths;
+    IncusProviderContext providerContext;
+    Project ensuredProject;
+    Output<String> ensuredProjectName;
+    Output<String> ensuredProfileName;
+    Output<String> ensuredImageFingerprint;
+    DeploymentMetadata deploymentMetadata;
+    ProvisioningMetadata provisioningMetadata;
+    BuildMetadata buildMetadata;
+    RuntimeMetadata runtimeMetadata;
+    Instance instance;
+  }
 
-    PathStage(ApplyPipeline pipeline) {
-      this.pipeline = pipeline;
+  /** Topic stages — each holds a reference to the shared ApplyState. */
+  private static final class PathStage {
+    private final ApplyState state;
+    private final BootstrapConfig config;
+
+    PathStage(ApplyState state, BootstrapConfig config) {
+      this.state = state;
+      this.config = config;
     }
 
     PathStage resolve() {
-      pipeline.resolvePaths();
-      return this;
-    }
-  }
-
-  private static final class HostStage {
-    private final ApplyPipeline pipeline;
-
-    HostStage(ApplyPipeline pipeline) {
-      this.pipeline = pipeline;
-    }
-
-    HostStage prepareAll() {
-      pipeline.prepareHostState();
-      return this;
-    }
-  }
-
-  private static final class ProviderStage {
-    private final ApplyPipeline pipeline;
-
-    ProviderStage(ApplyPipeline pipeline) {
-      this.pipeline = pipeline;
-    }
-
-    ProviderStage ensureAll() {
-      pipeline.prepareProviderResources();
-      return this;
-    }
-  }
-
-  private static final class InstanceStage {
-    private final ApplyPipeline pipeline;
-
-    InstanceStage(ApplyPipeline pipeline) {
-      this.pipeline = pipeline;
-    }
-
-    InstanceStage create() {
-      pipeline.createInstance();
-      return this;
-    }
-  }
-
-  /** State-machine entry / transitions for the apply pipeline. */
-  private static final class ApplyStart {
-    private final ApplyPipeline pipeline;
-
-    ApplyStart(ApplyPipeline pipeline) {
-      this.pipeline = pipeline;
-    }
-
-    /** Optional: register a per-topic failure handler. Defaults to no-op when not called. */
-    ApplyStart onFailure(OnFailure handler) {
-      pipeline.onFailure = handler;
-      return this;
-    }
-
-    PathDone during(String topic, java.util.function.Function<PathStage, PathStage> body) {
-      TopicRunner.runDuring("incus", topic, new PathStage(pipeline), body, pipeline.onFailure);
-      return new PathDone(pipeline);
-    }
-  }
-
-  private static final class PathDone {
-    private final ApplyPipeline pipeline;
-
-    PathDone(ApplyPipeline pipeline) {
-      this.pipeline = pipeline;
-    }
-
-    AwaitingHost then() {
-      return new AwaitingHost(pipeline);
-    }
-  }
-
-  private static final class AwaitingHost {
-    private final ApplyPipeline pipeline;
-
-    AwaitingHost(ApplyPipeline pipeline) {
-      this.pipeline = pipeline;
-    }
-
-    HostDone during(String topic, java.util.function.Function<HostStage, HostStage> body) {
-      TopicRunner.runDuring("incus", topic, new HostStage(pipeline), body, pipeline.onFailure);
-      return new HostDone(pipeline);
-    }
-  }
-
-  private static final class HostDone {
-    private final ApplyPipeline pipeline;
-
-    HostDone(ApplyPipeline pipeline) {
-      this.pipeline = pipeline;
-    }
-
-    AwaitingProvider then() {
-      return new AwaitingProvider(pipeline);
-    }
-  }
-
-  private static final class AwaitingProvider {
-    private final ApplyPipeline pipeline;
-
-    AwaitingProvider(ApplyPipeline pipeline) {
-      this.pipeline = pipeline;
-    }
-
-    ProviderDone during(
-        String topic, java.util.function.Function<ProviderStage, ProviderStage> body) {
-      TopicRunner.runDuring("incus", topic, new ProviderStage(pipeline), body, pipeline.onFailure);
-      return new ProviderDone(pipeline);
-    }
-  }
-
-  private static final class ProviderDone {
-    private final ApplyPipeline pipeline;
-
-    ProviderDone(ApplyPipeline pipeline) {
-      this.pipeline = pipeline;
-    }
-
-    AwaitingInstance then() {
-      return new AwaitingInstance(pipeline);
-    }
-  }
-
-  private static final class AwaitingInstance {
-    private final ApplyPipeline pipeline;
-
-    AwaitingInstance(ApplyPipeline pipeline) {
-      this.pipeline = pipeline;
-    }
-
-    InstanceDone during(
-        String topic, java.util.function.Function<InstanceStage, InstanceStage> body) {
-      TopicRunner.runDuring("incus", topic, new InstanceStage(pipeline), body, pipeline.onFailure);
-      return new InstanceDone(pipeline);
-    }
-  }
-
-  private static final class InstanceDone {
-    private final ApplyPipeline pipeline;
-
-    InstanceDone(ApplyPipeline pipeline) {
-      this.pipeline = pipeline;
-    }
-
-    BootstrapResult toResult() {
-      return pipeline.toResult();
-    }
-  }
-
-  private final class ApplyPipeline {
-
-    private OnFailure onFailure;
-
-    private BootstrapPaths localPaths;
-
-    private BootstrapPaths nixosPaths;
-
-    private IncusProviderContext providerContext;
-
-    private Project ensuredProject;
-
-    private Output<String> ensuredProjectName;
-
-    private Output<String> ensuredProfileName;
-
-    private Output<String> ensuredImageFingerprint;
-
-    private DeploymentMetadata deploymentMetadata;
-
-    private ProvisioningMetadata provisioningMetadata;
-
-    private BuildMetadata buildMetadata;
-
-    private RuntimeMetadata runtimeMetadata;
-
-    private Instance instance;
-
-    private ApplyPipeline resolvePaths() {
       final Path localWorktreeRoot = config.worktreeDirOn(WorktreeHost.DARWIN);
-      this.localPaths =
+      state.localPaths =
           BootstrapPaths.fromLocalWorktree(
               localWorktreeRoot, config.clusterName(), config.nodeName());
-      this.nixosPaths = localPaths.asHostView(config, WorktreeHost.NIXOS);
+      state.nixosPaths = state.localPaths.asHostView(config, WorktreeHost.NIXOS);
       return this;
     }
+  }
 
-    private ApplyPipeline prepareHostState() {
+  private final class HostStage {
+    private final ApplyState state;
+    private final BootstrapConfig config;
+    private final ControlplanePolicy policy;
+
+    HostStage(ApplyState state, BootstrapConfig config, ControlplanePolicy policy) {
+      this.state = state;
+      this.config = config;
+      this.policy = policy;
+    }
+
+    HostStage materializeAssets() {
       logInfo("mode=" + (Deployment.getInstance().isDryRun() ? "preview" : "apply"));
 
       final HostAssetRootLifecycle lifecycle =
@@ -364,17 +217,26 @@ public final class IncusResourceBootstrap {
       final SliceContext slices = registerProvisioningSlices(staging);
       syncStagingToFinal(lifecycle, staging.stagingRoot());
       captureDeploymentMetadata(staging, slices);
-      ensureLaunchSecretsToken(localPaths.secretsFile());
 
-      logInfo("deployment=" + deploymentMetadata);
-      logInfo("provisioning.slices=" + provisioningMetadata.slices());
+      return this;
+    }
+
+    HostStage ensureSecrets() {
+      ensureLaunchSecretsToken(state.localPaths.secretsFile());
+      return this;
+    }
+
+    HostStage logSummary() {
+      logInfo("deployment=" + state.deploymentMetadata);
+      logInfo("provisioning.slices=" + state.provisioningMetadata.slices());
       return this;
     }
 
     private StagingContext materializeToStaging(HostAssetRootLifecycle lifecycle) {
-      final Path stagingRoot = lifecycle.prepareStagingRoot(localPaths.assetsRoot());
+      final Path stagingRoot = lifecycle.prepareStagingRoot(state.localPaths.assetsRoot());
       final Path stagingManifestsRoot =
-          stagingRoot.resolve(localPaths.assetsRoot().relativize(localPaths.manifestsRoot()));
+          stagingRoot.resolve(
+              state.localPaths.assetsRoot().relativize(state.localPaths.manifestsRoot()));
 
       classpathAssetMaterializer.materializeIncusAssets(stagingRoot);
       classpathAssetMaterializer.materializeManifests(stagingManifestsRoot);
@@ -447,15 +309,15 @@ public final class IncusResourceBootstrap {
     }
 
     private void syncStagingToFinal(HostAssetRootLifecycle lifecycle, Path stagingRoot) {
-      lifecycle.syncStagingToFinal(stagingRoot, localPaths.assetsRoot());
+      lifecycle.syncStagingToFinal(stagingRoot, state.localPaths.assetsRoot());
     }
 
     private void captureDeploymentMetadata(StagingContext staging, SliceContext slices) {
       final ProvisioningMetadata.Slices provisioningSlices =
-          ProvisioningResourceInventory.sliceChecksums(localPaths, slices.sliceRegistry());
+          ProvisioningResourceInventory.sliceChecksums(state.localPaths, slices.sliceRegistry());
 
       final String hostSourceDirRelative =
-          relativizeAgainstWorktree(localPaths.worktreeRoot(), localPaths.assetsRoot());
+          state.localPaths.relativizeAgainst(state.localPaths.worktreeRoot());
 
       @SuppressWarnings("unchecked")
       final Map<String, Object> layerEnvSummary =
@@ -464,16 +326,20 @@ public final class IncusResourceBootstrap {
       final Map<String, Object> systemdSummary =
           (Map<String, Object>) slices.runtimeSummaries().get("systemd");
 
-      this.deploymentMetadata = DeploymentMetadata.capture();
-      this.provisioningMetadata =
+      state.deploymentMetadata = DeploymentMetadata.capture();
+      state.provisioningMetadata =
           new ProvisioningMetadata(
               provisioningSlices, new ProvisioningMetadata.Paths(hostSourceDirRelative));
-      this.buildMetadata =
+      state.buildMetadata =
           new BuildMetadata(null, BuildMetadata.Manifests.of(staging.manifestSynthSummary()));
-      this.runtimeMetadata =
+      state.runtimeMetadata =
           new RuntimeMetadata(
               RuntimeMetadata.Environment.of(layerEnvSummary),
               RuntimeMetadata.Systemd.of(systemdSummary));
+    }
+
+    private BootstrapPaths createStagingPaths(Path stagingRoot) {
+      return state.localPaths.asStagingView(stagingRoot);
     }
 
     private record StagingContext(
@@ -485,193 +351,153 @@ public final class IncusResourceBootstrap {
 
     private record SliceContext(
         ProvisioningSliceRegistry sliceRegistry, Map<String, Object> runtimeSummaries) {}
+  }
 
-    private BootstrapPaths createStagingPaths(Path stagingRoot) {
-      final Path originalRoot = localPaths.assetsRoot();
-      return BootstrapPaths.builder()
-          .worktreeRoot(localPaths.worktreeRoot())
-          .stateRoot(localPaths.stateRoot())
-          .clusterNodeRoot(localPaths.clusterNodeRoot())
-          .manifestsRoot(stagingRoot.resolve(originalRoot.relativize(localPaths.manifestsRoot())))
-          .runtimeRke2ConfigRoot(
-              stagingRoot.resolve(originalRoot.relativize(localPaths.runtimeRke2ConfigRoot())))
-          .runtimeCloudConfigRoot(
-              stagingRoot.resolve(originalRoot.relativize(localPaths.runtimeCloudConfigRoot())))
-          .runtimeEnvConfigRoot(
-              stagingRoot.resolve(originalRoot.relativize(localPaths.runtimeEnvConfigRoot())))
-          .secretsFile(localPaths.secretsFile())
-          .assetsRoot(stagingRoot)
-          .daemonsetRoot(stagingRoot.resolve(originalRoot.relativize(localPaths.daemonsetRoot())))
-          .scriptsRoot(stagingRoot.resolve(originalRoot.relativize(localPaths.scriptsRoot())))
-          .systemdLibexecRoot(
-              stagingRoot.resolve(originalRoot.relativize(localPaths.systemdLibexecRoot())))
-          .systemdRoot(stagingRoot.resolve(originalRoot.relativize(localPaths.systemdRoot())))
-          .gitRoot(localPaths.gitRoot())
-          .shareRoot(localPaths.shareRoot())
-          .kubeconfigRoot(localPaths.kubeconfigRoot())
-          .cloudSeedRoot(stagingRoot.resolve(originalRoot.relativize(localPaths.cloudSeedRoot())))
-          .build();
+  private void clearStaleBootstrapKubeconfig() {
+    if (Deployment.getInstance().isDryRun()) {
+      return;
     }
 
-    private void clearStaleBootstrapKubeconfig() {
-      if (Deployment.getInstance().isDryRun()) {
-        return;
-      }
+    final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
+    try {
+      Files.deleteIfExists(kubeconfigPath);
+    } catch (IOException ex) {
+      throw new IllegalStateException(
+          "Failed to clear stale bootstrap kubeconfig before readiness gating: " + kubeconfigPath,
+          ex);
+    }
+  }
 
-      final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
+  private Map<String, Object> synthesizeAndExplodeManifests(
+      Path manifestsRoot, ControlplanePolicy policy, LayerEnvContext layerContext) {
+    final long startedAt = System.nanoTime();
+    Path synthScratch = null;
+    try {
+      synthScratch = Files.createTempDirectory("rke2lab-synth-");
+      final Path consolidated = synthScratch.resolve("manifests.yaml");
+      final FloxDebugPolicy floxDebugPolicy = resolveFloxDebugPolicy(policy);
+
+      manifestFileOps.wipeExplodedLayers(manifestsRoot);
+
+      synthesizeManifests(synthScratch, consolidated, layerContext, floxDebugPolicy);
+      final ManifestExplodeResult explodeResult = explodeManifests(consolidated, manifestsRoot);
+      final Map<String, Object> summary =
+          buildManifestSynthSummary(manifestsRoot, explodeResult, floxDebugPolicy);
+
+      logManifestSynthesisComplete(startedAt, floxDebugPolicy, summary);
+      return summary;
+    } catch (IOException ex) {
+      throw new IllegalStateException("Failed to synthesize/explode manifests", ex);
+    } finally {
+      if (synthScratch != null) {
+        manifestFileOps.deleteSynthScratchSilently(synthScratch);
+      }
+    }
+  }
+
+  private FloxDebugPolicy resolveFloxDebugPolicy(ControlplanePolicy policy) {
+    return policy.debug().floxNriPluginEnabled()
+        ? FloxDebugPolicy.debug()
+        : FloxDebugPolicy.disabled();
+  }
+
+  private void synthesizeManifests(
+      Path synthScratch,
+      Path consolidated,
+      LayerEnvContext layerContext,
+      FloxDebugPolicy floxDebugPolicy)
+      throws IOException {
+    final ComponentVersions componentVersions = ComponentVersions.defaults();
+
+    final ManifestSynthesisRequest synthRequest =
+        new ManifestSynthesisRequest(synthScratch, consolidated)
+            .withFloxDebugPolicy(floxDebugPolicy)
+            .withBootstrapIdentity(layerContext.bootstrapIdentity())
+            .withNetworkTopology(layerContext.networkTopology())
+            .withComponentVersions(componentVersions);
+
+    final ManifestSynthesisService synthesizer = singleSpiProvider(ManifestSynthesisService.class);
+    synthesizer.synthesize(synthRequest);
+  }
+
+  private ManifestExplodeResult explodeManifests(Path consolidated, Path manifestsRoot)
+      throws IOException {
+    final ManifestExplodeService exploder = singleSpiProvider(ManifestExplodeService.class);
+    return exploder.explode(new ManifestExplodeRequest(consolidated, manifestsRoot));
+  }
+
+  private void logManifestSynthesisComplete(
+      long startedAt, FloxDebugPolicy floxDebugPolicy, Map<String, Object> summary) {
+    logInfo(
+        "phase prepareHostState: manifests synthesized + exploded after "
+            + elapsedSince(startedAt)
+            + " (floxDebugPolicy.enabled="
+            + floxDebugPolicy.enabled()
+            + ", checksum="
+            + summary.get("checksum")
+            + ", fileCount="
+            + summary.get("fileCount")
+            + ")");
+  }
+
+  private Map<String, Object> buildManifestSynthSummary(
+      Path manifestsRoot, ManifestExplodeResult explodeResult, FloxDebugPolicy floxDebugPolicy) {
+    final List<Path> writtenFiles = explodeResult.writtenFiles();
+
+    return Map.of(
+        "checksum", computeManifestChecksum(manifestsRoot, writtenFiles),
+        "fileCount", writtenFiles.size(),
+        "layers", countLayers(manifestsRoot, writtenFiles),
+        "byLayer", groupByLayer(manifestsRoot, writtenFiles),
+        "floxDebugEnabled", floxDebugPolicy.enabled(),
+        "manifestsRoot", manifestsRoot.toString());
+  }
+
+  private String computeManifestChecksum(Path manifestsRoot, List<Path> writtenFiles) {
+    final MessageDigest digest;
+    try {
+      digest = MessageDigest.getInstance("SHA-256");
+    } catch (NoSuchAlgorithmException ex) {
+      throw new IllegalStateException("SHA-256 unavailable", ex);
+    }
+
+    for (Path file : writtenFiles) {
       try {
-        Files.deleteIfExists(kubeconfigPath);
+        digest.update(manifestsRoot.relativize(file).toString().getBytes(StandardCharsets.UTF_8));
+        digest.update((byte) 0);
+        digest.update(Files.readAllBytes(file));
+        digest.update((byte) 0);
       } catch (IOException ex) {
-        throw new IllegalStateException(
-            "Failed to clear stale bootstrap kubeconfig before readiness gating: " + kubeconfigPath,
-            ex);
+        throw new IllegalStateException("Failed reading exploded manifest: " + file, ex);
       }
     }
 
-    /**
-     * Run the cdk8s synth and split the consolidated YAML into per-resource files under {@code
-     * manifestsRoot}. The {@link FloxDebugPolicy} is derived from {@link ControlplanePolicy} so a
-     * Pulumi config flip materializes new manifests on the next {@code pulumi up} — no
-     * manifests-module rebuild required.
-     */
-    private Map<String, Object> synthesizeAndExplodeManifests(
-        Path manifestsRoot, ControlplanePolicy policy, LayerEnvContext layerContext) {
-      final long startedAt = System.nanoTime();
-      Path synthScratch = null;
-      try {
-        synthScratch = Files.createTempDirectory("rke2lab-synth-");
-        final Path consolidated = synthScratch.resolve("manifests.yaml");
-        final FloxDebugPolicy floxDebugPolicy = resolveFloxDebugPolicy(policy);
+    return HexFormat.of().formatHex(digest.digest());
+  }
 
-        wipeExplodedLayers(manifestsRoot);
-
-        synthesizeManifests(synthScratch, consolidated, layerContext, floxDebugPolicy);
-        final ManifestExplodeResult explodeResult = explodeManifests(consolidated, manifestsRoot);
-        final Map<String, Object> summary =
-            buildManifestSynthSummary(manifestsRoot, explodeResult, floxDebugPolicy);
-
-        logManifestSynthesisComplete(startedAt, floxDebugPolicy, summary);
-        return summary;
-      } catch (IOException ex) {
-        throw new IllegalStateException("Failed to synthesize/explode manifests", ex);
-      } finally {
-        if (synthScratch != null) {
-          deleteSynthScratchSilently(synthScratch);
-        }
+  private Map<String, Integer> groupByLayer(Path manifestsRoot, List<Path> writtenFiles) {
+    final LinkedHashMap<String, Integer> byLayer = new LinkedHashMap<>();
+    for (Path file : writtenFiles) {
+      final Path relative = manifestsRoot.relativize(file);
+      if (relative.getNameCount() == 0) {
+        continue;
       }
+      final String layer = relative.getName(0).toString();
+      byLayer.merge(layer, 1, (existing, increment) -> existing + increment);
     }
+    return Map.copyOf(byLayer);
+  }
 
-    private FloxDebugPolicy resolveFloxDebugPolicy(ControlplanePolicy policy) {
-      return policy.debug().floxNriPluginEnabled()
-          ? FloxDebugPolicy.debug()
-          : FloxDebugPolicy.disabled();
-    }
+  private int countLayers(Path manifestsRoot, List<Path> writtenFiles) {
+    return groupByLayer(manifestsRoot, writtenFiles).size();
+  }
 
-    private void synthesizeManifests(
-        Path synthScratch,
-        Path consolidated,
-        LayerEnvContext layerContext,
-        FloxDebugPolicy floxDebugPolicy)
-        throws IOException {
-      final ComponentVersions componentVersions = ComponentVersions.defaults();
+  private static final class ManifestFileOperations {
+    private static final ManifestFileOperations INSTANCE = new ManifestFileOperations();
 
-      final ManifestSynthesisRequest synthRequest =
-          new ManifestSynthesisRequest(synthScratch, consolidated)
-              .withFloxDebugPolicy(floxDebugPolicy)
-              .withBootstrapIdentity(layerContext.bootstrapIdentity())
-              .withNetworkTopology(layerContext.networkTopology())
-              .withComponentVersions(componentVersions);
+    private ManifestFileOperations() {}
 
-      final ManifestSynthesisService synthesizer =
-          singleSpiProvider(ManifestSynthesisService.class);
-      synthesizer.synthesize(synthRequest);
-    }
-
-    private ManifestExplodeResult explodeManifests(Path consolidated, Path manifestsRoot)
-        throws IOException {
-      final ManifestExplodeService exploder = singleSpiProvider(ManifestExplodeService.class);
-      return exploder.explode(new ManifestExplodeRequest(consolidated, manifestsRoot));
-    }
-
-    private void logManifestSynthesisComplete(
-        long startedAt, FloxDebugPolicy floxDebugPolicy, Map<String, Object> summary) {
-      logInfo(
-          "phase prepareHostState: manifests synthesized + exploded after "
-              + elapsedSince(startedAt)
-              + " (floxDebugPolicy.enabled="
-              + floxDebugPolicy.enabled()
-              + ", checksum="
-              + summary.get("checksum")
-              + ", fileCount="
-              + summary.get("fileCount")
-              + ")");
-    }
-
-    private Map<String, Object> buildManifestSynthSummary(
-        Path manifestsRoot, ManifestExplodeResult explodeResult, FloxDebugPolicy floxDebugPolicy) {
-      final List<Path> writtenFiles = explodeResult.writtenFiles();
-
-      return Map.of(
-          "checksum", computeManifestChecksum(manifestsRoot, writtenFiles),
-          "fileCount", writtenFiles.size(),
-          "layers", countLayers(manifestsRoot, writtenFiles),
-          "byLayer", groupByLayer(manifestsRoot, writtenFiles),
-          "floxDebugEnabled", floxDebugPolicy.enabled(),
-          "manifestsRoot", manifestsRoot.toString());
-    }
-
-    private String computeManifestChecksum(Path manifestsRoot, List<Path> writtenFiles) {
-      final MessageDigest digest;
-      try {
-        digest = MessageDigest.getInstance("SHA-256");
-      } catch (NoSuchAlgorithmException ex) {
-        throw new IllegalStateException("SHA-256 unavailable", ex);
-      }
-
-      for (Path file : writtenFiles) {
-        try {
-          digest.update(manifestsRoot.relativize(file).toString().getBytes(StandardCharsets.UTF_8));
-          digest.update((byte) 0);
-          digest.update(Files.readAllBytes(file));
-          digest.update((byte) 0);
-        } catch (IOException ex) {
-          throw new IllegalStateException("Failed reading exploded manifest: " + file, ex);
-        }
-      }
-
-      return HexFormat.of().formatHex(digest.digest());
-    }
-
-    private Map<String, Integer> groupByLayer(Path manifestsRoot, List<Path> writtenFiles) {
-      final LinkedHashMap<String, Integer> byLayer = new LinkedHashMap<>();
-      for (Path file : writtenFiles) {
-        final Path relative = manifestsRoot.relativize(file);
-        if (relative.getNameCount() == 0) {
-          continue;
-        }
-        final String layer = relative.getName(0).toString();
-        byLayer.merge(layer, 1, (existing, increment) -> existing + increment);
-      }
-      return Map.copyOf(byLayer);
-    }
-
-    private int countLayers(Path manifestsRoot, List<Path> writtenFiles) {
-      return groupByLayer(manifestsRoot, writtenFiles).size();
-    }
-
-    /**
-     * Lay the flox runtime-installer build inputs out under {@code <daemonsetRoot>/runtime/flox/},
-     * which incus bind-mounts into each guest at {@code /srv/host/k8s-daemonset.d/runtime/flox/} —
-     * read-only on the pod side. The init container copies these inputs into a per-node mutable
-     * workspace at {@code /var/run/k8s-daemonset.d/runtime/flox/} at startup; nix and flox write
-     * locks there. Since this path is build-only on the pod side, the wipe can be wholesale.
-     */
-    /**
-     * Remove every direct child of {@code manifestsRoot} except {@code host/} (which carries the
-     * non-synthesized systemd-scripts and systemd-units the materializer just wrote). Stale layer
-     * directories from a prior synth would otherwise leak into the bind-mounted host view.
-     */
-    private static void wipeExplodedLayers(Path manifestsRoot) throws IOException {
+    void wipeExplodedLayers(Path manifestsRoot) throws IOException {
       if (!Files.isDirectory(manifestsRoot)) {
         return;
       }
@@ -685,7 +511,7 @@ public final class IncusResourceBootstrap {
       }
     }
 
-    private static void deleteSubtree(Path root) throws IOException {
+    void deleteSubtree(Path root) throws IOException {
       if (!Files.exists(root)) {
         return;
       }
@@ -697,7 +523,7 @@ public final class IncusResourceBootstrap {
       }
     }
 
-    private static void deleteSynthScratchSilently(Path scratch) {
+    void deleteSynthScratchSilently(Path scratch) {
       try (Stream<Path> stream = Files.walk(scratch)) {
         stream
             .sorted(java.util.Comparator.reverseOrder())
@@ -706,49 +532,94 @@ public final class IncusResourceBootstrap {
                   try {
                     Files.deleteIfExists(entry);
                   } catch (IOException ignored) {
-                    // best-effort cleanup; leave the entry in place
+                    // best-effort cleanup
                   }
                 });
       } catch (IOException ignored) {
-        // synthScratch already gone or unreadable — nothing to clean
+        // synthScratch already gone or unreadable
       }
     }
+  }
 
-    private <T> T singleSpiProvider(Class<T> serviceType) {
-      final List<T> providers =
-          ServiceLoader.load(serviceType).stream().map(ServiceLoader.Provider::get).toList();
-      if (providers.isEmpty()) {
-        throw new IllegalStateException(
-            "No " + serviceType.getSimpleName() + " provider found via ServiceLoader.");
-      }
-      if (providers.size() > 1) {
-        throw new IllegalStateException(
-            "Expected exactly one "
-                + serviceType.getSimpleName()
-                + " provider, found "
-                + providers.size());
-      }
-      return providers.getFirst();
+  private <T> T singleSpiProvider(Class<T> serviceType) {
+    final List<T> providers =
+        ServiceLoader.load(serviceType).stream().map(ServiceLoader.Provider::get).toList();
+    if (providers.isEmpty()) {
+      throw new IllegalStateException(
+          "No " + serviceType.getSimpleName() + " provider found via ServiceLoader.");
+    }
+    if (providers.size() > 1) {
+      throw new IllegalStateException(
+          "Expected exactly one "
+              + serviceType.getSimpleName()
+              + " provider, found "
+              + providers.size());
+    }
+    return providers.getFirst();
+  }
+
+  private final class ProviderStage {
+    private final ApplyState state;
+    private final BootstrapConfig config;
+    private final ControlplanePolicy policy;
+    private final PulumiIncusImageProvider imageProvider;
+
+    ProviderStage(
+        ApplyState state,
+        BootstrapConfig config,
+        ControlplanePolicy policy,
+        PulumiIncusImageProvider imageProvider) {
+      this.state = state;
+      this.config = config;
+      this.policy = policy;
+      this.imageProvider = imageProvider;
     }
 
-    private ApplyPipeline prepareProviderResources() {
-      this.providerContext = IncusProviderContext.forBootstrap("seed-incus-provider", config);
-      this.ensuredProject = ensureProject(providerContext);
-      this.ensuredProjectName = ensuredProject.name();
-      ensureNetwork(providerContext, config.lanBridgeParent(), ensuredProject);
-      ensureNetwork(providerContext, config.vmnetNetworkName(), ensuredProject);
-      this.ensuredProfileName = ensureProfile(providerContext, ensuredProject);
-      this.ensuredImageFingerprint =
-          imageProvider.ensureSeedImageFingerprint(
-              providerContext.invokeOptions(), providerContext.provider(), ensuredProject);
-      // Update buildMetadata with image checksum now that image is built
-      this.buildMetadata =
-          new BuildMetadata(
-              new BuildMetadata.Image(imageProvider.buildChecksum()), buildMetadata.manifests());
+    ProviderStage ensureProject() {
+      state.providerContext = IncusProviderContext.forBootstrap("seed-incus-provider", config);
+      state.ensuredProject = IncusResourceBootstrap.this.ensureProject(state.providerContext);
+      state.ensuredProjectName = state.ensuredProject.name();
       return this;
     }
 
-    private ApplyPipeline createInstance() {
+    ProviderStage ensureNetworks() {
+      IncusResourceBootstrap.this.ensureNetwork(
+          state.providerContext, config.lanBridgeParent(), state.ensuredProject);
+      IncusResourceBootstrap.this.ensureNetwork(
+          state.providerContext, config.vmnetNetworkName(), state.ensuredProject);
+      return this;
+    }
+
+    ProviderStage ensureProfile() {
+      state.ensuredProfileName =
+          IncusResourceBootstrap.this.ensureProfile(state.providerContext, state.ensuredProject);
+      return this;
+    }
+
+    ProviderStage ensureImage() {
+      state.ensuredImageFingerprint =
+          imageProvider.ensureSeedImageFingerprint(
+              state.providerContext.invokeOptions(),
+              state.providerContext.provider(),
+              state.ensuredProject);
+      state.buildMetadata =
+          new BuildMetadata(
+              new BuildMetadata.Image(imageProvider.buildChecksum()),
+              state.buildMetadata.manifests());
+      return this;
+    }
+  }
+
+  private final class InstanceStage {
+    private final ApplyState state;
+    private final BootstrapConfig config;
+
+    InstanceStage(ApplyState state, BootstrapConfig config) {
+      this.state = state;
+      this.config = config;
+    }
+
+    InstanceStage create() {
       final Map<String, String> instanceConfig = new LinkedHashMap<>();
       instanceConfig.put(
           "raw.lxc",
@@ -762,31 +633,24 @@ public final class IncusResourceBootstrap {
       instanceConfig.put("security.syscalls.intercept.bpf", "true");
       instanceConfig.put("security.syscalls.intercept.bpf.devices", "true");
 
-      // Store STATIC slice checksums in instance config
-      // Changes trigger full renewal. HOT_RELOAD slices stored separately (outputs/ConfigMap).
       for (Map.Entry<String, String> entry :
-          provisioningMetadata.slices().staticSlices().entrySet()) {
+          state.provisioningMetadata.slices().staticSlices().entrySet()) {
         instanceConfig.put("user.rke2lab.provisioning.slice." + entry.getKey(), entry.getValue());
       }
 
-      // Image checksum - triggers renewal if base image changes (semantic change requiring rebuild)
-      instanceConfig.put("user.rke2lab.imageBuildChecksum", buildMetadata.image().checksum());
+      instanceConfig.put("user.rke2lab.imageBuildChecksum", state.buildMetadata.image().checksum());
 
-      // NOTE: Git SHA, branch, and timestamp excluded from config to enable hot-reload
-      // These are available in Pulumi outputs for audit/tracking purposes
-      // Only STATIC slice checksums and image checksum should trigger instance renewal
-
-      this.instance =
+      state.instance =
           new Instance(
               "seed-instance",
               InstanceArgs.builder()
                   .name(config.nodeName())
-                  .project(ensuredProjectName)
-                  .image(ensuredImageFingerprint)
-                  .profiles(ensuredProfileName.applyValue(List::of))
+                  .project(state.ensuredProjectName)
+                  .image(state.ensuredImageFingerprint)
+                  .profiles(state.ensuredProfileName.applyValue(List::of))
                   .config(instanceConfig)
                   .running(true)
-                  .devices(seedInstanceDevices(nixosPaths))
+                  .devices(seedInstanceDevices(state.nixosPaths))
                   .build(),
               instanceOptions());
       return this;
@@ -794,35 +658,137 @@ public final class IncusResourceBootstrap {
 
     private CustomResourceOptions instanceOptions() {
       return CustomResourceOptions.builder()
-          .provider(providerContext.provider())
+          .provider(state.providerContext.provider())
           .deleteBeforeReplace(true)
           .replaceOnChanges(List.of("config", "config.*"))
           .ignoreChanges(List.of("image"))
           .build();
     }
+  }
 
-    private BootstrapResult toResult() {
-      return new BootstrapResult(
-          "incus://" + config.incusProject() + "/" + config.nodeName(),
-          ensuredImageFingerprint,
-          instance.status(),
-          instance.urn(),
-          providerContext.provider().urn(),
-          deploymentMetadata,
-          provisioningMetadata,
-          buildMetadata,
-          runtimeMetadata,
-          instance);
+  /** State-machine entry / transitions for the apply pipeline. */
+  private final class ApplyStart {
+    private final ApplyState state;
+
+    ApplyStart(ApplyState state) {
+      this.state = state;
     }
 
-    private String relativizeAgainstWorktree(Path worktreeRoot, Path path) {
-      final Path normalizedWorktree = worktreeRoot.toAbsolutePath().normalize();
-      final Path normalizedPath = path.toAbsolutePath().normalize();
-      try {
-        return normalizedWorktree.relativize(normalizedPath).toString();
-      } catch (IllegalArgumentException ex) {
-        return normalizedPath.toString();
-      }
+    /** Optional: register a per-topic failure handler. Defaults to no-op when not called. */
+    ApplyStart onFailure(OnFailure handler) {
+      state.onFailure = handler;
+      return this;
+    }
+
+    PathDone during(String topic, java.util.function.Function<PathStage, PathStage> body) {
+      TopicRunner.runDuring("incus", topic, new PathStage(state, config), body, state.onFailure);
+      return new PathDone(state);
+    }
+  }
+
+  private final class PathDone {
+    private final ApplyState state;
+
+    PathDone(ApplyState state) {
+      this.state = state;
+    }
+
+    AwaitingHost then() {
+      return new AwaitingHost(state);
+    }
+  }
+
+  private final class AwaitingHost {
+    private final ApplyState state;
+
+    AwaitingHost(ApplyState state) {
+      this.state = state;
+    }
+
+    HostDone during(String topic, java.util.function.Function<HostStage, HostStage> body) {
+      TopicRunner.runDuring(
+          "incus", topic, new HostStage(state, config, policy), body, state.onFailure);
+      return new HostDone(state);
+    }
+  }
+
+  private final class HostDone {
+    private final ApplyState state;
+
+    HostDone(ApplyState state) {
+      this.state = state;
+    }
+
+    AwaitingProvider then() {
+      return new AwaitingProvider(state);
+    }
+  }
+
+  private final class AwaitingProvider {
+    private final ApplyState state;
+
+    AwaitingProvider(ApplyState state) {
+      this.state = state;
+    }
+
+    ProviderDone during(
+        String topic, java.util.function.Function<ProviderStage, ProviderStage> body) {
+      TopicRunner.runDuring(
+          "incus",
+          topic,
+          new ProviderStage(state, config, policy, imageProvider),
+          body,
+          state.onFailure);
+      return new ProviderDone(state);
+    }
+  }
+
+  private final class ProviderDone {
+    private final ApplyState state;
+
+    ProviderDone(ApplyState state) {
+      this.state = state;
+    }
+
+    AwaitingInstance then() {
+      return new AwaitingInstance(state);
+    }
+  }
+
+  private final class AwaitingInstance {
+    private final ApplyState state;
+
+    AwaitingInstance(ApplyState state) {
+      this.state = state;
+    }
+
+    InstanceDone during(
+        String topic, java.util.function.Function<InstanceStage, InstanceStage> body) {
+      TopicRunner.runDuring(
+          "incus", topic, new InstanceStage(state, config), body, state.onFailure);
+      return new InstanceDone(state);
+    }
+  }
+
+  private final class InstanceDone {
+    private final ApplyState state;
+
+    InstanceDone(ApplyState state) {
+      this.state = state;
+    }
+
+    BootstrapResult toResult() {
+      return new BootstrapResult(
+          "incus://" + config.incusProject() + "/" + config.nodeName(),
+          state.ensuredImageFingerprint,
+          state.instance.status(),
+          state.instance.urn(),
+          state.providerContext.provider().urn(),
+          state.deploymentMetadata,
+          state.provisioningMetadata,
+          state.buildMetadata,
+          state.runtimeMetadata,
+          state.instance);
     }
   }
 
@@ -1288,6 +1254,41 @@ public final class IncusResourceBootstrap {
           .kubeconfigRoot(config.pathOn(host, kubeconfigRoot))
           .cloudSeedRoot(config.pathOn(host, cloudSeedRoot))
           .build();
+    }
+
+    private BootstrapPaths asStagingView(Path stagingRoot) {
+      final Path originalRoot = assetsRoot;
+      return BootstrapPaths.builder()
+          .worktreeRoot(worktreeRoot)
+          .stateRoot(stateRoot)
+          .clusterNodeRoot(clusterNodeRoot)
+          .manifestsRoot(stagingRoot.resolve(originalRoot.relativize(manifestsRoot)))
+          .runtimeRke2ConfigRoot(
+              stagingRoot.resolve(originalRoot.relativize(runtimeRke2ConfigRoot)))
+          .runtimeCloudConfigRoot(
+              stagingRoot.resolve(originalRoot.relativize(runtimeCloudConfigRoot)))
+          .runtimeEnvConfigRoot(stagingRoot.resolve(originalRoot.relativize(runtimeEnvConfigRoot)))
+          .secretsFile(secretsFile)
+          .assetsRoot(stagingRoot)
+          .daemonsetRoot(stagingRoot.resolve(originalRoot.relativize(daemonsetRoot)))
+          .scriptsRoot(stagingRoot.resolve(originalRoot.relativize(scriptsRoot)))
+          .systemdLibexecRoot(stagingRoot.resolve(originalRoot.relativize(systemdLibexecRoot)))
+          .systemdRoot(stagingRoot.resolve(originalRoot.relativize(systemdRoot)))
+          .gitRoot(gitRoot)
+          .shareRoot(shareRoot)
+          .kubeconfigRoot(kubeconfigRoot)
+          .cloudSeedRoot(stagingRoot.resolve(originalRoot.relativize(cloudSeedRoot)))
+          .build();
+    }
+
+    private String relativizeAgainst(Path base) {
+      final Path normalizedBase = base.toAbsolutePath().normalize();
+      final Path normalizedAssets = assetsRoot.toAbsolutePath().normalize();
+      try {
+        return normalizedBase.relativize(normalizedAssets).toString();
+      } catch (IllegalArgumentException ex) {
+        return normalizedAssets.toString();
+      }
     }
 
     private static final class Builder {
