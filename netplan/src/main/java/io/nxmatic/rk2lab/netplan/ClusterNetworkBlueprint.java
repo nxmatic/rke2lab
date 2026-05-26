@@ -102,7 +102,7 @@ public record ClusterNetworkBlueprint(
             lanHostMacaddr,
             lanBridgeMacaddr),
         new WanPlan(wanDhcpRange, wanHostMacaddr),
-        new InterfacePlan(nodeName + "-lan0", nodeName + "-vmnet0", "rke2-vip0"),
+        new InterfacePlan(nodeName + "-lan0", nodeName + "-vmnet0", "vmnet0"),
         new VlanPlan(100, "rke2-vlan"));
   }
 

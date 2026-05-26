@@ -208,7 +208,7 @@ public final class PorchResourcesLayer extends Construct {
             "cluster-node-vip-inetaddr",
             "10.80.7.10",
             "cluster-vip-interface",
-            "rke2-vip0",
+            "vmnet0",
             "kube-vip-namespace",
             "kube-vip",
             "kube-vip-version",

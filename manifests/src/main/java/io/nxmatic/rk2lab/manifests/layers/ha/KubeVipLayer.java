@@ -233,7 +233,14 @@ public final class KubeVipLayer extends Construct {
                                 List.of(
                                     Map.of("name", "vip_arp", "value", "true"),
                                     Map.of("name", "port", "value", "6443"),
-                                    Map.of("name", "vip_interface", "value", "rke2-vip0"),
+                                    // kube-vip binds the VIP as a secondary IP on an existing
+                                    // interface — there is no dedicated `rke2-vip0` link in the
+                                    // netplan, despite the historical blueprint slot suggesting
+                                    // one. The cluster-internal bridge is `vmnet0` (10.80.0.0/21
+                                    // cluster CIDR), and the VIP 10.80.7.10 sits in the
+                                    // cluster-vip-cidr 10.80.7.0/24 routed across that bridge —
+                                    // so vmnet0 is the only correct binding target.
+                                    Map.of("name", "vip_interface", "value", "vmnet0"),
                                     Map.of("name", "vip_cidr", "value", "32"),
                                     Map.of("name", "dns_mode", "value", "first"),
                                     Map.of("name", "cp_enable", "value", "true"),
