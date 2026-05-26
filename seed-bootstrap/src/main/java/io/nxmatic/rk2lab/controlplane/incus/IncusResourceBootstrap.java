@@ -1834,8 +1834,7 @@ public final class IncusResourceBootstrap {
         siblings
             .filter(p -> p.getFileName().toString().matches(rotationPattern))
             .sorted(
-                java.util.Comparator.<Path, String>comparing(
-                        p -> p.getFileName().toString())
+                java.util.Comparator.<Path, String>comparing(p -> p.getFileName().toString())
                     .reversed())
             .skip(retentionCount)
             .forEach(

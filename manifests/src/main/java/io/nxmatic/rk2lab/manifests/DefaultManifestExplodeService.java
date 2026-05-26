@@ -13,12 +13,15 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.nodes.Node;
+import org.yaml.snakeyaml.nodes.Tag;
 import org.yaml.snakeyaml.representer.Representer;
 
 /**
@@ -61,7 +64,7 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
 
     final List<Path> written = new ArrayList<>();
     final DumperOptions dumperOptions = buildDumperOptions();
-    final Yaml writer = new Yaml(new Representer(dumperOptions), dumperOptions);
+    final Yaml writer = new Yaml(new SortedKeyRepresenter(dumperOptions), dumperOptions);
     final Yaml reader = new Yaml(new SafeConstructor(largeDocumentLoaderOptions()));
 
     final String yamlSource = Files.readString(source);
@@ -161,5 +164,22 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
     final LoaderOptions options = new LoaderOptions();
     options.setCodePointLimit(64 * 1024 * 1024);
     return options;
+  }
+
+  /**
+   * Custom Representer that sorts map keys alphabetically for deterministic YAML output. Ensures
+   * stable checksums by producing consistent field ordering across builds.
+   */
+  private static final class SortedKeyRepresenter extends Representer {
+    SortedKeyRepresenter(DumperOptions options) {
+      super(options);
+    }
+
+    @Override
+    protected Node representMapping(Tag tag, Map<?, ?> mapping, DumperOptions.FlowStyle flowStyle) {
+      // Convert to TreeMap to sort keys alphabetically
+      final Map<?, ?> sortedMap = new TreeMap<>(mapping);
+      return super.representMapping(tag, sortedMap, flowStyle);
+    }
   }
 }
