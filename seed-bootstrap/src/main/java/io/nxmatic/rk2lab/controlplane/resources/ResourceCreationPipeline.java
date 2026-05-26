@@ -17,7 +17,7 @@ import java.util.function.Consumer;
  * <p>Organizes resource creation into composable stages: systemd adapter, readiness verification,
  * registry provisioning, image builds, and manifest synthesis.
  */
-final class BootstrapPipeline {
+final class ResourceCreationPipeline {
 
   private final BootstrapConfig config;
   private final ControlplanePolicy policy;
@@ -26,7 +26,7 @@ final class BootstrapPipeline {
   private final IncusResourceBootstrap.BootstrapResult bootstrapResult;
   private final Map<String, Object> systemdAdapterLaunchSummary;
 
-  BootstrapPipeline(
+  ResourceCreationPipeline(
       BootstrapConfig config,
       ControlplanePolicy policy,
       boolean readinessEnabled,

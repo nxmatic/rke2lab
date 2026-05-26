@@ -18,8 +18,8 @@ public final class ResourceManager {
       Map<String, Object> systemdAdapterLaunchSummary,
       boolean pulumiMode) {
 
-    final BootstrapPipeline pipeline =
-        new BootstrapPipeline(
+    final ResourceCreationPipeline pipeline =
+        new ResourceCreationPipeline(
             config,
             policy,
             readinessEnabled,
@@ -28,7 +28,7 @@ public final class ResourceManager {
             systemdAdapterLaunchSummary);
 
     if (pulumiMode) {
-      final BootstrapPipeline.PulumiResources resources = pipeline.createPulumiResources();
+      final ResourceCreationPipeline.PulumiResources resources = pipeline.createPulumiResources();
       return new ResourceCreationResult(
           resources.readinessOutput(),
           resources.clusterReadinessResourceUrn(),
