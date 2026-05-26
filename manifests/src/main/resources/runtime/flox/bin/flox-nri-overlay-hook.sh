@@ -1,5 +1,6 @@
 #!/usr/bin/env -S bash -euxo pipefail
 # OCI CreateContainer hook: mount an overlayfs on a path in the container rootfs.
+echo "[flox-overlay-hook] Hot-reload test - version 1.0.1" >&2
 #
 # Runs in the container's mount namespace before pivot_root, so mounts performed
 # here persist into the running container after pivot_root. (CreateRuntime hooks

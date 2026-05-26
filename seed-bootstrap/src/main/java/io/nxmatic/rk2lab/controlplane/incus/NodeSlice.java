@@ -71,8 +71,8 @@ public final class NodeSlice implements ProvisioningSlice {
         CLASSPATH_HOST_SYSTEMD_UNITS_ROOT, hostRoot.resolve("systemd-units"), false);
   }
 
-  private void materializeResourceTree(String classpathRoot, Path targetDir, boolean executableFiles)
-      throws IOException {
+  private void materializeResourceTree(
+      String classpathRoot, Path targetDir, boolean executableFiles) throws IOException {
     // Use ClasspathAssetMaterializer logic (inline for now, could extract shared util later)
     if (!Files.exists(targetDir)) {
       Files.createDirectories(targetDir);

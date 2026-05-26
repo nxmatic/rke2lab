@@ -130,10 +130,10 @@ public final class SliceChecksumPipeline {
     }
 
     public CoreSliceStage fromCoreRoots() {
-      // Core slice: STATIC infrastructure (cloud-init seed only)
-      // cloud-init consumes user-data/meta-data/network-config at boot
-      // Everything else (systemd, manifests, rke2-config, env-config) moved to hot-reload slices
-      final List<Path> coreRoots = List.of(state.paths.cloudSeedRoot());
+      // Core slice: STATIC infrastructure (cloud-init source ConfigMap)
+      // runtimeCloudConfigRoot generates cloudSeedRoot (user-data/meta-data/network-config)
+      // Only checksum the input - output is deterministically derived
+      final List<Path> coreRoots = List.of(state.paths.runtimeCloudConfigRoot());
 
       state.sliceChecksums.put("core", computeChecksum(coreRoots));
       return this;

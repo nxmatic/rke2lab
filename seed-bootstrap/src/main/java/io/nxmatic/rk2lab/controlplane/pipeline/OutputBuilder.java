@@ -50,7 +50,10 @@ public final class OutputBuilder {
         "seedProvisioningMetadata",
         Map.of(
             "slices",
-            bootstrapResult.provisioning().slices().checksums(),
+            Map.of(
+                "static", bootstrapResult.provisioning().slices().staticSlices(),
+                "hotReload", bootstrapResult.provisioning().slices().hotReloadSlices(),
+                "all", bootstrapResult.provisioning().slices().all()),
             "paths",
             Map.of(
                 "hostSourceDirRelative",

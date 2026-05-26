@@ -368,7 +368,7 @@ public final class IncusResourceBootstrap {
       // Initialize slice registry
       final ProvisioningSliceRegistry sliceRegistry = new ProvisioningSliceRegistry();
 
-      // Define core slice as STATIC (cloud-init seed only - user-data/meta-data/network-config)
+      // Define core slice as STATIC (cloud-init: seed + source ConfigMap for generation)
       sliceRegistry.defineSlice("core", SliceStoragePolicy.STATIC);
 
       // Materialize and register node slice (systemd units/scripts, NRI plugin, node runtime)
@@ -380,7 +380,7 @@ public final class IncusResourceBootstrap {
       }
       sliceRegistry.register(nodeSlice);
 
-      // Register runtime config slice (rke2-config, cloud-config, env-config - materialized below)
+      // Register runtime config slice (rke2-config, env-config - materialized below)
       // These are HOT_RELOAD because they're consumed by systemd services that can restart
       sliceRegistry.defineSlice("runtimeConfig", SliceStoragePolicy.HOT_RELOAD);
 
@@ -398,7 +398,6 @@ public final class IncusResourceBootstrap {
       sliceRegistry.register(
           "runtimeConfig",
           localPaths.runtimeRke2ConfigRoot(),
-          localPaths.runtimeCloudConfigRoot(),
           localPaths.runtimeEnvConfigRoot());
 
       final ProvisioningMetadata.Slices provisioningSlices =

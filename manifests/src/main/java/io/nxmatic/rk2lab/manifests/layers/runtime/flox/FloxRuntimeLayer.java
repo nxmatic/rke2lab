@@ -309,8 +309,7 @@ public final class FloxRuntimeLayer extends Construct {
                                         + " && export SCRIPT_MOUNT_DIR=/var/run/k8s-daemonset.d/runtime/flox"
                                         + " && export DAEMONLESS_POLICY_SCRIPT_MOUNT_DIR=/.sh-daemonset"
                                         + " && export DYNAMIC_PLUGIN_MOUNT_DIR=/dynamic-plugin"
-                                        + " && . ${SCRIPT_MOUNT_DIR}/bin/flox-runtime-lib.sh"
-                                        + " && flox_runtime::reconcile"
+                                        + " && bash -c '. ${SCRIPT_MOUNT_DIR}/bin/flox-runtime-lib.sh && flox_runtime::reconcile'"
                                   },
                                   "env",
                                   new Object[] {
