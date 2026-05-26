@@ -396,9 +396,7 @@ public final class IncusResourceBootstrap {
 
       // Register runtime config paths (materialized above by specialized writers)
       sliceRegistry.register(
-          "runtimeConfig",
-          localPaths.runtimeRke2ConfigRoot(),
-          localPaths.runtimeEnvConfigRoot());
+          "runtimeConfig", localPaths.runtimeRke2ConfigRoot(), localPaths.runtimeEnvConfigRoot());
 
       final ProvisioningMetadata.Slices provisioningSlices =
           ProvisioningResourceInventory.sliceChecksums(localPaths, sliceRegistry);
@@ -666,10 +664,10 @@ public final class IncusResourceBootstrap {
       }
 
       // Deployment metadata for provenance tracking
+      // NOTE: timestamp excluded from config to avoid triggering replacement on every deploy
+      // Timestamp is available in Pulumi outputs for audit purposes
       instanceConfig.put("user.rke2lab.git.branch", deploymentMetadata.git().branch());
       instanceConfig.put("user.rke2lab.git.commitSha", deploymentMetadata.git().commitSha());
-      instanceConfig.put(
-          "user.rke2lab.deploymentTimestamp", deploymentMetadata.timestamp().toString());
 
       instanceConfig.put("user.rke2lab.imageBuildChecksum", buildMetadata.image().checksum());
 
