@@ -15,6 +15,12 @@ cdk8s-cli.pkg-path = "cdk8s-cli"
 dasel.pkg-path = "dasel"
 dasel.version = "3.3.0"
 graphviz.pkg-path = "graphviz"
+## incus client. Full `incus` daemon is Linux-only in nixpkgs/flox catalog,
+## but its client sub-binary builds on both platforms via the
+## `pkgs.incus.passthru.client` derivation, surfaced as `.#incus-client`
+## from the top-level flake. Single source for both Darwin shells (where
+## we run `incus exec master`) and the Linux NixOS VM.
+incus-client.flake = "path:.#incus-client"
 
 
 ## Environment Variables ---------------------------------------------

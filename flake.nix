@@ -86,9 +86,19 @@
             };
         };
 
+        # Darwin-buildable incus client. The full `incus` daemon is Linux-only
+        # (requires lxc, libcap, cowsql, etc.), but nixpkgs ships a `client.nix`
+        # variant exposed as `pkgs.incus.passthru.client` that builds on both
+        # platforms because it only needs Go + the `cmd/incus` subpackage.
+        # Surfacing it here gives us a stable `flake = ".#incus-client"`
+        # reference for the rke2lab flox env to install on Darwin (the catalog
+        # entry only ships Linux builds).
+        incusClient = pkgs.incus.passthru.client;
+
       in {
         packages = {
           inherit netplanJar networkBlueprintYaml;
+          incus-client = incusClient;
         };
 
         # Export the network blueprint for consumption by nix-darwin-home

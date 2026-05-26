@@ -82,6 +82,9 @@
         "pkg-group": "k8s-kubectl-tools",
         "outputs": "all"
       },
+      "incus-client": {
+        "flake": "path:.#incus-client"
+      },
       "jdk25": {
         "pkg-path": "jdk25",
         "outputs": "all"
@@ -3071,6 +3074,64 @@
       "broken": false,
       "unfree": false,
       "priority": 5
+    },
+    {
+      "install_id": "incus-client",
+      "locked-url": "path:/private/var/lib/git/nxmatic/rke2lab?lastModified=1779784742&narHash=sha256-ThC2a1p5EMCsMIfkWJlj7idKoHrlDokSV58hm1U876E%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-darwin.incus-client",
+      "derivation": "/nix/store/xkmqiqkhdw1jfkfyanq04gbcmkikdpqv-incus-client-7.0.0.drv",
+      "outputs": {
+        "out": "/nix/store/rhfy794ls0fyy452za70mwzqg41714k3-incus-client-7.0.0"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-darwin",
+      "system": "aarch64-darwin",
+      "name": "incus-client-7.0.0",
+      "pname": "incus-client",
+      "version": "7.0.0",
+      "description": "Powerful system container and virtual machine manager",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "incus-client",
+      "locked-url": "path:/private/var/lib/git/nxmatic/rke2lab?lastModified=1779784863&narHash=sha256-1R9nUf2DDJv69Cwog5ggStcNAW03iGy7JadUMFBr0j8%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-linux.incus-client",
+      "derivation": "/nix/store/yqi01xbli6dha4zwqirjnw7yivdkpsz0-incus-client-7.0.0.drv",
+      "outputs": {
+        "out": "/nix/store/snxkbj03l5szzqjsczf6zy1w27fimisr-incus-client-7.0.0"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "incus-client-7.0.0",
+      "pname": "incus-client",
+      "version": "7.0.0",
+      "description": "Powerful system container and virtual machine manager",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
     }
   ],
   "compose": {
@@ -3092,6 +3153,9 @@
         },
         "graphviz": {
           "pkg-path": "graphviz"
+        },
+        "incus-client": {
+          "flake": "path:.#incus-client"
         },
         "pulumi": {
           "pkg-path": "pulumi-bin"
