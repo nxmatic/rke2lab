@@ -70,13 +70,6 @@ public final class ApplicationPipeline {
       this.resourceManager = new ResourceManager();
       this.outputBuilder = new OutputBuilder();
     }
-
-    <S, R> R runDuring(String topic, S stage, Function<S, S> body) {
-      TopicRunner.runDuring("pipeline", topic, stage, body, onFailure);
-      @SuppressWarnings("unchecked")
-      final R cast = (R) this;
-      return cast;
-    }
   }
 
   public static final class Launch {
@@ -117,7 +110,8 @@ public final class ApplicationPipeline {
                   state.options = options;
                 }
               });
-      return state.runDuring(topic, stage, body);
+      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      return new EnvironmentDone(state);
     }
   }
 
@@ -153,7 +147,8 @@ public final class ApplicationPipeline {
               state.resourceManager,
               state.outputBuilder,
               outputs -> state.outputs = outputs);
-      return state.runDuring(topic, stage, body);
+      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      return new BootstrapDone(state);
     }
   }
 
@@ -178,7 +173,8 @@ public final class ApplicationPipeline {
 
     public OutputsDone during(String topic, Function<OutputsStage, OutputsStage> body) {
       final OutputsStage stage = new OutputsStage(state.pulumiContext, () -> state.outputs);
-      return state.runDuring(topic, stage, body);
+      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      return new OutputsDone(state);
     }
   }
 

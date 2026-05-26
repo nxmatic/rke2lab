@@ -7,7 +7,6 @@ import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rk2lab.controlplane.resources.ResourceManager;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 final class PipelineState {
 
@@ -30,12 +29,5 @@ final class PipelineState {
   PipelineState(BootstrapConfig config, ControlplanePolicy policy) {
     this.config = config;
     this.policy = policy;
-  }
-
-  <S, R> R runDuring(String topic, S stage, Function<S, S> body) {
-    TopicRunner.runDuring("pipeline", topic, stage, body, onFailure);
-    @SuppressWarnings("unchecked")
-    final R cast = (R) this;
-    return cast;
   }
 }

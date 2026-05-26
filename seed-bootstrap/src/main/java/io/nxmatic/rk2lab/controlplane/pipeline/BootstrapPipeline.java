@@ -122,7 +122,8 @@ public final class BootstrapPipeline {
               state.config.imageBuilderHost(),
               state.options.cleanWorktreeRequired(),
               state.readinessLogger);
-      return state.runDuring(topic, stage, body);
+      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      return new PreflightDone(state);
     }
   }
 
@@ -152,7 +153,8 @@ public final class BootstrapPipeline {
               state.config.localWorktreePath(),
               state.options.bboxFailOnError(),
               result -> state.bboxResult = result);
-      return state.runDuring(topic, stage, body);
+      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      return new BboxDone(state);
     }
   }
 
@@ -178,7 +180,8 @@ public final class BootstrapPipeline {
     public IncusDone during(String topic, Function<IncusStage, IncusStage> body) {
       final IncusStage stage =
           new IncusStage(state.config, state.policy, result -> state.bootstrapResult = result);
-      return state.runDuring(topic, stage, body);
+      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      return new IncusDone(state);
     }
   }
 
@@ -209,7 +212,8 @@ public final class BootstrapPipeline {
               state.pulumiMode,
               state.readinessLogger,
               summary -> state.systemdAdapterLaunchSummary = summary);
-      return state.runDuring(topic, stage, body);
+      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      return new SystemdAdapterDone(state);
     }
   }
 
@@ -244,7 +248,8 @@ public final class BootstrapPipeline {
               () -> state.bootstrapResult,
               () -> state.systemdAdapterLaunchSummary,
               result -> state.resourceResult = result);
-      return state.runDuring(topic, stage, body);
+      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      return new ResourcesDone(state);
     }
   }
 
