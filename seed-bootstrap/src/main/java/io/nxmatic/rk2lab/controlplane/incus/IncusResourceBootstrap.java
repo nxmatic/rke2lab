@@ -42,12 +42,10 @@ import java.io.IOException;
 import java.net.JarURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -1787,14 +1785,14 @@ public final class IncusResourceBootstrap {
         Files.createDirectories(parent);
 
         if (Files.exists(hostAssetRoot)) {
-          final Path rotatedPath = rotatedHostPath(hostAssetRoot);
-          rotate(hostAssetRoot, rotatedPath);
-          registerRecursiveDeleteAtShutdown(rotatedPath);
+          final Path backupPath = backupHostPath(hostAssetRoot);
+          backup(hostAssetRoot, backupPath);
+          registerRecursiveDeleteAtShutdown(backupPath);
         }
 
-        // Clean up old rotated directories, keeping only N most recent (if retention > 0)
+        // Clean up old backups, keeping only N most recent (if retention > 0)
         if (retentionCount >= 0) {
-          cleanupOldRotations(hostAssetRoot, retentionCount);
+          cleanupOldBackups(hostAssetRoot, retentionCount);
         }
 
         Files.createDirectories(hostAssetRoot);
@@ -1804,23 +1802,37 @@ public final class IncusResourceBootstrap {
       }
     }
 
-    private static Path rotatedHostPath(Path hostAssetRoot) {
+    private static Path backupHostPath(Path hostAssetRoot) {
       final long pid = ProcessHandle.current().pid();
       final long epochMillis = System.currentTimeMillis();
-      final String rotatedName =
-          hostAssetRoot.getFileName().toString() + "." + pid + "." + epochMillis;
-      return hostAssetRoot.resolveSibling(rotatedName);
+      final String backupName =
+          hostAssetRoot.getFileName().toString() + ".backup." + pid + "." + epochMillis;
+      return hostAssetRoot.resolveSibling(backupName);
     }
 
-    private static void rotate(Path source, Path target) throws IOException {
-      try {
-        Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
-      } catch (AtomicMoveNotSupportedException ex) {
-        Files.move(source, target);
-      }
+    private static void backup(Path source, Path target) throws IOException {
+      Files.createDirectories(target);
+      Files.walkFileTree(
+          source,
+          new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+                throws IOException {
+              Path targetDir = target.resolve(source.relativize(dir));
+              Files.createDirectories(targetDir);
+              return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                throws IOException {
+              Files.copy(file, target.resolve(source.relativize(file)));
+              return FileVisitResult.CONTINUE;
+            }
+          });
     }
 
-    private static void cleanupOldRotations(Path hostAssetRoot, int retentionCount)
+    private static void cleanupOldBackups(Path hostAssetRoot, int retentionCount)
         throws IOException {
       final Path parent = hostAssetRoot.getParent();
       if (parent == null) {
@@ -1828,11 +1840,11 @@ public final class IncusResourceBootstrap {
       }
 
       final String hostDirName = hostAssetRoot.getFileName().toString();
-      final String rotationPattern = hostDirName + "\\.\\d+\\.\\d+";
+      final String backupPattern = hostDirName + "\\.backup\\.\\d+\\.\\d+";
 
       try (Stream<Path> siblings = Files.list(parent)) {
         siblings
-            .filter(p -> p.getFileName().toString().matches(rotationPattern))
+            .filter(p -> p.getFileName().toString().matches(backupPattern))
             .sorted(
                 java.util.Comparator.<Path, String>comparing(p -> p.getFileName().toString())
                     .reversed())
