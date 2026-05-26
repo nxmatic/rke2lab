@@ -5,6 +5,8 @@ import com.pulumi.resources.ComponentResource;
 import com.pulumi.resources.ComponentResourceOptions;
 import com.pulumi.resources.Resource;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rk2lab.controlplane.incus.ProvisioningMetadata;
+import io.nxmatic.rk2lab.controlplane.incus.RuntimeMetadata;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,19 +21,17 @@ public final class BootstrapRegistryResource extends ComponentResource {
   public BootstrapRegistryResource(
       String name,
       BootstrapConfig config,
-      String provisioningChecksum,
-      String hostSourceDirRelative,
-      Map<String, Object> layerEnvRegistrySummary,
-      Map<String, Object> systemdProvisioningSummary,
+      ProvisioningMetadata provisioning,
+      RuntimeMetadata runtime,
       Resource dependsOnResource) {
     super(TYPE_TOKEN, name, buildOptions(dependsOnResource));
 
     final LinkedHashMap<String, Object> values = new LinkedHashMap<>();
-    values.put("checksum", provisioningChecksum);
-    values.put("hostSourceDirRelative", hostSourceDirRelative);
+    values.put("sliceChecksums", provisioning.slices().checksums());
+    values.put("hostSourceDirRelative", provisioning.paths().hostSourceDirRelative());
     values.put("localWorktreePath", config.localWorktreePath().toString());
-    values.put("layerEnvRegistry", layerEnvRegistrySummary);
-    values.put("systemdProvisioning", systemdProvisioningSummary);
+    values.put("layerEnvRegistry", runtime.environment().summary());
+    values.put("systemdProvisioning", runtime.systemd().summary());
     this.summary = Map.copyOf(values);
 
     registerOutputs(asResourceOutputs(summary));

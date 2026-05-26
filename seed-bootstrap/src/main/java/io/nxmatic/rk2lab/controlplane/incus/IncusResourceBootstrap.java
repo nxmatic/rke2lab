@@ -338,15 +338,13 @@ public final class IncusResourceBootstrap {
 
     private Output<String> ensuredImageFingerprint;
 
-    private String provisioningChecksum;
+    private DeploymentMetadata deploymentMetadata;
 
-    private String imageBuildChecksum;
+    private ProvisioningMetadata provisioningMetadata;
 
-    private Map<String, Object> layerEnvRegistrySummary;
+    private BuildMetadata buildMetadata;
 
-    private Map<String, Object> systemdProvisioningSummary;
-
-    private Map<String, Object> manifestSynthSummary;
+    private RuntimeMetadata runtimeMetadata;
 
     private Instance instance;
 
@@ -367,21 +365,45 @@ public final class IncusResourceBootstrap {
       classpathAssetMaterializer.materializeHostSystemdAssets(
           localPaths.manifestsRoot().resolve("host"));
       LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
-      this.manifestSynthSummary =
+      final Map<String, Object> manifestSynthSummary =
           synthesizeAndExplodeManifests(localPaths.manifestsRoot(), policy, layerContext);
-      materializeFloxRuntimeInstallerAssets(localPaths.daemonsetRoot());
+
+      // Initialize slice registry for components to declare their hot-reloadable slices
+      final ProvisioningSliceRegistry sliceRegistry = new ProvisioningSliceRegistry();
+      materializeFloxRuntimeInstallerAssets(localPaths.daemonsetRoot(), sliceRegistry);
+
       final List<String> hostMountNotes = hostMountSourceVerifier.ensureSources(localPaths);
-      this.systemdProvisioningSummary =
+      final Map<String, Object> systemdProvisioningSummary =
           SystemdProvisioningInventory.summarize(localPaths, hostMountNotes);
       clearStaleBootstrapKubeconfig();
-      this.layerEnvRegistrySummary =
+      final Map<String, Object> layerEnvRegistrySummary =
           runtimeEnvControlplaneOverlayWriter.write(
               localPaths.runtimeEnvConfigRoot(), layerContext, policy);
       nodeConfigRegenerator.regenerateCloudConfigDir(
           localPaths.runtimeCloudConfigRoot(), localPaths.cloudSeedRoot());
-      this.provisioningChecksum = ProvisioningResourceInventory.checksum(localPaths);
+      final Map<String, String> provisioningSliceChecksums =
+          ProvisioningResourceInventory.sliceChecksums(localPaths, sliceRegistry);
+      final String hostSourceDirRelative =
+          relativizeAgainstWorktree(localPaths.worktreeRoot(), localPaths.assetsRoot());
+
+      // Build structured metadata
+      this.deploymentMetadata = DeploymentMetadata.capture();
+      this.provisioningMetadata =
+          new ProvisioningMetadata(
+              ProvisioningMetadata.Slices.of(provisioningSliceChecksums),
+              new ProvisioningMetadata.Paths(hostSourceDirRelative));
+      this.buildMetadata =
+          new BuildMetadata(
+              null, // image checksum set later in ensureProviderResources
+              BuildMetadata.Manifests.of(manifestSynthSummary));
+      this.runtimeMetadata =
+          new RuntimeMetadata(
+              RuntimeMetadata.Environment.of(layerEnvRegistrySummary),
+              RuntimeMetadata.Systemd.of(systemdProvisioningSummary));
+
       ensureLaunchSecretsToken(localPaths.secretsFile());
-      logInfo("provisioningChecksum=" + provisioningChecksum);
+      logInfo("deployment=" + deploymentMetadata);
+      logInfo("provisioning.slices=" + provisioningMetadata.slices());
       return this;
     }
 
@@ -522,13 +544,17 @@ public final class IncusResourceBootstrap {
      * workspace at {@code /var/run/k8s-daemonset.d/runtime/flox/} at startup; nix and flox write
      * locks there. Since this path is build-only on the pod side, the wipe can be wholesale.
      */
-    private void materializeFloxRuntimeInstallerAssets(Path daemonsetRoot) {
+    private void materializeFloxRuntimeInstallerAssets(
+        Path daemonsetRoot, ProvisioningSliceRegistry sliceRegistry) {
       final Path target = daemonsetRoot.resolve("runtime").resolve("flox");
       try {
         deleteSubtree(target);
         Files.createDirectories(target);
         FloxRuntimeAssets.builder().build().writeInstallerAssetTree(target);
         logInfo("phase prepareHostState: flox runtime-installer inputs written to " + target);
+
+        // Register flox runtime as a hot-reloadable slice
+        sliceRegistry.register("floxRuntime", target);
       } catch (IOException ex) {
         throw new IllegalStateException(
             "Failed to materialize flox runtime-installer asset tree at " + target, ex);
@@ -610,7 +636,10 @@ public final class IncusResourceBootstrap {
       this.ensuredImageFingerprint =
           imageProvider.ensureSeedImageFingerprint(
               providerContext.invokeOptions(), providerContext.provider(), ensuredProject);
-      this.imageBuildChecksum = imageProvider.buildChecksum();
+      // Update buildMetadata with image checksum now that image is built
+      this.buildMetadata =
+          new BuildMetadata(
+              new BuildMetadata.Image(imageProvider.buildChecksum()), buildMetadata.manifests());
       return this;
     }
 
@@ -627,8 +656,21 @@ public final class IncusResourceBootstrap {
       instanceConfig.put("security.nesting", "true");
       instanceConfig.put("security.syscalls.intercept.bpf", "true");
       instanceConfig.put("security.syscalls.intercept.bpf.devices", "true");
-      instanceConfig.put("user.rke2lab.provisioningChecksum", provisioningChecksum);
-      instanceConfig.put("user.rke2lab.imageBuildChecksum", imageBuildChecksum);
+
+      // Store per-slice checksums as user.rke2lab.provisioning.slice.<sliceName>
+      // Changes to core slice → full renewal via replaceOnChanges
+      // Changes to other slices → hot-reload reconciliation (future)
+      for (Map.Entry<String, String> entry : provisioningMetadata.slices().checksums().entrySet()) {
+        instanceConfig.put("user.rke2lab.provisioning.slice." + entry.getKey(), entry.getValue());
+      }
+
+      // Deployment metadata for provenance tracking
+      instanceConfig.put("user.rke2lab.git.branch", deploymentMetadata.git().branch());
+      instanceConfig.put("user.rke2lab.git.commitSha", deploymentMetadata.git().commitSha());
+      instanceConfig.put(
+          "user.rke2lab.deploymentTimestamp", deploymentMetadata.timestamp().toString());
+
+      instanceConfig.put("user.rke2lab.imageBuildChecksum", buildMetadata.image().checksum());
 
       this.instance =
           new Instance(
@@ -656,20 +698,16 @@ public final class IncusResourceBootstrap {
     }
 
     private BootstrapResult toResult() {
-      final String hostSourceDirRelative =
-          relativizeAgainstWorktree(localPaths.worktreeRoot(), localPaths.assetsRoot());
       return new BootstrapResult(
           "incus://" + config.incusProject() + "/" + config.nodeName(),
           ensuredImageFingerprint,
           instance.status(),
           instance.urn(),
           providerContext.provider().urn(),
-          provisioningChecksum,
-          imageBuildChecksum,
-          hostSourceDirRelative,
-          layerEnvRegistrySummary,
-          systemdProvisioningSummary,
-          manifestSynthSummary,
+          deploymentMetadata,
+          provisioningMetadata,
+          buildMetadata,
+          runtimeMetadata,
           instance);
     }
 
@@ -1057,7 +1095,7 @@ public final class IncusResourceBootstrap {
     }
   }
 
-  private record BootstrapPaths(
+  record BootstrapPaths(
       Path worktreeRoot,
       Path stateRoot,
       Path clusterNodeRoot,
@@ -2536,6 +2574,32 @@ public final class IncusResourceBootstrap {
 
     private ProvisioningResourceInventory() {}
 
+    /**
+     * Compute per-slice checksums for independently reconcilable provisioning slices using fluent
+     * pipeline grammar.
+     *
+     * <p>The core slice covers base provisioning (systemd, manifests, rke2 config); component
+     * slices are discovered from the registry populated during materialization. Each slice change
+     * triggers slice-specific reconciliation without full master renewal.
+     *
+     * @param paths bootstrap filesystem paths
+     * @param registry component-populated slice registry
+     * @return map from slice name to SHA-256 checksum
+     */
+    private static Map<String, String> sliceChecksums(
+        BootstrapPaths paths, ProvisioningSliceRegistry registry) {
+      return SliceChecksumPipeline.begin(paths, registry)
+          .during("core", core -> core.fromCoreRoots())
+          .then()
+          .during("registered components", components -> components.fromRegistry())
+          .collectChecksums();
+    }
+
+    /**
+     * Legacy single-checksum method for backward compatibility during migration. Computes aggregate
+     * checksum over all slices.
+     */
+    @Deprecated
     private static String checksum(BootstrapPaths paths) {
       final List<Path> roots =
           List.of(
@@ -2548,6 +2612,32 @@ public final class IncusResourceBootstrap {
               paths.cloudSeedRoot(),
               paths.daemonsetRoot());
 
+      try {
+        final MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        for (Path root : roots) {
+          updateDigestForPath(digest, root);
+        }
+        return HexFormat.of().formatHex(digest.digest());
+      } catch (NoSuchAlgorithmException ex) {
+        throw new IllegalStateException("SHA-256 is not available", ex);
+      }
+    }
+
+    private static String coreSliceChecksum(BootstrapPaths paths) {
+      final List<Path> coreRoots =
+          List.of(
+              paths.scriptsRoot(),
+              paths.systemdRoot(),
+              paths.manifestsRoot(),
+              paths.runtimeRke2ConfigRoot(),
+              paths.runtimeCloudConfigRoot(),
+              paths.runtimeEnvConfigRoot(),
+              paths.cloudSeedRoot());
+
+      return computeChecksum(coreRoots);
+    }
+
+    private static String computeChecksum(List<Path> roots) {
       try {
         final MessageDigest digest = MessageDigest.getInstance("SHA-256");
         for (Path root : roots) {
@@ -2736,11 +2826,9 @@ public final class IncusResourceBootstrap {
       Object instanceStatus,
       Object instanceUrn,
       Object providerUrn,
-      String provisioningChecksum,
-      String imageBuildChecksum,
-      String hostSourceDirRelative,
-      Map<String, Object> layerEnvRegistrySummary,
-      Map<String, Object> systemdProvisioningSummary,
-      Map<String, Object> manifestSynthSummary,
+      DeploymentMetadata deployment,
+      ProvisioningMetadata provisioning,
+      BuildMetadata build,
+      RuntimeMetadata runtime,
       Resource readinessDependency) {}
 }

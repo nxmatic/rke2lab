@@ -104,10 +104,8 @@ final class ResourceCreationPipeline {
           new BootstrapRegistryResource(
               "seed-bootstrap-registry",
               config,
-              bootstrapResult.provisioningChecksum(),
-              bootstrapResult.hostSourceDirRelative(),
-              bootstrapResult.layerEnvRegistrySummary(),
-              bootstrapResult.systemdProvisioningSummary(),
+              bootstrapResult.provisioning(),
+              bootstrapResult.runtime(),
               bootstrapResult.readinessDependency());
       return this;
     }
@@ -117,7 +115,7 @@ final class ResourceCreationPipeline {
           new SeedImageBuildResource(
               "seed-image-build",
               config,
-              bootstrapResult.imageBuildChecksum(),
+              bootstrapResult.build().image().checksum(),
               bootstrapResult.imageFingerprint(),
               bootstrapResult.readinessDependency());
       return this;
@@ -127,7 +125,7 @@ final class ResourceCreationPipeline {
       this.manifestSynth =
           new SeedManifestSynthResource(
               "seed-manifest-synth",
-              bootstrapResult.manifestSynthSummary(),
+              bootstrapResult.build().manifests().summary(),
               bootstrapResult.readinessDependency());
       return this;
     }
@@ -174,16 +172,16 @@ final class ResourceCreationPipeline {
     StandaloneResourceBuilder withRegistry() {
       this.registrySummary =
           Map.of(
-              "checksum",
-              bootstrapResult.provisioningChecksum(),
+              "sliceChecksums",
+              bootstrapResult.provisioning().slices().checksums(),
               "hostSourceDirRelative",
-              bootstrapResult.hostSourceDirRelative(),
+              bootstrapResult.provisioning().paths().hostSourceDirRelative(),
               "localWorktreePath",
               config.localWorktreePath().toString(),
               "layerEnvRegistry",
-              bootstrapResult.layerEnvRegistrySummary(),
+              bootstrapResult.runtime().environment().summary(),
               "systemdProvisioning",
-              bootstrapResult.systemdProvisioningSummary());
+              bootstrapResult.runtime().systemd().summary());
       return this;
     }
 
@@ -191,7 +189,7 @@ final class ResourceCreationPipeline {
       this.imageBuildSummary =
           Map.of(
               "checksum",
-              bootstrapResult.imageBuildChecksum(),
+              bootstrapResult.build().image().checksum(),
               "imageAlias",
               config.imageAlias(),
               "imageFingerprint",
@@ -203,9 +201,9 @@ final class ResourceCreationPipeline {
 
     StandaloneResourceBuilder withManifestSynth() {
       this.manifestSynthSummary =
-          bootstrapResult.manifestSynthSummary() == null
+          bootstrapResult.build().manifests().summary() == null
               ? Map.of()
-              : Map.copyOf(bootstrapResult.manifestSynthSummary());
+              : Map.copyOf(bootstrapResult.build().manifests().summary());
       return this;
     }
 
