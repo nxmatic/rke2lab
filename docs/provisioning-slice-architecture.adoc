@@ -1,0 +1,288 @@
+= Provisioning Slice Architecture
+:toc:
+:toclevels: 3
+
+== Overview
+
+Provisioning slices are independently reconcilable resource partitions that enable hot-reload of node components without full instance renewal. Each slice is a self-contained materializer component that declares what to materialize, its storage policy, and its materialized paths for checksum computation.
+
+== Execution Domains
+
+Slices are organized by *where* the resources execute:
+
+* **Node**: Runs on the node OS (systemd units, NRI plugin binary)
+* **K8s**: Runs in Kubernetes API (Pods, Services, ConfigMaps)
+* **Infrastructure**: Defines the instance itself (cloud-init, RKE2 initial bootstrap)
+
+== Storage Policies
+
+Each slice has a storage policy that determines lifecycle behavior:
+
+* **STATIC**: Changes trigger full instance renewal. Stored in Incus instance config (`user.rke2lab.provisioning.slice.*`). Used for infrastructure that defines the instance bootstrap.
+
+* **HOT_RELOAD**: Changes trigger reconciliation without instance renewal. Stored in Pulumi outputs and ConfigMaps. Used for runtime components that can be updated dynamically.
+
+== Three-Slice Architecture
+
+=== InfrastructureSlice (STATIC)
+
+Node infrastructure that defines the instance itself:
+
+* Cloud-init files (`/srv/host/cloudconfig-nocloud.d`)
+* RKE2 initial bootstrap config (`/srv/host/rke2-config.d`)
+* Environment ConfigMaps for systemd (`/srv/host/rke2lab-environment.d`)
+
+Changes require instance recreation because they define the bootstrap process.
+
+=== K8sSlice (HOT_RELOAD)
+
+Kubernetes API resources - reloadable via RKE2 auto-apply:
+
+* All manifest units from all domains (`/srv/host/rke2-manifests.d/<layer>/<package>/`)
+* Organized by: cluster, storage, replication, gitops, runtime, networking, mesh, ha, cicd
+* Includes DaemonSet manifests (e.g., flox-runtime DaemonSet)
+
+Hot-reloadable because RKE2 watches `/srv/host/rke2-manifests.d/` and Kubernetes reconciles changes.
+
+=== NodeSlice (HOT_RELOAD)
+
+Node runtime components:
+
+* Systemd units and scripts (`/srv/host/systemd-units.d`, `/srv/host/systemd-scripts.d`)
+* NRI plugin binary + hooks (`/srv/host/k8s-daemonset.d/runtime/flox`)
+* Future: other node-side agents, configs, binaries
+
+Hot-reloadable because:
+
+* Systemd can `daemon-reload` to pick up unit/script changes
+* DaemonSet init container + reconciler sidecar handle binary updates via trampoline to node
+
+== C4 Context Diagram: Slice Architecture in the Provisioning System
+
+[mermaid]
+----
+graph TB
+    subgraph PulumiApp["Pulumi Application (Stage A Bootstrap)"]
+        Bootstrap[IncusResourceBootstrap<br/>Orchestrates slice materialization]
+        Registry[ProvisioningSliceRegistry<br/>Tracks slices & checksums]
+        Inventory[ProvisioningResourceInventory<br/>Computes checksums via pipeline]
+    end
+
+    subgraph Slices["Slice Components (Self-Contained Materializers)"]
+        Infra[InfrastructureSlice<br/>STATIC: cloud-init, RKE2 bootstrap<br/>Triggers: instance renewal]
+        K8s[K8sSlice<br/>HOT_RELOAD: manifests<br/>Triggers: RKE2 auto-apply]
+        Node[NodeSlice<br/>HOT_RELOAD: systemd, NRI plugin<br/>Triggers: daemon-reload, DaemonSet trampoline]
+    end
+
+    subgraph Storage["Storage & Reconciliation"]
+        IncusConfig[Incus Instance Config<br/>user.rke2lab.provisioning.slice.*<br/>STATIC slices only]
+        PulumiOutputs[Pulumi Outputs / ConfigMaps<br/>HOT_RELOAD slices only]
+        Filesystem[Host Filesystem<br/>/srv/host/* mounted as disks]
+    end
+
+    subgraph Runtime["Runtime Consumers"]
+        CloudInit[cloud-init<br/>Consumes: Infrastructure slice]
+        RKE2[RKE2 Auto-Apply<br/>Watches: /srv/host/rke2-manifests.d]
+        Systemd[systemd daemon<br/>Loads: /srv/host/systemd-units.d]
+        Containerd[containerd + NRI<br/>Loads: /srv/host/k8s-daemonset.d]
+    end
+
+    Bootstrap -->|materialize & register| Infra
+    Bootstrap -->|materialize & register| K8s
+    Bootstrap -->|materialize & register| Node
+
+    Infra -->|register| Registry
+    K8s -->|register| Registry
+    Node -->|register| Registry
+
+    Bootstrap -->|compute checksums| Inventory
+    Inventory -->|reads slices from| Registry
+
+    Infra -->|writes to| Filesystem
+    K8s -->|writes to| Filesystem
+    Node -->|writes to| Filesystem
+
+    Inventory -->|static checksums| IncusConfig
+    Inventory -->|hot-reload checksums| PulumiOutputs
+
+    IncusConfig -->|change triggers renewal| CloudInit
+    CloudInit -->|bootstrap reads| Filesystem
+
+    PulumiOutputs -->|no renewal on change| RKE2
+    PulumiOutputs -->|no renewal on change| Systemd
+    PulumiOutputs -->|no renewal on change| Containerd
+
+    RKE2 -->|watches & reconciles| Filesystem
+    Systemd -->|daemon-reload from| Filesystem
+    Containerd -->|loads NRI plugin from| Filesystem
+
+    style Infra fill:#ffcccc
+    style K8s fill:#ccffcc
+    style Node fill:#ccffcc
+    style IncusConfig fill:#ffcccc
+    style PulumiOutputs fill:#ccffcc
+----
+
+**Legend:**
+
+* Red (STATIC): Changes trigger full instance renewal via Incus instance config
+* Green (HOT_RELOAD): Changes trigger reconciliation without renewal
+
+**Key Flows:**
+
+1. **Materialization**: Bootstrap orchestrates each slice to materialize its resources to `/srv/host/*`
+2. **Registration**: Slices self-register with registry, declaring name, policy, and paths
+3. **Checksum Partitioning**: Inventory computes checksums and partitions by policy
+4. **Storage Split**: STATIC → Incus config (triggers renewal), HOT_RELOAD → outputs (no renewal)
+5. **Runtime Consumption**: Each runtime component consumes its slice from mounted filesystem
+
+Each slice component:
+
+1. Implements `ProvisioningSlice` interface
+2. Materializes its own resources to filesystem
+3. Self-registers with the registry
+4. Declares its storage policy
+5. Provides paths for checksum computation
+
+== Registration Flow
+
+[mermaid]
+----
+sequenceDiagram
+    participant Bootstrap as IncusResourceBootstrap
+    participant Infra as InfrastructureSlice
+    participant K8s as K8sSlice
+    participant Node as NodeSlice
+    participant Registry as ProvisioningSliceRegistry
+
+    Bootstrap->>Infra: materialize(paths)
+    Infra->>Infra: write resources
+    Bootstrap->>Registry: register(infraSlice)
+
+    Bootstrap->>K8s: materialize(paths)
+    K8s->>K8s: write resources
+    Bootstrap->>Registry: register(k8sSlice)
+
+    Bootstrap->>Node: materialize(paths)
+    Node->>Node: write resources
+    Bootstrap->>Registry: register(nodeSlice)
+
+    Bootstrap->>Registry: computeChecksums()
+    Registry-->>Bootstrap: Slices(static, hotReload)
+----
+
+The registry partitions checksums by policy:
+
+* `staticSlices` → stored in Incus instance config
+* `hotReloadSlices` → stored in Pulumi outputs / ConfigMaps
+
+== Class Structure
+
+[mermaid]
+----
+classDiagram
+    ProvisioningSlice <|.. InfrastructureSlice
+    ProvisioningSlice <|.. K8sSlice
+    ProvisioningSlice <|.. NodeSlice
+    ProvisioningSliceRegistry o-- ProvisioningSlice
+    ProvisioningSlice ..> SliceStoragePolicy
+
+    class ProvisioningSlice {
+        <<interface>>
+        +name() String
+        +storagePolicy() SliceStoragePolicy
+        +materialize(paths)
+        +getMaterializedPaths() List~Path~
+    }
+
+    class InfrastructureSlice {
+        +name() "infrastructure"
+        +storagePolicy() STATIC
+        +materialize(paths)
+    }
+
+    class K8sSlice {
+        +name() "k8s"
+        +storagePolicy() HOT_RELOAD
+        +materialize(paths)
+    }
+
+    class NodeSlice {
+        +name() "node"
+        +storagePolicy() HOT_RELOAD
+        +materialize(paths)
+        -materializeHostSystemdAssets()
+        -materializeResourceTree()
+    }
+
+    class ProvisioningSliceRegistry {
+        -sliceDefinitions Map
+        -sliceRoots Map
+        -pathOwnership Map
+        +register(slice)
+        +getSliceRoots() Map
+        +getStoragePolicy(name) SliceStoragePolicy
+    }
+
+    class SliceStoragePolicy {
+        <<enumeration>>
+        STATIC
+        HOT_RELOAD
+    }
+----
+
+== Key Design Decisions
+
+=== Why Systemd Units are in NodeSlice
+
+Systemd units and scripts are provisioned to `/srv/host/systemd-*` as disk mounts. They are:
+
+* Consumed by systemd daemon at runtime (not embedded in cloud-init)
+* Referenced via `RequiresMountsFor` and `ConditionPathExists` in unit files
+* Hot-reloadable via `systemctl daemon-reload`
+
+Therefore they belong in NodeSlice (HOT_RELOAD), not InfrastructureSlice (STATIC).
+
+=== Why Separate K8s and Node Slices
+
+K8sSlice contains Kubernetes API resources (YAML manifests). NodeSlice contains node-side binaries and configs consumed by those resources. Different execution domain, different reconciliation mechanism:
+
+* K8s: RKE2 auto-applies manifest changes → Kubernetes reconciles
+* Node: DaemonSet trampolines updates to host → systemd/containerd reloads
+
+=== Component Self-Registration vs ServiceLoader
+
+Slices are explicitly instantiated in `IncusResourceBootstrap.prepareHostState()` rather than discovered via `ServiceLoader`. This keeps the flow explicit and avoids the complexity of auto-discovery for a small, fixed set of slices.
+
+Revisit if slice count grows significantly.
+
+== Verification
+
+After deployment, verify slice partitioning:
+
+[source,bash]
+----
+# Static slice stored in instance config (triggers renewal on change)
+incus config show bioskop:master | grep "user.rke2lab.provisioning.slice"
+
+# Hot-reload slices in Pulumi outputs (no renewal on change)
+pulumi stack output seedProvisioningMetadata
+----
+
+Expected output structure:
+
+[source,yaml]
+----
+slices:
+  static:
+    infrastructure: "abc123..."
+  hotReload:
+    k8s: "def456..."
+    node: "789ghi..."
+----
+
+== Related Documentation
+
+* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow pattern used in slice checksum computation
+* link:../seed-bootstrap/src/main/java/io/nxmatic/rk2lab/controlplane/incus/ProvisioningSlice.java[ProvisioningSlice.java] - Interface definition
+* link:../seed-bootstrap/src/main/java/io/nxmatic/rk2lab/controlplane/incus/NodeSlice.java[NodeSlice.java] - Implementation example
