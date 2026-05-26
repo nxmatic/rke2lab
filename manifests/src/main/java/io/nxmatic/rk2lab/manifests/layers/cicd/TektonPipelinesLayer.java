@@ -2,6 +2,7 @@
 package io.nxmatic.rk2lab.manifests.layers.cicd;
 
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
+import io.nxmatic.rk2lab.manifests.layers.common.upstream.UpstreamYamlInclusion;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -12,13 +13,24 @@ import software.constructs.Construct;
 
 public final class TektonPipelinesLayer extends Construct {
 
+  /**
+   * Pinned operator release. Bumping is a two-line change: drop the new release.yaml under {@code
+   * src/main/resources/upstream/cicd/tekton-operator/} and update this constant.
+   */
+  private static final String OPERATOR_RELEASE_RESOURCE =
+      "/upstream/cicd/tekton-operator/release-v0.79.1.yaml";
+
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("cicd", "tekton-pipelines");
 
   public TektonPipelinesLayer(final Construct scope, final String id) {
     super(scope, id);
 
-    createTektonOperatorNamespace();
+    // Bundle the upstream operator release (Namespace, CRDs, RBAC, Service, Deployment,
+    // ConfigMaps, webhooks). The bundle ships its own `tekton-operator` Namespace, so we no
+    // longer create one separately.
+    new UpstreamYamlInclusion(this, OPERATOR_RELEASE_RESOURCE, packageProfile);
+
     createReplicatedSecret(
         "tekton-git-auth", "kubernetes.io/basic-auth", "kube-system/tekton-git-auth");
     createReplicatedSecret(
@@ -26,22 +38,6 @@ public final class TektonPipelinesLayer extends Construct {
         "kubernetes.io/dockerconfigjson",
         "kube-system/tekton-docker-config");
     createTektonConfig();
-  }
-
-  private void createTektonOperatorNamespace() {
-    new ApiObject(
-        this,
-        "namespace-tekton-operator",
-        ApiObjectProps.builder()
-            .apiVersion("v1")
-            .kind("Namespace")
-            .metadata(
-                ApiObjectMetadata.builder()
-                    .name("tekton-operator")
-                    .annotations(
-                        packageProfile.packageAnnotations("|Namespace|default|tekton-operator"))
-                    .build())
-            .build());
   }
 
   private void createReplicatedSecret(
