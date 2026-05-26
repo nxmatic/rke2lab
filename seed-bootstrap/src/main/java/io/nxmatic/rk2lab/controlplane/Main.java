@@ -3,7 +3,7 @@ package io.nxmatic.rk2lab.controlplane;
 import com.pulumi.Config;
 import com.pulumi.Pulumi;
 import com.pulumi.deployment.Deployment;
-import io.nxmatic.rk2lab.controlplane.bbox.BboxReconcilerComponent;
+import io.nxmatic.rk2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rk2lab.controlplane.config.ConfigResolver;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.incus.IncusResourceBootstrap;
@@ -16,17 +16,21 @@ import java.util.function.Consumer;
 /** Entry point for the Pulumi management-cluster bootstrap program. */
 public final class Main {
 
+  private final BboxReconciliationOrchestrator bboxOrchestrator;
   private final ResourceManager resourceManager;
   private final OutputBuilder outputBuilder;
 
-  private Main() {
+  private Main(boolean pulumiMode) {
+    this.bboxOrchestrator = new BboxReconciliationOrchestrator(pulumiMode);
     this.resourceManager = new ResourceManager();
     this.outputBuilder = new OutputBuilder();
   }
 
   public static void main(String[] args) {
-    final Main instance = new Main();
-    if (!instance.isPulumiEngineAvailable()) {
+    final boolean pulumiMode = isPulumiEngineAvailable();
+    final Main instance = new Main(pulumiMode);
+
+    if (!pulumiMode) {
       instance.runStandalone();
       return;
     }
@@ -81,9 +85,13 @@ public final class Main {
     outputs.forEach((key, value) -> SeedLog.info("standalone", key + "=" + value));
   }
 
-  private boolean isPulumiEngineAvailable() {
+  private static boolean isPulumiEngineAvailable() {
     final String monitor = System.getenv("PULUMI_MONITOR");
     return monitor != null && !monitor.isBlank();
+  }
+
+  private boolean isPulumiMode() {
+    return isPulumiEngineAvailable();
   }
 
   private Map<String, Object> bootstrapAndCollectOutputs(
@@ -102,8 +110,8 @@ public final class Main {
         config.imageBuilderHost(), "incus", readinessLogger);
 
     // Bbox reconciliation
-    final BboxReconcileResult bboxResult =
-        reconcileBbox(config.localWorktreePath(), bboxFailOnError);
+    final BboxReconciliationOrchestrator.ReconciliationResult bboxResult =
+        bboxOrchestrator.reconcile(config.localWorktreePath(), bboxFailOnError);
 
     // Incus bootstrap
     final IncusResourceBootstrap.BootstrapResult bootstrapResult =
@@ -111,14 +119,14 @@ public final class Main {
 
     // Systemd adapter launch
     final Map<String, Object> systemdAdapterLaunchSummary;
-    if (isPulumiEngineAvailable() && Deployment.getInstance().isDryRun()) {
+    if (isPulumiMode() && Deployment.getInstance().isDryRun()) {
       systemdAdapterLaunchSummary = SeedSystemdAdapterEndpointGate.deferredPreview(config);
     } else {
       systemdAdapterLaunchSummary =
           SeedSystemdAdapterEndpointGate.ensureReachable(config, readinessLogger);
     }
 
-    // Resource creation
+    // Resource creation via pipeline
     final ResourceCreationResult resourceResult =
         resourceManager.createResources(
             config,
@@ -127,27 +135,12 @@ public final class Main {
             readinessLogger,
             bootstrapResult,
             systemdAdapterLaunchSummary,
-            isPulumiEngineAvailable());
+            isPulumiMode());
 
     // Build outputs
     return outputBuilder.buildOutputs(
         config, policy, bootstrapResult, bboxResult, systemdAdapterLaunchSummary, resourceResult);
   }
-
-  private BboxReconcileResult reconcileBbox(java.nio.file.Path worktreePath, boolean failOnError) {
-    if (isPulumiEngineAvailable()) {
-      final BboxReconcilerComponent.ReconcileResult result =
-          BboxReconcilerComponent.reconcileForPulumi(worktreePath, failOnError, null);
-      return new BboxReconcileResult(result.resourceUrn(), result.summaryMap());
-    } else {
-      final Map<String, Object> summaryMap =
-          BboxReconcilerComponent.reconcileStandalone(worktreePath, failOnError);
-      return new BboxReconcileResult("", summaryMap);
-    }
-  }
-
-  /** Result of bbox reconciliation containing URN and summary. */
-  record BboxReconcileResult(Object resourceUrn, Map<String, Object> summaryMap) {}
 
   /** Result of resource creation containing all created resources and summaries. */
   record ResourceCreationResult(
@@ -209,7 +202,7 @@ public final class Main {
         BootstrapConfig config,
         ControlplanePolicy policy,
         IncusResourceBootstrap.BootstrapResult bootstrapResult,
-        BboxReconcileResult bboxResult,
+        BboxReconciliationOrchestrator.ReconciliationResult bboxResult,
         Map<String, Object> systemdAdapterLaunchSummary,
         ResourceCreationResult resourceResult) {
 
