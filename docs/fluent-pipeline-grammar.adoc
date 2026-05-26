@@ -49,13 +49,19 @@ The string passed to `during(...)` is not decoration. It is used in three places
 
 Labels are short, lowercase, descriptive of the *domain* not the action. Good: `"bbox reconciliation"`. Bad: `"step 2"`, `"reconcile-bbox-and-update"`.
 
-=== 4. Outcome verbs
+=== 4. Failure handler
+
+A per-topic failure handler is registered *before* the first `during(...)` call, typically via an `.onFailure(handler)` method on the pre-execution builder state. This is mandatory by structural design: the handler is consumed by `TopicRunner` on every topic execution, so it must be in place when the first stage runs. Putting it at the end (after all `during` calls) was the previous shape and silently never fired — the type-state pattern now puts the handler before any `during` so it's always live.
+
+The handler is optional; when not supplied, failures still propagate as `PipelineStageFailure` carrying the topic label, but no user-supplied side-effect runs.
+
+=== 5. Outcome verbs
 
 The pipeline ends with one terminal verb that turns the chain into a result:
 
 * `.collectOutputs()` — return a result map
-* `.reportTo(logger)` — terminal side-effect
-* `.orFailWith(handler).collectOutputs()` — chain attaches a per-topic failure handler before the outcome
+* `.complete()` — terminal with no return value (used by entry-point pipelines)
+* `.toResult()` — return a domain object
 
 == Type-state ordering
 
@@ -66,7 +72,7 @@ Authors literally cannot:
 * skip `.then()`
 * reorder topics
 * call `.collectOutputs()` early
-* forget the failure handler when one is required
+* register a failure handler after a topic has already run (the slot exists only on the pre-execution builder state)
 
 The cost is one class per state transition (typically one method each). The benefit is that valid pipelines are the only ones that compile.
 

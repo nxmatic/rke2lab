@@ -11,6 +11,8 @@ public final class Main {
     ApplicationPipeline.run(
         launch ->
             launch
+                .onFailure(
+                    (topic, cause) -> SeedLog.error("pipeline", topic + ": " + cause.getMessage()))
                 .during(
                     "environment",
                     env ->
@@ -22,8 +24,6 @@ public final class Main {
                 .during("bootstrap", bootstrap -> bootstrap.runBootstrapPipeline())
                 .then()
                 .during("outputs", outputs -> outputs.exportOrPrint())
-                .orFailWith(
-                    (topic, cause) -> SeedLog.error("pipeline", topic + ": " + cause.getMessage()))
                 .complete());
   }
 }

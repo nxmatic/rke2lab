@@ -147,6 +147,7 @@ public final class IncusResourceBootstrap {
   public BootstrapResult apply() {
     final ApplyPipeline pipeline = new ApplyPipeline();
     return new ApplyStart(pipeline)
+        .onFailure((topic, cause) -> SeedLog.error("incus", topic + ": " + cause.getMessage()))
         .during("path resolution", paths -> paths.resolve())
         .then()
         .during("host state", host -> host.prepareAll())
@@ -154,7 +155,6 @@ public final class IncusResourceBootstrap {
         .during("provider resources", provider -> provider.ensureAll())
         .then()
         .during("instance", instance -> instance.create())
-        .orFailWith((topic, cause) -> SeedLog.error("incus", topic + ": " + cause.getMessage()))
         .toResult();
   }
 
@@ -219,8 +219,14 @@ public final class IncusResourceBootstrap {
       this.pipeline = pipeline;
     }
 
+    /** Optional: register a per-topic failure handler. Defaults to no-op when not called. */
+    ApplyStart onFailure(OnFailure handler) {
+      pipeline.onFailure = handler;
+      return this;
+    }
+
     PathDone during(String topic, java.util.function.Function<PathStage, PathStage> body) {
-      TopicRunner.runDuring("incus", topic, new PathStage(pipeline), body, null);
+      TopicRunner.runDuring("incus", topic, new PathStage(pipeline), body, pipeline.onFailure);
       return new PathDone(pipeline);
     }
   }
@@ -245,7 +251,7 @@ public final class IncusResourceBootstrap {
     }
 
     HostDone during(String topic, java.util.function.Function<HostStage, HostStage> body) {
-      TopicRunner.runDuring("incus", topic, new HostStage(pipeline), body, null);
+      TopicRunner.runDuring("incus", topic, new HostStage(pipeline), body, pipeline.onFailure);
       return new HostDone(pipeline);
     }
   }
@@ -271,7 +277,7 @@ public final class IncusResourceBootstrap {
 
     ProviderDone during(
         String topic, java.util.function.Function<ProviderStage, ProviderStage> body) {
-      TopicRunner.runDuring("incus", topic, new ProviderStage(pipeline), body, null);
+      TopicRunner.runDuring("incus", topic, new ProviderStage(pipeline), body, pipeline.onFailure);
       return new ProviderDone(pipeline);
     }
   }
@@ -297,7 +303,7 @@ public final class IncusResourceBootstrap {
 
     InstanceDone during(
         String topic, java.util.function.Function<InstanceStage, InstanceStage> body) {
-      TopicRunner.runDuring("incus", topic, new InstanceStage(pipeline), body, null);
+      TopicRunner.runDuring("incus", topic, new InstanceStage(pipeline), body, pipeline.onFailure);
       return new InstanceDone(pipeline);
     }
   }
@@ -309,30 +315,14 @@ public final class IncusResourceBootstrap {
       this.pipeline = pipeline;
     }
 
-    ApplyTerminal orFailWith(OnFailure handler) {
-      return new ApplyTerminal(pipeline, handler);
-    }
-
-    BootstrapResult toResult() {
-      return pipeline.toResult();
-    }
-  }
-
-  private static final class ApplyTerminal {
-    private final ApplyPipeline pipeline;
-
-    ApplyTerminal(ApplyPipeline pipeline, OnFailure handler) {
-      this.pipeline = pipeline;
-      // handler retained for symmetry with the grammar; latent: not yet wired through preceding
-      // during(...) calls. Same shape as the outer pipelines.
-    }
-
     BootstrapResult toResult() {
       return pipeline.toResult();
     }
   }
 
   private final class ApplyPipeline {
+
+    private OnFailure onFailure;
 
     private BootstrapPaths localPaths;
 

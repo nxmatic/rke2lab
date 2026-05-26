@@ -21,6 +21,7 @@ import java.util.function.Function;
  * BootstrapPipeline.forCluster(config, policy)
  *     .withOptions(options)
  *     .using(bboxOrchestrator, resourceManager, outputBuilder)
+ *     .onFailure(SeedLog::error)
  *     .reportingReadinessTo(logger)
  *     .during("preflight", preflight -&gt; preflight
  *         .enforceEntryGates()
@@ -34,7 +35,6 @@ import java.util.function.Function;
  *     .during("systemd adapter", adapter -&gt; adapter.launch())
  *     .then()
  *     .during("bootstrap resources", resources -&gt; resources.createAll())
- *     .orFailWith(SeedLog::error)
  *     .collectOutputs();
  * </pre>
  */
@@ -82,6 +82,12 @@ public final class BootstrapPipeline {
 
     private ComponentBoundPipeline(PipelineState state) {
       this.state = state;
+    }
+
+    /** Optional: register a per-topic failure handler. Defaults to no-op when not called. */
+    public ComponentBoundPipeline onFailure(OnFailure handler) {
+      state.onFailure = handler;
+      return this;
     }
 
     public AwaitingPreflight reportingReadinessTo(Consumer<String> readinessLogger) {
@@ -246,23 +252,6 @@ public final class BootstrapPipeline {
     private final PipelineState state;
 
     private ResourcesDone(PipelineState state) {
-      this.state = state;
-    }
-
-    public TerminalPipeline orFailWith(OnFailure handler) {
-      state.onFailure = handler;
-      return new TerminalPipeline(state);
-    }
-
-    public Map<String, Object> collectOutputs() {
-      return new TerminalPipeline(state).collectOutputs();
-    }
-  }
-
-  public static final class TerminalPipeline {
-    private final PipelineState state;
-
-    private TerminalPipeline(PipelineState state) {
       this.state = state;
     }
 

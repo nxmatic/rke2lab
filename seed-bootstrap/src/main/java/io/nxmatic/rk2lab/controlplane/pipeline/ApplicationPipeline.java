@@ -19,6 +19,7 @@ import java.util.function.Function;
  *
  * <pre>
  * ApplicationPipeline.run(launch -&gt; launch
+ *     .onFailure(SeedLog::error)
  *     .during("environment", env -&gt; env
  *         .installLogSink()
  *         .loadBootstrapConfig()
@@ -28,7 +29,6 @@ import java.util.function.Function;
  *     .during("bootstrap", bootstrap -&gt; bootstrap.runBootstrapPipeline())
  *     .then()
  *     .during("outputs", outputs -&gt; outputs.exportOrPrint())
- *     .orFailWith(SeedLog::error)
  *     .complete());
  * </pre>
  */
@@ -86,6 +86,12 @@ public final class ApplicationPipeline {
       this.state = new State(pulumiContext);
     }
 
+    /** Optional: register a per-topic failure handler. Defaults to no-op when not called. */
+    public Launch onFailure(OnFailure handler) {
+      state.onFailure = handler;
+      return this;
+    }
+
     public EnvironmentDone during(String topic, Function<EnvironmentStage, EnvironmentStage> body) {
       final EnvironmentStage stage =
           new EnvironmentStage(
@@ -141,6 +147,7 @@ public final class ApplicationPipeline {
               () -> state.bootstrapConfig,
               () -> state.controlplanePolicy,
               () -> state.options,
+              () -> state.onFailure,
               message -> SeedLog.info("readiness", message),
               state.bboxOrchestrator,
               state.resourceManager,
@@ -179,23 +186,6 @@ public final class ApplicationPipeline {
     private final State state;
 
     private OutputsDone(State state) {
-      this.state = state;
-    }
-
-    public Terminal orFailWith(OnFailure handler) {
-      state.onFailure = handler;
-      return new Terminal(state);
-    }
-
-    public Completed complete() {
-      return new Terminal(state).complete();
-    }
-  }
-
-  public static final class Terminal {
-    private final State state;
-
-    private Terminal(State state) {
       this.state = state;
     }
 

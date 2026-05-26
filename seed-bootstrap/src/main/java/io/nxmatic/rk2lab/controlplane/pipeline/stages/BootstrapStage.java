@@ -4,6 +4,7 @@ import io.nxmatic.rk2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.pipeline.BootstrapOptions;
 import io.nxmatic.rk2lab.controlplane.pipeline.BootstrapPipeline;
+import io.nxmatic.rk2lab.controlplane.pipeline.OnFailure;
 import io.nxmatic.rk2lab.controlplane.pipeline.OutputBuilder;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rk2lab.controlplane.resources.ResourceManager;
@@ -17,6 +18,7 @@ public final class BootstrapStage {
   private final Supplier<BootstrapConfig> configSupplier;
   private final Supplier<ControlplanePolicy> policySupplier;
   private final Supplier<BootstrapOptions> optionsSupplier;
+  private final Supplier<OnFailure> onFailureSupplier;
   private final Consumer<String> readinessLogger;
   private final BboxReconciliationOrchestrator bboxOrchestrator;
   private final ResourceManager resourceManager;
@@ -28,6 +30,7 @@ public final class BootstrapStage {
       Supplier<BootstrapConfig> configSupplier,
       Supplier<ControlplanePolicy> policySupplier,
       Supplier<BootstrapOptions> optionsSupplier,
+      Supplier<OnFailure> onFailureSupplier,
       Consumer<String> readinessLogger,
       BboxReconciliationOrchestrator bboxOrchestrator,
       ResourceManager resourceManager,
@@ -37,6 +40,7 @@ public final class BootstrapStage {
     this.configSupplier = configSupplier;
     this.policySupplier = policySupplier;
     this.optionsSupplier = optionsSupplier;
+    this.onFailureSupplier = onFailureSupplier;
     this.readinessLogger = readinessLogger;
     this.bboxOrchestrator = bboxOrchestrator;
     this.resourceManager = resourceManager;
@@ -45,10 +49,14 @@ public final class BootstrapStage {
   }
 
   public BootstrapStage runBootstrapPipeline() {
-    final BootstrapPipeline.ComponentBoundPipeline ready =
+    BootstrapPipeline.ComponentBoundPipeline ready =
         BootstrapPipeline.forCluster(configSupplier.get(), policySupplier.get())
             .withOptions(optionsSupplier.get())
             .using(bboxOrchestrator, resourceManager, outputBuilder);
+    final OnFailure handler = onFailureSupplier.get();
+    if (handler != null) {
+      ready = ready.onFailure(handler);
+    }
     final BootstrapPipeline.AwaitingPreflight primed =
         pulumiMode
             ? ready.runningInPulumi(readinessLogger)
