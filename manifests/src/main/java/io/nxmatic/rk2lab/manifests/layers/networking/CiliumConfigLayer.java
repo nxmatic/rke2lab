@@ -17,6 +17,29 @@ public final class CiliumConfigLayer extends Construct {
   public CiliumConfigLayer(final Construct scope, final String id) {
     super(scope, id);
     createHelmChartConfig();
+    createClustermeshRemoteUsersConfigMap();
+  }
+
+  private void createClustermeshRemoteUsersConfigMap() {
+    // Mounted by clustermesh-apiserver as `etcd-users-config`; without this
+    // ConfigMap the pod stays in Init:0/1 waiting for the volume. We ship it
+    // with no data — peer entries get appended (out-of-band, by `cilium
+    // clustermesh users add`) once federated clusters come online.
+    new ApiObject(
+        this,
+        "configmap-clustermesh-remote-users",
+        ApiObjectProps.builder()
+            .apiVersion("v1")
+            .kind("ConfigMap")
+            .metadata(
+                ApiObjectMetadata.builder()
+                    .name("clustermesh-remote-users")
+                    .namespace("kube-system")
+                    .annotations(
+                        packageProfile.packageAnnotations(
+                            "|ConfigMap|kube-system|clustermesh-remote-users"))
+                    .build())
+            .build());
   }
 
   private void createHelmChartConfig() {
