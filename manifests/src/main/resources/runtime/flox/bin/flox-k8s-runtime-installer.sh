@@ -139,7 +139,8 @@ installer::pod:materialize_assets() {
 
 	# Script-policy library — separate ConfigMap mount, real cross-volume copy.
 	for lib in daemonset-logging.sh daemonless-host-asset-materializer.sh \
-		daemonless-trampoline.sh daemonless-host-shell-policy.sh; do
+		daemonless-trampoline.sh daemonless-host-shell-policy.sh \
+		daemonless-host-asset-reconciler.sh; do
 		DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
 			DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
 			DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
@@ -149,6 +150,17 @@ installer::pod:materialize_assets() {
 			"${SCRIPT_MOUNT_DIR}" \
 			"${lib}" >/dev/null
 	done
+
+	# Hot-reload hook — installed to workspace bin/ so the reconciler sidecar
+	# can invoke it via daemonless::trampoline:exec_on_host.
+	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
+		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
+		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
+		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
+		daemonless::host_shell:binary:install \
+		"${SCRIPT_MOUNT_DIR}/bin/flox-nri-plugin-reload.sh" \
+		"${SCRIPT_MOUNT_DIR}" \
+		"flox-nri-plugin-reload.sh" >/dev/null
 
 	# OCI prestart hooks — runc looks them up in /usr/local/sbin on the host
 	# filesystem (bind-mounted at ${HOST_ROOT} inside this pod), not under

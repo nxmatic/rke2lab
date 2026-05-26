@@ -107,6 +107,12 @@ public final class RuntimeDaemonsetScriptPolicyAssets {
                   .configMapKey("daemonless-trampoline.sh")
                   .classpathResource(RESOURCE_ROOT + "/daemonless-trampoline.sh")
                   .relativePath(".sh.d/daemonless-trampoline.sh"));
+      addScriptAsset(
+          asset ->
+              asset
+                  .configMapKey("daemonless-host-asset-reconciler.sh")
+                  .classpathResource(RESOURCE_ROOT + "/daemonless-host-asset-reconciler.sh")
+                  .relativePath(".sh.d/daemonless-host-asset-reconciler.sh"));
       return this;
     }
 

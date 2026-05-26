@@ -56,8 +56,9 @@ public final class FloxRuntimeLayer extends Construct {
     // activate write locks (overlayfs lower=NFS isn't supported, so the
     // workspace must live on local fs).
     ApiObject envConfigMap = createFloxEnvConfigMap();
+    ApiObject dynamicPluginConfigMap = createDynamicPluginConfigMap();
     ApiObject serviceAccount = createServiceAccount();
-    createInstallerDaemonSet(envConfigMap, serviceAccount);
+    createInstallerDaemonSet(envConfigMap, dynamicPluginConfigMap, serviceAccount);
   }
 
   // RuntimeClass removed: NRI plugin approach doesn't need custom runtime handlers
@@ -108,6 +109,41 @@ public final class FloxRuntimeLayer extends Construct {
     return configMap;
   }
 
+  private ApiObject createDynamicPluginConfigMap() {
+    // Dynamic hot-reload ConfigMap for NRI plugin updates.
+    // Initially empty; populated at runtime via kubectl apply by the dev tool.
+    // Expected keys when populated:
+    //   nri-plugin.tar.b64 — base64-encoded tar archive of plugin binary + hooks
+    //   nri-plugin.manifest.json — JSON manifest with archive/entry checksums
+    ApiObject configMap =
+        new ApiObject(
+            this,
+            "configmap-flox-nri-plugin-dyn",
+            ApiObjectProps.builder()
+                .apiVersion("v1")
+                .kind("ConfigMap")
+                .metadata(
+                    ApiObjectMetadata.builder()
+                        .name("flox-nri-plugin-dyn")
+                        .namespace(RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName())
+                        .annotations(
+                            kptMetadata.packageAnnotations(
+                                LAYER_NAME,
+                                PACKAGE_NAME,
+                                "|ConfigMap|"
+                                    + RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName()
+                                    + "|flox-nri-plugin-dyn"))
+                        .build())
+                .build());
+
+    if (registry != null) {
+      configMap.addDependency(registry.require(ClusterLayerRefs.RUNTIME_SYSTEM_NAMESPACE));
+    }
+
+    configMap.addJsonPatch(JsonPatch.add("/data", Map.of()));
+    return configMap;
+  }
+
   private ApiObject createServiceAccount() {
     ApiObject serviceAccount =
         new ApiObject(
@@ -136,7 +172,9 @@ public final class FloxRuntimeLayer extends Construct {
   }
 
   private void createInstallerDaemonSet(
-      final ApiObject envConfigMap, final ApiObject serviceAccount) {
+      final ApiObject envConfigMap,
+      final ApiObject dynamicPluginConfigMap,
+      final ApiObject serviceAccount) {
     ApiObject daemonSet =
         new ApiObject(
             this,
@@ -169,6 +207,7 @@ public final class FloxRuntimeLayer extends Construct {
       daemonSet.addDependency(registry.require(RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP));
     }
     daemonSet.addDependency(envConfigMap);
+    daemonSet.addDependency(dynamicPluginConfigMap);
     daemonSet.addDependency(serviceAccount);
 
     daemonSet.addJsonPatch(
@@ -256,7 +295,89 @@ public final class FloxRuntimeLayer extends Construct {
                                           "ephemeral-storage",
                                           "64Mi",
                                           "memory",
-                                          "64Mi")))
+                                          "64Mi"))),
+                              // Reconciler sidecar: watches dynamic ConfigMap for hot-reload
+                              Map.of(
+                                  "command",
+                                  new Object[] {
+                                    "/bin/sh",
+                                    "-c",
+                                    // Source daemonless libraries, then call the reconciler
+                                    // primitive. Runs indefinitely watching for ConfigMap
+                                    // changes via inotifywait.
+                                    "apk add --no-cache bash inotify-tools"
+                                        + " && . /.sh-daemonset/.sh.d/daemonset-logging.sh"
+                                        + " && . /.sh-daemonset/.sh.d/daemonless-host-shell-policy.sh"
+                                        + " && . /.sh-daemonset/.sh.d/daemonless-trampoline.sh"
+                                        + " && . /.sh-daemonset/.sh.d/daemonless-host-asset-materializer.sh"
+                                        + " && . /.sh-daemonset/.sh.d/daemonless-host-asset-reconciler.sh"
+                                        + " && daemonless::host_asset:watch_and_reconcile"
+                                        + "      /dynamic-plugin"
+                                        + "      nri-plugin.tar.b64"
+                                        + "      nri-plugin.manifest.json"
+                                        + "      /var/run/k8s-daemonset.d/runtime/flox"
+                                        + "      flox-nri-plugin-reload.sh"
+                                  },
+                                  "env",
+                                  new Object[] {
+                                    Map.of("name", "DAEMONLESS_EXEC_MODE", "value", "pod"),
+                                    Map.of(
+                                        "name",
+                                        "DAEMONLESS_HOST_SCRIPT_ROOT",
+                                        "value",
+                                        "/var/run/k8s-daemonset.d/runtime/flox")
+                                  },
+                                  "image",
+                                  "alpine:3.20",
+                                  "imagePullPolicy",
+                                  "IfNotPresent",
+                                  "name",
+                                  "reconciler",
+                                  "securityContext",
+                                  Map.of("privileged", true, "runAsGroup", 0, "runAsUser", 0),
+                                  "volumeMounts",
+                                  new Object[] {
+                                    Map.of(
+                                        "mountPath",
+                                        "/dynamic-plugin",
+                                        "name",
+                                        "dynamic-plugin-configmap",
+                                        "readOnly",
+                                        true),
+                                    Map.of(
+                                        "mountPath",
+                                        "/.sh-daemonset",
+                                        "name",
+                                        "runtime-daemonset-script-policy",
+                                        "readOnly",
+                                        true),
+                                    Map.of(
+                                        "mountPath",
+                                        "/var/run/k8s-daemonset.d/runtime/flox",
+                                        "name",
+                                        "runtime-installer-workspace",
+                                        "subPath",
+                                        "runtime/flox"),
+                                    Map.of("mountPath", "/host-root", "name", "host-root")
+                                  },
+                                  "resources",
+                                  Map.of(
+                                      "limits",
+                                      Map.of(
+                                          "cpu",
+                                          "50m",
+                                          "ephemeral-storage",
+                                          "64Mi",
+                                          "memory",
+                                          "64Mi"),
+                                      "requests",
+                                      Map.of(
+                                          "cpu",
+                                          "10m",
+                                          "ephemeral-storage",
+                                          "32Mi",
+                                          "memory",
+                                          "32Mi")))
                             }),
                         Map.entry("hostPID", true),
                         Map.entry("hostNetwork", true),
@@ -446,6 +567,17 @@ public final class FloxRuntimeLayer extends Construct {
                                       RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name()),
                                   "name",
                                   "runtime-daemonset-script-policy"),
+                              Map.of(
+                                  "configMap",
+                                  Map.of(
+                                      "defaultMode",
+                                      420,
+                                      "name",
+                                      "flox-nri-plugin-dyn",
+                                      "optional",
+                                      true),
+                                  "name",
+                                  "dynamic-plugin-configmap"),
                               Map.of(
                                   "hostPath",
                                   Map.of("path", "/", "type", "Directory"),
