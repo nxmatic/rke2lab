@@ -663,13 +663,12 @@ public final class IncusResourceBootstrap {
         instanceConfig.put("user.rke2lab.provisioning.slice." + entry.getKey(), entry.getValue());
       }
 
-      // Deployment metadata for provenance tracking
-      // NOTE: timestamp excluded from config to avoid triggering replacement on every deploy
-      // Timestamp is available in Pulumi outputs for audit purposes
-      instanceConfig.put("user.rke2lab.git.branch", deploymentMetadata.git().branch());
-      instanceConfig.put("user.rke2lab.git.commitSha", deploymentMetadata.git().commitSha());
-
+      // Image checksum - triggers renewal if base image changes (semantic change requiring rebuild)
       instanceConfig.put("user.rke2lab.imageBuildChecksum", buildMetadata.image().checksum());
+
+      // NOTE: Git SHA, branch, and timestamp excluded from config to enable hot-reload
+      // These are available in Pulumi outputs for audit/tracking purposes
+      // Only STATIC slice checksums and image checksum should trigger instance renewal
 
       this.instance =
           new Instance(
