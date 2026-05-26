@@ -358,7 +358,8 @@ public final class IncusResourceBootstrap {
 
     private ApplyPipeline prepareHostState() {
       logInfo("mode=" + (Deployment.getInstance().isDryRun() ? "preview" : "apply"));
-      HostAssetRootLifecycle.prepareCleanHostAssetRoot(localPaths.assetsRoot());
+      HostAssetRootLifecycle.prepareCleanHostAssetRoot(
+          localPaths.assetsRoot(), config.hostAssetRotationRetentionCount());
       classpathAssetMaterializer.materializeIncusAssets(localPaths.assetsRoot());
       classpathAssetMaterializer.materializeManifests(localPaths.manifestsRoot());
       LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
@@ -1775,7 +1776,7 @@ public final class IncusResourceBootstrap {
 
     private HostAssetRootLifecycle() {}
 
-    private static void prepareCleanHostAssetRoot(Path hostAssetRoot) {
+    private static void prepareCleanHostAssetRoot(Path hostAssetRoot, int retentionCount) {
       try {
         final Path parent = hostAssetRoot.getParent();
         if (parent == null) {
@@ -1789,6 +1790,11 @@ public final class IncusResourceBootstrap {
           final Path rotatedPath = rotatedHostPath(hostAssetRoot);
           rotate(hostAssetRoot, rotatedPath);
           registerRecursiveDeleteAtShutdown(rotatedPath);
+        }
+
+        // Clean up old rotated directories, keeping only N most recent (if retention > 0)
+        if (retentionCount >= 0) {
+          cleanupOldRotations(hostAssetRoot, retentionCount);
         }
 
         Files.createDirectories(hostAssetRoot);
@@ -1811,6 +1817,35 @@ public final class IncusResourceBootstrap {
         Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
       } catch (AtomicMoveNotSupportedException ex) {
         Files.move(source, target);
+      }
+    }
+
+    private static void cleanupOldRotations(Path hostAssetRoot, int retentionCount)
+        throws IOException {
+      final Path parent = hostAssetRoot.getParent();
+      if (parent == null) {
+        return;
+      }
+
+      final String hostDirName = hostAssetRoot.getFileName().toString();
+      final String rotationPattern = hostDirName + "\\.\\d+\\.\\d+";
+
+      try (Stream<Path> siblings = Files.list(parent)) {
+        siblings
+            .filter(p -> p.getFileName().toString().matches(rotationPattern))
+            .sorted(
+                java.util.Comparator.<Path, String>comparing(
+                        p -> p.getFileName().toString())
+                    .reversed())
+            .skip(retentionCount)
+            .forEach(
+                old -> {
+                  try {
+                    deleteRecursively(old);
+                  } catch (IOException ignored) {
+                    // Best effort - don't fail build if cleanup fails
+                  }
+                });
       }
     }
 

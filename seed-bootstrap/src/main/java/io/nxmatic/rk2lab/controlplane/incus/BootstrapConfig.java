@@ -27,7 +27,8 @@ public record BootstrapConfig(
     Path kubeconfigRef,
     boolean nfsAutomount,
     String systemdAdapterDbusHost,
-    int systemdAdapterDbusPort) {
+    int systemdAdapterDbusPort,
+    int hostAssetRotationRetentionCount) {
 
   public String imageBuilderBinary() {
     return "distrobuilder";
@@ -83,7 +84,8 @@ public record BootstrapConfig(
         kubeconfigRef,
         nfsAutomount,
         systemdAdapterDbusHost,
-        systemdAdapterDbusPort);
+        systemdAdapterDbusPort,
+        hostAssetRotationRetentionCount);
   }
 
   public Path localWorktreePath() {
@@ -142,6 +144,8 @@ public record BootstrapConfig(
     private String systemdAdapterDbusHost = defaults.systemdAdapterDbusHost();
 
     private int systemdAdapterDbusPort = defaults.systemdAdapterDbusPort();
+
+    private int hostAssetRotationRetentionCount = 3;
 
     public Builder worktree(Path value) {
       this.worktree = normalizeAbsolutePath(value);
@@ -238,6 +242,11 @@ public record BootstrapConfig(
       return this;
     }
 
+    public Builder hostAssetRotationRetentionCount(int value) {
+      this.hostAssetRotationRetentionCount = value;
+      return this;
+    }
+
     public Builder applyConfig(Config config) {
       final EnvironmentValues environment = new EnvironmentValues(config);
       override(environment, "worktree.dir", value -> this.worktree(parsePath(value)));
@@ -267,6 +276,10 @@ public record BootstrapConfig(
           environment,
           "systemdAdapter.dbus.port",
           value -> this.systemdAdapterDbusPort(Integer.parseInt(value.trim())));
+      override(
+          environment,
+          "hostAsset.rotation.retentionCount",
+          value -> this.hostAssetRotationRetentionCount(Integer.parseInt(value.trim())));
       return this;
     }
 
@@ -306,7 +319,8 @@ public record BootstrapConfig(
           resolvedKubeconfigRef,
           nfsAutomount,
           systemdAdapterDbusHost,
-          systemdAdapterDbusPort);
+          systemdAdapterDbusPort,
+          hostAssetRotationRetentionCount);
     }
 
     private Path parsePath(String value) {
