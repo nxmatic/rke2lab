@@ -138,14 +138,226 @@ public final class IncusResourceBootstrap {
     this.launchSecretsUpdater = LaunchSecretsUpdater.INSTANCE;
   }
 
-  /** Materialize seed resources directly via the Incus provider. */
+  /**
+   * Materialize seed resources directly via the Incus provider. Reads as: resolve paths, then
+   * prepare host state, then prepare provider resources, then create the instance.
+   */
   public BootstrapResult apply() {
-    return new ApplyPipeline()
-        .resolvePaths()
-        .prepareHostState()
-        .prepareProviderResources()
-        .createInstance()
+    final ApplyPipeline pipeline = new ApplyPipeline();
+    return new ApplyStart(pipeline)
+        .during("path resolution", paths -> paths.resolve())
+        .then()
+        .during("host state", host -> host.prepareAll())
+        .then()
+        .during("provider resources", provider -> provider.ensureAll())
+        .then()
+        .during("instance", instance -> instance.create())
+        .orFailWith((topic, cause) -> SeedLog.error("incus", topic + ": " + cause.getMessage()))
         .toResult();
+  }
+
+  @FunctionalInterface
+  private interface PhaseFailure {
+    void handle(String topic, Throwable cause);
+  }
+
+  private static final class ApplyTopicFailure extends RuntimeException {
+    ApplyTopicFailure(String topic, Throwable cause) {
+      super(topic + ": " + cause.getMessage(), cause);
+    }
+  }
+
+  private static final class PhaseRunner {
+    private static <S, R> R runDuring(
+        String topic, S stage, java.util.function.Function<S, S> body, PhaseFailure onFailure) {
+      final long startedAt = System.nanoTime();
+      SeedLog.info("incus", "→ entering " + topic);
+      try {
+        body.apply(stage);
+      } catch (Throwable cause) {
+        if (onFailure != null) {
+          onFailure.handle(topic, cause);
+        }
+        throw new ApplyTopicFailure(topic, cause);
+      }
+      SeedLog.info("incus", "← leaving " + topic + " (" + elapsedSince(startedAt) + ")");
+      @SuppressWarnings("unchecked")
+      final R cast = (R) stage;
+      return cast;
+    }
+  }
+
+  /** Topic stages — each holds a reference to the shared ApplyPipeline state. */
+  private static final class PathStage {
+    private final ApplyPipeline pipeline;
+
+    PathStage(ApplyPipeline pipeline) {
+      this.pipeline = pipeline;
+    }
+
+    PathStage resolve() {
+      pipeline.resolvePaths();
+      return this;
+    }
+  }
+
+  private static final class HostStage {
+    private final ApplyPipeline pipeline;
+
+    HostStage(ApplyPipeline pipeline) {
+      this.pipeline = pipeline;
+    }
+
+    HostStage prepareAll() {
+      pipeline.prepareHostState();
+      return this;
+    }
+  }
+
+  private static final class ProviderStage {
+    private final ApplyPipeline pipeline;
+
+    ProviderStage(ApplyPipeline pipeline) {
+      this.pipeline = pipeline;
+    }
+
+    ProviderStage ensureAll() {
+      pipeline.prepareProviderResources();
+      return this;
+    }
+  }
+
+  private static final class InstanceStage {
+    private final ApplyPipeline pipeline;
+
+    InstanceStage(ApplyPipeline pipeline) {
+      this.pipeline = pipeline;
+    }
+
+    InstanceStage create() {
+      pipeline.createInstance();
+      return this;
+    }
+  }
+
+  /** State-machine entry / transitions for the apply pipeline. */
+  private static final class ApplyStart {
+    private final ApplyPipeline pipeline;
+
+    ApplyStart(ApplyPipeline pipeline) {
+      this.pipeline = pipeline;
+    }
+
+    PathDone during(String topic, java.util.function.Function<PathStage, PathStage> body) {
+      PhaseRunner.runDuring(topic, new PathStage(pipeline), body, null);
+      return new PathDone(pipeline);
+    }
+  }
+
+  private static final class PathDone {
+    private final ApplyPipeline pipeline;
+
+    PathDone(ApplyPipeline pipeline) {
+      this.pipeline = pipeline;
+    }
+
+    AwaitingHost then() {
+      return new AwaitingHost(pipeline);
+    }
+  }
+
+  private static final class AwaitingHost {
+    private final ApplyPipeline pipeline;
+
+    AwaitingHost(ApplyPipeline pipeline) {
+      this.pipeline = pipeline;
+    }
+
+    HostDone during(String topic, java.util.function.Function<HostStage, HostStage> body) {
+      PhaseRunner.runDuring(topic, new HostStage(pipeline), body, null);
+      return new HostDone(pipeline);
+    }
+  }
+
+  private static final class HostDone {
+    private final ApplyPipeline pipeline;
+
+    HostDone(ApplyPipeline pipeline) {
+      this.pipeline = pipeline;
+    }
+
+    AwaitingProvider then() {
+      return new AwaitingProvider(pipeline);
+    }
+  }
+
+  private static final class AwaitingProvider {
+    private final ApplyPipeline pipeline;
+
+    AwaitingProvider(ApplyPipeline pipeline) {
+      this.pipeline = pipeline;
+    }
+
+    ProviderDone during(
+        String topic, java.util.function.Function<ProviderStage, ProviderStage> body) {
+      PhaseRunner.runDuring(topic, new ProviderStage(pipeline), body, null);
+      return new ProviderDone(pipeline);
+    }
+  }
+
+  private static final class ProviderDone {
+    private final ApplyPipeline pipeline;
+
+    ProviderDone(ApplyPipeline pipeline) {
+      this.pipeline = pipeline;
+    }
+
+    AwaitingInstance then() {
+      return new AwaitingInstance(pipeline);
+    }
+  }
+
+  private static final class AwaitingInstance {
+    private final ApplyPipeline pipeline;
+
+    AwaitingInstance(ApplyPipeline pipeline) {
+      this.pipeline = pipeline;
+    }
+
+    InstanceDone during(
+        String topic, java.util.function.Function<InstanceStage, InstanceStage> body) {
+      PhaseRunner.runDuring(topic, new InstanceStage(pipeline), body, null);
+      return new InstanceDone(pipeline);
+    }
+  }
+
+  private static final class InstanceDone {
+    private final ApplyPipeline pipeline;
+
+    InstanceDone(ApplyPipeline pipeline) {
+      this.pipeline = pipeline;
+    }
+
+    ApplyTerminal orFailWith(PhaseFailure handler) {
+      return new ApplyTerminal(pipeline, handler);
+    }
+
+    BootstrapResult toResult() {
+      return pipeline.toResult();
+    }
+  }
+
+  private static final class ApplyTerminal {
+    private final ApplyPipeline pipeline;
+
+    ApplyTerminal(ApplyPipeline pipeline, PhaseFailure handler) {
+      this.pipeline = pipeline;
+      // handler used during preceding during(...) calls; retained for symmetry with the grammar
+    }
+
+    BootstrapResult toResult() {
+      return pipeline.toResult();
+    }
   }
 
   private final class ApplyPipeline {
@@ -177,23 +389,16 @@ public final class IncusResourceBootstrap {
     private Instance instance;
 
     private ApplyPipeline resolvePaths() {
-      final long startedAt = System.nanoTime();
-      logInfo("phase resolvePaths: starting");
       final Path localWorktreeRoot = config.worktreeDirOn(WorktreeHost.DARWIN);
       this.localPaths =
           BootstrapPaths.fromLocalWorktree(
               localWorktreeRoot, config.clusterName(), config.nodeName());
       this.nixosPaths = localPaths.asHostView(config, WorktreeHost.NIXOS);
-      logInfo("phase resolvePaths: complete after " + elapsedSince(startedAt));
       return this;
     }
 
     private ApplyPipeline prepareHostState() {
-      final long startedAt = System.nanoTime();
-      logInfo(
-          "phase prepareHostState: starting (mode="
-              + (Deployment.getInstance().isDryRun() ? "preview" : "apply")
-              + ")");
+      logInfo("mode=" + (Deployment.getInstance().isDryRun() ? "preview" : "apply"));
       HostAssetRootLifecycle.prepareCleanHostAssetRoot(localPaths.assetsRoot());
       classpathAssetMaterializer.materializeIncusAssets(localPaths.assetsRoot());
       classpathAssetMaterializer.materializeManifests(localPaths.manifestsRoot());
@@ -214,12 +419,7 @@ public final class IncusResourceBootstrap {
           localPaths.runtimeCloudConfigRoot(), localPaths.cloudSeedRoot());
       this.provisioningChecksum = ProvisioningResourceInventory.checksum(localPaths);
       ensureLaunchSecretsToken(localPaths.secretsFile());
-      logInfo(
-          "phase prepareHostState: complete after "
-              + elapsedSince(startedAt)
-              + " (provisioningChecksum="
-              + provisioningChecksum
-              + ")");
+      logInfo("provisioningChecksum=" + provisioningChecksum);
       return this;
     }
 
@@ -439,34 +639,20 @@ public final class IncusResourceBootstrap {
     }
 
     private ApplyPipeline prepareProviderResources() {
-      final long startedAt = System.nanoTime();
-      logInfo("phase prepareProviderResources: starting");
       this.providerContext = IncusProviderContext.forBootstrap("seed-incus-provider", config);
       this.ensuredProject = ensureProject(providerContext);
       this.ensuredProjectName = ensuredProject.name();
       ensureNetwork(providerContext, config.lanBridgeParent(), ensuredProject);
       ensureNetwork(providerContext, config.vmnetNetworkName(), ensuredProject);
       this.ensuredProfileName = ensureProfile(providerContext, ensuredProject);
-      final long imageStartAt = System.nanoTime();
-      logInfo(
-          "phase prepareProviderResources: ensuring seed image fingerprint "
-              + "(mode="
-              + (Deployment.getInstance().isDryRun() ? "preview" : "apply")
-              + ")");
       this.ensuredImageFingerprint =
           imageProvider.ensureSeedImageFingerprint(
               providerContext.invokeOptions(), providerContext.provider(), ensuredProject);
-      logInfo(
-          "phase prepareProviderResources: seed image fingerprint scheduled after "
-              + elapsedSince(imageStartAt));
       this.imageBuildChecksum = imageProvider.buildChecksum();
-      logInfo("phase prepareProviderResources: complete after " + elapsedSince(startedAt));
       return this;
     }
 
     private ApplyPipeline createInstance() {
-      final long startedAt = System.nanoTime();
-      logInfo("phase createInstance: starting");
       final Map<String, String> instanceConfig = new LinkedHashMap<>();
       instanceConfig.put(
           "raw.lxc",
@@ -495,7 +681,6 @@ public final class IncusResourceBootstrap {
                   .devices(seedInstanceDevices(nixosPaths))
                   .build(),
               instanceOptions());
-      logInfo("phase createInstance: complete after " + elapsedSince(startedAt));
       return this;
     }
 
