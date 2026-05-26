@@ -62,8 +62,9 @@ public final class SeedLog {
     log(scope, LogLevel.TRACE, message);
   }
 
-  public static void installPulumiLogSink(PulumiLogSink sink) {
+  public static AutoCloseable installPulumiLogSink(PulumiLogSink sink) {
     pulumiLogSink = sink;
+    return () -> pulumiLogSink = null;
   }
 
   public static void clearPulumiLogSink() {
