@@ -27,7 +27,7 @@ public final class BootstrapRegistryResource extends ComponentResource {
     super(TYPE_TOKEN, name, buildOptions(dependsOnResource));
 
     final LinkedHashMap<String, Object> values = new LinkedHashMap<>();
-    values.put("sliceChecksums", provisioning.slices().checksums());
+    values.put("sliceChecksums", provisioning.slices().all());
     values.put("hostSourceDirRelative", provisioning.paths().hostSourceDirRelative());
     values.put("localWorktreePath", config.localWorktreePath().toString());
     values.put("layerEnvRegistry", runtime.environment().summary());

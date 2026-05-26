@@ -37,7 +37,6 @@ import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributorRegistry;
-import io.nxmatic.rk2lab.manifests.layers.runtime.flox.FloxRuntimeAssets;
 import io.nxmatic.rk2lab.netplan.ClusterNetworkBlueprint;
 import java.io.IOException;
 import java.net.JarURLConnection;
@@ -362,15 +361,21 @@ public final class IncusResourceBootstrap {
       HostAssetRootLifecycle.prepareCleanHostAssetRoot(localPaths.assetsRoot());
       classpathAssetMaterializer.materializeIncusAssets(localPaths.assetsRoot());
       classpathAssetMaterializer.materializeManifests(localPaths.manifestsRoot());
-      classpathAssetMaterializer.materializeHostSystemdAssets(
-          localPaths.manifestsRoot().resolve("host"));
       LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
       final Map<String, Object> manifestSynthSummary =
           synthesizeAndExplodeManifests(localPaths.manifestsRoot(), policy, layerContext);
 
-      // Initialize slice registry for components to declare their hot-reloadable slices
+      // Initialize slice registry
       final ProvisioningSliceRegistry sliceRegistry = new ProvisioningSliceRegistry();
-      materializeFloxRuntimeInstallerAssets(localPaths.daemonsetRoot(), sliceRegistry);
+
+      // Materialize and register node slice (systemd units/scripts, NRI plugin, node runtime)
+      final NodeSlice nodeSlice = new NodeSlice();
+      try {
+        nodeSlice.materialize(localPaths);
+      } catch (IOException ex) {
+        throw new IllegalStateException("Failed to materialize node slice", ex);
+      }
+      sliceRegistry.register(nodeSlice);
 
       final List<String> hostMountNotes = hostMountSourceVerifier.ensureSources(localPaths);
       final Map<String, Object> systemdProvisioningSummary =
@@ -381,7 +386,7 @@ public final class IncusResourceBootstrap {
               localPaths.runtimeEnvConfigRoot(), layerContext, policy);
       nodeConfigRegenerator.regenerateCloudConfigDir(
           localPaths.runtimeCloudConfigRoot(), localPaths.cloudSeedRoot());
-      final Map<String, String> provisioningSliceChecksums =
+      final ProvisioningMetadata.Slices provisioningSlices =
           ProvisioningResourceInventory.sliceChecksums(localPaths, sliceRegistry);
       final String hostSourceDirRelative =
           relativizeAgainstWorktree(localPaths.worktreeRoot(), localPaths.assetsRoot());
@@ -390,8 +395,7 @@ public final class IncusResourceBootstrap {
       this.deploymentMetadata = DeploymentMetadata.capture();
       this.provisioningMetadata =
           new ProvisioningMetadata(
-              ProvisioningMetadata.Slices.of(provisioningSliceChecksums),
-              new ProvisioningMetadata.Paths(hostSourceDirRelative));
+              provisioningSlices, new ProvisioningMetadata.Paths(hostSourceDirRelative));
       this.buildMetadata =
           new BuildMetadata(
               null, // image checksum set later in ensureProviderResources
@@ -544,23 +548,6 @@ public final class IncusResourceBootstrap {
      * workspace at {@code /var/run/k8s-daemonset.d/runtime/flox/} at startup; nix and flox write
      * locks there. Since this path is build-only on the pod side, the wipe can be wholesale.
      */
-    private void materializeFloxRuntimeInstallerAssets(
-        Path daemonsetRoot, ProvisioningSliceRegistry sliceRegistry) {
-      final Path target = daemonsetRoot.resolve("runtime").resolve("flox");
-      try {
-        deleteSubtree(target);
-        Files.createDirectories(target);
-        FloxRuntimeAssets.builder().build().writeInstallerAssetTree(target);
-        logInfo("phase prepareHostState: flox runtime-installer inputs written to " + target);
-
-        // Register flox runtime as a hot-reloadable slice
-        sliceRegistry.register("floxRuntime", target);
-      } catch (IOException ex) {
-        throw new IllegalStateException(
-            "Failed to materialize flox runtime-installer asset tree at " + target, ex);
-      }
-    }
-
     /**
      * Remove every direct child of {@code manifestsRoot} except {@code host/} (which carries the
      * non-synthesized systemd-scripts and systemd-units the materializer just wrote). Stale layer
@@ -657,10 +644,10 @@ public final class IncusResourceBootstrap {
       instanceConfig.put("security.syscalls.intercept.bpf", "true");
       instanceConfig.put("security.syscalls.intercept.bpf.devices", "true");
 
-      // Store per-slice checksums as user.rke2lab.provisioning.slice.<sliceName>
-      // Changes to core slice → full renewal via replaceOnChanges
-      // Changes to other slices → hot-reload reconciliation (future)
-      for (Map.Entry<String, String> entry : provisioningMetadata.slices().checksums().entrySet()) {
+      // Store STATIC slice checksums in instance config
+      // Changes trigger full renewal. HOT_RELOAD slices stored separately (outputs/ConfigMap).
+      for (Map.Entry<String, String> entry :
+          provisioningMetadata.slices().staticSlices().entrySet()) {
         instanceConfig.put("user.rke2lab.provisioning.slice." + entry.getKey(), entry.getValue());
       }
 
@@ -2579,20 +2566,39 @@ public final class IncusResourceBootstrap {
      * pipeline grammar.
      *
      * <p>The core slice covers base provisioning (systemd, manifests, rke2 config); component
-     * slices are discovered from the registry populated during materialization. Each slice change
-     * triggers slice-specific reconciliation without full master renewal.
+     * slices are discovered from the registry populated during materialization. Static slices
+     * trigger instance renewal; hot-reload slices trigger reconciliation without renewal.
      *
      * @param paths bootstrap filesystem paths
-     * @param registry component-populated slice registry
-     * @return map from slice name to SHA-256 checksum
+     * @param registry component-populated slice registry with storage policies
+     * @return partitioned slice checksums (static vs hot-reload)
      */
-    private static Map<String, String> sliceChecksums(
+    private static ProvisioningMetadata.Slices sliceChecksums(
         BootstrapPaths paths, ProvisioningSliceRegistry registry) {
-      return SliceChecksumPipeline.begin(paths, registry)
-          .during("core", core -> core.fromCoreRoots())
-          .then()
-          .during("registered components", components -> components.fromRegistry())
-          .collectChecksums();
+      final Map<String, String> allChecksums =
+          SliceChecksumPipeline.begin(paths, registry)
+              .during("core", core -> core.fromCoreRoots())
+              .then()
+              .during("registered components", components -> components.fromRegistry())
+              .collectChecksums();
+
+      // Partition by storage policy
+      final Map<String, String> staticSlices = new java.util.LinkedHashMap<>();
+      final Map<String, String> hotReloadSlices = new java.util.LinkedHashMap<>();
+
+      for (Map.Entry<String, String> entry : allChecksums.entrySet()) {
+        final String sliceName = entry.getKey();
+        final String checksum = entry.getValue();
+        final SliceStoragePolicy policy = registry.getStoragePolicy(sliceName);
+
+        if (policy == SliceStoragePolicy.STATIC) {
+          staticSlices.put(sliceName, checksum);
+        } else if (policy == SliceStoragePolicy.HOT_RELOAD) {
+          hotReloadSlices.put(sliceName, checksum);
+        }
+      }
+
+      return ProvisioningMetadata.Slices.of(staticSlices, hotReloadSlices);
     }
 
     /**

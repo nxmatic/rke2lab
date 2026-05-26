@@ -11,16 +11,26 @@ import java.util.Map;
 public record ProvisioningMetadata(Slices slices, Paths paths) {
 
   /**
-   * Per-slice checksums for hot-reload reconciliation.
+   * Per-slice checksums partitioned by storage policy.
    *
-   * <p>Core slice changes trigger full renewal; component slice changes trigger hot-reload.
+   * <p>Static slices stored in instance config trigger full renewal on change. Hot-reload slices
+   * trigger reconciliation without instance renewal.
    *
-   * @param checksums map from slice name (core, floxRuntime, kdns, ...) to SHA-256 checksum
+   * @param staticSlices checksums for STATIC policy slices (stored in instance config)
+   * @param hotReloadSlices checksums for HOT_RELOAD policy slices (stored in outputs/ConfigMap)
    */
-  public record Slices(Map<String, String> checksums) {
+  public record Slices(Map<String, String> staticSlices, Map<String, String> hotReloadSlices) {
 
-    public static Slices of(Map<String, String> checksums) {
-      return new Slices(Map.copyOf(checksums));
+    public static Slices of(Map<String, String> staticSlices, Map<String, String> hotReloadSlices) {
+      return new Slices(Map.copyOf(staticSlices), Map.copyOf(hotReloadSlices));
+    }
+
+    /** All slice checksums regardless of policy. */
+    public Map<String, String> all() {
+      final var combined = new java.util.LinkedHashMap<String, String>();
+      combined.putAll(staticSlices);
+      combined.putAll(hotReloadSlices);
+      return Map.copyOf(combined);
     }
   }
 
