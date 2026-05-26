@@ -20,7 +20,27 @@ db::check() {
 	fi
 }
 
+nri::enable() {
+	local config_dir="/var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml.d"
+	mkdir -p "${config_dir}"
+
+	# Enable NRI before RKE2 starts via containerd config import
+	# RKE2 will read: imports = ['/var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml.d/*.toml']
+	cat >"${config_dir}/90-nri.toml" <<-'EOF'
+	[plugins."io.containerd.nri.v1.nri"]
+	  disable = false
+	  plugin_config_path = "/etc/nri/conf.d"
+	  plugin_path = "/opt/nri/plugins"
+
+	[plugins."io.containerd.cri.v1.runtime".containerd]
+	  systemd_cgroup = true
+	EOF
+}
+
 : "Check server database for IP address changes"
 db::check
+
+: "Enable NRI for containerd plugins (avoids restart)"
+nri::enable
 
 exit 0

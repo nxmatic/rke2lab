@@ -281,7 +281,6 @@ installer::pod:run() {
 		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${DAEMONSET_SCRIPT_ROOT%/}/.sh.d" \
 		daemonless::trampoline:exec_on_host \
 		"flox-k8s-runtime-installer.sh" \
-		"CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE}" \
 		"DAEMONSET_SCRIPT_ROOT=${DAEMONSET_SCRIPT_ROOT}"
 }
 
@@ -608,12 +607,6 @@ runtime::runtime:containerd:resolve-bin() {
 # env's closure. The upstream installer hardcodes these paths; here we let
 # nix-store discover them so version bumps land via `flox pull`.
 
-runtime::runtime:config-template:ensure() {
-	if [[ ! -f "${CONTAINERD_CONFIG_TEMPLATE}" ]]; then
-		cp "${CONTAINERD_CONFIG_FILE}" "${CONTAINERD_CONFIG_TEMPLATE}"
-	fi
-}
-
 nri::plugin:gcroot:ensure() {
 	local nri_plugin_pkg_path package_name
 
@@ -674,17 +667,8 @@ runtime::runtime:core:install() {
 	# containerd_bin="$(runtime::runtime:containerd:resolve-bin)"
 	# variant="$(runtime::runtime:variant:resolve "${containerd_bin}")"
 	# runtime::runtime:binary:install "${flox_env_dir}" "${arch}" "${variant}"
-	runtime::runtime:config-template:ensure
 	nri::plugin:gcroot:ensure
 	flox::runtime:profile:ensure
-}
-
-containerd::config:path:init() {
-	CONTAINERD_CONFIG_DIR="${CONTAINERD_CONFIG_DIR:-$(dirname "${CONTAINERD_CONFIG_FILE}")}"
-	CONTAINERD_CONFIG_FILE="${CONTAINERD_CONFIG_FILE:-${CONTAINERD_CONFIG_DIR}/config.toml}"
-	CONTAINERD_CONFIG_TEMPLATE="${CONTAINERD_CONFIG_FILE}.tmpl"
-	# shellcheck disable=SC2034  # Reserved for future template logic
-	CONTAINERD_CONFIG_BASENAME="$(basename --suffix=.toml "${CONTAINERD_CONFIG_FILE}")"
 }
 
 container::service:runtime:restart() {
@@ -699,62 +683,36 @@ container::service:runtime:restart() {
 	fi
 }
 
-containerd::config:version:detect() {
-	local version
-	version="$("${DASEL_BIN}" -i toml -o yaml <"${CONTAINERD_CONFIG_FILE}" | "${YQ_BIN}" -r '.version // ""' 2>/dev/null || true)"
-
-	if [[ -z "${version}" ]]; then
-		case "$(basename "${CONTAINERD_CONFIG_FILE}")" in
-		config-v3.toml | config-v3.toml.tmpl)
-			version="3"
-			;;
-		*)
-			version="2"
-			;;
-		esac
-	fi
-
-	printf '%s\n' "${version}"
-}
-
 containerd::config:flox:update() {
-	local version plugin_root nri_plugin_root tmp checksum_before checksum_after
-	version="$(containerd::config:version:detect)"
-	if [[ "${version}" == "3" ]]; then
-		plugin_root="io.containerd.cri.v1.runtime"
-		nri_plugin_root="io.containerd.nri.v1.nri"
-	else
-		plugin_root="io.containerd.grpc.v1.cri"
-		nri_plugin_root="io.containerd.nri.v1.nri"
+	# Drop NRI config file into containerd import directory
+	# RKE2 reads: imports = ['/var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml.d/*.toml']
+	# This approach is simpler than template manipulation and idempotent
+	local config_dir="/var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml.d"
+	local nri_config="${config_dir}/90-nri.toml"
+
+	mkdir -p "${config_dir}"
+
+	# Check if config already exists and matches desired state
+	local desired_config
+	desired_config=$(cat <<-'EOF'
+	[plugins."io.containerd.nri.v1.nri"]
+	  disable = false
+	  plugin_config_path = "/etc/nri/conf.d"
+	  plugin_path = "/opt/nri/plugins"
+
+	[plugins."io.containerd.cri.v1.runtime".containerd]
+	  systemd_cgroup = true
+	EOF
+	)
+
+	if [[ -f "${nri_config}" ]] && [[ "$(cat "${nri_config}")" == "${desired_config}" ]]; then
+		echo "NRI config already present and up to date at ${nri_config}"
+		return 1  # No change needed
 	fi
 
-	# Calculate checksum before update
-	checksum_before="$(sha256sum "${CONTAINERD_CONFIG_TEMPLATE}" 2>/dev/null | awk '{print $1}' || echo "none")"
-
-	local tmp
-	tmp="$(mktemp)"
-
-	"${DASEL_BIN}" -i toml -o yaml <"${CONTAINERD_CONFIG_TEMPLATE}" |
-		CRI_PLUGIN_ROOT="${plugin_root}" NRI_PLUGIN_ROOT="${nri_plugin_root}" "${YQ_BIN}" '
-      .plugins[env(CRI_PLUGIN_ROOT)].containerd.systemd_cgroup = true |
-      .plugins[env(NRI_PLUGIN_ROOT)].disable = false |
-      .plugins[env(NRI_PLUGIN_ROOT)].plugin_config_path = "/etc/nri/conf.d" |
-      .plugins[env(NRI_PLUGIN_ROOT)].plugin_path = "/opt/nri/plugins"
-    ' |
-		"${DASEL_BIN}" -i yaml -o toml >"${tmp}" &&
-		mv "${tmp}" "${CONTAINERD_CONFIG_TEMPLATE}"
-
-	rm -f "${tmp}"
-
-	# Calculate checksum after update
-	checksum_after="$(sha256sum "${CONTAINERD_CONFIG_TEMPLATE}" 2>/dev/null | awk '{print $1}' || echo "none")"
-
-	# Return 0 (true) if config changed, 1 (false) if unchanged
-	if [[ "${checksum_before}" != "${checksum_after}" ]]; then
-		return 0
-	else
-		return 1
-	fi
+	echo "Writing NRI config to ${nri_config}"
+	echo "${desired_config}" > "${nri_config}"
+	return 0  # Config changed
 }
 
 installer::host:run() {
@@ -771,9 +729,6 @@ installer::host:run() {
 
 	: "Pre-activate flox environments to populate /nix/store"
 	installer::host:flox:activate_environments
-
-	: "Initialize resolved containerd config paths"
-	containerd::config:path:init
 
 	# NRI plugin approach: no longer need to pre-build or sync store-paths
 	# Flox will build packages on-demand during 'flox activate' based on flake references
@@ -801,10 +756,11 @@ installer::host:run() {
 	fi
 
 	: "Restart containerd only if configuration changed"
+	: "NOTE: If NRI was pre-enabled in rke2-server prestart, config is already present and restart is skipped"
 	if [[ "${config_changed}" == "true" ]]; then
 		container::service:runtime:restart
 	else
-		echo "containerd configuration unchanged, skipping restart"
+		echo "NRI config already present, no restart needed"
 	fi
 
 }
