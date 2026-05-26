@@ -356,70 +356,150 @@ public final class IncusResourceBootstrap {
 
     private ApplyPipeline prepareHostState() {
       logInfo("mode=" + (Deployment.getInstance().isDryRun() ? "preview" : "apply"));
-      HostAssetRootLifecycle.prepareCleanHostAssetRoot(
-          localPaths.assetsRoot(), config.hostAssetRotationRetentionCount());
-      classpathAssetMaterializer.materializeIncusAssets(localPaths.assetsRoot());
-      classpathAssetMaterializer.materializeManifests(localPaths.manifestsRoot());
-      LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
-      final Map<String, Object> manifestSynthSummary =
-          synthesizeAndExplodeManifests(localPaths.manifestsRoot(), policy, layerContext);
 
-      // Initialize slice registry
+      final HostAssetRootLifecycle lifecycle =
+          new HostAssetRootLifecycle(config.hostAssetRotationRetentionCount());
+
+      final StagingContext staging = materializeToStaging(lifecycle);
+      final SliceContext slices = registerProvisioningSlices(staging);
+      syncStagingToFinal(lifecycle, staging.stagingRoot());
+      captureDeploymentMetadata(staging, slices);
+      ensureLaunchSecretsToken(localPaths.secretsFile());
+
+      logInfo("deployment=" + deploymentMetadata);
+      logInfo("provisioning.slices=" + provisioningMetadata.slices());
+      return this;
+    }
+
+    private StagingContext materializeToStaging(HostAssetRootLifecycle lifecycle) {
+      final Path stagingRoot = lifecycle.prepareStagingRoot(localPaths.assetsRoot());
+      final Path stagingManifestsRoot =
+          stagingRoot.resolve(localPaths.assetsRoot().relativize(localPaths.manifestsRoot()));
+
+      classpathAssetMaterializer.materializeIncusAssets(stagingRoot);
+      classpathAssetMaterializer.materializeManifests(stagingManifestsRoot);
+
+      final LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
+      final Map<String, Object> manifestSynthSummary =
+          synthesizeAndExplodeManifests(stagingManifestsRoot, policy, layerContext);
+
+      final BootstrapPaths stagingPaths = createStagingPaths(stagingRoot);
+
+      return new StagingContext(
+          stagingRoot, stagingPaths, stagingManifestsRoot, layerContext, manifestSynthSummary);
+    }
+
+    private SliceContext registerProvisioningSlices(StagingContext staging) {
       final ProvisioningSliceRegistry sliceRegistry = new ProvisioningSliceRegistry();
 
-      // Define core slice as STATIC (cloud-init: seed + source ConfigMap for generation)
-      sliceRegistry.defineSlice("core", SliceStoragePolicy.STATIC);
+      registerCoreSlice(sliceRegistry, staging);
+      registerNodeSlice(sliceRegistry, staging.stagingPaths());
+      final Map<String, Object> runtimeSummaries =
+          materializeAndRegisterRuntimeConfig(sliceRegistry, staging);
 
-      // Materialize and register node slice (systemd units/scripts, NRI plugin, node runtime)
+      return new SliceContext(sliceRegistry, runtimeSummaries);
+    }
+
+    private void registerCoreSlice(
+        ProvisioningSliceRegistry sliceRegistry, StagingContext staging) {
+      final CoreSlice coreSlice =
+          new CoreSlice(staging.stagingPaths().cloudSeedRoot(), staging.stagingManifestsRoot());
+      sliceRegistry.register(coreSlice);
+    }
+
+    private void registerNodeSlice(
+        ProvisioningSliceRegistry sliceRegistry, BootstrapPaths stagingPaths) {
       final NodeSlice nodeSlice = new NodeSlice();
       try {
-        nodeSlice.materialize(localPaths);
+        nodeSlice.materialize(stagingPaths);
       } catch (IOException ex) {
         throw new IllegalStateException("Failed to materialize node slice", ex);
       }
       sliceRegistry.register(nodeSlice);
+    }
 
-      // Register runtime config slice (rke2-config, env-config - materialized below)
-      // These are HOT_RELOAD because they're consumed by systemd services that can restart
-      sliceRegistry.defineSlice("runtimeConfig", SliceStoragePolicy.HOT_RELOAD);
+    private Map<String, Object> materializeAndRegisterRuntimeConfig(
+        ProvisioningSliceRegistry sliceRegistry, StagingContext staging) {
+      final BootstrapPaths stagingPaths = staging.stagingPaths();
+      final LayerEnvContext layerContext = staging.layerContext();
 
-      final List<String> hostMountNotes = hostMountSourceVerifier.ensureSources(localPaths);
+      final List<String> hostMountNotes = hostMountSourceVerifier.ensureSources(stagingPaths);
       final Map<String, Object> systemdProvisioningSummary =
-          SystemdProvisioningInventory.summarize(localPaths, hostMountNotes);
+          SystemdProvisioningInventory.summarize(stagingPaths, hostMountNotes);
+
       clearStaleBootstrapKubeconfig();
+
       final Map<String, Object> layerEnvRegistrySummary =
           runtimeEnvControlplaneOverlayWriter.write(
-              localPaths.runtimeEnvConfigRoot(), layerContext, policy);
+              stagingPaths.runtimeEnvConfigRoot(), layerContext, policy);
+
       nodeConfigRegenerator.regenerateCloudConfigDir(
-          localPaths.runtimeCloudConfigRoot(), localPaths.cloudSeedRoot());
+          stagingPaths.runtimeCloudConfigRoot(), stagingPaths.cloudSeedRoot());
 
-      // Register runtime config paths (materialized above by specialized writers)
-      sliceRegistry.register(
-          "runtimeConfig", localPaths.runtimeRke2ConfigRoot(), localPaths.runtimeEnvConfigRoot());
+      final RuntimeConfigSlice runtimeConfigSlice =
+          new RuntimeConfigSlice(
+              stagingPaths.runtimeRke2ConfigRoot(), stagingPaths.runtimeEnvConfigRoot());
+      sliceRegistry.register(runtimeConfigSlice);
 
+      return Map.of(
+          "systemd", systemdProvisioningSummary,
+          "layerEnv", layerEnvRegistrySummary);
+    }
+
+    private void syncStagingToFinal(HostAssetRootLifecycle lifecycle, Path stagingRoot) {
+      lifecycle.syncStagingToFinal(stagingRoot, localPaths.assetsRoot());
+    }
+
+    private void captureDeploymentMetadata(StagingContext staging, SliceContext slices) {
       final ProvisioningMetadata.Slices provisioningSlices =
-          ProvisioningResourceInventory.sliceChecksums(localPaths, sliceRegistry);
+          ProvisioningResourceInventory.sliceChecksums(localPaths, slices.sliceRegistry());
+
       final String hostSourceDirRelative =
           relativizeAgainstWorktree(localPaths.worktreeRoot(), localPaths.assetsRoot());
 
-      // Build structured metadata
+      @SuppressWarnings("unchecked")
+      final Map<String, Object> layerEnvSummary =
+          (Map<String, Object>) slices.runtimeSummaries().get("layerEnv");
+      @SuppressWarnings("unchecked")
+      final Map<String, Object> systemdSummary =
+          (Map<String, Object>) slices.runtimeSummaries().get("systemd");
+
       this.deploymentMetadata = DeploymentMetadata.capture();
       this.provisioningMetadata =
           new ProvisioningMetadata(
               provisioningSlices, new ProvisioningMetadata.Paths(hostSourceDirRelative));
       this.buildMetadata =
-          new BuildMetadata(
-              null, // image checksum set later in ensureProviderResources
-              BuildMetadata.Manifests.of(manifestSynthSummary));
+          new BuildMetadata(null, BuildMetadata.Manifests.of(staging.manifestSynthSummary()));
       this.runtimeMetadata =
           new RuntimeMetadata(
-              RuntimeMetadata.Environment.of(layerEnvRegistrySummary),
-              RuntimeMetadata.Systemd.of(systemdProvisioningSummary));
+              RuntimeMetadata.Environment.of(layerEnvSummary),
+              RuntimeMetadata.Systemd.of(systemdSummary));
+    }
 
-      ensureLaunchSecretsToken(localPaths.secretsFile());
-      logInfo("deployment=" + deploymentMetadata);
-      logInfo("provisioning.slices=" + provisioningMetadata.slices());
-      return this;
+    private record StagingContext(
+        Path stagingRoot,
+        BootstrapPaths stagingPaths,
+        Path stagingManifestsRoot,
+        LayerEnvContext layerContext,
+        Map<String, Object> manifestSynthSummary) {}
+
+    private record SliceContext(
+        ProvisioningSliceRegistry sliceRegistry, Map<String, Object> runtimeSummaries) {}
+
+    private BootstrapPaths createStagingPaths(Path stagingRoot) {
+      final Path originalRoot = localPaths.assetsRoot();
+      return new BootstrapPaths(
+          localPaths.worktreeRoot(),
+          stagingRoot,
+          stagingRoot.resolve(originalRoot.relativize(localPaths.manifestsRoot())),
+          stagingRoot.resolve(originalRoot.relativize(localPaths.cloudSeedRoot())),
+          stagingRoot.resolve(originalRoot.relativize(localPaths.runtimeRke2ConfigRoot())),
+          stagingRoot.resolve(originalRoot.relativize(localPaths.runtimeCloudConfigRoot())),
+          stagingRoot.resolve(originalRoot.relativize(localPaths.runtimeEnvConfigRoot())),
+          stagingRoot.resolve(originalRoot.relativize(localPaths.systemdUnitsRoot())),
+          stagingRoot.resolve(originalRoot.relativize(localPaths.systemdScriptsRoot())),
+          stagingRoot.resolve(originalRoot.relativize(localPaths.daemonsetScriptsRoot())),
+          localPaths.secretsFile());
     }
 
     private void clearStaleBootstrapKubeconfig() {
@@ -1772,9 +1852,13 @@ public final class IncusResourceBootstrap {
 
   private static final class HostAssetRootLifecycle {
 
-    private HostAssetRootLifecycle() {}
+    private final int retentionCount;
 
-    private static void prepareCleanHostAssetRoot(Path hostAssetRoot, int retentionCount) {
+    private HostAssetRootLifecycle(int retentionCount) {
+      this.retentionCount = retentionCount;
+    }
+
+    private Path prepareStagingRoot(Path hostAssetRoot) {
       try {
         final Path parent = hostAssetRoot.getParent();
         if (parent == null) {
@@ -1784,25 +1868,47 @@ public final class IncusResourceBootstrap {
 
         Files.createDirectories(parent);
 
-        if (Files.exists(hostAssetRoot)) {
-          final Path backupPath = backupHostPath(hostAssetRoot);
-          backup(hostAssetRoot, backupPath);
-          registerRecursiveDeleteAtShutdown(backupPath);
-        }
+        final long pid = ProcessHandle.current().pid();
+        final long epochMillis = System.currentTimeMillis();
+        final String stagingName =
+            hostAssetRoot.getFileName().toString() + ".staging." + pid + "." + epochMillis;
+        final Path stagingRoot = hostAssetRoot.resolveSibling(stagingName);
 
-        // Clean up old backups, keeping only N most recent (if retention > 0)
-        if (retentionCount >= 0) {
-          cleanupOldBackups(hostAssetRoot, retentionCount);
-        }
+        Files.createDirectories(stagingRoot);
+        // Keep staging directories for drift detection (don't delete at shutdown)
 
-        Files.createDirectories(hostAssetRoot);
+        return stagingRoot;
       } catch (IOException ex) {
-        throw new IllegalStateException(
-            "Failed to prepare clean host asset root: " + hostAssetRoot, ex);
+        throw new IllegalStateException("Failed to prepare staging root for: " + hostAssetRoot, ex);
       }
     }
 
-    private static Path backupHostPath(Path hostAssetRoot) {
+    private void syncStagingToFinal(Path stagingRoot, Path hostAssetRoot) {
+      try {
+        if (Files.exists(hostAssetRoot)) {
+          // Backup existing state before sync
+          final Path backupPath = backupHostPath(hostAssetRoot);
+          backup(hostAssetRoot, backupPath);
+
+          // Sync staging content to final location (preserves mount point inode)
+          syncDirectories(stagingRoot, hostAssetRoot);
+        } else {
+          // First deployment: copy staging to final location (keep staging for comparison)
+          backup(stagingRoot, hostAssetRoot);
+        }
+
+        // Clean up old backups and old staging directories
+        if (retentionCount >= 0) {
+          cleanupOldBackups(hostAssetRoot);
+          cleanupOldStagingDirs(hostAssetRoot);
+        }
+      } catch (IOException ex) {
+        throw new IllegalStateException(
+            "Failed to sync staging to final host asset root: " + hostAssetRoot, ex);
+      }
+    }
+
+    private Path backupHostPath(Path hostAssetRoot) {
       final long pid = ProcessHandle.current().pid();
       final long epochMillis = System.currentTimeMillis();
       final String backupName =
@@ -1810,7 +1916,7 @@ public final class IncusResourceBootstrap {
       return hostAssetRoot.resolveSibling(backupName);
     }
 
-    private static void backup(Path source, Path target) throws IOException {
+    private void backup(Path source, Path target) throws IOException {
       Files.createDirectories(target);
       Files.walkFileTree(
           source,
@@ -1832,8 +1938,75 @@ public final class IncusResourceBootstrap {
           });
     }
 
-    private static void cleanupOldBackups(Path hostAssetRoot, int retentionCount)
-        throws IOException {
+    private void syncDirectories(Path source, Path target) throws IOException {
+      // Collect all paths in source (for copying/updating)
+      final java.util.Set<Path> sourcePaths = new java.util.HashSet<>();
+      Files.walkFileTree(
+          source,
+          new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+                throws IOException {
+              Path relativePath = source.relativize(dir);
+              sourcePaths.add(relativePath);
+              Path targetDir = target.resolve(relativePath);
+              Files.createDirectories(targetDir);
+              return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                throws IOException {
+              Path relativePath = source.relativize(file);
+              sourcePaths.add(relativePath);
+              Path targetFile = target.resolve(relativePath);
+              Files.copy(
+                  file,
+                  targetFile,
+                  java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                  java.nio.file.StandardCopyOption.COPY_ATTRIBUTES);
+              return FileVisitResult.CONTINUE;
+            }
+          });
+
+      // Collect all paths in target (for deletion of stale entries)
+      final java.util.Set<Path> targetPaths = new java.util.HashSet<>();
+      if (Files.exists(target)) {
+        Files.walkFileTree(
+            target,
+            new SimpleFileVisitor<>() {
+              @Override
+              public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                Path relativePath = target.relativize(dir);
+                if (!relativePath.toString().isEmpty()) {
+                  targetPaths.add(relativePath);
+                }
+                return FileVisitResult.CONTINUE;
+              }
+
+              @Override
+              public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                Path relativePath = target.relativize(file);
+                targetPaths.add(relativePath);
+                return FileVisitResult.CONTINUE;
+              }
+            });
+      }
+
+      // Delete paths in target that don't exist in source (rsync --delete behavior)
+      final java.util.List<Path> toDelete =
+          targetPaths.stream()
+              .filter(p -> !sourcePaths.contains(p))
+              .map(target::resolve)
+              .sorted(java.util.Comparator.reverseOrder()) // Delete files before dirs
+              .toList();
+
+      for (Path path : toDelete) {
+        Files.deleteIfExists(path);
+      }
+    }
+
+    private void cleanupOldBackups(Path hostAssetRoot) throws IOException {
       final Path parent = hostAssetRoot.getParent();
       if (parent == null) {
         return;
@@ -1860,7 +2033,34 @@ public final class IncusResourceBootstrap {
       }
     }
 
-    private static void registerRecursiveDeleteAtShutdown(Path directory) {
+    private void cleanupOldStagingDirs(Path hostAssetRoot) throws IOException {
+      final Path parent = hostAssetRoot.getParent();
+      if (parent == null) {
+        return;
+      }
+
+      final String hostDirName = hostAssetRoot.getFileName().toString();
+      final String stagingPattern = hostDirName + "\\.staging\\.\\d+\\.\\d+";
+
+      try (Stream<Path> siblings = Files.list(parent)) {
+        siblings
+            .filter(p -> p.getFileName().toString().matches(stagingPattern))
+            .sorted(
+                java.util.Comparator.<Path, String>comparing(p -> p.getFileName().toString())
+                    .reversed())
+            .skip(retentionCount)
+            .forEach(
+                old -> {
+                  try {
+                    deleteRecursively(old);
+                  } catch (IOException ignored) {
+                    // Best effort - don't fail build if cleanup fails
+                  }
+                });
+      }
+    }
+
+    private void registerRecursiveDeleteAtShutdown(Path directory) {
       Runtime.getRuntime()
           .addShutdownHook(
               new Thread(
@@ -1874,7 +2074,7 @@ public final class IncusResourceBootstrap {
                   "rk2lab-host-asset-cleanup-" + ProcessHandle.current().pid()));
     }
 
-    private static void deleteRecursively(Path root) throws IOException {
+    private void deleteRecursively(Path root) throws IOException {
       if (!Files.exists(root)) {
         return;
       }
@@ -1898,6 +2098,66 @@ public final class IncusResourceBootstrap {
               return FileVisitResult.CONTINUE;
             }
           });
+    }
+  }
+
+  private static final class CoreSlice implements ProvisioningSlice {
+    private final Path cloudSeedRoot;
+    private final Path manifestsRoot;
+
+    private CoreSlice(Path cloudSeedRoot, Path manifestsRoot) {
+      this.cloudSeedRoot = cloudSeedRoot;
+      this.manifestsRoot = manifestsRoot;
+    }
+
+    @Override
+    public String name() {
+      return "core";
+    }
+
+    @Override
+    public SliceStoragePolicy storagePolicy() {
+      return SliceStoragePolicy.STATIC;
+    }
+
+    @Override
+    public void materialize(BootstrapPaths paths) {
+      // Already materialized by classpath materializers before slice registration
+    }
+
+    @Override
+    public List<Path> getMaterializedPaths() {
+      return List.of(cloudSeedRoot, manifestsRoot);
+    }
+  }
+
+  private static final class RuntimeConfigSlice implements ProvisioningSlice {
+    private final Path rke2ConfigRoot;
+    private final Path envConfigRoot;
+
+    private RuntimeConfigSlice(Path rke2ConfigRoot, Path envConfigRoot) {
+      this.rke2ConfigRoot = rke2ConfigRoot;
+      this.envConfigRoot = envConfigRoot;
+    }
+
+    @Override
+    public String name() {
+      return "runtimeConfig";
+    }
+
+    @Override
+    public SliceStoragePolicy storagePolicy() {
+      return SliceStoragePolicy.HOT_RELOAD;
+    }
+
+    @Override
+    public void materialize(BootstrapPaths paths) {
+      // Already materialized by specialized writers before slice registration
+    }
+
+    @Override
+    public List<Path> getMaterializedPaths() {
+      return List.of(rke2ConfigRoot, envConfigRoot);
     }
   }
 

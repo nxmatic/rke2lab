@@ -300,86 +300,6 @@ rke2lab::bool:is_true() {
 	esac
 }
 
-rke2lab::env:load() {
-	local env_script
-
-	env_script="${RKE2LAB_SCRIPTS_DIR:-/srv/host/systemd-scripts.d}/rke2lab-env-load.sh"
-	[[ -r "${env_script}" ]] || return 0
-
-	# shellcheck disable=SC1090
-	source "${env_script}"
-	# declare -F rke2lab::env:load >/dev/null 2>&1 && rke2lab::env:load
-}
-
-host::tooling:init() {
-	: "Ensure Nix is available in the host environment for runtime installer operations"
-	NIX_VAR="/nix/var/nix"
-	NIX_VAR_PROFILES_DEFAULT="${NIX_VAR}/profiles/default"
-
-	source "${NIX_VAR_PROFILES_DEFAULT}/etc/profile.d/nix-daemon.sh"
-
-	NIX_BIN="${NIX_VAR_PROFILES_DEFAULT}/bin/nix"
-	[[ -x "${NIX_BIN}" ]] || {
-		echo "Nix binary not found at ${NIX_BIN}" >&2
-		exit 1
-	}
-	export NIX_BIN
-
-	FLOX_BIN="${NIX_VAR_PROFILES_DEFAULT}/bin/flox"
-	[[ -x "${FLOX_BIN}" ]] || {
-		echo "Flox CLI not found at ${FLOX_BIN}" >&2
-		exit 1
-	}
-	export FLOX_BIN
-
-	GIT_BIN="${NIX_VAR_PROFILES_DEFAULT}/bin/git"
-	[[ -x "${GIT_BIN}" ]] || {
-		echo "Git binary not found at ${GIT_BIN}" >&2
-		exit 1
-	}
-	export GIT_BIN
-
-	mkdir -p /usr/bin
-	ln -sf "${NIX_BIN}" /usr/bin/nix
-	ln -sf "${FLOX_BIN}" /usr/bin/flox
-	ln -sf "${GIT_BIN}" /usr/bin/git
-
-	export PATH="${NIX_VAR_PROFILES_DEFAULT}/bin:${PATH}"
-	export PATH="/var/lib/rancher/rke2/bin:/var/lib/rancher/rke2/agent/bin:${PATH}"
-
-	export FLOX_NO_TELEMETRY=1
-	export FLOX_NONINTERACTIVE=1
-}
-
-host::tooling:bin:resolve() {
-	local bin_name="$1"
-	local candidate
-
-	if candidate="$(command -v "${bin_name}" 2>/dev/null)" && [[ -n "${candidate}" && -x "${candidate}" ]]; then
-		printf '%s\n' "${candidate}"
-		return 0
-	fi
-
-	for candidate in \
-		"/var/lib/rancher/rke2/.flox/run"/*/bin/"${bin_name}" \
-		"/nix/var/nix/profiles/default/bin/${bin_name}" \
-		"/root/.nix-profile/bin/${bin_name}"; do
-		if [[ -x "${candidate}" ]]; then
-			printf '%s\n' "${candidate}"
-			return 0
-		fi
-	done
-
-	echo "required binary not found: ${bin_name}" >&2
-	return 1
-}
-
-host::tooling:config-tools:resolve() {
-	YQ_BIN="$(host::tooling:bin:resolve yq)"
-	DASEL_BIN="$(host::tooling:bin:resolve dasel)"
-	export YQ_BIN DASEL_BIN
-}
-
 host::nix:flox-conf:ensure() {
 	local flox_conf
 
@@ -567,35 +487,11 @@ runtime::runtime:nix-system:resolve() {
 
 runtime::runtime:nri-plugin:build() {
 	local package_name="$1"
-	local nix_system package_attr
 
-	nix_system="$(runtime::runtime:nix-system:resolve)"
-	package_attr="packages.${nix_system}.${package_name}"
-
-	(
-		nix build \
-			--no-link \
-			--print-out-paths \
-			"${FLOX_RUNTIME_ROOT}#${package_attr}"
-	)
-}
-
-runtime::runtime:containerd:resolve-bin() {
-	if command -v containerd >/dev/null 2>&1; then
-		command -v containerd
-		return 0
-	fi
-	if [[ -x /var/lib/rancher/rke2/bin/containerd ]]; then
-		printf '%s\n' "/var/lib/rancher/rke2/bin/containerd"
-		return 0
-	fi
-	if [[ -x /var/lib/rancher/rke2/agent/bin/containerd ]]; then
-		printf '%s\n' "/var/lib/rancher/rke2/agent/bin/containerd"
-		return 0
-	fi
-
-	echo "containerd binary not found" >&2
-	return 1
+	nix build \
+		--no-link \
+		--print-out-paths \
+		"${FLOX_RUNTIME_ROOT}#${package_name}"
 }
 
 # The shim variants `flox/flox-runtime-{17,2x}` are not directly
@@ -720,13 +616,17 @@ installer::host:run() {
 	installer::policy:source
 	installer::host:activate_flox
 
-	: "Initialize host tooling and runtime asset paths"
-	host::tooling:init
-	host::tooling:config-tools:resolve
+	: "Initialize runtime asset paths and load environment"
 	host::nix:flox-conf:ensure
 	runtime::assets:path:init
 	runtime::assets:path:validate
-	rke2lab::env:load
+
+	: "Load RKE2Lab environment variables from ConfigMap/Secret manifests"
+	local env_script="${RKE2LAB_SCRIPTS_DIR:-/srv/host/systemd-scripts.d}/rke2lab-env-load.sh"
+	if [[ -r "${env_script}" ]]; then
+		# shellcheck disable=SC1090
+		source "${env_script}"
+	fi
 
 	: "Pre-activate flox environments to populate /nix/store"
 	installer::host:flox:activate_environments
