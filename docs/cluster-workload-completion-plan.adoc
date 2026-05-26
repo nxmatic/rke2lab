@@ -1,0 +1,126 @@
+= Cluster Workload Completion Plan
+:toc: left
+:toclevels: 3
+
+This note is the running plan for finishing the master cluster's workload bring-up after the Pulumi/cdk8s migration. It captures the failure backlog observed on master, the order in which we intend to address it, and the build-side work (nix-built binaries, upstream pinning) that pairs with the runtime fixes.
+
+It is meant to evolve. Cross out items as they land; add items as new failures surface. The order below is the recommended sequence, but each section is self-contained enough to take out of order if a constraint changes.
+
+== Snapshot — current master state
+
+Reference snapshot taken 2026-05-26 after `pulumi up` with the busybox-carrier / relative-flake-path / clustermesh-remote-users / synth-context-records / Tekton-operator-inlined batch (commits `c727b597`..`d9db75aa`).
+
+Healthy:
+
+* RKE2 server running, CNI (Cilium) up, kubelet ready
+* `kdns` deploys (busybox + `flox activate` on PATH) and resolves its env
+* `clustermesh-apiserver` runs (3/3) once the empty `clustermesh-remote-users` ConfigMap ships
+* Tekton operator deployment lands and reconciles `TektonConfig` (after the inline-release commit and `pulumi up`)
+
+Still broken (or pending validation):
+
+* `kube-vip-ds` CrashLoopBackOff
+* `openebs-zfs-localpv-controller` CrashLoopBackOff (snapshot-controller container) — RKE2 ships CSI snapshot CRDs but the project's `RuntimeRke2ConfigLayer` adds them to the `disable:` list
+* `Repository`/`PackageVariant` resources fail apply because the Porch CRD is absent
+* `FluxInstance` fails apply because the Flux Operator CRD is absent
+* CAPI core installed by `rke2lab-cluster-api-install.service` (manual one-shot — service ordering bug to fix); CAPN provider not installed (clusterctl.yaml lacks `incus` provider entry)
+
+Hygiene:
+
+* Every pod logs `DNSConfigForming` because `/etc/resolv.conf` lists more than three nameservers and kubelet trims silently
+* Several `rke2lab-*-manifests.service` units run after `rke2.target` has already settled; revisit unit ordering once the workload set is stable
+
+== Phase 1 — finish the operator install backlog
+
+Pattern: every remaining apply-time failure is "operand shipped before operator's CRDs exist." The fix is the same shape as Tekton (commit `d9db75aa`): inline the upstream operator release as a classpath YAML, project it through `UpstreamYamlInclusion`.
+
+The component pattern is in place — what's left is bumping each operator into its layer.
+
+[cols="1,2,3,1", options="header"]
+|===
+|Order | Operator | Affected manifests today | Notes
+
+| 1 | Porch (`config.porch.kpt.dev`)
+| `gitops/porch-resources/02-packagevariant-*.yml` (×7), `gitops/porch-resources/02-repository-*.yml` (×2)
+| Largest unblock — fixes seven failing addons in one move. Pull from `kpt-dev/kpt` releases. Choose between full Porch (apiserver + controller + porchctl) or porch-lite. Single-cluster needs only the controller surface.
+
+| 2 | Flux Operator (`fluxcd.controlplane.io`)
+| `gitops/flux-instance/02-fluxinstance-flux.yml`
+| `controlplane/flux-operator` releases on GitHub. Latest stable. Ships its own namespace. Operator owns the `Flux*` reconcilers; the existing `FluxInstance` CR will reconcile once the CRD lands.
+
+| 3 | kube-vip (workload-side, not the daemonset)
+| `kube-vip-ds-*` CrashLoopBackOff
+| Different problem from the others — this is a *workload* failure (the daemonset is already running, just crashlooping). Investigate logs first; likely a config / args / kubeconfig issue, not a missing CRD. May not need an operator at all.
+
+| 4 | OpenEBS snapshot CRDs (or RKE2's bundled set)
+| `openebs-zfs-localpv-controller` snapshot-controller container CrashLoopBackOff
+| Two routes (revisit per `RuntimeRke2ConfigLayer`):
+* drop the three `rke2-snapshot-*` entries from the rke2 `disable:` list and let RKE2 install its bundled snapshot stack;
+* keep the disables and ship our own `external-snapshotter` v8.x CRDs as a project layer.
+First option is simpler and matches RKE2's intent.
+|===
+
+For each line: drop the upstream release.yaml under `manifests/src/main/resources/upstream/<layer>/<name>/release-<version>.yaml`, instantiate `UpstreamYamlInclusion` from the matching `*Layer` class. Same shape as Tekton.
+
+== Phase 2 — close the CAPN gap (Stage B prerequisite)
+
+Stage B (CAPI + CAPN + CAPRKE2) cannot start until the master cluster has the CAPN infrastructure provider configured. Today the `rke2lab-capn-provider-install.service` fails because `clusterctl config repositories` does not list `incus` (no `~/.cluster-api/clusterctl.yaml`).
+
+Two work items:
+
+. *Materialize `clusterctl.yaml` at provisioning time.* Pulumi config (`rke2lab:capn.provider.url`, `rke2lab:capn.provider.version`) → templated by a host-side init script writing `/root/.cluster-api/clusterctl.yaml`. Drives `rke2lab-capn-provider-install.service` precondition green. Add CAPRKE2 in the same pass so `clusterctl init -i incus -c rke2 -b rke2` is one call.
+. *Fix the systemd ordering bug.* `rke2lab-cluster-api-install.service` and `rke2lab-capn-provider-install.service` both have `Requires=` on a prerequisite that becomes active after `rke2lab.target`, so they get queued and dropped. Either propagate `WantedBy=` from the prerequisite, or restructure so both services are pulled in by their actual unblocker rather than by the target.
+
+After Phase 2 the cluster can declare nikopol (and additional bioskop nodes) as `Cluster`/`Machine` resources, and CAPN owns their lifecycle.
+
+== Phase 3 — automation: tracking and bumping upstream artifacts
+
+Once Phase 1 lands we will have ≥4 `release-vX.Y.Z.yaml` files committed under `manifests/src/main/resources/upstream/`. Treat this as a versioned manifest of cluster components and automate the bump cycle.
+
+Goals:
+
+* Single source of truth for "what version of upstream operator X is the cluster running."
+* Mechanical upgrade: replace the file, bump the Java string, review the YAML diff, ship.
+* Visibility: PR review sees what changed in the upstream artifact alongside our integration changes.
+
+Concrete workstream:
+
+. *Inventory.* Author a `docs/upstream-tracked-components.adoc` listing every tracked upstream (Tekton operator, Flux operator, Porch, snapshot-controller-CRDs, …) with its current pinned version, source URL, and the layer that owns it.
+. *Bumper script.* Small flake script (`bin/bump-upstream-component.sh <component>`): re-fetches the latest release artifact, writes the new YAML to a new versioned filename, prints the diff against the old one, leaves the Java string update to the human (one place, easy to grep).
+. *CI guard.* Build asserts that every `release-*.yaml` referenced by Java code actually exists in `src/main/resources/upstream/`. Catches typos and orphaned files.
+. *Renovate-style automation* (later): periodic check, opens a PR per component when a new upstream release exists.
+
+== Phase 4 — build cluster-required binaries via nix
+
+The flox runtime flake (`manifests/src/main/resources/runtime/flox/flake.nix`) already builds `flox-nri-plugin`, `kdns`, headplane stack from source. Same path applies to the rest of the operator binaries we currently consume as upstream container images.
+
+Why bother: same reason flox-injected workloads beat per-image baking — single nix store across host and pods, byte-for-byte reproducibility through `flake.lock`, no registry dependency, fast iteration.
+
+Candidates, ordered by leverage:
+
+. *kube-vip* — single Go binary, easy to flake-build. Replace the upstream container with a flox-managed version. Also kills the Phase-1.3 investigation by giving us full control of the binary.
+. *clusterctl* — already shipped via `curl` from `rke2lab-cluster-api-install.service`. Move it to a flox env so version pinning matches the same flake.lock as everything else.
+. *Tekton operator* — Go-built, but more involved (multi-binary, embedded assets). Phase 4.B candidate after the simpler ones land.
+. *Porch / Flux operator* — same shape as Tekton operator, evaluate after Phase 4.A pieces land.
+
+Open question for each candidate: do we replace the **operator container image** referenced in the upstream release.yaml (transform hook in `UpstreamYamlInclusion` to swap the image tag), or do we build a **separate workload that calls the same controller code** (more work, more control)? For phase 4.A (kube-vip, clusterctl) the answer is "image swap." For Tekton/Porch it's likely "image swap" too, but the diff is bigger.
+
+== Order of operations summary
+
+Recommended execution order — respects what unblocks what, leaves room to skip:
+
+. *Phase 1.1 Porch* — biggest single unblock (7 manifests). Same shape as Tekton.
+. *Phase 1.2 Flux Operator* — small follow-up; once Porch is in we have the core gitops surface.
+. *Phase 1.3 kube-vip* — workload triage, may not need an operator at all.
+. *Phase 1.4 OpenEBS snapshot CRDs* — drop the rke2 disables; revisit if `RuntimeRke2ConfigLayer` truly meant to ship project-owned CRDs.
+. *Phase 2 CAPN materialization + systemd ordering fix* — unblocks Stage B and node provisioning of nikopol.
+. *Phase 3 tracking + bumper script* — once the upstream inventory is non-trivial.
+. *Phase 4 nix builds for kube-vip, clusterctl, then operator binaries* — opt-in, per-component.
+
+== Notes that don't fit a phase but should not be lost
+
+* `RuntimeRke2ConfigLayer` adds `rke2-snapshot-{controller,controller-crd,validation-webhook}` and `rke2-ingress-nginx` to RKE2's `disable:` list. The original intent was likely "openebs-zfs ships its own snapshot stack" — but openebs-zfs only ships the *controller container*, not the CRDs. Reconcile this when working Phase 1.4.
+* `rke2lab-cluster-api-install.service` and `rke2lab-capn-provider-install.service` were observed as `inactive (dead)` after a fresh boot because their `Requires=` prerequisite (`rke2lab-networking-manifests.service`) became active *after* `rke2lab.target` had already settled. The services are queued + dropped. `systemd show -p WantedBy/Wants` lists them; `Result=success` is misleading. Phase 2.2 covers this.
+* The CSI snapshot CRDs `volumesnapshots.snapshot.storage.k8s.io` etc. genuinely don't exist on the cluster despite RKE2 attempting to install them — confirmed by `kubectl get crd | grep snapshot` returning only the openebs-zfs internal types. RKE2's logs show "Extracting … rke2-snapshot-controller-crd.yaml" followed 27 seconds later by "Deleting manifest … rke2-snapshot-controller-crd.yaml" because of the project's `disable:` list.
+* The deprecated branch `deprecated/rke2lab-pre-pulumi-main` shipped Tekton via raw kpt-rendered upstream YAML in `rke2.d/bioskop/master/catalog/cicd/tekton-pipelines/release-operator-v0.78.1.yaml`. Same approach now lives in `UpstreamYamlInclusion`; `release-v0.79.1.yaml` is its current pinned successor.
+* `BootstrapIdentity` / `NetworkTopology` / `ComponentVersions` records are in place under `layers/common/profiles/`. `ComponentVersions` is currently empty — fill it as Phase 3 introduces version tracking, and graduate per-layer literals (`kube-vip-version`, `tailscale-version`, etc.) into it.
