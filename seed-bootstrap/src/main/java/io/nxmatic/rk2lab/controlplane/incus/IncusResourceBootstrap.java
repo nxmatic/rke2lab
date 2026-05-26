@@ -368,6 +368,9 @@ public final class IncusResourceBootstrap {
       // Initialize slice registry
       final ProvisioningSliceRegistry sliceRegistry = new ProvisioningSliceRegistry();
 
+      // Define core slice as STATIC (cloud-init seed only - user-data/meta-data/network-config)
+      sliceRegistry.defineSlice("core", SliceStoragePolicy.STATIC);
+
       // Materialize and register node slice (systemd units/scripts, NRI plugin, node runtime)
       final NodeSlice nodeSlice = new NodeSlice();
       try {
@@ -376,6 +379,10 @@ public final class IncusResourceBootstrap {
         throw new IllegalStateException("Failed to materialize node slice", ex);
       }
       sliceRegistry.register(nodeSlice);
+
+      // Register runtime config slice (rke2-config, cloud-config, env-config - materialized below)
+      // These are HOT_RELOAD because they're consumed by systemd services that can restart
+      sliceRegistry.defineSlice("runtimeConfig", SliceStoragePolicy.HOT_RELOAD);
 
       final List<String> hostMountNotes = hostMountSourceVerifier.ensureSources(localPaths);
       final Map<String, Object> systemdProvisioningSummary =
@@ -386,6 +393,14 @@ public final class IncusResourceBootstrap {
               localPaths.runtimeEnvConfigRoot(), layerContext, policy);
       nodeConfigRegenerator.regenerateCloudConfigDir(
           localPaths.runtimeCloudConfigRoot(), localPaths.cloudSeedRoot());
+
+      // Register runtime config paths (materialized above by specialized writers)
+      sliceRegistry.register(
+          "runtimeConfig",
+          localPaths.runtimeRke2ConfigRoot(),
+          localPaths.runtimeCloudConfigRoot(),
+          localPaths.runtimeEnvConfigRoot());
+
       final ProvisioningMetadata.Slices provisioningSlices =
           ProvisioningResourceInventory.sliceChecksums(localPaths, sliceRegistry);
       final String hostSourceDirRelative =
