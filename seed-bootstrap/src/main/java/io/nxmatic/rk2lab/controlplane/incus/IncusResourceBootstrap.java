@@ -586,30 +586,27 @@ public final class IncusResourceBootstrap {
       }
     }
 
-    /**
-     * Build a summary of the synth output: an aggregate checksum, the total file count, a per-layer
-     * breakdown, and the resolved {@link FloxDebugPolicy} so {@code pulumi preview} can show a diff
-     * when the policy or any source resource changes.
-     */
     private Map<String, Object> buildManifestSynthSummary(
         Path manifestsRoot, ManifestExplodeResult explodeResult, FloxDebugPolicy floxDebugPolicy) {
       final List<Path> writtenFiles = explodeResult.writtenFiles();
-      final LinkedHashMap<String, Integer> byLayer = new LinkedHashMap<>();
-      for (Path file : writtenFiles) {
-        final Path relative = manifestsRoot.relativize(file);
-        if (relative.getNameCount() == 0) {
-          continue;
-        }
-        final String layer = relative.getName(0).toString();
-        byLayer.merge(layer, 1, Integer::sum);
-      }
 
+      return Map.of(
+          "checksum", computeManifestChecksum(manifestsRoot, writtenFiles),
+          "fileCount", writtenFiles.size(),
+          "layers", countLayers(manifestsRoot, writtenFiles),
+          "byLayer", groupByLayer(manifestsRoot, writtenFiles),
+          "floxDebugEnabled", floxDebugPolicy.enabled(),
+          "manifestsRoot", manifestsRoot.toString());
+    }
+
+    private String computeManifestChecksum(Path manifestsRoot, List<Path> writtenFiles) {
       final MessageDigest digest;
       try {
         digest = MessageDigest.getInstance("SHA-256");
       } catch (NoSuchAlgorithmException ex) {
         throw new IllegalStateException("SHA-256 unavailable", ex);
       }
+
       for (Path file : writtenFiles) {
         try {
           digest.update(manifestsRoot.relativize(file).toString().getBytes(StandardCharsets.UTF_8));
@@ -620,16 +617,25 @@ public final class IncusResourceBootstrap {
           throw new IllegalStateException("Failed reading exploded manifest: " + file, ex);
         }
       }
-      final String checksum = HexFormat.of().formatHex(digest.digest());
 
-      final LinkedHashMap<String, Object> summary = new LinkedHashMap<>();
-      summary.put("checksum", checksum);
-      summary.put("fileCount", writtenFiles.size());
-      summary.put("layers", byLayer.size());
-      summary.put("byLayer", Map.copyOf(byLayer));
-      summary.put("floxDebugEnabled", floxDebugPolicy.enabled());
-      summary.put("manifestsRoot", manifestsRoot.toString());
-      return Map.copyOf(summary);
+      return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private Map<String, Integer> groupByLayer(Path manifestsRoot, List<Path> writtenFiles) {
+      final LinkedHashMap<String, Integer> byLayer = new LinkedHashMap<>();
+      for (Path file : writtenFiles) {
+        final Path relative = manifestsRoot.relativize(file);
+        if (relative.getNameCount() == 0) {
+          continue;
+        }
+        final String layer = relative.getName(0).toString();
+        byLayer.merge(layer, 1, (existing, increment) -> existing + increment);
+      }
+      return Map.copyOf(byLayer);
+    }
+
+    private int countLayers(Path manifestsRoot, List<Path> writtenFiles) {
+      return groupByLayer(manifestsRoot, writtenFiles).size();
     }
 
     /**
