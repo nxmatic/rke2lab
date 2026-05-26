@@ -1,4 +1,4 @@
-package io.nxmatic.rk2lab.controlplane;
+package io.nxmatic.rk2lab.controlplane.readiness;
 
 import de.thjom.java.systemd.Manager;
 import de.thjom.java.systemd.Service;

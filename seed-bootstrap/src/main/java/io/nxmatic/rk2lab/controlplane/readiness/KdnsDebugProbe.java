@@ -1,4 +1,4 @@
-package io.nxmatic.rk2lab.controlplane;
+package io.nxmatic.rk2lab.controlplane.readiness;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

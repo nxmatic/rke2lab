@@ -1,10 +1,11 @@
-package io.nxmatic.rk2lab.controlplane;
+package io.nxmatic.rk2lab.controlplane.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rk2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;

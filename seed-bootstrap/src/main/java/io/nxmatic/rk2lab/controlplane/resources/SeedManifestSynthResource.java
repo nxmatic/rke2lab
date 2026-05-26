@@ -1,4 +1,4 @@
-package io.nxmatic.rk2lab.controlplane;
+package io.nxmatic.rk2lab.controlplane.resources;
 
 import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;

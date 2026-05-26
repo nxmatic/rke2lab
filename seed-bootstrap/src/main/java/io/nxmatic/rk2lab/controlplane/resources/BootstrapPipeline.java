@@ -1,9 +1,13 @@
-package io.nxmatic.rk2lab.controlplane;
+package io.nxmatic.rk2lab.controlplane.resources;
 
 import com.pulumi.deployment.Deployment;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
+import io.nxmatic.rk2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
+import io.nxmatic.rk2lab.controlplane.readiness.ClusterReadinessResource;
+import io.nxmatic.rk2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
+import io.nxmatic.rk2lab.controlplane.systemd.SystemdAdapterResource;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -243,8 +247,8 @@ final class BootstrapPipeline {
       Object systemdRuntimeStatusSummary) {
 
     /** Converts to full ResourceCreationResult with empty URNs. */
-    Main.ResourceCreationResult toResourceCreationResult() {
-      return new Main.ResourceCreationResult(
+    ResourceManager.ResourceCreationResult toResourceCreationResult() {
+      return new ResourceManager.ResourceCreationResult(
           readinessOutput,
           "",
           "",

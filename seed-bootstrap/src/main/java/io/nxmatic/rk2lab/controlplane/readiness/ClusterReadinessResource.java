@@ -1,4 +1,4 @@
-package io.nxmatic.rk2lab.controlplane;
+package io.nxmatic.rk2lab.controlplane.readiness;
 
 import com.pulumi.core.Output;
 import com.pulumi.deployment.Deployment;

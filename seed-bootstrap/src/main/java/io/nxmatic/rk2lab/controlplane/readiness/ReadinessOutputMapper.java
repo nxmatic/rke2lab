@@ -1,4 +1,4 @@
-package io.nxmatic.rk2lab.controlplane;
+package io.nxmatic.rk2lab.controlplane.readiness;
 
 import com.pulumi.core.Output;
 import java.util.LinkedHashMap;
@@ -11,7 +11,7 @@ import java.util.function.Function;
  * <p>Transforms readiness results into output map entries using a declarative pipeline approach,
  * eliminating repetitive output.put() calls.
  */
-final class ReadinessOutputMapper {
+public final class ReadinessOutputMapper {
 
   private static final Map<
           String, Function<ClusterBootstrapReadinessVerifier.VerificationResult, Object>>
@@ -52,7 +52,7 @@ final class ReadinessOutputMapper {
    * <p>Handles both Pulumi Output and direct VerificationResult values using functional
    * transformations.
    */
-  static Map<String, Object> mapToOutputs(Object readinessOutput) {
+  public static Map<String, Object> mapToOutputs(Object readinessOutput) {
     if (readinessOutput instanceof Output<?> pulumiOutput) {
       return mapPulumiOutput(pulumiOutput);
     } else {

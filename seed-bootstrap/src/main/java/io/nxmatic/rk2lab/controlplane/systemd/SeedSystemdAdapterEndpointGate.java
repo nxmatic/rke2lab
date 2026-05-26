@@ -1,4 +1,4 @@
-package io.nxmatic.rk2lab.controlplane;
+package io.nxmatic.rk2lab.controlplane.systemd;
 
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import java.io.IOException;

@@ -2,14 +2,11 @@ package io.nxmatic.rk2lab.controlplane;
 
 import com.pulumi.Config;
 import com.pulumi.Pulumi;
-import com.pulumi.deployment.Deployment;
 import io.nxmatic.rk2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rk2lab.controlplane.config.ConfigResolver;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
-import io.nxmatic.rk2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
-import io.nxmatic.rk2lab.controlplane.policy.EntryGatePolicyEnforcer;
-import java.util.LinkedHashMap;
+import io.nxmatic.rk2lab.controlplane.resources.ResourceManager;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -102,154 +99,19 @@ public final class Main {
       boolean bboxFailOnError,
       Consumer<String> readinessLogger) {
 
-    // Preflight checks
-    EntryGatePolicyEnforcer.enforceAll(config.localWorktreePath(), cleanWorktreeRequired);
-    RuntimeCommandPreflight.enforceRequiredCommands(
-        java.util.List.of("ssh", "kubectl"), readinessLogger);
-    RuntimeCommandPreflight.enforceRemoteCommandAvailable(
-        config.imageBuilderHost(), "incus", readinessLogger);
-
-    // Bbox reconciliation
-    final BboxReconciliationOrchestrator.ReconciliationResult bboxResult =
-        bboxOrchestrator.reconcile(config.localWorktreePath(), bboxFailOnError);
-
-    // Incus bootstrap
-    final IncusResourceBootstrap.BootstrapResult bootstrapResult =
-        new IncusResourceBootstrap(config, policy).apply();
-
-    // Systemd adapter launch
-    final Map<String, Object> systemdAdapterLaunchSummary;
-    if (isPulumiMode() && Deployment.getInstance().isDryRun()) {
-      systemdAdapterLaunchSummary = SeedSystemdAdapterEndpointGate.deferredPreview(config);
-    } else {
-      systemdAdapterLaunchSummary =
-          SeedSystemdAdapterEndpointGate.ensureReachable(config, readinessLogger);
-    }
-
-    // Resource creation via pipeline
-    final ResourceCreationResult resourceResult =
-        resourceManager.createResources(
+    return BootstrapExecutionPipeline.start(
             config,
             policy,
-            readinessEnabled,
             readinessLogger,
-            bootstrapResult,
-            systemdAdapterLaunchSummary,
-            isPulumiMode());
-
-    // Build outputs
-    return outputBuilder.buildOutputs(
-        config, policy, bootstrapResult, bboxResult, systemdAdapterLaunchSummary, resourceResult);
-  }
-
-  /** Result of resource creation containing all created resources and summaries. */
-  record ResourceCreationResult(
-      Object readinessOutput,
-      Object clusterReadinessResourceUrn,
-      Object systemdAdapterResourceUrn,
-      Object registryResourceUrn,
-      Object imageBuildResourceUrn,
-      Object manifestSynthResourceUrn,
-      Map<String, Object> registrySummary,
-      Map<String, Object> imageBuildSummary,
-      Map<String, Object> manifestSynthSummary,
-      Object systemdRuntimeStatusSummary) {}
-
-  /** Manages resource creation for both Pulumi and standalone modes using functional pipelines. */
-  private final class ResourceManager {
-
-    ResourceCreationResult createResources(
-        BootstrapConfig config,
-        ControlplanePolicy policy,
-        boolean readinessEnabled,
-        Consumer<String> readinessLogger,
-        IncusResourceBootstrap.BootstrapResult bootstrapResult,
-        Map<String, Object> systemdAdapterLaunchSummary,
-        boolean pulumiMode) {
-
-      final BootstrapPipeline pipeline =
-          new BootstrapPipeline(
-              config,
-              policy,
-              readinessEnabled,
-              readinessLogger,
-              bootstrapResult,
-              systemdAdapterLaunchSummary);
-
-      if (pulumiMode) {
-        final BootstrapPipeline.PulumiResources resources = pipeline.createPulumiResources();
-        return new ResourceCreationResult(
-            resources.readinessOutput(),
-            resources.clusterReadinessResourceUrn(),
-            resources.systemdAdapterResourceUrn(),
-            resources.registryResourceUrn(),
-            resources.imageBuildResourceUrn(),
-            resources.manifestSynthResourceUrn(),
-            resources.registrySummary(),
-            resources.imageBuildSummary(),
-            resources.manifestSynthSummary(),
-            resources.systemdRuntimeStatusSummary());
-      } else {
-        return pipeline.createStandaloneResources().toResourceCreationResult();
-      }
-    }
-  }
-
-  /** Builds the final output map from all bootstrap results. */
-  private final class OutputBuilder {
-
-    Map<String, Object> buildOutputs(
-        BootstrapConfig config,
-        ControlplanePolicy policy,
-        IncusResourceBootstrap.BootstrapResult bootstrapResult,
-        BboxReconciliationOrchestrator.ReconciliationResult bboxResult,
-        Map<String, Object> systemdAdapterLaunchSummary,
-        ResourceCreationResult resourceResult) {
-
-      final Map<String, Object> outputs = new LinkedHashMap<>();
-
-      // Core cluster information
-      outputs.put("managementClusterName", config.clusterName());
-      outputs.put("apiEndpoint", config.apiEndpoint().toString());
-      outputs.put("kubeconfigRef", config.kubeconfigRef().toString());
-
-      // Seed instance information
-      outputs.put("seedNodeId", bootstrapResult.seedNodeId());
-      outputs.put("seedInstanceUrn", bootstrapResult.instanceUrn());
-      outputs.put("seedProviderUrn", bootstrapResult.providerUrn());
-      outputs.put("seedProvisioningChecksum", bootstrapResult.provisioningChecksum());
-      outputs.put("seedImageBuildChecksum", bootstrapResult.imageBuildChecksum());
-      outputs.put("seedImageFingerprint", bootstrapResult.imageFingerprint());
-      outputs.put("seedInstanceStatus", bootstrapResult.instanceStatus());
-      outputs.put("hostSourceDirRelative", bootstrapResult.hostSourceDirRelative());
-
-      // Configuration
-      outputs.put("incusProject", config.incusProject());
-      outputs.put("imageAlias", config.imageAlias());
-      outputs.put("seedLanBridgeParent", config.lanBridgeParent());
-      outputs.putAll(policy.toOutputMap());
-
-      // Readiness outputs (functional mapping)
-      outputs.putAll(ReadinessOutputMapper.mapToOutputs(resourceResult.readinessOutput()));
-
-      // Resource URNs
-      outputs.put("clusterReadinessResourceUrn", resourceResult.clusterReadinessResourceUrn());
-      outputs.put("systemdAdapterResourceUrn", resourceResult.systemdAdapterResourceUrn());
-      outputs.put("registryResourceUrn", resourceResult.registryResourceUrn());
-      outputs.put("seedImageBuildResourceUrn", resourceResult.imageBuildResourceUrn());
-      outputs.put("seedManifestSynthResourceUrn", resourceResult.manifestSynthResourceUrn());
-      outputs.put("bboxReservationsResourceUrn", bboxResult.resourceUrn());
-
-      // Summaries
-      outputs.put("bboxReservationsSummary", bboxResult.summaryMap());
-      outputs.put("registrySummary", resourceResult.registrySummary());
-      outputs.put("systemdProvisioningSummary", bootstrapResult.systemdProvisioningSummary());
-      outputs.put("systemdAdapterLaunchSummary", systemdAdapterLaunchSummary);
-      outputs.put("systemdRuntimeStatusSummary", resourceResult.systemdRuntimeStatusSummary());
-      outputs.put("seedImageBuildSummary", resourceResult.imageBuildSummary());
-      outputs.put("seedManifestSynthSummary", resourceResult.manifestSynthSummary());
-
-      return outputs;
-    }
+            isPulumiMode(),
+            bboxOrchestrator,
+            resourceManager,
+            outputBuilder)
+        .withPreflight(readinessEnabled, cleanWorktreeRequired)
+        .reconcileBbox(bboxFailOnError)
+        .bootstrapIncus()
+        .launchSystemdAdapter()
+        .createResources()
+        .buildOutputs();
   }
 }
