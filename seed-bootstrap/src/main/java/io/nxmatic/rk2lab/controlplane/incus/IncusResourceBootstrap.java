@@ -530,52 +530,16 @@ public final class IncusResourceBootstrap {
       try {
         synthScratch = Files.createTempDirectory("rke2lab-synth-");
         final Path consolidated = synthScratch.resolve("manifests.yaml");
+        final FloxDebugPolicy floxDebugPolicy = resolveFloxDebugPolicy(policy);
 
-        final FloxDebugPolicy floxDebugPolicy =
-            policy.debug().floxNriPluginEnabled()
-                ? FloxDebugPolicy.debug()
-                : FloxDebugPolicy.disabled();
-
-        // Wipe stale per-layer outputs before re-exploding so removed/renamed
-        // resources from a previous run can't survive. The host/ subtree was
-        // just (re)materialized by materializeHostSystemdAssets — leave it.
         wipeExplodedLayers(manifestsRoot);
 
-        // Component versions: typed registry of bootstrap-layer pins (operators that land before
-        // Porch is up — Tekton operator, kube-vip, openebs-zfs chart, CAPN providers, etc.).
-        // Defaults live in ComponentVersions.defaults(); Pulumi config (rke2lab:components.<id>
-        // .version) overrides land via ComponentVersions.toBuilder().mergeFrom(...).build() in
-        // a follow-up. See manifests/.../profiles/ComponentVersions.java for the full set.
-        final ComponentVersions componentVersions = ComponentVersions.defaults();
-
-        final ManifestSynthesisRequest synthRequest =
-            new ManifestSynthesisRequest(synthScratch, consolidated)
-                .withFloxDebugPolicy(floxDebugPolicy)
-                .withBootstrapIdentity(layerContext.bootstrapIdentity())
-                .withNetworkTopology(layerContext.networkTopology())
-                .withComponentVersions(componentVersions);
-        final ManifestSynthesisService synthesizer =
-            singleSpiProvider(ManifestSynthesisService.class);
-        synthesizer.synthesize(synthRequest);
-
-        final ManifestExplodeService exploder = singleSpiProvider(ManifestExplodeService.class);
-        final ManifestExplodeResult explodeResult =
-            exploder.explode(new ManifestExplodeRequest(consolidated, manifestsRoot));
-
+        synthesizeManifests(synthScratch, consolidated, layerContext, floxDebugPolicy);
+        final ManifestExplodeResult explodeResult = explodeManifests(consolidated, manifestsRoot);
         final Map<String, Object> summary =
             buildManifestSynthSummary(manifestsRoot, explodeResult, floxDebugPolicy);
 
-        logInfo(
-            "phase prepareHostState: manifests synthesized + exploded after "
-                + elapsedSince(startedAt)
-                + " (floxDebugPolicy.enabled="
-                + floxDebugPolicy.enabled()
-                + ", checksum="
-                + summary.get("checksum")
-                + ", fileCount="
-                + summary.get("fileCount")
-                + ")");
-
+        logManifestSynthesisComplete(startedAt, floxDebugPolicy, summary);
         return summary;
       } catch (IOException ex) {
         throw new IllegalStateException("Failed to synthesize/explode manifests", ex);
@@ -584,6 +548,52 @@ public final class IncusResourceBootstrap {
           deleteSynthScratchSilently(synthScratch);
         }
       }
+    }
+
+    private FloxDebugPolicy resolveFloxDebugPolicy(ControlplanePolicy policy) {
+      return policy.debug().floxNriPluginEnabled()
+          ? FloxDebugPolicy.debug()
+          : FloxDebugPolicy.disabled();
+    }
+
+    private void synthesizeManifests(
+        Path synthScratch,
+        Path consolidated,
+        LayerEnvContext layerContext,
+        FloxDebugPolicy floxDebugPolicy)
+        throws IOException {
+      final ComponentVersions componentVersions = ComponentVersions.defaults();
+
+      final ManifestSynthesisRequest synthRequest =
+          new ManifestSynthesisRequest(synthScratch, consolidated)
+              .withFloxDebugPolicy(floxDebugPolicy)
+              .withBootstrapIdentity(layerContext.bootstrapIdentity())
+              .withNetworkTopology(layerContext.networkTopology())
+              .withComponentVersions(componentVersions);
+
+      final ManifestSynthesisService synthesizer =
+          singleSpiProvider(ManifestSynthesisService.class);
+      synthesizer.synthesize(synthRequest);
+    }
+
+    private ManifestExplodeResult explodeManifests(Path consolidated, Path manifestsRoot)
+        throws IOException {
+      final ManifestExplodeService exploder = singleSpiProvider(ManifestExplodeService.class);
+      return exploder.explode(new ManifestExplodeRequest(consolidated, manifestsRoot));
+    }
+
+    private void logManifestSynthesisComplete(
+        long startedAt, FloxDebugPolicy floxDebugPolicy, Map<String, Object> summary) {
+      logInfo(
+          "phase prepareHostState: manifests synthesized + exploded after "
+              + elapsedSince(startedAt)
+              + " (floxDebugPolicy.enabled="
+              + floxDebugPolicy.enabled()
+              + ", checksum="
+              + summary.get("checksum")
+              + ", fileCount="
+              + summary.get("fileCount")
+              + ")");
     }
 
     private Map<String, Object> buildManifestSynthSummary(
