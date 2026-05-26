@@ -76,6 +76,43 @@ Authors literally cannot:
 
 The cost is one class per state transition (typically one method each). The benefit is that valid pipelines are the only ones that compile.
 
+== Pitfalls observed in this codebase
+
+These are mistakes we made and fixed. Listing them so the next author doesn't repeat them.
+
+=== Don't share `runDuring` on a state object via an unchecked cast
+
+A tempting DRY: put a generic `<S, R> R runDuring(topic, stage, body)` on the shared state class so every transition reads `return state.runDuring(...)`. The body looks like:
+
+[source,java]
+----
+TopicRunner.runDuring("pipeline", topic, stage, body, onFailure);
+@SuppressWarnings("unchecked")
+final R cast = (R) this;
+return cast;
+----
+
+This compiles. It does not work. `(R) this` lies — `this` is the shared `State`, not the next-state class — and the JVM throws `ClassCastException` the first time a transition runs. The `@SuppressWarnings` was suppressing a real bug.
+
+**Correct shape**: each transition calls `TopicRunner.runDuring(...)` directly and returns `new <Next>(state)` explicitly. Three lines instead of one, but type-safe at runtime:
+
+[source,java]
+----
+public PreflightDone during(String topic, Function<PreflightStage, PreflightStage> body) {
+  final PreflightStage stage = new PreflightStage(...);
+  TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+  return new PreflightDone(state);
+}
+----
+
+Mnemonic: **the type-state pattern is the deduplication.** Don't try to deduplicate the transitions themselves.
+
+=== Don't put the failure handler at the end of the chain
+
+`.orFailWith(handler)` placed after the last `during(...)` *cannot work*: every preceding topic already ran with a `null` handler. Failures still propagate as `PipelineStageFailure`, but no user-supplied side-effect fires.
+
+**Correct shape**: the handler slot lives on the pre-execution builder state, before any `during(...)`. Optional, defaults to no-op when not called. See <<_failure_handler>>.
+
 == Error semantics
 
 Failures are caught per-topic. A throw inside any `during(...)` lambda is wrapped:
@@ -96,12 +133,23 @@ The default mode is *fail-fast*: the wrapped exception propagates to the termina
 When you find yourself writing a builder with three or more boolean parameters or a sequence of methods that need explanatory comments, consider expressing it as a fluent pipeline:
 
 . Identify the topics. Each topic should map to a real domain in the codebase (a package, a problem area), not an arbitrary chunk of work.
-. Define a topic builder interface for each. List the verbs the topic supports.
-. Build the type-state machine: one `Awaiting<Topic>` class per entry point, one `<Topic>Done` class per transition.
+. Define a topic builder for each (a class with the verbs that topic supports). Stages are package-private and have a public constructor so the pipeline machinery in the parent package can instantiate them.
+. Build the type-state machine: one `Awaiting<Topic>` class per entry point, one `<Topic>Done` class per transition. Each transition calls `TopicRunner.runDuring("scope", topic, stage, body, state.onFailure)` and returns `new <Next>(state)` explicitly. Do *not* try to factor the runDuring call onto the shared state with an unchecked cast — see Pitfalls.
+. Add an optional `.onFailure(handler)` method on the pre-execution builder state, before the first `during(...)` slot.
 . Add the terminal verb(s) on the final `*Done` class.
 . Write a sample call site as the first thing — let the call site shape the API.
 
-Exemplar in this codebase: `controlplane.pipeline.BootstrapPipeline` (the outer bootstrap workflow).
+Reuse from `controlplane.pipeline`:
+
+* `TopicRunner.runDuring(scope, topic, stage, body, onFailure)` — the topic-execution loop with logging and exception wrapping
+* `OnFailure` — failure callback SAM
+* `PipelineStageFailure` — wrapped exception type
+
+Exemplars in this codebase:
+
+* `controlplane.pipeline.BootstrapPipeline` — outer workflow (5 topics)
+* `controlplane.pipeline.ApplicationPipeline` — entry-point pipeline (3 topics)
+* `controlplane.incus.IncusResourceBootstrap.ApplyPipeline` — internal incus apply, state-machine inner classes (4 topics)
 
 == When *not* to use this
 
