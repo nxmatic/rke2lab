@@ -67,9 +67,22 @@ public final class RuntimeRke2ConfigLayer extends Construct {
         Map.of(
             "disable",
             List.of(
+                // Keep RKE2's snapshot controller + validation webhook disabled.
+                // The openebs-zfs chart already ships its own snapshot-controller
+                // sidecar in its localpv-controller deployment; running RKE2's
+                // alongside would mean two controllers reconciling the same
+                // VolumeSnapshot CRs.
                 "rke2-snapshot-controller",
-                "rke2-snapshot-controller-crd",
                 "rke2-snapshot-validation-webhook",
+                // rke2-snapshot-controller-crd is *enabled* (i.e. not in this
+                // list) so the upstream VolumeSnapshot{,Content,Class} CRDs
+                // exist on the cluster. Without them the openebs-zfs-bundled
+                // snapshot-controller v8 hard-fails at startup ("Exiting due
+                // to failure to ensure CRDs exist"). The CRDs themselves are
+                // pure data — they don't bring a controller of their own —
+                // so installing them is the minimum-viable fix that makes the
+                // openebs-zfs controller pod healthy without introducing a
+                // second snapshot-controller.
                 "rke2-ingress-nginx")));
     createConfigMap(
         "etcd-metrics.yaml",
