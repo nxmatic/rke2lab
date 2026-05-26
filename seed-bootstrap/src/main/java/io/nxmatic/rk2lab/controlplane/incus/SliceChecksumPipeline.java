@@ -168,8 +168,9 @@ public final class SliceChecksumPipeline {
   }
 
   private static void updateDigestForPath(MessageDigest digest, Path root) {
-    digest.update((byte) '\n');
-    digest.update(root.toString().getBytes(StandardCharsets.UTF_8));
+    // NOTE: Do not include absolute path in digest - it contains ephemeral PID+timestamp
+    // from Maven build directory (host.12345.1779123456789). Only hash file contents
+    // and relative paths within the slice to ensure deterministic checksums.
 
     if (!Files.exists(root)) {
       digest.update("<missing>".getBytes(StandardCharsets.UTF_8));
