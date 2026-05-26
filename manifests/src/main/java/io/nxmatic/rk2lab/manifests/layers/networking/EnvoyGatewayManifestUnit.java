@@ -15,6 +15,7 @@ public final class EnvoyGatewayManifestUnit extends AbstractManifestUnit {
 
   @Override
   public void apply(final Chart chart) {
-    new EnvoyGatewayLayer(chart, "layer-networking-envoy-gateway");
+    new EnvoyGatewayLayer(
+        chart, "layer-networking-envoy-gateway", componentVersions().envoyGateway());
   }
 }

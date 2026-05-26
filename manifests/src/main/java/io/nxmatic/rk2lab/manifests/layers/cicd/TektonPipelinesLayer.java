@@ -13,23 +13,21 @@ import software.constructs.Construct;
 
 public final class TektonPipelinesLayer extends Construct {
 
-  /**
-   * Pinned operator release. Bumping is a two-line change: drop the new release.yaml under {@code
-   * src/main/resources/upstream/cicd/tekton-operator/} and update this constant.
-   */
-  private static final String OPERATOR_RELEASE_RESOURCE =
-      "/upstream/cicd/tekton-operator/release-v0.79.1.yaml";
-
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("cicd", "tekton-pipelines");
 
-  public TektonPipelinesLayer(final Construct scope, final String id) {
+  public TektonPipelinesLayer(
+      final Construct scope, final String id, final String operatorVersion) {
     super(scope, id);
 
     // Bundle the upstream operator release (Namespace, CRDs, RBAC, Service, Deployment,
     // ConfigMaps, webhooks). The bundle ships its own `tekton-operator` Namespace, so we no
-    // longer create one separately.
-    new UpstreamYamlInclusion(this, OPERATOR_RELEASE_RESOURCE, packageProfile);
+    // longer create one separately. Version is resolved from ComponentVersions; the matching
+    // release-<version>.yaml must exist under src/main/resources/upstream/cicd/tekton-operator/
+    // — the build will fail fast if it doesn't.
+    final String operatorReleaseResource =
+        "/upstream/cicd/tekton-operator/release-" + operatorVersion + ".yaml";
+    new UpstreamYamlInclusion(this, operatorReleaseResource, packageProfile);
 
     createReplicatedSecret(
         "tekton-git-auth", "kubernetes.io/basic-auth", "kube-system/tekton-git-auth");

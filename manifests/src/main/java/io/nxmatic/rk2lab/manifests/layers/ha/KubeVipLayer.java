@@ -17,8 +17,11 @@ public final class KubeVipLayer extends Construct {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("high-availability", "kube-vip");
 
-  public KubeVipLayer(final Construct scope, final String id) {
+  private final String kubeVipVersion;
+
+  public KubeVipLayer(final Construct scope, final String id, final String kubeVipVersion) {
     super(scope, id);
+    this.kubeVipVersion = kubeVipVersion;
 
     ApiObject namespace = createNamespace();
     ApiObject serviceAccount = createServiceAccount(namespace);
@@ -224,7 +227,7 @@ public final class KubeVipLayer extends Construct {
                                 "name",
                                 "kube-vip",
                                 "image",
-                                "ghcr.io/kube-vip/kube-vip:v0.8.7",
+                                "ghcr.io/kube-vip/kube-vip:" + kubeVipVersion,
                                 "imagePullPolicy",
                                 "Always",
                                 "args",

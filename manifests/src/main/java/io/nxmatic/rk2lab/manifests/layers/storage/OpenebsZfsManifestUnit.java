@@ -15,6 +15,6 @@ public final class OpenebsZfsManifestUnit extends AbstractManifestUnit {
 
   @Override
   public void apply(final Chart chart) {
-    new OpenebsZfsLayer(chart, "layer-storage-openebs-zfs");
+    new OpenebsZfsLayer(chart, "layer-storage-openebs-zfs", componentVersions().openebsZfsChart());
   }
 }

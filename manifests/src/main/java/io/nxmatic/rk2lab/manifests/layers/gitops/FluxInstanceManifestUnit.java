@@ -15,6 +15,6 @@ public final class FluxInstanceManifestUnit extends AbstractManifestUnit {
 
   @Override
   public void apply(final Chart chart) {
-    new FluxInstanceLayer(chart, "layer-gitops-flux-instance");
+    new FluxInstanceLayer(chart, "layer-gitops-flux-instance", componentVersions().fluxOperator());
   }
 }

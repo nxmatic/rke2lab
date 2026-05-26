@@ -113,7 +113,8 @@ public record ManifestSynthesisRequest(
           Files.createTempDirectory("rk2lab-manifests-").toAbsolutePath().normalize();
       final Path manifestFile = outdir.resolve("manifests.yaml");
       return new ManifestSynthesisRequest(
-          outdir, manifestFile, manifestDomainPolicy, floxDebugPolicy);
+              outdir, manifestFile, manifestDomainPolicy, floxDebugPolicy)
+          .withComponentVersions(ComponentVersions.defaults());
     } catch (IOException ex) {
       throw new UncheckedIOException("Failed to create temporary synthesis directory", ex);
     }

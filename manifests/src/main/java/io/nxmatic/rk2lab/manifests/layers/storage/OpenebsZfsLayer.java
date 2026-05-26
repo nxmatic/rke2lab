@@ -16,8 +16,11 @@ public final class OpenebsZfsLayer extends Construct {
 
   private final KptMetadata kptMetadata = new KptMetadata();
 
-  public OpenebsZfsLayer(final Construct scope, final String id) {
+  private final String chartVersion;
+
+  public OpenebsZfsLayer(final Construct scope, final String id, final String chartVersion) {
     super(scope, id);
+    this.chartVersion = chartVersion;
     ApiObject namespace = createNamespace();
     createStorageClass();
     createHelmChart(namespace);
@@ -106,6 +109,6 @@ public final class OpenebsZfsLayer extends Construct {
                 "valuesContent",
                 "crds:\n  csi:\n    volumeSnapshots:\n      enabled: false\nzfs:\n  bin: /usr/sbin/zfs\nzfsNode:\n  kubeletDir: /var/lib/kubelet\n",
                 "version",
-                "2.8.0")));
+                chartVersion)));
   }
 }

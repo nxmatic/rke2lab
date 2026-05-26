@@ -15,6 +15,7 @@ public final class TektonPipelinesManifestUnit extends AbstractManifestUnit {
 
   @Override
   public void apply(final Chart chart) {
-    new TektonPipelinesLayer(chart, "layer-cicd-tekton-pipelines");
+    new TektonPipelinesLayer(
+        chart, "layer-cicd-tekton-pipelines", componentVersions().tektonOperator());
   }
 }

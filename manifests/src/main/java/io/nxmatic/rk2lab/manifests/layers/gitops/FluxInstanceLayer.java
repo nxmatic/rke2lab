@@ -16,8 +16,12 @@ public final class FluxInstanceLayer extends Construct {
 
   private final KptMetadata kptMetadata = new KptMetadata();
 
-  public FluxInstanceLayer(final Construct scope, final String id) {
+  private final String fluxOperatorVersion;
+
+  public FluxInstanceLayer(
+      final Construct scope, final String id, final String fluxOperatorVersion) {
     super(scope, id);
+    this.fluxOperatorVersion = fluxOperatorVersion;
     createFluxInstance();
   }
 
@@ -47,9 +51,9 @@ public final class FluxInstanceLayer extends Construct {
                                 "app.kubernetes.io/name",
                                 "flux-instance",
                                 "app.kubernetes.io/version",
-                                "v0.36.0",
+                                fluxOperatorVersion,
                                 "helm.sh/chart",
-                                "flux-instance-0.36.0"))
+                                "flux-instance-" + fluxOperatorVersion.replaceFirst("^v", "")))
                         .build())
                 .build());
 

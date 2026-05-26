@@ -30,6 +30,7 @@ import io.nxmatic.rk2lab.manifests.api.ManifestExplodeResult;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeService;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.ComponentVersions;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
@@ -261,11 +262,19 @@ public final class IncusResourceBootstrap {
         // just (re)materialized by materializeHostSystemdAssets — leave it.
         wipeExplodedLayers(manifestsRoot);
 
+        // Component versions: typed registry of bootstrap-layer pins (operators that land before
+        // Porch is up — Tekton operator, kube-vip, openebs-zfs chart, CAPN providers, etc.).
+        // Defaults live in ComponentVersions.defaults(); Pulumi config (rke2lab:components.<id>
+        // .version) overrides land via ComponentVersions.toBuilder().mergeFrom(...).build() in
+        // a follow-up. See manifests/.../profiles/ComponentVersions.java for the full set.
+        final ComponentVersions componentVersions = ComponentVersions.defaults();
+
         final ManifestSynthesisRequest synthRequest =
             new ManifestSynthesisRequest(synthScratch, consolidated)
                 .withFloxDebugPolicy(floxDebugPolicy)
                 .withBootstrapIdentity(layerContext.bootstrapIdentity())
-                .withNetworkTopology(layerContext.networkTopology());
+                .withNetworkTopology(layerContext.networkTopology())
+                .withComponentVersions(componentVersions);
         final ManifestSynthesisService synthesizer =
             singleSpiProvider(ManifestSynthesisService.class);
         synthesizer.synthesize(synthRequest);

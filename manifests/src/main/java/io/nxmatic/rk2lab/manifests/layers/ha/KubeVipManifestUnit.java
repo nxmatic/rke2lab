@@ -15,6 +15,6 @@ public final class KubeVipManifestUnit extends AbstractManifestUnit {
 
   @Override
   public void apply(final Chart chart) {
-    new KubeVipLayer(chart, "layer-high-availability-kube-vip");
+    new KubeVipLayer(chart, "layer-high-availability-kube-vip", componentVersions().kubeVip());
   }
 }

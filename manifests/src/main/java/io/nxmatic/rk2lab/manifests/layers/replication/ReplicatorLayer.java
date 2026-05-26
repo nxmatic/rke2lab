@@ -16,8 +16,11 @@ public final class ReplicatorLayer extends Construct {
 
   private final KptMetadata kptMetadata = new KptMetadata();
 
-  public ReplicatorLayer(final Construct scope, final String id) {
+  private final String replicatorVersion;
+
+  public ReplicatorLayer(final Construct scope, final String id, final String replicatorVersion) {
     super(scope, id);
+    this.replicatorVersion = replicatorVersion;
 
     ApiObject clusterRole = createClusterRole();
     ApiObject serviceAccount = createServiceAccount();
@@ -214,7 +217,7 @@ public final class ReplicatorLayer extends Construct {
                               "name",
                               "kubernetes-replicator",
                               "image",
-                              "quay.io/mittwald/kubernetes-replicator:v2.12.2",
+                              "quay.io/mittwald/kubernetes-replicator:" + replicatorVersion,
                               "imagePullPolicy",
                               "Always",
                               "args",
@@ -275,8 +278,8 @@ public final class ReplicatorLayer extends Construct {
         "app.kubernetes.io/name",
         "kubernetes-replicator",
         "app.kubernetes.io/version",
-        "v2.12.2",
+        replicatorVersion,
         "helm.sh/chart",
-        "kubernetes-replicator-2.12.2");
+        "kubernetes-replicator-" + replicatorVersion.replaceFirst("^v", ""));
   }
 }

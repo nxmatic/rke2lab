@@ -15,8 +15,12 @@ public final class EnvoyGatewayLayer extends Construct {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("networking", "envoy-gateway");
 
-  public EnvoyGatewayLayer(final Construct scope, final String id) {
+  private final String envoyGatewayVersion;
+
+  public EnvoyGatewayLayer(
+      final Construct scope, final String id, final String envoyGatewayVersion) {
     super(scope, id);
+    this.envoyGatewayVersion = envoyGatewayVersion;
 
     ApiObject namespace = createNamespace();
     ApiObject serviceAccount = createServiceAccount(namespace);
@@ -215,7 +219,11 @@ public final class EnvoyGatewayLayer extends Construct {
                                 List.of("sh", "/scripts/install.sh"),
                                 "env",
                                 List.of(
-                                    Map.of("name", "ENVOY_GATEWAY_VERSION", "value", "v1.4.2"),
+                                    Map.of(
+                                        "name",
+                                        "ENVOY_GATEWAY_VERSION",
+                                        "value",
+                                        envoyGatewayVersion),
                                     Map.of(
                                         "name",
                                         "ENVOY_GATEWAY_NAMESPACE",

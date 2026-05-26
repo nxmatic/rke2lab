@@ -15,6 +15,7 @@ public final class ReplicationReplicatorManifestUnit extends AbstractManifestUni
 
   @Override
   public void apply(final Chart chart) {
-    new ReplicatorLayer(chart, "layer-replication-replicator");
+    new ReplicatorLayer(
+        chart, "layer-replication-replicator", componentVersions().kubernetesReplicator());
   }
 }
