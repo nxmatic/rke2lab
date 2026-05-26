@@ -198,13 +198,14 @@ public final class IncusResourceBootstrap {
       classpathAssetMaterializer.materializeManifests(localPaths.manifestsRoot());
       classpathAssetMaterializer.materializeHostSystemdAssets(
           localPaths.manifestsRoot().resolve("host"));
-      this.manifestSynthSummary = synthesizeAndExplodeManifests(localPaths.manifestsRoot(), policy);
+      LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
+      this.manifestSynthSummary =
+          synthesizeAndExplodeManifests(localPaths.manifestsRoot(), policy, layerContext);
       materializeFloxRuntimeInstallerAssets(localPaths.daemonsetRoot());
       final List<String> hostMountNotes = hostMountSourceVerifier.ensureSources(localPaths);
       this.systemdProvisioningSummary =
           SystemdProvisioningInventory.summarize(localPaths, hostMountNotes);
       clearStaleBootstrapKubeconfig();
-      LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
       this.layerEnvRegistrySummary =
           runtimeEnvControlplaneOverlayWriter.write(
               localPaths.runtimeEnvConfigRoot(), layerContext, policy);
@@ -243,7 +244,7 @@ public final class IncusResourceBootstrap {
      * manifests-module rebuild required.
      */
     private Map<String, Object> synthesizeAndExplodeManifests(
-        Path manifestsRoot, ControlplanePolicy policy) {
+        Path manifestsRoot, ControlplanePolicy policy, LayerEnvContext layerContext) {
       final long startedAt = System.nanoTime();
       Path synthScratch = null;
       try {
@@ -262,7 +263,9 @@ public final class IncusResourceBootstrap {
 
         final ManifestSynthesisRequest synthRequest =
             new ManifestSynthesisRequest(synthScratch, consolidated)
-                .withFloxDebugPolicy(floxDebugPolicy);
+                .withFloxDebugPolicy(floxDebugPolicy)
+                .withBootstrapIdentity(layerContext.bootstrapIdentity())
+                .withNetworkTopology(layerContext.networkTopology());
         final ManifestSynthesisService synthesizer =
             singleSpiProvider(ManifestSynthesisService.class);
         synthesizer.synthesize(synthRequest);

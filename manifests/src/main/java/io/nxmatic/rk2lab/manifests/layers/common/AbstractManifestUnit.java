@@ -1,7 +1,10 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.common;
 
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.ComponentVersions;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.NetworkTopology;
 import java.util.List;
 
 public abstract class AbstractManifestUnit implements ManifestUnit {
@@ -32,5 +35,20 @@ public abstract class AbstractManifestUnit implements ManifestUnit {
    */
   protected final FloxDebugPolicy floxDebugPolicy() {
     return ManifestSynthesisContext.current().floxDebugPolicy();
+  }
+
+  /** Cluster + node identity slice. */
+  protected final BootstrapIdentity bootstrapIdentity() {
+    return ManifestSynthesisContext.current().bootstrapIdentity();
+  }
+
+  /** Cluster network topology slice (CIDRs, interfaces, gateway addresses). */
+  protected final NetworkTopology networkTopology() {
+    return ManifestSynthesisContext.current().networkTopology();
+  }
+
+  /** Component-version slice (kube-vip, tailscale, …). */
+  protected final ComponentVersions componentVersions() {
+    return ManifestSynthesisContext.current().componentVersions();
   }
 }

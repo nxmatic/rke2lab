@@ -72,7 +72,12 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         providerId(),
         request.floxDebugPolicy().enabled());
 
-    final ManifestSynthesisContext context = ManifestSynthesisContext.of(request.floxDebugPolicy());
+    final ManifestSynthesisContext context =
+        ManifestSynthesisContext.of(
+            request.floxDebugPolicy(),
+            request.bootstrapIdentity(),
+            request.networkTopology(),
+            request.componentVersions());
     try (var ignored = ManifestSynthesisContext.bind(context)) {
       return synthesizeInContext(request);
     }

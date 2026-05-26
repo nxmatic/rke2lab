@@ -15,6 +15,6 @@ public final class PorchResourcesManifestUnit extends AbstractManifestUnit {
 
   @Override
   public void apply(final Chart chart) {
-    new PorchResourcesLayer(chart, "layer-gitops-porch-resources");
+    new PorchResourcesLayer(chart, "layer-gitops-porch-resources", bootstrapIdentity());
   }
 }

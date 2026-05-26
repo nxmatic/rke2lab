@@ -1,5 +1,7 @@
 package io.nxmatic.rk2lab.manifests.layers.env;
 
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.NetworkTopology;
 import java.nio.file.Path;
 
 /**
@@ -75,4 +77,41 @@ public interface LayerEnvContext {
   String vipGatewayInetAddr(); // "10.80.7.1"
 
   String vipHostInetAddr(); // "10.80.7.10"
+
+  /**
+   * Identity slice for synth-time consumption. The cluster env is left blank by default — the env
+   * loader / Pulumi config can override per cluster as that surface materializes.
+   */
+  default BootstrapIdentity bootstrapIdentity() {
+    return new BootstrapIdentity(
+        clusterName(),
+        clusterId(),
+        clusterToken(),
+        clusterDomain(),
+        "",
+        nodeName(),
+        nodeId(),
+        nodeKind());
+  }
+
+  /** Network topology slice for synth-time consumption. */
+  default NetworkTopology networkTopology() {
+    return new NetworkTopology(
+        clusterCidr(),
+        clusterPodCidr(),
+        clusterServiceCidr(),
+        nodeHostInetAddr(),
+        nodeNetworkCidr(),
+        nodeNetworkGatewayAddr(),
+        clusterLoadBalancerCidr(),
+        clusterLoadBalancerGatewayAddr(),
+        lanInterface(),
+        lanHostInetAddr(),
+        lanLoadBalancerCidr(),
+        wanInterface(),
+        vipInterface(),
+        vipCidr(),
+        vipGatewayInetAddr(),
+        vipHostInetAddr());
+  }
 }

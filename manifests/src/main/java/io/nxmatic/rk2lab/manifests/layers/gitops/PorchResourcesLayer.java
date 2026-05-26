@@ -1,6 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.gitops;
 
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +13,12 @@ import software.constructs.Construct;
 
 public final class PorchResourcesLayer extends Construct {
 
+  /**
+   * kpt setter placeholder — kept as a literal only in {@code apply-setters} mutator config values,
+   * where the downstream kpt run substitutes it during package render. Anywhere the manifest ships
+   * straight to the rke2 addon controller (e.g. k8s {@code metadata.name}, descriptions), use
+   * {@link #identityClusterName} instead.
+   */
   private static final String CLUSTER_NAME = "${cluster-name}";
 
   private static final String CLUSTER_ENV = "${cluster-env}";
@@ -19,8 +26,12 @@ public final class PorchResourcesLayer extends Construct {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("gitops", "porch-resources");
 
-  public PorchResourcesLayer(final Construct scope, final String id) {
+  /** Cluster name resolved at synth time from {@link BootstrapIdentity}. */
+  private final String identityClusterName;
+
+  public PorchResourcesLayer(final Construct scope, final String id, BootstrapIdentity identity) {
     super(scope, id);
+    this.identityClusterName = identity.clusterName();
 
     ApiObject catalogRepo = createCatalogRepository();
     ApiObject stateRepo = createStateRepository();
@@ -48,7 +59,9 @@ public final class PorchResourcesLayer extends Construct {
                         .namespace("porch-system")
                         .annotations(
                             packageProfile.packageAnnotations(
-                                "config.porch.kpt.dev|Repository|porch-system|${cluster-name}-catalog"))
+                                "config.porch.kpt.dev|Repository|porch-system|"
+                                    + identityClusterName
+                                    + "-catalog"))
                         .build())
                 .build());
 
@@ -89,7 +102,9 @@ public final class PorchResourcesLayer extends Construct {
                         .namespace("porch-system")
                         .annotations(
                             packageProfile.packageAnnotations(
-                                "config.porch.kpt.dev|Repository|porch-system|${cluster-name}-state"))
+                                "config.porch.kpt.dev|Repository|porch-system|"
+                                    + identityClusterName
+                                    + "-state"))
                         .build())
                 .build());
 
@@ -99,7 +114,7 @@ public final class PorchResourcesLayer extends Construct {
             "deployment",
             true,
             "description",
-            "Rendered Porch package state for ${cluster-name} cluster",
+            "Rendered Porch package state for " + identityClusterName + " cluster",
             "git",
             Map.of(
                 "branch",
@@ -372,19 +387,19 @@ public final class PorchResourcesLayer extends Construct {
     apiObject.addJsonPatch(JsonPatch.add("/spec", spec));
   }
 
-  private static String catalogRepoName() {
-    return CLUSTER_NAME + "-catalog";
+  private String catalogRepoName() {
+    return identityClusterName + "-catalog";
   }
 
-  private static String stateRepoName() {
-    return CLUSTER_NAME + "-state";
+  private String stateRepoName() {
+    return identityClusterName + "-state";
   }
 
-  private static String stateRepoDirectory() {
-    return "rke2/" + CLUSTER_NAME + "/catalog";
+  private String stateRepoDirectory() {
+    return "rke2/" + identityClusterName + "/catalog";
   }
 
-  private static String clusterQualifiedName() {
-    return CLUSTER_NAME + "-cluster";
+  private String clusterQualifiedName() {
+    return identityClusterName + "-cluster";
   }
 }

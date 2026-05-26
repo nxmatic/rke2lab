@@ -1,6 +1,9 @@
 package io.nxmatic.rk2lab.manifests.api;
 
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.ComponentVersions;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.NetworkTopology;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -14,7 +17,10 @@ public record ManifestSynthesisRequest(
     Path synthOutdir,
     Path synthManifestFile,
     Optional<ManifestDomainPolicy> manifestDomainPolicy,
-    FloxDebugPolicy floxDebugPolicy)
+    FloxDebugPolicy floxDebugPolicy,
+    BootstrapIdentity bootstrapIdentity,
+    NetworkTopology networkTopology,
+    ComponentVersions componentVersions)
     implements ManifestDomainPolicyAware {
 
   private static final String ENABLED_DOMAINS_PROPERTY = "rk2lab.manifests.policy.enabledDomains";
@@ -33,6 +39,21 @@ public record ManifestSynthesisRequest(
     this(synthOutdir, synthManifestFile, manifestDomainPolicy, FloxDebugPolicy.disabled());
   }
 
+  public ManifestSynthesisRequest(
+      Path synthOutdir,
+      Path synthManifestFile,
+      Optional<ManifestDomainPolicy> manifestDomainPolicy,
+      FloxDebugPolicy floxDebugPolicy) {
+    this(
+        synthOutdir,
+        synthManifestFile,
+        manifestDomainPolicy,
+        floxDebugPolicy,
+        BootstrapIdentity.unknown(),
+        NetworkTopology.empty(),
+        ComponentVersions.empty());
+  }
+
   public ManifestSynthesisRequest {
     synthOutdir = synthOutdir.toAbsolutePath().normalize();
     synthManifestFile = synthManifestFile.toAbsolutePath().normalize();
@@ -41,6 +62,9 @@ public record ManifestSynthesisRequest(
             ? Optional.empty()
             : manifestDomainPolicy.map(policy -> policy);
     floxDebugPolicy = floxDebugPolicy == null ? FloxDebugPolicy.disabled() : floxDebugPolicy;
+    bootstrapIdentity = bootstrapIdentity == null ? BootstrapIdentity.unknown() : bootstrapIdentity;
+    networkTopology = networkTopology == null ? NetworkTopology.empty() : networkTopology;
+    componentVersions = componentVersions == null ? ComponentVersions.empty() : componentVersions;
   }
 
   public static ManifestSynthesisRequest fromSystemProperties() {
@@ -97,12 +121,57 @@ public record ManifestSynthesisRequest(
 
   public ManifestSynthesisRequest withManifestDomainPolicy(ManifestDomainPolicy policy) {
     return new ManifestSynthesisRequest(
-        synthOutdir, synthManifestFile, Optional.of(policy), floxDebugPolicy);
+        synthOutdir,
+        synthManifestFile,
+        Optional.of(policy),
+        floxDebugPolicy,
+        bootstrapIdentity,
+        networkTopology,
+        componentVersions);
   }
 
   public ManifestSynthesisRequest withFloxDebugPolicy(FloxDebugPolicy policy) {
     return new ManifestSynthesisRequest(
-        synthOutdir, synthManifestFile, manifestDomainPolicy, policy);
+        synthOutdir,
+        synthManifestFile,
+        manifestDomainPolicy,
+        policy,
+        bootstrapIdentity,
+        networkTopology,
+        componentVersions);
+  }
+
+  public ManifestSynthesisRequest withBootstrapIdentity(BootstrapIdentity identity) {
+    return new ManifestSynthesisRequest(
+        synthOutdir,
+        synthManifestFile,
+        manifestDomainPolicy,
+        floxDebugPolicy,
+        identity,
+        networkTopology,
+        componentVersions);
+  }
+
+  public ManifestSynthesisRequest withNetworkTopology(NetworkTopology topology) {
+    return new ManifestSynthesisRequest(
+        synthOutdir,
+        synthManifestFile,
+        manifestDomainPolicy,
+        floxDebugPolicy,
+        bootstrapIdentity,
+        topology,
+        componentVersions);
+  }
+
+  public ManifestSynthesisRequest withComponentVersions(ComponentVersions versions) {
+    return new ManifestSynthesisRequest(
+        synthOutdir,
+        synthManifestFile,
+        manifestDomainPolicy,
+        floxDebugPolicy,
+        bootstrapIdentity,
+        networkTopology,
+        versions);
   }
 
   private static FloxDebugPolicy floxDebugPolicyFromSystemProperties() {
