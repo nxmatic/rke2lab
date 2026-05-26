@@ -31,7 +31,7 @@ public final class OutputBuilder {
     outputs.put("seedNodeId", bootstrapResult.seedNodeId());
     outputs.put("seedInstanceUrn", bootstrapResult.instanceUrn());
     outputs.put("seedProviderUrn", bootstrapResult.providerUrn());
-    outputs.put("seedProvisioningChecksum", bootstrapResult.provisioningChecksum());
+    outputs.put("seedProvisioningSliceChecksums", bootstrapResult.provisioningSliceChecksums());
     outputs.put("seedImageBuildChecksum", bootstrapResult.imageBuildChecksum());
     outputs.put("seedImageFingerprint", bootstrapResult.imageFingerprint());
     outputs.put("seedInstanceStatus", bootstrapResult.instanceStatus());

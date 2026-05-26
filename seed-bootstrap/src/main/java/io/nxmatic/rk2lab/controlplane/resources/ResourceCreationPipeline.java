@@ -104,7 +104,7 @@ final class ResourceCreationPipeline {
           new BootstrapRegistryResource(
               "seed-bootstrap-registry",
               config,
-              bootstrapResult.provisioningChecksum(),
+              bootstrapResult.provisioningSliceChecksums(),
               bootstrapResult.hostSourceDirRelative(),
               bootstrapResult.layerEnvRegistrySummary(),
               bootstrapResult.systemdProvisioningSummary(),
@@ -174,8 +174,8 @@ final class ResourceCreationPipeline {
     StandaloneResourceBuilder withRegistry() {
       this.registrySummary =
           Map.of(
-              "checksum",
-              bootstrapResult.provisioningChecksum(),
+              "sliceChecksums",
+              bootstrapResult.provisioningSliceChecksums(),
               "hostSourceDirRelative",
               bootstrapResult.hostSourceDirRelative(),
               "localWorktreePath",

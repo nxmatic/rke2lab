@@ -19,7 +19,7 @@ public final class BootstrapRegistryResource extends ComponentResource {
   public BootstrapRegistryResource(
       String name,
       BootstrapConfig config,
-      String provisioningChecksum,
+      Map<String, String> provisioningSliceChecksums,
       String hostSourceDirRelative,
       Map<String, Object> layerEnvRegistrySummary,
       Map<String, Object> systemdProvisioningSummary,
@@ -27,7 +27,7 @@ public final class BootstrapRegistryResource extends ComponentResource {
     super(TYPE_TOKEN, name, buildOptions(dependsOnResource));
 
     final LinkedHashMap<String, Object> values = new LinkedHashMap<>();
-    values.put("checksum", provisioningChecksum);
+    values.put("sliceChecksums", provisioningSliceChecksums);
     values.put("hostSourceDirRelative", hostSourceDirRelative);
     values.put("localWorktreePath", config.localWorktreePath().toString());
     values.put("layerEnvRegistry", layerEnvRegistrySummary);
