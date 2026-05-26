@@ -1,4 +1,4 @@
-package io.nxmatic.rk2lab.controlplane;
+package io.nxmatic.rk2lab.controlplane.pipeline;
 
 import io.nxmatic.rk2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
@@ -10,9 +10,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Builds the final bootstrap output map from all pipeline results. */
-final class OutputBuilder {
+public final class OutputBuilder {
 
-  Map<String, Object> buildOutputs(
+  public Map<String, Object> buildOutputs(
       BootstrapConfig config,
       ControlplanePolicy policy,
       IncusResourceBootstrap.BootstrapResult bootstrapResult,
