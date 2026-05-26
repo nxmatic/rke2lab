@@ -4,20 +4,20 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic</groupId>
-    <artifactId>rke2lab</artifactId>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <artifactId>rke2lab-netplan</artifactId>
-  <name>rke2lab-netplan</name>
+  <artifactId>netplan</artifactId>
+  <name>netplan</name>
 
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>io.nxmatic</groupId>
-        <artifactId>rke2lab-bom</artifactId>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>bom</artifactId>
         <version>${project.version}</version>
         <type>pom</type>
         <scope>import</scope>

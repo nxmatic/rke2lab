@@ -37,7 +37,7 @@
 
           installPhase = ''
             mkdir -p $out/share/java
-            cp netplan/target/rke2lab-netplan-*-exec.jar $out/share/java/rke2lab-netplan.jar
+            cp netplan/target/netplan-*-exec.jar $out/share/java/rke2lab-netplan.jar
           '';
         };
 

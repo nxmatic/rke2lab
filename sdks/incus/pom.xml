@@ -4,20 +4,21 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic</groupId>
-    <artifactId>rke2lab</artifactId>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
 
-  <artifactId>rke2lab-incus-sdk</artifactId>
-  <name>rke2lab-incus-sdk</name>
+  <groupId>io.nxmatic.rke2lab.sdks</groupId>
+  <artifactId>incus</artifactId>
+  <name>sdks/incus</name>
 
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>io.nxmatic</groupId>
-        <artifactId>rke2lab-bom</artifactId>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>bom</artifactId>
         <version>${project.version}</version>
         <type>pom</type>
         <scope>import</scope>

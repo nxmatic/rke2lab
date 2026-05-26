@@ -4,14 +4,14 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic</groupId>
-    <artifactId>rke2lab</artifactId>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
   </parent>
 
-  <artifactId>rke2lab-bom</artifactId>
+  <artifactId>bom</artifactId>
   <packaging>pom</packaging>
-  <name>rke2lab-bom</name>
+  <name>bom</name>
 
   <properties>
     <dbus.java.version>5.2.0</dbus.java.version>
@@ -71,29 +71,34 @@
       </dependency>
       <!-- rke2lab dependencies -->
       <dependency>
-        <groupId>io.nxmatic</groupId>
-        <artifactId>rke2lab-seed-bootstrap</artifactId>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>seed-bootstrap</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic</groupId>
-        <artifactId>rke2lab-seed-bootstrap</artifactId>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>seed-bootstrap</artifactId>
         <version>${rke2lab.version}</version>
         <classifier>exec</classifier>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic</groupId>
-        <artifactId>rke2lab-manifests</artifactId>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>manifests</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic</groupId>
-        <artifactId>rke2lab-netplan</artifactId>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>netplan</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.nxmatic</groupId>
-        <artifactId>rke2lab-systemd-contract</artifactId>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>systemd-contract</artifactId>
+        <version>${rke2lab.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab.sdks</groupId>
+        <artifactId>incus</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <!-- third-party dependencies -->

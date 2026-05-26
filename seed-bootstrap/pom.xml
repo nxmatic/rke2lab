@@ -4,14 +4,14 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.nxmatic</groupId>
-    <artifactId>rke2lab</artifactId>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <artifactId>rke2lab-seed-bootstrap</artifactId>
-  <name>rke2lab seed bootstrap</name>
+  <artifactId>seed-bootstrap</artifactId>
+  <name>seed-bootstrap</name>
 
   <properties>
     <rk2lab.manifests.unpack.skip>false</rk2lab.manifests.unpack.skip>
@@ -20,8 +20,8 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>io.nxmatic</groupId>
-        <artifactId>rke2lab-bom</artifactId>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>bom</artifactId>
         <version>${project.version}</version>
         <type>pom</type>
         <scope>import</scope>
@@ -45,23 +45,23 @@
       <artifactId>grpc-netty</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic</groupId>
-      <artifactId>rke2lab-incus-sdk</artifactId>
+      <groupId>io.nxmatic.rke2lab.sdks</groupId>
+      <artifactId>incus</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic</groupId>
-      <artifactId>rke2lab-manifests</artifactId>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>manifests</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic</groupId>
-      <artifactId>rke2lab-netplan</artifactId>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>netplan</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>io.nxmatic</groupId>
-      <artifactId>rke2lab-systemd-contract</artifactId>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>systemd-contract</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -216,8 +216,8 @@
               <skip>${rk2lab.manifests.unpack.skip}</skip>
               <artifactItems>
                 <artifactItem>
-                  <groupId>io.nxmatic</groupId>
-                  <artifactId>rke2lab-manifests</artifactId>
+                  <groupId>io.nxmatic.rke2lab</groupId>
+                  <artifactId>manifests</artifactId>
                   <version>${rke2lab.version}</version>
                   <classifier>manifests-d</classifier>
                   <type>zip</type>
