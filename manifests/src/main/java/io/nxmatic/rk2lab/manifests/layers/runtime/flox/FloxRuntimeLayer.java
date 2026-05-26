@@ -302,21 +302,15 @@ public final class FloxRuntimeLayer extends Construct {
                                   new Object[] {
                                     "/bin/sh",
                                     "-c",
-                                    // Source daemonless libraries, then call the reconciler
-                                    // primitive. Runs indefinitely watching for ConfigMap
-                                    // changes via inotifywait.
+                                    // Source flox-runtime shared library and call
+                                    // flox_runtime::reconcile. The library handles both
+                                    // bootstrap-complete verification and the watch loop.
                                     "apk add --no-cache bash inotify-tools"
-                                        + " && . /.sh-daemonset/.sh.d/daemonset-logging.sh"
-                                        + " && . /.sh-daemonset/.sh.d/daemonless-host-shell-policy.sh"
-                                        + " && . /.sh-daemonset/.sh.d/daemonless-trampoline.sh"
-                                        + " && . /.sh-daemonset/.sh.d/daemonless-host-asset-materializer.sh"
-                                        + " && . /.sh-daemonset/.sh.d/daemonless-host-asset-reconciler.sh"
-                                        + " && daemonless::host_asset:watch_and_reconcile"
-                                        + "      /dynamic-plugin"
-                                        + "      nri-plugin.tar.b64"
-                                        + "      nri-plugin.manifest.json"
-                                        + "      /var/run/k8s-daemonset.d/runtime/flox"
-                                        + "      flox-nri-plugin-reload.sh"
+                                        + " && export SCRIPT_MOUNT_DIR=/var/run/k8s-daemonset.d/runtime/flox"
+                                        + " && export DAEMONLESS_POLICY_SCRIPT_MOUNT_DIR=/.sh-daemonset"
+                                        + " && export DYNAMIC_PLUGIN_MOUNT_DIR=/dynamic-plugin"
+                                        + " && . ${SCRIPT_MOUNT_DIR}/bin/flox-runtime-lib.sh"
+                                        + " && flox_runtime::reconcile"
                                   },
                                   "env",
                                   new Object[] {

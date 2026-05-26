@@ -817,6 +817,11 @@ installer::host:run() {
 	else
 		echo "containerd configuration unchanged, skipping restart"
 	fi
+
+	: "Write bootstrap completion marker for reconciler"
+	mkdir -p "${FLOX_RUNTIME_ROOT}"
+	touch "${FLOX_RUNTIME_ROOT}/.bootstrap-complete"
+	echo "Bootstrap complete marker written: ${FLOX_RUNTIME_ROOT}/.bootstrap-complete"
 }
 
 installer::mode:validate

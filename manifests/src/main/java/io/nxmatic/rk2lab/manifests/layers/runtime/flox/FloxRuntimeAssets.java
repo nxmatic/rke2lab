@@ -404,6 +404,10 @@ public final class FloxRuntimeAssets {
 
     private void addDefaultCoreInstallerAssets() {
       addInstallerAsset(
+          "flox-runtime-lib.sh",
+          FLOX_RESOURCE_ROOT + "/bin/flox-runtime-lib.sh",
+          "bin/flox-runtime-lib.sh");
+      addInstallerAsset(
           "flox-k8s-runtime-installer.sh",
           FLOX_RESOURCE_ROOT + "/bin/flox-k8s-runtime-installer.sh",
           "bin/flox-k8s-runtime-installer.sh");
@@ -411,6 +415,10 @@ public final class FloxRuntimeAssets {
           "flox-nri-plugin-run.sh",
           FLOX_RESOURCE_ROOT + "/bin/flox-nri-plugin-run.sh",
           "bin/flox-nri-plugin-run.sh");
+      addInstallerAsset(
+          "flox-nri-plugin-reload.sh",
+          FLOX_RESOURCE_ROOT + "/bin/flox-nri-plugin-reload.sh",
+          "bin/flox-nri-plugin-reload.sh");
       addInstallerAsset(
           "flox-nri-overlay-hook.sh",
           FLOX_RESOURCE_ROOT + "/bin/flox-nri-overlay-hook.sh",
