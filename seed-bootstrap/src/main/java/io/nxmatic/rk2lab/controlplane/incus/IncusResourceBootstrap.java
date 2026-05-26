@@ -1073,7 +1073,7 @@ public final class IncusResourceBootstrap {
     }
   }
 
-  private record BootstrapPaths(
+  record BootstrapPaths(
       Path worktreeRoot,
       Path stateRoot,
       Path clusterNodeRoot,
@@ -2553,7 +2553,8 @@ public final class IncusResourceBootstrap {
     private ProvisioningResourceInventory() {}
 
     /**
-     * Compute per-slice checksums for independently reconcilable provisioning slices.
+     * Compute per-slice checksums for independently reconcilable provisioning slices using fluent
+     * pipeline grammar.
      *
      * <p>The core slice covers base provisioning (systemd, manifests, rke2 config); component
      * slices are discovered from the registry populated during materialization. Each slice change
@@ -2565,17 +2566,11 @@ public final class IncusResourceBootstrap {
      */
     private static Map<String, String> sliceChecksums(
         BootstrapPaths paths, ProvisioningSliceRegistry registry) {
-      final LinkedHashMap<String, String> slices = new LinkedHashMap<>();
-
-      // Core slice: base provisioning resources
-      slices.put("core", coreSliceChecksum(paths));
-
-      // Component slices: registered by components during materialization
-      for (Map.Entry<String, List<Path>> entry : registry.getSliceRoots().entrySet()) {
-        slices.put(entry.getKey(), computeChecksum(entry.getValue()));
-      }
-
-      return Map.copyOf(slices);
+      return SliceChecksumPipeline.begin(paths, registry)
+          .during("core", core -> core.fromCoreRoots())
+          .then()
+          .during("registered components", components -> components.fromRegistry())
+          .collectChecksums();
     }
 
     /**
