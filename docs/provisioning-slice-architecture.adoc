@@ -176,6 +176,29 @@ The registry partitions checksums by policy:
 * `staticSlices` → stored in Incus instance config
 * `hotReloadSlices` → stored in Pulumi outputs / ConfigMaps
 
+== Instance Replacement Mechanism
+
+The slice architecture integrates with Pulumi's resource lifecycle via a deliberate layering:
+
+1. **Our code**: Computes slice checksums and decides which go into instance config (STATIC only)
+2. **Pulumi layer**: Instance resource configured with `.replaceOnChanges(List.of("config", "config.*"))`
+3. **Incus SDK**: Auto-generated from upstream Pulumi provider (`pulumi-language-java`), vendor code
+4. **Incus API**: Receives delete + create operations from Pulumi
+
+When a STATIC slice checksum changes:
+
+* Our code writes new checksum to `user.rke2lab.provisioning.slice.*` in instance config
+* Pulumi detects config change → triggers replacement due to `replaceOnChanges`
+* Incus SDK executes delete-before-replace → instance renewed
+
+When a HOT_RELOAD slice checksum changes:
+
+* Our code stores checksum in Pulumi outputs (not instance config)
+* Pulumi sees no config change → no replacement triggered
+* Reconciler reads new checksum from outputs → hot-reloads component
+
+**Key insight**: We're not duplicating checksums. We're controlling **which** checksums appear in instance config to leverage Pulumi's existing `replaceOnChanges` mechanism. The Incus SDK doesn't have its own checksum logic - it's just a pass-through to the Incus API.
+
 == Class Structure
 
 [mermaid]
