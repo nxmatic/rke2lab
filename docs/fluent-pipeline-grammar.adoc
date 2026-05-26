@@ -1,0 +1,120 @@
+= Fluent Pipeline Grammar
+:toc: left
+:toclevels: 3
+
+This document defines the conventions for authoring multi-stage workflows in the seed-bootstrap codebase as fluent pipelines that read like English narrative.
+
+== Motivation
+
+A workflow expressed as a sequence of method calls on a builder is easy to write but hard to read. Boolean arguments lose context (`reconcileBbox(true, false, true)`), and stage boundaries are invisible — readers cannot tell where one logical phase ends and another begins.
+
+The grammar below makes the structure explicit: stages are scoped, conjunctions are explicit, and labels carry weight (logging, error context). The result reads as a sentence describing the workflow.
+
+== The four primitives
+
+=== 1. Topic blocks via scoped lambdas
+
+Each domain is entered through a `during(label, lambda)` call. The lambda receives a topic-specific builder; the compiler enforces that only that topic's verbs are callable inside the lambda.
+
+[source,java]
+----
+.during("preflight", preflight -> preflight
+    .enforceEntryGates()
+    .requireLocalCommands("ssh", "kubectl")
+    .requireRemoteCommand(host, "incus"))
+----
+
+Topic builders are package-private interfaces. The lambda parameter type narrows the surface, so `preflight.loadReservations()` will not compile.
+
+=== 2. Conjunctions
+
+Stages are joined with explicit `then()`. The conjunction is mandatory — its purpose is readability, not data flow.
+
+[source,java]
+----
+.during("preflight", preflight -> ...)
+.then()
+.during("bbox reconciliation", bbox -> ...)
+.then()
+.during("incus provisioning", incus -> ...)
+----
+
+=== 3. Real labels
+
+The string passed to `during(...)` is not decoration. It is used in three places:
+
+* On entry: `→ entering preflight` is logged.
+* On exit: `← leaving preflight` is logged with elapsed time.
+* On failure: the exception is wrapped as `PipelineStageFailure("preflight", cause)` so the topic name appears in stack traces and reaches the failure handler.
+
+Labels are short, lowercase, descriptive of the *domain* not the action. Good: `"bbox reconciliation"`. Bad: `"step 2"`, `"reconcile-bbox-and-update"`.
+
+=== 4. Outcome verbs
+
+The pipeline ends with one terminal verb that turns the chain into a result:
+
+* `.collectOutputs()` — return a result map
+* `.reportTo(logger)` — terminal side-effect
+* `.orFailWith(handler).collectOutputs()` — chain attaches a per-topic failure handler before the outcome
+
+== Type-state ordering
+
+Stage order is enforced by the type system. Each `during(...)` returns a distinct class representing "topic X done", which exposes only `then()`. Each `then()` returns the next-expected `Awaiting…` class, which exposes only the corresponding `during(...)`.
+
+Authors literally cannot:
+
+* skip `.then()`
+* reorder topics
+* call `.collectOutputs()` early
+* forget the failure handler when one is required
+
+The cost is one class per state transition (typically one method each). The benefit is that valid pipelines are the only ones that compile.
+
+== Error semantics
+
+Failures are caught per-topic. A throw inside any `during(...)` lambda is wrapped:
+
+[source,java]
+----
+catch (Throwable cause) {
+  throw new PipelineStageFailure(topicLabel, cause);
+}
+----
+
+`PipelineStageFailure` carries the topic label so logs and handlers receive structured context (`"bbox reconciliation: <message>"`).
+
+The default mode is *fail-fast*: the wrapped exception propagates to the terminal handler, the pipeline aborts, no later stages run. A degraded-continuation mode is intentionally not provided — add it only when a real workflow needs it.
+
+== Authoring a new pipeline
+
+When you find yourself writing a builder with three or more boolean parameters or a sequence of methods that need explanatory comments, consider expressing it as a fluent pipeline:
+
+. Identify the topics. Each topic should map to a real domain in the codebase (a package, a problem area), not an arbitrary chunk of work.
+. Define a topic builder interface for each. List the verbs the topic supports.
+. Build the type-state machine: one `Awaiting<Topic>` class per entry point, one `<Topic>Done` class per transition.
+. Add the terminal verb(s) on the final `*Done` class.
+. Write a sample call site as the first thing — let the call site shape the API.
+
+Exemplar in this codebase: `controlplane.pipeline.BootstrapPipeline` (the outer bootstrap workflow).
+
+== When *not* to use this
+
+A fluent pipeline is overkill for:
+
+* Single-step operations.
+* Workflows with two stages whose order is obvious from data flow alone.
+* Code that needs to vary stage order at runtime (the type-state pattern is rigid by design).
+
+For those, prefer a plain method or a small builder without the topic/conjunction machinery.
+
+== Naming
+
+* **Topic builders**: `<Topic>Stage` (e.g. `PreflightStage`, `BboxStage`).
+* **State classes**: `Awaiting<Topic>`, `<Topic>Done`. Package-private.
+* **Failure type**: one shared `PipelineStageFailure` per pipeline package.
+* **Outer pipeline**: short, domain-named (e.g. `BootstrapPipeline`), not `…ExecutionPipeline` or `…Orchestrator`.
+
+== Cross-references
+
+* `seed-bootstrap/src/main/java/io/nxmatic/rk2lab/controlplane/pipeline/` — implementation home.
+* `controlplane/pipeline/stages/` — topic builder interfaces.
