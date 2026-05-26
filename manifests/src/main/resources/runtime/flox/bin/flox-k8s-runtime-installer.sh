@@ -147,20 +147,9 @@ installer::pod:materialize_assets() {
 			DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
 			daemonless::host_shell:library:install \
 			"${SCRIPT_POLICY_LIB_DIR}/${lib}" \
-			"${SCRIPT_MOUNT_DIR}" \
+			"${policy_shell_root}" \
 			"${lib}" >/dev/null
 	done
-
-	# Hot-reload hook — installed to workspace bin/ so the reconciler sidecar
-	# can invoke it via daemonless::trampoline:exec_on_host.
-	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
-		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
-		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
-		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-		daemonless::host_shell:binary:install \
-		"${SCRIPT_MOUNT_DIR}/bin/flox-nri-plugin-reload.sh" \
-		"${SCRIPT_MOUNT_DIR}" \
-		"flox-nri-plugin-reload.sh" >/dev/null
 
 	# OCI prestart hooks — runc looks them up in /usr/local/sbin on the host
 	# filesystem (bind-mounted at ${HOST_ROOT} inside this pod), not under
@@ -818,10 +807,6 @@ installer::host:run() {
 		echo "containerd configuration unchanged, skipping restart"
 	fi
 
-	: "Write bootstrap completion marker for reconciler"
-	mkdir -p "${FLOX_RUNTIME_ROOT}"
-	touch "${FLOX_RUNTIME_ROOT}/.bootstrap-complete"
-	echo "Bootstrap complete marker written: ${FLOX_RUNTIME_ROOT}/.bootstrap-complete"
 }
 
 installer::mode:validate

@@ -16,18 +16,8 @@ flox_runtime::bootstrap() {
 
 # Reconcile mode: watch dynamic ConfigMap and hot-reload plugin on changes
 flox_runtime::reconcile() {
-	local marker_file="${DAEMONLESS_HOST_SCRIPT_ROOT}/runtime/flox/.bootstrap-complete"
-
 	echo "[flox-runtime] Starting reconcile mode..."
-
-	# Verify bootstrap completed
-	if [[ ! -f "${marker_file}" ]]; then
-		echo "ERROR: Bootstrap incomplete, marker missing: ${marker_file}" >&2
-		echo "       The init container must complete successfully before reconcile can start." >&2
-		exit 1
-	fi
-
-	echo "[flox-runtime] Bootstrap verified, entering watch loop..."
+	echo "[flox-runtime] Init container completed, entering watch loop..."
 
 	# Source daemonless library for asset materialization
 	# shellcheck source=/dev/null
@@ -38,6 +28,6 @@ flox_runtime::reconcile() {
 		"${DYNAMIC_PLUGIN_MOUNT_DIR}" \
 		"nri-plugin.tar.b64" \
 		"nri-plugin.manifest.json" \
-		"${DAEMONLESS_HOST_SCRIPT_ROOT}/runtime/flox" \
+		"${DAEMONLESS_HOST_SCRIPT_ROOT}" \
 		"flox-nri-plugin-reload.sh"
 }
