@@ -694,25 +694,26 @@ containerd::config:flox:update() {
 
 	# Check if config already exists and matches desired state
 	local desired_config
-	desired_config=$(cat <<-'EOF'
-	[plugins."io.containerd.nri.v1.nri"]
-	  disable = false
-	  plugin_config_path = "/etc/nri/conf.d"
-	  plugin_path = "/opt/nri/plugins"
+	desired_config=$(
+		cat <<-'EOF'
+			[plugins."io.containerd.nri.v1.nri"]
+			  disable = false
+			  plugin_config_path = "/etc/nri/conf.d"
+			  plugin_path = "/opt/nri/plugins"
 
-	[plugins."io.containerd.cri.v1.runtime".containerd]
-	  systemd_cgroup = true
-	EOF
+			[plugins."io.containerd.cri.v1.runtime".containerd.runtimes.runc.options]
+			  SystemdCgroup = true
+		EOF
 	)
 
 	if [[ -f "${nri_config}" ]] && [[ "$(cat "${nri_config}")" == "${desired_config}" ]]; then
 		echo "NRI config already present and up to date at ${nri_config}"
-		return 1  # No change needed
+		return 1 # No change needed
 	fi
 
 	echo "Writing NRI config to ${nri_config}"
-	echo "${desired_config}" > "${nri_config}"
-	return 0  # Config changed
+	echo "${desired_config}" >"${nri_config}"
+	return 0 # Config changed
 }
 
 installer::host:run() {
