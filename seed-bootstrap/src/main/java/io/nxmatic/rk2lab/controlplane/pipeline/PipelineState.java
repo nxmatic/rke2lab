@@ -1,6 +1,5 @@
 package io.nxmatic.rk2lab.controlplane.pipeline;
 
-import io.nxmatic.rk2lab.controlplane.SeedLog;
 import io.nxmatic.rk2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.incus.IncusResourceBootstrap;
@@ -34,19 +33,7 @@ final class PipelineState {
   }
 
   <S, R> R runDuring(String topic, S stage, Function<S, S> body) {
-    final long startedAt = System.nanoTime();
-    SeedLog.info("pipeline", "→ entering " + topic);
-    try {
-      body.apply(stage);
-    } catch (Throwable cause) {
-      final PipelineStageFailure failure = new PipelineStageFailure(topic, cause);
-      if (onFailure != null) {
-        onFailure.handle(topic, cause);
-      }
-      throw failure;
-    }
-    final long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
-    SeedLog.info("pipeline", "← leaving " + topic + " (" + elapsedMs + "ms)");
+    TopicRunner.runDuring("pipeline", topic, stage, body, onFailure);
     @SuppressWarnings("unchecked")
     final R cast = (R) this;
     return cast;

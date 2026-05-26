@@ -24,6 +24,8 @@ import com.pulumi.resources.Resource;
 import io.nxmatic.rk2lab.controlplane.SeedLog;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig.WorktreeHost;
 import io.nxmatic.rk2lab.controlplane.incus.image.PulumiIncusImageProvider;
+import io.nxmatic.rk2lab.controlplane.pipeline.OnFailure;
+import io.nxmatic.rk2lab.controlplane.pipeline.TopicRunner;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeResult;
@@ -156,37 +158,6 @@ public final class IncusResourceBootstrap {
         .toResult();
   }
 
-  @FunctionalInterface
-  private interface PhaseFailure {
-    void handle(String topic, Throwable cause);
-  }
-
-  private static final class ApplyTopicFailure extends RuntimeException {
-    ApplyTopicFailure(String topic, Throwable cause) {
-      super(topic + ": " + cause.getMessage(), cause);
-    }
-  }
-
-  private static final class PhaseRunner {
-    private static <S, R> R runDuring(
-        String topic, S stage, java.util.function.Function<S, S> body, PhaseFailure onFailure) {
-      final long startedAt = System.nanoTime();
-      SeedLog.info("incus", "→ entering " + topic);
-      try {
-        body.apply(stage);
-      } catch (Throwable cause) {
-        if (onFailure != null) {
-          onFailure.handle(topic, cause);
-        }
-        throw new ApplyTopicFailure(topic, cause);
-      }
-      SeedLog.info("incus", "← leaving " + topic + " (" + elapsedSince(startedAt) + ")");
-      @SuppressWarnings("unchecked")
-      final R cast = (R) stage;
-      return cast;
-    }
-  }
-
   /** Topic stages — each holds a reference to the shared ApplyPipeline state. */
   private static final class PathStage {
     private final ApplyPipeline pipeline;
@@ -249,7 +220,7 @@ public final class IncusResourceBootstrap {
     }
 
     PathDone during(String topic, java.util.function.Function<PathStage, PathStage> body) {
-      PhaseRunner.runDuring(topic, new PathStage(pipeline), body, null);
+      TopicRunner.runDuring("incus", topic, new PathStage(pipeline), body, null);
       return new PathDone(pipeline);
     }
   }
@@ -274,7 +245,7 @@ public final class IncusResourceBootstrap {
     }
 
     HostDone during(String topic, java.util.function.Function<HostStage, HostStage> body) {
-      PhaseRunner.runDuring(topic, new HostStage(pipeline), body, null);
+      TopicRunner.runDuring("incus", topic, new HostStage(pipeline), body, null);
       return new HostDone(pipeline);
     }
   }
@@ -300,7 +271,7 @@ public final class IncusResourceBootstrap {
 
     ProviderDone during(
         String topic, java.util.function.Function<ProviderStage, ProviderStage> body) {
-      PhaseRunner.runDuring(topic, new ProviderStage(pipeline), body, null);
+      TopicRunner.runDuring("incus", topic, new ProviderStage(pipeline), body, null);
       return new ProviderDone(pipeline);
     }
   }
@@ -326,7 +297,7 @@ public final class IncusResourceBootstrap {
 
     InstanceDone during(
         String topic, java.util.function.Function<InstanceStage, InstanceStage> body) {
-      PhaseRunner.runDuring(topic, new InstanceStage(pipeline), body, null);
+      TopicRunner.runDuring("incus", topic, new InstanceStage(pipeline), body, null);
       return new InstanceDone(pipeline);
     }
   }
@@ -338,7 +309,7 @@ public final class IncusResourceBootstrap {
       this.pipeline = pipeline;
     }
 
-    ApplyTerminal orFailWith(PhaseFailure handler) {
+    ApplyTerminal orFailWith(OnFailure handler) {
       return new ApplyTerminal(pipeline, handler);
     }
 
@@ -350,9 +321,10 @@ public final class IncusResourceBootstrap {
   private static final class ApplyTerminal {
     private final ApplyPipeline pipeline;
 
-    ApplyTerminal(ApplyPipeline pipeline, PhaseFailure handler) {
+    ApplyTerminal(ApplyPipeline pipeline, OnFailure handler) {
       this.pipeline = pipeline;
-      // handler used during preceding during(...) calls; retained for symmetry with the grammar
+      // handler retained for symmetry with the grammar; latent: not yet wired through preceding
+      // during(...) calls. Same shape as the outer pipelines.
     }
 
     BootstrapResult toResult() {
