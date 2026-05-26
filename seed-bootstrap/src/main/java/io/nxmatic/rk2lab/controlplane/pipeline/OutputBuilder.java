@@ -31,11 +31,46 @@ public final class OutputBuilder {
     outputs.put("seedNodeId", bootstrapResult.seedNodeId());
     outputs.put("seedInstanceUrn", bootstrapResult.instanceUrn());
     outputs.put("seedProviderUrn", bootstrapResult.providerUrn());
-    outputs.put("seedProvisioningSliceChecksums", bootstrapResult.provisioningSliceChecksums());
-    outputs.put("seedImageBuildChecksum", bootstrapResult.imageBuildChecksum());
     outputs.put("seedImageFingerprint", bootstrapResult.imageFingerprint());
     outputs.put("seedInstanceStatus", bootstrapResult.instanceStatus());
-    outputs.put("hostSourceDirRelative", bootstrapResult.hostSourceDirRelative());
+
+    // Deployment metadata
+    outputs.put(
+        "seedDeploymentMetadata",
+        Map.of(
+            "git",
+            Map.of(
+                "branch", bootstrapResult.deployment().git().branch(),
+                "commitSha", bootstrapResult.deployment().git().commitSha()),
+            "timestamp",
+            bootstrapResult.deployment().timestamp().toString()));
+
+    // Provisioning metadata
+    outputs.put(
+        "seedProvisioningMetadata",
+        Map.of(
+            "slices",
+            bootstrapResult.provisioning().slices().checksums(),
+            "paths",
+            Map.of(
+                "hostSourceDirRelative",
+                bootstrapResult.provisioning().paths().hostSourceDirRelative())));
+
+    // Build metadata
+    outputs.put(
+        "seedBuildMetadata",
+        Map.of(
+            "image",
+            Map.of("checksum", bootstrapResult.build().image().checksum()),
+            "manifests",
+            bootstrapResult.build().manifests().summary()));
+
+    // Runtime metadata
+    outputs.put(
+        "seedRuntimeMetadata",
+        Map.of(
+            "environment", bootstrapResult.runtime().environment().summary(),
+            "systemd", bootstrapResult.runtime().systemd().summary()));
 
     // Configuration
     outputs.put("incusProject", config.incusProject());
@@ -57,7 +92,6 @@ public final class OutputBuilder {
     // Summaries
     outputs.put("bboxReservationsSummary", bboxResult.summaryMap());
     outputs.put("registrySummary", resourceResult.registrySummary());
-    outputs.put("systemdProvisioningSummary", bootstrapResult.systemdProvisioningSummary());
     outputs.put("systemdAdapterLaunchSummary", systemdAdapterLaunchSummary);
     outputs.put("systemdRuntimeStatusSummary", resourceResult.systemdRuntimeStatusSummary());
     outputs.put("seedImageBuildSummary", resourceResult.imageBuildSummary());

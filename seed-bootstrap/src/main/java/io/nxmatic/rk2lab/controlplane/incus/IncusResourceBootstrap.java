@@ -338,15 +338,13 @@ public final class IncusResourceBootstrap {
 
     private Output<String> ensuredImageFingerprint;
 
-    private Map<String, String> provisioningSliceChecksums;
+    private DeploymentMetadata deploymentMetadata;
 
-    private String imageBuildChecksum;
+    private ProvisioningMetadata provisioningMetadata;
 
-    private Map<String, Object> layerEnvRegistrySummary;
+    private BuildMetadata buildMetadata;
 
-    private Map<String, Object> systemdProvisioningSummary;
-
-    private Map<String, Object> manifestSynthSummary;
+    private RuntimeMetadata runtimeMetadata;
 
     private Instance instance;
 
@@ -367,7 +365,7 @@ public final class IncusResourceBootstrap {
       classpathAssetMaterializer.materializeHostSystemdAssets(
           localPaths.manifestsRoot().resolve("host"));
       LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
-      this.manifestSynthSummary =
+      final Map<String, Object> manifestSynthSummary =
           synthesizeAndExplodeManifests(localPaths.manifestsRoot(), policy, layerContext);
 
       // Initialize slice registry for components to declare their hot-reloadable slices
@@ -375,18 +373,37 @@ public final class IncusResourceBootstrap {
       materializeFloxRuntimeInstallerAssets(localPaths.daemonsetRoot(), sliceRegistry);
 
       final List<String> hostMountNotes = hostMountSourceVerifier.ensureSources(localPaths);
-      this.systemdProvisioningSummary =
+      final Map<String, Object> systemdProvisioningSummary =
           SystemdProvisioningInventory.summarize(localPaths, hostMountNotes);
       clearStaleBootstrapKubeconfig();
-      this.layerEnvRegistrySummary =
+      final Map<String, Object> layerEnvRegistrySummary =
           runtimeEnvControlplaneOverlayWriter.write(
               localPaths.runtimeEnvConfigRoot(), layerContext, policy);
       nodeConfigRegenerator.regenerateCloudConfigDir(
           localPaths.runtimeCloudConfigRoot(), localPaths.cloudSeedRoot());
-      this.provisioningSliceChecksums =
+      final Map<String, String> provisioningSliceChecksums =
           ProvisioningResourceInventory.sliceChecksums(localPaths, sliceRegistry);
+      final String hostSourceDirRelative =
+          relativizeAgainstWorktree(localPaths.worktreeRoot(), localPaths.assetsRoot());
+
+      // Build structured metadata
+      this.deploymentMetadata = DeploymentMetadata.capture();
+      this.provisioningMetadata =
+          new ProvisioningMetadata(
+              ProvisioningMetadata.Slices.of(provisioningSliceChecksums),
+              new ProvisioningMetadata.Paths(hostSourceDirRelative));
+      this.buildMetadata =
+          new BuildMetadata(
+              null, // image checksum set later in ensureProviderResources
+              BuildMetadata.Manifests.of(manifestSynthSummary));
+      this.runtimeMetadata =
+          new RuntimeMetadata(
+              RuntimeMetadata.Environment.of(layerEnvRegistrySummary),
+              RuntimeMetadata.Systemd.of(systemdProvisioningSummary));
+
       ensureLaunchSecretsToken(localPaths.secretsFile());
-      logInfo("provisioningSliceChecksums=" + provisioningSliceChecksums);
+      logInfo("deployment=" + deploymentMetadata);
+      logInfo("provisioning.slices=" + provisioningMetadata.slices());
       return this;
     }
 
@@ -619,7 +636,10 @@ public final class IncusResourceBootstrap {
       this.ensuredImageFingerprint =
           imageProvider.ensureSeedImageFingerprint(
               providerContext.invokeOptions(), providerContext.provider(), ensuredProject);
-      this.imageBuildChecksum = imageProvider.buildChecksum();
+      // Update buildMetadata with image checksum now that image is built
+      this.buildMetadata =
+          new BuildMetadata(
+              new BuildMetadata.Image(imageProvider.buildChecksum()), buildMetadata.manifests());
       return this;
     }
 
@@ -640,11 +660,17 @@ public final class IncusResourceBootstrap {
       // Store per-slice checksums as user.rke2lab.provisioning.slice.<sliceName>
       // Changes to core slice → full renewal via replaceOnChanges
       // Changes to other slices → hot-reload reconciliation (future)
-      for (Map.Entry<String, String> entry : provisioningSliceChecksums.entrySet()) {
+      for (Map.Entry<String, String> entry : provisioningMetadata.slices().checksums().entrySet()) {
         instanceConfig.put("user.rke2lab.provisioning.slice." + entry.getKey(), entry.getValue());
       }
 
-      instanceConfig.put("user.rke2lab.imageBuildChecksum", imageBuildChecksum);
+      // Deployment metadata for provenance tracking
+      instanceConfig.put("user.rke2lab.git.branch", deploymentMetadata.git().branch());
+      instanceConfig.put("user.rke2lab.git.commitSha", deploymentMetadata.git().commitSha());
+      instanceConfig.put(
+          "user.rke2lab.deploymentTimestamp", deploymentMetadata.timestamp().toString());
+
+      instanceConfig.put("user.rke2lab.imageBuildChecksum", buildMetadata.image().checksum());
 
       this.instance =
           new Instance(
@@ -672,20 +698,16 @@ public final class IncusResourceBootstrap {
     }
 
     private BootstrapResult toResult() {
-      final String hostSourceDirRelative =
-          relativizeAgainstWorktree(localPaths.worktreeRoot(), localPaths.assetsRoot());
       return new BootstrapResult(
           "incus://" + config.incusProject() + "/" + config.nodeName(),
           ensuredImageFingerprint,
           instance.status(),
           instance.urn(),
           providerContext.provider().urn(),
-          provisioningSliceChecksums,
-          imageBuildChecksum,
-          hostSourceDirRelative,
-          layerEnvRegistrySummary,
-          systemdProvisioningSummary,
-          manifestSynthSummary,
+          deploymentMetadata,
+          provisioningMetadata,
+          buildMetadata,
+          runtimeMetadata,
           instance);
     }
 
@@ -2804,11 +2826,9 @@ public final class IncusResourceBootstrap {
       Object instanceStatus,
       Object instanceUrn,
       Object providerUrn,
-      Map<String, String> provisioningSliceChecksums,
-      String imageBuildChecksum,
-      String hostSourceDirRelative,
-      Map<String, Object> layerEnvRegistrySummary,
-      Map<String, Object> systemdProvisioningSummary,
-      Map<String, Object> manifestSynthSummary,
+      DeploymentMetadata deployment,
+      ProvisioningMetadata provisioning,
+      BuildMetadata build,
+      RuntimeMetadata runtime,
       Resource readinessDependency) {}
 }
