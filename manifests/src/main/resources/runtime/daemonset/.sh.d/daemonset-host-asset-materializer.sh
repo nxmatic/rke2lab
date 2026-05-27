@@ -2,35 +2,35 @@
 
 # shellcheck shell=bash
 
-# Canonical daemonless host-binary installation pattern:
+# Canonical daemonset host-binary installation pattern:
 # 1. Install the real executable asset under the daemonset-owned host asset root.
 # 2. Expose the host-executable entrypoint under <asset-root>/bin.
-# 3. Let daemonless::trampoline:exec_on_host resolve commands from that bin directory.
+# 3. Let daemonset::trampoline:exec_on_host resolve commands from that bin directory.
 #
-# Installers should prefer daemonless::host_binary:install for host-reexec-capable entrypoints,
+# Installers should prefer daemonset::host_binary:install for host-reexec-capable entrypoints,
 # and use raw install(1) only for non-entrypoint assets such as config, policy, or data files.
 
-daemonless::host_binary:bin:dir() {
+daemonset::host_binary:bin:dir() {
 	local binary_root="${1:?binary root required}"
 	printf '%s/bin\n' "${binary_root%/}"
 }
 
-daemonless::host_binary:bin:ensure() {
+daemonset::host_binary:bin:ensure() {
 	local binary_root="${1:?binary root required}"
 	local bin_dir
 
-	bin_dir="$(daemonless::host_binary:bin:dir "${binary_root}")"
+	bin_dir="$(daemonset::host_binary:bin:dir "${binary_root}")"
 	mkdir -p "${bin_dir}"
 	printf '%s\n' "${bin_dir}"
 }
 
-daemonless::host_binary:entrypoint:install() {
+daemonset::host_binary:entrypoint:install() {
 	local binary_root="${1:?binary root required}"
 	local command_name="${2:?command name required}"
 	local target_relative_path="${3:?target relative path required}"
 	local bin_dir entrypoint_path
 
-	bin_dir="$(daemonless::host_binary:bin:ensure "${binary_root}")" || return 1
+	bin_dir="$(daemonset::host_binary:bin:ensure "${binary_root}")" || return 1
 	entrypoint_path="${bin_dir%/}/${command_name}"
 
 	cat >"${entrypoint_path}" <<EOF
@@ -46,7 +46,7 @@ EOF
 	printf '%s\n' "${entrypoint_path}"
 }
 
-daemonless::host_binary:install() {
+daemonset::host_binary:install() {
 	local source_path="${1:?source path required}"
 	local binary_root="${2:?binary root required}"
 	local command_name="${3:?command name required}"
@@ -61,11 +61,11 @@ daemonless::host_binary:install() {
 
 	target_path="${binary_root%/}/${target_relative_path}"
 	install -D -m "${install_mode}" "${source_path}" "${target_path}"
-	daemonless::host_binary:entrypoint:install "${binary_root}" "${command_name}" "${target_relative_path}" >/dev/null
+	daemonset::host_binary:entrypoint:install "${binary_root}" "${command_name}" "${target_relative_path}" >/dev/null
 	printf '%s\n' "${target_path}"
 }
 
-daemonless::host_asset:materialize_encoded_tar() {
+daemonset::host_asset:materialize_encoded_tar() {
 	local archive_b64_path="$1"
 	local manifest_path="$2"
 	local output_root="$3"

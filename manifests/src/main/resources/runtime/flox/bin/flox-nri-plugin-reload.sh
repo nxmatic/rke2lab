@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Flox NRI plugin hot-reload hook
 #
-# Invoked by daemonless::host_asset:watch_and_reconcile after the dynamic NRI plugin
+# Invoked by daemonset::host_asset:watch_and_reconcile after the dynamic NRI plugin
 # archive has been materialized onto the host. This script runs in host namespace.
 #
 # Responsibilities:
@@ -13,10 +13,10 @@ set -euo pipefail
 # 4. Containerd's NRI client automatically reconnects to the restarted plugin
 #
 # Canonical environment:
-# - DAEMONLESS_HOST_SCRIPT_ROOT=/srv/host/k8s-daemonset.d/runtime/flox
-# - FLOX_RUNTIME_ROOT (falls back to DAEMONLESS_HOST_SCRIPT_ROOT)
+# - DAEMONSET_HOST_SCRIPT_ROOT=/srv/host/k8s-daemonset.d/runtime/flox
+# - FLOX_RUNTIME_ROOT (falls back to DAEMONSET_HOST_SCRIPT_ROOT)
 
-FLOX_RUNTIME_ROOT="${FLOX_RUNTIME_ROOT:-${DAEMONLESS_HOST_SCRIPT_ROOT}}"
+FLOX_RUNTIME_ROOT="${FLOX_RUNTIME_ROOT:-${DAEMONSET_HOST_SCRIPT_ROOT}}"
 FLOX_NRI_PLUGIN_DYN_DIR="${FLOX_RUNTIME_ROOT}/nri-plugin.dyn"
 FLOX_NRI_PLUGIN_BINARY="${FLOX_NRI_PLUGIN_DYN_DIR}/bin/flox-nri-plugin"
 

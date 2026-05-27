@@ -92,27 +92,27 @@ public final class RuntimeDaemonsetScriptPolicyAssets {
       addScriptAsset(
           asset ->
               asset
-                  .configMapKey("daemonless-host-asset-materializer.sh")
-                  .classpathResource(RESOURCE_ROOT + "/daemonless-host-asset-materializer.sh")
-                  .relativePath(".sh.d/daemonless-host-asset-materializer.sh"));
+                  .configMapKey("daemonset-host-asset-materializer.sh")
+                  .classpathResource(RESOURCE_ROOT + "/daemonset-host-asset-materializer.sh")
+                  .relativePath(".sh.d/daemonset-host-asset-materializer.sh"));
       addScriptAsset(
           asset ->
               asset
-                  .configMapKey("daemonless-host-shell-policy.sh")
-                  .classpathResource(RESOURCE_ROOT + "/daemonless-host-shell-policy.sh")
-                  .relativePath(".sh.d/daemonless-host-shell-policy.sh"));
+                  .configMapKey("daemonset-host-shell-policy.sh")
+                  .classpathResource(RESOURCE_ROOT + "/daemonset-host-shell-policy.sh")
+                  .relativePath(".sh.d/daemonset-host-shell-policy.sh"));
       addScriptAsset(
           asset ->
               asset
-                  .configMapKey("daemonless-trampoline.sh")
-                  .classpathResource(RESOURCE_ROOT + "/daemonless-trampoline.sh")
-                  .relativePath(".sh.d/daemonless-trampoline.sh"));
+                  .configMapKey("daemonset-trampoline.sh")
+                  .classpathResource(RESOURCE_ROOT + "/daemonset-trampoline.sh")
+                  .relativePath(".sh.d/daemonset-trampoline.sh"));
       addScriptAsset(
           asset ->
               asset
-                  .configMapKey("daemonless-host-asset-reconciler.sh")
-                  .classpathResource(RESOURCE_ROOT + "/daemonless-host-asset-reconciler.sh")
-                  .relativePath(".sh.d/daemonless-host-asset-reconciler.sh"));
+                  .configMapKey("daemonset-host-asset-reconciler.sh")
+                  .classpathResource(RESOURCE_ROOT + "/daemonset-host-asset-reconciler.sh")
+                  .relativePath(".sh.d/daemonset-host-asset-reconciler.sh"));
       return this;
     }
 

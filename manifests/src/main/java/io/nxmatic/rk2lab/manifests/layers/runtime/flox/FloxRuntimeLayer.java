@@ -307,16 +307,16 @@ public final class FloxRuntimeLayer extends Construct {
                                     // bootstrap-complete verification and the watch loop.
                                     "apk add --no-cache bash inotify-tools"
                                         + " && export SCRIPT_MOUNT_DIR=/var/run/k8s-daemonset.d/runtime/flox"
-                                        + " && export DAEMONLESS_POLICY_SCRIPT_MOUNT_DIR=/.sh-daemonset"
+                                        + " && export DAEMONSET_POLICY_SCRIPT_MOUNT_DIR=/.sh-daemonset"
                                         + " && export DYNAMIC_PLUGIN_MOUNT_DIR=/dynamic-plugin"
                                         + " && bash -c '. ${SCRIPT_MOUNT_DIR}/bin/flox-runtime-lib.sh && flox_runtime::reconcile'"
                                   },
                                   "env",
                                   new Object[] {
-                                    Map.of("name", "DAEMONLESS_EXEC_MODE", "value", "pod"),
+                                    Map.of("name", "DAEMONSET_EXEC_MODE", "value", "pod"),
                                     Map.of(
                                         "name",
-                                        "DAEMONLESS_HOST_SCRIPT_ROOT",
+                                        "DAEMONSET_HOST_SCRIPT_ROOT",
                                         "value",
                                         "/var/run/k8s-daemonset.d/runtime/flox")
                                   },
@@ -385,7 +385,7 @@ public final class FloxRuntimeLayer extends Construct {
                                     "-ec",
                                     // Overwrite the workspace's build-derived
                                     // inputs from /.sh/ each pod start so a
-                                    // newly-deployed flox-k8s-runtime-installer.sh
+                                    // newly-deployed flox-nri-plugin-installer.sh
                                     // (or any other build asset) actually replaces
                                     // a stale copy from a prior run.
                                     //
@@ -420,7 +420,7 @@ public final class FloxRuntimeLayer extends Construct {
                                         + " && git config user.name rke2lab-installer"
                                         + " && git add -A"
                                         + " && git commit -q -m 'flox-runtime baseline' --allow-empty"
-                                        + " && /var/run/k8s-daemonset.d/runtime/flox/bin/flox-k8s-runtime-installer.sh"
+                                        + " && /var/run/k8s-daemonset.d/runtime/flox/bin/flox-nri-plugin-installer.sh"
                                   },
                                   "env",
                                   new Object[] {
@@ -429,10 +429,10 @@ public final class FloxRuntimeLayer extends Construct {
                                         "CONTAINERD_CONFIG_FILE",
                                         "value",
                                         "/var/lib/rancher/rke2/agent/etc/containerd/config.toml"),
-                                    Map.of("name", "DAEMONLESS_EXEC_MODE", "value", "pod"),
+                                    Map.of("name", "DAEMONSET_EXEC_MODE", "value", "pod"),
                                     Map.of(
                                         "name",
-                                        "DAEMONLESS_HOST_SCRIPT_ROOT",
+                                        "DAEMONSET_HOST_SCRIPT_ROOT",
                                         "value",
                                         "/var/run/k8s-daemonset.d/runtime/flox"),
                                     Map.of(
@@ -533,7 +533,7 @@ public final class FloxRuntimeLayer extends Construct {
                               // volumeMount pick the runtime/flox/ subPath
                               // — that keeps the in-pod path identical to the host
                               // path while ensuring this pod can't see sibling
-                              // daemonless workspaces under the parent.
+                              // daemonset workspaces under the parent.
                               // The init container copies the build-derived inputs
                               // here, then `nix build` and `flox activate` write
                               // flake.lock and per-env manifest.lock here. Survives

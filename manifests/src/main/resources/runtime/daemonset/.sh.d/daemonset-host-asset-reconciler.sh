@@ -2,17 +2,17 @@
 
 # shellcheck shell=bash
 
-# Generic daemonless reconcile policy: watch a ConfigMap for changes, materialize
+# Generic daemonset reconcile policy: watch a ConfigMap for changes, materialize
 # verified assets onto the host, then invoke a workflow-specific hook.
 #
 # Canonical contract:
 # - Watches <source_dir> for ConfigMap atomic-swap events (inotifywait -e moved_to)
 # - On change, materializes encoded tar archive from <source_dir>/<archive_key>
-# - Validates against <source_dir>/<manifest_key> via daemonless::host_asset:materialize_encoded_tar
-# - If checksums differ, trampolines <on_change_hook> to host via daemonless::trampoline:exec_on_host
-# - Hook receives no arguments; reads DAEMONLESS_HOST_SCRIPT_ROOT from environment
+# - Validates against <source_dir>/<manifest_key> via daemonset::host_asset:materialize_encoded_tar
+# - If checksums differ, trampolines <on_change_hook> to host via daemonset::trampoline:exec_on_host
+# - Hook receives no arguments; reads DAEMONSET_HOST_SCRIPT_ROOT from environment
 
-daemonless::host_asset:watch_and_reconcile() {
+daemonset::host_asset:watch_and_reconcile() {
 	local source_dir="${1:?source_dir required}"
 	local archive_key="${2:?archive_key required}"
 	local manifest_key="${3:?manifest_key required}"
@@ -22,20 +22,20 @@ daemonless::host_asset:watch_and_reconcile() {
 
 	archive_path="${source_dir%/}/${archive_key}"
 	manifest_path="${source_dir%/}/${manifest_key}"
-	checksum_file="/tmp/daemonless-reconciler-${archive_key}.sha256"
+	checksum_file="/tmp/daemonset-reconciler-${archive_key}.sha256"
 
 	[[ -d "${source_dir}" ]] || {
-		echo "daemonless reconciler: source_dir does not exist: ${source_dir}" >&2
+		echo "daemonset reconciler: source_dir does not exist: ${source_dir}" >&2
 		return 1
 	}
 
 	# Compute initial checksum if archive already exists
 	if [[ -r "${archive_path}" ]]; then
 		sha256sum "${archive_path}" | awk '{print $1}' >"${checksum_file}"
-		echo "daemonless reconciler: initial checksum recorded for ${archive_key}"
+		echo "daemonset reconciler: initial checksum recorded for ${archive_key}"
 	fi
 
-	echo "daemonless reconciler: watching ${source_dir} for ConfigMap updates..."
+	echo "daemonset reconciler: watching ${source_dir} for ConfigMap updates..."
 	echo "  archive_key: ${archive_key}"
 	echo "  manifest_key: ${manifest_key}"
 	echo "  target_root: ${target_root}"
@@ -44,14 +44,14 @@ daemonless::host_asset:watch_and_reconcile() {
 	# ConfigMap volume mounts in Kubernetes use atomic symlink swap: a ..data -> ..data_tmp
 	# rename. Watch for moved_to events on the parent directory.
 	while inotifywait -q -e moved_to "${source_dir}"; do
-		echo "daemonless reconciler: change detected in ${source_dir}"
+		echo "daemonset reconciler: change detected in ${source_dir}"
 
 		[[ -r "${archive_path}" ]] || {
-			echo "daemonless reconciler: archive missing after change event: ${archive_path}" >&2
+			echo "daemonset reconciler: archive missing after change event: ${archive_path}" >&2
 			continue
 		}
 		[[ -r "${manifest_path}" ]] || {
-			echo "daemonless reconciler: manifest missing after change event: ${manifest_path}" >&2
+			echo "daemonset reconciler: manifest missing after change event: ${manifest_path}" >&2
 			continue
 		}
 
@@ -59,29 +59,29 @@ daemonless::host_asset:watch_and_reconcile() {
 		prior_checksum="$(cat "${checksum_file}" 2>/dev/null || echo "")"
 
 		if [[ -n "${prior_checksum}" && "${current_checksum}" == "${prior_checksum}" ]]; then
-			echo "daemonless reconciler: checksum unchanged (${current_checksum}); skipping reconcile"
+			echo "daemonset reconciler: checksum unchanged (${current_checksum}); skipping reconcile"
 			continue
 		fi
 
-		echo "daemonless reconciler: checksum changed (${prior_checksum:-none} -> ${current_checksum})"
-		echo "daemonless reconciler: materializing ${archive_key} to ${target_root}..."
+		echo "daemonset reconciler: checksum changed (${prior_checksum:-none} -> ${current_checksum})"
+		echo "daemonset reconciler: materializing ${archive_key} to ${target_root}..."
 
-		if daemonless::host_asset:materialize_encoded_tar \
+		if daemonset::host_asset:materialize_encoded_tar \
 			"${archive_path}" \
 			"${manifest_path}" \
 			"${target_root}" \
 			""; then
-			echo "daemonless reconciler: materialization succeeded; recording new checksum"
+			echo "daemonset reconciler: materialization succeeded; recording new checksum"
 			echo "${current_checksum}" >"${checksum_file}"
 
-			echo "daemonless reconciler: invoking hook ${on_change_hook} on host..."
-			if daemonless::trampoline:exec_on_host "${on_change_hook}"; then
-				echo "daemonless reconciler: hook ${on_change_hook} completed successfully"
+			echo "daemonset reconciler: invoking hook ${on_change_hook} on host..."
+			if daemonset::trampoline:exec_on_host "${on_change_hook}"; then
+				echo "daemonset reconciler: hook ${on_change_hook} completed successfully"
 			else
-				echo "daemonless reconciler: hook ${on_change_hook} failed (exit $?)" >&2
+				echo "daemonset reconciler: hook ${on_change_hook} failed (exit $?)" >&2
 			fi
 		else
-			echo "daemonless reconciler: materialization failed; keeping prior checksum" >&2
+			echo "daemonset reconciler: materialization failed; keeping prior checksum" >&2
 		fi
 	done
 }

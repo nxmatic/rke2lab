@@ -63,7 +63,7 @@ public final class FloxRuntimeAssets {
    * <p>Layout produced (rooted at {@code targetDir}):
    *
    * <ul>
-   *   <li>{@code bin/flox-k8s-runtime-installer.sh}, {@code bin/flox-nri-plugin-run.sh}
+   *   <li>{@code bin/flox-nri-plugin-installer.sh}, {@code bin/flox-nri-plugin-run.sh}
    *   <li>{@code bin/flox-nri-overlay-hook.sh}, {@code bin/flox-nri-chown-hook.sh}
    *   <li>{@code build-assets/flake.nix}
    *   <li>{@code
@@ -99,9 +99,9 @@ public final class FloxRuntimeAssets {
 
   /**
    * Mark shell scripts executable. The host-mode trampoline exec's {@code
-   * bin/flox-k8s-runtime-installer.sh} directly (no chmod step in between), so files we drop to
-   * disk need their exec bit set at write time. We treat any {@code .sh} extension and any file
-   * under a {@code bin/} directory as executable — matches the layout the legacy installer assumed.
+   * bin/flox-nri-plugin-installer.sh} directly (no chmod step in between), so files we drop to disk
+   * need their exec bit set at write time. We treat any {@code .sh} extension and any file under a
+   * {@code bin/} directory as executable — matches the layout the legacy installer assumed.
    */
   private static void applyExecutableBitIfNeeded(Path target) throws IOException {
     final String name = target.getFileName().toString();
@@ -408,9 +408,9 @@ public final class FloxRuntimeAssets {
           FLOX_RESOURCE_ROOT + "/bin/flox-runtime-lib.sh",
           "bin/flox-runtime-lib.sh");
       addInstallerAsset(
-          "flox-k8s-runtime-installer.sh",
-          FLOX_RESOURCE_ROOT + "/bin/flox-k8s-runtime-installer.sh",
-          "bin/flox-k8s-runtime-installer.sh");
+          "flox-nri-plugin-installer.sh",
+          FLOX_RESOURCE_ROOT + "/bin/flox-nri-plugin-installer.sh",
+          "bin/flox-nri-plugin-installer.sh");
       addInstallerAsset(
           "flox-nri-plugin-run.sh",
           FLOX_RESOURCE_ROOT + "/bin/flox-nri-plugin-run.sh",

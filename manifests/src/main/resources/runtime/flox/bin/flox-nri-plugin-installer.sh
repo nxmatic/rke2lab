@@ -57,19 +57,19 @@ installer::policy:source() {
 	# shellcheck disable=SC1091
 	source "${policy_lib_dir}/daemonset-logging.sh"
 	# shellcheck disable=SC1091
-	source "${policy_lib_dir}/daemonless-host-shell-policy.sh"
+	source "${policy_lib_dir}/daemonset-host-shell-policy.sh"
 	installer::logging:setup
 	# shellcheck disable=SC1091
-	source "${policy_lib_dir}/daemonless-trampoline.sh"
+	source "${policy_lib_dir}/daemonset-trampoline.sh"
 	# shellcheck disable=SC1091
-	source "${policy_lib_dir}/daemonless-host-asset-materializer.sh"
+	source "${policy_lib_dir}/daemonset-host-asset-materializer.sh"
 }
 
 installer::logging:setup() {
 	local script_path script_log_dir
 
-	script_path="${DAEMONSET_HOST_SCRIPT_ROOT}/bin/flox-k8s-runtime-installer.sh"
-	script_log_dir="$(daemonless::host_shell:log:resolve)"
+	script_path="${DAEMONSET_HOST_SCRIPT_ROOT}/bin/flox-nri-plugin-installer.sh"
+	script_log_dir="$(daemonset::host_shell:log:resolve)"
 
 	DAEMONSET_SCRIPT_LOG_DIR="${script_log_dir}" \
 		daemonset::logging:stderr:setup "${script_path}"
@@ -115,7 +115,7 @@ installer::pod:materialize_assets() {
 	# ${SCRIPT_MOUNT_DIR} (the init container `cp -an`'d /.sh/. there before
 	# running this script). We only materialize the things that genuinely
 	# live elsewhere:
-	#   1. Script-policy library (daemonset-logging.sh, daemonless-*.sh) —
+	#   1. Script-policy library (daemonset-logging.sh, daemonset-*.sh) —
 	#      these ride a separate ConfigMap mounted at /.sh-daemonset, so
 	#      they need to be copied into ${SCRIPT_MOUNT_DIR}/.sh.d/.
 	#   2. OCI prestart hooks — runc looks them up in /usr/local/sbin on the
@@ -140,17 +140,17 @@ installer::pod:materialize_assets() {
 		DAEMONSET_HOST_SCRIPT_BIN="${policy_shell_bin}" \
 		DAEMONSET_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
 		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-		daemonless::host_shell:layout:ensure "${SCRIPT_MOUNT_DIR}"
+		daemonset::host_shell:layout:ensure "${SCRIPT_MOUNT_DIR}"
 
 	# Script-policy library — separate ConfigMap mount, real cross-volume copy.
-	for lib in daemonset-logging.sh daemonless-host-asset-materializer.sh \
-		daemonless-trampoline.sh daemonless-host-shell-policy.sh \
-		daemonless-host-asset-reconciler.sh; do
+	for lib in daemonset-logging.sh daemonset-host-asset-materializer.sh \
+		daemonset-trampoline.sh daemonset-host-shell-policy.sh \
+		daemonset-host-asset-reconciler.sh; do
 		DAEMONSET_HOST_SCRIPT_ROOT="${policy_shell_root}" \
 			DAEMONSET_HOST_SCRIPT_BIN="${policy_shell_bin}" \
 			DAEMONSET_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
 			DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-			daemonless::host_shell:library:install \
+			daemonset::host_shell:library:install \
 			"${SCRIPT_POLICY_LIB_DIR}/${lib}" \
 			"${policy_shell_root}" \
 			"${lib}" >/dev/null
@@ -285,8 +285,8 @@ installer::pod:run() {
 	DAEMONSET_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT}" \
 		DAEMONSET_HOST_SCRIPT_BIN="${DAEMONSET_SCRIPT_ROOT%/}/bin" \
 		DAEMONSET_HOST_SCRIPT_LIB_DIR="${DAEMONSET_SCRIPT_ROOT%/}/.sh.d" \
-		daemonless::trampoline:exec_on_host \
-		"flox-k8s-runtime-installer.sh" \
+		daemonset::trampoline:exec_on_host \
+		"flox-nri-plugin-installer.sh" \
 		"DAEMONSET_SCRIPT_ROOT=${DAEMONSET_SCRIPT_ROOT}"
 }
 
