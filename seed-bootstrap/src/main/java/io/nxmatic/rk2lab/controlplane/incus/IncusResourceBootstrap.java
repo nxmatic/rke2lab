@@ -1881,6 +1881,7 @@ public final class IncusResourceBootstrap {
   private static final class HostAssetRootLifecycle {
 
     private final int retentionCount;
+    private int slotSeq = -1;
 
     private HostAssetRootLifecycle(int retentionCount) {
       this.retentionCount = retentionCount;
@@ -1896,15 +1897,14 @@ public final class IncusResourceBootstrap {
 
         Files.createDirectories(parent);
 
-        final long pid = ProcessHandle.current().pid();
-        final long epochMillis = System.currentTimeMillis();
-        final String stagingName =
-            hostAssetRoot.getFileName().toString() + ".staging." + pid + "." + epochMillis;
-        final Path stagingRoot = hostAssetRoot.resolveSibling(stagingName);
+        slotSeq = allocateSlot(hostAssetRoot);
+        final Path stagingRoot = stagingPathFor(hostAssetRoot, slotSeq);
+
+        // Recycle the slot if we picked an occupied one (oldest by mtime).
+        deleteRecursively(stagingRoot);
+        deleteRecursively(backupPathFor(hostAssetRoot, slotSeq));
 
         Files.createDirectories(stagingRoot);
-        // Keep staging directories for drift detection (don't delete at shutdown)
-
         return stagingRoot;
       } catch (IOException ex) {
         throw new IllegalStateException("Failed to prepare staging root for: " + hostAssetRoot, ex);
@@ -1914,8 +1914,8 @@ public final class IncusResourceBootstrap {
     private void syncStagingToFinal(Path stagingRoot, Path hostAssetRoot) {
       try {
         if (Files.exists(hostAssetRoot)) {
-          // Backup existing state before sync
-          final Path backupPath = backupHostPath(hostAssetRoot);
+          // Backup existing state before sync (paired with the staging slot for this run).
+          final Path backupPath = backupPathFor(hostAssetRoot, slotSeq);
           backup(hostAssetRoot, backupPath);
 
           // Sync staging content to final location (preserves mount point inode)
@@ -1924,24 +1924,45 @@ public final class IncusResourceBootstrap {
           // First deployment: copy staging to final location (keep staging for comparison)
           backup(stagingRoot, hostAssetRoot);
         }
-
-        // Clean up old backups and old staging directories
-        if (retentionCount >= 0) {
-          cleanupOldBackups(hostAssetRoot);
-          cleanupOldStagingDirs(hostAssetRoot);
-        }
       } catch (IOException ex) {
         throw new IllegalStateException(
             "Failed to sync staging to final host asset root: " + hostAssetRoot, ex);
       }
     }
 
-    private Path backupHostPath(Path hostAssetRoot) {
-      final long pid = ProcessHandle.current().pid();
-      final long epochMillis = System.currentTimeMillis();
-      final String backupName =
-          hostAssetRoot.getFileName().toString() + ".backup." + pid + "." + epochMillis;
-      return hostAssetRoot.resolveSibling(backupName);
+    /**
+     * Pick a slot in {@code [0, retentionCount)}. Returns the lowest unused slot when one exists,
+     * otherwise the slot whose staging dir has the oldest mtime (the caller will overwrite it).
+     */
+    private int allocateSlot(Path hostAssetRoot) throws IOException {
+      if (retentionCount <= 0) {
+        return 0;
+      }
+
+      int oldestSlot = 0;
+      java.nio.file.attribute.FileTime oldestMtime = null;
+      for (int seq = 0; seq < retentionCount; seq++) {
+        final Path stagingPath = stagingPathFor(hostAssetRoot, seq);
+        if (!Files.exists(stagingPath)) {
+          return seq;
+        }
+        final java.nio.file.attribute.FileTime mtime = Files.getLastModifiedTime(stagingPath);
+        if (oldestMtime == null || mtime.compareTo(oldestMtime) < 0) {
+          oldestMtime = mtime;
+          oldestSlot = seq;
+        }
+      }
+      return oldestSlot;
+    }
+
+    private Path stagingPathFor(Path hostAssetRoot, int seq) {
+      return hostAssetRoot.resolveSibling(
+          hostAssetRoot.getFileName().toString() + ".staging." + seq);
+    }
+
+    private Path backupPathFor(Path hostAssetRoot, int seq) {
+      return hostAssetRoot.resolveSibling(
+          hostAssetRoot.getFileName().toString() + ".backup." + seq);
     }
 
     private void backup(Path source, Path target) throws IOException {
@@ -2032,75 +2053,6 @@ public final class IncusResourceBootstrap {
       for (Path path : toDelete) {
         Files.deleteIfExists(path);
       }
-    }
-
-    private void cleanupOldBackups(Path hostAssetRoot) throws IOException {
-      final Path parent = hostAssetRoot.getParent();
-      if (parent == null) {
-        return;
-      }
-
-      final String hostDirName = hostAssetRoot.getFileName().toString();
-      final String backupPattern = hostDirName + "\\.backup\\.\\d+\\.\\d+";
-
-      try (Stream<Path> siblings = Files.list(parent)) {
-        siblings
-            .filter(p -> p.getFileName().toString().matches(backupPattern))
-            .sorted(
-                java.util.Comparator.<Path, String>comparing(
-                        p -> p.getFileName().toString())
-                    .reversed())
-            .skip(retentionCount)
-            .forEach(
-                old -> {
-                  try {
-                    deleteRecursively(old);
-                  } catch (IOException ignored) {
-                    // Best effort - don't fail build if cleanup fails
-                  }
-                });
-      }
-    }
-
-    private void cleanupOldStagingDirs(Path hostAssetRoot) throws IOException {
-      final Path parent = hostAssetRoot.getParent();
-      if (parent == null) {
-        return;
-      }
-
-      final String hostDirName = hostAssetRoot.getFileName().toString();
-      final String stagingPattern = hostDirName + "\\.staging\\.\\d+\\.\\d+";
-
-      try (Stream<Path> siblings = Files.list(parent)) {
-        siblings
-            .filter(p -> p.getFileName().toString().matches(stagingPattern))
-            .sorted(
-                java.util.Comparator.<Path, String>comparing(p -> p.getFileName().toString())
-                    .reversed())
-            .skip(retentionCount)
-            .forEach(
-                old -> {
-                  try {
-                    deleteRecursively(old);
-                  } catch (IOException ignored) {
-                    // Best effort - don't fail build if cleanup fails
-                  }
-                });
-      }
-    }
-
-    private void registerRecursiveDeleteAtShutdown(Path directory) {
-      Runtime.getRuntime()
-          .addShutdownHook(
-              new Thread(
-                  () -> {
-                    try {
-                      deleteRecursively(directory);
-                    } catch (IOException ignored) {
-                      // Best-effort cleanup on shutdown.
-                    }
-                  },
-                  "rk2lab-host-asset-cleanup-" + ProcessHandle.current().pid()));
     }
 
     private void deleteRecursively(Path root) throws IOException {
