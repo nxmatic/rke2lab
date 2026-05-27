@@ -113,6 +113,12 @@ public final class RuntimeDaemonsetScriptPolicyAssets {
                   .configMapKey("daemonset-host-asset-reconciler.sh")
                   .classpathResource(RESOURCE_ROOT + "/daemonset-host-asset-reconciler.sh")
                   .relativePath(".sh.d/daemonset-host-asset-reconciler.sh"));
+      addScriptAsset(
+          asset ->
+              asset
+                  .configMapKey("daemonset-runtime.sh")
+                  .classpathResource(RESOURCE_ROOT + "/daemonset-runtime.sh")
+                  .relativePath(".sh.d/daemonset-runtime.sh"));
       return this;
     }
 
