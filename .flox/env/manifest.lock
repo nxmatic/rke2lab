@@ -83,7 +83,7 @@
         "outputs": "all"
       },
       "incus-client": {
-        "flake": "path:.#incus-client"
+        "flake": "github:nxmatic/rke2lab#incus-client"
       },
       "jdk25": {
         "pkg-path": "jdk25",
@@ -163,6 +163,9 @@
         "pkg-path": "maven",
         "outputs": "all"
       },
+      "moreutils": {
+        "pkg-path": "moreutils"
+      },
       "openssh": {
         "pkg-path": "openssh",
         "pkg-group": "keyhole",
@@ -191,12 +194,18 @@
       "pulumictl": {
         "pkg-path": "pulumictl"
       },
+      "screen": {
+        "pkg-path": "screen"
+      },
       "shellcheck": {
         "pkg-path": "shellcheck",
         "outputs": "all"
       },
       "shfmt": {
         "pkg-path": "shfmt"
+      },
+      "socat": {
+        "pkg-path": "socat"
       },
       "sops": {
         "pkg-path": "sops",
@@ -2599,6 +2608,64 @@
       "priority": 5
     },
     {
+      "attr_path": "moreutils",
+      "broken": false,
+      "derivation": "/nix/store/c3fzwq6ggzpmk82j6gl1pwrcwa1jbgh6-moreutils-0.70.drv",
+      "description": "Growing collection of the unix tools that nobody thought to write long ago when unix was young",
+      "install_id": "moreutils",
+      "license": "GPL-2.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "moreutils-0.70",
+      "pname": "moreutils",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:42:26.174888Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.70",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/xh01gzaar4mkpqahyzdbfl1www9b6rnl-moreutils-0.70"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "moreutils",
+      "broken": false,
+      "derivation": "/nix/store/gg1z9ikw5vfn8i8xns4k72ax5ay3fg3b-moreutils-0.70.drv",
+      "description": "Growing collection of the unix tools that nobody thought to write long ago when unix was young",
+      "install_id": "moreutils",
+      "license": "GPL-2.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "moreutils-0.70",
+      "pname": "moreutils",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:15:16.157402Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.70",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/prjv3nagmjqnns2nimn5fw1ahxs3sy93-moreutils-0.70"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "pstree",
       "broken": false,
       "derivation": "/nix/store/h6rk2knq4w1pdygflxj3pn2shcv10zrj-pstree-2.39.drv",
@@ -2773,6 +2840,70 @@
       "priority": 5
     },
     {
+      "attr_path": "screen",
+      "broken": false,
+      "derivation": "/nix/store/xsjsr7y3yf6sfmbpzchpb4pahrw7srz0-screen-5.0.1.drv",
+      "description": "Window manager that multiplexes a physical terminal",
+      "install_id": "screen",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "screen-5.0.1",
+      "pname": "screen",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:43:49.665166Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "5.0.1",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "info": "/nix/store/m9n26x3bznrdadrf4jvsa9cbhkmkfv7a-screen-5.0.1-info",
+        "man": "/nix/store/aqd3k8hpqj1c1b0985jibzjnsyfj9gna-screen-5.0.1-man",
+        "out": "/nix/store/i2n1rhjx5g9231dgk8vqh66ym9k7ldl7-screen-5.0.1"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "screen",
+      "broken": false,
+      "derivation": "/nix/store/lv90583p4pch0xx7il6lnsbcq7b8ii7y-screen-5.0.1.drv",
+      "description": "Window manager that multiplexes a physical terminal",
+      "install_id": "screen",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "screen-5.0.1",
+      "pname": "screen",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:17:08.999257Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "5.0.1",
+      "outputs_to_install": [
+        "man",
+        "out"
+      ],
+      "outputs": {
+        "info": "/nix/store/ji2zqs72g67z97rpypff2rdfp4c6qy7l-screen-5.0.1-info",
+        "man": "/nix/store/gw6rvjc8nfv3028b66nzjq6ylkks9vz8-screen-5.0.1-man",
+        "out": "/nix/store/jvmffdl6hxnb47nyr011rafxdj4b7p11-screen-5.0.1"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "shellcheck",
       "broken": false,
       "derivation": "/nix/store/qh9fq60lf5c7dvck178szqyf8p24m8mb-shellcheck-0.11.0.drv",
@@ -2894,6 +3025,65 @@
       ],
       "outputs": {
         "out": "/nix/store/fxcdsnnykza75zrly0bjnj3kykgzh6zf-shfmt-3.13.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "socat",
+      "broken": false,
+      "derivation": "/nix/store/7diabxg5nw9f68agjv8z0mhgh39f3daz-socat-1.8.1.0.drv",
+      "description": "Utility for bidirectional data transfer between two independent data channels",
+      "install_id": "socat",
+      "license": "[ GPL-2.0-only ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "socat-1.8.1.0",
+      "pname": "socat",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:43:51.248630Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.8.1.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/8r963pw2crzva75hlcgk2f2z09jkqjvq-socat-1.8.1.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "socat",
+      "broken": false,
+      "derivation": "/nix/store/d5zci3x70in5vkgbkfwqpg3kh23fkrcc-socat-1.8.1.0.drv",
+      "description": "Utility for bidirectional data transfer between two independent data channels",
+      "install_id": "socat",
+      "license": "[ GPL-2.0-only ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "socat-1.8.1.0",
+      "pname": "socat",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:17:11.573237Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.8.1.0",
+      "outputs_to_install": [
+        "out",
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/abfalbis8ppi4w9id1i3h80mzhbxq0kc-socat-1.8.1.0"
       },
       "system": "aarch64-linux",
       "group": "toplevel",
@@ -3024,64 +3214,6 @@
       "priority": 5
     },
     {
-      "install_id": "incus-client",
-      "locked-url": "path:/private/var/lib/git/nxmatic/rke2lab?lastModified=1779792245&narHash=sha256-PIyORugx6SnH3idZDHZSV%2BYI4YPSADFvxeK49Gaj%2Bes%3D",
-      "flake-description": "RKE2 lab infrastructure and network blueprints",
-      "locked-flake-attr-path": "packages.aarch64-darwin.incus-client",
-      "derivation": "/nix/store/xkmqiqkhdw1jfkfyanq04gbcmkikdpqv-incus-client-7.0.0.drv",
-      "outputs": {
-        "out": "/nix/store/rhfy794ls0fyy452za70mwzqg41714k3-incus-client-7.0.0"
-      },
-      "output-names": [
-        "out"
-      ],
-      "outputs-to-install": [
-        "out"
-      ],
-      "requested-outputs-to-install": [],
-      "package-system": "aarch64-darwin",
-      "system": "aarch64-darwin",
-      "name": "incus-client-7.0.0",
-      "pname": "incus-client",
-      "version": "7.0.0",
-      "description": "Powerful system container and virtual machine manager",
-      "licenses": [
-        "Apache-2.0"
-      ],
-      "broken": false,
-      "unfree": false,
-      "priority": 5
-    },
-    {
-      "install_id": "incus-client",
-      "locked-url": "path:/private/var/lib/git/nxmatic/rke2lab?lastModified=1779792245&narHash=sha256-PIyORugx6SnH3idZDHZSV%2BYI4YPSADFvxeK49Gaj%2Bes%3D",
-      "flake-description": "RKE2 lab infrastructure and network blueprints",
-      "locked-flake-attr-path": "packages.aarch64-linux.incus-client",
-      "derivation": "/nix/store/yqi01xbli6dha4zwqirjnw7yivdkpsz0-incus-client-7.0.0.drv",
-      "outputs": {
-        "out": "/nix/store/snxkbj03l5szzqjsczf6zy1w27fimisr-incus-client-7.0.0"
-      },
-      "output-names": [
-        "out"
-      ],
-      "outputs-to-install": [
-        "out"
-      ],
-      "requested-outputs-to-install": [],
-      "package-system": "aarch64-linux",
-      "system": "aarch64-linux",
-      "name": "incus-client-7.0.0",
-      "pname": "incus-client",
-      "version": "7.0.0",
-      "description": "Powerful system container and virtual machine manager",
-      "licenses": [
-        "Apache-2.0"
-      ],
-      "broken": false,
-      "unfree": false,
-      "priority": 5
-    },
-    {
       "install_id": "podman-wrapper",
       "locked-url": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper&ref=refs/heads/main&rev=30444c66a6ef778ddc479c32e7789eb66823e125",
       "flake-description": "podman-wrapper flake for k8s env",
@@ -3126,6 +3258,64 @@
       "broken": false,
       "unfree": false,
       "priority": 5
+    },
+    {
+      "install_id": "incus-client",
+      "locked-url": "github:nxmatic/rke2lab/e95a0b7c8b8b78b54ea7b792821118453cf2132f?narHash=sha256-ofROqHbubtsYgghGkVs321KFYfXI3%2Bydk%2BYFgg1RYho%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-darwin.incus-client",
+      "derivation": "/nix/store/xkmqiqkhdw1jfkfyanq04gbcmkikdpqv-incus-client-7.0.0.drv",
+      "outputs": {
+        "out": "/nix/store/rhfy794ls0fyy452za70mwzqg41714k3-incus-client-7.0.0"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-darwin",
+      "system": "aarch64-darwin",
+      "name": "incus-client-7.0.0",
+      "pname": "incus-client",
+      "version": "7.0.0",
+      "description": "Powerful system container and virtual machine manager",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "incus-client",
+      "locked-url": "github:nxmatic/rke2lab/e95a0b7c8b8b78b54ea7b792821118453cf2132f?narHash=sha256-ofROqHbubtsYgghGkVs321KFYfXI3%2Bydk%2BYFgg1RYho%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-linux.incus-client",
+      "derivation": "/nix/store/yqi01xbli6dha4zwqirjnw7yivdkpsz0-incus-client-7.0.0.drv",
+      "outputs": {
+        "out": "/nix/store/snxkbj03l5szzqjsczf6zy1w27fimisr-incus-client-7.0.0"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "incus-client-7.0.0",
+      "pname": "incus-client",
+      "version": "7.0.0",
+      "description": "Powerful system container and virtual machine manager",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
     }
   ],
   "compose": {
@@ -3149,7 +3339,7 @@
           "pkg-path": "graphviz"
         },
         "incus-client": {
-          "flake": "path:.#incus-client"
+          "flake": "github:nxmatic/rke2lab#incus-client"
         },
         "pulumi": {
           "pkg-path": "pulumi-bin"
@@ -3455,8 +3645,14 @@
               "pkg-path": "bash",
               "outputs": "all"
             },
+            "moreutils": {
+              "pkg-path": "moreutils"
+            },
             "pstree": {
               "pkg-path": "pstree"
+            },
+            "screen": {
+              "pkg-path": "screen"
             },
             "shellcheck": {
               "pkg-path": "shellcheck",
@@ -3464,6 +3660,9 @@
             },
             "shfmt": {
               "pkg-path": "shfmt"
+            },
+            "socat": {
+              "pkg-path": "socat"
             },
             "zsh": {
               "pkg-path": "zsh",

@@ -20,7 +20,14 @@ graphviz.pkg-path = "graphviz"
 ## `pkgs.incus.passthru.client` derivation, surfaced as `.#incus-client`
 ## from the top-level flake. Single source for both Darwin shells (where
 ## we run `incus exec master`) and the Linux NixOS VM.
-incus-client.flake = "path:.#incus-client"
+##
+## Reference the github repo (not `path:.`) so the lock pins to a commit
+## SHA portable across machines. `path:.` would bake the dev-machine
+## absolute path into manifest.lock and break flox activate on the NixOS
+## image-builder host (which only sees the repo via NFS at a different
+## absolute path). Bumping: `flox upgrade` or `flox update` picks up
+## new commits on main.
+incus-client.flake = "github:nxmatic/rke2lab#incus-client"
 
 
 ## Environment Variables ---------------------------------------------
