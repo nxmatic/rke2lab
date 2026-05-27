@@ -18,7 +18,6 @@ public final class SeedSystemdAdapterEndpointGate {
   private static final String API_VERSION = "rk2lab.nxmatic.io/v1alpha1";
   private static final String KIND = "SystemdAdapterEndpointGateStatus";
   private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(20);
-  private static final Duration RUNTIME_PROBE_TOLERANCE = Duration.ofMinutes(4);
   // Adaptive retry intervals based on bootstrap phase
   private static final Duration RUNTIME_PROBE_RETRY_INTERVAL_EARLY = Duration.ofSeconds(15);
   private static final Duration RUNTIME_PROBE_RETRY_INTERVAL_MID = Duration.ofSeconds(8);
@@ -28,7 +27,6 @@ public final class SeedSystemdAdapterEndpointGate {
   private static final long PHASE_MID_CUTOFF_SECONDS = 150; // Systemd initialization
   private static final long PHASE_LATE_CUTOFF_SECONDS = 210; // Service convergence
   private static final Duration PROGRESS_LOG_INTERVAL = Duration.ofSeconds(15);
-  private static final Duration INSTANCE_READY_TOLERANCE = Duration.ofMinutes(4);
   private static final Duration INSTANCE_READY_RETRY_INTERVAL = Duration.ofSeconds(2);
 
   private SeedSystemdAdapterEndpointGate() {
@@ -75,8 +73,9 @@ public final class SeedSystemdAdapterEndpointGate {
 
   private static Map<String, Object> waitForRuntimeProbe(
       BootstrapConfig config, Consumer<String> logger) {
+    final Duration tolerance = config.readinessTimeout();
     final long startedAt = System.nanoTime();
-    final long deadlineNanos = startedAt + RUNTIME_PROBE_TOLERANCE.toNanos();
+    final long deadlineNanos = startedAt + tolerance.toNanos();
     long nextProgressLogAt = startedAt;
 
     Map<String, Object> lastSnapshot = Map.of();
@@ -100,7 +99,7 @@ public final class SeedSystemdAdapterEndpointGate {
                 + ", summary="
                 + runtimeSnapshot.getOrDefault("summary", "n/a")
                 + " (retrying for up to "
-                + RUNTIME_PROBE_TOLERANCE
+                + tolerance
                 + ")");
         nextProgressLogAt = now + PROGRESS_LOG_INTERVAL.toNanos();
       }
@@ -119,7 +118,7 @@ public final class SeedSystemdAdapterEndpointGate {
             + ":"
             + config.systemdAdapterDbusPort()
             + " after "
-            + RUNTIME_PROBE_TOLERANCE
+            + tolerance
             + " (last status="
             + lastStatus
             + ", summary="
@@ -161,8 +160,9 @@ public final class SeedSystemdAdapterEndpointGate {
   // call, so on first apply the instance may not yet exist when ensureReachable
   // runs. Retry the cheapest no-op probe until incus exec succeeds.
   private static void waitForInstanceReachable(BootstrapConfig config, Consumer<String> logger) {
+    final Duration tolerance = config.readinessTimeout();
     final long startedAt = System.nanoTime();
-    final long deadlineNanos = startedAt + INSTANCE_READY_TOLERANCE.toNanos();
+    final long deadlineNanos = startedAt + tolerance.toNanos();
     long nextProgressLogAt = startedAt;
     CommandResult lastResult = null;
     while (System.nanoTime() < deadlineNanos) {
@@ -180,7 +180,7 @@ public final class SeedSystemdAdapterEndpointGate {
                 + " not reachable yet via incus exec; "
                 + lastResult.summary()
                 + " (retrying for up to "
-                + INSTANCE_READY_TOLERANCE
+                + tolerance
                 + ")");
         nextProgressLogAt = now + PROGRESS_LOG_INTERVAL.toNanos();
       }
@@ -192,7 +192,7 @@ public final class SeedSystemdAdapterEndpointGate {
             + " in project "
             + config.incusProject()
             + " did not become reachable via incus exec within "
-            + INSTANCE_READY_TOLERANCE
+            + tolerance
             + " (last result: "
             + (lastResult == null ? "<no attempts>" : lastResult.summary())
             + ")");

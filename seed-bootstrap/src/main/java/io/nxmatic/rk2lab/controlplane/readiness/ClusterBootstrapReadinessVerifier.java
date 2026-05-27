@@ -29,12 +29,6 @@ import java.util.function.Consumer;
  */
 public final class ClusterBootstrapReadinessVerifier {
 
-  private static final Duration KUBECONFIG_WAIT_TIMEOUT = Duration.ofMinutes(10);
-
-  private static final Duration API_READY_TIMEOUT = Duration.ofMinutes(10);
-
-  private static final Duration CONTROLLER_WAIT_TIMEOUT = Duration.ofMinutes(10);
-
   private static final Duration RETRY_INTERVAL = Duration.ofSeconds(2);
 
   private static final Duration LOG_PROGRESS_INTERVAL = Duration.ofSeconds(30);
@@ -51,25 +45,16 @@ public final class ClusterBootstrapReadinessVerifier {
 
   public static VerificationResult verify(BootstrapConfig config, ControlplanePolicy policy) {
     final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
+    final Duration timeout = config.readinessTimeout();
     final Consumer<String> bootstrapWatcherLogger = message -> logInfo(message);
 
     logInfo("readiness check enabled");
     logInfo("seed node: " + config.nodeName() + " (project=" + config.incusProject() + ")");
     logInfo("kubeconfig path: " + kubeconfigPath);
-    logInfo(
-        "timeouts: kubeconfig="
-            + KUBECONFIG_WAIT_TIMEOUT
-            + ", api="
-            + API_READY_TIMEOUT
-            + ", controllers="
-            + CONTROLLER_WAIT_TIMEOUT);
+    logInfo("timeouts: kubeconfig=" + timeout + ", api=" + timeout + ", controllers=" + timeout);
 
     if (!SeedNodeBootstrapWatcher.waitForBootstrapPreconditions(
-        config,
-        KUBECONFIG_WAIT_TIMEOUT,
-        RETRY_INTERVAL,
-        LOG_PROGRESS_INTERVAL,
-        bootstrapWatcherLogger)) {
+        config, timeout, RETRY_INTERVAL, LOG_PROGRESS_INTERVAL, bootstrapWatcherLogger)) {
       logInfo("readiness failed: seed node systemd/bootstrap gate did not converge in time");
       return VerificationResult.failed(
           false,
@@ -82,7 +67,7 @@ public final class ClusterBootstrapReadinessVerifier {
           requiredControllerRefs(policy));
     }
 
-    if (!waitForKubeconfigPublished(kubeconfigPath)) {
+    if (!waitForKubeconfigPublished(kubeconfigPath, timeout)) {
       logInfo("readiness failed: kubeconfig was not published in time");
       return VerificationResult.failed(
           false,
@@ -92,7 +77,7 @@ public final class ClusterBootstrapReadinessVerifier {
           requiredControllerRefs(policy));
     }
 
-    if (!waitForApiReady(kubeconfigPath)) {
+    if (!waitForApiReady(kubeconfigPath, timeout)) {
       logInfo("readiness failed: kubernetes API did not become ready in time");
       return VerificationResult.failed(
           true,
@@ -103,7 +88,8 @@ public final class ClusterBootstrapReadinessVerifier {
           requiredControllerRefs(policy));
     }
 
-    final ControllerVerification controllers = verifyRequiredControllers(kubeconfigPath, policy);
+    final ControllerVerification controllers =
+        verifyRequiredControllers(kubeconfigPath, policy, timeout);
     if (!controllers.ready()) {
       logInfo("readiness failed: " + controllers.detail());
       return VerificationResult.failed(
@@ -160,11 +146,11 @@ public final class ClusterBootstrapReadinessVerifier {
     }
   }
 
-  private static boolean waitForKubeconfigPublished(Path kubeconfigPath) {
+  private static boolean waitForKubeconfigPublished(Path kubeconfigPath, Duration timeout) {
     logInfo("waiting for kubeconfig publication...");
     final long startedAt = System.nanoTime();
     long nextProgressLogAt = startedAt + LOG_PROGRESS_INTERVAL.toNanos();
-    final long deadlineNanos = System.nanoTime() + KUBECONFIG_WAIT_TIMEOUT.toNanos();
+    final long deadlineNanos = System.nanoTime() + timeout.toNanos();
     while (System.nanoTime() < deadlineNanos) {
       try {
         if (Files.exists(kubeconfigPath)
@@ -196,19 +182,19 @@ public final class ClusterBootstrapReadinessVerifier {
 
     logInfo(
         "kubeconfig wait timed out after "
-            + KUBECONFIG_WAIT_TIMEOUT
+            + timeout
             + " ("
             + describeKubeconfigState(kubeconfigPath)
             + ")");
     return false;
   }
 
-  private static boolean waitForApiReady(Path kubeconfigPath) {
+  private static boolean waitForApiReady(Path kubeconfigPath, Duration timeout) {
     logInfo("waiting for kubernetes API readiness (/readyz)...");
     final long startedAt = System.nanoTime();
     long nextProgressLogAt = startedAt + LOG_PROGRESS_INTERVAL.toNanos();
     String lastSummary = "not yet checked";
-    final long deadlineNanos = System.nanoTime() + API_READY_TIMEOUT.toNanos();
+    final long deadlineNanos = System.nanoTime() + timeout.toNanos();
     while (System.nanoTime() < deadlineNanos) {
       final CommandResult readyzResult =
           runCommand(
@@ -242,16 +228,12 @@ public final class ClusterBootstrapReadinessVerifier {
     }
 
     logInfo(
-        "API readiness wait timed out after "
-            + API_READY_TIMEOUT
-            + " (last result: "
-            + lastSummary
-            + ")");
+        "API readiness wait timed out after " + timeout + " (last result: " + lastSummary + ")");
     return false;
   }
 
   private static ControllerVerification verifyRequiredControllers(
-      Path kubeconfigPath, ControlplanePolicy policy) {
+      Path kubeconfigPath, ControlplanePolicy policy, Duration timeout) {
     final List<ControllerRef> requiredControllers = requiredControllers(policy);
     if (requiredControllers.isEmpty()) {
       logInfo("no required controllers configured for readiness gate");
@@ -280,8 +262,8 @@ public final class ClusterBootstrapReadinessVerifier {
                     "wait",
                     "--for=create",
                     resourceRef,
-                    "--timeout=" + CONTROLLER_WAIT_TIMEOUT.toSeconds() + "s"),
-                CONTROLLER_WAIT_TIMEOUT.plusSeconds(5));
+                    "--timeout=" + timeout.toSeconds() + "s"),
+                timeout.plusSeconds(5));
         if (createdResult.exitCode() != 0) {
           logInfo("controller create wait failed: " + controllerRef.ref());
           failure =
@@ -307,8 +289,8 @@ public final class ClusterBootstrapReadinessVerifier {
                       "rollout",
                       "status",
                       resourceRef,
-                      "--timeout=" + CONTROLLER_WAIT_TIMEOUT.toSeconds() + "s"),
-                  CONTROLLER_WAIT_TIMEOUT.plusSeconds(5));
+                      "--timeout=" + timeout.toSeconds() + "s"),
+                  timeout.plusSeconds(5));
           if (rolloutResult.exitCode() != 0) {
             logInfo("controller rollout wait failed: " + controllerRef.ref());
             failure =

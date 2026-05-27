@@ -3,6 +3,7 @@ package io.nxmatic.rk2lab.controlplane.incus;
 import com.pulumi.Config;
 import java.net.URI;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.function.Consumer;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
@@ -28,7 +29,8 @@ public record BootstrapConfig(
     boolean nfsAutomount,
     String systemdAdapterDbusHost,
     int systemdAdapterDbusPort,
-    int hostAssetRotationRetentionCount) {
+    int hostAssetRotationRetentionCount,
+    Duration readinessTimeout) {
 
   public String imageBuilderBinary() {
     return "distrobuilder";
@@ -85,7 +87,8 @@ public record BootstrapConfig(
         nfsAutomount,
         systemdAdapterDbusHost,
         systemdAdapterDbusPort,
-        hostAssetRotationRetentionCount);
+        hostAssetRotationRetentionCount,
+        readinessTimeout);
   }
 
   public Path localWorktreePath() {
@@ -146,6 +149,8 @@ public record BootstrapConfig(
     private int systemdAdapterDbusPort = defaults.systemdAdapterDbusPort();
 
     private int hostAssetRotationRetentionCount = 3;
+
+    private Duration readinessTimeout = Duration.ofMinutes(10);
 
     public Builder worktree(Path value) {
       this.worktree = normalizeAbsolutePath(value);
@@ -247,6 +252,11 @@ public record BootstrapConfig(
       return this;
     }
 
+    public Builder readinessTimeout(Duration value) {
+      this.readinessTimeout = value;
+      return this;
+    }
+
     public Builder applyConfig(Config config) {
       final EnvironmentValues environment = new EnvironmentValues(config);
       override(environment, "worktree.dir", value -> this.worktree(parsePath(value)));
@@ -280,6 +290,10 @@ public record BootstrapConfig(
           environment,
           "hostAsset.rotation.retentionCount",
           value -> this.hostAssetRotationRetentionCount(Integer.parseInt(value.trim())));
+      override(
+          environment,
+          "readiness.timeout",
+          value -> this.readinessTimeout(Duration.parse(value.trim())));
       return this;
     }
 
@@ -320,7 +334,8 @@ public record BootstrapConfig(
           nfsAutomount,
           systemdAdapterDbusHost,
           systemdAdapterDbusPort,
-          hostAssetRotationRetentionCount);
+          hostAssetRotationRetentionCount,
+          readinessTimeout);
     }
 
     private Path parsePath(String value) {
