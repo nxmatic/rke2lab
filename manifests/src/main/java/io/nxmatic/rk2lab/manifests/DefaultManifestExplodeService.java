@@ -3,13 +3,10 @@ package io.nxmatic.rk2lab.manifests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.MappingIterator;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeResult;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeService;
+import io.nxmatic.rk2lab.manifests.api.ManifestYaml;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,7 +16,6 @@ import java.util.List;
 import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.LoaderOptions;
 
 /**
  * Splits a consolidated multi-document YAML synth into one file per resource under {@code
@@ -38,13 +34,6 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
   private static final Logger LOG = LoggerFactory.getLogger(DefaultManifestExplodeService.class);
 
   private static final String CRD_KIND = "CustomResourceDefinition";
-
-  /**
-   * Jackson YAML mapper configured for deterministic output: {@link
-   * SerializationFeature#ORDER_MAP_ENTRIES_BY_KEYS} sorts every map alphabetically, eliminating
-   * checksum churn from {@code Map.of()} hash randomization upstream in CDK8s.
-   */
-  private static final ObjectMapper YAML_MAPPER = buildMapper();
 
   @Override
   public String providerId() {
@@ -68,8 +57,7 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
 
     final List<Path> written = new ArrayList<>();
 
-    try (MappingIterator<JsonNode> documents =
-        YAML_MAPPER.readerFor(JsonNode.class).readValues(source.toFile())) {
+    try (MappingIterator<JsonNode> documents = ManifestYaml.readNodes(source)) {
       while (documents.hasNext()) {
         final JsonNode document = documents.next();
         if (document == null || !document.isObject()) {
@@ -87,11 +75,8 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
         final String order = orderPrefixFor(kind, namespace);
         final String fileName = order + "-" + kind.toLowerCase(Locale.ROOT) + "-" + name + ".yml";
 
-        final Path packageDir = target.resolve(layer).resolve(pkg);
-        Files.createDirectories(packageDir);
-        final Path outFile = packageDir.resolve(fileName);
-
-        Files.writeString(outFile, YAML_MAPPER.writeValueAsString(document));
+        final Path outFile = target.resolve(layer).resolve(pkg).resolve(fileName);
+        ManifestYaml.writeDocument(outFile, document);
         written.add(outFile);
       }
     }
@@ -127,24 +112,5 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
       return "unnamed";
     }
     return value.toLowerCase(Locale.ROOT).replace(':', '-').replace('/', '-');
-  }
-
-  /**
-   * SnakeYaml's default 3 MiB code-point limit is too tight for the consolidated synth output: the
-   * flox installer-assets ConfigMap embeds pre-locked flake/manifest locks plus a base64 NRI plugin
-   * archive. Bump to 64 MiB to match the synthesizer's reader.
-   */
-  private static ObjectMapper buildMapper() {
-    final LoaderOptions loaderOptions = new LoaderOptions();
-    loaderOptions.setCodePointLimit(64 * 1024 * 1024);
-
-    final YAMLFactory factory =
-        YAMLFactory.builder()
-            .loaderOptions(loaderOptions)
-            .enable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
-            .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
-            .disable(YAMLGenerator.Feature.SPLIT_LINES)
-            .build();
-    return new ObjectMapper(factory).enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
   }
 }

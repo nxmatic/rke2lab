@@ -1,7 +1,5 @@
 package io.nxmatic.rk2lab.controlplane.incus;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.pulumi.core.Output;
 import com.pulumi.deployment.Deployment;
 import com.pulumi.incus.IncusFunctions;
@@ -32,6 +30,7 @@ import io.nxmatic.rk2lab.manifests.api.ManifestExplodeResult;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeService;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
+import io.nxmatic.rk2lab.manifests.api.ManifestYaml;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.ComponentVersions;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
@@ -79,8 +78,6 @@ public final class IncusResourceBootstrap {
 
     private DaemonsetLogPolicy() {}
   }
-
-  private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
 
   private static final String HOST_ROOT_PATH = "/srv/host";
 
@@ -459,8 +456,7 @@ public final class IncusResourceBootstrap {
         "fileCount", writtenFiles.size(),
         "layers", countLayers(manifestsRoot, writtenFiles),
         "byLayer", groupByLayer(manifestsRoot, writtenFiles),
-        "floxDebugEnabled", floxDebugPolicy.enabled(),
-        "manifestsRoot", manifestsRoot.toString());
+        "floxDebugEnabled", floxDebugPolicy.enabled());
   }
 
   private String computeManifestChecksum(Path manifestsRoot, List<Path> writtenFiles) {
@@ -930,34 +926,28 @@ public final class IncusResourceBootstrap {
         final Map<String, String> layerContributionVars = registry.aggregateContributions();
         aggregatedVars.putAll(layerContributionVars);
 
-        // Build ConfigMap YAML with all aggregated variables
-        StringBuilder yaml = new StringBuilder();
-        yaml.append("---\n");
-        yaml.append("apiVersion: v1\n");
-        yaml.append("kind: ConfigMap\n");
-        yaml.append("metadata:\n");
-        yaml.append("  annotations:\n");
-        yaml.append("    config.kubernetes.io/local-config: \"true\"\n");
-        yaml.append(
-            "    description.kpt.dev: Controlplane runtime environment with layer contributions\n");
-        yaml.append(
-            "    env.rk2lab.nxmatic.io/section: section-controlplane-layer-contributions\n");
-        yaml.append("    rk2lab.nxmatic.io/managed-by: controlplane\n");
-        yaml.append("  name: env-section-controlplane-layer-contributions\n");
-        yaml.append("data:\n");
+        final Map<String, Object> annotations = new LinkedHashMap<>();
+        annotations.put("config.kubernetes.io/local-config", "true");
+        annotations.put(
+            "description.kpt.dev", "Controlplane runtime environment with layer contributions");
+        annotations.put(
+            "env.rk2lab.nxmatic.io/section", "section-controlplane-layer-contributions");
+        annotations.put("rk2lab.nxmatic.io/managed-by", "controlplane");
 
-        for (Map.Entry<String, String> entry : aggregatedVars.entrySet()) {
-          yaml.append("  ")
-              .append(entry.getKey())
-              .append(": ")
-              .append(quoteYamlIfNeeded(entry.getValue()))
-              .append("\n");
-        }
+        final Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("annotations", annotations);
+        metadata.put("name", "env-section-controlplane-layer-contributions");
+
+        final Map<String, Object> document = new LinkedHashMap<>();
+        document.put("apiVersion", "v1");
+        document.put("kind", "ConfigMap");
+        document.put("metadata", metadata);
+        document.put("data", aggregatedVars);
 
         final Path overlayPath =
             runtimeEnvConfigRoot.resolve(
                 "99-configmap-env-section-controlplane-layer-contributions.yml");
-        Files.writeString(overlayPath, yaml.toString(), StandardCharsets.UTF_8);
+        ManifestYaml.writeDocument(overlayPath, document);
         return buildRegistrySnapshot(orderedContributors, layerContributionVars);
 
       } catch (IOException ex) {
@@ -992,17 +982,6 @@ public final class IncusResourceBootstrap {
           "contributedSections", List.copyOf(contributedSections),
           "contributedSectionCount", contributedSections.size(),
           "aggregatedVariableCount", layerContributionVars.size());
-    }
-
-    private static String quoteYamlIfNeeded(String value) {
-      if (value.isEmpty()
-          || value.contains(" ")
-          || value.contains(":")
-          || value.equals("false")
-          || value.equals("true")) {
-        return "\"" + value.replace("\"", "\\\"") + "\"";
-      }
-      return value;
     }
   }
 
@@ -2608,7 +2587,7 @@ public final class IncusResourceBootstrap {
       try {
         @SuppressWarnings("unchecked")
         final Map<String, Object> parsed =
-            YAML_MAPPER.readValue(Files.readString(yamlSource, StandardCharsets.UTF_8), Map.class);
+            ManifestYaml.mapper().readValue(yamlSource.toFile(), Map.class);
         return parsed;
       } catch (IOException ex) {
         throw new IllegalStateException("Failed to parse YAML manifest: " + yamlSource, ex);
@@ -3091,9 +3070,6 @@ public final class IncusResourceBootstrap {
       summary.put("scriptsMountPath", HOST_SCRIPTS_DIR_PATH);
       summary.put("unitsMountPath", HOST_SYSTEMD_DIR_PATH);
       summary.put("systemdLibexecMountPath", HOST_SYSTEMD_LIBEXEC_DIR_PATH);
-      summary.put("scriptsSourcePath", paths.scriptsRoot().toString());
-      summary.put("unitsSourcePath", paths.systemdRoot().toString());
-      summary.put("systemdLibexecSourcePath", paths.systemdLibexecRoot().toString());
       summary.put("scriptCount", scripts.size());
       summary.put("unitCount", units.size());
       summary.put("systemdLibexecContributionCount", systemdLibexecContributions.size());

@@ -54,7 +54,7 @@ public class LayerEnvContributorRegistry {
    * runtime < gitops).
    */
   public Map<String, String> aggregateContributions() throws IOException {
-    var aggregated = new HashMap<String, String>();
+    var aggregated = new TreeMap<String, String>();
     for (var contributor : orderedContributors()) {
       for (String section : contributor.contributedSections()) {
         var vars = contributor.contributeVariables(section, context);

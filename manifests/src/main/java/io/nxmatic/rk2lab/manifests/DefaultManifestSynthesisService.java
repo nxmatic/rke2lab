@@ -2,18 +2,11 @@ package io.nxmatic.rk2lab.manifests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.MappingIterator;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SequenceWriter;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.cfg.CoercionAction;
-import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
-import com.fasterxml.jackson.databind.type.LogicalType;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import io.nxmatic.rk2lab.manifests.api.ManifestDomainPolicy;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisResult;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
+import io.nxmatic.rk2lab.manifests.api.ManifestYaml;
 import io.nxmatic.rk2lab.manifests.layers.cicd.CicdDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.common.ApplyingManifestUnitVisitor;
@@ -34,7 +27,6 @@ import io.nxmatic.rk2lab.manifests.layers.replication.ReplicationDomainRegistrar
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.storage.StorageDomainRegistrar;
 import java.io.IOException;
-import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -50,7 +42,6 @@ import org.cdk8s.AppProps;
 import org.cdk8s.Chart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.LoaderOptions;
 
 /** Default SPI implementation for canonical manifest synthesis. */
 public final class DefaultManifestSynthesisService implements ManifestSynthesisService {
@@ -61,14 +52,6 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
       Set.of(".sh", ".bash", ".env", ".yaml", ".yml", ".conf", ".policy");
 
   private static final TypeReference<Map<String, Object>> DOCUMENT_TYPE = new TypeReference<>() {};
-
-  /**
-   * Jackson YAML mapper for the synth round-trip pass. {@code ORDER_MAP_ENTRIES_BY_KEYS} produces
-   * deterministic output (CDK8s/{@code Map.of()} hash randomization upstream is otherwise visible
-   * in checksums). {@code LITERAL_BLOCK_STYLE} renders any string containing a newline as a YAML
-   * literal block scalar, replacing the previous custom-Representer + regex post-processing dance.
-   */
-  private static final ObjectMapper YAML_MAPPER = buildYamlMapper();
 
   @Override
   public String providerId() {
@@ -239,7 +222,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
       throws IOException {
     final List<Map<String, Object>> documents = new ArrayList<>();
     try (MappingIterator<Map<String, Object>> iterator =
-        YAML_MAPPER.readerFor(DOCUMENT_TYPE).readValues(synthesizedFile.toFile())) {
+        ManifestYaml.readValues(synthesizedFile, DOCUMENT_TYPE)) {
       while (iterator.hasNext()) {
         final Map<String, Object> document = iterator.next();
         if (document != null) {
@@ -248,13 +231,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
       }
     }
 
-    final StringWriter writer = new StringWriter();
-    try (SequenceWriter sequence = YAML_MAPPER.writer().writeValues(writer)) {
-      for (Map<String, Object> document : documents) {
-        sequence.write(document);
-      }
-    }
-    Files.writeString(synthesizedFile, writer.toString());
+    ManifestYaml.writeDocuments(synthesizedFile, documents);
   }
 
   private Map<String, Object> normalizeConfigMapScripts(Map<String, Object> document) {
@@ -296,33 +273,5 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
       normalized = normalized + "\n";
     }
     return normalized;
-  }
-
-  /**
-   * SnakeYaml (which Jackson YAML wraps internally) caps single-document parses at 3 MiB by
-   * default. The synthesized manifest carries the base64-encoded NRI plugin archive plus the flox
-   * installer-assets ConfigMap (now including pre-locked flake/manifest locks per env), so single
-   * ConfigMap documents can sit well above that. Bump to 64 MiB — generous headroom for the inputs
-   * we actually emit.
-   */
-  private static ObjectMapper buildYamlMapper() {
-    final LoaderOptions loaderOptions = new LoaderOptions();
-    loaderOptions.setCodePointLimit(64 * 1024 * 1024);
-
-    final YAMLFactory factory =
-        YAMLFactory.builder()
-            .loaderOptions(loaderOptions)
-            .enable(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE)
-            .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
-            .disable(YAMLGenerator.Feature.SPLIT_LINES)
-            .build();
-    final ObjectMapper mapper =
-        new ObjectMapper(factory).enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
-    // Multi-doc synth output occasionally contains stray `---` separators that yield an empty
-    // document; coerce those to null so the iterator filter can skip them instead of throwing.
-    mapper
-        .coercionConfigFor(LogicalType.Map)
-        .setCoercion(CoercionInputShape.EmptyString, CoercionAction.AsNull);
-    return mapper;
   }
 }

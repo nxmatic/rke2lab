@@ -1,7 +1,9 @@
 package io.nxmatic.rk2lab.manifests.layers.env;
 
+import io.nxmatic.rk2lab.manifests.api.ManifestYaml;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -45,51 +47,33 @@ public interface LayerEnvContributor {
    */
   default void writeConfigMap(Path outputDir, LayerEnvContext context) throws IOException {
     for (String section : contributedSections()) {
-      String configMapName = "env-section-" + section;
-      Map<String, String> variables = contributeVariables(section, context);
-
-      // Write standard Kubernetes ConfigMap YAML
-      String yaml = generateConfigMapYaml(configMapName, section, variables);
-      Path outputFile = outputDir.resolve(layerId() + "-" + section + ".yml");
-      java.nio.file.Files.writeString(outputFile, yaml);
+      final Map<String, Object> document =
+          buildConfigMapDocument(
+              "env-section-" + section, section, contributeVariables(section, context));
+      ManifestYaml.writeDocument(outputDir.resolve(layerId() + "-" + section + ".yml"), document);
     }
   }
 
-  /** Standard ConfigMap YAML generation (reusable by all contributors). */
-  static String generateConfigMapYaml(String name, String section, Map<String, String> variables) {
+  /**
+   * Build a Kubernetes ConfigMap document for a contributor section. The caller hands the result to
+   * {@link ManifestYaml} for rendering — no caller serializes YAML by hand.
+   */
+  static Map<String, Object> buildConfigMapDocument(
+      String name, String section, Map<String, String> variables) {
+    final Map<String, Object> annotations = new LinkedHashMap<>();
+    annotations.put("config.kubernetes.io/local-config", "true");
+    annotations.put("env.rk2lab.nxmatic.io/section", section);
+    annotations.put("rk2lab.nxmatic.io/managed-by", "layer-contributor");
 
-    StringBuilder yaml = new StringBuilder();
-    yaml.append("---\n");
-    yaml.append("apiVersion: v1\n");
-    yaml.append("kind: ConfigMap\n");
-    yaml.append("metadata:\n");
-    yaml.append("  annotations:\n");
-    yaml.append("    config.kubernetes.io/local-config: \"true\"\n");
-    yaml.append("    env.rk2lab.nxmatic.io/section: ").append(section).append("\n");
-    yaml.append("    rk2lab.nxmatic.io/managed-by: layer-contributor\n");
-    yaml.append("  name: ").append(name).append("\n");
-    yaml.append("data:\n");
+    final Map<String, Object> metadata = new LinkedHashMap<>();
+    metadata.put("annotations", annotations);
+    metadata.put("name", name);
 
-    for (Map.Entry<String, String> entry : variables.entrySet()) {
-      yaml.append("  ")
-          .append(entry.getKey())
-          .append(": ")
-          .append(quoteIfNeeded(entry.getValue()))
-          .append("\n");
-    }
-
-    return yaml.toString();
-  }
-
-  /** Quote YAML values if they contain spaces or special chars. */
-  static String quoteIfNeeded(String value) {
-    if (value.isEmpty()
-        || value.contains(" ")
-        || value.contains(":")
-        || value.equals("false")
-        || value.equals("true")) {
-      return "\"" + value.replace("\"", "\\\"") + "\"";
-    }
-    return value;
+    final Map<String, Object> document = new LinkedHashMap<>();
+    document.put("apiVersion", "v1");
+    document.put("kind", "ConfigMap");
+    document.put("metadata", metadata);
+    document.put("data", variables);
+    return document;
   }
 }

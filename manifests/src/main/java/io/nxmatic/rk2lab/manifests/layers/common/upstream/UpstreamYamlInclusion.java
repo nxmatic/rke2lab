@@ -3,11 +3,7 @@ package io.nxmatic.rk2lab.manifests.layers.common.upstream;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.MappingIterator;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.cfg.CoercionAction;
-import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
-import com.fasterxml.jackson.databind.type.LogicalType;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import io.nxmatic.rk2lab.manifests.api.ManifestYaml;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,7 +17,6 @@ import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
 import org.cdk8s.JsonPatch;
-import org.yaml.snakeyaml.LoaderOptions;
 import software.constructs.Construct;
 
 /**
@@ -204,8 +199,7 @@ public class UpstreamYamlInclusion {
       if (in == null) {
         throw new IllegalArgumentException("Classpath resource not found: " + classpathResource);
       }
-      try (MappingIterator<Map<String, Object>> iterator =
-          YAML_MAPPER.readerFor(MAP_TYPE).readValues(in)) {
+      try (MappingIterator<Map<String, Object>> iterator = ManifestYaml.readValues(in, MAP_TYPE)) {
         final List<Map<String, Object>> documents = new ArrayList<>();
         while (iterator.hasNext()) {
           final Map<String, Object> document = iterator.next();
@@ -221,24 +215,4 @@ public class UpstreamYamlInclusion {
   }
 
   private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
-
-  /**
-   * Tekton's release.yaml carries large CRD schemas; lift SnakeYaml's per-document code-point cap
-   * (Jackson YAML wraps SnakeYaml internally) from the default 3 MiB to 64 MiB to be safe against
-   * future bundles.
-   */
-  private static final ObjectMapper YAML_MAPPER = buildMapper();
-
-  private static ObjectMapper buildMapper() {
-    final LoaderOptions loaderOptions = new LoaderOptions();
-    loaderOptions.setCodePointLimit(64 * 1024 * 1024);
-    final ObjectMapper mapper =
-        new ObjectMapper(YAMLFactory.builder().loaderOptions(loaderOptions).build());
-    // Multi-doc YAML often contains stray `---` separators that yield an empty document; coerce
-    // those to null so the iterator filter can skip them instead of throwing.
-    mapper
-        .coercionConfigFor(LogicalType.Map)
-        .setCoercion(CoercionInputShape.EmptyString, CoercionAction.AsNull);
-    return mapper;
-  }
 }
