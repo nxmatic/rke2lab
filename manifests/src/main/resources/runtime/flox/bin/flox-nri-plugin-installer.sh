@@ -1,12 +1,31 @@
 #!/usr/bin/env bash
 set -exuo pipefail
 
-DAEMONSET_BASE_ROOT="/srv/host/k8s-daemonset.d"
-DAEMONSET_ASSET_SUBDIR="runtime/flox"
 DAEMONSET_EXEC_MODE="${DAEMONSET_EXEC_MODE:-pod}"
-# Note: In host mode, DAEMONSET_SCRIPT_ROOT will be set by flox activation
-# In pod mode, we'll set it explicitly in installer::logging:setup
-# Don't set defaults here - let each mode establish its source of truth
+DAEMONSET_ASSET_SUBDIR="runtime/flox"
+
+# Path contract:
+#
+#   DAEMONSET_SCRIPT_ROOT       — base root, sibling of other daemonsets
+#   DAEMONSET_HOST_SCRIPT_ROOT  — asset root = ${DAEMONSET_SCRIPT_ROOT}/runtime/flox
+#
+# Per execution context:
+#   host               base = /srv/host/k8s-daemonset.d   (set by flox activation)
+#   pod (init/sidecar) base = /var/run/k8s-daemonset.d    (workspace hostPath,
+#                                                          path-identical inside)
+#
+# DAEMONSET_SCRIPT_ROOT may be supplied by the environment (flox activation in
+# host mode, or an explicit env entry in the pod spec). Otherwise default by
+# mode.
+case "${DAEMONSET_EXEC_MODE}" in
+host)
+	DAEMONSET_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT:-/srv/host/k8s-daemonset.d}"
+	;;
+pod)
+	DAEMONSET_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT:-/var/run/k8s-daemonset.d}"
+	;;
+esac
+DAEMONSET_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT%/}/${DAEMONSET_ASSET_SUBDIR}"
 
 installer::mode:validate() {
 	case "${DAEMONSET_EXEC_MODE}" in
@@ -21,25 +40,25 @@ installer::mode:validate() {
 }
 
 installer::paths:init() {
-	# Establish the single source of truth for script root paths based on mode
-	case "${DAEMONSET_EXEC_MODE}" in
-	pod)
-		# Pod mode: SCRIPT_MOUNT_DIR is the workspace volume mount, already at runtime/flox level
-		# This is mounted from host's /srv/host/k8s-daemonset.d/runtime/flox
-		DAEMONSET_HOST_SCRIPT_ROOT="${SCRIPT_MOUNT_DIR}"
-		;;
-	host)
-		# Host mode: DAEMONSET_SCRIPT_ROOT comes from flox activation (ConfigMap env var = /srv/host/k8s-daemonset.d)
-		# Append the asset subdirectory to get to runtime/flox
-		DAEMONSET_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT:-${DAEMONSET_BASE_ROOT}}/${DAEMONSET_ASSET_SUBDIR}"
-		;;
-	esac
-
-	# Derive dependent paths from the single source of truth
 	DAEMONSET_HOST_SCRIPT_BIN="${DAEMONSET_HOST_SCRIPT_ROOT}/bin"
-	DAEMONSET_HOST_SCRIPT_LIB_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/.sh.d"
 	DAEMONSET_HOST_SCRIPT_ETC_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/etc"
 	DAEMONSET_SCRIPT_LOG_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/log"
+
+	# Policy library lives in different places per mode:
+	#   pod  — materialized into the workspace volume at <root>/.sh.d/ by
+	#          installer::pod:materialize_assets (workspace volume = host's
+	#          /var/run/k8s-daemonset.d).
+	#   host — seed-bootstrap's FloxRuntimeAssets writes the policy entries
+	#          under build-assets/, so on the host filesystem the lib sits at
+	#          <root>/build-assets/.sh.d/.
+	case "${DAEMONSET_EXEC_MODE}" in
+	pod)
+		DAEMONSET_HOST_SCRIPT_LIB_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/.sh.d"
+		;;
+	host)
+		DAEMONSET_HOST_SCRIPT_LIB_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/build-assets/.sh.d"
+		;;
+	esac
 }
 
 installer::policy:source() {
@@ -282,12 +301,19 @@ installer::pod:run() {
 	# decode step is needed — `cp -af /.sh/. ${SCRIPT_MOUNT_DIR}/` already brought it into
 	# the workspace next to flake.nix.
 
-	DAEMONSET_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT}" \
-		DAEMONSET_HOST_SCRIPT_BIN="${DAEMONSET_SCRIPT_ROOT%/}/bin" \
-		DAEMONSET_HOST_SCRIPT_LIB_DIR="${DAEMONSET_SCRIPT_ROOT%/}/.sh.d" \
+	# Hand off to host: the trampoline needs the *host* roots (where the
+	# re-execed script lives on the host filesystem), not the in-pod roots.
+	local host_base_root="/srv/host/k8s-daemonset.d"
+	local host_asset_root="${host_base_root}/${DAEMONSET_ASSET_SUBDIR}"
+
+	# Forward only the trampoline's contract vars (root + bin); the host child
+	# recomputes its lib/etc/log paths from DAEMONSET_HOST_SCRIPT_ROOT in its
+	# own installer::paths:init.
+	DAEMONSET_HOST_SCRIPT_ROOT="${host_asset_root}" \
+		DAEMONSET_HOST_SCRIPT_BIN="${host_asset_root}/bin" \
 		daemonset::trampoline:exec_on_host \
 		"flox-nri-plugin-installer.sh" \
-		"DAEMONSET_SCRIPT_ROOT=${DAEMONSET_SCRIPT_ROOT}"
+		"DAEMONSET_SCRIPT_ROOT=${host_base_root}"
 }
 
 installer::host:flox:activate() {
