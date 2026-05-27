@@ -31,7 +31,9 @@ public final class HeadplaneLayer extends Construct {
       final Construct scope, final String id, final ManifestUnitReferenceRegistry registry) {
     super(scope, id);
     this.registry = registry;
-    this.floxImage = ManifestSynthesisContext.current().floxDebugPolicy().image();
+    // Always use the prod carrier image; the FloxShellSidecarProfile (when adopted) will carry
+    // the debug image in its sidecar. See HeadscaleLayer for the same deferral.
+    this.floxImage = ManifestSynthesisContext.current().floxDebugPolicy().prodImage();
 
     ApiObject serviceAccount = createServiceAccount();
     ApiObject envConfigMap = createEnvConfigMap();

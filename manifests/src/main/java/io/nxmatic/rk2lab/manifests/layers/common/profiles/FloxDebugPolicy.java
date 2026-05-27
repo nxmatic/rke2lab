@@ -1,8 +1,6 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.common.profiles;
 
-import java.util.List;
-
 /**
  * Synth-scoped debug policy for the flox NRI plugin. Carried on {@link
  * io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest} and reachable from any manifest unit
@@ -29,7 +27,6 @@ public record FloxDebugPolicy(boolean enabled) {
   private static final String PROD_IMAGE = "busybox:stable";
 
   private static final String DEBUG_IMAGE = "alpine:latest";
-  private static final List<String> PAUSE_COMMAND = List.of("/bin/sleep", "infinity");
   private static final FloxDebugPolicy DISABLED = new FloxDebugPolicy(false);
 
   /** Production-shape policy: every primitive falls through unchanged. */
@@ -38,7 +35,9 @@ public record FloxDebugPolicy(boolean enabled) {
   }
 
   /**
-   * Debug-shape policy: image becomes {@code bash:5} and command becomes {@code sleep infinity}.
+   * Debug-shape policy: opts a workload's pod into the shell sidecar (see {@link
+   * FloxShellSidecarProfile}). Layers no longer flip their prod container's image/command/flox env;
+   * debug capability is additive.
    */
   public static FloxDebugPolicy debug() {
     return new FloxDebugPolicy(true);
@@ -48,30 +47,18 @@ public record FloxDebugPolicy(boolean enabled) {
     return DEBUG_IMAGE;
   }
 
-  public List<String> pauseCommand() {
-    return PAUSE_COMMAND;
-  }
-
   /** The single prod-image identifier shared by every flox-injected workload carrier. */
   public String prodImage() {
     return PROD_IMAGE;
   }
 
-  /** Returns {@link #prodImage()} unless debug is enabled, in which case {@link #debugImage()}. */
+  /**
+   * Returns {@link #prodImage()} unless debug is enabled, in which case {@link #debugImage()}. The
+   * one consumer is {@link DelveSidecarProfile}, which wants alpine when delve is opt-in; workload
+   * carriers should call {@link #prodImage()} directly and rely on {@link FloxShellSidecarProfile}
+   * for the alpine shell.
+   */
   public String image() {
     return enabled ? DEBUG_IMAGE : PROD_IMAGE;
-  }
-
-  /** Returns {@code prodCommand} unless debug is enabled, in which case {@link #pauseCommand()}. */
-  public List<String> command(final List<String> prodCommand) {
-    return enabled ? PAUSE_COMMAND : prodCommand;
-  }
-
-  /**
-   * Returns {@code prodEnv} unless debug is enabled and a {@code debugEnv} variant is supplied.
-   * Used to swap to {@code <category>/<name>-debug} flox envs that ship dlv and shell tools.
-   */
-  public String floxEnvironment(final String prodEnv, final String debugEnv) {
-    return (enabled && debugEnv != null) ? debugEnv : prodEnv;
   }
 }

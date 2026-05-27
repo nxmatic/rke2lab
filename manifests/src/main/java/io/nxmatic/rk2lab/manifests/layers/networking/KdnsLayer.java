@@ -6,6 +6,7 @@ import io.nxmatic.rk2lab.manifests.layers.common.ManifestSynthesisContext;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.DelveSidecarProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.DelveSidecarToggleResolver;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxShellSidecarProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.RuntimePodProfile;
 import java.util.ArrayList;
@@ -213,22 +214,21 @@ public final class KdnsLayer extends Construct {
     deployment.addDependency(dlvScriptConfigMap);
     deployment.addDependency(clusterRoleBinding);
 
-    // Debug mode swaps the workload for a paused bash:5 shell so the container
-    // stays up while we exec in to inspect mounts, run flox by hand, attach
-    // dlv, etc. The mounted flox env is also swapped to networking/kdns-debug
-    // so delve and friends are available inside $HOME/.flox.
+    // Debug mode is additive: prod container always runs the real workload in the prod carrier;
+    // an opt-in shell sidecar (FloxShellSidecarProfile) carries the debug flox env so an operator
+    // can `kubectl exec -c kdns-shell -- bash` and run `flox activate -- kdns ...` against the
+    // same flox state the prod kdns container is using.
     final FloxDebugPolicy debugPolicy = ManifestSynthesisContext.current().floxDebugPolicy();
-    final String containerImage = debugPolicy.image();
-    final List<String> containerCommand =
-        debugPolicy.command(List.of("flox", "activate", "--dir", "/root", "--", "kdns"));
-    final String floxEnvironment =
-        debugPolicy.floxEnvironment("networking/kdns", "networking/kdns-debug");
+    final FloxShellSidecarProfile shellSidecar =
+        new FloxShellSidecarProfile(
+            debugPolicy, "kdns", "/root", "networking/kdns-debug", "0", "0");
+    final String floxEnvironment = "networking/kdns";
 
     LinkedHashMap<String, Object> kdnsContainer = new LinkedHashMap<>();
     kdnsContainer.put("name", "kdns");
-    kdnsContainer.put("image", containerImage);
+    kdnsContainer.put("image", debugPolicy.prodImage());
     kdnsContainer.put("imagePullPolicy", "IfNotPresent");
-    kdnsContainer.put("command", containerCommand);
+    kdnsContainer.put("command", List.of("flox", "activate", "--dir", "/root", "--", "kdns"));
     kdnsContainer.put(
         "env",
         List.of(
@@ -267,17 +267,43 @@ public final class KdnsLayer extends Construct {
             false,
             "runAsUser",
             0));
-    kdnsContainer.put(
-        "volumeMounts",
-        List.of(
-            Map.of("mountPath", "/.config/flox", "name", "flox-config"),
-            Map.of("mountPath", "/.cache/flox", "name", "flox-cache")));
+    final List<Map<String, Object>> kdnsProdMounts = new ArrayList<>();
+    if (!shellSidecar.enabled()) {
+      // Prod-only flox state volumes; when the shell sidecar is enabled, it owns the matching
+      // emptyDirs and shares them with prod via extraProdMounts() — these become duplicates.
+      kdnsProdMounts.add(Map.of("mountPath", "/.config/flox", "name", "flox-config"));
+      kdnsProdMounts.add(Map.of("mountPath", "/.cache/flox", "name", "flox-cache"));
+    }
+    kdnsProdMounts.addAll(shellSidecar.extraProdMounts());
+    kdnsContainer.put("volumeMounts", List.copyOf(kdnsProdMounts));
 
     List<Object> containers = new ArrayList<>();
     containers.add(kdnsContainer);
+    shellSidecar.sidecar(kdnsProdMounts).ifPresent(containers::add);
     delveSidecarProfile
         .delveSidecar("kdns-dlv", "kdns-dlv.sh", "kdns-dlv-script")
         .ifPresent(containers::add);
+
+    final LinkedHashMap<String, String> floxAnnotations = new LinkedHashMap<>();
+    floxAnnotations.put("flox.dev/environment.kdns", floxEnvironment);
+    floxAnnotations.put("flox.dev/home.kdns", "/root");
+    floxAnnotations.put("flox.dev/uid.kdns", "0");
+    floxAnnotations.put("flox.dev/gid.kdns", "0");
+    floxAnnotations.putAll(shellSidecar.sidecarAnnotations());
+
+    final List<Object> volumes = new ArrayList<>();
+    volumes.add(
+        Map.of(
+            "name",
+            "kdns-dlv-script",
+            "configMap",
+            Map.of("defaultMode", 493, "name", "kdns-dlv-script")));
+    if (!shellSidecar.enabled()) {
+      // Prod-only emptyDirs; the shell sidecar provides the shared variants when enabled.
+      volumes.add(Map.of("name", "flox-config", "emptyDir", Map.of()));
+      volumes.add(Map.of("name", "flox-cache", "emptyDir", Map.of()));
+    }
+    volumes.addAll(shellSidecar.extraVolumes());
 
     LinkedHashMap<String, Object> deploymentSpec = new LinkedHashMap<>();
     deploymentSpec.put("replicas", 1);
@@ -293,12 +319,7 @@ public final class KdnsLayer extends Construct {
             Map.of(
                 "annotations",
                 delveSidecarProfile.workloadAnnotations(
-                    packageProfile.templateAnnotations(
-                        Map.of(
-                            "flox.dev/environment.kdns", floxEnvironment,
-                            "flox.dev/home.kdns", "/root",
-                            "flox.dev/uid.kdns", "0",
-                            "flox.dev/gid.kdns", "0"))),
+                    packageProfile.templateAnnotations(Map.copyOf(floxAnnotations))),
                 "labels",
                 Map.of(
                     "app.kubernetes.io/instance",
@@ -310,18 +331,7 @@ public final class KdnsLayer extends Construct {
                     "helm.sh/chart",
                     "kdns-0.2.3")),
             "spec",
-            runtimePodProfile.apply(
-                containers,
-                List.of(
-                    Map.of(
-                        "name",
-                        "kdns-dlv-script",
-                        "configMap",
-                        Map.of("defaultMode", 493, "name", "kdns-dlv-script")),
-                    Map.of("name", "flox-config", "emptyDir", Map.of()),
-                    Map.of("name", "flox-cache", "emptyDir", Map.of())),
-                "kdns",
-                Map.of())));
+            runtimePodProfile.apply(containers, List.copyOf(volumes), "kdns", Map.of())));
 
     deployment.addJsonPatch(
         JsonPatch.add("/spec", deploymentSpec),
