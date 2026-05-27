@@ -105,9 +105,10 @@ daemonset::runtime:preflight() {
 	done
 }
 
-# Source the canonical policy libs. Callers should have already run
-# daemonset::runtime:paths:bind + daemonset::runtime:preflight, so any
-# missing-file failure here is a programming error in the runtime itself.
+# Source the canonical policy libs and set up xtrace mirroring. Callers
+# should have already run daemonset::runtime:paths:bind +
+# daemonset::runtime:preflight, so any missing-file failure here is a
+# programming error in the runtime itself.
 daemonset::runtime:libs:source() {
 	local lib_dir="${DAEMONSET_HOST_SCRIPT_LIB_DIR}"
 	# shellcheck disable=SC1091
@@ -116,6 +117,13 @@ daemonset::runtime:libs:source() {
 	source "${lib_dir}/daemonset-host-shell-policy.sh"
 	# shellcheck disable=SC1091
 	source "${lib_dir}/daemonset-trampoline.sh"
+
+	# Mirror stderr to <log-dir>/<script-basename>.xtrace. $0 inside a sourced
+	# file resolves to the *caller's* path, which is the daemonset's
+	# entrypoint script — exactly what we want to log under.
+	local script_basename="${0##*/}"
+	DAEMONSET_SCRIPT_LOG_DIR="${DAEMONSET_SCRIPT_LOG_DIR}" \
+		daemonset::logging:stderr:setup "${DAEMONSET_HOST_SCRIPT_BIN}/${script_basename}"
 }
 
 # Materialize the shared policy library from the ConfigMap mount
@@ -154,6 +162,31 @@ daemonset::runtime:assets:install_executable() {
 		return 1
 	}
 	install -D -m "${install_mode}" "${source_path}" "${target_path}"
+}
+
+# Invoke the daemonset's optional materialization hook, if defined. The hook
+# is a single function `<namespace>::on_materialize <phase>` that the runtime
+# calls before and after each materialization step. Missing hook = no-op.
+daemonset::runtime:hooks:on_materialize() {
+	local namespace="${1:?namespace required}"
+	local phase="${2:?phase required (pre or post)}"
+	local entry="${namespace}::on_materialize"
+
+	declare -F "${entry}" >/dev/null || return 0
+	"${entry}" "${phase}"
+}
+
+# End-to-end pod-mode materialization: run the daemonset's pre hook, lay out
+# the workspace, copy the policy lib in from the ConfigMap mount, then run
+# the post hook. The daemonset declares only its hook; the runtime owns the
+# rest.
+daemonset::runtime:materialize() {
+	local namespace="${1:?namespace required}"
+
+	daemonset::runtime:hooks:on_materialize "${namespace}" pre
+	daemonset::host_shell:layout:ensure "${DAEMONSET_HOST_SCRIPT_ROOT}"
+	daemonset::runtime:assets:install_policy_lib
+	daemonset::runtime:hooks:on_materialize "${namespace}" post
 }
 
 # Dispatch to the daemonset's <namespace>::<mode>:run function. The function

@@ -467,19 +467,27 @@ containerd::config:flox:update() {
 	return 0 # Config changed
 }
 
-flox_nri_plugin::pod:run() {
-	install_deps
-	daemonset::runtime:assets:install_policy_lib
+flox_nri_plugin::on_materialize() {
+	case "${1}" in
+	pre)
+		install_deps
+		;;
+	post)
+		# OCI prestart hooks — runc looks them up in /usr/local/sbin on the
+		# host filesystem (bind-mounted at ${HOST_ROOT} inside this pod), not
+		# under our daemonset asset root.
+		daemonset::runtime:assets:install_executable \
+			"${DAEMONSET_HOST_SCRIPT_BIN}/flox-nri-overlay-hook.sh" \
+			"${HOST_ROOT}/usr/local/sbin/flox-nri-overlay-hook.sh"
+		daemonset::runtime:assets:install_executable \
+			"${DAEMONSET_HOST_SCRIPT_BIN}/flox-nri-chown-hook.sh" \
+			"${HOST_ROOT}/usr/local/sbin/flox-nri-chown-hook.sh"
+		;;
+	esac
+}
 
-	# OCI prestart hooks — runc looks them up in /usr/local/sbin on the host
-	# filesystem (bind-mounted at ${HOST_ROOT} inside this pod), not under
-	# our daemonset asset root.
-	daemonset::runtime:assets:install_executable \
-		"${DAEMONSET_HOST_SCRIPT_BIN}/flox-nri-overlay-hook.sh" \
-		"${HOST_ROOT}/usr/local/sbin/flox-nri-overlay-hook.sh"
-	daemonset::runtime:assets:install_executable \
-		"${DAEMONSET_HOST_SCRIPT_BIN}/flox-nri-chown-hook.sh" \
-		"${HOST_ROOT}/usr/local/sbin/flox-nri-chown-hook.sh"
+flox_nri_plugin::pod:run() {
+	daemonset::runtime:materialize flox_nri_plugin
 
 	# Hand off to host. The trampoline forwards DAEMONSET_SCRIPT_ROOT (host
 	# base root) and DAEMONSET_EXEC_MODE=host; the host child re-runs paths:bind
