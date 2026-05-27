@@ -58,7 +58,7 @@ That gives the system a layered path:
 . NFS-mounted worktree inside the NixOS Tart/VZ guest
 . bind-mounted worktree folders inside Incus instances or nodes
 
-This matters because the worktree is neither a cluster-owned runtime output nor a daemonless host-asset root. It is an upstream source input projected across multiple boundaries.
+This matters because the worktree is neither a cluster-owned runtime output nor a daemonset host-asset root. It is an upstream source input projected across multiple boundaries.
 
 == Canonical ownership split
 
@@ -89,7 +89,7 @@ This is the core design rule:
 * The workflow/pipeline controller owns build and delivery workflows.
 * Node-local reconcilers own host mutation on already-running nodes.
 
-That split is deliberate because CAPI is not the natural owner of ongoing host-local runtime mutationfootnote:[A second wrong assumption was that CAPI might absorb the host-local runtime mutation currently expressed through staged systemd services and daemonless host workflows. CAPI can bootstrap machines, but the active plan treats ongoing host-runtime reconciliation as a node-local controller concern, not as generic machine lifecycle.] and the workflow/pipeline controller is not the natural owner of either node lifecycle or host drift correction.footnote:[A third wrong assumption was that the workflow/pipeline controller might become a general post-bootstrap orchestrator. The corrected plan keeps it focused on build, promotion, delivery, and workflow execution, not node reconciliation or bootstrap authority.]
+That split is deliberate because CAPI is not the natural owner of ongoing host-local runtime mutationfootnote:[A second wrong assumption was that CAPI might absorb the host-local runtime mutation currently expressed through staged systemd services and daemonset host workflows. CAPI can bootstrap machines, but the active plan treats ongoing host-runtime reconciliation as a node-local controller concern, not as generic machine lifecycle.] and the workflow/pipeline controller is not the natural owner of either node lifecycle or host drift correction.footnote:[A third wrong assumption was that the workflow/pipeline controller might become a general post-bootstrap orchestrator. The corrected plan keeps it focused on build, promotion, delivery, and workflow execution, not node reconciliation or bootstrap authority.]
 
 == Role of the workflow/pipeline controller
 

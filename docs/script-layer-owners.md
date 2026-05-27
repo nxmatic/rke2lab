@@ -71,7 +71,7 @@ Scripts in this owner set:
 
 ## Notes
 
-- Runtime daemonset policy scripts currently include `daemonset-logging.sh`, `daemonless-trampoline.sh`, and `daemonless-host-asset-materializer.sh` under `manifests/src/main/resources/runtime/daemonset/.sh.d/`.
+- Runtime daemonset policy scripts currently include `daemonset-logging.sh`, `daemonset-trampoline.sh`, and `daemonset-host-asset-materializer.sh` under `manifests/src/main/resources/runtime/daemonset/.sh.d/`.
 - `runtime/flox-runtime` is the canonical owner for runtime installer scripts.
 - The runtime now uses NRI (Node Resource Interface) plugin instead of custom containerd shim.
 - `kdns` source resolution is worktree-based (`path:` input), with subtree mode preferred at `networking/kdns/src` and explicit override available via `KDNS_SRC_WORKTREE`.

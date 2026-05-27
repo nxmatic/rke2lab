@@ -22,7 +22,7 @@ Before starting live troubleshooting, create or update a short troubleshooting n
 Examples of operation modes include:
 
 * `master-guest`
-* `daemonless-host-assets`
+* `daemonset-host-assets`
 * `master-hotfix`
 * `pod-materialization`
 * `host-reexec`
@@ -92,7 +92,7 @@ That promotion should preserve a single canonical implementation rather than lea
 
 == Relationship to runtime debugging
 
-This workflow is especially important for daemonless and host-mutating runtime flows where multiple execution surfaces can be confused with each other.
+This workflow is especially important for daemonset and host-mutating runtime flows where multiple execution surfaces can be confused with each other.
 
 Examples include:
 
