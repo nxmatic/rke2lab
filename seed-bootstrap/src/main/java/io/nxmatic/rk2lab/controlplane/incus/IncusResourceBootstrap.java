@@ -208,15 +208,25 @@ public final class IncusResourceBootstrap {
     }
 
     HostStage materializeAssets() {
-      logInfo("mode=" + (Deployment.getInstance().isDryRun() ? "preview" : "apply"));
+      final boolean dryRun = Deployment.getInstance().isDryRun();
+      logInfo("mode=" + (dryRun ? "preview" : "apply"));
 
+      // Preview reuses a fixed `host.preview` slot so it never consumes a retention slot or syncs
+      // to host/. Apply allocates a numbered slot in [0, retentionCount) and rsyncs it onto host/.
       final HostAssetRootLifecycle lifecycle =
-          new HostAssetRootLifecycle(config.hostAssetRotationRetentionCount());
+          dryRun
+              ? HostAssetRootLifecycle.previewLifecycle()
+              : new HostAssetRootLifecycle(config.hostAssetRotationRetentionCount());
 
       final StagingContext staging = materializeToStaging(lifecycle);
       final SliceContext slices = registerProvisioningSlices(staging);
-      syncStagingToFinal(lifecycle, staging.stagingRoot());
+      // Capture metadata BEFORE syncing: the sync step may move the scratch dir into a numbered
+      // slot, after which the slice registry's recorded paths would no longer resolve. Metadata
+      // capture only reads from the registry and in-memory summaries, so it's safe to do first.
       captureDeploymentMetadata(staging, slices);
+      if (!dryRun) {
+        syncStagingToFinal(lifecycle, staging.stagingRoot());
+      }
 
       return this;
     }
@@ -1880,11 +1890,24 @@ public final class IncusResourceBootstrap {
 
   private static final class HostAssetRootLifecycle {
 
+    private static final String PREVIEW_SUFFIX = ".preview";
+    private static final String SCRATCH_SUFFIX = ".scratch";
+
     private final int retentionCount;
-    private int slotSeq = -1;
+    private final boolean preview;
 
     private HostAssetRootLifecycle(int retentionCount) {
+      this(retentionCount, false);
+    }
+
+    private HostAssetRootLifecycle(int retentionCount, boolean preview) {
       this.retentionCount = retentionCount;
+      this.preview = preview;
+    }
+
+    /** Lifecycle for {@code pulumi preview} runs: reuses a fixed slot, never rotates or syncs. */
+    private static HostAssetRootLifecycle previewLifecycle() {
+      return new HostAssetRootLifecycle(0, true);
     }
 
     private Path prepareStagingRoot(Path hostAssetRoot) {
@@ -1897,13 +1920,12 @@ public final class IncusResourceBootstrap {
 
         Files.createDirectories(parent);
 
-        slotSeq = allocateSlot(hostAssetRoot);
-        final Path stagingRoot = stagingPathFor(hostAssetRoot, slotSeq);
-
-        // Recycle the slot if we picked an occupied one (oldest by mtime).
+        // Apply mode: materialize into a scratch dir first. We only allocate a numbered slot in
+        // syncStagingToFinal, after comparing against host/ so a no-op deploy doesn't burn one.
+        final String suffix = preview ? PREVIEW_SUFFIX : SCRATCH_SUFFIX;
+        final Path stagingRoot =
+            hostAssetRoot.resolveSibling(hostAssetRoot.getFileName().toString() + suffix);
         deleteRecursively(stagingRoot);
-        deleteRecursively(backupPathFor(hostAssetRoot, slotSeq));
-
         Files.createDirectories(stagingRoot);
         return stagingRoot;
       } catch (IOException ex) {
@@ -1913,21 +1935,82 @@ public final class IncusResourceBootstrap {
 
     private void syncStagingToFinal(Path stagingRoot, Path hostAssetRoot) {
       try {
+        if (Files.exists(hostAssetRoot) && directoriesAreIdentical(stagingRoot, hostAssetRoot)) {
+          // No-op deploy: scratch matches host/ byte-for-byte. Discard scratch, don't rotate.
+          deleteRecursively(stagingRoot);
+          return;
+        }
+
+        // Promote scratch to a numbered slot before any backup/sync so the slot is the canonical
+        // record of this run. Slot eviction (oldest mtime) happens here when retention is full.
+        final int slotSeq = allocateSlot(hostAssetRoot);
+        final Path slotPath = stagingPathFor(hostAssetRoot, slotSeq);
+        deleteRecursively(slotPath);
+        deleteRecursively(backupPathFor(hostAssetRoot, slotSeq));
+        Files.move(stagingRoot, slotPath);
+
         if (Files.exists(hostAssetRoot)) {
           // Backup existing state before sync (paired with the staging slot for this run).
-          final Path backupPath = backupPathFor(hostAssetRoot, slotSeq);
-          backup(hostAssetRoot, backupPath);
+          backup(hostAssetRoot, backupPathFor(hostAssetRoot, slotSeq));
 
           // Sync staging content to final location (preserves mount point inode)
-          syncDirectories(stagingRoot, hostAssetRoot);
+          syncDirectories(slotPath, hostAssetRoot);
         } else {
           // First deployment: copy staging to final location (keep staging for comparison)
-          backup(stagingRoot, hostAssetRoot);
+          backup(slotPath, hostAssetRoot);
         }
       } catch (IOException ex) {
         throw new IllegalStateException(
             "Failed to sync staging to final host asset root: " + hostAssetRoot, ex);
       }
+    }
+
+    private boolean directoriesAreIdentical(Path left, Path right) throws IOException {
+      final java.util.Set<Path> leftRelativePaths = collectRelativePaths(left);
+      final java.util.Set<Path> rightRelativePaths = collectRelativePaths(right);
+      if (!leftRelativePaths.equals(rightRelativePaths)) {
+        return false;
+      }
+      for (Path relative : leftRelativePaths) {
+        final Path leftPath = left.resolve(relative);
+        final Path rightPath = right.resolve(relative);
+        if (Files.isRegularFile(leftPath) != Files.isRegularFile(rightPath)) {
+          return false;
+        }
+        if (!Files.isRegularFile(leftPath)) {
+          continue;
+        }
+        if (Files.size(leftPath) != Files.size(rightPath)) {
+          return false;
+        }
+        if (Files.mismatch(leftPath, rightPath) != -1L) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    private java.util.Set<Path> collectRelativePaths(Path root) throws IOException {
+      final java.util.Set<Path> entries = new java.util.HashSet<>();
+      Files.walkFileTree(
+          root,
+          new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+              final Path relative = root.relativize(dir);
+              if (!relative.toString().isEmpty()) {
+                entries.add(relative);
+              }
+              return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+              entries.add(root.relativize(file));
+              return FileVisitResult.CONTINUE;
+            }
+          });
+      return entries;
     }
 
     /**
