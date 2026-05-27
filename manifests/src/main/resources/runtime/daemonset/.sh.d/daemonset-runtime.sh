@@ -118,6 +118,44 @@ daemonset::runtime:libs:source() {
 	source "${lib_dir}/daemonset-trampoline.sh"
 }
 
+# Materialize the shared policy library from the ConfigMap mount
+# (${SCRIPT_POLICY_LIB_DIR}) into the per-node workspace volume
+# (${DAEMONSET_HOST_SCRIPT_LIB_DIR}). Required in pod mode before the
+# trampoline can re-exec on the host: the host filesystem doesn't see the
+# in-pod ConfigMap mount, so the workspace is the only place the host child
+# can read the libs from.
+daemonset::runtime:assets:install_policy_lib() {
+	local source_lib_dir="${SCRIPT_POLICY_LIB_DIR:?SCRIPT_POLICY_LIB_DIR required (ConfigMap mount, e.g. /.sh-daemonset/.sh.d)}"
+	local target_lib_dir="${DAEMONSET_HOST_SCRIPT_LIB_DIR:?DAEMONSET_HOST_SCRIPT_LIB_DIR required; call paths:bind first}"
+
+	mkdir -p "${target_lib_dir}"
+	for lib in daemonset-runtime.sh daemonset-logging.sh \
+		daemonset-host-shell-policy.sh daemonset-trampoline.sh \
+		daemonset-host-asset-materializer.sh daemonset-host-asset-reconciler.sh; do
+		[[ -r "${source_lib_dir%/}/${lib}" ]] || {
+			echo "policy lib source missing or unreadable: ${source_lib_dir%/}/${lib}" >&2
+			return 1
+		}
+		install -D -m 0644 "${source_lib_dir%/}/${lib}" "${target_lib_dir%/}/${lib}"
+	done
+}
+
+# Install a single executable from the workspace bin/ to a host path. Used
+# for OCI hooks and any other daemonset-specific assets the daemonset wants
+# to drop into a well-known host directory. Wraps `install -D` with a clearer
+# error on missing source so layout drift surfaces immediately.
+daemonset::runtime:assets:install_executable() {
+	local source_path="${1:?source path required}"
+	local target_path="${2:?target path required}"
+	local install_mode="${3:-0755}"
+
+	[[ -r "${source_path}" ]] || {
+		echo "asset source missing or unreadable: ${source_path}" >&2
+		return 1
+	}
+	install -D -m "${install_mode}" "${source_path}" "${target_path}"
+}
+
 # Dispatch to the daemonset's <namespace>::<mode>:run function. The function
 # naming is convention-bound so the runtime never has to know which daemonset
 # is running — the caller passes its namespace.
