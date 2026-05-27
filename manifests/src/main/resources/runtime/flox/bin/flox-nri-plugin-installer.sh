@@ -4,80 +4,31 @@ set -exuo pipefail
 DAEMONSET_EXEC_MODE="${DAEMONSET_EXEC_MODE:-pod}"
 DAEMONSET_ASSET_SUBDIR="runtime/flox"
 
-# Path contract:
-#
-#   DAEMONSET_SCRIPT_ROOT       — base root, sibling of other daemonsets
-#   DAEMONSET_HOST_SCRIPT_ROOT  — asset root = ${DAEMONSET_SCRIPT_ROOT}/runtime/flox
-#
-# Per execution context:
-#   host               base = /srv/host/k8s-daemonset.d   (set by flox activation)
-#   pod (init/sidecar) base = /var/run/k8s-daemonset.d    (workspace hostPath,
-#                                                          path-identical inside)
-#
-# DAEMONSET_SCRIPT_ROOT may be supplied by the environment (flox activation in
-# host mode, or an explicit env entry in the pod spec). Otherwise default by
-# mode.
+# Pod-mode constants — ConfigMap mounts and host bind-mounts the daemonset
+# uses for cross-volume copies.
+HOST_ROOT="${HOST_ROOT:-/host-root}"
+SCRIPT_POLICY_ROOT="${SCRIPT_POLICY_ROOT:-/.sh-daemonset}"
+SCRIPT_POLICY_LIB_DIR="${SCRIPT_POLICY_LIB_DIR:-${SCRIPT_POLICY_ROOT%/}/.sh.d}"
+
+# Bootstrap the shared runtime lib. Pod mode sources it from the policy
+# ConfigMap mount; host mode (post-trampoline) sources it from the workspace
+# volume the pod just materialized. paths:bind populates the canonical
+# DAEMONSET_HOST_SCRIPT_* set; subsequent helpers all read from there.
 case "${DAEMONSET_EXEC_MODE}" in
-host)
-	DAEMONSET_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT:-/srv/host/k8s-daemonset.d}"
-	;;
-pod)
-	DAEMONSET_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT:-/var/run/k8s-daemonset.d}"
+pod) _bootstrap_lib_dir="${SCRIPT_POLICY_LIB_DIR}" ;;
+host) _bootstrap_lib_dir="${DAEMONSET_SCRIPT_ROOT:-/srv/host/k8s-daemonset.d}/${DAEMONSET_ASSET_SUBDIR}/.sh.d" ;;
+*)
+	echo "unsupported DAEMONSET_EXEC_MODE: ${DAEMONSET_EXEC_MODE} (expected pod or host)" >&2
+	exit 1
 	;;
 esac
-DAEMONSET_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT%/}/${DAEMONSET_ASSET_SUBDIR}"
+# shellcheck disable=SC1091
+source "${_bootstrap_lib_dir}/daemonset-runtime.sh"
+unset _bootstrap_lib_dir
 
-installer::mode:validate() {
-	case "${DAEMONSET_EXEC_MODE}" in
-	host | pod)
-		return 0
-		;;
-	*)
-		echo "unsupported runtime-installer mode: ${DAEMONSET_EXEC_MODE} (expected pod or host)" >&2
-		exit 1
-		;;
-	esac
-}
-
-installer::paths:init() {
-	DAEMONSET_HOST_SCRIPT_BIN="${DAEMONSET_HOST_SCRIPT_ROOT}/bin"
-	DAEMONSET_HOST_SCRIPT_LIB_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/.sh.d"
-	DAEMONSET_HOST_SCRIPT_ETC_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/etc"
-	DAEMONSET_SCRIPT_LOG_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/log"
-}
-
-installer::policy:source() {
-	local policy_lib_dir
-
-	case "${DAEMONSET_EXEC_MODE}" in
-	pod)
-		policy_lib_dir="${SCRIPT_POLICY_LIB_DIR}"
-		;;
-	host)
-		policy_lib_dir="${DAEMONSET_HOST_SCRIPT_LIB_DIR}"
-		;;
-	esac
-
-	# shellcheck disable=SC1091
-	source "${policy_lib_dir}/daemonset-logging.sh"
-	# shellcheck disable=SC1091
-	source "${policy_lib_dir}/daemonset-host-shell-policy.sh"
-	installer::logging:setup
-	# shellcheck disable=SC1091
-	source "${policy_lib_dir}/daemonset-trampoline.sh"
-	# shellcheck disable=SC1091
-	source "${policy_lib_dir}/daemonset-host-asset-materializer.sh"
-}
-
-installer::logging:setup() {
-	local script_path script_log_dir
-
-	script_path="${DAEMONSET_HOST_SCRIPT_ROOT}/bin/flox-nri-plugin-installer.sh"
-	script_log_dir="$(daemonset::host_shell:log:resolve)"
-
-	DAEMONSET_SCRIPT_LOG_DIR="${script_log_dir}" \
-		daemonset::logging:stderr:setup "${script_path}"
-}
+daemonset::runtime:paths:bind
+daemonset::runtime:preflight
+daemonset::runtime:libs:source
 
 install_deps() {
 	local attempt=0
@@ -93,78 +44,6 @@ install_deps() {
 		fi
 		sleep $((attempt * 2))
 	done
-}
-
-: "Pod mode constants - materialize bundled flox build resources onto host filesystem"
-HOST_ROOT="${HOST_ROOT:-/host-root}"
-SCRIPT_MOUNT_DIR="${SCRIPT_MOUNT_DIR:-/scripts}"
-SCRIPT_POLICY_ROOT="${SCRIPT_POLICY_ROOT:-/.sh-daemonset}"
-SCRIPT_POLICY_LIB_DIR="${SCRIPT_POLICY_LIB_DIR:-${SCRIPT_POLICY_ROOT%/}/.sh.d}"
-BUILD_ASSETS_DIR="${BUILD_ASSETS_DIR:-/build-assets}"
-
-runtime::assets:root:resolve() {
-	local resolved_root
-
-	resolved_root="${DAEMONSET_HOST_SCRIPT_ROOT:-${DAEMONSET_ASSET_ROOT}}"
-	[[ -n "${resolved_root}" ]] || {
-		echo "flox runtime asset root is not defined" >&2
-		exit 1
-	}
-
-	printf '%s\n' "${resolved_root}"
-}
-
-installer::pod:materialize_assets() {
-	# Build-derived inputs are already in the per-node workspace at
-	# ${SCRIPT_MOUNT_DIR} (the init container `cp -an`'d /.sh/. there before
-	# running this script). We only materialize the things that genuinely
-	# live elsewhere:
-	#   1. Script-policy library (daemonset-logging.sh, daemonset-*.sh) —
-	#      these ride a separate ConfigMap mounted at /.sh-daemonset, so
-	#      they need to be copied into ${SCRIPT_MOUNT_DIR}/.sh.d/.
-	#   2. OCI prestart hooks — runc looks them up in /usr/local/sbin on the
-	#      host, not under our daemonset asset root.
-	#
-	# IMPORTANT: write to ${SCRIPT_MOUNT_DIR} (the workspace mount in this
-	# pod), NOT to ${HOST_SCRIPT_ROOT} (which routes through /host-root/).
-	# /host-root is a hostPath bind of '/', but the host's /var/run is a
-	# separate tmpfs mounted *inside* /, and that tmpfs does NOT propagate
-	# through the hostPath bind. Writing under /host-root/var/run/... lands
-	# in the container's own overlay, invisible to the host. The workspace
-	# mount, on the other hand, is the host's /var/run/k8s-daemonset.d/...
-	# directly, so writes here actually land on the host filesystem.
-	local policy_shell_root policy_shell_bin policy_shell_lib_dir policy_shell_log_dir
-
-	policy_shell_root="${SCRIPT_MOUNT_DIR}"
-	policy_shell_bin="${SCRIPT_MOUNT_DIR%/}/bin"
-	policy_shell_lib_dir="${SCRIPT_MOUNT_DIR%/}/.sh.d"
-	policy_shell_log_dir="${SCRIPT_MOUNT_DIR%/}/log"
-
-	DAEMONSET_HOST_SCRIPT_ROOT="${policy_shell_root}" \
-		DAEMONSET_HOST_SCRIPT_BIN="${policy_shell_bin}" \
-		DAEMONSET_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
-		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-		daemonset::host_shell:layout:ensure "${SCRIPT_MOUNT_DIR}"
-
-	# Script-policy library — separate ConfigMap mount, real cross-volume copy.
-	for lib in daemonset-logging.sh daemonset-host-asset-materializer.sh \
-		daemonset-trampoline.sh daemonset-host-shell-policy.sh \
-		daemonset-host-asset-reconciler.sh; do
-		DAEMONSET_HOST_SCRIPT_ROOT="${policy_shell_root}" \
-			DAEMONSET_HOST_SCRIPT_BIN="${policy_shell_bin}" \
-			DAEMONSET_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
-			DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
-			daemonset::host_shell:library:install \
-			"${SCRIPT_POLICY_LIB_DIR}/${lib}" \
-			"${policy_shell_root}" \
-			"${lib}" >/dev/null
-	done
-
-	# OCI prestart hooks — runc looks them up in /usr/local/sbin on the host
-	# filesystem (bind-mounted at ${HOST_ROOT} inside this pod), not under
-	# our daemonset asset root.
-	install -D -m 0755 "${SCRIPT_MOUNT_DIR}/bin/flox-nri-overlay-hook.sh" "${HOST_ROOT}/usr/local/sbin/flox-nri-overlay-hook.sh"
-	install -D -m 0755 "${SCRIPT_MOUNT_DIR}/bin/flox-nri-chown-hook.sh" "${HOST_ROOT}/usr/local/sbin/flox-nri-chown-hook.sh"
 }
 
 installer::host:flox:prebuild_runtime_packages() {
@@ -275,30 +154,6 @@ installer::host:flox:activate_environments() {
 	echo "=== All ${#discovered_envs[@]} environments activated ==="
 }
 
-installer::pod:run() {
-	install_deps
-	installer::paths:init
-	installer::policy:source
-	installer::pod:materialize_assets
-
-	# nri-plugin source tree now ships as part of the build inputs (it's a
-	# `src = ./nri-plugin` reference from the parent flake), so no archive
-	# decode step is needed — `cp -af /.sh/. ${SCRIPT_MOUNT_DIR}/` already brought it into
-	# the workspace next to flake.nix.
-
-	# Hand off to host: the trampoline needs the host's asset root (to find
-	# the re-execed script's bin dir) and the host's base root (forwarded to
-	# the child as DAEMONSET_SCRIPT_ROOT, from which it re-derives everything
-	# via daemonset::runtime:paths:bind).
-	local host_base_root="/srv/host/k8s-daemonset.d"
-	local host_asset_root="${host_base_root}/${DAEMONSET_ASSET_SUBDIR}"
-
-	DAEMONSET_HOST_SCRIPT_ROOT="${host_asset_root}" \
-		DAEMONSET_SCRIPT_ROOT="${host_base_root}" \
-		daemonset::trampoline:exec_on_host \
-		"flox-nri-plugin-installer.sh"
-}
-
 installer::host:flox:activate() {
 	: Resolve flox in the binary path
 	source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
@@ -328,7 +183,7 @@ host::nix:flox-conf:ensure() {
 }
 
 runtime::assets:path:init() {
-	FLOX_RUNTIME_ROOT="$(runtime::assets:root:resolve)"
+	FLOX_RUNTIME_ROOT="${DAEMONSET_HOST_SCRIPT_ROOT}"
 	FLOX_RUNTIME_BIN_DIR="${FLOX_RUNTIME_ROOT}/bin"
 	FLOX_RUNTIME_ETC_DIR="${FLOX_RUNTIME_ROOT}/etc"
 	FLOX_RUNTIME_LOG_DIR="${FLOX_RUNTIME_ROOT}/log"
@@ -510,15 +365,6 @@ runtime::runtime:nri-plugin:build() {
 		"${FLOX_RUNTIME_ROOT}#${package_name}"
 }
 
-# The shim variants `flox/flox-runtime-{17,2x}` are not directly
-# resolvable via `flox install`; the canonical entrypoint published on FloxHub
-# is `flox/flox-runtime-installer`, whose closure carries both shim
-# variants. Pull that env, then read the shim path out of its requisites.
-
-# Find the flox-runtime-${variant}-* store path inside the installer
-# env's closure. The upstream installer hardcodes these paths; here we let
-# nix-store discover them so version bumps land via `flox pull`.
-
 nri::plugin:gcroot:ensure() {
 	local nri_plugin_pkg_path package_name
 
@@ -572,13 +418,6 @@ flox::runtime:profile:ensure() {
 
 runtime::runtime:core:install() {
 	: "Install/refresh flox runtime binaries on host"
-	# NRI plugin approach: no longer install custom shim binaries
-	# The NRI plugin handles Flox environment injection instead
-	# runtime::runtime:env:ensure "${flox_env_dir}"
-	# runtime::runtime:gcroots:ensure
-	# containerd_bin="$(runtime::runtime:containerd:resolve-bin)"
-	# variant="$(runtime::runtime:variant:resolve "${containerd_bin}")"
-	# runtime::runtime:binary:install "${flox_env_dir}" "${arch}" "${variant}"
 	nri::plugin:gcroot:ensure
 	flox::runtime:profile:ensure
 }
@@ -628,10 +467,35 @@ containerd::config:flox:update() {
 	return 0 # Config changed
 }
 
-installer::host:run() {
+flox_nri_plugin::pod:run() {
+	install_deps
+	daemonset::runtime:assets:install_policy_lib
+
+	# OCI prestart hooks — runc looks them up in /usr/local/sbin on the host
+	# filesystem (bind-mounted at ${HOST_ROOT} inside this pod), not under
+	# our daemonset asset root.
+	daemonset::runtime:assets:install_executable \
+		"${DAEMONSET_HOST_SCRIPT_BIN}/flox-nri-overlay-hook.sh" \
+		"${HOST_ROOT}/usr/local/sbin/flox-nri-overlay-hook.sh"
+	daemonset::runtime:assets:install_executable \
+		"${DAEMONSET_HOST_SCRIPT_BIN}/flox-nri-chown-hook.sh" \
+		"${HOST_ROOT}/usr/local/sbin/flox-nri-chown-hook.sh"
+
+	# Hand off to host. The trampoline forwards DAEMONSET_SCRIPT_ROOT (host
+	# base root) and DAEMONSET_EXEC_MODE=host; the host child re-runs paths:bind
+	# to derive the rest. DAEMONSET_HOST_SCRIPT_ROOT in the env is read by the
+	# trampoline to find the host bin dir for the re-exec'd command.
+	local host_base_root="/srv/host/k8s-daemonset.d"
+	local host_asset_root="${host_base_root}/${DAEMONSET_ASSET_SUBDIR}"
+
+	DAEMONSET_HOST_SCRIPT_ROOT="${host_asset_root}" \
+		DAEMONSET_SCRIPT_ROOT="${host_base_root}" \
+		daemonset::trampoline:exec_on_host \
+		"flox-nri-plugin-installer.sh"
+}
+
+flox_nri_plugin::host:run() {
 	installer::host:flox:activate
-	installer::paths:init
-	installer::policy:source
 
 	: "Initialize runtime asset paths and load environment"
 	host::nix:flox-conf:ensure
@@ -647,13 +511,6 @@ installer::host:run() {
 
 	: "Pre-activate flox environments to populate /nix/store"
 	installer::host:flox:activate_environments
-
-	# NRI plugin approach: no longer need to pre-build or sync store-paths
-	# Flox will build packages on-demand during 'flox activate' based on flake references
-	# : "Execute the shim build before mutating containerd config"
-	# runtime::assets:build:run
-	# : "Synchronize flox environment store-paths with actual built packages and push to FloxHub"
-	# flox::env:sync:run
 
 	: "Install/update flox runtime binaries on host"
 	runtime::runtime:core:install
@@ -680,14 +537,6 @@ installer::host:run() {
 	else
 		echo "NRI config already present, no restart needed"
 	fi
-
 }
 
-installer::mode:validate
-
-if [[ "${DAEMONSET_EXEC_MODE}" == "pod" ]]; then
-	installer::pod:run
-	return 0 2>/dev/null || exit 0
-fi
-
-installer::host:run
+daemonset::runtime:dispatch flox_nri_plugin
