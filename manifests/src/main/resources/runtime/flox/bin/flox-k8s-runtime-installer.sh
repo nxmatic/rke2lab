@@ -1,34 +1,56 @@
 #!/usr/bin/env bash
 set -exuo pipefail
 
-DAEMONSET_ASSET_ROOT="/srv/host/k8s-daemonset.d/runtime/flox"
-DAEMONLESS_EXEC_MODE="${DAEMONLESS_EXEC_MODE:-pod}"
-DAEMONSET_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT:-${DAEMONLESS_HOST_SCRIPT_ROOT:-${DAEMONSET_ASSET_ROOT}}}"
-DAEMONLESS_HOST_SCRIPT_ROOT="${DAEMONLESS_HOST_SCRIPT_ROOT:-${DAEMONSET_SCRIPT_ROOT}}"
-DAEMONLESS_HOST_SCRIPT_LIB_DIR="${DAEMONLESS_HOST_SCRIPT_LIB_DIR:-${DAEMONLESS_HOST_SCRIPT_ROOT%/}/.sh.d}"
-DAEMONLESS_HOST_SCRIPT_BIN="${DAEMONLESS_HOST_SCRIPT_BIN:-${DAEMONLESS_HOST_SCRIPT_ROOT%/}/bin}"
+DAEMONSET_BASE_ROOT="/srv/host/k8s-daemonset.d"
+DAEMONSET_ASSET_SUBDIR="runtime/flox"
+DAEMONSET_EXEC_MODE="${DAEMONSET_EXEC_MODE:-pod}"
+# Note: In host mode, DAEMONSET_SCRIPT_ROOT will be set by flox activation
+# In pod mode, we'll set it explicitly in installer::logging:setup
+# Don't set defaults here - let each mode establish its source of truth
 
 installer::mode:validate() {
-	case "${DAEMONLESS_EXEC_MODE}" in
+	case "${DAEMONSET_EXEC_MODE}" in
 	host | pod)
 		return 0
 		;;
 	*)
-		echo "unsupported runtime-installer mode: ${DAEMONLESS_EXEC_MODE} (expected pod or host)" >&2
+		echo "unsupported runtime-installer mode: ${DAEMONSET_EXEC_MODE} (expected pod or host)" >&2
 		exit 1
 		;;
 	esac
 }
 
+installer::paths:init() {
+	# Establish the single source of truth for script root paths based on mode
+	case "${DAEMONSET_EXEC_MODE}" in
+	pod)
+		# Pod mode: SCRIPT_MOUNT_DIR is the workspace volume mount, already at runtime/flox level
+		# This is mounted from host's /srv/host/k8s-daemonset.d/runtime/flox
+		DAEMONSET_HOST_SCRIPT_ROOT="${SCRIPT_MOUNT_DIR}"
+		;;
+	host)
+		# Host mode: DAEMONSET_SCRIPT_ROOT comes from flox activation (ConfigMap env var = /srv/host/k8s-daemonset.d)
+		# Append the asset subdirectory to get to runtime/flox
+		DAEMONSET_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT:-${DAEMONSET_BASE_ROOT}}/${DAEMONSET_ASSET_SUBDIR}"
+		;;
+	esac
+
+	# Derive dependent paths from the single source of truth
+	DAEMONSET_HOST_SCRIPT_BIN="${DAEMONSET_HOST_SCRIPT_ROOT}/bin"
+	DAEMONSET_HOST_SCRIPT_LIB_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/.sh.d"
+	DAEMONSET_HOST_SCRIPT_ETC_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/etc"
+	DAEMONSET_SCRIPT_LOG_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/log"
+}
+
 installer::policy:source() {
 	local policy_lib_dir
 
-	case "${DAEMONLESS_EXEC_MODE}" in
+	case "${DAEMONSET_EXEC_MODE}" in
 	pod)
 		policy_lib_dir="${SCRIPT_POLICY_LIB_DIR}"
 		;;
 	host)
-		policy_lib_dir="${DAEMONLESS_HOST_SCRIPT_LIB_DIR}"
+		policy_lib_dir="${DAEMONSET_HOST_SCRIPT_LIB_DIR}"
 		;;
 	esac
 
@@ -46,24 +68,8 @@ installer::policy:source() {
 installer::logging:setup() {
 	local script_path script_log_dir
 
-	case "${DAEMONLESS_EXEC_MODE}" in
-	pod)
-		script_path="${HOST_SCRIPT_ROOT}/bin/flox-k8s-runtime-installer.sh"
-		DAEMONLESS_HOST_SCRIPT_ROOT="${HOST_SCRIPT_ROOT}"
-		DAEMONLESS_HOST_SCRIPT_BIN="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/bin"
-		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/.sh.d"
-		# shellcheck disable=SC2034  # Passed as env var to daemonless functions below
-		DAEMONSET_SCRIPT_LOG_DIR="${HOST_SCRIPT_ROOT%/}/log"
-		script_log_dir="$(daemonless::host_shell:log:resolve)"
-		;;
-	host)
-		script_path="${DAEMONSET_SCRIPT_ROOT}/bin/flox-k8s-runtime-installer.sh"
-		DAEMONLESS_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT}"
-		DAEMONLESS_HOST_SCRIPT_BIN="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/bin"
-		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${DAEMONLESS_HOST_SCRIPT_ROOT%/}/.sh.d"
-		script_log_dir="$(daemonless::host_shell:log:resolve)"
-		;;
-	esac
+	script_path="${DAEMONSET_HOST_SCRIPT_ROOT}/bin/flox-k8s-runtime-installer.sh"
+	script_log_dir="$(daemonless::host_shell:log:resolve)"
 
 	DAEMONSET_SCRIPT_LOG_DIR="${script_log_dir}" \
 		daemonset::logging:stderr:setup "${script_path}"
@@ -85,18 +91,17 @@ install_deps() {
 	done
 }
 
-: "Materialize bundled flox build resources onto host filesystem"
+: "Pod mode constants - materialize bundled flox build resources onto host filesystem"
 HOST_ROOT="${HOST_ROOT:-/host-root}"
 SCRIPT_MOUNT_DIR="${SCRIPT_MOUNT_DIR:-/scripts}"
 SCRIPT_POLICY_ROOT="${SCRIPT_POLICY_ROOT:-/.sh-daemonset}"
 SCRIPT_POLICY_LIB_DIR="${SCRIPT_POLICY_LIB_DIR:-${SCRIPT_POLICY_ROOT%/}/.sh.d}"
 BUILD_ASSETS_DIR="${BUILD_ASSETS_DIR:-/build-assets}"
-HOST_SCRIPT_ROOT="${HOST_ROOT}${DAEMONSET_SCRIPT_ROOT}"
 
 runtime::assets:root:resolve() {
 	local resolved_root
 
-	resolved_root="${DAEMONLESS_HOST_SCRIPT_ROOT:-${DAEMONSET_ASSET_ROOT}}"
+	resolved_root="${DAEMONSET_HOST_SCRIPT_ROOT:-${DAEMONSET_ASSET_ROOT}}"
 	[[ -n "${resolved_root}" ]] || {
 		echo "flox runtime asset root is not defined" >&2
 		exit 1
@@ -131,9 +136,9 @@ installer::pod:materialize_assets() {
 	policy_shell_lib_dir="${SCRIPT_MOUNT_DIR%/}/.sh.d"
 	policy_shell_log_dir="${SCRIPT_MOUNT_DIR%/}/log"
 
-	DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
-		DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
-		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
+	DAEMONSET_HOST_SCRIPT_ROOT="${policy_shell_root}" \
+		DAEMONSET_HOST_SCRIPT_BIN="${policy_shell_bin}" \
+		DAEMONSET_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
 		DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
 		daemonless::host_shell:layout:ensure "${SCRIPT_MOUNT_DIR}"
 
@@ -141,9 +146,9 @@ installer::pod:materialize_assets() {
 	for lib in daemonset-logging.sh daemonless-host-asset-materializer.sh \
 		daemonless-trampoline.sh daemonless-host-shell-policy.sh \
 		daemonless-host-asset-reconciler.sh; do
-		DAEMONLESS_HOST_SCRIPT_ROOT="${policy_shell_root}" \
-			DAEMONLESS_HOST_SCRIPT_BIN="${policy_shell_bin}" \
-			DAEMONLESS_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
+		DAEMONSET_HOST_SCRIPT_ROOT="${policy_shell_root}" \
+			DAEMONSET_HOST_SCRIPT_BIN="${policy_shell_bin}" \
+			DAEMONSET_HOST_SCRIPT_LIB_DIR="${policy_shell_lib_dir}" \
 			DAEMONSET_SCRIPT_LOG_DIR="${policy_shell_log_dir}" \
 			daemonless::host_shell:library:install \
 			"${SCRIPT_POLICY_LIB_DIR}/${lib}" \
@@ -268,6 +273,7 @@ installer::host:flox:activate_environments() {
 
 installer::pod:run() {
 	install_deps
+	installer::paths:init
 	installer::policy:source
 	installer::pod:materialize_assets
 
@@ -276,9 +282,9 @@ installer::pod:run() {
 	# decode step is needed — `cp -af /.sh/. ${SCRIPT_MOUNT_DIR}/` already brought it into
 	# the workspace next to flake.nix.
 
-	DAEMONLESS_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT}" \
-		DAEMONLESS_HOST_SCRIPT_BIN="${DAEMONSET_SCRIPT_ROOT%/}/bin" \
-		DAEMONLESS_HOST_SCRIPT_LIB_DIR="${DAEMONSET_SCRIPT_ROOT%/}/.sh.d" \
+	DAEMONSET_HOST_SCRIPT_ROOT="${DAEMONSET_SCRIPT_ROOT}" \
+		DAEMONSET_HOST_SCRIPT_BIN="${DAEMONSET_SCRIPT_ROOT%/}/bin" \
+		DAEMONSET_HOST_SCRIPT_LIB_DIR="${DAEMONSET_SCRIPT_ROOT%/}/.sh.d" \
 		daemonless::trampoline:exec_on_host \
 		"flox-k8s-runtime-installer.sh" \
 		"DAEMONSET_SCRIPT_ROOT=${DAEMONSET_SCRIPT_ROOT}"
@@ -329,10 +335,8 @@ runtime::assets:path:init() {
 	FLOX_RUNTIME_OVERLAY_MOUNT_POINTS_DIR="${FLOX_RUNTIME_ROOT}/overlay-mount-points"
 	RKE2LAB_DEBUG_SHARE_ROOT="${RKE2LAB_DEBUG_SHARE_ROOT:-/srv/host/rke2lab-share.d}"
 
-	# Create base directory for overlay mount points
-	# NRI plugin will create container-specific subdirectories (using container ID)
-	# to avoid conflicts between concurrent containers
-	mkdir -p "${FLOX_RUNTIME_OVERLAY_MOUNT_POINTS_DIR}"
+	# Create runtime directories that may not be materialized by the pod phase
+	mkdir -p "${FLOX_RUNTIME_ETC_DIR}" "${FLOX_RUNTIME_LOG_DIR}" "${FLOX_RUNTIME_OVERLAY_MOUNT_POINTS_DIR}"
 }
 
 runtime::assets:path:validate() {
@@ -617,6 +621,7 @@ containerd::config:flox:update() {
 
 installer::host:run() {
 	installer::host:flox:activate
+	installer::paths:init
 	installer::policy:source
 
 	: "Initialize runtime asset paths and load environment"
@@ -671,7 +676,7 @@ installer::host:run() {
 
 installer::mode:validate
 
-if [[ "${DAEMONLESS_EXEC_MODE}" == "pod" ]]; then
+if [[ "${DAEMONSET_EXEC_MODE}" == "pod" ]]; then
 	installer::pod:run
 	return 0 2>/dev/null || exit 0
 fi

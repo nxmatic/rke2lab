@@ -62,7 +62,7 @@ public final class RuntimeLayerEnvContributor implements LayerEnvContributor {
               "HOME", "/root");
       case "daemonset-script-policy" ->
           Map.of(
-              "DAEMONSET_SCRIPT_ROOT", "/var/lib/rke2lab/daemonset-scripts.d",
+              "DAEMONSET_SCRIPT_ROOT", "/srv/host/k8s-daemonset.d",
               "SCRIPT_POLICY_ROOT", "/var/lib/rke2lab/script-policy.d");
       default -> Map.of();
     };
