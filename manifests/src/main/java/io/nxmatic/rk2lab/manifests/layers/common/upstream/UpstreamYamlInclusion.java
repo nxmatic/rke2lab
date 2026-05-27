@@ -4,6 +4,9 @@ package io.nxmatic.rk2lab.manifests.layers.common.upstream;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.cfg.CoercionAction;
+import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import java.io.IOException;
@@ -229,6 +232,13 @@ public class UpstreamYamlInclusion {
   private static ObjectMapper buildMapper() {
     final LoaderOptions loaderOptions = new LoaderOptions();
     loaderOptions.setCodePointLimit(64 * 1024 * 1024);
-    return new ObjectMapper(YAMLFactory.builder().loaderOptions(loaderOptions).build());
+    final ObjectMapper mapper =
+        new ObjectMapper(YAMLFactory.builder().loaderOptions(loaderOptions).build());
+    // Multi-doc YAML often contains stray `---` separators that yield an empty document; coerce
+    // those to null so the iterator filter can skip them instead of throwing.
+    mapper
+        .coercionConfigFor(LogicalType.Map)
+        .setCoercion(CoercionInputShape.EmptyString, CoercionAction.AsNull);
+    return mapper;
   }
 }

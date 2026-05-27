@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.cfg.CoercionAction;
+import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import io.nxmatic.rk2lab.manifests.api.ManifestDomainPolicy;
@@ -313,6 +316,13 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
             .disable(YAMLGenerator.Feature.SPLIT_LINES)
             .build();
-    return new ObjectMapper(factory).enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+    final ObjectMapper mapper =
+        new ObjectMapper(factory).enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+    // Multi-doc synth output occasionally contains stray `---` separators that yield an empty
+    // document; coerce those to null so the iterator filter can skip them instead of throwing.
+    mapper
+        .coercionConfigFor(LogicalType.Map)
+        .setCoercion(CoercionInputShape.EmptyString, CoercionAction.AsNull);
+    return mapper;
   }
 }
