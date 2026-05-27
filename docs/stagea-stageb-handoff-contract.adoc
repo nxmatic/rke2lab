@@ -9,6 +9,10 @@ This document defines the normalized output contract between:
 
 The objective is to avoid drift between bootstrap assumptions and CAPI templates.
 
+== Related plans
+
+For the detailed implementation plan of the GitOps + Cluster API transition (peer1 and beyond via seed-peers + Tekton-reactive), see link:gitops-cluster-api-transition-plan.md[GitOps Cluster API Transition Plan].
+
 == Ownership boundary
 
 Stage ownership is strict:
