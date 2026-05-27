@@ -58,18 +58,38 @@ public record ManifestDomainPolicy(Map<String, Boolean> enabledByDomainId) {
       return this;
     }
 
-    public Builder stageALinkPolicy(
-        boolean highAvailabilityEnabled,
-        boolean networkingEnabled,
-        boolean replicationEnabled,
-        boolean storageEnabled,
-        boolean meshEnabled) {
+    public Builder stageADefaults() {
       resetAllDisabled();
-      put(domainCatalog.highAvailability(), highAvailabilityEnabled);
-      put(domainCatalog.networking(), networkingEnabled);
-      put(domainCatalog.replication(), replicationEnabled);
-      put(domainCatalog.storage(), storageEnabled);
-      put(domainCatalog.mesh(), meshEnabled);
+      return this;
+    }
+
+    public Builder highAvailability(boolean enabled) {
+      put(domainCatalog.highAvailability(), enabled);
+      return this;
+    }
+
+    public Builder networking(boolean enabled) {
+      put(domainCatalog.networking(), enabled);
+      return this;
+    }
+
+    public Builder replication(boolean enabled) {
+      put(domainCatalog.replication(), enabled);
+      return this;
+    }
+
+    public Builder storage(boolean enabled) {
+      put(domainCatalog.storage(), enabled);
+      return this;
+    }
+
+    public Builder mesh(boolean enabled) {
+      put(domainCatalog.mesh(), enabled);
+      return this;
+    }
+
+    public Builder clusterApi(boolean enabled) {
+      put(domainCatalog.clusterApi(), enabled);
       return this;
     }
 

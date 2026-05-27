@@ -17,7 +17,7 @@ public record ControlplanePolicy(
     return new ControlplanePolicy(
         new DebugPolicy(false, false, false),
         new NetworkPolicy(true),
-        ManifestLinkPolicy.stageA(true, true, true, true, true));
+        ManifestLinkPolicy.stageA(true, true, true, true, true, true));
   }
 
   public static ControlplanePolicy from(Config config) {
@@ -36,13 +36,13 @@ public record ControlplanePolicy(
         new ManifestLinkPolicy(
             ManifestDomainPolicy.builder()
                 .domainCatalog(MANIFEST_DOMAIN_CATALOG)
-                .stageALinkPolicy(
-                    environment.bool("policy.link.highAvailability.enabled", true),
-                    environment.bool("policy.link.networking.enabled", true),
-                    environment.bool("policy.link.replication.enabled", true),
-                    environment.bool("policy.link.storage.enabled", true),
-                    environment.bool("policy.link.mesh.enabled", false))
-                .build());
+                .stageADefaults()
+                .highAvailability(environment.bool("policy.link.highAvailability.enabled", true))
+                .networking(environment.bool("policy.link.networking.enabled", true))
+                .replication(environment.bool("policy.link.replication.enabled", true))
+                .storage(environment.bool("policy.link.storage.enabled", true))
+                .mesh(environment.bool("policy.link.mesh.enabled", false)).build(),
+            new ManifestLinkPolicy.DebugPolicy(debugPolicy::domainDebug));
 
     return new ControlplanePolicy(debugPolicy, networkPolicy, manifestLinkPolicy);
   }
@@ -61,6 +61,45 @@ public record ControlplanePolicy(
     outputs.putAll(network.toOutputMap());
     outputs.putAll(manifestLink.toOutputMap());
     return outputs;
+  }
+
+  public record DebugPolicy(boolean mesh, boolean networking, boolean nriPluginsFlox) {
+    public boolean domainDebug(String domain) {
+      return switch (domain) {
+        case "cilium" -> networking;
+        case "multus" -> networking;
+        case "istio" -> mesh;
+        case "rke2-helm-managed-nri-plugins-flox" -> nriPluginsFlox;
+        default -> false;
+      };
+    }
+
+    public Map<String, String> toEnvMap() {
+      return Map.of(
+          "DEBUG_MESH", String.valueOf(mesh),
+          "DEBUG_NETWORKING", String.valueOf(networking),
+          "DEBUG_NRI_PLUGINS_FLOX", String.valueOf(nriPluginsFlox));
+    }
+
+    public Map<String, Object> toOutputMap() {
+      return Map.of(
+          "debug.mesh",
+          mesh,
+          "debug.networking",
+          networking,
+          "debug.nriPluginsFlox",
+          nriPluginsFlox);
+    }
+  }
+
+  public record NetworkPolicy(boolean lanBinding) {
+    public Map<String, String> toEnvMap() {
+      return Map.of("NETWORK_LAN_BINDING", String.valueOf(lanBinding));
+    }
+
+    public Map<String, Object> toOutputMap() {
+      return Map.of("network.lanBinding", lanBinding);
+    }
   }
 
   private record EnvironmentValues(Config config) {

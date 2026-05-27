@@ -6,13 +6,24 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Policy controlling which serialized host manifest layers are linked into live RKE2 manifests. */
-public record ManifestLinkPolicy(ManifestDomainPolicy domains) {
+public record ManifestLinkPolicy(ManifestDomainPolicy domains, DebugPolicy debug) {
+
+  public record DebugPolicy(java.util.function.Predicate<String> domainDebug) {
+    public static DebugPolicy none() {
+      return new DebugPolicy(domain -> false);
+    }
+
+    public boolean isEnabled(String domain) {
+      return domainDebug.test(domain);
+    }
+  }
 
   private static final ManifestDomainCatalog MANIFEST_DOMAIN_CATALOG =
       ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
 
   public ManifestLinkPolicy {
     domains = new ManifestDomainPolicy(new LinkedHashMap<>(domains.asMap()));
+    java.util.Objects.requireNonNull(debug, "debug");
   }
 
   public static ManifestLinkPolicy stageA(
@@ -20,17 +31,20 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains) {
       boolean networkingEnabled,
       boolean replicationEnabled,
       boolean storageEnabled,
-      boolean meshEnabled) {
+      boolean meshEnabled,
+      boolean clusterApiEnabled) {
     return new ManifestLinkPolicy(
         ManifestDomainPolicy.builder()
             .domainCatalog(MANIFEST_DOMAIN_CATALOG)
-            .stageALinkPolicy(
-                highAvailabilityEnabled,
-                networkingEnabled,
-                replicationEnabled,
-                storageEnabled,
-                meshEnabled)
-            .build());
+            .stageADefaults()
+            .highAvailability(highAvailabilityEnabled)
+            .networking(networkingEnabled)
+            .replication(replicationEnabled)
+            .storage(storageEnabled)
+            .mesh(meshEnabled)
+            .clusterApi(clusterApiEnabled)
+            .build(),
+        DebugPolicy.none());
   }
 
   public boolean highAvailabilityEnabled() {
@@ -53,6 +67,10 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains) {
     return domains.isEnabled(MANIFEST_DOMAIN_CATALOG.mesh());
   }
 
+  public boolean clusterApiEnabled() {
+    return domains.isEnabled(MANIFEST_DOMAIN_CATALOG.clusterApi());
+  }
+
   public Map<String, String> toEnvMap() {
     return Map.of(
         "RKE2LAB_POLICY_LINK_HIGH_AVAILABILITY_ENABLED",
@@ -64,7 +82,9 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains) {
         "RKE2LAB_POLICY_LINK_STORAGE_ENABLED",
         Boolean.toString(storageEnabled()),
         "RKE2LAB_POLICY_LINK_MESH_ENABLED",
-        Boolean.toString(meshEnabled()));
+        Boolean.toString(meshEnabled()),
+        "RKE2LAB_POLICY_LINK_CLUSTER_API_ENABLED",
+        Boolean.toString(clusterApiEnabled()));
   }
 
   public Map<String, Object> toOutputMap() {
@@ -73,6 +93,7 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains) {
         "policyLinkNetworkingEnabled", networkingEnabled(),
         "policyLinkReplicationEnabled", replicationEnabled(),
         "policyLinkStorageEnabled", storageEnabled(),
-        "policyLinkMeshEnabled", meshEnabled());
+        "policyLinkMeshEnabled", meshEnabled(),
+        "policyLinkClusterApiEnabled", clusterApiEnabled());
   }
 }
