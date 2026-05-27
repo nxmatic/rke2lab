@@ -1994,6 +1994,12 @@ public final class IncusResourceBootstrap {
               if (!relative.toString().isEmpty()) {
                 entries.add(relative);
               }
+              // Track the .flox/ directory itself but not its volatile contents — flox manages
+              // run/, cache/, lib/, log/ live, so peeking into them produces phantom diffs that
+              // would force unnecessary slot rotations on no-op deploys.
+              if (isFloxRuntimeStateDir(dir)) {
+                return FileVisitResult.SKIP_SUBTREE;
+              }
               return FileVisitResult.CONTINUE;
             }
 
@@ -2041,6 +2047,18 @@ public final class IncusResourceBootstrap {
           hostAssetRoot.getFileName().toString() + ".backup." + seq);
     }
 
+    /**
+     * A {@code .flox/} directory is opaque runtime state once the env has been activated. Its
+     * {@code .gitignore} declares {@code run/}, {@code cache/}, {@code lib/}, {@code log/} as flox-
+     * managed mutable subtrees, and the asset materializer only writes {@code env/manifest.toml} +
+     * {@code env.json} — flox owns everything else. Walking into {@code .flox/} for backup/sync
+     * races with live flox activations (run/<arch>.<env>.dev symlinks come and go), so we treat
+     * the whole subtree as a black box: skip on entry, never copy, never delete.
+     */
+    private static boolean isFloxRuntimeStateDir(Path dir) {
+      return ".flox".equals(String.valueOf(dir.getFileName()));
+    }
+
     private void backup(Path source, Path target) throws IOException {
       Files.createDirectories(target);
       Files.walkFileTree(
@@ -2049,6 +2067,9 @@ public final class IncusResourceBootstrap {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
                 throws IOException {
+              if (isFloxRuntimeStateDir(dir)) {
+                return FileVisitResult.SKIP_SUBTREE;
+              }
               Path targetDir = target.resolve(source.relativize(dir));
               Files.createDirectories(targetDir);
               return FileVisitResult.CONTINUE;
@@ -2064,7 +2085,8 @@ public final class IncusResourceBootstrap {
     }
 
     private void syncDirectories(Path source, Path target) throws IOException {
-      // Collect all paths in source (for copying/updating)
+      // Collect all paths in source (for copying/updating). .flox/ subtrees are skipped on both
+      // sides so flox runtime state stays untouched: we don't copy it, and we don't delete it.
       final java.util.Set<Path> sourcePaths = new java.util.HashSet<>();
       Files.walkFileTree(
           source,
@@ -2072,6 +2094,9 @@ public final class IncusResourceBootstrap {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
                 throws IOException {
+              if (isFloxRuntimeStateDir(dir)) {
+                return FileVisitResult.SKIP_SUBTREE;
+              }
               Path relativePath = source.relativize(dir);
               sourcePaths.add(relativePath);
               Path targetDir = target.resolve(relativePath);
@@ -2102,6 +2127,9 @@ public final class IncusResourceBootstrap {
             new SimpleFileVisitor<>() {
               @Override
               public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                if (isFloxRuntimeStateDir(dir)) {
+                  return FileVisitResult.SKIP_SUBTREE;
+                }
                 Path relativePath = target.relativize(dir);
                 if (!relativePath.toString().isEmpty()) {
                   targetPaths.add(relativePath);
