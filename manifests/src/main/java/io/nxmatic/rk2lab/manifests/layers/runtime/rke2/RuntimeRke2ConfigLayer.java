@@ -1,6 +1,10 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.runtime.rke2;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import io.nxmatic.rk2lab.manifests.layers.env.DefaultLayerEnvContext;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
@@ -12,13 +16,11 @@ import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
 import org.cdk8s.JsonPatch;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.Yaml;
 import software.constructs.Construct;
 
 public final class RuntimeRke2ConfigLayer extends Construct {
 
-  private static final Yaml YAML_SCALAR_SERIALIZER = createYamlScalarSerializer();
+  private static final ObjectMapper YAML_SCALAR_SERIALIZER = createYamlScalarSerializer();
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("runtime", "rke2-config");
@@ -172,16 +174,21 @@ public final class RuntimeRke2ConfigLayer extends Construct {
   }
 
   private static String yamlScalarString(final Object value) {
-    final String dumped = YAML_SCALAR_SERIALIZER.dump(value);
-    return dumped.endsWith("\n") ? dumped.substring(0, dumped.length() - 1) : dumped;
+    try {
+      final String dumped = YAML_SCALAR_SERIALIZER.writeValueAsString(value);
+      return dumped.endsWith("\n") ? dumped.substring(0, dumped.length() - 1) : dumped;
+    } catch (JsonProcessingException ex) {
+      throw new IllegalStateException("Failed to render YAML scalar for value: " + value, ex);
+    }
   }
 
-  private static Yaml createYamlScalarSerializer() {
-    final DumperOptions options = new DumperOptions();
-    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-    options.setPrettyFlow(false);
-    options.setSplitLines(false);
-    return new Yaml(options);
+  private static ObjectMapper createYamlScalarSerializer() {
+    final YAMLFactory factory =
+        YAMLFactory.builder()
+            .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+            .disable(YAMLGenerator.Feature.SPLIT_LINES)
+            .build();
+    return new ObjectMapper(factory);
   }
 
   @SafeVarargs

@@ -1,5 +1,12 @@
 package io.nxmatic.rk2lab.manifests;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.MappingIterator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SequenceWriter;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import io.nxmatic.rk2lab.manifests.api.ManifestDomainPolicy;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisResult;
@@ -28,26 +35,19 @@ import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.cdk8s.App;
 import org.cdk8s.AppProps;
 import org.cdk8s.Chart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
-import org.yaml.snakeyaml.nodes.Tag;
-import org.yaml.snakeyaml.representer.Represent;
-import org.yaml.snakeyaml.representer.Representer;
 
 /** Default SPI implementation for canonical manifest synthesis. */
 public final class DefaultManifestSynthesisService implements ManifestSynthesisService {
@@ -57,8 +57,15 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
   private static final Set<String> SCRIPT_DATA_SUFFIXES =
       Set.of(".sh", ".bash", ".env", ".yaml", ".yml", ".conf", ".policy");
 
-  private static final Pattern QUOTED_SCALAR_LINE_PATTERN =
-      Pattern.compile("^(\\s*)([A-Za-z0-9._-]+):\\s*\"(.*)\"\\s*$");
+  private static final TypeReference<Map<String, Object>> DOCUMENT_TYPE = new TypeReference<>() {};
+
+  /**
+   * Jackson YAML mapper for the synth round-trip pass. {@code ORDER_MAP_ENTRIES_BY_KEYS} produces
+   * deterministic output (CDK8s/{@code Map.of()} hash randomization upstream is otherwise visible
+   * in checksums). {@code LITERAL_BLOCK_STYLE} renders any string containing a newline as a YAML
+   * literal block scalar, replacing the previous custom-Representer + regex post-processing dance.
+   */
+  private static final ObjectMapper YAML_MAPPER = buildYamlMapper();
 
   @Override
   public String providerId() {
@@ -227,147 +234,49 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
   private void enforceLiteralBlockStyleForConfigMapScripts(Path synthesizedFile)
       throws IOException {
-    final String yamlSource = Files.readString(synthesizedFile);
-    final Iterable<Object> loadedDocuments =
-        new Yaml(new SafeConstructor(largeDocumentLoaderOptions())).loadAll(yamlSource);
-    final List<Object> documents = new java.util.ArrayList<>();
-    for (Object loadedDocument : loadedDocuments) {
-      documents.add(applyConfigMapScriptLiteralBlocks(loadedDocument));
-    }
-
-    final DumperOptions dumperOptions = new DumperOptions();
-    dumperOptions.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-    dumperOptions.setSplitLines(false);
-    dumperOptions.setPrettyFlow(true);
-    dumperOptions.setIndent(2);
-
-    final Representer representer = new LiteralBlockRepresenter(dumperOptions);
-
-    final Yaml yaml = new Yaml(representer, dumperOptions);
-    final StringWriter writer = new StringWriter();
-    yaml.dumpAll(documents.iterator(), writer);
-    final String normalizedYaml = coerceQuotedScriptScalarsToLiteralBlocks(writer.toString());
-    Files.writeString(synthesizedFile, normalizedYaml);
-  }
-
-  /**
-   * SnakeYaml caps single-document parses at 3 MiB by default. The synthesized manifest carries the
-   * base64-encoded NRI plugin archive plus the flox installer-assets ConfigMap (now including
-   * pre-locked flake/manifest locks per env), so single ConfigMap documents can sit well above
-   * that. Bump to 64 MiB — generous headroom for the inputs we actually emit.
-   */
-  private static LoaderOptions largeDocumentLoaderOptions() {
-    final LoaderOptions options = new LoaderOptions();
-    options.setCodePointLimit(64 * 1024 * 1024);
-    return options;
-  }
-
-  private String coerceQuotedScriptScalarsToLiteralBlocks(String yamlText) {
-    final StringBuilder rewritten = new StringBuilder(yamlText.length());
-    final String[] lines = yamlText.split("\\n", -1);
-    for (String line : lines) {
-      final Matcher matcher = QUOTED_SCALAR_LINE_PATTERN.matcher(line);
-      if (!matcher.matches()) {
-        rewritten.append(line).append('\n');
-        continue;
-      }
-
-      final String indent = matcher.group(1);
-      final String key = matcher.group(2);
-      final String value = matcher.group(3);
-      if (!isScriptLikeConfigMapKey(key) || !value.contains("\\n")) {
-        rewritten.append(line).append('\n');
-        continue;
-      }
-
-      final String decoded = normalizeScriptConfigMapText(decodeEscapedQuotedScalar(value));
-      rewritten.append(indent).append(key).append(": |\n");
-      final String blockIndent = indent + "  ";
-      final String[] blockLines = decoded.split("\\n", -1);
-      for (int i = 0; i < blockLines.length; i++) {
-        final String blockLine = blockLines[i];
-        if (i == blockLines.length - 1 && blockLine.isEmpty()) {
-          continue;
+    final List<Map<String, Object>> documents = new ArrayList<>();
+    try (MappingIterator<Map<String, Object>> iterator =
+        YAML_MAPPER.readerFor(DOCUMENT_TYPE).readValues(synthesizedFile.toFile())) {
+      while (iterator.hasNext()) {
+        final Map<String, Object> document = iterator.next();
+        if (document != null) {
+          documents.add(normalizeConfigMapScripts(document));
         }
-        rewritten.append(blockIndent).append(blockLine).append('\n');
       }
     }
-    return rewritten.toString();
+
+    final StringWriter writer = new StringWriter();
+    try (SequenceWriter sequence = YAML_MAPPER.writer().writeValues(writer)) {
+      for (Map<String, Object> document : documents) {
+        sequence.write(document);
+      }
+    }
+    Files.writeString(synthesizedFile, writer.toString());
   }
 
-  private String decodeEscapedQuotedScalar(String escaped) {
-    final StringBuilder decoded = new StringBuilder(escaped.length());
-    for (int i = 0; i < escaped.length(); i++) {
-      final char ch = escaped.charAt(i);
-      if (ch != '\\' || i + 1 >= escaped.length()) {
-        decoded.append(ch);
-        continue;
-      }
-
-      final char next = escaped.charAt(++i);
-      switch (next) {
-        case 'n' -> decoded.append('\n');
-        case 'r' -> decoded.append('\r');
-        case 't' -> decoded.append('\t');
-        case '"' -> decoded.append('"');
-        case '\\' -> decoded.append('\\');
-        default -> decoded.append(next);
-      }
+  private Map<String, Object> normalizeConfigMapScripts(Map<String, Object> document) {
+    if (!"ConfigMap".equals(document.get("kind"))) {
+      return document;
     }
-    return decoded.toString();
-  }
-
-  @SuppressWarnings("unchecked")
-  private Object applyConfigMapScriptLiteralBlocks(Object document) {
-    if (document instanceof List<?> list) {
-      return list.stream().map(this::applyConfigMapScriptLiteralBlocks).toList();
-    }
-    if (!(document instanceof Map<?, ?> map)) {
+    final Object data = document.get("data");
+    if (!(data instanceof Map<?, ?> dataMap)) {
       return document;
     }
 
-    final LinkedHashMap<Object, Object> rewritten = new LinkedHashMap<>();
-    for (Map.Entry<?, ?> entry : map.entrySet()) {
-      rewritten.put(entry.getKey(), applyConfigMapScriptLiteralBlocks(entry.getValue()));
-    }
-
-    final Object kind = rewritten.get("kind");
-    if (!"ConfigMap".equals(kind)) {
-      return rewritten;
-    }
-
-    final Object data = rewritten.get("data");
-    if (!(data instanceof Map<?, ?> dataMap)) {
-      return rewritten;
-    }
-
-    final LinkedHashMap<Object, Object> rewrittenData = new LinkedHashMap<>();
+    final LinkedHashMap<String, Object> rewrittenData = new LinkedHashMap<>();
     for (Map.Entry<?, ?> entry : dataMap.entrySet()) {
       final Object key = entry.getKey();
       final Object value = entry.getValue();
       if (key instanceof String dataKey
           && value instanceof String textValue
           && isScriptLikeConfigMapKey(dataKey)) {
-        final String normalized = normalizeScriptConfigMapText(textValue);
-        if (shouldRenderAsLiteralBlock(dataKey, normalized)) {
-          rewrittenData.put(dataKey, new LiteralBlockString(normalized));
-          continue;
-        }
-      }
-      if (key instanceof String dataKey
-          && value instanceof String textValue
-          && shouldRenderAsLiteralBlock(dataKey, textValue)) {
-        rewrittenData.put(dataKey, new LiteralBlockString(textValue));
-      } else {
-        rewrittenData.put(key, value);
+        rewrittenData.put(dataKey, normalizeScriptConfigMapText(textValue));
+      } else if (key instanceof String dataKey) {
+        rewrittenData.put(dataKey, value);
       }
     }
-    rewritten.put("data", rewrittenData);
-    return rewritten;
-  }
-
-  private boolean shouldRenderAsLiteralBlock(String dataKey, String textValue) {
-    return textValue.contains("\n") && isScriptLikeConfigMapKey(dataKey);
+    document.put("data", rewrittenData);
+    return document;
   }
 
   private boolean isScriptLikeConfigMapKey(String dataKey) {
@@ -386,31 +295,24 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     return normalized;
   }
 
-  private static final class LiteralBlockString {
-    private final String value;
+  /**
+   * SnakeYaml (which Jackson YAML wraps internally) caps single-document parses at 3 MiB by
+   * default. The synthesized manifest carries the base64-encoded NRI plugin archive plus the flox
+   * installer-assets ConfigMap (now including pre-locked flake/manifest locks per env), so single
+   * ConfigMap documents can sit well above that. Bump to 64 MiB — generous headroom for the inputs
+   * we actually emit.
+   */
+  private static ObjectMapper buildYamlMapper() {
+    final LoaderOptions loaderOptions = new LoaderOptions();
+    loaderOptions.setCodePointLimit(64 * 1024 * 1024);
 
-    private LiteralBlockString(String value) {
-      this.value = value;
-    }
-
-    @Override
-    public String toString() {
-      return value;
-    }
-  }
-
-  private static final class LiteralBlockRepresenter extends Representer {
-    private LiteralBlockRepresenter(DumperOptions dumperOptions) {
-      super(dumperOptions);
-      this.addClassTag(LiteralBlockString.class, Tag.STR);
-      this.representers.put(
-          LiteralBlockString.class,
-          new Represent() {
-            @Override
-            public org.yaml.snakeyaml.nodes.Node representData(Object data) {
-              return representScalar(Tag.STR, data.toString(), DumperOptions.ScalarStyle.LITERAL);
-            }
-          });
-    }
+    final YAMLFactory factory =
+        YAMLFactory.builder()
+            .loaderOptions(loaderOptions)
+            .enable(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE)
+            .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+            .disable(YAMLGenerator.Feature.SPLIT_LINES)
+            .build();
+    return new ObjectMapper(factory).enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
   }
 }

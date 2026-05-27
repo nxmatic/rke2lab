@@ -1,6 +1,10 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.common.upstream;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.MappingIterator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,8 +19,6 @@ import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
 import org.cdk8s.JsonPatch;
 import org.yaml.snakeyaml.LoaderOptions;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
 import software.constructs.Construct;
 
 /**
@@ -85,16 +87,11 @@ public class UpstreamYamlInclusion {
       final Construct scope,
       final String classpathResource,
       final PackageMetadataProfile packageProfile) {
-    final String yamlSource = readClasspathResource(classpathResource);
-    final Yaml reader = new Yaml(new SafeConstructor(loaderOptions()));
+    final List<Map<String, Object>> documents = readDocuments(classpathResource);
     final List<ApiObject> emitted = new ArrayList<>();
 
     int index = 0;
-    for (Object raw : reader.loadAll(yamlSource)) {
-      if (!(raw instanceof Map<?, ?> map)) {
-        continue;
-      }
-      final Map<String, Object> document = (Map<String, Object>) map;
+    for (Map<String, Object> document : documents) {
       if (!accept(document)) {
         continue;
       }
@@ -196,7 +193,7 @@ public class UpstreamYamlInclusion {
     return Map.copyOf(merged);
   }
 
-  private static String readClasspathResource(final String classpathResource) {
+  private static List<Map<String, Object>> readDocuments(final String classpathResource) {
     final String resourcePath =
         classpathResource.startsWith("/") ? classpathResource.substring(1) : classpathResource;
     try (InputStream in =
@@ -204,17 +201,34 @@ public class UpstreamYamlInclusion {
       if (in == null) {
         throw new IllegalArgumentException("Classpath resource not found: " + classpathResource);
       }
-      return new String(in.readAllBytes());
+      try (MappingIterator<Map<String, Object>> iterator =
+          YAML_MAPPER.readerFor(MAP_TYPE).readValues(in)) {
+        final List<Map<String, Object>> documents = new ArrayList<>();
+        while (iterator.hasNext()) {
+          final Map<String, Object> document = iterator.next();
+          if (document != null) {
+            documents.add(document);
+          }
+        }
+        return documents;
+      }
     } catch (IOException ex) {
       throw new UncheckedIOException("Failed to read classpath resource: " + classpathResource, ex);
     }
   }
 
-  private static LoaderOptions loaderOptions() {
-    // Tekton's release.yaml carries large CRD schemas; lift the per-document code-point cap from
-    // SnakeYaml's default (3 MiB) to 64 MiB to be safe against future bundles.
-    final LoaderOptions options = new LoaderOptions();
-    options.setCodePointLimit(64 * 1024 * 1024);
-    return options;
+  private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
+
+  /**
+   * Tekton's release.yaml carries large CRD schemas; lift SnakeYaml's per-document code-point cap
+   * (Jackson YAML wraps SnakeYaml internally) from the default 3 MiB to 64 MiB to be safe against
+   * future bundles.
+   */
+  private static final ObjectMapper YAML_MAPPER = buildMapper();
+
+  private static ObjectMapper buildMapper() {
+    final LoaderOptions loaderOptions = new LoaderOptions();
+    loaderOptions.setCodePointLimit(64 * 1024 * 1024);
+    return new ObjectMapper(YAMLFactory.builder().loaderOptions(loaderOptions).build());
   }
 }

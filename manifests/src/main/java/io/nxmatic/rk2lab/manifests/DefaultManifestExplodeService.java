@@ -1,25 +1,25 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.MappingIterator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeResult;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeService;
 import java.io.IOException;
-import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
-import org.yaml.snakeyaml.representer.Representer;
 
 /**
  * Splits a consolidated multi-document YAML synth into one file per resource under {@code
@@ -39,9 +39,16 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
 
   private static final String CRD_KIND = "CustomResourceDefinition";
 
+  /**
+   * Jackson YAML mapper configured for deterministic output: {@link
+   * SerializationFeature#ORDER_MAP_ENTRIES_BY_KEYS} sorts every map alphabetically, eliminating
+   * checksum churn from {@code Map.of()} hash randomization upstream in CDK8s.
+   */
+  private static final ObjectMapper YAML_MAPPER = buildMapper();
+
   @Override
   public String providerId() {
-    return "default-snakeyaml-exploder";
+    return "default-jackson-exploder";
   }
 
   @Override
@@ -60,36 +67,33 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
     Files.createDirectories(target);
 
     final List<Path> written = new ArrayList<>();
-    final DumperOptions dumperOptions = buildDumperOptions();
-    final Yaml writer = new Yaml(new Representer(dumperOptions), dumperOptions);
-    final Yaml reader = new Yaml(new SafeConstructor(largeDocumentLoaderOptions()));
 
-    final String yamlSource = Files.readString(source);
-    for (Object document : reader.loadAll(yamlSource)) {
-      if (!(document instanceof Map<?, ?> map)) {
-        continue;
+    try (MappingIterator<JsonNode> documents =
+        YAML_MAPPER.readerFor(JsonNode.class).readValues(source.toFile())) {
+      while (documents.hasNext()) {
+        final JsonNode document = documents.next();
+        if (document == null || !document.isObject()) {
+          continue;
+        }
+
+        final String layer = annotation(document, "kpt.dev/package-layer", "default");
+        final String pkg = annotation(document, "kpt.dev/package-name", "unknown");
+        final String kind = textOrNull(document.get("kind"));
+        if (kind == null) {
+          continue;
+        }
+        final String namespace = textOrNull(document.path("metadata").get("namespace"));
+        final String name = sanitizeFileSegment(textOrNull(document.path("metadata").get("name")));
+        final String order = orderPrefixFor(kind, namespace);
+        final String fileName = order + "-" + kind.toLowerCase(Locale.ROOT) + "-" + name + ".yml";
+
+        final Path packageDir = target.resolve(layer).resolve(pkg);
+        Files.createDirectories(packageDir);
+        final Path outFile = packageDir.resolve(fileName);
+
+        Files.writeString(outFile, YAML_MAPPER.writeValueAsString(document));
+        written.add(outFile);
       }
-
-      final String layer = annotation(map, "kpt.dev/package-layer", "default");
-      final String pkg = annotation(map, "kpt.dev/package-name", "unknown");
-      final String kind = stringField(map, "kind");
-      if (kind == null) {
-        continue;
-      }
-      final String namespace = nestedString(map, "metadata", "namespace");
-      final String name = sanitizeFileSegment(nestedString(map, "metadata", "name"));
-      final String order = orderPrefixFor(kind, namespace);
-      final String fileName = order + "-" + kind.toLowerCase(Locale.ROOT) + "-" + name + ".yml";
-
-      final Path packageDir = target.resolve(layer).resolve(pkg);
-      Files.createDirectories(packageDir);
-      final Path outFile = packageDir.resolve(fileName);
-
-      try (StringWriter buffer = new StringWriter()) {
-        writer.dump(document, buffer);
-        Files.writeString(outFile, "---\n" + buffer);
-      }
-      written.add(outFile);
     }
 
     written.sort(Comparator.naturalOrder());
@@ -97,15 +101,6 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
     LOG.info("Exploded {} resources from {} into {}", written.size(), source.getFileName(), target);
 
     return new ManifestExplodeResult(target, written);
-  }
-
-  private static DumperOptions buildDumperOptions() {
-    final DumperOptions options = new DumperOptions();
-    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-    options.setSplitLines(false);
-    options.setPrettyFlow(true);
-    options.setIndent(2);
-    return options;
   }
 
   private static String orderPrefixFor(String kind, String namespace) {
@@ -118,31 +113,13 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
     return "02";
   }
 
-  private static String annotation(Map<?, ?> document, String key, String fallback) {
-    final Object metadata = document.get("metadata");
-    if (!(metadata instanceof Map<?, ?> metaMap)) {
-      return fallback;
-    }
-    final Object annotations = metaMap.get("annotations");
-    if (!(annotations instanceof Map<?, ?> annotationMap)) {
-      return fallback;
-    }
-    final Object value = annotationMap.get(key);
-    return value == null ? fallback : value.toString();
+  private static String annotation(JsonNode document, String key, String fallback) {
+    final JsonNode value = document.path("metadata").path("annotations").get(key);
+    return value == null || value.isNull() ? fallback : value.asText();
   }
 
-  private static String stringField(Map<?, ?> map, String key) {
-    final Object value = map.get(key);
-    return value == null ? null : value.toString();
-  }
-
-  private static String nestedString(Map<?, ?> map, String first, String second) {
-    final Object value = map.get(first);
-    if (!(value instanceof Map<?, ?> child)) {
-      return null;
-    }
-    final Object inner = child.get(second);
-    return inner == null ? null : inner.toString();
+  private static String textOrNull(JsonNode node) {
+    return node == null || node.isNull() ? null : node.asText();
   }
 
   private static String sanitizeFileSegment(String value) {
@@ -157,9 +134,17 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
    * flox installer-assets ConfigMap embeds pre-locked flake/manifest locks plus a base64 NRI plugin
    * archive. Bump to 64 MiB to match the synthesizer's reader.
    */
-  private static LoaderOptions largeDocumentLoaderOptions() {
-    final LoaderOptions options = new LoaderOptions();
-    options.setCodePointLimit(64 * 1024 * 1024);
-    return options;
+  private static ObjectMapper buildMapper() {
+    final LoaderOptions loaderOptions = new LoaderOptions();
+    loaderOptions.setCodePointLimit(64 * 1024 * 1024);
+
+    final YAMLFactory factory =
+        YAMLFactory.builder()
+            .loaderOptions(loaderOptions)
+            .enable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+            .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+            .disable(YAMLGenerator.Feature.SPLIT_LINES)
+            .build();
+    return new ObjectMapper(factory).enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
   }
 }
