@@ -286,19 +286,17 @@ installer::pod:run() {
 	# decode step is needed — `cp -af /.sh/. ${SCRIPT_MOUNT_DIR}/` already brought it into
 	# the workspace next to flake.nix.
 
-	# Hand off to host: the trampoline needs the *host* roots (where the
-	# re-execed script lives on the host filesystem), not the in-pod roots.
+	# Hand off to host: the trampoline needs the host's asset root (to find
+	# the re-execed script's bin dir) and the host's base root (forwarded to
+	# the child as DAEMONSET_SCRIPT_ROOT, from which it re-derives everything
+	# via daemonset::runtime:paths:bind).
 	local host_base_root="/srv/host/k8s-daemonset.d"
 	local host_asset_root="${host_base_root}/${DAEMONSET_ASSET_SUBDIR}"
 
-	# Forward only the trampoline's contract vars (root + bin); the host child
-	# recomputes its lib/etc/log paths from DAEMONSET_HOST_SCRIPT_ROOT in its
-	# own installer::paths:init.
 	DAEMONSET_HOST_SCRIPT_ROOT="${host_asset_root}" \
-		DAEMONSET_HOST_SCRIPT_BIN="${host_asset_root}/bin" \
+		DAEMONSET_SCRIPT_ROOT="${host_base_root}" \
 		daemonset::trampoline:exec_on_host \
-		"flox-nri-plugin-installer.sh" \
-		"DAEMONSET_SCRIPT_ROOT=${host_base_root}"
+		"flox-nri-plugin-installer.sh"
 }
 
 installer::host:flox:activate() {
