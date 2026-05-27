@@ -22,15 +22,18 @@ import java.util.List;
  *   <li><b>cloud-init</b>: First-boot consumer of {@code /var/lib/cloud/seed/nocloud/} — STATIC
  *   <li><b>systemd</b>: Loads units from {@code /srv/host/systemd-{units,scripts,libexec}.d/} —
  *       DYNAMIC via daemon-reload
- *   <li><b>k8s</b>: rke2-server inotifies {@code /var/lib/rancher/rke2/server/manifests/} — DYNAMIC
- *       via manifest watch
- *   <li><b>runtime-config</b>: rke2 + host scripts read {@code rke2-config/} and {@code
- *       env-config/} ConfigMap YAMLs — DYNAMIC
+ *   <li><b>k8s</b>: rke2-server inotifies {@code /var/lib/rancher/rke2/server/manifests/} —
+ *       DYNAMIC via manifest watch
+ *   <li><b>rke2-config</b>: rke2-server reads ConfigMaps from {@code manifestsRoot/runtime/rke2-config/}
+ *       at startup (etcd flags, advertise-address, TLS-SAN, …) — DYNAMIC
+ *   <li><b>rke2lab-env</b>: {@code rke2lab-bootstrap-env.sh}'s flox profile-common.sh sources YAMLs
+ *       under {@code manifestsRoot/runtime/env-config/} and turns their {@code data:} keys into
+ *       shell environment variables — DYNAMIC
  * </ul>
  */
 public interface ProvisioningTarget {
 
-  /** Unique target identifier (e.g. "core", "systemd", "k8s", "runtimeConfig"). */
+  /** Unique target identifier (e.g. "cloud-init", "systemd", "k8s", "rke2-config", "rke2lab-env"). */
   String name();
 
   /** Reload policy determines lifecycle behavior on checksum change. */

@@ -24,7 +24,7 @@ import java.util.stream.Stream;
  * <pre>
  * Map&lt;String, String&gt; checksums = TargetChecksumPipeline.begin(paths, registry)
  *   .onFailure((topic, cause) -> logError("Checksum failed", cause))
- *   .during("core", core -> core.fromCoreRoots())
+ *   .during("cloud-init", cloudInit -> cloudInit.fromCloudInitRoots())
  *   .then()
  *   .during("registered components", components -> components.fromRegistry())
  *   .collectChecksums();
@@ -57,36 +57,38 @@ public final class TargetChecksumPipeline {
       this.state = state;
     }
 
-    public AwaitingCore onFailure(OnFailure onFailure) {
+    public AwaitingCloudInit onFailure(OnFailure onFailure) {
       state.onFailure = onFailure;
-      return new AwaitingCore(state);
+      return new AwaitingCloudInit(state);
     }
 
-    public CoreDone during(String topic, Function<CoreTargetStage, CoreTargetStage> body) {
-      final CoreTargetStage stage = new CoreTargetStage(state);
+    public CloudInitDone during(
+        String topic, Function<CloudInitTargetStage, CloudInitTargetStage> body) {
+      final CloudInitTargetStage stage = new CloudInitTargetStage(state);
       TopicRunner.runDuring("target-checksum", topic, stage, body, state.onFailure);
-      return new CoreDone(state);
+      return new CloudInitDone(state);
     }
   }
 
-  public static final class AwaitingCore {
+  public static final class AwaitingCloudInit {
     private final State state;
 
-    AwaitingCore(State state) {
+    AwaitingCloudInit(State state) {
       this.state = state;
     }
 
-    public CoreDone during(String topic, Function<CoreTargetStage, CoreTargetStage> body) {
-      final CoreTargetStage stage = new CoreTargetStage(state);
+    public CloudInitDone during(
+        String topic, Function<CloudInitTargetStage, CloudInitTargetStage> body) {
+      final CloudInitTargetStage stage = new CloudInitTargetStage(state);
       TopicRunner.runDuring("target-checksum", topic, stage, body, state.onFailure);
-      return new CoreDone(state);
+      return new CloudInitDone(state);
     }
   }
 
-  public static final class CoreDone {
+  public static final class CloudInitDone {
     private final State state;
 
-    CoreDone(State state) {
+    CloudInitDone(State state) {
       this.state = state;
     }
 
@@ -122,20 +124,21 @@ public final class TargetChecksumPipeline {
     }
   }
 
-  public static final class CoreTargetStage {
+  public static final class CloudInitTargetStage {
     private final State state;
 
-    CoreTargetStage(State state) {
+    CloudInitTargetStage(State state) {
       this.state = state;
     }
 
-    public CoreTargetStage fromCoreRoots() {
-      // Core target: STATIC infrastructure (cloud-init source ConfigMap).
+    public CloudInitTargetStage fromCloudInitRoots() {
+      // Cloud-init target: STATIC. Cloud-init reads the seed once at first boot, so any change
+      // to the source ConfigMap means we recreate the instance.
       // runtimeCloudConfigRoot generates cloudSeedRoot (user-data/meta-data/network-config);
       // checksum only the input — output is deterministically derived.
-      final List<Path> coreRoots = List.of(state.paths.runtimeCloudConfigRoot());
+      final List<Path> roots = List.of(state.paths.runtimeCloudConfigRoot());
 
-      state.targetChecksums.put("core", computeChecksum(coreRoots));
+      state.targetChecksums.put("cloud-init", computeChecksum(roots));
       return this;
     }
   }

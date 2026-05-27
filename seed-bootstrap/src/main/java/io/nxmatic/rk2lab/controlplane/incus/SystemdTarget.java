@@ -34,10 +34,7 @@ public final class SystemdTarget implements ProvisioningTarget {
 
   @Override
   public String name() {
-    // On-the-wire target name kept as "node" for now to avoid a one-time checksum-key rotation in
-    // outputs/ConfigMaps. Source-side type is SystemdTarget; the wire name can rotate later when
-    // its checksum naturally changes.
-    return "node";
+    return "systemd";
   }
 
   @Override

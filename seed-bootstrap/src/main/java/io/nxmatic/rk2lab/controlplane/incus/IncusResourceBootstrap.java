@@ -255,9 +255,10 @@ public final class IncusResourceBootstrap {
 
       registerCloudInitTarget(targetRegistry, staging);
       registerSystemdTarget(targetRegistry, staging.stagingPaths());
-      registerClusterTarget(targetRegistry, staging);
+      registerK8sTarget(targetRegistry, staging);
+      registerRke2ConfigTarget(targetRegistry, staging.stagingPaths());
       final Map<String, Object> runtimeSummaries =
-          materializeAndRegisterRuntimeConfigTarget(targetRegistry, staging);
+          materializeAndRegisterRke2labEnvTarget(targetRegistry, staging);
 
       return new TargetContext(targetRegistry, runtimeSummaries);
     }
@@ -289,14 +290,21 @@ public final class IncusResourceBootstrap {
       targetRegistry.register(systemdTarget);
     }
 
-    private void registerClusterTarget(
+    private void registerK8sTarget(
         ProvisioningTargetRegistry targetRegistry, StagingContext staging) {
       // ManifestSynthesisService + explode already filled stagingManifestsRoot upstream; the
       // target carries no materialize body and only declares ownership for checksum/inventory.
-      targetRegistry.register(new ClusterTarget(staging.stagingManifestsRoot()));
+      targetRegistry.register(new K8sTarget(staging.stagingManifestsRoot()));
     }
 
-    private Map<String, Object> materializeAndRegisterRuntimeConfigTarget(
+    private void registerRke2ConfigTarget(
+        ProvisioningTargetRegistry targetRegistry, BootstrapPaths stagingPaths) {
+      // cdk8s synth+explode fills the rke2-config dir upstream; passive target — no materialize
+      // body of its own, just declares ownership.
+      targetRegistry.register(new Rke2ConfigTarget(stagingPaths.runtimeRke2ConfigRoot()));
+    }
+
+    private Map<String, Object> materializeAndRegisterRke2labEnvTarget(
         ProvisioningTargetRegistry targetRegistry, StagingContext staging) {
       final BootstrapPaths stagingPaths = staging.stagingPaths();
       final LayerEnvContext layerContext = staging.layerContext();
@@ -305,22 +313,21 @@ public final class IncusResourceBootstrap {
       final Map<String, Object> systemdProvisioningSummary =
           SystemdProvisioningInventory.summarize(stagingPaths, hostMountNotes);
 
-      final RuntimeConfigTarget runtimeConfigTarget =
-          new RuntimeConfigTarget(
+      final Rke2labEnvTarget rke2labEnvTarget =
+          new Rke2labEnvTarget(
               runtimeEnvControlplaneOverlayWriter,
               layerContext,
               policy,
-              stagingPaths.runtimeRke2ConfigRoot(),
               stagingPaths.runtimeEnvConfigRoot());
       try {
-        runtimeConfigTarget.materialize(stagingPaths);
+        rke2labEnvTarget.materialize(stagingPaths);
       } catch (IOException ex) {
-        throw new IllegalStateException("Failed to materialize runtime-config target", ex);
+        throw new IllegalStateException("Failed to materialize rke2lab-env target", ex);
       }
-      targetRegistry.register(runtimeConfigTarget);
+      targetRegistry.register(rke2labEnvTarget);
 
       return Map.of(
-          "systemd", systemdProvisioningSummary, "layerEnv", runtimeConfigTarget.layerEnvSummary());
+          "systemd", systemdProvisioningSummary, "layerEnv", rke2labEnvTarget.layerEnvSummary());
     }
 
     private boolean syncStagingToFinal(HostAssetRootLifecycle lifecycle, Path stagingRoot) {
@@ -2059,7 +2066,7 @@ public final class IncusResourceBootstrap {
 
     @Override
     public String name() {
-      return "core";
+      return "cloud-init";
     }
 
     @Override
@@ -2090,16 +2097,16 @@ public final class IncusResourceBootstrap {
    * registration; this target carries no materialize body of its own and only declares ownership of
    * the path so the registry can compute its checksum.
    */
-  private static final class ClusterTarget implements ProvisioningTarget {
+  private static final class K8sTarget implements ProvisioningTarget {
     private final Path manifestsRoot;
 
-    private ClusterTarget(Path manifestsRoot) {
+    private K8sTarget(Path manifestsRoot) {
       this.manifestsRoot = manifestsRoot;
     }
 
     @Override
     public String name() {
-      return "cluster";
+      return "k8s";
     }
 
     @Override
@@ -2110,7 +2117,7 @@ public final class IncusResourceBootstrap {
     @Override
     public void materialize(BootstrapPaths paths) {
       // No-op: manifests tree is materialised by ManifestSynthesisService + explode upstream of
-      // target registration. ClusterTarget declares ownership for checksum + inventory only.
+      // target registration. K8sTarget declares ownership for checksum + inventory only.
     }
 
     @Override
@@ -2119,30 +2126,67 @@ public final class IncusResourceBootstrap {
     }
   }
 
-  private static final class RuntimeConfigTarget implements ProvisioningTarget {
+  /**
+   * rke2 config target — passive. cdk8s synth + explode produces ConfigMaps under {@code
+   * manifestsRoot/runtime/rke2-config/} (cluster-init token, etcd flags, advertise-address,
+   * TLS-SAN, …); rke2-server reads them at startup. DYNAMIC: rke2 picks up changes on its next
+   * (re)start triggered by systemd or the manifests-install service.
+   */
+  private static final class Rke2ConfigTarget implements ProvisioningTarget {
+    private final Path rke2ConfigRoot;
+
+    private Rke2ConfigTarget(Path rke2ConfigRoot) {
+      this.rke2ConfigRoot = rke2ConfigRoot;
+    }
+
+    @Override
+    public String name() {
+      return "rke2-config";
+    }
+
+    @Override
+    public TargetReloadPolicy reloadPolicy() {
+      return TargetReloadPolicy.DYNAMIC;
+    }
+
+    @Override
+    public void materialize(BootstrapPaths paths) {
+      // No-op: cdk8s synth+explode fills rke2ConfigRoot upstream of target registration.
+    }
+
+    @Override
+    public List<Path> getMaterializedPaths() {
+      return List.of(rke2ConfigRoot);
+    }
+  }
+
+  /**
+   * rke2lab env target — active producer. Writes per-layer env-section ConfigMaps + the aggregated
+   * 99-configmap overlay under {@code manifestsRoot/runtime/env-config/}. The host's {@code
+   * rke2lab-bootstrap-env.sh} sources these YAMLs and turns their {@code data:} keys into shell
+   * environment variables. DYNAMIC: re-sourced on the next service restart.
+   */
+  private static final class Rke2labEnvTarget implements ProvisioningTarget {
     private final RuntimeEnvControlplaneOverlayWriter overlayWriter;
     private final LayerEnvContext layerContext;
     private final ControlplanePolicy policy;
-    private final Path rke2ConfigRoot;
     private final Path envConfigRoot;
     private Map<String, Object> layerEnvSummary = Map.of();
 
-    private RuntimeConfigTarget(
+    private Rke2labEnvTarget(
         RuntimeEnvControlplaneOverlayWriter overlayWriter,
         LayerEnvContext layerContext,
         ControlplanePolicy policy,
-        Path rke2ConfigRoot,
         Path envConfigRoot) {
       this.overlayWriter = overlayWriter;
       this.layerContext = layerContext;
       this.policy = policy;
-      this.rke2ConfigRoot = rke2ConfigRoot;
       this.envConfigRoot = envConfigRoot;
     }
 
     @Override
     public String name() {
-      return "runtimeConfig";
+      return "rke2lab-env";
     }
 
     @Override
@@ -2152,15 +2196,12 @@ public final class IncusResourceBootstrap {
 
     @Override
     public void materialize(BootstrapPaths paths) throws IOException {
-      // rke2-config root is filled by cdk8s synth+explode upstream of target registration. The
-      // env-config root is the target's own output: per-layer ConfigMap files plus the aggregated
-      // 99-configmap overlay.
       layerEnvSummary = overlayWriter.write(envConfigRoot, layerContext, policy);
     }
 
     @Override
     public List<Path> getMaterializedPaths() {
-      return List.of(rke2ConfigRoot, envConfigRoot);
+      return List.of(envConfigRoot);
     }
 
     /** Layer-contributor registry summary captured during {@link #materialize}. */
@@ -2902,7 +2943,7 @@ public final class IncusResourceBootstrap {
         BootstrapPaths paths, ProvisioningTargetRegistry registry) {
       final Map<String, String> allChecksums =
           TargetChecksumPipeline.begin(paths, registry)
-              .during("core", core -> core.fromCoreRoots())
+              .during("cloud-init", stage -> stage.fromCloudInitRoots())
               .then()
               .during("registered components", components -> components.fromRegistry())
               .collectChecksums();

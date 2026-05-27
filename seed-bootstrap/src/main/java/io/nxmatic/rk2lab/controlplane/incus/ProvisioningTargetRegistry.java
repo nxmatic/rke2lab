@@ -54,10 +54,11 @@ public final class ProvisioningTargetRegistry {
 
     if (paths != null && !paths.isEmpty()) {
       // Single-ownership for *exact* paths. Nested ownership is allowed: a parent target may
-      // register a directory whose subtree is partially owned by other targets (e.g.
-      // ClusterTarget owns manifestsRoot, RuntimeConfigTarget owns
-      // manifestsRoot/runtime/{rke2-config,env-config}). The checksum walker filters descendants
-      // owned elsewhere when it walks a parent path so each file is hashed by exactly one target.
+      // register a directory whose subtree is partially owned by other targets (e.g. K8sTarget
+      // owns manifestsRoot, Rke2ConfigTarget owns manifestsRoot/runtime/rke2-config, and
+      // Rke2labEnvTarget owns manifestsRoot/runtime/env-config). The checksum walker filters
+      // descendants owned elsewhere when walking a parent path so each file is hashed by exactly
+      // one target.
       for (Path root : paths) {
         final String existingOwner = pathOwnership.get(root);
         if (existingOwner != null && !existingOwner.equals(targetName)) {
