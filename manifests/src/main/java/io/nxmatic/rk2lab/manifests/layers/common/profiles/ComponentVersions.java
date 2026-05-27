@@ -39,7 +39,7 @@ public record ComponentVersions(
     String fluxOperator,
     String envoyGateway,
     String tailscale,
-    String clusterctl,
+    String clusterApiOperator,
     String capiIncusProvider,
     String capiRke2Provider) {
 
@@ -51,7 +51,7 @@ public record ComponentVersions(
     fluxOperator = blankToEmpty(fluxOperator);
     envoyGateway = blankToEmpty(envoyGateway);
     tailscale = blankToEmpty(tailscale);
-    clusterctl = blankToEmpty(clusterctl);
+    clusterApiOperator = blankToEmpty(clusterApiOperator);
     capiIncusProvider = blankToEmpty(capiIncusProvider);
     capiRke2Provider = blankToEmpty(capiRke2Provider);
   }
@@ -73,9 +73,9 @@ public record ComponentVersions(
    *       version
    *   <li>{@code fluxOperator}: matches {@code controlplane/flux-operator} releases
    *   <li>{@code envoyGateway} / {@code tailscale}: matched the existing per-layer literals
-   *   <li>{@code clusterctl}: CAPI core CLI binary; the providers below are installed by it
-   *   <li>{@code capiIncusProvider}: {@code lxc/cluster-api-provider-incus} (CAPN)
-   *   <li>{@code capiRke2Provider}: {@code rancher/cluster-api-provider-rke2} (CAPRKE2)
+   *   <li>{@code clusterApiOperator}: CAPI operator managing core + providers declaratively
+   *   <li>{@code capiIncusProvider}: {@code lxc/cluster-api-provider-incus} (CAPN) version for provider CR
+   *   <li>{@code capiRke2Provider}: {@code rancher/cluster-api-provider-rke2} (CAPRKE2) version for provider CR
    * </ul>
    */
   public static ComponentVersions defaults() {
@@ -87,7 +87,7 @@ public record ComponentVersions(
         .fluxOperator("v0.36.0")
         .envoyGateway("v1.4.2")
         .tailscale("1.82.0")
-        .clusterctl("v1.12.3")
+        .clusterApiOperator("v0.27.0")
         .capiIncusProvider("v0.8.6")
         .capiRke2Provider("v0.24.4")
         .build();
@@ -113,7 +113,7 @@ public record ComponentVersions(
         .fluxOperator(fluxOperator)
         .envoyGateway(envoyGateway)
         .tailscale(tailscale)
-        .clusterctl(clusterctl)
+        .clusterApiOperator(clusterApiOperator)
         .capiIncusProvider(capiIncusProvider)
         .capiRke2Provider(capiRke2Provider);
   }
@@ -130,7 +130,7 @@ public record ComponentVersions(
     private String fluxOperator = "";
     private String envoyGateway = "";
     private String tailscale = "";
-    private String clusterctl = "";
+    private String clusterApiOperator = "";
     private String capiIncusProvider = "";
     private String capiRke2Provider = "";
 
@@ -171,8 +171,8 @@ public record ComponentVersions(
       return this;
     }
 
-    public Builder clusterctl(final String v) {
-      this.clusterctl = v;
+    public Builder clusterApiOperator(final String v) {
+      this.clusterApiOperator = v;
       return this;
     }
 
@@ -199,7 +199,7 @@ public record ComponentVersions(
       if (!other.fluxOperator.isEmpty()) fluxOperator = other.fluxOperator;
       if (!other.envoyGateway.isEmpty()) envoyGateway = other.envoyGateway;
       if (!other.tailscale.isEmpty()) tailscale = other.tailscale;
-      if (!other.clusterctl.isEmpty()) clusterctl = other.clusterctl;
+      if (!other.clusterApiOperator.isEmpty()) clusterApiOperator = other.clusterApiOperator;
       if (!other.capiIncusProvider.isEmpty()) capiIncusProvider = other.capiIncusProvider;
       if (!other.capiRke2Provider.isEmpty()) capiRke2Provider = other.capiRke2Provider;
       return this;
@@ -214,7 +214,7 @@ public record ComponentVersions(
           fluxOperator,
           envoyGateway,
           tailscale,
-          clusterctl,
+          clusterApiOperator,
           capiIncusProvider,
           capiRke2Provider);
     }
