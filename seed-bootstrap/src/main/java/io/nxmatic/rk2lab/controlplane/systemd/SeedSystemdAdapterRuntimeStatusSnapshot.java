@@ -4,7 +4,6 @@ import io.nxmatic.rk2lab.controlplane.SeedLog;
 import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rk2lab.controlplane.readiness.DbusSystemdProbe;
 import io.nxmatic.rk2lab.systemdcontract.api.SystemdStatusSnapshot;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -36,7 +35,6 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
       parsed.put("source", "systemd-adapter-runtime-probe");
       parsed.put("probeMode", "systemd-adapter-runtime");
       parsed.put("status", "ok");
-      parsed.putIfAbsent("capturedAt", Instant.now().toString());
 
       if (logger != null) {
         logger.accept("systemd adapter runtime summary: " + parsed.getOrDefault("summary", "n/a"));
@@ -69,7 +67,6 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
     payload.put("kind", KIND);
     payload.put("status", status);
     payload.put("summary", summary);
-    payload.put("capturedAt", Instant.now().toString());
     if (details != null && !details.isEmpty()) {
       payload.putAll(details);
     }

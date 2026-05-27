@@ -4,7 +4,6 @@ import io.nxmatic.rk2lab.controlplane.incus.BootstrapConfig;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -275,7 +274,6 @@ public final class SeedSystemdAdapterEndpointGate {
     payload.put("kind", KIND);
     payload.put("status", status);
     payload.put("summary", summary);
-    payload.put("capturedAt", Instant.now().toString());
     if (details != null && !details.isEmpty()) {
       payload.putAll(details);
     }

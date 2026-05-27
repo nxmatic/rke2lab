@@ -34,16 +34,16 @@ public final class OutputBuilder {
     outputs.put("seedImageFingerprint", bootstrapResult.imageFingerprint());
     outputs.put("seedInstanceStatus", bootstrapResult.instanceStatus());
 
-    // Deployment metadata
+    // Deployment metadata. Intentionally omit `timestamp` here -- it would change every run and
+    // produce phantom output diffs on no-op pulumi up. Pulumi's own state already tracks when the
+    // stack was last updated.
     outputs.put(
         "seedDeploymentMetadata",
         Map.of(
             "git",
             Map.of(
                 "branch", bootstrapResult.deployment().git().branch(),
-                "commitSha", bootstrapResult.deployment().git().commitSha()),
-            "timestamp",
-            bootstrapResult.deployment().timestamp().toString()));
+                "commitSha", bootstrapResult.deployment().git().commitSha())));
 
     // Provisioning metadata
     outputs.put(
