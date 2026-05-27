@@ -41,24 +41,9 @@ installer::mode:validate() {
 
 installer::paths:init() {
 	DAEMONSET_HOST_SCRIPT_BIN="${DAEMONSET_HOST_SCRIPT_ROOT}/bin"
+	DAEMONSET_HOST_SCRIPT_LIB_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/.sh.d"
 	DAEMONSET_HOST_SCRIPT_ETC_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/etc"
 	DAEMONSET_SCRIPT_LOG_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/log"
-
-	# Policy library lives in different places per mode:
-	#   pod  — materialized into the workspace volume at <root>/.sh.d/ by
-	#          installer::pod:materialize_assets (workspace volume = host's
-	#          /var/run/k8s-daemonset.d).
-	#   host — seed-bootstrap's FloxRuntimeAssets writes the policy entries
-	#          under build-assets/, so on the host filesystem the lib sits at
-	#          <root>/build-assets/.sh.d/.
-	case "${DAEMONSET_EXEC_MODE}" in
-	pod)
-		DAEMONSET_HOST_SCRIPT_LIB_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/.sh.d"
-		;;
-	host)
-		DAEMONSET_HOST_SCRIPT_LIB_DIR="${DAEMONSET_HOST_SCRIPT_ROOT}/build-assets/.sh.d"
-		;;
-	esac
 }
 
 installer::policy:source() {

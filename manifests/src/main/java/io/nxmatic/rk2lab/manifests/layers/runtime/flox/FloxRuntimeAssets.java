@@ -70,7 +70,8 @@ public final class FloxRuntimeAssets {
    *       build-assets/environment.d/<category>/<env>/.flox/{env.json,env/flake.nix,env/manifest.toml,env/flake.lock,env/manifest.lock}}
    *   <li>{@code build-assets/debug-tools/...}
    *   <li>{@code build-assets/nri-plugin.tar.b64}, {@code build-assets/nri-plugin.manifest.json}
-   *   <li>{@code build-assets/<runtime-daemonset-script-policy entries>}
+   *   <li>{@code .sh.d/<runtime-daemonset-script-policy entries>} — same layout the in-pod
+   *       materializer writes, so host-mode and pod-mode resolve to one path.
    * </ul>
    */
   public void writeInstallerAssetTree(Path targetDir) throws IOException {
@@ -81,9 +82,8 @@ public final class FloxRuntimeAssets {
     }
     for (Map.Entry<String, String> entry :
         runtimeDaemonsetScriptPolicyAssets.relativePathsByKey().entrySet()) {
-      final String relativePath = installerBuildAssetPath(entry.getValue());
       final String content = runtimeDaemonsetScriptPolicyAssets.configMapData().get(entry.getKey());
-      writeText(targetDir.resolve(relativePath), content == null ? "" : content);
+      writeText(targetDir.resolve(entry.getValue()), content == null ? "" : content);
     }
     // The parent flake's `flox-nri-plugin` derivation has `src = ./nri-plugin`,
     // so the source tree must sit next to flake.nix on disk. Walk the
@@ -189,10 +189,6 @@ public final class FloxRuntimeAssets {
       }
       applyExecutableBitIfNeeded(dst);
     }
-  }
-
-  private static String installerBuildAssetPath(String relativePath) {
-    return "build-assets/" + relativePath;
   }
 
   private String resolveAssetContent(InstallerAsset asset) {
