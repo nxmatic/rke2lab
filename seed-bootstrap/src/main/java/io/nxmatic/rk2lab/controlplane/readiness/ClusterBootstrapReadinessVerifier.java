@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
@@ -242,78 +241,59 @@ public final class ClusterBootstrapReadinessVerifier {
 
     for (ControllerRef controllerRef : requiredControllers) {
       final String resourceRef = controllerRef.kind() + "/" + controllerRef.name();
-      final boolean kdnsSuspendActive =
-          isKdnsControllerRef(controllerRef) && policy.debug().kdnsSuspend();
-      final KdnsDebugMonitor debugMonitor =
-          kdnsSuspendActive ? KdnsDebugMonitor.start(kubeconfigPath) : null;
 
-      final ControllerVerification failure;
-      try {
-        logInfo("waiting for controller create: " + controllerRef.ref());
-        final CommandResult createdResult =
-            runCommand(
-                List.of(
-                    "kubectl",
-                    "--kubeconfig",
-                    kubeconfigPath.toString(),
-                    "--insecure-skip-tls-verify=true",
-                    "-n",
-                    controllerRef.namespace(),
-                    "wait",
-                    "--for=create",
-                    resourceRef,
-                    "--timeout=" + timeout.toSeconds() + "s"),
-                timeout.plusSeconds(5));
-        if (createdResult.exitCode() != 0) {
-          logInfo("controller create wait failed: " + controllerRef.ref());
-          failure =
-              new ControllerVerification(
-                  false,
-                  "failed waiting for resource create "
-                      + controllerRef.ref()
-                      + " ("
-                      + createdResult.summary()
-                      + ")",
-                  requiredControllerRefs(policy));
-        } else {
-          logInfo("waiting for controller rollout: " + controllerRef.ref());
-          final CommandResult rolloutResult =
-              runCommand(
-                  List.of(
-                      "kubectl",
-                      "--kubeconfig",
-                      kubeconfigPath.toString(),
-                      "--insecure-skip-tls-verify=true",
-                      "-n",
-                      controllerRef.namespace(),
-                      "rollout",
-                      "status",
-                      resourceRef,
-                      "--timeout=" + timeout.toSeconds() + "s"),
-                  timeout.plusSeconds(5));
-          if (rolloutResult.exitCode() != 0) {
-            logInfo("controller rollout wait failed: " + controllerRef.ref());
-            failure =
-                new ControllerVerification(
-                    false,
-                    "failed rollout status for "
-                        + controllerRef.ref()
-                        + " ("
-                        + rolloutResult.summary()
-                        + ")",
-                    requiredControllerRefs(policy));
-          } else {
-            failure = null;
-          }
-        }
-      } finally {
-        if (debugMonitor != null) {
-          debugMonitor.stop();
-        }
+      logInfo("waiting for controller create: " + controllerRef.ref());
+      final CommandResult createdResult =
+          runCommand(
+              List.of(
+                  "kubectl",
+                  "--kubeconfig",
+                  kubeconfigPath.toString(),
+                  "--insecure-skip-tls-verify=true",
+                  "-n",
+                  controllerRef.namespace(),
+                  "wait",
+                  "--for=create",
+                  resourceRef,
+                  "--timeout=" + timeout.toSeconds() + "s"),
+              timeout.plusSeconds(5));
+      if (createdResult.exitCode() != 0) {
+        logInfo("controller create wait failed: " + controllerRef.ref());
+        return new ControllerVerification(
+            false,
+            "failed waiting for resource create "
+                + controllerRef.ref()
+                + " ("
+                + createdResult.summary()
+                + ")",
+            requiredControllerRefs(policy));
       }
 
-      if (failure != null) {
-        return failure;
+      logInfo("waiting for controller rollout: " + controllerRef.ref());
+      final CommandResult rolloutResult =
+          runCommand(
+              List.of(
+                  "kubectl",
+                  "--kubeconfig",
+                  kubeconfigPath.toString(),
+                  "--insecure-skip-tls-verify=true",
+                  "-n",
+                  controllerRef.namespace(),
+                  "rollout",
+                  "status",
+                  resourceRef,
+                  "--timeout=" + timeout.toSeconds() + "s"),
+              timeout.plusSeconds(5));
+      if (rolloutResult.exitCode() != 0) {
+        logInfo("controller rollout wait failed: " + controllerRef.ref());
+        return new ControllerVerification(
+            false,
+            "failed rollout status for "
+                + controllerRef.ref()
+                + " ("
+                + rolloutResult.summary()
+                + ")",
+            requiredControllerRefs(policy));
       }
 
       logInfo("controller ready: " + controllerRef.ref());
@@ -353,12 +333,6 @@ public final class ClusterBootstrapReadinessVerifier {
 
   private static void logInfo(String message) {
     ACTIVE_LOGGER.get().accept(message);
-  }
-
-  private static boolean isKdnsControllerRef(ControllerRef ref) {
-    return "deployment".equals(ref.kind())
-        && "kdns".equals(ref.name())
-        && "rke2lab-system".equals(ref.namespace());
   }
 
   private static List<ControllerRef> requiredControllers(ControlplanePolicy policy) {
@@ -515,101 +489,6 @@ public final class ClusterBootstrapReadinessVerifier {
 
   private record ControllerVerification(
       boolean ready, String detail, List<String> requiredControllerRefs) {}
-
-  /**
-   * Background poller that surfaces kdns pod debug suspension hints in the Pulumi log while the
-   * kdns rollout is being awaited. When {@code policy.debug.kdns.suspend=true}, kdns pods may be
-   * paused at startup waiting for debugger attach. This monitor detects such pods and provides
-   * operator guidance.
-   *
-   * <p>Intended to be used as a try/finally sentinel around a single long-running {@code kubectl
-   * wait}/{@code kubectl rollout status} call.
-   */
-  private static final class KdnsDebugMonitor {
-
-    private static final Duration POLL_INTERVAL = Duration.ofSeconds(15);
-
-    private final Thread thread;
-    private final java.util.concurrent.atomic.AtomicBoolean stopped =
-        new java.util.concurrent.atomic.AtomicBoolean(false);
-
-    private KdnsDebugMonitor(Thread thread) {
-      this.thread = thread;
-    }
-
-    static KdnsDebugMonitor start(Path kubeconfigPath) {
-      final Map<String, Long> reportedAt = new ConcurrentHashMap<>();
-      final Thread t =
-          new Thread(
-              () -> {
-                while (!Thread.currentThread().isInterrupted()) {
-                  try {
-                    final List<KdnsDebugProbe.SuspendedPod> suspended =
-                        KdnsDebugProbe.probe(kubeconfigPath);
-                    final long now = System.nanoTime();
-                    for (KdnsDebugProbe.SuspendedPod pod : suspended) {
-                      final String key = pod.namespace() + "/" + pod.podName();
-                      reportedAt.computeIfAbsent(
-                          key,
-                          k -> {
-                            logInfo(
-                                "kdns pod stuck in ContainerCreating state (pod="
-                                    + pod.podName()
-                                    + " namespace="
-                                    + pod.namespace()
-                                    + "). If debug suspend is enabled, attach debugger to kdns container."
-                                    + " Check pod logs: kubectl -n "
-                                    + pod.namespace()
-                                    + " logs "
-                                    + pod.podName()
-                                    + " or describe pod: kubectl -n "
-                                    + pod.namespace()
-                                    + " describe pod "
-                                    + pod.podName());
-                            return now;
-                          });
-                    }
-                    // Drop entries for pods that left the suspended set (released or replaced).
-                    reportedAt
-                        .keySet()
-                        .removeIf(
-                            key ->
-                                suspended.stream()
-                                    .noneMatch(
-                                        s -> (s.namespace() + "/" + s.podName()).equals(key)));
-                    Thread.sleep(POLL_INTERVAL.toMillis());
-                  } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                    return;
-                  } catch (RuntimeException ex) {
-                    // Probe is best-effort; never let it kill the wait.
-                    try {
-                      Thread.sleep(POLL_INTERVAL.toMillis());
-                    } catch (InterruptedException ie) {
-                      Thread.currentThread().interrupt();
-                      return;
-                    }
-                  }
-                }
-              },
-              "rke2lab-kdns-debug-monitor");
-      t.setDaemon(true);
-      t.start();
-      return new KdnsDebugMonitor(t);
-    }
-
-    void stop() {
-      if (stopped.getAndSet(true)) {
-        return;
-      }
-      thread.interrupt();
-      try {
-        thread.join(Duration.ofSeconds(2).toMillis());
-      } catch (InterruptedException ex) {
-        Thread.currentThread().interrupt();
-      }
-    }
-  }
 
   private record CommandResult(int exitCode, String stdout, String stderr) {
     private String summary() {

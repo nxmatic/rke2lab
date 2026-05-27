@@ -460,10 +460,6 @@ public final class FloxRuntimeAssets {
           "debug-tools-rke2lab-dlv.sh",
           FLOX_RESOURCE_ROOT + "/debug-tools/rke2lab-dlv.sh",
           "build-assets/debug-tools/rke2lab-dlv.sh");
-      addInstallerAsset(
-          "debug-tools-rke2lab-runtime-dlv.sh",
-          FLOX_RESOURCE_ROOT + "/debug-tools/rke2lab-runtime-dlv.sh",
-          "build-assets/debug-tools/rke2lab-runtime-dlv.sh");
     }
 
     public Builder runtimeDaemonsetScriptPolicyAssets(

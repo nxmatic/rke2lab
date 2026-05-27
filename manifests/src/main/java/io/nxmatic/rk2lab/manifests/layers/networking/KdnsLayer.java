@@ -221,8 +221,18 @@ public final class KdnsLayer extends Construct {
     final FloxDebugPolicy debugPolicy = ManifestSynthesisContext.current().floxDebugPolicy();
     final FloxShellSidecarProfile shellSidecar =
         new FloxShellSidecarProfile(
-            debugPolicy, "kdns", "/root", "networking/kdns-debug", "0", "0");
-    final String floxEnvironment = "networking/kdns";
+            debugPolicy,
+            debugPolicy.networkingEnabled(),
+            "kdns",
+            "/root",
+            "networking/kdns-debug",
+            "0",
+            "0");
+    // When debug.networking is on, the prod container runs against the debug env so the binary
+    // it executes has symbols + delve in PATH; the shell sidecar can then
+    // `dlv attach $(pgrep kdns)` from the shared PID namespace.
+    final String floxEnvironment =
+        debugPolicy.resolveNetworkingEnvironment("networking/kdns", "networking/kdns-debug");
 
     LinkedHashMap<String, Object> kdnsContainer = new LinkedHashMap<>();
     kdnsContainer.put("name", "kdns");

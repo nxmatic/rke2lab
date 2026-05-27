@@ -2,9 +2,13 @@
 package io.nxmatic.rk2lab.manifests.layers.mesh;
 
 import io.nxmatic.rk2lab.manifests.layers.common.ManifestSynthesisContext;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxShellSidecarProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -31,8 +35,8 @@ public final class HeadplaneLayer extends Construct {
       final Construct scope, final String id, final ManifestUnitReferenceRegistry registry) {
     super(scope, id);
     this.registry = registry;
-    // Always use the prod carrier image; the FloxShellSidecarProfile (when adopted) will carry
-    // the debug image in its sidecar. See HeadscaleLayer for the same deferral.
+    // Prod carrier image is always busybox/alpine baseline; debug shell lives in the
+    // FloxShellSidecarProfile sidecar wired into createDeployment.
     this.floxImage = ManifestSynthesisContext.current().floxDebugPolicy().prodImage();
 
     ApiObject serviceAccount = createServiceAccount();
@@ -649,6 +653,136 @@ public final class HeadplaneLayer extends Construct {
       deployment.addDependency(registry.require(MeshLayerRefs.HEADSCALE_CONFIG_CONFIGMAP));
     }
 
+    final FloxDebugPolicy debugPolicy = ManifestSynthesisContext.current().floxDebugPolicy();
+    final FloxShellSidecarProfile shellSidecar =
+        new FloxShellSidecarProfile(
+            debugPolicy,
+            debugPolicy.meshEnabled(),
+            "headplane",
+            "/root",
+            "mesh/headplane-debug",
+            "0",
+            "0");
+
+    final List<Map<String, Object>> headplaneMounts = new ArrayList<>();
+    headplaneMounts.add(
+        Map.of(
+            "mountPath", "/etc/headplane/config.yaml",
+            "name", "config",
+            "subPath", "config.yaml"));
+    headplaneMounts.add(
+        Map.of(
+            "mountPath", "/etc/headplane/secrets",
+            "name", "secrets",
+            "readOnly", true));
+    headplaneMounts.add(
+        Map.of(
+            "mountPath", "/etc/headplane/agent",
+            "name", "agent",
+            "readOnly", true));
+    headplaneMounts.add(Map.of("mountPath", "/var/lib/headplane", "name", "data"));
+    headplaneMounts.add(
+        Map.of(
+            "mountPath", "/etc/headscale",
+            "name", "headscale-config",
+            "readOnly", true));
+    headplaneMounts.add(Map.of("mountPath", "/usr/libexec/headplane", "name", "shared-bin"));
+    headplaneMounts.addAll(shellSidecar.extraProdMounts());
+
+    final LinkedHashMap<String, Object> headplaneContainer = new LinkedHashMap<>();
+    headplaneContainer.put("name", "headplane");
+    headplaneContainer.put("image", floxImage);
+    headplaneContainer.put("command", List.of("headplane"));
+    headplaneContainer.put("args", List.of("serve"));
+    headplaneContainer.put(
+        "env",
+        List.of(
+            Map.of("name", "HEADPLANE_LOAD_ENV_OVERRIDES", "value", "true"),
+            Map.of(
+                "name",
+                "HEADPLANE_INTEGRATION__KUBERNETES__POD_NAME",
+                "valueFrom",
+                Map.of("fieldRef", Map.of("fieldPath", "metadata.name")))));
+    headplaneContainer.put(
+        "envFrom",
+        List.of(
+            Map.of("configMapRef", Map.of("name", MeshLayerRefs.HEADPLANE_ENV_CONFIGMAP.name())),
+            Map.of("configMapRef", Map.of("name", RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name()))));
+    headplaneContainer.put(
+        "livenessProbe",
+        Map.of(
+            "exec",
+            Map.of("command", List.of("/usr/libexec/headplane/healthcheck")),
+            "failureThreshold",
+            3,
+            "initialDelaySeconds",
+            30,
+            "periodSeconds",
+            10,
+            "timeoutSeconds",
+            5));
+    headplaneContainer.put(
+        "readinessProbe",
+        Map.of(
+            "exec",
+            Map.of("command", List.of("/usr/libexec/headplane/healthcheck")),
+            "failureThreshold",
+            2,
+            "initialDelaySeconds",
+            10,
+            "periodSeconds",
+            5,
+            "timeoutSeconds",
+            3));
+    headplaneContainer.put("ports", List.of(Map.of("containerPort", 3000, "name", "http")));
+    headplaneContainer.put(
+        "resources",
+        Map.of(
+            "limits",
+            Map.of(
+                "cpu", "500m",
+                "ephemeral-storage", "512Mi",
+                "memory", "512Mi"),
+            "requests",
+            Map.of(
+                "cpu", "100m",
+                "ephemeral-storage", "256Mi",
+                "memory", "128Mi")));
+    headplaneContainer.put("volumeMounts", List.copyOf(headplaneMounts));
+
+    final List<Object> containers = new ArrayList<>();
+    containers.add(headplaneContainer);
+    shellSidecar.sidecar(headplaneMounts).ifPresent(containers::add);
+
+    final List<Object> volumes = new ArrayList<>();
+    volumes.add(Map.of("name", "config", "secret", Map.of("secretName", "headplane-config")));
+    volumes.add(
+        Map.of(
+            "name",
+            "secrets",
+            "secret",
+            Map.of("secretName", MeshLayerRefs.HEADPLANE_SECRETS_SECRET.name())));
+    volumes.add(Map.of("name", "agent", "secret", Map.of("secretName", "headplane-agent-auth")));
+    volumes.add(
+        Map.of("name", "data", "persistentVolumeClaim", Map.of("claimName", "headplane-data")));
+    volumes.add(
+        Map.of(
+            "name",
+            "headscale-config",
+            "configMap",
+            Map.of("name", MeshLayerRefs.HEADSCALE_CONFIG_CONFIGMAP.name())));
+    volumes.add(Map.of("name", "shared-bin", "emptyDir", Map.of()));
+    volumes.addAll(shellSidecar.extraVolumes());
+
+    // When debug is on, the prod container runs the debug env so its node has --enable-source-maps
+    // + --inspect; the shell sidecar (with SYS_PTRACE + shareProcessNamespace) can attach to the
+    // running node process from the shared PID namespace.
+    final LinkedHashMap<String, String> annotations = new LinkedHashMap<>();
+    annotations.put(
+        "flox.dev/environment.headplane",
+        debugPolicy.resolveMeshEnvironment("mesh/headplane", "mesh/headplane-debug"));
+    annotations.putAll(shellSidecar.sidecarAnnotations());
+
     deployment.addJsonPatch(
         JsonPatch.add(
             "/spec",
@@ -662,136 +796,13 @@ public final class HeadplaneLayer extends Construct {
                     "metadata",
                     Map.of(
                         "annotations",
-                        packageProfile.templateAnnotations(
-                            Map.of("flox.dev/environment.headplane", "mesh/headplane")),
+                        packageProfile.templateAnnotations(Map.copyOf(annotations)),
                         "labels",
                         Map.of("app", "headplane")),
                     "spec",
                     Map.of(
                         "containers",
-                        List.of(
-                            Map.ofEntries(
-                                Map.entry("name", "headplane"),
-                                Map.entry("image", floxImage),
-                                Map.entry("command", List.of("headplane")),
-                                Map.entry("args", List.of("serve")),
-                                Map.entry(
-                                    "env",
-                                    List.of(
-                                        Map.of(
-                                            "name",
-                                            "HEADPLANE_LOAD_ENV_OVERRIDES",
-                                            "value",
-                                            "true"),
-                                        Map.of(
-                                            "name",
-                                            "HEADPLANE_INTEGRATION__KUBERNETES__POD_NAME",
-                                            "valueFrom",
-                                            Map.of(
-                                                "fieldRef",
-                                                Map.of("fieldPath", "metadata.name"))))),
-                                Map.entry(
-                                    "envFrom",
-                                    List.of(
-                                        Map.of(
-                                            "configMapRef",
-                                            Map.of(
-                                                "name",
-                                                MeshLayerRefs.HEADPLANE_ENV_CONFIGMAP.name())),
-                                        Map.of(
-                                            "configMapRef",
-                                            Map.of(
-                                                "name",
-                                                RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name())))),
-                                Map.entry(
-                                    "livenessProbe",
-                                    Map.of(
-                                        "exec",
-                                        Map.of(
-                                            "command",
-                                            List.of("/usr/libexec/headplane/healthcheck")),
-                                        "failureThreshold",
-                                        3,
-                                        "initialDelaySeconds",
-                                        30,
-                                        "periodSeconds",
-                                        10,
-                                        "timeoutSeconds",
-                                        5)),
-                                Map.entry(
-                                    "readinessProbe",
-                                    Map.of(
-                                        "exec",
-                                        Map.of(
-                                            "command",
-                                            List.of("/usr/libexec/headplane/healthcheck")),
-                                        "failureThreshold",
-                                        2,
-                                        "initialDelaySeconds",
-                                        10,
-                                        "periodSeconds",
-                                        5,
-                                        "timeoutSeconds",
-                                        3)),
-                                Map.entry(
-                                    "ports",
-                                    List.of(Map.of("containerPort", 3000, "name", "http"))),
-                                Map.entry(
-                                    "resources",
-                                    Map.of(
-                                        "limits",
-                                        Map.of(
-                                            "cpu",
-                                            "500m",
-                                            "ephemeral-storage",
-                                            "512Mi",
-                                            "memory",
-                                            "512Mi"),
-                                        "requests",
-                                        Map.of(
-                                            "cpu",
-                                            "100m",
-                                            "ephemeral-storage",
-                                            "256Mi",
-                                            "memory",
-                                            "128Mi"))),
-                                Map.entry(
-                                    "volumeMounts",
-                                    List.of(
-                                        Map.of(
-                                            "mountPath",
-                                            "/etc/headplane/config.yaml",
-                                            "name",
-                                            "config",
-                                            "subPath",
-                                            "config.yaml"),
-                                        Map.of(
-                                            "mountPath",
-                                            "/etc/headplane/secrets",
-                                            "name",
-                                            "secrets",
-                                            "readOnly",
-                                            true),
-                                        Map.of(
-                                            "mountPath",
-                                            "/etc/headplane/agent",
-                                            "name",
-                                            "agent",
-                                            "readOnly",
-                                            true),
-                                        Map.of("mountPath", "/var/lib/headplane", "name", "data"),
-                                        Map.of(
-                                            "mountPath",
-                                            "/etc/headscale",
-                                            "name",
-                                            "headscale-config",
-                                            "readOnly",
-                                            true),
-                                        Map.of(
-                                            "mountPath",
-                                            "/usr/libexec/headplane",
-                                            "name",
-                                            "shared-bin"))))),
+                        List.copyOf(containers),
                         "initContainers",
                         List.of(
                             Map.of(
@@ -818,34 +829,7 @@ public final class HeadplaneLayer extends Construct {
                         "shareProcessNamespace",
                         true,
                         "volumes",
-                        List.of(
-                            Map.of(
-                                "name",
-                                "config",
-                                "secret",
-                                Map.of("secretName", "headplane-config")),
-                            Map.of(
-                                "name",
-                                "secrets",
-                                "secret",
-                                Map.of(
-                                    "secretName", MeshLayerRefs.HEADPLANE_SECRETS_SECRET.name())),
-                            Map.of(
-                                "name",
-                                "agent",
-                                "secret",
-                                Map.of("secretName", "headplane-agent-auth")),
-                            Map.of(
-                                "name",
-                                "data",
-                                "persistentVolumeClaim",
-                                Map.of("claimName", "headplane-data")),
-                            Map.of(
-                                "name",
-                                "headscale-config",
-                                "configMap",
-                                Map.of("name", MeshLayerRefs.HEADSCALE_CONFIG_CONFIGMAP.name())),
-                            Map.of("name", "shared-bin", "emptyDir", Map.of())))))));
+                        List.copyOf(volumes))))));
 
     return deployment;
   }

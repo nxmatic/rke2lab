@@ -25,6 +25,7 @@ import io.nxmatic.rk2lab.controlplane.incus.image.PulumiIncusImageProvider;
 import io.nxmatic.rk2lab.controlplane.pipeline.OnFailure;
 import io.nxmatic.rk2lab.controlplane.pipeline.TopicRunner;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
+import io.nxmatic.rk2lab.controlplane.policy.DebugPolicy;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeResult;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeService;
@@ -418,9 +419,9 @@ public final class IncusResourceBootstrap {
   }
 
   private FloxDebugPolicy resolveFloxDebugPolicy(ControlplanePolicy policy) {
-    return policy.debug().floxNriPluginEnabled()
-        ? FloxDebugPolicy.debug()
-        : FloxDebugPolicy.disabled();
+    final DebugPolicy debug = policy.debug();
+    return new FloxDebugPolicy(
+        debug.meshEnabled(), debug.networkingEnabled(), debug.floxNriPluginEnabled());
   }
 
   private void synthesizeManifests(
@@ -453,8 +454,8 @@ public final class IncusResourceBootstrap {
     logInfo(
         "phase prepareHostState: manifests synthesized + exploded after "
             + elapsedSince(startedAt)
-            + " (floxDebugPolicy.enabled="
-            + floxDebugPolicy.enabled()
+            + " (floxDebugPolicy="
+            + floxDebugPolicy
             + ", checksum="
             + summary.get("checksum")
             + ", fileCount="
@@ -471,7 +472,9 @@ public final class IncusResourceBootstrap {
         "fileCount", writtenFiles.size(),
         "layers", countLayers(manifestsRoot, writtenFiles),
         "byLayer", groupByLayer(manifestsRoot, writtenFiles),
-        "floxDebugEnabled", floxDebugPolicy.enabled());
+        "floxDebugMeshEnabled", floxDebugPolicy.meshEnabled(),
+        "floxDebugNetworkingEnabled", floxDebugPolicy.networkingEnabled(),
+        "floxDebugFloxNriPluginEnabled", floxDebugPolicy.floxNriPluginEnabled());
   }
 
   private String computeManifestChecksum(Path manifestsRoot, List<Path> writtenFiles) {

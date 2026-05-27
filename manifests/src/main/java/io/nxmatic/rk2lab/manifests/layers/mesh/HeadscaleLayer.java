@@ -2,9 +2,13 @@
 package io.nxmatic.rk2lab.manifests.layers.mesh;
 
 import io.nxmatic.rk2lab.manifests.layers.common.ManifestSynthesisContext;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxShellSidecarProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -16,9 +20,8 @@ import software.constructs.Construct;
 public final class HeadscaleLayer extends Construct {
 
   private static final String HEADSCALE_NAMESPACE = MeshLayerRefs.MESH_SYSTEM_NAMESPACE.name();
-  // Always use the prod carrier image; the FloxShellSidecarProfile (when adopted) carries the
-  // debug image in its sidecar. Headscale doesn't ship a *-debug flox env, so a follow-up branch
-  // can wire the shared sidecar profile in without changing the workload's flox env.
+  // Prod carrier image is always busybox/alpine baseline; debug shell lives in the
+  // FloxShellSidecarProfile sidecar attached to each long-lived pod below.
   private final String floxImage = ManifestSynthesisContext.current().floxDebugPolicy().prodImage();
 
   private final PackageMetadataProfile packageProfile =
@@ -734,6 +737,155 @@ public final class HeadscaleLayer extends Construct {
     deployment.addDependency(cmExtraRecords);
     deployment.addDependency(l2Policy);
 
+    final FloxDebugPolicy debugPolicy = ManifestSynthesisContext.current().floxDebugPolicy();
+    final FloxShellSidecarProfile shellSidecar =
+        new FloxShellSidecarProfile(
+            debugPolicy,
+            debugPolicy.meshEnabled(),
+            "headscale",
+            "/root",
+            "mesh/headscale-debug",
+            "0",
+            "0");
+
+    final List<Map<String, Object>> headscaleMounts = new ArrayList<>();
+    headscaleMounts.add(
+        Map.of(
+            "mountPath", "/etc/headscale/config.yaml",
+            "name", "config",
+            "subPath", "config.yaml"));
+    headscaleMounts.add(
+        Map.of(
+            "mountPath", "/etc/headscale/acl.json",
+            "name", "acl",
+            "subPath", "acl.json"));
+    headscaleMounts.add(
+        Map.of(
+            "mountPath", "/etc/headscale/derp.yaml",
+            "name", "derp",
+            "subPath", "derp.yaml"));
+    headscaleMounts.add(Map.of("mountPath", "/var/lib/headscale", "name", "data"));
+    headscaleMounts.add(Map.of("mountPath", "/var/run/headscale", "name", "run"));
+    headscaleMounts.addAll(shellSidecar.extraProdMounts());
+
+    final LinkedHashMap<String, Object> headscaleContainer = new LinkedHashMap<>();
+    headscaleContainer.put("name", "headscale");
+    headscaleContainer.put("image", floxImage);
+    headscaleContainer.put("command", List.of("headscale", "serve"));
+    headscaleContainer.put(
+        "envFrom",
+        List.of(
+            Map.of("configMapRef", Map.of("name", RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name()))));
+    headscaleContainer.put(
+        "livenessProbe",
+        Map.of(
+            "httpGet",
+            Map.of("path", "/health", "port", "http"),
+            "initialDelaySeconds",
+            30,
+            "periodSeconds",
+            10));
+    headscaleContainer.put(
+        "readinessProbe",
+        Map.of(
+            "httpGet",
+            Map.of("path", "/health", "port", "http"),
+            "initialDelaySeconds",
+            10,
+            "periodSeconds",
+            5));
+    headscaleContainer.put(
+        "ports",
+        List.of(
+            Map.of("containerPort", 8080, "name", "http", "protocol", "TCP"),
+            Map.of("containerPort", 9090, "name", "metrics", "protocol", "TCP")));
+    headscaleContainer.put(
+        "resources",
+        Map.of(
+            "limits",
+            Map.of(
+                "cpu", "500m",
+                "ephemeral-storage", "512Mi",
+                "memory", "512Mi"),
+            "requests",
+            Map.of(
+                "cpu", "100m",
+                "ephemeral-storage", "256Mi",
+                "memory", "128Mi")));
+    headscaleContainer.put("volumeMounts", List.copyOf(headscaleMounts));
+
+    final List<Object> containers = new ArrayList<>();
+    containers.add(headscaleContainer);
+    shellSidecar.sidecar(headscaleMounts).ifPresent(containers::add);
+
+    final List<Object> volumes = new ArrayList<>();
+    volumes.add(
+        Map.of(
+            "name",
+            "config-source",
+            "configMap",
+            Map.of("name", MeshLayerRefs.HEADSCALE_CONFIG_CONFIGMAP.name())));
+    volumes.add(Map.of("name", "config", "emptyDir", Map.of()));
+    volumes.add(
+        Map.of(
+            "name",
+            "config-init-script",
+            "configMap",
+            Map.of("defaultMode", 493, "name", "headscale-config-init-script")));
+    volumes.add(
+        Map.of(
+            "name",
+            "extra-records-source",
+            "configMap",
+            Map.of("name", "headscale-extra-records")));
+    volumes.add(Map.of("name", "acl", "configMap", Map.of("name", "headscale-acl")));
+    volumes.add(Map.of("name", "derp", "configMap", Map.of("name", "headscale-derp")));
+    volumes.add(Map.of("name", "data", "emptyDir", Map.of()));
+    volumes.add(Map.of("name", "run", "emptyDir", Map.of()));
+    volumes.addAll(shellSidecar.extraVolumes());
+
+    // When debug is on, the prod container runs against the debug env so headscale ships with
+    // delve in PATH and unstripped symbols; the shell sidecar can `dlv attach $(pgrep headscale)`
+    // through the shared PID namespace.
+    final LinkedHashMap<String, String> annotations = new LinkedHashMap<>();
+    annotations.put(
+        "flox.dev/environment.headscale",
+        debugPolicy.resolveMeshEnvironment("mesh/headscale", "mesh/headscale-debug"));
+    annotations.putAll(shellSidecar.sidecarAnnotations());
+
+    final LinkedHashMap<String, Object> headscalePodSpec = new LinkedHashMap<>();
+    headscalePodSpec.put("automountServiceAccountToken", false);
+    headscalePodSpec.put("containers", List.copyOf(containers));
+    headscalePodSpec.put(
+        "initContainers",
+        List.of(
+            Map.of(
+                "name",
+                "config-init",
+                "image",
+                floxImage,
+                "command",
+                List.of("/scripts/config-init.sh"),
+                "volumeMounts",
+                List.of(
+                    Map.of("mountPath", "/scripts", "name", "config-init-script"),
+                    Map.of(
+                        "mountPath", "/config-source", "name", "config-source", "readOnly", true),
+                    Map.of("mountPath", "/config", "name", "config"),
+                    Map.of(
+                        "mountPath",
+                        "/extra-records-source",
+                        "name",
+                        "extra-records-source",
+                        "readOnly",
+                        true),
+                    Map.of("mountPath", "/var/lib/headscale", "name", "data")))));
+    headscalePodSpec.put("nodeSelector", Map.of("node-role.kubernetes.io/control-plane", "true"));
+    if (shellSidecar.shareProcessNamespace()) {
+      headscalePodSpec.put("shareProcessNamespace", true);
+    }
+    headscalePodSpec.put("volumes", List.copyOf(volumes));
+
     deployment.addJsonPatch(
         JsonPatch.add(
             "/spec",
@@ -745,175 +897,13 @@ public final class HeadscaleLayer extends Construct {
                 "template",
                 Map.of(
                     "metadata",
-                        Map.of(
-                            "annotations",
-                            packageProfile.templateAnnotations(
-                                Map.of("flox.dev/environment.headscale", "nxmatic/headscale")),
-                            "labels",
-                            Map.of("app", "headscale")),
+                    Map.of(
+                        "annotations",
+                        packageProfile.templateAnnotations(Map.copyOf(annotations)),
+                        "labels",
+                        Map.of("app", "headscale")),
                     "spec",
-                        Map.of(
-                            "automountServiceAccountToken",
-                            false,
-                            "containers",
-                            List.of(
-                                Map.ofEntries(
-                                    Map.entry("name", "headscale"),
-                                    Map.entry("image", floxImage),
-                                    Map.entry("command", List.of("headscale", "serve")),
-                                    Map.entry(
-                                        "envFrom",
-                                        List.of(
-                                            Map.of(
-                                                "configMapRef",
-                                                Map.of(
-                                                    "name",
-                                                    RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name())))),
-                                    Map.entry(
-                                        "livenessProbe",
-                                        Map.of(
-                                            "httpGet",
-                                            Map.of("path", "/health", "port", "http"),
-                                            "initialDelaySeconds",
-                                            30,
-                                            "periodSeconds",
-                                            10)),
-                                    Map.entry(
-                                        "readinessProbe",
-                                        Map.of(
-                                            "httpGet",
-                                            Map.of("path", "/health", "port", "http"),
-                                            "initialDelaySeconds",
-                                            10,
-                                            "periodSeconds",
-                                            5)),
-                                    Map.entry(
-                                        "ports",
-                                        List.of(
-                                            Map.of(
-                                                "containerPort",
-                                                8080,
-                                                "name",
-                                                "http",
-                                                "protocol",
-                                                "TCP"),
-                                            Map.of(
-                                                "containerPort",
-                                                9090,
-                                                "name",
-                                                "metrics",
-                                                "protocol",
-                                                "TCP"))),
-                                    Map.entry(
-                                        "resources",
-                                        Map.of(
-                                            "limits",
-                                            Map.of(
-                                                "cpu",
-                                                "500m",
-                                                "ephemeral-storage",
-                                                "512Mi",
-                                                "memory",
-                                                "512Mi"),
-                                            "requests",
-                                            Map.of(
-                                                "cpu",
-                                                "100m",
-                                                "ephemeral-storage",
-                                                "256Mi",
-                                                "memory",
-                                                "128Mi"))),
-                                    Map.entry(
-                                        "volumeMounts",
-                                        List.of(
-                                            Map.of(
-                                                "mountPath",
-                                                "/etc/headscale/config.yaml",
-                                                "name",
-                                                "config",
-                                                "subPath",
-                                                "config.yaml"),
-                                            Map.of(
-                                                "mountPath",
-                                                "/etc/headscale/acl.json",
-                                                "name",
-                                                "acl",
-                                                "subPath",
-                                                "acl.json"),
-                                            Map.of(
-                                                "mountPath",
-                                                "/etc/headscale/derp.yaml",
-                                                "name",
-                                                "derp",
-                                                "subPath",
-                                                "derp.yaml"),
-                                            Map.of(
-                                                "mountPath", "/var/lib/headscale", "name", "data"),
-                                            Map.of(
-                                                "mountPath",
-                                                "/var/run/headscale",
-                                                "name",
-                                                "run"))))),
-                            "initContainers",
-                            List.of(
-                                Map.of(
-                                    "name",
-                                    "config-init",
-                                    "image",
-                                    floxImage,
-                                    "command",
-                                    List.of("/scripts/config-init.sh"),
-                                    "volumeMounts",
-                                    List.of(
-                                        Map.of(
-                                            "mountPath", "/scripts", "name", "config-init-script"),
-                                        Map.of(
-                                            "mountPath",
-                                            "/config-source",
-                                            "name",
-                                            "config-source",
-                                            "readOnly",
-                                            true),
-                                        Map.of("mountPath", "/config", "name", "config"),
-                                        Map.of(
-                                            "mountPath",
-                                            "/extra-records-source",
-                                            "name",
-                                            "extra-records-source",
-                                            "readOnly",
-                                            true),
-                                        Map.of(
-                                            "mountPath", "/var/lib/headscale", "name", "data")))),
-                            "nodeSelector",
-                            Map.of("node-role.kubernetes.io/control-plane", "true"),
-                            "volumes",
-                            List.of(
-                                Map.of(
-                                    "name",
-                                    "config-source",
-                                    "configMap",
-                                    Map.of(
-                                        "name", MeshLayerRefs.HEADSCALE_CONFIG_CONFIGMAP.name())),
-                                Map.of("name", "config", "emptyDir", Map.of()),
-                                Map.of(
-                                    "name",
-                                    "config-init-script",
-                                    "configMap",
-                                    Map.of(
-                                        "defaultMode",
-                                        493,
-                                        "name",
-                                        "headscale-config-init-script")),
-                                Map.of(
-                                    "name",
-                                    "extra-records-source",
-                                    "configMap",
-                                    Map.of("name", "headscale-extra-records")),
-                                Map.of("name", "acl", "configMap", Map.of("name", "headscale-acl")),
-                                Map.of(
-                                    "name", "derp", "configMap", Map.of("name", "headscale-derp")),
-                                Map.of("name", "data", "emptyDir", Map.of()),
-                                Map.of("name", "run", "emptyDir", Map.of())))))));
+                    Map.copyOf(headscalePodSpec)))));
     return deployment;
   }
 
@@ -998,7 +988,7 @@ public final class HeadscaleLayer extends Construct {
                     Map.of(
                         "annotations",
                         packageProfile.templateAnnotations(
-                            Map.of("flox.dev/environment.bootstrap", "nxmatic/headscale"))),
+                            Map.of("flox.dev/environment.bootstrap", "mesh/headscale"))),
                     "spec",
                     Map.of(
                         "containers",
@@ -1095,6 +1085,138 @@ public final class HeadscaleLayer extends Construct {
     deployment.addDependency(cmScript);
     deployment.addDependency(bootstrapJob);
 
+    final FloxDebugPolicy gatewayDebugPolicy = ManifestSynthesisContext.current().floxDebugPolicy();
+    final FloxShellSidecarProfile gatewayShellSidecar =
+        new FloxShellSidecarProfile(
+            gatewayDebugPolicy,
+            gatewayDebugPolicy.meshEnabled(),
+            "tailscale-gateway",
+            "/root",
+            "mesh/tailscale-debug",
+            "0",
+            "0");
+
+    final List<Map<String, Object>> gatewayMounts = new ArrayList<>();
+    gatewayMounts.add(Map.of("mountPath", "/dev/net/tun", "name", "dev-net-tun"));
+    gatewayMounts.add(Map.of("mountPath", "/var/lib/tailscale", "name", "tailscale-state"));
+    gatewayMounts.add(Map.of("mountPath", "/var/run/tailscale", "name", "tailscale-socket"));
+    gatewayMounts.add(
+        Map.of(
+            "mountPath", "/var/secrets",
+            "name", "authkey",
+            "readOnly", true));
+    gatewayMounts.add(
+        Map.of(
+            "mountPath", "/scripts",
+            "name", "gateway-script",
+            "readOnly", true));
+    gatewayMounts.addAll(gatewayShellSidecar.extraProdMounts());
+
+    final LinkedHashMap<String, Object> gatewayContainer = new LinkedHashMap<>();
+    gatewayContainer.put("name", "tailscale-gateway");
+    gatewayContainer.put("image", floxImage);
+    gatewayContainer.put("command", List.of("/scripts/gateway.sh"));
+    gatewayContainer.put(
+        "env",
+        List.of(
+            Map.of(
+                "name",
+                "TS_AUTHKEY",
+                "valueFrom",
+                Map.of(
+                    "secretKeyRef",
+                    Map.of(
+                        "key",
+                        "authkey",
+                        "name",
+                        MeshLayerRefs.HEADSCALE_CLIENT_AUTH_SECRET.name())))));
+    gatewayContainer.put(
+        "envFrom",
+        List.of(
+            Map.of("configMapRef", Map.of("name", MeshLayerRefs.HEADSCALE_ENV_CONFIGMAP.name())),
+            Map.of("configMapRef", Map.of("name", RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name()))));
+    gatewayContainer.put(
+        "resources",
+        Map.of(
+            "limits",
+            Map.of(
+                "cpu", "200m",
+                "ephemeral-storage", "500Mi",
+                "memory", "256Mi"),
+            "requests",
+            Map.of(
+                "cpu", "50m",
+                "ephemeral-storage", "100Mi",
+                "memory", "64Mi")));
+    gatewayContainer.put(
+        "securityContext",
+        Map.of("capabilities", Map.of("add", List.of("NET_ADMIN", "NET_RAW")), "privileged", true));
+    gatewayContainer.put("volumeMounts", List.copyOf(gatewayMounts));
+
+    final List<Object> gatewayContainers = new ArrayList<>();
+    gatewayContainers.add(gatewayContainer);
+    gatewayShellSidecar.sidecar(gatewayMounts).ifPresent(gatewayContainers::add);
+
+    final List<Object> gatewayVolumes = new ArrayList<>();
+    gatewayVolumes.add(
+        Map.of(
+            "name",
+            "dev-net-tun",
+            "hostPath",
+            Map.of("path", "/dev/net/tun", "type", "CharDevice")));
+    gatewayVolumes.add(
+        Map.of(
+            "name",
+            "tailscale-state",
+            "hostPath",
+            Map.of("path", "/var/lib/tailscale", "type", "DirectoryOrCreate")));
+    gatewayVolumes.add(Map.of("name", "tailscale-socket", "emptyDir", Map.of()));
+    gatewayVolumes.add(
+        Map.of(
+            "name",
+            "gateway-script",
+            "configMap",
+            Map.of("defaultMode", 493, "name", "headscale-gateway-script")));
+    gatewayVolumes.add(
+        Map.of(
+            "name",
+            "authkey",
+            "secret",
+            Map.of(
+                "items",
+                List.of(Map.of("key", "authkey", "path", "authkey")),
+                "secretName",
+                MeshLayerRefs.HEADSCALE_CLIENT_AUTH_SECRET.name())));
+    gatewayVolumes.addAll(gatewayShellSidecar.extraVolumes());
+
+    final LinkedHashMap<String, String> gatewayAnnotations = new LinkedHashMap<>();
+    gatewayAnnotations.put(
+        "flox.dev/environment.tailscale-gateway",
+        gatewayDebugPolicy.resolveMeshEnvironment("mesh/tailscale", "mesh/tailscale-debug"));
+    gatewayAnnotations.putAll(gatewayShellSidecar.sidecarAnnotations());
+
+    final LinkedHashMap<String, Object> gatewayPodSpec = new LinkedHashMap<>();
+    gatewayPodSpec.put("automountServiceAccountToken", false);
+    gatewayPodSpec.put("containers", List.copyOf(gatewayContainers));
+    gatewayPodSpec.put("dnsPolicy", "ClusterFirstWithHostNet");
+    gatewayPodSpec.put("hostNetwork", true);
+    gatewayPodSpec.put("nodeSelector", Map.of("node-role.kubernetes.io/control-plane", "true"));
+    gatewayPodSpec.put("serviceAccountName", "headscale-gateway");
+    if (gatewayShellSidecar.shareProcessNamespace()) {
+      gatewayPodSpec.put("shareProcessNamespace", true);
+    }
+    gatewayPodSpec.put(
+        "tolerations",
+        List.of(
+            Map.of(
+                "effect",
+                "NoSchedule",
+                "key",
+                "node-role.kubernetes.io/control-plane",
+                "operator",
+                "Exists")));
+    gatewayPodSpec.put("volumes", List.copyOf(gatewayVolumes));
+
     deployment.addJsonPatch(
         JsonPatch.add(
             "/spec",
@@ -1108,142 +1230,11 @@ public final class HeadscaleLayer extends Construct {
                     "metadata",
                     Map.of(
                         "annotations",
-                        packageProfile.templateAnnotations(
-                            Map.of("flox.dev/environment.tailscale-gateway", "nxmatic/headscale")),
+                        packageProfile.templateAnnotations(Map.copyOf(gatewayAnnotations)),
                         "labels",
                         Map.of("app", "headscale-gateway")),
                     "spec",
-                    Map.of(
-                        "automountServiceAccountToken",
-                        false,
-                        "containers",
-                        List.of(
-                            Map.of(
-                                "name",
-                                "tailscale-gateway",
-                                "image",
-                                floxImage,
-                                "command",
-                                List.of("/scripts/gateway.sh"),
-                                "env",
-                                List.of(
-                                    Map.of(
-                                        "name",
-                                        "TS_AUTHKEY",
-                                        "valueFrom",
-                                        Map.of(
-                                            "secretKeyRef",
-                                            Map.of(
-                                                "key",
-                                                "authkey",
-                                                "name",
-                                                MeshLayerRefs.HEADSCALE_CLIENT_AUTH_SECRET
-                                                    .name())))),
-                                "envFrom",
-                                List.of(
-                                    Map.of(
-                                        "configMapRef",
-                                        Map.of(
-                                            "name", MeshLayerRefs.HEADSCALE_ENV_CONFIGMAP.name())),
-                                    Map.of(
-                                        "configMapRef",
-                                        Map.of(
-                                            "name", RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name()))),
-                                "resources",
-                                Map.of(
-                                    "limits",
-                                    Map.of(
-                                        "cpu",
-                                        "200m",
-                                        "ephemeral-storage",
-                                        "500Mi",
-                                        "memory",
-                                        "256Mi"),
-                                    "requests",
-                                    Map.of(
-                                        "cpu",
-                                        "50m",
-                                        "ephemeral-storage",
-                                        "100Mi",
-                                        "memory",
-                                        "64Mi")),
-                                "securityContext",
-                                Map.of(
-                                    "capabilities",
-                                    Map.of("add", List.of("NET_ADMIN", "NET_RAW")),
-                                    "privileged",
-                                    true),
-                                "volumeMounts",
-                                List.of(
-                                    Map.of("mountPath", "/dev/net/tun", "name", "dev-net-tun"),
-                                    Map.of(
-                                        "mountPath",
-                                        "/var/lib/tailscale",
-                                        "name",
-                                        "tailscale-state"),
-                                    Map.of(
-                                        "mountPath",
-                                        "/var/run/tailscale",
-                                        "name",
-                                        "tailscale-socket"),
-                                    Map.of(
-                                        "mountPath",
-                                        "/var/secrets",
-                                        "name",
-                                        "authkey",
-                                        "readOnly",
-                                        true),
-                                    Map.of(
-                                        "mountPath",
-                                        "/scripts",
-                                        "name",
-                                        "gateway-script",
-                                        "readOnly",
-                                        true)))),
-                        "dnsPolicy",
-                        "ClusterFirstWithHostNet",
-                        "hostNetwork",
-                        true,
-                        "nodeSelector",
-                        Map.of("node-role.kubernetes.io/control-plane", "true"),
-                        "serviceAccountName",
-                        "headscale-gateway",
-                        "tolerations",
-                        List.of(
-                            Map.of(
-                                "effect",
-                                "NoSchedule",
-                                "key",
-                                "node-role.kubernetes.io/control-plane",
-                                "operator",
-                                "Exists")),
-                        "volumes",
-                        List.of(
-                            Map.of(
-                                "name",
-                                "dev-net-tun",
-                                "hostPath",
-                                Map.of("path", "/dev/net/tun", "type", "CharDevice")),
-                            Map.of(
-                                "name",
-                                "tailscale-state",
-                                "hostPath",
-                                Map.of("path", "/var/lib/tailscale", "type", "DirectoryOrCreate")),
-                            Map.of("name", "tailscale-socket", "emptyDir", Map.of()),
-                            Map.of(
-                                "name",
-                                "gateway-script",
-                                "configMap",
-                                Map.of("defaultMode", 493, "name", "headscale-gateway-script")),
-                            Map.of(
-                                "name",
-                                "authkey",
-                                "secret",
-                                Map.of(
-                                    "items",
-                                    List.of(Map.of("key", "authkey", "path", "authkey")),
-                                    "secretName",
-                                    MeshLayerRefs.HEADSCALE_CLIENT_AUTH_SECRET.name()))))))));
+                    Map.copyOf(gatewayPodSpec)))));
   }
 
   private void createDaemonsetClient(
@@ -1279,6 +1270,129 @@ public final class HeadscaleLayer extends Construct {
     daemonSet.addDependency(bootstrapJob);
     daemonSet.addDependency(serviceHeadscale);
 
+    final FloxDebugPolicy clientDebugPolicy = ManifestSynthesisContext.current().floxDebugPolicy();
+    final FloxShellSidecarProfile clientShellSidecar =
+        new FloxShellSidecarProfile(
+            clientDebugPolicy,
+            clientDebugPolicy.meshEnabled(),
+            "tailscale",
+            "/root",
+            "mesh/tailscale-debug",
+            "0",
+            "0");
+
+    final List<Map<String, Object>> clientMounts = new ArrayList<>();
+    clientMounts.add(Map.of("mountPath", "/dev/net/tun", "name", "dev-net-tun"));
+    clientMounts.add(Map.of("mountPath", "/var/lib/tailscale", "name", "tailscale-state"));
+    clientMounts.add(Map.of("mountPath", "/var/run/tailscale", "name", "tailscale-socket"));
+    clientMounts.add(
+        Map.of(
+            "mountPath", "/var/secrets",
+            "name", "authkey",
+            "readOnly", true));
+    clientMounts.add(
+        Map.of(
+            "mountPath", "/scripts",
+            "name", "client-scripts",
+            "readOnly", true));
+    clientMounts.addAll(clientShellSidecar.extraProdMounts());
+
+    final LinkedHashMap<String, Object> clientContainer = new LinkedHashMap<>();
+    clientContainer.put("name", "tailscale");
+    clientContainer.put("image", floxImage);
+    clientContainer.put("command", List.of("/scripts/tailscale-client.sh"));
+    clientContainer.put(
+        "env",
+        List.of(
+            Map.of(
+                "name",
+                "RKE2_NODENAME",
+                "valueFrom",
+                Map.of("fieldRef", Map.of("fieldPath", "spec.nodeName"))),
+            Map.of(
+                "name",
+                "TS_AUTHKEY",
+                "valueFrom",
+                Map.of(
+                    "secretKeyRef",
+                    Map.of(
+                        "key",
+                        "authkey",
+                        "name",
+                        MeshLayerRefs.HEADSCALE_CLIENT_AUTH_SECRET.name()))),
+            Map.of("name", "TS_STATE_DIR", "value", "/var/lib/tailscale"),
+            Map.of("name", "TS_SOCKET", "value", "/var/run/tailscale/tailscaled.sock"),
+            Map.of("name", "TS_USERSPACE", "value", "true"),
+            Map.of("name", "TS_KUBE_SECRET", "value", "")));
+    clientContainer.put(
+        "envFrom",
+        List.of(
+            Map.of("configMapRef", Map.of("name", MeshLayerRefs.HEADSCALE_ENV_CONFIGMAP.name())),
+            Map.of("configMapRef", Map.of("name", RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name()))));
+    clientContainer.put(
+        "resources",
+        Map.of(
+            "limits",
+            Map.of(
+                "cpu", "200m",
+                "ephemeral-storage", "256Mi",
+                "memory", "256Mi"),
+            "requests",
+            Map.of(
+                "cpu", "50m",
+                "ephemeral-storage", "64Mi",
+                "memory", "64Mi")));
+    clientContainer.put(
+        "securityContext",
+        Map.of("capabilities", Map.of("add", List.of("NET_ADMIN", "NET_RAW")), "privileged", true));
+    clientContainer.put("volumeMounts", List.copyOf(clientMounts));
+
+    final List<Object> clientContainers = new ArrayList<>();
+    clientContainers.add(clientContainer);
+    clientShellSidecar.sidecar(clientMounts).ifPresent(clientContainers::add);
+
+    final List<Object> clientVolumes = new ArrayList<>();
+    clientVolumes.add(
+        Map.of(
+            "name",
+            "dev-net-tun",
+            "hostPath",
+            Map.of("path", "/dev/net/tun", "type", "CharDevice")));
+    clientVolumes.add(
+        Map.of(
+            "name",
+            "tailscale-state",
+            "hostPath",
+            Map.of("path", "/var/lib/tailscale", "type", "DirectoryOrCreate")));
+    clientVolumes.add(Map.of("name", "tailscale-socket", "emptyDir", Map.of()));
+    clientVolumes.add(
+        Map.of(
+            "name",
+            "client-scripts",
+            "configMap",
+            Map.of("defaultMode", 493, "name", "headscale-client-scripts")));
+    clientVolumes.add(
+        Map.of(
+            "name",
+            "authkey",
+            "secret",
+            Map.of(
+                "items",
+                List.of(Map.of("key", "authkey", "path", "authkey")),
+                "secretName",
+                MeshLayerRefs.HEADSCALE_CLIENT_AUTH_SECRET.name())));
+    clientVolumes.addAll(clientShellSidecar.extraVolumes());
+
+    // Pod has hostPID: true (mutually exclusive with shareProcessNamespace), so the sidecar
+    // already sees the prod tailscale PID via the host's PID namespace and `dlv attach` works
+    // as long as the prod container exposes its symbols (debug env mounts the unstripped binary
+    // when debug is on).
+    final LinkedHashMap<String, String> clientAnnotations = new LinkedHashMap<>();
+    clientAnnotations.put(
+        "flox.dev/environment.tailscale",
+        clientDebugPolicy.resolveMeshEnvironment("mesh/tailscale", "mesh/tailscale-debug"));
+    clientAnnotations.putAll(clientShellSidecar.sidecarAnnotations());
+
     daemonSet.addJsonPatch(
         JsonPatch.add(
             "/spec",
@@ -1290,109 +1404,13 @@ public final class HeadscaleLayer extends Construct {
                     "metadata",
                     Map.of(
                         "annotations",
-                        packageProfile.templateAnnotations(
-                            Map.of("flox.dev/environment.tailscale", "nxmatic/headscale")),
+                        packageProfile.templateAnnotations(Map.copyOf(clientAnnotations)),
                         "labels",
                         Map.of("app", "headscale-client")),
                     "spec",
                     Map.of(
                         "containers",
-                        List.of(
-                            Map.of(
-                                "name",
-                                "tailscale",
-                                "image",
-                                floxImage,
-                                "command",
-                                List.of("/scripts/tailscale-client.sh"),
-                                "env",
-                                List.of(
-                                    Map.of(
-                                        "name",
-                                        "RKE2_NODENAME",
-                                        "valueFrom",
-                                        Map.of("fieldRef", Map.of("fieldPath", "spec.nodeName"))),
-                                    Map.of(
-                                        "name",
-                                        "TS_AUTHKEY",
-                                        "valueFrom",
-                                        Map.of(
-                                            "secretKeyRef",
-                                            Map.of(
-                                                "key",
-                                                "authkey",
-                                                "name",
-                                                MeshLayerRefs.HEADSCALE_CLIENT_AUTH_SECRET
-                                                    .name()))),
-                                    Map.of("name", "TS_STATE_DIR", "value", "/var/lib/tailscale"),
-                                    Map.of(
-                                        "name",
-                                        "TS_SOCKET",
-                                        "value",
-                                        "/var/run/tailscale/tailscaled.sock"),
-                                    Map.of("name", "TS_USERSPACE", "value", "true"),
-                                    Map.of("name", "TS_KUBE_SECRET", "value", "")),
-                                "envFrom",
-                                List.of(
-                                    Map.of(
-                                        "configMapRef",
-                                        Map.of(
-                                            "name", MeshLayerRefs.HEADSCALE_ENV_CONFIGMAP.name())),
-                                    Map.of(
-                                        "configMapRef",
-                                        Map.of(
-                                            "name", RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name()))),
-                                "resources",
-                                Map.of(
-                                    "limits",
-                                    Map.of(
-                                        "cpu",
-                                        "200m",
-                                        "ephemeral-storage",
-                                        "256Mi",
-                                        "memory",
-                                        "256Mi"),
-                                    "requests",
-                                    Map.of(
-                                        "cpu",
-                                        "50m",
-                                        "ephemeral-storage",
-                                        "64Mi",
-                                        "memory",
-                                        "64Mi")),
-                                "securityContext",
-                                Map.of(
-                                    "capabilities",
-                                    Map.of("add", List.of("NET_ADMIN", "NET_RAW")),
-                                    "privileged",
-                                    true),
-                                "volumeMounts",
-                                List.of(
-                                    Map.of("mountPath", "/dev/net/tun", "name", "dev-net-tun"),
-                                    Map.of(
-                                        "mountPath",
-                                        "/var/lib/tailscale",
-                                        "name",
-                                        "tailscale-state"),
-                                    Map.of(
-                                        "mountPath",
-                                        "/var/run/tailscale",
-                                        "name",
-                                        "tailscale-socket"),
-                                    Map.of(
-                                        "mountPath",
-                                        "/var/secrets",
-                                        "name",
-                                        "authkey",
-                                        "readOnly",
-                                        true),
-                                    Map.of(
-                                        "mountPath",
-                                        "/scripts",
-                                        "name",
-                                        "client-scripts",
-                                        "readOnly",
-                                        true)))),
+                        List.copyOf(clientContainers),
                         "dnsPolicy",
                         "ClusterFirstWithHostNet",
                         "hostNetwork",
@@ -1441,32 +1459,7 @@ public final class HeadscaleLayer extends Construct {
                                 "operator",
                                 "Exists")),
                         "volumes",
-                        List.of(
-                            Map.of(
-                                "name",
-                                "dev-net-tun",
-                                "hostPath",
-                                Map.of("path", "/dev/net/tun", "type", "CharDevice")),
-                            Map.of(
-                                "name",
-                                "tailscale-state",
-                                "hostPath",
-                                Map.of("path", "/var/lib/tailscale", "type", "DirectoryOrCreate")),
-                            Map.of("name", "tailscale-socket", "emptyDir", Map.of()),
-                            Map.of(
-                                "name",
-                                "client-scripts",
-                                "configMap",
-                                Map.of("defaultMode", 493, "name", "headscale-client-scripts")),
-                            Map.of(
-                                "name",
-                                "authkey",
-                                "secret",
-                                Map.of(
-                                    "items",
-                                    List.of(Map.of("key", "authkey", "path", "authkey")),
-                                    "secretName",
-                                    MeshLayerRefs.HEADSCALE_CLIENT_AUTH_SECRET.name()))))))));
+                        List.copyOf(clientVolumes))))));
   }
 
   private ApiObject configMapWithData(

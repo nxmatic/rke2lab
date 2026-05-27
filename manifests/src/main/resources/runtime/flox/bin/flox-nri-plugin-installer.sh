@@ -333,11 +333,6 @@ runtime::debug:tools:install() {
 		install -m "${install_mode}" "${source_path}" "${target_path}"
 	done < <(find "${source_root}" -type f -print0 | sort -z)
 
-	if [[ -x "${target_root%/}/rke2lab-runtime-dlv.sh" ]]; then
-		install -d /usr/local/bin
-		ln -sfn "${target_root%/}/rke2lab-runtime-dlv.sh" /usr/local/bin/rke2lab-runtime-dlv
-	fi
-
 	echo "installed debug helper scripts in ${target_root}"
 }
 

@@ -17,7 +17,7 @@ public record ControlplanePolicy(
     return new ControlplanePolicy(
         new DebugPolicy(false, false, false),
         new NetworkPolicy(true),
-        ManifestLinkPolicy.stageA(true, true, true, true, false));
+        ManifestLinkPolicy.stageA(true, true, true, true, true));
   }
 
   public static ControlplanePolicy from(Config config) {
@@ -25,8 +25,8 @@ public record ControlplanePolicy(
 
     DebugPolicy debugPolicy =
         new DebugPolicy(
-            environment.bool("policy.debug.kdns.enabled", false),
-            environment.bool("policy.debug.kdns.suspend", false),
+            environment.bool("policy.debug.mesh.enabled", false),
+            environment.bool("policy.debug.networking.enabled", false),
             environment.bool("policy.debug.nriPlugins.flox.enabled", false));
 
     NetworkPolicy networkPolicy =

@@ -458,7 +458,7 @@ public final class FloxRuntimeLayer extends Construct {
                                         "value",
                                         ManifestSynthesisContext.current()
                                                 .floxDebugPolicy()
-                                                .enabled()
+                                                .floxNriPluginEnabled()
                                             ? "true"
                                             : "false")
                                   },

@@ -7,14 +7,20 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Adds a {@code <workload>-shell} sidecar to a flox-injected workload pod for live inspection. The
- * sidecar shares the prod container's volume mounts plus a per-pod flox state set ({@code HOME},
- * {@code ~/.config/flox}, {@code ~/.cache/flox}) so an operator can {@code kubectl exec -it ... -c
- * <workload>-shell -- bash} and run {@code flox activate -- ...} against the same flox view the
- * prod container is using.
+ * Adds a {@code <workload>-shell} sidecar to a flox-injected workload pod for live inspection.
  *
- * <p>The sidecar is opted in via {@link FloxDebugPolicy#enabled()}. When disabled, every accessor
- * returns an empty/no-op shape so the layer-side wiring stays uniform.
+ * <p>The sidecar shares the prod container's volume mounts plus a per-pod flox state set ({@code
+ * HOME}, {@code ~/.config/flox}, {@code ~/.cache/flox}) so an operator can {@code kubectl exec -it
+ * ... -c <workload>-shell -- bash} and run {@code flox activate -- ...} against the same flox view
+ * the prod container is using. With {@link #shareProcessNamespace()} = {@code true} on the pod and
+ * {@code SYS_PTRACE} added to the sidecar's capabilities, the operator can also {@code dlv attach
+ * $(pgrep <workload>)} and step through the live workload — provided the prod build retains debug
+ * symbols (the layer-side flox env should drop {@code -s -w} from the workload's go ldflags).
+ *
+ * <p>The sidecar is opted in via the per-domain debug toggle the layer passes in (e.g. {@code
+ * floxDebugPolicy.meshEnabled()} for {@code mesh/*} workloads, {@code networkingEnabled()} for
+ * {@code networking/*}). When disabled, every accessor returns an empty/no-op shape so the
+ * layer-side wiring stays uniform.
  *
  * <p>The flox env injected into the sidecar is its own per-container annotation ({@code
  * flox.dev/environment.<workload>-shell}); it can match the prod env or point at a debug variant
@@ -27,6 +33,7 @@ public final class FloxShellSidecarProfile {
   private static final String FLOX_CACHE_VOLUME_SUFFIX = "-shell-flox-cache";
 
   private final FloxDebugPolicy policy;
+  private final boolean enabled;
   private final String workloadName;
   private final String homePath;
   private final String floxEnvironment;
@@ -35,12 +42,14 @@ public final class FloxShellSidecarProfile {
 
   public FloxShellSidecarProfile(
       final FloxDebugPolicy policy,
+      final boolean enabled,
       final String workloadName,
       final String homePath,
       final String floxEnvironment,
       final String uid,
       final String gid) {
     this.policy = policy;
+    this.enabled = enabled;
     this.workloadName = workloadName;
     this.homePath = homePath;
     this.floxEnvironment = floxEnvironment;
@@ -49,13 +58,24 @@ public final class FloxShellSidecarProfile {
   }
 
   public boolean enabled() {
-    return policy.enabled();
+    return enabled;
+  }
+
+  /**
+   * Whether the pod spec needs {@code shareProcessNamespace: true}. Required for {@code dlv attach}
+   * to see the prod PID from the sidecar. {@code true} only when debug is enabled.
+   */
+  public boolean shareProcessNamespace() {
+    return enabled();
   }
 
   /**
    * Sidecar container spec; empty when the debug policy is disabled. The caller passes the prod
    * container's *final* volumeMounts (i.e. after augmenting with {@link #extraProdMounts()}) so the
    * sidecar inherits the same mount table verbatim — same flox state, same workload mounts.
+   *
+   * <p>The sidecar adds {@code SYS_PTRACE} so {@code dlv attach $(pgrep <workload>)} works against
+   * the prod container's process (visible via the shared PID namespace).
    */
   public Optional<Map<String, Object>> sidecar(final List<Map<String, Object>> prodMounts) {
     if (!enabled()) {
@@ -83,7 +103,7 @@ public final class FloxShellSidecarProfile {
             "allowPrivilegeEscalation",
             false,
             "capabilities",
-            Map.of("drop", List.of("ALL")),
+            Map.of("drop", List.of("ALL"), "add", List.of("SYS_PTRACE")),
             "readOnlyRootFilesystem",
             false,
             "runAsNonRoot",

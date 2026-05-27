@@ -61,9 +61,9 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
   @Override
   public ManifestSynthesisResult synthesize(ManifestSynthesisRequest request) throws IOException {
     LOG.info(
-        "Starting manifests synthesis via provider '{}' (floxDebugPolicy.enabled={})",
+        "Starting manifests synthesis via provider '{}' (floxDebugPolicy={})",
         providerId(),
-        request.floxDebugPolicy().enabled());
+        request.floxDebugPolicy());
 
     final ManifestSynthesisContext context =
         ManifestSynthesisContext.of(

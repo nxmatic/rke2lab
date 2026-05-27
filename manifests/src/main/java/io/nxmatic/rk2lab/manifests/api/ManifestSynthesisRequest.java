@@ -176,14 +176,20 @@ public record ManifestSynthesisRequest(
   }
 
   private static FloxDebugPolicy floxDebugPolicyFromSystemProperties() {
-    final String value =
-        System.getProperty("rk2lab.manifests.policy.debug.nriPlugins.flox.enabled");
+    return new FloxDebugPolicy(
+        boolSystemProperty("rk2lab.manifests.policy.debug.mesh.enabled"),
+        boolSystemProperty("rk2lab.manifests.policy.debug.networking.enabled"),
+        boolSystemProperty("rk2lab.manifests.policy.debug.nriPlugins.flox.enabled"));
+  }
+
+  private static boolean boolSystemProperty(final String key) {
+    final String value = System.getProperty(key);
     if (value == null || value.isBlank()) {
-      return FloxDebugPolicy.disabled();
+      return false;
     }
     return switch (value.trim().toLowerCase()) {
-      case "1", "true", "yes", "on" -> FloxDebugPolicy.debug();
-      default -> FloxDebugPolicy.disabled();
+      case "1", "true", "yes", "on" -> true;
+      default -> false;
     };
   }
 
