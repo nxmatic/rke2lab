@@ -1,7 +1,6 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.common.profiles;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +52,11 @@ public final class FloxShellSidecarProfile {
     return policy.enabled();
   }
 
-  /** Sidecar container spec; empty when the debug policy is disabled. */
+  /**
+   * Sidecar container spec; empty when the debug policy is disabled. The caller passes the prod
+   * container's *final* volumeMounts (i.e. after augmenting with {@link #extraProdMounts()}) so the
+   * sidecar inherits the same mount table verbatim — same flox state, same workload mounts.
+   */
   public Optional<Map<String, Object>> sidecar(final List<Map<String, Object>> prodMounts) {
     if (!enabled()) {
       return Optional.empty();
@@ -87,7 +90,7 @@ public final class FloxShellSidecarProfile {
             false,
             "runAsUser",
             0));
-    container.put("volumeMounts", mergeMounts(prodMounts, extraProdMounts()));
+    container.put("volumeMounts", List.copyOf(prodMounts));
     return Optional.of(Map.copyOf(container));
   }
 
@@ -149,13 +152,5 @@ public final class FloxShellSidecarProfile {
 
   private String floxCacheVolumeName() {
     return workloadName + FLOX_CACHE_VOLUME_SUFFIX;
-  }
-
-  private static List<Map<String, Object>> mergeMounts(
-      final List<Map<String, Object>> prodMounts, final List<Map<String, Object>> extras) {
-    List<Map<String, Object>> merged = new ArrayList<>(prodMounts.size() + extras.size());
-    merged.addAll(prodMounts);
-    merged.addAll(extras);
-    return List.copyOf(merged);
   }
 }
