@@ -149,17 +149,28 @@ public final class TargetChecksumPipeline {
 
     public RegisteredComponentsStage fromRegistry() {
       for (Map.Entry<String, List<Path>> entry : state.registry.getTargetRoots().entrySet()) {
-        state.targetChecksums.put(entry.getKey(), computeChecksum(entry.getValue()));
+        final String targetName = entry.getKey();
+        state.targetChecksums.put(
+            targetName, computeChecksum(entry.getValue(), targetName, state.registry));
       }
       return this;
     }
   }
 
   private static String computeChecksum(List<Path> roots) {
+    return computeChecksum(roots, null, null);
+  }
+
+  private static String computeChecksum(
+      List<Path> roots, String ownerName, ProvisioningTargetRegistry registry) {
     try {
       final MessageDigest digest = MessageDigest.getInstance("SHA-256");
       for (Path root : roots) {
-        updateDigestForPath(digest, root);
+        final java.util.Set<Path> foreign =
+            (ownerName != null && registry != null)
+                ? registry.nestedForeignDescendants(root, ownerName)
+                : java.util.Set.of();
+        updateDigestForPath(digest, root, foreign);
       }
       return HexFormat.of().formatHex(digest.digest());
     } catch (NoSuchAlgorithmException ex) {
@@ -167,7 +178,8 @@ public final class TargetChecksumPipeline {
     }
   }
 
-  private static void updateDigestForPath(MessageDigest digest, Path root) {
+  private static void updateDigestForPath(
+      MessageDigest digest, Path root, java.util.Set<Path> foreignDescendants) {
     // NOTE: Do not include absolute path in digest — it contains ephemeral PID+timestamp from
     // the Maven build directory (host.12345.1779123456789). Hash only file contents and the
     // relative paths within the target's roots so checksums are deterministic.
@@ -184,12 +196,22 @@ public final class TargetChecksumPipeline {
 
     try (Stream<Path> walk = Files.walk(root)) {
       walk.filter(Files::isRegularFile)
+          .filter(file -> !isUnderForeign(file, foreignDescendants))
           .sorted()
           .forEach(file -> digestFile(digest, file, root.relativize(file)));
     } catch (IOException ex) {
       throw new IllegalStateException(
           "Failed to fingerprint provisioning resources at: " + root, ex);
     }
+  }
+
+  private static boolean isUnderForeign(Path file, java.util.Set<Path> foreignDescendants) {
+    for (Path foreign : foreignDescendants) {
+      if (file.startsWith(foreign)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static void digestFile(MessageDigest digest, Path file, Path relativePath) {

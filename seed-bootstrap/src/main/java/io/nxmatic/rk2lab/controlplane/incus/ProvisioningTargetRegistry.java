@@ -53,7 +53,11 @@ public final class ProvisioningTargetRegistry {
     targetDefinitions.put(targetName, policy);
 
     if (paths != null && !paths.isEmpty()) {
-      // Enforce single-target ownership per path.
+      // Single-ownership for *exact* paths. Nested ownership is allowed: a parent target may
+      // register a directory whose subtree is partially owned by other targets (e.g.
+      // ClusterTarget owns manifestsRoot, RuntimeConfigTarget owns
+      // manifestsRoot/runtime/{rke2-config,env-config}). The checksum walker filters descendants
+      // owned elsewhere when it walks a parent path so each file is hashed by exactly one target.
       for (Path root : paths) {
         final String existingOwner = pathOwnership.get(root);
         if (existingOwner != null && !existingOwner.equals(targetName)) {
@@ -71,6 +75,32 @@ public final class ProvisioningTargetRegistry {
 
       targetRoots.put(targetName, new ArrayList<>(paths));
     }
+  }
+
+  /**
+   * Returns paths owned by other targets that are descendants of {@code parent}. Used by the
+   * checksum walker to skip subtrees claimed by a more specific target so each file is hashed
+   * exactly once.
+   *
+   * @param parent root path being walked
+   * @param ownerName target that owns {@code parent}; descendants owned by this same target are not
+   *     returned
+   */
+  public java.util.Set<Path> nestedForeignDescendants(Path parent, String ownerName) {
+    final java.util.LinkedHashSet<Path> descendants = new java.util.LinkedHashSet<>();
+    for (Map.Entry<Path, String> entry : pathOwnership.entrySet()) {
+      final Path candidate = entry.getKey();
+      if (candidate.equals(parent)) {
+        continue;
+      }
+      if (entry.getValue().equals(ownerName)) {
+        continue;
+      }
+      if (candidate.startsWith(parent)) {
+        descendants.add(candidate);
+      }
+    }
+    return descendants;
   }
 
   /**

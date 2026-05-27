@@ -36,7 +36,7 @@ link_units_fallback() {
 	log "fallback linked systemd units from ${SYSTEMD_UNITS_DIR}"
 }
 
-: "Stow unit tree from host/systemd-units into /etc/systemd/system"
+: "Stow unit tree from /srv/host/systemd-units.d into /etc/systemd/system"
 if ! command -v xstow >/dev/null 2>&1; then
 	: "Install xstow for stowing systemd unit files"
 	if ! nix profile add nixpkgs#xstow; then

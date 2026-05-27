@@ -25,10 +25,10 @@ import java.util.List;
 public final class SystemdTarget implements ProvisioningTarget {
 
   private static final String CLASSPATH_ROOT = "META-INF/io.nxmatic/rk2lab/controlplane";
-  private static final String CLASSPATH_HOST_SYSTEMD_SCRIPTS_ROOT =
-      CLASSPATH_ROOT + "/incus/manifests/manifests.d/host/systemd-scripts";
-  private static final String CLASSPATH_HOST_SYSTEMD_UNITS_ROOT =
-      CLASSPATH_ROOT + "/incus/manifests/manifests.d/host/systemd-units";
+  private static final String CLASSPATH_SYSTEMD_SCRIPTS_ROOT =
+      CLASSPATH_ROOT + "/incus/manifests/systemd/systemd-scripts";
+  private static final String CLASSPATH_SYSTEMD_UNITS_ROOT =
+      CLASSPATH_ROOT + "/incus/manifests/systemd/systemd-units";
 
   private final List<Path> materializedPaths = new ArrayList<>();
 
@@ -49,82 +49,21 @@ public final class SystemdTarget implements ProvisioningTarget {
   public void materialize(IncusResourceBootstrap.BootstrapPaths paths) throws IOException {
     materializedPaths.clear();
 
-    // Systemd units and scripts (systemd loads these at runtime).
-    final Path hostManifestsRoot = paths.manifestsRoot().resolve("host");
-    materializeHostSystemdAssets(hostManifestsRoot);
-    materializedPaths.add(hostManifestsRoot.resolve("systemd-scripts"));
-    materializedPaths.add(hostManifestsRoot.resolve("systemd-units"));
+    // Systemd units and scripts (systemd loads these at runtime). Materialize directly into the
+    // configured staging paths — they live at <assetsRoot>/systemd.d/, not under manifestsRoot.
+    ClasspathTreeCopier.copy(CLASSPATH_SYSTEMD_SCRIPTS_ROOT, paths.scriptsRoot(), true);
+    ClasspathTreeCopier.copy(CLASSPATH_SYSTEMD_UNITS_ROOT, paths.systemdRoot(), false);
+    materializedPaths.add(paths.scriptsRoot());
+    materializedPaths.add(paths.systemdRoot());
 
     // Flox runtime installer assets.
     final Path floxRuntimeTarget = paths.daemonsetRoot().resolve("runtime").resolve("flox");
-
     if (Files.exists(floxRuntimeTarget)) {
       deleteSubtree(floxRuntimeTarget);
     }
     Files.createDirectories(floxRuntimeTarget);
-
     FloxRuntimeAssets.builder().build().writeInstallerAssetTree(floxRuntimeTarget);
-
     materializedPaths.add(floxRuntimeTarget);
-  }
-
-  private void materializeHostSystemdAssets(Path hostRoot) throws IOException {
-    materializeResourceTree(
-        CLASSPATH_HOST_SYSTEMD_SCRIPTS_ROOT, hostRoot.resolve("systemd-scripts"), true);
-    materializeResourceTree(
-        CLASSPATH_HOST_SYSTEMD_UNITS_ROOT, hostRoot.resolve("systemd-units"), false);
-  }
-
-  private void materializeResourceTree(
-      String classpathRoot, Path targetDir, boolean executableFiles) throws IOException {
-    if (!Files.exists(targetDir)) {
-      Files.createDirectories(targetDir);
-    }
-
-    try (var resourceStream =
-        getClass().getClassLoader().getResourceAsStream(classpathRoot + "/")) {
-      if (resourceStream == null) {
-        throw new IllegalStateException("Classpath root not found: " + classpathRoot);
-      }
-    }
-
-    final java.nio.file.FileSystem fs;
-    final Path classpathPath;
-    try {
-      final java.net.URI uri = getClass().getClassLoader().getResource(classpathRoot).toURI();
-      if (uri.getScheme().equals("jar")) {
-        fs = java.nio.file.FileSystems.newFileSystem(uri, java.util.Collections.emptyMap());
-        classpathPath = fs.getPath(classpathRoot);
-      } else {
-        fs = null;
-        classpathPath = Path.of(uri);
-      }
-    } catch (Exception ex) {
-      throw new IOException("Failed to open classpath root: " + classpathRoot, ex);
-    }
-
-    try {
-      Files.walk(classpathPath)
-          .filter(Files::isRegularFile)
-          .forEach(
-              source -> {
-                final Path relative = classpathPath.relativize(source);
-                final Path target = targetDir.resolve(relative.toString());
-                try {
-                  Files.createDirectories(target.getParent());
-                  Files.copy(source, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                  if (executableFiles) {
-                    target.toFile().setExecutable(true);
-                  }
-                } catch (IOException ex) {
-                  throw new java.io.UncheckedIOException(ex);
-                }
-              });
-    } finally {
-      if (fs != null) {
-        fs.close();
-      }
-    }
   }
 
   @Override

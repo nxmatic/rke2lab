@@ -1,15 +1,15 @@
 <!-- @codebase -->
 <!--
-  Ships the non-synthesized portion of manifests.d to seed-bootstrap.
+  Ships systemd assets to seed-bootstrap.
 
-  The per-layer/per-package YAML tree (e.g. manifests.d/networking/kdns/*.yml)
-  is no longer produced at build time — seed-bootstrap synthesizes it at
-  pulumi-up time via ManifestSynthesisService and explodes the result, with the
-  ControlplanePolicy driving FloxDebugPolicy. This zip only carries the host
-  systemd assets that don't go through cdk8s synthesis.
+  The cdk8s-synthesized k8s manifests (e.g. manifests.d/networking/kdns/*.yml)
+  are produced at pulumi-up time via ManifestSynthesisService, not here. This
+  zip carries only the host-systemd assets (units + scripts) that systemd
+  consumes from /srv/host/systemd-{units,scripts,libexec}.d/ and that don't
+  go through cdk8s synthesis.
 
-  Layer-side classpath resources (e.g. runtime/flox-runtime/**) ride along on
-  the manifests jar itself; FloxRuntimeAssets and friends read them via
+  Layer-side classpath resources (e.g. runtime/flox/**) ride along on the
+  manifests jar itself; FloxRuntimeAssets and friends read them via
   Class.getResourceAsStream from seed-bootstrap's classpath.
 -->
 <assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
@@ -23,15 +23,15 @@
 
   <fileSets>
     <fileSet>
-      <directory>${project.basedir}/src/main/resources/host</directory>
-      <outputDirectory>manifests.d/host</outputDirectory>
+      <directory>${project.basedir}/src/main/resources/systemd</directory>
+      <outputDirectory>systemd</outputDirectory>
       <includes>
         <include>**/*</include>
       </includes>
     </fileSet>
     <fileSet>
-      <directory>${project.build.directory}/generated-resources/host</directory>
-      <outputDirectory>manifests.d/host</outputDirectory>
+      <directory>${project.build.directory}/generated-resources/systemd</directory>
+      <outputDirectory>systemd</outputDirectory>
       <includes>
         <include>**/*</include>
       </includes>

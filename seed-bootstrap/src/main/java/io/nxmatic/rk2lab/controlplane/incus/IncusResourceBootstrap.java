@@ -38,8 +38,6 @@ import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributorRegistry;
 import io.nxmatic.rk2lab.netplan.ClusterNetworkBlueprint;
 import java.io.IOException;
-import java.net.JarURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -51,15 +49,12 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.Enumeration;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.concurrent.TimeUnit;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -118,8 +113,6 @@ public final class IncusResourceBootstrap {
 
   private final RuntimeEnvControlplaneOverlayWriter runtimeEnvControlplaneOverlayWriter;
 
-  private final ClasspathAssetMaterializer classpathAssetMaterializer;
-
   private final IncusImportLookup incusImportLookup;
 
   private final LaunchSecretsUpdater launchSecretsUpdater;
@@ -131,7 +124,6 @@ public final class IncusResourceBootstrap {
     this.hostMountSourceVerifier = HostMountSourceVerifier.INSTANCE;
     this.nodeConfigRegenerator = new NodeConfigRegenerator(CloudConfigSecretRenderer.INSTANCE);
     this.runtimeEnvControlplaneOverlayWriter = RuntimeEnvControlplaneOverlayWriter.INSTANCE;
-    this.classpathAssetMaterializer = ClasspathAssetMaterializer.INSTANCE;
     this.incusImportLookup = IncusImportLookup.INSTANCE;
     this.launchSecretsUpdater = LaunchSecretsUpdater.INSTANCE;
   }
@@ -248,9 +240,6 @@ public final class IncusResourceBootstrap {
           stagingRoot.resolve(
               state.localPaths.assetsRoot().relativize(state.localPaths.manifestsRoot()));
 
-      classpathAssetMaterializer.materializeIncusAssets(stagingRoot);
-      classpathAssetMaterializer.materializeManifests(stagingManifestsRoot);
-
       final LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
       final Map<String, Object> manifestSynthSummary =
           synthesizeAndExplodeManifests(stagingManifestsRoot, policy, layerContext);
@@ -266,6 +255,7 @@ public final class IncusResourceBootstrap {
 
       registerCloudInitTarget(targetRegistry, staging);
       registerSystemdTarget(targetRegistry, staging.stagingPaths());
+      registerClusterTarget(targetRegistry, staging);
       final Map<String, Object> runtimeSummaries =
           materializeAndRegisterRuntimeConfigTarget(targetRegistry, staging);
 
@@ -279,8 +269,7 @@ public final class IncusResourceBootstrap {
           new CloudInitTarget(
               nodeConfigRegenerator,
               stagingPaths.runtimeCloudConfigRoot(),
-              stagingPaths.cloudSeedRoot(),
-              staging.stagingManifestsRoot());
+              stagingPaths.cloudSeedRoot());
       try {
         cloudInitTarget.materialize(stagingPaths);
       } catch (IOException ex) {
@@ -298,6 +287,13 @@ public final class IncusResourceBootstrap {
         throw new IllegalStateException("Failed to materialize systemd target", ex);
       }
       targetRegistry.register(systemdTarget);
+    }
+
+    private void registerClusterTarget(
+        ProvisioningTargetRegistry targetRegistry, StagingContext staging) {
+      // ManifestSynthesisService + explode already filled stagingManifestsRoot upstream; the
+      // target carries no materialize body and only declares ownership for checksum/inventory.
+      targetRegistry.register(new ClusterTarget(staging.stagingManifestsRoot()));
     }
 
     private Map<String, Object> materializeAndRegisterRuntimeConfigTarget(
@@ -1212,10 +1208,15 @@ public final class IncusResourceBootstrap {
               .resolve(nodeName);
       final Path manifestsRoot = hostResourceRoot.resolve("manifests.d");
       final Path runtimeRoot = manifestsRoot.resolve("runtime");
-      final Path hostRoot = manifestsRoot.resolve("host");
-      final Path scriptsRoot = hostRoot.resolve("systemd-scripts");
-      final Path systemdLibexecRoot = hostRoot.resolve("systemd-libexec");
-      final Path systemdRoot = hostRoot.resolve("systemd-units");
+      // systemd assets are siblings of manifests.d/, not nested under it. Keeping them separate
+      // gives manifestsRoot a single owner (the k8s target) and lets the systemd target own
+      // systemd.d/ end-to-end. On-disk paths (/srv/host/systemd-{scripts,units,libexec}.d/) are
+      // unaffected — the incus disk binds at instance creation reference these staging fields
+      // directly, not the parent.
+      final Path systemdStagingRoot = hostResourceRoot.resolve("systemd.d");
+      final Path scriptsRoot = systemdStagingRoot.resolve("systemd-scripts");
+      final Path systemdLibexecRoot = systemdStagingRoot.resolve("systemd-libexec");
+      final Path systemdRoot = systemdStagingRoot.resolve("systemd-units");
 
       return BootstrapPaths.builder()
           .worktreeRoot(worktreeRoot)
@@ -1735,153 +1736,6 @@ public final class IncusResourceBootstrap {
     }
   }
 
-  private static final class ClasspathAssetMaterializer {
-
-    private static final ClasspathAssetMaterializer INSTANCE = new ClasspathAssetMaterializer();
-
-    private static final String CLASSPATH_ROOT = "META-INF/io.nxmatic/rk2lab/controlplane";
-
-    private static final String CLASSPATH_HOST_SYSTEMD_SCRIPTS_ROOT =
-        CLASSPATH_ROOT + "/incus/manifests/manifests.d/host/systemd-scripts";
-
-    private static final String CLASSPATH_HOST_SYSTEMD_UNITS_ROOT =
-        CLASSPATH_ROOT + "/incus/manifests/manifests.d/host/systemd-units";
-
-    private static final String CLASSPATH_MANIFESTS_ROOT =
-        CLASSPATH_ROOT + "/incus/manifests/manifests.d";
-
-    private ClasspathAssetMaterializer() {}
-
-    private void materializeIncusAssets(Path assetsTargetRoot) {
-      // Keep materialization hook for non-systemd host assets.
-    }
-
-    private void materializeHostSystemdAssets(Path hostRoot) {
-      materializeResourceTree(
-          CLASSPATH_HOST_SYSTEMD_SCRIPTS_ROOT, hostRoot.resolve("systemd-scripts"), true);
-      materializeResourceTree(
-          CLASSPATH_HOST_SYSTEMD_UNITS_ROOT, hostRoot.resolve("systemd-units"), false);
-    }
-
-    private void materializeManifests(Path manifestsTargetRoot) {
-      materializeResourceTree(CLASSPATH_MANIFESTS_ROOT, manifestsTargetRoot, false);
-    }
-
-    private void materializeResourceTree(
-        String classpathRoot, Path targetRoot, boolean scriptsExecutable) {
-      try {
-        final URL rootUrl = getClass().getClassLoader().getResource(classpathRoot);
-        if (rootUrl == null) {
-          throw new IllegalStateException("Classpath resource root not found: " + classpathRoot);
-        }
-
-        ensureDirectories(List.of(targetRoot));
-        clearTargetRoot(targetRoot);
-
-        final String protocol = rootUrl.getProtocol();
-        if ("jar".equals(protocol)) {
-          copyFromJar(rootUrl, classpathRoot, targetRoot, scriptsExecutable);
-          return;
-        }
-
-        copyFromDirectory(Path.of(rootUrl.toURI()), targetRoot, scriptsExecutable);
-      } catch (Exception ex) {
-        throw new IllegalStateException(
-            "Failed to materialize classpath resources from " + classpathRoot, ex);
-      }
-    }
-
-    private void clearTargetRoot(Path targetRoot) {
-      if (!Files.exists(targetRoot)) {
-        return;
-      }
-      try (Stream<Path> walk = Files.walk(targetRoot)) {
-        walk.sorted((left, right) -> Integer.compare(right.getNameCount(), left.getNameCount()))
-            .filter(path -> !path.equals(targetRoot))
-            .forEach(
-                path -> {
-                  try {
-                    Files.delete(path);
-                  } catch (IOException ex) {
-                    throw new IllegalStateException(
-                        "Failed to clear target root before materialization: " + targetRoot, ex);
-                  }
-                });
-      } catch (IOException ex) {
-        throw new IllegalStateException(
-            "Failed to walk target root before materialization: " + targetRoot, ex);
-      }
-    }
-
-    private void copyFromDirectory(Path classpathRoot, Path targetRoot, boolean scriptsExecutable)
-        throws IOException {
-      try (Stream<Path> walk = Files.walk(classpathRoot)) {
-        walk.filter(Files::isRegularFile)
-            .forEach(
-                sourcePath -> {
-                  final Path relative = classpathRoot.relativize(sourcePath);
-                  final Path targetPath = targetRoot.resolve(relative);
-                  copyOneFile(sourcePath, targetPath, relative, scriptsExecutable);
-                });
-      }
-    }
-
-    private void copyFromJar(
-        URL rootUrl, String classpathRoot, Path targetRoot, boolean scriptsExecutable)
-        throws IOException {
-      final JarURLConnection connection = (JarURLConnection) rootUrl.openConnection();
-      final String root = classpathRoot + "/";
-      try (JarFile jarFile = connection.getJarFile()) {
-        final Enumeration<JarEntry> entries = jarFile.entries();
-        while (entries.hasMoreElements()) {
-          final JarEntry entry = entries.nextElement();
-          final String name = entry.getName();
-          if (!name.startsWith(root) || entry.isDirectory()) {
-            continue;
-          }
-
-          final Path relative = Path.of(name.substring(root.length()));
-          final Path targetPath = targetRoot.resolve(relative);
-          ensureDirectories(List.of(targetPath.getParent()));
-          try (var in = jarFile.getInputStream(entry)) {
-            Files.copy(in, targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-          }
-          maybeSetExecutable(targetPath, relative, scriptsExecutable);
-        }
-      }
-    }
-
-    private void copyOneFile(
-        Path sourcePath, Path targetPath, Path relative, boolean scriptsExecutable) {
-      try {
-        ensureDirectories(List.of(targetPath.getParent()));
-        Files.copy(sourcePath, targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-        maybeSetExecutable(targetPath, relative, scriptsExecutable);
-      } catch (IOException ex) {
-        throw new IllegalStateException("Failed to copy classpath asset to " + targetPath, ex);
-      }
-    }
-
-    private void maybeSetExecutable(Path targetPath, Path relative, boolean scriptsExecutable) {
-      if (scriptsExecutable) {
-        targetPath.toFile().setExecutable(true, false);
-      }
-    }
-
-    private void ensureDirectories(List<Path> directories) {
-      for (Path directory : directories) {
-        if (directory == null) {
-          continue;
-        }
-        try {
-          Files.createDirectories(directory);
-        } catch (IOException ex) {
-          throw new IllegalStateException("Failed to prepare required directory: " + directory, ex);
-        }
-      }
-    }
-  }
-
   private static final class HostAssetRootLifecycle {
 
     private static final String PREVIEW_SUFFIX = ".preview";
@@ -2193,17 +2047,14 @@ public final class IncusResourceBootstrap {
     private final NodeConfigRegenerator nodeConfigRegenerator;
     private final Path runtimeCloudConfigRoot;
     private final Path cloudSeedRoot;
-    private final Path manifestsRoot;
 
     private CloudInitTarget(
         NodeConfigRegenerator nodeConfigRegenerator,
         Path runtimeCloudConfigRoot,
-        Path cloudSeedRoot,
-        Path manifestsRoot) {
+        Path cloudSeedRoot) {
       this.nodeConfigRegenerator = nodeConfigRegenerator;
       this.runtimeCloudConfigRoot = runtimeCloudConfigRoot;
       this.cloudSeedRoot = cloudSeedRoot;
-      this.manifestsRoot = manifestsRoot;
     }
 
     @Override
@@ -2218,15 +2069,53 @@ public final class IncusResourceBootstrap {
 
     @Override
     public void materialize(BootstrapPaths paths) throws IOException {
-      // Manifests root is filled by classpath materialization + cdk8s synth+explode upstream of
-      // slice registration. Cloud-seed (user-data/meta-data/network-config) is the slice's own
-      // output, derived deterministically from the runtime/cloud-config ConfigMap.
+      // Cloud-seed (user-data/meta-data/network-config) is this target's own output, derived
+      // deterministically from the runtime/cloud-config ConfigMap. Cloud-init reads it once at
+      // first boot, so the only STATIC target.
       nodeConfigRegenerator.regenerateCloudConfigDir(runtimeCloudConfigRoot, cloudSeedRoot);
     }
 
     @Override
     public List<Path> getMaterializedPaths() {
-      return List.of(cloudSeedRoot, manifestsRoot);
+      return List.of(cloudSeedRoot);
+    }
+  }
+
+  /**
+   * K8s manifests target — owns the synthesized + exploded {@code manifests.d/} tree that rke2
+   * watches via inotify. DYNAMIC: changes hot-reload through rke2's manifest watch, no instance
+   * renewal.
+   *
+   * <p>The tree itself is filled by {@link #synthesizeAndExplodeManifests} upstream of target
+   * registration; this target carries no materialize body of its own and only declares ownership of
+   * the path so the registry can compute its checksum.
+   */
+  private static final class ClusterTarget implements ProvisioningTarget {
+    private final Path manifestsRoot;
+
+    private ClusterTarget(Path manifestsRoot) {
+      this.manifestsRoot = manifestsRoot;
+    }
+
+    @Override
+    public String name() {
+      return "cluster";
+    }
+
+    @Override
+    public TargetReloadPolicy reloadPolicy() {
+      return TargetReloadPolicy.DYNAMIC;
+    }
+
+    @Override
+    public void materialize(BootstrapPaths paths) {
+      // No-op: manifests tree is materialised by ManifestSynthesisService + explode upstream of
+      // target registration. ClusterTarget declares ownership for checksum + inventory only.
+    }
+
+    @Override
+    public List<Path> getMaterializedPaths() {
+      return List.of(manifestsRoot);
     }
   }
 
