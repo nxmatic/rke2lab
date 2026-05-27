@@ -221,8 +221,11 @@ public final class IncusResourceBootstrap {
       // slot, after which the slice registry's recorded paths would no longer resolve. Metadata
       // capture only reads from the registry and in-memory summaries, so it's safe to do first.
       captureDeploymentMetadata(staging, slices);
-      if (!dryRun) {
-        syncStagingToFinal(lifecycle, staging.stagingRoot());
+      if (!dryRun && syncStagingToFinal(lifecycle, staging.stagingRoot())) {
+        // Host content actually changed -- the kubeconfig may now point at an instance that's
+        // about to be replaced, so wipe it so readiness re-publishes a fresh one. Skip on no-op
+        // deploys: nothing rotated, the existing kubeconfig still matches the running instance.
+        clearStaleBootstrapKubeconfig();
       }
 
       return this;
@@ -271,8 +274,18 @@ public final class IncusResourceBootstrap {
 
     private void registerCoreSlice(
         ProvisioningSliceRegistry sliceRegistry, StagingContext staging) {
+      final BootstrapPaths stagingPaths = staging.stagingPaths();
       final CoreSlice coreSlice =
-          new CoreSlice(staging.stagingPaths().cloudSeedRoot(), staging.stagingManifestsRoot());
+          new CoreSlice(
+              nodeConfigRegenerator,
+              stagingPaths.runtimeCloudConfigRoot(),
+              stagingPaths.cloudSeedRoot(),
+              staging.stagingManifestsRoot());
+      try {
+        coreSlice.materialize(stagingPaths);
+      } catch (IOException ex) {
+        throw new IllegalStateException("Failed to materialize core slice", ex);
+      }
       sliceRegistry.register(coreSlice);
     }
 
@@ -296,27 +309,26 @@ public final class IncusResourceBootstrap {
       final Map<String, Object> systemdProvisioningSummary =
           SystemdProvisioningInventory.summarize(stagingPaths, hostMountNotes);
 
-      clearStaleBootstrapKubeconfig();
-
-      final Map<String, Object> layerEnvRegistrySummary =
-          runtimeEnvControlplaneOverlayWriter.write(
-              stagingPaths.runtimeEnvConfigRoot(), layerContext, policy);
-
-      nodeConfigRegenerator.regenerateCloudConfigDir(
-          stagingPaths.runtimeCloudConfigRoot(), stagingPaths.cloudSeedRoot());
-
       final RuntimeConfigSlice runtimeConfigSlice =
           new RuntimeConfigSlice(
-              stagingPaths.runtimeRke2ConfigRoot(), stagingPaths.runtimeEnvConfigRoot());
+              runtimeEnvControlplaneOverlayWriter,
+              layerContext,
+              policy,
+              stagingPaths.runtimeRke2ConfigRoot(),
+              stagingPaths.runtimeEnvConfigRoot());
+      try {
+        runtimeConfigSlice.materialize(stagingPaths);
+      } catch (IOException ex) {
+        throw new IllegalStateException("Failed to materialize runtimeConfig slice", ex);
+      }
       sliceRegistry.register(runtimeConfigSlice);
 
       return Map.of(
-          "systemd", systemdProvisioningSummary,
-          "layerEnv", layerEnvRegistrySummary);
+          "systemd", systemdProvisioningSummary, "layerEnv", runtimeConfigSlice.layerEnvSummary());
     }
 
-    private void syncStagingToFinal(HostAssetRootLifecycle lifecycle, Path stagingRoot) {
-      lifecycle.syncStagingToFinal(stagingRoot, state.localPaths.assetsRoot());
+    private boolean syncStagingToFinal(HostAssetRootLifecycle lifecycle, Path stagingRoot) {
+      return lifecycle.syncStagingToFinal(stagingRoot, state.localPaths.assetsRoot());
     }
 
     private void captureDeploymentMetadata(StagingContext staging, SliceContext slices) {
@@ -1912,12 +1924,13 @@ public final class IncusResourceBootstrap {
       }
     }
 
-    private void syncStagingToFinal(Path stagingRoot, Path hostAssetRoot) {
+    /** Returns {@code true} if the host asset root actually changed (slot was rotated). */
+    private boolean syncStagingToFinal(Path stagingRoot, Path hostAssetRoot) {
       try {
         if (Files.exists(hostAssetRoot) && directoriesAreIdentical(stagingRoot, hostAssetRoot)) {
           // No-op deploy: scratch matches host/ byte-for-byte. Discard scratch, don't rotate.
           deleteRecursively(stagingRoot);
-          return;
+          return false;
         }
 
         // Promote scratch to a numbered slot before any backup/sync so the slot is the canonical
@@ -1938,6 +1951,7 @@ public final class IncusResourceBootstrap {
           // First deployment: copy staging to final location (keep staging for comparison)
           backup(slotPath, hostAssetRoot);
         }
+        return true;
       } catch (IOException ex) {
         throw new IllegalStateException(
             "Failed to sync staging to final host asset root: " + hostAssetRoot, ex);
@@ -2145,10 +2159,18 @@ public final class IncusResourceBootstrap {
   }
 
   private static final class CoreSlice implements ProvisioningSlice {
+    private final NodeConfigRegenerator nodeConfigRegenerator;
+    private final Path runtimeCloudConfigRoot;
     private final Path cloudSeedRoot;
     private final Path manifestsRoot;
 
-    private CoreSlice(Path cloudSeedRoot, Path manifestsRoot) {
+    private CoreSlice(
+        NodeConfigRegenerator nodeConfigRegenerator,
+        Path runtimeCloudConfigRoot,
+        Path cloudSeedRoot,
+        Path manifestsRoot) {
+      this.nodeConfigRegenerator = nodeConfigRegenerator;
+      this.runtimeCloudConfigRoot = runtimeCloudConfigRoot;
       this.cloudSeedRoot = cloudSeedRoot;
       this.manifestsRoot = manifestsRoot;
     }
@@ -2164,8 +2186,11 @@ public final class IncusResourceBootstrap {
     }
 
     @Override
-    public void materialize(BootstrapPaths paths) {
-      // Already materialized by classpath materializers before slice registration
+    public void materialize(BootstrapPaths paths) throws IOException {
+      // Manifests root is filled by classpath materialization + cdk8s synth+explode upstream of
+      // slice registration. Cloud-seed (user-data/meta-data/network-config) is the slice's own
+      // output, derived deterministically from the runtime/cloud-config ConfigMap.
+      nodeConfigRegenerator.regenerateCloudConfigDir(runtimeCloudConfigRoot, cloudSeedRoot);
     }
 
     @Override
@@ -2175,10 +2200,22 @@ public final class IncusResourceBootstrap {
   }
 
   private static final class RuntimeConfigSlice implements ProvisioningSlice {
+    private final RuntimeEnvControlplaneOverlayWriter overlayWriter;
+    private final LayerEnvContext layerContext;
+    private final ControlplanePolicy policy;
     private final Path rke2ConfigRoot;
     private final Path envConfigRoot;
+    private Map<String, Object> layerEnvSummary = Map.of();
 
-    private RuntimeConfigSlice(Path rke2ConfigRoot, Path envConfigRoot) {
+    private RuntimeConfigSlice(
+        RuntimeEnvControlplaneOverlayWriter overlayWriter,
+        LayerEnvContext layerContext,
+        ControlplanePolicy policy,
+        Path rke2ConfigRoot,
+        Path envConfigRoot) {
+      this.overlayWriter = overlayWriter;
+      this.layerContext = layerContext;
+      this.policy = policy;
       this.rke2ConfigRoot = rke2ConfigRoot;
       this.envConfigRoot = envConfigRoot;
     }
@@ -2194,13 +2231,21 @@ public final class IncusResourceBootstrap {
     }
 
     @Override
-    public void materialize(BootstrapPaths paths) {
-      // Already materialized by specialized writers before slice registration
+    public void materialize(BootstrapPaths paths) throws IOException {
+      // rke2-config root is filled by cdk8s synth+explode upstream of slice registration. The
+      // env-config root is the slice's own output: per-layer ConfigMap files plus the aggregated
+      // 99-configmap overlay.
+      layerEnvSummary = overlayWriter.write(envConfigRoot, layerContext, policy);
     }
 
     @Override
     public List<Path> getMaterializedPaths() {
       return List.of(rke2ConfigRoot, envConfigRoot);
+    }
+
+    /** Layer-contributor registry summary captured during {@link #materialize}. */
+    Map<String, Object> layerEnvSummary() {
+      return layerEnvSummary;
     }
   }
 
