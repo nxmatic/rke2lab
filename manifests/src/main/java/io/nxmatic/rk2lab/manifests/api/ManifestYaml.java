@@ -39,6 +39,10 @@ import org.yaml.snakeyaml.LoaderOptions;
  *   <li>Empty documents (stray {@code ---} separators in upstream multi-doc YAML like Tekton's
  *       release.yaml) coerce to {@code null} so the iterator filter can skip them without a {@code
  *       Cannot coerce empty String} exception.
+ *   <li>Numeric-looking strings (e.g. an {@code EnvVar.value} of {@code "6443"}) stay quoted via
+ *       {@link YAMLGenerator.Feature#ALWAYS_QUOTE_NUMBERS_AS_STRINGS}. Without it, {@link
+ *       YAMLGenerator.Feature#MINIMIZE_QUOTES} would emit them as bare YAML numbers and the
+ *       Kubernetes API server would reject the manifest (env values are typed {@code string}).
  * </ul>
  *
  * <p>Do not introduce another {@code ObjectMapper} or {@code StringBuilder yaml.append("---\n")}
@@ -135,6 +139,7 @@ public final class ManifestYaml {
             .enable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
             .enable(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE)
             .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+            .enable(YAMLGenerator.Feature.ALWAYS_QUOTE_NUMBERS_AS_STRINGS)
             .disable(YAMLGenerator.Feature.SPLIT_LINES)
             .build();
 
