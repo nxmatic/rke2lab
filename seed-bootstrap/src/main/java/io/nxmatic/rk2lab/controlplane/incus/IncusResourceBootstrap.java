@@ -1197,29 +1197,17 @@ public final class IncusResourceBootstrap {
 
     private static BootstrapPaths fromLocalWorktree(
         Path worktreeRoot, String clusterName, String nodeName) {
+      // Operator-friendly layout: .local.d/<cluster>/<node>/ owns everything per-node, with the
+      // cluster-scoped kubeconfig at .local.d/<cluster>/kubeconfig.yaml. No more
+      // var/{run,lib}/incus/<cluster>/<node>/ split — that mirrored the host-fs convention but
+      // forced the operator to mentally translate between provisioner storage and "the master
+      // node of cluster bioskop". One short cd lands now in the per-node tree.
       final Path stateRoot = worktreeRoot.resolve(".local.d");
-      final Path hostResourceRoot =
-          stateRoot
-              .resolve("var")
-              .resolve("run")
-              .resolve("incus")
-              .resolve(clusterName)
-              .resolve(nodeName)
-              .resolve("host");
-      final Path clusterNodeRoot =
-          stateRoot
-              .resolve("var")
-              .resolve("lib")
-              .resolve("rke2lab")
-              .resolve(clusterName)
-              .resolve(nodeName);
+      final Path clusterRoot = stateRoot.resolve(clusterName);
+      final Path nodeRoot = clusterRoot.resolve(nodeName);
+      final Path hostResourceRoot = nodeRoot.resolve("host");
       final Path manifestsRoot = hostResourceRoot.resolve("manifests.d");
       final Path runtimeRoot = manifestsRoot.resolve("runtime");
-      // systemd assets are siblings of manifests.d/, not nested under it. Keeping them separate
-      // gives manifestsRoot a single owner (the k8s target) and lets the systemd target own
-      // systemd.d/ end-to-end. On-disk paths (/srv/host/systemd-{scripts,units,libexec}.d/) are
-      // unaffected — the incus disk binds at instance creation reference these staging fields
-      // directly, not the parent.
       final Path systemdStagingRoot = hostResourceRoot.resolve("systemd.d");
       final Path scriptsRoot = systemdStagingRoot.resolve("systemd-scripts");
       final Path systemdLibexecRoot = systemdStagingRoot.resolve("systemd-libexec");
@@ -1228,7 +1216,7 @@ public final class IncusResourceBootstrap {
       return BootstrapPaths.builder()
           .worktreeRoot(worktreeRoot)
           .stateRoot(stateRoot)
-          .clusterNodeRoot(clusterNodeRoot)
+          .clusterNodeRoot(nodeRoot)
           .manifestsRoot(manifestsRoot)
           .runtimeRke2ConfigRoot(runtimeRoot.resolve("rke2-config"))
           .runtimeCloudConfigRoot(runtimeRoot.resolve("cloud-config"))
@@ -1241,8 +1229,8 @@ public final class IncusResourceBootstrap {
           .systemdRoot(systemdRoot)
           .gitRoot(worktreeRoot.getParent().getParent())
           .shareRoot(stateRoot.resolve("share"))
-          .kubeconfigRoot(stateRoot.resolve("var").resolve("kube"))
-          .cloudSeedRoot(clusterNodeRoot.resolve("cloud.d"))
+          .kubeconfigRoot(clusterRoot)
+          .cloudSeedRoot(nodeRoot.resolve("cloud.d"))
           .build();
     }
 

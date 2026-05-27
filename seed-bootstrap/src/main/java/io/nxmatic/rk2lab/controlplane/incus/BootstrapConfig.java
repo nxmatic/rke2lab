@@ -305,10 +305,13 @@ public record BootstrapConfig(
     }
 
     public BootstrapConfig build() {
+      // Cluster-scoped kubeconfig: one file per cluster at .local.d/<cluster>/kubeconfig.yaml.
+      // Same dir is bind-mounted into every node in the cluster (nodes converge on identical
+      // content via rke2lab-vip-kubeconfig.sh on the master).
       final Path resolvedKubeconfigRef =
           kubeconfigRef != null
               ? kubeconfigRef
-              : Path.of(".local.d", "var", "kube", "rke2-" + clusterName + ".yaml").normalize();
+              : Path.of(".local.d", clusterName, "kubeconfig.yaml").normalize();
 
       if (imageSharedFolder == null || imageSharedFolder.toString().isBlank()) {
         throw new IllegalStateException("Missing required configuration: image.sharedFolder");

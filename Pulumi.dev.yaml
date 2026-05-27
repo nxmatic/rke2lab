@@ -9,7 +9,7 @@ config:
   "rke2lab:image.builderBinary": distrobuilder
   "rke2lab:image.builderHost": bioskop-nixos
   "rke2lab:image.distrobuilderConfig": classpath:/incus/incus-distrobuilder.yaml
-  "rke2lab:image.sharedFolder": .local.d/var/lib/distrobuilder
+  "rke2lab:image.sharedFolder": .local.d/images/distrobuilder
   "rke2lab:network.lanBridgeParent": lan-br
   "rke2lab:network.vmnetNetworkName": vmnet-br
   "rke2lab:api.endpoint": https://10.66.106.10:6443
