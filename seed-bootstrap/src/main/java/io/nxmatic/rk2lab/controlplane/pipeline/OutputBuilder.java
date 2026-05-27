@@ -49,11 +49,11 @@ public final class OutputBuilder {
     outputs.put(
         "seedProvisioningMetadata",
         Map.of(
-            "slices",
+            "targets",
             Map.of(
-                "static", bootstrapResult.provisioning().slices().staticSlices(),
-                "hotReload", bootstrapResult.provisioning().slices().hotReloadSlices(),
-                "all", bootstrapResult.provisioning().slices().all()),
+                "static", bootstrapResult.provisioning().targets().staticTargets(),
+                "dynamic", bootstrapResult.provisioning().targets().dynamicTargets(),
+                "all", bootstrapResult.provisioning().targets().all()),
             "paths",
             Map.of(
                 "hostSourceDirRelative",

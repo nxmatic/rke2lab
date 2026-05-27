@@ -216,11 +216,11 @@ public final class IncusResourceBootstrap {
               : new HostAssetRootLifecycle(config.hostAssetRotationRetentionCount());
 
       final StagingContext staging = materializeToStaging(lifecycle);
-      final SliceContext slices = registerProvisioningSlices(staging);
+      final TargetContext targets = registerProvisioningTargets(staging);
       // Capture metadata BEFORE syncing: the sync step may move the scratch dir into a numbered
-      // slot, after which the slice registry's recorded paths would no longer resolve. Metadata
+      // slot, after which the target registry's recorded paths would no longer resolve. Metadata
       // capture only reads from the registry and in-memory summaries, so it's safe to do first.
-      captureDeploymentMetadata(staging, slices);
+      captureDeploymentMetadata(staging, targets);
       if (!dryRun && syncStagingToFinal(lifecycle, staging.stagingRoot())) {
         // Host content actually changed -- the kubeconfig may now point at an instance that's
         // about to be replaced, so wipe it so readiness re-publishes a fresh one. Skip on no-op
@@ -238,7 +238,7 @@ public final class IncusResourceBootstrap {
 
     HostStage logSummary() {
       logInfo("deployment=" + state.deploymentMetadata);
-      logInfo("provisioning.slices=" + state.provisioningMetadata.slices());
+      logInfo("provisioning.targets=" + state.provisioningMetadata.targets());
       return this;
     }
 
@@ -261,47 +261,47 @@ public final class IncusResourceBootstrap {
           stagingRoot, stagingPaths, stagingManifestsRoot, layerContext, manifestSynthSummary);
     }
 
-    private SliceContext registerProvisioningSlices(StagingContext staging) {
-      final ProvisioningSliceRegistry sliceRegistry = new ProvisioningSliceRegistry();
+    private TargetContext registerProvisioningTargets(StagingContext staging) {
+      final ProvisioningTargetRegistry targetRegistry = new ProvisioningTargetRegistry();
 
-      registerCoreSlice(sliceRegistry, staging);
-      registerNodeSlice(sliceRegistry, staging.stagingPaths());
+      registerCloudInitTarget(targetRegistry, staging);
+      registerSystemdTarget(targetRegistry, staging.stagingPaths());
       final Map<String, Object> runtimeSummaries =
-          materializeAndRegisterRuntimeConfig(sliceRegistry, staging);
+          materializeAndRegisterRuntimeConfigTarget(targetRegistry, staging);
 
-      return new SliceContext(sliceRegistry, runtimeSummaries);
+      return new TargetContext(targetRegistry, runtimeSummaries);
     }
 
-    private void registerCoreSlice(
-        ProvisioningSliceRegistry sliceRegistry, StagingContext staging) {
+    private void registerCloudInitTarget(
+        ProvisioningTargetRegistry targetRegistry, StagingContext staging) {
       final BootstrapPaths stagingPaths = staging.stagingPaths();
-      final CoreSlice coreSlice =
-          new CoreSlice(
+      final CloudInitTarget cloudInitTarget =
+          new CloudInitTarget(
               nodeConfigRegenerator,
               stagingPaths.runtimeCloudConfigRoot(),
               stagingPaths.cloudSeedRoot(),
               staging.stagingManifestsRoot());
       try {
-        coreSlice.materialize(stagingPaths);
+        cloudInitTarget.materialize(stagingPaths);
       } catch (IOException ex) {
-        throw new IllegalStateException("Failed to materialize core slice", ex);
+        throw new IllegalStateException("Failed to materialize cloud-init target", ex);
       }
-      sliceRegistry.register(coreSlice);
+      targetRegistry.register(cloudInitTarget);
     }
 
-    private void registerNodeSlice(
-        ProvisioningSliceRegistry sliceRegistry, BootstrapPaths stagingPaths) {
-      final NodeSlice nodeSlice = new NodeSlice();
+    private void registerSystemdTarget(
+        ProvisioningTargetRegistry targetRegistry, BootstrapPaths stagingPaths) {
+      final SystemdTarget systemdTarget = new SystemdTarget();
       try {
-        nodeSlice.materialize(stagingPaths);
+        systemdTarget.materialize(stagingPaths);
       } catch (IOException ex) {
-        throw new IllegalStateException("Failed to materialize node slice", ex);
+        throw new IllegalStateException("Failed to materialize systemd target", ex);
       }
-      sliceRegistry.register(nodeSlice);
+      targetRegistry.register(systemdTarget);
     }
 
-    private Map<String, Object> materializeAndRegisterRuntimeConfig(
-        ProvisioningSliceRegistry sliceRegistry, StagingContext staging) {
+    private Map<String, Object> materializeAndRegisterRuntimeConfigTarget(
+        ProvisioningTargetRegistry targetRegistry, StagingContext staging) {
       final BootstrapPaths stagingPaths = staging.stagingPaths();
       final LayerEnvContext layerContext = staging.layerContext();
 
@@ -309,46 +309,46 @@ public final class IncusResourceBootstrap {
       final Map<String, Object> systemdProvisioningSummary =
           SystemdProvisioningInventory.summarize(stagingPaths, hostMountNotes);
 
-      final RuntimeConfigSlice runtimeConfigSlice =
-          new RuntimeConfigSlice(
+      final RuntimeConfigTarget runtimeConfigTarget =
+          new RuntimeConfigTarget(
               runtimeEnvControlplaneOverlayWriter,
               layerContext,
               policy,
               stagingPaths.runtimeRke2ConfigRoot(),
               stagingPaths.runtimeEnvConfigRoot());
       try {
-        runtimeConfigSlice.materialize(stagingPaths);
+        runtimeConfigTarget.materialize(stagingPaths);
       } catch (IOException ex) {
-        throw new IllegalStateException("Failed to materialize runtimeConfig slice", ex);
+        throw new IllegalStateException("Failed to materialize runtime-config target", ex);
       }
-      sliceRegistry.register(runtimeConfigSlice);
+      targetRegistry.register(runtimeConfigTarget);
 
       return Map.of(
-          "systemd", systemdProvisioningSummary, "layerEnv", runtimeConfigSlice.layerEnvSummary());
+          "systemd", systemdProvisioningSummary, "layerEnv", runtimeConfigTarget.layerEnvSummary());
     }
 
     private boolean syncStagingToFinal(HostAssetRootLifecycle lifecycle, Path stagingRoot) {
       return lifecycle.syncStagingToFinal(stagingRoot, state.localPaths.assetsRoot());
     }
 
-    private void captureDeploymentMetadata(StagingContext staging, SliceContext slices) {
-      final ProvisioningMetadata.Slices provisioningSlices =
-          ProvisioningResourceInventory.sliceChecksums(state.localPaths, slices.sliceRegistry());
+    private void captureDeploymentMetadata(StagingContext staging, TargetContext targets) {
+      final ProvisioningMetadata.Targets provisioningTargets =
+          ProvisioningResourceInventory.targetChecksums(state.localPaths, targets.targetRegistry());
 
       final String hostSourceDirRelative =
           state.localPaths.relativizeAgainst(state.localPaths.worktreeRoot());
 
       @SuppressWarnings("unchecked")
       final Map<String, Object> layerEnvSummary =
-          (Map<String, Object>) slices.runtimeSummaries().get("layerEnv");
+          (Map<String, Object>) targets.runtimeSummaries().get("layerEnv");
       @SuppressWarnings("unchecked")
       final Map<String, Object> systemdSummary =
-          (Map<String, Object>) slices.runtimeSummaries().get("systemd");
+          (Map<String, Object>) targets.runtimeSummaries().get("systemd");
 
       state.deploymentMetadata = DeploymentMetadata.capture();
       state.provisioningMetadata =
           new ProvisioningMetadata(
-              provisioningSlices, new ProvisioningMetadata.Paths(hostSourceDirRelative));
+              provisioningTargets, new ProvisioningMetadata.Paths(hostSourceDirRelative));
       state.buildMetadata =
           new BuildMetadata(null, BuildMetadata.Manifests.of(staging.manifestSynthSummary()));
       state.runtimeMetadata =
@@ -368,8 +368,8 @@ public final class IncusResourceBootstrap {
         LayerEnvContext layerContext,
         Map<String, Object> manifestSynthSummary) {}
 
-    private record SliceContext(
-        ProvisioningSliceRegistry sliceRegistry, Map<String, Object> runtimeSummaries) {}
+    private record TargetContext(
+        ProvisioningTargetRegistry targetRegistry, Map<String, Object> runtimeSummaries) {}
   }
 
   private void clearStaleBootstrapKubeconfig() {
@@ -652,7 +652,10 @@ public final class IncusResourceBootstrap {
       instanceConfig.put("security.syscalls.intercept.bpf.devices", "true");
 
       for (Map.Entry<String, String> entry :
-          state.provisioningMetadata.slices().staticSlices().entrySet()) {
+          state.provisioningMetadata.targets().staticTargets().entrySet()) {
+        // Wire format kept as `slice.<name>` to avoid a one-time instance replace from the
+        // rename. Source code now uses Target vocabulary; the on-instance key migrates the day
+        // a static-target checksum changes for a real reason.
         instanceConfig.put("user.rke2lab.provisioning.slice." + entry.getKey(), entry.getValue());
       }
 
@@ -2052,8 +2055,8 @@ public final class IncusResourceBootstrap {
      * {@code .gitignore} declares {@code run/}, {@code cache/}, {@code lib/}, {@code log/} as flox-
      * managed mutable subtrees, and the asset materializer only writes {@code env/manifest.toml} +
      * {@code env.json} — flox owns everything else. Walking into {@code .flox/} for backup/sync
-     * races with live flox activations (run/<arch>.<env>.dev symlinks come and go), so we treat
-     * the whole subtree as a black box: skip on entry, never copy, never delete.
+     * races with live flox activations (run/<arch>.<env>.dev symlinks come and go), so we treat the
+     * whole subtree as a black box: skip on entry, never copy, never delete.
      */
     private static boolean isFloxRuntimeStateDir(Path dir) {
       return ".flox".equals(String.valueOf(dir.getFileName()));
@@ -2186,13 +2189,13 @@ public final class IncusResourceBootstrap {
     }
   }
 
-  private static final class CoreSlice implements ProvisioningSlice {
+  private static final class CloudInitTarget implements ProvisioningTarget {
     private final NodeConfigRegenerator nodeConfigRegenerator;
     private final Path runtimeCloudConfigRoot;
     private final Path cloudSeedRoot;
     private final Path manifestsRoot;
 
-    private CoreSlice(
+    private CloudInitTarget(
         NodeConfigRegenerator nodeConfigRegenerator,
         Path runtimeCloudConfigRoot,
         Path cloudSeedRoot,
@@ -2209,8 +2212,8 @@ public final class IncusResourceBootstrap {
     }
 
     @Override
-    public SliceStoragePolicy storagePolicy() {
-      return SliceStoragePolicy.STATIC;
+    public TargetReloadPolicy reloadPolicy() {
+      return TargetReloadPolicy.STATIC;
     }
 
     @Override
@@ -2227,7 +2230,7 @@ public final class IncusResourceBootstrap {
     }
   }
 
-  private static final class RuntimeConfigSlice implements ProvisioningSlice {
+  private static final class RuntimeConfigTarget implements ProvisioningTarget {
     private final RuntimeEnvControlplaneOverlayWriter overlayWriter;
     private final LayerEnvContext layerContext;
     private final ControlplanePolicy policy;
@@ -2235,7 +2238,7 @@ public final class IncusResourceBootstrap {
     private final Path envConfigRoot;
     private Map<String, Object> layerEnvSummary = Map.of();
 
-    private RuntimeConfigSlice(
+    private RuntimeConfigTarget(
         RuntimeEnvControlplaneOverlayWriter overlayWriter,
         LayerEnvContext layerContext,
         ControlplanePolicy policy,
@@ -2254,14 +2257,14 @@ public final class IncusResourceBootstrap {
     }
 
     @Override
-    public SliceStoragePolicy storagePolicy() {
-      return SliceStoragePolicy.HOT_RELOAD;
+    public TargetReloadPolicy reloadPolicy() {
+      return TargetReloadPolicy.DYNAMIC;
     }
 
     @Override
     public void materialize(BootstrapPaths paths) throws IOException {
-      // rke2-config root is filled by cdk8s synth+explode upstream of slice registration. The
-      // env-config root is the slice's own output: per-layer ConfigMap files plus the aggregated
+      // rke2-config root is filled by cdk8s synth+explode upstream of target registration. The
+      // env-config root is the target's own output: per-layer ConfigMap files plus the aggregated
       // 99-configmap overlay.
       layerEnvSummary = overlayWriter.write(envConfigRoot, layerContext, policy);
     }
@@ -2995,48 +2998,48 @@ public final class IncusResourceBootstrap {
     private ProvisioningResourceInventory() {}
 
     /**
-     * Compute per-slice checksums for independently reconcilable provisioning slices using fluent
-     * pipeline grammar.
+     * Compute per-target checksums for independently reconcilable provisioning targets using the
+     * fluent pipeline grammar.
      *
-     * <p>The core slice covers base provisioning (systemd, manifests, rke2 config); component
-     * slices are discovered from the registry populated during materialization. Static slices
-     * trigger instance renewal; hot-reload slices trigger reconciliation without renewal.
+     * <p>The core target covers cloud-init source (the only STATIC target today); other targets are
+     * discovered from the registry populated during materialization. STATIC targets trigger
+     * instance renewal; DYNAMIC targets trigger reconciliation without renewal.
      *
      * @param paths bootstrap filesystem paths
-     * @param registry component-populated slice registry with storage policies
-     * @return partitioned slice checksums (static vs hot-reload)
+     * @param registry component-populated target registry with reload policies
+     * @return partitioned target checksums (static vs dynamic)
      */
-    private static ProvisioningMetadata.Slices sliceChecksums(
-        BootstrapPaths paths, ProvisioningSliceRegistry registry) {
+    private static ProvisioningMetadata.Targets targetChecksums(
+        BootstrapPaths paths, ProvisioningTargetRegistry registry) {
       final Map<String, String> allChecksums =
-          SliceChecksumPipeline.begin(paths, registry)
+          TargetChecksumPipeline.begin(paths, registry)
               .during("core", core -> core.fromCoreRoots())
               .then()
               .during("registered components", components -> components.fromRegistry())
               .collectChecksums();
 
-      // Partition by storage policy
-      final Map<String, String> staticSlices = new java.util.LinkedHashMap<>();
-      final Map<String, String> hotReloadSlices = new java.util.LinkedHashMap<>();
+      // Partition by reload policy.
+      final Map<String, String> staticTargets = new java.util.LinkedHashMap<>();
+      final Map<String, String> dynamicTargets = new java.util.LinkedHashMap<>();
 
       for (Map.Entry<String, String> entry : allChecksums.entrySet()) {
-        final String sliceName = entry.getKey();
+        final String targetName = entry.getKey();
         final String checksum = entry.getValue();
-        final SliceStoragePolicy policy = registry.getStoragePolicy(sliceName);
+        final TargetReloadPolicy policy = registry.getReloadPolicy(targetName);
 
-        if (policy == SliceStoragePolicy.STATIC) {
-          staticSlices.put(sliceName, checksum);
-        } else if (policy == SliceStoragePolicy.HOT_RELOAD) {
-          hotReloadSlices.put(sliceName, checksum);
+        if (policy == TargetReloadPolicy.STATIC) {
+          staticTargets.put(targetName, checksum);
+        } else if (policy == TargetReloadPolicy.DYNAMIC) {
+          dynamicTargets.put(targetName, checksum);
         }
       }
 
-      return ProvisioningMetadata.Slices.of(staticSlices, hotReloadSlices);
+      return ProvisioningMetadata.Targets.of(staticTargets, dynamicTargets);
     }
 
     /**
      * Legacy single-checksum method for backward compatibility during migration. Computes aggregate
-     * checksum over all slices.
+     * checksum over all targets.
      */
     @Deprecated
     private static String checksum(BootstrapPaths paths) {
@@ -3060,20 +3063,6 @@ public final class IncusResourceBootstrap {
       } catch (NoSuchAlgorithmException ex) {
         throw new IllegalStateException("SHA-256 is not available", ex);
       }
-    }
-
-    private static String coreSliceChecksum(BootstrapPaths paths) {
-      final List<Path> coreRoots =
-          List.of(
-              paths.scriptsRoot(),
-              paths.systemdRoot(),
-              paths.manifestsRoot(),
-              paths.runtimeRke2ConfigRoot(),
-              paths.runtimeCloudConfigRoot(),
-              paths.runtimeEnvConfigRoot(),
-              paths.cloudSeedRoot());
-
-      return computeChecksum(coreRoots);
     }
 
     private static String computeChecksum(List<Path> roots) {

@@ -3,33 +3,36 @@ package io.nxmatic.rk2lab.controlplane.incus;
 import java.util.Map;
 
 /**
- * Provisioning metadata — what resources are being provisioned and where they reside.
+ * Provisioning metadata — what is being provisioned and where its inputs reside.
  *
- * @param slices per-slice checksums for independently reconcilable components
+ * @param targets per-target checksums for independently reconcilable downstream consumers
  * @param paths filesystem paths for provisioning assets
  */
-public record ProvisioningMetadata(Slices slices, Paths paths) {
+public record ProvisioningMetadata(Targets targets, Paths paths) {
 
   /**
-   * Per-slice checksums partitioned by storage policy.
+   * Per-target checksums partitioned by reload policy.
    *
-   * <p>Static slices stored in instance config trigger full renewal on change. Hot-reload slices
+   * <p>Static targets stored in instance config trigger full renewal on change. Dynamic targets
    * trigger reconciliation without instance renewal.
    *
-   * @param staticSlices checksums for STATIC policy slices (stored in instance config)
-   * @param hotReloadSlices checksums for HOT_RELOAD policy slices (stored in outputs/ConfigMap)
+   * @param staticTargets checksums for {@link TargetReloadPolicy#STATIC} targets (stored in
+   *     instance config)
+   * @param dynamicTargets checksums for {@link TargetReloadPolicy#DYNAMIC} targets (stored in
+   *     outputs/ConfigMap)
    */
-  public record Slices(Map<String, String> staticSlices, Map<String, String> hotReloadSlices) {
+  public record Targets(Map<String, String> staticTargets, Map<String, String> dynamicTargets) {
 
-    public static Slices of(Map<String, String> staticSlices, Map<String, String> hotReloadSlices) {
-      return new Slices(Map.copyOf(staticSlices), Map.copyOf(hotReloadSlices));
+    public static Targets of(
+        Map<String, String> staticTargets, Map<String, String> dynamicTargets) {
+      return new Targets(Map.copyOf(staticTargets), Map.copyOf(dynamicTargets));
     }
 
-    /** All slice checksums regardless of policy. */
+    /** All target checksums regardless of policy. */
     public Map<String, String> all() {
       final var combined = new java.util.LinkedHashMap<String, String>();
-      combined.putAll(staticSlices);
-      combined.putAll(hotReloadSlices);
+      combined.putAll(staticTargets);
+      combined.putAll(dynamicTargets);
       return Map.copyOf(combined);
     }
   }

@@ -172,8 +172,8 @@ final class ResourceCreationPipeline {
     StandaloneResourceBuilder withRegistry() {
       this.registrySummary =
           Map.of(
-              "sliceChecksums",
-              bootstrapResult.provisioning().slices().all(),
+              "targetChecksums",
+              bootstrapResult.provisioning().targets().all(),
               "hostSourceDirRelative",
               bootstrapResult.provisioning().paths().hostSourceDirRelative(),
               "localWorktreePath",

@@ -8,20 +8,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Node runtime slice - hot-reloadable node-side components.
+ * Systemd target — host-side units, scripts, libexec helpers, plus the daemonset assets the host
+ * trampolines into.
  *
- * <p>Materializes node runtime assets:
+ * <p>Materializes:
  *
  * <ul>
- *   <li>Systemd units and scripts (loaded by systemd daemon at runtime)
- *   <li>NRI plugin binary and hooks (installed by DaemonSets)
- *   <li>Future: other node-side agents, configs, binaries
+ *   <li>Systemd units and scripts (loaded by the host systemd daemon)
+ *   <li>Flox runtime installer assets (read by DaemonSet init container, then trampolined to host)
  * </ul>
  *
- * <p>Hot-reloadable because systemd can daemon-reload units, and DaemonSet init container +
- * reconciler sidecar handle binary updates via trampoline to node.
+ * <p>Reload policy: {@link TargetReloadPolicy#DYNAMIC}. systemd picks up unit changes via {@code
+ * daemon-reload}; the DaemonSet init container + reconciler sidecar handle the flox/NRI assets via
+ * the host-trampoline path.
  */
-public final class NodeSlice implements ProvisioningSlice {
+public final class SystemdTarget implements ProvisioningTarget {
 
   private static final String CLASSPATH_ROOT = "META-INF/io.nxmatic/rk2lab/controlplane";
   private static final String CLASSPATH_HOST_SYSTEMD_SCRIPTS_ROOT =
@@ -33,25 +34,28 @@ public final class NodeSlice implements ProvisioningSlice {
 
   @Override
   public String name() {
+    // On-the-wire target name kept as "node" for now to avoid a one-time checksum-key rotation in
+    // outputs/ConfigMaps. Source-side type is SystemdTarget; the wire name can rotate later when
+    // its checksum naturally changes.
     return "node";
   }
 
   @Override
-  public SliceStoragePolicy storagePolicy() {
-    return SliceStoragePolicy.HOT_RELOAD;
+  public TargetReloadPolicy reloadPolicy() {
+    return TargetReloadPolicy.DYNAMIC;
   }
 
   @Override
   public void materialize(IncusResourceBootstrap.BootstrapPaths paths) throws IOException {
     materializedPaths.clear();
 
-    // Systemd units and scripts (systemd loads these at runtime)
+    // Systemd units and scripts (systemd loads these at runtime).
     final Path hostManifestsRoot = paths.manifestsRoot().resolve("host");
     materializeHostSystemdAssets(hostManifestsRoot);
     materializedPaths.add(hostManifestsRoot.resolve("systemd-scripts"));
     materializedPaths.add(hostManifestsRoot.resolve("systemd-units"));
 
-    // Flox runtime installer assets
+    // Flox runtime installer assets.
     final Path floxRuntimeTarget = paths.daemonsetRoot().resolve("runtime").resolve("flox");
 
     if (Files.exists(floxRuntimeTarget)) {
@@ -73,7 +77,6 @@ public final class NodeSlice implements ProvisioningSlice {
 
   private void materializeResourceTree(
       String classpathRoot, Path targetDir, boolean executableFiles) throws IOException {
-    // Use ClasspathAssetMaterializer logic (inline for now, could extract shared util later)
     if (!Files.exists(targetDir)) {
       Files.createDirectories(targetDir);
     }
@@ -85,7 +88,6 @@ public final class NodeSlice implements ProvisioningSlice {
       }
     }
 
-    // Walk classpath resources and copy to target
     final java.nio.file.FileSystem fs;
     final Path classpathPath;
     try {
