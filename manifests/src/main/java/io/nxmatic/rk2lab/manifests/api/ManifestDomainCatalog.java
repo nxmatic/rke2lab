@@ -55,6 +55,10 @@ public final class ManifestDomainCatalog {
     return "cicd";
   }
 
+  public String clusterApi() {
+    return "cluster-api";
+  }
+
   public List<String> all() {
     return all;
   }
@@ -84,12 +88,14 @@ public final class ManifestDomainCatalog {
               "networking",
               "mesh",
               "high-availability",
-              "cicd"));
+              "cicd",
+              "cluster-api"));
     }
 
     public Builder addDefaultStageALinkableDomains() {
       return addStageALinkableDomains(
-          List.of("high-availability", "networking", "replication", "storage", "mesh"));
+          List.of(
+              "high-availability", "networking", "replication", "storage", "mesh", "cluster-api"));
     }
 
     public Builder addDomain(String domainId) {
