@@ -13,6 +13,7 @@ public final class ClusterApiDomainRegistrar implements LayerDomainRegistrar {
         List.of(),
         List.of(
             new ClusterApiOperatorManifestUnit(),
-            new IncusIdentitySecretManifestUnit()));
+            new IncusIdentitySecretManifestUnit(),
+            new ImageStateConfigMapManifestUnit()));
   }
 }
