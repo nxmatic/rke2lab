@@ -15,7 +15,7 @@ public final class GitopsDomainRegistrar implements LayerDomainRegistrar {
         List.of(
             new FluxInstanceManifestUnit(),
             new SopsAgeSecretManifestUnit(),
-            new FluxRootManifestUnit(),
-            new PorchResourcesManifestUnit()));
+            new FluxRootManifestUnit()));
+    // PorchResourcesManifestUnit removed: Porch PackageVariants not needed for peer bootstrap
   }
 }

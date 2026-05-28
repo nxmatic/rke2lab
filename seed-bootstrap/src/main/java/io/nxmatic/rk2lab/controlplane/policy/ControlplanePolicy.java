@@ -37,11 +37,16 @@ public record ControlplanePolicy(
             ManifestDomainPolicy.builder()
                 .domainCatalog(MANIFEST_DOMAIN_CATALOG)
                 .stageADefaults()
-                .highAvailability(environment.bool("policy.link.highAvailability.enabled", true))
-                .networking(environment.bool("policy.link.networking.enabled", true))
-                .replication(environment.bool("policy.link.replication.enabled", true))
+                .cluster(environment.bool("policy.link.cluster.enabled", true))
                 .storage(environment.bool("policy.link.storage.enabled", true))
+                .replication(environment.bool("policy.link.replication.enabled", true))
+                .gitops(environment.bool("policy.link.gitops.enabled", true))
+                .runtime(environment.bool("policy.link.runtime.enabled", true))
+                .networking(environment.bool("policy.link.networking.enabled", true))
                 .mesh(environment.bool("policy.link.mesh.enabled", false))
+                .highAvailability(environment.bool("policy.link.highAvailability.enabled", true))
+                .cicd(environment.bool("policy.link.cicd.enabled", true))
+                .clusterApi(environment.bool("policy.link.clusterApi.enabled", false))
                 .build(),
             new ManifestLinkPolicy.DebugPolicy(debugPolicy::domainDebug));
 

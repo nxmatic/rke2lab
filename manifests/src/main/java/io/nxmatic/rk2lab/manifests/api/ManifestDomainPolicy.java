@@ -93,6 +93,26 @@ public record ManifestDomainPolicy(Map<String, Boolean> enabledByDomainId) {
       return this;
     }
 
+    public Builder cicd(boolean enabled) {
+      put(domainCatalog.cicd(), enabled);
+      return this;
+    }
+
+    public Builder gitops(boolean enabled) {
+      put(domainCatalog.gitops(), enabled);
+      return this;
+    }
+
+    public Builder runtime(boolean enabled) {
+      put(domainCatalog.runtime(), enabled);
+      return this;
+    }
+
+    public Builder cluster(boolean enabled) {
+      put(domainCatalog.cluster(), enabled);
+      return this;
+    }
+
     public Builder enableOnly(Iterable<String> enabledDomainIds) {
       resetAllDisabled();
       for (String domainId : enabledDomainIds) {
