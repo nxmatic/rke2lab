@@ -86,6 +86,7 @@ on-activate = '''
     { dir = "../fleet/flox/git" },
     { dir = "../fleet/flox/jdk" },
     { dir = "../fleet/flox/k8s" },
+    { dir = "../fleet/flox/keyhole" },
     { dir = "../fleet/flox/pulumi" },
     { dir = "../fleet/flox/shell" },
   ]

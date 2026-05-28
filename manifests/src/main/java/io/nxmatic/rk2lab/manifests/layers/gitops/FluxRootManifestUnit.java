@@ -24,8 +24,8 @@ import org.cdk8s.JsonPatch;
  *
  * <p><b>GitRepository CR:</b> Points to this repository, branch {@code main}
  *
- * <p><b>Root Kustomization CR:</b> Watches {@code gitops/clusters/<cluster>/} in the
- * GitRepository. Configured with SOPS decryption using the cluster age key.
+ * <p><b>Root Kustomization CR:</b> Watches {@code gitops/clusters/<cluster>/} in the GitRepository.
+ * Configured with SOPS decryption using the cluster age key.
  *
  * <p><b>Note:</b> Currently uses placeholder values for repository URL and age key secret
  * reference. These will be configured from environment/config in a future iteration.
@@ -102,14 +102,15 @@ public final class FluxRootManifestUnit extends AbstractManifestUnit {
         JsonPatch.add(
             "/spec",
             Map.of(
-                "interval", "5m",
-                "path", "./gitops/clusters/" + clusterName,
-                "prune", true,
+                "interval",
+                "5m",
+                "path",
+                "./gitops/clusters/" + clusterName,
+                "prune",
+                true,
                 "sourceRef",
-                    Map.of("kind", "GitRepository", "name", "rke2lab"),
+                Map.of("kind", "GitRepository", "name", "rke2lab"),
                 "decryption",
-                    Map.of(
-                        "provider", "sops",
-                        "secretRef", Map.of("name", "sops-age")))));
+                Map.of("provider", "sops", "secretRef", Map.of("name", "sops-age")))));
   }
 }

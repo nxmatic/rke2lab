@@ -32,8 +32,8 @@ import org.cdk8s.JsonPatch;
  *   <li>Commit {@code .sops.yaml} to repository
  * </ol>
  *
- * <p>The manifest unit reads the private key from {@code .secrets} and creates the Secret in
- * {@code flux-system} namespace.
+ * <p>The manifest unit reads the private key from {@code .secrets} and creates the Secret in {@code
+ * flux-system} namespace.
  *
  * <p><b>Note:</b> This is the Stage A bootstrap - the Secret is applied at master bootstrap time.
  * After that, Flux can decrypt SOPS-encrypted resources.
@@ -73,8 +73,7 @@ public final class SopsAgeSecretManifestUnit extends AbstractManifestUnit {
                         .name("sops-age")
                         .namespace("flux-system")
                         .annotations(
-                            packageProfile.packageAnnotations(
-                                "|Secret|flux-system|sops-age"))
+                            packageProfile.packageAnnotations("|Secret|flux-system|sops-age"))
                         .build())
                 .build());
 

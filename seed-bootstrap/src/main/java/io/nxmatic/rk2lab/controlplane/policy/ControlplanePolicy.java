@@ -41,7 +41,8 @@ public record ControlplanePolicy(
                 .networking(environment.bool("policy.link.networking.enabled", true))
                 .replication(environment.bool("policy.link.replication.enabled", true))
                 .storage(environment.bool("policy.link.storage.enabled", true))
-                .mesh(environment.bool("policy.link.mesh.enabled", false)).build(),
+                .mesh(environment.bool("policy.link.mesh.enabled", false))
+                .build(),
             new ManifestLinkPolicy.DebugPolicy(debugPolicy::domainDebug));
 
     return new ControlplanePolicy(debugPolicy, networkPolicy, manifestLinkPolicy);
