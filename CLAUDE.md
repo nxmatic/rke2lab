@@ -32,3 +32,91 @@ When you encounter a builder with three or more boolean parameters or a sequence
 - **Builder enforcement**: If a class offers a builder and has multi-parameter constructors, make the constructor private to enforce builder usage and ease review. The builder pattern signals complex construction; direct construction bypasses that contract.
 - **Functional APIs**: Design for composition and pipelines. Prefer fluent chains, function parameters (lambdas/method refs), and immutable transformations over stateful accumulators.
 - **Multi-parameter methods**: When you encounter methods with 3+ parameters (especially booleans), note them as candidates for pipeline-based implementation. Consider whether the fluent grammar or a builder would improve readability and type safety.
+
+## Documentation standards
+
+Documentation is critical for context recovery. This is a complex, multi-concern project where the developer needs to frequently context-switch between different domains (Incus, Kubernetes, Cluster API, GitOps, systemd, networking). High-quality documentation prevents re-learning and accelerates future work.
+
+### When to document
+
+Document architectural decisions, patterns, and workflows proactively, especially when:
+
+- Implementing a new subsystem or cross-cutting concern
+- Making non-obvious design decisions (e.g., "why not constructor parameters?")
+- Establishing patterns that will be reused (e.g., manifest unit access patterns)
+- Completing a phase or deliverable that hands off to future work
+
+**Don't wait until asked.** If the implementation revealed complexity or required clarification during development, that's a signal to document.
+
+### Documentation quality standard
+
+Follow the pattern established in `docs/bootstrap-identity-provider.adoc` (commit c324fa05):
+
+**Required elements**:
+
+1. **Overview** - What is this? Why does it exist? What problem does it solve?
+
+2. **C4 Architecture Diagrams** (using Mermaid)
+   - Context diagram showing separation of concerns
+   - Component or sequence diagram showing data flow
+   - Color-coded legend explaining component types
+
+3. **Usage Patterns**
+   - Show the correct pattern with code examples
+   - Call out anti-patterns (❌ Don't do this / ✅ Do this instead)
+   - Explain WHY the correct pattern is better
+
+4. **Setup/Configuration** - If applicable, step-by-step bootstrap instructions
+
+5. **Troubleshooting** - Common errors with causes and fixes
+
+6. **Related Documentation** - Bidirectional cross-references to other docs
+
+### Format and style
+
+- **Use AsciiDoc** (`.adoc`) for consistency with existing docs
+- **Mermaid diagrams** for architecture visualization (not PlantUML)
+- **Code examples** should be runnable and match actual implementation
+- **Organize by concern**, not chronologically
+- **Clear section headers** - reader should find what they need quickly
+
+### Cross-referencing discipline
+
+When you create or update documentation:
+
+1. **Add forward links** FROM your doc TO related docs
+2. **Add backward links** FROM related docs TO your doc  
+3. **Update `docs/README.adoc`** with your doc in the appropriate section
+4. **Add navigation hints** if your doc is part of a learning flow
+
+Example cross-reference block (end of document):
+
+```asciidoc
+== Related Documentation
+
+* link:other-doc.adoc[Other Doc] - Brief description of relationship
+* link:another-doc.adoc[Another Doc] - Why reader might go there next
+```
+
+### Documentation checklist
+
+Before considering architecture work complete:
+
+- [ ] Core concepts explained with "why" not just "what"
+- [ ] Anti-patterns called out (prevents future duplication of mistakes)
+- [ ] C4 diagram showing concerns and data flow
+- [ ] Code examples demonstrate actual usage
+- [ ] Bidirectional cross-references to related docs
+- [ ] `docs/README.adoc` updated with new document
+- [ ] Troubleshooting section with common errors
+
+### Why this matters
+
+**Reference example**: The bootstrap identity provider documentation prevented a near-duplication where constructor parameters were about to be added to manifest units. The documentation made it clear:
+
+- ❌ Constructor parameters for runtime config = wrong (statically instantiated units can't receive them)
+- ✅ Context access via `bootstrapIdentity()` = correct (ThreadLocal injection)
+
+Without documentation, this mistake would have been discovered later during actual synthesis, requiring rework. The doc caught it at design time.
+
+**Impact**: High-quality docs let you context-switch away from a subsystem and return weeks later without re-learning. They prevent architectural mistakes during future work. They make code review more effective because reviewers can understand the "why" behind decisions.
