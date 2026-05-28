@@ -1,0 +1,124 @@
+= RKE2Lab Documentation
+:toc: left
+:toclevels: 2
+
+Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via Pulumi, Incus, and Cluster API.
+
+== Core Architecture
+
+=== Bootstrap & Provisioning
+
+* link:bootstrap-contract.adoc[Bootstrap Contract] - Stage A bootstrap requirements and outputs
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - How cluster/infrastructure identity flows through synthesis
+* link:provisioning-slice-architecture.adoc[Provisioning Slice Architecture] - Hot-reload vs static resource partitioning
+
+=== Manifest Synthesis
+
+* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How K8s manifests are generated from code
+* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow patterns in seed-bootstrap
+
+== GitOps & Cluster API
+
+* link:gitops-cluster-api-transition-plan.adoc[GitOps + Cluster API Transition Plan] - Phase 1-3 implementation roadmap
+* link:stagea-stageb-handoff-contract.adoc[Stage A/B Handoff Contract] - Bootstrap → cluster management transition
+* link:post-bootstrap-in-cluster-ownership-plan.adoc[Post-Bootstrap Ownership Plan] - Component lifecycle after bootstrap
+
+== Infrastructure
+
+=== Incus
+
+* link:incus-distribution-contract.adoc[Incus Distribution Contract] - How Incus images are built and distributed
+* link:incus-resource-bootstrap-refactoring-plan.adoc[Incus Resource Bootstrap Refactoring Plan] - Bootstrap refactoring decisions
+
+=== Runtime Assets
+
+* link:controlnode-runtime-assets-architecture.adoc[Control Node Runtime Assets Architecture] - How assets are materialized on nodes
+* link:daemonset-host-assets-architecture.adoc[DaemonSet Host Assets Architecture] - DaemonSet-to-host asset trampoline pattern
+
+== Networking
+
+* link:cilium-bgp-multi-host-topology.adoc[Cilium BGP Multi-Host Topology] - BGP configuration for multi-node clusters
+
+== Development Tools
+
+* link:systemd-dbus-adapter-architecture.adoc[Systemd DBus Adapter Architecture] - Systemd state monitoring via DBus
+* link:troubleshooting-workflow.adoc[Troubleshooting Workflow] - Common debugging patterns
+
+== Implementation Plans
+
+* link:cluster-workload-completion-plan.adoc[Cluster Workload Completion Plan] - Completing cluster workload features
+* link:script-layer-owners.md[Script Layer Owners] - Ownership mapping for bootstrap scripts
+* link:rke2lab-authored-notes-import.adoc[RKE2Lab Authored Notes Import] - Migration notes
+
+== Architecture Diagrams
+
+* link:architecture/nri-plugin-c4-diagrams.md[NRI Plugin C4 Diagrams] - Container Runtime Interface plugin architecture
+
+== Navigation Tips
+
+=== By Concern
+
+**Identity & Configuration**
+----
+Bootstrap Identity Provider → Bootstrap Contract → Manifest Synthesis Architecture
+----
+
+**Provisioning Flow**
+----
+Provisioning Slice Architecture → Bootstrap Contract → Stage A/B Handoff
+----
+
+**Cluster API Implementation**
+----
+GitOps + Cluster API Plan → Bootstrap Identity Provider → Manifest Synthesis Architecture
+----
+
+**Runtime Assets**
+----
+Control Node Runtime Assets → DaemonSet Host Assets → Provisioning Slice Architecture
+----
+
+=== By Development Phase
+
+**Planning** (before implementation):
+
+* GitOps + Cluster API Transition Plan
+* Incus Resource Bootstrap Refactoring Plan
+* Cluster Workload Completion Plan
+
+**Architecture** (design documents):
+
+* Bootstrap Identity Provider
+* Manifest Synthesis Architecture
+* Provisioning Slice Architecture
+* Fluent Pipeline Grammar
+
+**Contracts** (interfaces between components):
+
+* Bootstrap Contract
+* Stage A/B Handoff Contract
+* Incus Distribution Contract
+
+**Troubleshooting** (operational guides):
+
+* Troubleshooting Workflow
+* Bootstrap Identity Provider (setup section)
+
+== Contributing
+
+When adding new documentation:
+
+1. **Use AsciiDoc format** (`.adoc`) for consistency
+2. **Include Mermaid diagrams** for architecture visualization
+3. **Add cross-references** - link to related docs in both directions
+4. **Update this index** - add your document to the appropriate section
+5. **Follow the pattern**: Overview → Architecture → Usage → Troubleshooting
+
+=== Cross-Reference Checklist
+
+When you document a new concept:
+
+- [ ] Add forward links FROM your doc TO related docs
+- [ ] Add backward links FROM related docs TO your doc
+- [ ] Update this README with your doc in the appropriate section
+- [ ] Add to the "By Concern" or "By Development Phase" navigation section if applicable

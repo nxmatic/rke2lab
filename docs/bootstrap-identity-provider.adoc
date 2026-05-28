@@ -1,0 +1,569 @@
+= Bootstrap Identity Provider
+:toc: left
+:toclevels: 3
+
+This document explains the bootstrap identity provider pattern, how to use it in manifest units, and how to set up infrastructure identities (Incus credentials).
+
+== Overview
+
+The bootstrap identity provider is a **thread-local context** that supplies cluster and infrastructure identity to manifest units during synthesis. It prevents parameter proliferation and ensures consistent identity access across all manifest units.
+
+== Architecture
+
+=== C4 Context Diagram: Bootstrap Identity Concerns
+
+[mermaid]
+----
+graph TB
+    subgraph Synthesis["Manifest Synthesis Process"]
+        Bootstrap[IncusResourceBootstrap<br/><i>Builds identity</i>]
+        Service[DefaultManifestSynthesisService<br/><i>Binds context</i>]
+        Context[ManifestSynthesisContext<br/><i>ThreadLocal provider</i>]
+        Units[ManifestUnits<br/><i>Consume identity</i>]
+    end
+
+    subgraph Identity["Bootstrap Identity Record"]
+        ClusterID[Cluster Identity<br/>name, id, token, domain]
+        NodeID[Node Identity<br/>name, id, kind]
+        InfraID[Infrastructure Identity<br/>Incus remote = cluster name]
+    end
+
+    subgraph Operator["Operator Environment"]
+        Secrets[.secrets<br/><i>incus.capn.clientKey</i>]
+        IncusConfig[~/.config/incus/<br/><i>remotes, server certs</i>]
+        Resources[Resources<br/><i>capn-client.crt</i>]
+    end
+
+    Bootstrap -->|creates| Identity
+    Bootstrap -->|passes in request| Service
+    Service -->|binds to ThreadLocal| Context
+    Context -->|provides| ClusterID
+    Context -->|provides| NodeID
+    Context -->|provides| InfraID
+
+    Units -->|reads via helper| Context
+
+    Units -.->|reads from| Secrets
+    Units -.->|reads from| IncusConfig
+    Units -.->|reads from| Resources
+
+    style Identity fill:#fff4e6,stroke:#ff9900
+    style Context fill:#ccffcc,stroke:#00cc66
+    style Operator fill:#e1f5ff,stroke:#0066cc
+----
+
+**Legend:**
+
+* Orange: Identity data (cluster-scoped configuration)
+* Green: Context provider (thread-local, synthesis-scoped)
+* Blue: Operator environment (filesystem-resident)
+* Solid lines: Data flow during synthesis
+* Dashed lines: File reads during manifest unit apply
+
+**Key Separation of Concerns:**
+
+1. **Cluster Identity** (what) - Cluster name, token, domain - varies per cluster
+2. **Node Identity** (where) - Seed node name, role - varies per node
+3. **Infrastructure Identity** (how) - Incus remote derived from cluster name
+4. **Operator Environment** (secrets) - Credentials from filesystem - constant location
+5. **Context Provider** (mechanism) - ThreadLocal injection - synthesis-scoped
+
+=== C4 Component Diagram: Identity Flow
+
+[mermaid]
+----
+sequenceDiagram
+    participant Config as Pulumi Config
+    participant Bootstrap as IncusResourceBootstrap
+    participant Request as ManifestSynthesisRequest
+    participant Service as ManifestSynthesisService
+    participant Context as ManifestSynthesisContext
+    participant Unit as ManifestUnit
+    participant FS as Filesystem
+
+    Config->>Bootstrap: clusterName, clusterId, token...
+    Bootstrap->>Bootstrap: Build BootstrapIdentity
+
+    Note over Bootstrap: Identity is immutable record
+
+    Bootstrap->>Request: withBootstrapIdentity(identity)
+    Bootstrap->>Service: synthesize(request)
+
+    Service->>Context: bind(identity, versions, topology...)
+    activate Context
+
+    Note over Context: ThreadLocal scope:<br/>duration of synthesize()
+
+    Service->>Unit: apply(chart)
+
+    Note over Unit: No constructor params!
+
+    Unit->>Context: bootstrapIdentity().clusterName()
+    Context-->>Unit: "bioskop"
+
+    Unit->>FS: Read .secrets (incus.capn.clientKey)
+    FS-->>Unit: Private key PEM
+
+    Unit->>FS: Read ~/.config/incus/config.yml
+    FS-->>Unit: Remote address
+
+    Unit->>FS: Read ~/.config/incus/servercerts/...
+    FS-->>Unit: Server certificate
+
+    Unit->>Unit: Create K8s Secret with identity
+
+    deactivate Context
+
+    Note over Context: Unbound after synthesis
+----
+
+=== What BootstrapIdentity Provides
+
+`BootstrapIdentity` is a record in `ManifestSynthesisContext` that exposes:
+
+[cols="1,3",options="header"]
+|===
+|Field |Description
+|`clusterName` |Cluster identifier (e.g., "bioskop", "nikopol")
+|`clusterId` |Numeric cluster identifier
+|`clusterToken` |RKE2 cluster join token
+|`clusterDomain` |Kubernetes cluster domain (default: "cluster.local")
+|`clusterEnv` |Environment label (e.g., "dev", "prod")
+|`nodeName` |Node identifier for seed node
+|`nodeId` |Numeric node identifier
+|`nodeKind` |Node role (e.g., "master", "worker")
+|===
+
+=== Incus Infrastructure Identity
+
+Each cluster uses its own Incus remote, but all clusters share a single CAPN identity:
+
+* **Remote naming**: Remote name = cluster name (bioskop cluster → bioskop remote)
+* **Single CAPN identity**: All clusters use identity name `"capn"` for Cluster API Provider Incus
+* **Operator environment**: Credentials stored in operator's environment (`.secrets`, `~/.config/incus`)
+
+[mermaid]
+----
+graph LR
+    subgraph Clusters
+        Bioskop[bioskop cluster]
+        Nikopol[nikopol cluster]
+    end
+
+    subgraph Incus Remotes
+        BioskopRemote[bioskop remote<br/>192.168.1.1:8443]
+        NikopolRemote[nikopol remote<br/>192.168.1.2:8443]
+    end
+
+    subgraph CAPN Identity
+        CapnCert[capn-client.crt<br/><i>shared</i>]
+        CapnKey[incus.capn.clientKey<br/><i>shared</i>]
+    end
+
+    Bioskop -->|uses| BioskopRemote
+    Nikopol -->|uses| NikopolRemote
+
+    BioskopRemote -.->|authenticated by| CapnCert
+    NikopolRemote -.->|authenticated by| CapnCert
+
+    CapnCert -.->|private key| CapnKey
+
+    style CapnCert fill:#ccffcc
+    style CapnKey fill:#ccffcc
+----
+
+**Legend:**
+
+* Green: Shared CAPN identity across all clusters
+* Each cluster has its own remote, but authenticates with the same identity
+
+== Usage Pattern: How to Access Identity in Manifest Units
+
+=== Anti-Pattern: Constructor Parameters
+
+**❌ Don't do this:**
+
+[source,java]
+----
+public final class IncusIdentitySecretManifestUnit extends AbstractManifestUnit {
+
+  private final String clusterName;  // ❌ Constructor parameter
+  private final String remoteAddress;  // ❌ Constructor parameter
+
+  public IncusIdentitySecretManifestUnit(String clusterName, String remoteAddress) {
+    super(MANIFEST_UNIT_ID, List.of());
+    this.clusterName = clusterName;
+    this.remoteAddress = remoteAddress;
+  }
+}
+----
+
+**Problems:**
+
+1. Manifest units are statically instantiated by `DomainRegistrar` - no way to pass runtime parameters
+2. Leads to duplication of identity concerns across manifest units
+3. Breaks the separation: orchestration (registrar) vs. runtime config (context)
+
+=== Correct Pattern: Context Access
+
+**✅ Do this instead:**
+
+[source,java]
+----
+public final class IncusIdentitySecretManifestUnit extends AbstractManifestUnit {
+
+  public IncusIdentitySecretManifestUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
+  }
+
+  @Override
+  public void apply(Chart chart) {
+    // Access identity from context during apply()
+    String clusterName = bootstrapIdentity().clusterName();
+
+    // Derive remote name from cluster name
+    String remoteName = clusterName;  // bioskop → bioskop remote
+
+    // Read from operator environment
+    Path incusConfigDir = Path.of(System.getProperty("user.home"), ".config", "incus");
+    String remoteAddress = readRemoteAddress(remoteName, incusConfigDir);
+
+    // ... create secret ...
+  }
+}
+----
+
+**Benefits:**
+
+1. Manifest units have no runtime dependencies - statically instantiable
+2. Identity access is consistent across all units
+3. Clear separation: structure (constructor) vs. data (context)
+4. Runtime configuration injected via thread-local context
+
+=== Available Helper Methods
+
+`AbstractManifestUnit` provides these helpers for accessing context:
+
+[source,java]
+----
+// Cluster + node identity
+protected final BootstrapIdentity bootstrapIdentity() {
+    return ManifestSynthesisContext.current().bootstrapIdentity();
+}
+
+// Network topology (CIDRs, interfaces, gateway addresses)
+protected final NetworkTopology networkTopology() {
+    return ManifestSynthesisContext.current().networkTopology();
+}
+
+// Component versions (kube-vip, tailscale, operators, ...)
+protected final ComponentVersions componentVersions() {
+    return ManifestSynthesisContext.current().componentVersions();
+}
+
+// Debug toggles for development
+protected final FloxDebugPolicy floxDebugPolicy() {
+    return ManifestSynthesisContext.current().floxDebugPolicy();
+}
+----
+
+== Incus Identity Setup (One-Time Bootstrap)
+
+=== Prerequisites
+
+* OpenSSL installed
+* Incus CLI configured with remote access
+* Access to `.secrets` file for storing private keys
+
+=== Step 1: Generate CAPN Client Certificate
+
+[source,bash]
+----
+# Generate EC private key (secp384r1 curve)
+openssl ecparam -name secp384r1 -genkey -noout -out capn-client.key
+
+# Generate certificate signing request
+openssl req -new -key capn-client.key -out capn-client.csr \
+    -subj "/CN=capn-provider"
+
+# Self-sign certificate (valid for 10 years)
+openssl x509 -req -in capn-client.csr -signkey capn-client.key \
+    -out capn-client.crt -days 3650
+
+# Clean up CSR
+rm capn-client.csr
+----
+
+**Note**: The CN `capn-provider` is descriptive but not tied to a specific cluster. All clusters share this identity.
+
+=== Step 2: Add Certificate to Incus Trust
+
+For each Incus remote, add the certificate to the trust store:
+
+[source,bash]
+----
+# Add to bioskop remote
+incus config trust add-certificate capn-client.crt \
+    --name "cluster-capn" \
+    --type client
+
+# If you have multiple remotes, repeat for each
+incus config trust add-certificate capn-client.crt \
+    --name "cluster-capn" \
+    --type client \
+    --remote nikopol
+----
+
+=== Step 3: Store Certificate in Resources
+
+Copy the public certificate to the manifests module resources:
+
+[source,bash]
+----
+cp capn-client.crt \
+    manifests/src/main/resources/incus/capn-client.crt
+----
+
+This file is shipped with the application and read from classpath during synthesis.
+
+=== Step 4: Store Private Key in `.secrets`
+
+Add the private key to the `.secrets` file in the repository root:
+
+[source,yaml]
+----
+incus:
+  capn:
+    # sops:encrypted
+    clientKey: |
+      -----BEGIN PRIVATE KEY-----
+      MIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDCRtb9cilzN7q8wYrjR
+      328PF/Tk4rBLt9ZD5cY34vHr7T+hCixRdmMACPzjuithMDOhZANiAAQWIauKN9+J
+      ...
+      -----END PRIVATE KEY-----
+----
+
+**Important**: Encrypt with SOPS before committing:
+
+[source,bash]
+----
+sops --encrypt --in-place .secrets
+----
+
+=== Step 5: Verify Setup
+
+Check that the certificate is trusted:
+
+[source,bash]
+----
+# List trusted certificates
+incus config trust list
+
+# Should show:
+# +------------------+--------+----------------------+
+# |       NAME       |  TYPE  |    FINGERPRINT       |
+# +------------------+--------+----------------------+
+# | cluster-capn     | client | abc123...            |
+# +------------------+--------+----------------------+
+----
+
+== How Manifest Synthesis Uses Identity
+
+=== Synthesis Flow
+
+[mermaid]
+----
+sequenceDiagram
+    participant Bootstrap as IncusResourceBootstrap
+    participant Service as DefaultManifestSynthesisService
+    participant Context as ManifestSynthesisContext
+    participant Unit as IncusIdentitySecretManifestUnit
+
+    Bootstrap->>Service: synthesize(request)
+    Note over Bootstrap,Service: Request includes BootstrapIdentity
+
+    Service->>Context: bind(context)
+    activate Context
+
+    Note over Service: Create cdk8s App + Chart
+
+    Service->>Unit: apply(chart)
+
+    Note over Unit: No constructor parameters!
+
+    Unit->>Context: bootstrapIdentity().clusterName()
+    Context-->>Unit: "bioskop"
+
+    Note over Unit: Read operator environment:<br/>~/.config/incus/config.yml<br/>.secrets
+
+    Unit->>Unit: createIncusIdentitySecret(chart, ...)
+
+    deactivate Context
+----
+
+=== Entry Point: IncusResourceBootstrap
+
+The seed-bootstrap module builds the `ManifestSynthesisRequest`:
+
+[source,java]
+----
+final BootstrapIdentity identity = BootstrapIdentity.builder()
+    .clusterName(config.clusterName())
+    .clusterId(config.clusterId())
+    .clusterToken(config.clusterToken())
+    // ... other fields ...
+    .build();
+
+final ManifestSynthesisRequest request = baseRequest
+    .withBootstrapIdentity(identity)
+    .withComponentVersions(versions)
+    .withNetworkTopology(topology);
+
+synthesisService.synthesize(request);
+----
+
+=== Context Binding: DefaultManifestSynthesisService
+
+The service binds the context for the duration of synthesis:
+
+[source,java]
+----
+final ManifestSynthesisContext context = ManifestSynthesisContext.of(
+    request.floxDebugPolicy(),
+    request.bootstrapIdentity(),  // ← Identity injected here
+    request.networkTopology(),
+    request.componentVersions());
+
+try (var scope = ManifestSynthesisContext.bind(context)) {
+    // All manifest units can now access bootstrapIdentity()
+    for (ManifestUnit unit : manifestUnits) {
+        unit.apply(chart);
+    }
+    app.synth();
+}
+----
+
+=== Unit Access: During apply()
+
+Manifest units access identity during `apply(chart)`:
+
+[source,java]
+----
+@Override
+public void apply(Chart chart) {
+    // Context access - no constructor parameters needed
+    String clusterName = bootstrapIdentity().clusterName();
+    String version = componentVersions().clusterApiOperator();
+
+    // Create K8s resources
+    new ApiObject(chart, "provider", ...);
+}
+----
+
+== Operator Environment Layout
+
+The manifest synthesis expects the following operator environment:
+
+[source]
+----
+.
+├── .secrets                           # Encrypted secrets file (SOPS)
+│   └── incus.capn.clientKey          # CAPN private key (PEM format)
+│
+└── ~/.config/incus/
+    ├── config.yml                     # Incus remote configuration
+    │   └── remotes:
+    │       ├── bioskop:               # Remote name = cluster name
+    │       │   addr: https://192.168.1.1:8443
+    │       │   protocol: lxd
+    │       │   ...
+    │       └── nikopol:
+    │           addr: https://192.168.1.2:8443
+    │           ...
+    │
+    └── servercerts/
+        ├── 192.168.1.1.crt            # Server certificate for bioskop
+        └── 192.168.1.2.crt            # Server certificate for nikopol
+----
+
+== Adding New Identity Fields
+
+When Stage B / multi-cluster work requires new identity fields:
+
+1. **Add field to `BootstrapIdentity` record**:
++
+[source,java]
+----
+public record BootstrapIdentity(
+    String clusterName,
+    // ... existing fields ...
+    String newField  // NEW
+) {
+    // Update constructor validation if needed
+}
+----
+
+2. **Update entry point** (`IncusResourceBootstrap`):
++
+[source,java]
+----
+final BootstrapIdentity identity = BootstrapIdentity.builder()
+    .clusterName(config.clusterName())
+    // ... existing fields ...
+    .newField(config.newField())  // NEW
+    .build();
+----
+
+3. **Access in manifest units** via `bootstrapIdentity().newField()`
+
+No need to update `ManifestSynthesisContext` - it passes the entire `BootstrapIdentity` record through.
+
+== Related Documentation
+
+* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - Overall synthesis flow
+* link:gitops-cluster-api-transition-plan.adoc[GitOps + Cluster API Transition Plan] - Phase 1 deliverables
+* link:bootstrap-contract.adoc[Stage A Bootstrap Contract] - Bootstrap outputs and handoff
+
+== Troubleshooting
+
+=== "Client certificate resource not found"
+
+**Symptom**: `IllegalStateException: Client certificate resource not found: /incus/capn-client.crt`
+
+**Cause**: Certificate not in classpath resources.
+
+**Fix**: Copy certificate to `manifests/src/main/resources/incus/capn-client.crt` and rebuild.
+
+=== "incus.capn.clientKey not found in .secrets"
+
+**Symptom**: `IllegalStateException: incus.capn.clientKey not found in .secrets`
+
+**Cause**: Private key not in `.secrets` file or incorrect YAML structure.
+
+**Fix**:
+1. Decrypt `.secrets` with `sops --decrypt .secrets`
+2. Add key under `incus.capn.clientKey` as YAML block scalar (`|`)
+3. Re-encrypt with `sops --encrypt --in-place .secrets`
+
+=== "Server certificate not found"
+
+**Symptom**: `IllegalStateException: Server certificate not found for remote <host> at ~/.config/incus/servercerts/<host>.crt`
+
+**Cause**: Missing server certificate or wrong hostname.
+
+**Fix**:
+1. Check remote address in `~/.config/incus/config.yml`
+2. Extract hostname from address (e.g., `https://192.168.1.1:8443` → `192.168.1.1`)
+3. Ensure `~/.config/incus/servercerts/192.168.1.1.crt` exists
+4. If missing, connect to remote once: `incus remote add bioskop https://192.168.1.1:8443`
+
+=== "Remote '<cluster>' not found in config.yml"
+
+**Symptom**: `IllegalStateException: Remote 'nikopol' not found in ~/.config/incus/config.yml`
+
+**Cause**: Remote not configured or name mismatch.
+
+**Fix**:
+1. Add remote: `incus remote add nikopol https://192.168.1.2:8443`
+2. Verify remote name matches cluster name exactly
+3. Check `incus remote list` to see configured remotes

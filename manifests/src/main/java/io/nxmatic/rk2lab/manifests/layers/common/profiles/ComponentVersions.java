@@ -74,8 +74,10 @@ public record ComponentVersions(
    *   <li>{@code fluxOperator}: matches {@code controlplane/flux-operator} releases
    *   <li>{@code envoyGateway} / {@code tailscale}: matched the existing per-layer literals
    *   <li>{@code clusterApiOperator}: CAPI operator managing core + providers declaratively
-   *   <li>{@code capiIncusProvider}: {@code lxc/cluster-api-provider-incus} (CAPN) version for provider CR
-   *   <li>{@code capiRke2Provider}: {@code rancher/cluster-api-provider-rke2} (CAPRKE2) version for provider CR
+   *   <li>{@code capiIncusProvider}: {@code lxc/cluster-api-provider-incus} (CAPN) version for
+   *       provider CR
+   *   <li>{@code capiRke2Provider}: {@code rancher/cluster-api-provider-rke2} (CAPRKE2) version for
+   *       provider CR
    * </ul>
    */
   public static ComponentVersions defaults() {

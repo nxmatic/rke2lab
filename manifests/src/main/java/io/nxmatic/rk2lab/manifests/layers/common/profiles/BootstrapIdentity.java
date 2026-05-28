@@ -13,6 +13,12 @@ package io.nxmatic.rk2lab.manifests.layers.common.profiles;
  * deliberately exposes only the identity subset — bootstrap paths and per-package config stay in
  * their owning layers.
  *
+ * <p>Incus cluster configuration: Each cluster uses its own Incus remote (cluster name = remote
+ * name: bioskop → bioskop remote, nikopol → nikopol remote). All clusters share a single CAPN
+ * identity ({@code "capn"}) for Cluster API Provider Incus authentication. Manifest units read from
+ * operator environment paths ({@code .secrets}, {@code ~/.config/incus}) using the cluster name as
+ * remote name and the constant {@code "capn"} identity.
+ *
  * <p>Add new fields here as Stage B / multi-cluster work surfaces them (cluster fqdn, region, peer
  * cluster set, etc.). The default instance backs unit tests and ephemeral synth runs that don't go
  * through seed-bootstrap.

@@ -18,7 +18,7 @@ import java.util.Objects;
  *
  * <ul>
  *   <li>{@link FloxDebugPolicy} — flox NRI debug toggle (image / command / env swap).
- *   <li>{@link BootstrapIdentity} — cluster + node identity (cluster name, id, token, …).
+ *   <li>{@link BootstrapIdentity} — cluster + node identity (cluster name, id, token, Incus remote/identity, …).
  *   <li>{@link NetworkTopology} — CIDRs, interface names, gateway addresses.
  *   <li>{@link ComponentVersions} — kube-vip, tailscale, envoy-gateway, … versions.
  * </ul>

@@ -1,0 +1,593 @@
+= Manifest Synthesis Architecture
+:toc: left
+:toclevels: 3
+
+This document defines the architecture of the manifest synthesis system in the `manifests` module, which generates Kubernetes manifests for the bootstrap layer via cdk8s.
+
+== Overview
+
+Manifest synthesis transforms domain-specific configuration into Kubernetes YAML manifests through a declarative, context-aware pipeline. The system uses:
+
+* **cdk8s framework** for type-safe K8s object creation
+* **Domain registrars** for organizing related manifest units
+* **ThreadLocal context** for runtime configuration injection
+* **Construct tree pattern** for object collection and serialization
+
+== Key Components
+
+[cols="1,3",options="header"]
+|===
+|Component |Description
+|`DefaultManifestSynthesisService` |Orchestrates the entire synthesis process
+|`ManifestSynthesisContext` |ThreadLocal runtime configuration (bootstrap identity, versions, topology)
+|`LayerDomainRegistry` |Registry of all manifest domains
+|`DomainRegistrar` |Provides a `LayerDomain` with its manifest units
+|`ManifestUnit` |Generates K8s resources via cdk8s `ApiObject`
+|`cdk8s App` |Root construct that manages the output directory
+|`cdk8s Chart` |Container for K8s objects (Construct tree root)
+|===
+
+== C4 Component Diagram
+
+[mermaid]
+----
+graph TB
+    subgraph SeedBootstrap["seed-bootstrap module"]
+        Bootstrap["IncusResourceBootstrap<br/><i>Entry point for bootstrap synthesis</i>"]
+    end
+
+    subgraph ManifestsModule["manifests module"]
+        Service["DefaultManifestSynthesisService<br/><i>Orchestrates synthesis</i>"]
+        Context["ManifestSynthesisContext<br/><i>ThreadLocal runtime config</i>"]
+        Registry["LayerDomainRegistry<br/><i>Registry of domains</i>"]
+        Registrar["DomainRegistrar<br/><i>Provides domains + units</i>"]
+        Unit["ManifestUnit<br/><i>Generates K8s resources</i>"]
+        App["cdk8s App<br/><i>cdk8s application</i>"]
+        Chart["cdk8s Chart<br/><i>K8s objects container</i>"]
+    end
+
+    CDK8S["cdk8s Framework<br/><i>YAML synthesizer</i>"]
+
+    Bootstrap -->|"synthesize(request)"| Service
+    Service -->|"bind(context)"| Context
+    Service -->|"new App(outdir)"| App
+    Service -->|"new Chart(app)"| Chart
+    Service -->|"build from registrars"| Registry
+    Registry -->|"domain()"| Registrar
+    Registrar -->|"provides"| Unit
+    Service -->|"apply(chart)"| Unit
+    Unit -->|"current()"| Context
+    Unit -->|"new ApiObject(chart)"| Chart
+    App -->|"synth()"| CDK8S
+    CDK8S -->|"manifests.k8s.yaml"| Service
+
+    style CDK8S fill:#e1f5ff,stroke:#0066cc
+    style Bootstrap fill:#fff4e6,stroke:#ff9900
+    style Service fill:#fff4e6,stroke:#ff9900
+    style Context fill:#ccffcc,stroke:#00cc66
+    style Registry fill:#fff4e6,stroke:#ff9900
+    style Registrar fill:#fff4e6,stroke:#ff9900
+    style Unit fill:#fff4e6,stroke:#ff9900
+    style App fill:#e1f5ff,stroke:#0066cc
+    style Chart fill:#e1f5ff,stroke:#0066cc
+----
+
+**Legend:**
+
+* Orange: Internal rke2lab components
+* Green: ThreadLocal context (scoped to synthesis)
+* Blue: cdk8s framework components
+
+**Key Relationships:**
+
+1. **Entry**: `IncusResourceBootstrap` creates request with runtime config and calls service
+2. **Context Binding**: Service binds context to ThreadLocal for duration of synthesis
+3. **cdk8s Setup**: Service creates App + Chart
+4. **Domain Registry**: Service builds registry from all DomainRegistrars
+5. **Unit Application**: Service invokes each unit's `apply(chart)` method
+6. **Context Access**: Units read runtime config via `ManifestSynthesisContext.current()`
+7. **Object Creation**: Units create `ApiObject` instances in the chart
+8. **Synthesis**: cdk8s walks construct tree and emits YAML
+
+== Synthesis Flow
+
+[mermaid]
+----
+sequenceDiagram
+    participant Op as Operator
+    participant Boot as IncusResourceBootstrap
+    participant Svc as DefaultManifestSynthesisService
+    participant Ctx as ManifestSynthesisContext
+    participant Reg as LayerDomainRegistry
+    participant Unit as ManifestUnit
+    participant Chart as cdk8s Chart
+    participant App as cdk8s App
+
+    Op->>Boot: synthesizeAndExplodeManifests()
+    Boot->>Svc: synthesize(request)
+
+    Note over Svc,Ctx: Bind runtime config to ThreadLocal
+    Svc->>Ctx: bind(context)
+    activate Ctx
+
+    Note over Svc,App: Create cdk8s infrastructure
+    Svc->>App: new App(outdir)
+    Svc->>Chart: new Chart(app)
+
+    Note over Svc,Reg: Build domain registry
+    Svc->>Reg: build from DomainRegistrars
+    Reg-->>Svc: domain registry
+
+    Note over Svc,Reg: Apply policy filters
+    Svc->>Reg: applyPolicy(request)
+    Reg-->>Svc: filtered domains
+
+    Note over Svc,Unit: Apply each manifest unit
+    loop For each ManifestUnit
+        Svc->>Unit: apply(chart)
+
+        Note over Unit,Ctx: Read runtime config
+        Unit->>Ctx: current().bootstrapIdentity()
+        Ctx-->>Unit: cluster config
+        Unit->>Ctx: current().componentVersions()
+        Ctx-->>Unit: version pins
+
+        Note over Unit,Chart: Create K8s objects
+        Unit->>Chart: new ApiObject(chart, props)
+        Chart-->>Chart: register in construct tree
+    end
+
+    Note over Svc,App: Synthesize YAML
+    Svc->>App: synth()
+    App->>Chart: walk construct tree
+    Chart-->>App: K8s objects
+    App->>App: serialize to YAML
+    App-->>Svc: manifests.k8s.yaml written
+
+    Note over Svc: Post-process YAML
+    Svc->>Svc: enforceLiteralBlockStyle()
+    Svc->>Svc: move to final location
+
+    deactivate Ctx
+    Svc-->>Boot: ManifestSynthesisResult
+    Boot-->>Op: success
+----
+
+== Component Details
+
+=== Entry Point: IncusResourceBootstrap
+
+Location: `seed-bootstrap/src/main/java/io/nxmatic/rk2lab/controlplane/incus/IncusResourceBootstrap.java`
+
+The `synthesizeAndExplodeManifests()` method builds a `ManifestSynthesisRequest` containing:
+
+[cols="1,3",options="header"]
+|===
+|Field |Description
+|`floxDebugPolicy` |Per-domain debug toggles for development
+|`bootstrapIdentity` |Cluster name, ID, token, node identity
+|`networkTopology` |CIDRs, interface names, gateway addresses
+|`componentVersions` |Version pins for all bootstrap components
+|`manifestDomainPolicy` |Which domains to enable/disable
+|`synthOutdir` |Temporary synthesis directory
+|`synthManifestFile` |Final manifest file path
+|===
+
+=== Orchestrator: DefaultManifestSynthesisService
+
+Location: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/DefaultManifestSynthesisService.java`
+
+Central orchestration logic (lines 62-147):
+
+[source,java]
+----
+public ManifestSynthesisResult synthesize(ManifestSynthesisRequest request) {
+    // 1. Build context from request
+    final ManifestSynthesisContext context = ManifestSynthesisContext.of(
+        request.floxDebugPolicy(),
+        request.bootstrapIdentity(),
+        request.networkTopology(),
+        request.componentVersions());
+
+    // 2. Bind context to ThreadLocal for unit access
+    try (var ignored = ManifestSynthesisContext.bind(context)) {
+
+        // 3. Create cdk8s App + Chart
+        final App app = new App(AppProps.builder().outdir(synthOutdir.toString()).build());
+        final Chart chart = new Chart(app, "manifests");
+
+        // 4. Build domain registry from DomainRegistrars
+        final LayerDomainRegistry registry = buildDomainRegistry();
+
+        // 5. Apply policy to filter domains
+        final LayerDomainRegistry filteredRegistry = applyPolicy(request, registry);
+
+        // 6. For each ManifestUnit: call apply(chart)
+        for (ManifestUnit unit : filteredRegistry.manifestUnits()) {
+            unit.apply(chart);
+        }
+
+        // 7. Synthesize YAML via cdk8s
+        app.synth();  // Writes to synthOutdir/manifests.k8s.yaml
+
+        // 8. Post-process (enforce literal block style for ConfigMap scripts)
+        enforceLiteralBlockStyleForConfigMapScripts(synthesizedFile);
+
+        // 9. Move to final location
+        Files.move(synthesizedFile, synthManifestFile);
+    }
+}
+----
+
+=== Runtime Configuration: ManifestSynthesisContext
+
+Location: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/ManifestSynthesisContext.java`
+
+Thread-local context for accessing runtime configuration (lines 29-123).
+
+**Pattern**: Published by synthesizer, consumed by manifest units.
+
+[source,java]
+----
+// Synthesizer binds context
+try (var scope = ManifestSynthesisContext.bind(context)) {
+    // ... synthesis happens here ...
+}
+
+// Manifest units read context
+class MyManifestUnit extends AbstractManifestUnit {
+    @Override
+    public void apply(Chart chart) {
+        String clusterName = bootstrapIdentity().clusterName();
+        String kubeVipVersion = componentVersions().kubeVip();
+        // ... create K8s objects ...
+    }
+}
+----
+
+==== Context Slices
+
+The context composes orthogonal concerns as separate records:
+
+[cols="1,3",options="header"]
+|===
+|Slice |Description
+|`FloxDebugPolicy` |Per-domain debug toggle for flox NRI plugin development
+|`BootstrapIdentity` |Cluster + node identity (clusterName, clusterId, clusterToken, ...)
+|`NetworkTopology` |CIDRs, interface names, gateway addresses
+|`ComponentVersions` |Version pins for kube-vip, tailscale, envoy-gateway, operators, ...
+|===
+
+==== Helper Methods in AbstractManifestUnit
+
+Location: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/AbstractManifestUnit.java`
+
+[source,java]
+----
+protected final BootstrapIdentity bootstrapIdentity() {
+    return ManifestSynthesisContext.current().bootstrapIdentity();
+}
+
+protected final ComponentVersions componentVersions() {
+    return ManifestSynthesisContext.current().componentVersions();
+}
+
+protected final NetworkTopology networkTopology() {
+    return ManifestSynthesisContext.current().networkTopology();
+}
+
+protected final FloxDebugPolicy floxDebugPolicy() {
+    return ManifestSynthesisContext.current().floxDebugPolicy();
+}
+----
+
+=== Domain Organization: DomainRegistrar → LayerDomain → ManifestUnit
+
+==== DomainRegistrar
+
+Interface: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomainRegistrar.java`
+
+Provides a `LayerDomain` with its manifest units.
+
+Example: `ClusterApiDomainRegistrar`
+
+[source,java]
+----
+public LayerDomain domain() {
+    return new LayerDomain(
+        "cluster-api",                          // domain ID
+        List.of(),                              // depends on domain IDs
+        List.of(
+            new ClusterApiOperatorManifestUnit(),
+            new IncusIdentitySecretManifestUnit()
+        )
+    );
+}
+----
+
+==== LayerDomain
+
+Record: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomain.java`
+
+Groups related manifest units with dependency ordering.
+
+[cols="1,3",options="header"]
+|===
+|Field |Description
+|`domainId` |Unique identifier (e.g., "cluster-api", "networking", "storage")
+|`dependsOnDomainIds` |Domain dependencies for ordering
+|`layers` |List of manifest units (field name is historical, actually units not layers)
+|===
+
+==== ManifestUnit
+
+Interface: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/ManifestUnit.java`
+
+Generates Kubernetes resources via cdk8s.
+
+[source,java]
+----
+public interface ManifestUnit {
+    String manifestUnitId();
+    List<String> dependsOnManifestUnitIds();
+    void apply(Chart chart);
+}
+----
+
+=== Resource Generation: ManifestUnit + cdk8s
+
+Manifest units create Kubernetes resources using cdk8s `ApiObject`:
+
+[source,java]
+----
+@Override
+public void apply(Chart chart) {
+    // 1. Read runtime config from context
+    String version = componentVersions().clusterApiOperator();
+
+    // 2. Create K8s object using cdk8s
+    ApiObject provider = new ApiObject(
+        chart,
+        "coreprovider-cluster-api",
+        ApiObjectProps.builder()
+            .apiVersion("operator.cluster.x-k8s.io/v1alpha2")
+            .kind("CoreProvider")
+            .metadata(
+                ApiObjectMetadata.builder()
+                    .name("cluster-api")
+                    .namespace("capi-system")
+                    .build())
+            .build());
+
+    // 3. Add spec via JsonPatch
+    provider.addJsonPatch(JsonPatch.add("/spec", Map.of("version", version)));
+}
+----
+
+**Key points:**
+
+1. Units are **statically instantiated** by DomainRegistrars
+2. Units access **runtime configuration** via `ManifestSynthesisContext.current()`
+3. Units **create K8s objects** using cdk8s `ApiObject` + `JsonPatch`
+4. cdk8s **registers objects** in the Chart's internal construct tree
+5. `app.synth()` **walks the tree** and emits YAML
+
+=== cdk8s Construct Tree Pattern
+
+**Question**: "cdk8s do not provide itself references to the manifests built, they're registered somewhere from the Construct base class. but then?"
+
+**Answer**: cdk8s maintains an internal tree structure via the `Construct` base class:
+
+1. **Object Creation**: When you create `new ApiObject(chart, "id", props)`
+   * `ApiObject` extends `Construct`
+   * Construct constructor registers itself in parent's children list
+   * `chart` is the parent, so chart tracks all created ApiObjects
+
+2. **Synthesis**: When you call `app.synth()`
+   * App walks the tree starting from root
+   * Visits each Chart
+   * Chart visits each child Construct (ApiObject)
+   * Serializes each ApiObject to YAML
+   * Writes single YAML file with all documents
+
+3. **No Reference Storage Needed**
+   * ManifestUnits just create objects in the chart
+   * cdk8s framework handles collection + serialization
+   * One-way data flow: create → register → synthesize
+
+This is why ManifestUnits can be statically instantiated and just call `new ApiObject(chart, ...)` without storing references - the chart itself tracks everything via the Construct parent-child tree.
+
+== Data Flow Summary
+
+----
+IncusResourceBootstrap
+  ↓ creates ManifestSynthesisRequest with runtime config
+DefaultManifestSynthesisService
+  ↓ binds ManifestSynthesisContext to ThreadLocal
+  ↓ creates cdk8s App + Chart
+  ↓ builds LayerDomainRegistry from DomainRegistrars
+  ↓   ↳ each DomainRegistrar provides LayerDomain with ManifestUnits
+  ↓ applies ManifestDomainPolicy to filter domains
+  ↓ for each ManifestUnit:
+  ↓   unit.apply(chart)
+  ↓     ↳ unit reads ManifestSynthesisContext.current()
+  ↓     ↳ unit creates new ApiObject(chart, ...)
+  ↓       ↳ cdk8s registers object in Chart's construct tree
+  ↓ app.synth()
+  ↓   ↳ cdk8s walks construct tree, emits manifests.k8s.yaml
+  ↓ post-process YAML (enforce literal block style for ConfigMap scripts)
+  ↓ move to final location
+ManifestSynthesisResult
+----
+
+== Extending ManifestSynthesisContext
+
+To add new runtime configuration (e.g., Incus configuration), there are three patterns:
+
+=== Option 1: Extend Existing Slice
+
+If the data fits an existing concern (e.g., BootstrapIdentity):
+
+[source,java]
+----
+public record BootstrapIdentity(
+    String clusterName,
+    String clusterId,
+    String clusterToken,
+    String incusRemoteAddress,  // NEW
+    Path incusConfigDir         // NEW
+) {
+    // ...
+}
+----
+
+**When to use**: Data is core cluster identity
+
+=== Option 2: Add New Orthogonal Slice
+
+If the data is a distinct concern:
+
+[source,java]
+----
+// 1. Create new record in profiles package
+public record IncusConfig(
+    String remoteAddress,
+    Path configDir,
+    Path secretsFile
+) {
+    public static IncusConfig empty() {
+        return new IncusConfig("", Path.of(""), Path.of(""));
+    }
+}
+
+// 2. Add field to ManifestSynthesisContext
+private final IncusConfig incusConfig;
+
+public IncusConfig incusConfig() {
+    return incusConfig;
+}
+
+// 3. Update ManifestSynthesisContext.of() factory
+public static ManifestSynthesisContext of(
+    FloxDebugPolicy floxDebugPolicy,
+    BootstrapIdentity bootstrapIdentity,
+    NetworkTopology networkTopology,
+    ComponentVersions componentVersions,
+    IncusConfig incusConfig) {  // NEW
+    // ...
+}
+
+// 4. Add helper to AbstractManifestUnit
+protected final IncusConfig incusConfig() {
+    return ManifestSynthesisContext.current().incusConfig();
+}
+
+// 5. Update DefaultManifestSynthesisService to pass config
+final ManifestSynthesisContext context = ManifestSynthesisContext.of(
+    request.floxDebugPolicy(),
+    request.bootstrapIdentity(),
+    request.networkTopology(),
+    request.componentVersions(),
+    request.incusConfig());  // NEW
+----
+
+**When to use**: Data is infrastructure-scoped and orthogonal to cluster identity
+
+=== Option 3: Read from Filesystem/Environment
+
+If the data is truly static (doesn't vary per synthesis):
+
+[source,java]
+----
+@Override
+public void apply(Chart chart) {
+    // Read from known locations
+    Path incusConfigDir = Path.of(System.getProperty("user.home"), ".config", "incus");
+    Path secretsFile = Path.of(".secrets");
+    String remoteAddress = readRemoteFromBootstrapConfig();
+
+    // ... create secret ...
+}
+----
+
+**When to use**: Data doesn't vary across synthesis runs and is filesystem-resident
+
+== Example: ClusterApiOperatorManifestUnit
+
+Full example showing all patterns:
+
+[source,java]
+----
+public final class ClusterApiOperatorManifestUnit extends AbstractManifestUnit {
+
+  public static final String MANIFEST_UNIT_ID = "clusterapi/cluster-api-operator";
+
+  public ClusterApiOperatorManifestUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
+  }
+
+  @Override
+  public void apply(final Chart chart) {
+    // 1. Access runtime config via context helpers
+    final String operatorVersion = componentVersions().clusterApiOperator();
+    final String coreVersion = componentVersions().clusterApiOperator();
+    final String incusProviderVersion = componentVersions().capiIncusProvider();
+    final String rke2ProviderVersion = componentVersions().capiRke2Provider();
+
+    // 2. Include upstream YAML using helper
+    final String operatorReleaseResource =
+        "/upstream/clusterapi/operator/release-" + operatorVersion + ".yaml";
+    new UpstreamYamlInclusion(chart, operatorReleaseResource, packageProfile);
+
+    // 3. Create custom provider CRs using cdk8s
+    createCoreProvider(chart, coreVersion);
+    createInfrastructureProvider(chart, incusProviderVersion);
+    createControlPlaneProvider(chart, rke2ProviderVersion);
+  }
+
+  private void createCoreProvider(Chart chart, String version) {
+    ApiObject provider = new ApiObject(
+        chart,
+        "coreprovider-cluster-api",
+        ApiObjectProps.builder()
+            .apiVersion("operator.cluster.x-k8s.io/v1alpha2")
+            .kind("CoreProvider")
+            .metadata(
+                ApiObjectMetadata.builder()
+                    .name("cluster-api")
+                    .namespace("capi-system")
+                    .annotations(packageProfile.packageAnnotations(...))
+                    .build())
+            .build());
+
+    provider.addJsonPatch(JsonPatch.add("/spec", Map.of("version", version)));
+  }
+
+  // ... similar for infrastructure and control plane providers ...
+}
+----
+
+== Registered Domains
+
+Current domains registered in `DefaultManifestSynthesisService`:
+
+[cols="1,3",options="header"]
+|===
+|Domain ID |Description
+|`cluster` |Core cluster resources (kube-vip, namespace management)
+|`storage` |Storage layer (OpenEBS ZFS)
+|`replication` |Secret replication (kubernetes-replicator)
+|`gitops` |GitOps operator (Flux)
+|`runtime` |Runtime extensions (flox NRI plugin DaemonSet)
+|`networking` |Network layer (Cilium, Multus)
+|`mesh` |Service mesh (Istio)
+|`ha` |High availability resources
+|`cicd` |CI/CD pipeline (Tekton)
+|`cluster-api` |Cluster API operators (CAPI, CAPN, CAPRKE2)
+|===
+
+== Related Documentation
+
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - How to access cluster/infrastructure identity in manifest units
+* link:gitops-cluster-api-transition-plan.adoc[GitOps + Cluster API Transition Plan] - Phase 1 Cluster API implementation
+* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow patterns

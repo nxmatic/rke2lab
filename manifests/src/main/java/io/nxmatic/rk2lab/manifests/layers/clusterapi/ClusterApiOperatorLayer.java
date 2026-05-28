@@ -94,9 +94,6 @@ public final class ClusterApiOperatorLayer extends Construct {
 
     provider.addJsonPatch(
         JsonPatch.add(
-            "/spec",
-            Map.of(
-                "version", version,
-                "configSecret", Map.of("name", "rke2-config"))));
+            "/spec", Map.of("version", version, "configSecret", Map.of("name", "rke2-config"))));
   }
 }
