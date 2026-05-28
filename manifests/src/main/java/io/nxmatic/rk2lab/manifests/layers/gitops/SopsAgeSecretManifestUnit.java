@@ -18,25 +18,33 @@ import org.cdk8s.JsonPatch;
  * Manifest unit that creates the SOPS age key Secret for Flux decryption.
  *
  * <p>The Secret contains the private age key that Flux uses to decrypt SOPS-encrypted resources
- * (e.g., cloud-init Secrets in Phase 2). The corresponding public key is committed to {@code
- * gitops/clusters/<cluster>/.sops.yaml}.
+ * (e.g., cloud-init Secrets in Phase 2).
  *
- * <p><b>Operator setup required:</b>
+ * <p><b>Implementation:</b>
  *
  * <ol>
- *   <li>Generate age keypair: {@code age-keygen -o cluster-age.key}
- *   <li>Extract public key from file (line starting with "# public key:")
- *   <li>Create {@code gitops/clusters/<cluster>/.sops.yaml} with public key
- *   <li>Store private key in {@code .secrets} under {@code flux.ageKey}
- *   <li>Encrypt {@code .secrets} with SOPS
- *   <li>Commit {@code .sops.yaml} to repository
+ *   <li>Reads {@code .ndh-ssh.d/keys.yaml} (nix-darwin-home subtree, auto-decrypted by git sops
+ *       filter)
+ *   <li>Extracts {@code rke2-cluster} SSH private key
+ *   <li>Converts SSH key to age format using {@code ssh-to-age}
+ *   <li>Creates Kubernetes Secret in {@code flux-system} namespace
  * </ol>
  *
- * <p>The manifest unit reads the private key from {@code .secrets} and creates the Secret in {@code
- * flux-system} namespace.
+ * <p><b>Key derivation:</b> The age key is derived from the {@code rke2-cluster} SSH key managed in
+ * nix-darwin-home. Public age key: {@code
+ * age1k0tc4gmaqrk5df3ujja34gkqxstu0cye7fl7fktjeuua3yych3aqxfjlak}. This same public key is added as
+ * a recipient in both rke2lab and nix-darwin-home {@code .sops.yaml}, enabling both operator (via
+ * git filter) and Flux (in-cluster) to decrypt the same content.
  *
- * <p><b>Note:</b> This is the Stage A bootstrap - the Secret is applied at master bootstrap time.
- * After that, Flux can decrypt SOPS-encrypted resources.
+ * <p><b>Single source of truth:</b> SSH keys are maintained only in nix-darwin-home, imported to
+ * rke2lab via git subtree. No key duplication.
+ *
+ * <p><b>Runtime dependency:</b> Requires {@code ssh-to-age} CLI tool in PATH, provided by {@code
+ * fleet/flox/keyhole} environment. Always run Maven builds via {@code flox activate -- ./mvnw ...}
+ * to ensure availability.
+ *
+ * <p><b>Note:</b> This is Stage A bootstrap - the Secret is applied at master bootstrap time,
+ * enabling Flux to decrypt SOPS-encrypted resources from gitops/ directory.
  */
 public final class SopsAgeSecretManifestUnit extends AbstractManifestUnit {
 
@@ -52,8 +60,7 @@ public final class SopsAgeSecretManifestUnit extends AbstractManifestUnit {
   @Override
   public void apply(final Chart chart) {
     try {
-      final Path secretsFile = Path.of(".secrets");
-      final String ageKey = readAgeKeyFromSecrets(secretsFile);
+      final String ageKey = readAgeKeyFromSSH();
       createSopsAgeSecret(chart, ageKey);
     } catch (Exception ex) {
       throw new IllegalStateException("Failed to materialize SOPS age secret", ex);
@@ -86,35 +93,88 @@ public final class SopsAgeSecretManifestUnit extends AbstractManifestUnit {
                 Base64.getEncoder().encodeToString(ageKey.getBytes(StandardCharsets.UTF_8)))));
   }
 
-  private String readAgeKeyFromSecrets(Path secretsFile) throws Exception {
-    if (!Files.exists(secretsFile)) {
+  /**
+   * Reads the age key for Flux SOPS decryption by converting the rke2-cluster SSH key.
+   *
+   * <p>The rke2-cluster SSH private key is read from {@code .ndh-ssh.d/keys.yaml} (nix-darwin-home
+   * subtree, auto-decrypted by git sops filter) and converted to age format using {@code
+   * ssh-to-age}.
+   *
+   * @return age private key in standard format
+   */
+  private String readAgeKeyFromSSH() throws Exception {
+    final Path keysYaml = Path.of(".ndh-ssh.d/keys.yaml");
+    if (!Files.exists(keysYaml)) {
       throw new IllegalStateException(
-          "Secrets file not found at "
-              + secretsFile
-              + " - cannot read age key. "
-              + "Run 'age-keygen -o cluster-age.key' and add private key to .secrets under flux.ageKey");
+          "SSH keys file not found at "
+              + keysYaml
+              + " - missing nix-darwin-home subtree. "
+              + "Run: git subtree pull --prefix=.ndh-ssh.d nix-darwin-home split/hm-ssh.d --squash");
     }
 
-    final String secretsContent = Files.readString(secretsFile, StandardCharsets.UTF_8);
+    // Read keys.yaml (auto-decrypted by git sops filter)
+    final String keysContent = Files.readString(keysYaml, StandardCharsets.UTF_8);
+
+    // Extract rke2-cluster SSH private key
     final java.util.regex.Pattern keyPattern =
         java.util.regex.Pattern.compile(
-            "flux:\\s*\\n(?:.*\\n)*?\\s*ageKey:\\s*\\|\\s*\\n((?:\\s+.*\\n)+)",
-            java.util.regex.Pattern.MULTILINE);
-    final java.util.regex.Matcher matcher = keyPattern.matcher(secretsContent);
+            "rke2-cluster:.*?private:\\s*\\|-\\s*\\n((?:\\s+.*\\n)+)",
+            java.util.regex.Pattern.DOTALL);
+    final java.util.regex.Matcher matcher = keyPattern.matcher(keysContent);
     if (!matcher.find()) {
       throw new IllegalStateException(
-          "flux.ageKey not found in "
-              + secretsFile
-              + " - expected YAML block scalar with age private key. "
-              + "Generate with: age-keygen -o cluster-age.key, then add to .secrets");
+          "rke2-cluster SSH key not found in "
+              + keysYaml
+              + " - expected 'rke2-cluster:' entry with private key");
     }
 
+    // Extract and clean up SSH private key
     final String keyBlock = matcher.group(1);
     final String[] lines = keyBlock.split("\\n");
-    final StringBuilder key = new StringBuilder();
+    final StringBuilder sshKey = new StringBuilder();
     for (String line : lines) {
-      key.append(line.trim()).append("\n");
+      final String trimmed = line.trim();
+      if (!trimmed.isEmpty()) {
+        sshKey.append(trimmed).append("\n");
+      }
     }
-    return key.toString().trim();
+
+    // Convert SSH key to age format using ssh-to-age
+    return convertSSHToAge(sshKey.toString().trim());
+  }
+
+  /**
+   * Converts an SSH private key to age format using the {@code ssh-to-age} command.
+   *
+   * <p><b>Runtime dependency:</b> Requires {@code ssh-to-age} in PATH. This is satisfied by the
+   * {@code fleet/flox/keyhole} environment included in the rke2lab flox manifest. Always run Maven
+   * builds via {@code flox activate -- ./mvnw ...} to ensure the tool is available.
+   *
+   * @param sshPrivateKey SSH private key in OpenSSH format
+   * @return age private key
+   * @throws IllegalStateException if {@code ssh-to-age} is not found or exits with error
+   */
+  private String convertSSHToAge(String sshPrivateKey) throws Exception {
+    final ProcessBuilder pb = new ProcessBuilder("ssh-to-age", "-private-key");
+    pb.redirectErrorStream(true);
+
+    final Process process = pb.start();
+    try (final var out = process.getOutputStream()) {
+      out.write(sshPrivateKey.getBytes(StandardCharsets.UTF_8));
+      out.flush();
+    }
+
+    final String output;
+    try (final var in = process.getInputStream()) {
+      output = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+    }
+
+    final int exitCode = process.waitFor();
+    if (exitCode != 0) {
+      throw new IllegalStateException(
+          "ssh-to-age failed with exit code " + exitCode + ": " + output);
+    }
+
+    return output.trim();
   }
 }
