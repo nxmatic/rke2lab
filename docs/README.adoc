@@ -19,7 +19,8 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 
 == GitOps & Cluster API
 
-* link:gitops-cluster-api-transition-plan.adoc[GitOps + Cluster API Transition Plan] - Phase 1-3 implementation roadmap
+* link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] - Phase 1-3 implementation roadmap
+* link:cluster-api-bootstrap-requirements.adoc[Cluster API Bootstrap Requirements] - Cleanup plan & flox webhook injection architecture
 * link:stagea-stageb-handoff-contract.adoc[Stage A/B Handoff Contract] - Bootstrap → cluster management transition
 * link:post-bootstrap-in-cluster-ownership-plan.adoc[Post-Bootstrap Ownership Plan] - Component lifecycle after bootstrap
 

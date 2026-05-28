@@ -3214,52 +3214,6 @@
       "priority": 5
     },
     {
-      "install_id": "podman-wrapper",
-      "locked-url": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper&ref=refs/heads/main&rev=30444c66a6ef778ddc479c32e7789eb66823e125",
-      "flake-description": "podman-wrapper flake for k8s env",
-      "locked-flake-attr-path": "packages.aarch64-darwin.default",
-      "derivation": "/nix/store/28ljhpm7i6l007bgy9id4yfl0qfdbgkq-docker.drv",
-      "outputs": {
-        "out": "/nix/store/gx239pa2zxkcpfcnb6bzb84zhvfixkq8-docker"
-      },
-      "output-names": [
-        "out"
-      ],
-      "outputs-to-install": [
-        "out"
-      ],
-      "requested-outputs-to-install": [],
-      "package-system": "aarch64-darwin",
-      "system": "aarch64-darwin",
-      "name": "docker",
-      "broken": false,
-      "unfree": false,
-      "priority": 5
-    },
-    {
-      "install_id": "podman-wrapper",
-      "locked-url": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper&ref=refs/heads/main&rev=30444c66a6ef778ddc479c32e7789eb66823e125",
-      "flake-description": "podman-wrapper flake for k8s env",
-      "locked-flake-attr-path": "packages.aarch64-linux.default",
-      "derivation": "/nix/store/hd1ygnxw606vp5kc50v0c1jgmylr6nay-docker.drv",
-      "outputs": {
-        "out": "/nix/store/pyik04i1zzfiq510vwiz8jqsqqr3k2k1-docker"
-      },
-      "output-names": [
-        "out"
-      ],
-      "outputs-to-install": [
-        "out"
-      ],
-      "requested-outputs-to-install": [],
-      "package-system": "aarch64-linux",
-      "system": "aarch64-linux",
-      "name": "docker",
-      "broken": false,
-      "unfree": false,
-      "priority": 5
-    },
-    {
       "install_id": "incus-client",
       "locked-url": "github:nxmatic/rke2lab/e95a0b7c8b8b78b54ea7b792821118453cf2132f?narHash=sha256-ofROqHbubtsYgghGkVs321KFYfXI3%2Bydk%2BYFgg1RYho%3D",
       "flake-description": "RKE2 lab infrastructure and network blueprints",
@@ -3313,6 +3267,52 @@
       "licenses": [
         "Apache-2.0"
       ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "podman-wrapper",
+      "locked-url": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper&ref=refs/heads/main&rev=30444c66a6ef778ddc479c32e7789eb66823e125",
+      "flake-description": "podman-wrapper flake for k8s env",
+      "locked-flake-attr-path": "packages.aarch64-darwin.default",
+      "derivation": "/nix/store/28ljhpm7i6l007bgy9id4yfl0qfdbgkq-docker.drv",
+      "outputs": {
+        "out": "/nix/store/gx239pa2zxkcpfcnb6bzb84zhvfixkq8-docker"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-darwin",
+      "system": "aarch64-darwin",
+      "name": "docker",
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "podman-wrapper",
+      "locked-url": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper&ref=refs/heads/main&rev=30444c66a6ef778ddc479c32e7789eb66823e125",
+      "flake-description": "podman-wrapper flake for k8s env",
+      "locked-flake-attr-path": "packages.aarch64-linux.default",
+      "derivation": "/nix/store/hd1ygnxw606vp5kc50v0c1jgmylr6nay-docker.drv",
+      "outputs": {
+        "out": "/nix/store/pyik04i1zzfiq510vwiz8jqsqqr3k2k1-docker"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "docker",
       "broken": false,
       "unfree": false,
       "priority": 5

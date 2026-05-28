@@ -122,7 +122,7 @@ Replaces the two clusterctl-driven shell-script systemd units with cdk8s manifes
 6. **GitOps bootstrap layer** — `manifests/.../layers/gitops/FluxRootLayer.java` (new) emits the `GitRepository` (pointing at this repo, `branch=main`) + root `Kustomization` (watching `gitops/clusters/<cluster>/`). Applied by `rke2lab-cluster-manifests.service` at master bootstrap. From then on Flux self-manages reconciliation of the `gitops/` subtree. The same `GitRepository` + root `Kustomization` YAMLs *also* live committed under `gitops/flux-system/` for self-reference, but the bootstrap source is the manifest layer (chicken-and-egg solved).
 7. **Cluster age key bootstrapping** (also Stage A): generate an age keypair if absent on the operator's machine, push the public half into `gitops/clusters/bioskop/.sops.yaml` (committed), apply the private half as `Secret sops-age` in `flux-system` namespace. Configure the root Kustomization with `decryption.provider: sops, secretRef: sops-age`. Allows Phase 2 SOPS-encrypted cloud-init Secrets to decrypt at apply time.
 
-**What's removed**:
+**What's removed** (see [Cluster API Bootstrap Requirements](cluster-api-bootstrap-requirements.adoc) for cleanup plan):
 - `manifests/src/main/resources/systemd/systemd-units/rke2lab-cluster-api-install.service`
 - `manifests/src/main/resources/systemd/systemd-units/rke2lab-capn-provider-install.service`
 - `manifests/src/main/resources/systemd/systemd-scripts/rke2lab-cluster-api-install.sh`

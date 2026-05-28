@@ -30,9 +30,9 @@ import org.cdk8s.JsonPatch;
  *   <li>Remote address: from {@code ~/.config/incus/config.yml} (remote name = cluster name)
  * </ul>
  *
- * <p>Cluster-scoped configuration: The Incus remote name equals the cluster name (bioskop →
- * bioskop remote, nikopol → nikopol remote). The remote address and server certificate are looked
- * up using the cluster name as the remote name.
+ * <p>Cluster-scoped configuration: The Incus remote name equals the cluster name (bioskop → bioskop
+ * remote, nikopol → nikopol remote). The remote address and server certificate are looked up using
+ * the cluster name as the remote name.
  *
  * <p>The generated secret is named {@code <cluster-name>-incus-identity} in namespace {@code
  * capn-system}.
@@ -55,8 +55,7 @@ public final class IncusIdentitySecretManifestUnit extends AbstractManifestUnit 
     try {
       final String clusterName = bootstrapIdentity().clusterName();
       final Path secretsFile = Path.of(".secrets");
-      final Path incusConfigDir =
-          Path.of(System.getProperty("user.home"), ".config", "incus");
+      final Path incusConfigDir = Path.of(System.getProperty("user.home"), ".config", "incus");
 
       final String remoteAddress = readRemoteAddress(clusterName, incusConfigDir);
       final String clientCert = readClientCertFromClasspath();
@@ -116,12 +115,15 @@ public final class IncusIdentitySecretManifestUnit extends AbstractManifestUnit 
     final String configContent = Files.readString(configFile, StandardCharsets.UTF_8);
     final Pattern remotePattern =
         Pattern.compile(
-            "^\\s*" + Pattern.quote(clusterName) + ":\\s*\\n\\s*addr:\\s*(.+)$",
-            Pattern.MULTILINE);
+            "^\\s*" + Pattern.quote(clusterName) + ":\\s*\\n\\s*addr:\\s*(.+)$", Pattern.MULTILINE);
     final Matcher matcher = remotePattern.matcher(configContent);
     if (!matcher.find()) {
       throw new IllegalStateException(
-          "Remote '" + clusterName + "' not found in " + configFile + " - expected remote definition with addr field");
+          "Remote '"
+              + clusterName
+              + "' not found in "
+              + configFile
+              + " - expected remote definition with addr field");
     }
 
     return matcher.group(1).trim();
@@ -131,8 +133,7 @@ public final class IncusIdentitySecretManifestUnit extends AbstractManifestUnit 
     final String certResource = "/incus/" + INCUS_IDENTITY_NAME + "-client.crt";
     final var inputStream = getClass().getResourceAsStream(certResource);
     if (inputStream == null) {
-      throw new IllegalStateException(
-          "Client certificate resource not found: " + certResource);
+      throw new IllegalStateException("Client certificate resource not found: " + certResource);
     }
     final byte[] certBytes = inputStream.readAllBytes();
     return Base64.getEncoder().encodeToString(certBytes);
@@ -148,7 +149,9 @@ public final class IncusIdentitySecretManifestUnit extends AbstractManifestUnit 
     final String secretsPath = "incus." + INCUS_IDENTITY_NAME + ".clientKey";
     final Pattern keyPattern =
         Pattern.compile(
-            "incus:\\s*\\n\\s*" + INCUS_IDENTITY_NAME + ":\\s*\\n(?:.*\\n)*?\\s*clientKey:\\s*\\|\\s*\\n((?:\\s+.*\\n)+)",
+            "incus:\\s*\\n\\s*"
+                + INCUS_IDENTITY_NAME
+                + ":\\s*\\n(?:.*\\n)*?\\s*clientKey:\\s*\\|\\s*\\n((?:\\s+.*\\n)+)",
             Pattern.MULTILINE);
     final Matcher matcher = keyPattern.matcher(secretsContent);
     if (!matcher.find()) {
@@ -170,8 +173,7 @@ public final class IncusIdentitySecretManifestUnit extends AbstractManifestUnit 
   private String readServerCertFromIncusConfig(String remoteAddress, Path incusConfigDir)
       throws IOException {
     final String remoteHost = extractHostFromUri(remoteAddress);
-    final Path serverCertPath =
-        incusConfigDir.resolve("servercerts").resolve(remoteHost + ".crt");
+    final Path serverCertPath = incusConfigDir.resolve("servercerts").resolve(remoteHost + ".crt");
 
     if (!Files.exists(serverCertPath)) {
       throw new IllegalStateException(

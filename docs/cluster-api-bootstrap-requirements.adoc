@@ -1,0 +1,470 @@
+= Cluster API Bootstrap Requirements & Cleanup
+:toc: left
+:toclevels: 3
+
+Plan for Phase 1 cleanup and flox environment architecture for cluster workloads.
+
+== Overview
+
+Phase 1 implemented declarative CAPI/CAPN/CAPRKE2 installation via manifest layers. This plan covers:
+
+1. **Cleanup** - Remove old imperative clusterctl-based installation
+2. **Environment architecture** - Define flox environments for pod-level executable injection
+3. **Validation** - Verify bootstrap without clusterctl dependency
+
+== Context
+
+**Phase 1 complete** (commits c324fa05, 8ed42994, 515157e2):
+
+- ✅ Cluster API Operator with provider CRs
+- ✅ Incus identity secret via manifest unit
+- ✅ Image-state ConfigMap for Stage A → Stage B handoff
+- ✅ Flux GitRepository + root Kustomization
+- ✅ SOPS age Secret for encrypted resource decryption
+
+**Remaining work**:
+
+- Remove imperative clusterctl installation (systemd units)
+- Define flox environment architecture for cluster workloads
+- Validate bootstrap without clusterctl
+
+== Current State
+
+=== Old Imperative Installation (TO REMOVE)
+
+Files to delete:
+
+[source,bash]
+----
+manifests/src/main/resources/systemd/systemd-units/rke2lab-cluster-api-install.service
+manifests/src/main/resources/systemd/systemd-units/rke2lab-capn-provider-install.service
+manifests/src/main/resources/systemd/systemd-scripts/rke2lab-cluster-api-install.sh
+manifests/src/main/resources/systemd/systemd-scripts/rke2lab-capn-provider-install.sh
+----
+
+Additional cleanup:
+
+- Remove clusterctl references from Java code (if any)
+- Do NOT add clusterctl to any flox environment (operator replaces it)
+
+=== New Declarative Installation (CURRENT)
+
+Manifest units in `cluster-api` domain:
+
+- `ClusterApiOperatorManifestUnit` - operator + provider CRs
+- `IncusIdentitySecretManifestUnit` - CAPN identity secret
+- `ImageStateConfigMapManifestUnit` - Stage A → Stage B handoff
+
+Applied by `rke2lab-cluster-manifests.service` during bootstrap.
+
+See link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] for identity pattern.
+
+=== Flox Environment Structure
+
+**Main environment**: `.flox/env/manifest.toml`
+
+- Includes: `fleet/git`, `fleet/jdk`, `fleet/k8s`, `fleet/pulumi`, `fleet/shell`
+- Direct installs: pulumi, distrobuilder, cdk8s-cli, incus-client
+
+**Fleet k8s environment**: `fleet/flox/k8s/.flox/env/manifest.toml`
+
+- kubectl, helm, helmfile, cilium-cli, fluxcd, kpt, etcdctl
+- kubectl plugins: doctor, tree, view-secret, etc.
+
+**Fleet keyhole environment**: `fleet/flox/keyhole/.flox/env/manifest.toml`
+
+- age, sops, gnupg, openssh, openssl, pass, ssh-to-age
+- SOPS_AGE_KEY auto-configured from ssh key
+
+== Architecture: Flox Environment Injection for Pods
+
+=== Three-Tier Environment Model
+
+**Goal**: Pods in bioskop use flox-provided executables from nix store via annotation-based injection.
+
+[mermaid]
+----
+graph TB
+    subgraph Operator["Operator Environment (dev machine)"]
+        OpTools[pulumi, cdk8s-cli, incus-client<br/>+ fleet/git, jdk, k8s, pulumi, shell<br/>+ ADD: fleet/keyhole]
+    end
+
+    subgraph BootstrapNode["Bootstrap Node (master host)"]
+        RKE2[RKE2 server binary]
+        NixStore[Nix store with flox environments]
+        DaemonSet[Flox NRI DaemonSet<br/><i>trampolines environments</i>]
+    end
+
+    subgraph Pods["Cluster Workloads (pods)"]
+        Annotation[flox.dev/environment: fleet/k8s]
+        Webhook[Mutating Webhook<br/><i>injects volumes + env</i>]
+        Executables[kubectl, helm, age, sops<br/><i>from nix store</i>]
+    end
+
+    OpTools -.->|synthesizes| BootstrapNode
+    DaemonSet -->|materializes| NixStore
+    Annotation -->|triggers| Webhook
+    Webhook -->|mounts + env vars| NixStore
+    NixStore -->|provides| Executables
+
+    style Operator fill:#fff4e6,stroke:#ff9900
+    style BootstrapNode fill:#ccffcc,stroke:#00cc66
+    style Pods fill:#e1f5ff,stroke:#0066cc
+----
+
+**Legend:**
+
+- Orange: Operator environment (dev machine)
+- Green: Bootstrap node (master host)
+- Blue: Cluster workloads (pods)
+
+=== Tier 1: Operator Environment (Dev Machine)
+
+Current: `.flox/env/manifest.toml`
+
+[source,toml]
+----
+[install]
+pulumi.pkg-path = "pulumi-bin"
+cdk8s-cli.pkg-path = "cdk8s-cli"
+incus-client.flake = "github:nxmatic/rke2lab#incus-client"
+
+[include]
+  environments = [
+    { dir = "../fleet/flox/git" },
+    { dir = "../fleet/flox/jdk" },
+    { dir = "../fleet/flox/k8s" },
+    { dir = "../fleet/flox/pulumi" },
+    { dir = "../fleet/flox/shell" },
+  ]
+----
+
+**Action**: Add `fleet/keyhole` to includes for age/sops availability.
+
+=== Tier 2: Bootstrap Node (Master Host)
+
+**Components**:
+
+- RKE2 server binary (installed by RKE2 install script)
+- Nix store with flox environments
+- Flox NRI plugin DaemonSet (existing pattern)
+
+**DaemonSet responsibilities**:
+
+- Materialize flox environments to `/srv/host/k8s-daemonset.d/runtime/flox/environment.d/`
+- Update nix store on nodes
+- Publish environment metadata via ConfigMap (nix store paths)
+
+**Pattern**: Reuses existing flox NRI plugin architecture.
+
+=== Tier 3: Cluster Workloads (Pods)
+
+**NEW ARCHITECTURE**: Pods use flox annotations for executable injection.
+
+**Annotation format**:
+
+[source,yaml]
+----
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    flox.dev/environment: "fleet/k8s"  # or "fleet/keyhole"
+spec:
+  containers:
+  - name: app
+    image: alpine:latest  # minimal base image
+    command: ["/nix/store/xxx-kubectl/bin/kubectl", "version"]
+----
+
+**Mutating admission webhook** injects:
+
+1. **Volume mounts** - nix store read-only:
++
+[source,yaml]
+----
+volumeMounts:
+- name: nix-store
+  mountPath: /nix/store
+  readOnly: true
+volumes:
+- name: nix-store
+  hostPath:
+    path: /nix/store
+    type: Directory
+----
+
+2. **Environment variables** - flox environment:
++
+[source,yaml]
+----
+env:
+- name: PATH
+  value: "/nix/store/xxx-kubectl/bin:/nix/store/yyy-helm/bin:..."
+- name: FLOX_ENV
+  value: "fleet/k8s"
+----
+
+3. **Init container** (optional) - environment verification
+
+**Webhook implementation** (future):
+
+- Deployed in `flox-system` namespace
+- Cluster-wide scope with opt-in annotation
+- Reads ConfigMap for nix store paths (published by DaemonSet)
+- Failure policy: Fail (missing tools should block pod creation)
+- Certificate: cert-manager managed TLS
+
+== Required Flox Environments for Cluster Workloads
+
+=== Fleet K8s Environment
+
+**Location**: `fleet/flox/k8s/.flox/env/manifest.toml`
+
+**Contents**:
+
+- kubectl, helm, helmfile
+- cilium-cli, fluxcd
+- kpt, etcdctl
+- kubectl plugins: doctor, tree, view-secret, graph, etc.
+
+**Use cases**:
+
+- Flux controllers (GitRepository, Kustomization reconciliation)
+- Tekton tasks (kubectl apply, helm upgrade)
+- Debug pods (kubectl exec into cluster)
+
+=== Fleet Keyhole Environment
+
+**Location**: `fleet/flox/keyhole/.flox/env/manifest.toml`
+
+**Contents**:
+
+- age, sops
+- gnupg, openssh, openssl
+- pass, ssh-to-age, keychain
+
+**Use cases**:
+
+- Flux SOPS controller (decrypt encrypted Secrets)
+- Tekton tasks (encrypt cloud-init Secrets in Phase 2)
+- Secret management workloads
+
+=== Environment Availability
+
+**How environments reach nodes**:
+
+1. Flox NRI plugin DaemonSet materializes environments to host
+2. Nix store paths available for volume mounting
+3. ConfigMap publishes environment metadata (paths, versions)
+4. Webhook reads ConfigMap to inject correct paths
+
+**Phase 1 scope**: Verify these environments exist and are suitable.
+
+**Future work**: Implement webhook injection based on annotations.
+
+== Deliverables
+
+=== Phase 1A: Cleanup & Environment Definition (Current)
+
+1. ✅ **Document architecture** - this document defines webhook injection pattern
+2. ✅ **Verify tooling** - age/sops in fleet/keyhole, kubectl/helm in fleet/k8s
+3. 🔲 **Add keyhole to main env** - include fleet/keyhole in operator environment
+4. 🔲 **Remove imperative installation** - delete 4 systemd files
+5. 🔲 **Test build** - verify manifests module compiles
+6. 🔲 **Review domain policy** - decide on mesh/cicd toggles
+7. 🔲 **Update cross-references** - link from transition plan and README
+8. 🔲 **Validation** - full bootstrap test without clusterctl
+
+=== Phase 1B: Environment Availability (Future)
+
+9. 🔮 **Materialize environments** - ensure fleet/k8s and fleet/keyhole on nodes via DaemonSet
+10. 🔮 **ConfigMap metadata** - publish nix store paths for environments
+11. 🔮 **Verify mounts** - test volume mount pattern from existing flox NRI plugin
+
+=== Phase 2: Mutating Webhook (Future Track)
+
+12. 🔮 **Design webhook API** - annotation format, injection rules
+13. 🔮 **Implement webhook** - read annotations, inject volumes + env vars
+14. 🔮 **Certificate management** - integrate with cert-manager
+15. 🔮 **Deploy webhook** - flox-system namespace, cluster-wide scope
+16. 🔮 **Test injection** - pod with `flox.dev/environment: "fleet/k8s"`, verify kubectl
+
+**Current focus**: Phase 1A
+
+== Manifest Domain Review
+
+=== Currently Enabled Domains
+
+From `DefaultManifestSynthesisService`:
+
+[cols="1,2,1",options="header"]
+|===
+|Domain |Description |Status
+|cluster |kube-vip, namespaces |✅ Required
+|storage |OpenEBS ZFS |✅ Required
+|replication |kubernetes-replicator |✅ Required
+|gitops |Flux, Porch |✅ Required
+|runtime |flox NRI plugin |✅ Required
+|networking |Cilium, Multus |✅ Required
+|mesh |Istio, Tailscale, Headscale |⚠️ Review
+|ha |High availability |✅ Required
+|cicd |Tekton |⚠️ Review
+|cluster-api |CAPI, CAPN, CAPRKE2 |✅ Required
+|===
+
+=== Review Questions
+
+**Mesh domain** (Istio, Tailscale, Headscale):
+
+- Required at bootstrap? Tailscale provides cluster networking
+- **Recommendation**: Keep enabled - may be bootstrap requirement
+
+**CICD domain** (Tekton):
+
+- Required at bootstrap? Phase 3 needs it for drift correction
+- Tekton operator is lightweight, enables Phase 3 without reconfiguration
+- **Recommendation**: Keep enabled - ready for Phase 3
+
+**Decision**: Keep current domain configuration, validate during bootstrap test.
+
+== Validation Plan
+
+=== Build Verification
+
+[source,bash]
+----
+flox activate -- ./mvnw clean verify -pl :manifests
+----
+
+=== Manifest Synthesis Test
+
+[source,bash]
+----
+flox activate -- ./mvnw -pl :manifests test -Dtest=*ManifestSynthesis*
+----
+
+=== Bootstrap Dry-Run
+
+[source,bash]
+----
+flox activate -- pulumi preview --stack dev
+----
+
+=== Post-Bootstrap Checks
+
+**Systemd check** - verify no cluster-api units:
+
+[source,bash]
+----
+ssh master "systemctl list-dependencies rke2lab.target | grep -E 'cluster-api|capn'"
+# Should return empty
+----
+
+**Operator check** - verify CAPI operator running:
+
+[source,bash]
+----
+kubectl get pods -n capi-operator-system
+kubectl get coreprovider,infrastructureprovider,controlplaneprovider -A
+----
+
+**Provider CRs check**:
+
+[source,bash]
+----
+kubectl get coreprovider cluster-api -n capi-system
+kubectl get infrastructureprovider incus -n capn-system
+kubectl get controlplaneprovider rke2 -n caprke2-system
+----
+
+== Benefits of Flox Injection Architecture
+
+**Single source of truth**:
+
+- Tool versions defined in flox environments
+- No version drift between dev and cluster
+- Update once, applies cluster-wide
+
+**Minimal container images**:
+
+- Base images (alpine, busybox) sufficient
+- No need for kubectl/helm/etc in every image
+- Smaller image sizes, faster pulls
+
+**Consistent with existing patterns**:
+
+- Reuses flox NRI plugin DaemonSet pattern
+- Same nix store maintenance
+- Unified environment management
+
+**Easy updates**:
+
+- Update flox environment
+- Refresh DaemonSet
+- All pods get new tool versions
+
+**Developer experience**:
+
+- Same tools locally and in-cluster
+- Annotate pod, get tools
+- No Dockerfile changes for new tools
+
+== Open Questions
+
+1. **Mesh domain at bootstrap?**
+   - Tailscale provides cluster networking
+   - **Answer**: Keep enabled, may be required
+
+2. **CICD domain at bootstrap?**
+   - Tekton needed for Phase 3
+   - **Answer**: Keep enabled, lightweight operator
+
+3. **Age key generation automation?**
+   - Manual vs automated in seed-bootstrap
+   - **Answer**: Keep manual (one-time setup, documented)
+
+4. **Webhook namespace?**
+   - flox-system vs kube-system
+   - **Answer**: flox-system (separate from core K8s components)
+
+5. **Failure policy?**
+   - Fail vs Ignore for missing environments
+   - **Answer**: Fail (missing tools should block pod creation)
+
+== Success Criteria
+
+Phase 1A complete when:
+
+- ✅ No clusterctl in any flox environment
+- ✅ No imperative cluster-api systemd units
+- ✅ fleet/keyhole included in operator environment
+- ✅ Manifests module builds successfully
+- ✅ Cluster API operator installs declaratively
+- ✅ All provider CRs created (Core, Infrastructure, ControlPlane)
+- ✅ Bootstrap completes without clusterctl dependency
+- ✅ Documentation cross-referenced
+
+== Related Documentation
+
+* link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] - Phase 1 complete, Phase 2 roadmap
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Identity pattern, age key setup
+* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How manifest units work
+* link:bootstrap-contract.adoc[Bootstrap Contract] - Stage A outputs and handoff
+* link:daemonset-host-assets-architecture.adoc[DaemonSet Host Assets Architecture] - Existing trampoline pattern
+
+== Timeline
+
+**Phase 1A Estimated**: 2-3 hours
+
+- Environment verification: 30 min
+- Add keyhole to includes: 15 min
+- File removal: 15 min
+- Build/test: 30 min
+- Domain policy review: 30 min
+- Documentation cross-references: 30 min
+- Full validation: 30 min
+
+**Phase 1B Estimated**: 4-6 hours (future)
+
+**Phase 2 Estimated**: 1-2 days (future)

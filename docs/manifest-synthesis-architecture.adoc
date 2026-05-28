@@ -589,5 +589,6 @@ Current domains registered in `DefaultManifestSynthesisService`:
 == Related Documentation
 
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - How to access cluster/infrastructure identity in manifest units
-* link:gitops-cluster-api-transition-plan.adoc[GitOps + Cluster API Transition Plan] - Phase 1 Cluster API implementation
+* link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] - Phase 1 Cluster API implementation
+* link:cluster-api-bootstrap-requirements.adoc[Cluster API Bootstrap Requirements] - Cleanup & environment architecture
 * link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow patterns
