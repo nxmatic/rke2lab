@@ -25,3 +25,7 @@ config:
   "rke2lab:readiness.enabled": "true"
   "rke2lab:entryGate.cleanWorktree.required": "false"
   rke2lab:readiness.timeout: PT1M
+  rke2lab:link.clusterApi.enabled: "true"
+  rke2lab:link.flux.enabled: "true"
+  rke2lab:link.porch.enabled: "false"
+  rke2lab:link.mesh.enabled: "false"
