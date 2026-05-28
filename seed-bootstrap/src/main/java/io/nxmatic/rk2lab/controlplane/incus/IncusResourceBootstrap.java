@@ -25,7 +25,6 @@ import io.nxmatic.rk2lab.controlplane.incus.image.PulumiIncusImageProvider;
 import io.nxmatic.rk2lab.controlplane.pipeline.OnFailure;
 import io.nxmatic.rk2lab.controlplane.pipeline.TopicRunner;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
-import io.nxmatic.rk2lab.controlplane.policy.DebugPolicy;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeResult;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeService;
@@ -419,9 +418,8 @@ public final class IncusResourceBootstrap {
   }
 
   private FloxDebugPolicy resolveFloxDebugPolicy(ControlplanePolicy policy) {
-    final DebugPolicy debug = policy.debug();
-    return new FloxDebugPolicy(
-        debug.meshEnabled(), debug.networkingEnabled(), debug.floxNriPluginEnabled());
+    final ControlplanePolicy.DebugPolicy debug = policy.debug();
+    return new FloxDebugPolicy(debug.mesh(), debug.networking(), debug.nriPluginsFlox());
   }
 
   private void synthesizeManifests(
