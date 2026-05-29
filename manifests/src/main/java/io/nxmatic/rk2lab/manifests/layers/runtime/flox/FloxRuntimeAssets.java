@@ -225,7 +225,7 @@ public final class FloxRuntimeAssets {
    * A discovered Flox environment: the {@code category/name} pair (e.g. {@code networking/kdns})
    * derived from the {@code environment.d/<category>/<name>/} directory layout on the classpath.
    */
-  private record DiscoveredEnvironment(String category, String name) {
+  public record DiscoveredEnvironment(String category, String name) {
     String envPrefix() {
       return category + "/" + name;
     }
@@ -241,6 +241,23 @@ public final class FloxRuntimeAssets {
    * env's category/name — the directory layout already disambiguates which env is mounted.
    */
   private static final String ENV_JSON_CONTENT = "{\"name\": \"default\", \"version\": 1}\n";
+
+  /**
+   * Returns discovered flox environments (category/name pairs) from the classpath.
+   *
+   * <p>Exposed for slot manifest generation during bootstrap.
+   *
+   * @return list of discovered environments
+   */
+  public List<DiscoveredEnvironment> getDiscoveredEnvironments() {
+    return discoverEnvironments(resourceAnchor).stream()
+        .sorted(
+            (a, b) -> {
+              int cmp = a.category().compareTo(b.category());
+              return cmp != 0 ? cmp : a.name().compareTo(b.name());
+            })
+        .toList();
+  }
 
   /**
    * Walk the {@code /runtime/flox/environment.d/} resource tree and return every {@code

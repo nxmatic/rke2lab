@@ -32,6 +32,88 @@ When you encounter a builder with three or more boolean parameters or a sequence
 - **Builder enforcement**: If a class offers a builder and has multi-parameter constructors, make the constructor private to enforce builder usage and ease review. The builder pattern signals complex construction; direct construction bypasses that contract.
 - **Functional APIs**: Design for composition and pipelines. Prefer fluent chains, function parameters (lambdas/method refs), and immutable transformations over stateful accumulators.
 - **Multi-parameter methods**: When you encounter methods with 3+ parameters (especially booleans), note them as candidates for pipeline-based implementation. Consider whether the fluent grammar or a builder would improve readability and type safety.
+- **Prefer instances over helpers**: Pass object instances through the call graph rather than creating static helper methods. This makes dependencies explicit, enables testing/mocking, and keeps state encapsulated. See "Instance-passing discipline" below.
+
+### Instance-passing discipline
+
+**Always prefer passing instances over creating static helpers.**
+
+When you need functionality from another component:
+
+✅ **DO**: Pass the instance through the call path
+
+```java
+// Caller creates and passes the instance
+SystemdTarget systemdTarget = new SystemdTarget();
+systemdTarget.materialize(paths);
+FloxRuntimeAssets floxAssets = systemdTarget.getFloxRuntimeAssets();
+List<DiscoveredEnvironment> envs = floxAssets.getDiscoveredEnvironments();
+```
+
+❌ **DON'T**: Create static helper methods
+
+```java
+// Anti-pattern: static helper hides dependencies
+List<DiscoveredEnvironment> envs = FloxEnvironmentHelper.discover();
+```
+
+**Why this matters:**
+
+1. **Explicit dependencies**: The call graph shows what data flows where. Static helpers hide this.
+2. **Testability**: Instances can be mocked or stubbed. Static methods can't (without PowerMock hacks).
+3. **State encapsulation**: Instances own their state. Static helpers either have no state (re-computing expensively) or hidden global state (coupling).
+4. **Refactoring safety**: IDEs track instance passing. Static calls are harder to refactor.
+5. **Context availability**: Instances can hold context (config, logger, metrics). Static methods can't without passing everything as parameters.
+
+**Common scenarios:**
+
+- **Discovered data** (like flox environments): The discovery is expensive and should happen once. Store in an instance field, expose via getter.
+- **Configuration**: Pass `BootstrapConfig` or `ControlplanePolicy` instances, don't make static accessors.
+- **Resource handles** (git repo, file trees): Wrap in an instance that manages lifecycle. Don't make static "open/close" helpers.
+
+**When static methods ARE appropriate:**
+
+- Pure utility functions with no state: `Math.max()`, `String.format()`, `Collections.unmodifiableList()`
+- Factory methods: `ClassName.builder()`, `ClassName.of(...)`, `ClassName.parse(...)`
+- Type-safe enum conversions: `SlotType.fromYamlValue(String)`
+
+**Pattern evolution example:**
+
+Starting point (static helper anti-pattern):
+
+```java
+// FloxEnvironmentHelper.java
+public class FloxEnvironmentHelper {
+  public static List<DiscoveredEnvironment> discover() {
+    // Re-scans classpath every call - expensive!
+  }
+}
+```
+
+Refactored to instance (correct):
+
+```java
+// FloxRuntimeAssets.java
+public class FloxRuntimeAssets {
+  private final List<DiscoveredEnvironment> discovered;  // Computed once
+  
+  public List<DiscoveredEnvironment> getDiscoveredEnvironments() {
+    return discovered;
+  }
+}
+
+// Caller
+FloxRuntimeAssets assets = FloxRuntimeAssets.builder().build();
+List<DiscoveredEnvironment> envs = assets.getDiscoveredEnvironments();
+```
+
+**Enforcement:**
+
+When reviewing code or implementing features:
+
+- If you find yourself writing `public static X doSomething()`, ask: "Should this be an instance method?"
+- If you're about to create a `XyzHelper` class with static methods, ask: "Which existing class should own this behavior?"
+- If you see `SomeHelper.staticMethod()` calls, refactor to pass the instance.
 
 ## Documentation standards
 

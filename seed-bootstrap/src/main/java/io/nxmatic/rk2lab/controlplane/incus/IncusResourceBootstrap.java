@@ -213,11 +213,13 @@ public final class IncusResourceBootstrap {
       // slot, after which the target registry's recorded paths would no longer resolve. Metadata
       // capture only reads from the registry and in-memory summaries, so it's safe to do first.
       captureDeploymentMetadata(staging, targets);
-      if (!dryRun && syncStagingToFinal(lifecycle, staging.stagingRoot())) {
-        // Host content actually changed -- the kubeconfig may now point at an instance that's
-        // about to be replaced, so wipe it so readiness re-publishes a fresh one. Skip on no-op
-        // deploys: nothing rotated, the existing kubeconfig still matches the running instance.
-        clearStaleBootstrapKubeconfig();
+      if (!dryRun) {
+        syncStagingToFinal(lifecycle, staging.stagingRoot(), targets);
+        // Note: We do NOT delete the kubeconfig here, even if host assets changed. The kubeconfig
+        // is written by RKE2 inside the instance and mounted to the host. It remains valid unless
+        // the *instance* is replaced (not just host assets). Deleting it prematurely breaks kubectl
+        // access when only manifests/flox environments are updated. The instance replacement logic
+        // (replaceOnChanges: ["config", "config.*"]) will trigger a fresh kubeconfig if needed.
       }
 
       return this;
@@ -254,13 +256,14 @@ public final class IncusResourceBootstrap {
       final ProvisioningTargetRegistry targetRegistry = new ProvisioningTargetRegistry();
 
       registerCloudInitTarget(targetRegistry, staging);
-      registerSystemdTarget(targetRegistry, staging.stagingPaths());
+      final SystemdTarget systemdTarget =
+          registerSystemdTarget(targetRegistry, staging.stagingPaths());
       registerK8sTarget(targetRegistry, staging);
       registerRke2ConfigTarget(targetRegistry, staging.stagingPaths());
       final Map<String, Object> runtimeSummaries =
           materializeAndRegisterRke2labEnvTarget(targetRegistry, staging);
 
-      return new TargetContext(targetRegistry, runtimeSummaries);
+      return new TargetContext(targetRegistry, runtimeSummaries, systemdTarget);
     }
 
     private void registerCloudInitTarget(
@@ -279,7 +282,7 @@ public final class IncusResourceBootstrap {
       targetRegistry.register(cloudInitTarget);
     }
 
-    private void registerSystemdTarget(
+    private SystemdTarget registerSystemdTarget(
         ProvisioningTargetRegistry targetRegistry, BootstrapPaths stagingPaths) {
       final SystemdTarget systemdTarget = new SystemdTarget();
       try {
@@ -288,6 +291,7 @@ public final class IncusResourceBootstrap {
         throw new IllegalStateException("Failed to materialize systemd target", ex);
       }
       targetRegistry.register(systemdTarget);
+      return systemdTarget;
     }
 
     private void registerK8sTarget(
@@ -330,8 +334,10 @@ public final class IncusResourceBootstrap {
           "systemd", systemdProvisioningSummary, "layerEnv", rke2labEnvTarget.layerEnvSummary());
     }
 
-    private boolean syncStagingToFinal(HostAssetRootLifecycle lifecycle, Path stagingRoot) {
-      return lifecycle.syncStagingToFinal(stagingRoot, state.localPaths.assetsRoot());
+    private boolean syncStagingToFinal(
+        HostAssetRootLifecycle lifecycle, Path stagingRoot, TargetContext targets) {
+      return lifecycle.syncStagingToFinal(
+          stagingRoot, state.localPaths.assetsRoot(), config, policy, targets.systemdTarget());
     }
 
     private void captureDeploymentMetadata(StagingContext staging, TargetContext targets) {
@@ -372,22 +378,9 @@ public final class IncusResourceBootstrap {
         Map<String, Object> manifestSynthSummary) {}
 
     private record TargetContext(
-        ProvisioningTargetRegistry targetRegistry, Map<String, Object> runtimeSummaries) {}
-  }
-
-  private void clearStaleBootstrapKubeconfig() {
-    if (Deployment.getInstance().isDryRun()) {
-      return;
-    }
-
-    final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
-    try {
-      Files.deleteIfExists(kubeconfigPath);
-    } catch (IOException ex) {
-      throw new IllegalStateException(
-          "Failed to clear stale bootstrap kubeconfig before readiness gating: " + kubeconfigPath,
-          ex);
-    }
+        ProvisioningTargetRegistry targetRegistry,
+        Map<String, Object> runtimeSummaries,
+        SystemdTarget systemdTarget) {}
   }
 
   private Map<String, Object> synthesizeAndExplodeManifests(
@@ -1783,7 +1776,12 @@ public final class IncusResourceBootstrap {
     }
 
     /** Returns {@code true} if the host asset root actually changed (slot was rotated). */
-    private boolean syncStagingToFinal(Path stagingRoot, Path hostAssetRoot) {
+    private boolean syncStagingToFinal(
+        Path stagingRoot,
+        Path hostAssetRoot,
+        BootstrapConfig config,
+        ControlplanePolicy policy,
+        SystemdTarget systemdTarget) {
       try {
         if (Files.exists(hostAssetRoot) && directoriesAreIdentical(stagingRoot, hostAssetRoot)) {
           // No-op deploy: scratch matches host/ byte-for-byte. Discard scratch, don't rotate.
@@ -1799,6 +1797,9 @@ public final class IncusResourceBootstrap {
         deleteRecursively(backupPathFor(hostAssetRoot, slotSeq));
         Files.move(stagingRoot, slotPath);
 
+        // Write manifest to the slot directory for future inspection and renewal selection
+        writeSlotManifest(slotPath, slotSeq, config, policy, systemdTarget);
+
         if (Files.exists(hostAssetRoot)) {
           // Backup existing state before sync (paired with the staging slot for this run).
           backup(hostAssetRoot, backupPathFor(hostAssetRoot, slotSeq));
@@ -1813,6 +1814,71 @@ public final class IncusResourceBootstrap {
       } catch (IOException ex) {
         throw new IllegalStateException(
             "Failed to sync staging to final host asset root: " + hostAssetRoot, ex);
+      }
+    }
+
+    /**
+     * Writes the slot manifest YAML to the slot directory.
+     *
+     * <p>The manifest describes what's in this slot: git commit, policy flags, discovered flox
+     * environments, etc. Future renewals can read these manifests to select the newest valid slot.
+     */
+    private void writeSlotManifest(
+        Path slotPath,
+        int slotSeq,
+        BootstrapConfig config,
+        ControlplanePolicy policy,
+        SystemdTarget systemdTarget)
+        throws IOException {
+
+      final java.time.Instant timestamp = java.time.Instant.now();
+      final Path repoRoot = java.nio.file.Paths.get(System.getProperty("user.dir"));
+      final HostSlotManifest.GitInfo gitInfo = GitMetadataExtractor.extract(repoRoot);
+      final String buildId = GitMetadataExtractor.generateBuildId(gitInfo);
+
+      // Build manifest using CDK8s
+      final org.cdk8s.App app = org.cdk8s.App.Builder.create().outdir(slotPath.toString()).build();
+      final org.cdk8s.Chart chart = org.cdk8s.Chart.Builder.create(app, "manifest").build();
+
+      final HostSlotManifest.Builder manifestBuilder =
+          HostSlotManifest.builder()
+              .slotType(HostSlotManifest.SlotType.STAGING)
+              .slotSequence(slotSeq)
+              .timestamp(timestamp)
+              .buildId(buildId)
+              .policy(policy)
+              .source(HostSlotManifest.SourceType.FRESH_BUILD, slotPath.toString(), null);
+
+      if (gitInfo != null) {
+        manifestBuilder.gitInfo(
+            gitInfo.commit(),
+            gitInfo.commitFull(),
+            gitInfo.branch(),
+            gitInfo.dirty(),
+            gitInfo.commitMessage(),
+            gitInfo.author(),
+            gitInfo.commitDate());
+      }
+
+      // Add discovered flox environments
+      final io.nxmatic.rk2lab.manifests.layers.runtime.flox.FloxRuntimeAssets floxAssets =
+          systemdTarget.getFloxRuntimeAssets();
+      if (floxAssets != null) {
+        for (var env : floxAssets.getDiscoveredEnvironments()) {
+          manifestBuilder.addFloxEnvironment(env.category(), env.name(), true);
+        }
+      }
+
+      manifestBuilder.build(chart, "slot-manifest");
+
+      // Synthesize to YAML - CDK8s writes to slotPath/.rke2lab-manifest.yaml
+      app.synth();
+
+      // CDK8s creates manifest-c8XXXXX.k8s.yaml - rename to our expected name
+      final Path synthesized = slotPath.resolve("manifest.k8s.yaml");
+      final Path target = slotPath.resolve(".rke2lab-manifest.yaml");
+      if (Files.exists(synthesized)) {
+        Files.move(synthesized, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
       }
     }
 
@@ -1913,8 +1979,34 @@ public final class IncusResourceBootstrap {
      * races with live flox activations (run/<arch>.<env>.dev symlinks come and go), so we treat the
      * whole subtree as a black box: skip on entry, never copy, never delete.
      */
+    /**
+     * Returns true if {@code dir} is a flox runtime state directory that should be skipped during
+     * sync/comparison.
+     *
+     * <p>Flox creates runtime state in {@code .flox/} at the activation root (the plugin install
+     * location), which contains volatile subdirectories (run/, cache/, lib/, log/). Those must be
+     * skipped so sync doesn't copy stale state and comparison doesn't produce phantom diffs.
+     *
+     * <p>However, {@code .flox/} directories inside {@code environment.d/<category>/<name>/} are
+     * BUILD ARTIFACTS (env/, env.json, manifest.toml) that must be copied, not skipped.
+     *
+     * <p>Strategy: skip {@code .flox} only if it's NOT under an {@code environment.d/} tree.
+     */
     private static boolean isFloxRuntimeStateDir(Path dir) {
-      return ".flox".equals(String.valueOf(dir.getFileName()));
+      if (!".flox".equals(String.valueOf(dir.getFileName()))) {
+        return false;
+      }
+      // Check if any ancestor directory is named "environment.d"
+      Path current = dir.getParent();
+      while (current != null) {
+        if ("environment.d".equals(String.valueOf(current.getFileName()))) {
+          // This .flox is under environment.d/ - it's a build artifact, not runtime state
+          return false;
+        }
+        current = current.getParent();
+      }
+      // This .flox is NOT under environment.d/ - it's runtime state, skip it
+      return true;
     }
 
     private void backup(Path source, Path target) throws IOException {

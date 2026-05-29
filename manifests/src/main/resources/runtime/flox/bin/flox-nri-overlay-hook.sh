@@ -73,8 +73,16 @@ mount -o remount,bind,ro "$lower"
 mount -t tmpfs -o mode=0755,size=2g tmpfs "$rw"
 mkdir -p "$upper" "$work"
 
-mount -t overlay overlay \
-	-o "lowerdir=${lower},upperdir=${upper},workdir=${work}" \
-	"$target"
+# Use container-relative paths (from the perspective of the future root after pivot_root).
+# The hook runs before pivot_root, so we must chroot into ${rootfs} first to make paths
+# relative to the container's future root. Otherwise overlayfs records absolute host paths
+# like /run/k3s/containerd/.../rootfs/.overlays.d/... which are invalid after pivot_root.
+container_lower="/.overlays.d/${overlay_name}/lower"
+container_upper="/.overlays.d/${overlay_name}/rw/upper"
+container_work="/.overlays.d/${overlay_name}/rw/work"
+
+chroot "$rootfs" mount -t overlay overlay \
+	-o "lowerdir=${container_lower},upperdir=${container_upper},workdir=${container_work}" \
+	"${target_rel}"
 
 exit 0

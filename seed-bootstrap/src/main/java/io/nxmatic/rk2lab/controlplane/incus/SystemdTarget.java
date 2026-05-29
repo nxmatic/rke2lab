@@ -31,6 +31,7 @@ public final class SystemdTarget implements ProvisioningTarget {
       CLASSPATH_ROOT + "/incus/manifests/systemd/systemd-units";
 
   private final List<Path> materializedPaths = new ArrayList<>();
+  private FloxRuntimeAssets floxRuntimeAssets;
 
   @Override
   public String name() {
@@ -59,8 +60,20 @@ public final class SystemdTarget implements ProvisioningTarget {
       deleteSubtree(floxRuntimeTarget);
     }
     Files.createDirectories(floxRuntimeTarget);
-    FloxRuntimeAssets.builder().build().writeInstallerAssetTree(floxRuntimeTarget);
+    this.floxRuntimeAssets = FloxRuntimeAssets.builder().build();
+    this.floxRuntimeAssets.writeInstallerAssetTree(floxRuntimeTarget);
     materializedPaths.add(floxRuntimeTarget);
+  }
+
+  /**
+   * Returns the FloxRuntimeAssets instance used during materialization.
+   *
+   * <p>Provides access to discovered flox environments for slot manifest generation.
+   *
+   * @return the flox runtime assets, or {@code null} if not yet materialized
+   */
+  public FloxRuntimeAssets getFloxRuntimeAssets() {
+    return floxRuntimeAssets;
   }
 
   @Override
