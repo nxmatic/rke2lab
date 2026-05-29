@@ -1,0 +1,20 @@
+[Unit]
+Description=Install RKE2Lab Cluster API manifests from host share (post-server)
+RequiresMountsFor=/srv/host/systemd-units.d /srv/host
+After=local-fs.target
+After=rke2-server.service
+Requires=rke2-server.service
+After=rke2lab-cluster-manifests.service
+Requires=rke2lab-cluster-manifests.service
+ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh
+ConditionPathExists=/srv/host/rke2-manifests.d/cluster-api
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh cluster-api
+RemainAfterExit=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=rke2lab.target
