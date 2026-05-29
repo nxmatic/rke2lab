@@ -1,0 +1,15 @@
+{
+  "recommendations": [
+    "redhat.vscode-yaml",
+    "asciidoctor.asciidoctor-vscode",
+    "golang.go",
+    "redhat.java",
+    "vscjava.vscode-maven",
+    "vscjava.vscode-java-debug",
+    "jnoortheen.nix-ide"
+  ],
+  "unwantedRecommendations": [
+    "sonarsource.sonarlint-vscode",
+    "Codeium.codeium"
+  ]
+}

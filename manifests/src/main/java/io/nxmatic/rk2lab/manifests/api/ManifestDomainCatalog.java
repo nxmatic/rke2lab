@@ -59,6 +59,10 @@ public final class ManifestDomainCatalog {
     return "cluster-api";
   }
 
+  public String porch() {
+    return "porch";
+  }
+
   public List<String> all() {
     return all;
   }
@@ -89,7 +93,8 @@ public final class ManifestDomainCatalog {
               "mesh",
               "high-availability",
               "cicd",
-              "cluster-api"));
+              "cluster-api",
+              "porch"));
     }
 
     public Builder addDefaultStageALinkableDomains() {

@@ -41,6 +41,7 @@ public record ControlplanePolicy(
                 .storage(environment.bool("policy.link.storage.enabled", true))
                 .replication(environment.bool("policy.link.replication.enabled", true))
                 .gitops(environment.bool("policy.link.gitops.enabled", true))
+                .porch(environment.bool("policy.link.porch.enabled", false))
                 .runtime(environment.bool("policy.link.runtime.enabled", true))
                 .networking(environment.bool("policy.link.networking.enabled", true))
                 .mesh(environment.bool("policy.link.mesh.enabled", false))

@@ -9,6 +9,7 @@ import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
 import io.nxmatic.rk2lab.manifests.api.ManifestYaml;
 import io.nxmatic.rk2lab.manifests.layers.cicd.CicdDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterDomainRegistrar;
+import io.nxmatic.rk2lab.manifests.layers.clusterapi.ClusterApiDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.common.ApplyingManifestUnitVisitor;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomain;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistry;
@@ -85,17 +86,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     final Chart chart = new Chart(app, "manifests");
 
     final LayerDomainRegistry configuredDomainRegistry =
-        new LayerDomainRegistryBuilder()
-            .register(new ClusterDomainRegistrar())
-            .register(new StorageDomainRegistrar())
-            .register(new ReplicationDomainRegistrar())
-            .register(new GitopsDomainRegistrar())
-            .register(new RuntimeDomainRegistrar())
-            .register(new NetworkingDomainRegistrar())
-            .register(new MeshDomainRegistrar())
-            .register(new HighAvailabilityDomainRegistrar())
-            .register(new CicdDomainRegistrar())
-            .build();
+        buildDomainRegistry(request.manifestDomainPolicy().orElse(null));
 
     final LayerDomainRegistry domainRegistry =
         applyManifestDomainPolicy(request, configuredDomainRegistry);
@@ -144,6 +135,24 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
     return new ManifestSynthesisResult(
         synthManifestFile, manifestUnitHitCount, domainRegistry.domains().size());
+  }
+
+  private LayerDomainRegistry buildDomainRegistry(ManifestDomainPolicy policy) {
+    final ManifestDomainPolicy effectivePolicy =
+        policy != null ? policy : ManifestDomainPolicy.builder().build();
+
+    return new LayerDomainRegistryBuilder()
+        .register(new ClusterDomainRegistrar(), effectivePolicy)
+        .register(new StorageDomainRegistrar(), effectivePolicy)
+        .register(new ReplicationDomainRegistrar(), effectivePolicy)
+        .register(new GitopsDomainRegistrar(), effectivePolicy)
+        .register(new RuntimeDomainRegistrar(), effectivePolicy)
+        .register(new NetworkingDomainRegistrar(), effectivePolicy)
+        .register(new MeshDomainRegistrar(), effectivePolicy)
+        .register(new HighAvailabilityDomainRegistrar(), effectivePolicy)
+        .register(new CicdDomainRegistrar(), effectivePolicy)
+        .register(new ClusterApiDomainRegistrar(), effectivePolicy)
+        .build();
   }
 
   private LayerDomainRegistry applyManifestDomainPolicy(

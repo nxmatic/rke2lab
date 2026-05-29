@@ -1093,6 +1093,11 @@ public final class IncusResourceBootstrap {
     }
 
     @Override
+    public String incusRemoteName() {
+      return config.incusDefaultRemote();
+    }
+
+    @Override
     public String clusterCidr() {
       return managementNodeBlueprint.host().clusterCidr().toString();
     }

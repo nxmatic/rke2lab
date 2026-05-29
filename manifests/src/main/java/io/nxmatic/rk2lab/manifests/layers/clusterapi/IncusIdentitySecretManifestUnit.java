@@ -1,6 +1,7 @@
 package io.nxmatic.rk2lab.manifests.layers.clusterapi;
 
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -52,12 +53,20 @@ public final class IncusIdentitySecretManifestUnit extends AbstractManifestUnit 
 
   @Override
   public void apply(final Chart chart) {
+    final BootstrapIdentity identity = bootstrapIdentity();
+    final String clusterName = identity.clusterName();
+    final String incusRemoteName = identity.incusRemoteName();
+
+    // Skip synthesis when running in ephemeral/test mode without real bootstrap identity
+    if (BootstrapIdentity.UNKNOWN.equals(clusterName)) {
+      return;
+    }
+
     try {
-      final String clusterName = bootstrapIdentity().clusterName();
       final Path secretsFile = Path.of(".secrets");
       final Path incusConfigDir = Path.of(System.getProperty("user.home"), ".config", "incus");
 
-      final String remoteAddress = readRemoteAddress(clusterName, incusConfigDir);
+      final String remoteAddress = readRemoteAddress(incusRemoteName, incusConfigDir);
       final String clientCert = readClientCertFromClasspath();
       final String clientKey = readClientKeyFromSecrets(secretsFile);
       final String serverCert = readServerCertFromIncusConfig(remoteAddress, incusConfigDir);

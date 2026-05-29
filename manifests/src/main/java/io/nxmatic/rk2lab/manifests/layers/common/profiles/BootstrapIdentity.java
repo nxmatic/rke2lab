@@ -13,11 +13,12 @@ package io.nxmatic.rk2lab.manifests.layers.common.profiles;
  * deliberately exposes only the identity subset — bootstrap paths and per-package config stay in
  * their owning layers.
  *
- * <p>Incus cluster configuration: Each cluster uses its own Incus remote (cluster name = remote
- * name: bioskop → bioskop remote, nikopol → nikopol remote). All clusters share a single CAPN
- * identity ({@code "capn"}) for Cluster API Provider Incus authentication. Manifest units read from
- * operator environment paths ({@code .secrets}, {@code ~/.config/incus}) using the cluster name as
- * remote name and the constant {@code "capn"} identity.
+ * <p>Incus cluster configuration: The Incus remote name ({@code incusRemoteName}) is configured per
+ * cluster and may differ from the cluster name (e.g., cluster "bioskop" uses remote
+ * "bioskop-nixos"). All clusters share a single CAPN identity ({@code "capn"}) for Cluster API
+ * Provider Incus authentication. Manifest units read from operator environment paths ({@code
+ * .secrets}, {@code ~/.config/incus}) using the configured remote name and the constant {@code
+ * "capn"} identity.
  *
  * <p>Add new fields here as Stage B / multi-cluster work surfaces them (cluster fqdn, region, peer
  * cluster set, etc.). The default instance backs unit tests and ephemeral synth runs that don't go
@@ -31,13 +32,15 @@ public record BootstrapIdentity(
     String clusterEnv,
     String nodeName,
     int nodeId,
-    String nodeKind) {
+    String nodeKind,
+    String incusRemoteName) {
 
   /** Sentinel used when seed-bootstrap hasn't supplied identity (tests, ephemeral runs). */
   public static final String UNKNOWN = "unknown";
 
   private static final BootstrapIdentity DEFAULT =
-      new BootstrapIdentity(UNKNOWN, 0, UNKNOWN, "cluster.local", UNKNOWN, UNKNOWN, 0, UNKNOWN);
+      new BootstrapIdentity(
+          UNKNOWN, 0, UNKNOWN, "cluster.local", UNKNOWN, UNKNOWN, 0, UNKNOWN, UNKNOWN);
 
   public BootstrapIdentity {
     clusterName = blankToUnknown(clusterName);
@@ -47,6 +50,7 @@ public record BootstrapIdentity(
     clusterEnv = blankToUnknown(clusterEnv);
     nodeName = blankToUnknown(nodeName);
     nodeKind = blankToUnknown(nodeKind);
+    incusRemoteName = blankToUnknown(incusRemoteName);
   }
 
   /**

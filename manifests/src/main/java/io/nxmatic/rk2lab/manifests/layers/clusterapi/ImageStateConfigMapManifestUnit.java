@@ -1,6 +1,7 @@
 package io.nxmatic.rk2lab.manifests.layers.clusterapi;
 
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +44,11 @@ public final class ImageStateConfigMapManifestUnit extends AbstractManifestUnit 
   @Override
   public void apply(final Chart chart) {
     final String clusterName = bootstrapIdentity().clusterName();
+
+    // Skip synthesis when running in ephemeral/test mode without real bootstrap identity
+    if (BootstrapIdentity.UNKNOWN.equals(clusterName)) {
+      return;
+    }
 
     // TODO: These values should come from Stage A outputs (imageProvider, BuildMetadata)
     // For now, using placeholders to establish the handoff contract

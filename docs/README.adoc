@@ -15,6 +15,7 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 === Manifest Synthesis
 
 * link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How K8s manifests are generated from code
+* link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven optional manifest units within domains
 * link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow patterns in seed-bootstrap
 
 == GitOps & Cluster API
@@ -105,15 +106,24 @@ Control Node Runtime Assets → DaemonSet Host Assets → Provisioning Slice Arc
 * Troubleshooting Workflow
 * Bootstrap Identity Provider (setup section)
 
+== Navigation
+
+**New to the project?** Start here:
+
+* link:cross-reference-navigation.adoc[Cross-Reference Navigation Map] - Visual guide to navigating between docs and code
+
+**Looking for specific topics?** Use the sections below or search by concern/phase.
+
 == Contributing
 
 When adding new documentation:
 
 1. **Use AsciiDoc format** (`.adoc`) for consistency
 2. **Include Mermaid diagrams** for architecture visualization
-3. **Add cross-references** - link to related docs in both directions
+3. **Add cross-references** - link to related docs AND code in both directions
 4. **Update this index** - add your document to the appropriate section
 5. **Follow the pattern**: Overview → Architecture → Usage → Troubleshooting
+6. **Add package-info.java** for domain-level architecture co-located with code
 
 === Cross-Reference Checklist
 
@@ -121,5 +131,10 @@ When you document a new concept:
 
 - [ ] Add forward links FROM your doc TO related docs
 - [ ] Add backward links FROM related docs TO your doc
+- [ ] **Add links FROM docs TO code** (interfaces, implementations, package-info)
+- [ ] **Add links FROM code (JavaDoc) TO docs** (architecture, patterns)
 - [ ] Update this README with your doc in the appropriate section
 - [ ] Add to the "By Concern" or "By Development Phase" navigation section if applicable
+- [ ] Add package-info.java with architecture diagram if documenting a domain/package
+
+See link:cross-reference-navigation.adoc[Cross-Reference Navigation Map] for patterns and examples.

@@ -78,6 +78,11 @@ public interface LayerEnvContext {
 
   String vipHostInetAddr(); // "10.80.7.10"
 
+  // Incus Infrastructure Identity
+  default String incusRemoteName() {
+    return clusterName(); // Default: remote name = cluster name
+  }
+
   /**
    * Identity slice for synth-time consumption. The cluster env is left blank by default — the env
    * loader / Pulumi config can override per cluster as that surface materializes.
@@ -91,7 +96,8 @@ public interface LayerEnvContext {
         "",
         nodeName(),
         nodeId(),
-        nodeKind());
+        nodeKind(),
+        incusRemoteName());
   }
 
   /** Network topology slice for synth-time consumption. */

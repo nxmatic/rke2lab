@@ -1,0 +1,242 @@
+= Cross-Reference Navigation Map
+:toc: left
+:toclevels: 2
+
+This document visualizes the bidirectional cross-reference network between code (JavaDoc) and documentation (AsciiDoc).
+
+== Navigation Graph
+
+[mermaid]
+----
+graph TB
+    subgraph "AsciiDoc Documentation"
+        MCI[manifest-conditional-inclusion.adoc]
+        BIP[bootstrap-identity-provider.adoc]
+        FPG[fluent-pipeline-grammar.adoc]
+    end
+
+    subgraph "Package Documentation - JavaDoc"
+        GPI[gitops/package-info.java]
+        CPI[clusterapi/package-info.java]
+    end
+
+    subgraph "Core Interfaces - JavaDoc"
+        LDR[LayerDomainRegistrar.java]
+        BI[BootstrapIdentity.java]
+        MDP[ManifestDomainPolicy.java]
+    end
+
+    subgraph "Implementations - JavaDoc"
+        GDR[GitopsDomainRegistrar.java]
+        IISU[IncusIdentitySecretManifestUnit.java]
+        DMS[DefaultManifestSynthesisService.java]
+    end
+
+    %% AsciiDoc → JavaDoc
+    MCI -->|"See implementation"| LDR
+    MCI -->|"See example"| GPI
+    MCI -->|"See example"| CPI
+    MCI -->|"See real code"| GDR
+    MCI -->|"See real code"| IISU
+    MCI -->|"See identity fields"| BI
+
+    BIP -->|"See usage"| BI
+    BIP -->|"See usage"| IISU
+
+    %% JavaDoc → AsciiDoc
+    LDR -->|"Related docs"| MCI
+    GPI -->|"Related docs"| MCI
+    GPI -->|"Related docs"| BIP
+    CPI -->|"Related docs"| MCI
+    CPI -->|"Related docs"| BIP
+    BI -->|"Related docs"| BIP
+
+    %% JavaDoc → JavaDoc
+    GPI -->|"@see"| GDR
+    CPI -->|"@see"| IISU
+    LDR -->|"@see"| MDP
+    IISU -->|"extends"| BI
+
+    %% Package → Implementation
+    GPI -.->|contains| GDR
+    CPI -.->|contains| IISU
+
+    classDef docClass fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef pkgClass fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef interfaceClass fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef implClass fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+
+    class MCI,BIP,FPG docClass
+    class GPI,CPI pkgClass
+    class LDR,BI,MDP interfaceClass
+    class GDR,IISU,DMS implClass
+----
+
+**Legend:**
+
+* Blue: System-level AsciiDoc documentation
+* Orange: Package-level JavaDoc (domain architecture)
+* Purple: Interface/API JavaDoc
+* Green: Implementation JavaDoc
+* Solid lines: Direct cross-references
+* Dotted lines: Containment relationships
+
+== Navigation Patterns
+
+=== Pattern 1: Top-Down (Concept → Code)
+
+**Starting point**: Reading architecture documentation
+
+1. Read link:manifest-conditional-inclusion.adoc[manifest-conditional-inclusion.adoc] (system-level understanding)
+2. Click "See implementation" link → link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java] (interface + component diagram)
+3. Click "See example" link → link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/package-info.java[gitops/package-info.java] (domain architecture)
+4. Navigate to implementation → link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java] (actual code)
+
+=== Pattern 2: Bottom-Up (Code → Context)
+
+**Starting point**: Working on a specific class
+
+1. Open link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/clusterapi/IncusIdentitySecretManifestUnit.java[IncusIdentitySecretManifestUnit.java] in IDE
+2. Read JavaDoc → see package-info reference
+3. Click → link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/clusterapi/package-info.java[clusterapi/package-info.java] (domain architecture with diagram)
+4. See "Related Documentation" link
+5. Click → link:manifest-conditional-inclusion.adoc[manifest-conditional-inclusion.adoc] (system-level understanding)
+
+=== Pattern 3: Lateral (Similar Concepts)
+
+**Starting point**: Understanding one domain, need to implement another
+
+1. Reading link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/package-info.java[gitops/package-info.java]
+2. See cross-reference to link:manifest-conditional-inclusion.adoc[manifest-conditional-inclusion.adoc]
+3. In doc, see cross-reference to link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/clusterapi/package-info.java[clusterapi/package-info.java]
+4. Compare patterns across domains
+
+=== Pattern 4: Interface → Implementation
+
+**Starting point**: Understanding the contract
+
+1. Read link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java] (interface with component diagram)
+2. IDE "Show Implementations" → list of all registrars
+3. Pick one → e.g., link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java]
+4. See package-info reference
+5. Click → link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/package-info.java[gitops/package-info.java] (domain context)
+
+== Cross-Reference Syntax Reference
+
+=== In AsciiDoc → Java Source
+
+**Link to Java file** (GitHub/IDE clickable):
+----
+link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java]
+----
+
+**Link to package**:
+----
+link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/package-info.java[gitops package-info]
+----
+
+**Inline code reference**:
+----
+The `LayerDomainRegistrar` interface...
+See link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomainRegistrar.java[implementation] for details.
+----
+
+=== In JavaDoc → AsciiDoc
+
+**Link to doc** (from JavaDoc):
+[source,java]
+----
+/**
+ * Related documentation:
+ * <ul>
+ *   <li><a href="../../../../../../../../../../docs/manifest-conditional-inclusion.adoc">
+ *       Manifest Conditional Inclusion</a> - Pattern overview
+ *   <li><a href="../../../../../../../../../../docs/bootstrap-identity-provider.adoc">
+ *       Bootstrap Identity Provider</a> - Identity flow
+ * </ul>
+ */
+----
+
+**Relative path calculation**:
+
+* From `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/package-info.java`
+* To `docs/manifest-conditional-inclusion.adoc`
+* Path: `../../../../../../../../../../docs/manifest-conditional-inclusion.adoc` (11 levels up)
+
+=== In JavaDoc → JavaDoc
+
+**Standard @see tags**:
+[source,java]
+----
+/**
+ * @see LayerDomainRegistrar
+ * @see ManifestDomainPolicy
+ * @see io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity
+ */
+----
+
+**Link to package**:
+[source,java]
+----
+/**
+ * See {@link io.nxmatic.rk2lab.manifests.layers.gitops} package documentation
+ * for domain architecture and examples.
+ */
+----
+
+== Benefits of Bidirectional Cross-References
+
+**Discoverability**:
+* Developers find architecture docs from code
+* Readers find real implementations from docs
+
+**Context Switching**:
+* Minimal - one click from code to context
+* IDE integration makes it seamless
+
+**Maintenance**:
+* Changes to one trigger review of cross-references
+* IDEs show broken links (dead code/doc)
+
+**Learning**:
+* New developers navigate concept → code → context
+* Experienced developers navigate code → similar patterns
+
+**Review**:
+* Reviewers verify code matches documented architecture
+* Doc updates prompt code verification
+
+== IDE Integration
+
+**IntelliJ IDEA**:
+* HTML links in JavaDoc rendered as clickable
+* AsciiDoc plugin renders links to Java files
+* Ctrl+Click navigates across boundaries
+
+**VS Code**:
+* AsciiDoc extension renders `link:` as clickable
+* JavaDoc preview renders HTML links
+* Mermaid diagrams render inline
+
+**GitHub**:
+* Both AsciiDoc and JavaDoc rendered
+* Relative links navigate within repository
+* Search finds references across docs and code
+
+== Maintenance Checklist
+
+When updating architecture:
+
+- [ ] Update system-level AsciiDoc documentation
+- [ ] Update affected package-info.java files
+- [ ] Update affected interface JavaDoc
+- [ ] Verify cross-references are bidirectional
+- [ ] Verify relative paths are correct
+- [ ] Update this navigation map if adding new docs
+- [ ] Test links in IDE and GitHub preview
+
+== Related Documentation
+
+* link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Main architecture doc with cross-references
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Identity flow patterns
+* link:README.adoc[Documentation Index] - All project documentation
