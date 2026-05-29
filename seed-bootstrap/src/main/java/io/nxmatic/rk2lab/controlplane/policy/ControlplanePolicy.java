@@ -47,7 +47,7 @@ public record ControlplanePolicy(
                 .mesh(environment.bool("policy.link.mesh.enabled", false))
                 .highAvailability(environment.bool("policy.link.highAvailability.enabled", true))
                 .cicd(environment.bool("policy.link.cicd.enabled", true))
-                .clusterApi(environment.bool("policy.link.clusterApi.enabled", false))
+                .clusterApi(environment.bool("policy.link.clusterApi.enabled", true))
                 .build(),
             new ManifestLinkPolicy.DebugPolicy(debugPolicy::domainDebug));
 
