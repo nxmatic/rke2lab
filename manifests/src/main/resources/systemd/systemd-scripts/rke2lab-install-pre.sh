@@ -16,30 +16,6 @@ export RKE2_FLOX_SYSTEM
 flox install --dir=/var/lib/cloud git gh@^2.86
 source <(flox activate --dir=/var/lib/cloud)
 
-kdns::manifest:patch() {
-	local deployment_manifest flox_env debug_enabled debug_suspend runtime_class
-
-	deployment_manifest="${RKE2LAB_MANIFESTS_DIR:-/srv/host/rke2-manifests.d}/networking/kdns/02-deployment-kdns.yml"
-	[[ -f "${deployment_manifest}" ]] || return 0
-
-	flox_env="${RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV:-nxmatic/kdns}"
-	debug_enabled="${RKE2LAB_POLICY_DEBUG_KDNS_ENABLED:-false}"
-	debug_suspend="${RKE2LAB_POLICY_DEBUG_KDNS_SUSPEND:-false}"
-
-	RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV="${flox_env}" \
-		RKE2LAB_POLICY_DEBUG_KDNS_ENABLED="${debug_enabled}" \
-		RKE2LAB_POLICY_DEBUG_KDNS_SUSPEND="${debug_suspend}" \
-		yq eval -i '
-      .spec.template.metadata.annotations."flox.dev/environment.kdns" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_FLOX_ENV) |
-       .spec.template.metadata.annotations."flox.dev/debug.kdns" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_ENABLED) |
-       .spec.template.metadata.annotations."flox.dev/debug-suspend.kdns" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_SUSPEND) |
-      .spec.template.metadata.annotations."debug.kdns.lab42/enabled" = strenv(RKE2LAB_POLICY_DEBUG_KDNS_ENABLED)
-    ' "${deployment_manifest}"
-}
-
-: "Patch KDNS manifest runtime selection from controlplane env overlay"
-kdns::manifest:patch
-
 : "Load GitHub credentials from worktree secrets (hard-fail on missing keys)"
 rke2lab::secrets:load() {
 	local secrets_file var key val
