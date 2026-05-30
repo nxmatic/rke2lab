@@ -51,6 +51,32 @@
           '';
         };
 
+        # Build the seed-master bootstrap app (and the manifests jar it embeds)
+        # as a single reactor build, so the deployable artifact Pulumi runs comes
+        # from the immutable store rather than a mutable target/. seed-master
+        # depends on manifests, netplan, systemd-contract and sdks/incus, so the
+        # whole reactor is built once from the parent pom. Mirrors netplanJar's
+        # Maven-in-nix pattern; the build runs with sandbox=false (per the host
+        # nix.conf) so Maven can resolve its dependency tree.
+        seedMasterJar = pkgs.stdenv.mkDerivation {
+          name = "rke2lab-seed-master";
+          src = ./.;
+
+          nativeBuildInputs = [ pkgs.maven pkgs.jdk25 ];
+
+          buildPhase = ''
+            mkdir -p $TMPDIR/.m2
+            mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
+              -DskipTests clean package
+          '';
+
+          installPhase = ''
+            mkdir -p $out/share/java
+            cp seed-master/target/seed-master-*-exec.jar $out/share/java/seed-master.jar
+            cp manifests/target/manifests-*-exec.jar $out/share/java/manifests.jar
+          '';
+        };
+
         # Generate network blueprint YAML from Java source of truth
         networkBlueprintYaml = pkgs.stdenv.mkDerivation {
           name = "rke2lab-network-blueprint";
@@ -122,7 +148,8 @@
 
       in {
         packages = {
-          inherit netplanJar networkBlueprintYaml;
+          inherit netplanJar networkBlueprintYaml seedMasterJar;
+          seed-master = seedMasterJar;
           incus-client = incusClient;
         } // floxNriPluginPackages;
 

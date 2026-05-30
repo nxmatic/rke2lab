@@ -2,7 +2,10 @@ name: rke2lab
 runtime:
   name: java
   options:
-    binary: seed-master/target/seed-master-0.1.0-SNAPSHOT-exec.jar
+    # Store-built bootstrap jar via `nix build .#seed-master` (-> ./result).
+    # The artifact Pulumi runs is the immutable store path, not a mutable
+    # target/ build. Run `nix build .#seed-master` before `pulumi up`.
+    binary: result/share/java/seed-master.jar
 description: Pulumi-based provisioning control plane for RK2Lab management cluster bootstrap
 packages:
   incus:
