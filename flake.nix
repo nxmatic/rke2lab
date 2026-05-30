@@ -40,8 +40,28 @@
     flox-runtime.inputs.flake-commons.follows = "flake-commons";
   };
 
-  outputs = { self, nixpkgs, flake-utils, flox-runtime, ... }:
+  outputs = inputs@{ self, nixpkgs, flake-utils, flox-runtime, ... }:
     let
+      # Enforce the INVARIANT above mechanically, not just by comment: fail eval
+      # (any `nix build`/`nix eval` of this flake) with a printed diagnostic if
+      # nix-darwin-home is ever wired in as an input. The `...` in the argument
+      # set would otherwise swallow it silently. The dependency must stay
+      # one-directional — nix-darwin-home -> rke2lab — so this edge never closes
+      # into a flake-eval cycle.
+      _invariantGuard =
+        if inputs ? nix-darwin-home then
+          throw ''
+            rke2lab flake INVARIANT violated: `nix-darwin-home` is an input.
+            The two repos relate in opposite scopes — nix-darwin-home depends on
+            rke2lab at build/eval time (it imports lib.networkBlueprint), while
+            rke2lab depends on nix-darwin-home only at runtime (incus instances
+            run on the host it provisions). Adding nix-darwin-home as an input
+            here closes that into a real flake-eval cycle. Remove the input;
+            keep the dependency one-directional: nix-darwin-home -> rke2lab.
+          ''
+        else
+          null;
+
       # The network blueprint is OS-independent data (cluster/node IDs, MAC
       # patterns, addressing): the netplan jar is a portable JDK/Maven build, so
       # the YAML — and the data parsed from it — is identical regardless of which
@@ -149,6 +169,9 @@
           };
       };
     in
+    # Force the invariant guard before returning any output, so a forbidden
+    # nix-darwin-home input fails eval with the diagnostic rather than slipping by.
+    builtins.seq _invariantGuard
     (flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
