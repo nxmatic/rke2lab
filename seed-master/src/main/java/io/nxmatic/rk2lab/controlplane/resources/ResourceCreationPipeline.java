@@ -102,7 +102,7 @@ final class ResourceCreationPipeline {
     PulumiResourceBuilder withRegistry() {
       this.registry =
           new BootstrapRegistryResource(
-              "seed-bootstrap-registry",
+              "seed-master-registry",
               config,
               bootstrapResult.provisioning(),
               bootstrapResult.runtime(),

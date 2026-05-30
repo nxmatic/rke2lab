@@ -8,7 +8,7 @@ It is meant to evolve. Cross out items as they land; add items as new failures s
 
 == Snapshot — current master state
 
-Reference snapshot taken 2026-05-26 after the seed-bootstrap pipeline-grammar / Maven-coords / on-failure-fix / topic-runner batch landed end-to-end successfully (commits `c8e4c385`..`6585cb55`). The earlier 2026-05-26 snapshot from the busybox-carrier batch (`c727b597`..`d9db75aa`) is preserved in git history.
+Reference snapshot taken 2026-05-26 after the seed-master pipeline-grammar / Maven-coords / on-failure-fix / topic-runner batch landed end-to-end successfully (commits `c8e4c385`..`6585cb55`). The earlier 2026-05-26 snapshot from the busybox-carrier batch (`c727b597`..`d9db75aa`) is preserved in git history.
 
 Healthy:
 
@@ -25,7 +25,7 @@ Still broken (or pending validation):
 
 * `Repository`/`PackageVariant` resources fail apply because the Porch CRD is absent
 * `FluxInstance` fails apply because the Flux Operator CRD is absent
-* `rke2lab-cluster-api-install.service` and `rke2lab-capn-provider-install.service` are stuck `inactive`: systemd ordering bug (their prerequisite activates after `rke2lab.target` has settled) and `clusterctl.yaml` lacks the `incus` provider entry. Visible in the seed-bootstrap output as `pendingDependencies`.
+* `rke2lab-cluster-api-install.service` and `rke2lab-capn-provider-install.service` are stuck `inactive`: systemd ordering bug (their prerequisite activates after `rke2lab.target` has settled) and `clusterctl.yaml` lacks the `incus` provider entry. Visible in the seed-master output as `pendingDependencies`.
 
 Hygiene:
 
@@ -74,7 +74,7 @@ Two prerequisite work items before any `Machine` reconciles:
 . *Materialize `clusterctl.yaml` at provisioning time.* Pulumi config (`rke2lab:capn.provider.url`, `rke2lab:capn.provider.version`) → templated by a host-side init script writing `/root/.cluster-api/clusterctl.yaml`. Drives `rke2lab-capn-provider-install.service` precondition green. Add CAPRKE2 in the same pass so `clusterctl init -i incus -c rke2 -b rke2` is one call.
 . *Fix the systemd ordering bug.* `rke2lab-cluster-api-install.service` and `rke2lab-capn-provider-install.service` both have `Requires=` on a prerequisite that becomes active after `rke2lab.target`, so they get queued and dropped. Either propagate `WantedBy=` from the prerequisite, or restructure so both services are pulled in by their actual unblocker rather than by the target.
 
-Validation: `pulumi up` with these fixes should land the seed-bootstrap output's `pendingDependencies` empty (currently shows the two services as `inactive`).
+Validation: `pulumi up` with these fixes should land the seed-master output's `pendingDependencies` empty (currently shows the two services as `inactive`).
 
 === 2.B — Bring control-plane peers under CAPN (current focus)
 
@@ -82,9 +82,9 @@ Once 2.A lands, the *first* CAPN-managed nodes are the missing bioskop control-p
 
 Work items:
 
-. *Define a `Cluster` resource for `bioskop`* targeting the existing master and the three peers. The seed-bootstrap output already publishes the handoff identity (`managementClusterName=bioskop`, `apiEndpoint=https://10.66.106.10:6443`, `kubeconfigRef`, etc.) — Stage B reads these to populate the Cluster spec.
+. *Define a `Cluster` resource for `bioskop`* targeting the existing master and the three peers. The seed-master output already publishes the handoff identity (`managementClusterName=bioskop`, `apiEndpoint=https://10.66.106.10:6443`, `kubeconfigRef`, etc.) — Stage B reads these to populate the Cluster spec.
 . *Define `IncusMachine`+`RKE2ControlPlane`* (or equivalent CAPN+CAPRKE2 shapes) for peer1/peer2/peer3. They join via the kube-vip-fronted control-plane endpoint that's already up.
-. *Validate end-to-end*: `kubectl get machines` shows the four control-plane Machines reconciling; `etcd` member list grows to 4; `kube-apiserver` is reachable through the VIP throughout. The bbox DHCP reservations for peer1/2/3 are already in place (the seed-bootstrap reconciles 12 reservations; only 1 is currently bound to a running instance).
+. *Validate end-to-end*: `kubectl get machines` shows the four control-plane Machines reconciling; `etcd` member list grows to 4; `kube-apiserver` is reachable through the VIP throughout. The bbox DHCP reservations for peer1/2/3 are already in place (the seed-master reconciles 12 reservations; only 1 is currently bound to a running instance).
 
 Worker nodes (worker1, worker2) and external nodes (nikopol) are deferred to a later sub-phase — they need separate `MachineDeployment` shapes and a different bootstrap profile, and we want HA on the management plane before adding workload capacity.
 

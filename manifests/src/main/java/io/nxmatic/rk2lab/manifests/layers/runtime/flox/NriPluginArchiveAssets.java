@@ -47,7 +47,7 @@ public final class NriPluginArchiveAssets {
   }
 
   /**
-   * Raw archive bytes. Used by the hostPath materializer in seed-bootstrap to write the archive
+   * Raw archive bytes. Used by the hostPath materializer in seed-master to write the archive
    * directly to disk without the base64 round-trip the ConfigMap path required.
    */
   public byte[] archiveBytes() {

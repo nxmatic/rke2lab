@@ -72,12 +72,12 @@
       <!-- rke2lab dependencies -->
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>seed-bootstrap</artifactId>
+        <artifactId>seed-master</artifactId>
         <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>seed-bootstrap</artifactId>
+        <artifactId>seed-master</artifactId>
         <version>${rke2lab.version}</version>
         <classifier>exec</classifier>
       </dependency>

@@ -2,14 +2,14 @@
 
 ## Build & module layout
 
-- Maven multi-module project. CLI selectors use the unprefixed module name: `./mvnw -pl :seed-bootstrap` (not `:rke2lab-seed-bootstrap`).
+- Maven multi-module project. CLI selectors use the unprefixed module name: `./mvnw -pl :seed-master` (not `:rke2lab-seed-master`).
 - Group ids are nested under `io.nxmatic.rke2lab` (and `io.nxmatic.rke2lab.sdks` for the `sdks/` tree). Artifact ids match the directory name.
 - `<name>` in each pom is the relative directory path from the repo root.
 - Toolchain is JDK 25 via flox. Always run Maven through `flox activate -- ./mvnw …`. Builds and provisioning are run by the user — propose fixes, don't run mvnw/pulumi/kubectl yourself.
 
 ## Fluent pipeline grammar
 
-Multi-stage workflows in seed-bootstrap follow a documented fluent grammar. The full design lives at [docs/fluent-pipeline-grammar.adoc](docs/fluent-pipeline-grammar.adoc). Summary:
+Multi-stage workflows in seed-master follow a documented fluent grammar. The full design lives at [docs/fluent-pipeline-grammar.adoc](docs/fluent-pipeline-grammar.adoc). Summary:
 
 - **Topic blocks** are entered with `.during("label", lambda)`. The lambda receives a topic-specific builder so only that topic's verbs are callable inside.
 - **Conjunctions** between topics are explicit: `.then()` is mandatory between `during(...)` calls. It exists for readability, not data flow.

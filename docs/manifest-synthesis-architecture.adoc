@@ -32,7 +32,7 @@ Manifest synthesis transforms domain-specific configuration into Kubernetes YAML
 [mermaid]
 ----
 graph TB
-    subgraph SeedBootstrap["seed-bootstrap module"]
+    subgraph SeedBootstrap["seed-master module"]
         Bootstrap["IncusResourceBootstrap<br/><i>Entry point for bootstrap synthesis</i>"]
     end
 
@@ -157,7 +157,7 @@ sequenceDiagram
 
 === Entry Point: IncusResourceBootstrap
 
-Location: `seed-bootstrap/src/main/java/io/nxmatic/rk2lab/controlplane/incus/IncusResourceBootstrap.java`
+Location: `seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/incus/IncusResourceBootstrap.java`
 
 The `synthesizeAndExplodeManifests()` method builds a `ManifestSynthesisRequest` containing:
 

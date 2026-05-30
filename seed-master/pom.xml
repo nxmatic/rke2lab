@@ -10,8 +10,8 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <artifactId>seed-bootstrap</artifactId>
-  <name>seed-bootstrap</name>
+  <artifactId>seed-master</artifactId>
+  <name>seed-master</name>
 
   <properties>
     <rk2lab.manifests.unpack.skip>false</rk2lab.manifests.unpack.skip>

@@ -48,7 +48,7 @@ public final class FloxRuntimeLayer extends Construct {
     //
     // Installer assets used to ride a single ConfigMap, but the aggregate
     // payload (scripts + nri-plugin source tree + env trees + flake) is well
-    // over Kubernetes' per-object 1 MiB limit. seed-bootstrap materializes
+    // over Kubernetes' per-object 1 MiB limit. seed-master materializes
     // the build-derived inputs to /srv/host/k8s-daemonset.d/runtime/flox/
     // (FloxRuntimeAssets.writeInstallerAssetTree); the init container then
     // copies that tree into the per-node mutable workspace at
@@ -472,8 +472,8 @@ public final class FloxRuntimeLayer extends Construct {
                                   Map.of("privileged", true, "runAsGroup", 0, "runAsUser", 0),
                                   "volumeMounts",
                                   new Object[] {
-                                    // /.sh = build-derived inputs from seed-bootstrap.
-                                    // Read-only: seed-bootstrap owns this path
+                                    // /.sh = build-derived inputs from seed-master.
+                                    // Read-only: seed-master owns this path
                                     // and the init container only reads from it.
                                     Map.of(
                                         "mountPath",
@@ -515,7 +515,7 @@ public final class FloxRuntimeLayer extends Construct {
                         Map.entry(
                             "volumes",
                             new Object[] {
-                              // Build-derived inputs from seed-bootstrap.
+                              // Build-derived inputs from seed-master.
                               // Read-only on the pod side: this path is owned
                               // by the apply-time materializer
                               // (FloxRuntimeAssets.writeInstallerAssetTree).

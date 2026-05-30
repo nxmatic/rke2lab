@@ -16,7 +16,7 @@
   <properties>
     <!--
       Build-time synthesis was removed: the cdk8s synth and explode steps now
-      run inside seed-bootstrap at pulumi-up time so ControlplanePolicy can
+      run inside seed-master at pulumi-up time so ControlplanePolicy can
       drive FloxDebugPolicy. The shaded manifests-exec.jar still exposes the
       Main CLI for ad-hoc synthesis (`java -jar … synthesize`); pass debug
       knobs via -D system properties on that invocation if needed.

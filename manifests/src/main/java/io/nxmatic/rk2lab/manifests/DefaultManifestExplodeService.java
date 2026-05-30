@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
  * <layer>/<package>/<order>-<kind>-<name>.yml}.
  *
  * <p>Replaces the old {@code bin/explode-manifests.sh} that used {@code yq} — the synth itself runs
- * in seed-bootstrap at pulumi-up time now, and we don't want a {@code yq} runtime dep.
+ * in seed-master at pulumi-up time now, and we don't want a {@code yq} runtime dep.
  *
  * <p>Layer and package come from {@code kpt.dev/package-layer} and {@code kpt.dev/package-name}
  * annotations stamped by layer code; defaults match the old script ({@code default} / {@code
@@ -50,7 +50,7 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
     }
 
     // Note: we do NOT wipe target here. The caller may have other content under
-    // it (e.g. host/ assets in seed-bootstrap's manifestsRoot) that must survive.
+    // it (e.g. host/ assets in seed-master's manifestsRoot) that must survive.
     // Callers are responsible for clearing stale per-resource files before
     // invoking explode.
     Files.createDirectories(target);

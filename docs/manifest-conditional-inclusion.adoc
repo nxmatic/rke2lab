@@ -486,7 +486,7 @@ This documentation is directly linked to the implementation. Navigate to these f
 
 * link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/profiles/BootstrapIdentity.java[BootstrapIdentity.java] - Identity record with infrastructure fields
 * link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/env/LayerEnvContext.java[LayerEnvContext.java] - Environment context that builds BootstrapIdentity
-* link:../seed-bootstrap/src/main/java/io/nxmatic/rk2lab/controlplane/incus/IncusResourceBootstrap.java[IncusResourceBootstrap.java] - Where `incusRemoteName()` is provided
+* link:../seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/incus/IncusResourceBootstrap.java[IncusResourceBootstrap.java] - Where `incusRemoteName()` is provided
 
 **Manifest Units** (showing patterns):
 
@@ -496,7 +496,7 @@ This documentation is directly linked to the implementation. Navigate to these f
 **Orchestration**:
 
 * link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java] - Synthesis service that distributes policy to registrars
-* link:../seed-bootstrap/src/main/java/io/nxmatic/rk2lab/controlplane/policy/ControlplanePolicy.java[ControlplanePolicy.java] - Pulumi config → policy mapping
+* link:../seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/policy/ControlplanePolicy.java[ControlplanePolicy.java] - Pulumi config → policy mapping
 
 == Related Documentation
 
@@ -601,7 +601,7 @@ pulumi config get rke2lab:incus.defaultRemote
 grep -A 3 "^remotes:" ~/.config/incus/config.yml
 
 # Verify BootstrapConfig loads the remote name
-grep "incusDefaultRemote" seed-bootstrap/src/main/java/.../BootstrapConfig.java
+grep "incusDefaultRemote" seed-master/src/main/java/.../BootstrapConfig.java
 ----
 
 **In manifest units**, always use `incusRemoteName()` not `clusterName()`:

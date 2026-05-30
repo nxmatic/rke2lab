@@ -2,7 +2,7 @@
 
 ## Context
 
-Today rke2lab provisions a single seed control-plane node (`master`) via Pulumi at `pulumi up` time on a dev machine. Module name `seed-bootstrap/` reflects "bootstrap" but is misleading — it's specifically about master.
+Today rke2lab provisions a single seed control-plane node (`master`) via Pulumi at `pulumi up` time on a dev machine. Module name `seed-master/` reflects "bootstrap" but is misleading — it's specifically about master.
 
 Goal: bring up peer1 (and later peer2, peer3, worker1, worker2 — the canonical netplan topology) under a **type-safe, GitOps-with-build-step + Tekton-reactive** loop. Java code is source of truth; Tekton synthesizes the gitops/ tree from Java; Flux applies the synthesized YAMLs.
 
@@ -10,7 +10,7 @@ End state: edit `IncusResourceBootstrap.java` → push to GitHub → Tekton (re-
 
 ## Locked decisions
 
-- **Module rename**: `seed-bootstrap/` → `seed-master/` (Pulumi-driven bootstrap of master; unchanged role).
+- **Module rename**: `seed-master/` → `seed-master/` (Pulumi-driven bootstrap of master; unchanged role).
 - **New module**: `seed-peers/` — cdk8s-driven synth of peer-related CRs. Maven dependency on `seed-master/` for `HostStage.materializeAssets()` reuse, with **Pulumi SDK explicitly excluded** via Maven `<exclusions>`. Ensures seed-peers' classpath cannot accidentally invoke Pulumi.
 - **Two flows for gitops/ updates** (both share the same `mvn -pl :seed-peers generate-resources` build):
   - **Flow A — operator-driven, intentional**: Java/synth changes → operator runs `mvn -pl :seed-peers generate-resources` locally → reviews diff → opens PR with the change + synthesized gitops/ diff → reviews in GitHub UI → merges to main → Flux applies.
@@ -142,7 +142,7 @@ Replaces the two clusterctl-driven shell-script systemd units with cdk8s manifes
 Author the `seed-peers/` module. Operator runs it locally, commits the synth output, peer1 comes up.
 
 **Deliverables**:
-1. **Module rename**: `seed-bootstrap/` → `seed-master/`. Update Maven `<artifactId>`, `<name>`, parent pom's `<modules>`, all refs across CLAUDE.md / pom files / scripts. Group id stays `io.nxmatic.rke2lab`.
+1. **Module rename**: `seed-master/` → `seed-master/`. Update Maven `<artifactId>`, `<name>`, parent pom's `<modules>`, all refs across CLAUDE.md / pom files / scripts. Group id stays `io.nxmatic.rke2lab`.
 2. **Image-state ConfigMap as Stage A output**: master's bootstrap (in HostStage's k8s ConfigMap authoring) emits a `ConfigMap bioskop-image-state` in `capn-system` carrying:
    - `imageAlias: control-node`
    - `imageFingerprint: <sha from imageProvider>`
@@ -218,7 +218,7 @@ GitHub webhook triggers seed-peers in-cluster on relevant pushes; Tekton synthes
 - `Pulumi.dev.yaml` — add `policy.link.clusterApi.enabled=true`
 
 **Phase 2**:
-- Module rename: `seed-bootstrap/` → `seed-master/` across `pom.xml` (root + module), `CLAUDE.md`, all refs
+- Module rename: `seed-master/` → `seed-master/` across `pom.xml` (root + module), `CLAUDE.md`, all refs
 - New module `seed-peers/` with `pom.xml` (deps: seed-master with Pulumi exclusions, manifests, cdk8s from BOM), `src/main/java/.../Main.java`, synth code reusing `HostStage.materializeAssets`
 - `manifests/.../runtime/RuntimeCloudConfigLayer.java` — parameterize cluster + node + hostname
 - `gitops/flux-system/{gitrepository,kustomization}.yaml` + `gitops/clusters/bioskop/{cluster,controlplane,kustomization,.sops.yaml}.yaml` (synth output, committed)

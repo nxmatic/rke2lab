@@ -403,7 +403,7 @@ sequenceDiagram
 
 === Entry Point: IncusResourceBootstrap
 
-The seed-bootstrap module builds the `ManifestSynthesisRequest`:
+The seed-master module builds the `ManifestSynthesisRequest`:
 
 [source,java]
 ----

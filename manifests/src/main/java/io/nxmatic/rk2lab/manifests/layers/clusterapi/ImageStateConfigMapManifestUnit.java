@@ -28,7 +28,7 @@ import org.cdk8s.JsonPatch;
  * <p>The ConfigMap is named {@code <cluster-name>-image-state} in namespace {@code capn-system}.
  *
  * <p><b>Note:</b> Currently uses placeholder values. These will be populated from Stage A outputs
- * (imageProvider, BuildMetadata) in a future iteration when seed-bootstrap integration is complete.
+ * (imageProvider, BuildMetadata) in a future iteration when seed-master integration is complete.
  */
 public final class ImageStateConfigMapManifestUnit extends AbstractManifestUnit {
 

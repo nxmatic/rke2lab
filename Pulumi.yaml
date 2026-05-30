@@ -1,8 +1,8 @@
 name: rke2lab
-runtime: 
+runtime:
   name: java
   options:
-    binary: seed-bootstrap/target/seed-bootstrap-0.1.0-SNAPSHOT-exec.jar
+    binary: seed-master/target/seed-master-0.1.0-SNAPSHOT-exec.jar
 description: Pulumi-based provisioning control plane for RK2Lab management cluster bootstrap
 packages:
   incus:

@@ -258,7 +258,7 @@ If the file remains >2000 lines after above refactorings:
 ## References
 
 - [fluent-pipeline-grammar.adoc](./fluent-pipeline-grammar.adoc) - Full grammar spec
-- [ApplicationPipeline.java](../seed-bootstrap/src/main/java/io/nxmatic/rk2lab/controlplane/pipeline/ApplicationPipeline.java) - Reference implementation
+- [ApplicationPipeline.java](../seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/pipeline/ApplicationPipeline.java) - Reference implementation
 
 ## Notes
 

@@ -1,6 +1,6 @@
 <!-- @codebase -->
 <!--
-  Ships systemd assets to seed-bootstrap.
+  Ships systemd assets to seed-master.
 
   The cdk8s-synthesized k8s manifests (e.g. manifests.d/networking/kdns/*.yml)
   are produced at pulumi-up time via ManifestSynthesisService, not here. This
@@ -10,7 +10,7 @@
 
   Layer-side classpath resources (e.g. runtime/flox/**) ride along on the
   manifests jar itself; FloxRuntimeAssets and friends read them via
-  Class.getResourceAsStream from seed-bootstrap's classpath.
+  Class.getResourceAsStream from seed-master's classpath.
 -->
 <assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

@@ -19,10 +19,9 @@ package io.nxmatic.rk2lab.manifests.layers.common.profiles;
  *   <li>{@link #defaults()} returns the all-components-pinned baseline — single grep target for
  *       "what version of operator X are we shipping in the bootstrap layer." Bumping a component is
  *       a one-line change here.
- *   <li>The seed-bootstrap entry point ({@code
- *       IncusResourceBootstrap.synthesizeAndExplodeManifests}) layers Pulumi-config overrides
- *       ({@code rke2lab:components.<id>.version}) on top via {@link Builder#mergeFrom}. Defaults
- *       win if Pulumi config is silent.
+ *   <li>The seed-master entry point ({@code IncusResourceBootstrap.synthesizeAndExplodeManifests})
+ *       layers Pulumi-config overrides ({@code rke2lab:components.<id>.version}) on top via {@link
+ *       Builder#mergeFrom}. Defaults win if Pulumi config is silent.
  * </ol>
  *
  * <p>Bootstrap-only scope: only operators and runtime tools that land before Porch is up live here.
@@ -95,9 +94,7 @@ public record ComponentVersions(
         .build();
   }
 
-  /**
-   * Empty versions — used by tests and ephemeral synth runs that don't go through seed-bootstrap.
-   */
+  /** Empty versions — used by tests and ephemeral synth runs that don't go through seed-master. */
   public static ComponentVersions empty() {
     return builder().build();
   }
@@ -190,7 +187,7 @@ public record ComponentVersions(
 
     /**
      * Layer overrides on top of an existing record (typically {@link #defaults()}). Empty values in
-     * {@code other} are skipped — they don't clobber a non-empty default. Used by seed-bootstrap to
+     * {@code other} are skipped — they don't clobber a non-empty default. Used by seed-master to
      * blend Pulumi-config overrides onto the baseline.
      */
     public Builder mergeFrom(final ComponentVersions other) {

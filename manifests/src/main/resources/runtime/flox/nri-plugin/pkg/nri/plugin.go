@@ -28,7 +28,7 @@ const (
 	// (kernel returns EOPNOTSUPP for reads inside the resulting overlay).
 	// The runtime-installer pod populates this path (cp -af from /.sh/.) at
 	// pod startup and `flox activate` writes locks here, so it has the same
-	// content the seed-bootstrap-owned path does — but it lives on the
+	// content the seed-master-owned path does — but it lives on the
 	// node's local zfs and supports overlayfs as a lower layer.
 	floxEnvBaseDir = "/var/run/k8s-daemonset.d/runtime/flox/environment.d"
 	floxOverlayHookPath       = "/usr/local/sbin/flox-nri-overlay-hook.sh"

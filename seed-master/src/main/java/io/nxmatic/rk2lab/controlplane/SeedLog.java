@@ -4,7 +4,7 @@ import java.util.Locale;
 import java.util.logging.Handler;
 import java.util.logging.Logger;
 
-/** Shared seed-bootstrap logger with Pulumi verbosity-aware level mapping. */
+/** Shared seed-master logger with Pulumi verbosity-aware level mapping. */
 public final class SeedLog {
 
   @FunctionalInterface

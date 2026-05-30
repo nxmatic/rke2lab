@@ -22,7 +22,7 @@ package io.nxmatic.rk2lab.manifests.layers.common.profiles;
  *
  * <p>Add new fields here as Stage B / multi-cluster work surfaces them (cluster fqdn, region, peer
  * cluster set, etc.). The default instance backs unit tests and ephemeral synth runs that don't go
- * through seed-bootstrap.
+ * through seed-master.
  */
 public record BootstrapIdentity(
     String clusterName,
@@ -35,7 +35,7 @@ public record BootstrapIdentity(
     String nodeKind,
     String incusRemoteName) {
 
-  /** Sentinel used when seed-bootstrap hasn't supplied identity (tests, ephemeral runs). */
+  /** Sentinel used when seed-master hasn't supplied identity (tests, ephemeral runs). */
   public static final String UNKNOWN = "unknown";
 
   private static final BootstrapIdentity DEFAULT =

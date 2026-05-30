@@ -16,7 +16,7 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 
 * link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How K8s manifests are generated from code
 * link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven optional manifest units within domains
-* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow patterns in seed-bootstrap
+* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow patterns in seed-master
 
 == GitOps & Cluster API
 

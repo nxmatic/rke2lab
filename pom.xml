@@ -15,7 +15,7 @@
     <module>netplan</module>
     <module>systemd-contract</module>
     <module>sdks/incus</module>
-    <module>seed-bootstrap</module>
+    <module>seed-master</module>
     <module>manifests</module>
   </modules>
 

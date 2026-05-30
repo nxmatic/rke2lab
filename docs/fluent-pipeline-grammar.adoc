@@ -2,7 +2,7 @@
 :toc: left
 :toclevels: 3
 
-This document defines the conventions for authoring multi-stage workflows in the seed-bootstrap codebase as fluent pipelines that read like English narrative.
+This document defines the conventions for authoring multi-stage workflows in the seed-master codebase as fluent pipelines that read like English narrative.
 
 == Motivation
 
@@ -170,5 +170,5 @@ For those, prefer a plain method or a small builder without the topic/conjunctio
 
 == Cross-references
 
-* `seed-bootstrap/src/main/java/io/nxmatic/rk2lab/controlplane/pipeline/` — implementation home.
+* `seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/pipeline/` — implementation home.
 * `controlplane/pipeline/stages/` — topic builder interfaces.

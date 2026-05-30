@@ -18,7 +18,7 @@ public final class RuntimeLayerRefs {
           "runtime/flox-env-configmap", ClusterLayerRefs.RUNTIME_SYSTEM_NAMESPACE, "flox-env");
 
   // FLOX_RUNTIME_INSTALLER_ASSETS_CONFIGMAP retired — installer assets ride a
-  // hostPath volume now (seed-bootstrap writes them at prepareHostState).
+  // hostPath volume now (seed-master writes them at prepareHostState).
   // See FloxRuntimeAssets.writeInstallerAssetTree(...) and FloxRuntimeLayer.
 
   private RuntimeLayerRefs() {}
