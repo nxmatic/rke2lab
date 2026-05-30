@@ -8,9 +8,19 @@
     # Follow flake-commons versions
     nixpkgs.follows = "flake-commons/nixpkgs";
     flake-utils.follows = "flake-commons/flake-utils";
+
+    # The flox runtime flake owns the NRI plugin + per-workload package
+    # definitions. We re-export its outputs here so the deployable artifacts
+    # build through this top-level entry point (and the aarch64-linux NRI plugin
+    # cross-builds via the configured linux-builder). It shares nixpkgs/flake-utils
+    # so there is a single resolved version set across the two flakes.
+    flox-runtime.url = "path:./manifests/src/main/resources/runtime/flox";
+    flox-runtime.inputs.nixpkgs.follows = "nixpkgs";
+    flox-runtime.inputs.flake-utils.follows = "flake-utils";
+    flox-runtime.inputs.flake-commons.follows = "flake-commons";
   };
 
-  outputs = { self, nixpkgs, flake-utils, ... }:
+  outputs = { self, nixpkgs, flake-utils, flox-runtime, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -95,11 +105,26 @@
         # entry only ships Linux builds).
         incusClient = pkgs.incus.passthru.client;
 
+        # NRI plugin (+ debug) re-exported from the flox runtime flake, so the
+        # aarch64-linux Go binary builds through this entry point at build time
+        # (cross-built via the configured linux-builder) rather than on the node
+        # at runtime. The node consumes the resulting store path via its gcroot.
+        # Guarded so darwin-only eval of `packages` does not fail when the
+        # runtime flake lacks an output for a given system.
+        floxRuntimePackages = flox-runtime.packages.${system} or { };
+        floxNriPluginPackages =
+          (if floxRuntimePackages ? flox-nri-plugin
+           then { inherit (floxRuntimePackages) flox-nri-plugin; }
+           else { })
+          // (if floxRuntimePackages ? flox-nri-plugin-debug
+                then { inherit (floxRuntimePackages) flox-nri-plugin-debug; }
+                else { });
+
       in {
         packages = {
           inherit netplanJar networkBlueprintYaml;
           incus-client = incusClient;
-        };
+        } // floxNriPluginPackages;
 
         # Export the network blueprint for consumption by nix-darwin-home
         lib = {
