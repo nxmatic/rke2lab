@@ -272,6 +272,11 @@
         # entry only ships Linux builds).
         incusClient = pkgs.incus.passthru.client;
 
+        # Prebuilt pulumi CLI for the deploy wrapper (matches the flox env's
+        # `pulumi.pkg-path = "pulumi-bin"`); the `-bin` variant avoids a Go
+        # compile and tracks the same release line the dev loop uses.
+        pulumiPkg = pkgs.pulumi-bin;
+
         # NRI plugin (+ debug) re-exported from the flox runtime flake, so the
         # aarch64-linux Go binary builds through this entry point at build time
         # (cross-built via the configured linux-builder) rather than on the node
@@ -295,12 +300,121 @@
         # spotless gate.
         toolchainPackages = mavenToolchain pkgs;
 
+        # Release deploy: `nix run .#deploy -- <stack>`. Runs `pulumi up` against
+        # the STORE-built seed-master jar instead of the mutable Maven target the
+        # dev loop uses. A Pulumi project is more than Pulumi.yaml — the stack
+        # config (Pulumi.<stack>.yaml, committed) and stack state
+        # (.pulumi-state/, the local backend) plus the flox PULUMI_* env all live
+        # in the repo working dir — so we deploy IN PLACE and only swap the one
+        # thing that differs between dev and release: Pulumi.yaml's `binary`,
+        # pointed at the store path for the duration (restored on exit, even on
+        # failure). Pulumi can't run from /nix/store (needs a writable cwd for
+        # state + plugin cache), which is exactly why we don't copy a skeleton.
+        #
+        # Deterministic, self-contained: every dependency pulumi needs to run is
+        # a nix build input (runtimeInputs) — NOT inherited from the flox env
+        # (`nix run` doesn't propagate the caller's PATH anyway). pulumi itself,
+        # a JRE to run the seed-master jar, and the incus client the provider
+        # shells out to. The PULUMI_* vars are set here too, mirroring the flox
+        # env's [vars]: local file:// backend under the repo, empty passphrase.
+        deployApp = pkgs.writeShellApplication {
+          name = "rke2lab-deploy";
+          runtimeInputs = [
+            pkgs.coreutils
+            pkgs.nix
+            pkgs.git
+            pulumiPkg
+            pkgs.jdk25
+            incusClient
+          ];
+          text = ''
+            if [ ! -f Pulumi.yaml ]; then
+              echo "error: run from the rke2lab repo root (no Pulumi.yaml here)" >&2
+              exit 1
+            fi
+
+            stack="''${1:-}"
+            if [ -z "$stack" ]; then
+              echo "usage: nix run .#deploy -- <stack> [preview|up] [pulumi args...]" >&2
+              echo "  preview  read-only diff, no apply (default)" >&2
+              echo "  up       apply, non-interactive (pulumi up --yes)" >&2
+              exit 2
+            fi
+            shift
+
+            # Action verb (default: preview — safe, read-only). `up` applies
+            # non-interactively: preview is the inspection step, so an explicit
+            # `up` means apply and the confirm prompt is redundant. Anything
+            # after the verb is passed through to pulumi (e.g. --diff, --target).
+            action="''${1:-preview}"
+            case "$action" in
+              preview | up) shift ;;
+              -*) action="preview" ;;  # no verb given, first arg is a pulumi flag
+              *) echo "error: unknown action '$action' (preview|up)" >&2; exit 2 ;;
+            esac
+
+            # Pulumi project env (mirrors the flox env's [vars]); each
+            # `''${VAR:-default}` so an active flox env's values win when present.
+            # PULUMI_HOME defaults to the XDG location (NOT the repo) so the
+            # plugin/cache dir never becomes a repo artifact, matching flox.
+            export PULUMI_HOME="''${PULUMI_HOME:-''${XDG_STATE_HOME:-$HOME/.local/state}/pulumi}"
+            export PULUMI_BACKEND_URL="''${PULUMI_BACKEND_URL:-file://$PWD/.pulumi-state}"
+            export PULUMI_CONFIG_PASSPHRASE="''${PULUMI_CONFIG_PASSPHRASE:-}"
+            mkdir -p "$PULUMI_HOME" .pulumi-state
+
+            # Self-heal: a previous run killed before its restore trap fired can
+            # leave Pulumi.yaml's binary pointing at a store path. Restore the
+            # committed (Maven-target) file from git before swapping again.
+            if grep -qE '^ *binary: /nix/store/' Pulumi.yaml; then
+              echo "==> Pulumi.yaml left swapped by a prior run; restoring from git" >&2
+              git checkout -- Pulumi.yaml
+            fi
+
+            # Flags for the inner `nix build .#seed-master` go via
+            # DEPLOY_NIX_FLAGS, e.g. `DEPLOY_NIX_FLAGS='-L -v -v' nix run .#deploy -- dev`.
+            # Flags given to the OUTER `nix run` (e.g. `nix run .#deploy -L ...`)
+            # are consumed by nix to build/run THIS wrapper; the seed-master
+            # build is a separate child `nix` process and does not inherit them.
+            read -r -a nixFlags <<< "''${DEPLOY_NIX_FLAGS:-}"
+
+            echo "==> building seed-master from the store" >&2
+            jar="$(nix build .#seed-master "''${nixFlags[@]}" --no-link --print-out-paths)/share/java/seed-master.jar"
+            [ -f "$jar" ] || { echo "error: store jar not found at $jar" >&2; exit 1; }
+
+            # Swap Pulumi.yaml's binary to the store jar for the duration; always
+            # restore the committed file on exit so the dev loop is untouched.
+            # Trap signals too (not just EXIT) so a Ctrl-C during `pulumi up`
+            # still restores; the self-heal above covers a hard kill (-9).
+            backup="$(mktemp)"
+            cp Pulumi.yaml "$backup"
+            trap 'cp "$backup" Pulumi.yaml; rm -f "$backup"' EXIT INT TERM HUP
+            sed -E "s#^( *binary: ).*#\1$jar#" "$backup" > Pulumi.yaml
+
+            case "$action" in
+              preview)
+                echo "==> pulumi preview --stack $stack (binary=$jar)" >&2
+                pulumi preview --stack "$stack" "$@"
+                ;;
+              up)
+                echo "==> pulumi up --yes --stack $stack (binary=$jar)" >&2
+                pulumi up --yes --stack "$stack" "$@"
+                ;;
+            esac
+          '';
+        };
+
       in {
         packages = {
           inherit netplanJar networkBlueprintYaml seedMasterJar;
           seed-master = seedMasterJar;
           incus-client = incusClient;
+          deploy = deployApp;
         } // floxNriPluginPackages // toolchainPackages;
+
+        apps.deploy = {
+          type = "app";
+          program = "${deployApp}/bin/rke2lab-deploy";
+        };
 
         # The declared source of truth for the Maven-build toolchain. `mvn` from
         # here (or via the flox env that consumes these versions) sees the same
