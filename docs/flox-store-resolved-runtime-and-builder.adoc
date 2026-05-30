@@ -1,0 +1,415 @@
+= Flox Store-Resolved Runtime + Remote Nix Builder
+:toc: left
+:toclevels: 3
+:kroki-server-url: https://kroki.io
+
+== Overview
+
+This design covers two intertwined changes to the Flox container runtime:
+
+. *Store-resolved runtime* — move both the loose shell scripts under
+  `manifests/src/main/resources/runtime/flox/bin/` AND the flox envs themselves
+  out of the copy-based delivery model, so the node resolves them from
+  `/nix/store` the same way it already resolves the NRI plugin binary and the
+  workload packages (kdns, headplane, ...). Scripts become nix-built packages;
+  envs are consumed via a fine-grained `.flox` symlink farm (`env/` → store,
+  `run/cache/log` → local). This removes the `cp` trampoline, the lock-propagation
+  step, and the relative-flake-ref breakage in one stroke.
+. *Remote nix builder* — let any Flox-injected container build arbitrary,
+  unknown-at-provision-time packages by delegating builds to the NixOS host
+  (`{bioskop,nikopol}-nixos`) over `ssh-ng`, while never building locally.
+
+They share one boundary, which is why they are designed together: the line
+between *immutable code* (belongs in `/nix/store`, read-only) and the *mutable
+runtime workspace* (`/var/run/...`, where locks are written and builds stage).
+Both changes are about pushing immutable artifacts into the store and keeping
+only genuinely mutable state in `/var/run`.
+
+=== Why now
+
+The loose-script model surfaced two defects already fixed (see
+xref:_related_documentation[Related Documentation]): a stale install-time
+manifest patch and a missing lock propagation. Both were symptoms of shipping
+runtime code as raw resource files copied through a ConfigMap trampoline rather
+than as versioned, store-addressed build outputs. Moving to store resolution
+removes the class of bug where "the file on the node" and "the file in the repo"
+drift, and it is the prerequisite for the builder feature (a builder must hand
+back store paths the container can actually resolve).
+
+== Background: the current delivery model
+
+The Flox runtime installer DaemonSet materializes assets through three distinct
+delivery contracts. Any migration must preserve all three.
+
+[cols="1,3,2",options="header"]
+|===
+| Contract | Scripts | How resolved today
+
+| *A. Pod-mode `/.sh/bin/`*
+| `flox-nri-plugin-run.sh`
+| ConfigMap mounted read-only at `/.sh`; run as `/bin/sh /.sh/bin/...`
+  (`FloxRuntimeLayer` init container).
+
+| *B. Node-local `/var/run/.../bin/`*
+| `flox-nri-plugin-installer.sh`, `flox-runtime-lib.sh`,
+  `flox-nri-plugin-reload.sh`
+| `cp -af /.sh -> /var/run` at pod start, then exec'd from the node-local copy.
+
+| *C. Fixed `/usr/local/sbin/`*
+| `flox-nri-overlay-hook.sh`, `flox-nri-chown-hook.sh`
+| OCI hook contract: runc looks them up at a fixed host path. The installer
+  copies them there via `on_materialize`.
+|===
+
+A separate shared library, the daemonset policy lib
+(`runtime/daemonset/.sh.d/`: `daemonset-runtime.sh`, `daemonset-trampoline.sh`,
+`daemonset-host-shell-policy.sh`), is shipped as its own
+`runtime-daemonset-script-policy` ConfigMap mounted at `/.sh-daemonset`. The
+runtime scripts source it. It is generic daemonset infrastructure reused beyond
+Flox, so it is treated as a distinct artifact in this design.
+
+=== The mutable-vs-immutable boundary
+
+The `cp -af /.sh -> /var/run` step is not incidental. It makes
+`/var/run/k8s-daemonset.d/runtime/flox` a *writable git tree* because:
+
+* `flox activate` writes `manifest.lock` there (the lock-propagation path),
+* `nix build` runs against the flake source there,
+* the path must be a real git tree so nix's path-flake fetcher hashes the
+  source via git's index rather than walking volatile files.
+
+`/nix/store` is read-only. Therefore scripts can move to the store, but the
+*workspace* (the flake source nix builds against, `environment.d/`, the written
+locks) cannot. The design must keep these separate.
+
+== C4 context: concerns and data flow
+
+[mermaid]
+....
+flowchart TB
+  subgraph synth["Synthesis (operator machine, pulumi up)"]
+    flake["runtime/flox/flake.nix\n(new: runtime-scripts pkg,\nbuilder.conf authoring)"]:::code
+    assets["FloxRuntimeAssets\n(ships store path refs,\nno loose scripts)"]:::code
+    keys[".ndh-ssh.d/keys.yaml\n(nix-store key, decrypted in tree)"]:::secret
+  end
+
+  subgraph node["Cluster node (bioskop-master incus instance)"]
+    store["/nix/store/...-flox-runtime-scripts\n(immutable, read-only)"]:::store
+    workspace["/var/run/.../runtime/flox\n(mutable: flake src, locks, builds)"]:::mut
+    hooks["/usr/local/sbin/flox-nri-*-hook.sh\n(fixed OCI hook path)"]:::store
+    plugin["NRI plugin\n(mounts envs + builder.conf into containers)"]:::code
+  end
+
+  subgraph host["NixOS host (bioskop-nixos)"]
+    daemon["nix-daemon\n(native aarch64-linux builder)"]:::builder
+    inbound["nix-store SSH user\n(forced shell: nix-daemon --stdio)"]:::builder
+  end
+
+  subgraph ctr["Flox-injected container"]
+    cnix["/etc/nix/nix.conf.d/builder.conf\nmax-jobs=0, builders=ssh-ng://nix-store.<host>"]:::store
+    cstore["/nix/store (overlay)"]:::mut
+  end
+
+  flake -->|nix build| store
+  flake -->|nix build| hooks
+  assets -->|store path ref| workspace
+  keys -->|synth-time read| assets
+  store -.->|sourced by| workspace
+  plugin -->|RO bind-mount| cnix
+  cnix -->|ssh-ng remote build| inbound
+  inbound --> daemon
+  daemon -->|copy closure back| cstore
+
+  classDef code fill:#dae8fc,stroke:#6c8ebf
+  classDef store fill:#d5e8d4,stroke:#82b366
+  classDef mut fill:#ffe6cc,stroke:#d79b00
+  classDef secret fill:#f8cecc,stroke:#b85450
+  classDef builder fill:#e1d5e7,stroke:#9673a6
+....
+
+[cols="1,3",options="header"]
+|===
+| Color | Meaning
+| Blue | Code/synthesis (Java layers, flake, plugin)
+| Green | Immutable, store-resolved (read-only)
+| Orange | Mutable runtime workspace / overlay
+| Red | Secret material (synth-time only)
+| Purple | The NixOS host builder
+|===
+
+== Part 1 — Store-resolved runtime scripts
+
+=== Goal
+
+Scripts under `runtime/flox/bin/` stop being source-tracked loose files copied
+through a ConfigMap. They become outputs of a nix package built by the runtime
+flake, resolved from `/nix/store`. The repository keeps the script *sources* as
+flake build inputs, not as runtime-shipped resources.
+
+=== Package shape
+
+Add to `runtime/flox/flake.nix` a `flox-runtime-scripts` package built with
+`pkgs.writeShellApplication` per script (or a single `stdenvNoCC.mkDerivation`
+installing the set), with `runtimeInputs` declaring `bash`, `coreutils`,
+`inotify-tools`, etc. so the closure is self-contained. This mirrors how
+`flox-nri-plugin` is already a flake package.
+
+[source,nix]
+----
+flox-runtime-scripts = pkgs.stdenvNoCC.mkDerivation {
+  pname = "flox-runtime-scripts";
+  version = nriPluginVersion;
+  src = ./scripts;            # sources move here from bin/
+  installPhase = ''
+    mkdir -p $out/bin $out/libexec
+    install -m0755 flox-nri-plugin-installer.sh $out/bin/
+    install -m0755 flox-nri-plugin-run.sh       $out/bin/
+    install -m0755 flox-nri-plugin-reload.sh    $out/bin/
+    install -m0644 flox-runtime-lib.sh          $out/libexec/   # sourced, not exec'd
+    install -m0755 flox-nri-overlay-hook.sh     $out/libexec/   # contract C: installed to /usr/local/sbin
+    install -m0755 flox-nri-chown-hook.sh       $out/libexec/
+  '';
+};
+----
+
+=== Handling the three contracts after migration
+
+* *Contract A & B (orchestration scripts)*: `FloxRuntimeAssets` stops emitting
+  the five `addInstallerAsset` script entries. Instead the synthesis layer
+  resolves the store path of `flox-runtime-scripts` and the init container runs
+  the installer/lib/run/reload directly from `/nix/store/...-flox-runtime-scripts/bin/...`.
+  The `SCRIPT_MOUNT_DIR` env in `FloxRuntimeLayer` points at the store path
+  instead of `/var/run/.../bin`.
+* *Contract C (OCI hooks)*: runc's hook path is fixed and not store-aware, so
+  the hooks still land at `/usr/local/sbin/flox-nri-*-hook.sh`. The change is
+  the *source*: the installer installs them *from the store package's libexec*
+  rather than from the `cp`-populated `/var/run/.../bin`.
+
+=== Store-located envs via a fine-grained `.flox` symlink farm
+
+The same store-resolution principle extends past scripts to the *flox envs
+themselves*. The container's `/nix/store` overlay LOWER is the host store (NRI
+plugin: `nix-store /nix/store -> /nix/store`), so any store path the host holds,
+the container sees. The static part of an env (`manifest.toml` + `manifest.lock`)
+is immutable and belongs in the store; only flox's `run/`/`cache/`/`log/` are
+mutable.
+
+The split must be done at *`.flox`-internal* granularity. The following layout
+is verified working on the master:
+
+----
+.flox/                  ← real local writable directory
+  env  -> /nix/store/<hash>-<env>/env   ← symlink into store (manifest.toml + lock)
+  env.json              ← small local file
+  run/   cache/  log/   ← real local writable dirs (flox writes here)
+----
+
+`flox activate` from this layout writes its `run/aarch64-linux.<env>.dev` into
+the *local* `.flox/run`, leaves the store path pristine, and resolves the
+workload from the locked store paths — `ACTIVATE_OK`.
+
+[WARNING]
+====
+Do *not* symlink the whole `.flox` into the store (a naive `xstow` of the env
+dir). flox resolves `run/` relative to the symlink's *real target*, tries to
+create a GC root inside `/nix/store`, and nix itself refuses:
+`creating a garbage collector root ... in the Nix store is forbidden`. The
+mutable/immutable boundary is *inside* `.flox`, so a whole-dir symlink cannot
+straddle it. Likewise, activating directly from a read-only store path while
+running as root silently pollutes the store (root has `CAP_DAC_OVERRIDE`).
+====
+
+This is the `xstow` pattern already used by `rke2lab-systemd-link.sh`, applied
+at `.flox`-internal granularity (or a tiny purpose-built linker). It replaces
+the `cp -af /.sh -> /var/run` env-consumption path.
+
+=== What this removes
+
+Store-located envs collapse machinery the copy model required:
+
+[cols="1,2",options="header"]
+|===
+| Current (copy model) | With store-located env
+
+| `cp -af /.sh -> /var/run` for env consumption | gone — `.flox/env` symlinks into store
+| overlay-mount `.flox` at `$HOME/.flox` | gone — local `.flox` with store-symlinked `env/`
+| lock propagation to `/var/run` | gone — the lock is immutable in the store path
+| relative `path:../../..` re-resolution breakage | gone — a locked store env never re-resolves
+|===
+
+=== What still needs `/var/run` (master-only, production side)
+
+The mutable workspace remains, but only on the *master* and only for *producing*
+locked envs and realizing packages:
+
+* the flake source `nix build` runs against,
+* the `flox activate` pass that *writes* `manifest.lock` (lock production),
+* the staging area for builds.
+
+The container *consumption* side no longer needs a writable workspace at all.
+The conflation in the current model — using one `cp`-everything tree for both
+production and consumption — is what this design separates.
+
+=== Open question: how the node gets the store paths
+
+The store path (scripts package + env subtrees) must exist on the node before
+the container can resolve it. Two options, to be decided at implementation:
+
+* *(a)* the runtime flake's `flox activate` prebuild pass (already runs on the
+  master) realizes the packages and `nix store add-path` the env subtrees into
+  the node store as a side effect, and the synthesis layer passes the resolved
+  store paths in;
+* *(b)* the packages are added to the set the master pre-builds explicitly, and
+  the store paths are published through the image-state/handoff surface.
+
+This intersects Part 2: realizing a store path on a node that lacks it is itself
+a remote build.
+
+This intersects Part 2: once the builder exists, realizing a script package on a
+node that lacks it is itself a remote-build.
+
+== Part 2 — Remote nix builder
+
+=== Goal
+
+A Flox-injected container that needs to build a package it does not already have
+must *not* build locally. It delegates to the NixOS host builder over `ssh-ng`.
+Default workload envs are unaffected: they are pre-locked (lock propagation) and
+resolve from store paths already present, so they never trigger a build.
+
+=== The three-builder distinction
+
+There are three nix-build entities; this design targets exactly one.
+
+[cols="1,3,1",options="header"]
+|===
+| Entity | What it is | Use here?
+
+| vz-host embedded `linux-builder` VM
+| The QEMU/Lima `aarch64-linux` VM `linux-builder.nix` spins up *on the darwin
+  host* so darwin can cross-build Linux. A different role.
+| *No*
+
+| `{bioskop,nikopol}-nixos` native daemon
+| The NixOS hosts' own `nix-daemon`, native `aarch64-linux`, already holding the
+  store + cache-trust signing + nixbld users.
+| *Yes*
+
+| `master` incus container daemon
+| The Debian instance. Never a builder.
+| *No*
+|===
+
+`{bioskop,nikopol}-nixos` are native `aarch64-linux`, so there is no VM
+indirection — the host builds the container's packages on bare metal directly.
+
+=== Reuse map — almost everything already exists
+
+[cols="1,1",options="header"]
+|===
+| Piece | Status
+
+| Builder (`{bioskop,nikopol}-nixos` native daemon) | exists
+| Hardened inbound endpoint: `nix-store` SSH user whose forced login shell is
+  `nix-daemon --stdio` (nix-darwin-home `nix-store-identity.nix`) | exists
+| Dedicated key + cert: `nix-store` entry in `keys.yaml` | exists
+| Fleet store-trust signing key `io-nxmatic-nix-darwin-home` (`cache-trust.nix`) | exists
+| SOPS key delivery into rke2lab via `.ndh-ssh.d` subtree (git smudge decrypts
+  in-tree) | exists
+| Container `builder.conf` + ssh `nix-store.<host>` alias, authored by the NRI
+  manifest unit | *new*
+| NRI plugin RO-mounts builder.conf + key into every container | *new*
+|===
+
+=== The `nix-store` peer identity
+
+nix-darwin-home already defines a complete peer-to-peer remote-store mechanism.
+The inbound side runs a dedicated `nix-store` user with forced shell
+`nix-daemon --stdio` (a locked-down remote-build endpoint). The canonical
+outbound access path is `ssh-ng://nix-store.<host>`, cert-signed. A Flox
+container that needs to build is exactly "a new consumer" of this path. No new
+key, no new host user.
+
+=== Container-side config (the only new material)
+
+Authored by the NRI plugin's manifest unit (single, patchable source of truth),
+bind-mounted read-only into *every* Flox container, mirroring the existing
+`/etc/flox.toml` pattern (`floxSystemConfigPath` in `plugin.go`).
+
+`/etc/nix/nix.conf.d/builder.conf`:
+
+[source,ini]
+----
+max-jobs = 0
+builders = ssh-ng://nix-store.bioskop-nixos aarch64-linux /etc/nix/nix-store-key - <speed> <features>
+builders-use-substitutes = true
+trusted-public-keys = io-nxmatic-nix-darwin-home:U/at4v0hCbZhn3u7uvQhQo+lzq5ZobOJyn3Be3txbqg= ...
+----
+
+`max-jobs = 0` is the key primitive: the container performs *zero* local builds.
+Anything not in-store and not substitutable goes to the remote builder.
+
+=== Decisions locked
+
+* *No local builds*: `max-jobs = 0`. The container is a pure client; it needs no
+  in-container nixbld users.
+* *Build identity*: the existing `nix-store` key (purpose-built, cert-signed,
+  forced-command endpoint). Not the `linux-builder` key (that is host->VM).
+* *Universal, not opt-in*: every Flox container gets `builder.conf` mounted.
+* *Config ownership*: authored by the NRI manifest unit so it is retrievable and
+  patchable from code, not baked into the distrobuilder image.
+
+=== Secret-handling discipline
+
+`.ndh-ssh.d/keys.yaml` is always plaintext in the working tree (git SOPS smudge
+on checkout; clean re-encrypts on commit). The manifest unit reads the
+`nix-store` key material at synth time, exactly like
+`SopsAgeSecretManifestUnit` reads `rke2-cluster`. The *private* key must flow
+only into the runtime asset tree mounted into containers — never into a
+committed path or a world-readable location. Synthesis happens on the operator
+machine; the container only ever receives the materialized key as a read-only
+mount, never the git filter or SOPS.
+
+=== Overlay store + copy-back semantics
+
+The container's `/nix/store` is an overlay (read-only lower + ephemeral tmpfs
+upper). A remote build copies its closure *back into the container's store* —
+landing in the ephemeral upper. This is correct for "packages we don't know":
+they are transient by nature and live as long as the container. Persisted
+artifacts (workload packages, the scripts package) are built by the master and
+already present in the real store the overlay lowers from.
+
+== Open questions to resolve at implementation
+
+. *Network reachability*: can a container reach `nix-store.bioskop-nixos`
+  through the cluster netns (cilium), or must the builder be addressed by a
+  host-routable path? This is the one unverified runtime unknown.
+. *SSH PATH on the inbound side*: remote builds run `nix-store --serve` via the
+  forced shell; confirm the `nix-store` user's non-interactive session resolves
+  the nix binaries (the forced shell already execs an absolute
+  `nix-daemon --stdio`, which likely sidesteps this — verify).
+. *Script-package realization on the node* (Part 1 open question): option (a)
+  prebuild side effect vs (b) explicit publish. Intersects the builder: a node
+  missing the script closure would itself remote-build it.
+. *`known_hosts` for the container*: the `nix-store.<host>` alias uses
+  `StrictHostKeyChecking accept-new`; decide whether to pre-seed the host key
+  via the same mount.
+
+== Sequencing
+
+Part 1 (scripts to store) is the foundation: it establishes the immutable-vs-
+mutable split cleanly and removes the loose-file delivery model. Part 2 (builder)
+builds on a store-resolved world and reuses the split. Recommended order:
+Part 1 first, then Part 2 — but the `builder.conf` mount (Part 2) is independent
+enough to land alongside if reachability is confirmed early.
+
+== Related Documentation
+
+* link:daemonset-host-assets-architecture.adoc[Daemonless Host Assets Architecture] —
+  the execution contract and host-asset materialization path these scripts use.
+* link:controlnode-runtime-assets-architecture.adoc[Control Node Runtime Assets Architecture] —
+  how runtime assets are materialized on nodes.
+* link:architecture/nri-plugin-c4-diagrams.md[NRI Plugin C4 Diagrams] —
+  the plugin that mounts envs (and will mount `builder.conf`) into containers.
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] —
+  the synth-time secret-access pattern the builder key delivery follows.

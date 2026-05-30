@@ -36,6 +36,7 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 
 * link:controlnode-runtime-assets-architecture.adoc[Control Node Runtime Assets Architecture] - How assets are materialized on nodes
 * link:daemonset-host-assets-architecture.adoc[DaemonSet Host Assets Architecture] - DaemonSet-to-host asset trampoline pattern
+* link:flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved Runtime + Remote Nix Builder] - Moving runtime scripts into the nix store + letting containers build via the NixOS host builder
 
 == Networking
 
