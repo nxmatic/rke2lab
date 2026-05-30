@@ -112,12 +112,32 @@ underlying values (cluster/node IDs, MAC patterns, addressing) are pure literals
 from the Java, identical on every system. The jar that generates the YAML does
 need a build platform (jdk/maven), but the *resulting data* does not.
 
-Practical consequence: expose `lib.networkBlueprint` as flat and
-system-independent where feasible, so consumers use
-`rke2lab.lib.networkBlueprint.deriveMacs` rather than a per-system
-`rke2lab.lib.${system}.networkBlueprint...`. (The generating derivation is
-per-system because it builds the jar; the exposed *data* need not be — parse once
-and surface flat.)
+Practical consequence: `lib.networkBlueprint` is exposed flat and
+system-independent, so consumers use `rke2lab.lib.networkBlueprint.deriveMacs`
+rather than a per-system `rke2lab.lib.${system}.networkBlueprint...`. The data is
+parsed once and surfaced flat; `deriveMacs` uses the system-independent
+`nixpkgs.lib` (pure int/string functions).
+
+=== How the flat `lib` is realized (implemented)
+
+A flat `lib` has no `system` in scope, but IFD must still realize the generating
+derivation on *some* concrete system. The netplan jar is a portable JDK/Maven
+build, so the YAML — and the parsed data — is byte-identical regardless of build
+platform. We therefore pin generation to a single system rather than the
+consumer's:
+
+* `blueprintSystem = "aarch64-darwin"` — bioskop, the sole build host.
+* The jar/YAML/parse derivations are factored into `pkgs`-parameterized helpers
+  (`netplanJarFor` / `networkBlueprintYamlFor`); the flat `lib` builds them under
+  `nixpkgs.legacyPackages.aarch64-darwin`, parses once, and merges the result at
+  the top level via `(eachDefaultSystem ...) // { lib = ...; }`.
+* The per-system `packages.${system}.networkBlueprintYaml` still builds locally
+  for inspection; only the consumed `lib` copy is pinned.
+
+Because both the darwin config (bioskop) and the NixOS config (bioskop-nixos) are
+evaluated *on bioskop*, the pinned `aarch64-darwin` derivation always builds
+natively — no linux-builder is involved, and the NixOS side carries only the
+parsed MAC strings, not a darwin derivation.
 
 == Implementation plan
 
@@ -140,15 +160,14 @@ and surface flat.)
 
 == Open questions
 
-. *`lib` flattening mechanics*: how to expose the parsed blueprint data flat while
-  the generating derivation stays per-system (e.g. parse under one system, surface
-  under top-level `lib`). Confirm this evaluates without forcing a build on the
-  wrong platform.
-. *Input pinning*: nix-darwin-home pins rke2lab via flake.lock; decide the ref
-  (branch vs rev) and the lock-bump cadence.
-. *IFD platform*: nix-darwin-home eval on bioskop-nixos (aarch64-linux) builds the
-  netplan jar for that system; confirm jdk25 + maven are substitutable/cached so
-  the first `nixos-rebuild` isn't a cold full build.
+. *Input pinning*: nix-darwin-home pins rke2lab via flake.lock. Decision: track
+  rke2lab `main` and let the operator bump the lock (`nix flake update rke2lab`)
+  when they choose to sync — no auto-follow on every rke2lab commit. This keeps
+  eval coupling under operator control for a single-developer lab.
+. *IFD build*: generation is pinned to `aarch64-darwin` (bioskop, the only build
+  host), so both the darwin and the NixOS evals — both run on bioskop — build the
+  jar natively. Confirm jdk25 + maven are substitutable/cached so a cold
+  `nixos-rebuild`/`darwin-rebuild` isn't a full Maven cold start.
 
 == Related Documentation
 

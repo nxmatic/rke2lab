@@ -30,35 +30,102 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, flox-runtime, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = nixpkgs.legacyPackages.${system};
+    let
+      # The network blueprint is OS-independent data (cluster/node IDs, MAC
+      # patterns, addressing): the netplan jar is a portable JDK/Maven build, so
+      # the YAML — and the data parsed from it — is identical regardless of which
+      # platform builds it. But IFD must still *realize* the generating
+      # derivation on some concrete system, and a flat `lib` (no `lib.${system}`)
+      # has no system in scope to pick. Pin generation to the single build host
+      # (bioskop = aarch64-darwin): darwin eval builds it natively, and a NixOS
+      # eval — which also runs on bioskop — builds the same darwin derivation
+      # locally, baking in only the parsed data (pure MAC strings). No
+      # linux-builder is involved on this path.
+      blueprintSystem = "aarch64-darwin";
 
-        # Build the netplan JAR
-        netplanJar = pkgs.stdenv.mkDerivation {
-          name = "rke2lab-netplan";
-          src = ./.;  # Need full repo for parent POM + BOM resolution
+      # netplan JAR build, parameterized by pkgs so the per-system `packages`
+      # output can build it locally while `lib` uses the pinned set.
+      netplanJarFor = pkgs: pkgs.stdenv.mkDerivation {
+        name = "rke2lab-netplan";
+        src = ./.;  # Need full repo for parent POM + BOM resolution
 
-          nativeBuildInputs = [ pkgs.maven pkgs.jdk25 ];
+        nativeBuildInputs = [ pkgs.maven pkgs.jdk25 ];
+
+        buildPhase = ''
+          # Maven needs a writable HOME for .m2/repository
+          mkdir -p $TMPDIR/.m2
+          # Install parent POM and BOM first, then build netplan module
+          mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
+            install:install-file -Dfile=pom.xml -DpomFile=pom.xml
+          mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
+            -f bom/pom.xml install
+          mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
+            -f netplan/pom.xml \
+            clean package -DskipTests
+        '';
+
+        installPhase = ''
+          mkdir -p $out/share/java
+          cp netplan/target/netplan-*-exec.jar $out/share/java/rke2lab-netplan.jar
+        '';
+      };
+
+      # Generate the network blueprint YAML from the Java source of truth.
+      networkBlueprintYamlFor = pkgs:
+        let netplanJar = netplanJarFor pkgs;
+        in pkgs.stdenv.mkDerivation {
+          name = "rke2lab-network-blueprint";
+
+          buildInputs = [ pkgs.jdk25 ];
+
+          dontUnpack = true;
 
           buildPhase = ''
-            # Maven needs a writable HOME for .m2/repository
-            mkdir -p $TMPDIR/.m2
-            # Install parent POM and BOM first, then build netplan module
-            mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
-              install:install-file -Dfile=pom.xml -DpomFile=pom.xml
-            mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
-              -f bom/pom.xml install
-            mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
-              -f netplan/pom.xml \
-              clean package -DskipTests
+            # NetplanCli dispatcher routes to yamlExport command
+            java -jar ${netplanJar}/share/java/rke2lab-netplan.jar yamlExport > blueprint.yaml
           '';
 
           installPhase = ''
-            mkdir -p $out/share/java
-            cp netplan/target/netplan-*-exec.jar $out/share/java/rke2lab-netplan.jar
+            mkdir -p $out
+            cp blueprint.yaml $out/network-blueprint.yaml
           '';
         };
+
+      # Pinned-system generation + IFD parse → the canonical, flat blueprint data.
+      blueprintPkgs = nixpkgs.legacyPackages.${blueprintSystem};
+      networkBlueprintYaml = networkBlueprintYamlFor blueprintPkgs;
+      networkBlueprintData = builtins.fromJSON (
+        builtins.readFile (
+          blueprintPkgs.runCommand "blueprint.json" {
+            buildInputs = [ blueprintPkgs.yq-go ];
+          } ''
+            ${blueprintPkgs.yq-go}/bin/yq -o=json '.' ${networkBlueprintYaml}/network-blueprint.yaml > $out
+          ''
+        )
+      );
+
+      # Export network blueprint with Nix helpers. `deriveMacs` uses the
+      # system-independent `nixpkgs.lib` (pure int/string functions) so the whole
+      # export is platform-agnostic.
+      networkBlueprint = networkBlueprintData // {
+        # Helper to derive MACs for a cluster/node pair, using the cluster/node
+        # ID mappings from the Java-generated YAML.
+        deriveMacs = cluster: node:
+          let
+            clusterId = networkBlueprintData.clusters.${cluster};
+            nodeId = networkBlueprintData.nodes.${node};
+            toHex = n: if n < 16 then "0${nixpkgs.lib.toLower (nixpkgs.lib.toHexString n)}" else nixpkgs.lib.toLower (nixpkgs.lib.toHexString n);
+          in {
+            lan = "10:66:6a:4c:${toHex clusterId}:${toHex nodeId}";
+            wan = "52:54:00:${toHex clusterId}:${toHex nodeId}:00";
+          };
+      };
+    in
+    (flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+
+        netplanJar = netplanJarFor pkgs;
 
         # Build the seed-master bootstrap app (and the manifests jar it embeds)
         # as a single reactor build, so the deployable artifact Pulumi runs comes
@@ -86,50 +153,9 @@
           '';
         };
 
-        # Generate network blueprint YAML from Java source of truth
-        networkBlueprintYaml = pkgs.stdenv.mkDerivation {
-          name = "rke2lab-network-blueprint";
-
-          buildInputs = [ pkgs.jdk25 ];
-
-          dontUnpack = true;
-
-          buildPhase = ''
-            # NetplanCli dispatcher routes to yamlExport command
-            java -jar ${netplanJar}/share/java/rke2lab-netplan.jar yamlExport > blueprint.yaml
-          '';
-
-          installPhase = ''
-            mkdir -p $out
-            cp blueprint.yaml $out/network-blueprint.yaml
-          '';
-        };
-
-        # Load network blueprint from YAML (generated by Java source of truth)
-        networkBlueprintData = builtins.fromJSON (
-          builtins.readFile (
-            pkgs.runCommand "blueprint.json" {
-              buildInputs = [ pkgs.yq-go ];
-            } ''
-              ${pkgs.yq-go}/bin/yq -o=json '.' ${networkBlueprintYaml}/network-blueprint.yaml > $out
-            ''
-          )
-        );
-
-        # Export network blueprint with Nix helpers
-        networkBlueprint = networkBlueprintData // {
-          # Helper to derive MACs for a cluster/node pair
-          # Uses the cluster/node ID mappings from the Java-generated YAML
-          deriveMacs = cluster: node:
-            let
-              clusterId = networkBlueprintData.clusters.${cluster};
-              nodeId = networkBlueprintData.nodes.${node};
-              toHex = n: if n < 16 then "0${pkgs.lib.toLower (pkgs.lib.toHexString n)}" else pkgs.lib.toLower (pkgs.lib.toHexString n);
-            in {
-              lan = "10:66:6a:4c:${toHex clusterId}:${toHex nodeId}";
-              wan = "52:54:00:${toHex clusterId}:${toHex nodeId}:00";
-            };
-        };
+        # Per-system inspectable build of the blueprint YAML (the canonical,
+        # consumed copy is the pinned one surfaced under the flat `lib`).
+        networkBlueprintYaml = networkBlueprintYamlFor pkgs;
 
         # Darwin-buildable incus client. The full `incus` daemon is Linux-only
         # (requires lxc, libcap, cowsql, etc.), but nixpkgs ships a `client.nix`
@@ -161,13 +187,15 @@
           seed-master = seedMasterJar;
           incus-client = incusClient;
         } // floxNriPluginPackages;
-
-        # Export the network blueprint for consumption by nix-darwin-home
-        lib = {
-          inherit networkBlueprint;
-          # Also expose the raw YAML for inspection
-          networkBlueprintYamlPath = "${networkBlueprintYaml}/network-blueprint.yaml";
-        };
       }
-    );
+    )) // {
+      # Flat, system-independent export consumed by nix-darwin-home as
+      # `rke2lab.lib.networkBlueprint.deriveMacs` (no `lib.${system}` selector).
+      # Built once on `blueprintSystem`; the data is the same everywhere.
+      lib = {
+        inherit networkBlueprint;
+        # Raw YAML store path for inspection (the pinned, canonical build).
+        networkBlueprintYamlPath = "${networkBlueprintYaml}/network-blueprint.yaml";
+      };
+    };
 }
