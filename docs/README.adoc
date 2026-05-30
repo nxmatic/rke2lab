@@ -6,6 +6,10 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 
 == Core Architecture
 
+=== Build & Packaging
+
+* link:flake-build-entry-point.adoc[Flake as Build Entry Point] - Flake as the authoritative deploy build (Maven=dev loop, flake=release); store-built seed-master + manifests + NRI plugin
+
 === Bootstrap & Provisioning
 
 * link:bootstrap-contract.adoc[Bootstrap Contract] - Stage A bootstrap requirements and outputs
