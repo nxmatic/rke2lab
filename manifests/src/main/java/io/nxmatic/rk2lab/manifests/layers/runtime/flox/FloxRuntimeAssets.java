@@ -64,7 +64,8 @@ public final class FloxRuntimeAssets {
    *
    * <ul>
    *   <li>{@code bin/flox-nri-plugin-installer.sh}, {@code bin/flox-nri-plugin-run.sh}
-   *   <li>{@code bin/flox-nri-overlay-hook.sh}, {@code bin/flox-nri-chown-hook.sh}
+   *   <li>{@code bin/flox-nri-overlay-hook.sh}, {@code bin/flox-nri-env-link-hook.sh},
+   *       {@code bin/flox-nri-chown-hook.sh}
    *   <li>{@code build-assets/flake.nix}
    *   <li>{@code
    *       build-assets/environment.d/<category>/<env>/.flox/{env.json,env/flake.nix,env/manifest.toml,env/flake.lock,env/manifest.lock}}
@@ -436,6 +437,10 @@ public final class FloxRuntimeAssets {
           "flox-nri-overlay-hook.sh",
           FLOX_RESOURCE_ROOT + "/bin/flox-nri-overlay-hook.sh",
           "bin/flox-nri-overlay-hook.sh");
+      addInstallerAsset(
+          "flox-nri-env-link-hook.sh",
+          FLOX_RESOURCE_ROOT + "/bin/flox-nri-env-link-hook.sh",
+          "bin/flox-nri-env-link-hook.sh");
       addInstallerAsset(
           "flox-nri-chown-hook.sh",
           FLOX_RESOURCE_ROOT + "/bin/flox-nri-chown-hook.sh",

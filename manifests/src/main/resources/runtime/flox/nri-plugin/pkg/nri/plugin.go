@@ -22,16 +22,17 @@ const (
 	floxGIDAnnotationPrefix   = "flox.dev/gid"         // <prefix>.<container> = desired GID (optional, default: 0)
 	floxDebugAnnotationPrefix = "flox.dev/debug"       // <prefix>.<container> = "true" to enable debug pause
 	floxDebugPortPrefix       = "flox.dev/debug-port"  // <prefix>.<container> = delve port (default: 2345)
-	// Per-node mutable workspace path. We deliberately do NOT use
-	// /srv/host/k8s-daemonset.d/... here because that path is NFS-backed in
-	// the bootstrap setup, and overlayfs cannot use an NFS lower layer
-	// (kernel returns EOPNOTSUPP for reads inside the resulting overlay).
-	// The runtime-installer pod populates this path (cp -af from /.sh/.) at
-	// pod startup and `flox activate` writes locks here, so it has the same
-	// content the seed-master-owned path does — but it lives on the
-	// node's local zfs and supports overlayfs as a lower layer.
-	floxEnvBaseDir = "/var/run/k8s-daemonset.d/runtime/flox/environment.d"
+	// Store-resolved env handoff. The runtime installer realizes each env's
+	// static subtree (env/{manifest.toml,manifest.lock}) into /nix/store and
+	// GC-roots it at <floxEnvGcrootBase>/<category>/<name>. We readlink that
+	// gcroot to get the immutable store path, then flox-nri-env-link-hook.sh
+	// builds a fine-grained .flox symlink farm in the container (env/ -> store,
+	// run/cache/log local). The container's /nix/store overlay lowers from the
+	// host store, so the same store path resolves inside the container.
+	// This supersedes the old /var/run env-dir copy + overlay-mount of .flox.
+	floxEnvGcrootBase = "/nix/var/nix/gcroots/flox-runtime/env"
 	floxOverlayHookPath       = "/usr/local/sbin/flox-nri-overlay-hook.sh"
+	floxEnvLinkHookPath       = "/usr/local/sbin/flox-nri-env-link-hook.sh"
 	floxChownHookPath         = "/usr/local/sbin/flox-nri-chown-hook.sh"
 	// System-wide flox config maintained on the host by rke2lab-env-load.sh.
 	// We bind-mount it read-only into every flox-injected container so the in-
@@ -61,8 +62,10 @@ const (
 //
 // Behavior:
 //   - Determines HOME directory: flox.dev/home.<c> > HOME env var > /root
-//   - Resolves environment: "category/name" maps to /srv/host/.../runtime/flox/environment.d/{category}/{name}
-//   - Mounts the requested Flox environment at $HOME/.flox
+//   - Resolves environment: "category/name" -> the store path GC-rooted at
+//     /nix/var/nix/gcroots/flox-runtime/env/{category}/{name} by the installer
+//   - Materializes a fine-grained .flox symlink farm at $HOME/.flox (env/ -> store,
+//     run/cache/log local) via flox-nri-env-link-hook.sh
 //   - Mounts /nix/store with overlayfs protection (read-only lower, writable ephemeral upper)
 //   - Allows `flox activate --dir $HOME` to automatically discover the environment
 //
@@ -173,11 +176,10 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 		return nil, nil, fmt.Errorf("failed to resolve flox environment: %w", err)
 	}
 
-	log.Printf("Flox environment %s resolved to: %s", floxEnv, floxEnvPath)
+	log.Printf("Flox environment %s resolved to store path: %s", floxEnv, floxEnvPath)
 
-	// Target path where we'll mount the flox environment: $HOME/.flox
+	// Target path where we materialize the env's .flox symlink farm: $HOME/.flox
 	floxMountTarget := filepath.Join(homeDir, ".flox")
-	floxEnvSource := filepath.Join(floxEnvPath, ".flox")
 
 	if uid != defaultUID || gid != defaultGID {
 		log.Printf("WARNING: UID/GID mapping requested (uid=%s, gid=%s) but not yet implemented", uid, gid)
@@ -186,26 +188,30 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 
 	adjustment := &api.ContainerAdjustment{}
 
-	// CreateContainer hooks set up overlayfs mounts in the container rootfs.
-	// They run in the container's mount namespace before pivot_root, so the
-	// mounts persist after pivot_root. CreateRuntime would NOT work here: it
-	// runs in the host/runtime namespace, and the container ns is unshared with
-	// rprivate propagation so host-side mounts don't reach the container.
+	// CreateContainer hooks run in the container's mount namespace before
+	// pivot_root, so what they write persists after pivot_root. CreateRuntime
+	// would NOT work here: it runs in the host/runtime namespace, and the
+	// container ns is unshared with rprivate propagation so host-side mounts
+	// don't reach the container.
 	//
-	// Each invocation creates scratch dirs under /.overlays.d/<name>/ in the
-	// container rootfs (lower bind, single tmpfs hosting upper+work) and mounts
-	// an overlayfs at the requested target.
+	// 1) nix-store overlay: read-only host store lower + writable ephemeral
+	//    tmpfs upper, so the container sees every host store path AND can author
+	//    its own (new flox envs, profiles, builds land in the upper).
 	nixStoreOverlayHook := &api.Hook{
 		Path: floxOverlayHookPath,
 		Args: []string{floxOverlayHookPath, "nix-store", "/nix/store", "/nix/store"},
 	}
 	log.Printf("Adding CreateContainer hook (nix-store): %s /nix/store -> /nix/store", floxOverlayHookPath)
 
-	floxEnvOverlayHook := &api.Hook{
-		Path: floxOverlayHookPath,
-		Args: []string{floxOverlayHookPath, "flox-env", floxEnvSource, floxMountTarget},
+	// 2) env-link: build the fine-grained .flox symlink farm — env/ symlinks
+	//    into the resolved store path (immutable default env), run/cache/log are
+	//    real local writable dirs. Replaces the old overlay-mount of .flox,
+	//    which mutated/clamped the env tree and broke relative flake refs.
+	floxEnvLinkHook := &api.Hook{
+		Path: floxEnvLinkHookPath,
+		Args: []string{floxEnvLinkHookPath, floxEnvPath, floxMountTarget},
 	}
-	log.Printf("Adding CreateContainer hook (flox-env): %s %s -> %s", floxOverlayHookPath, floxEnvSource, floxMountTarget)
+	log.Printf("Adding CreateContainer hook (env-link): %s %s -> %s", floxEnvLinkHookPath, floxEnvPath, floxMountTarget)
 
 	// Prestart hook fixes ownership of $HOME and $HOME/.flox via ${bundle}/rootfs.
 	// Runs in the host namespace; the container rootfs is reachable from there.
@@ -216,7 +222,7 @@ func (p *FloxPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, c
 	log.Printf("Adding Prestart hook: %s %s %s %s", floxChownHookPath, uid, gid, homeDir)
 
 	adjustment.AddHooks(&api.Hooks{
-		CreateContainer: []*api.Hook{nixStoreOverlayHook, floxEnvOverlayHook},
+		CreateContainer: []*api.Hook{nixStoreOverlayHook, floxEnvLinkHook},
 		Prestart:        []*api.Hook{chownHook},
 	})
 
@@ -246,44 +252,43 @@ func (p *FloxPlugin) RemoveContainer(ctx context.Context, pod *api.PodSandbox, c
 	return nil
 }
 
-// resolveFloxEnvironment resolves a flox environment name to its filesystem path
+// resolveFloxEnvironment resolves a flox environment name to its immutable
+// /nix/store path by reading the GC-root the runtime installer published.
+//
+// Format: "category/name" (e.g., "networking/kdns"). A bare "name" defaults to
+// the "networking" category. The installer GC-roots each env at
+// <floxEnvGcrootBase>/<category>/<name>; we readlink it to the real store path,
+// which exposes <store-path>/env/{manifest.toml,manifest.lock}.
 func (p *FloxPlugin) resolveFloxEnvironment(floxEnv string) (string, error) {
-	// Parse flox environment
-	// Format: "category/name" (e.g., "networking/kdns")
-	// Matches the filesystem layout: /var/run/k8s-daemonset.d/runtime/flox/environment.d/{category}/{name}
-
 	var category, envName string
 
 	envParts := strings.Split(floxEnv, "/")
 	if len(envParts) == 2 {
-		// category/name format
 		category = envParts[0]
 		envName = envParts[1]
 	} else if len(envParts) == 1 {
-		// Just name - default to networking category
 		category = "networking"
 		envName = envParts[0]
 	} else {
 		return "", fmt.Errorf("invalid flox environment format: %s (expected 'category/name' or 'name')", floxEnv)
 	}
 
-	// Build path to flox environment directory
-	floxEnvPath := filepath.Join(floxEnvBaseDir, category, envName)
+	gcroot := filepath.Join(floxEnvGcrootBase, category, envName)
 
-	log.Printf("Resolving Flox environment '%s' -> category=%s, name=%s, path=%s", floxEnv, category, envName, floxEnvPath)
-
-	// Verify the environment directory exists
-	if _, err := os.Stat(floxEnvPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("flox environment not found: %s (path: %s)", floxEnv, floxEnvPath)
+	storePath, err := os.Readlink(gcroot)
+	if err != nil {
+		return "", fmt.Errorf("flox environment %s not GC-rooted at %s: %w", floxEnv, gcroot, err)
 	}
 
-	// Verify it has a .flox directory
-	floxMetaDir := filepath.Join(floxEnvPath, ".flox")
-	if _, err := os.Stat(floxMetaDir); os.IsNotExist(err) {
-		return "", fmt.Errorf("flox environment missing .flox metadata: %s", floxEnvPath)
+	// Confirm the resolved store path carries the env subtree the link hook expects.
+	envSubtree := filepath.Join(storePath, "env")
+	if _, err := os.Stat(envSubtree); err != nil {
+		return "", fmt.Errorf("flox environment %s store path missing env/ subtree (%s): %w", floxEnv, envSubtree, err)
 	}
 
-	return floxEnvPath, nil
+	log.Printf("Resolving Flox environment '%s' -> category=%s, name=%s, store=%s", floxEnv, category, envName, storePath)
+
+	return storePath, nil
 }
 
 // perContainerKey builds a per-container annotation key by suffixing the

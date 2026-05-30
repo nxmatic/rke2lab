@@ -153,42 +153,56 @@ installer::host:flox:activate_environments() {
 
 	echo "=== All ${#discovered_envs[@]} environments activated ==="
 
-	installer::host:flox:propagate_locks_to_runtime "${env_root}" "${discovered_envs[@]}"
+	installer::host:flox:gcroot_env_packages "${env_root}" "${discovered_envs[@]}"
 }
 
-# Activation above runs in the shared /srv/host tree, where flox writes each
-# env's manifest.lock. But the NRI plugin overlay-mounts envs from the node-local
-# /var/run tree (it deliberately avoids the NFS-backed /srv/host — see
-# floxEnvBaseDir in nri-plugin/pkg/nri/plugin.go). The init container's earlier
-# `cp -af /.sh -> /var/run` predates activation, so /var/run holds manifest.toml
-# but no lock. Without the lock, the in-container `flox activate` is forced to
-# re-resolve and evaluates the env's relative `path:../../..` flake ref, which
-# clamps to / under the mount and fails. Copy the freshly-produced lock into the
-# consumer tree so containers activate from pinned state and never re-resolve.
-installer::host:flox:propagate_locks_to_runtime() {
+# Realize each activated env's static subtree (env/{manifest.toml,manifest.lock})
+# into the nix store and GC-root it at a stable well-known path. This is the
+# store-resolved env model: the env's static half is immutable cluster state, so
+# it belongs in /nix/store; only flox's run/cache/log are mutable (the container
+# materializes those locally via flox-nri-env-link-hook.sh). The container's
+# /nix/store overlay lowers from the host store, so the same store path resolves
+# inside the container.
+#
+# Mirrors nri::plugin:gcroot:ensure exactly: build/realize -> --add-root
+# --indirect, and the consumer (the NRI plugin) reads the gcroot via readlink to
+# get the real store path. This supersedes copying the env tree (and its lock)
+# into /var/run — the gcroot IS the node-local handoff surface now.
+#
+# See docs/flox-store-resolved-runtime-and-builder.adoc.
+installer::host:flox:gcroot_env_packages() {
 	local env_root="$1"
 	shift
-	local consumer_env_root="/var/run/k8s-daemonset.d/${DAEMONSET_ASSET_SUBDIR}/environment.d"
-	local env_path src_lock dst_lock dst_dir
-
-	if [[ "${env_root}" == "${consumer_env_root}" ]]; then
-		echo "lock propagation skipped: activation tree is already the runtime tree (${env_root})"
-		return 0
-	fi
+	local gcroot_base="${NIX_GC_ROOTS:-/nix/var/nix/gcroots}/flox-runtime/env"
+	local env_path src_env staging storepath gcroot
 
 	for env_path in "$@"; do
-		src_lock="${env_root}/${env_path}/.flox/env/manifest.lock"
-		dst_lock="${consumer_env_root}/${env_path}/.flox/env/manifest.lock"
-		dst_dir="${dst_lock%/*}"
-
-		[[ -r "${src_lock}" ]] || {
-			echo "  ⚠ no lock to propagate for ${env_path} (${src_lock} absent)" >&2
+		src_env="${env_root}/${env_path}/.flox/env"
+		[[ -r "${src_env}/manifest.lock" ]] || {
+			echo "  ⚠ no lock for ${env_path}; skipping store realization (${src_env}/manifest.lock absent)" >&2
 			continue
 		}
 
-		mkdir -p "${dst_dir}"
-		cp -f "${src_lock}" "${dst_lock}"
-		echo "  ✓ propagated lock for ${env_path} -> ${dst_lock}"
+		# Assemble the static subtree under env/ so the realized store path exposes
+		# <store-path>/env/{manifest.toml,manifest.lock} — the layout
+		# flox-nri-env-link-hook.sh symlinks into the container's .flox/env.
+		staging="$(mktemp -d)"
+		mkdir -p "${staging}/env"
+		cp -f "${src_env}/manifest.toml" "${src_env}/manifest.lock" "${staging}/env/"
+
+		storepath="$(nix --extra-experimental-features 'nix-command flakes' \
+			store add-path --name "flox-env-${env_path//\//-}" "${staging}")" || {
+			echo "  ✗ failed to realize store path for ${env_path}" >&2
+			rm -rf "${staging}"
+			return 1
+		}
+		rm -rf "${staging}"
+
+		gcroot="${gcroot_base}/${env_path}"
+		mkdir -p "${gcroot%/*}"
+		nix-store --add-root "${gcroot}" --indirect -r "${storepath}" >/dev/null
+
+		echo "  ✓ ${env_path} env GC-rooted: ${gcroot} -> ${storepath}"
 	done
 }
 
@@ -512,6 +526,9 @@ flox_nri_plugin::on_materialize() {
 		daemonset::runtime:assets:install_executable \
 			"${DAEMONSET_HOST_SCRIPT_BIN}/flox-nri-overlay-hook.sh" \
 			"${HOST_ROOT}/usr/local/sbin/flox-nri-overlay-hook.sh"
+		daemonset::runtime:assets:install_executable \
+			"${DAEMONSET_HOST_SCRIPT_BIN}/flox-nri-env-link-hook.sh" \
+			"${HOST_ROOT}/usr/local/sbin/flox-nri-env-link-hook.sh"
 		daemonset::runtime:assets:install_executable \
 			"${DAEMONSET_HOST_SCRIPT_BIN}/flox-nri-chown-hook.sh" \
 			"${HOST_ROOT}/usr/local/sbin/flox-nri-chown-hook.sh"
