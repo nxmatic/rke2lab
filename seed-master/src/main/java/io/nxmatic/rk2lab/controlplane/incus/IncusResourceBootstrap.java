@@ -1971,41 +1971,44 @@ public final class IncusResourceBootstrap {
           hostAssetRoot.getFileName().toString() + ".backup." + seq);
     }
 
+    private static final java.util.Set<String> FLOX_VOLATILE_SUBTREES =
+        java.util.Set.of("run", "cache", "lib", "log");
+
     /**
-     * A {@code .flox/} directory is opaque runtime state once the env has been activated. Its
-     * {@code .gitignore} declares {@code run/}, {@code cache/}, {@code lib/}, {@code log/} as flox-
-     * managed mutable subtrees, and the asset materializer only writes {@code env/manifest.toml} +
-     * {@code env.json} — flox owns everything else. Walking into {@code .flox/} for backup/sync
-     * races with live flox activations (run/<arch>.<env>.dev symlinks come and go), so we treat the
-     * whole subtree as a black box: skip on entry, never copy, never delete.
-     */
-    /**
-     * Returns true if {@code dir} is a flox runtime state directory that should be skipped during
-     * sync/comparison.
+     * Returns true if {@code dir} is flox-managed state that must not be backed up or synced.
      *
-     * <p>Flox creates runtime state in {@code .flox/} at the activation root (the plugin install
-     * location), which contains volatile subdirectories (run/, cache/, lib/, log/). Those must be
-     * skipped so sync doesn't copy stale state and comparison doesn't produce phantom diffs.
+     * <p>Two cases are skipped:
      *
-     * <p>However, {@code .flox/} directories inside {@code environment.d/<category>/<name>/} are
-     * BUILD ARTIFACTS (env/, env.json, manifest.toml) that must be copied, not skipped.
+     * <ul>
+     *   <li>A {@code .flox/} that is NOT under an {@code environment.d/} tree — activation-root
+     *       runtime state (the plugin install location), opaque to us.
+     *   <li>A volatile subtree ({@code run/}, {@code cache/}, {@code lib/}, {@code log/}) directly
+     *       under any {@code .flox/} — flox owns these (its {@code .gitignore} declares them) and
+     *       {@code run/} holds host/arch-specific activation symlinks like {@code <arch>.<env>.dev}
+     *       that dangle on a cross-arch host and fail a follow-the-link copy.
+     * </ul>
      *
-     * <p>Strategy: skip {@code .flox} only if it's NOT under an {@code environment.d/} tree.
+     * <p>Build artifacts under {@code environment.d/<category>/<name>/.flox/} ({@code env/}, {@code
+     * env.json}, {@code manifest.lock}) are still copied — only the volatile subtrees are skipped,
+     * so the asset materializer's output survives while live flox state stays untouched.
      */
     private static boolean isFloxRuntimeStateDir(Path dir) {
+      final Path parent = dir.getParent();
+      if (parent != null
+          && ".flox".equals(String.valueOf(parent.getFileName()))
+          && FLOX_VOLATILE_SUBTREES.contains(String.valueOf(dir.getFileName()))) {
+        return true;
+      }
       if (!".flox".equals(String.valueOf(dir.getFileName()))) {
         return false;
       }
-      // Check if any ancestor directory is named "environment.d"
-      Path current = dir.getParent();
+      Path current = parent;
       while (current != null) {
         if ("environment.d".equals(String.valueOf(current.getFileName()))) {
-          // This .flox is under environment.d/ - it's a build artifact, not runtime state
           return false;
         }
         current = current.getParent();
       }
-      // This .flox is NOT under environment.d/ - it's runtime state, skip it
       return true;
     }
 

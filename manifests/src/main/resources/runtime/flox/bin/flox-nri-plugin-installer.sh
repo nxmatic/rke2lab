@@ -488,6 +488,14 @@ flox_nri_plugin::pod:run() {
 	# base root) and DAEMONSET_EXEC_MODE=host; the host child re-runs paths:bind
 	# to derive the rest. DAEMONSET_HOST_SCRIPT_ROOT in the env is read by the
 	# trampoline to find the host bin dir for the re-exec'd command.
+	#
+	# Root is the shared /srv/host tree, by design: host:run cd's into each env
+	# here and `flox activate` writes .flox/env/{flake,manifest}.lock onto the
+	# shared NFS filesystem. The master locks once; every node reading the same
+	# folder resolves identical /nix/store paths — runtime cluster state, the
+	# single source of truth. The arch-specific .flox/{run,cache,lib,log} state
+	# written alongside is valid on every (Linux) node; it is excluded from the
+	# dev-machine asset sync on the seed-master side, not avoided here.
 	local host_base_root="/srv/host/k8s-daemonset.d"
 	local host_asset_root="${host_base_root}/${DAEMONSET_ASSET_SUBDIR}"
 
