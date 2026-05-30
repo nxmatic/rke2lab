@@ -5,14 +5,38 @@ and key bundle, shared between repositories as a `git subtree` (not a submodule,
 not a flake input). Editing either copy and syncing through the integration
 branch keeps both in step.
 
+**`nix-darwin-home` owns the tree.** `modules/home-manager/ssh.d/` here is the
+canonical source of the SSH config and keys; `rke2lab`'s `.ndh-ssh.d/` is a
+synchronized consumer copy. Tree ownership is independent of the branch names
+below.
+
 | Role | Repository | Path |
 | --- | --- | --- |
-| Canonical source | `nix-darwin-home` | `modules/home-manager/ssh.d/` |
+| Canonical source (owns the tree) | `nix-darwin-home` | `modules/home-manager/ssh.d/` |
 | Consumer copy | `rke2lab` | `.ndh-ssh.d/` |
-| Integration branch | `nix-darwin-home` (origin) | `split/hm-ssh.d` |
+| Branch published by nix-darwin-home | `nix-darwin-home` (origin) | `split/nix-darwin-home/hm-ssh.d` |
+| Branch published by rke2lab | `nix-darwin-home` (origin) | `split/rke2lab/hm-ssh.d` |
 
-`split/hm-ssh.d` is a `subtree split` of `modules/home-manager/ssh.d` — its root
-*is* the ssh.d files, so it is the ref both repositories pull from and push to.
+Each branch is a `subtree split` of the ssh.d tree — its root *is* the ssh.d
+files, so it is a ref the two repositories sync through.
+
+Integration branches follow the scheme **`split/{repo}/{tree}`**, where:
+
+- **`{repo}` owns and publishes the branch** — it `subtree split`s the tree from
+  its own copy and pushes the branch. The *other* repo **pulls** from it.
+- This is symmetric: each repo publishes the branch named after itself, and
+  consumes the branch named after its peer.
+
+So there are two branches for `hm-ssh.d`:
+
+- `split/nix-darwin-home/hm-ssh.d` — nix-darwin-home publishes it (sync **down**);
+  rke2lab pulls from it.
+- `split/rke2lab/hm-ssh.d` — rke2lab publishes it (sync **up**); nix-darwin-home
+  pulls from it.
+
+Both carry the same tree; they differ only in which repo refreshes each.
+**`{repo}` is the branch's publisher, not the tree owner** — the tree is always
+nix-darwin-home's.
 
 ## Why a subtree and not a flake input
 
@@ -28,41 +52,40 @@ ssh.d content to reach rke2lab.
 After committing changes to `modules/home-manager/ssh.d` in nix-darwin-home:
 
 ```bash
-# nix-darwin-home: refresh the integration branch from the latest ssh.d
+# nix-darwin-home: refresh ITS OWN branch from the latest ssh.d
 git subtree split --prefix=modules/home-manager/ssh.d \
-  --branch=split/hm-ssh.d --rejoin HEAD
-git push origin split/hm-ssh.d
+  --branch=split/nix-darwin-home/hm-ssh.d --rejoin HEAD
+git push origin split/nix-darwin-home/hm-ssh.d
 ```
 
 ```bash
-# rke2lab: pull the integration branch into the subtree (squashed)
-git fetch nix-darwin-home split/hm-ssh.d
+# rke2lab: pull nix-darwin-home's branch into the subtree (squashed)
+git fetch nix-darwin-home split/nix-darwin-home/hm-ssh.d
 git subtree pull --prefix=.ndh-ssh.d \
-  nix-darwin-home split/hm-ssh.d --squash
+  nix-darwin-home split/nix-darwin-home/hm-ssh.d --squash
 ```
 
 ## Sync up (rke2lab → nix-darwin-home)
 
-rke2lab's subtree was added with `--squash`, so its history does not contain
-`split/hm-ssh.d`'s commits as ancestors — only a squash commit referencing them.
-Pushing **directly** onto `split/hm-ssh.d` would therefore be rejected as
-non-fast-forward. Push to a **side branch** and integrate in nix-darwin-home:
+After committing changes to `.ndh-ssh.d` in rke2lab, publish rke2lab's own
+branch, then pull it into the source tree in nix-darwin-home:
 
 ```bash
-# rke2lab: split .ndh-ssh.d and push it to a fresh branch (fast-forward-safe)
-git subtree push --prefix=.ndh-ssh.d \
-  nix-darwin-home ssh.d-from-rke2lab
+# rke2lab: split .ndh-ssh.d onto ITS OWN branch and push it
+git subtree split --prefix=.ndh-ssh.d \
+  --branch=split/rke2lab/hm-ssh.d --rejoin HEAD
+git push nix-darwin-home split/rke2lab/hm-ssh.d
 ```
 
 ```bash
-# nix-darwin-home: merge those changes into the source, then refresh the
-# integration branch so the next "sync down" carries them
-git fetch origin ssh.d-from-rke2lab
-git subtree merge --prefix=modules/home-manager/ssh.d \
-  --squash origin/ssh.d-from-rke2lab
+# nix-darwin-home: pull rke2lab's branch into the source ssh.d tree (squashed),
+# then refresh its own branch so the next "sync down" carries the change
+git fetch origin split/rke2lab/hm-ssh.d
+git subtree pull --prefix=modules/home-manager/ssh.d \
+  origin split/rke2lab/hm-ssh.d --squash
 git subtree split --prefix=modules/home-manager/ssh.d \
-  --branch=split/hm-ssh.d --rejoin HEAD
-git push origin split/hm-ssh.d
+  --branch=split/nix-darwin-home/hm-ssh.d --rejoin HEAD
+git push origin split/nix-darwin-home/hm-ssh.d
 ```
 
 Always sync down before editing for an up-push, and keep `--squash` consistent on
@@ -73,9 +96,9 @@ provoke avoidable merge conflicts.
 
 ```bash
 git remote add nix-darwin-home https://github.com/nxmatic/nix-darwin-home.git
-git fetch nix-darwin-home split/hm-ssh.d
+git fetch nix-darwin-home split/nix-darwin-home/hm-ssh.d
 git subtree add --prefix=.ndh-ssh.d \
-  nix-darwin-home split/hm-ssh.d --squash
+  nix-darwin-home split/nix-darwin-home/hm-ssh.d --squash
 ```
 
 ## Purpose
