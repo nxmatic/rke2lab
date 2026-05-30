@@ -122,21 +122,25 @@ aarch64-linux` cross-builds via the linux-builder.
 
 == Pulumi binary resolution
 
-`Pulumi.yaml` currently hardcodes `binary: seed-master/target/seed-master-0.1.0-SNAPSHOT-exec.jar`.
-A store path is content-addressed (changes every build), so it cannot be
-hardcoded. The clean seam is a stable `result` symlink produced by `nix build`:
+`Pulumi.yaml` hardcodes `binary: seed-master/target/seed-master-0.1.0-SNAPSHOT-exec.jar`
+— the Maven build output — so the dev inner loop stays fast: `mvn package`
+(or the reactor) -> `pulumi up`, no `nix build` on the critical path. This is
+deliberate and matches the dev/release split: Maven = dev loop, flake = release.
 
-[source,yaml]
-----
-runtime:
-  name: java
-  options:
-    binary: result/share/java/seed-master.jar   # nix build .#seed-master -> ./result
-----
+A bare `result/` symlink was tried as the binary source and *rejected*: `result`
+is not stable. Any other `nix build`/`nix eval` that realizes a different output
+(e.g. forcing `lib.networkBlueprint`) repoints `./result` at that path, so
+`result/share/java/seed-master.jar` silently vanishes and `pulumi up` fails with
+"Unable to access jarfile". A content-addressed store path also changes every
+build, so it can't be hardcoded either.
 
-`result` is gitignored. The deploy flow becomes:
-`nix build .#seed-master && pulumi up`. The jar Pulumi runs is then exactly the
-store-built artifact, not a possibly-stale `target/`.
+Release/deploy therefore consumes the store-built jar (`nix build .#seed-master`)
+through the deploy path, not by wiring a bare `result/` into `Pulumi.yaml`. The
+exact shape of that store-sourced deploy (absolute store path injected at deploy
+time, or a project-skeleton derivation copied into a writable workdir) is the
+open "app output" decision — see the deploy-scope discussion. The flake building
+the jar as a store output stands regardless; only the *pointer* in `Pulumi.yaml`
+stays on the Maven target for the dev loop.
 
 == Build-time vs runtime for the NRI plugin
 
@@ -213,9 +217,12 @@ design first gives the builder feature a clean, store-resolved world to build on
   ambient environment; the full reactor will expose this.
 . *Incremental dev story*: confirm the Maven inner loop stays untouched (it does —
   `./mvnw` is unchanged); document when to use which entry point.
-. *`result` symlink vs wrapper*: whether Pulumi reads `result/...jar` directly or
-  via a tiny wrapper that `nix build`s on demand. Direct symlink is simpler;
-  wrapper auto-builds but hides the step.
+. *Store-sourced deploy shape*: how release consumes the store-built jar without
+  a bare `result/` (which gets clobbered by other `nix build`s). Candidates: an
+  absolute store path injected into `Pulumi.yaml`/the deploy env at deploy time,
+  or a project-skeleton derivation (Pulumi.yaml + jar + pinned provider plugin)
+  copied into a writable workdir by a `nix run .#deploy` wrapper. Pulumi can't
+  `up` from read-only `/nix/store` directly (needs a writable state/plugin dir).
 . *CI*: where `nix build .#seed-master .#flox-nri-plugin` runs (the linux-builder
   must be reachable from CI, not just the dev machine).
 

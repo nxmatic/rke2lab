@@ -2,10 +2,12 @@ name: rke2lab
 runtime:
   name: java
   options:
-    # Store-built bootstrap jar via `nix build .#seed-master` (-> ./result).
-    # The artifact Pulumi runs is the immutable store path, not a mutable
-    # target/ build. Run `nix build .#seed-master` before `pulumi up`.
-    binary: result/share/java/seed-master.jar
+    # Dev inner loop: Pulumi runs the Maven build output, so `mvn package`
+    # (or the reactor) -> `pulumi up` is the fast edit/test cycle. The flake
+    # also builds this jar as a store output (`nix build .#seed-master`) for
+    # release/deploy; that store path is consumed by the deploy path, not wired
+    # here as a bare `result/` symlink (which any `nix build` would clobber).
+    binary: seed-master/target/seed-master-0.1.0-SNAPSHOT-exec.jar
 description: Pulumi-based provisioning control plane for RK2Lab management cluster bootstrap
 packages:
   incus:
