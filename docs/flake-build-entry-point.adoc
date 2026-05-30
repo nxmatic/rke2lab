@@ -163,6 +163,38 @@ since the store-resolved-env work, the env store paths the same way). So the nod
 side changes from "build then gcroot" to "consume the pre-built path then gcroot"
 — a natural fit with the existing model.
 
+=== Store distribution to the node (verified)
+
+The node (`master`) is an incus instance with its *own* rootfs-resident nix store
+(~8272 paths), independent of `bioskop-nixos` (~2790) and the darwin dev machine.
+A build-time store path therefore must be *distributed* into master's store. The
+topology, verified live:
+
+----
+bioskop (darwin dev machine = this host)   nix build here; also the NFS source
+  └─ bioskop-nixos (NixOS aarch64)          own store; sshd:22; reachable as `nxmatic`
+       └─ master (incus instance)            own store; sshd:22; runs the flox containers
+----
+
+The proven mechanism — no ssh keys, no substituter, no shared mount, over the
+incus control channel that already exists:
+
+[source,sh]
+----
+# on bioskop-nixos (or proxied from the dev machine):
+nix-store --export $(nix-store --query --requisites "$STOREPATH") \
+  | incus exec master --project rke2lab -- nix-store --import
+----
+
+Verified by copying `nixpkgs#hello` (absent in master) into master's store:
+the path and its full closure landed (RESULT=PRESENT). This corrects the earlier
+framing that distribution would go "dev -> node over the nix-store ssh identity":
+the dev machine *is* bioskop (local, not a remote peer), the hardened
+`nix-store.<peer>` alias only targets nikopol (inventory filters out self), and
+the real consumer is `master`, one hop deeper than `bioskop-nixos`.
+`nix copy --to ssh-ng://master` is also viable (sshd is up) but needs auth wiring;
+export|import needs none.
+
 == Coupling to the remote nix builder
 
 The plugin's build-time cross-build and the container remote-builder feature
