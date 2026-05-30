@@ -152,6 +152,44 @@ installer::host:flox:activate_environments() {
 	done
 
 	echo "=== All ${#discovered_envs[@]} environments activated ==="
+
+	installer::host:flox:propagate_locks_to_runtime "${env_root}" "${discovered_envs[@]}"
+}
+
+# Activation above runs in the shared /srv/host tree, where flox writes each
+# env's manifest.lock. But the NRI plugin overlay-mounts envs from the node-local
+# /var/run tree (it deliberately avoids the NFS-backed /srv/host — see
+# floxEnvBaseDir in nri-plugin/pkg/nri/plugin.go). The init container's earlier
+# `cp -af /.sh -> /var/run` predates activation, so /var/run holds manifest.toml
+# but no lock. Without the lock, the in-container `flox activate` is forced to
+# re-resolve and evaluates the env's relative `path:../../..` flake ref, which
+# clamps to / under the mount and fails. Copy the freshly-produced lock into the
+# consumer tree so containers activate from pinned state and never re-resolve.
+installer::host:flox:propagate_locks_to_runtime() {
+	local env_root="$1"
+	shift
+	local consumer_env_root="/var/run/k8s-daemonset.d/${DAEMONSET_ASSET_SUBDIR}/environment.d"
+	local env_path src_lock dst_lock dst_dir
+
+	if [[ "${env_root}" == "${consumer_env_root}" ]]; then
+		echo "lock propagation skipped: activation tree is already the runtime tree (${env_root})"
+		return 0
+	fi
+
+	for env_path in "$@"; do
+		src_lock="${env_root}/${env_path}/.flox/env/manifest.lock"
+		dst_lock="${consumer_env_root}/${env_path}/.flox/env/manifest.lock"
+		dst_dir="${dst_lock%/*}"
+
+		[[ -r "${src_lock}" ]] || {
+			echo "  ⚠ no lock to propagate for ${env_path} (${src_lock} absent)" >&2
+			continue
+		}
+
+		mkdir -p "${dst_dir}"
+		cp -f "${src_lock}" "${dst_lock}"
+		echo "  ✓ propagated lock for ${env_path} -> ${dst_lock}"
+	done
 }
 
 installer::host:flox:activate() {
