@@ -86,8 +86,7 @@
         "flake": "github:nxmatic/rke2lab#incus-client"
       },
       "jdk25": {
-        "pkg-path": "jdk25",
-        "outputs": "all"
+        "flake": "github:nxmatic/rke2lab#jdk25"
       },
       "keychain": {
         "pkg-path": "keychain",
@@ -160,8 +159,7 @@
         "outputs": "all"
       },
       "maven": {
-        "pkg-path": "maven",
-        "outputs": "all"
+        "flake": "github:nxmatic/rke2lab#maven"
       },
       "moreutils": {
         "pkg-path": "moreutils"
@@ -198,11 +196,10 @@
         "pkg-path": "screen"
       },
       "shellcheck": {
-        "pkg-path": "shellcheck",
-        "outputs": "all"
+        "flake": "github:nxmatic/rke2lab#shellcheck"
       },
       "shfmt": {
-        "pkg-path": "shfmt"
+        "flake": "github:nxmatic/rke2lab#shfmt"
       },
       "socat": {
         "pkg-path": "socat"
@@ -2490,124 +2487,6 @@
       "priority": 5
     },
     {
-      "attr_path": "jdk25",
-      "broken": false,
-      "derivation": "/nix/store/4g2vqin5qnhllv6djn7krg27mw638s8y-zulu-ca-jdk-25.0.0.drv",
-      "description": "Certified builds of OpenJDK",
-      "install_id": "jdk25",
-      "license": "GPL-2.0-only",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "zulu-ca-jdk-25.0.0",
-      "pname": "jdk25",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T04:42:19.982263Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "25.0.0",
-      "outputs_to_install": [
-        "out",
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/g2m73l2987sld7zzv8hshadghp2y2k84-zulu-ca-jdk-25.0.0"
-      },
-      "system": "aarch64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "jdk25",
-      "broken": false,
-      "derivation": "/nix/store/s6yi3z3sh5y512k3zxm27l3yrwih20jz-openjdk-25.0.2+10.drv",
-      "description": "Open-source Java Development Kit",
-      "install_id": "jdk25",
-      "license": "GPL-2.0-only",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "openjdk-25.0.2+10",
-      "pname": "jdk25",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T05:15:00.702829Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "25.0.2+10",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "debug": "/nix/store/38hwrmfm117ky6rqg4ngdzap3vri7idr-openjdk-25.0.2+10-debug",
-        "out": "/nix/store/b772vilhd4v97dzwj90km7llb9q0anl6-openjdk-25.0.2+10"
-      },
-      "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "maven",
-      "broken": false,
-      "derivation": "/nix/store/sbp7g4gazpgmw1cmh7zyg08qqi5lxyca-maven-3.9.12.drv",
-      "description": "Build automation tool (used primarily for Java projects)",
-      "install_id": "maven",
-      "license": "Apache-2.0",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "maven-3.9.12",
-      "pname": "maven",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T04:42:25.391517Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "3.9.12",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/njv115l854b6s5xi8z5s9bv1azicq3wk-maven-3.9.12"
-      },
-      "system": "aarch64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "maven",
-      "broken": false,
-      "derivation": "/nix/store/dlf97pybix92f23swgza4swhy3616b1f-maven-3.9.12.drv",
-      "description": "Build automation tool (used primarily for Java projects)",
-      "install_id": "maven",
-      "license": "Apache-2.0",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "maven-3.9.12",
-      "pname": "maven",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T05:15:14.792637Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "3.9.12",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/60qkfjzwrb323k2yp76fvfi8lbbc0qq1-maven-3.9.12"
-      },
-      "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
       "attr_path": "moreutils",
       "broken": false,
       "derivation": "/nix/store/c3fzwq6ggzpmk82j6gl1pwrcwa1jbgh6-moreutils-0.70.drv",
@@ -2904,133 +2783,6 @@
       "priority": 5
     },
     {
-      "attr_path": "shellcheck",
-      "broken": false,
-      "derivation": "/nix/store/qh9fq60lf5c7dvck178szqyf8p24m8mb-shellcheck-0.11.0.drv",
-      "description": "Shell script analysis tool",
-      "install_id": "shellcheck",
-      "license": "GPL-3.0-only",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "shellcheck-0.11.0",
-      "pname": "shellcheck",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T04:43:50.227668Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "0.11.0",
-      "outputs_to_install": [
-        "bin",
-        "bin",
-        "doc",
-        "man"
-      ],
-      "outputs": {
-        "bin": "/nix/store/adhxjbq5402r6vzbjkiir7cbblc0yrh8-shellcheck-0.11.0-bin",
-        "doc": "/nix/store/41cc95q6jff4aw4lxpndvajidl1lsvdq-shellcheck-0.11.0-doc",
-        "man": "/nix/store/hr9cii9wgnabh04bahlk76ssmjc7lmsy-shellcheck-0.11.0-man",
-        "out": "/nix/store/168k09jnrsnzaj4dx2ms987ncwk6q38a-shellcheck-0.11.0"
-      },
-      "system": "aarch64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "shellcheck",
-      "broken": false,
-      "derivation": "/nix/store/3sxahq5l4y93l9s0lf6nnq1fwkjxp22y-shellcheck-0.11.0.drv",
-      "description": "Shell script analysis tool",
-      "install_id": "shellcheck",
-      "license": "GPL-3.0-only",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "shellcheck-0.11.0",
-      "pname": "shellcheck",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T05:17:09.949083Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "0.11.0",
-      "outputs_to_install": [
-        "bin",
-        "doc",
-        "man"
-      ],
-      "outputs": {
-        "bin": "/nix/store/265r98p68pgj5wd7k9fdq9jq2kvikxcs-shellcheck-0.11.0-bin",
-        "doc": "/nix/store/swp7wmafcggw1ahb01lmwpvc32j0m1a2-shellcheck-0.11.0-doc",
-        "man": "/nix/store/ij1aai8kr64xjwiwz8pdfw1bg7k3bsgx-shellcheck-0.11.0-man",
-        "out": "/nix/store/cji2z7y449ga9w7w68w78h2hfbvv571g-shellcheck-0.11.0"
-      },
-      "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "shfmt",
-      "broken": false,
-      "derivation": "/nix/store/d32zr98kcczhs0k4b66m8wx6f1hngy8x-shfmt-3.13.0.drv",
-      "description": "Shell parser and formatter",
-      "install_id": "shfmt",
-      "license": "BSD-3-Clause",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "shfmt-3.13.0",
-      "pname": "shfmt",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T04:43:50.274143Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "3.13.0",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/vvfnjrbh8ij2fgrrr6raqm7bgy08l3bz-shfmt-3.13.0"
-      },
-      "system": "aarch64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "shfmt",
-      "broken": false,
-      "derivation": "/nix/store/3hwrraw01wzhnvnsz3qslxqhw25c911c-shfmt-3.13.0.drv",
-      "description": "Shell parser and formatter",
-      "install_id": "shfmt",
-      "license": "BSD-3-Clause",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "shfmt-3.13.0",
-      "pname": "shfmt",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T05:17:10.016461Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "3.13.0",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/fxcdsnnykza75zrly0bjnj3kykgzh6zf-shfmt-3.13.0"
-      },
-      "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
       "attr_path": "socat",
       "broken": false,
       "derivation": "/nix/store/7diabxg5nw9f68agjv8z0mhgh39f3daz-socat-1.8.1.0.drv",
@@ -3272,6 +3024,124 @@
       "priority": 5
     },
     {
+      "install_id": "jdk25",
+      "locked-url": "github:nxmatic/rke2lab/34cee3576300c3bfe039c81f4f8aa0a3538d748a?narHash=sha256-ZqypShxu%2BSPEgwuJ6pVcTVmfMCFVymMAvnNApnFs5aI%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-darwin.jdk25",
+      "derivation": "/nix/store/m2c0cgjyg7ixazl8wf2p9g3kbah9hk3f-zulu-ca-jdk-25.0.0.drv",
+      "outputs": {
+        "out": "/nix/store/h6ff74586l9p2nvxa9j93nbngpnpw703-zulu-ca-jdk-25.0.0"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-darwin",
+      "system": "aarch64-darwin",
+      "name": "zulu-ca-jdk-25.0.0",
+      "pname": "zulu-ca-jdk",
+      "version": "25.0.0",
+      "description": "Certified builds of OpenJDK",
+      "licenses": [
+        "GPL-2.0-only"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "jdk25",
+      "locked-url": "github:nxmatic/rke2lab/34cee3576300c3bfe039c81f4f8aa0a3538d748a?narHash=sha256-ZqypShxu%2BSPEgwuJ6pVcTVmfMCFVymMAvnNApnFs5aI%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-linux.jdk25",
+      "derivation": "/nix/store/8n8xkbnvc2hn8sfp0m9haxyqxvrrf686-openjdk-25.0.2+10.drv",
+      "outputs": {
+        "debug": "/nix/store/zyc6ig0xgxq0y67l12v9xshl1z86d7xp-openjdk-25.0.2+10-debug",
+        "out": "/nix/store/a94v8iv5daxd1ba55jhzbppivnra9qds-openjdk-25.0.2+10"
+      },
+      "output-names": [
+        "out",
+        "debug"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "openjdk-25.0.2+10",
+      "pname": "openjdk",
+      "version": "25.0.2+10",
+      "description": "Open-source Java Development Kit",
+      "licenses": [
+        "GPL-2.0-only"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "maven",
+      "locked-url": "github:nxmatic/rke2lab/34cee3576300c3bfe039c81f4f8aa0a3538d748a?narHash=sha256-ZqypShxu%2BSPEgwuJ6pVcTVmfMCFVymMAvnNApnFs5aI%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-darwin.maven",
+      "derivation": "/nix/store/h9axl6drwfh94xi6kpv93920apjg0pdv-maven-3.9.11.drv",
+      "outputs": {
+        "out": "/nix/store/rhdcf51rndrisr6wz4lhbib6ghhfqrn4-maven-3.9.11"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-darwin",
+      "system": "aarch64-darwin",
+      "name": "maven-3.9.11",
+      "pname": "maven",
+      "version": "3.9.11",
+      "description": "Build automation tool (used primarily for Java projects)",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "maven",
+      "locked-url": "github:nxmatic/rke2lab/34cee3576300c3bfe039c81f4f8aa0a3538d748a?narHash=sha256-ZqypShxu%2BSPEgwuJ6pVcTVmfMCFVymMAvnNApnFs5aI%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-linux.maven",
+      "derivation": "/nix/store/vll9r13jidmx4nndh0aa6qkq2521mpi2-maven-3.9.11.drv",
+      "outputs": {
+        "out": "/nix/store/r2lkjdqmnyw7wyvld5j59xka4yq7m1h6-maven-3.9.11"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "maven-3.9.11",
+      "pname": "maven",
+      "version": "3.9.11",
+      "description": "Build automation tool (used primarily for Java projects)",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
       "install_id": "podman-wrapper",
       "locked-url": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper&ref=refs/heads/main&rev=30444c66a6ef778ddc479c32e7789eb66823e125",
       "flake-description": "podman-wrapper flake for k8s env",
@@ -3316,6 +3186,138 @@
       "broken": false,
       "unfree": false,
       "priority": 5
+    },
+    {
+      "install_id": "shellcheck",
+      "locked-url": "github:nxmatic/rke2lab/152845588a3186c3a70d090f91332b8027c47b07?narHash=sha256-zVxv8Y%2B2ed/sds1lTNINP%2BZ1JsBKVmnoTF%2BJtSUszuo%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-darwin.shellcheck",
+      "derivation": "/nix/store/jxcwclwrlv33aa8zmbwd6alm96dybpjm-shellcheck-0.11.0.drv",
+      "outputs": {
+        "bin": "/nix/store/7zaq834a8sc9fkarsywjgfbivi5m1rmp-shellcheck-0.11.0-bin",
+        "doc": "/nix/store/f1bcll4qhg8rjhzfbvys78kxji2i58k9-shellcheck-0.11.0-doc",
+        "man": "/nix/store/jvx9763hyf7vcfdpr3lxn1hh26yqgvc8-shellcheck-0.11.0-man",
+        "out": "/nix/store/1ab88ml7xnfqgs2vn216cl226z84g30i-shellcheck-0.11.0"
+      },
+      "output-names": [
+        "bin",
+        "man",
+        "doc",
+        "out"
+      ],
+      "outputs-to-install": [
+        "bin",
+        "doc",
+        "man"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-darwin",
+      "system": "aarch64-darwin",
+      "name": "shellcheck-0.11.0",
+      "pname": "ShellCheck",
+      "version": "0.11.0",
+      "description": "Shell script analysis tool",
+      "licenses": [
+        "GPL-3.0-only"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "shellcheck",
+      "locked-url": "github:nxmatic/rke2lab/152845588a3186c3a70d090f91332b8027c47b07?narHash=sha256-zVxv8Y%2B2ed/sds1lTNINP%2BZ1JsBKVmnoTF%2BJtSUszuo%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-linux.shellcheck",
+      "derivation": "/nix/store/4ki35fksjllcfab7iwddszqj2bq1y1ks-shellcheck-0.11.0.drv",
+      "outputs": {
+        "bin": "/nix/store/jxny30kladfhiwwnf7flbzinzaxdfml2-shellcheck-0.11.0-bin",
+        "doc": "/nix/store/jp41ky8459f65dnzlp5vgj8lab396xvp-shellcheck-0.11.0-doc",
+        "man": "/nix/store/jlsx03al08ppagcpg176icr6lh436xhj-shellcheck-0.11.0-man",
+        "out": "/nix/store/m1rjazid0wzdnxwg3mcrdk8cgk5rna1a-shellcheck-0.11.0"
+      },
+      "output-names": [
+        "bin",
+        "man",
+        "doc",
+        "out"
+      ],
+      "outputs-to-install": [
+        "bin",
+        "doc",
+        "man"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "shellcheck-0.11.0",
+      "pname": "ShellCheck",
+      "version": "0.11.0",
+      "description": "Shell script analysis tool",
+      "licenses": [
+        "GPL-3.0-only"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "shfmt",
+      "locked-url": "github:nxmatic/rke2lab/152845588a3186c3a70d090f91332b8027c47b07?narHash=sha256-zVxv8Y%2B2ed/sds1lTNINP%2BZ1JsBKVmnoTF%2BJtSUszuo%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-darwin.shfmt",
+      "derivation": "/nix/store/imi2igyyrjjg8j76aiv403xx4wwr9igj-shfmt-3.12.0.drv",
+      "outputs": {
+        "out": "/nix/store/9gnpg8zw829a5vplb272q0axdsli4iqm-shfmt-3.12.0"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-darwin",
+      "system": "aarch64-darwin",
+      "name": "shfmt-3.12.0",
+      "pname": "shfmt",
+      "version": "3.12.0",
+      "description": "Shell parser and formatter",
+      "licenses": [
+        "BSD-3-Clause"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "shfmt",
+      "locked-url": "github:nxmatic/rke2lab/152845588a3186c3a70d090f91332b8027c47b07?narHash=sha256-zVxv8Y%2B2ed/sds1lTNINP%2BZ1JsBKVmnoTF%2BJtSUszuo%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-linux.shfmt",
+      "derivation": "/nix/store/kjwvnnyfy7fmm5dhyak7kri6qs1z09ij-shfmt-3.12.0.drv",
+      "outputs": {
+        "out": "/nix/store/y7g38ki1wx58g4c13c1dsmijqnwdp0jb-shfmt-3.12.0"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "shfmt-3.12.0",
+      "pname": "shfmt",
+      "version": "3.12.0",
+      "description": "Shell parser and formatter",
+      "licenses": [
+        "BSD-3-Clause"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
     }
   ],
   "compose": {
@@ -3341,11 +3343,23 @@
         "incus-client": {
           "flake": "github:nxmatic/rke2lab#incus-client"
         },
+        "jdk25": {
+          "flake": "github:nxmatic/rke2lab#jdk25"
+        },
+        "maven": {
+          "flake": "github:nxmatic/rke2lab#maven"
+        },
         "pulumi": {
           "pkg-path": "pulumi-bin"
         },
         "pulumictl": {
           "pkg-path": "pulumictl"
+        },
+        "shellcheck": {
+          "flake": "github:nxmatic/rke2lab#shellcheck"
+        },
+        "shfmt": {
+          "flake": "github:nxmatic/rke2lab#shfmt"
         }
       },
       "vars": {
@@ -3815,6 +3829,24 @@
         "warning": {
           "Overriding": [
             "install",
+            "jdk25"
+          ]
+        },
+        "higher_priority_name": "Current manifest"
+      },
+      {
+        "warning": {
+          "Overriding": [
+            "install",
+            "maven"
+          ]
+        },
+        "higher_priority_name": "Current manifest"
+      },
+      {
+        "warning": {
+          "Overriding": [
+            "install",
             "pulumi"
           ]
         },
@@ -3825,6 +3857,24 @@
           "Overriding": [
             "install",
             "pulumictl"
+          ]
+        },
+        "higher_priority_name": "Current manifest"
+      },
+      {
+        "warning": {
+          "Overriding": [
+            "install",
+            "shellcheck"
+          ]
+        },
+        "higher_priority_name": "Current manifest"
+      },
+      {
+        "warning": {
+          "Overriding": [
+            "install",
+            "shfmt"
           ]
         },
         "higher_priority_name": "Current manifest"

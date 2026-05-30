@@ -43,13 +43,24 @@
       # linux-builder is involved on this path.
       blueprintSystem = "aarch64-darwin";
 
+      # Single source of truth for the Maven-build toolchain. This one attrset
+      # feeds three consumers: the build derivations below, `devShells.default`,
+      # and the re-exported `packages` that the flox env pins against — so dev
+      # loop, devShell, and store build all resolve the same versions from this
+      # flake's nixpkgs. Spotless version-checks the shfmt binary it finds on
+      # PATH against its configured `${shfmt.version}`, so the build passes
+      # `-Dshfmt.version=${shfmt.version}` to keep binary and config identical,
+      # both sourced from this `pkgs`.
+      mavenToolchain = pkgs: { inherit (pkgs) jdk25 maven shfmt shellcheck; };
+      mavenBuildInputs = pkgs: builtins.attrValues (mavenToolchain pkgs);
+
       # netplan JAR build, parameterized by pkgs so the per-system `packages`
       # output can build it locally while `lib` uses the pinned set.
       netplanJarFor = pkgs: pkgs.stdenv.mkDerivation {
         name = "rke2lab-netplan";
         src = ./.;  # Need full repo for parent POM + BOM resolution
 
-        nativeBuildInputs = [ pkgs.maven pkgs.jdk25 ];
+        nativeBuildInputs = mavenBuildInputs pkgs;
 
         buildPhase = ''
           # Maven needs a writable HOME for .m2/repository
@@ -61,7 +72,7 @@
             -f bom/pom.xml install
           mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
             -f netplan/pom.xml \
-            clean package -DskipTests
+            -Dshfmt.version=${pkgs.shfmt.version} clean package -DskipTests
         '';
 
         installPhase = ''
@@ -138,12 +149,15 @@
           name = "rke2lab-seed-master";
           src = ./.;
 
-          nativeBuildInputs = [ pkgs.maven pkgs.jdk25 ];
+          nativeBuildInputs = mavenBuildInputs pkgs;
 
           buildPhase = ''
             mkdir -p $TMPDIR/.m2
+            # Pin spotless's shfmt to the flake's binary (see mavenBuildInputs):
+            # binary and configured version are both this `pkgs`, so the format
+            # gate runs and passes instead of failing on a version mismatch.
             mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
-              -DskipTests clean package
+              -Dshfmt.version=${pkgs.shfmt.version} -DskipTests clean package
           '';
 
           installPhase = ''
@@ -181,12 +195,27 @@
                 then { inherit (floxRuntimePackages) flox-nri-plugin-debug; }
                 else { });
 
+        # Maven-build toolchain re-exported as individual packages, so the flox
+        # env pins each tool to this flake's version
+        # (e.g. `shfmt.flake = "github:nxmatic/rke2lab#shfmt"`) instead of the
+        # overlapping fleet includes. This flake is the source of truth; flox
+        # follows it, keeping the dev loop aligned with the Maven build's
+        # spotless gate.
+        toolchainPackages = mavenToolchain pkgs;
+
       in {
         packages = {
           inherit netplanJar networkBlueprintYaml seedMasterJar;
           seed-master = seedMasterJar;
           incus-client = incusClient;
-        } // floxNriPluginPackages;
+        } // floxNriPluginPackages // toolchainPackages;
+
+        # The declared source of truth for the Maven-build toolchain. `mvn` from
+        # here (or via the flox env that consumes these versions) sees the same
+        # shfmt/shellcheck the store build does.
+        devShells.default = pkgs.mkShell {
+          packages = mavenBuildInputs pkgs;
+        };
       }
     )) // {
       # Flat, system-independent export consumed by nix-darwin-home as

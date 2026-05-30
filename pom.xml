@@ -34,7 +34,10 @@
     <spotless.version>3.3.0</spotless.version>
     <shellcheck.maven.plugin.version>0.5.1</shellcheck.maven.plugin.version>
     <google-java-format.version>1.35.0</google-java-format.version>
-    <shfmt.version>3.13.0</shfmt.version>
+    <!-- Tracks the flake's nixpkgs shfmt (the toolchain source of truth);
+         the nix build also passes -Dshfmt.version=${pkgs.shfmt.version} so the
+         spotless gate's binary and config always agree. Bump together. -->
+    <shfmt.version>3.12.0</shfmt.version>
   </properties>
 
   <!--
