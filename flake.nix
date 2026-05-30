@@ -2,6 +2,15 @@
   description = "RKE2 lab infrastructure and network blueprints";
 
   inputs = {
+    # INVARIANT: nix-darwin-home must NEVER be an input of this flake.
+    # The two repos relate in opposite scopes: nix-darwin-home depends on rke2lab
+    # at BUILD/eval time (it imports this flake's networkBlueprint as the netplan
+    # source of truth), while rke2lab depends on nix-darwin-home only at RUNTIME
+    # (its incus instances run on the NixOS host nix-darwin-home provisions). That
+    # runtime edge is invisible to nix eval, so there is no cycle. Adding
+    # nix-darwin-home here would close the loop into a real flake-eval cycle.
+    # Keep the dependency one-directional at the flake level: nix-darwin-home -> rke2lab.
+
     # Use flake-commons as aggregator to stay synchronized with nix-darwin-home
     flake-commons.url = "github:nxmatic/nix-flake-commons/develop";
 

@@ -9,6 +9,7 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 === Build & Packaging
 
 * link:flake-build-entry-point.adoc[Flake as Build Entry Point] - Flake as the authoritative deploy build (Maven=dev loop, flake=release); store-built seed-master + manifests + NRI plugin
+* link:netplan-blueprint-single-source.adoc[Netplan Blueprint Single Source] - Cross-repo single source of truth for the network underlay (committed YAML projection + sync guard); nix-darwin-home consumes rke2lab's blueprint without IFD
 
 === Bootstrap & Provisioning
 
