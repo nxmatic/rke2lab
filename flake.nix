@@ -1,6 +1,17 @@
 {
   description = "RKE2 lab infrastructure and network blueprints";
 
+  # The seed-master build reuses the host `~/.m2` (resolved via getEnv "HOME")
+  # to reach private GitHub Packages deps without plumbing a token into the
+  # sandbox, so its eval is necessarily impure. Declare that here — like
+  # extra-substituters, nixConfig is applied before outputs are evaluated, so
+  # `nix build .#seed-master` works without a manual `--impure`. This only takes
+  # effect when rke2lab is the TOP-LEVEL flake; when consumed as an input (e.g.
+  # nix-darwin-home reading `lib.networkBlueprint`), it is ignored and that pure
+  # path never forces the impure getEnv. First use prompts to trust the config
+  # unless `accept-flake-config = true` is set.
+  nixConfig.pure-eval = false;
+
   inputs = {
     # INVARIANT: nix-darwin-home must NEVER be an input of this flake.
     # The two repos relate in opposite scopes: nix-darwin-home depends on rke2lab
@@ -51,7 +62,13 @@
       # PATH against its configured `${shfmt.version}`, so the build passes
       # `-Dshfmt.version=${shfmt.version}` to keep binary and config identical,
       # both sourced from this `pkgs`.
-      mavenToolchain = pkgs: { inherit (pkgs) jdk25 maven shfmt shellcheck; };
+      #
+      # `which` is required: spotless locates shfmt by shelling out to
+      # `which shfmt` (ForeignExe, when no <pathToExe> is set) and reports a
+      # non-zero exit as "Unable to find shfmt on path". The nix stdenv has no
+      # `which`, so without it the gate fails even though shfmt is on PATH; the
+      # dev loop never hit this because flox/the system provides `which`.
+      mavenToolchain = pkgs: { inherit (pkgs) jdk25 maven shfmt shellcheck which; };
       mavenBuildInputs = pkgs: builtins.attrValues (mavenToolchain pkgs);
 
       # netplan JAR build, parameterized by pkgs so the per-system `packages`
@@ -145,6 +162,23 @@
         # whole reactor is built once from the parent pom. Mirrors netplanJar's
         # Maven-in-nix pattern; the build runs with sandbox=false (per the host
         # nix.conf) so Maven can resolve its dependency tree.
+        #
+        # The reactor depends on private GitHub Packages artifacts
+        # (io.nxmatic:java-bbox-api-client, java-systemd) that need auth. Rather
+        # than plumb a token into the sandbox, reuse the host `~/.m2/repository`,
+        # which the dev loop has already populated with these (release) artifacts.
+        # The build user can't WRITE to the host repo, so it can't be the primary
+        # local repo (Maven writes tracking files there → AccessDeniedException).
+        # Instead use Maven 3.9's chained local repo: a writable $TMPDIR primary
+        # plus the host repo as a READ-ONLY tail (`maven.repo.local.tail`).
+        # Private deps resolve from the read-only tail (no write attempt, no 401);
+        # public deps read through and download into the temp primary. This makes
+        # the build impure (reads host state via `getEnv "HOME"`); the top-level
+        # `nixConfig.pure-eval = false` lets `nix build .#seed-master` run it
+        # without a manual `--impure`.
+        hostM2Settings = "${builtins.getEnv "HOME"}/.m2/settings";
+        hostM2Repo = "${builtins.getEnv "HOME"}/.m2/repository";
+        hostGHToken = "${builtins.getEnv "GH_TOKEN"}";
         seedMasterJar = pkgs.stdenv.mkDerivation {
           name = "rke2lab-seed-master";
           src = ./.;
@@ -152,11 +186,46 @@
           nativeBuildInputs = mavenBuildInputs pkgs;
 
           buildPhase = ''
-            mkdir -p $TMPDIR/.m2
-            # Pin spotless's shfmt to the flake's binary (see mavenBuildInputs):
-            # binary and configured version are both this `pkgs`, so the format
-            # gate runs and passes instead of failing on a version mismatch.
-            mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
+            set -euo pipefail
+            M2_REPO=$TMPDIR/.m2/repository
+            mkdir -p $M2_REPO
+
+            # Reuse strategy (see above): writable $TMPDIR primary + host repo as
+            # read-only tail (`maven.repo.local.tail`). The tail serves released
+            # deps (e.g. io.nxmatic:java-bbox-api-client) and is auth-backed via
+            # the host settings + GH_TOKEN for GitHub Packages.
+            #
+            # EXCEPTION: locally-`mvn install`ed SNAPSHOTs (here
+            # com.github.thjomnx:java-systemd:3.0.0-SNAPSHOT — the upstream
+            # project, present in no remote repo) cannot be served from the tail:
+            # a tail repo's manager won't treat a `maven-metadata-local.xml`
+            # artifact as locally installed, so for a SNAPSHOT it demands remote
+            # timestamped metadata that doesn't exist → "Could not find"
+            # (ignoreAvailability doesn't help — it flips availability, not the
+            # local-install determination). Seed such artifacts into the writable
+            # primary, copying `_remote.repositories` so Maven still reads them as
+            # local installs. Add more lines here if other local-only deps appear.
+            #
+            # NOTE: the multi-user nix build user must be able to traverse the
+            # host home to read the tail/seed source. nix-darwin-home grants this
+            # (home.activation.ensureHomeTraversable: `chmod a+x $HOME`); if the
+            # build can't reach `~/.m2`, that step hasn't run.
+            for a in com/github/thjomnx/java-systemd; do
+              src=${hostM2Repo}/$a
+              if [ -d "$src" ]; then
+                mkdir -p "$M2_REPO/$(dirname "$a")"
+                cp -r "$src" "$M2_REPO/$a"
+                chmod -R u+w "$M2_REPO/$a"
+              fi
+            done
+
+            # Pin spotless's shfmt to the flake binary so its version-check
+            # matches the binary on PATH.
+            env GH_TOKEN="${hostGHToken}" mvn \
+              -Dmaven.settings="${hostM2Settings}" \
+              -Dmaven.repo.local="$M2_REPO" \
+              -Dmaven.repo.local.tail="${hostM2Repo}" \
+              -Dmaven.repo.local.tail.ignoreAvailability=true \
               -Dshfmt.version=${pkgs.shfmt.version} -DskipTests clean package
           '';
 

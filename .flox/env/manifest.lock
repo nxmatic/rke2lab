@@ -159,7 +159,8 @@
         "outputs": "all"
       },
       "maven": {
-        "flake": "github:nxmatic/rke2lab#maven"
+        "pkg-path": "maven",
+        "outputs": "all"
       },
       "moreutils": {
         "pkg-path": "moreutils"
@@ -2487,6 +2488,64 @@
       "priority": 5
     },
     {
+      "attr_path": "maven",
+      "broken": false,
+      "derivation": "/nix/store/sbp7g4gazpgmw1cmh7zyg08qqi5lxyca-maven-3.9.12.drv",
+      "description": "Build automation tool (used primarily for Java projects)",
+      "install_id": "maven",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "maven-3.9.12",
+      "pname": "maven",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T04:42:25.391517Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.9.12",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/njv115l854b6s5xi8z5s9bv1azicq3wk-maven-3.9.12"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "maven",
+      "broken": false,
+      "derivation": "/nix/store/dlf97pybix92f23swgza4swhy3616b1f-maven-3.9.12.drv",
+      "description": "Build automation tool (used primarily for Java projects)",
+      "install_id": "maven",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "name": "maven-3.9.12",
+      "pname": "maven",
+      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
+      "rev_count": 963917,
+      "rev_date": "2026-03-16T07:26:50Z",
+      "scrape_date": "2026-03-17T05:15:14.792637Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.9.12",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/60qkfjzwrb323k2yp76fvfi8lbbc0qq1-maven-3.9.12"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "moreutils",
       "broken": false,
       "derivation": "/nix/store/c3fzwq6ggzpmk82j6gl1pwrcwa1jbgh6-moreutils-0.70.drv",
@@ -3084,64 +3143,6 @@
       "priority": 5
     },
     {
-      "install_id": "maven",
-      "locked-url": "github:nxmatic/rke2lab/34cee3576300c3bfe039c81f4f8aa0a3538d748a?narHash=sha256-ZqypShxu%2BSPEgwuJ6pVcTVmfMCFVymMAvnNApnFs5aI%3D",
-      "flake-description": "RKE2 lab infrastructure and network blueprints",
-      "locked-flake-attr-path": "packages.aarch64-darwin.maven",
-      "derivation": "/nix/store/h9axl6drwfh94xi6kpv93920apjg0pdv-maven-3.9.11.drv",
-      "outputs": {
-        "out": "/nix/store/rhdcf51rndrisr6wz4lhbib6ghhfqrn4-maven-3.9.11"
-      },
-      "output-names": [
-        "out"
-      ],
-      "outputs-to-install": [
-        "out"
-      ],
-      "requested-outputs-to-install": [],
-      "package-system": "aarch64-darwin",
-      "system": "aarch64-darwin",
-      "name": "maven-3.9.11",
-      "pname": "maven",
-      "version": "3.9.11",
-      "description": "Build automation tool (used primarily for Java projects)",
-      "licenses": [
-        "Apache-2.0"
-      ],
-      "broken": false,
-      "unfree": false,
-      "priority": 5
-    },
-    {
-      "install_id": "maven",
-      "locked-url": "github:nxmatic/rke2lab/34cee3576300c3bfe039c81f4f8aa0a3538d748a?narHash=sha256-ZqypShxu%2BSPEgwuJ6pVcTVmfMCFVymMAvnNApnFs5aI%3D",
-      "flake-description": "RKE2 lab infrastructure and network blueprints",
-      "locked-flake-attr-path": "packages.aarch64-linux.maven",
-      "derivation": "/nix/store/vll9r13jidmx4nndh0aa6qkq2521mpi2-maven-3.9.11.drv",
-      "outputs": {
-        "out": "/nix/store/r2lkjdqmnyw7wyvld5j59xka4yq7m1h6-maven-3.9.11"
-      },
-      "output-names": [
-        "out"
-      ],
-      "outputs-to-install": [
-        "out"
-      ],
-      "requested-outputs-to-install": [],
-      "package-system": "aarch64-linux",
-      "system": "aarch64-linux",
-      "name": "maven-3.9.11",
-      "pname": "maven",
-      "version": "3.9.11",
-      "description": "Build automation tool (used primarily for Java projects)",
-      "licenses": [
-        "Apache-2.0"
-      ],
-      "broken": false,
-      "unfree": false,
-      "priority": 5
-    },
-    {
       "install_id": "podman-wrapper",
       "locked-url": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper&ref=refs/heads/main&rev=30444c66a6ef778ddc479c32e7789eb66823e125",
       "flake-description": "podman-wrapper flake for k8s env",
@@ -3345,9 +3346,6 @@
         },
         "jdk25": {
           "flake": "github:nxmatic/rke2lab#jdk25"
-        },
-        "maven": {
-          "flake": "github:nxmatic/rke2lab#maven"
         },
         "pulumi": {
           "pkg-path": "pulumi-bin"
@@ -3830,15 +3828,6 @@
           "Overriding": [
             "install",
             "jdk25"
-          ]
-        },
-        "higher_priority_name": "Current manifest"
-      },
-      {
-        "warning": {
-          "Overriding": [
-            "install",
-            "maven"
           ]
         },
         "higher_priority_name": "Current manifest"

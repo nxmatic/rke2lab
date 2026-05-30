@@ -31,15 +31,15 @@ incus-client.flake = "github:nxmatic/rke2lab#incus-client"
 
 ## Maven-build toolchain consumed from the rke2lab flake, which is the single
 ## source of truth (see `mavenToolchain` / `devShells.default` in flake.nix).
-## All four tools are pinned here so the dev loop is deterministic and identical
-## to the nix store build: same jdk25, maven, shfmt, shellcheck versions. These
-## top-level entries take precedence over the unpinned `pkg-path` copies the
-## fleet `flox/jdk` and `flox/shell` includes would otherwise supply, and keep
-## the dev loop's shfmt matched to the Maven spotless gate (`<shfmt.version>` in
-## pom.xml). Same `github:` (not `path:.`) rationale as incus-client above; bump
-## with `flox upgrade` after pushing flake changes.
+## Pinned here so the dev loop is deterministic and identical to the nix store
+## build: same jdk25, shfmt, shellcheck versions. (Maven itself comes from the
+## `./mvnw` wrapper, so it is not pinned here.) These top-level entries take
+## precedence over the unpinned `pkg-path` copies the fleet `flox/jdk` and
+## `flox/shell` includes would otherwise supply, and keep the dev loop's shfmt
+## matched to the Maven spotless gate (`<shfmt.version>` in pom.xml). Same
+## `github:` (not `path:.`) rationale as incus-client above; bump with
+## `flox upgrade` after pushing flake changes.
 jdk25.flake = "github:nxmatic/rke2lab#jdk25"
-maven.flake = "github:nxmatic/rke2lab#maven"
 shfmt.flake = "github:nxmatic/rke2lab#shfmt"
 shellcheck.flake = "github:nxmatic/rke2lab#shellcheck"
 
