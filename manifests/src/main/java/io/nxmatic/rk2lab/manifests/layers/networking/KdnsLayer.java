@@ -316,7 +316,13 @@ public final class KdnsLayer extends Construct {
     volumes.addAll(shellSidecar.extraVolumes());
 
     LinkedHashMap<String, Object> deploymentSpec = new LinkedHashMap<>();
-    deploymentSpec.put("replicas", 1);
+    // Scaled to 0 while the kdns OOM is investigated: the `kdns` busybox
+    // container (flox activate -- kdns) OOMKills at both 256Mi and 512Mi with no
+    // log output. The flox NRI plugin + env injection work; the runaway memory
+    // is intrinsic to the kdns workload itself. Set at the source so RKE2's
+    // AddOn auto-deploy can't revert a manual `kubectl scale 0` back to 1.
+    // Restore to 1 once the OOM root cause is fixed.
+    deploymentSpec.put("replicas", 0);
     deploymentSpec.put(
         "selector",
         Map.of(
