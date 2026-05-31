@@ -33,6 +33,7 @@ When you encounter a builder with three or more boolean parameters or a sequence
 - **Functional APIs**: Design for composition and pipelines. Prefer fluent chains, function parameters (lambdas/method refs), and immutable transformations over stateful accumulators.
 - **Multi-parameter methods**: When you encounter methods with 3+ parameters (especially booleans), note them as candidates for pipeline-based implementation. Consider whether the fluent grammar or a builder would improve readability and type safety.
 - **Prefer instances over helpers**: Pass object instances through the call graph rather than creating static helper methods. This makes dependencies explicit, enables testing/mocking, and keeps state encapsulated. See "Instance-passing discipline" below.
+- **Single source of truth for identifiers**: Use typed accessor methods from canonical registries (like `ManifestDomainCatalog`) instead of hardcoded string literals. This prevents identifier mismatches like the `clusterApi` bug where `"clusterApi"` string didn't match catalog's `"cluster-api"` ID. See "ManifestDomainCatalog discipline" below.
 
 ### Instance-passing discipline
 
@@ -114,6 +115,51 @@ When reviewing code or implementing features:
 - If you find yourself writing `public static X doSomething()`, ask: "Should this be an instance method?"
 - If you're about to create a `XyzHelper` class with static methods, ask: "Which existing class should own this behavior?"
 - If you see `SomeHelper.staticMethod()` calls, refactor to pass the instance.
+
+### ManifestDomainCatalog discipline
+
+**Never use hardcoded domain ID strings. Always use the ManifestDomainCatalog.**
+
+On May 31, 2026, we fixed a critical bug where `clusterApi` policy showed `false` in MANIFEST.yaml despite being configured as `true`. Root cause: hardcoded string `"clusterApi"` didn't match the catalog's actual ID `"cluster-api"` (kebab-case). The mismatch caused `policy.isEnabled("clusterApi")` to silently return `false` (default) instead of the configured `true`.
+
+**The fix**: Import `ManifestDomainCatalog` and use typed methods.
+
+✅ **DO**: Use catalog accessor methods
+
+```java
+private static final ManifestDomainCatalog CATALOG =
+    ManifestDomainCatalog.builder().addDefaultDomains().build();
+
+// Domain registration
+return new LayerDomain(
+    CATALOG.gitops(),                    // ✅ Type-safe
+    List.of(CATALOG.replication()),      // ✅ No typos possible
+    units);
+
+// Policy queries
+if (policy.isEnabled(CATALOG.porch())) { // ✅ Guaranteed match
+  units.add(new PorchResourcesManifestUnit());
+}
+```
+
+❌ **DON'T**: Use magic strings
+
+```java
+// Anti-patterns that caused the clusterApi bug:
+return new LayerDomain("gitops", List.of("replication"), units);  // ❌ Duplicates catalog
+if (policy.isEnabled("porch")) { ... }                             // ❌ Could typo to "Porch"
+manifestDomain.put("clusterApi", policy.isEnabled("clusterApi")); // ❌ Mismatch: "clusterApi" ≠ "cluster-api"
+```
+
+**Why multi-word domains are dangerous**:
+- `catalog.clusterApi()` returns `"cluster-api"` (kebab-case)
+- `catalog.highAvailability()` returns `"high-availability"` (kebab-case)
+- Hardcoding `"clusterApi"` creates a mismatch → silent failure
+
+**Enforcement**:
+- Grep in code review: `! grep -r 'isEnabled("' manifests/src/ seed-master/src/`
+- When adding a new domain, add the accessor method to `ManifestDomainCatalog` first
+- See `docs/manifest-domain-catalog-pattern.adoc` for full pattern documentation
 
 ## Documentation standards
 

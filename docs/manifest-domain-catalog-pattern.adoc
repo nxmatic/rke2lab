@@ -1,0 +1,267 @@
+= ManifestDomainCatalog: Single Source of Truth for Domain IDs
+:toc: left
+:toclevels: 2
+
+**Status**: ✅ Enforced (as of 2026-05-31)
+
+== Overview
+
+`ManifestDomainCatalog` is the *canonical registry* for all manifest domain identifiers. It prevents identifier mismatches by providing typed accessor methods instead of magic strings.
+
+**What it solves**: The `clusterApi: false` bug (May 2026) where hardcoded string `"clusterApi"` didn't match the catalog's actual ID `"cluster-api"`, causing policy values to silently default to `false` instead of using the configured `true` value.
+
+== Architecture
+
+=== Catalog as Single Source
+
+[mermaid]
+....
+graph TD
+    Catalog[ManifestDomainCatalog]
+    Catalog -->|clusterApi| ClusterApiReg[ClusterApiDomainRegistrar]
+    Catalog -->|clusterApi| HostManifest[HostSlotManifest]
+    Catalog -->|clusterApi| Policy[ManifestLinkPolicy]
+
+    style Catalog fill:#4a90e2,color:#fff
+    style ClusterApiReg fill:#7ed321
+    style HostManifest fill:#7ed321
+    style Policy fill:#7ed321
+
+    classDef source fill:#4a90e2,color:#fff
+    classDef consumer fill:#7ed321,color:#000
+....
+
+**Key principle**: Domain IDs are *data*, not code. They should be defined once and referenced everywhere.
+
+=== Domain ID Formats
+
+[cols="1,2,2", options="header"]
+|===
+| Domain | Catalog Method | Actual ID String
+| Cluster API | `catalog.clusterApi()` | `"cluster-api"` (kebab-case)
+| High Availability | `catalog.highAvailability()` | `"high-availability"` (kebab-case)
+| Networking | `catalog.networking()` | `"networking"` (single word)
+| All others | camelCase method | lowercase string
+|===
+
+**Critical**: Multi-word domains use *kebab-case* strings but *camelCase* methods. Hardcoding the string directly causes mismatches.
+
+== Usage Patterns
+
+=== ✅ Correct: Use Catalog Methods
+
+[source,java]
+----
+public class GitopsDomainRegistrar implements LayerDomainRegistrar {
+  private static final ManifestDomainCatalog CATALOG =
+      ManifestDomainCatalog.builder()
+          .addDefaultDomains()
+          .addDefaultStageALinkableDomains()
+          .build();
+
+  @Override
+  public LayerDomain domain(ManifestDomainPolicy policy) {
+    List<ManifestUnit> units = new ArrayList<>();
+    units.add(new FluxInstanceManifestUnit());
+
+    if (policy.isEnabled(CATALOG.porch())) {  // ✅ Type-safe, no mismatch possible
+      units.add(new PorchResourcesManifestUnit());
+    }
+
+    return new LayerDomain(
+        CATALOG.gitops(),                      // ✅ Single source
+        List.of(CATALOG.replication()),        // ✅ All IDs from catalog
+        units);
+  }
+}
+----
+
+=== ❌ Wrong: Hardcoded Strings
+
+[source,java]
+----
+public class GitopsDomainRegistrar implements LayerDomainRegistrar {
+  @Override
+  public LayerDomain domain(ManifestDomainPolicy policy) {
+    List<ManifestUnit> units = new ArrayList<>();
+    units.add(new FluxInstanceManifestUnit());
+
+    if (policy.isEnabled("porch")) {  // ❌ Magic string - could typo to "Porch"
+      units.add(new PorchResourcesManifestUnit());
+    }
+
+    return new LayerDomain(
+        "gitops",                      // ❌ Duplicates catalog definition
+        List.of("replication"),        // ❌ Could mismatch if catalog changes
+        units);
+  }
+}
+----
+
+=== ❌ Wrong: Mixed camelCase/kebab-case
+
+[source,java]
+----
+// ACTUAL BUG that caused clusterApi to show false:
+manifestDomain.put("clusterApi", policy.isEnabled("clusterApi"));
+// The string "clusterApi" doesn't exist in the catalog!
+// The real ID is "cluster-api" (kebab-case).
+// Result: isEnabled("clusterApi") → false (default)
+
+// ✅ CORRECT:
+manifestDomain.put("clusterApi", policy.isEnabled(catalog.clusterApi()));
+// catalog.clusterApi() returns "cluster-api" - guaranteed match
+----
+
+== The Bug We Fixed
+
+**Symptom** (May 2026):
+- Pulumi output showed `policyLinkClusterApiEnabled: true` (correct)
+- MANIFEST.yaml showed `clusterApi: false` (wrong)
+- Cluster API manifests weren't being deployed
+
+**Root cause**: `HostSlotManifest.Builder.policy()` used hardcoded strings:
+
+[source,java]
+----
+manifestDomain.put("clusterApi", policy.isEnabled("clusterApi"));
+//                                                  ^^^^^^^^^^^
+// This string doesn't match the catalog's "cluster-api"!
+----
+
+**Fix**: Import catalog and use methods:
+
+[source,java]
+----
+final ManifestDomainCatalog catalog = ManifestDomainCatalog.builder()...build();
+manifestDomain.put("clusterApi", policy.isEnabled(catalog.clusterApi()));
+//                                                  ^^^^^^^^^^^^^^^^^^^^
+// Returns "cluster-api" - guaranteed to match policy map
+----
+
+== Enforcement Rules
+
+=== Rule 1: Never Hardcode Domain ID Strings
+
+**What**: Domain IDs like `"cluster-api"`, `"gitops"`, `"networking"` must NEVER appear as string literals in domain-related code.
+
+**Where it applies**:
+- `LayerDomainRegistrar` implementations
+- `ManifestDomainPolicy` queries (`isEnabled()` calls)
+- Policy serialization (`HostSlotManifest`, etc.)
+- Policy loading (`ControlplanePolicy.from()`)
+
+**Exceptions**:
+- The catalog's own builder methods (`addDefaultDomains()` implementation)
+- Test fixtures where IDs are explicitly being tested
+
+**Violation examples**:
+[source,java]
+----
+new LayerDomain("gitops", ...)           // ❌ Hardcoded
+policy.isEnabled("cluster-api")           // ❌ Hardcoded
+manifestDomain.put("mesh", ...)           // ❌ Hardcoded
+----
+
+**Correct**:
+[source,java]
+----
+new LayerDomain(CATALOG.gitops(), ...)                  // ✅
+policy.isEnabled(CATALOG.clusterApi())                  // ✅
+manifestDomain.put("mesh", policy.isEnabled(CATALOG.mesh()))  // ✅
+----
+
+=== Rule 2: Initialize Catalog as Static Final
+
+**Pattern**:
+[source,java]
+----
+private static final ManifestDomainCatalog CATALOG =
+    ManifestDomainCatalog.builder()
+        .addDefaultDomains()
+        .addDefaultStageALinkableDomains()  // If Stage A linkable needed
+        .build();
+----
+
+**Why**: Catalog is immutable once built. Share one instance per class. Reduces overhead and signals immutability.
+
+=== Rule 3: Grep for Violations in CI
+
+Add to CI pipeline (example):
+
+[source,bash]
+----
+# Fail if any Java file uses hardcoded domain strings in wrong contexts
+! grep -r 'isEnabled("' manifests/src/ seed-master/src/
+! grep -r 'new LayerDomain("' manifests/src/
+----
+
+== Adding a New Domain
+
+**Steps**:
+
+1. Add accessor method to `ManifestDomainCatalog`:
++
+[source,java]
+----
+public String myNewDomain() {
+  return "my-new-domain";  // Use kebab-case for multi-word
+}
+----
+
+2. Add to default domains list in `Builder.addDefaultDomains()`:
++
+[source,java]
+----
+.addAllDomains(List.of(
+    "cluster", "storage", ...,
+    "my-new-domain"  // Add here
+))
+----
+
+3. Optionally add to Stage A linkable list if applicable.
+
+4. Create the domain registrar using the catalog method:
++
+[source,java]
+----
+return new LayerDomain(CATALOG.myNewDomain(), ...);
+----
+
+5. Add to policy loading in `ControlplanePolicy.from()`:
++
+[source,java]
+----
+.myNewDomain(environment.bool("policy.link.myNewDomain.enabled", false))
+----
+
+**That's it!** All existing consumers will automatically have access via the catalog.
+
+== Related Documentation
+
+* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How domains become manifests
+* link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven domain enablement
+* link:policy-configuration-guide.adoc[Policy Configuration Guide] - How to configure domain policies
+
+== Troubleshooting
+
+**Q: Policy shows `true` in Pulumi outputs but `false` in MANIFEST.yaml**
+
+A: Domain ID mismatch. Check if the serialization code uses hardcoded strings instead of catalog methods.
+
+Debugging steps:
+1. Add debug logging to see raw vs parsed values
+2. Grep for hardcoded domain strings: `grep -r '"your-domain"' src/`
+3. Verify catalog method returns expected ID: `System.err.println(catalog.yourDomain())`
+
+**Q: New domain doesn't appear in policy**
+
+A: Check these locations:
+1. `ManifestDomainCatalog` - accessor method exists?
+2. `Builder.addDefaultDomains()` - ID in the list?
+3. `ControlplanePolicy.from()` - policy loading code added?
+4. `ManifestDomainPolicy.Builder` - setter method exists?
+
+**Q: Can I use domain ID strings in tests?**
+
+A: Yes, but prefer catalog methods even in tests for consistency. Only use strings when explicitly testing ID matching logic itself.
