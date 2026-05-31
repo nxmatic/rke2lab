@@ -10,6 +10,8 @@ import io.nxmatic.rk2lab.manifests.layers.runtime.env.RKE2LabEnvConfigManifestUn
 import io.nxmatic.rk2lab.manifests.layers.runtime.flox.FloxRuntimeManifestUnit;
 import io.nxmatic.rk2lab.manifests.layers.runtime.libexec.RuntimeSystemdLibexecPlaceholderManifestUnit;
 import io.nxmatic.rk2lab.manifests.layers.runtime.rke2.RKE2ConfigManifestUnit;
+import io.nxmatic.rk2lab.manifests.systemd.SystemdUnitSynthesizer;
+import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import java.util.List;
 
 public final class RuntimeDomainRegistrar implements LayerDomainRegistrar {
@@ -28,6 +30,12 @@ public final class RuntimeDomainRegistrar implements LayerDomainRegistrar {
             new RKE2ConfigManifestUnit(),
             new CloudConfigManifestUnit(),
             new RuntimeDaemonsetScriptPolicyManifestUnit(),
-            new FloxRuntimeManifestUnit()));
+            new FloxRuntimeManifestUnit())) {
+      @Override
+      public void synthesizeSystemdUnits(SystemdChart systemdChart) {
+        super.synthesizeSystemdUnits(systemdChart);
+        SystemdUnitSynthesizer.synthesizeManifestInstaller(systemdChart, CATALOG.runtime());
+      }
+    };
   }
 }

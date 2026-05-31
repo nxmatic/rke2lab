@@ -4,6 +4,8 @@ package io.nxmatic.rk2lab.manifests.layers.networking;
 import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomain;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistrar;
+import io.nxmatic.rk2lab.manifests.systemd.SystemdUnitSynthesizer;
+import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import java.util.List;
 
 public final class NetworkingDomainRegistrar implements LayerDomainRegistrar {
@@ -20,6 +22,13 @@ public final class NetworkingDomainRegistrar implements LayerDomainRegistrar {
             new CiliumConfigManifestUnit(),
             new CiliumAdvancedManifestUnit(),
             new EnvoyGatewayManifestUnit(),
-            new KdnsManifestUnit()));
+            new KdnsManifestUnit())) {
+      @Override
+      public void synthesizeSystemdUnits(SystemdChart systemdChart) {
+        super.synthesizeSystemdUnits(systemdChart);
+        SystemdUnitSynthesizer.synthesizeManifestInstaller(
+            systemdChart, manifestDomainCatalog.networking());
+      }
+    };
   }
 }

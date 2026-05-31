@@ -6,6 +6,8 @@ import io.nxmatic.rk2lab.manifests.api.ManifestDomainPolicy;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomain;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnit;
+import io.nxmatic.rk2lab.manifests.systemd.SystemdUnitSynthesizer;
+import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,6 +32,12 @@ public final class GitopsDomainRegistrar implements LayerDomainRegistrar {
       units.add(new PorchResourcesManifestUnit());
     }
 
-    return new LayerDomain(CATALOG.gitops(), List.of(CATALOG.replication()), units);
+    return new LayerDomain(CATALOG.gitops(), List.of(CATALOG.replication()), units) {
+      @Override
+      public void synthesizeSystemdUnits(SystemdChart systemdChart) {
+        super.synthesizeSystemdUnits(systemdChart);
+        SystemdUnitSynthesizer.synthesizeManifestInstaller(systemdChart, CATALOG.gitops());
+      }
+    };
   }
 }
