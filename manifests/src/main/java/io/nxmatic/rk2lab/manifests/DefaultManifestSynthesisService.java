@@ -27,6 +27,7 @@ import io.nxmatic.rk2lab.manifests.layers.networking.NetworkingDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.replication.ReplicationDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.storage.StorageDomainRegistrar;
+import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -85,6 +86,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
     final App app = new App(AppProps.builder().outdir(synthOutdir.toString()).build());
     final Chart chart = new Chart(app, "manifests");
+    final SystemdChart systemdChart = new SystemdChart(app, "systemd");
 
     final LayerDomainRegistry configuredDomainRegistry =
         buildDomainRegistry(request.manifestDomainPolicy().orElse(null));
@@ -117,7 +119,13 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
           manifestUnit.manifestUnitId(), dependencyApplier);
     }
 
+    for (LayerDomain domain : domainRegistry.domains()) {
+      LOG.debug("Synthesizing systemd units for domain '{}'", domain.domainId());
+      domain.synthesizeSystemdUnits(systemdChart);
+    }
+
     app.synth();
+    systemdChart.synthesize(synthOutdir);
 
     final Path synthesizedFile = synthOutdir.resolve("manifests.k8s.yaml");
     if (!Files.exists(synthesizedFile)) {
@@ -131,7 +139,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     Files.move(synthesizedFile, synthManifestFile, StandardCopyOption.REPLACE_EXISTING);
 
     LOG.info(
-        "Synthesized manifests from canonical manifest units (manifest unit hits={})",
+        "Synthesized K8s manifests and systemd units from canonical manifest units (manifest unit hits={})",
         manifestUnitHitCount);
 
     return new ManifestSynthesisResult(
