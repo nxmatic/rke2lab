@@ -59,16 +59,28 @@ public final class ImageStateConfigMapManifestUnit extends AbstractManifestUnit 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("clusterapi", "image-state");
 
+  private final String clusterName;
+
   public ImageStateConfigMapManifestUnit() {
+    this(null);
+  }
+
+  /**
+   * Constructor for staged synthesis with explicit clusterName. Used when synthesizing outside the
+   * normal ManifestSynthesisContext flow.
+   */
+  public ImageStateConfigMapManifestUnit(String clusterName) {
     super(MANIFEST_UNIT_ID, List.of());
+    this.clusterName = clusterName;
   }
 
   @Override
   public void apply(final Chart chart) {
-    final String clusterName = bootstrapIdentity().clusterName();
+    final String effectiveClusterName =
+        clusterName != null ? clusterName : bootstrapIdentity().clusterName();
 
     // Skip synthesis when running in ephemeral/test mode without real bootstrap identity
-    if (BootstrapIdentity.UNKNOWN.equals(clusterName)) {
+    if (BootstrapIdentity.UNKNOWN.equals(effectiveClusterName)) {
       return;
     }
 
@@ -88,7 +100,7 @@ public final class ImageStateConfigMapManifestUnit extends AbstractManifestUnit 
             "incusProject", state.incusProject(),
             "incusRemoteAddress", state.incusRemoteAddress());
 
-    createImageStateConfigMap(chart, clusterName, data);
+    createImageStateConfigMap(chart, effectiveClusterName, data);
   }
 
   private void createImageStateConfigMap(

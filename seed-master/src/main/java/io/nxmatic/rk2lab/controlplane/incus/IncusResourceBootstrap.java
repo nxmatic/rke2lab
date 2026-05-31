@@ -31,16 +31,8 @@ import io.nxmatic.rk2lab.manifests.api.ManifestExplodeService;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
 import io.nxmatic.rk2lab.manifests.api.ManifestYaml;
-import io.nxmatic.rk2lab.manifests.layers.clusterapi.ImageStateConfigMapManifestUnit;
-import io.nxmatic.rk2lab.manifests.layers.common.ManifestSynthesisContext;
-import io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.ComponentVersions;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
-import io.nxmatic.rk2lab.manifests.layers.common.profiles.ImageState;
-import io.nxmatic.rk2lab.manifests.layers.common.profiles.NetworkTopology;
-import org.cdk8s.App;
-import org.cdk8s.AppProps;
-import org.cdk8s.Chart;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributorRegistry;
@@ -66,6 +58,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import org.cdk8s.ApiObject;
+import org.cdk8s.ApiObjectMetadata;
+import org.cdk8s.ApiObjectProps;
+import org.cdk8s.App;
+import org.cdk8s.AppProps;
+import org.cdk8s.Chart;
+import org.cdk8s.JsonPatch;
 
 /** Provider-native Stage A bootstrap resources for the Incus management seed node. */
 public final class IncusResourceBootstrap {
@@ -661,14 +660,14 @@ public final class IncusResourceBootstrap {
                   Output.of(config.imageAlias()),
                   Output.of(imageProvider.buildChecksum()),
                   Output.of(config.incusProject()),
-                  Output.of(config.incusRemote()))
+                  Output.of(config.incusRemoteAddress().toString()))
               .applyValue(
-                  tuple -> {
-                    final String fingerprint = tuple.t1();
-                    final String alias = tuple.t2();
-                    final String checksum = tuple.t3();
-                    final String project = tuple.t4();
-                    final String remote = tuple.t5();
+                  outputs -> {
+                    final String fingerprint = outputs.get(0);
+                    final String alias = outputs.get(1);
+                    final String checksum = outputs.get(2);
+                    final String project = outputs.get(3);
+                    final String remote = outputs.get(4);
 
                     return synthesizeImageStateConfigMapYaml(
                         config.clusterName(), alias, fingerprint, checksum, project, remote);
@@ -686,15 +685,18 @@ public final class IncusResourceBootstrap {
 
     private void writeImageStateManifest(String yaml) {
       try {
-        final Path targetDir =
-            state.localPaths.assetsRoot().resolve("manifests/clusterapi/staged");
+        final Path targetDir = state.localPaths.assetsRoot().resolve("manifests/clusterapi/staged");
         Files.createDirectories(targetDir);
 
         final Path targetFile = targetDir.resolve("image-state-configmap.yaml");
         Files.writeString(targetFile, yaml, StandardCharsets.UTF_8);
 
         logInfo(
-            "Wrote staged image-state ConfigMap manifest to " + targetFile + " (" + yaml.length() + " bytes)");
+            "Wrote staged image-state ConfigMap manifest to "
+                + targetFile
+                + " ("
+                + yaml.length()
+                + " bytes)");
       } catch (IOException ex) {
         throw new IllegalStateException("Failed to write image-state manifest", ex);
       }
@@ -763,9 +765,9 @@ public final class IncusResourceBootstrap {
   /**
    * Synthesize the image-state ConfigMap via CDK8s with resolved values.
    *
-   * <p>This is called from {@link ProviderStage#createImageStateConfigMap()} during Pulumi apply,
-   * after Outputs have resolved. The manifest unit code is reused, but invoked with explicit values
-   * instead of from the normal synthesis flow.
+   * <p>This is a standalone synthesis entrypoint for staged resources. It does NOT use
+   * ManifestSynthesisContext or AbstractManifestUnit - those are for the normal host-state
+   * synthesis flow. This creates the ConfigMap directly using CDK8s primitives.
    *
    * @return YAML manifest string
    */
@@ -777,7 +779,7 @@ public final class IncusResourceBootstrap {
       String incusProject,
       String incusRemoteAddress) {
 
-    // Create in-memory CDK8s app (no file output)
+    // Create in-memory CDK8s app (temp dir for output)
     final Path tempDir;
     try {
       tempDir = Files.createTempDirectory("cdk8s-staged-");
@@ -788,33 +790,34 @@ public final class IncusResourceBootstrap {
     final App app = new App(AppProps.builder().outdir(tempDir.toString()).build());
     final Chart chart = new Chart(app, "staged-resources");
 
-    // Build ImageState with resolved values
-    final ImageState imageState =
-        new ImageState(imageAlias, imageFingerprint, imageBuildChecksum, incusProject, incusRemoteAddress);
+    // Create ConfigMap directly (no manifest unit, no context)
+    final Map<String, String> data =
+        Map.of(
+            "imageAlias", imageAlias,
+            "imageFingerprint", imageFingerprint,
+            "imageBuildChecksum", imageBuildChecksum,
+            "incusProject", incusProject,
+            "incusRemoteAddress", incusRemoteAddress);
 
-    // Build minimal BootstrapIdentity for the ConfigMap
-    final BootstrapIdentity bootstrapIdentity =
-        new BootstrapIdentity(
-            clusterName,
-            config.clusterToken(),
-            config.incusProject(),
-            config.incusRemote(),
-            config.incusIdentity());
+    final ApiObject configMap =
+        new ApiObject(
+            chart,
+            "configmap-image-state",
+            ApiObjectProps.builder()
+                .apiVersion("v1")
+                .kind("ConfigMap")
+                .metadata(
+                    ApiObjectMetadata.builder()
+                        .name(clusterName + "-image-state")
+                        .namespace("capn-system")
+                        .annotations(
+                            Map.of(
+                                "package", "clusterapi/image-state",
+                                "description", "Stage A → Stage B image identity handoff"))
+                        .build())
+                .build());
 
-    // Create synthesis context with resolved image state
-    final ManifestSynthesisContext context =
-        ManifestSynthesisContext.of(
-            FloxDebugPolicy.disabled(),
-            bootstrapIdentity,
-            NetworkTopology.empty(),
-            ComponentVersions.empty(),
-            imageState);
-
-    // Synthesize via the same manifest unit code
-    try (var scope = ManifestSynthesisContext.bind(context)) {
-      final ImageStateConfigMapManifestUnit unit = new ImageStateConfigMapManifestUnit();
-      unit.apply(chart);
-    }
+    configMap.addJsonPatch(JsonPatch.add("/data", data));
 
     // CDK8s writes to disk, read it back
     app.synth();

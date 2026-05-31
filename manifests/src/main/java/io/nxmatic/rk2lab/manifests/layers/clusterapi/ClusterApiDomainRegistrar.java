@@ -11,8 +11,6 @@ public final class ClusterApiDomainRegistrar implements LayerDomainRegistrar {
     return new LayerDomain(
         "cluster-api",
         List.of(),
-        List.of(
-            new ClusterApiOperatorManifestUnit(),
-            new IncusIdentitySecretManifestUnit()));
+        List.of(new ClusterApiOperatorManifestUnit(), new IncusIdentitySecretManifestUnit()));
   }
 }

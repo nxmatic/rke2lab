@@ -319,7 +319,7 @@ graph TB
     subgraph "🟢 Pulumi Domain (Java)"
         PulumiStage["ProviderStage<br/>.createImageStateConfigMap()"]
         OutputCombine["Output.all()<br/>combine fingerprint + config"]
-        FileWrite["Command resource<br/>write JSON to /srv/host"]
+        FileWrite["CDK8s synthesis<br/>write YAML manifest to /srv/host"]
     end
 
     subgraph "🔵 Systemd Domain (Units)"
@@ -372,13 +372,13 @@ graph TB
 | Component | Responsibility
 
 | **Pulumi Program (ProviderStage)**
-| Use `Output.all()` to combine resolved provider resource Outputs, call CDK8s synthesis with resolved values, write the resulting YAML manifest to `/srv/host/manifests/clusterapi/staged/`
+| Use `Output.all()` to combine resolved provider resource Outputs, call standalone CDK8s synthesis method with resolved values, write the resulting YAML manifest to `/srv/host/manifests/clusterapi/staged/`
 
-| **CDK8s Manifest Unit**
-| Author the ConfigMap structure (same code as normal synthesis). Called from Pulumi with resolved values instead of from ManifestSynthesisService
+| **Standalone CDK8s Synthesis**
+| Direct use of CDK8s primitives (ApiObject, ApiObjectMetadata, JsonPatch) to create the ConfigMap. NOT the normal manifest unit machinery — staged synthesis is a separate entrypoint without ManifestSynthesisContext dependency
 
 | **YAML Manifest File**
-| CDK8s-synthesized Kubernetes manifest in `/srv/host/manifests/clusterapi/staged/`. Same format and structure as all other manifests, just written late
+| CDK8s-synthesized Kubernetes manifest in `/srv/host/manifests/clusterapi/staged/`. Same structure as ImageStateConfigMapManifestUnit, just synthesized via standalone entrypoint
 
 | **Systemd Unit**
 | Oneshot service (+ optional timer) that runs after `rke2-server.service` and applies the manifest via `kubectl`
@@ -387,7 +387,49 @@ graph TB
 | Shell script that does `kubectl apply -f <manifest>`. NO YAML authoring, NO templating, NO JSON parsing — just applies the CDK8s-authored file
 |===
 
-**Architecture invariant:** All YAML structure comes from CDK8s. Shell scripts only do `kubectl apply`.
+**Architecture invariants:**
+1. All YAML structure comes from CDK8s (no shell templating)
+2. Staged synthesis uses CDK8s primitives directly (no context machinery that doesn't fit)
+3. Shell scripts only do `kubectl apply`
+
+== Architecture Decision: Standalone vs. Reusing Manifest Units
+
+Before implementation, understand the key architectural choice:
+
+**Should staged synthesis reuse the normal manifest unit code?**
+
+**❌ NO — Use a standalone CDK8s entrypoint instead.**
+
+**Why not reuse manifest units?**
+
+The normal synthesis flow uses ManifestSynthesisContext which bundles:
+- FloxDebugPolicy
+- BootstrapIdentity (9 fields: clusterName, clusterId, clusterToken, ...)
+- NetworkTopology
+- ComponentVersions
+- ImageState
+
+Staged synthesis only needs:
+- `clusterName` (1 field)
+- Image data (5 fields: alias, fingerprint, checksum, project, remote)
+
+Forcing staged synthesis through ManifestSynthesisContext creates **bad smell**:
+- Dummy BootstrapIdentity with fake clusterId, clusterToken, nodeId values
+- Empty NetworkTopology/ComponentVersions that aren't used
+- ImageState wrapper when you already have the raw values
+- AbstractManifestUnit.bootstrapIdentity() accessor that isn't needed
+
+**Solution:** Standalone synthesis using CDK8s primitives directly (ApiObject, ApiObjectMetadata, JsonPatch). Same YAML structure, no machinery that doesn't fit.
+
+**When to reuse manifest units:**
+- Normal host-state synthesis flow (ManifestSynthesisService)
+- Full context is available
+- Multiple units share the same context
+
+**When to use standalone synthesis:**
+- Staged resources (this pattern)
+- Only need a subset of context
+- Outputs drive the synthesis
 
 == Implementation Guide
 
@@ -406,13 +448,15 @@ If you can't break the cycle by reordering, proceed to staged creation.
 
 **IMPORTANT**: Do NOT serialize YAML in shell scripts. All manifest authoring stays in CDK8s. The staged pattern only defers *when* the synthesis happens.
 
-Create a synthesis method that takes resolved values (not Outputs):
+**Architecture Decision**: Use a **standalone CDK8s entrypoint**, not the normal manifest unit machinery. The ManifestSynthesisContext is designed for the host-state preparation flow and doesn't fit the staged use case.
+
+Create a synthesis method that uses CDK8s primitives directly:
 
 [source,java]
 ----
 /**
- * Synthesize the image-state ConfigMap to YAML using CDK8s.
- * Called from Pulumi with resolved Output values.
+ * Synthesize the image-state ConfigMap via CDK8s with resolved values.
+ * Standalone entrypoint - does NOT use ManifestSynthesisContext.
  */
 private String synthesizeImageStateConfigMapYaml(
     String clusterName,
@@ -422,34 +466,49 @@ private String synthesizeImageStateConfigMapYaml(
     String incusProject,
     String incusRemoteAddress) {
 
-  // Use CDK8s just like normal synthesis, but in-memory (no file output)
-  final App app = new App(AppProps.builder().outdir(null).build());
+  // Create in-memory CDK8s app (temp dir for output)
+  final Path tempDir = Files.createTempDirectory("cdk8s-staged-");
+  final App app = new App(AppProps.builder().outdir(tempDir.toString()).build());
   final Chart chart = new Chart(app, "staged-resources");
 
-  // Reuse the SAME manifest unit code, but bind ImageState manually
-  final ImageState imageState =
-      new ImageState(imageAlias, imageFingerprint, imageBuildChecksum,
-                     incusProject, incusRemoteAddress);
+  // Create ConfigMap directly using CDK8s primitives
+  final Map<String, String> data =
+      Map.of(
+          "imageAlias", imageAlias,
+          "imageFingerprint", imageFingerprint,
+          "imageBuildChecksum", imageBuildChecksum,
+          "incusProject", incusProject,
+          "incusRemoteAddress", incusRemoteAddress);
 
-  final ManifestSynthesisContext context =
-      ManifestSynthesisContext.of(
-          FloxDebugPolicy.disabled(),
-          new BootstrapIdentity(clusterName, /* ... */),
-          NetworkTopology.empty(),
-          ComponentVersions.empty(),
-          imageState);
+  final ApiObject configMap =
+      new ApiObject(
+          chart,
+          "configmap-image-state",
+          ApiObjectProps.builder()
+              .apiVersion("v1")
+              .kind("ConfigMap")
+              .metadata(
+                  ApiObjectMetadata.builder()
+                      .name(clusterName + "-image-state")
+                      .namespace("capn-system")
+                      .annotations(
+                          Map.of(
+                              "package", "clusterapi/image-state",
+                              "description", "Stage A → Stage B image identity handoff"))
+                      .build())
+              .build());
 
-  try (var scope = ManifestSynthesisContext.bind(context)) {
-    final ImageStateConfigMapManifestUnit unit = new ImageStateConfigMapManifestUnit();
-    unit.apply(chart);
-  }
+  configMap.addJsonPatch(JsonPatch.add("/data", data));
 
-  // CDK8s synthesizes to string
-  return chart.toYaml();
+  // Synthesize, read from disk, cleanup
+  app.synth();
+  final String yaml = Files.readString(tempDir.resolve("staged-resources.k8s.yaml"));
+  // ... cleanup tempDir ...
+  return yaml;
 }
 ----
 
-**Key insight:** The manifest unit code is authoritative. The staged pattern just calls it with resolved values instead of from the normal synthesis flow.
+**Key insight:** Staged synthesis is a **separate entrypoint**, not a variant of normal synthesis. Don't force-fit ManifestSynthesisContext/AbstractManifestUnit when you only need CDK8s primitives. The structure matches ImageStateConfigMapManifestUnit but without the context dependency.
 ----
 
 === Step 3: Write the Manifest YAML During Pulumi Apply
@@ -591,25 +650,25 @@ If using a custom target like `cluster-ready.target`, make sure it's defined and
 
 == Testing & Verification
 
-=== Unit Test the Metadata Serialization
+=== Unit Test the CDK8s Synthesis
 
 [source,java]
 ----
 @Test
-void imageStateMetadata_serializesToValidJson() {
-  final ImageStateMetadata meta =
-      new ImageStateMetadata(
-          "control-node",
-          "abc123fingerprint",
-          "def456checksum",
-          "rke2lab",
-          "https://bioskop-nixos:8443");
+void synthesizeImageStateConfigMap_producesValidYaml() {
+  final String yaml = synthesizeImageStateConfigMapYaml(
+      "master",
+      "control-node",
+      "abc123fingerprint",
+      "def456checksum",
+      "rke2lab",
+      "https://bioskop-nixos:8443");
 
-  final String json = meta.toJson();
-
-  // Parse back to verify structure
-  final JsonNode parsed = objectMapper.readTree(json);
-  assertThat(parsed.get("imageFingerprint").asText()).isEqualTo("abc123fingerprint");
+  // Parse YAML and verify structure
+  assertThat(yaml).contains("kind: ConfigMap");
+  assertThat(yaml).contains("name: master-image-state");
+  assertThat(yaml).contains("namespace: capn-system");
+  assertThat(yaml).contains("imageFingerprint: abc123fingerprint");
 }
 ----
 

@@ -19,10 +19,6 @@
       "cdk8s-cli": {
         "pkg-path": "cdk8s-cli"
       },
-      "checkstyle": {
-        "pkg-path": "checkstyle",
-        "outputs": "all"
-      },
       "cilium-cli": {
         "pkg-path": "cilium-cli",
         "pkg-group": "k8s-kubectl-tools",
@@ -158,10 +154,6 @@
         "pkg-group": "k8s-kubectl-tools",
         "outputs": "all"
       },
-      "maven": {
-        "pkg-path": "maven",
-        "outputs": "all"
-      },
       "moreutils": {
         "pkg-path": "moreutils"
       },
@@ -218,10 +210,6 @@
       "tubekit": {
         "pkg-path": "tubekit",
         "pkg-group": "k8s-kubectl-tools",
-        "outputs": "all"
-      },
-      "visualvm": {
-        "pkg-path": "visualvm",
         "outputs": "all"
       },
       "yq-go": {
@@ -2284,64 +2272,6 @@
       "priority": 5
     },
     {
-      "attr_path": "checkstyle",
-      "broken": false,
-      "derivation": "/nix/store/191z1nbiy1bc8xd3gfm3c65m603jndf5-checkstyle-13.2.0.drv",
-      "description": "Checks Java source against a coding standard",
-      "install_id": "checkstyle",
-      "license": "LGPL-2.1",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "checkstyle-13.2.0",
-      "pname": "checkstyle",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T04:42:03.470375Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "13.2.0",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/mmayxbjcpn4viqrz2k3kc08afcfdmjbf-checkstyle-13.2.0"
-      },
-      "system": "aarch64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "checkstyle",
-      "broken": false,
-      "derivation": "/nix/store/fc1821y0a03vgqjqimpqx7a053j9zg9w-checkstyle-13.2.0.drv",
-      "description": "Checks Java source against a coding standard",
-      "install_id": "checkstyle",
-      "license": "LGPL-2.1",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "checkstyle-13.2.0",
-      "pname": "checkstyle",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T05:14:38.553532Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "13.2.0",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/km94caqfw3v9lq1sib1xv4rnchq4fd2q-checkstyle-13.2.0"
-      },
-      "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
       "attr_path": "dasel",
       "broken": false,
       "derivation": "/nix/store/np07g2vxsvjchvckv8j7asjh4m2baqsh-dasel-3.3.0.drv",
@@ -2482,64 +2412,6 @@
       ],
       "outputs": {
         "out": "/nix/store/241vgqijh7v53h5r7ilf1hfiriplqlvi-graphviz-12.2.1"
-      },
-      "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "maven",
-      "broken": false,
-      "derivation": "/nix/store/sbp7g4gazpgmw1cmh7zyg08qqi5lxyca-maven-3.9.12.drv",
-      "description": "Build automation tool (used primarily for Java projects)",
-      "install_id": "maven",
-      "license": "Apache-2.0",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "maven-3.9.12",
-      "pname": "maven",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T04:42:25.391517Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "3.9.12",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/njv115l854b6s5xi8z5s9bv1azicq3wk-maven-3.9.12"
-      },
-      "system": "aarch64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "maven",
-      "broken": false,
-      "derivation": "/nix/store/dlf97pybix92f23swgza4swhy3616b1f-maven-3.9.12.drv",
-      "description": "Build automation tool (used primarily for Java projects)",
-      "install_id": "maven",
-      "license": "Apache-2.0",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "maven-3.9.12",
-      "pname": "maven",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T05:15:14.792637Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "3.9.12",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/60qkfjzwrb323k2yp76fvfi8lbbc0qq1-maven-3.9.12"
       },
       "system": "aarch64-linux",
       "group": "toplevel",
@@ -2895,64 +2767,6 @@
       ],
       "outputs": {
         "out": "/nix/store/abfalbis8ppi4w9id1i3h80mzhbxq0kc-socat-1.8.1.0"
-      },
-      "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "visualvm",
-      "broken": false,
-      "derivation": "/nix/store/h5839c0px0rsz8qn4m5w25aq0r0bkwcf-visualvm-2.2.drv",
-      "description": "Visual interface for viewing information about Java applications",
-      "install_id": "visualvm",
-      "license": "[ GPL-2.0-or-later, Classpath-exception-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "visualvm-2.2",
-      "pname": "visualvm",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T04:44:41.284791Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "2.2",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/76xb7z3553rrcmvll2faqy8k3jkxm9w5-visualvm-2.2"
-      },
-      "system": "aarch64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "visualvm",
-      "broken": false,
-      "derivation": "/nix/store/sj09x58na9z6qfkvl6f3pal138lqf1vq-visualvm-2.2.drv",
-      "description": "Visual interface for viewing information about Java applications",
-      "install_id": "visualvm",
-      "license": "[ GPL-2.0-or-later, Classpath-exception-2.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "name": "visualvm-2.2",
-      "pname": "visualvm",
-      "rev": "5b2c2d84341b2afb5647081c1386a80d7a8d8605",
-      "rev_count": 963917,
-      "rev_date": "2026-03-16T07:26:50Z",
-      "scrape_date": "2026-03-17T05:18:20.348659Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "2.2",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/argibnmaz461751m0l1iqx8q341a6qig-visualvm-2.2"
       },
       "system": "aarch64-linux",
       "group": "toplevel",
@@ -3377,9 +3191,6 @@
             "dir": "../fleet/flox/git"
           },
           {
-            "dir": "../fleet/flox/jdk"
-          },
-          {
             "dir": "../fleet/flox/k8s"
           },
           {
@@ -3475,32 +3286,6 @@
         "name": "git",
         "descriptor": {
           "dir": "../fleet/flox/git"
-        }
-      },
-      {
-        "manifest": {
-          "version": 1,
-          "install": {
-            "checkstyle": {
-              "pkg-path": "checkstyle"
-            },
-            "jdk25": {
-              "pkg-path": "jdk25"
-            },
-            "maven": {
-              "pkg-path": "maven"
-            },
-            "visualvm": {
-              "pkg-path": "visualvm"
-            }
-          },
-          "hook": {},
-          "profile": {},
-          "options": {}
-        },
-        "name": "jdk",
-        "descriptor": {
-          "dir": "../fleet/flox/jdk"
         }
       },
       {
@@ -3819,15 +3604,6 @@
           "Overriding": [
             "install",
             "dasel"
-          ]
-        },
-        "higher_priority_name": "Current manifest"
-      },
-      {
-        "warning": {
-          "Overriding": [
-            "install",
-            "jdk25"
           ]
         },
         "higher_priority_name": "Current manifest"
