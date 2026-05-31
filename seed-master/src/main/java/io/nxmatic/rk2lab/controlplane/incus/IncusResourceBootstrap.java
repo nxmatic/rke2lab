@@ -712,7 +712,7 @@ public final class IncusResourceBootstrap {
       // comes FROM those provider resources).
       //
       // Solution: Use CDK8s to synthesize the manifest DURING Pulumi apply (after Outputs resolve),
-      // write the YAML to /srv/host/manifests/clusterapi/staged/, then a systemd oneshot unit
+      // write the YAML to /srv/host/manifests/cluster-api/staged/, then a systemd oneshot unit
       // applies it after RKE2 is up.
       //
       // This implements the "staged post-cluster resource" pattern documented in
@@ -758,7 +758,7 @@ public final class IncusResourceBootstrap {
 
     private void writeImageStateManifest(String yaml) {
       try {
-        final Path targetDir = state.localPaths.manifestsRoot().resolve("clusterapi/staged");
+        final Path targetDir = state.localPaths.manifestsRoot().resolve("cluster-api/staged");
         Files.createDirectories(targetDir);
 
         final Path targetFile = targetDir.resolve("image-state-configmap.yaml");
@@ -888,7 +888,7 @@ public final class IncusResourceBootstrap {
                         .namespace("capn-system")
                         .annotations(
                             Map.of(
-                                "package", "clusterapi/image-state",
+                                "package", "cluster-api/image-state",
                                 "description", "Stage A → Stage B image identity handoff"))
                         .build())
                 .build());
@@ -2193,9 +2193,9 @@ public final class IncusResourceBootstrap {
       }
 
       // Add staged manifests (post-cluster resources)
-      if (policy.manifestLink().domains().isEnabled("clusterApi")) {
+      if (policy.manifestLink().clusterApiEnabled()) {
         manifestBuilder.addStagedManifest(
-            "clusterapi", "staged", "Image-state ConfigMap for Cluster API");
+            "cluster-api", "staged", "Image-state ConfigMap for Cluster API");
       }
 
       manifestBuilder.build(chart, "slot-manifest");

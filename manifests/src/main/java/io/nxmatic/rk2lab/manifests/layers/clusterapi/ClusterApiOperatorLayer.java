@@ -12,7 +12,7 @@ import software.constructs.Construct;
 public final class ClusterApiOperatorLayer extends Construct {
 
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile("clusterapi", "cluster-api-operator");
+      new PackageMetadataProfile("cluster-api", "cluster-api-operator");
 
   public ClusterApiOperatorLayer(
       final Construct scope,

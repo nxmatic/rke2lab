@@ -54,10 +54,10 @@ import org.cdk8s.JsonPatch;
  */
 public final class ImageStateConfigMapManifestUnit extends AbstractManifestUnit {
 
-  public static final String MANIFEST_UNIT_ID = "clusterapi/image-state";
+  public static final String MANIFEST_UNIT_ID = "cluster-api/image-state";
 
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile("clusterapi", "image-state");
+      new PackageMetadataProfile("cluster-api", "image-state");
 
   private final String clusterName;
 

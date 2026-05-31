@@ -40,12 +40,12 @@ import org.cdk8s.JsonPatch;
  */
 public final class IncusIdentitySecretManifestUnit extends AbstractManifestUnit {
 
-  public static final String MANIFEST_UNIT_ID = "clusterapi/incus-identity";
+  public static final String MANIFEST_UNIT_ID = "cluster-api/incus-identity";
 
   private static final String INCUS_IDENTITY_NAME = "capn";
 
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile("clusterapi", "incus-identity");
+      new PackageMetadataProfile("cluster-api", "incus-identity");
 
   public IncusIdentitySecretManifestUnit() {
     super(MANIFEST_UNIT_ID, List.of());

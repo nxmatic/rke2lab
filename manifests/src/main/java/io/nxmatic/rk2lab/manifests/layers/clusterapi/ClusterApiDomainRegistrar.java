@@ -41,9 +41,10 @@ public final class ClusterApiDomainRegistrar implements LayerDomainRegistrar {
             .requires("rke2-server.service", clusterApiManifests.getUnitFileName())
             .conditionPathExists(
                 "/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh",
-                "/srv/host/rke2-manifests.d/clusterapi/staged")
+                "/srv/host/rke2-manifests.d/cluster-api/staged")
             .type(ServiceType.ONESHOT)
-            .execStart("/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh clusterapi/staged")
+            .execStart(
+                "/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh cluster-api/staged")
             .remainAfterExit(true)
             .standardOutput(StandardStream.JOURNAL)
             .standardError(StandardStream.JOURNAL)

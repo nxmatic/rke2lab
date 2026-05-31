@@ -6,7 +6,7 @@ import org.cdk8s.Chart;
 
 public final class ClusterApiOperatorManifestUnit extends AbstractManifestUnit {
 
-  public static final String MANIFEST_UNIT_ID = "clusterapi/operator";
+  public static final String MANIFEST_UNIT_ID = "cluster-api/operator";
 
   public ClusterApiOperatorManifestUnit() {
     super(MANIFEST_UNIT_ID, List.of());
