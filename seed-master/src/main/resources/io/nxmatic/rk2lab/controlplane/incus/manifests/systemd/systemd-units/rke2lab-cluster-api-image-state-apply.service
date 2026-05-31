@@ -1,0 +1,18 @@
+[Unit]
+Description=Apply Cluster API image-state ConfigMap (staged post-cluster resource)
+Documentation=file:///srv/host/docs/staged-post-cluster-resources.adoc
+After=rke2-server.service
+Wants=network-online.target
+ConditionPathExists=/srv/host/manifests/clusterapi/staged/image-state-configmap.yaml
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/srv/host/systemd.d/systemd-scripts/rke2lab-cluster-api-image-state-apply.sh
+StandardOutput=journal
+StandardError=journal
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

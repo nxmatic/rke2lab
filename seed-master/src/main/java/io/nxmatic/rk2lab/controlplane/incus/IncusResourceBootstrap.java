@@ -31,8 +31,16 @@ import io.nxmatic.rk2lab.manifests.api.ManifestExplodeService;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
 import io.nxmatic.rk2lab.manifests.api.ManifestYaml;
+import io.nxmatic.rk2lab.manifests.layers.clusterapi.ImageStateConfigMapManifestUnit;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestSynthesisContext;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.ComponentVersions;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.ImageState;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.NetworkTopology;
+import org.cdk8s.App;
+import org.cdk8s.AppProps;
+import org.cdk8s.Chart;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributorRegistry;
@@ -646,18 +654,50 @@ public final class IncusResourceBootstrap {
       // IMPORTANT: Shell scripts do NOT author YAML. All manifest structure comes from CDK8s
       // (ImageStateConfigMapManifestUnit), even for staged resources. The staging only affects
       // WHEN synthesis happens (Output.apply time vs. host-state prep), not WHO authors it.
-      //
-      // The implementation is deferred to Phase 1.5 (current work is getting the manifest layer
-      // plumbing correct). For now, the ConfigMap will be manually applied or handled by Stage B
-      // provisioning once the full Stage A→B handoff is working.
-      //
-      // When implementing:
-      // 1. Use Output.all() to combine fingerprint + config values
-      // 2. Call synthesizeImageStateConfigMapYaml() with resolved values (CDK8s synthesis)
-      // 3. Write YAML to /srv/host/manifests/clusterapi/staged/image-state-configmap.yaml
-      // 4. Create systemd unit that does `kubectl apply -f <manifest>`
-      // 5. Wire into bootstrap sequence (After=rke2-server, Before=cluster-ready.target)
+
+      final Output<String> manifestYaml =
+          Output.all(
+                  state.ensuredImageFingerprint,
+                  Output.of(config.imageAlias()),
+                  Output.of(imageProvider.buildChecksum()),
+                  Output.of(config.incusProject()),
+                  Output.of(config.incusRemote()))
+              .applyValue(
+                  tuple -> {
+                    final String fingerprint = tuple.t1();
+                    final String alias = tuple.t2();
+                    final String checksum = tuple.t3();
+                    final String project = tuple.t4();
+                    final String remote = tuple.t5();
+
+                    return synthesizeImageStateConfigMapYaml(
+                        config.clusterName(), alias, fingerprint, checksum, project, remote);
+                  });
+
+      // Write manifest via Output side-effect (runs during Pulumi apply)
+      manifestYaml.applyValue(
+          yaml -> {
+            writeImageStateManifest(yaml);
+            return yaml;
+          });
+
       return this;
+    }
+
+    private void writeImageStateManifest(String yaml) {
+      try {
+        final Path targetDir =
+            state.localPaths.assetsRoot().resolve("manifests/clusterapi/staged");
+        Files.createDirectories(targetDir);
+
+        final Path targetFile = targetDir.resolve("image-state-configmap.yaml");
+        Files.writeString(targetFile, yaml, StandardCharsets.UTF_8);
+
+        logInfo(
+            "Wrote staged image-state ConfigMap manifest to " + targetFile + " (" + yaml.length() + " bytes)");
+      } catch (IOException ex) {
+        throw new IllegalStateException("Failed to write image-state manifest", ex);
+      }
     }
   }
 
@@ -717,6 +757,90 @@ public final class IncusResourceBootstrap {
           .replaceOnChanges(List.of("config", "config.*"))
           .ignoreChanges(List.of("image"))
           .build();
+    }
+  }
+
+  /**
+   * Synthesize the image-state ConfigMap via CDK8s with resolved values.
+   *
+   * <p>This is called from {@link ProviderStage#createImageStateConfigMap()} during Pulumi apply,
+   * after Outputs have resolved. The manifest unit code is reused, but invoked with explicit values
+   * instead of from the normal synthesis flow.
+   *
+   * @return YAML manifest string
+   */
+  private String synthesizeImageStateConfigMapYaml(
+      String clusterName,
+      String imageAlias,
+      String imageFingerprint,
+      String imageBuildChecksum,
+      String incusProject,
+      String incusRemoteAddress) {
+
+    // Create in-memory CDK8s app (no file output)
+    final Path tempDir;
+    try {
+      tempDir = Files.createTempDirectory("cdk8s-staged-");
+    } catch (IOException ex) {
+      throw new IllegalStateException("Failed to create temp dir for CDK8s synthesis", ex);
+    }
+
+    final App app = new App(AppProps.builder().outdir(tempDir.toString()).build());
+    final Chart chart = new Chart(app, "staged-resources");
+
+    // Build ImageState with resolved values
+    final ImageState imageState =
+        new ImageState(imageAlias, imageFingerprint, imageBuildChecksum, incusProject, incusRemoteAddress);
+
+    // Build minimal BootstrapIdentity for the ConfigMap
+    final BootstrapIdentity bootstrapIdentity =
+        new BootstrapIdentity(
+            clusterName,
+            config.clusterToken(),
+            config.incusProject(),
+            config.incusRemote(),
+            config.incusIdentity());
+
+    // Create synthesis context with resolved image state
+    final ManifestSynthesisContext context =
+        ManifestSynthesisContext.of(
+            FloxDebugPolicy.disabled(),
+            bootstrapIdentity,
+            NetworkTopology.empty(),
+            ComponentVersions.empty(),
+            imageState);
+
+    // Synthesize via the same manifest unit code
+    try (var scope = ManifestSynthesisContext.bind(context)) {
+      final ImageStateConfigMapManifestUnit unit = new ImageStateConfigMapManifestUnit();
+      unit.apply(chart);
+    }
+
+    // CDK8s writes to disk, read it back
+    app.synth();
+
+    try {
+      final Path manifestFile = tempDir.resolve("staged-resources.k8s.yaml");
+      if (!Files.exists(manifestFile)) {
+        throw new IllegalStateException(
+            "CDK8s synthesis did not produce expected file: " + manifestFile);
+      }
+      final String yaml = Files.readString(manifestFile, StandardCharsets.UTF_8);
+
+      // Cleanup temp dir
+      Files.walk(tempDir)
+          .sorted((a, b) -> -a.compareTo(b)) // Delete files before dirs
+          .forEach(
+              path -> {
+                try {
+                  Files.delete(path);
+                } catch (IOException ignored) {
+                }
+              });
+
+      return yaml;
+    } catch (IOException ex) {
+      throw new IllegalStateException("Failed to read CDK8s synthesized manifest", ex);
     }
   }
 
