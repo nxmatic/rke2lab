@@ -1,6 +1,7 @@
 package io.nxmatic.rk2lab.controlplane.incus;
 
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
+import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -329,19 +330,29 @@ public final class HostSlotManifest extends Construct {
     public Builder policy(ControlplanePolicy policy) {
       if (policy == null) return this;
 
+      final ManifestDomainCatalog catalog =
+          ManifestDomainCatalog.builder()
+              .addDefaultDomains()
+              .addDefaultStageALinkableDomains()
+              .build();
+
       final var manifestDomain = new LinkedHashMap<String, Boolean>();
-      manifestDomain.put("cluster", policy.manifestLink().domains().isEnabled("cluster"));
-      manifestDomain.put("storage", policy.manifestLink().domains().isEnabled("storage"));
-      manifestDomain.put("replication", policy.manifestLink().domains().isEnabled("replication"));
-      manifestDomain.put("gitops", policy.manifestLink().domains().isEnabled("gitops"));
-      manifestDomain.put("porch", policy.manifestLink().domains().isEnabled("porch"));
-      manifestDomain.put("runtime", policy.manifestLink().domains().isEnabled("runtime"));
-      manifestDomain.put("networking", policy.manifestLink().domains().isEnabled("networking"));
-      manifestDomain.put("mesh", policy.manifestLink().domains().isEnabled("mesh"));
+      manifestDomain.put("cluster", policy.manifestLink().domains().isEnabled(catalog.cluster()));
+      manifestDomain.put("storage", policy.manifestLink().domains().isEnabled(catalog.storage()));
       manifestDomain.put(
-          "highAvailability", policy.manifestLink().domains().isEnabled("highAvailability"));
-      manifestDomain.put("cicd", policy.manifestLink().domains().isEnabled("cicd"));
-      manifestDomain.put("clusterApi", policy.manifestLink().domains().isEnabled("clusterApi"));
+          "replication", policy.manifestLink().domains().isEnabled(catalog.replication()));
+      manifestDomain.put("gitops", policy.manifestLink().domains().isEnabled(catalog.gitops()));
+      manifestDomain.put("porch", policy.manifestLink().domains().isEnabled(catalog.porch()));
+      manifestDomain.put("runtime", policy.manifestLink().domains().isEnabled(catalog.runtime()));
+      manifestDomain.put(
+          "networking", policy.manifestLink().domains().isEnabled(catalog.networking()));
+      manifestDomain.put("mesh", policy.manifestLink().domains().isEnabled(catalog.mesh()));
+      manifestDomain.put(
+          "highAvailability",
+          policy.manifestLink().domains().isEnabled(catalog.highAvailability()));
+      manifestDomain.put("cicd", policy.manifestLink().domains().isEnabled(catalog.cicd()));
+      manifestDomain.put(
+          "clusterApi", policy.manifestLink().domains().isEnabled(catalog.clusterApi()));
 
       final var debug = new LinkedHashMap<String, Boolean>();
       debug.put("mesh", policy.debug().mesh());
