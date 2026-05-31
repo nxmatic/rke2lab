@@ -20,7 +20,7 @@ public final class IncusStage {
   }
 
   public IncusStage provisionInstance() {
-    sink.accept(new IncusResourceBootstrap(config, policy).apply());
+    sink.accept(new IncusResourceBootstrap(config).apply(policy));
     return this;
   }
 }

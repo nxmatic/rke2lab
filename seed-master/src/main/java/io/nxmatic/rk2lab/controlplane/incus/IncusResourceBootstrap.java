@@ -110,8 +110,6 @@ public final class IncusResourceBootstrap {
 
   private final BootstrapConfig config;
 
-  private final ControlplanePolicy policy;
-
   private final PulumiIncusImageProvider imageProvider;
 
   private final HostMountSourceVerifier hostMountSourceVerifier;
@@ -124,9 +122,8 @@ public final class IncusResourceBootstrap {
 
   private final LaunchSecretsUpdater launchSecretsUpdater;
 
-  public IncusResourceBootstrap(BootstrapConfig config, ControlplanePolicy policy) {
+  public IncusResourceBootstrap(BootstrapConfig config) {
     this.config = config;
-    this.policy = policy;
     this.imageProvider = new PulumiIncusImageProvider(config);
     this.hostMountSourceVerifier = HostMountSourceVerifier.INSTANCE;
     this.nodeConfigRegenerator = new NodeConfigRegenerator(CloudConfigSecretRenderer.INSTANCE);
@@ -139,8 +136,9 @@ public final class IncusResourceBootstrap {
    * Materialize seed resources directly via the Incus provider. Reads as: resolve paths, then
    * prepare host state, then prepare provider resources, then create the instance.
    */
-  public BootstrapResult apply() {
+  public BootstrapResult apply(ControlplanePolicy policy) {
     final ApplyState state = new ApplyState();
+    state.controlplanePolicy = policy;
     return new ApplyStart(state)
         .onFailure((topic, cause) -> SeedLog.error("incus", topic + ": " + cause.getMessage()))
         .during("path resolution", paths -> paths.resolve())
@@ -167,6 +165,7 @@ public final class IncusResourceBootstrap {
     BootstrapPaths localPaths;
     BootstrapPaths nixosPaths;
     IncusProviderContext providerContext;
+    ControlplanePolicy controlplanePolicy;
     Project ensuredProject;
     Output<String> ensuredProjectName;
     Output<String> ensuredProfileName;
@@ -201,12 +200,10 @@ public final class IncusResourceBootstrap {
   private final class HostStage {
     private final ApplyState state;
     private final BootstrapConfig config;
-    private final ControlplanePolicy policy;
 
-    HostStage(ApplyState state, BootstrapConfig config, ControlplanePolicy policy) {
+    HostStage(ApplyState state, BootstrapConfig config) {
       this.state = state;
       this.config = config;
-      this.policy = policy;
     }
 
     HostStage materializeAssets() {
@@ -257,7 +254,7 @@ public final class IncusResourceBootstrap {
 
       final LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
       final Map<String, Object> manifestSynthSummary =
-          synthesizeAndExplodeManifests(stagingManifestsRoot, policy, layerContext);
+          synthesizeAndExplodeManifests(stagingManifestsRoot, state.controlplanePolicy, layerContext);
 
       final BootstrapPaths stagingPaths = createStagingPaths(stagingRoot);
 
@@ -334,7 +331,7 @@ public final class IncusResourceBootstrap {
           new Rke2labEnvTarget(
               runtimeEnvControlplaneOverlayWriter,
               layerContext,
-              policy,
+              state.controlplanePolicy,
               stagingPaths.runtimeEnvConfigRoot());
       try {
         rke2labEnvTarget.materialize(stagingPaths);
@@ -350,7 +347,7 @@ public final class IncusResourceBootstrap {
     private boolean syncStagingToFinal(
         HostAssetRootLifecycle lifecycle, Path stagingRoot, TargetContext targets) {
       return lifecycle.syncStagingToFinal(
-          stagingRoot, state.localPaths.assetsRoot(), config, policy, targets.systemdTarget());
+          stagingRoot, state.localPaths.assetsRoot(), config, state.controlplanePolicy, targets.systemdTarget());
     }
 
     private void captureDeploymentMetadata(StagingContext staging, TargetContext targets) {
@@ -589,17 +586,14 @@ public final class IncusResourceBootstrap {
   private final class ProviderStage {
     private final ApplyState state;
     private final BootstrapConfig config;
-    private final ControlplanePolicy policy;
     private final PulumiIncusImageProvider imageProvider;
 
     ProviderStage(
         ApplyState state,
         BootstrapConfig config,
-        ControlplanePolicy policy,
         PulumiIncusImageProvider imageProvider) {
       this.state = state;
       this.config = config;
-      this.policy = policy;
       this.imageProvider = imageProvider;
     }
 
@@ -888,7 +882,7 @@ public final class IncusResourceBootstrap {
 
     HostDone during(String topic, java.util.function.Function<HostStage, HostStage> body) {
       TopicRunner.runDuring(
-          "incus", topic, new HostStage(state, config, policy), body, state.onFailure);
+          "incus", topic, new HostStage(state, config), body, state.onFailure);
       return new HostDone(state);
     }
   }
@@ -917,7 +911,7 @@ public final class IncusResourceBootstrap {
       TopicRunner.runDuring(
           "incus",
           topic,
-          new ProviderStage(state, config, policy, imageProvider),
+          new ProviderStage(state, config, imageProvider),
           body,
           state.onFailure);
       return new ProviderDone(state);
@@ -2058,8 +2052,8 @@ public final class IncusResourceBootstrap {
     /**
      * Symlink host/.rke2lab-manifest.yaml to MANIFEST.yaml at master level for operator visibility.
      *
-     * <p>Operators navigating .local.d/bioskop/master/ see MANIFEST.yaml immediately without drilling
-     * into host/.
+     * <p>Operators navigating .local.d/bioskop/master/ see MANIFEST.yaml immediately without
+     * drilling into host/.
      */
     private void symlinkManifestToMasterLevel(Path hostAssetRoot) throws IOException {
       final Path hostManifest = hostAssetRoot.resolve(".rke2lab-manifest.yaml");
