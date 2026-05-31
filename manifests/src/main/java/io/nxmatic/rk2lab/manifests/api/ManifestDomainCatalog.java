@@ -26,6 +26,7 @@ public final class ManifestDomainCatalog {
   public static final String HIGH_AVAILABILITY = "high-availability";
   public static final String CICD = "cicd";
   public static final String CLUSTER_API = "cluster-api";
+  public static final String CERT_MANAGER = "cert-manager";
   public static final String PORCH = "porch";
 
   private final List<String> all;
@@ -80,6 +81,10 @@ public final class ManifestDomainCatalog {
     return CLUSTER_API;
   }
 
+  public String certManager() {
+    return CERT_MANAGER;
+  }
+
   public String porch() {
     return PORCH;
   }
@@ -115,6 +120,7 @@ public final class ManifestDomainCatalog {
               HIGH_AVAILABILITY,
               CICD,
               CLUSTER_API,
+              CERT_MANAGER,
               PORCH));
     }
 

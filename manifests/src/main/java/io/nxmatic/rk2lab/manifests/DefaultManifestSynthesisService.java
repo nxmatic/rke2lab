@@ -8,6 +8,7 @@ import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisResult;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
 import io.nxmatic.rk2lab.manifests.api.ManifestYaml;
+import io.nxmatic.rk2lab.manifests.layers.certmanager.CertManagerDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.cicd.CicdDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.clusterapi.ClusterApiDomainRegistrar;
@@ -247,6 +248,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         .register(new HighAvailabilityDomainRegistrar(), effectivePolicy)
         .register(new CicdDomainRegistrar(), effectivePolicy)
         .register(new ClusterApiDomainRegistrar(), effectivePolicy)
+        .register(new CertManagerDomainRegistrar(), effectivePolicy)
         .build();
   }
 

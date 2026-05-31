@@ -19,7 +19,7 @@ public final class ClusterApiDomainRegistrar implements LayerDomainRegistrar {
   public LayerDomain domain() {
     return new LayerDomain(
         CATALOG.clusterApi(),
-        List.of(),
+        List.of(CATALOG.certManager()),
         List.of(new ClusterApiOperatorManifestUnit(), new IncusIdentitySecretManifestUnit())) {
       @Override
       public void synthesizeSystemdUnits(

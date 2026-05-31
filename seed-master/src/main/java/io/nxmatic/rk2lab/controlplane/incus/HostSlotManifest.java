@@ -353,6 +353,8 @@ public final class HostSlotManifest extends Construct {
       manifestDomain.put("cicd", policy.manifestLink().domains().isEnabled(catalog.cicd()));
       manifestDomain.put(
           "clusterApi", policy.manifestLink().domains().isEnabled(catalog.clusterApi()));
+      manifestDomain.put(
+          "certManager", policy.manifestLink().domains().isEnabled(catalog.certManager()));
 
       final var debug = new LinkedHashMap<String, Boolean>();
       debug.put("mesh", policy.debug().mesh());

@@ -40,7 +40,8 @@ public record ComponentVersions(
     String tailscale,
     String clusterApiOperator,
     String capiIncusProvider,
-    String capiRke2Provider) {
+    String capiRke2Provider,
+    String certManager) {
 
   public ComponentVersions {
     tektonOperator = blankToEmpty(tektonOperator);
@@ -53,6 +54,7 @@ public record ComponentVersions(
     clusterApiOperator = blankToEmpty(clusterApiOperator);
     capiIncusProvider = blankToEmpty(capiIncusProvider);
     capiRke2Provider = blankToEmpty(capiRke2Provider);
+    certManager = blankToEmpty(certManager);
   }
 
   /**
@@ -77,6 +79,8 @@ public record ComponentVersions(
    *       provider CR
    *   <li>{@code capiRke2Provider}: {@code rancher/cluster-api-provider-rke2} (CAPRKE2) version for
    *       provider CR
+   *   <li>{@code certManager}: {@code cert-manager/cert-manager} chart version — webhook-cert
+   *       prerequisite for the CAPI operator and Tekton operator
    * </ul>
    */
   public static ComponentVersions defaults() {
@@ -91,6 +95,7 @@ public record ComponentVersions(
         .clusterApiOperator("v0.27.0")
         .capiIncusProvider("v0.8.6")
         .capiRke2Provider("v0.24.4")
+        .certManager("v1.20.2")
         .build();
   }
 
@@ -114,7 +119,8 @@ public record ComponentVersions(
         .tailscale(tailscale)
         .clusterApiOperator(clusterApiOperator)
         .capiIncusProvider(capiIncusProvider)
-        .capiRke2Provider(capiRke2Provider);
+        .capiRke2Provider(capiRke2Provider)
+        .certManager(certManager);
   }
 
   private static String blankToEmpty(final String value) {
@@ -132,6 +138,7 @@ public record ComponentVersions(
     private String clusterApiOperator = "";
     private String capiIncusProvider = "";
     private String capiRke2Provider = "";
+    private String certManager = "";
 
     private Builder() {}
 
@@ -185,6 +192,11 @@ public record ComponentVersions(
       return this;
     }
 
+    public Builder certManager(final String v) {
+      this.certManager = v;
+      return this;
+    }
+
     /**
      * Layer overrides on top of an existing record (typically {@link #defaults()}). Empty values in
      * {@code other} are skipped — they don't clobber a non-empty default. Used by seed-master to
@@ -201,6 +213,7 @@ public record ComponentVersions(
       if (!other.clusterApiOperator.isEmpty()) clusterApiOperator = other.clusterApiOperator;
       if (!other.capiIncusProvider.isEmpty()) capiIncusProvider = other.capiIncusProvider;
       if (!other.capiRke2Provider.isEmpty()) capiRke2Provider = other.capiRke2Provider;
+      if (!other.certManager.isEmpty()) certManager = other.certManager;
       return this;
     }
 
@@ -215,7 +228,8 @@ public record ComponentVersions(
           tailscale,
           clusterApiOperator,
           capiIncusProvider,
-          capiRke2Provider);
+          capiRke2Provider,
+          certManager);
     }
   }
 }
