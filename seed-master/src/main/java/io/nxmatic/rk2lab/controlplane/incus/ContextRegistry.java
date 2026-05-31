@@ -103,6 +103,32 @@ public final class ContextRegistry {
   }
 
   /**
+   * Updates a record in the registry.
+   *
+   * <p>Use this when a record needs to be enriched or replaced after initial registration (e.g.,
+   * BuildMetadata registered with null image, then updated with actual checksum after provider
+   * resources resolve).
+   *
+   * @param type The record class
+   * @param record The new record instance
+   * @param <T> The record type
+   * @throws IllegalStateException if no record is currently registered for this type
+   */
+  public <T> void update(Class<T> type, T record) {
+    if (record == null) {
+      throw new IllegalArgumentException(
+          "Cannot update to null record for type: " + type.getName());
+    }
+    Object existing = records.replace(type, record);
+    if (existing == null) {
+      throw new IllegalStateException(
+          "Cannot update non-existent record: "
+              + type.getName()
+              + " (use register() for initial registration)");
+    }
+  }
+
+  /**
    * Requires a record from the registry.
    *
    * <p>Use this for records that MUST be available at the call site (precondition). If the record

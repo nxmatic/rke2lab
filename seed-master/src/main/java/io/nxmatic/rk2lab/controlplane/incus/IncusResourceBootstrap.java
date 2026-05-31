@@ -138,6 +138,15 @@ public final class IncusResourceBootstrap {
    */
   public BootstrapResult apply(ControlplanePolicy policy) {
     final ApplyState state = new ApplyState();
+    state.bootstrapContext =
+        new BootstrapContext(
+            config,
+            imageProvider,
+            hostMountSourceVerifier,
+            nodeConfigRegenerator,
+            runtimeEnvControlplaneOverlayWriter,
+            incusImportLookup,
+            launchSecretsUpdater);
     state.controlplanePolicy = policy;
     return new ApplyStart(state)
         .onFailure((topic, cause) -> SeedLog.error("incus", topic + ": " + cause.getMessage()))
@@ -160,8 +169,8 @@ public final class IncusResourceBootstrap {
   }
 
   /**
-   * Immutable context shared across all stages.
-   * Contains configuration and service instances that don't change during bootstrap.
+   * Immutable context shared across all stages. Contains configuration and service instances that
+   * don't change during bootstrap.
    */
   private record BootstrapContext(
       BootstrapConfig config,
@@ -178,8 +187,8 @@ public final class IncusResourceBootstrap {
    * <p><b>Architecture:</b>
    *
    * <ul>
-   *   <li><b>registry</b> - Type-safe storage for computed records (BootstrapPaths,
-   *       StagingContext, metadata)
+   *   <li><b>bootstrapContext</b> - Immutable config + services (shared reference)
+   *   <li><b>registry</b> - Type-safe storage for computed records (metadata, contexts)
    *   <li><b>Direct fields</b> - Mutable pipeline state and provider-specific resources
    *   <li><b>controlplanePolicy</b> - Set once at pipeline start from EnvironmentStage
    * </ul>
@@ -187,13 +196,25 @@ public final class IncusResourceBootstrap {
    * <p><b>Design Decision:</b> Why some fields are direct vs registry?
    *
    * <ul>
-   *   <li>Direct fields: Accessed frequently, simple types, single-owner lifecycle
-   *   <li>Registry: Computed records, multi-stage lifecycle, type-safe sharing
+   *   <li>Direct fields: Accessed frequently, simple types, provider-specific Pulumi resources
+   *   <li>Registry: Computed records with multi-stage lifecycle requiring type-safe sharing
+   * </ul>
+   *
+   * <p><b>Registry contents:</b>
+   *
+   * <ul>
+   *   <li>{@link DeploymentMetadata} - git context + timestamp (captured in HostStage)
+   *   <li>{@link ProvisioningMetadata} - target checksums + paths (captured in HostStage)
+   *   <li>{@link BuildMetadata} - image + manifest checksums (captured in HostStage +
+   *       ProviderStage)
+   *   <li>{@link RuntimeMetadata} - environment + systemd summaries (captured in HostStage)
    * </ul>
    */
   private static final class ApplyState {
+    // Immutable bootstrap context (config + services)
+    BootstrapContext bootstrapContext;
+
     // Type-safe record registry for computed/intermediate records
-    // Stores: StagingContext, TargetContext, LayerEnvContext, *Metadata records
     final ContextRegistry registry = new ContextRegistry();
 
     // Pipeline coordination
@@ -204,7 +225,7 @@ public final class IncusResourceBootstrap {
     BootstrapPaths localPaths;
     BootstrapPaths nixosPaths;
 
-    // Provider-specific state (Incus)
+    // Provider-specific state (Incus resources)
     IncusProviderContext providerContext;
     Project ensuredProject;
     Output<String> ensuredProjectName;
@@ -217,20 +238,20 @@ public final class IncusResourceBootstrap {
 
   /** Topic stages — each holds a reference to the shared ApplyState. */
   private static final class PathStage {
+    private final BootstrapContext context;
     private final ApplyState state;
-    private final BootstrapConfig config;
 
-    PathStage(ApplyState state, BootstrapConfig config) {
+    PathStage(BootstrapContext context, ApplyState state) {
+      this.context = context;
       this.state = state;
-      this.config = config;
     }
 
     PathStage resolve() {
-      final Path localWorktreeRoot = config.worktreeDirOn(WorktreeHost.DARWIN);
+      final Path localWorktreeRoot = context.config().worktreeDirOn(WorktreeHost.DARWIN);
       state.localPaths =
           BootstrapPaths.fromLocalWorktree(
-              localWorktreeRoot, config.clusterName(), config.nodeName());
-      state.nixosPaths = state.localPaths.asHostView(config, WorktreeHost.NIXOS);
+              localWorktreeRoot, context.config().clusterName(), context.config().nodeName());
+      state.nixosPaths = state.localPaths.asHostView(context.config(), WorktreeHost.NIXOS);
       return this;
     }
   }
@@ -279,8 +300,9 @@ public final class IncusResourceBootstrap {
     }
 
     HostStage logSummary() {
-      logInfo("deployment=" + state.deploymentMetadata);
-      logInfo("provisioning.targets=" + state.provisioningMetadata.targets());
+      logInfo("deployment=" + state.registry.require(DeploymentMetadata.class));
+      logInfo(
+          "provisioning.targets=" + state.registry.require(ProvisioningMetadata.class).targets());
       return this;
     }
 
@@ -292,7 +314,8 @@ public final class IncusResourceBootstrap {
 
       final LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
       final Map<String, Object> manifestSynthSummary =
-          synthesizeAndExplodeManifests(stagingManifestsRoot, state.controlplanePolicy, layerContext);
+          synthesizeAndExplodeManifests(
+              stagingManifestsRoot, state.controlplanePolicy, layerContext);
 
       final BootstrapPaths stagingPaths = createStagingPaths(stagingRoot);
 
@@ -385,7 +408,11 @@ public final class IncusResourceBootstrap {
     private boolean syncStagingToFinal(
         HostAssetRootLifecycle lifecycle, Path stagingRoot, TargetContext targets) {
       return lifecycle.syncStagingToFinal(
-          stagingRoot, state.localPaths.assetsRoot(), config, state.controlplanePolicy, targets.systemdTarget());
+          stagingRoot,
+          state.localPaths.assetsRoot(),
+          config,
+          state.controlplanePolicy,
+          targets.systemdTarget());
     }
 
     private void captureDeploymentMetadata(StagingContext staging, TargetContext targets) {
@@ -402,16 +429,19 @@ public final class IncusResourceBootstrap {
       final Map<String, Object> systemdSummary =
           (Map<String, Object>) targets.runtimeSummaries().get("systemd");
 
-      state.deploymentMetadata = DeploymentMetadata.capture();
-      state.provisioningMetadata =
+      state.registry.register(DeploymentMetadata.class, DeploymentMetadata.capture());
+      state.registry.register(
+          ProvisioningMetadata.class,
           new ProvisioningMetadata(
-              provisioningTargets, new ProvisioningMetadata.Paths(hostSourceDirRelative));
-      state.buildMetadata =
-          new BuildMetadata(null, BuildMetadata.Manifests.of(staging.manifestSynthSummary()));
-      state.runtimeMetadata =
+              provisioningTargets, new ProvisioningMetadata.Paths(hostSourceDirRelative)));
+      state.registry.register(
+          BuildMetadata.class,
+          new BuildMetadata(null, BuildMetadata.Manifests.of(staging.manifestSynthSummary())));
+      state.registry.register(
+          RuntimeMetadata.class,
           new RuntimeMetadata(
               RuntimeMetadata.Environment.of(layerEnvSummary),
-              RuntimeMetadata.Systemd.of(systemdSummary));
+              RuntimeMetadata.Systemd.of(systemdSummary)));
     }
 
     private BootstrapPaths createStagingPaths(Path stagingRoot) {
@@ -622,21 +652,17 @@ public final class IncusResourceBootstrap {
   }
 
   private final class ProviderStage {
+    private final BootstrapContext context;
     private final ApplyState state;
-    private final BootstrapConfig config;
-    private final PulumiIncusImageProvider imageProvider;
 
-    ProviderStage(
-        ApplyState state,
-        BootstrapConfig config,
-        PulumiIncusImageProvider imageProvider) {
+    ProviderStage(BootstrapContext context, ApplyState state) {
+      this.context = context;
       this.state = state;
-      this.config = config;
-      this.imageProvider = imageProvider;
     }
 
     ProviderStage ensureProject() {
-      state.providerContext = IncusProviderContext.forBootstrap("seed-incus-provider", config);
+      state.providerContext =
+          IncusProviderContext.forBootstrap("seed-incus-provider", context.config());
       state.ensuredProject = IncusResourceBootstrap.this.ensureProject(state.providerContext);
       state.ensuredProjectName = state.ensuredProject.name();
       return this;
@@ -644,9 +670,9 @@ public final class IncusResourceBootstrap {
 
     ProviderStage ensureNetworks() {
       IncusResourceBootstrap.this.ensureNetwork(
-          state.providerContext, config.lanBridgeParent(), state.ensuredProject);
+          state.providerContext, context.config().lanBridgeParent(), state.ensuredProject);
       IncusResourceBootstrap.this.ensureNetwork(
-          state.providerContext, config.vmnetNetworkName(), state.ensuredProject);
+          state.providerContext, context.config().vmnetNetworkName(), state.ensuredProject);
       return this;
     }
 
@@ -658,14 +684,20 @@ public final class IncusResourceBootstrap {
 
     ProviderStage ensureImage() {
       state.ensuredImageFingerprint =
-          imageProvider.ensureSeedImageFingerprint(
-              state.providerContext.invokeOptions(),
-              state.providerContext.provider(),
-              state.ensuredProject);
-      state.buildMetadata =
+          context
+              .imageProvider()
+              .ensureSeedImageFingerprint(
+                  state.providerContext.invokeOptions(),
+                  state.providerContext.provider(),
+                  state.ensuredProject);
+
+      // Update BuildMetadata with image checksum (manifests already registered in HostStage)
+      final BuildMetadata existing = state.registry.require(BuildMetadata.class);
+      state.registry.update(
+          BuildMetadata.class,
           new BuildMetadata(
-              new BuildMetadata.Image(imageProvider.buildChecksum()),
-              state.buildMetadata.manifests());
+              new BuildMetadata.Image(context.imageProvider().buildChecksum()),
+              existing.manifests()));
       return this;
     }
 
@@ -689,10 +721,10 @@ public final class IncusResourceBootstrap {
       final Output<String> manifestYaml =
           Output.all(
                   state.ensuredImageFingerprint,
-                  Output.of(config.imageAlias()),
-                  Output.of(imageProvider.buildChecksum()),
-                  Output.of(config.incusProject()),
-                  Output.of(config.incusRemoteAddress().toString()))
+                  Output.of(context.config().imageAlias()),
+                  Output.of(context.imageProvider().buildChecksum()),
+                  Output.of(context.config().incusProject()),
+                  Output.of(context.config().incusRemoteAddress().toString()))
               .applyValue(
                   outputs -> {
                     final String fingerprint = outputs.get(0);
@@ -702,7 +734,12 @@ public final class IncusResourceBootstrap {
                     final String remote = outputs.get(4);
 
                     return synthesizeImageStateConfigMapYaml(
-                        config.clusterName(), alias, fingerprint, checksum, project, remote);
+                        context.config().clusterName(),
+                        alias,
+                        fingerprint,
+                        checksum,
+                        project,
+                        remote);
                   });
 
       // Write manifest via Output side-effect (runs during Pulumi apply)
@@ -736,12 +773,12 @@ public final class IncusResourceBootstrap {
   }
 
   private final class InstanceStage {
+    private final BootstrapContext context;
     private final ApplyState state;
-    private final BootstrapConfig config;
 
-    InstanceStage(ApplyState state, BootstrapConfig config) {
+    InstanceStage(BootstrapContext context, ApplyState state) {
+      this.context = context;
       this.state = state;
-      this.config = config;
     }
 
     InstanceStage create() {
@@ -758,21 +795,24 @@ public final class IncusResourceBootstrap {
       instanceConfig.put("security.syscalls.intercept.bpf", "true");
       instanceConfig.put("security.syscalls.intercept.bpf.devices", "true");
 
+      final ProvisioningMetadata provisioningMetadata =
+          state.registry.require(ProvisioningMetadata.class);
       for (Map.Entry<String, String> entry :
-          state.provisioningMetadata.targets().staticTargets().entrySet()) {
+          provisioningMetadata.targets().staticTargets().entrySet()) {
         // Wire format kept as `slice.<name>` to avoid a one-time instance replace from the
         // rename. Source code now uses Target vocabulary; the on-instance key migrates the day
         // a static-target checksum changes for a real reason.
         instanceConfig.put("user.rke2lab.provisioning.slice." + entry.getKey(), entry.getValue());
       }
 
-      instanceConfig.put("user.rke2lab.imageBuildChecksum", state.buildMetadata.image().checksum());
+      final BuildMetadata buildMetadata = state.registry.require(BuildMetadata.class);
+      instanceConfig.put("user.rke2lab.imageBuildChecksum", buildMetadata.image().checksum());
 
       state.instance =
           new Instance(
               "seed-instance",
               InstanceArgs.builder()
-                  .name(config.nodeName())
+                  .name(context.config().nodeName())
                   .project(state.ensuredProjectName)
                   .image(state.ensuredImageFingerprint)
                   .profiles(state.ensuredProfileName.applyValue(List::of))
@@ -894,7 +934,8 @@ public final class IncusResourceBootstrap {
     }
 
     PathDone during(String topic, java.util.function.Function<PathStage, PathStage> body) {
-      TopicRunner.runDuring("incus", topic, new PathStage(state, config), body, state.onFailure);
+      TopicRunner.runDuring(
+          "incus", topic, new PathStage(state.bootstrapContext, state), body, state.onFailure);
       return new PathDone(state);
     }
   }
@@ -920,7 +961,7 @@ public final class IncusResourceBootstrap {
 
     HostDone during(String topic, java.util.function.Function<HostStage, HostStage> body) {
       TopicRunner.runDuring(
-          "incus", topic, new HostStage(state, config), body, state.onFailure);
+          "incus", topic, new HostStage(state.bootstrapContext, state), body, state.onFailure);
       return new HostDone(state);
     }
   }
@@ -947,11 +988,7 @@ public final class IncusResourceBootstrap {
     ProviderDone during(
         String topic, java.util.function.Function<ProviderStage, ProviderStage> body) {
       TopicRunner.runDuring(
-          "incus",
-          topic,
-          new ProviderStage(state, config, imageProvider),
-          body,
-          state.onFailure);
+          "incus", topic, new ProviderStage(state.bootstrapContext, state), body, state.onFailure);
       return new ProviderDone(state);
     }
   }
@@ -978,7 +1015,7 @@ public final class IncusResourceBootstrap {
     InstanceDone during(
         String topic, java.util.function.Function<InstanceStage, InstanceStage> body) {
       TopicRunner.runDuring(
-          "incus", topic, new InstanceStage(state, config), body, state.onFailure);
+          "incus", topic, new InstanceStage(state.bootstrapContext, state), body, state.onFailure);
       return new InstanceDone(state);
     }
   }
@@ -992,15 +1029,18 @@ public final class IncusResourceBootstrap {
 
     BootstrapResult toResult() {
       return new BootstrapResult(
-          "incus://" + config.incusProject() + "/" + config.nodeName(),
+          "incus://"
+              + state.bootstrapContext.config().incusProject()
+              + "/"
+              + state.bootstrapContext.config().nodeName(),
           state.ensuredImageFingerprint,
           state.instance.status(),
           state.instance.urn(),
           state.providerContext.provider().urn(),
-          state.deploymentMetadata,
-          state.provisioningMetadata,
-          state.buildMetadata,
-          state.runtimeMetadata,
+          state.registry.require(DeploymentMetadata.class),
+          state.registry.require(ProvisioningMetadata.class),
+          state.registry.require(BuildMetadata.class),
+          state.registry.require(RuntimeMetadata.class),
           state.instance);
     }
   }
