@@ -8,7 +8,7 @@ import java.util.Map;
 
 /**
  * Runtime layer environment variable contributor. Contributes: rke2, config, containerd, cri, helm,
- * kubectl, user, daemonset-script-policy
+ * kubectl, user, daemonset-script-policy, systemd
  */
 public final class RuntimeLayerEnvContributor implements LayerEnvContributor {
 
@@ -27,7 +27,8 @@ public final class RuntimeLayerEnvContributor implements LayerEnvContributor {
         "helm",
         "kubectl",
         "user",
-        "daemonset-script-policy");
+        "daemonset-script-policy",
+        "systemd");
   }
 
   @Override
@@ -64,6 +65,10 @@ public final class RuntimeLayerEnvContributor implements LayerEnvContributor {
           Map.of(
               "DAEMONSET_SCRIPT_ROOT", "/srv/host/k8s-daemonset.d",
               "SCRIPT_POLICY_ROOT", "/var/lib/rke2lab/script-policy.d");
+      case "systemd" ->
+          Map.of(
+              "RKE2LAB_SYSTEMD_DIR", "/srv/host/systemd-units.d",
+              "RKE2LAB_SYSTEMD_LIBEXEC_DIR", "/srv/host/systemd-libexec.d");
       default -> Map.of();
     };
   }
