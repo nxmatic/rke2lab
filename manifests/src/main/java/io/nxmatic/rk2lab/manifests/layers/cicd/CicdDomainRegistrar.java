@@ -20,11 +20,14 @@ public final class CicdDomainRegistrar implements LayerDomainRegistrar {
         List.of(CATALOG.gitops()),
         List.of(new TektonPipelinesManifestUnit(), new TektonDashboardManifestUnit())) {
       @Override
-      public void synthesizeSystemdUnits(SystemdChart systemdChart) {
-        super.synthesizeSystemdUnits(systemdChart);
-        // Note: manifest uses "tekton-pipelines", secrets use "cicd"
-        new SystemdUnitSynthesizer(systemdChart, "tekton-pipelines").manifestInstaller();
-        new SystemdUnitSynthesizer(systemdChart, "cicd").secretsInstaller();
+      public void synthesizeSystemdUnits(
+          SystemdChart systemdChart,
+          io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
+        super.synthesizeSystemdUnits(systemdChart, context);
+        // Note: manifest directory is "tekton-pipelines", but secrets use domain ID "cicd"
+        new SystemdUnitSynthesizer(systemdChart, "tekton-pipelines", context).manifestInstaller();
+        new SystemdUnitSynthesizer(systemdChart, context.domainCatalog().cicd(), context)
+            .secretsInstaller();
       }
     };
   }

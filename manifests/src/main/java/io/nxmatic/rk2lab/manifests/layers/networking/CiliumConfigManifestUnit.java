@@ -2,7 +2,6 @@
 package io.nxmatic.rk2lab.manifests.layers.networking;
 
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
-import io.nxmatic.rk2lab.manifests.systemd.SystemdUnitCatalog;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.ServiceType;
@@ -24,13 +23,22 @@ public final class CiliumConfigManifestUnit extends AbstractManifestUnit {
   }
 
   @Override
-  public void synthesizeSystemdUnits(SystemdChart systemdChart) {
+  public void synthesizeSystemdUnits(
+      SystemdChart systemdChart,
+      io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
     // Special case: cilium-config runs BEFORE rke2-server (not after like other manifests)
+    // Need to lookup the install service since it's created by BootstrapInfrastructureSynthesizer
+    var installService = systemdChart.findUnit("rke2lab-install");
+    if (installService == null) {
+      throw new IllegalStateException(
+          "rke2lab-install service not found in systemd chart - ensure BootstrapInfrastructureSynthesizer runs first");
+    }
+
     new SystemdService(systemdChart, "cilium-config-manifests")
         .description("Install RKE2Lab Cilium config manifests before server start")
         .requiresMountsFor("/srv/host/systemd-units.d", "/srv/host")
-        .after("local-fs.target", SystemdUnitCatalog.INSTALL)
-        .requires(SystemdUnitCatalog.INSTALL)
+        .after("local-fs.target", installService.getUnitFileName())
+        .requires(installService.getUnitFileName())
         .before("rke2-server.service")
         .conditionPathExists(
             "/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh",
@@ -41,6 +49,6 @@ public final class CiliumConfigManifestUnit extends AbstractManifestUnit {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(SystemdUnitCatalog.RKE2LAB_TARGET);
+        .wantedBy(context.rke2labTarget().getUnitFileName());
   }
 }

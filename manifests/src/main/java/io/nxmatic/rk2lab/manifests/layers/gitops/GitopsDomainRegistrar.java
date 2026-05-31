@@ -34,9 +34,12 @@ public final class GitopsDomainRegistrar implements LayerDomainRegistrar {
 
     return new LayerDomain(CATALOG.gitops(), List.of(CATALOG.replication()), units) {
       @Override
-      public void synthesizeSystemdUnits(SystemdChart systemdChart) {
-        super.synthesizeSystemdUnits(systemdChart);
-        var synthesizer = new SystemdUnitSynthesizer(systemdChart, CATALOG.gitops());
+      public void synthesizeSystemdUnits(
+          SystemdChart systemdChart,
+          io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
+        super.synthesizeSystemdUnits(systemdChart, context);
+        var synthesizer =
+            new SystemdUnitSynthesizer(systemdChart, context.domainCatalog().gitops(), context);
         synthesizer.manifestInstaller();
         synthesizer.secretsInstaller();
       }

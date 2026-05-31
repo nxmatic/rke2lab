@@ -24,9 +24,12 @@ public final class MeshDomainRegistrar implements LayerDomainRegistrar {
             new TailscaleManifestUnit(),
             new HeadplaneManifestUnit())) {
       @Override
-      public void synthesizeSystemdUnits(SystemdChart systemdChart) {
-        super.synthesizeSystemdUnits(systemdChart);
-        var synthesizer = new SystemdUnitSynthesizer(systemdChart, manifestDomainCatalog.mesh());
+      public void synthesizeSystemdUnits(
+          SystemdChart systemdChart,
+          io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
+        super.synthesizeSystemdUnits(systemdChart, context);
+        var synthesizer =
+            new SystemdUnitSynthesizer(systemdChart, context.domainCatalog().mesh(), context);
         synthesizer.manifestInstaller();
         synthesizer.secretsInstaller();
       }

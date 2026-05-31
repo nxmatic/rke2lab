@@ -32,9 +32,12 @@ public final class RuntimeDomainRegistrar implements LayerDomainRegistrar {
             new RuntimeDaemonsetScriptPolicyManifestUnit(),
             new FloxRuntimeManifestUnit())) {
       @Override
-      public void synthesizeSystemdUnits(SystemdChart systemdChart) {
-        super.synthesizeSystemdUnits(systemdChart);
-        var synthesizer = new SystemdUnitSynthesizer(systemdChart, CATALOG.runtime());
+      public void synthesizeSystemdUnits(
+          SystemdChart systemdChart,
+          io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
+        super.synthesizeSystemdUnits(systemdChart, context);
+        var synthesizer =
+            new SystemdUnitSynthesizer(systemdChart, context.domainCatalog().runtime(), context);
         synthesizer.manifestInstaller();
         synthesizer.secretsInstaller();
       }

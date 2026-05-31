@@ -119,16 +119,44 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
           manifestUnit.manifestUnitId(), dependencyApplier);
     }
 
+    // Create shared domain catalog FIRST (single source of truth for domain IDs)
+    final ManifestDomainCatalog sharedDomainCatalog =
+        ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
+
+    // Create targets FIRST (they're referenced by all services)
+    LOG.debug("Creating systemd targets");
+    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget rke2labTarget =
+        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab")
+            .description("RKE2 Lab Bootstrap Target")
+            .documentation("https://github.com/nxmatic/rke2lab")
+            .wantedBy("multi-user.target");
+
+    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget networkTarget =
+        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-network")
+            .description("RKE2 Lab Network Infrastructure Target")
+            .after("network-online.target")
+            .wants("network-online.target");
+
+    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget toolsTarget =
+        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-tools")
+            .description("RKE2 Lab Tools and Utilities Target")
+            .after(rke2labTarget.getUnitFileName())
+            .wants(rke2labTarget.getUnitFileName());
+
+    // Create synthesis context with target references and shared catalog
+    final io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext systemdContext =
+        new io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext(
+            rke2labTarget, networkTarget, toolsTarget, sharedDomainCatalog);
+
+    // Now domains can reference targets without string literals
     for (LayerDomain domain : domainRegistry.domains()) {
       LOG.debug("Synthesizing systemd units for domain '{}'", domain.domainId());
-      domain.synthesizeSystemdUnits(systemdChart);
+      domain.synthesizeSystemdUnits(systemdChart, systemdContext);
     }
 
-    LOG.debug("Synthesizing cross-cutting systemd targets");
-    io.nxmatic.rk2lab.manifests.systemd.SystemdUnitSynthesizer.synthesizeTargets(systemdChart);
-
     LOG.debug("Synthesizing bootstrap and infrastructure systemd units");
-    new io.nxmatic.rk2lab.manifests.systemd.BootstrapInfrastructureSynthesizer(systemdChart)
+    new io.nxmatic.rk2lab.manifests.systemd.BootstrapInfrastructureSynthesizer(
+            systemdChart, systemdContext)
         .synthesizeAll();
 
     app.synth();

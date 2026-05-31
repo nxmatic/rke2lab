@@ -10,21 +10,23 @@ import java.util.List;
 
 public final class ReplicationDomainRegistrar implements LayerDomainRegistrar {
 
-  private final ManifestDomainCatalog manifestDomainCatalog =
+  private static final ManifestDomainCatalog CATALOG =
       ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
 
   @Override
   public LayerDomain domain() {
     return new LayerDomain(
-        manifestDomainCatalog.replication(),
+        CATALOG.replication(),
         List.of(
             new io.nxmatic.rk2lab.manifests.layers.replication
                 .ReplicationReplicatorManifestUnit())) {
       @Override
-      public void synthesizeSystemdUnits(SystemdChart systemdChart) {
-        super.synthesizeSystemdUnits(systemdChart);
+      public void synthesizeSystemdUnits(
+          SystemdChart systemdChart,
+          io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
+        super.synthesizeSystemdUnits(systemdChart, context);
         var synthesizer =
-            new SystemdUnitSynthesizer(systemdChart, manifestDomainCatalog.replication());
+            new SystemdUnitSynthesizer(systemdChart, context.domainCatalog().replication(), context);
         synthesizer.manifestInstaller();
       }
     };

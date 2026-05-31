@@ -24,10 +24,13 @@ public final class NetworkingDomainRegistrar implements LayerDomainRegistrar {
             new EnvoyGatewayManifestUnit(),
             new KdnsManifestUnit())) {
       @Override
-      public void synthesizeSystemdUnits(SystemdChart systemdChart) {
-        super.synthesizeSystemdUnits(systemdChart);
+      public void synthesizeSystemdUnits(
+          SystemdChart systemdChart,
+          io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
+        super.synthesizeSystemdUnits(systemdChart, context);
         var synthesizer =
-            new SystemdUnitSynthesizer(systemdChart, manifestDomainCatalog.networking());
+            new SystemdUnitSynthesizer(
+                systemdChart, context.domainCatalog().networking(), context);
         synthesizer.manifestInstaller();
       }
     };

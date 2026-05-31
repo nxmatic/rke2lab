@@ -17,9 +17,12 @@ public final class ClusterDomainRegistrar implements LayerDomainRegistrar {
   public LayerDomain domain() {
     return new LayerDomain(CATALOG.cluster(), List.of(new ClusterRuntimeNamespaceManifestUnit())) {
       @Override
-      public void synthesizeSystemdUnits(SystemdChart systemdChart) {
-        super.synthesizeSystemdUnits(systemdChart);
-        var synthesizer = new SystemdUnitSynthesizer(systemdChart, CATALOG.cluster());
+      public void synthesizeSystemdUnits(
+          SystemdChart systemdChart,
+          io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
+        super.synthesizeSystemdUnits(systemdChart, context);
+        var synthesizer =
+            new SystemdUnitSynthesizer(systemdChart, context.domainCatalog().cluster(), context);
         synthesizer.manifestInstaller();
       }
     };

@@ -5,7 +5,6 @@ import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.ServiceType;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.StandardStream;
-import io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget;
 
 /**
  * Domain-scoped systemd unit synthesizer.
@@ -25,10 +24,15 @@ public final class SystemdUnitSynthesizer {
 
   private final SystemdChart systemdChart;
   private final String domainId;
+  private final io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context;
 
-  public SystemdUnitSynthesizer(SystemdChart systemdChart, String domainId) {
+  public SystemdUnitSynthesizer(
+      SystemdChart systemdChart,
+      String domainId,
+      io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
     this.systemdChart = systemdChart;
     this.domainId = domainId;
+    this.context = context;
   }
 
   /**
@@ -50,16 +54,6 @@ public final class SystemdUnitSynthesizer {
    * @return the created SystemdService for further customization
    */
   public SystemdService manifestInstaller() {
-    final String unitFileName = "rke2lab-" + domainId + "-manifests.service";
-    if (!SystemdUnitCatalog.isKnownUnit(unitFileName)) {
-      throw new IllegalStateException(
-          "Unit file name not in SystemdUnitCatalog: "
-              + unitFileName
-              + " (domain="
-              + domainId
-              + ")");
-    }
-
     return new SystemdService(systemdChart, domainId + "-manifests")
         .description("Install RKE2Lab " + domainId + " manifests from host share (post-server)")
         .requiresMountsFor("/srv/host/systemd-units.d", "/srv/host")
@@ -73,7 +67,7 @@ public final class SystemdUnitSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(SystemdUnitCatalog.RKE2LAB_TARGET);
+        .wantedBy(context.rke2labTarget().getUnitFileName());
   }
 
   /**
@@ -91,16 +85,6 @@ public final class SystemdUnitSynthesizer {
    * @return the created SystemdService for further customization
    */
   public SystemdService secretsInstaller() {
-    final String unitFileName = "rke2lab-" + domainId + "-secrets.service";
-    if (!SystemdUnitCatalog.isKnownUnit(unitFileName)) {
-      throw new IllegalStateException(
-          "Unit file name not in SystemdUnitCatalog: "
-              + unitFileName
-              + " (domain="
-              + domainId
-              + ")");
-    }
-
     return new SystemdService(systemdChart, domainId + "-secrets")
         .description("Apply RKE2Lab " + domainId + " secrets")
         .requiresMountsFor("/srv/host/systemd-units.d", "/srv/host")
@@ -112,42 +96,7 @@ public final class SystemdUnitSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(SystemdUnitCatalog.RKE2LAB_TARGET);
+        .wantedBy(context.rke2labTarget().getUnitFileName());
   }
 
-  /**
-   * Synthesizes all cross-cutting systemd targets.
-   *
-   * <p>Targets group services and establish ordering. Called once at synthesis time to emit:
-   *
-   * <ul>
-   *   <li>rke2lab.target - main completion target for all rke2lab services
-   *   <li>rke2lab-network.target - networking infrastructure readiness
-   *   <li>rke2lab-tools.target - tools and utilities readiness
-   * </ul>
-   *
-   * @param systemdChart the systemd chart to add targets to
-   */
-  public static void synthesizeTargets(SystemdChart systemdChart) {
-    // rke2lab.target - main completion target
-    new SystemdTarget(systemdChart, "rke2lab")
-        .description("RKE2 Lab Bootstrap Target")
-        .documentation("https://github.com/nxmatic/rke2lab")
-        .after(SystemdUnitCatalog.BOOTSTRAP_ENV, SystemdUnitCatalog.INSTALL, "rke2-server.service")
-        .wants(SystemdUnitCatalog.BOOTSTRAP_ENV, SystemdUnitCatalog.INSTALL, "rke2-server.service")
-        .requires(SystemdUnitCatalog.BOOTSTRAP_ENV, SystemdUnitCatalog.INSTALL)
-        .wantedBy("multi-user.target");
-
-    // rke2lab-network.target - networking infrastructure
-    new SystemdTarget(systemdChart, "rke2lab-network")
-        .description("RKE2 Lab Network Infrastructure Target")
-        .after("network-online.target")
-        .wants("network-online.target");
-
-    // rke2lab-tools.target - tools and utilities
-    new SystemdTarget(systemdChart, "rke2lab-tools")
-        .description("RKE2 Lab Tools and Utilities Target")
-        .after(SystemdUnitCatalog.RKE2LAB_TARGET)
-        .wants(SystemdUnitCatalog.RKE2LAB_TARGET);
-  }
 }

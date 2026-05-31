@@ -32,8 +32,9 @@ public interface ManifestUnit {
    * (network, tools) emit targets and support services.
    *
    * @param systemdChart the systemd chart to populate with units
+   * @param context systemd synthesis context (contains references to common targets)
    */
-  default void synthesizeSystemdUnits(SystemdChart systemdChart) {
+  default void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
     // Default: no systemd units
   }
 }

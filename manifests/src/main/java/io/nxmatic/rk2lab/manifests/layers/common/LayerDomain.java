@@ -55,11 +55,12 @@ public class LayerDomain {
    * installs all manifests in this domain.
    *
    * @param systemdChart the systemd chart to populate
+   * @param context systemd synthesis context (contains references to common targets)
    */
-  public void synthesizeSystemdUnits(SystemdChart systemdChart) {
+  public void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
     // Delegate to each manifest unit
     for (ManifestUnit unit : layers) {
-      unit.synthesizeSystemdUnits(systemdChart);
+      unit.synthesizeSystemdUnits(systemdChart, context);
     }
   }
 }

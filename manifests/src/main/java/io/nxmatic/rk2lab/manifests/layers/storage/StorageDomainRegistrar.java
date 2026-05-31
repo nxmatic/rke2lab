@@ -17,9 +17,12 @@ public final class StorageDomainRegistrar implements LayerDomainRegistrar {
   public LayerDomain domain() {
     return new LayerDomain(manifestDomainCatalog.storage(), List.of(new OpenebsZfsManifestUnit())) {
       @Override
-      public void synthesizeSystemdUnits(SystemdChart systemdChart) {
-        super.synthesizeSystemdUnits(systemdChart);
-        var synthesizer = new SystemdUnitSynthesizer(systemdChart, manifestDomainCatalog.storage());
+      public void synthesizeSystemdUnits(
+          SystemdChart systemdChart,
+          io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
+        super.synthesizeSystemdUnits(systemdChart, context);
+        var synthesizer =
+            new SystemdUnitSynthesizer(systemdChart, context.domainCatalog().storage(), context);
         synthesizer.manifestInstaller();
       }
     };
