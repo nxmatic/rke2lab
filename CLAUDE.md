@@ -161,6 +161,41 @@ manifestDomain.put("clusterApi", policy.isEnabled("clusterApi")); // ❌ Mismatc
 - When adding a new domain, add the accessor method to `ManifestDomainCatalog` first
 - See `docs/manifest-domain-catalog-pattern.adoc` for full pattern documentation
 
+### Single-source-of-truth pattern for identifiers
+
+**The pattern**: ManifestDomainCatalog, BootstrapPaths.HostPathCatalog, and SystemdUnitCatalog all follow the same principle - **define identifiers once, reference everywhere**.
+
+**Why**: Identifier mismatches cause silent failures. Three bugs fixed on May 31, 2026:
+
+1. `"clusterApi"` string vs `"cluster-api"` catalog ID → policy showed false
+2. `"manifests.d"` directory vs `"/srv/host/rke2-manifests.d"` constant → units never started (condition failed)
+3. `"rke2lab-clusterapi-manifests.service"` dependency vs `"rke2lab-cluster-api-manifests.service"` filename → systemd "Unit not found"
+
+**When to create a catalog**:
+
+- Multiple files reference the same identifier (domain ID, path, unit name, etc.)
+- Identifier format is non-obvious (kebab-case, camelCase, with/without prefix)
+- Mismatch would cause silent failure or runtime error
+
+**Existing catalogs**:
+
+- `ManifestDomainCatalog` - manifest domain IDs
+- `BootstrapPaths.HostPathCatalog` - container mount paths  
+- `SystemdUnitCatalog` - systemd unit filenames
+
+**Template**:
+
+```java
+public final class XyzCatalog {
+  public static final String SOME_ID = "actual-value";
+  // ... more constants
+  
+  private XyzCatalog() {} // Utility class
+}
+```
+
+For systemd units specifically: unit files can't use Java code, so the catalog serves as the **authoritative registry during code review**. When writing `After=some-unit.service`, verify the name exists in `SystemdUnitCatalog`.
+
 ## Documentation standards
 
 Documentation is critical for context recovery. This is a complex, multi-concern project where the developer needs to frequently context-switch between different domains (Incus, Kubernetes, Cluster API, GitOps, systemd, networking). High-quality documentation prevents re-learning and accelerates future work.
