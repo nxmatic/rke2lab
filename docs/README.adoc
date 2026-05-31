@@ -17,6 +17,7 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 * link:bootstrap-contract.adoc[Bootstrap Contract] - Stage A bootstrap requirements and outputs
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - How cluster/infrastructure identity flows through synthesis
 * link:provisioning-slice-architecture.adoc[Provisioning Slice Architecture] - Hot-reload vs static resource partitioning
+* link:host-slot-management.adoc[Host Slot Management] - Slot rotation mechanism for deployment history, rollback, and audit trails
 
 === Manifest Synthesis
 

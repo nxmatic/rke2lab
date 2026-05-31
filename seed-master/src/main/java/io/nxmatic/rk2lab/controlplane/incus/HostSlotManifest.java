@@ -40,6 +40,7 @@ public final class HostSlotManifest extends Construct {
       GitInfo git,
       PolicyInfo policy,
       List<FloxEnvironment> floxEnvironments,
+      List<StagedManifest> stagedManifests,
       PromotionInfo promotion,
       SourceInfo source) {
 
@@ -68,6 +69,11 @@ public final class HostSlotManifest extends Construct {
     // Flox environments
     if (!floxEnvironments.isEmpty()) {
       data.put("floxEnvironments", floxEnvironmentsToList(floxEnvironments));
+    }
+
+    // Staged manifests (post-cluster resources)
+    if (!stagedManifests.isEmpty()) {
+      data.put("stagedManifests", stagedManifestsToList(stagedManifests));
     }
 
     // Promotion tracking
@@ -179,6 +185,19 @@ public final class HostSlotManifest extends Construct {
         .toList();
   }
 
+  private static List<Map<String, Object>> stagedManifestsToList(List<StagedManifest> manifests) {
+    return manifests.stream()
+        .map(
+            manifest -> {
+              final Map<String, Object> map = new LinkedHashMap<>();
+              map.put("domain", manifest.domain);
+              map.put("subpath", manifest.subpath);
+              map.put("description", manifest.description);
+              return map;
+            })
+        .toList();
+  }
+
   private static Map<String, Object> promotionToMap(PromotionInfo promotion) {
     final Map<String, Object> map = new LinkedHashMap<>();
     map.put("promotedToActive", promotion.promotedToActive);
@@ -230,6 +249,8 @@ public final class HostSlotManifest extends Construct {
 
   public record FloxEnvironment(String category, String name, boolean hasManifest) {}
 
+  public record StagedManifest(String domain, String subpath, String description) {}
+
   public record PromotionInfo(
       boolean promotedToActive, Instant promotedAt, String previousActiveManifest) {}
 
@@ -263,6 +284,7 @@ public final class HostSlotManifest extends Construct {
     private GitInfo git;
     private PolicyInfo policy;
     private final List<FloxEnvironment> floxEnvironments = new java.util.ArrayList<>();
+    private final List<StagedManifest> stagedManifests = new java.util.ArrayList<>();
     private PromotionInfo promotion;
     private SourceInfo source;
 
@@ -335,6 +357,11 @@ public final class HostSlotManifest extends Construct {
       return this;
     }
 
+    public Builder addStagedManifest(String domain, String subpath, String description) {
+      this.stagedManifests.add(new StagedManifest(domain, subpath, description));
+      return this;
+    }
+
     public Builder promotion(
         boolean promotedToActive, Instant promotedAt, String previousActiveManifest) {
       this.promotion = new PromotionInfo(promotedToActive, promotedAt, previousActiveManifest);
@@ -357,6 +384,7 @@ public final class HostSlotManifest extends Construct {
           git,
           policy,
           List.copyOf(floxEnvironments),
+          List.copyOf(stagedManifests),
           promotion,
           source);
     }

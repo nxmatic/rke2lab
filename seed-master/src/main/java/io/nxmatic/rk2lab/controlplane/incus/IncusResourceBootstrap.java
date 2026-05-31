@@ -1973,6 +1973,10 @@ public final class IncusResourceBootstrap {
           // First deployment: copy staging to final location (keep staging for comparison)
           backup(slotPath, hostAssetRoot);
         }
+
+        // Symlink manifest to master level for operator visibility
+        symlinkManifestToMasterLevel(hostAssetRoot);
+
         return true;
       } catch (IOException ex) {
         throw new IllegalStateException(
@@ -2032,6 +2036,12 @@ public final class IncusResourceBootstrap {
         }
       }
 
+      // Add staged manifests (post-cluster resources)
+      if (policy.manifestLink().domains().isEnabled("clusterApi")) {
+        manifestBuilder.addStagedManifest(
+            "clusterapi", "staged", "Image-state ConfigMap for Cluster API");
+      }
+
       manifestBuilder.build(chart, "slot-manifest");
 
       // Synthesize to YAML - CDK8s writes to slotPath/.rke2lab-manifest.yaml
@@ -2043,6 +2053,24 @@ public final class IncusResourceBootstrap {
       if (Files.exists(synthesized)) {
         Files.move(synthesized, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
       }
+    }
+
+    /**
+     * Symlink host/.rke2lab-manifest.yaml to MANIFEST.yaml at master level for operator visibility.
+     *
+     * <p>Operators navigating .local.d/bioskop/master/ see MANIFEST.yaml immediately without drilling
+     * into host/.
+     */
+    private void symlinkManifestToMasterLevel(Path hostAssetRoot) throws IOException {
+      final Path hostManifest = hostAssetRoot.resolve(".rke2lab-manifest.yaml");
+      final Path masterManifest = hostAssetRoot.getParent().resolve("MANIFEST.yaml");
+
+      // Remove existing symlink/file if present
+      Files.deleteIfExists(masterManifest);
+
+      // Create relative symlink: MANIFEST.yaml -> host/.rke2lab-manifest.yaml
+      final Path relativeTarget = masterManifest.getParent().relativize(hostManifest);
+      Files.createSymbolicLink(masterManifest, relativeTarget);
     }
 
     private boolean directoriesAreIdentical(Path left, Path right) throws IOException {
