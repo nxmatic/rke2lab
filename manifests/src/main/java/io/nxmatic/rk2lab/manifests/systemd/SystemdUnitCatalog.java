@@ -70,10 +70,12 @@ public final class SystemdUnitCatalog {
   public static final String RUNTIME_SECRETS = "rke2lab-runtime-secrets.service";
 
   // Targets
+  public static final String NETWORK_TARGET = "rke2lab-network.target";
   public static final String TOOLS_TARGET = "rke2lab-tools.target";
+  public static final String RKE2LAB_TARGET = "rke2lab.target";
 
-  // Timers
-  public static final String CACHIX_WATCH_STORE_TIMER = "rke2lab-cachix-watch-store.timer";
+  // System units (not rke2lab-prefixed, but managed by rke2lab)
+  public static final String ZFS_EARLY_UMOUNT = "zfs-early-umount.service";
 
   private SystemdUnitCatalog() {
     // Utility class
@@ -116,7 +118,9 @@ public final class SystemdUnitCatalog {
         || unitName.equals(GITOPS_SECRETS)
         || unitName.equals(MESH_SECRETS)
         || unitName.equals(RUNTIME_SECRETS)
+        || unitName.equals(NETWORK_TARGET)
         || unitName.equals(TOOLS_TARGET)
-        || unitName.equals(CACHIX_WATCH_STORE_TIMER);
+        || unitName.equals(RKE2LAB_TARGET)
+        || unitName.equals(ZFS_EARLY_UMOUNT);
   }
 }
