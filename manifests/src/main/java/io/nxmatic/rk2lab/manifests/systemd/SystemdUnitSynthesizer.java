@@ -22,6 +22,8 @@ import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.StandardStream;
  */
 public final class SystemdUnitSynthesizer {
 
+  private static final String UNIT_PREFIX = "rke2lab-";
+
   private final SystemdChart systemdChart;
   private final String domainId;
   private final io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context;
@@ -33,6 +35,16 @@ public final class SystemdUnitSynthesizer {
     this.systemdChart = systemdChart;
     this.domainId = domainId;
     this.context = context;
+  }
+
+  /**
+   * Generates a unit ID with the rke2lab- prefix and given suffix.
+   *
+   * @param suffix the unit purpose suffix (e.g., "manifests", "secrets")
+   * @return prefixed unit ID (e.g., "rke2lab-gitops-manifests")
+   */
+  private String unitId(String suffix) {
+    return UNIT_PREFIX + domainId + "-" + suffix;
   }
 
   /**
@@ -54,7 +66,7 @@ public final class SystemdUnitSynthesizer {
    * @return the created SystemdService for further customization
    */
   public SystemdService manifestInstaller() {
-    return new SystemdService(systemdChart, domainId + "-manifests")
+    return new SystemdService(systemdChart, unitId("manifests"))
         .description("Install RKE2Lab " + domainId + " manifests from host share (post-server)")
         .requiresMountsFor("/srv/host/systemd-units.d", "/srv/host")
         .after("local-fs.target", "rke2-server.service")
@@ -85,7 +97,7 @@ public final class SystemdUnitSynthesizer {
    * @return the created SystemdService for further customization
    */
   public SystemdService secretsInstaller() {
-    return new SystemdService(systemdChart, domainId + "-secrets")
+    return new SystemdService(systemdChart, unitId("secrets"))
         .description("Apply RKE2Lab " + domainId + " secrets")
         .requiresMountsFor("/srv/host/systemd-units.d", "/srv/host")
         .after("local-fs.target", "rke2-server.service")

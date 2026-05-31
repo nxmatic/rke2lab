@@ -34,7 +34,7 @@ public final class CiliumConfigManifestUnit extends AbstractManifestUnit {
           "rke2lab-install service not found in systemd chart - ensure BootstrapInfrastructureSynthesizer runs first");
     }
 
-    new SystemdService(systemdChart, "cilium-config-manifests")
+    new SystemdService(systemdChart, "rke2lab-cilium-config-manifests")
         .description("Install RKE2Lab Cilium config manifests before server start")
         .requiresMountsFor("/srv/host/systemd-units.d", "/srv/host")
         .after("local-fs.target", installService.getUnitFileName())

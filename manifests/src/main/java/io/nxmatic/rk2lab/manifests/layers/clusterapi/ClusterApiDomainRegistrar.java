@@ -31,7 +31,7 @@ public final class ClusterApiDomainRegistrar implements LayerDomainRegistrar {
         var clusterApiManifests = synthesizer.manifestInstaller();
 
         // Staged image-state manifest installer (runs after cluster-api-manifests)
-        new SystemdService(systemdChart, "cluster-api-image-state-apply")
+        new SystemdService(systemdChart, "rke2lab-cluster-api-image-state-apply")
             .description("Install Cluster API staged image-state manifest (via RKE2 auto-deploy)")
             .documentation(
                 "file:///srv/host/docs/staged-post-cluster-resources.adoc",
