@@ -4,6 +4,13 @@
 
 Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via Pulumi, Incus, and Cluster API.
 
+**Implementation Status Legend:**
+
+* ✅ Complete - Fully implemented and operational
+* 📋 Planned - Designed but not yet implemented
+* ⚠️ Design Only - Design document, implementation not started
+* ⚠️ Historical Reference - Archived documentation, may be outdated
+
 == Core Architecture
 
 === Build & Packaging
@@ -33,8 +40,8 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 
 == GitOps & Cluster API
 
-* link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] - Phase 1-3 implementation roadmap
-* link:cluster-api-bootstrap-requirements.adoc[Cluster API Bootstrap Requirements] - Cleanup plan & flox webhook injection architecture
+* link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] - Phase 1-3 implementation roadmap (✅ Phase 1, 📋 Phase 2/3)
+* link:cluster-api-bootstrap-requirements.adoc[Cluster API Bootstrap Requirements] - Cleanup plan & flox webhook injection architecture (⚠️ Design Only)
 * link:stagea-stageb-handoff-contract.adoc[Stage A/B Handoff Contract] - Bootstrap → cluster management transition
 * link:post-bootstrap-in-cluster-ownership-plan.adoc[Post-Bootstrap Ownership Plan] - Component lifecycle after bootstrap
 
@@ -42,14 +49,14 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 
 === Incus
 
-* link:incus-distribution-contract.adoc[Incus Distribution Contract] - How Incus images are built and distributed
-* link:incus-resource-bootstrap-refactoring-plan.adoc[Incus Resource Bootstrap Refactoring Plan] - Bootstrap refactoring decisions
+* link:incus-distribution-contract.adoc[Incus Distribution Contract] - How Incus images are built and distributed (⚠️ Reverse-Engineered v1)
+* link:incus-resource-bootstrap-refactoring-plan.adoc[Incus Resource Bootstrap Refactoring Plan] - Bootstrap refactoring decisions (✅ Complete)
 
 === Host Assets
 
-* link:controlnode-host-assets-architecture.adoc[Control Node Host Assets Architecture] - How assets are materialized on nodes
+* link:controlnode-host-assets-architecture.adoc[Control Node Host Assets Architecture] - How assets are materialized on nodes (⚠️ Design, partially implemented)
 * link:daemonset-host-assets-architecture.adoc[DaemonSet Host Assets Architecture] - DaemonSet-to-host asset trampoline pattern
-* link:flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved Runtime + Remote Nix Builder] - Moving runtime scripts into the nix store + letting containers build via the NixOS host builder
+* link:flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved Runtime + Remote Nix Builder] - Moving runtime scripts into the nix store + letting containers build via the NixOS host builder (⚠️ Design Only)
 
 == Networking
 
@@ -62,9 +69,9 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 
 == Implementation Plans
 
-* link:cluster-workload-completion-plan.adoc[Cluster Workload Completion Plan] - Completing cluster workload features
-* link:script-layer-owners.md[Script Layer Owners] - Ownership mapping for bootstrap scripts
-* link:rke2lab-authored-notes-import.adoc[RKE2Lab Authored Notes Import] - Migration notes
+* link:cluster-workload-completion-plan.adoc[Cluster Workload Completion Plan] - Completing cluster workload features (📋 Status Unknown)
+* link:script-layer-owners.md[Script Layer Owners] - Ownership mapping for bootstrap scripts (⚠️ Historical Reference)
+* link:rke2lab-authored-notes-import.adoc[RKE2Lab Authored Notes Import] - Migration notes (⚠️ Historical Reference)
 
 == Architecture Diagrams
 
