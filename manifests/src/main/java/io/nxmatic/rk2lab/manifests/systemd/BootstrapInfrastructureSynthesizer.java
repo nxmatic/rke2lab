@@ -41,6 +41,7 @@ public final class BootstrapInfrastructureSynthesizer {
 
     // Bootstrap & installation
     bootstrapEnv();
+    configInstall();
     install();
     systemdLink();
 
@@ -55,6 +56,7 @@ public final class BootstrapInfrastructureSynthesizer {
     containerdZfsMountConfig();
     dbusTcpSystemBus();
     zfsEarlyUmount();
+    vipKubeconfig();
 
     // Update rke2lab.target dependencies (now that all services exist)
     context
@@ -102,7 +104,7 @@ public final class BootstrapInfrastructureSynthesizer {
             .remainAfterExit(true)
             .standardOutput(StandardStream.JOURNAL)
             .standardError(StandardStream.JOURNAL)
-            .wantedBy(context.rke2labTarget().getUnitFileName());
+            .wantedBy(context.bootstrapTarget().getUnitFileName());
   }
 
   private void install() {
@@ -136,7 +138,7 @@ public final class BootstrapInfrastructureSynthesizer {
             .remainAfterExit(true)
             .standardOutput(StandardStream.JOURNAL)
             .standardError(StandardStream.JOURNAL)
-            .wantedBy(context.rke2labTarget().getUnitFileName());
+            .wantedBy(context.bootstrapTarget().getUnitFileName());
   }
 
   private void systemdLink() {
@@ -154,7 +156,7 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(context.rke2labTarget().getUnitFileName());
+        .wantedBy(context.bootstrapTarget().getUnitFileName());
   }
 
   private void nixInstall() {
@@ -264,24 +266,24 @@ public final class BootstrapInfrastructureSynthesizer {
   }
 
   private void containerdZfsMountConfig() {
-    var bootstrapEnv = systemdChart.findUnit("rke2lab-bootstrap-env");
-    var floxInstall = systemdChart.findUnit("rke2lab-flox-install");
-    if (bootstrapEnv == null || floxInstall == null) {
-      throw new IllegalStateException(
-          "rke2lab-bootstrap-env and rke2lab-flox-install must exist before containerdZfsMountConfig");
-    }
-
     new SystemdService(systemdChart, "rke2lab-containerd-zfs-mount-config")
         .description("Configure containerd for ZFS mounts")
-        .after("local-fs.target", bootstrapEnv.getUnitFileName(), floxInstall.getUnitFileName())
-        .requires(bootstrapEnv.getUnitFileName(), floxInstall.getUnitFileName())
+        .after(
+            "local-fs.target",
+            bootstrapEnvService.getUnitFileName(),
+            floxInstallService.getUnitFileName(),
+            installService.getUnitFileName())
+        .requires(
+            bootstrapEnvService.getUnitFileName(),
+            floxInstallService.getUnitFileName(),
+            installService.getUnitFileName())
         .before("rke2-server.service", "rke2-agent.service")
         .type(ServiceType.ONESHOT)
         .execStart("/srv/host/systemd-scripts.d/rke2lab-configure-containerd-zfs-mount.sh")
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(context.rke2labTarget().getUnitFileName());
+        .wantedBy(context.bootstrapTarget().getUnitFileName());
   }
 
   private void dbusTcpSystemBus() {
@@ -308,5 +310,47 @@ public final class BootstrapInfrastructureSynthesizer {
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
         .wantedBy("umount.target");
+  }
+
+  private void vipKubeconfig() {
+    new SystemdService(systemdChart, "rke2lab-vip-kubeconfig")
+        .description("Generate VIP-enabled kubeconfig for cluster access")
+        .after(
+            "local-fs.target",
+            bootstrapEnvService.getUnitFileName(),
+            floxInstallService.getUnitFileName(),
+            "rke2-server.service")
+        .requires(
+            bootstrapEnvService.getUnitFileName(),
+            floxInstallService.getUnitFileName(),
+            "rke2-server.service")
+        .conditionPathExists(
+            "/srv/host/systemd-scripts.d/rke2lab-vip-kubeconfig.sh",
+            "/etc/rancher/rke2/rke2.yaml",
+            "/var/lib/rancher/rke2/.flox/env")
+        .type(ServiceType.ONESHOT)
+        .execStart("/srv/host/systemd-scripts.d/rke2lab-vip-kubeconfig.sh")
+        .remainAfterExit(true)
+        .standardOutput(StandardStream.JOURNAL)
+        .standardError(StandardStream.JOURNAL)
+        .wantedBy("rke2-server.service");
+  }
+
+  private void configInstall() {
+    new SystemdService(systemdChart, "rke2lab-config-install")
+        .description("Install RKE2 config fragments before server start")
+        .after(
+            "local-fs.target",
+            bootstrapEnvService.getUnitFileName(),
+            floxInstallService.getUnitFileName())
+        .requires(bootstrapEnvService.getUnitFileName(), floxInstallService.getUnitFileName())
+        .before("rke2-server.service", "rke2-agent.service")
+        .conditionPathExists("/srv/host/systemd-scripts.d/rke2lab-config-install.sh")
+        .type(ServiceType.ONESHOT)
+        .execStart("/srv/host/systemd-scripts.d/rke2lab-config-install.sh")
+        .remainAfterExit(true)
+        .standardOutput(StandardStream.JOURNAL)
+        .standardError(StandardStream.JOURNAL)
+        .wantedBy(context.bootstrapTarget().getUnitFileName());
   }
 }

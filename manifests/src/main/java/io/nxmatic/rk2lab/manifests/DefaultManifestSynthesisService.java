@@ -139,6 +139,26 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             .documentation("https://github.com/nxmatic/rke2lab")
             .wantedBy("multi-user.target");
 
+    // Sub-targets for better organization
+    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget bootstrapTarget =
+        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-bootstrap")
+            .description("RKE2 Lab Early Bootstrap (pre-server)")
+            .wantedBy(rke2labTarget.getUnitFileName());
+
+    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget manifestsTarget =
+        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-manifests")
+            .description("RKE2 Lab Manifest Installers (post-server)")
+            .after("rke2-server.service")
+            .requires("rke2-server.service")
+            .wantedBy(rke2labTarget.getUnitFileName());
+
+    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget secretsTarget =
+        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-secrets")
+            .description("RKE2 Lab Secrets Installers (post-server)")
+            .after("rke2-server.service")
+            .requires("rke2-server.service")
+            .wantedBy(rke2labTarget.getUnitFileName());
+
     final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget networkTarget =
         new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-network")
             .description("RKE2 Lab Network Infrastructure Target")
@@ -154,7 +174,13 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     // Create synthesis context with target references and shared catalog
     final io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext systemdContext =
         new io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext(
-            rke2labTarget, networkTarget, toolsTarget, sharedDomainCatalog);
+            rke2labTarget,
+            bootstrapTarget,
+            manifestsTarget,
+            secretsTarget,
+            networkTarget,
+            toolsTarget,
+            sharedDomainCatalog);
 
     // Bootstrap and infrastructure services MUST be created first (domains may reference them)
     LOG.debug("Synthesizing bootstrap and infrastructure systemd units");

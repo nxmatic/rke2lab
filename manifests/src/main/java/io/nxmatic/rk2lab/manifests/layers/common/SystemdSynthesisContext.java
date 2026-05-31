@@ -13,13 +13,19 @@ import io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget;
  *
  * <p><b>Pattern</b>: Create once, pass everywhere.
  *
- * @param rke2labTarget the main rke2lab.target (WantedBy for most services)
+ * @param rke2labTarget the main rke2lab.target (parent of all rke2lab services)
+ * @param bootstrapTarget the rke2lab-bootstrap.target (early bootstrap, pre-server)
+ * @param manifestsTarget the rke2lab-manifests.target (manifest installers, post-server)
+ * @param secretsTarget the rke2lab-secrets.target (secrets installers, post-server)
  * @param networkTarget the rke2lab-network.target (networking infrastructure)
  * @param toolsTarget the rke2lab-tools.target (tools and utilities)
  * @param domainCatalog the shared domain catalog (single source of truth for domain IDs)
  */
 public record SystemdSynthesisContext(
     SystemdTarget rke2labTarget,
+    SystemdTarget bootstrapTarget,
+    SystemdTarget manifestsTarget,
+    SystemdTarget secretsTarget,
     SystemdTarget networkTarget,
     SystemdTarget toolsTarget,
     ManifestDomainCatalog domainCatalog) {
@@ -27,6 +33,15 @@ public record SystemdSynthesisContext(
   public SystemdSynthesisContext {
     if (rke2labTarget == null) {
       throw new IllegalArgumentException("rke2labTarget must not be null");
+    }
+    if (bootstrapTarget == null) {
+      throw new IllegalArgumentException("bootstrapTarget must not be null");
+    }
+    if (manifestsTarget == null) {
+      throw new IllegalArgumentException("manifestsTarget must not be null");
+    }
+    if (secretsTarget == null) {
+      throw new IllegalArgumentException("secretsTarget must not be null");
     }
     if (networkTarget == null) {
       throw new IllegalArgumentException("networkTarget must not be null");

@@ -10,7 +10,7 @@ public final class FluxInstanceManifestUnit extends AbstractManifestUnit {
   public static final String MANIFEST_UNIT_ID = "gitops/flux-instance";
 
   public FluxInstanceManifestUnit() {
-    super(MANIFEST_UNIT_ID, List.of());
+    super(MANIFEST_UNIT_ID, List.of(FluxOperatorManifestUnit.MANIFEST_UNIT_ID));
   }
 
   @Override

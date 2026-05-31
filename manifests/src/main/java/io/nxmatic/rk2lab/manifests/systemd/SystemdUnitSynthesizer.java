@@ -79,7 +79,7 @@ public final class SystemdUnitSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(context.rke2labTarget().getUnitFileName());
+        .wantedBy(context.manifestsTarget().getUnitFileName());
   }
 
   /**
@@ -108,6 +108,6 @@ public final class SystemdUnitSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(context.rke2labTarget().getUnitFileName());
+        .wantedBy(context.secretsTarget().getUnitFileName());
   }
 }

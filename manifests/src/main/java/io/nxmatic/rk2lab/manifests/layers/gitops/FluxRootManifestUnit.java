@@ -38,7 +38,7 @@ public final class FluxRootManifestUnit extends AbstractManifestUnit {
       new PackageMetadataProfile("gitops", "flux-root");
 
   public FluxRootManifestUnit() {
-    super(MANIFEST_UNIT_ID, List.of());
+    super(MANIFEST_UNIT_ID, List.of(FluxInstanceManifestUnit.MANIFEST_UNIT_ID));
   }
 
   @Override

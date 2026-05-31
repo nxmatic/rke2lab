@@ -24,6 +24,7 @@ public final class GitopsDomainRegistrar implements LayerDomainRegistrar {
   @Override
   public LayerDomain domain(ManifestDomainPolicy policy) {
     final List<ManifestUnit> units = new ArrayList<>();
+    units.add(new FluxOperatorManifestUnit());
     units.add(new FluxInstanceManifestUnit());
     units.add(new SopsAgeSecretManifestUnit());
     units.add(new FluxRootManifestUnit());
