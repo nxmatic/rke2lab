@@ -98,5 +98,4 @@ public final class SystemdUnitSynthesizer {
         .standardError(StandardStream.JOURNAL)
         .wantedBy(context.rke2labTarget().getUnitFileName());
   }
-
 }

@@ -29,8 +29,7 @@ public final class NetworkingDomainRegistrar implements LayerDomainRegistrar {
           io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
         super.synthesizeSystemdUnits(systemdChart, context);
         var synthesizer =
-            new SystemdUnitSynthesizer(
-                systemdChart, context.domainCatalog().networking(), context);
+            new SystemdUnitSynthesizer(systemdChart, context.domainCatalog().networking(), context);
         synthesizer.manifestInstaller();
       }
     };

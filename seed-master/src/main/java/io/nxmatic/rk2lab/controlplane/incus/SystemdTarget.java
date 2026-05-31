@@ -27,8 +27,6 @@ public final class SystemdTarget implements ProvisioningTarget {
   private static final String CLASSPATH_ROOT = "META-INF/io.nxmatic/rk2lab/controlplane";
   private static final String CLASSPATH_SYSTEMD_SCRIPTS_ROOT =
       CLASSPATH_ROOT + "/incus/manifests/systemd/systemd-scripts";
-  private static final String CLASSPATH_SYSTEMD_UNITS_ROOT =
-      CLASSPATH_ROOT + "/incus/manifests/systemd/systemd-units";
 
   private final List<Path> materializedPaths = new ArrayList<>();
   private FloxRuntimeAssets floxRuntimeAssets;
@@ -49,8 +47,12 @@ public final class SystemdTarget implements ProvisioningTarget {
 
     // Systemd units and scripts (systemd loads these at runtime). Materialize directly into the
     // configured staging paths — they live at <assetsRoot>/systemd.d/, not under manifestsRoot.
+
+    // Scripts come from classpath (static resources)
     ClasspathTreeCopier.copy(CLASSPATH_SYSTEMD_SCRIPTS_ROOT, paths.scriptsRoot(), true);
-    ClasspathTreeCopier.copy(CLASSPATH_SYSTEMD_UNITS_ROOT, paths.systemdRoot(), false);
+
+    // Units are already copied to paths.systemdRoot() by synthesizeAndExplodeManifests upstream
+
     materializedPaths.add(paths.scriptsRoot());
     materializedPaths.add(paths.systemdRoot());
 

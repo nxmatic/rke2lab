@@ -5,7 +5,6 @@ import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.ServiceType;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.StandardStream;
-import io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget;
 
 /**
  * Synthesizes bootstrap and infrastructure systemd units.
@@ -86,7 +85,7 @@ public final class BootstrapInfrastructureSynthesizer {
             .wants(
                 "network-online.target",
                 "systemd-networkd.service",
-                networkTarget.getUnitFileName())
+                context.networkTarget().getUnitFileName())
             .requires(
                 context.networkTarget().getUnitFileName(),
                 context.toolsTarget().getUnitFileName(),
@@ -120,7 +119,7 @@ public final class BootstrapInfrastructureSynthesizer {
             .wants(
                 "network-online.target",
                 "systemd-networkd.service",
-                networkTarget.getUnitFileName())
+                context.networkTarget().getUnitFileName())
             .requires(
                 context.networkTarget().getUnitFileName(),
                 context.toolsTarget().getUnitFileName(),
@@ -155,7 +154,7 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(rke2labTarget.getUnitFileName());
+        .wantedBy(context.rke2labTarget().getUnitFileName());
   }
 
   private void nixInstall() {
@@ -274,7 +273,7 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(rke2labTarget.getUnitFileName());
+        .wantedBy(context.rke2labTarget().getUnitFileName());
   }
 
   private void dbusTcpSystemBus() {
@@ -287,7 +286,7 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(rke2labTarget.getUnitFileName());
+        .wantedBy(context.rke2labTarget().getUnitFileName());
   }
 
   private void zfsEarlyUmount() {

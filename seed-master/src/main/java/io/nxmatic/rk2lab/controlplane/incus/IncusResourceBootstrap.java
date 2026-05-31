@@ -29,6 +29,7 @@ import io.nxmatic.rk2lab.manifests.api.ManifestExplodeRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeResult;
 import io.nxmatic.rk2lab.manifests.api.ManifestExplodeService;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
+import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisResult;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
 import io.nxmatic.rk2lab.manifests.api.ManifestYaml;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.ComponentVersions;
@@ -268,12 +269,14 @@ public final class IncusResourceBootstrap {
           stagingRoot.resolve(
               state.localPaths.assetsRoot().relativize(state.localPaths.manifestsRoot()));
 
+      final BootstrapPaths stagingPaths = createStagingPaths(stagingRoot);
       final LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
       final Map<String, Object> manifestSynthSummary =
           synthesizeAndExplodeManifests(
-              stagingManifestsRoot, state.registry.require(ControlplanePolicy.class), layerContext);
-
-      final BootstrapPaths stagingPaths = createStagingPaths(stagingRoot);
+              stagingManifestsRoot,
+              stagingPaths.systemdRoot(),
+              state.registry.require(ControlplanePolicy.class),
+              layerContext);
 
       return new StagingContext(
           stagingRoot, stagingPaths, stagingManifestsRoot, layerContext, manifestSynthSummary);
@@ -419,7 +422,10 @@ public final class IncusResourceBootstrap {
   }
 
   private Map<String, Object> synthesizeAndExplodeManifests(
-      Path manifestsRoot, ControlplanePolicy policy, LayerEnvContext layerContext) {
+      Path manifestsRoot,
+      Path systemdUnitsTarget,
+      ControlplanePolicy policy,
+      LayerEnvContext layerContext) {
     final long startedAt = System.nanoTime();
     Path synthScratch = null;
     try {
@@ -429,8 +435,13 @@ public final class IncusResourceBootstrap {
 
       manifestFileOps.wipeExplodedLayers(manifestsRoot);
 
-      synthesizeManifests(synthScratch, consolidated, layerContext, floxDebugPolicy);
+      final ManifestSynthesisResult synthResult =
+          synthesizeManifests(synthScratch, consolidated, layerContext, floxDebugPolicy);
       final ManifestExplodeResult explodeResult = explodeManifests(consolidated, manifestsRoot);
+
+      // Copy synthesized systemd units to target location before scratch is deleted
+      copySystemdUnitsFromSynthesis(synthResult.systemdUnitsDir(), systemdUnitsTarget);
+
       final Map<String, Object> summary =
           buildManifestSynthSummary(manifestsRoot, explodeResult, floxDebugPolicy);
 
@@ -445,12 +456,48 @@ public final class IncusResourceBootstrap {
     }
   }
 
+  /**
+   * Copies synthesized systemd units from the synthesis output to the target location.
+   *
+   * @param systemdSource directory containing synthesized .service and .target files
+   * @param target destination directory for systemd units
+   */
+  private void copySystemdUnitsFromSynthesis(Path systemdSource, Path target) throws IOException {
+    if (!Files.exists(systemdSource) || !Files.isDirectory(systemdSource)) {
+      throw new IllegalStateException(
+          "Systemd units directory not found in synthesis output: " + systemdSource);
+    }
+
+    Files.createDirectories(target);
+
+    try (var stream = Files.list(systemdSource)) {
+      stream
+          .filter(Files::isRegularFile)
+          .filter(
+              p -> {
+                String name = p.getFileName().toString();
+                return name.endsWith(".service") || name.endsWith(".target");
+              })
+          .forEach(
+              unitFile -> {
+                try {
+                  Path targetFile = target.resolve(unitFile.getFileName());
+                  Files.copy(
+                      unitFile, targetFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                } catch (IOException e) {
+                  throw new java.io.UncheckedIOException(
+                      "Failed to copy systemd unit: " + unitFile, e);
+                }
+              });
+    }
+  }
+
   private FloxDebugPolicy resolveFloxDebugPolicy(ControlplanePolicy policy) {
     final ControlplanePolicy.DebugPolicy debug = policy.debug();
     return new FloxDebugPolicy(debug.mesh(), debug.networking(), debug.nriPluginsFlox());
   }
 
-  private void synthesizeManifests(
+  private ManifestSynthesisResult synthesizeManifests(
       Path synthScratch,
       Path consolidated,
       LayerEnvContext layerContext,
@@ -466,7 +513,7 @@ public final class IncusResourceBootstrap {
             .withComponentVersions(componentVersions);
 
     final ManifestSynthesisService synthesizer = singleSpiProvider(ManifestSynthesisService.class);
-    synthesizer.synthesize(synthRequest);
+    return synthesizer.synthesize(synthRequest);
   }
 
   private ManifestExplodeResult explodeManifests(Path consolidated, Path manifestsRoot)

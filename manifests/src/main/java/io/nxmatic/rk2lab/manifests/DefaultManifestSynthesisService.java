@@ -2,6 +2,7 @@ package io.nxmatic.rk2lab.manifests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.MappingIterator;
+import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.api.ManifestDomainPolicy;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
 import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisResult;
@@ -84,7 +85,11 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     final Path synthOutdir = request.synthOutdir();
     final Path synthManifestFile = request.synthManifestFile();
 
-    final App app = new App(AppProps.builder().outdir(synthOutdir.toString()).build());
+    // Separate output directories for K8s and systemd
+    final Path k8sOutdir = synthOutdir.resolve("k8s");
+    final Path systemdOutdir = synthOutdir.resolve("systemd");
+
+    final App app = new App(AppProps.builder().outdir(k8sOutdir.toString()).build());
     final Chart chart = new Chart(app, "manifests");
     final SystemdChart systemdChart = new SystemdChart(app, "systemd");
 
@@ -121,7 +126,10 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
     // Create shared domain catalog FIRST (single source of truth for domain IDs)
     final ManifestDomainCatalog sharedDomainCatalog =
-        ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
+        ManifestDomainCatalog.builder()
+            .addDefaultDomains()
+            .addDefaultStageALinkableDomains()
+            .build();
 
     // Create targets FIRST (they're referenced by all services)
     LOG.debug("Creating systemd targets");
@@ -148,21 +156,22 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         new io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext(
             rke2labTarget, networkTarget, toolsTarget, sharedDomainCatalog);
 
-    // Now domains can reference targets without string literals
-    for (LayerDomain domain : domainRegistry.domains()) {
-      LOG.debug("Synthesizing systemd units for domain '{}'", domain.domainId());
-      domain.synthesizeSystemdUnits(systemdChart, systemdContext);
-    }
-
+    // Bootstrap and infrastructure services MUST be created first (domains may reference them)
     LOG.debug("Synthesizing bootstrap and infrastructure systemd units");
     new io.nxmatic.rk2lab.manifests.systemd.BootstrapInfrastructureSynthesizer(
             systemdChart, systemdContext)
         .synthesizeAll();
 
-    app.synth();
-    systemdChart.synthesize(synthOutdir);
+    // Now domains can reference both targets and bootstrap services
+    for (LayerDomain domain : domainRegistry.domains()) {
+      LOG.debug("Synthesizing systemd units for domain '{}'", domain.domainId());
+      domain.synthesizeSystemdUnits(systemdChart, systemdContext);
+    }
 
-    final Path synthesizedFile = synthOutdir.resolve("manifests.k8s.yaml");
+    app.synth();
+    systemdChart.synthesize(systemdOutdir);
+
+    final Path synthesizedFile = k8sOutdir.resolve("manifests.k8s.yaml");
     if (!Files.exists(synthesizedFile)) {
       throw new IllegalStateException(
           "Expected synthesized manifest file is missing: " + synthesizedFile);
@@ -178,7 +187,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         manifestUnitHitCount);
 
     return new ManifestSynthesisResult(
-        synthManifestFile, manifestUnitHitCount, domainRegistry.domains().size());
+        synthManifestFile, systemdOutdir, manifestUnitHitCount, domainRegistry.domains().size());
   }
 
   private LayerDomainRegistry buildDomainRegistry(ManifestDomainPolicy policy) {
