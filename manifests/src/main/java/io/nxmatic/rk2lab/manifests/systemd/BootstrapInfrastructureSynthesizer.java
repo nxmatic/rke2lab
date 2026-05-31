@@ -264,12 +264,20 @@ public final class BootstrapInfrastructureSynthesizer {
   }
 
   private void containerdZfsMountConfig() {
+    var bootstrapEnv = systemdChart.findUnit("rke2lab-bootstrap-env");
+    var floxInstall = systemdChart.findUnit("rke2lab-flox-install");
+    if (bootstrapEnv == null || floxInstall == null) {
+      throw new IllegalStateException(
+          "rke2lab-bootstrap-env and rke2lab-flox-install must exist before containerdZfsMountConfig");
+    }
+
     new SystemdService(systemdChart, "rke2lab-containerd-zfs-mount-config")
         .description("Configure containerd for ZFS mounts")
-        .after("local-fs.target")
+        .after("local-fs.target", bootstrapEnv.getUnitFileName(), floxInstall.getUnitFileName())
+        .requires(bootstrapEnv.getUnitFileName(), floxInstall.getUnitFileName())
         .before("rke2-server.service", "rke2-agent.service")
         .type(ServiceType.ONESHOT)
-        .execStart("/srv/host/systemd-scripts.d/rke2lab-containerd-zfs-mount-config.sh")
+        .execStart("/srv/host/systemd-scripts.d/rke2lab-configure-containerd-zfs-mount.sh")
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
@@ -280,7 +288,6 @@ public final class BootstrapInfrastructureSynthesizer {
     new SystemdService(systemdChart, "rke2lab-dbus-tcp-system-bus")
         .description("Expose DBus system bus over TCP for RKE2Lab")
         .after("dbus.service")
-        .requires("dbus.service")
         .type(ServiceType.ONESHOT)
         .execStart("/srv/host/systemd-scripts.d/rke2lab-dbus-tcp-system-bus.sh")
         .remainAfterExit(true)
