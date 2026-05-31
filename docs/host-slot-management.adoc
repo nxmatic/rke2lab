@@ -269,22 +269,22 @@ Files.createSymbolicLink(masterManifest, relativeTarget);
 [mermaid]
 ----
 graph LR
-    subgraph "Seed-master (Java)"
-        A[ManifestSynthesizer]
-        B[SystemdTarget]
-        C[HostSlotManager]
+    subgraph "Seed-master Java"
+        A["ManifestSynthesizer"]
+        B["SystemdTarget"]
+        C["HostSlotManager"]
     end
 
-    subgraph ".local.d/bioskop/master"
-        D[host.preview<br/>scratch]
-        E[host.staging.N<br/>numbered slots]
-        F[host/<br/>active]
-        G[MANIFEST.yaml<br/>symlink]
-        H[host.backup.N<br/>paired backups]
+    subgraph "local bioskop master"
+        D["host.preview scratch"]
+        E["host.staging.N numbered slots"]
+        F["host active"]
+        G["MANIFEST.yaml symlink"]
+        H["host.backup.N paired backups"]
     end
 
     subgraph "Master Instance"
-        I[/srv/host<br/>bind mount]
+        I["srv host bind mount"]
     end
 
     A -->|"synthesize"| D
