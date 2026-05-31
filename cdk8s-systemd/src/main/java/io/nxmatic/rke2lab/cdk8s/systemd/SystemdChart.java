@@ -74,4 +74,21 @@ public class SystemdChart extends Construct {
   public List<SystemdUnit> getUnits() {
     return List.copyOf(units);
   }
+
+  /**
+   * Looks up a unit by its construct ID.
+   *
+   * <p>Returns null if not found.
+   *
+   * @param id the construct ID (without suffix, e.g., "rke2lab-nix-install")
+   * @return the unit, or null if not found
+   */
+  public SystemdUnit findUnit(String id) {
+    for (SystemdUnit unit : units) {
+      if (unit.getUnitId().equals(id)) {
+        return unit;
+      }
+    }
+    return null;
+  }
 }

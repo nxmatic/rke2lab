@@ -1,12 +1,11 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.systemd;
 
-import static io.nxmatic.rk2lab.manifests.systemd.SystemdUnitCatalog.*;
-
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.ServiceType;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.StandardStream;
+import io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget;
 
 /**
  * Synthesizes bootstrap and infrastructure systemd units.
@@ -14,11 +13,20 @@ import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.StandardStream;
  * <p>These units are cross-cutting infrastructure that don't belong to any specific domain:
  * bootstrap environment, Nix/Flox installation, networking setup, storage configuration, etc.
  *
- * <p>Called once from the synthesis orchestrator after domain synthesis completes.
+ * <p>Uses construct references for dependencies instead of string constants.
  */
 public final class BootstrapInfrastructureSynthesizer {
 
   private final SystemdChart systemdChart;
+
+  // Store construct references for dependency resolution
+  private SystemdTarget networkTarget;
+  private SystemdTarget toolsTarget;
+  private SystemdTarget rke2labTarget;
+  private SystemdService nixInstallService;
+  private SystemdService floxInstallService;
+  private SystemdService bootstrapEnvService;
+  private SystemdService installService;
 
   public BootstrapInfrastructureSynthesizer(SystemdChart systemdChart) {
     this.systemdChart = systemdChart;
@@ -26,15 +34,18 @@ public final class BootstrapInfrastructureSynthesizer {
 
   /** Synthesizes all bootstrap and infrastructure units. */
   public void synthesizeAll() {
+    // Create targets first (referenced by services)
+    createTargets();
+
+    // Nix & Flox (must be before bootstrap-env which depends on flox-install)
+    nixInstall();
+    floxInstall();
+    cachixWatchStore();
+
     // Bootstrap & installation
     bootstrapEnv();
     install();
     systemdLink();
-
-    // Nix & Flox
-    nixInstall();
-    floxInstall();
-    cachixWatchStore();
 
     // Networking infrastructure
     networkConfig();
@@ -47,69 +58,110 @@ public final class BootstrapInfrastructureSynthesizer {
     containerdZfsMountConfig();
     dbusTcpSystemBus();
     zfsEarlyUmount();
+
+    // Update rke2lab.target dependencies (now that all services exist)
+    rke2labTarget
+        .after(
+            bootstrapEnvService.getUnitFileName(),
+            installService.getUnitFileName(),
+            "rke2-server.service")
+        .wants(
+            bootstrapEnvService.getUnitFileName(),
+            installService.getUnitFileName(),
+            "rke2-server.service")
+        .requires(bootstrapEnvService.getUnitFileName(), installService.getUnitFileName());
+  }
+
+  private void createTargets() {
+    // rke2lab.target - main completion target
+    rke2labTarget =
+        new SystemdTarget(systemdChart, "rke2lab")
+            .description("RKE2 Lab Bootstrap Target")
+            .documentation("https://github.com/nxmatic/rke2lab")
+            .wantedBy("multi-user.target");
+
+    // rke2lab-network.target - networking infrastructure
+    networkTarget =
+        new SystemdTarget(systemdChart, "rke2lab-network")
+            .description("RKE2 Lab Network Infrastructure Target")
+            .after("network-online.target")
+            .wants("network-online.target");
+
+    // rke2lab-tools.target - tools and utilities
+    toolsTarget =
+        new SystemdTarget(systemdChart, "rke2lab-tools")
+            .description("RKE2 Lab Tools and Utilities Target")
+            .after(rke2labTarget.getUnitFileName())
+            .wants(rke2labTarget.getUnitFileName());
   }
 
   private void bootstrapEnv() {
-    new SystemdService(systemdChart, "rke2lab-bootstrap-env")
-        .description("RKE2Lab bootstrap environment (Nix + Flox + nocloud)")
-        .documentation("https://github.com/nxmatic/rke2lab")
-        .after(
-            "network-online.target",
-            "systemd-networkd.service",
-            "local-fs.target",
-            SystemdUnitCatalog.NETWORK_TARGET,
-            SystemdUnitCatalog.TOOLS_TARGET,
-            SystemdUnitCatalog.FLOX_INSTALL)
-        .wants(
-            "network-online.target", "systemd-networkd.service", SystemdUnitCatalog.NETWORK_TARGET)
-        .requires(
-            SystemdUnitCatalog.NETWORK_TARGET,
-            SystemdUnitCatalog.TOOLS_TARGET,
-            SystemdUnitCatalog.FLOX_INSTALL)
-        .requiresMountsFor(
-            "/srv/host/systemd-scripts.d",
-            "/srv/host/rke2lab-environment.d",
-            "/srv/host/rke2lab-worktree.d")
-        .conditionPathExists(
-            "/srv/host/systemd-scripts.d/rke2lab-bootstrap-env.sh",
-            "/srv/host/systemd-scripts.d/rke2lab-env-load.sh")
-        .type(ServiceType.ONESHOT)
-        .execStart("/srv/host/systemd-scripts.d/rke2lab-bootstrap-env.sh")
-        .remainAfterExit(true)
-        .standardOutput(StandardStream.JOURNAL)
-        .standardError(StandardStream.JOURNAL)
-        .wantedBy(SystemdUnitCatalog.RKE2LAB_TARGET);
+    bootstrapEnvService =
+        new SystemdService(systemdChart, "rke2lab-bootstrap-env")
+            .description("RKE2Lab bootstrap environment (Nix + Flox + nocloud)")
+            .documentation("https://github.com/nxmatic/rke2lab")
+            .after(
+                "network-online.target",
+                "systemd-networkd.service",
+                "local-fs.target",
+                networkTarget.getUnitFileName(),
+                toolsTarget.getUnitFileName(),
+                floxInstallService.getUnitFileName())
+            .wants(
+                "network-online.target",
+                "systemd-networkd.service",
+                networkTarget.getUnitFileName())
+            .requires(
+                networkTarget.getUnitFileName(),
+                toolsTarget.getUnitFileName(),
+                floxInstallService.getUnitFileName())
+            .requiresMountsFor(
+                "/srv/host/systemd-scripts.d",
+                "/srv/host/rke2lab-environment.d",
+                "/srv/host/rke2lab-worktree.d")
+            .conditionPathExists(
+                "/srv/host/systemd-scripts.d/rke2lab-bootstrap-env.sh",
+                "/srv/host/systemd-scripts.d/rke2lab-env-load.sh")
+            .type(ServiceType.ONESHOT)
+            .execStart("/srv/host/systemd-scripts.d/rke2lab-bootstrap-env.sh")
+            .remainAfterExit(true)
+            .standardOutput(StandardStream.JOURNAL)
+            .standardError(StandardStream.JOURNAL)
+            .wantedBy(rke2labTarget.getUnitFileName());
   }
 
   private void install() {
-    new SystemdService(systemdChart, "rke2lab-install")
-        .description("Run RKE2Lab Installation Script")
-        .after(
-            "network-online.target",
-            "systemd-networkd.service",
-            "local-fs.target",
-            SystemdUnitCatalog.NETWORK_TARGET,
-            SystemdUnitCatalog.TOOLS_TARGET,
-            SystemdUnitCatalog.BOOTSTRAP_ENV)
-        .wants(
-            "network-online.target", "systemd-networkd.service", SystemdUnitCatalog.NETWORK_TARGET)
-        .requires(
-            SystemdUnitCatalog.NETWORK_TARGET,
-            SystemdUnitCatalog.TOOLS_TARGET,
-            SystemdUnitCatalog.BOOTSTRAP_ENV)
-        .requiresMountsFor("/srv/host/systemd-scripts.d")
-        .conditionPathExists(
-            "/srv/host/systemd-scripts.d/rke2lab-install.sh",
-            "!/etc/systemd/system/rke2-server.service",
-            "!/etc/systemd/system/rke2-agent.service")
-        .type(ServiceType.ONESHOT)
-        .execStartPre("/srv/host/systemd-scripts.d/rke2lab-install-pre.sh")
-        .execStart("/srv/host/systemd-scripts.d/rke2lab-install.sh")
-        .execStartPost("/srv/host/systemd-scripts.d/rke2lab-install-post.sh")
-        .remainAfterExit(true)
-        .standardOutput(StandardStream.JOURNAL)
-        .standardError(StandardStream.JOURNAL)
-        .wantedBy(SystemdUnitCatalog.RKE2LAB_TARGET);
+    installService =
+        new SystemdService(systemdChart, "rke2lab-install")
+            .description("Run RKE2Lab Installation Script")
+            .after(
+                "network-online.target",
+                "systemd-networkd.service",
+                "local-fs.target",
+                networkTarget.getUnitFileName(),
+                toolsTarget.getUnitFileName(),
+                bootstrapEnvService.getUnitFileName())
+            .wants(
+                "network-online.target",
+                "systemd-networkd.service",
+                networkTarget.getUnitFileName())
+            .requires(
+                networkTarget.getUnitFileName(),
+                toolsTarget.getUnitFileName(),
+                bootstrapEnvService.getUnitFileName())
+            .requiresMountsFor("/srv/host/systemd-scripts.d")
+            .conditionPathExists(
+                "/srv/host/systemd-scripts.d/rke2lab-install.sh",
+                "!/etc/systemd/system/rke2-server.service",
+                "!/etc/systemd/system/rke2-agent.service")
+            .type(ServiceType.ONESHOT)
+            .execStartPre("/srv/host/systemd-scripts.d/rke2lab-install-pre.sh")
+            .execStart("/srv/host/systemd-scripts.d/rke2lab-install.sh")
+            .execStartPost("/srv/host/systemd-scripts.d/rke2lab-install-post.sh")
+            .remainAfterExit(true)
+            .standardOutput(StandardStream.JOURNAL)
+            .standardError(StandardStream.JOURNAL)
+            .wantedBy(rke2labTarget.getUnitFileName());
   }
 
   private void systemdLink() {
@@ -117,8 +169,8 @@ public final class BootstrapInfrastructureSynthesizer {
         .description("Link RKE2Lab systemd service files from host share")
         .documentation("https://github.com/nxmatic/rke2lab")
         .requiresMountsFor("/srv/host/systemd-units.d", "/srv/host")
-        .after("local-fs.target", SystemdUnitCatalog.BOOTSTRAP_ENV)
-        .requires(SystemdUnitCatalog.BOOTSTRAP_ENV)
+        .after("local-fs.target", bootstrapEnvService.getUnitFileName())
+        .requires(bootstrapEnvService.getUnitFileName())
         .before("rke2-server.service", "rke2-agent.service")
         .conditionPathExists(
             "/srv/host/systemd-scripts.d/rke2lab-systemd-link.sh", "/srv/host/systemd-units.d")
@@ -127,46 +179,48 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(SystemdUnitCatalog.RKE2LAB_TARGET);
+        .wantedBy(rke2labTarget.getUnitFileName());
   }
 
   private void nixInstall() {
-    new SystemdService(systemdChart, "rke2lab-nix-install")
-        .description("Install Nix Package Manager for RKE2 Lab")
-        .after(SystemdUnitCatalog.NETWORK_TARGET)
-        .requires(SystemdUnitCatalog.NETWORK_TARGET)
-        .type(ServiceType.ONESHOT)
-        .execStart("/srv/host/systemd-scripts.d/rke2lab-nix-install.sh")
-        .remainAfterExit(true)
-        .standardOutput(StandardStream.JOURNAL)
-        .standardError(StandardStream.JOURNAL)
-        .wantedBy(SystemdUnitCatalog.TOOLS_TARGET);
+    nixInstallService =
+        new SystemdService(systemdChart, "rke2lab-nix-install")
+            .description("Install Nix Package Manager for RKE2 Lab")
+            .after(networkTarget.getUnitFileName())
+            .requires(networkTarget.getUnitFileName())
+            .type(ServiceType.ONESHOT)
+            .execStart("/srv/host/systemd-scripts.d/rke2lab-nix-install.sh")
+            .remainAfterExit(true)
+            .standardOutput(StandardStream.JOURNAL)
+            .standardError(StandardStream.JOURNAL)
+            .wantedBy(toolsTarget.getUnitFileName());
   }
 
   private void floxInstall() {
-    new SystemdService(systemdChart, "rke2lab-flox-install")
-        .description("Install Flox Package Manager for RKE2 Lab")
-        .after(SystemdUnitCatalog.NIX_INSTALL)
-        .requires(SystemdUnitCatalog.NIX_INSTALL)
-        .type(ServiceType.ONESHOT)
-        .execStart("/srv/host/systemd-scripts.d/rke2lab-flox-install.sh")
-        .remainAfterExit(true)
-        .standardOutput(StandardStream.JOURNAL)
-        .standardError(StandardStream.JOURNAL)
-        .wantedBy(SystemdUnitCatalog.TOOLS_TARGET);
+    floxInstallService =
+        new SystemdService(systemdChart, "rke2lab-flox-install")
+            .description("Install Flox Package Manager for RKE2 Lab")
+            .after(nixInstallService.getUnitFileName())
+            .requires(nixInstallService.getUnitFileName())
+            .type(ServiceType.ONESHOT)
+            .execStart("/srv/host/systemd-scripts.d/rke2lab-flox-install.sh")
+            .remainAfterExit(true)
+            .standardOutput(StandardStream.JOURNAL)
+            .standardError(StandardStream.JOURNAL)
+            .wantedBy(toolsTarget.getUnitFileName());
   }
 
   private void cachixWatchStore() {
     new SystemdService(systemdChart, "rke2lab-cachix-watch-store")
         .description("Watch Nix store and push to Cachix")
-        .after(SystemdUnitCatalog.NIX_INSTALL)
-        .requires(SystemdUnitCatalog.NIX_INSTALL)
+        .after(nixInstallService.getUnitFileName())
+        .requires(nixInstallService.getUnitFileName())
         .type(ServiceType.ONESHOT)
         .execStart("/srv/host/systemd-scripts.d/rke2lab-cachix-watch-store.sh")
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(SystemdUnitCatalog.TOOLS_TARGET);
+        .wantedBy(toolsTarget.getUnitFileName());
   }
 
   private void networkConfig() {
@@ -174,13 +228,13 @@ public final class BootstrapInfrastructureSynthesizer {
         .description("RKE2Lab Network Configuration Service")
         .after("systemd-networkd.service", "cloud-init.service")
         .wants("systemd-networkd.service")
-        .before(SystemdUnitCatalog.INSTALL)
+        .before(installService.getUnitFileName())
         .type(ServiceType.ONESHOT)
         .execStart("/srv/host/systemd-scripts.d/rke2lab-network-config.sh")
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(SystemdUnitCatalog.NETWORK_TARGET);
+        .wantedBy(networkTarget.getUnitFileName());
   }
 
   private void networkWait() {
@@ -193,32 +247,32 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(SystemdUnitCatalog.NETWORK_TARGET);
+        .wantedBy(networkTarget.getUnitFileName());
   }
 
   private void networkDebug() {
     new SystemdService(systemdChart, "rke2lab-network-debug")
         .description("RKE2Lab network diagnostics")
-        .after(SystemdUnitCatalog.NETWORK_TARGET)
+        .after(networkTarget.getUnitFileName())
         .type(ServiceType.ONESHOT)
         .execStart("/srv/host/systemd-scripts.d/rke2lab-network-debug.sh")
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(SystemdUnitCatalog.NETWORK_TARGET);
+        .wantedBy(networkTarget.getUnitFileName());
   }
 
   private void routeCleanup() {
     new SystemdService(systemdChart, "rke2lab-route-cleanup")
         .description("Clean up conflicting routes for RKE2Lab")
         .after("network-online.target")
-        .before(SystemdUnitCatalog.NETWORK_TARGET)
+        .before(networkTarget.getUnitFileName())
         .type(ServiceType.ONESHOT)
         .execStart("/srv/host/systemd-scripts.d/rke2lab-route-cleanup.sh")
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(SystemdUnitCatalog.NETWORK_TARGET);
+        .wantedBy(networkTarget.getUnitFileName());
   }
 
   private void remountShared() {
@@ -244,7 +298,7 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(SystemdUnitCatalog.RKE2LAB_TARGET);
+        .wantedBy(rke2labTarget.getUnitFileName());
   }
 
   private void dbusTcpSystemBus() {
@@ -257,7 +311,7 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy(SystemdUnitCatalog.RKE2LAB_TARGET);
+        .wantedBy(rke2labTarget.getUnitFileName());
   }
 
   private void zfsEarlyUmount() {
