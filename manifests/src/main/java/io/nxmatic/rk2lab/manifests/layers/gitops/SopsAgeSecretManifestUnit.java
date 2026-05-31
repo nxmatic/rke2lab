@@ -1,5 +1,6 @@
 package io.nxmatic.rk2lab.manifests.layers.gitops;
 
+import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import java.nio.charset.StandardCharsets;
@@ -48,7 +49,7 @@ import org.cdk8s.JsonPatch;
  */
 public final class SopsAgeSecretManifestUnit extends AbstractManifestUnit {
 
-  public static final String MANIFEST_UNIT_ID = "gitops/sops-age";
+  public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.GITOPS + "/sops-age";
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("gitops", "sops-age");

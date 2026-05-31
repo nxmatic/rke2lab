@@ -1,5 +1,6 @@
 package io.nxmatic.rk2lab.manifests.layers.clusterapi;
 
+import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
@@ -40,7 +41,8 @@ import org.cdk8s.JsonPatch;
  */
 public final class IncusIdentitySecretManifestUnit extends AbstractManifestUnit {
 
-  public static final String MANIFEST_UNIT_ID = "cluster-api/incus-identity";
+  public static final String MANIFEST_UNIT_ID =
+      ManifestDomainCatalog.CLUSTER_API + "/incus-identity";
 
   private static final String INCUS_IDENTITY_NAME = "capn";
 

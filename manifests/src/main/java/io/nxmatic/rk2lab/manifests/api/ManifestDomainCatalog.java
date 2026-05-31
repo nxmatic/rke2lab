@@ -4,8 +4,29 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 
-/** Canonical manifest-domain catalog shared across synthesis and controlplane policy. */
+/**
+ * Canonical manifest-domain catalog shared across synthesis and controlplane policy.
+ *
+ * <p>The {@code public static final String} constants below are the single source of truth for
+ * domain IDs. They are compile-time constants, so manifest units can compose their {@code
+ * "<domain>/<leaf>"} IDs from them at static-initialization time (e.g. {@code CLUSTER_API +
+ * "/operator"}) — something the instance accessors cannot do, since they require a built catalog.
+ * The instance accessors and the builder's default-domain lists both reference these constants too,
+ * so a domain string is spelled exactly once in the codebase.
+ */
 public final class ManifestDomainCatalog {
+
+  public static final String CLUSTER = "cluster";
+  public static final String STORAGE = "storage";
+  public static final String REPLICATION = "replication";
+  public static final String GITOPS = "gitops";
+  public static final String RUNTIME = "runtime";
+  public static final String NETWORKING = "networking";
+  public static final String MESH = "mesh";
+  public static final String HIGH_AVAILABILITY = "high-availability";
+  public static final String CICD = "cicd";
+  public static final String CLUSTER_API = "cluster-api";
+  public static final String PORCH = "porch";
 
   private final List<String> all;
   private final List<String> stageALinkable;
@@ -20,47 +41,47 @@ public final class ManifestDomainCatalog {
   }
 
   public String cluster() {
-    return "cluster";
+    return CLUSTER;
   }
 
   public String storage() {
-    return "storage";
+    return STORAGE;
   }
 
   public String replication() {
-    return "replication";
+    return REPLICATION;
   }
 
   public String gitops() {
-    return "gitops";
+    return GITOPS;
   }
 
   public String runtime() {
-    return "runtime";
+    return RUNTIME;
   }
 
   public String networking() {
-    return "networking";
+    return NETWORKING;
   }
 
   public String mesh() {
-    return "mesh";
+    return MESH;
   }
 
   public String highAvailability() {
-    return "high-availability";
+    return HIGH_AVAILABILITY;
   }
 
   public String cicd() {
-    return "cicd";
+    return CICD;
   }
 
   public String clusterApi() {
-    return "cluster-api";
+    return CLUSTER_API;
   }
 
   public String porch() {
-    return "porch";
+    return PORCH;
   }
 
   public List<String> all() {
@@ -84,23 +105,22 @@ public final class ManifestDomainCatalog {
     public Builder addDefaultDomains() {
       return addAllDomains(
           List.of(
-              "cluster",
-              "storage",
-              "replication",
-              "gitops",
-              "runtime",
-              "networking",
-              "mesh",
-              "high-availability",
-              "cicd",
-              "cluster-api",
-              "porch"));
+              CLUSTER,
+              STORAGE,
+              REPLICATION,
+              GITOPS,
+              RUNTIME,
+              NETWORKING,
+              MESH,
+              HIGH_AVAILABILITY,
+              CICD,
+              CLUSTER_API,
+              PORCH));
     }
 
     public Builder addDefaultStageALinkableDomains() {
       return addStageALinkableDomains(
-          List.of(
-              "high-availability", "networking", "replication", "storage", "mesh", "cluster-api"));
+          List.of(HIGH_AVAILABILITY, NETWORKING, REPLICATION, STORAGE, MESH, CLUSTER_API));
     }
 
     public Builder addDomain(String domainId) {

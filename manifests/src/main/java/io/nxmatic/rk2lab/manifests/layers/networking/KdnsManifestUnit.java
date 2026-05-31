@@ -1,6 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.networking;
 
+import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterRuntimeNamespaceManifestUnit;
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
 import java.util.List;
@@ -9,7 +10,7 @@ import org.cdk8s.Chart;
 
 public final class KdnsManifestUnit extends AbstractManifestUnit {
 
-  public static final String MANIFEST_UNIT_ID = "networking/kdns";
+  public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.NETWORKING + "/kdns";
 
   private static final NetworkingDependencyIntents NETWORKING_DEPENDENCY_INTENTS =
       NetworkingDependencyIntents.builder().build();

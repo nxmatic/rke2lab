@@ -2,6 +2,7 @@
 package io.nxmatic.rk2lab.manifests.layers.runtime.libexec;
 
 import io.nxmatic.rk2lab.manifests.api.HostAssetDeliveryPolicy;
+import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
 import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitContext;
 import java.util.List;
@@ -15,7 +16,8 @@ import java.util.List;
  */
 public final class RuntimeSystemdLibexecPlaceholderManifestUnit extends AbstractManifestUnit {
 
-  public static final String MANIFEST_UNIT_ID = "runtime/systemd-libexec-placeholder";
+  public static final String MANIFEST_UNIT_ID =
+      ManifestDomainCatalog.RUNTIME + "/systemd-libexec-placeholder";
 
   static final String ENABLE_PROPERTY =
       "rk2lab.manifests.runtime.systemdLibexecPlaceholder.enabled";

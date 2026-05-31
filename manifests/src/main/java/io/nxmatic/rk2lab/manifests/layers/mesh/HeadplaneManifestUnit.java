@@ -1,6 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.mesh;
 
+import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
 import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitContext;
 import java.util.List;
@@ -8,7 +9,7 @@ import org.cdk8s.Chart;
 
 public final class HeadplaneManifestUnit extends AbstractManifestUnit {
 
-  public static final String MANIFEST_UNIT_ID = "mesh/headplane";
+  public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.MESH + "/headplane";
 
   public HeadplaneManifestUnit() {
     super(

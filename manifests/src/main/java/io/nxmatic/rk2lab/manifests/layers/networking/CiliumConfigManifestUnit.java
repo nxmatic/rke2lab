@@ -1,6 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.networking;
 
+import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService;
@@ -11,7 +12,7 @@ import org.cdk8s.Chart;
 
 public final class CiliumConfigManifestUnit extends AbstractManifestUnit {
 
-  public static final String MANIFEST_UNIT_ID = "networking/cilium-config";
+  public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.NETWORKING + "/cilium-config";
 
   public CiliumConfigManifestUnit() {
     super(MANIFEST_UNIT_ID, List.of());
