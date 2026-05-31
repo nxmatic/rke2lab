@@ -85,11 +85,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     final Path synthOutdir = request.synthOutdir();
     final Path synthManifestFile = request.synthManifestFile();
 
-    // Separate output directories for K8s and systemd
-    final Path k8sOutdir = synthOutdir.resolve("k8s");
-    final Path systemdOutdir = synthOutdir.resolve("systemd");
-
-    final App app = new App(AppProps.builder().outdir(k8sOutdir.toString()).build());
+    final App app = new App(AppProps.builder().outdir(synthOutdir.toString()).build());
     final Chart chart = new Chart(app, "manifests");
     final SystemdChart systemdChart = new SystemdChart(app, "systemd");
 
@@ -194,14 +190,32 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
       domain.synthesizeSystemdUnits(systemdChart, systemdContext);
     }
 
+    LOG.info("Calling app.synth() to synthesize K8s manifests to: {}", synthOutdir);
     app.synth();
-    systemdChart.synthesize(systemdOutdir);
+    LOG.info("app.synth() completed, now synthesizing systemd units");
+    systemdChart.synthesize(synthOutdir);
+    LOG.info("systemdChart.synthesize() completed");
 
-    final Path synthesizedFile = k8sOutdir.resolve("manifests.k8s.yaml");
-    if (!Files.exists(synthesizedFile)) {
-      throw new IllegalStateException(
-          "Expected synthesized manifest file is missing: " + synthesizedFile);
+    // CDK8s may add numeric prefixes (e.g., "0001-manifests.k8s.yaml")
+    // Find the actual file that matches the pattern
+    Path synthesizedFile = null;
+    try (var files = Files.list(synthOutdir)) {
+      synthesizedFile =
+          files
+              .filter(
+                  p ->
+                      p.getFileName().toString().endsWith("-manifests.k8s.yaml")
+                          || p.getFileName().toString().equals("manifests.k8s.yaml"))
+              .findFirst()
+              .orElse(null);
     }
+
+    if (synthesizedFile == null || !Files.exists(synthesizedFile)) {
+      throw new IllegalStateException(
+          "Expected synthesized manifest file (manifests.k8s.yaml or *-manifests.k8s.yaml) is missing in: "
+              + synthOutdir);
+    }
+    LOG.info("Found synthesized K8s manifest file: {}", synthesizedFile.getFileName());
 
     enforceLiteralBlockStyleForConfigMapScripts(synthesizedFile);
 
@@ -213,7 +227,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         manifestUnitHitCount);
 
     return new ManifestSynthesisResult(
-        synthManifestFile, systemdOutdir, manifestUnitHitCount, domainRegistry.domains().size());
+        synthManifestFile, synthOutdir, manifestUnitHitCount, domainRegistry.domains().size());
   }
 
   private LayerDomainRegistry buildDomainRegistry(ManifestDomainPolicy policy) {
