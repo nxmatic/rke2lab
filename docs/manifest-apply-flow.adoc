@@ -1,0 +1,706 @@
+= Manifest Apply Flow
+:toc:
+:toc-placement: preamble
+
+== Overview
+
+RKE2Lab manifests flow through a multi-stage pipeline from CDK8s synthesis to live Kubernetes resources. **RKE2's built-in auto-deploy mechanism** applies manifests by watching a directory; no explicit `kubectl apply` is needed.
+
+This document traces the complete flow using the `networking` layer as the reference example and explains how staged post-cluster resources fit into the same pattern.
+
+== The Five-Stage Pipeline
+
+[mermaid]
+....
+graph TB
+    subgraph "Stage 1: Synthesis - Pulumi Apply"
+        SYNTH["CDK8s Java code<br/>ManifestUnit.apply"]
+        EXPLODE["ManifestExploder<br/>splits consolidated YAML"]
+        LOCAL["host/manifests.d/<br/>networking/kdns/"]
+    end
+
+    subgraph "Stage 2: Push - Pulumi Apply"
+        SYNC["HostAssetRootLifecycle<br/>syncStagingToFinal"]
+        PUSH["incus file push -r<br/>host to master"]
+        MASTER["/srv/host/rke2-manifests.d/<br/>networking/kdns/"]
+    end
+
+    subgraph "Stage 3: Systemd Unit - Post RKE2 Server Start"
+        UNIT["rke2lab-networking-manifests.service<br/>After=rke2-server.service"]
+        SCRIPT["rke2lab-manifests-install.sh networking"]
+    end
+
+    subgraph "Stage 4: Symlink Creation"
+        LINK["link_manifest_tree<br/>creates symlinks"]
+        RKE2DIR["/var/lib/rancher/rke2/server/manifests/<br/>networking/kdns/"]
+    end
+
+    subgraph "Stage 5: RKE2 Auto-Deploy"
+        WATCH[RKE2 watches /var/lib/rancher/rke2/server/manifests/]
+        APPLY[RKE2 applies YAML files automatically]
+        CLUSTER[Live Kubernetes resources]
+    end
+
+    SYNTH --> EXPLODE
+    EXPLODE --> LOCAL
+    LOCAL --> SYNC
+    SYNC --> PUSH
+    PUSH --> MASTER
+    MASTER --> UNIT
+    UNIT --> SCRIPT
+    SCRIPT --> LINK
+    LINK --> RKE2DIR
+    RKE2DIR --> WATCH
+    WATCH --> APPLY
+    APPLY --> CLUSTER
+
+    style LOCAL fill:#d4f1d4
+    style MASTER fill:#d1ecf1
+    style RKE2DIR fill:#fff3cd
+    style CLUSTER fill:#f8d7da
+....
+
+**Key insight**: No `kubectl apply` command is executed. RKE2's built-in mechanism handles application automatically when files appear in its watched directory.
+
+== Stage 1: Synthesis (Pulumi Apply - Host State)
+
+=== C4 Component: CDK8s Synthesis
+
+[mermaid]
+....
+graph TB
+    subgraph "Java Code - manifests module"
+        UNIT[KdnsManifestUnit<br/>extends AbstractManifestUnit]
+        CDK8S[CDK8s Chart.apply]
+        RESOURCES[Deployment, ClusterRole,<br/>ServiceAccount, etc.]
+    end
+
+    subgraph "Synthesis Request"
+        REQ[ManifestSynthesisRequest<br/>networkTopology, bootstrapIdentity,<br/>componentVersions, policy]
+        CONTEXT[ManifestSynthesisContext<br/>ThreadLocal context provider]
+    end
+
+    subgraph "Output"
+        CONSOLIDATED[manifests.yaml<br/>single consolidated file<br/>all layers, all units]
+    end
+
+    REQ --> CONTEXT
+    CONTEXT --> UNIT
+    UNIT --> CDK8S
+    CDK8S --> RESOURCES
+    RESOURCES --> CONSOLIDATED
+
+    style UNIT fill:#d4f1d4
+    style CONSOLIDATED fill:#fff3cd
+....
+
+**Code location**: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/networking/`
+
+Each layer has multiple `ManifestUnit` implementations that generate Kubernetes resources via CDK8s. All units write to a single consolidated YAML file during synthesis.
+
+=== C4 Component: Manifest Explosion
+
+[mermaid]
+....
+sequenceDiagram
+    participant SYNTH as Synthesis
+    participant EXPLODER as ManifestExploder
+    participant FS as Filesystem
+
+    SYNTH->>EXPLODER: manifests.yaml (consolidated)
+    Note over EXPLODER: Parse YAML stream<br/>Split by document separator (---)
+
+    loop For each document
+        EXPLODER->>EXPLODER: Extract package annotation<br/>(io.nxmatic.rk2lab/package)
+        EXPLODER->>EXPLODER: Determine layer/package path<br/>e.g. "networking/kdns"
+        EXPLODER->>EXPLODER: Generate filename<br/>NN-kind-name.yml
+        EXPLODER->>FS: Write to manifests.d/{layer}/{package}/
+    end
+
+    EXPLODER->>SYNTH: ExplodeResult (file count, by layer)
+....
+
+**Output structure**:
+```
+.local.d/bioskop/master/host/manifests.d/
+├── networking/
+│   ├── kdns/
+│   │   ├── 01-clusterrole-kdns-ingress-reader.yml
+│   │   ├── 02-serviceaccount-kdns.yml
+│   │   └── 02-deployment-kdns.yml
+│   ├── cilium-config/
+│   └── envoy-gateway/
+├── clusterapi/
+│   ├── cluster-api-operator/
+│   └── incus-identity/
+└── ...
+```
+
+**Package annotation** (in Java):
+```java
+@Override
+public void apply(Chart chart) {
+  packageProfile.packageAnnotations("|Deployment|rke2lab-system|kdns")
+  // Results in annotation: io.nxmatic.rk2lab/package: "networking/kdns"
+}
+```
+
+The exploder uses this annotation to route each resource to the correct directory.
+
+== Stage 2: Push to Master (Pulumi Apply)
+
+=== File Sync
+
+**Local path**: `.local.d/bioskop/master/host/manifests.d/`
+**Master path**: `/srv/host/rke2-manifests.d/`
+
+Note the directory name change: `manifests.d` → `rke2-manifests.d` (to clarify purpose on the host).
+
+**Mechanism**: `HostAssetRootLifecycle.syncStagingToFinal()` uses `incus file push -r` to push the entire `host/` directory to the master instance.
+
+=== What Gets Pushed
+
+All subdirectories under `host/`:
+- `manifests.d/` → `/srv/host/rke2-manifests.d/`
+- `systemd.d/systemd-units/` → `/srv/host/systemd-units.d/`
+- `systemd.d/systemd-scripts/` → `/srv/host/systemd-scripts.d/`
+- `k8s-daemonset.d/` → `/srv/host/k8s-daemonset.d/`
+- etc.
+
+== Stage 3: Systemd Unit Trigger
+
+=== C4 Component: Layer Manifest Service
+
+Each layer has a corresponding systemd oneshot unit:
+
+**Unit file**: `/srv/host/systemd-units.d/rke2lab-networking-manifests.service`
+
+```ini
+[Unit]
+Description=Install RKE2Lab networking manifests from host share (post-server)
+After=rke2-server.service
+Requires=rke2-server.service
+After=rke2lab-storage-manifests.service
+Requires=rke2lab-storage-manifests.service
+ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh
+ConditionPathExists=/srv/host/rke2-manifests.d/networking
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh networking
+ExecStartPost=/srv/host/systemd-scripts.d/rke2lab-cilium-ready.sh
+RemainAfterExit=true
+
+[Install]
+WantedBy=rke2lab.target
+```
+
+**Key points**:
+- `After=rke2-server.service` - waits for RKE2 to be running
+- `ConditionPathExists` - ensures manifests and script are present
+- `ExecStart` - calls the install script with the layer name
+- `ExecStartPost` (optional) - layer-specific readiness checks
+
+=== Dependency Chain
+
+[mermaid]
+....
+graph LR
+    RKE2[rke2-server.service]
+    STORAGE[rke2lab-storage-manifests.service]
+    NET[rke2lab-networking-manifests.service]
+    CLUSTERAPI[rke2lab-clusterapi-manifests.service]
+
+    RKE2 --> STORAGE
+    STORAGE --> NET
+    RKE2 --> CLUSTERAPI
+
+    style RKE2 fill:#f8d7da
+    style STORAGE fill:#d1ecf1
+    style NET fill:#d1ecf1
+    style CLUSTERAPI fill:#d1ecf1
+....
+
+Layers have explicit ordering via `After=/Requires=` to ensure dependencies are applied first (e.g., storage before networking).
+
+== Stage 4: Symlink Creation
+
+=== The Install Script
+
+**Script**: `/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh`
+
+**Invocation**: `rke2lab-manifests-install.sh networking`
+
+**What it does**:
+
+1. Reads environment variables:
+   - `RKE2LAB_MANIFESTS_DIR=/srv/host/rke2-manifests.d`
+   - `RKE2_SERVER_MANIFESTS_DIR=/var/lib/rancher/rke2/server/manifests`
+
+2. Checks policy (for linkable layers):
+   - Reads `RKE2LAB_POLICY_LINK_NETWORKING_ENABLED` (etc.)
+   - If `false`, removes existing symlinks and exits
+
+3. Calls `link_manifest_tree()`:
+   - Removes old symlinks in `/var/lib/rancher/rke2/server/manifests/{layer}/`
+   - Walks `/srv/host/rke2-manifests.d/{layer}/` recursively
+   - Skips manifests with `config.kubernetes.io/local-config: "true"` annotation
+   - Creates symlinks preserving directory structure
+
+**Result**:
+```
+/var/lib/rancher/rke2/server/manifests/networking/kdns/
+├── 01-clusterrole-kdns-ingress-reader.yml → /srv/host/rke2-manifests.d/networking/kdns/01-clusterrole-kdns-ingress-reader.yml
+├── 02-serviceaccount-kdns.yml → /srv/host/rke2-manifests.d/networking/kdns/02-serviceaccount-kdns.yml
+└── 02-deployment-kdns.yml → /srv/host/rke2-manifests.d/networking/kdns/02-deployment-kdns.yml
+```
+
+=== Local-Config Annotation
+
+Manifests with this annotation are **NOT symlinked**:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    config.kubernetes.io/local-config: "true"
+```
+
+**Use case**: Configuration data used by other manifests (e.g., Helm values, Kustomize bases) that shouldn't be applied as standalone resources.
+
+=== Policy-Based Exclusion
+
+Layers can be disabled via policy:
+
+```bash
+RKE2LAB_POLICY_LINK_MESH_ENABLED=false
+```
+
+If disabled, the script removes all symlinks for that layer, effectively uninstalling it from the cluster.
+
+== Stage 5: RKE2 Auto-Deploy
+
+=== The Auto-Deploy Mechanism
+
+RKE2 has a built-in controller that watches `/var/lib/rancher/rke2/server/manifests/` using Kubernetes' `apply` semantics:
+
+1. **File appears** → RKE2 applies it
+2. **File changes** → RKE2 re-applies (server-side apply)
+3. **File removed** → RKE2 **does NOT delete** the resource (manual cleanup needed)
+
+**No explicit `kubectl apply` needed** - RKE2 handles this automatically.
+
+=== Directory Structure
+
+```
+/var/lib/rancher/rke2/server/manifests/
+├── rke2-cilium.yaml          # Built-in RKE2 manifests
+├── rke2-coredns.yaml
+├── rke2-traefik.yaml
+├── networking/               # rke2lab-networking-manifests.service created this
+│   ├── kdns/
+│   ├── cilium-config/
+│   └── envoy-gateway/
+├── clusterapi/               # rke2lab-clusterapi-manifests.service would create this
+│   ├── cluster-api-operator/
+│   └── incus-identity/
+└── storage/                  # rke2lab-storage-manifests.service created this
+```
+
+All files under this directory (including subdirectories) are auto-deployed by RKE2.
+
+== Staged Post-Cluster Resources Pattern
+
+=== The Problem
+
+Some manifests need data that's only available AFTER Pulumi provider resources are created (e.g., image fingerprint from `incus.Image`). But manifest synthesis happens DURING host-state preparation, BEFORE provider resources exist.
+
+**Example**: The Cluster API `image-state` ConfigMap needs:
+- `imageFingerprint` - comes from `incus.Image` resource (created in provider-resources stage)
+- `imageAlias`, `imageBuildChecksum`, `incusProject` - available during host-state
+
+This is a **chicken-and-egg dependency**.
+
+=== The Solution: Staged Synthesis
+
+**Key insight**: Staged manifests follow THE SAME FIVE-STAGE FLOW, but synthesis happens later (during Pulumi Output resolution).
+
+[mermaid]
+....
+graph TB
+    subgraph "Stage A: Host State Preparation"
+        SYNTH_A["Regular manifests synthesized"]
+        PUSH_A["Push to /srv/host/rke2-manifests.d/"]
+    end
+
+    subgraph "Stage B: Provider Resources"
+        PROVIDER["incus.Image resource created"]
+        OUTPUT["Output resolves with fingerprint"]
+        SYNTH_B["Staged manifest synthesized<br/>via Output.applyValue"]
+        WRITE_B["Write to host/manifests/layer/staged/"]
+    end
+
+    subgraph "Stage C: Next Pulumi Apply"
+        PUSH_C["Push staged manifests to master<br/>/srv/host/rke2-manifests.d/layer/staged/"]
+    end
+
+    subgraph "Stage D: Systemd Staged Unit"
+        UNIT_D["rke2lab-layer-name-apply.service<br/>calls manifests-install.sh"]
+        LINK_D["Symlinks to RKE2 directory"]
+    end
+
+    subgraph "Stage E: RKE2 Auto-Deploy"
+        APPLY_E["RKE2 applies staged manifest"]
+    end
+
+    SYNTH_A --> PUSH_A
+    PUSH_A --> PROVIDER
+    PROVIDER --> OUTPUT
+    OUTPUT --> SYNTH_B
+    SYNTH_B --> WRITE_B
+    WRITE_B --> PUSH_C
+    PUSH_C --> UNIT_D
+    UNIT_D --> LINK_D
+    LINK_D --> APPLY_E
+
+    style SYNTH_B fill:#fff3cd
+    style WRITE_B fill:#fff3cd
+    style UNIT_D fill:#d1ecf1
+....
+
+**The staged manifest is written to disk during Stage B, but pushed to master in Stage C (next Pulumi apply).**
+
+=== Directory Structure for Staged Manifests
+
+**Local synthesis output**:
+```
+.local.d/bioskop/master/host/manifests/
+└── clusterapi/
+    └── staged/
+        └── image-state-configmap.yaml
+```
+
+**Pushed to master** (next `pulumi up`):
+```
+/srv/host/rke2-manifests.d/
+└── clusterapi/
+    └── staged/
+        └── image-state-configmap.yaml
+```
+
+**Symlinked by systemd unit**:
+```
+/var/lib/rancher/rke2/server/manifests/
+└── clusterapi/
+    └── staged/
+        └── image-state-configmap.yaml → /srv/host/rke2-manifests.d/clusterapi/staged/image-state-configmap.yaml
+```
+
+**Applied by RKE2 auto-deploy** (no kubectl needed).
+
+=== Staged Manifest Systemd Unit
+
+**IMPORTANT**: Staged manifests use THE SAME `rke2lab-manifests-install.sh` script, just with a subpath argument.
+
+**Correct pattern**:
+```ini
+[Unit]
+Description=Install Cluster API staged image-state manifest
+After=rke2-server.service
+ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh
+ConditionPathExists=/srv/host/rke2-manifests.d/clusterapi/staged
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh clusterapi/staged
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Key difference**: The `ExecStart` argument includes the subpath: `clusterapi/staged` (not just `clusterapi`).
+
+The script will:
+1. Link from `/srv/host/rke2-manifests.d/clusterapi/staged/`
+2. To `/var/lib/rancher/rke2/server/manifests/clusterapi/staged/`
+3. RKE2 auto-deploy picks it up
+
+=== Anti-Pattern: Direct kubectl apply
+
+❌ **DO NOT** create units that run `kubectl apply -f`:
+
+```bash
+# WRONG - bypasses RKE2 auto-deploy
+#!/bin/bash
+kubectl apply -f /srv/host/manifests/clusterapi/staged/image-state-configmap.yaml
+```
+
+**Why this is wrong**:
+1. Inconsistent with the rest of the manifest flow
+2. Requires `kubectl` binary and kubeconfig access in the script
+3. No policy-based enablement/disablement
+4. No automatic re-application on file changes
+5. Breaks the symlink pattern used everywhere else
+
+✅ **DO** use the standard `rke2lab-manifests-install.sh` script with a subpath.
+
+== Component Ownership
+
+[cols="1,2,3"]
+|===
+| Component | Owner | Purpose
+
+| Manifest synthesis
+| manifests module (Java/CDK8s)
+| Generate Kubernetes resources as YAML
+
+| Manifest explosion
+| seed-master (ManifestExploder)
+| Split consolidated YAML into per-resource files
+
+| Host asset push
+| seed-master (HostAssetRootLifecycle)
+| Sync local staging to master via `incus file push`
+
+| Systemd units
+| manifests module (systemd-units/)
+| Trigger manifest installation after RKE2 starts
+
+| Install script
+| manifests module (systemd-scripts/)
+| Create symlinks from rke2-manifests.d to RKE2 directory
+
+| Auto-deploy
+| RKE2 (built-in)
+| Watch and apply manifests automatically
+|===
+
+== Adding a New Layer
+
+**Step 1**: Create manifest units in `manifests/src/main/java/.../layers/{layer}/`
+
+```java
+public class MyLayerManifestUnit extends AbstractManifestUnit {
+  @Override
+  public void apply(Chart chart) {
+    // Use packageProfile.packageAnnotations("|Kind|namespace|name")
+    // to set io.nxmatic.rk2lab/package annotation
+  }
+}
+```
+
+**Step 2**: Register in domain registrar
+
+```java
+public class MyLayerDomainRegistrar implements ManifestDomainRegistrar {
+  @Override
+  public void registerUnits(ManifestUnitRegistry registry) {
+    registry.register(new MyLayerManifestUnit());
+  }
+}
+```
+
+**Step 3**: Create systemd unit in `manifests/src/main/resources/systemd/systemd-units/`
+
+```ini
+[Unit]
+Description=Install RKE2Lab mylayer manifests from host share (post-server)
+After=rke2-server.service
+Requires=rke2-server.service
+ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh
+ConditionPathExists=/srv/host/rke2-manifests.d/mylayer
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh mylayer
+RemainAfterExit=true
+
+[Install]
+WantedBy=rke2lab.target
+```
+
+**Step 4**: Build and deploy
+
+```bash
+./mvnw clean package -pl :manifests,:seed-master
+pulumi up
+```
+
+The new layer will automatically flow through all five stages.
+
+== Adding a Staged Resource
+
+**Step 1**: Create the staged manifest during Pulumi Output resolution
+
+```java
+// In ProviderStage or similar
+final Output<String> manifestYaml = Output.all(
+  state.someProviderOutput,
+  Output.of("some-static-value")
+).applyValue(outputs -> {
+  return synthesizeStagedManifestYaml(outputs.get(0), outputs.get(1));
+});
+
+manifestYaml.applyValue(yaml -> {
+  writeStagedManifest(yaml, "mylayer", "staged", "my-resource.yaml");
+  return yaml;
+});
+
+private void writeStagedManifest(String yaml, String layer, String subpath, String filename) {
+  Path targetDir = state.localPaths.assetsRoot()
+    .resolve("manifests").resolve(layer).resolve(subpath);
+  Files.createDirectories(targetDir);
+  Files.writeString(targetDir.resolve(filename), yaml, StandardCharsets.UTF_8);
+}
+```
+
+**Step 2**: Create systemd unit in `manifests/src/main/resources/systemd/systemd-units/`
+
+```ini
+[Unit]
+Description=Install mylayer staged resource
+After=rke2-server.service
+ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh
+ConditionPathExists=/srv/host/rke2-manifests.d/mylayer/staged
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh mylayer/staged
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Note**: Use `mylayer/staged` as the argument to `rke2lab-manifests-install.sh`.
+
+**Step 3**: First deploy writes the manifest locally
+
+```bash
+pulumi up  # Output.applyValue runs, writes to .local.d/.../manifests/mylayer/staged/
+```
+
+**Step 4**: Second deploy pushes to master and systemd applies it
+
+```bash
+pulumi up  # Pushes to /srv/host/rke2-manifests.d/mylayer/staged/, systemd unit runs
+```
+
+== Troubleshooting
+
+=== Manifests not appearing in cluster
+
+**Check 1**: Are manifests exploded locally?
+```bash
+ls .local.d/bioskop/master/host/manifests.d/{layer}/
+```
+
+**Check 2**: Are manifests on master?
+```bash
+incus exec master -- ls /srv/host/rke2-manifests.d/{layer}/
+```
+
+**Check 3**: Did the systemd unit run?
+```bash
+incus exec master -- systemctl status rke2lab-{layer}-manifests.service
+```
+
+**Check 4**: Are symlinks created?
+```bash
+incus exec master -- ls -la /var/lib/rancher/rke2/server/manifests/{layer}/
+```
+
+**Check 5**: Did RKE2 apply them?
+```bash
+kubectl get all -n {namespace}
+```
+
+=== Staged manifest not applied
+
+**Check 1**: Does the manifest exist locally?
+```bash
+ls .local.d/bioskop/master/host/manifests/{layer}/staged/
+```
+
+**Check 2**: Was it pushed to master?
+```bash
+incus exec master -- ls /srv/host/rke2-manifests.d/{layer}/staged/
+```
+
+**Check 3**: Does the systemd unit exist and is it linked?
+```bash
+incus exec master -- ls /etc/systemd/system/rke2lab-{layer}-{name}-*.service
+```
+
+**Check 4**: Did the unit run?
+```bash
+incus exec master -- systemctl status rke2lab-{layer}-{name}-*.service
+```
+
+**Common issue**: Staged manifest was written during first `pulumi up` but not pushed until the SECOND `pulumi up`. The first deploy only creates the manifest locally; the second deploy pushes it to master.
+
+=== Policy disabling layer
+
+If policy disables a layer, the install script removes all symlinks:
+
+```bash
+# Check policy
+incus exec master -- bash -c 'source /srv/host/rke2lab-environment.d/*.sh && env | grep POLICY_LINK'
+
+# Example output
+RKE2LAB_POLICY_LINK_MESH_ENABLED=false
+```
+
+If a layer is disabled, manifests remain in `/srv/host/rke2-manifests.d/` but symlinks are removed from `/var/lib/rancher/rke2/server/manifests/`, so RKE2 doesn't see them.
+
+=== Unit condition not met
+
+Check `ConditionPathExists` failures:
+
+```bash
+incus exec master -- systemctl status rke2lab-{layer}-manifests.service
+# Look for "Condition: ... was not met"
+```
+
+Common causes:
+- Wrong path in `ConditionPathExists` (e.g., `cluster-api` vs `clusterapi`)
+- Manifests directory doesn't exist (synthesis failed or policy excluded it)
+- Script path wrong
+
+== Related Documentation
+
+* link:staged-post-cluster-resources.adoc[Staged Post-Cluster Resources] - Detailed pattern documentation
+* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How CDK8s synthesis works
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Context injection for synthesis
+* link:systemd-resource-provisioning.adoc[Systemd Resource Provisioning] - How systemd units/scripts are deployed
+
+== Design Rationale
+
+**Why RKE2 auto-deploy instead of kubectl apply?**
+
+1. **Consistency**: All manifests (RKE2 built-ins + rke2lab layers) use the same mechanism
+2. **Declarative**: File presence = desired state; no imperative apply commands
+3. **Resilience**: RKE2 re-applies on file changes automatically
+4. **Simplicity**: No need for kubeconfig management, retries, or error handling in scripts
+5. **Boot-time application**: RKE2 applies manifests during startup, before other controllers run
+
+**Why symlinks instead of copying files?**
+
+1. **Storage efficiency**: Manifests stored once in `/srv/host/rke2-manifests.d/`
+2. **Atomic updates**: Changing symlink target is atomic, no partial file writes
+3. **Source tracking**: `ls -la` shows the original path, aiding debugging
+4. **Policy application**: Script can remove/recreate symlinks without touching source files
+
+**Why the manifests.d → rke2-manifests.d rename?**
+
+Clarity of purpose: when operators see `/srv/host/rke2-manifests.d/`, it's immediately clear these are manifests for RKE2 to deploy, not arbitrary config files.
+
+**Why separate layer units instead of one monolithic unit?**
+
+1. **Dependency ordering**: Layers can depend on each other (storage before networking)
+2. **Selective restarts**: Re-run just one layer without affecting others
+3. **Failure isolation**: One layer failing doesn't block unrelated layers
+4. **Policy control**: Each layer can be independently enabled/disabled
+5. **Observability**: `systemctl status rke2lab-networking-manifests.service` shows layer-specific state

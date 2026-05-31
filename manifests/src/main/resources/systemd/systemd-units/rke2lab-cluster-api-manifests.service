@@ -7,11 +7,11 @@ Requires=rke2-server.service
 After=rke2lab-cluster-manifests.service
 Requires=rke2lab-cluster-manifests.service
 ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh
-ConditionPathExists=/srv/host/rke2-manifests.d/cluster-api
+ConditionPathExists=/srv/host/rke2-manifests.d/clusterapi
 
 [Service]
 Type=oneshot
-ExecStart=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh cluster-api
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh clusterapi
 RemainAfterExit=true
 StandardOutput=journal
 StandardError=journal

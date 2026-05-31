@@ -685,7 +685,7 @@ public final class IncusResourceBootstrap {
 
     private void writeImageStateManifest(String yaml) {
       try {
-        final Path targetDir = state.localPaths.assetsRoot().resolve("manifests/clusterapi/staged");
+        final Path targetDir = state.localPaths.manifestsRoot().resolve("clusterapi/staged");
         Files.createDirectories(targetDir);
 
         final Path targetFile = targetDir.resolve("image-state-configmap.yaml");

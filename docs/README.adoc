@@ -10,6 +10,7 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 
 * link:flake-build-entry-point.adoc[Flake as Build Entry Point] - Flake as the authoritative deploy build (Maven=dev loop, flake=release); store-built seed-master + manifests + NRI plugin
 * link:netplan-blueprint-single-source.adoc[Netplan Blueprint Single Source] - Cross-repo single source of truth for the network underlay; the flake runs the netplan jar (IFD) and exposes a flat `lib.networkBlueprint` that nix-darwin-home consumes via `deriveMacs`
+* link:systemd-resource-provisioning.adoc[Systemd Resource Provisioning] - Cross-module build pattern: manifests module owns systemd units/scripts, seed-master unpacks via manifests-d.zip
 
 === Bootstrap & Provisioning
 
@@ -19,6 +20,7 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 
 === Manifest Synthesis
 
+* link:manifest-apply-flow.adoc[Manifest Apply Flow] - Complete five-stage pipeline from CDK8s synthesis to live resources via RKE2 auto-deploy (no kubectl apply needed)
 * link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How K8s manifests are generated from code
 * link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven optional manifest units within domains
 * link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow patterns in seed-master

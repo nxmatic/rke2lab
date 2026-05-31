@@ -1,18 +1,22 @@
 [Unit]
-Description=Apply Cluster API image-state ConfigMap (staged post-cluster resource)
+Description=Install Cluster API staged image-state manifest (via RKE2 auto-deploy)
 Documentation=file:///srv/host/docs/staged-post-cluster-resources.adoc
+Documentation=file:///srv/host/docs/manifest-apply-flow.adoc
+RequiresMountsFor=/srv/host/systemd-units.d /srv/host
+After=local-fs.target
 After=rke2-server.service
-Wants=network-online.target
-ConditionPathExists=/srv/host/manifests/clusterapi/staged/image-state-configmap.yaml
+Requires=rke2-server.service
+After=rke2lab-clusterapi-manifests.service
+Requires=rke2lab-clusterapi-manifests.service
+ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh
+ConditionPathExists=/srv/host/rke2-manifests.d/clusterapi/staged
 
 [Service]
 Type=oneshot
-RemainAfterExit=yes
-ExecStart=/srv/host/systemd.d/systemd-scripts/rke2lab-cluster-api-image-state-apply.sh
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh clusterapi/staged
+RemainAfterExit=true
 StandardOutput=journal
 StandardError=journal
-Restart=on-failure
-RestartSec=10s
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=rke2lab.target
