@@ -1,8 +1,8 @@
-= Controlnode Runtime Assets Architecture
+= Control Node Host Assets Architecture
 
 == Why this change
 
-Today, runtime assets are produced in multiple places:
+Today, host assets are produced in multiple places:
 
 - Layer code emits ConfigMaps/Secrets and script payloads.
 - `manifests` materializes embedded resources for runtime installers.
@@ -12,10 +12,10 @@ This works, but path ownership and contribution boundaries are implicit. Recent 
 
 == Goals
 
-- Single, owned filesystem contract for controlnode runtime assets.
+- Single, owned filesystem contract for controlnode host assets.
 - Layer-driven contributions via a stable API (not ad-hoc file/path strings).
 - A dedicated script-interface layer handling script/unit integration.
-- Explicit separation between external source inputs and node-owned runtime assets.
+- Explicit separation between external source inputs and node-owned host assets.
 - One source of truth for runtime path aliases consumed by:
   - `controlplane` mount devices,
   - runtime env config (`paths.env`),
@@ -96,7 +96,7 @@ Create one materializer that:
 
 1. merges all layer contributions,
 2. validates collisions/conflicts,
-3. renders runtime assets to deterministic package layout,
+3. renders host assets to deterministic package layout,
 4. emits env-config from contract aliases,
 5. publishes metadata manifest (inventory + checksums).
 

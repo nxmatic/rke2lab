@@ -94,7 +94,7 @@ rectangle "systemd manager" as systemd
 controlplane --> adapter : optional monitor mode\n(endpoint)
 adapter --> systemd : state probe commands\n(target/jobs/failed units)
 controlplane --> seed : bootstrap + readiness
-manifests --> seed : runtime assets consumed by units
+manifests --> seed : host assets consumed by units
 @enduml
 ----
 

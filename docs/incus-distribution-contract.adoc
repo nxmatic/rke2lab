@@ -273,5 +273,5 @@ These must be resolved before GA of the contract:
 
 * link:bootstrap-contract.adoc[Bootstrap Contract] - Stage A bootstrap requirements that this distribution contract fulfills
 * link:stagea-stageb-handoff-contract.adoc[Stage A/B Handoff Contract] - How image fingerprints flow from Stage A to Stage B
-* link:controlnode-runtime-assets-architecture.adoc[Control Node Runtime Assets Architecture] - How assets are materialized on the image at runtime
+* link:controlnode-host-assets-architecture.adoc[Control Node Host Assets Architecture] - How assets are materialized on the image at runtime
 * link:cluster-api-bootstrap-requirements.adoc[Cluster API Bootstrap Requirements] - Future image build architecture (distrobuilder + flox)

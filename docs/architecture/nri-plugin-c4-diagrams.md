@@ -70,7 +70,7 @@ flowchart TB
 
 ```mermaid
 flowchart TD
-    CM[ConfigMap<br/>Runtime Assets<br/>scripts, envs, plugin<br/>Mounted at /.sh]
+    CM[ConfigMap<br/>Host Assets<br/>scripts, envs, plugin<br/>Mounted at /.sh]
 
     subgraph Init["Init Container (Pod Mode)"]
         Pod[Pod Mode<br/>installer::pod:run]
@@ -278,7 +278,7 @@ C4Deployment
 
     Deployment_Node(node, "Kubernetes Node", "Linux Host") {
         Deployment_Node(host_fs, "Host Filesystem") {
-            Container(runtime_assets, "/srv/host/k8s-daemonset.d/runtime/flox-runtime/", "Runtime Assets", "Scripts, envs, plugin")
+            Container(runtime_assets, "/srv/host/k8s-daemonset.d/runtime/flox-runtime/", "Host Assets", "Scripts, envs, plugin")
             Container(nix_store, "/nix/store/", "Nix Store", "Shared packages")
         }
 

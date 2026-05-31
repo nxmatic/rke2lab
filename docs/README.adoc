@@ -45,9 +45,9 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 * link:incus-distribution-contract.adoc[Incus Distribution Contract] - How Incus images are built and distributed
 * link:incus-resource-bootstrap-refactoring-plan.adoc[Incus Resource Bootstrap Refactoring Plan] - Bootstrap refactoring decisions
 
-=== Runtime Assets
+=== Host Assets
 
-* link:controlnode-runtime-assets-architecture.adoc[Control Node Runtime Assets Architecture] - How assets are materialized on nodes
+* link:controlnode-host-assets-architecture.adoc[Control Node Host Assets Architecture] - How assets are materialized on nodes
 * link:daemonset-host-assets-architecture.adoc[DaemonSet Host Assets Architecture] - DaemonSet-to-host asset trampoline pattern
 * link:flox-store-resolved-runtime-and-builder.adoc[Flox Store-Resolved Runtime + Remote Nix Builder] - Moving runtime scripts into the nix store + letting containers build via the NixOS host builder
 
@@ -89,9 +89,9 @@ Provisioning Slice Architecture → Bootstrap Contract → Stage A/B Handoff
 GitOps + Cluster API Plan → Bootstrap Identity Provider → Manifest Synthesis Architecture
 ----
 
-**Runtime Assets**
+**Host Assets**
 ----
-Control Node Runtime Assets → DaemonSet Host Assets → Provisioning Slice Architecture
+Control Node Host Assets → DaemonSet Host Assets → Provisioning Slice Architecture
 ----
 
 === By Development Phase
