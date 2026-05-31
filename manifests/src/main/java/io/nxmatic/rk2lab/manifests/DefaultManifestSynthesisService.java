@@ -127,6 +127,10 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     LOG.debug("Synthesizing cross-cutting systemd targets");
     io.nxmatic.rk2lab.manifests.systemd.SystemdUnitSynthesizer.synthesizeTargets(systemdChart);
 
+    LOG.debug("Synthesizing bootstrap and infrastructure systemd units");
+    new io.nxmatic.rk2lab.manifests.systemd.BootstrapInfrastructureSynthesizer(systemdChart)
+        .synthesizeAll();
+
     app.synth();
     systemdChart.synthesize(synthOutdir);
 

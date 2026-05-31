@@ -80,6 +80,14 @@ public abstract class SystemdUnit extends Construct {
     return this;
   }
 
+  /** Adds Conflicts directive (negative dependency). */
+  public SystemdUnit conflicts(String... units) {
+    for (String unit : units) {
+      addUnitDirective("Conflicts", unit);
+    }
+    return this;
+  }
+
   /** Adds RequiresMountsFor directive. */
   public SystemdUnit requiresMountsFor(String... paths) {
     addUnitDirective("RequiresMountsFor", String.join(" ", paths));

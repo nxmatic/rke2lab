@@ -176,6 +176,12 @@ public class SystemdService extends SystemdUnit {
   }
 
   @Override
+  public SystemdService conflicts(String... units) {
+    super.conflicts(units);
+    return this;
+  }
+
+  @Override
   public SystemdService requiresMountsFor(String... paths) {
     super.requiresMountsFor(paths);
     return this;

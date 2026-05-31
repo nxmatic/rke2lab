@@ -73,6 +73,12 @@ public class SystemdTarget extends SystemdUnit {
   }
 
   @Override
+  public SystemdTarget conflicts(String... units) {
+    super.conflicts(units);
+    return this;
+  }
+
+  @Override
   public SystemdTarget requiresMountsFor(String... paths) {
     super.requiresMountsFor(paths);
     return this;
