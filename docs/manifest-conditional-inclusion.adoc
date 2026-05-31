@@ -614,3 +614,10 @@ final String remoteName = bootstrapIdentity().clusterName();
 // ✅ Correct - uses configured remote name
 final String remoteName = bootstrapIdentity().incusRemoteName();
 ----
+
+== Related Documentation
+
+* link:policy-configuration-guide.adoc[Policy Configuration Guide] - Comprehensive guide to all policy types, configuration format, and decision trees
+* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - Overall CDK8s generation system
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - ThreadLocal context pattern for cluster identity access
+* link:manifest-apply-flow.adoc[Manifest Apply Flow] - How synthesized manifests reach live Kubernetes resources

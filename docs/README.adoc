@@ -19,6 +19,10 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 * link:provisioning-slice-architecture.adoc[Provisioning Slice Architecture] - Hot-reload vs static resource partitioning
 * link:host-slot-management.adoc[Host Slot Management] - Slot rotation mechanism for deployment history, rollback, and audit trails
 
+=== Policies & Configuration
+
+* link:policy-configuration-guide.adoc[Policy Configuration Guide] - Comprehensive guide to ControlplanePolicy, ManifestDomainPolicy, debug flags, and Pulumi config
+
 === Manifest Synthesis
 
 * link:manifest-apply-flow.adoc[Manifest Apply Flow] - Complete five-stage pipeline from CDK8s synthesis to live resources via RKE2 auto-deploy (no kubectl apply needed)

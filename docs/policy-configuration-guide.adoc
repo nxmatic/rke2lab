@@ -1,0 +1,596 @@
+= Policy Configuration Guide
+:toc:
+:toclevels: 3
+
+== Overview
+
+RKE2Lab uses a **policy-based configuration system** to control which infrastructure components are deployed and how they behave. Policies are defined in `Pulumi.dev.yaml` and consumed by seed-master during Stage A bootstrap.
+
+**Key benefits:**
+
+* **Selective deployment** - Enable/disable entire manifest domains (networking, mesh, storage, etc.)
+* **Debug modes** - Extra logging, resource labeling, and troubleshooting hooks
+* **Environment-specific config** - Different policies for dev/staging/prod without code changes
+* **Type-safe** - Policies are records with validation, not raw strings
+
+== Policy Architecture
+
+[mermaid]
+----
+graph TB
+    A["Pulumi.dev.yaml<br/>Raw config"]
+    B["ControlplanePolicy<br/>Java record"]
+    C["ManifestLinkPolicy<br/>Domain enablement"]
+    D["DebugPolicy<br/>Verbosity flags"]
+    E["NetworkPolicy<br/>LAN binding"]
+    F["ManifestDomainPolicy<br/>Domain map"]
+    G["ManifestSynthesizer<br/>CDK8s generation"]
+    H["SystemdTarget<br/>Script rendering"]
+    I["Slot manifest<br/>YAML output"]
+
+    A -->|"Config.from()"| B
+    B --> C
+    B --> D
+    B --> E
+    C --> F
+    F -->|"isEnabled(domain)"| G
+    D -->|"toEnvMap()"| H
+    C -->|"toEnvMap()"| H
+    H --> I
+
+    style A fill:#ff9,stroke:#333
+    style B fill:#9f9,stroke:#333
+    style F fill:#9cf,stroke:#333
+----
+
+=== Policy Hierarchy
+
+1. **`ControlplanePolicy`** - Top-level policy aggregating all sub-policies
+   - Location: `seed-master/.../policy/ControlplanePolicy.java`
+   - Composed of: `DebugPolicy`, `NetworkPolicy`, `ManifestLinkPolicy`
+
+2. **`ManifestLinkPolicy`** - Controls which manifest domains are linked (synthesized + installed)
+   - Location: `seed-master/.../policy/ManifestLinkPolicy.java`
+   - Wraps: `ManifestDomainPolicy` + `DebugPolicy` predicate
+
+3. **`ManifestDomainPolicy`** - Domain-level enable/disable flags
+   - Location: `manifests/.../api/ManifestDomainPolicy.java`
+   - Shared between synthesis (manifests module) and bootstrap (seed-master)
+
+4. **`DebugPolicy`** - Enables verbose logging and debug resources
+   - Location: `seed-master/.../policy/ControlplanePolicy.DebugPolicy`
+   - Affects: systemd scripts, manifest labels, container environments
+
+5. **`NetworkPolicy`** - Networking-specific toggles
+   - Location: `seed-master/.../policy/ControlplanePolicy.NetworkPolicy`
+   - Currently: LAN binding enable/disable
+
+== Configuration Format
+
+=== Pulumi.dev.yaml Structure
+
+[source,yaml]
+----
+config:
+  # Manifest domain link policies (synthesis + symlink)
+  rke2lab:policy.link.cluster.enabled: "true"
+  rke2lab:policy.link.storage.enabled: "true"
+  rke2lab:policy.link.replication.enabled: "true"
+  rke2lab:policy.link.gitops.enabled: "true"
+  rke2lab:policy.link.porch.enabled: "false"
+  rke2lab:policy.link.runtime.enabled: "true"
+  rke2lab:policy.link.networking.enabled: "true"
+  rke2lab:policy.link.mesh.enabled: "false"
+  rke2lab:policy.link.highAvailability.enabled: "true"
+  rke2lab:policy.link.cicd.enabled: "true"
+  rke2lab:policy.link.clusterApi.enabled: "true"
+
+  # Debug policies (extra logging, labels, troubleshooting)
+  rke2lab:policy.debug.mesh.enabled: "false"
+  rke2lab:policy.debug.networking.enabled: "false"
+  rke2lab:policy.debug.nriPlugins.flox.enabled: "false"
+
+  # Network policies
+  rke2lab:policy.network.lan.binding.enabled: "true"
+----
+
+=== Boolean Value Syntax
+
+Policy values accept multiple formats (case-insensitive):
+
+* **True**: `"true"`, `"yes"`, `"on"`, `"1"`
+* **False**: `"false"`, `"no"`, `"off"`, `"0"`
+* **Invalid**: Any other value throws `IllegalArgumentException`
+
+**Why strings?** Pulumi config values are always strings; the policy parser converts them.
+
+== Manifest Domain Policies
+
+Manifest domains are **groups of related Kubernetes resources** synthesized together. Disabling a domain skips both synthesis and symlinking.
+
+=== Available Domains
+
+[cols="1,2,1,2",options="header"]
+|===
+|Domain |Purpose |Default |Key Components
+
+|`cluster`
+|Core cluster resources
+|✅ `true`
+|Namespace (rke2lab-system), runtime ConfigMaps
+
+|`storage`
+|Persistent storage provisioning
+|✅ `true`
+|OpenEBS ZFS driver, StorageClass
+
+|`replication`
+|Secret/ConfigMap replication
+|✅ `true`
+|kubernetes-replicator operator
+
+|`gitops`
+|GitOps reconciliation
+|✅ `true`
+|Flux instance, GitRepository, Kustomization
+
+|`porch`
+|Kubernetes package management
+|❌ `false`
+|Porch server, repositories (see note below)
+
+|`runtime`
+|Runtime environment assets
+|✅ `true`
+|Flox NRI plugin, RKE2 config fragments, cloud-config
+
+|`networking`
+|CNI and networking services
+|✅ `true`
+|Cilium config, BGP, LoadBalancer IP pools, kdns, Envoy Gateway
+
+|`mesh`
+|Service mesh (Tailscale/Headscale)
+|❌ `false`
+|Headscale server, Tailscale operator, headplane
+
+|`highAvailability`
+|Control plane HA
+|✅ `true`
+|kube-vip DaemonSet, VIP configuration
+
+|`cicd`
+|CI/CD pipelines
+|✅ `true`
+|Tekton operator, dashboard, pipelines
+
+|`clusterApi`
+|Cluster API resources
+|✅ `true`
+|CAPI operator, Incus provider, RKE2 provider, identity secrets
+|===
+
+=== Domain Dependencies
+
+Some domains have implicit dependencies:
+
+[mermaid]
+----
+graph TD
+    A[gitops] --> B[cluster]
+    C[clusterApi] --> B
+    D[mesh] --> E[networking]
+    F[cicd] --> B
+    G[storage] --> B
+
+    style B fill:#9f9,stroke:#333
+    style E fill:#9cf,stroke:#333
+----
+
+**Important**: Disabling `cluster` breaks domains that require the `rke2lab-system` namespace.
+
+**Recommendation**: Always keep `cluster` enabled unless doing infrastructure-only testing.
+
+=== Decision Tree: When to Toggle Domains
+
+[cols="2,3",options="header"]
+|===
+|Scenario |Configuration
+
+|**Minimal viable cluster**
+|Enable: `cluster`, `runtime`, `networking`
+Disable: All others
+
+|**Production cluster**
+|Enable: `cluster`, `storage`, `replication`, `gitops`, `runtime`, `networking`, `highAvailability`, `cicd`
+Disable: `mesh`, `porch`, `clusterApi` (unless managing peers)
+
+|**Development/debugging**
+|Enable: All (including `mesh` for Tailscale access)
+Set: `policy.debug.*` flags
+
+|**Cluster API testing**
+|Enable: `cluster`, `runtime`, `networking`, `clusterApi`
+Disable: `mesh`, `cicd`, `porch`
+
+|**Network troubleshooting**
+|Enable: `cluster`, `runtime`, `networking`
+Set: `policy.debug.networking.enabled: "true"`
+Disable: All others
+|===
+
+=== Porch Domain Note
+
+**Status**: ⚠️ Kept as-is, not actively developed
+
+Porch provides Kubernetes-native package management (wraps `kpt`). Currently disabled by default because:
+
+* Phase 3 GitOps plan doesn't require it
+* Tekton pipelines use direct git operations instead
+* Adds complexity without current use case
+
+**When to enable**: If you need `kpt` package workflows or multi-cluster package distribution.
+
+== Debug Policies
+
+Debug policies enable **verbose logging, extra labels, and troubleshooting resources** without modifying code.
+
+=== Available Debug Flags
+
+[cols="1,2,2",options="header"]
+|===
+|Flag |Affects |Behavior When Enabled
+
+|`policy.debug.mesh.enabled`
+|Headscale, Tailscale, headplane
+|Extra logging in containers, debug labels on pods, auth token logging (⚠️ sensitive)
+
+|`policy.debug.networking.enabled`
+|Cilium, kdns, BGP
+|Debug-level logs in kdns, Cilium agent debug mode, BGP session logging
+
+|`policy.debug.nriPlugins.flox.enabled`
+|Flox NRI plugin
+|NRI plugin logs all hook invocations, environment resolution details, errors to stderr
+|===
+
+=== Debug Policy Effects
+
+**1. Environment variables** - Injected into systemd units and DaemonSet containers:
+
+[source,bash]
+----
+# /srv/host/systemd-scripts.d/some-script.sh sees:
+DEBUG_MESH=true
+DEBUG_NETWORKING=true
+DEBUG_NRI_PLUGINS_FLOX=true
+----
+
+**2. Manifest labels** - Added to debug-enabled resources:
+
+[source,yaml]
+----
+metadata:
+  labels:
+    rke2lab.io/debug: "true"
+    rke2lab.io/debug-category: "networking"
+----
+
+**3. Logging levels** - Changed in container specs:
+
+[source,yaml]
+----
+# kdns Deployment when debug.networking=true
+env:
+  - name: LOG_LEVEL
+    value: "debug"
+----
+
+**4. Conditional resources** - Extra troubleshooting aids:
+
+* **kdns-dlv** ConfigMap with Delve debugger script (when `debug.networking=true`)
+* **Headscale bootstrap logging** to `/tmp/headscale-bootstrap.log` (when `debug.mesh=true`)
+
+=== When to Enable Debug Policies
+
+**✅ Enable when:**
+
+* Troubleshooting component failures
+* Understanding resource reconciliation order
+* Debugging webhook injection (Flox NRI plugin)
+* Investigating network connectivity issues
+
+**❌ Do NOT enable in production:**
+
+* Performance impact (verbose logging)
+* Security risk (may log sensitive data like auth tokens)
+* Increased log volume (fills up disk faster)
+
+== Network Policies
+
+Currently minimal; expected to expand.
+
+=== LAN Binding Policy
+
+**Config**: `rke2lab:policy.network.lan.binding.enabled`
+
+**Purpose**: Controls whether the cluster binds to the physical LAN interface.
+
+**Values**:
+
+* `"true"` (default): Bind to LAN, advertise services via BGP/L2, reachable from physical network
+* `"false"`: Cluster-only networking, no external access (useful for air-gapped testing)
+
+**Effect**:
+
+* When `true`: Cilium L2AnnouncementPolicy for `lan` pool is synthesized
+* When `false`: Only `cluster` and `vip` pools exist (internal-only)
+
+**When to disable**: Testing cluster behavior without external network dependencies.
+
+== Policy Validation
+
+=== Validation Rules
+
+1. **Unknown domain IDs rejected**:
+   [source,java]
+   ----
+   policy.link.unknownDomain.enabled: "true"
+   // Throws: IllegalArgumentException: Unknown manifest domain id in policy: unknownDomain
+   ----
+
+2. **Invalid boolean values rejected**:
+   [source,java]
+   ----
+   policy.link.mesh.enabled: "maybe"
+   // Throws: IllegalArgumentException: Invalid boolean for policy.link.mesh.enabled: maybe
+   ----
+
+3. **Missing config keys get defaults**:
+   [source,java]
+   ----
+   // If policy.link.mesh.enabled not set, defaults to false (per ControlplanePolicy.from())
+   ----
+
+=== How to Validate Before Deploy
+
+[source,bash]
+----
+# Dry-run to catch policy validation errors
+pulumi preview 2>&1 | grep -i "policy\|illegal"
+
+# Check resolved policy in Pulumi outputs (after successful apply)
+pulumi stack output | grep policy
+----
+
+== Policy Propagation Flow
+
+[mermaid]
+----
+sequenceDiagram
+    participant C as Pulumi.dev.yaml
+    participant P as ControlplanePolicy.from(config)
+    participant M as ManifestSynthesizer
+    participant S as SystemdTarget
+    participant H as Host (/srv/host)
+
+    C->>P: Load config
+    P->>P: Validate & parse
+    P->>M: Pass ManifestDomainPolicy
+    M->>M: Skip disabled domains
+    M->>H: Write manifests.d/ (enabled only)
+    P->>S: Pass toEnvMap()
+    S->>H: Write systemd scripts with DEBUG_* vars
+    P->>H: Write slot manifest policy section
+----
+
+=== Stage A (Bootstrap)
+
+1. **Load**: `ControlplanePolicy.from(config)` reads `Pulumi.dev.yaml`
+2. **Validate**: Throws on unknown domains or invalid booleans
+3. **Synthesize**: `ManifestDomainPolicy` passed to CDK8s synthesis
+4. **Filter**: Disabled domains skipped (no YAML generated)
+5. **Render**: `toEnvMap()` generates environment variables for systemd scripts
+6. **Record**: Policy section written to slot manifest (`.rke2lab-manifest.yaml`)
+
+=== Stage B (Ongoing)
+
+Policy is **baked into host assets** during Stage A. Stage B (seed-peers, Flux) reads:
+
+* **Manifest files**: Only enabled domains exist in `/srv/host/rke2-manifests.d/`
+* **Environment variables**: Systemd units source `DEBUG_*` vars
+* **Slot manifest**: Flux can read policy flags to make decisions
+
+**No runtime policy changes** - To change policy, re-run `pulumi up` (Stage A rebuild).
+
+== Common Scenarios
+
+=== Scenario 1: Disable Mesh for Faster Iteration
+
+**Problem**: Headscale/Tailscale slow down deployment, not needed for current work.
+
+**Solution**:
+[source,yaml]
+----
+config:
+  rke2lab:policy.link.mesh.enabled: "false"
+----
+
+**Effect**:
+- No mesh manifests synthesized
+- Headscale namespace not created
+- Tailscale operator not installed
+- ~30s faster deployment
+
+=== Scenario 2: Debug kdns DNS Issues
+
+**Problem**: kdns not resolving ingress hostnames.
+
+**Solution**:
+[source,yaml]
+----
+config:
+  rke2lab:policy.debug.networking.enabled: "true"
+----
+
+**Effect**:
+- kdns logs at `debug` level
+- Extra labels on kdns Deployment
+- kdns-dlv ConfigMap with debugger script
+
+**Verify**:
+[source,bash]
+----
+kubectl logs -n rke2lab-system deployment/kdns | grep DEBUG
+----
+
+=== Scenario 3: Cluster API Testing Without Other Workloads
+
+**Problem**: Testing Cluster API provider, don't want Tekton/Flux interference.
+
+**Solution**:
+[source,yaml]
+----
+config:
+  rke2lab:policy.link.cluster.enabled: "true"
+  rke2lab:policy.link.runtime.enabled: "true"
+  rke2lab:policy.link.networking.enabled: "true"
+  rke2lab:policy.link.clusterApi.enabled: "true"
+  rke2lab:policy.link.gitops.enabled: "false"
+  rke2lab:policy.link.cicd.enabled: "false"
+  rke2lab:policy.link.storage.enabled: "false"
+  rke2lab:policy.link.mesh.enabled: "false"
+----
+
+**Result**: Minimal cluster with just CAPI operator and providers.
+
+=== Scenario 4: Enable Everything for Full System Test
+
+**Problem**: Need complete production-like environment.
+
+**Solution**:
+[source,yaml]
+----
+config:
+  # All domains enabled
+  rke2lab:policy.link.cluster.enabled: "true"
+  rke2lab:policy.link.storage.enabled: "true"
+  rke2lab:policy.link.replication.enabled: "true"
+  rke2lab:policy.link.gitops.enabled: "true"
+  rke2lab:policy.link.runtime.enabled: "true"
+  rke2lab:policy.link.networking.enabled: "true"
+  rke2lab:policy.link.mesh.enabled: "true"
+  rke2lab:policy.link.highAvailability.enabled: "true"
+  rke2lab:policy.link.cicd.enabled: "true"
+  rke2lab:policy.link.clusterApi.enabled: "true"
+
+  # No debug (production-like)
+  rke2lab:policy.debug.mesh.enabled: "false"
+  rke2lab:policy.debug.networking.enabled: "false"
+  rke2lab:policy.debug.nriPlugins.flox.enabled: "false"
+----
+
+== Troubleshooting
+
+=== Symptom: Policy change not reflected after `pulumi up`
+
+**Cause**: Policy is baked into host assets; Pulumi detected no-op (identical assets).
+
+**Check**:
+[source,bash]
+----
+# Check if slot rotated
+ls -lt .local.d/bioskop/master/host.staging.*
+# If latest slot is old (timestamp before policy change), no-op occurred
+
+# Verify policy in manifest
+yq '.data."manifest.yaml" | from_yaml | .policy' \
+  .local.d/bioskop/master/MANIFEST.yaml
+----
+
+**Fix**: Force rebuild by touching a source file:
+[source,bash]
+----
+touch seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/Main.java
+./mvnw clean package
+pulumi up
+----
+
+=== Symptom: Unknown domain error during Pulumi apply
+
+**Error**:
+[source]
+----
+IllegalArgumentException: Unknown manifest domain id in policy: myCustomDomain
+----
+
+**Cause**: Domain not registered in `ManifestDomainCatalog`.
+
+**Fix**: Only use documented domain IDs (see "Available Domains" table above).
+
+=== Symptom: Debug flag enabled but no debug logs
+
+**Cause**: Flag controls manifest synthesis, not runtime behavior. Container may not read the env var.
+
+**Check**:
+[source,bash]
+----
+# Verify env var reached container
+kubectl exec -n rke2lab-system deployment/kdns -- env | grep DEBUG
+
+# If missing, check systemd script sources it
+incus exec master -- cat /srv/host/systemd-scripts.d/rke2lab-manifests-install.sh | grep DEBUG
+----
+
+**Fix**: Check the specific component's manifest unit (e.g., `KdnsManifestUnit.java`) to see if it reads the debug policy.
+
+=== Symptom: Domain disabled but resources still exist in cluster
+
+**Cause**: Disabling a domain **skips synthesis + symlink**, but doesn't delete existing resources.
+
+**Fix**: Manually delete resources:
+[source,bash]
+----
+# Example: Delete mesh resources after disabling mesh domain
+kubectl delete namespace mesh-system --wait=false
+kubectl delete crd headscales.headscale.io
+----
+
+Or destroy and recreate the cluster:
+[source,bash]
+----
+pulumi destroy
+pulumi up
+----
+
+== Code References
+
+**Policy Definitions**:
+
+* link:../seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/policy/ControlplanePolicy.java[ControlplanePolicy.java] - Top-level policy aggregation
+* link:../seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/policy/ManifestLinkPolicy.java[ManifestLinkPolicy.java] - Domain link policy
+* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/api/ManifestDomainPolicy.java[ManifestDomainPolicy.java] - Domain enable/disable map
+
+**Policy Consumption**:
+
+* link:../seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/incus/HostSlotManifest.java[HostSlotManifest.java:306-329] - Policy serialization to slot manifest
+* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java] - Policy-driven domain filtering
+* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/AbstractManifestUnit.java[AbstractManifestUnit.java] - Domain-aware base class
+
+== Related Documentation
+
+* link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - How individual manifest units check policies
+* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - CDK8s generation system that consumes policies
+* link:bootstrap-contract.adoc[Bootstrap Contract] - Stage A requirements including policy resolution
+* link:host-slot-management.adoc[Host Slot Management] - How policy is recorded in slot manifests
+* link:troubleshooting-workflow.adoc[Troubleshooting Workflow] - Debugging policy-related issues
+
+== Best Practices
+
+1. **Start minimal, add incrementally** - Enable `cluster` + `runtime` + `networking` first, then add domains as needed
+2. **Never enable debug in production** - Performance and security implications
+3. **Document policy rationale** - Add comments in `Pulumi.dev.yaml` explaining why domains are disabled
+4. **Test policy changes in isolation** - Change one domain at a time to understand impact
+5. **Check slot manifest after deploy** - Verify policy was applied: `cat .local.d/bioskop/master/MANIFEST.yaml`
+6. **Use version control** - Track `Pulumi.dev.yaml` changes to understand policy evolution
+7. **Clean up when disabling domains** - Manually delete resources or destroy/recreate cluster to avoid stale state
