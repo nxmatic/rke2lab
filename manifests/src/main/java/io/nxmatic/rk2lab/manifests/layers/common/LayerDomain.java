@@ -10,25 +10,41 @@ import java.util.List;
  * <p>Domains correspond to installer services (e.g., "cluster-api" →
  * rke2lab-cluster-api-manifests.service).
  */
-public record LayerDomain(
-    String domainId, List<String> dependsOnDomainIds, List<? extends ManifestUnit> layers) {
+public class LayerDomain {
+  private final String domainId;
+  private final List<String> dependsOnDomainIds;
+  private final List<? extends ManifestUnit> layers;
 
-  public LayerDomain(final String domainId, final List<? extends ManifestUnit> layers) {
-    this(domainId, List.of(), layers);
-  }
-
-  public LayerDomain {
+  public LayerDomain(
+      String domainId, List<String> dependsOnDomainIds, List<? extends ManifestUnit> layers) {
     if (domainId == null || domainId.isBlank()) {
       throw new IllegalArgumentException("Domain id must not be blank");
     }
     if (dependsOnDomainIds == null) {
       throw new IllegalArgumentException("Domain dependencies must not be null: " + domainId);
     }
-    dependsOnDomainIds = List.copyOf(dependsOnDomainIds);
     if (layers == null || layers.isEmpty()) {
       throw new IllegalArgumentException("Domain must define at least one layer: " + domainId);
     }
-    layers = List.copyOf(layers);
+    this.domainId = domainId;
+    this.dependsOnDomainIds = List.copyOf(dependsOnDomainIds);
+    this.layers = List.copyOf(layers);
+  }
+
+  public LayerDomain(String domainId, List<? extends ManifestUnit> layers) {
+    this(domainId, List.of(), layers);
+  }
+
+  public String domainId() {
+    return domainId;
+  }
+
+  public List<String> dependsOnDomainIds() {
+    return dependsOnDomainIds;
+  }
+
+  public List<? extends ManifestUnit> layers() {
+    return layers;
   }
 
   /**

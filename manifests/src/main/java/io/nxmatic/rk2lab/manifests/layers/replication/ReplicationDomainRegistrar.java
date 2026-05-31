@@ -4,6 +4,8 @@ package io.nxmatic.rk2lab.manifests.layers.replication;
 import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomain;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistrar;
+import io.nxmatic.rk2lab.manifests.systemd.SystemdUnitSynthesizer;
+import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import java.util.List;
 
 public final class ReplicationDomainRegistrar implements LayerDomainRegistrar {
@@ -17,6 +19,13 @@ public final class ReplicationDomainRegistrar implements LayerDomainRegistrar {
         manifestDomainCatalog.replication(),
         List.of(
             new io.nxmatic.rk2lab.manifests.layers.replication
-                .ReplicationReplicatorManifestUnit()));
+                .ReplicationReplicatorManifestUnit())) {
+      @Override
+      public void synthesizeSystemdUnits(SystemdChart systemdChart) {
+        super.synthesizeSystemdUnits(systemdChart);
+        SystemdUnitSynthesizer.synthesizeManifestInstaller(
+            systemdChart, manifestDomainCatalog.replication());
+      }
+    };
   }
 }
