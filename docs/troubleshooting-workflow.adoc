@@ -133,3 +133,10 @@ The canonical troubleshooting workflow for this repository is:
 * author helper scripts in `.local.d/share`
 * execute them through `RKE2LAB_SHARED_DIR`
 * promote durable helpers into the repository so they are not lost
+
+== Related Documentation
+
+* link:policy-configuration-guide.adoc[Policy Configuration Guide] - Debug policies for enabling verbose logging and troubleshooting resources
+* link:systemd-dbus-adapter-architecture.adoc[Systemd DBus Adapter Architecture] - Monitoring systemd unit state for debugging
+* link:manifest-apply-flow.adoc[Manifest Apply Flow] - Troubleshooting checklist for manifest application failures
+* link:host-slot-management.adoc[Host Slot Management] - Slot history for comparing deployments and rollback procedures
