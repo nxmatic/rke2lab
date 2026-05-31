@@ -1,6 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.gitops;
 
+import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.api.ManifestDomainPolicy;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomain;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistrar;
@@ -9,6 +10,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class GitopsDomainRegistrar implements LayerDomainRegistrar {
+
+  private static final ManifestDomainCatalog CATALOG =
+      ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
 
   @Override
   public LayerDomain domain() {
@@ -22,10 +26,10 @@ public final class GitopsDomainRegistrar implements LayerDomainRegistrar {
     units.add(new SopsAgeSecretManifestUnit());
     units.add(new FluxRootManifestUnit());
 
-    if (policy.isEnabled("porch")) {
+    if (policy.isEnabled(CATALOG.porch())) {
       units.add(new PorchResourcesManifestUnit());
     }
 
-    return new LayerDomain("gitops", List.of("replication"), units);
+    return new LayerDomain(CATALOG.gitops(), List.of(CATALOG.replication()), units);
   }
 }

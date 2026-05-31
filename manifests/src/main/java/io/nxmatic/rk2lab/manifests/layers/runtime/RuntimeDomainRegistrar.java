@@ -1,6 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.runtime;
 
+import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomain;
 import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.runtime.cloudinit.CloudConfigManifestUnit;
@@ -13,11 +14,14 @@ import java.util.List;
 
 public final class RuntimeDomainRegistrar implements LayerDomainRegistrar {
 
+  private static final ManifestDomainCatalog CATALOG =
+      ManifestDomainCatalog.builder().addDefaultDomains().build();
+
   @Override
   public LayerDomain domain() {
     return new LayerDomain(
-        "runtime",
-        List.of("cluster", "storage", "replication"),
+        CATALOG.runtime(),
+        List.of(CATALOG.cluster(), CATALOG.storage(), CATALOG.replication()),
         List.of(
             new RKE2LabEnvConfigManifestUnit(),
             new RuntimeSystemdLibexecPlaceholderManifestUnit(),

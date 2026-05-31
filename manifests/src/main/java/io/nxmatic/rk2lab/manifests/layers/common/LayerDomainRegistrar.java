@@ -45,14 +45,17 @@ import io.nxmatic.rk2lab.manifests.api.ManifestDomainPolicy;
  *
  * <pre>{@code
  * public class GitopsDomainRegistrar implements LayerDomainRegistrar {
+ *   private static final ManifestDomainCatalog CATALOG =
+ *       ManifestDomainCatalog.builder().addDefaultDomains().build();
+ *
  *   @Override
  *   public LayerDomain domain(ManifestDomainPolicy policy) {
  *     List<ManifestUnit> units = new ArrayList<>();
  *     units.add(new FluxInstanceManifestUnit());
- *     if (policy.isEnabled("porch")) {
+ *     if (policy.isEnabled(CATALOG.porch())) {
  *       units.add(new PorchResourcesManifestUnit());
  *     }
- *     return new LayerDomain("gitops", List.of("replication"), units);
+ *     return new LayerDomain(CATALOG.gitops(), List.of(CATALOG.replication()), units);
  *   }
  * }
  * }</pre>
