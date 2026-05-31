@@ -36,7 +36,9 @@ public final class GitopsDomainRegistrar implements LayerDomainRegistrar {
       @Override
       public void synthesizeSystemdUnits(SystemdChart systemdChart) {
         super.synthesizeSystemdUnits(systemdChart);
-        SystemdUnitSynthesizer.synthesizeManifestInstaller(systemdChart, CATALOG.gitops());
+        var synthesizer = new SystemdUnitSynthesizer(systemdChart, CATALOG.gitops());
+        synthesizer.manifestInstaller();
+        synthesizer.secretsInstaller();
       }
     };
   }

@@ -22,8 +22,9 @@ public final class CicdDomainRegistrar implements LayerDomainRegistrar {
       @Override
       public void synthesizeSystemdUnits(SystemdChart systemdChart) {
         super.synthesizeSystemdUnits(systemdChart);
-        // Note: This synthesizes tekton-pipelines-manifests.service
-        SystemdUnitSynthesizer.synthesizeManifestInstaller(systemdChart, "tekton-pipelines");
+        // Note: manifest uses "tekton-pipelines", secrets use "cicd"
+        new SystemdUnitSynthesizer(systemdChart, "tekton-pipelines").manifestInstaller();
+        new SystemdUnitSynthesizer(systemdChart, "cicd").secretsInstaller();
       }
     };
   }

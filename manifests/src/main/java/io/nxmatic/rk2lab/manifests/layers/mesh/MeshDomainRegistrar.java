@@ -26,8 +26,9 @@ public final class MeshDomainRegistrar implements LayerDomainRegistrar {
       @Override
       public void synthesizeSystemdUnits(SystemdChart systemdChart) {
         super.synthesizeSystemdUnits(systemdChart);
-        SystemdUnitSynthesizer.synthesizeManifestInstaller(
-            systemdChart, manifestDomainCatalog.mesh());
+        var synthesizer = new SystemdUnitSynthesizer(systemdChart, manifestDomainCatalog.mesh());
+        synthesizer.manifestInstaller();
+        synthesizer.secretsInstaller();
       }
     };
   }

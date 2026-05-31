@@ -23,8 +23,9 @@ public final class ReplicationDomainRegistrar implements LayerDomainRegistrar {
       @Override
       public void synthesizeSystemdUnits(SystemdChart systemdChart) {
         super.synthesizeSystemdUnits(systemdChart);
-        SystemdUnitSynthesizer.synthesizeManifestInstaller(
-            systemdChart, manifestDomainCatalog.replication());
+        var synthesizer =
+            new SystemdUnitSynthesizer(systemdChart, manifestDomainCatalog.replication());
+        synthesizer.manifestInstaller();
       }
     };
   }

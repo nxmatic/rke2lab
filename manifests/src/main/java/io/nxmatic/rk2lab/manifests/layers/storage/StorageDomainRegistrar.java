@@ -19,8 +19,8 @@ public final class StorageDomainRegistrar implements LayerDomainRegistrar {
       @Override
       public void synthesizeSystemdUnits(SystemdChart systemdChart) {
         super.synthesizeSystemdUnits(systemdChart);
-        SystemdUnitSynthesizer.synthesizeManifestInstaller(
-            systemdChart, manifestDomainCatalog.storage());
+        var synthesizer = new SystemdUnitSynthesizer(systemdChart, manifestDomainCatalog.storage());
+        synthesizer.manifestInstaller();
       }
     };
   }

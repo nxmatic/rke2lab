@@ -26,8 +26,9 @@ public final class NetworkingDomainRegistrar implements LayerDomainRegistrar {
       @Override
       public void synthesizeSystemdUnits(SystemdChart systemdChart) {
         super.synthesizeSystemdUnits(systemdChart);
-        SystemdUnitSynthesizer.synthesizeManifestInstaller(
-            systemdChart, manifestDomainCatalog.networking());
+        var synthesizer =
+            new SystemdUnitSynthesizer(systemdChart, manifestDomainCatalog.networking());
+        synthesizer.manifestInstaller();
       }
     };
   }

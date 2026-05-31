@@ -34,7 +34,9 @@ public final class RuntimeDomainRegistrar implements LayerDomainRegistrar {
       @Override
       public void synthesizeSystemdUnits(SystemdChart systemdChart) {
         super.synthesizeSystemdUnits(systemdChart);
-        SystemdUnitSynthesizer.synthesizeManifestInstaller(systemdChart, CATALOG.runtime());
+        var synthesizer = new SystemdUnitSynthesizer(systemdChart, CATALOG.runtime());
+        synthesizer.manifestInstaller();
+        synthesizer.secretsInstaller();
       }
     };
   }

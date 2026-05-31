@@ -19,7 +19,8 @@ public final class ClusterDomainRegistrar implements LayerDomainRegistrar {
       @Override
       public void synthesizeSystemdUnits(SystemdChart systemdChart) {
         super.synthesizeSystemdUnits(systemdChart);
-        SystemdUnitSynthesizer.synthesizeManifestInstaller(systemdChart, CATALOG.cluster());
+        var synthesizer = new SystemdUnitSynthesizer(systemdChart, CATALOG.cluster());
+        synthesizer.manifestInstaller();
       }
     };
   }
