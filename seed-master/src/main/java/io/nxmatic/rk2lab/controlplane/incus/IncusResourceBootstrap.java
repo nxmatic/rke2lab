@@ -129,7 +129,7 @@ public final class IncusResourceBootstrap {
   public BootstrapResult apply(ControlplanePolicy policy) {
     final ApplyState state = new ApplyState();
     state.bootstrapContext = bootstrapContext;
-    state.controlplanePolicy = policy;
+    state.registry.register(ControlplanePolicy.class, policy);
     return new ApplyStart(state)
         .onFailure((topic, cause) -> SeedLog.error("incus", topic + ": " + cause.getMessage()))
         .during("path resolution", paths -> paths.resolve())
@@ -170,9 +170,8 @@ public final class IncusResourceBootstrap {
    *
    * <ul>
    *   <li><b>bootstrapContext</b> - Immutable config + services (shared reference)
-   *   <li><b>registry</b> - Type-safe storage for computed records (metadata, contexts)
+   *   <li><b>registry</b> - Type-safe storage for computed records (metadata, policy, contexts)
    *   <li><b>Direct fields</b> - Mutable pipeline state and provider-specific resources
-   *   <li><b>controlplanePolicy</b> - Set once at pipeline start from EnvironmentStage
    * </ul>
    *
    * <p><b>Design Decision:</b> Why some fields are direct vs registry?
@@ -185,6 +184,7 @@ public final class IncusResourceBootstrap {
    * <p><b>Registry contents:</b>
    *
    * <ul>
+   *   <li>{@link ControlplanePolicy} - operational policy loaded from Pulumi config
    *   <li>{@link DeploymentMetadata} - git context + timestamp (captured in HostStage)
    *   <li>{@link ProvisioningMetadata} - target checksums + paths (captured in HostStage)
    *   <li>{@link BuildMetadata} - image + manifest checksums (captured in HostStage +
@@ -201,7 +201,6 @@ public final class IncusResourceBootstrap {
 
     // Pipeline coordination
     OnFailure onFailure;
-    ControlplanePolicy controlplanePolicy;
 
     // Path state (kept as direct fields: dual instance, frequent access)
     BootstrapPaths localPaths;
@@ -297,7 +296,7 @@ public final class IncusResourceBootstrap {
       final LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
       final Map<String, Object> manifestSynthSummary =
           synthesizeAndExplodeManifests(
-              stagingManifestsRoot, state.controlplanePolicy, layerContext);
+              stagingManifestsRoot, state.registry.require(ControlplanePolicy.class), layerContext);
 
       final BootstrapPaths stagingPaths = createStagingPaths(stagingRoot);
 
@@ -375,7 +374,7 @@ public final class IncusResourceBootstrap {
           new Rke2labEnvTarget(
               context.runtimeEnvControlplaneOverlayWriter(),
               layerContext,
-              state.controlplanePolicy,
+              state.registry.require(ControlplanePolicy.class),
               stagingPaths.runtimeEnvConfigRoot());
       try {
         rke2labEnvTarget.materialize(stagingPaths);
@@ -394,7 +393,7 @@ public final class IncusResourceBootstrap {
           stagingRoot,
           state.localPaths.assetsRoot(),
           context.config(),
-          state.controlplanePolicy,
+          state.registry.require(ControlplanePolicy.class),
           targets.systemdTarget());
     }
 
