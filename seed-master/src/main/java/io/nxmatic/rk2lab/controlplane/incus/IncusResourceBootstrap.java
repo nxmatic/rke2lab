@@ -81,32 +81,7 @@ public final class IncusResourceBootstrap {
     private DaemonsetLogPolicy() {}
   }
 
-  private static final String HOST_ROOT_PATH = "/srv/host";
-
-  private static final String HOST_WORKTREE_PATH = "/srv/host/rke2lab-worktree.d";
-
-  private static final String HOST_ENV_DIR_PATH = "/srv/host/rke2lab-environment.d";
-
   private final ManifestFileOperations manifestFileOps = ManifestFileOperations.INSTANCE;
-
-  private static final String HOST_SCRIPTS_DIR_PATH = "/srv/host/systemd-scripts.d";
-
-  private static final String HOST_GIT_WORKTREE_DIR_PATH = "/srv/host/git-worktree.d";
-
-  private static final String HOST_SYSTEMD_LIBEXEC_DIR_PATH = "/srv/host/systemd-libexec.d";
-
-  private static final String HOST_SYSTEMD_DIR_PATH = "/srv/host/systemd-units.d";
-
-  private static final String HOST_MANIFESTS_DIR_PATH = "/srv/host/rke2-manifests.d";
-
-  private static final String HOST_RKE2_CONFIG_DIR_PATH = "/srv/host/rke2-config.d";
-
-  private static final String HOST_CLOUDCONFIG_NO_CLOUD_DIR_PATH =
-      "/srv/host/cloudconfig-nocloud.d";
-
-  private static final String HOST_SHARE_DIR_PATH = "/srv/host/rke2lab-share.d";
-
-  private static final String HOST_KUBECONFIG_DIR_PATH = "/srv/host/rke2lab-kube.d";
 
   private final BootstrapContext bootstrapContext;
 
@@ -1116,24 +1091,45 @@ public final class IncusResourceBootstrap {
             managementNodeBlueprint.wan().hostMacaddr().value())
         .kmsgDevice()
         .zfsDevice()
-        .disk("worktree.dir", hostPaths.worktreeRoot(), HOST_WORKTREE_PATH)
-        .disk("rke2lab.environment.dir", hostPaths.runtimeEnvConfigRoot(), HOST_ENV_DIR_PATH)
-        .disk("rke2lab.scripts.dir", hostPaths.scriptsRoot(), HOST_SCRIPTS_DIR_PATH)
-        .disk("git.dir", hostPaths.gitRoot(), HOST_GIT_WORKTREE_DIR_PATH)
+        .disk(
+            "worktree.dir",
+            hostPaths.worktreeRoot(),
+            BootstrapPaths.HostPathCatalog.WORKTREE.path())
+        .disk(
+            "rke2lab.environment.dir",
+            hostPaths.runtimeEnvConfigRoot(),
+            BootstrapPaths.HostPathCatalog.ENV.path())
+        .disk(
+            "rke2lab.scripts.dir",
+            hostPaths.scriptsRoot(),
+            BootstrapPaths.HostPathCatalog.SCRIPTS.path())
+        .disk("git.dir", hostPaths.gitRoot(), BootstrapPaths.HostPathCatalog.GIT_WORKTREE.path())
         .disk(
             "rke2lab.systemd.libexec.dir",
             hostPaths.systemdLibexecRoot(),
-            HOST_SYSTEMD_LIBEXEC_DIR_PATH)
-        .disk("rke2lab.system.dir", hostPaths.systemdRoot(), HOST_SYSTEMD_DIR_PATH)
-        .disk("manifests.dir", hostPaths.manifestsRoot(), HOST_MANIFESTS_DIR_PATH)
-        .disk("rke2.config.dir", hostPaths.runtimeRke2ConfigRoot(), HOST_RKE2_CONFIG_DIR_PATH)
+            BootstrapPaths.HostPathCatalog.SYSTEMD_LIBEXEC.path())
+        .disk(
+            "rke2lab.system.dir",
+            hostPaths.systemdRoot(),
+            BootstrapPaths.HostPathCatalog.SYSTEMD_UNITS.path())
+        .disk(
+            "manifests.dir",
+            hostPaths.manifestsRoot(),
+            BootstrapPaths.HostPathCatalog.MANIFESTS.path())
+        .disk(
+            "rke2.config.dir",
+            hostPaths.runtimeRke2ConfigRoot(),
+            BootstrapPaths.HostPathCatalog.RKE2_CONFIG.path())
         .disk(
             "cloudconfig.nocloud.dir",
             hostPaths.runtimeCloudConfigRoot(),
-            HOST_CLOUDCONFIG_NO_CLOUD_DIR_PATH)
-        .disk("shared.dir", hostPaths.shareRoot(), HOST_SHARE_DIR_PATH)
+            BootstrapPaths.HostPathCatalog.CLOUDCONFIG_NOCLOUD.path())
+        .disk("shared.dir", hostPaths.shareRoot(), BootstrapPaths.HostPathCatalog.SHARE.path())
         .disk("daemonset.dir", hostPaths.daemonsetRoot(), DaemonsetLogPolicy.GUEST_ROOT_PATH)
-        .disk("kubeconfig.dir", hostPaths.kubeconfigRoot(), HOST_KUBECONFIG_DIR_PATH)
+        .disk(
+            "kubeconfig.dir",
+            hostPaths.kubeconfigRoot(),
+            BootstrapPaths.HostPathCatalog.KUBECONFIG.path())
         .disk("nocloud.dir", hostPaths.cloudSeedRoot(), "/var/lib/cloud/seed/nocloud")
         .build();
   }
@@ -1159,7 +1155,7 @@ public final class IncusResourceBootstrap {
         Map<String, String> aggregatedVars = new LinkedHashMap<>();
 
         // Add bootstrap-only constants first; contributor-owned sections override as needed
-        aggregatedVars.put("RKE2LAB_REPO_ROOT", HOST_WORKTREE_PATH);
+        aggregatedVars.put("RKE2LAB_REPO_ROOT", BootstrapPaths.HostPathCatalog.WORKTREE.path());
         aggregatedVars.putAll(policy.toEnvMap());
 
         // Add layer contributions (later ones override earlier)
@@ -1232,47 +1228,47 @@ public final class IncusResourceBootstrap {
 
     @Override
     public Path rootPath() {
-      return Path.of(HOST_ROOT_PATH);
+      return BootstrapPaths.HostPathCatalog.ROOT.asPath();
     }
 
     @Override
     public Path envDirPath() {
-      return Path.of(HOST_ENV_DIR_PATH);
+      return BootstrapPaths.HostPathCatalog.ENV.asPath();
     }
 
     @Override
     public Path scriptsDirPath() {
-      return Path.of(HOST_SCRIPTS_DIR_PATH);
+      return BootstrapPaths.HostPathCatalog.SCRIPTS.asPath();
     }
 
     @Override
     public Path systemdDirPath() {
-      return Path.of(HOST_SYSTEMD_DIR_PATH);
+      return BootstrapPaths.HostPathCatalog.SYSTEMD_UNITS.asPath();
     }
 
     @Override
     public Path configDirPath() {
-      return Path.of(HOST_RKE2_CONFIG_DIR_PATH);
+      return BootstrapPaths.HostPathCatalog.RKE2_CONFIG.asPath();
     }
 
     @Override
     public Path cloudconfigNocloudDirPath() {
-      return Path.of(HOST_CLOUDCONFIG_NO_CLOUD_DIR_PATH);
+      return BootstrapPaths.HostPathCatalog.CLOUDCONFIG_NOCLOUD.asPath();
     }
 
     @Override
     public Path manifestsDirPath() {
-      return Path.of(HOST_MANIFESTS_DIR_PATH);
+      return BootstrapPaths.HostPathCatalog.MANIFESTS.asPath();
     }
 
     @Override
     public Path sharedDirPath() {
-      return Path.of(HOST_SHARE_DIR_PATH);
+      return BootstrapPaths.HostPathCatalog.SHARE.asPath();
     }
 
     @Override
     public Path kubeconfigDirPath() {
-      return Path.of(HOST_KUBECONFIG_DIR_PATH);
+      return BootstrapPaths.HostPathCatalog.KUBECONFIG.asPath();
     }
 
     @Override
@@ -1418,6 +1414,43 @@ public final class IncusResourceBootstrap {
       Path kubeconfigRoot,
       Path cloudSeedRoot) {
 
+    /** Catalog of host-mounted paths (single source of truth for container paths). */
+    enum HostPathCatalog {
+      ROOT("/srv/host"),
+      WORKTREE("/srv/host/rke2lab-worktree.d"),
+      ENV("/srv/host/rke2lab-environment.d"),
+      SCRIPTS("/srv/host/systemd-scripts.d"),
+      GIT_WORKTREE("/srv/host/git-worktree.d"),
+      SYSTEMD_LIBEXEC("/srv/host/systemd-libexec.d"),
+      SYSTEMD_UNITS("/srv/host/systemd-units.d"),
+      MANIFESTS("/srv/host/rke2-manifests.d"),
+      RKE2_CONFIG("/srv/host/rke2-config.d"),
+      CLOUDCONFIG_NOCLOUD("/srv/host/cloudconfig-nocloud.d"),
+      SHARE("/srv/host/rke2lab-share.d"),
+      KUBECONFIG("/srv/host/rke2lab-kube.d");
+
+      private final String containerPath;
+
+      HostPathCatalog(String containerPath) {
+        this.containerPath = containerPath;
+      }
+
+      /** Returns the absolute container path (e.g., "/srv/host/rke2-manifests.d"). */
+      public String path() {
+        return containerPath;
+      }
+
+      /** Returns the directory name only (e.g., "rke2-manifests.d"). */
+      public String dirName() {
+        return Path.of(containerPath).getFileName().toString();
+      }
+
+      /** Returns the container path as a Path object. */
+      public Path asPath() {
+        return Path.of(containerPath);
+      }
+    }
+
     private static Builder builder() {
       return new Builder();
     }
@@ -1433,12 +1466,13 @@ public final class IncusResourceBootstrap {
       final Path clusterRoot = stateRoot.resolve(clusterName);
       final Path nodeRoot = clusterRoot.resolve(nodeName);
       final Path hostResourceRoot = nodeRoot.resolve("host");
-      final Path manifestsRoot = hostResourceRoot.resolve("manifests.d");
+      final Path manifestsRoot = hostResourceRoot.resolve(HostPathCatalog.MANIFESTS.dirName());
       final Path runtimeRoot = manifestsRoot.resolve("runtime");
       final Path systemdStagingRoot = hostResourceRoot.resolve("systemd.d");
-      final Path scriptsRoot = systemdStagingRoot.resolve("systemd-scripts");
-      final Path systemdLibexecRoot = systemdStagingRoot.resolve("systemd-libexec");
-      final Path systemdRoot = systemdStagingRoot.resolve("systemd-units");
+      final Path scriptsRoot = systemdStagingRoot.resolve(HostPathCatalog.SCRIPTS.dirName());
+      final Path systemdLibexecRoot =
+          systemdStagingRoot.resolve(HostPathCatalog.SYSTEMD_LIBEXEC.dirName());
+      final Path systemdRoot = systemdStagingRoot.resolve(HostPathCatalog.SYSTEMD_UNITS.dirName());
 
       return BootstrapPaths.builder()
           .worktreeRoot(worktreeRoot)
@@ -3414,9 +3448,9 @@ public final class IncusResourceBootstrap {
           hostMountNotes == null ? List.of() : List.copyOf(hostMountNotes);
 
       final LinkedHashMap<String, Object> summary = new LinkedHashMap<>();
-      summary.put("scriptsMountPath", HOST_SCRIPTS_DIR_PATH);
-      summary.put("unitsMountPath", HOST_SYSTEMD_DIR_PATH);
-      summary.put("systemdLibexecMountPath", HOST_SYSTEMD_LIBEXEC_DIR_PATH);
+      summary.put("scriptsMountPath", BootstrapPaths.HostPathCatalog.SCRIPTS.path());
+      summary.put("unitsMountPath", BootstrapPaths.HostPathCatalog.SYSTEMD_UNITS.path());
+      summary.put("systemdLibexecMountPath", BootstrapPaths.HostPathCatalog.SYSTEMD_LIBEXEC.path());
       summary.put("scriptCount", scripts.size());
       summary.put("unitCount", units.size());
       summary.put("systemdLibexecContributionCount", systemdLibexecContributions.size());
