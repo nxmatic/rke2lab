@@ -1,6 +1,7 @@
 package io.nxmatic.rk2lab.controlplane.policy;
 
 import com.pulumi.Config;
+import io.nxmatic.rk2lab.controlplane.SeedLog;
 import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.api.ManifestDomainPolicy;
 import java.util.LinkedHashMap;
@@ -32,6 +33,14 @@ public record ControlplanePolicy(
     NetworkPolicy networkPolicy =
         new NetworkPolicy(environment.bool("policy.network.lan.binding.enabled", true));
 
+    boolean clusterApiEnabled = environment.bool("policy.link.clusterApi.enabled", true);
+    SeedLog.debug(
+        "policy",
+        "clusterApi raw='"
+            + environment.raw("policy.link.clusterApi.enabled")
+            + "' parsed="
+            + clusterApiEnabled);
+
     ManifestLinkPolicy manifestLinkPolicy =
         new ManifestLinkPolicy(
             ManifestDomainPolicy.builder()
@@ -47,7 +56,7 @@ public record ControlplanePolicy(
                 .mesh(environment.bool("policy.link.mesh.enabled", false))
                 .highAvailability(environment.bool("policy.link.highAvailability.enabled", true))
                 .cicd(environment.bool("policy.link.cicd.enabled", true))
-                .clusterApi(environment.bool("policy.link.clusterApi.enabled", true))
+                .clusterApi(clusterApiEnabled)
                 .build(),
             new ManifestLinkPolicy.DebugPolicy(debugPolicy::domainDebug));
 
