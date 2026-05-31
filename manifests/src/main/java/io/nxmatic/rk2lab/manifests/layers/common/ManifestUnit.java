@@ -1,6 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.common;
 
+import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import java.util.List;
 import org.cdk8s.Chart;
 
@@ -18,5 +19,21 @@ public interface ManifestUnit {
     throw new UnsupportedOperationException(
         "ManifestUnit must override apply(Chart) or apply(ManifestUnitContext): "
             + manifestUnitId());
+  }
+
+  /**
+   * Synthesizes systemd units for this manifest unit.
+   *
+   * <p>Default implementation does nothing. Override to emit systemd installer services, targets,
+   * or other units that support the K8s manifests synthesized by {@link #apply(Chart)}.
+   *
+   * <p><b>Design rationale</b>: Each ManifestUnit decides whether it needs systemd support. Domain
+   * manifest units (cluster-api, gitops, porch) emit installer services. Infrastructure units
+   * (network, tools) emit targets and support services.
+   *
+   * @param systemdChart the systemd chart to populate with units
+   */
+  default void synthesizeSystemdUnits(SystemdChart systemdChart) {
+    // Default: no systemd units
   }
 }
