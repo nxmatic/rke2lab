@@ -1,6 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.gitops;
 
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import java.util.Map;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
@@ -10,6 +11,9 @@ import org.cdk8s.JsonPatch;
 import software.constructs.Construct;
 
 public final class FluxOperatorLayer extends Chart {
+
+  private final PackageMetadataProfile packageProfile =
+      new PackageMetadataProfile("gitops", "flux-operator");
 
   public FluxOperatorLayer(final Construct scope, final String id, final String version) {
     super(scope, id);
@@ -25,6 +29,7 @@ public final class FluxOperatorLayer extends Chart {
                 .metadata(
                     ApiObjectMetadata.builder()
                         .name("flux-system")
+                        .annotations(packageProfile.packageAnnotations("|Namespace||flux-system"))
                         .labels(
                             Map.of(
                                 "app.kubernetes.io/name", "flux-system",
@@ -44,6 +49,9 @@ public final class FluxOperatorLayer extends Chart {
                     ApiObjectMetadata.builder()
                         .name("flux-operator")
                         .namespace("kube-system")
+                        .annotations(
+                            packageProfile.packageAnnotations(
+                                "helm.cattle.io|HelmChart|kube-system|flux-operator"))
                         .build())
                 .build());
 
