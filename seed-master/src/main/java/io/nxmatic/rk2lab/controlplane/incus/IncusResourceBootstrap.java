@@ -159,21 +159,59 @@ public final class IncusResourceBootstrap {
         .toResult();
   }
 
-  /** Shared mutable state across all pipeline stages. */
+  /**
+   * Immutable context shared across all stages.
+   * Contains configuration and service instances that don't change during bootstrap.
+   */
+  private record BootstrapContext(
+      BootstrapConfig config,
+      PulumiIncusImageProvider imageProvider,
+      HostMountSourceVerifier hostMountSourceVerifier,
+      NodeConfigRegenerator nodeConfigRegenerator,
+      RuntimeEnvControlplaneOverlayWriter runtimeEnvControlplaneOverlayWriter,
+      IncusImportLookup incusImportLookup,
+      LaunchSecretsUpdater launchSecretsUpdater) {}
+
+  /**
+   * Shared mutable state across all pipeline stages.
+   *
+   * <p><b>Architecture:</b>
+   *
+   * <ul>
+   *   <li><b>registry</b> - Type-safe storage for computed records (BootstrapPaths,
+   *       StagingContext, metadata)
+   *   <li><b>Direct fields</b> - Mutable pipeline state and provider-specific resources
+   *   <li><b>controlplanePolicy</b> - Set once at pipeline start from EnvironmentStage
+   * </ul>
+   *
+   * <p><b>Design Decision:</b> Why some fields are direct vs registry?
+   *
+   * <ul>
+   *   <li>Direct fields: Accessed frequently, simple types, single-owner lifecycle
+   *   <li>Registry: Computed records, multi-stage lifecycle, type-safe sharing
+   * </ul>
+   */
   private static final class ApplyState {
+    // Type-safe record registry for computed/intermediate records
+    // Stores: StagingContext, TargetContext, LayerEnvContext, *Metadata records
+    final ContextRegistry registry = new ContextRegistry();
+
+    // Pipeline coordination
     OnFailure onFailure;
+    ControlplanePolicy controlplanePolicy;
+
+    // Path state (kept as direct fields: dual instance, frequent access)
     BootstrapPaths localPaths;
     BootstrapPaths nixosPaths;
+
+    // Provider-specific state (Incus)
     IncusProviderContext providerContext;
-    ControlplanePolicy controlplanePolicy;
     Project ensuredProject;
     Output<String> ensuredProjectName;
     Output<String> ensuredProfileName;
     Output<String> ensuredImageFingerprint;
-    DeploymentMetadata deploymentMetadata;
-    ProvisioningMetadata provisioningMetadata;
-    BuildMetadata buildMetadata;
-    RuntimeMetadata runtimeMetadata;
+
+    // Final result
     Instance instance;
   }
 
@@ -198,12 +236,12 @@ public final class IncusResourceBootstrap {
   }
 
   private final class HostStage {
+    private final BootstrapContext context;
     private final ApplyState state;
-    private final BootstrapConfig config;
 
-    HostStage(ApplyState state, BootstrapConfig config) {
+    HostStage(BootstrapContext context, ApplyState state) {
+      this.context = context;
       this.state = state;
-      this.config = config;
     }
 
     HostStage materializeAssets() {
@@ -215,7 +253,7 @@ public final class IncusResourceBootstrap {
       final HostAssetRootLifecycle lifecycle =
           dryRun
               ? HostAssetRootLifecycle.previewLifecycle()
-              : new HostAssetRootLifecycle(config.hostAssetRotationRetentionCount());
+              : new HostAssetRootLifecycle(context.config().hostAssetRotationRetentionCount());
 
       final StagingContext staging = materializeToStaging(lifecycle);
       final TargetContext targets = registerProvisioningTargets(staging);
