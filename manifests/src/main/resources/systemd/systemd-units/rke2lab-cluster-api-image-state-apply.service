@@ -6,8 +6,8 @@ RequiresMountsFor=/srv/host/systemd-units.d /srv/host
 After=local-fs.target
 After=rke2-server.service
 Requires=rke2-server.service
-After=rke2lab-clusterapi-manifests.service
-Requires=rke2lab-clusterapi-manifests.service
+After=rke2lab-cluster-api-manifests.service
+Requires=rke2lab-cluster-api-manifests.service
 ConditionPathExists=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh
 ConditionPathExists=/srv/host/rke2-manifests.d/clusterapi/staged
 
