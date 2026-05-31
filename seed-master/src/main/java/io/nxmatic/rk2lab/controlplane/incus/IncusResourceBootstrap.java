@@ -108,28 +108,18 @@ public final class IncusResourceBootstrap {
 
   private static final String HOST_KUBECONFIG_DIR_PATH = "/srv/host/rke2lab-kube.d";
 
-  private final BootstrapConfig config;
-
-  private final PulumiIncusImageProvider imageProvider;
-
-  private final HostMountSourceVerifier hostMountSourceVerifier;
-
-  private final NodeConfigRegenerator nodeConfigRegenerator;
-
-  private final RuntimeEnvControlplaneOverlayWriter runtimeEnvControlplaneOverlayWriter;
-
-  private final IncusImportLookup incusImportLookup;
-
-  private final LaunchSecretsUpdater launchSecretsUpdater;
+  private final BootstrapContext bootstrapContext;
 
   public IncusResourceBootstrap(BootstrapConfig config) {
-    this.config = config;
-    this.imageProvider = new PulumiIncusImageProvider(config);
-    this.hostMountSourceVerifier = HostMountSourceVerifier.INSTANCE;
-    this.nodeConfigRegenerator = new NodeConfigRegenerator(CloudConfigSecretRenderer.INSTANCE);
-    this.runtimeEnvControlplaneOverlayWriter = RuntimeEnvControlplaneOverlayWriter.INSTANCE;
-    this.incusImportLookup = IncusImportLookup.INSTANCE;
-    this.launchSecretsUpdater = LaunchSecretsUpdater.INSTANCE;
+    this.bootstrapContext =
+        new BootstrapContext(
+            config,
+            new PulumiIncusImageProvider(config),
+            HostMountSourceVerifier.INSTANCE,
+            new NodeConfigRegenerator(CloudConfigSecretRenderer.INSTANCE),
+            RuntimeEnvControlplaneOverlayWriter.INSTANCE,
+            IncusImportLookup.INSTANCE,
+            LaunchSecretsUpdater.INSTANCE);
   }
 
   /**
@@ -138,15 +128,7 @@ public final class IncusResourceBootstrap {
    */
   public BootstrapResult apply(ControlplanePolicy policy) {
     final ApplyState state = new ApplyState();
-    state.bootstrapContext =
-        new BootstrapContext(
-            config,
-            imageProvider,
-            hostMountSourceVerifier,
-            nodeConfigRegenerator,
-            runtimeEnvControlplaneOverlayWriter,
-            incusImportLookup,
-            launchSecretsUpdater);
+    state.bootstrapContext = bootstrapContext;
     state.controlplanePolicy = policy;
     return new ApplyStart(state)
         .onFailure((topic, cause) -> SeedLog.error("incus", topic + ": " + cause.getMessage()))
@@ -342,7 +324,7 @@ public final class IncusResourceBootstrap {
       final BootstrapPaths stagingPaths = staging.stagingPaths();
       final CloudInitTarget cloudInitTarget =
           new CloudInitTarget(
-              nodeConfigRegenerator,
+              context.nodeConfigRegenerator(),
               stagingPaths.runtimeCloudConfigRoot(),
               stagingPaths.cloudSeedRoot());
       try {
@@ -384,13 +366,14 @@ public final class IncusResourceBootstrap {
       final BootstrapPaths stagingPaths = staging.stagingPaths();
       final LayerEnvContext layerContext = staging.layerContext();
 
-      final List<String> hostMountNotes = hostMountSourceVerifier.ensureSources(stagingPaths);
+      final List<String> hostMountNotes =
+          context.hostMountSourceVerifier().ensureSources(stagingPaths);
       final Map<String, Object> systemdProvisioningSummary =
           SystemdProvisioningInventory.summarize(stagingPaths, hostMountNotes);
 
       final Rke2labEnvTarget rke2labEnvTarget =
           new Rke2labEnvTarget(
-              runtimeEnvControlplaneOverlayWriter,
+              context.runtimeEnvControlplaneOverlayWriter(),
               layerContext,
               state.controlplanePolicy,
               stagingPaths.runtimeEnvConfigRoot());
@@ -410,7 +393,7 @@ public final class IncusResourceBootstrap {
       return lifecycle.syncStagingToFinal(
           stagingRoot,
           state.localPaths.assetsRoot(),
-          config,
+          context.config(),
           state.controlplanePolicy,
           targets.systemdTarget());
     }
@@ -1055,8 +1038,12 @@ public final class IncusResourceBootstrap {
 
   private Project ensureProject(IncusProviderContext context) {
     final String existingProjectId =
-        incusImportLookup.normalizeImportId(
-            incusImportLookup.existingProjectId(context, config.incusProject()));
+        bootstrapContext
+            .incusImportLookup()
+            .normalizeImportId(
+                bootstrapContext
+                    .incusImportLookup()
+                    .existingProjectId(context, bootstrapContext.config().incusProject()));
 
     final CustomResourceOptions.Builder optionsBuilder =
         CustomResourceOptions.builder().provider(context.provider()).retainOnDelete(true);
@@ -1067,7 +1054,7 @@ public final class IncusResourceBootstrap {
     return new Project(
         "seed-project",
         ProjectArgs.builder()
-            .name(config.incusProject())
+            .name(bootstrapContext.config().incusProject())
             // Enable per-project network namespacing so instance NIC parent
             // references resolve under this project even though the actual
             // bridges (lan-br, vmnet-br) are created in the default project
@@ -1086,7 +1073,9 @@ public final class IncusResourceBootstrap {
             .ignoreChanges(List.of("name", "project", "devices", "config", "description"));
 
     final ProfileArgs.Builder profileArgsBuilder =
-        ProfileArgs.builder().name(config.profileName()).project(config.incusProject());
+        ProfileArgs.builder()
+            .name(bootstrapContext.config().profileName())
+            .project(bootstrapContext.config().incusProject());
     profileArgsBuilder.devices(
         ProfileDeviceArgs.builder()
             .name("root")
@@ -1104,23 +1093,28 @@ public final class IncusResourceBootstrap {
     if (Deployment.getInstance().isDryRun()) {
       return;
     }
-    launchSecretsUpdater.ensureTokensPresent(secretsFile);
+    bootstrapContext.launchSecretsUpdater().ensureTokensPresent(secretsFile);
   }
 
   private ClusterNetworkBlueprint deriveBlueprint(String nodeName) {
     return ClusterNetworkBlueprint.builder()
-        .cluster(config.clusterName())
+        .cluster(bootstrapContext.config().clusterName())
         .node(nodeName)
         .deriveRecipeModel()
         .build();
   }
 
   private List<InstanceDeviceArgs> seedInstanceDevices(BootstrapPaths hostPaths) {
-    final ClusterNetworkBlueprint managementNodeBlueprint = deriveBlueprint(config.nodeName());
+    final ClusterNetworkBlueprint managementNodeBlueprint =
+        deriveBlueprint(bootstrapContext.config().nodeName());
 
     return DeviceMountPipeline.builder()
-        .lanNic(config.lanBridgeParent(), managementNodeBlueprint.lan().hostMacaddr().value())
-        .vmnetNic(config.vmnetNetworkName(), managementNodeBlueprint.wan().hostMacaddr().value())
+        .lanNic(
+            bootstrapContext.config().lanBridgeParent(),
+            managementNodeBlueprint.lan().hostMacaddr().value())
+        .vmnetNic(
+            bootstrapContext.config().vmnetNetworkName(),
+            managementNodeBlueprint.wan().hostMacaddr().value())
         .kmsgDevice()
         .zfsDevice()
         .disk("worktree.dir", hostPaths.worktreeRoot(), HOST_WORKTREE_PATH)
@@ -1235,7 +1229,7 @@ public final class IncusResourceBootstrap {
   private final class DefaultBootstrapLayerEnvContext implements LayerEnvContext {
 
     private final ClusterNetworkBlueprint managementNodeBlueprint =
-        deriveBlueprint(config.nodeName());
+        deriveBlueprint(bootstrapContext.config().nodeName());
 
     @Override
     public Path rootPath() {
@@ -1289,7 +1283,7 @@ public final class IncusResourceBootstrap {
 
     @Override
     public String nodeName() {
-      return config.nodeName();
+      return bootstrapContext.config().nodeName();
     }
 
     @Override
@@ -1307,12 +1301,12 @@ public final class IncusResourceBootstrap {
 
     @Override
     public String clusterName() {
-      return config.clusterName();
+      return bootstrapContext.config().clusterName();
     }
 
     @Override
     public String clusterToken() {
-      return config.clusterName(); // Using cluster name as token (bioskop)
+      return bootstrapContext.config().clusterName(); // Using cluster name as token (bioskop)
     }
 
     @Override
@@ -1322,7 +1316,7 @@ public final class IncusResourceBootstrap {
 
     @Override
     public String incusRemoteName() {
-      return config.incusDefaultRemote();
+      return bootstrapContext.config().incusDefaultRemote();
     }
 
     @Override
@@ -1654,7 +1648,7 @@ public final class IncusResourceBootstrap {
 
   private void ensureNetwork(
       IncusProviderContext context, String networkName, Resource projectDependency) {
-    if (networkName.equals(config.lanBridgeParent())) {
+    if (networkName.equals(bootstrapContext.config().lanBridgeParent())) {
       // lan-br is provisioned by the host (NixOS systemd-networkd in
       // nix-darwin-home/modules/nixos/incus.nix);
       // is incus-managed
@@ -1667,9 +1661,13 @@ public final class IncusResourceBootstrap {
     }
 
     final String networkProject =
-        networkName.equals(config.vmnetNetworkName()) ? "default" : config.incusProject();
+        networkName.equals(bootstrapContext.config().vmnetNetworkName())
+            ? "default"
+            : bootstrapContext.config().incusProject();
 
-    if (incusImportLookup.isUnmanagedNetwork(context, networkName, networkProject)) {
+    if (bootstrapContext
+        .incusImportLookup()
+        .isUnmanagedNetwork(context, networkName, networkProject)) {
       // Additional safeguard for any non-canonical network that provider reports unmanaged.
       logInfo(
           "incus network ensure: skipping unmanaged bridge reported by provider (name="
@@ -1679,10 +1677,15 @@ public final class IncusResourceBootstrap {
     }
 
     final String existingNetworkId =
-        incusImportLookup.normalizeImportId(
-            incusImportLookup.existingNetworkId(context, networkName, networkProject));
+        bootstrapContext
+            .incusImportLookup()
+            .normalizeImportId(
+                bootstrapContext
+                    .incusImportLookup()
+                    .existingNetworkId(context, networkName, networkProject));
 
-    if (!existingNetworkId.isBlank() && networkName.equals(config.vmnetNetworkName())) {
+    if (!existingNetworkId.isBlank()
+        && networkName.equals(bootstrapContext.config().vmnetNetworkName())) {
       // Existing vmnet bridge is the canonical source of truth for Stage A.
       // Managing it via import causes persistent provider import-replacement churn.
       return;
@@ -1690,17 +1693,17 @@ public final class IncusResourceBootstrap {
 
     final NetworkArgs.Builder builder = NetworkArgs.builder().name(networkName).type("bridge");
 
-    if (networkName.equals(config.vmnetNetworkName())) {
+    if (networkName.equals(bootstrapContext.config().vmnetNetworkName())) {
       // Incus restricts non-default projects to OVN networks only; bridges must
       // live in the default project. Since the rke2lab project inherits
       // networks from default (features.networks=NO), instances in rke2lab can
       // still reference vmnet-br as a NIC parent.
       builder.project("default");
     } else if (existingNetworkId.isBlank()) {
-      builder.project(config.incusProject());
+      builder.project(bootstrapContext.config().incusProject());
     }
 
-    if (networkName.equals(config.vmnetNetworkName())) {
+    if (networkName.equals(bootstrapContext.config().vmnetNetworkName())) {
       builder.config(vmnetBridgeConfig());
     }
 
@@ -1725,7 +1728,8 @@ public final class IncusResourceBootstrap {
   }
 
   private Map<String, String> vmnetBridgeConfig() {
-    final ClusterNetworkBlueprint managementNodeBlueprint = deriveBlueprint(config.nodeName());
+    final ClusterNetworkBlueprint managementNodeBlueprint =
+        deriveBlueprint(bootstrapContext.config().nodeName());
 
     final String clusterGatewayWithPrefix =
         managementNodeBlueprint.host().clusterGatewayInetaddr().getHostAddress()
@@ -1766,7 +1770,7 @@ public final class IncusResourceBootstrap {
   }
 
   private String clusterNodeLeaseHostname(String nodeName) {
-    return config.clusterName() + "-" + nodeName;
+    return bootstrapContext.config().clusterName() + "-" + nodeName;
   }
 
   private static final class DeviceMountPipeline {
