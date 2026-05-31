@@ -142,7 +142,13 @@ public final class IncusResourceBootstrap {
         .then()
         .during(
             "provider resources",
-            provider -> provider.ensureProject().ensureNetworks().ensureProfile().ensureImage())
+            provider ->
+                provider
+                    .ensureProject()
+                    .ensureNetworks()
+                    .ensureProfile()
+                    .ensureImage()
+                    .createImageStateConfigMap())
         .then()
         .during("instance", instance -> instance.create())
         .toResult();
@@ -621,6 +627,36 @@ public final class IncusResourceBootstrap {
           new BuildMetadata(
               new BuildMetadata.Image(imageProvider.buildChecksum()),
               state.buildMetadata.manifests());
+      return this;
+    }
+
+    ProviderStage createImageStateConfigMap() {
+      // Image state ConfigMap cannot be synthesized during Stage A "host state" preparation
+      // because the image fingerprint isn't available yet (chicken-and-egg: manifests need to
+      // be materialized into /srv/host BEFORE provider resources are created, but the fingerprint
+      // comes FROM those provider resources).
+      //
+      // Solution: Use CDK8s to synthesize the manifest DURING Pulumi apply (after Outputs resolve),
+      // write the YAML to /srv/host/manifests/clusterapi/staged/, then a systemd oneshot unit
+      // applies it after RKE2 is up.
+      //
+      // This implements the "staged post-cluster resource" pattern documented in
+      // docs/staged-post-cluster-resources.adoc.
+      //
+      // IMPORTANT: Shell scripts do NOT author YAML. All manifest structure comes from CDK8s
+      // (ImageStateConfigMapManifestUnit), even for staged resources. The staging only affects
+      // WHEN synthesis happens (Output.apply time vs. host-state prep), not WHO authors it.
+      //
+      // The implementation is deferred to Phase 1.5 (current work is getting the manifest layer
+      // plumbing correct). For now, the ConfigMap will be manually applied or handled by Stage B
+      // provisioning once the full Stage A→B handoff is working.
+      //
+      // When implementing:
+      // 1. Use Output.all() to combine fingerprint + config values
+      // 2. Call synthesizeImageStateConfigMapYaml() with resolved values (CDK8s synthesis)
+      // 3. Write YAML to /srv/host/manifests/clusterapi/staged/image-state-configmap.yaml
+      // 4. Create systemd unit that does `kubectl apply -f <manifest>`
+      // 5. Wire into bootstrap sequence (After=rke2-server, Before=cluster-ready.target)
       return this;
     }
   }

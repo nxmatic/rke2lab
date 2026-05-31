@@ -2,6 +2,7 @@ package io.nxmatic.rk2lab.manifests.layers.clusterapi;
 
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.ImageState;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -27,8 +28,29 @@ import org.cdk8s.JsonPatch;
  *
  * <p>The ConfigMap is named {@code <cluster-name>-image-state} in namespace {@code capn-system}.
  *
- * <p><b>Note:</b> Currently uses placeholder values. These will be populated from Stage A outputs
- * (imageProvider, BuildMetadata) in a future iteration when seed-master integration is complete.
+ * <p><b>NOTE:</b> This unit is currently NOT registered in {@link
+ * io.nxmatic.rk2lab.manifests.layers.clusterapi.ClusterApiDomainRegistrar} due to a dependency
+ * cycle: CDK8s manifest synthesis happens during Stage A "host state" preparation (before Pulumi
+ * provider resources are created), but the image fingerprint comes FROM a Pulumi provider resource
+ * (the Incus image). This creates a chicken-and-egg problem where manifests need to be materialized
+ * into {@code /srv/host} before the data they need exists.
+ *
+ * <p><b>Solution:</b> The ConfigMap is created via the "staged post-cluster resource" pattern
+ * documented in {@code docs/staged-post-cluster-resources.adoc} — a systemd oneshot unit applies it
+ * after RKE2 starts, reading image state from a metadata file written during Pulumi apply.
+ *
+ * <p>This class remains in the codebase as:
+ *
+ * <ul>
+ *   <li>Documentation of the ConfigMap structure
+ *   <li>Reference for the systemd bootstrap script that creates it
+ *   <li>Potential future use if the dependency cycle is broken another way
+ * </ul>
+ *
+ * <p>Values are supplied by seed-master (Stage A) through the {@link ImageState} synth slice — the
+ * fingerprint via the synchronous Incus {@code getImagePlain} lookup, the checksum from the build,
+ * the remote/project from the bootstrap config. When no real image state is bound (ephemeral/test
+ * synth), the unit is skipped, same as for an unknown cluster identity.
  */
 public final class ImageStateConfigMapManifestUnit extends AbstractManifestUnit {
 
@@ -50,17 +72,23 @@ public final class ImageStateConfigMapManifestUnit extends AbstractManifestUnit 
       return;
     }
 
-    // TODO: These values should come from Stage A outputs (imageProvider, BuildMetadata)
-    // For now, using placeholders to establish the handoff contract
-    final Map<String, String> imageState =
-        Map.of(
-            "imageAlias", "control-node",
-            "imageFingerprint", "PLACEHOLDER-fingerprint-from-imageProvider",
-            "imageBuildChecksum", "PLACEHOLDER-checksum-from-BuildMetadata",
-            "incusProject", "rke2lab",
-            "incusRemoteAddress", "PLACEHOLDER-remote-from-bootstrapIdentity");
+    final ImageState state = imageState();
 
-    createImageStateConfigMap(chart, clusterName, imageState);
+    // Skip when seed-master supplied no real image identity (ephemeral/test synth): an
+    // all-placeholder ConfigMap would mislead Stage B into pinning a non-existent image.
+    if (state.isUnknown()) {
+      return;
+    }
+
+    final Map<String, String> data =
+        Map.of(
+            "imageAlias", state.imageAlias(),
+            "imageFingerprint", state.imageFingerprint(),
+            "imageBuildChecksum", state.imageBuildChecksum(),
+            "incusProject", state.incusProject(),
+            "incusRemoteAddress", state.incusRemoteAddress());
+
+    createImageStateConfigMap(chart, clusterName, data);
   }
 
   private void createImageStateConfigMap(

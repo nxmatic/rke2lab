@@ -71,7 +71,8 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             request.floxDebugPolicy(),
             request.bootstrapIdentity(),
             request.networkTopology(),
-            request.componentVersions());
+            request.componentVersions(),
+            request.imageState());
     try (var ignored = ManifestSynthesisContext.bind(context)) {
       return synthesizeInContext(request);
     }

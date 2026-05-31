@@ -3,6 +3,7 @@ package io.nxmatic.rk2lab.manifests.api;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.ComponentVersions;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.ImageState;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.NetworkTopology;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -20,7 +21,8 @@ public record ManifestSynthesisRequest(
     FloxDebugPolicy floxDebugPolicy,
     BootstrapIdentity bootstrapIdentity,
     NetworkTopology networkTopology,
-    ComponentVersions componentVersions)
+    ComponentVersions componentVersions,
+    ImageState imageState)
     implements ManifestDomainPolicyAware {
 
   private static final String ENABLED_DOMAINS_PROPERTY = "rk2lab.manifests.policy.enabledDomains";
@@ -51,7 +53,8 @@ public record ManifestSynthesisRequest(
         floxDebugPolicy,
         BootstrapIdentity.unknown(),
         NetworkTopology.empty(),
-        ComponentVersions.empty());
+        ComponentVersions.empty(),
+        ImageState.unknown());
   }
 
   public ManifestSynthesisRequest {
@@ -65,6 +68,7 @@ public record ManifestSynthesisRequest(
     bootstrapIdentity = bootstrapIdentity == null ? BootstrapIdentity.unknown() : bootstrapIdentity;
     networkTopology = networkTopology == null ? NetworkTopology.empty() : networkTopology;
     componentVersions = componentVersions == null ? ComponentVersions.empty() : componentVersions;
+    imageState = imageState == null ? ImageState.unknown() : imageState;
   }
 
   public static ManifestSynthesisRequest fromSystemProperties() {
@@ -128,7 +132,8 @@ public record ManifestSynthesisRequest(
         floxDebugPolicy,
         bootstrapIdentity,
         networkTopology,
-        componentVersions);
+        componentVersions,
+        imageState);
   }
 
   public ManifestSynthesisRequest withFloxDebugPolicy(FloxDebugPolicy policy) {
@@ -139,7 +144,8 @@ public record ManifestSynthesisRequest(
         policy,
         bootstrapIdentity,
         networkTopology,
-        componentVersions);
+        componentVersions,
+        imageState);
   }
 
   public ManifestSynthesisRequest withBootstrapIdentity(BootstrapIdentity identity) {
@@ -150,7 +156,8 @@ public record ManifestSynthesisRequest(
         floxDebugPolicy,
         identity,
         networkTopology,
-        componentVersions);
+        componentVersions,
+        imageState);
   }
 
   public ManifestSynthesisRequest withNetworkTopology(NetworkTopology topology) {
@@ -161,7 +168,8 @@ public record ManifestSynthesisRequest(
         floxDebugPolicy,
         bootstrapIdentity,
         topology,
-        componentVersions);
+        componentVersions,
+        imageState);
   }
 
   public ManifestSynthesisRequest withComponentVersions(ComponentVersions versions) {
@@ -172,7 +180,20 @@ public record ManifestSynthesisRequest(
         floxDebugPolicy,
         bootstrapIdentity,
         networkTopology,
-        versions);
+        versions,
+        imageState);
+  }
+
+  public ManifestSynthesisRequest withImageState(ImageState state) {
+    return new ManifestSynthesisRequest(
+        synthOutdir,
+        synthManifestFile,
+        manifestDomainPolicy,
+        floxDebugPolicy,
+        bootstrapIdentity,
+        networkTopology,
+        componentVersions,
+        state);
   }
 
   private static FloxDebugPolicy floxDebugPolicyFromSystemProperties() {

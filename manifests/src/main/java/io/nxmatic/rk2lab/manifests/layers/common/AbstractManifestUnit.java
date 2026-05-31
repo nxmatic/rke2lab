@@ -4,6 +4,7 @@ package io.nxmatic.rk2lab.manifests.layers.common;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.ComponentVersions;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.ImageState;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.NetworkTopology;
 import java.util.List;
 
@@ -50,5 +51,10 @@ public abstract class AbstractManifestUnit implements ManifestUnit {
   /** Component-version slice (kube-vip, tailscale, …). */
   protected final ComponentVersions componentVersions() {
     return ManifestSynthesisContext.current().componentVersions();
+  }
+
+  /** Stage A → Stage B control-node image identity slice (alias, fingerprint, checksum, remote). */
+  protected final ImageState imageState() {
+    return ManifestSynthesisContext.current().imageState();
   }
 }

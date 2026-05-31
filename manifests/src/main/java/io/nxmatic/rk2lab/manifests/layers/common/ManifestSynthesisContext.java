@@ -4,6 +4,7 @@ package io.nxmatic.rk2lab.manifests.layers.common;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.ComponentVersions;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.ImageState;
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.NetworkTopology;
 import java.util.Objects;
 
@@ -22,6 +23,8 @@ import java.util.Objects;
  *       remote/identity, …).
  *   <li>{@link NetworkTopology} — CIDRs, interface names, gateway addresses.
  *   <li>{@link ComponentVersions} — kube-vip, tailscale, envoy-gateway, … versions.
+ *   <li>{@link ImageState} — Stage A → Stage B control-node image identity (alias, fingerprint,
+ *       build checksum, Incus project/remote) for the image-state ConfigMap.
  * </ul>
  *
  * <p>When no synthesis is in progress (direct unit tests of a Layer without {@code synthesize}),
@@ -34,7 +37,8 @@ public final class ManifestSynthesisContext {
           FloxDebugPolicy.disabled(),
           BootstrapIdentity.unknown(),
           NetworkTopology.empty(),
-          ComponentVersions.empty());
+          ComponentVersions.empty(),
+          ImageState.unknown());
 
   private static final ThreadLocal<ManifestSynthesisContext> CURRENT = new ThreadLocal<>();
 
@@ -42,25 +46,29 @@ public final class ManifestSynthesisContext {
   private final BootstrapIdentity bootstrapIdentity;
   private final NetworkTopology networkTopology;
   private final ComponentVersions componentVersions;
+  private final ImageState imageState;
 
   private ManifestSynthesisContext(
       FloxDebugPolicy floxDebugPolicy,
       BootstrapIdentity bootstrapIdentity,
       NetworkTopology networkTopology,
-      ComponentVersions componentVersions) {
+      ComponentVersions componentVersions,
+      ImageState imageState) {
     this.floxDebugPolicy = Objects.requireNonNull(floxDebugPolicy, "floxDebugPolicy");
     this.bootstrapIdentity = Objects.requireNonNull(bootstrapIdentity, "bootstrapIdentity");
     this.networkTopology = Objects.requireNonNull(networkTopology, "networkTopology");
     this.componentVersions = Objects.requireNonNull(componentVersions, "componentVersions");
+    this.imageState = Objects.requireNonNull(imageState, "imageState");
   }
 
   public static ManifestSynthesisContext of(
       FloxDebugPolicy floxDebugPolicy,
       BootstrapIdentity bootstrapIdentity,
       NetworkTopology networkTopology,
-      ComponentVersions componentVersions) {
+      ComponentVersions componentVersions,
+      ImageState imageState) {
     return new ManifestSynthesisContext(
-        floxDebugPolicy, bootstrapIdentity, networkTopology, componentVersions);
+        floxDebugPolicy, bootstrapIdentity, networkTopology, componentVersions, imageState);
   }
 
   /** Convenience overload for callers that only need to override the flox debug policy. */
@@ -69,7 +77,8 @@ public final class ManifestSynthesisContext {
         floxDebugPolicy,
         BootstrapIdentity.unknown(),
         NetworkTopology.empty(),
-        ComponentVersions.empty());
+        ComponentVersions.empty(),
+        ImageState.unknown());
   }
 
   public static ManifestSynthesisContext current() {
@@ -102,6 +111,10 @@ public final class ManifestSynthesisContext {
 
   public ComponentVersions componentVersions() {
     return componentVersions;
+  }
+
+  public ImageState imageState() {
+    return imageState;
   }
 
   /** Restores the previous binding when closed. */
