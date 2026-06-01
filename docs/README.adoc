@@ -33,17 +33,22 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 
 === Manifest Synthesis
 
+* link:manifest-nomenclature.adoc[Manifest Nomenclature Guide] (📐 **START HERE**) - Clarifies terminology: deployment layers vs manifest domains/components/charts. Essential reading to understand the codebase structure.
 * link:manifest-apply-flow.adoc[Manifest Apply Flow] - Complete five-stage pipeline from CDK8s synthesis to live resources via RKE2 auto-deploy (no kubectl apply needed)
 * link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How K8s manifests are generated from code
 * link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven optional manifest units within domains
 * link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] (✅ Enforced) - Single source of truth for domain IDs; prevents identifier mismatches like the clusterApi bug
-* link:cdk8s-chart-vs-construct-pattern.adoc[CDK8s Chart vs Construct Pattern] (✅ Enforced) - Critical distinction between synthesis boundaries (Chart) and composition (Construct); all Layer classes MUST extend Construct
-* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow patterns in seed-master
+* link:cdk8s-chart-vs-construct-pattern.adoc[CDK8s Chart vs Construct Pattern] (✅ Enforced) - Critical distinction between synthesis boundaries (Chart) and composition (Construct); components MUST extend Construct, charts extend Chart
+* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow patterns in seed-layer1
 * link:staged-post-cluster-resources.adoc[Staged Post-Cluster Resources] - Pattern for resources that need Pulumi Outputs but must exist before Stage B
 
 == GitOps & Cluster API
 
-* link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] - Phase 1-3 implementation roadmap (✅ Phase 1, 📋 Phase 2/3)
+**NEW**: Multiple planning documents? See link:planning-documents-guide.adoc[Planning Documents Navigation Guide] for help understanding which plans are active, superseded, and how they relate.
+
+* link:vcluster-implementation-plan.adoc[vCluster Implementation Plan] (📋 Active Plan - Phase 1.5-6) - **START HERE** for current implementation roadmap. Complete phased plan for gitops-mgmt vCluster pattern with detailed actions, code examples, and validation criteria. Supersedes Phase 2+ from transition plan below.
+* link:vcluster-gitops-architecture.adoc[vCluster GitOps Architecture] (📋 Architecture Reference) - Architecture decisions, C4 diagrams, and Option A/B/C/D analysis for management vCluster pattern. Implementation details in plan above.
+* link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] (✅ Phase 1 Complete, 📋 Phase 2+ Superseded) - Original Phase 1-3 plan. Phase 1 complete (master node). Phase 2+ superseded by vCluster Implementation Plan.
 * link:cluster-api-bootstrap-requirements.adoc[Cluster API Bootstrap Requirements] - Cleanup plan & flox webhook injection architecture (⚠️ Design Only)
 * link:stagea-stageb-handoff-contract.adoc[Stage A/B Handoff Contract] - Bootstrap → cluster management transition
 * link:post-bootstrap-in-cluster-ownership-plan.adoc[Post-Bootstrap Ownership Plan] - Component lifecycle after bootstrap

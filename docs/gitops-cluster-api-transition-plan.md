@@ -243,3 +243,26 @@ GitHub webhook triggers seed-peers in-cluster on relevant pushes; Tekton synthes
 - Migrate `PorchResourcesLayer` packages (cilium, headscale, etc.) to plain Flux Kustomizations + HelmReleases.
 - Worker `MachineDeployment` instantiation. Templates synthesized in Phase 2; replicas bumped in a future commit.
 - nikopol cluster (multi-cluster). seed-peers is parameterized for it but `gitops/clusters/nikopol/` not populated initially.
+
+## Phase 2+: vCluster-Based Architecture (REVISED)
+
+**IMPORTANT**: The original Phase 2-4 plan has been superseded by a revised approach based on architectural analysis.
+
+**Original plan**: Phase 2-3 install Flux in core, Phase 4 move to vCluster.
+**Revised plan**: Skip "Flux in core" step, go directly to gitops-mgmt vCluster pattern.
+
+See [vCluster Implementation Plan](vcluster-implementation-plan.adoc) for the complete revised roadmap (Phase 1.5-6).
+
+**Key change**: Phase 1-3 from this document are now consolidated into Phase 1.5-4 in the implementation plan, with better separation of concerns between RKE2 auto-deploy (infrastructure) and Flux (workloads).
+
+**Key architectural shift**: Phase 1-3 installs Flux + CAPI in the **core cluster** as a temporary arrangement. Phase 4 migrates them into a dedicated **`gitops-mgmt` vCluster**. This enables:
+
+- **Reentrant testing**: Test core cluster upgrades in isolation via `gitops-mgmt-next` before promoting to production
+- **Complete reentrancy**: The core cluster is managed like any other vCluster (Flux applies to parent via `parent-cluster-kubeconfig` Secret)
+- **Better isolation**: Flux failure in gitops-mgmt doesn't crash the core cluster
+- **Upgrade validation**: Standard workflow for testing Flux/CAPI upgrades before applying to production
+- **Mutualized management**: One Flux instance manages both the core cluster and all lab vClusters (not N × 120MB)
+
+**Migration path**: Phase 4 includes a detailed migration plan from "Flux in core" (Phase 1-3 state) to "Flux in gitops-mgmt vCluster" with rollback procedures and validation steps.
+
+**When to start Phase 4**: After Phase 2-3 are complete and peer provisioning is stable. The vCluster architecture assumes the cluster infrastructure (CAPI + peers) is operational.

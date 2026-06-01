@@ -1,0 +1,196 @@
+= Planning Documents Navigation Guide
+:toc: left
+:toclevels: 2
+
+== Overview
+
+This guide helps navigate the multiple planning documents in rke2lab. As the project evolved, plans were refined and consolidated. This document explains which plans are active, which are superseded, and how they relate.
+
+== Current Active Plans
+
+=== 1. link:vcluster-implementation-plan.adoc[vCluster Implementation Plan] 📋 **PRIMARY PLAN**
+
+**Status**: Active implementation roadmap
+
+**Scope**: Phase 1.5 through Phase 6 (post-Phase 1 from original plan)
+
+**Purpose**: Complete implementation roadmap for establishing gitops-mgmt vCluster pattern
+
+**Use when**: You need concrete implementation steps, code examples, or validation criteria
+
+**Key sections**:
+* Three-layer bootstrap architecture (RKE2 auto-deploy → Pulumi → Flux)
+* Phase 1.5: Refactor manifests/ to infrastructure-critical only
+* Phase 2: Create gitops-mgmt vCluster with Flux
+* Phase 3: Create seed-vclusters module
+* Phase 4: Peer provisioning via Flux
+* Phase 5: Lab vCluster deployment
+* Phase 6: Upgrade testing pattern
+
+**Supersedes**: Phase 2-4 sections in gitops-cluster-api-transition-plan.md
+
+=== 2. link:vcluster-gitops-architecture.adoc[vCluster GitOps Architecture] 📐 **ARCHITECTURE REFERENCE**
+
+**Status**: Architecture decisions and design analysis
+
+**Scope**: Complete vCluster architecture with Option A/B/C/D analysis
+
+**Purpose**: Understand WHY the architecture is designed this way
+
+**Use when**: You need to understand architectural trade-offs, review design decisions, or see C4 diagrams
+
+**Key sections**:
+* Problem statement and requirements
+* Four architecture options analyzed (A: centralized, B: distributed, C: hybrid, D: management vCluster)
+* Decision rationale for Option D (selected)
+* C4 diagrams (Context, Container, Component, Deployment, Sequence)
+* Migration path from Phase 1-3
+* Testing patterns
+
+**Relationship to implementation plan**: Architecture plan provides the "why", implementation plan provides the "how"
+
+== Historical/Superseded Plans
+
+=== link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan]
+
+**Status**: ✅ Phase 1 Complete, 📋 Phase 2+ Superseded
+
+**Still relevant for**: Phase 1 implementation details (master node bootstrap)
+
+**Superseded by**: vCluster Implementation Plan (for Phase 2 onwards)
+
+**Reason for change**: Original plan had Flux in core cluster (Phase 2-3) then move to vCluster (Phase 4). Revised plan goes directly to gitops-mgmt vCluster pattern, skipping "Flux in core" step.
+
+**What to read**:
+* ✅ Phase 1 sections: Still accurate for master node bootstrap via Pulumi
+* ❌ Phase 2-3 sections: Superseded, use vCluster Implementation Plan instead
+* ❌ Phase 4 section: Replaced by link to vCluster Implementation Plan
+
+== Document Relationships
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ vCluster Implementation Plan (PRIMARY)                          │
+│                                                                  │
+│ Phase 1.5-6: Complete implementation roadmap                    │
+│ - Detailed steps, code examples, validation                    │
+│ - Success criteria and checkpoints                             │
+│ - Repository structure changes                                  │
+└──────────────────────────────────┬──────────────────────────────┘
+                                   │
+                    ┌──────────────┴──────────────┐
+                    ↓                             ↓
+┌──────────────────────────────────┐  ┌──────────────────────────┐
+│ vCluster GitOps Architecture     │  │ GitOps + CAPI Plan       │
+│ (ARCHITECTURE)                   │  │ (HISTORICAL)             │
+│                                  │  │                          │
+│ - Why Option D was chosen       │  │ ✅ Phase 1 (complete)    │
+│ - C4 diagrams                   │  │ ❌ Phase 2-4 (superseded) │
+│ - Design trade-offs             │  │                          │
+│ - Migration path                │  └──────────────────────────┘
+└──────────────────────────────────┘
+```
+
+== How to Use These Documents
+
+=== Scenario 1: I'm implementing Phase 1.5 (refactor manifests/)
+
+1. **Read**: link:vcluster-implementation-plan.adoc#phase-15-refactor-manifests-module[vCluster Implementation Plan - Phase 1.5]
+2. **Reference**: link:vcluster-gitops-architecture.adoc#layer-1-rkе2-auto-deploy[vCluster Architecture - Layer 1] for rationale
+3. **Check**: link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] for CDK8s patterns
+
+=== Scenario 2: I need to understand why we chose gitops-mgmt vCluster
+
+1. **Read**: link:vcluster-gitops-architecture.adoc#architecture-decision-process[vCluster Architecture - Decision Process]
+2. **See**: Option A/B/C/D comparison with advantages/disadvantages
+3. **Check**: System Context Diagram (C4 Level 1) for visual overview
+
+=== Scenario 3: I want to implement peer provisioning
+
+1. **Read**: link:vcluster-implementation-plan.adoc#phase-4-peer-provisioning-via-flux[vCluster Implementation Plan - Phase 4]
+2. **Reference**: link:gitops-cluster-api-transition-plan.md#phase-2-seed-peers-module-operator-driven-peer1[Original Plan - Phase 2] for CAPI patterns (still valid)
+3. **Check**: link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] for identity flow
+
+=== Scenario 4: I'm confused about which Flux to install where
+
+1. **Read**: link:vcluster-implementation-plan.adoc#architecture-decision-three-layer-bootstrap[vCluster Implementation Plan - Three-Layer Bootstrap]
+2. **Key point**:
+   * Layer 1 (RKE2 auto-deploy): Flux**Operator** only (not FluxInstance)
+   * Layer 2 (Pulumi): Creates gitops-mgmt vCluster, bootstraps Flux **inside** it
+   * Layer 3 (Flux in gitops-mgmt): Manages everything via parent-cluster-kubeconfig
+
+=== Scenario 5: What happened to Phase 2-3 from the original plan?
+
+1. **Answer**: Merged into Phase 1.5-4 of vCluster Implementation Plan
+2. **Why**: Skip "Flux in core" step, go directly to gitops-mgmt vCluster
+3. **Benefit**: Simpler migration path, no need to move Flux later
+
+== Phase Mapping
+
+| Original Plan | vCluster Implementation Plan | Status |
+|---------------|------------------------------|--------|
+| Phase 1 | Phase 1 (unchanged) | ✅ Complete |
+| Phase 2 (Flux in core) | **SKIPPED** | ❌ Not implemented |
+| Phase 3 (Peers via Flux in core) | Phase 1.5 (refactor) + Phase 4 (peers via Flux in gitops-mgmt) | 📋 Planned |
+| Phase 4 (Move to vCluster) | Phase 2 (create gitops-mgmt) | 📋 Planned |
+| (none) | Phase 3 (seed-vclusters module) | 📋 Planned |
+| (none) | Phase 5 (lab vClusters) | 📋 Planned |
+| (none) | Phase 6 (upgrade testing) | 📋 Planned |
+
+**Key change**: Original Phase 2 (Flux in core) was removed. We now go directly from Phase 1 (master node) to Phase 1.5-2 (refactor + gitops-mgmt vCluster).
+
+== Quick Reference
+
+**Need implementation steps?** → link:vcluster-implementation-plan.adoc[vCluster Implementation Plan]
+
+**Need architecture diagrams?** → link:vcluster-gitops-architecture.adoc[vCluster GitOps Architecture]
+
+**Need Phase 1 details?** → link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] (Phase 1 only)
+
+**Confused about phase numbers?** → See "Phase Mapping" section above
+
+**Want to see all plans?** → link:README.adoc#gitops-cluster-api[docs/README.adoc - GitOps & Cluster API section]
+
+== Common Questions
+
+=== Q: Why are there multiple planning documents?
+
+**A**: The project evolved. Initial plan (gitops-cluster-api-transition-plan.md) was written before vCluster architecture was fully designed. After architectural analysis, we decided to skip "Flux in core" and go directly to gitops-mgmt vCluster, requiring a revised implementation plan.
+
+=== Q: Should I read all the plans?
+
+**A**: No. Start with link:vcluster-implementation-plan.adoc[vCluster Implementation Plan] for implementation. Reference link:vcluster-gitops-architecture.adoc[vCluster GitOps Architecture] for design rationale. Original plan is historical context only.
+
+=== Q: What if the plans conflict?
+
+**A**: vCluster Implementation Plan takes precedence for Phase 1.5+. If you find conflicts, they should be resolved in favor of the implementation plan (as it's the most recent).
+
+=== Q: Are Phase 2-3 from the original plan lost?
+
+**A**: No, they're incorporated into the revised plan:
+* Phase 2 (original) → Phase 1.5 (refactor) + Phase 4 (peers) in new plan
+* Phase 3 (original) → Phase 3 (seed-vclusters) + Phase 4 (peers) in new plan
+
+The work is preserved, just reorganized for better architecture.
+
+=== Q: When should I update these plans?
+
+**A**:
+* After completing a phase: Update implementation plan with "✅ Complete" status
+* After discovering architectural issues: Update architecture doc with lessons learned
+* After making implementation changes: Update implementation plan steps
+* Keep original plan as historical record (don't delete it)
+
+== Next Steps
+
+1. **Starting implementation?** Go to link:vcluster-implementation-plan.adoc#phase-15-refactor-manifests-module[Phase 1.5: Refactor manifests/]
+2. **Need architectural review?** Read link:vcluster-gitops-architecture.adoc#architecture-decision-process[Architecture Decision Process]
+3. **Confused about structure?** Review this guide's "Document Relationships" section
+
+== Related Documentation
+
+* link:README.adoc[Documentation Index] - Complete documentation map
+* link:manifest-nomenclature.adoc[Manifest Nomenclature Guide] - **READ THIS FIRST** - Clarifies deployment layers vs manifest domains/components/charts
+* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - CDK8s patterns
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Identity flow patterns
+* link:stagea-stageb-handoff-contract.adoc[Stage A/B Handoff Contract] - Bootstrap contracts

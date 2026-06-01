@@ -1,0 +1,1281 @@
+= vCluster GitOps Architecture - Phase 4 Proposal
+:toc: left
+:toclevels: 3
+:status: ⚠️ Design Proposal - Phase 1 Complete, Phase 2-3 In Progress
+
+**Status**: This document proposes the vCluster architecture for deploying applications using a management vCluster pattern.
+
+**Implementation**: See link:vcluster-implementation-plan.adoc[vCluster Implementation Plan] for the complete phased implementation roadmap.
+
+**Dependencies**:
+
+* ✅ Phase 1 Complete: Master node + CAPI/Flux operators installed via Pulumi
+* 📋 Phase 1.5-5 Planned: Implementation detailed in link:vcluster-implementation-plan.adoc[vCluster Implementation Plan]
+
+**Key Architectural Decision**: Use a three-layer bootstrap approach where RKE2 auto-deploy handles infrastructure-critical components (Layer 1), Pulumi creates gitops-mgmt vCluster (Layer 2), and Flux manages all workloads (Layer 3). This enables complete reentrancy and testability while maintaining operational infrastructure dependencies.
+
+== Document Overview
+
+This document defines the architecture for Phase 4 of rke2lab: deploying applications in virtual clusters using a lightweight GitOps approach with Flux in a dedicated management vCluster.
+
+== Overview
+
+Phase 4 extends the rke2lab bootstrap system to provision and manage applications within vClusters. Rather than installing Flux in the core cluster (Option A) or duplicating Flux in every vCluster (Option B), we use **Option D**: a permanent `gitops-mgmt` vCluster that hosts Flux and manages both the parent cluster and all child vClusters.
+
+**Key Innovation**: The `gitops-mgmt` vCluster uses the parent cluster's kubeconfig (via Secret) to apply manifests to the core cluster itself. This enables complete reentrancy: the cluster core is managed as if it were just another vCluster.
+
+**Benefits**:
+
+* **Mutualized**: One Flux (120MB) manages everything, not N × 120MB
+* **Reentrant**: Can test a new version of the core in `gitops-mgmt-next` before promoting
+* **Isolated**: Flux failure in `gitops-mgmt` doesn't crash the core (core still runs, just not managed)
+* **Testable**: Standard workflow for validating upgrades before applying to production
+
+== Problem Statement
+
+=== Current State (Phase 1-3)
+
+rke2lab implements:
+
+* **Phase 1 COMPLETE**: Cluster API + Flux Operator installed via Pulumi (`seed-master/`)
+* **Phase 2-3 IN PROGRESS**: `seed-peers/` module to provision peer nodes via CAPI
+* **Architecture**: Pulumi → master node → CAPI/Flux → peers
+
+=== Requirements for Phase 4
+
+From conversation with Perplexity, need to replace heavy Porch/Flux/kpt stack (200-400MB) with lightweight solution for:
+
+* Provisioning applications in vClusters (labs/teams)
+* Deploying standard apps: Traefik, cert-manager, etc.
+* Managing 1-5 vClusters (not hundreds)
+* **Critical**: System must be reentrant — a lab vCluster should be able to test/deploy a new version of the cluster core
+
+**Problems with current Porch/Flux/kpt**:
+
+* 200-400MB RAM per installation + 10+ CRDs
+* 10-minute Git sync delay
+* Complex debugging (4+ commands to diagnose issues)
+* Excessive complexity for small-scale use case
+
+**Desired characteristics**:
+
+* Lightweight (0-120MB acceptable)
+* GitOps-native (auto-sync from Git)
+* Simple debugging
+* Multi-lab/multi-team support
+* **Reentrant**: Can test core upgrades in isolation
+
+== Architecture Decision Process
+
+=== Options Explored
+
+==== Option A: Centralized GitOps in Core (Initial Approach)
+
+[source,text]
+----
+Cluster core (RKE2)
+├── Namespace: flux-system
+│   ├── source-controller (50MB)
+│   ├── kustomize-controller (50MB)
+│   └── notification-controller (20MB)
+├── vCluster lab-1 (namespace: lab-1)
+│   └── Apps deployed by core Flux
+└── vCluster lab-2 (namespace: lab-2)
+    └── Apps deployed by core Flux
+----
+
+**Advantages**:
+
+* ✅ Single Flux to maintain
+* ✅ 120MB total (vs 120MB × N)
+* ✅ Centralized view of all deployments
+
+**Disadvantages**:
+
+* ❌ Core is a Single Point of Failure
+* ❌ Cannot test new core version easily
+* ❌ **Not reentrant**: How to bootstrap the core itself?
+* ❌ Strong coupling: core problem impacts all labs
+
+==== Option B: Distributed GitOps per vCluster
+
+[source,text]
+----
+Cluster core (RKE2) - MINIMAL
+├── vCluster lab-1 (namespace: lab-1)
+│   ├── Namespace: flux-system
+│   │   ├── source-controller (50MB)
+│   │   ├── kustomize-controller (50MB)
+│   │   └── notification-controller (20MB)
+│   └── Apps deployed locally
+├── vCluster lab-2 (namespace: lab-2)
+│   └── Same: own Flux
+└── vCluster core-next (test next core)
+    └── Flux that deploys v2 of cluster core
+----
+
+**Advantages**:
+
+* ✅ **Reentrant**: A lab can deploy/test new core
+* ✅ **Complete isolation**: lab-1 problem doesn't affect lab-2
+* ✅ **Dogfooding**: System can manage itself
+* ✅ **Testing**: Test new core in disposable vCluster
+
+**Disadvantages**:
+
+* ❌ 120MB × N vClusters (600MB for 5 labs)
+* ❌ N Flux installations to maintain/upgrade
+* ❌ No centralized view (unless monitoring added)
+
+==== Option C: Hybrid GitOps (Compromise)
+
+[source,text]
+----
+Cluster core (RKE2)
+├── Namespace: flux-system (LIGHTWEIGHT)
+│   └── source-controller (50MB) - ONLY watches Git
+├── vCluster lab-1 (namespace: lab-1)
+│   ├── kustomize-controller (50MB) - Applies locally
+│   └── Apps
+├── vCluster lab-2 (namespace: lab-2)
+│   └── Same: local controller
+└── vCluster core-next (test next core)
+    └── Full GitOps stack
+----
+
+**Advantages**:
+
+* ✅ 50MB in core + 50MB × N (300MB for 5 labs)
+* ✅ Partially reentrant
+* ✅ Isolation for applies (local kustomize-controller)
+* ✅ Centralized Git source (single source-controller)
+
+**Disadvantages**:
+
+* ⚠️ Intermediate complexity
+* ⚠️ source-controller in core remains a Git SPOF
+
+==== Option D: Flux in Management vCluster (SELECTED)
+
+[source,text]
+----
+Bootstrap initial (Pulumi)
+↓
+Cluster core (RKE2) - NO FLUX IN CORE
+├── vCluster: gitops-mgmt (namespace: gitops-mgmt) ← PERMANENT
+│   ├── Flux complete (120MB)
+│   ├── CAPI controllers (150MB)
+│   └── Manages core itself via parent-cluster-kubeconfig Secret
+├── vCluster: lab-1 (namespace: lab-1)
+│   └── Apps (managed by gitops-mgmt Flux)
+└── vCluster: lab-2 (namespace: lab-2)
+    └── Apps (managed by gitops-mgmt Flux)
+----
+
+**Pattern**: A special `gitops-mgmt` vCluster is responsible for managing the core cluster.
+
+**Advantages**:
+
+* ✅ **Completely reentrant**: Core is managed like a lab
+* ✅ **Testing**: Create `gitops-mgmt-next` to test new core
+* ✅ **Rollback**: Return to `gitops-mgmt` v1 if problems
+* ✅ **Perfect isolation**: Everything in vClusters
+* ✅ **Mutualized**: One Flux manages everything (not N × 120MB)
+* ✅ **Evolutive**: Can test Flux upgrades in gitops-mgmt-next
+
+**Disadvantages**:
+
+* ⚠️ 270MB in gitops-mgmt (120MB Flux + 150MB CAPI)
+* ⚠️ Conceptually more complex than Option A
+* ⚠️ Requires 3-layer bootstrap (see below)
+
+**Decision**: Option D selected because it solves the reentrancy requirement while maintaining mutualization benefits.
+
+== Migration Path from Phase 1-3
+
+=== Current State (Post-Phase 3)
+
+After Phase 1-3 completion, the cluster architecture is:
+
+[source,text]
+----
+RKE2 Core Cluster
+├── Namespace: flux-system (IN CORE)
+│   ├── Flux Operator (installed by Pulumi)
+│   ├── FluxInstance CR
+│   └── Watching gitops/clusters/bioskop/ (if Phase 1 GitOps bootstrap complete)
+├── Namespace: capi-system (IN CORE)
+│   ├── CAPI core controllers (cluster-api-controller-manager)
+│   └── Cluster CRs for peer provisioning
+├── Namespace: capn-system (IN CORE)
+│   ├── CAPN Incus provider (for LXC container provisioning)
+│   └── Secret: bioskop-incus-identity (Incus API credentials)
+├── Namespace: caprke2-system (IN CORE)
+│   └── CAPRKE2 bootstrap provider (RKE2 cloud-init generation)
+└── Peer nodes: peer1, peer2, peer3 (CAPI-managed, Incus containers)
+----
+
+**Key characteristic**: Flux and CAPI live **in the core cluster**. This is a **temporary arrangement** for Phase 1-3. They will migrate to a vCluster in Phase 4.
+
+=== Why Migrate to gitops-mgmt vCluster?
+
+The Phase 1-3 architecture has limitations:
+
+* **Not reentrant**: Cannot test core cluster upgrades in isolation
+* **Single point of failure**: Flux crash impacts the entire cluster
+* **No upgrade testing**: Upgrading Flux/CAPI requires applying directly to production
+* **Tight coupling**: Core cluster problems impact GitOps management
+
+Moving Flux + CAPI into a dedicated vCluster solves these issues while maintaining the benefits of centralized management.
+
+=== Phase 4 Transition Steps
+
+**Step 1: Install vCluster Operator** (via manifests layer)
+
+Add `VClusterOperatorLayer.java` to `manifests/` module, installed by `rke2lab-cluster-manifests.service`:
+
+[source,java]
+----
+// manifests/.../layers/vcluster/VClusterOperatorLayer.java
+public class VClusterOperatorLayer extends Construct {
+    public VClusterOperatorLayer(Construct scope) {
+        super(scope, "vcluster-operator");
+        // Helm chart installation via CDK8s
+        // Operator size: ~10MB
+    }
+}
+----
+
+**Step 2: Create gitops-mgmt vCluster** (via seed-master Pulumi)
+
+Update `seed-master/` to create the management vCluster:
+
+[source,java]
+----
+// seed-master/.../layers/vcluster/GitopsMgmtVClusterLayer.java
+public class GitopsMgmtVClusterLayer {
+    public GitopsMgmtVClusterLayer(Construct scope) {
+        // Creates VCluster CR: gitops-mgmt
+        // With init.manifests: Flux bootstrap YAML (vendored)
+        // Result: vCluster with Flux pre-installed
+    }
+}
+----
+
+**Step 3: Inject parent-cluster-kubeconfig Secret**
+
+Key innovation: Flux in the vCluster can manage the parent cluster:
+
+[source,bash]
+----
+# Extract vCluster kubeconfig
+vcluster connect gitops-mgmt -n gitops-mgmt --print > /tmp/gitops-mgmt-kubeconfig
+
+# Inject parent cluster kubeconfig into vCluster
+kubectl --kubeconfig=/tmp/gitops-mgmt-kubeconfig \
+  create secret generic parent-cluster-kubeconfig \
+  -n flux-system \
+  --from-file=kubeconfig=$HOME/.kube/config
+----
+
+**Step 4: Bootstrap Flux in gitops-mgmt**
+
+Connect Flux to the repository:
+
+[source,bash]
+----
+flux bootstrap github \
+  --kubeconfig=/tmp/gitops-mgmt-kubeconfig \
+  --owner=nxmatic \
+  --repository=rke2lab \
+  --branch=main \
+  --path=gitops/flux-system
+----
+
+**Step 5: Configure Kustomizations to use parent kubeconfig**
+
+Create Kustomizations that apply to the **parent cluster**:
+
+[source,yaml]
+----
+# gitops/vclusters/gitops-mgmt/flux/kustomizations.yaml
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: bioskop-core
+  namespace: flux-system  # IN gitops-mgmt vCluster
+spec:
+  interval: 10m
+  path: ./clusters/bioskop/core  # CAPI resources, etc.
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  # KEY: Apply to parent cluster, not vCluster
+  kubeConfig:
+    secretRef:
+      name: parent-cluster-kubeconfig
+----
+
+**Step 6: Move CAPI controllers to gitops-mgmt** (optional, can stay in core)
+
+Two sub-options:
+
+* **Option 6A**: Keep CAPI in core (simpler, manages physical infrastructure)
+* **Option 6B**: Move CAPI to gitops-mgmt (full reentrancy, can test CAPI upgrades)
+
+**Recommended**: Start with Option 6A (CAPI in core), migrate to 6B later if needed.
+
+**Step 7: Suspend old Flux in core** (during transition)
+
+Prevent conflicts during dual-Flux period:
+
+[source,bash]
+----
+# Suspend old Flux Kustomizations in core
+kubectl patch kustomization -n flux-system <name> \
+  --type=merge -p '{"spec":{"suspend":true}}'
+
+# After validating gitops-mgmt Flux works, delete old Flux from core
+kubectl delete namespace flux-system  # In core cluster
+----
+
+**Step 8: Create lab vClusters**
+
+With gitops-mgmt operational, create application vClusters:
+
+[source,yaml]
+----
+# gitops/vclusters/labs/lab-1/vcluster.yaml
+apiVersion: vcluster.loft.sh/v1
+kind: VCluster
+metadata:
+  name: lab-1
+  namespace: lab-1
+spec:
+  sync:
+    toHost:
+      pods:
+        enabled: true
+----
+
+Flux in gitops-mgmt applies this to the parent cluster via `parent-cluster-kubeconfig`.
+
+=== Migration Validation
+
+**After each step, validate**:
+
+1. **vCluster Operator**: `kubectl get crd vclusters.vcluster.loft.sh`
+2. **gitops-mgmt vCluster**: `kubectl get vcluster -n gitops-mgmt`
+3. **Flux in gitops-mgmt**: `vcluster connect gitops-mgmt && flux get all`
+4. **Parent kubeconfig Secret**: `kubectl --kubeconfig=<vcluster> get secret parent-cluster-kubeconfig -n flux-system`
+5. **Kustomizations apply to parent**: Check that Flux creates resources in parent, not vCluster
+6. **Old Flux suspended**: Verify no reconciliation conflicts
+7. **Lab vClusters created**: `kubectl get vcluster -n lab-1`
+
+=== Rollback Plan
+
+If Phase 4 migration fails:
+
+1. **Suspend gitops-mgmt Flux**: `kubectl patch kustomization ...`
+2. **Resume old Flux in core**: `kubectl patch kustomization --type=merge -p '{"spec":{"suspend":false}}'`
+3. **Delete gitops-mgmt vCluster**: `kubectl delete vcluster gitops-mgmt -n gitops-mgmt`
+4. **Investigate logs**: `kubectl logs -n gitops-mgmt <flux-pod>`
+
+The core cluster remains operational throughout — Flux manages GitOps, but cluster itself is independent.
+
+== System Context Diagram (C4 Level 1)
+
+[mermaid]
+----
+graph TB
+    Operator["Operator (human)<br/><i>Manages via Pulumi + Git</i>"]
+
+    subgraph Baremetal["bioskop (nix-darwin baremetal)<br/>Mac Studio M4 Max 64GB RAM"]
+        TartVM["bioskop-nixos<br/><i>Tart/VZ VM</i><br/>8 vCPU, 16GB RAM"]
+    end
+
+    subgraph VM["bioskop-nixos VM (Tart/VZ)"]
+        Incus["Incus LXC runtime<br/><i>Container orchestrator</i>"]
+    end
+
+    subgraph RKE2["RKE2 Cluster"]
+        Master["master node<br/><i>Control plane + etcd</i><br/>4 vCPU, 8GB"]
+        Peer1["peer1 node<br/><i>Worker node</i><br/>2 vCPU, 4GB"]
+        Peer2["peer2 node"]
+        Peer3["peer3 node"]
+
+        subgraph VClusters["Virtual Clusters (vCluster)"]
+            GitopsMgmt["gitops-mgmt<br/><i>PERMANENT</i><br/>Flux + CAPI<br/>120MB + 150MB"]
+            GitopsMgmtNext["gitops-mgmt-next<br/><i>TEMPORARY</i><br/>Test upgrades"]
+            Lab1["lab-1<br/><i>User workloads</i>"]
+            Lab2["lab-2"]
+        end
+    end
+
+    GitRepo["GitHub: nxmatic/rke2lab<br/><i>GitOps source of truth</i>"]
+
+    Operator -->|"pulumi up (seed-master)"| Master
+    Operator -->|"git push"| GitRepo
+
+    TartVM -.->|"hosts VM"| Incus
+    Incus -.->|"hosts containers"| Master
+    Incus -.->|"hosts containers"| Peer1
+    Incus -.->|"hosts containers"| Peer2
+    Incus -.->|"hosts containers"| Peer3
+
+    GitopsMgmt -->|"watches git"| GitRepo
+    GitopsMgmt -->|"manages via parent kubeconfig"| Master
+    GitopsMgmt -->|"provisions via CAPI"| Peer1
+    GitopsMgmt -->|"provisions via CAPI"| Peer2
+    GitopsMgmt -->|"provisions via CAPI"| Peer3
+    GitopsMgmt -->|"creates vCluster CRs"| Lab1
+    GitopsMgmt -->|"creates vCluster CRs"| Lab2
+    GitopsMgmtNext -->|"test configuration"| GitRepo
+
+    style Operator fill:#e1f5ff,stroke:#0066cc
+    style GitRepo fill:#e1f5ff,stroke:#0066cc
+    style Baremetal fill:#f0f0f0,stroke:#666
+    style VM fill:#fff4e6,stroke:#ff9900
+    style RKE2 fill:#ccffcc,stroke:#00cc66
+    style VClusters fill:#ffe6f0,stroke:#cc0066
+    style GitopsMgmt fill:#ffcccc,stroke:#cc0000
+    style GitopsMgmtNext fill:#ffeecc,stroke:#cc6600
+----
+
+**Legend:**
+
+* Blue: External actors and systems
+* Gray: Baremetal host (nix-darwin)
+* Orange: VM layer (Tart/VZ)
+* Green: Kubernetes cluster
+* Pink: vCluster namespace
+* Red: Management vClusters (gitops-mgmt)
+
+== Container Diagram (C4 Level 2)
+
+[mermaid]
+----
+graph TB
+    subgraph NixDarwin["bioskop (nix-darwin-home)"]
+        Pulumi["Pulumi (seed-master)<br/><i>Bootstrap Layer 1</i>"]
+        CDK8s["CDK8s (manifests)<br/><i>Synth K8s resources</i>"]
+    end
+
+    subgraph TartVM["bioskop-nixos VM"]
+        Incus["Incus<br/><i>LXC container runtime</i>"]
+    end
+
+    subgraph Core["RKE2 Core Cluster"]
+        VClusterOp["vCluster Operator<br/><i>10MB - installed by Pulumi</i>"]
+        Cilium["Cilium<br/><i>CNI + NetworkPolicy</i>"]
+
+        subgraph GitopsMgmtNS["Namespace: gitops-mgmt"]
+            GitopsMgmtCR["VCluster CR<br/><i>Created by Pulumi</i>"]
+
+            subgraph GitopsMgmtVCluster["gitops-mgmt vCluster"]
+                FluxMgmt["Flux<br/><i>source-controller<br/>kustomize-controller<br/>120MB total</i>"]
+                CAPI["CAPI Controllers<br/><i>cluster-api<br/>capn (Incus)<br/>caprke2<br/>150MB total</i>"]
+                ParentKubeconfig["Secret:<br/>parent-cluster-kubeconfig<br/><i>Injected by Pulumi</i>"]
+            end
+        end
+
+        subgraph Lab1NS["Namespace: lab-1"]
+            Lab1CR["VCluster CR"]
+            subgraph Lab1VCluster["lab-1 vCluster"]
+                Traefik["Traefik Ingress"]
+                CertManager["cert-manager"]
+            end
+        end
+    end
+
+    subgraph Peers["Peer Nodes (CAPI-managed)"]
+        Peer1["peer1<br/><i>Incus container</i>"]
+        Peer2["peer2"]
+        Peer3["peer3"]
+    end
+
+    GitRepo["GitHub<br/>nxmatic/rke2lab"]
+
+    Pulumi -->|"install"| VClusterOp
+    Pulumi -->|"create CR"| GitopsMgmtCR
+    Pulumi -->|"bootstrap Flux"| FluxMgmt
+    Pulumi -->|"inject Secret"| ParentKubeconfig
+
+    CDK8s -->|"synth → gitops/"| GitRepo
+
+    FluxMgmt -->|"watch"| GitRepo
+    FluxMgmt -->|"apply to parent<br/>via parent-cluster-kubeconfig"| Cilium
+    FluxMgmt -->|"create Machine via CAPI"| CAPI
+    FluxMgmt -->|"create VCluster CR"| Lab1CR
+
+    CAPI -->|"provision via Incus API"| Incus
+    Incus -->|"create containers"| Peer1
+    Incus -->|"create containers"| Peer2
+    Incus -->|"create containers"| Peer3
+
+    VClusterOp -->|"reconcile CR"| GitopsMgmtCR
+    VClusterOp -->|"reconcile CR"| Lab1CR
+
+    style Pulumi fill:#e1f5ff,stroke:#0066cc
+    style CDK8s fill:#e1f5ff,stroke:#0066cc
+    style GitRepo fill:#e1f5ff,stroke:#0066cc
+    style FluxMgmt fill:#ffcccc,stroke:#cc0000
+    style CAPI fill:#ffcccc,stroke:#cc0000
+    style ParentKubeconfig fill:#ffffcc,stroke:#cccc00
+----
+
+**Key Components:**
+
+1. **vCluster Operator** (10MB): Installed by Pulumi in Layer 1, runs in core cluster
+2. **gitops-mgmt vCluster**: Permanent vCluster hosting Flux + CAPI
+3. **parent-cluster-kubeconfig Secret**: Enables Flux to manage the parent cluster
+4. **Flux in gitops-mgmt**: Watches GitHub, applies to parent via Secret
+5. **CAPI in gitops-mgmt**: Provisions peer nodes via Incus
+6. **Lab vClusters**: User workload isolation, managed by Flux via VCluster CRs
+
+== Component Diagram: gitops-mgmt vCluster (C4 Level 3)
+
+[mermaid]
+----
+graph TB
+    subgraph GitopsMgmt["gitops-mgmt vCluster"]
+        subgraph FluxSystem["Namespace: flux-system"]
+            SourceCtrl["source-controller<br/><i>Watches Git repos</i>"]
+            KustomizeCtrl["kustomize-controller<br/><i>Applies manifests</i>"]
+            NotificationCtrl["notification-controller<br/><i>Events & alerts</i>"]
+
+            GitSource["GitRepository CR<br/><i>nxmatic/rke2lab</i>"]
+
+            BioskopKustomization["Kustomization CR<br/><i>clusters/bioskop/</i><br/>kubeConfig: parent-cluster-kubeconfig"]
+            VClustersKustomization["Kustomization CR<br/><i>vclusters/</i><br/>kubeConfig: parent-cluster-kubeconfig"]
+        end
+
+        subgraph CAPISystem["Namespace: capi-system"]
+            CAPIOperator["CAPI Operator<br/><i>cluster-api controller</i>"]
+            CAPNProvider["Incus Provider<br/><i>CAPN controller</i>"]
+            CAPRKE2Provider["RKE2 Bootstrap Provider<br/><i>CAPRKE2 controller</i>"]
+
+            PeerCluster["Cluster CR<br/><i>bioskop-peers</i>"]
+            PeerMachine1["Machine CR: peer1"]
+            PeerMachine2["Machine CR: peer2"]
+            PeerMachine3["Machine CR: peer3"]
+        end
+
+        ParentSecret["Secret:<br/>parent-cluster-kubeconfig<br/><i>Injected by Pulumi</i>"]
+    end
+
+    ParentCluster["Parent Cluster<br/><i>RKE2 Core</i>"]
+    IncusAPI["Incus API<br/><i>bioskop-nixos VM</i>"]
+
+    SourceCtrl -->|"fetch"| GitSource
+    GitSource -->|"content"| BioskopKustomization
+    GitSource -->|"content"| VClustersKustomization
+
+    KustomizeCtrl -->|"read"| BioskopKustomization
+    KustomizeCtrl -->|"read"| VClustersKustomization
+    KustomizeCtrl -->|"use kubeconfig"| ParentSecret
+    KustomizeCtrl -->|"apply CAPI CRs"| ParentCluster
+    KustomizeCtrl -->|"apply VCluster CRs"| ParentCluster
+
+    CAPIOperator -->|"read Cluster CR from parent"| ParentCluster
+    CAPIOperator -->|"create Machine CRs"| PeerMachine1
+    CAPIOperator -->|"create Machine CRs"| PeerMachine2
+    CAPIOperator -->|"create Machine CRs"| PeerMachine3
+
+    CAPNProvider -->|"provision container via"| IncusAPI
+    CAPRKE2Provider -->|"generate cloud-init"| PeerMachine1
+
+    style ParentSecret fill:#ffffcc,stroke:#cccc00
+    style SourceCtrl fill:#ccffcc,stroke:#00cc66
+    style KustomizeCtrl fill:#ccffcc,stroke:#00cc66
+    style BioskopKustomization fill:#ffcccc,stroke:#cc0000
+    style VClustersKustomization fill:#ffcccc,stroke:#cc0000
+    style CAPIOperator fill:#e1f5ff,stroke:#0066cc
+----
+
+**Critical Path:**
+
+1. **source-controller** fetches `nxmatic/rke2lab` from GitHub
+2. **kustomize-controller** reads `Kustomization` CRs (clusters/bioskop/, vclusters/)
+3. Each `Kustomization` references **parent-cluster-kubeconfig** Secret
+4. **kustomize-controller** applies to **parent cluster** using that kubeconfig
+5. **CAPI operators** (running in gitops-mgmt) read parent cluster CRs and provision peers
+
+== Bootstrap Sequence Diagram (3-Layer Bootstrap)
+
+[mermaid]
+----
+sequenceDiagram
+    participant Op as Operator
+    participant Pulumi as Pulumi<br/>(seed-master)
+    participant Core as RKE2 Core
+    participant VClusterOp as vCluster Operator
+    participant GitopsMgmt as gitops-mgmt vCluster
+    participant Flux as Flux (in gitops-mgmt)
+    participant GitHub as GitHub
+
+    Note over Op,GitHub: Layer 1: Pulumi Bootstrap (MINIMAL)
+
+    Op->>Pulumi: pulumi up
+    Pulumi->>Core: Install vCluster Operator (Helm)
+    Core->>VClusterOp: Operator starts (10MB)
+
+    Pulumi->>Core: Create VCluster CR: gitops-mgmt<br/>with init.manifests: Flux YAML
+    VClusterOp->>GitopsMgmt: Create vCluster namespace + pods
+    GitopsMgmt->>GitopsMgmt: Flux installs from init.manifests
+
+    Note over Pulumi,GitopsMgmt: Layer 2: Bootstrap Flux to GitHub
+
+    Pulumi->>GitopsMgmt: kubectl get secret --kubeconfig=gitops-mgmt
+    Pulumi->>GitopsMgmt: flux bootstrap github<br/>--kubeconfig=gitops-mgmt<br/>--path=gitops/flux-system
+    GitopsMgmt->>GitHub: Create deploy key + commit
+    GitHub-->>GitopsMgmt: Bootstrap complete
+
+    Pulumi->>GitopsMgmt: Create Secret: parent-cluster-kubeconfig<br/>from ~/.kube/config
+
+    Note over Flux,GitHub: Layer 3: Flux Manages Parent Cluster
+
+    Flux->>GitHub: Watch gitops/clusters/bioskop/
+    Flux->>GitHub: Watch gitops/vclusters/
+    GitHub-->>Flux: Manifests (CAPI Cluster, VCluster CRs)
+
+    Flux->>Flux: Read Kustomization.spec.kubeConfig.secretRef
+    Flux->>GitopsMgmt: Get parent-cluster-kubeconfig Secret
+    Flux->>Core: Apply CAPI Cluster CR to parent<br/>using parent kubeconfig
+    Flux->>Core: Apply VCluster CR: lab-1<br/>using parent kubeconfig
+
+    Core->>VClusterOp: Reconcile lab-1 VCluster CR
+    VClusterOp->>Core: Create lab-1 vCluster
+
+    Note over Op: Bootstrap complete - Flux managing parent
+----
+
+**Three Layers:**
+
+1. **Layer 1** (Pulumi): Install vCluster Operator + create gitops-mgmt vCluster with Flux inside
+2. **Layer 2** (Pulumi): Bootstrap Flux to GitHub + inject parent-cluster-kubeconfig Secret
+3. **Layer 3** (Flux): Manage parent cluster via parent kubeconfig Secret
+
+**Chicken-and-egg solved:** Pulumi creates the vCluster with Flux pre-installed via `init.manifests`, then bootstraps Flux to GitHub, then injects the Secret. From there, Flux manages the parent cluster as if it were external.
+
+== Runtime Flow: Deploying a Lab vCluster
+
+[mermaid]
+----
+sequenceDiagram
+    participant Op as Operator
+    participant CDK8s as CDK8s<br/>(seed-vclusters)
+    participant GitHub as GitHub
+    participant Flux as Flux<br/>(gitops-mgmt)
+    participant Core as RKE2 Core
+    participant VClusterOp as vCluster Operator
+    participant Lab as lab-1 vCluster
+
+    Op->>CDK8s: mvn -pl :seed-vclusters generate-resources
+    CDK8s->>CDK8s: Generate VCluster CR + apps YAML
+    CDK8s-->>Op: gitops/vclusters/lab-1/
+
+    Op->>GitHub: git add gitops/vclusters/lab-1/<br/>git commit && git push
+
+    Flux->>GitHub: Poll every 1m (default)
+    GitHub-->>Flux: New commit detected
+
+    Flux->>Flux: Reconcile Kustomization: vclusters
+    Flux->>Flux: Read parent-cluster-kubeconfig Secret
+    Flux->>Core: Apply VCluster CR: lab-1<br/>using parent kubeconfig
+
+    Core->>VClusterOp: Reconcile VCluster CR
+    VClusterOp->>Core: Create namespace: lab-1
+    VClusterOp->>Lab: Create vCluster control plane pods
+    VClusterOp-->>Core: VCluster ready
+
+    Flux->>Core: Apply Traefik manifests to lab-1 namespace<br/>using parent kubeconfig
+    Core->>Lab: Traefik pods start
+
+    Lab-->>Op: lab-1 ready with Traefik
+----
+
+**Key Points:**
+
+* **No Flux in lab-1**: Flux in gitops-mgmt manages lab-1 apps remotely
+* **Git-driven**: Changes to `gitops/vclusters/lab-1/` auto-apply
+* **Mutualized**: One Flux manages all labs
+
+== Deployment Diagram: Physical Resources
+
+[mermaid]
+----
+graph TB
+    subgraph Baremetal["bioskop (Mac Studio M4 Max)<br/>64GB RAM, 1TB SSD"]
+        NixDarwin["nix-darwin-home<br/><i>System config</i>"]
+
+        subgraph VM["bioskop-nixos (Tart/VZ)<br/>8 vCPU, 16GB RAM, 200GB disk"]
+            Incus["Incus<br/><i>LXC runtime</i>"]
+
+            subgraph Master["master (Incus container)<br/>4 vCPU, 8GB RAM"]
+                RKE2Master["RKE2 control plane<br/><i>apiserver, etcd, scheduler</i>"]
+                VClusterOp["vCluster Operator<br/><i>10MB</i>"]
+
+                subgraph GitopsMgmtPods["gitops-mgmt vCluster pods"]
+                    FluxPods["Flux controllers<br/><i>120MB total</i>"]
+                    CAPIPods["CAPI controllers<br/><i>150MB total</i>"]
+                end
+
+                subgraph Lab1Pods["lab-1 vCluster pods"]
+                    Lab1Control["vCluster control plane<br/><i>50MB</i>"]
+                    TraefikPod["Traefik<br/><i>100MB</i>"]
+                end
+            end
+
+            subgraph Peer1["peer1 (Incus container)<br/>2 vCPU, 4GB RAM"]
+                RKE2Peer1["RKE2 agent<br/><i>kubelet, kube-proxy</i>"]
+            end
+
+            subgraph Peer2["peer2 (Incus container)<br/>2 vCPU, 4GB RAM"]
+                RKE2Peer2["RKE2 agent"]
+            end
+
+            subgraph Peer3["peer3 (Incus container)<br/>2 vCPU, 4GB RAM"]
+                RKE2Peer3["RKE2 agent"]
+            end
+        end
+    end
+
+    style Baremetal fill:#f0f0f0,stroke:#666
+    style VM fill:#fff4e6,stroke:#ff9900
+    style Master fill:#ccffcc,stroke:#00cc66
+    style GitopsMgmtPods fill:#ffcccc,stroke:#cc0000
+    style Lab1Pods fill:#ffe6f0,stroke:#cc0066
+    style Peer1 fill:#ccffcc,stroke:#00cc66
+    style Peer2 fill:#ccffcc,stroke:#00cc66
+    style Peer3 fill:#ccffcc,stroke:#00cc66
+----
+
+**Resource Allocation:**
+
+* **Baremetal**: Mac Studio M4 Max, 64GB RAM
+* **VM**: bioskop-nixos, 8 vCPU, 16GB RAM (allocated from baremetal)
+* **master container**: 4 vCPU, 8GB RAM
+  * RKE2 control plane: ~2GB
+  * vCluster Operator: ~10MB
+  * gitops-mgmt vCluster: ~270MB (120MB Flux + 150MB CAPI)
+  * lab-1 vCluster: ~150MB (50MB control plane + 100MB Traefik)
+  * **Total**: ~2.5GB / 8GB available
+* **peer containers**: 2 vCPU, 4GB RAM each (×3 = 12GB total)
+
+**Total VM footprint**: 8 vCPU, 16GB RAM (master 8GB + peers 12GB oversubscribed to 16GB)
+
+== Testing Pattern: Upgrade Validation
+
+[mermaid]
+----
+graph TB
+    subgraph Current["Current Production"]
+        GitopsMgmt["gitops-mgmt vCluster<br/><i>Flux v2.3 + CAPI v1.12</i>"]
+    end
+
+    subgraph Test["Temporary Test vCluster"]
+        GitopsMgmtNext["gitops-mgmt-next vCluster<br/><i>Flux v2.4 + CAPI v1.13</i>"]
+        TestLab["lab-test<br/><i>Simulated workload</i>"]
+    end
+
+    GitRepo["GitHub: nxmatic/rke2lab"]
+
+    Operator["Operator"]
+
+    Operator -->|"1. Create test config"| GitRepo
+    GitopsMgmt -->|"2. Reads config,<br/>creates vCluster"| GitopsMgmtNext
+
+    Operator -->|"3. Validate Flux v2.4"| GitopsMgmtNext
+    GitopsMgmtNext -->|"4. Test managing<br/>lab-test vCluster"| TestLab
+
+    Operator -->|"5a. If OK: promote config<br/>to gitops-mgmt/"| GitRepo
+    Operator -->|"5b. If KO: delete<br/>gitops-mgmt-next/"| GitRepo
+
+    GitRepo -->|"6. Auto-upgrade<br/>gitops-mgmt"| GitopsMgmt
+
+    style GitopsMgmt fill:#ffcccc,stroke:#cc0000
+    style GitopsMgmtNext fill:#ffeecc,stroke:#cc6600
+    style TestLab fill:#ffffcc,stroke:#cccc00
+----
+
+**Upgrade Workflow:**
+
+1. **Create test vCluster**: Add `gitops/vclusters/gitops-mgmt-next/` with Flux v2.4
+2. **Flux (current) creates test**: gitops-mgmt (v2.3) reads Git, creates gitops-mgmt-next (v2.4)
+3. **Validate in isolation**: Test that Flux v2.4 works correctly
+4. **Create test lab**: gitops-mgmt-next manages a lab-test vCluster to validate full workflow
+5. **Decision**:
+   * **If OK**: Update `gitops/vclusters/gitops-mgmt/` to use v2.4, commit → auto-upgrade production
+   * **If KO**: Delete `gitops/vclusters/gitops-mgmt-next/`, no impact on production
+6. **Cleanup**: Once promoted, delete gitops-mgmt-next config
+
+**Reentrance validated**: The system can test and upgrade itself.
+
+== Multi-stage Evolution: Phase Integration
+
+[mermaid]
+----
+graph TB
+    subgraph Phase1["Phase 1: Core Bootstrap (COMPLETE)"]
+        Pulumi1["Pulumi<br/><i>seed-master</i>"]
+        Master1["master node<br/><i>RKE2 + CAPI + Flux Operator</i>"]
+    end
+
+    subgraph Phase2["Phase 2-3: Peer Provisioning (IN PROGRESS)"]
+        CDK8sPeers["CDK8s<br/><i>seed-peers</i>"]
+        GitopsPeers["gitops/clusters/bioskop/peers/"]
+        FluxPeers["Flux (in core)"]
+        Peers["peer1, peer2, peer3<br/><i>CAPI-managed</i>"]
+    end
+
+    subgraph Phase4["Phase 4: vCluster Apps (THIS PLAN)"]
+        CDK8sVClusters["CDK8s<br/><i>seed-vclusters</i>"]
+        GitopsVClusters["gitops/vclusters/"]
+        GitopsMgmt4["gitops-mgmt vCluster<br/><i>Flux + CAPI inside</i>"]
+        Labs["lab-1, lab-2<br/><i>User workloads</i>"]
+    end
+
+    Pulumi1 -->|"installs"| Master1
+    Master1 -->|"enables"| CDK8sPeers
+
+    CDK8sPeers -->|"synth"| GitopsPeers
+    FluxPeers -->|"applies"| Peers
+
+    Master1 -->|"Phase 4: Move Flux to"| GitopsMgmt4
+    CDK8sVClusters -->|"synth"| GitopsVClusters
+    GitopsMgmt4 -->|"applies"| Labs
+    GitopsMgmt4 -->|"ALSO manages peers"| Peers
+
+    style Phase1 fill:#ccffcc,stroke:#00cc66
+    style Phase2 fill:#e1f5ff,stroke:#0066cc
+    style Phase4 fill:#ffcccc,stroke:#cc0000
+----
+
+**Evolution Path:**
+
+* **Phase 1**: Pulumi installs master node with CAPI + Flux Operator
+* **Phase 2-3**: seed-peers synths CAPI Cluster CRs, Flux applies them
+* **Phase 4 (this plan)**:
+  * Move Flux from core into gitops-mgmt vCluster
+  * seed-vclusters synths VCluster CRs + app manifests
+  * Flux (in gitops-mgmt) manages BOTH peers (via CAPI) AND vClusters
+  * Reentrant: gitops-mgmt can test/upgrade itself via gitops-mgmt-next
+
+**Key Change**: Flux moves from core to gitops-mgmt vCluster, but gains ability to manage parent cluster via parent-cluster-kubeconfig Secret.
+
+== Repository Structure
+
+----
+rke2lab/
+├── seed-master/          (Phase 1 ✅)
+│   └── Bootstrap Pulumi layer 1-2
+│
+├── manifests/            (Phase 1 ✅)
+│   └── CDK8s layers for in-cluster resources
+│
+├── seed-peers/           (Phase 2-3 🚧)
+│   └── CDK8s synth → gitops/clusters/bioskop/peers/
+│
+└── seed-vclusters/       (Phase 4 🎯 THIS PLAN)
+    ├── pom.xml           (Maven module)
+    └── src/main/java/io/nxmatic/rke2lab/vclusters/
+        ├── Main.java                    (synth CDK8s → gitops/)
+        ├── VClusterTemplate.java        (VCluster CR generation)
+        └── AppTemplate.java             (Traefik, cert-manager, ...)
+
+gitops/
+├── flux-system/              (Phase 1 ✅)
+│   └── Flux bootstrap config
+│
+├── clusters/bioskop/         (Phase 2-3 🚧)
+│   └── peers/
+│       └── CAPI Cluster CRs
+│
+└── vclusters/                (Phase 4 🎯 THIS PLAN)
+    ├── gitops-mgmt/          ← PERMANENT management vCluster
+    │   ├── vcluster.yaml     (VCluster CR)
+    │   ├── flux/             (Flux config in vCluster)
+    │   └── kustomization.yaml
+    │
+    ├── gitops-mgmt-next/     ← TEMPORARY upgrade testing
+    │   └── (same structure, test versions)
+    │
+    └── labs/
+        ├── lab-1/
+        │   ├── vcluster.yaml (VCluster CR)
+        │   └── apps/
+        │       ├── traefik/
+        │       │   ├── kustomization.yaml
+        │       │   ├── namespace.yaml
+        │       │   ├── deployment.yaml
+        │       │   └── service.yaml
+        │       └── cert-manager/
+        │           └── ...
+        └── lab-2/
+            └── ...
+----
+
+== Implementation Plan
+
+**Note**: The implementation plan has been moved to a dedicated document for better organization.
+
+See link:vcluster-implementation-plan.adoc[vCluster Implementation Plan] for:
+* Complete phased implementation (Phase 1.5 through Phase 6)
+* Detailed code examples and file structures
+* Validation criteria for each phase
+* Success metrics and checkpoints
+
+The sections below provide architectural context but defer to the implementation plan for concrete steps.
+
+=== Step 1: Update seed-master for Layer 1-2 Bootstrap (MOVED)
+
+**Goal**: Make Pulumi install vCluster Operator + create gitops-mgmt with Flux inside.
+
+**Files to modify**:
+
+* `seed-master/.../layers/vcluster/VClusterOperatorLayer.java` (NEW)
+* `seed-master/.../layers/vcluster/GitopsMgmtVClusterLayer.java` (NEW)
+* `seed-master/.../IncusResourceBootstrap.java` (add vCluster layers)
+
+**Key logic**:
+
+[source,java]
+----
+// VClusterOperatorLayer.java
+public class VClusterOperatorLayer {
+    public VClusterOperatorLayer(Construct scope) {
+        // Install vCluster Operator via Helm
+        new HelmChart(scope, "vcluster-operator", HelmChartOptions.builder()
+            .chart("vcluster-operator")
+            .repository("https://charts.loft.sh")
+            .version("0.16.0")
+            .namespace("vcluster-system")
+            .createNamespace(true)
+            .build());
+    }
+}
+
+// GitopsMgmtVClusterLayer.java
+public class GitopsMgmtVClusterLayer {
+    public GitopsMgmtVClusterLayer(Construct scope) {
+        // Create VCluster CR with Flux pre-installed
+        new KubernetesManifest(scope, "gitops-mgmt-vcluster",
+            KubernetesManifestOptions.builder()
+                .manifest(List.of(Map.of(
+                    "apiVersion", "vcluster.loft.sh/v1",
+                    "kind", "VCluster",
+                    "metadata", Map.of(
+                        "name", "gitops-mgmt",
+                        "namespace", "gitops-mgmt"
+                    ),
+                    "spec", Map.of(
+                        "init", Map.of(
+                            "manifests", readFluxBootstrapYAML() // Vendor Flux YAML
+                        ),
+                        "sync", Map.of(
+                            "toHost", Map.of(
+                                "pods", Map.of("enabled", true),
+                                "secrets", Map.of("enabled", true)
+                            )
+                        )
+                    )
+                )))
+                .build());
+
+        // Bootstrap Flux to GitHub (Layer 2)
+        // This is a local-exec provisioner or post-apply script
+        // flux bootstrap github --kubeconfig=<gitops-mgmt-kubeconfig> \
+        //   --owner=nxmatic --repository=rke2lab \
+        //   --branch=main --path=./gitops/flux-system
+
+        // Inject parent kubeconfig Secret
+        // kubectl --kubeconfig=<gitops-mgmt-kubeconfig> \
+        //   create secret generic parent-cluster-kubeconfig \
+        //   -n flux-system --from-file=kubeconfig=$HOME/.kube/config
+    }
+}
+----
+
+=== Step 2: Create seed-vclusters Module
+
+**Goal**: CDK8s module that generates VCluster CRs + app manifests.
+
+**Structure**:
+
+----
+seed-vclusters/
+├── pom.xml
+└── src/main/java/io/nxmatic/rke2lab/vclusters/
+    ├── Main.java
+    ├── VClusterChart.java
+    ├── VClusterTemplate.java
+    └── apps/
+        ├── TraefikLayer.java
+        └── CertManagerLayer.java
+----
+
+**Example: VClusterTemplate.java**
+
+[source,java]
+----
+public class VClusterTemplate extends Construct {
+    public VClusterTemplate(Construct scope, String id, String namespace, Map<String, String> apps) {
+        super(scope, id);
+
+        // VCluster CR
+        ApiObject vcluster = new ApiObject(scope, id + "-vcluster", ApiObjectProps.builder()
+            .apiVersion("vcluster.loft.sh/v1")
+            .kind("VCluster")
+            .metadata(ApiObjectMetadata.builder()
+                .name(id)
+                .namespace(namespace)
+                .build())
+            .build());
+
+        vcluster.addJsonPatch(JsonPatch.add("/spec", Map.of(
+            "sync", Map.of(
+                "toHost", Map.of(
+                    "pods", Map.of("enabled", true)
+                )
+            )
+        )));
+
+        // Apps (Traefik, cert-manager, etc.)
+        if (apps.containsKey("traefik")) {
+            new TraefikLayer(scope, id + "-traefik", namespace);
+        }
+        if (apps.containsKey("cert-manager")) {
+            new CertManagerLayer(scope, id + "-cert-manager", namespace);
+        }
+    }
+}
+----
+
+**Workflow**:
+
+[source,bash]
+----
+# Generate manifests
+mvn -pl :seed-vclusters generate-resources
+# → Writes to gitops/vclusters/{gitops-mgmt,labs/lab-1}/
+
+# Commit & push
+git add gitops/vclusters/
+git commit -m "Add lab-1 vCluster with Traefik"
+git push
+
+# Flux (in gitops-mgmt) applies to parent cluster
+# → VCluster CR created in core
+# → vCluster Operator provisions lab-1
+# → Traefik starts in lab-1
+----
+
+=== Step 3: Configure Flux Kustomizations in gitops-mgmt
+
+**Goal**: Make Flux in gitops-mgmt manage the parent cluster.
+
+**File**: `gitops/vclusters/gitops-mgmt/flux/kustomizations.yaml`
+
+[source,yaml]
+----
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: bioskop-peers
+  namespace: flux-system # IN gitops-mgmt vCluster
+spec:
+  interval: 10m
+  path: ./clusters/bioskop/peers
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  # THE KEY: use parent cluster kubeconfig
+  kubeConfig:
+    secretRef:
+      name: parent-cluster-kubeconfig
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: vclusters
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./vclusters
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  # Apply VCluster CRs to parent cluster
+  kubeConfig:
+    secretRef:
+      name: parent-cluster-kubeconfig
+----
+
+=== Step 4: Test Upgrade Pattern
+
+**Goal**: Validate reentrance by creating gitops-mgmt-next.
+
+**Steps**:
+
+1. **Create test config**:
+   [source,bash]
+   ----
+   # Copy gitops-mgmt/ to gitops-mgmt-next/
+   cp -r gitops/vclusters/gitops-mgmt/ gitops/vclusters/gitops-mgmt-next/
+
+   # Edit gitops-mgmt-next/flux/versions.yaml
+   # Change Flux to v2.4.0
+
+   git add gitops/vclusters/gitops-mgmt-next/
+   git commit -m "Test Flux v2.4 in gitops-mgmt-next"
+   git push
+   ----
+
+2. **Flux (current) creates test vCluster**:
+   * gitops-mgmt (Flux v2.3) reads Git
+   * Applies VCluster CR: gitops-mgmt-next to parent cluster
+   * vCluster Operator creates gitops-mgmt-next vCluster
+   * Flux v2.4 starts inside gitops-mgmt-next
+
+3. **Validate**:
+   [source,bash]
+   ----
+   # Connect to test vCluster
+   vcluster connect gitops-mgmt-next -n gitops-mgmt-next
+
+   # Check Flux version
+   flux version
+   # Should show v2.4.0
+
+   # Test managing a lab
+   kubectl apply -f test-lab.yaml
+   ----
+
+4. **Promote or rollback**:
+   [source,bash]
+   ----
+   # If OK: promote to production
+   cp gitops/vclusters/gitops-mgmt-next/flux/versions.yaml \
+      gitops/vclusters/gitops-mgmt/flux/versions.yaml
+   git commit -m "Upgrade gitops-mgmt to Flux v2.4"
+   git push
+   # → Flux (current) auto-upgrades itself
+
+   # If KO: delete test vCluster
+   rm -rf gitops/vclusters/gitops-mgmt-next/
+   git commit -m "Rollback Flux v2.4 test"
+   git push
+   # → Flux (current) deletes gitops-mgmt-next
+   ----
+
+== Verification
+
+**End-to-end test**:
+
+1. **Bootstrap complete**:
+   [source,bash]
+   ----
+   kubectl get vcluster -A
+   # NAMESPACE       NAME               STATUS   AGE
+   # gitops-mgmt     gitops-mgmt        Ready    5m
+
+   vcluster connect gitops-mgmt -n gitops-mgmt
+   flux get all
+   # Should show GitRepository + Kustomizations
+   ----
+
+2. **Flux managing parent**:
+   [source,bash]
+   ----
+   # From gitops-mgmt vCluster
+   flux get kustomizations
+   # NAME              READY   MESSAGE
+   # bioskop-peers     True    Applied revision main@sha1:abc123
+   # vclusters         True    Applied revision main@sha1:abc123
+
+   # From parent cluster
+   kubectl get cluster -A
+   # Should show bioskop-peers Cluster CR
+   ----
+
+3. **Lab vCluster created**:
+   [source,bash]
+   ----
+   kubectl get vcluster -n lab-1
+   # NAME    STATUS   AGE
+   # lab-1   Ready    2m
+
+   vcluster connect lab-1 -n lab-1
+   kubectl get pods -A
+   # Should show Traefik pods
+   ----
+
+4. **Upgrade test**:
+   * Create gitops-mgmt-next with Flux v2.4
+   * Validate it works
+   * Promote to gitops-mgmt
+   * Verify gitops-mgmt upgraded without manual intervention
+
+== Related Documentation
+
+=== Prerequisites (Phase 1-3)
+
+* link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] - Phase 1-3 foundation (master + peer provisioning). This document describes Phase 4, which builds on Phase 1-3 completion.
+* link:stagea-stageb-handoff-contract.adoc[Stage A/B Handoff Contract] - Bootstrap → cluster management transition; gitops-mgmt continues this pattern
+* link:post-bootstrap-in-cluster-ownership-plan.adoc[Post-Bootstrap Ownership Plan] - Component lifecycle after bootstrap; vClusters extend ownership model
+
+=== Implementation Patterns
+
+* link:manifest-nomenclature.adoc[Manifest Nomenclature Guide] - **READ THIS FIRST** - Clarifies deployment layers vs manifest domains/components/charts
+* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - CDK8s pattern used in seed-layer3 module
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Runtime config access pattern; parent-cluster-kubeconfig follows same principle
+* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow pattern for seed-layer3 synth
+* link:cdk8s-chart-vs-construct-pattern.adoc[CDK8s Chart vs Construct Pattern] - Component classes must extend Construct, Chart classes extend Chart
+
+=== Cross-Cutting Concerns
+
+* link:policy-configuration-guide.adoc[Policy Configuration Guide] - Add `policy.link.vcluster.enabled` toggle for VCluster operator installation
+* link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] - Use catalog accessor for vCluster domain ID (avoid hardcoded strings)
+* link:systemd-resource-provisioning.adoc[Systemd Resource Provisioning] - VCluster CRs applied via manifest layer, not systemd units
+
+== Open Questions
+
+=== Critical (must decide before implementation)
+
+1. **CAPI placement decision**: Should CAPI controllers stay in core cluster (manages physical infrastructure) or move to gitops-mgmt vCluster (full reentrancy)?
+   * **Recommendation**: Start with CAPI in core (Option 6A), migrate later if needed
+   * **Rationale**: Physical infrastructure management feels more stable in core; vCluster overhead not justified initially
+
+2. **Migration strategy**: How to transition Flux+CAPI from core to gitops-mgmt without downtime?
+   * **Approach**: Dual-Flux period with old Flux suspended via `.spec.suspend: true`
+   * **Validation**: Server-side dry-run of gitops-mgmt Kustomizations before suspending old Flux
+
+3. **Bootstrap sequence**: Should gitops-mgmt vCluster creation be in seed-master (Pulumi) or seed-vclusters (CDK8s)?
+   * **Recommendation**: seed-master Pulumi (Layer 1 bootstrap)
+   * **Rationale**: gitops-mgmt is infrastructure, not an application. Pulumi ensures it exists before any GitOps loops start.
+
+=== Important (can be deferred to post-Phase 4)
+
+4. **VCluster lifecycle**: Should lab vClusters be ephemeral (auto-delete after N days)?
+   * **Initial answer**: Manual lifecycle (no auto-delete). Add TTL controller later if needed.
+
+5. **App catalog**: Predefined app sets (minimal, full, custom)?
+   * **Initial answer**: Hardcode Traefik + cert-manager in seed-vclusters. Abstract to catalog in Phase 5.
+
+6. **Resource limits**: What are the memory/CPU limits for gitops-mgmt and lab vClusters?
+   * **Initial answer**: No limits initially. Monitor and tune based on observed usage.
+
+=== Nice-to-have (future enhancements)
+
+7. **Monitoring**: How to aggregate metrics/logs from gitops-mgmt + labs?
+   * **Future work**: Centralized Prometheus + Loki with vCluster label selectors
+
+8. **RBAC**: How to isolate lab-1 from lab-2 (NetworkPolicy, RBAC)?
+   * **Initial answer**: Namespace isolation only. NetworkPolicy + RBAC in Phase 5 if multi-tenant requirements emerge.
+
+9. **Upgrade testing automation**: Can gitops-mgmt-next creation/promotion be automated?
+   * **Future work**: Tekton pipeline for "create test vCluster → validate → auto-promote on success"

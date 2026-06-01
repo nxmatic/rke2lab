@@ -1,0 +1,354 @@
+= Manifest Nomenclature Guide
+:toc: left
+:toclevels: 2
+
+== Overview
+
+This document clarifies the terminology used in rke2lab to avoid confusion between deployment layers and manifest components.
+
+**Problem**: The term "layer" was overloaded:
+* At the **system level**: `seed-layer1`, `seed-layer2`, `seed-layer3` (deployment units)
+* At the **manifest level**: `CiliumConfigLayer`, `FluxOperatorLayer` (CDK8s constructs)
+
+**Solution**: Clear terminology hierarchy at each level.
+
+== Terminology Hierarchy
+
+=== System Level (Deployment)
+
+**Deployment Layers** = Bootstrap stages for the cluster
+
+[cols="2,3,3"]
+|===
+|Term |Module |Purpose
+
+|**seed-layer1**
+|`seed-layer1/`
+|Physical infrastructure: master node via Incus + Pulumi
+
+|**seed-layer2**
+|`seed-layer2/`
+|Virtual control plane: gitops-mgmt vCluster + Flux
+
+|**seed-layer3**
+|`seed-layer3/`
+|Workloads: GitOps manifests for core/peers/labs
+|===
+
+=== Manifest Level (CDK8s)
+
+**Manifest Organization** = How Kubernetes resources are structured and synthesized
+
+[cols="2,3,3"]
+|===
+|Term |Location |Purpose
+
+|**Domain**
+|`manifests/domains/<domain>/`
+|Functional grouping (bootstrap, networking, mesh, storage, platform, cicd, runtime)
+
+|**Component**
+|`manifests/domains/<domain>/components/`
+|CDK8s reusable construct (VClusterOperatorComponent, CiliumConfigComponent, etc.)
+
+|**Chart**
+|`manifests/charts/layer<N>/`
+|Aggregation unit that selects components to synthesize together
+|===
+
+== Manifest Structure (Detailed)
+
+```
+manifests/
+├─ api/                                  (Base classes and interfaces)
+│  ├─ ManifestDomainCatalog.java        (Domain ID registry)
+│  ├─ ManifestUnit.java                 (Base class for components)
+│  └─ ManifestDomainPolicy.java         (Policy configuration)
+│
+├─ domains/                              (Functional domains)
+│  ├─ <domain-name>/
+│  │  ├─ <DomainName>Domain.java        (Domain aggregator)
+│  │  └─ components/
+│  │     └─ <Component>Component.java   (CDK8s construct)
+│  │
+│  ├─ bootstrap/
+│  │  ├─ BootstrapDomain.java
+│  │  └─ components/
+│  │     ├─ VClusterOperatorComponent.java
+│  │     ├─ FluxOperatorComponent.java
+│  │     └─ ClusterApiOperatorComponent.java
+│  │
+│  ├─ networking/
+│  │  ├─ NetworkingDomain.java
+│  │  └─ components/
+│  │     ├─ CiliumConfigComponent.java
+│  │     ├─ CiliumAdvancedComponent.java
+│  │     ├─ KdnsComponent.java
+│  │     └─ KubeVipComponent.java
+│  │
+│  ├─ mesh/
+│  │  ├─ MeshDomain.java
+│  │  └─ components/
+│  │     ├─ TailscaleComponent.java
+│  │     └─ HeadscaleComponent.java
+│  │
+│  ├─ storage/
+│  │  ├─ StorageDomain.java
+│  │  └─ components/
+│  │     └─ OpenebsZfsComponent.java
+│  │
+│  ├─ platform/
+│  │  ├─ PlatformDomain.java
+│  │  └─ components/
+│  │     ├─ ReplicatorComponent.java
+│  │     └─ CertManagerComponent.java
+│  │
+│  ├─ cicd/
+│  │  ├─ CicdDomain.java
+│  │  └─ components/
+│  │     ├─ TektonPipelinesComponent.java
+│  │     └─ TektonDashboardComponent.java
+│  │
+│  └─ runtime/
+│     ├─ RuntimeDomain.java
+│     └─ components/
+│        ├─ RuntimeRke2ConfigComponent.java
+│        └─ RuntimeEnvConfigComponent.java
+│
+├─ profiles/
+│  └─ ComponentVersions.java            (Version catalog)
+│
+└─ charts/                              (Aggregation for deployment layers)
+   ├─ layer1/
+   │  └─ Layer1Chart.java               (Aggregates components for seed-layer1)
+   └─ layer3/
+      ├─ CoreClusterChart.java          (Aggregates components for seed-layer3)
+      ├─ PeerClusterChart.java
+      └─ LabVClusterChart.java
+```
+
+== Key Concepts
+
+=== Domain
+
+**Definition**: A functional grouping of related Kubernetes resources.
+
+**Examples**:
+* `bootstrap`: Operators required to bootstrap the cluster (VCluster, Flux, CAPI)
+* `networking`: Network infrastructure (CNI, DNS, VIP)
+* `mesh`: Service mesh and VPN (Tailscale, Headscale)
+* `storage`: Persistent storage (OpenEBS)
+* `platform`: Platform services (Replicator, CertManager)
+* `cicd`: CI/CD tooling (Tekton)
+* `runtime`: Runtime configuration (RKE2 config, environment)
+
+**API**:
+```java
+public class NetworkingDomain {
+  // Select ALL components in this domain
+  public NetworkingDomain withAllComponents() { ... }
+
+  // Select a SUBSET of components
+  public NetworkingDomain withComponents(Class<?>... components) { ... }
+
+  // Synthesize selected components
+  public void synthesize(Construct scope, ManifestSynthesisRequest request) { ... }
+}
+```
+
+=== Component
+
+**Definition**: A reusable CDK8s construct that generates Kubernetes manifests for a specific technology.
+
+**Characteristics**:
+* Extends `Construct` (CDK8s base class)
+* Does NOT know where/when it will be synthesized
+* Can be reused across different charts
+* Typically generates multiple related K8s resources
+
+**Examples**:
+* `CiliumConfigComponent`: Generates Cilium CNI HelmChart + ConfigMap
+* `FluxOperatorComponent`: Generates Flux Operator installation
+* `TektonPipelinesComponent`: Generates Tekton Pipelines HelmChart
+
+**Naming Convention**: `<Technology><Purpose>Component.java`
+
+**Location**: `manifests/domains/<domain>/components/<Component>Component.java`
+
+=== Chart
+
+**Definition**: A CDK8s aggregation unit that selects which components to synthesize together. Charts define the **boundary** of what gets synthesized into YAML files.
+
+**Characteristics**:
+* Extends `Chart` (CDK8s synthesis boundary)
+* Selects components from one or more domains
+* Produces output YAML files when `app.synth()` is called
+* Associated with a deployment layer
+
+**Examples**:
+* `Layer1Chart`: Aggregates all infrastructure-critical components (bootstrap, networking, mesh, storage)
+* `CoreClusterChart`: Aggregates workload components (Tekton, CertManager)
+* `PeerClusterChart`: Aggregates CAPI cluster resources
+
+**Naming Convention**: `<Purpose>Chart.java`
+
+**Location**: `manifests/charts/layer<N>/<Chart>.java`
+
+== Usage Patterns
+
+=== Pattern 1: Use Entire Domain
+
+```java
+public class Layer1Chart extends Chart {
+  public Layer1Chart(Construct scope, String id, ManifestSynthesisRequest request) {
+    super(scope, id, ChartProps.builder().build());
+
+    // Use ALL components from networking domain
+    new NetworkingDomain()
+        .withAllComponents()  // Cilium, KDns, KubeVip
+        .synthesize(this, request);
+  }
+}
+```
+
+=== Pattern 2: Use Subset of Domain
+
+```java
+public class Layer1MinimalChart extends Chart {
+  public Layer1MinimalChart(Construct scope, String id, ManifestSynthesisRequest request) {
+    super(scope, id, ChartProps.builder().build());
+
+    // Use ONLY Cilium from networking domain
+    new NetworkingDomain()
+        .withComponents(
+            CiliumConfigComponent.class
+            // NOT KdnsComponent, NOT KubeVipComponent
+        )
+        .synthesize(this, request);
+  }
+}
+```
+
+=== Pattern 3: Use Component Directly
+
+```java
+public class CustomChart extends Chart {
+  public CustomChart(Construct scope, String id, ManifestSynthesisRequest request) {
+    super(scope, id, ChartProps.builder().build());
+
+    // Use component DIRECTLY (bypass domain)
+    new CiliumConfigComponent(this, "cilium",
+        request.componentVersions().cilium());
+  }
+}
+```
+
+=== Pattern 4: Mix Domains
+
+```java
+public class Layer1Chart extends Chart {
+  public Layer1Chart(Construct scope, String id, ManifestSynthesisRequest request) {
+    super(scope, id, ChartProps.builder().build());
+
+    // ALL of bootstrap domain
+    new BootstrapDomain()
+        .withAllComponents()
+        .synthesize(this, request);
+
+    // ALL of networking domain
+    new NetworkingDomain()
+        .withAllComponents()
+        .synthesize(this, request);
+
+    // SUBSET of platform domain (Replicator only, NOT CertManager)
+    new PlatformDomain()
+        .withComponents(ReplicatorComponent.class)
+        .synthesize(this, request);
+  }
+}
+```
+
+== How Charts Are Consumed
+
+=== In seed-layer1 (Pulumi + CDK8s)
+
+```java
+package io.nxmatic.rke2lab.seed.layer1;
+
+import io.nxmatic.rke2lab.manifests.charts.layer1.Layer1Chart;
+import org.cdk8s.App;
+
+public class Layer1Bootstrap {
+  public void synthManifests() {
+    App app = new App();
+
+    ManifestSynthesisRequest request = buildRequest();
+
+    // Use Layer1Chart to aggregate components
+    new Layer1Chart(app, "layer1", request);
+
+    // Synth to host/manifests.d/
+    app.synthYaml();
+  }
+}
+```
+
+=== In seed-layer3 (CDK8s only)
+
+```java
+package io.nxmatic.rke2lab.seed.layer3;
+
+import io.nxmatic.rke2lab.manifests.charts.layer3.*;
+import org.cdk8s.App;
+
+public class Layer3Synth {
+  public static void main(String[] args) {
+    App app = new App();
+
+    ManifestSynthesisRequest request = loadRequest();
+
+    // Use multiple charts
+    new CoreClusterChart(app, "core", request);
+    new PeerClusterChart(app, "peers", request);
+    new LabVClusterChart(app, "labs", request);
+
+    // Synth to gitops/
+    app.synth();
+  }
+}
+```
+
+== Migration from Old Nomenclature
+
+| Old Name | New Name | Rationale |
+|----------|----------|-----------|
+| `manifests/layers/` | `manifests/domains/` | Avoid confusion with deployment layers |
+| `CiliumConfigLayer` | `CiliumConfigComponent` | Standard CDK8s terminology |
+| `FluxOperatorLayer` | `FluxOperatorComponent` | Standard CDK8s terminology |
+| `NetworkingDomainRegistrar` | `NetworkingDomain` | Simpler, clearer purpose |
+| (none) | `Layer1Chart` | New aggregation layer |
+
+== Quick Reference
+
+**Need to add a new Kubernetes resource?**
+1. Identify the **domain** (bootstrap, networking, mesh, etc.)
+2. Create a **component** in `manifests/domains/<domain>/components/`
+3. Add component to appropriate **chart** in `manifests/charts/layer<N>/`
+4. Component is now synthesized when chart is used in `seed-layer<N>/`
+
+**Need to change what's deployed in Layer 1?**
+1. Edit `manifests/charts/layer1/Layer1Chart.java`
+2. Add/remove domains or components
+3. No changes to `seed-layer1/` required
+
+**Need to reuse a component in multiple layers?**
+1. Components in `manifests/domains/` are reusable
+2. Reference the same component from multiple charts
+3. Example: `CertManagerComponent` could be in both Layer1Chart and CoreClusterChart
+
+== Related Documentation
+
+* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How CDK8s synthesis works
+* link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] - Domain ID registry
+* link:vcluster-implementation-plan.adoc[vCluster Implementation Plan] - How charts are used in deployment layers
+* link:cdk8s-chart-vs-construct-pattern.adoc[CDK8s Chart vs Construct Pattern] - When to use Chart vs Construct

@@ -1,0 +1,1331 @@
+= vCluster Implementation Plan - Complete Roadmap
+:toc: left
+:toclevels: 3
+:status: 📋 Active Plan - Replaces Phase 2-4 from Previous Plans
+
+**Status**: This document supersedes the previous phasing in `gitops-cluster-api-transition-plan.md` for Phase 2 onwards. It consolidates the vCluster architecture decisions with the concrete implementation roadmap.
+
+**Supersedes**:
+* Phase 2-4 sections in link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan]
+* Implementation Plan section in link:vcluster-gitops-architecture.adoc[vCluster GitOps Architecture]
+
+**Context**: Phase 1 complete (master node + CAPI/Flux operators installed). This plan details how to transition to the gitops-mgmt vCluster pattern while maintaining operational infrastructure.
+
+== Executive Summary
+
+**Goal**: Establish a reentrant GitOps architecture where Flux manages the cluster from within a dedicated `gitops-mgmt` vCluster, enabling upgrade testing and isolation.
+
+**Key Decision**: Use **Option A - Bootstrap Minimal via RKE2 Auto-Deploy**, then transition to Flux management. This pragmatic approach:
+
+* ✅ Reuses existing RKE2 auto-deploy infrastructure for critical bootstrap
+* ✅ Maintains infrastructure dependencies (CNI, storage, networking)
+* ✅ Minimizes systemd complexity while keeping essential components
+* ✅ Enables clean transition to Flux-managed workloads
+
+**Architecture**:
+```
+Layer 1: RKE2 Auto-Deploy (infrastructure critical)
+    ↓ Enables
+Layer 2: Pulumi Creates gitops-mgmt vCluster
+    ↓ Enables
+Layer 3: Flux Manages Everything Else
+```
+
+== Architecture Decision: Three-Layer Bootstrap
+
+=== Layer 1: RKE2 Auto-Deploy (Infrastructure Critical)
+
+**Purpose**: Install ONLY the components required for Layer 2 to function.
+
+**Criterion**: "Without this, Flux or gitops-mgmt vCluster cannot start."
+
+**Components**:
+
+[cols="2,3,3"]
+|===
+|Domain |Components |Rationale
+
+|**Bootstrap**
+|VClusterOperatorComponent +
+FluxOperatorComponent +
+ClusterApiOperatorComponent
+|Required to create gitops-mgmt vCluster and enable CAPI-based peer provisioning
+
+|**Networking**
+|CiliumConfigComponent +
+CiliumAdvancedComponent +
+KdnsComponent +
+KubeVipComponent
+|CNI is blocking - no pods work without Cilium. DNS and VIP required for control plane access.
+
+|**Mesh**
+|TailscaleComponent +
+HeadscaleComponent
+|VPN access to cluster required for `kubectl` and operator access to control plane
+
+|**Storage**
+|OpenebsZfsComponent
+|PersistentVolumes required for infrastructure components (Flux state, etcd if external)
+
+|**Platform**
+|ReplicatorComponent
+|Cross-namespace secret replication required for bootstrap credentials
+
+|**Runtime**
+|RuntimeRke2ConfigComponent +
+RuntimeEnvConfigComponent
+|Master node configuration (NOT peer nodes - those via CAPI cloud-init)
+|===
+
+**Systemd Units**: 6 services
+
+```
+rke2lab-manifests.target
+├─ rke2lab-bootstrap-manifests.service    (operators)
+├─ rke2lab-networking-manifests.service   (Cilium, DNS, VIP)
+├─ rke2lab-mesh-manifests.service         (Tailscale, Headscale)
+├─ rke2lab-storage-manifests.service      (OpenEBS ZFS)
+├─ rke2lab-platform-manifests.service     (Replicator only)
+└─ rke2lab-runtime-manifests.service      (master config only)
+```
+
+**What's REMOVED from Layer 1** (compared to current architecture):
+* ❌ CI/CD domain (Tekton) → Layer 3
+* ❌ CertManagerComponent → Layer 3
+* ❌ FluxInstance CR → Not needed (Flux lives in gitops-mgmt)
+* ❌ RuntimeCloudConfigComponent for peers → Layer 3 (via CAPI)
+* ❌ Envoy Gateway → Layer 3
+
+=== Layer 2: Pulumi Creates gitops-mgmt vCluster
+
+**Purpose**: Bootstrap the management vCluster with Flux inside.
+
+**Prerequisites**: Layer 1 complete, all operators Ready.
+
+**Steps**:
+
+1. **Pulumi waits for Layer 1 readiness**:
+   ```java
+   // Wait for vCluster Operator
+   // Wait for Flux Operator
+   // Wait for Cilium (CNI ready)
+   // Wait for OpenEBS (storage ready)
+   ```
+
+2. **Create VCluster CR: gitops-mgmt**:
+   ```java
+   new KubernetesManifest(scope, "gitops-mgmt-vcluster",
+     KubernetesManifestOptions.builder()
+       .manifest(List.of(Map.of(
+         "apiVersion", "vcluster.loft.sh/v1",
+         "kind", "VCluster",
+         "metadata", Map.of(
+           "name", "gitops-mgmt",
+           "namespace", "gitops-mgmt"
+         ),
+         "spec", Map.of(
+           "sync", Map.of(
+             "toHost", Map.of(
+               "pods", Map.of("enabled", true),
+               "secrets", Map.of("enabled", true)
+             )
+           )
+         )
+       )))
+       .build());
+   ```
+
+3. **Bootstrap Flux in gitops-mgmt** (via Command resource):
+   ```bash
+   # Get vCluster kubeconfig
+   vcluster connect gitops-mgmt -n gitops-mgmt --print > /tmp/gitops-mgmt.kubeconfig
+
+   # Bootstrap Flux
+   flux bootstrap github \
+     --kubeconfig=/tmp/gitops-mgmt.kubeconfig \
+     --owner=nxmatic \
+     --repository=rke2lab \
+     --branch=main \
+     --path=gitops/flux-system
+   ```
+
+4. **Inject parent-cluster-kubeconfig Secret**:
+   ```bash
+   kubectl --kubeconfig=/tmp/gitops-mgmt.kubeconfig \
+     create secret generic parent-cluster-kubeconfig \
+     -n flux-system \
+     --from-file=kubeconfig=$HOME/.kube/config
+   ```
+
+**Output**: gitops-mgmt vCluster with Flux watching GitHub, ready to manage parent cluster.
+
+=== Layer 3: Flux Manages Everything Else
+
+**Purpose**: All non-critical components managed by Flux in gitops-mgmt.
+
+**Flux Kustomizations** (in gitops-mgmt):
+
+```yaml
+# Manages core cluster addons
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: bioskop-core
+  namespace: flux-system  # IN gitops-mgmt
+spec:
+  interval: 10m
+  path: ./clusters/bioskop/core
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  kubeConfig:
+    secretRef:
+      name: parent-cluster-kubeconfig  # Apply to parent cluster
+---
+# Manages peer nodes via CAPI
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: bioskop-peers
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./clusters/bioskop/peers
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  kubeConfig:
+    secretRef:
+      name: parent-cluster-kubeconfig
+---
+# Manages lab vClusters
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: vclusters-labs
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./vclusters/labs
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  kubeConfig:
+    secretRef:
+      name: parent-cluster-kubeconfig
+```
+
+**Components managed by Flux**:
+* CI/CD workloads (Tekton)
+* CertManager (for webhook certs)
+* Peer nodes (CAPI CRs + cloud-init)
+* Lab vClusters (VCluster CRs)
+* Apps in labs (Traefik, etc.)
+
+== Implementation Phases
+
+=== Phase 1.5: Refactor manifests/ Module ✅ FIRST
+
+**Goal**: Reorganize `manifests/` module to reflect Layer 1 architecture (infrastructure critical only).
+
+==== Actions
+
+**1. Create Bootstrap Domain** (NEW):
+
+```
+manifests/src/main/java/io/nxmatic/rk2lab/manifests/
+├─ domains/                          (renamed from layers/)
+│  └─ bootstrap/
+│     ├─ BootstrapDomain.java        (new, was BootstrapDomainRegistrar)
+│     └─ components/                 (new subdirectory)
+│        ├─ VClusterOperatorComponent.java      (new)
+│        ├─ FluxOperatorComponent.java          (move from gitops/)
+│        └─ ClusterApiOperatorComponent.java    (move from clusterapi/)
+│
+└─ charts/                           (new)
+   └─ layer1/
+      └─ Layer1Chart.java            (aggregates domains for Layer 1)
+```
+
+**BootstrapDomain.java**:
+```java
+package io.nxmatic.rke2lab.manifests.domains.bootstrap;
+
+import io.nxmatic.rke2lab.manifests.api.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.api.ManifestSynthesisRequest;
+import io.nxmatic.rke2lab.manifests.domains.bootstrap.components.*;
+import software.constructs.Construct;
+import java.util.List;
+
+/**
+ * Bootstrap domain - operators required for Layer 2 bootstrap.
+ *
+ * <p>Components:
+ * <ul>
+ *   <li>VCluster Operator: Creates and manages vClusters
+ *   <li>Flux Operator: Manages Flux instances
+ *   <li>Cluster API Operator: Manages CAPI providers
+ * </ul>
+ */
+public final class BootstrapDomain {
+  private static final ManifestDomainCatalog CATALOG =
+      ManifestDomainCatalog.builder().addDefaultDomains().build();
+
+  private List<Class<?>> selectedComponents = null;
+  private boolean allComponents = false;
+
+  public BootstrapDomain withAllComponents() {
+    this.allComponents = true;
+    return this;
+  }
+
+  @SafeVarargs
+  public final BootstrapDomain withComponents(Class<?>... components) {
+    this.selectedComponents = Arrays.asList(components);
+    return this;
+  }
+
+  public void synthesize(Construct scope, ManifestSynthesisRequest request) {
+    List<ManifestUnit> units = allComponents || selectedComponents == null
+        ? getAllUnits()
+        : getSelectedUnits();
+
+    for (ManifestUnit unit : units) {
+      unit.apply(scope, request);
+    }
+  }
+
+  private List<ManifestUnit> getAllUnits() {
+    return List.of(
+        new VClusterOperatorComponent(),
+        new FluxOperatorComponent(),
+        new ClusterApiOperatorComponent()
+    );
+  }
+
+  private List<ManifestUnit> getSelectedUnits() {
+    // Instantiate selected components
+    return selectedComponents.stream()
+        .map(this::instantiate)
+        .toList();
+  }
+}
+```
+
+**VClusterOperatorComponent.java**:
+```java
+package io.nxmatic.rke2lab.manifests.domains.bootstrap.components;
+
+import software.constructs.Construct;
+import org.cdk8s.ApiObject;
+import org.cdk8s.JsonPatch;
+import java.util.Map;
+
+public final class VClusterOperatorComponent extends Construct {
+  public VClusterOperatorComponent(Construct scope, String id, String version) {
+    super(scope, id);
+
+    // Namespace: vcluster-system
+    ApiObject namespace = new ApiObject(this, "namespace-vcluster-system", ...);
+
+    // HelmChart CR for vCluster Operator
+    ApiObject helmChart = new ApiObject(this, "helmchart-vcluster-operator",
+      ApiObjectProps.builder()
+        .apiVersion("helm.cattle.io/v1")
+        .kind("HelmChart")
+        .metadata(ApiObjectMetadata.builder()
+          .name("vcluster-operator")
+          .namespace("kube-system")
+          .build())
+        .build());
+
+    helmChart.addJsonPatch(JsonPatch.add("/spec", Map.of(
+      "chart", "vcluster",
+      "repo", "https://charts.loft.sh",
+      "version", version,
+      "targetNamespace", "vcluster-system"
+    )));
+  }
+}
+```
+
+**2. Update ManifestDomainCatalog**:
+
+```java
+// manifests/.../api/ManifestDomainCatalog.java
+public final class ManifestDomainCatalog {
+  // Add bootstrap domain accessor
+  public String bootstrap() {
+    return "bootstrap";
+  }
+
+  // Existing domains...
+}
+```
+
+**3. Clean Platform Domain** (KEEP components, adjust Layer1Chart):
+
+```
+manifests/src/main/java/io/nxmatic/rk2lab/manifests/domains/platform/
+├─ PlatformDomain.java               (update: keep all components)
+└─ components/
+   ├─ ReplicatorComponent.java       (keep - used in Layer 1)
+   └─ CertManagerComponent.java      (keep - used in Layer 3)
+```
+
+**PlatformDomain.java** (updated):
+```java
+private List<ManifestUnit> getAllUnits() {
+  return List.of(
+      new ReplicatorComponent(),
+      new CertManagerComponent()
+      // Both components exist, charts choose which to use
+  );
+}
+```
+
+**4. Keep CI/CD Domain** (components exist, not used in Layer 1):
+
+```
+manifests/src/main/java/io/nxmatic/rk2lab/manifests/domains/cicd/
+├─ CicdDomain.java                   (keep)
+└─ components/
+   ├─ TektonPipelinesComponent.java  (keep - used in Layer 3)
+   └─ TektonDashboardComponent.java  (keep - used in Layer 3)
+```
+
+**Note**: Components are NOT deleted, they're just not included in Layer1Chart. They'll be used by Layer3 charts.
+
+**5. Create Layer1Chart** (NEW - aggregates domains):
+
+```
+manifests/src/main/java/io/nxmatic/rk2lab/manifests/charts/layer1/
+└─ Layer1Chart.java
+```
+
+**Layer1Chart.java**:
+```java
+package io.nxmatic.rke2lab.manifests.charts.layer1;
+
+import io.nxmatic.rke2lab.manifests.api.ManifestSynthesisRequest;
+import io.nxmatic.rke2lab.manifests.domains.bootstrap.BootstrapDomain;
+import io.nxmatic.rke2lab.manifests.domains.networking.NetworkingDomain;
+import io.nxmatic.rke2lab.manifests.domains.mesh.MeshDomain;
+import io.nxmatic.rke2lab.manifests.domains.storage.StorageDomain;
+import io.nxmatic.rke2lab.manifests.domains.platform.PlatformDomain;
+import io.nxmatic.rke2lab.manifests.domains.platform.components.ReplicatorComponent;
+import org.cdk8s.Chart;
+import org.cdk8s.ChartProps;
+import software.constructs.Construct;
+
+/**
+ * Layer 1 Chart - Infrastructure Critical Components.
+ *
+ * <p>Aggregates all domains/components required for RKE2 auto-deploy (Layer 1).
+ * These components MUST exist before gitops-mgmt vCluster can function.
+ */
+public class Layer1Chart extends Chart {
+
+  public Layer1Chart(Construct scope, String id, ManifestSynthesisRequest request) {
+    super(scope, id, ChartProps.builder().build());
+
+    // Bootstrap domain - ALL components
+    new BootstrapDomain()
+        .withAllComponents()
+        .synthesize(this, request);
+
+    // Networking domain - ALL components
+    new NetworkingDomain()
+        .withAllComponents()
+        .synthesize(this, request);
+
+    // Mesh domain - ALL components
+    new MeshDomain()
+        .withAllComponents()
+        .synthesize(this, request);
+
+    // Storage domain - ALL components
+    new StorageDomain()
+        .withAllComponents()
+        .synthesize(this, request);
+
+    // Platform domain - ONLY Replicator (NOT CertManager)
+    new PlatformDomain()
+        .withComponents(ReplicatorComponent.class)
+        .synthesize(this, request);
+
+    // Runtime domain handled separately (master node config)
+  }
+}
+```
+
+**6. Update Systemd Units**:
+
+Create new systemd unit for bootstrap domain:
+
+```
+manifests/src/main/resources/systemd-templates/
+└─ rke2lab-bootstrap-manifests.service.template
+
+[Unit]
+Description=RKE2Lab Bootstrap Manifests (Operators)
+After=rke2-server.service
+PartOf=rke2lab-manifests.target
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/scripts/rke2lab-manifests-install.sh bootstrap
+RemainAfterExit=yes
+
+[Install]
+WantedBy=rke2lab-manifests.target
+```
+
+Update BootstrapDomainRegistrar to synthesize this unit.
+
+**6. Update Policy Configuration**:
+
+```java
+// manifests/.../policy/ManifestDomainPolicy.java
+public final class ManifestDomainPolicy {
+  // Add bootstrap domain policy
+  public boolean bootstrapEnabled() {
+    return policy.getOrDefault("bootstrap", true); // Always enabled
+  }
+}
+```
+
+==== Validation
+
+After Phase 1.5:
+
+```bash
+# Check module structure
+ls manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/
+# Should show: bootstrap/, networking/, mesh/, storage/, platform/, runtime/
+# Should NOT show: cicd/ (deleted), gitops/ (moved to bootstrap/)
+
+# Check manifest units
+mvn -pl :manifests clean compile
+# Should compile without errors
+
+# Check that deleted layers are truly gone
+git status
+# Should show deleted files:
+#   deleted: manifests/.../cicd/CicdDomainRegistrar.java
+#   deleted: manifests/.../cicd/TektonPipelinesLayer.java
+#   deleted: manifests/.../platform/CertManagerLayer.java
+```
+
+**Deliverables**:
+* ✅ Bootstrap domain created with VCluster/Flux/CAPI operators
+* ✅ CertManager removed from manifests/
+* ✅ Tekton domain removed from manifests/
+* ✅ ManifestDomainCatalog updated with bootstrap() accessor
+* ✅ Systemd unit for bootstrap domain created
+
+=== Phase 2: Create gitops-mgmt vCluster (Pulumi)
+
+**Goal**: Establish the management vCluster with Flux inside.
+
+**Prerequisites**: Phase 1.5 complete, bootstrap domain deploys successfully.
+
+==== Actions
+
+**1. Create GitopsMgmtVClusterLayer** in seed-master:
+
+```
+seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/
+├─ vcluster/
+│  └─ GitopsMgmtVClusterLayer.java   (new)
+```
+
+**GitopsMgmtVClusterLayer.java**:
+```java
+public class GitopsMgmtVClusterLayer extends ComponentResource {
+  public GitopsMgmtVClusterLayer(String name, ComponentResourceOptions options) {
+    super("rke2lab:vcluster:GitopsMgmt", name, options);
+
+    // Wait for vCluster Operator to be ready
+    var vclusterCrd = CustomResource.get("vcluster-crd",
+      Output.of("vclusters.vcluster.loft.sh"));
+
+    // Create namespace
+    var namespace = new Namespace("gitops-mgmt",
+      NamespaceArgs.builder()
+        .metadata(ObjectMetaArgs.builder()
+          .name("gitops-mgmt")
+          .build())
+        .build(),
+      CustomResourceOptions.builder()
+        .parent(this)
+        .dependsOn(vclusterCrd)
+        .build());
+
+    // Create VCluster CR
+    var vcluster = new CustomResource("gitops-mgmt-vcluster",
+      CustomResourceArgs.builder()
+        .apiVersion("vcluster.loft.sh/v1")
+        .kind("VCluster")
+        .metadata(ObjectMetaArgs.builder()
+          .name("gitops-mgmt")
+          .namespace("gitops-mgmt")
+          .build())
+        .otherFields(Map.of(
+          "spec", Map.of(
+            "sync", Map.of(
+              "toHost", Map.of(
+                "pods", Map.of("enabled", true),
+                "secrets", Map.of("enabled", true)
+              )
+            )
+          )
+        ))
+        .build(),
+      CustomResourceOptions.builder()
+        .parent(this)
+        .dependsOn(namespace)
+        .build());
+
+    // Bootstrap Flux (via local Command)
+    var fluxBootstrap = new Command("flux-bootstrap",
+      CommandArgs.builder()
+        .create(vcluster.id().apply(id -> String.format("""
+          set -e
+          # Get vCluster kubeconfig
+          vcluster connect gitops-mgmt -n gitops-mgmt --print > /tmp/gitops-mgmt.kubeconfig
+
+          # Bootstrap Flux to GitHub
+          flux bootstrap github \
+            --kubeconfig=/tmp/gitops-mgmt.kubeconfig \
+            --owner=nxmatic \
+            --repository=rke2lab \
+            --branch=main \
+            --path=gitops/flux-system \
+            --personal=false
+
+          # Inject parent-cluster-kubeconfig
+          kubectl --kubeconfig=/tmp/gitops-mgmt.kubeconfig \
+            create secret generic parent-cluster-kubeconfig \
+            -n flux-system \
+            --from-file=kubeconfig=$HOME/.kube/config \
+            --dry-run=client -o yaml | \
+            kubectl --kubeconfig=/tmp/gitops-mgmt.kubeconfig apply -f -
+
+          # Cleanup temp kubeconfig
+          rm /tmp/gitops-mgmt.kubeconfig
+
+          echo "Flux bootstrap complete"
+          """)))
+        .build(),
+      CustomResourceOptions.builder()
+        .parent(this)
+        .dependsOn(vcluster)
+        .build());
+
+    this.registerOutputs();
+  }
+}
+```
+
+**2. Add to IncusResourceBootstrap**:
+
+```java
+// seed-master/.../incus/IncusResourceBootstrap.java
+public class IncusResourceBootstrap extends ComponentResource {
+
+  @Override
+  public void run() {
+    // ... existing bootstrap code ...
+
+    // Stage B: Post-cluster resources
+    during("stage-b", stageB -> {
+      // ... existing Stage B code ...
+
+      // Add gitops-mgmt vCluster
+      stageB.create("gitops-mgmt-vcluster", () ->
+        new GitopsMgmtVClusterLayer("gitops-mgmt",
+          ComponentResourceOptions.builder()
+            .parent(this)
+            .dependsOn(stageBDependencies)
+            .build())
+      );
+    });
+  }
+}
+```
+
+**3. Create Initial GitOps Structure**:
+
+```
+gitops/
+├─ flux-system/                    (created by flux bootstrap)
+│  ├─ gotk-components.yaml
+│  ├─ gotk-sync.yaml
+│  └─ kustomization.yaml
+│
+├─ clusters/bioskop/
+│  ├─ kustomization.yaml           (root kustomization)
+│  ├─ core/                        (placeholder, populated in Phase 3)
+│  │  └─ .gitkeep
+│  └─ peers/                       (placeholder, populated in Phase 3)
+│     └─ .gitkeep
+│
+└─ vclusters/
+   ├─ gitops-mgmt/                 (self-reference)
+   │  └─ kustomization.yaml
+   └─ labs/                        (placeholder, populated in Phase 3)
+      └─ .gitkeep
+```
+
+**clusters/bioskop/kustomization.yaml**:
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - core/
+  - peers/
+```
+
+Create Flux Kustomization in gitops-mgmt to watch parent cluster:
+
+```
+gitops/flux-system/kustomizations/
+└─ bioskop-cluster.yaml
+
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: bioskop-cluster
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./clusters/bioskop
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  kubeConfig:
+    secretRef:
+      name: parent-cluster-kubeconfig
+```
+
+==== Validation
+
+```bash
+# Pulumi up completes successfully
+pulumi up
+
+# Check vCluster created
+kubectl get vcluster -n gitops-mgmt
+# NAME           STATUS   AGE
+# gitops-mgmt    Ready    2m
+
+# Connect to gitops-mgmt
+vcluster connect gitops-mgmt -n gitops-mgmt
+
+# Check Flux in vCluster
+flux get all
+# Should show GitRepository + Kustomization for bioskop-cluster
+
+# Check parent-cluster-kubeconfig exists
+kubectl get secret -n flux-system parent-cluster-kubeconfig
+# Should exist
+
+# Check Flux can reach parent cluster
+flux logs --level=info
+# Should show "Applied revision" for bioskop-cluster Kustomization
+
+# Disconnect from vCluster
+vcluster disconnect
+```
+
+**Deliverables**:
+* ✅ gitops-mgmt vCluster created and running
+* ✅ Flux bootstrapped in gitops-mgmt
+* ✅ parent-cluster-kubeconfig Secret injected
+* ✅ Flux watching GitHub and able to apply to parent cluster
+* ✅ GitOps directory structure created
+
+=== Phase 3: Create seed-vclusters Module
+
+**Goal**: Create CDK8s module that synthesizes GitOps manifests for Flux to consume.
+
+**Prerequisites**: Phase 2 complete, Flux operational in gitops-mgmt.
+
+==== Module Structure
+
+```
+seed-vclusters/
+├─ pom.xml
+└─ src/main/java/io/nxmatic/rke2lab/vclusters/
+   ├─ Main.java                      (CLI entry point)
+   ├─ VClusterSynthesizer.java       (main synthesis orchestrator)
+   │
+   ├─ core/                          (core cluster addons)
+   │  ├─ CoreClusterChart.java       (root chart)
+   │  ├─ CicdChart.java              (Tekton - ex-TektonPipelinesLayer)
+   │  ├─ PlatformChart.java          (CertManager - ex-CertManagerLayer)
+   │  └─ MeshAddonsChart.java        (Envoy - ex-EnvoyGatewayLayer)
+   │
+   ├─ peers/                         (CAPI cluster CRs)
+   │  ├─ PeerClusterChart.java       (Cluster + LXCCluster)
+   │  ├─ PeerMachineChart.java       (LXCMachineTemplate per node)
+   │  └─ PeerCloudInitChart.java     (cloud-init Secrets, SOPS-encrypted)
+   │
+   └─ labs/                          (lab vClusters)
+      ├─ LabVClusterChart.java       (VCluster CRs)
+      └─ LabAppsChart.java           (Traefik, etc.)
+```
+
+==== pom.xml
+
+```xml
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>rke2lab</artifactId>
+    <version>1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>seed-vclusters</artifactId>
+  <name>vclusters/seed-vclusters</name>
+
+  <dependencies>
+    <!-- CDK8s -->
+    <dependency>
+      <groupId>org.cdk8s</groupId>
+      <artifactId>cdk8s</artifactId>
+    </dependency>
+
+    <!-- Reuse from seed-master (Pulumi EXCLUDED) -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>seed-master</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.pulumi</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <!-- Reuse manifest patterns -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>manifests</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+</project>
+```
+
+==== Main.java (Entry Point)
+
+```java
+package io.nxmatic.rke2lab.vclusters;
+
+import org.cdk8s.App;
+
+public class Main {
+  public static void main(String[] args) {
+    App app = new App();
+
+    // Synth core cluster addons
+    new CoreClusterChart(app, "core-cluster");
+
+    // Synth peer nodes
+    new PeerClusterChart(app, "peer-cluster");
+
+    // Synth lab vClusters
+    new LabVClusterChart(app, "lab-vclusters");
+
+    // Output to gitops/
+    app.synth();
+  }
+}
+```
+
+==== CoreClusterChart.java (Example)
+
+```java
+package io.nxmatic.rke2lab.vclusters.core;
+
+import org.cdk8s.Chart;
+import org.cdk8s.ChartProps;
+import software.constructs.Construct;
+
+public class CoreClusterChart extends Chart {
+  public CoreClusterChart(Construct scope, String id) {
+    super(scope, id, ChartProps.builder()
+      .namespace("default")
+      .build());
+
+    // Tekton (migrated from manifests/)
+    new CicdChart(this, "cicd");
+
+    // CertManager (migrated from manifests/)
+    new PlatformChart(this, "platform");
+  }
+}
+```
+
+==== Build Integration
+
+Add to root `pom.xml`:
+```xml
+<modules>
+  <module>seed-master</module>
+  <module>manifests</module>
+  <module>seed-vclusters</module>  <!-- NEW -->
+</modules>
+```
+
+Configure output directory:
+```xml
+<plugin>
+  <groupId>org.cdk8s</groupId>
+  <artifactId>cdk8s-maven-plugin</artifactId>
+  <configuration>
+    <outputDir>${project.basedir}/../gitops</outputDir>
+  </configuration>
+</plugin>
+```
+
+==== Workflow
+
+```bash
+# Synth GitOps manifests
+mvn -pl :seed-vclusters clean generate-resources
+
+# Output structure
+gitops/
+├─ clusters/bioskop/
+│  ├─ core/
+│  │  ├─ cicd/
+│  │  │  ├─ namespace.yaml
+│  │  │  ├─ tekton-pipelines.yaml
+│  │  │  └─ kustomization.yaml
+│  │  ├─ platform/
+│  │  │  ├─ cert-manager.yaml
+│  │  │  └─ kustomization.yaml
+│  │  └─ kustomization.yaml
+│  └─ peers/
+│     ├─ cluster.yaml
+│     ├─ peer1-template.yaml
+│     ├─ peer1-cloud-init.sops.yaml
+│     └─ kustomization.yaml
+
+# Commit and push
+git add gitops/
+git commit -m "Add core addons and peers"
+git push
+
+# Flux (in gitops-mgmt) reconciles automatically
+flux reconcile kustomization bioskop-cluster --with-source
+
+# Verify resources applied to parent cluster
+kubectl get helmchart -A | grep tekton
+# Should show tekton-pipelines HelmChart
+```
+
+==== Migration Mapping
+
+| Old (manifests/) | New (seed-vclusters/) | Output Path |
+|------------------|----------------------|-------------|
+| TektonPipelinesLayer | CicdChart | gitops/clusters/bioskop/core/cicd/ |
+| CertManagerLayer | PlatformChart | gitops/clusters/bioskop/core/platform/ |
+| EnvoyGatewayLayer | MeshAddonsChart | gitops/clusters/bioskop/core/mesh/ |
+| RuntimeCloudConfigLayer (peers) | PeerCloudInitChart | gitops/clusters/bioskop/peers/ |
+| (none - new) | LabVClusterChart | gitops/vclusters/labs/ |
+
+==== Validation
+
+```bash
+# Module builds successfully
+mvn -pl :seed-vclusters clean compile
+# BUILD SUCCESS
+
+# Synth produces expected output
+mvn -pl :seed-vclusters generate-resources
+ls gitops/clusters/bioskop/core/
+# Should show: cicd/ platform/ kustomization.yaml
+
+# Flux reconciles successfully
+flux get kustomizations
+# NAME              READY   MESSAGE
+# bioskop-cluster   True    Applied revision main@sha1:abc123
+
+# Resources exist in parent cluster
+kubectl get helmchart -n kube-system tekton-pipelines
+# Should exist
+
+kubectl get certificate -A
+# Should show cert-manager certificates if configured
+```
+
+**Deliverables**:
+* ✅ seed-vclusters module created and building
+* ✅ Core addons (CI/CD, Platform) synthesizing to gitops/
+* ✅ Peer cluster CAPI CRs synthesizing to gitops/
+* ✅ Flux reconciling and applying to parent cluster
+* ✅ Migration from manifests/ complete
+
+=== Phase 4: Peer Provisioning via Flux
+
+**Goal**: Provision peer nodes using CAPI, managed by Flux in gitops-mgmt.
+
+**Prerequisites**: Phase 3 complete, seed-vclusters synthesizing peer CRs.
+
+==== Actions
+
+**1. Synth Peer Cluster CRs**:
+
+Enhance `PeerClusterChart` to generate:
+* Cluster CR
+* LXCCluster CR (with Incus identity secret reference)
+* KThreesControlPlane CR (replicas: 0 initially)
+* LXCMachineTemplate per node (peer1, peer2, peer3)
+* SOPS-encrypted cloud-init Secrets
+
+**2. Bootstrap Peer1**:
+
+```bash
+# Synth peers
+mvn -pl :seed-vclusters generate-resources
+
+# Commit peer1 resources
+git add gitops/clusters/bioskop/peers/
+git commit -m "Add peer1 CAPI resources"
+git push
+
+# Edit controlplane.yaml: replicas 0 → 1
+vim gitops/clusters/bioskop/peers/controlplane.yaml
+# Change: replicas: 1
+git commit -m "Scale peer1"
+git push
+
+# Flux reconciles → CAPI provisions → peer1 joins
+flux reconcile kustomization bioskop-cluster --with-source
+
+# Wait for peer1
+kubectl get cluster bioskop
+kubectl get machines -n bioskop
+kubectl get nodes
+# Should show bioskop-peer1 Ready
+```
+
+==== Validation
+
+```bash
+# Cluster provisioned
+kubectl get cluster bioskop
+# NAME      PHASE         AGE
+# bioskop   Provisioned   5m
+
+# Machine created
+kubectl get machines -n bioskop
+# NAME             CLUSTER   PHASE     AGE
+# bioskop-peer1    bioskop   Running   5m
+
+# Node joined
+kubectl get nodes
+# NAME             STATUS   ROLES                       AGE
+# bioskop-master   Ready    control-plane,etcd,master   1h
+# bioskop-peer1    Ready    control-plane,etcd,master   5m
+
+# Cloud-init applied
+incus exec bioskop-peer1 -- cat /var/lib/cloud/instance/user-data.txt
+# Should show cloud-init content from Secret
+```
+
+**Deliverables**:
+* ✅ CAPI Cluster CR synthesized and applied
+* ✅ peer1 provisioned and joined cluster
+* ✅ Cloud-init applied correctly
+* ✅ Flux managing peer lifecycle
+
+=== Phase 5: Lab vCluster Deployment
+
+**Goal**: Deploy lab vClusters with applications.
+
+**Prerequisites**: Phase 4 complete, peers operational.
+
+==== Actions
+
+**1. Synth Lab vCluster CRs**:
+
+```bash
+# Add lab-1 vCluster
+mvn -pl :seed-vclusters generate-resources
+
+# Output:
+gitops/vclusters/labs/lab-1/
+├─ vcluster.yaml          (VCluster CR)
+├─ apps/
+│  ├─ traefik/
+│  │  ├─ namespace.yaml
+│  │  ├─ helmrelease.yaml
+│  │  └─ kustomization.yaml
+│  └─ cert-manager/
+│     └─ ...
+└─ kustomization.yaml
+```
+
+**2. Commit and Apply**:
+
+```bash
+git add gitops/vclusters/labs/lab-1/
+git commit -m "Add lab-1 vCluster with Traefik"
+git push
+
+# Flux reconciles
+flux reconcile kustomization vclusters-labs --with-source
+
+# VCluster created
+kubectl get vcluster -n lab-1
+# NAME    STATUS   AGE
+# lab-1   Ready    2m
+
+# Connect to lab-1
+vcluster connect lab-1 -n lab-1
+
+# Check apps in lab-1
+kubectl get pods -A
+# Should show Traefik pods
+
+vcluster disconnect
+```
+
+==== Validation
+
+```bash
+# Lab vCluster created
+kubectl get vcluster -A
+# NAMESPACE       NAME          STATUS   AGE
+# gitops-mgmt     gitops-mgmt   Ready    1h
+# lab-1           lab-1         Ready    5m
+
+# Apps deployed in lab-1
+vcluster connect lab-1 -n lab-1
+kubectl get helmrelease -A
+# Should show Traefik HelmRelease
+
+kubectl get pods -n traefik
+# Should show Traefik pods Running
+
+vcluster disconnect
+```
+
+**Deliverables**:
+* ✅ lab-1 vCluster created
+* ✅ Apps deployed in lab-1
+* ✅ Pattern established for additional labs
+
+== Upgrade Testing Pattern (Phase 6+)
+
+Once Phases 1-5 complete, validate the reentrant upgrade pattern:
+
+=== Create gitops-mgmt-next for Testing
+
+```bash
+# Copy gitops-mgmt config
+cp -r gitops/vclusters/gitops-mgmt/ gitops/vclusters/gitops-mgmt-next/
+
+# Edit to use Flux v2.4 (example upgrade)
+vim gitops/vclusters/gitops-mgmt-next/flux-version.yaml
+
+git add gitops/vclusters/gitops-mgmt-next/
+git commit -m "Test Flux v2.4 in gitops-mgmt-next"
+git push
+
+# Flux (current) creates test vCluster
+kubectl get vcluster -n gitops-mgmt-next
+# Should appear after Flux reconciles
+
+# Connect and validate
+vcluster connect gitops-mgmt-next -n gitops-mgmt-next
+flux version
+# Should show v2.4
+
+# Test managing a lab
+kubectl apply -f test-lab.yaml
+
+vcluster disconnect
+```
+
+=== Promote or Rollback
+
+**If test successful**:
+```bash
+# Promote to production
+cp gitops/vclusters/gitops-mgmt-next/flux-version.yaml \
+   gitops/vclusters/gitops-mgmt/flux-version.yaml
+git commit -m "Upgrade gitops-mgmt to Flux v2.4"
+git push
+
+# Flux auto-upgrades itself
+# Cleanup test vCluster
+rm -rf gitops/vclusters/gitops-mgmt-next/
+git commit -m "Remove test vCluster"
+git push
+```
+
+**If test fails**:
+```bash
+# Just delete test vCluster
+rm -rf gitops/vclusters/gitops-mgmt-next/
+git commit -m "Rollback Flux v2.4 test"
+git push
+
+# Production gitops-mgmt unaffected
+```
+
+== Repository Structure (Final State)
+
+```
+rke2lab/
+├─ seed-master/                (Pulumi bootstrap - Phase 1 + 2)
+│  └─ Creates master + gitops-mgmt vCluster
+│
+├─ manifests/                  (CDK8s - Layer 1 only)
+│  ├─ layers/
+│  │  ├─ bootstrap/           (VCluster/Flux/CAPI operators)
+│  │  ├─ networking/          (Cilium, DNS, VIP)
+│  │  ├─ mesh/                (Tailscale, Headscale)
+│  │  ├─ storage/             (OpenEBS)
+│  │  ├─ platform/            (Replicator only)
+│  │  └─ runtime/             (Master config only)
+│  └─ Applied by: RKE2 auto-deploy (systemd)
+│
+├─ seed-vclusters/             (CDK8s - Layer 3)
+│  ├─ core/                   (CI/CD, CertManager, etc.)
+│  ├─ peers/                  (CAPI CRs + cloud-init)
+│  └─ labs/                   (Lab vClusters + apps)
+│  └─ Synths to: gitops/
+│
+└─ gitops/                     (Flux source of truth)
+   ├─ flux-system/            (Flux bootstrap)
+   ├─ clusters/bioskop/
+   │  ├─ core/                (CI/CD, platform addons)
+   │  └─ peers/               (CAPI Cluster CRs)
+   └─ vclusters/
+      ├─ gitops-mgmt/         (Management vCluster config)
+      └─ labs/                (Lab vClusters)
+```
+
+== Critical Decision Points
+
+Throughout implementation, these decisions may require adjustment:
+
+=== 1. CAPI Operators Placement
+
+**Current decision**: Layer 1 (RKE2 auto-deploy) with vCluster Operator.
+
+**Rationale**: CAPI may be needed for gitops-mgmt infrastructure itself (if vCluster uses CAPI underneath).
+
+**Alternative**: Move to Layer 3 (Flux) if only needed for peer provisioning.
+
+**Validation**: During Phase 2, verify whether gitops-mgmt vCluster creation requires CAPI.
+
+=== 2. Storage for gitops-mgmt
+
+**Current decision**: Layer 1 (OpenEBS ZFS).
+
+**Rationale**: Flux may need PersistentVolumes for state.
+
+**Validation**: During Phase 2, check if gitops-mgmt vCluster requests PVs. If not, consider moving storage to Layer 3.
+
+=== 3. Mesh Access Requirements
+
+**Current decision**: Layer 1 (Tailscale + Headscale).
+
+**Rationale**: VPN required for operator access to cluster.
+
+**Alternative**: If VPN only for workloads, move to Layer 3.
+
+**Validation**: Confirm that `kubectl` access requires Tailscale/Headscale running.
+
+== Success Criteria
+
+=== Phase 1.5 Success
+* [ ] Bootstrap domain exists with 3 layers (VCluster/Flux/CAPI operators)
+* [ ] CertManager removed from manifests/
+* [ ] Tekton removed from manifests/
+* [ ] 6 systemd units (not 8+)
+* [ ] `pulumi up` succeeds with reduced manifest count
+
+=== Phase 2 Success
+* [ ] gitops-mgmt vCluster Running
+* [ ] Flux bootstrapped in gitops-mgmt
+* [ ] parent-cluster-kubeconfig Secret exists
+* [ ] Flux can apply test ConfigMap to parent cluster
+* [ ] GitOps directory structure created
+
+=== Phase 3 Success
+* [ ] seed-vclusters module builds
+* [ ] Tekton synthesizes to gitops/clusters/bioskop/core/cicd/
+* [ ] CertManager synthesizes to gitops/clusters/bioskop/core/platform/
+* [ ] Flux reconciles bioskop-cluster Kustomization
+* [ ] Tekton HelmChart exists in parent cluster
+
+=== Phase 4 Success
+* [ ] CAPI Cluster CR applied to parent
+* [ ] peer1 Machine created
+* [ ] peer1 node joins cluster (Ready state)
+* [ ] Cloud-init applied correctly
+
+=== Phase 5 Success
+* [ ] lab-1 vCluster created
+* [ ] Traefik deployed in lab-1
+* [ ] Apps accessible in lab-1
+
+=== Phase 6 Success (Upgrade Testing)
+* [ ] gitops-mgmt-next vCluster created
+* [ ] Flux v2.4 (or test version) running in gitops-mgmt-next
+* [ ] Test lab vCluster managed by gitops-mgmt-next
+* [ ] Promotion or rollback works as expected
+
+== Related Documentation
+
+=== Architecture & Design
+* link:vcluster-gitops-architecture.adoc[vCluster GitOps Architecture] - Full architecture with C4 diagrams and decision analysis
+* link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] - Original Phase 1-3 plan (Phase 1 complete)
+* link:stagea-stageb-handoff-contract.adoc[Stage A/B Handoff Contract] - Bootstrap contracts
+
+=== Implementation Patterns
+* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - CDK8s patterns reused in seed-vclusters
+* link:manifest-apply-flow.adoc[Manifest Apply Flow] - How Layer 1 RKE2 auto-deploy works
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Identity flow patterns
+* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Pipeline patterns for seed-master
+
+=== Configuration & Policies
+* link:policy-configuration-guide.adoc[Policy Configuration Guide] - How to configure domain policies
+* link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] - Single source of truth for domain IDs
+
+=== System Architecture
+* link:systemd-architecture.adoc[Systemd Architecture] - Target hierarchy and service lifecycle (updated for bootstrap domain)
+
+== Open Questions
+
+=== Critical (Phase 1.5)
+1. ✅ **RESOLVED**: Which layers stay in Layer 1? (Networking, Mesh, Storage, Platform-Replicator, Runtime-Master, Bootstrap)
+
+=== Important (Phase 2)
+2. **CAPI placement final decision**: Keep in Layer 1 or move to Layer 3 after gitops-mgmt validated?
+3. **Storage validation**: Does gitops-mgmt actually need PVs? Can we move OpenEBS to Layer 3?
+
+=== Nice-to-have (Phase 3+)
+4. **App catalog**: Should lab vClusters have predefined app sets (minimal/full/custom)?
+5. **VCluster lifecycle**: Auto-delete ephemeral labs after N days?
+6. **Monitoring**: Centralized observability for gitops-mgmt + labs?
+
+== Changelog
+
+* **2026-06-01**: Initial plan created, consolidating vCluster architecture decisions with implementation roadmap
+* Supersedes Phase 2-4 sections in previous planning documents
