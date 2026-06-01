@@ -160,7 +160,7 @@ public final class TailscaleLayer extends Construct {
                                 "kpt.dev/package-name",
                                 "tailscale",
                                 "replicator.v1.mittwald.de/replicate-from",
-                                "kube-system/operator-oauth"))
+                                "rke2lab-replicator-source/operator-oauth"))
                         .build())
                 .build());
     secret.addDependency(namespace);

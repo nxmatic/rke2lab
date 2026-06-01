@@ -30,11 +30,13 @@ public final class TektonPipelinesLayer extends Construct {
     new UpstreamYamlInclusion(this, operatorReleaseResource, packageProfile);
 
     createReplicatedSecret(
-        "tekton-git-auth", "kubernetes.io/basic-auth", "kube-system/tekton-git-auth");
+        "tekton-git-auth",
+        "kubernetes.io/basic-auth",
+        "rke2lab-replicator-source/tekton-git-auth");
     createReplicatedSecret(
         "tekton-docker-config",
         "kubernetes.io/dockerconfigjson",
-        "kube-system/tekton-docker-config");
+        "rke2lab-replicator-source/tekton-docker-config");
     createTektonConfig();
   }
 
