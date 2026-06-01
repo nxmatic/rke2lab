@@ -155,8 +155,8 @@ public final class BootstrapStage {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .partOf(context.toolsTarget().getUnitFileName())
-        .wantedBy(context.toolsTarget().getUnitFileName());
+        .partOf(context.bootstrapTarget().getUnitFileName())
+        .wantedBy(context.bootstrapTarget().getUnitFileName());
     return this;
   }
 
