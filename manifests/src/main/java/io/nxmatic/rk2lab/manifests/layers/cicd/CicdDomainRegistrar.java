@@ -43,6 +43,7 @@ public final class CicdDomainRegistrar implements LayerDomainRegistrar {
             .remainAfterExit(true)
             .standardOutput(StandardStream.JOURNAL)
             .standardError(StandardStream.JOURNAL)
+            .partOf(context.manifestsTarget().getUnitFileName())
             .wantedBy(context.manifestsTarget().getUnitFileName());
         new SystemdUnitSynthesizer(systemdChart, context.domainCatalog().cicd(), context)
             .secretsInstaller();

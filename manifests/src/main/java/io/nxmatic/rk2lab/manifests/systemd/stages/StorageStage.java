@@ -116,8 +116,8 @@ public final class StorageStage {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .partOf(context.rke2labTarget().getUnitFileName())
-        .wantedBy(context.rke2labTarget().getUnitFileName());
+        .partOf(context.manifestsTarget().getUnitFileName())
+        .wantedBy(context.manifestsTarget().getUnitFileName());
     return this;
   }
 }

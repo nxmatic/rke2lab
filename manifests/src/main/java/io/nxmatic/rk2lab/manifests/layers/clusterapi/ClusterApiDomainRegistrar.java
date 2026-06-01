@@ -48,6 +48,7 @@ public final class ClusterApiDomainRegistrar implements LayerDomainRegistrar {
             .remainAfterExit(true)
             .standardOutput(StandardStream.JOURNAL)
             .standardError(StandardStream.JOURNAL)
+            .partOf(context.manifestsTarget().getUnitFileName())
             .wantedBy(context.manifestsTarget().getUnitFileName());
       }
     };
