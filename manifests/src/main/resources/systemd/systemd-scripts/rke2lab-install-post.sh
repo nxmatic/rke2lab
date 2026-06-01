@@ -97,9 +97,3 @@ log "daemon-reload complete"
 # Use --no-block to avoid blocking the install service completion
 systemctl start --no-block "rke2-${RKE2LAB_NODE_KIND}"
 log "started rke2-${RKE2LAB_NODE_KIND}"
-
-: "Start post-server manifest installers"
-# The manifests target needs to be explicitly started since rke2lab.target
-# may already be active when rke2-server starts
-systemctl start --no-block rke2lab-manifests.target
-log "started rke2lab-manifests.target"

@@ -166,13 +166,14 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             .also(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName());
 
     // Manifests target comes after bootstrap and rke2-server
+    // Uses WantedBy=rke2-server.service to auto-start when rke2-server starts
     final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget manifestsTarget =
         new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-manifests")
             .description("RKE2 Lab Manifest Installers (post-server)")
             .after(bootstrapTarget.getUnitFileName(), "rke2-server.service")
             .requires("rke2-server.service")
             .partOf(rke2labTarget.getUnitFileName())
-            .wantedBy(rke2labTarget.getUnitFileName());
+            .wantedBy("rke2-server.service");
 
     // Secrets target comes after manifests (may depend on manifests being installed)
     final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget secretsTarget =
@@ -228,6 +229,14 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     // Finalize target dependencies (add reciprocal Wants= from services' WantedBy=)
     LOG.debug("Finalizing systemd target dependencies");
     systemdChart.finalizeTargetDependencies();
+
+    // Create drop-in for rke2-server to integrate pre/post-start hooks and manifests.target
+    LOG.debug("Creating rke2-server.service drop-in for lifecycle hooks");
+    new io.nxmatic.rke2lab.cdk8s.systemd.SystemdDropIn(
+            systemdChart, "rke2lab", "rke2-server.service")
+        .execStartPre("/srv/host/systemd-scripts.d/rke2lab-server-pre-start.sh")
+        .execStartPost("/srv/host/systemd-scripts.d/rke2lab-server-post-start.sh")
+        .wants(manifestsTarget.getUnitFileName());
 
     LOG.info("Calling app.synth() to synthesize K8s manifests to: {}", synthOutdir);
     app.synth();

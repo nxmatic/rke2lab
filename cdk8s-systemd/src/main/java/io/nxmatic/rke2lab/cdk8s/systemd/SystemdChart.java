@@ -35,6 +35,7 @@ import software.constructs.Construct;
 public class SystemdChart extends Construct {
 
   private final List<SystemdUnit> units = new ArrayList<>();
+  private final List<SystemdDropIn> dropIns = new ArrayList<>();
   private final Map<String, List<String>> targetWantsRegistry = new LinkedHashMap<>();
 
   public SystemdChart(Construct scope, String id) {
@@ -51,7 +52,16 @@ public class SystemdChart extends Construct {
   }
 
   /**
-   * Synthesizes all registered units to files.
+   * Called by child {@link SystemdDropIn} constructs when they're created.
+   *
+   * <p>Package-private - only drop-ins in this package can register themselves.
+   */
+  void registerDropIn(SystemdDropIn dropIn) {
+    dropIns.add(dropIn);
+  }
+
+  /**
+   * Synthesizes all registered units and drop-ins to files.
    *
    * <p>This is called automatically by CDK8s {@code App.synth()} via the construct tree traversal.
    *
@@ -61,10 +71,21 @@ public class SystemdChart extends Construct {
   public void synthesize(Path outdir) throws IOException {
     Files.createDirectories(outdir);
 
+    // Write unit files
     for (SystemdUnit unit : units) {
       final Path unitFile = outdir.resolve(unit.getUnitFileName());
       try (Writer writer = Files.newBufferedWriter(unitFile)) {
         unit.writeUnitFile(writer);
+      }
+    }
+
+    // Write drop-in files
+    for (SystemdDropIn dropIn : dropIns) {
+      final Path dropInDir = outdir.resolve(dropIn.getDropInDirectory());
+      Files.createDirectories(dropInDir);
+      final Path dropInFile = dropInDir.resolve(dropIn.getDropInFileName());
+      try (Writer writer = Files.newBufferedWriter(dropInFile)) {
+        dropIn.writeDropInFile(writer);
       }
     }
   }

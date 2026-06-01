@@ -1,0 +1,699 @@
+= RKE2Lab Systemd Architecture
+:toc: left
+:toclevels: 3
+
+== Overview
+
+This document describes the complete systemd architecture for rke2lab, including:
+
+- Target hierarchy and dependency relationships
+- Service lifecycle and ordering
+- RKE2 server integration via drop-ins
+- Bootstrap sequence and provisioning
+
+**Goal**: All dependencies are explicit, managed by systemd natively, and auditable via `systemctl list-dependencies`.
+
+== Target Hierarchy
+
+=== C4 Context Diagram
+
+[mermaid]
+----
+graph TB
+    MULTI["multi-user.target<br/>(systemd default)"]
+
+    subgraph "rke2lab.target"
+        MAIN["rke2lab.target<br/>Root coordination point"]
+
+        subgraph "Infrastructure Layer"
+            NET["rke2lab-network.target<br/>Network setup"]
+            TOOLS["rke2lab-tools.target<br/>Nix, Flox, Cachix"]
+        end
+
+        subgraph "Bootstrap Layer"
+            BOOT["rke2lab-bootstrap.target<br/>Pre-server initialization"]
+        end
+
+        subgraph "Server Layer"
+            RKE2["rke2-server.service<br/>(RKE2 binary)"]
+        end
+
+        subgraph "Post-Server Layer"
+            MANIFESTS["rke2lab-manifests.target<br/>Manifest installers"]
+            SECRETS["rke2lab-secrets.target<br/>Secrets installers"]
+        end
+    end
+
+    MULTI --> MAIN
+    MAIN --> NET
+    MAIN --> TOOLS
+    NET --> BOOT
+    TOOLS --> BOOT
+    BOOT --> RKE2
+    RKE2 -.->|WantedBy + Wants| MANIFESTS
+    MANIFESTS --> SECRETS
+
+    style MULTI fill:#f0f0f0
+    style MAIN fill:#ffeb99
+    style NET fill:#e1f5ff
+    style TOOLS fill:#e1f5ff
+    style BOOT fill:#d4edda
+    style RKE2 fill:#ffc107
+    style MANIFESTS fill:#fff3cd
+    style SECRETS fill:#fff3cd
+----
+
+**Legend**:
+- 🔵 Blue: Infrastructure (network, tools)
+- 🟢 Green: Bootstrap (pre-server)
+- 🟡 Yellow: Root target
+- 🟠 Orange: RKE2 server (external)
+- 🟨 Pale Yellow: Post-server coordination
+
+=== Target Relationships
+
+[cols="1,2,3"]
+|===
+|Target |Purpose |Key Dependencies
+
+|`multi-user.target`
+|System default multi-user target
+|Standard systemd target
+
+|`rke2lab.target`
+|Root coordination point for all rke2lab services
+|`WantedBy=multi-user.target`
+
+|`rke2lab-network.target`
+|Network infrastructure ready
+|`After=network-online.target`, `PartOf=rke2lab.target`
+
+|`rke2lab-tools.target`
+|Development tools installed (Nix, Flox, Cachix)
+|`After=rke2lab-network.target`, `PartOf=rke2lab.target`
+
+|`rke2lab-bootstrap.target`
+|Pre-server initialization complete
+|`After=rke2lab-network.target + rke2lab-tools.target`, `Requires=` both
+
+|`rke2-server.service`
+|RKE2 Kubernetes server (external, installed by get.rke2.io)
+|`After=rke2lab-bootstrap.target`, extended by drop-in
+
+|`rke2lab-manifests.target`
+|Post-server manifest installers
+|`After=rke2-server.service`, `WantedBy=rke2-server.service`
+
+|`rke2lab-secrets.target`
+|Post-server secrets installers
+|`After=rke2lab-manifests.target`
+|===
+
+== Bootstrap Sequence
+
+=== Timeline
+
+```
+Boot sequence:
+1. systemd init
+2. multi-user.target activates
+3. ├─> rke2lab.target activates (WantedBy=multi-user.target)
+4. ├─> rke2lab-network.target
+   │    ├─ rke2lab-network-config.service
+   │    └─ network-online.target (systemd built-in)
+5. ├─> rke2lab-tools.target (After=network)
+   │    ├─ rke2lab-nix-install.service
+   │    ├─ rke2lab-flox-install.service
+   │    └─ rke2lab-cachix-watch-store.service
+6. ├─> rke2lab-bootstrap.target (Requires=network + tools)
+   │    ├─ rke2lab-config-install.service
+   │    ├─ rke2lab-install-pre.service
+   │    ├─ rke2lab-install.service (runs get.rke2.io)
+   │    └─ rke2lab-install-post.service
+7. └─> rke2-server.service (started by install-post)
+        ├─ ExecStartPre=/srv/host/.../rke2lab-server-pre-start.sh
+        ├─ ExecStart=/usr/local/bin/rke2 server
+        ├─ ExecStartPost=/srv/host/.../rke2lab-server-post-start.sh
+        └─> (triggers via WantedBy symlink) rke2lab-manifests.target
+             ├─ rke2lab-gitops-manifests.service
+             ├─ rke2lab-cluster-api-manifests.service
+             ├─ rke2lab-networking-manifests.service
+             └─ ...
+```
+
+=== Key Ordering Constraints
+
+**Network before Tools**:
+- Nix/Flox downloads require network connectivity
+- `After=rke2lab-network.target`
+
+**Tools before Bootstrap**:
+- Bootstrap scripts source flox environments
+- `Requires=rke2lab-tools.target` (strict)
+
+**Bootstrap before RKE2**:
+- RKE2 config must be installed
+- RKE2 binaries must be downloaded
+- `After=rke2lab-bootstrap.target`
+
+**RKE2 before Manifests**:
+- Manifests installers require running API server
+- `After=rke2-server.service` + `WantedBy=rke2-server.service`
+
+== RKE2 Server Integration
+
+=== Drop-in Architecture
+
+**Problem**: `rke2-server.service` is installed by the official RKE2 installer (`get.rke2.io`). We cannot modify it directly because:
+1. Upgrades would overwrite our changes
+2. Conflicts with RKE2's own unit updates
+
+**Solution**: Use systemd drop-ins in `rke2-server.service.d/`
+
+=== Drop-in File: rke2lab.conf
+
+**Generated location**: `/etc/systemd/system/rke2-server.service.d/rke2lab.conf`
+
+**Content**:
+
+[source,ini]
+----
+# Generated by rke2lab cdk8s-systemd
+# Drop-in for: rke2-server.service
+
+[Service]
+ExecStartPre=/srv/host/systemd-scripts.d/rke2lab-server-pre-start.sh
+ExecStartPost=/srv/host/systemd-scripts.d/rke2lab-server-post-start.sh
+
+[Unit]
+Wants=rke2lab-manifests.target
+----
+
+=== Lifecycle Hooks
+
+==== Pre-Start: rke2lab-server-pre-start.sh
+
+**Runs**: Before RKE2 server binary starts (blocking)
+
+**Operations**:
+
+1. **Database IP check**:
+```bash
+# Detects IP address changes (e.g., VM migration)
+# Wipes etcd database if IP changed (prevents bind address mismatch)
+if [[ "${inet[current]}" != "${inet[last]}" ]]; then
+    rm -rf /var/lib/rancher/rke2/server/db
+fi
+```
+
+2. **NRI enablement**:
+```bash
+# Enables Node Resource Interface for containerd
+cat >/var/lib/rancher/rke2/agent/etc/containerd/config-v3.toml.d/90-nri.toml <<EOF
+[plugins."io.containerd.nri.v1.nri"]
+  disable = false
+EOF
+```
+
+**Failure behavior**: If pre-start exits non-zero, rke2-server will not start.
+
+==== Post-Start: rke2lab-server-post-start.sh
+
+**Runs**: After RKE2 server binary starts (non-blocking)
+
+**Operations**:
+
+1. **Readiness wait**:
+```bash
+until kubectl get --raw /readyz &>/dev/null; do
+    sleep 5
+done
+```
+
+2. **Kubeconfig permissions**:
+```bash
+chmod g-w /etc/rancher/rke2/rke2.yaml
+```
+
+3. **Node label normalization**:
+```bash
+kubectl label --overwrite node/... \
+    role=control-plane \
+    type=server \
+    node-type=rke2-server
+```
+
+**Failure behavior**: Post-start failure is logged but doesn't affect service state (remains active).
+
+=== Manifest Target Triggering
+
+**Key mechanism**: `WantedBy=rke2-server.service`
+
+**Java code** (DefaultManifestSynthesisService.java):
+
+[source,java]
+----
+final SystemdTarget manifestsTarget =
+    new SystemdTarget(systemdChart, "rke2lab-manifests")
+        .description("RKE2 Lab Manifest Installers (post-server)")
+        .after("rke2-server.service")
+        .requires("rke2-server.service")
+        .wantedBy("rke2-server.service");  // ← Creates .wants/ symlink
+----
+
+**Result**: `/etc/systemd/system/rke2-server.service.wants/rke2lab-manifests.target` symlink
+
+**Drop-in also adds** `Wants=` for runtime dependency:
+
+[source,java]
+----
+new SystemdDropIn(systemdChart, "rke2lab", "rke2-server.service")
+    .wants(manifestsTarget.getUnitFileName());  // ← Runtime Wants=
+----
+
+**Why both?**:
+- `WantedBy=` → Install-time symlink (during `systemctl enable`)
+- `Wants=` in drop-in → Runtime dependency declaration
+
+Both ensure manifests.target starts when rke2-server starts.
+
+== Dependency Directives
+
+=== After= (Ordering)
+
+**Purpose**: Controls start order, not whether units start.
+
+**Example**:
+```ini
+[Unit]
+After=network.target
+```
+
+**Meaning**: Wait for `network.target` to finish starting before starting this unit.
+
+**Does NOT**:
+- Force network.target to start
+- Fail if network.target fails
+
+=== Wants= (Weak Requirement)
+
+**Purpose**: Declares a weak dependency - start the wanted unit if possible.
+
+**Example**:
+```ini
+[Unit]
+Wants=rke2lab-manifests.target
+```
+
+**Meaning**: Attempt to start `rke2lab-manifests.target` when this unit starts.
+
+**Failure behavior**: If manifests.target fails, this unit continues (not affected).
+
+=== Requires= (Strict Requirement)
+
+**Purpose**: Declares a strict dependency - must succeed.
+
+**Example**:
+```ini
+[Unit]
+Requires=network.target
+```
+
+**Meaning**: If `network.target` fails, this unit also fails.
+
+**Failure behavior**: Propagates failure (stronger than Wants=).
+
+=== PartOf= (Lifecycle Binding)
+
+**Purpose**: Binds lifecycle - stop/restart propagates.
+
+**Example**:
+```ini
+[Unit]
+PartOf=rke2lab.target
+```
+
+**Meaning**:
+- `systemctl stop rke2lab.target` → also stops this unit
+- `systemctl restart rke2lab.target` → also restarts this unit
+
+**Does NOT**: Affect start order or start dependencies.
+
+=== WantedBy= (Install Directive)
+
+**Purpose**: Creates symlinks in target's `.wants/` directory during `systemctl enable`.
+
+**Example**:
+```ini
+[Install]
+WantedBy=rke2lab.target
+```
+
+**Result**: Creates `/etc/systemd/system/rke2lab.target.wants/<this-unit>`
+
+**Runtime effect**: When `rke2lab.target` activates, systemd starts units in its `.wants/` directory.
+
+=== Also= (Enable Propagation)
+
+**Purpose**: Enable/disable multiple units together.
+
+**Example**:
+```ini
+[Install]
+Also=network.target
+```
+
+**Meaning**: `systemctl enable this-unit` also enables `network.target`.
+
+== CDK8s Systemd Constructs
+
+=== SystemdService
+
+**Purpose**: Generate `.service` unit files.
+
+**Example**:
+
+[source,java]
+----
+new SystemdService(systemdChart, "rke2lab-nix-install")
+    .description("Install Nix package manager")
+    .after("rke2lab-network.target")
+    .requires("rke2lab-network.target")
+    .type(ServiceType.ONESHOT)
+    .execStart("/srv/host/systemd-scripts.d/rke2lab-nix-install.sh")
+    .remainAfterExit(true)
+    .partOf("rke2lab-tools.target")
+    .wantedBy("rke2lab-tools.target");
+----
+
+**Generated file**: `rke2lab-nix-install.service`
+
+[source,ini]
+----
+[Unit]
+Description=Install Nix package manager
+After=rke2lab-network.target
+Requires=rke2lab-network.target
+PartOf=rke2lab-tools.target
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-nix-install.sh
+RemainAfterExit=true
+
+[Install]
+WantedBy=rke2lab-tools.target
+----
+
+=== SystemdTarget
+
+**Purpose**: Generate `.target` unit files (coordination points).
+
+**Example**:
+
+[source,java]
+----
+new SystemdTarget(systemdChart, "rke2lab-bootstrap")
+    .description("RKE2 Lab Early Bootstrap (pre-server)")
+    .after("rke2lab-network.target", "rke2lab-tools.target")
+    .requires("rke2lab-network.target", "rke2lab-tools.target")
+    .partOf("rke2lab.target")
+    .wantedBy("rke2lab.target");
+----
+
+=== SystemdDropIn (NEW)
+
+**Purpose**: Generate drop-in configuration files to extend existing units.
+
+**Example**:
+
+[source,java]
+----
+new SystemdDropIn(systemdChart, "rke2lab", "rke2-server.service")
+    .execStartPre("/srv/host/systemd-scripts.d/rke2lab-server-pre-start.sh")
+    .execStartPost("/srv/host/systemd-scripts.d/rke2lab-server-post-start.sh")
+    .wants("rke2lab-manifests.target");
+----
+
+**Generated directory**: `rke2-server.service.d/`
+
+**Generated file**: `rke2-server.service.d/rke2lab.conf`
+
+**Key methods**:
+
+[source,java]
+----
+public SystemdDropIn execStartPre(String command)
+public SystemdDropIn execStartPost(String command)
+public SystemdDropIn wants(String... units)
+public SystemdDropIn after(String... units)
+public SystemdDropIn requires(String... units)
+----
+
+=== SystemdChart
+
+**Purpose**: Container for all systemd constructs, handles synthesis.
+
+**Key methods**:
+
+[source,java]
+----
+void registerUnit(SystemdUnit unit)          // Called by SystemdUnit constructor
+void registerDropIn(SystemdDropIn dropIn)    // Called by SystemdDropIn constructor
+void finalizeTargetDependencies()            // Adds reciprocal Wants= to targets
+void synthesize(Path outdir)                 // Writes all .service, .target, and drop-in files
+----
+
+**Target dependency finalization**:
+
+When services call `.wantedBy("some.target")`, SystemdChart tracks the relationship. Later, `finalizeTargetDependencies()` adds reciprocal `Wants=` directives to targets, making the hierarchy visible in `systemctl list-dependencies`.
+
+**Drop-in synthesis**:
+
+[source,java]
+----
+public void synthesize(Path outdir) throws IOException {
+    // Write unit files
+    for (SystemdUnit unit : units) {
+        Path unitFile = outdir.resolve(unit.getUnitFileName());
+        try (Writer w = Files.newBufferedWriter(unitFile)) {
+            unit.writeUnitFile(w);
+        }
+    }
+
+    // Write drop-in files
+    for (SystemdDropIn dropIn : dropIns) {
+        Path dropInDir = outdir.resolve(dropIn.getDropInDirectory());
+        Files.createDirectories(dropInDir);
+        Path dropInFile = dropInDir.resolve(dropIn.getDropInFileName());
+        try (Writer w = Files.newBufferedWriter(dropInFile)) {
+            dropIn.writeDropInFile(w);
+        }
+    }
+}
+----
+
+== Verification Commands
+
+=== Check Target Hierarchy
+
+[source,bash]
+----
+systemctl list-dependencies rke2lab.target
+----
+
+Expected output:
+```
+● └─network-online.target
+● └─rke2lab-network.target
+  └─rke2lab-network-config.service
+● └─rke2lab-tools.target
+  ├─rke2lab-nix-install.service
+  ├─rke2lab-flox-install.service
+  └─rke2lab-cachix-watch-store.service
+● └─rke2lab-bootstrap.target
+  ├─rke2lab-install-pre.service
+  ├─rke2lab-install.service
+  └─rke2lab-install-post.service
+● └─rke2-server.service
+● └─rke2lab-manifests.target
+  ├─rke2lab-gitops-manifests.service
+  └─...
+```
+
+=== Check RKE2 Drop-in
+
+[source,bash]
+----
+systemctl cat rke2-server.service
+----
+
+Should show both:
+1. Base unit (from `/usr/local/lib/systemd/system/rke2-server.service`)
+2. Drop-in (from `/etc/systemd/system/rke2-server.service.d/rke2lab.conf`)
+
+=== Verify Hooks Executed
+
+[source,bash]
+----
+journalctl -u rke2-server.service -b | grep -E "ExecStartPre|ExecStartPost"
+----
+
+Should show:
+```
+ExecStartPre: /srv/host/systemd-scripts.d/rke2lab-server-pre-start.sh (code=exited, status=0/SUCCESS)
+ExecStartPost: /srv/host/systemd-scripts.d/rke2lab-server-post-start.sh (code=exited, status=0/SUCCESS)
+```
+
+=== Check Manifest Services
+
+[source,bash]
+----
+systemctl list-units 'rke2lab-*-manifests.service'
+----
+
+All should show `active (exited)` (oneshot services with RemainAfterExit=true).
+
+=== Debug Dependency Issues
+
+[source,bash]
+----
+systemd-analyze critical-chain rke2-server.service
+----
+
+Shows the critical path to starting rke2-server:
+```
+rke2-server.service +5.234s
+└─rke2lab-install-post.service @10.123s +2.456s
+  └─rke2lab-install.service @5.678s +4.445s
+    └─rke2lab-install-pre.service @3.210s +2.468s
+      └─rke2lab-bootstrap.target @3.209s
+        └─rke2lab-tools.target @3.208s
+          └─rke2lab-network.target @1.234s +1.974s
+```
+
+== Design Principles
+
+=== Explicit Dependencies Over Scripts
+
+❌ **Anti-pattern**:
+```bash
+# In install-post.sh
+systemctl start rke2-server
+systemctl start rke2lab-manifests.target
+```
+
+✅ **Correct**:
+```java
+manifestsTarget.wantedBy("rke2-server.service");
+```
+
+**Why**: systemd manages dependencies natively. Shell scripts hide relationships and break auditability.
+
+=== Drop-ins Over Direct Modification
+
+❌ **Anti-pattern**: Edit `/etc/systemd/system/rke2-server.service` directly
+
+✅ **Correct**: Create `/etc/systemd/system/rke2-server.service.d/rke2lab.conf`
+
+**Why**: Upgrades won't overwrite drop-ins. Multiple tools can add drop-ins without conflicts.
+
+=== Strict Ordering vs Weak Dependencies
+
+**Use `After=` liberally**: Ordering is cheap, prevents race conditions.
+
+**Use `Requires=` sparingly**: Only when failure should propagate.
+
+**Use `Wants=` for optional dependencies**: Start if available, continue if not.
+
+**Example**:
+
+[source,java]
+----
+new SystemdService(...)
+    .after("network-online.target")     // Wait for network
+    .wants("network-online.target")     // Start network if not running
+    .requires("rke2lab-tools.target");  // MUST have tools (strict)
+----
+
+=== PartOf for Lifecycle Binding
+
+**Use `PartOf=` to bind sub-targets to main target**:
+
+[source,java]
+----
+networkTarget.partOf("rke2lab.target");
+toolsTarget.partOf("rke2lab.target");
+----
+
+**Result**: `systemctl stop rke2lab.target` stops all sub-targets and their services.
+
+**Don't use for services that should outlive their target**: If a service should keep running even after its parent target stops, omit `PartOf=`.
+
+== Troubleshooting
+
+=== Service Fails to Start
+
+1. **Check dependencies**:
+```bash
+systemctl list-dependencies <service> --reverse
+```
+
+2. **Check ordering**:
+```bash
+systemd-analyze critical-chain <service>
+```
+
+3. **Check logs**:
+```bash
+journalctl -u <service> -b
+```
+
+=== Target Never Activates
+
+**Symptom**: Target shows `inactive (dead)` even though WantedBy= is set.
+
+**Cause**: Parent target was already active when this target was enabled.
+
+**Solution**: Use explicit `Wants=` in parent, or trigger via service lifecycle (like rke2-server → manifests.target).
+
+=== Hooks Don't Run
+
+**Check drop-in is loaded**:
+```bash
+systemctl cat rke2-server.service | grep ExecStartPre
+```
+
+**If missing**: Re-synthesize and re-provision:
+```bash
+./mvnw clean install -pl manifests
+# Re-provision controlplane node
+```
+
+=== Circular Dependencies
+
+**Symptom**: `systemctl start <unit>` hangs or fails with "circular dependency".
+
+**Diagnosis**:
+```bash
+systemctl show -p After,Wants,Requires <unit>
+```
+
+**Fix**: Remove unnecessary `Requires=` directives. Use `After=` + `Wants=` instead.
+
+== Related Documentation
+
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - ThreadLocal context injection used by scripts
+* link:systemd-dbus-adapter-architecture.adoc[D-Bus TCP Adapter] - Remote systemd control via D-Bus
+* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Seed-master workflow orchestration
+
+== Migration from Previous Versions
+
+**If upgrading from manual systemctl start approach**:
+
+1. Rebuild manifests: `./mvnw clean install -pl manifests`
+2. Re-provision controlplane nodes (drop-ins are part of synthesis output)
+3. Verify: `systemctl cat rke2-server.service` should show drop-in
+4. Test: `systemctl restart rke2-server` should also restart manifest installers
+
+**No manual intervention required** - systemd automatically reads drop-ins and `.wants/` symlinks.
