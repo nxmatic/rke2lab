@@ -1,5 +1,5 @@
 // @codebase
-package io.nxmatic.rk2lab.manifests.layers.replication;
+package io.nxmatic.rk2lab.manifests.layers.platform;
 
 import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
 import java.util.Map;
@@ -11,7 +11,7 @@ import software.constructs.Construct;
 
 public final class ReplicatorLayer extends Construct {
 
-  private static final String LAYER_NAME = "replication";
+  private static final String LAYER_NAME = "platform";
   private static final String PACKAGE_NAME = "replicator";
 
   private final KptMetadata kptMetadata = new KptMetadata();

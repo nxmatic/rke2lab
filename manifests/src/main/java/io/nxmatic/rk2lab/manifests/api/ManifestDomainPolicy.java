@@ -73,11 +73,6 @@ public record ManifestDomainPolicy(Map<String, Boolean> enabledByDomainId) {
       return this;
     }
 
-    public Builder replication(boolean enabled) {
-      put(domainCatalog.replication(), enabled);
-      return this;
-    }
-
     public Builder storage(boolean enabled) {
       put(domainCatalog.storage(), enabled);
       return this;

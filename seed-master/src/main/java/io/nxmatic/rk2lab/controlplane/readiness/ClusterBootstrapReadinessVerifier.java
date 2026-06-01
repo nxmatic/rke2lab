@@ -347,7 +347,7 @@ public final class ClusterBootstrapReadinessVerifier {
       refs.add(new ControllerRef("deployment", "kdns", "rke2lab-system"));
     }
 
-    if (policy.manifestLink().replicationEnabled()) {
+    if (policy.manifestLink().platformEnabled()) {
       refs.add(new ControllerRef("deployment", "kubernetes-replicator", "kube-system"));
     }
 

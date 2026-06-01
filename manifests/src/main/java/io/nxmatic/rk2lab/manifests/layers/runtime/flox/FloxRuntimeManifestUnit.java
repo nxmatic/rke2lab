@@ -5,7 +5,7 @@ import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterRuntimeNamespaceManifestUnit;
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
 import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitContext;
-import io.nxmatic.rk2lab.manifests.layers.replication.ReplicationReplicatorManifestUnit;
+import io.nxmatic.rk2lab.manifests.layers.platform.ReplicatorManifestUnit;
 import io.nxmatic.rk2lab.manifests.layers.runtime.daemonset.RuntimeDaemonsetScriptPolicyManifestUnit;
 import java.util.List;
 import org.cdk8s.Chart;
@@ -19,7 +19,7 @@ public final class FloxRuntimeManifestUnit extends AbstractManifestUnit {
         MANIFEST_UNIT_ID,
         List.of(
             ClusterRuntimeNamespaceManifestUnit.MANIFEST_UNIT_ID,
-            ReplicationReplicatorManifestUnit.MANIFEST_UNIT_ID,
+            ReplicatorManifestUnit.MANIFEST_UNIT_ID,
             RuntimeDaemonsetScriptPolicyManifestUnit.MANIFEST_UNIT_ID));
   }
 

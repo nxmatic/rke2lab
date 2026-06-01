@@ -33,7 +33,7 @@ public final class GitopsDomainRegistrar implements LayerDomainRegistrar {
       units.add(new PorchResourcesManifestUnit());
     }
 
-    return new LayerDomain(CATALOG.gitops(), List.of(CATALOG.replication()), units) {
+    return new LayerDomain(CATALOG.gitops(), List.of(CATALOG.platform()), units) {
       @Override
       public void synthesizeSystemdUnits(
           SystemdChart systemdChart,

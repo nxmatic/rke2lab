@@ -29,7 +29,6 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains, DebugPolicy debug
   public static ManifestLinkPolicy stageA(
       boolean highAvailabilityEnabled,
       boolean networkingEnabled,
-      boolean replicationEnabled,
       boolean storageEnabled,
       boolean meshEnabled,
       boolean clusterApiEnabled) {
@@ -39,7 +38,6 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains, DebugPolicy debug
             .stageADefaults()
             .highAvailability(highAvailabilityEnabled)
             .networking(networkingEnabled)
-            .replication(replicationEnabled)
             .storage(storageEnabled)
             .mesh(meshEnabled)
             .clusterApi(clusterApiEnabled)
@@ -54,10 +52,6 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains, DebugPolicy debug
 
   public boolean networkingEnabled() {
     return domains.isEnabled(MANIFEST_DOMAIN_CATALOG.networking());
-  }
-
-  public boolean replicationEnabled() {
-    return domains.isEnabled(MANIFEST_DOMAIN_CATALOG.replication());
   }
 
   public boolean storageEnabled() {
@@ -82,8 +76,6 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains, DebugPolicy debug
         Boolean.toString(highAvailabilityEnabled()),
         "RKE2LAB_POLICY_LINK_NETWORKING_ENABLED",
         Boolean.toString(networkingEnabled()),
-        "RKE2LAB_POLICY_LINK_REPLICATION_ENABLED",
-        Boolean.toString(replicationEnabled()),
         "RKE2LAB_POLICY_LINK_STORAGE_ENABLED",
         Boolean.toString(storageEnabled()),
         "RKE2LAB_POLICY_LINK_MESH_ENABLED",
@@ -98,7 +90,6 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains, DebugPolicy debug
     return Map.of(
         "policyLinkHighAvailabilityEnabled", highAvailabilityEnabled(),
         "policyLinkNetworkingEnabled", networkingEnabled(),
-        "policyLinkReplicationEnabled", replicationEnabled(),
         "policyLinkStorageEnabled", storageEnabled(),
         "policyLinkMeshEnabled", meshEnabled(),
         "policyLinkClusterApiEnabled", clusterApiEnabled(),

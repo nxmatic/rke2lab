@@ -26,7 +26,6 @@ import io.nxmatic.rk2lab.manifests.layers.ha.HighAvailabilityDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.mesh.MeshDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.networking.NetworkingDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.platform.PlatformDomainRegistrar;
-import io.nxmatic.rk2lab.manifests.layers.replication.ReplicationDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeDomainRegistrar;
 import io.nxmatic.rk2lab.manifests.layers.storage.StorageDomainRegistrar;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
@@ -252,7 +251,6 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     return new LayerDomainRegistryBuilder()
         .register(new ClusterDomainRegistrar(), effectivePolicy)
         .register(new StorageDomainRegistrar(), effectivePolicy)
-        .register(new ReplicationDomainRegistrar(), effectivePolicy)
         .register(new GitopsDomainRegistrar(), effectivePolicy)
         .register(new RuntimeDomainRegistrar(), effectivePolicy)
         .register(new NetworkingDomainRegistrar(), effectivePolicy)

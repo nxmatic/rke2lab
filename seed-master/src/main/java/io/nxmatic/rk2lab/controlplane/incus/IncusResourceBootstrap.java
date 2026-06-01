@@ -3538,7 +3538,7 @@ public final class IncusResourceBootstrap {
       phased.put("cluster-api", new ArrayList<>());
       phased.put("gitops", new ArrayList<>());
       phased.put("mesh", new ArrayList<>());
-      phased.put("replication", new ArrayList<>());
+      phased.put("platform", new ArrayList<>());
       phased.put("cicd", new ArrayList<>());
       phased.put("tools", new ArrayList<>());
       phased.put("other", new ArrayList<>());
@@ -3596,8 +3596,8 @@ public final class IncusResourceBootstrap {
           || normalized.contains("headplane")) {
         return "mesh";
       }
-      if (normalized.contains("replication") || normalized.contains("replicator")) {
-        return "replication";
+      if (normalized.contains("replicator") || normalized.contains("cert-manager")) {
+        return "platform";
       }
       if (normalized.contains("cicd") || normalized.contains("tekton")) {
         return "cicd";

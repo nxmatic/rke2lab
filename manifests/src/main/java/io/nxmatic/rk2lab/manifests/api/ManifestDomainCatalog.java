@@ -18,7 +18,6 @@ public final class ManifestDomainCatalog {
 
   public static final String CLUSTER = "cluster";
   public static final String STORAGE = "storage";
-  public static final String REPLICATION = "replication";
   public static final String GITOPS = "gitops";
   public static final String RUNTIME = "runtime";
   public static final String NETWORKING = "networking";
@@ -47,10 +46,6 @@ public final class ManifestDomainCatalog {
 
   public String storage() {
     return STORAGE;
-  }
-
-  public String replication() {
-    return REPLICATION;
   }
 
   public String gitops() {
@@ -112,7 +107,6 @@ public final class ManifestDomainCatalog {
           List.of(
               CLUSTER,
               STORAGE,
-              REPLICATION,
               GITOPS,
               RUNTIME,
               NETWORKING,
@@ -126,7 +120,7 @@ public final class ManifestDomainCatalog {
 
     public Builder addDefaultStageALinkableDomains() {
       return addStageALinkableDomains(
-          List.of(HIGH_AVAILABILITY, NETWORKING, REPLICATION, STORAGE, MESH, CLUSTER_API));
+          List.of(HIGH_AVAILABILITY, NETWORKING, STORAGE, MESH, CLUSTER_API, PLATFORM));
     }
 
     public Builder addDomain(String domainId) {

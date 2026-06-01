@@ -17,7 +17,7 @@ public final class MeshDomainRegistrar implements LayerDomainRegistrar {
   public LayerDomain domain() {
     return new LayerDomain(
         manifestDomainCatalog.mesh(),
-        List.of(manifestDomainCatalog.networking(), manifestDomainCatalog.replication()),
+        List.of(manifestDomainCatalog.networking(), manifestDomainCatalog.platform()),
         List.of(
             new MeshSystemNamespaceManifestUnit(),
             new HeadscaleManifestUnit(),

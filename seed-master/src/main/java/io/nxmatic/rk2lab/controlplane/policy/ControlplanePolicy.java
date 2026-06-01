@@ -18,7 +18,7 @@ public record ControlplanePolicy(
     return new ControlplanePolicy(
         new DebugPolicy(false, false, false),
         new NetworkPolicy(true),
-        ManifestLinkPolicy.stageA(true, true, true, true, true, true));
+        ManifestLinkPolicy.stageA(true, true, true, true, true));
   }
 
   public static ControlplanePolicy from(Config config) {
@@ -48,7 +48,6 @@ public record ControlplanePolicy(
                 .stageADefaults()
                 .cluster(environment.bool("policy.link.cluster.enabled", true))
                 .storage(environment.bool("policy.link.storage.enabled", true))
-                .replication(environment.bool("policy.link.replication.enabled", true))
                 .gitops(environment.bool("policy.link.gitops.enabled", true))
                 .porch(environment.bool("policy.link.porch.enabled", false))
                 .runtime(environment.bool("policy.link.runtime.enabled", true))

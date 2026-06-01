@@ -55,7 +55,7 @@ import io.nxmatic.rk2lab.manifests.api.ManifestDomainPolicy;
  *     if (policy.isEnabled(CATALOG.porch())) {
  *       units.add(new PorchResourcesManifestUnit());
  *     }
- *     return new LayerDomain(CATALOG.gitops(), List.of(CATALOG.replication()), units);
+ *     return new LayerDomain(CATALOG.gitops(), List.of(CATALOG.platform()), units);
  *   }
  * }
  * }</pre>

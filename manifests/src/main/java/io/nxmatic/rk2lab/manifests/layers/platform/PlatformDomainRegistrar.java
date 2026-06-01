@@ -23,6 +23,8 @@ import java.util.List;
  * <ul>
  *   <li><b>cert-manager</b>: Certificate provisioning via cert-manager.io (webhook certs for CAPI,
  *       Tekton operators)
+ *   <li><b>kubernetes-replicator</b>: Cross-namespace secret/configmap replication for shared
+ *       credentials
  *   <li><b>traefik</b>: (Future) Ingress controller override for RKE2's default
  * </ul>
  *
@@ -36,7 +38,10 @@ public final class PlatformDomainRegistrar implements LayerDomainRegistrar {
 
   @Override
   public LayerDomain domain() {
-    return new LayerDomain(CATALOG.platform(), List.of(), List.of(new CertManagerManifestUnit())) {
+    return new LayerDomain(
+        CATALOG.platform(),
+        List.of(),
+        List.of(new CertManagerManifestUnit(), new ReplicatorManifestUnit())) {
       @Override
       public void synthesizeSystemdUnits(
           SystemdChart systemdChart,
