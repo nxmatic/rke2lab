@@ -58,18 +58,8 @@ public final class BootstrapInfrastructureSynthesizer {
     zfsEarlyUmount();
     vipKubeconfig();
 
-    // Update rke2lab.target dependencies (now that all services exist)
-    context
-        .rke2labTarget()
-        .after(
-            bootstrapEnvService.getUnitFileName(),
-            installService.getUnitFileName(),
-            "rke2-server.service")
-        .wants(
-            bootstrapEnvService.getUnitFileName(),
-            installService.getUnitFileName(),
-            "rke2-server.service")
-        .requires(bootstrapEnvService.getUnitFileName(), installService.getUnitFileName());
+    // Note: rke2lab.target dependencies are set in DefaultManifestSynthesisService
+    // after all targets and services are created
   }
 
   private void bootstrapEnv() {
