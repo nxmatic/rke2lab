@@ -37,6 +37,7 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 * link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How K8s manifests are generated from code
 * link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven optional manifest units within domains
 * link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] (✅ Enforced) - Single source of truth for domain IDs; prevents identifier mismatches like the clusterApi bug
+* link:cdk8s-chart-vs-construct-pattern.adoc[CDK8s Chart vs Construct Pattern] (✅ Enforced) - Critical distinction between synthesis boundaries (Chart) and composition (Construct); all Layer classes MUST extend Construct
 * link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow patterns in seed-master
 * link:staged-post-cluster-resources.adoc[Staged Post-Cluster Resources] - Pattern for resources that need Pulumi Outputs but must exist before Stage B
 

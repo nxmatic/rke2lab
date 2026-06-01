@@ -242,6 +242,7 @@ return new LayerDomain(CATALOG.myNewDomain(), ...);
 * link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How domains become manifests
 * link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven domain enablement
 * link:policy-configuration-guide.adoc[Policy Configuration Guide] - How to configure domain policies
+* link:cdk8s-chart-vs-construct-pattern.adoc[CDK8s Chart vs Construct Pattern] - Layer implementation rules (all MUST extend Construct)
 
 == Troubleshooting
 

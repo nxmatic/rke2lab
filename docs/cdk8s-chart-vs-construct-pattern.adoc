@@ -1,0 +1,529 @@
+= CDK8s Chart vs Construct Pattern
+:toc:
+:toclevels: 3
+
+== Overview
+
+This document explains the critical distinction between CDK8s `Chart` and `Construct` classes and establishes the correct pattern for manifest layer implementation in the RKE2Lab synthesis pipeline.
+
+=== Problem Statement
+
+CDK8s provides two base classes for building Kubernetes manifests:
+
+* **`Chart`**: A synthesis boundary that produces a separate `.k8s.yaml` output file
+* **`Construct`**: A compositional building block that adds resources to its parent Chart
+
+Incorrectly extending `Chart` when you should extend `Construct` causes resources to be synthesized into separate files that the manifest exploder ignores, resulting in manifests never reaching the RKE2 auto-deploy directory.
+
+=== Critical Rule
+
+[IMPORTANT]
+====
+**All Layer classes in `manifests/src/main/java/.../layers/` MUST extend `Construct`, NEVER `Chart`.**
+
+The only Charts in the codebase should be:
+
+* `Chart(app, "manifests")` in `DefaultManifestSynthesisService` (line 91)
+* `SystemdChart(app, "systemd")` in `DefaultManifestSynthesisService` (line 92)
+====
+
+== Architecture
+
+=== Single-Chart Model (Current Architecture)
+
+The RKE2Lab manifest synthesis uses a **single-Chart model** where all domains feed into one consolidated Chart, then an exploder splits the output by annotations.
+
+[mermaid]
+....
+graph TB
+    subgraph "Synthesis Phase"
+        App[App outdir=synthOutdir]
+        Chart[Chart 'manifests']
+        SystemdChart[SystemdChart 'systemd']
+
+        App --> Chart
+        App --> SystemdChart
+
+        subgraph "11 Domains feed into Chart"
+            CM[CertManagerLayer<br/>Construct]
+            GO[GitopsLayers<br/>Construct]
+            CA[ClusterApiLayers<br/>Construct]
+            More[... 8 more domains]
+        end
+
+        Chart --> CM
+        Chart --> GO
+        Chart --> CA
+        Chart --> More
+
+        CM --> NS1[ApiObject Namespace]
+        CM --> HC1[ApiObject HelmChart]
+        GO --> FI[ApiObject FluxInstance]
+        CA --> OP[ApiObject ClusterApiOperator]
+    end
+
+    subgraph "Output Phase"
+        Chart --> Synth[app.synth]
+        Synth --> Consolidated[manifests.k8s.yaml<br/>ALL domains in one file]
+
+        Consolidated --> Exploder[ManifestExplodeService]
+        Exploder --> |reads annotations| Annot[kpt.dev/package-layer<br/>kpt.dev/package-name]
+
+        Exploder --> CM_DIR[cert-manager/cert-manager/]
+        Exploder --> GO_DIR[gitops/flux-instance/]
+        Exploder --> CA_DIR[cluster-api/operator/]
+        Exploder --> More_DIR[... other domains]
+    end
+
+    style Chart fill:#90EE90
+    style Consolidated fill:#FFE4B5
+    style CM fill:#87CEEB
+    style GO fill:#87CEEB
+    style CA fill:#87CEEB
+    style More fill:#87CEEB
+....
+
+**Legend:**
+
+* Green: Chart (synthesis boundary)
+* Blue: Construct (composition)
+* Beige: Output file
+
+=== What Happens When You Extend Chart (Anti-Pattern)
+
+[mermaid]
+....
+graph TB
+    subgraph "WRONG: Layer Extends Chart"
+        App[App]
+        MainChart[Chart 'manifests']
+
+        App --> MainChart
+
+        subgraph "Nested Charts Created"
+            LayerChart1[Chart 'layer-cert-manager'<br/>❌ WRONG]
+            LayerChart2[Chart 'layer-flux-operator'<br/>❌ WRONG]
+        end
+
+        MainChart --> LayerChart1
+        MainChart --> LayerChart2
+
+        LayerChart1 --> NS1[ApiObject Namespace]
+        LayerChart1 --> HC1[ApiObject HelmChart]
+    end
+
+    subgraph "Output Phase"
+        App --> Synth[app.synth]
+        Synth --> File1[1-manifests.k8s.yaml<br/>empty or partial]
+        Synth --> File2[2-layer-cert-manager.k8s.yaml<br/>❌ IGNORED BY EXPLODER]
+        Synth --> File3[3-layer-flux-operator.k8s.yaml<br/>❌ IGNORED BY EXPLODER]
+
+        File1 --> Exploder[ManifestExplodeService]
+        Exploder --> |pattern match fails| NoMatch[Only looks for *-manifests.k8s.yaml]
+
+        File2 --> X1[❌ Never processed]
+        File3 --> X2[❌ Never processed]
+    end
+
+    subgraph "Result"
+        NoMatch --> Empty[cert-manager/ directory missing]
+        Empty --> Systemd[systemd service skipped<br/>ConditionPathExists fails]
+        Systemd --> Failure[Manifests never applied]
+    end
+
+    style LayerChart1 fill:#FFB6C1
+    style LayerChart2 fill:#FFB6C1
+    style File2 fill:#FFB6C1
+    style File3 fill:#FFB6C1
+    style Empty fill:#FFB6C1
+....
+
+**What went wrong:**
+
+1. Layer extends `Chart` instead of `Construct`
+2. CDK8s creates separate child Charts
+3. `app.synth()` outputs multiple `.k8s.yaml` files with numeric prefixes
+4. Exploder only processes `*-manifests.k8s.yaml` (line 210-211 in `DefaultManifestSynthesisService`)
+5. Resources in `*-layer-*.k8s.yaml` are never exploded
+6. Domain directories remain empty
+7. Systemd services fail `ConditionPathExists=/srv/host/rke2-manifests.d/cert-manager`
+8. RKE2 never applies the manifests
+
+== Usage Patterns
+
+=== ✅ Correct Pattern: Layer Extends Construct
+
+[source,java]
+----
+package io.nxmatic.rk2lab.manifests.layers.certmanager;
+
+import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
+import java.util.Map;
+import org.cdk8s.ApiObject;
+import org.cdk8s.ApiObjectMetadata;
+import org.cdk8s.ApiObjectProps;
+import org.cdk8s.JsonPatch;
+import software.constructs.Construct;  // ← Import Construct, not Chart
+
+public final class CertManagerLayer extends Construct {  // ← Extend Construct
+
+  private final PackageMetadataProfile packageProfile =
+      new PackageMetadataProfile("cert-manager", "cert-manager");
+
+  public CertManagerLayer(final Construct scope, final String id, final String version) {
+    super(scope, id);  // ← Pass scope through to Construct
+
+    // Create ApiObjects as children of this Construct
+    ApiObject namespace = new ApiObject(
+        this,  // ← 'this' is the Construct
+        "namespace-cert-manager",
+        ApiObjectProps.builder()
+            .apiVersion("v1")
+            .kind("Namespace")
+            .metadata(
+                ApiObjectMetadata.builder()
+                    .name("cert-manager")
+                    .annotations(packageProfile.packageAnnotations("|Namespace||cert-manager"))
+                    .build())
+            .build());
+
+    // More ApiObjects...
+  }
+}
+----
+
+**Why this works:**
+
+* `CertManagerLayer` is a `Construct` in the construct tree
+* When instantiated with `new CertManagerLayer(chart, "layer-cert-manager", version)`, it becomes a child of the Chart
+* Its ApiObjects are synthesized into the parent Chart's output
+* All resources end up in `manifests.k8s.yaml`
+* Exploder reads annotations and routes to `cert-manager/cert-manager/`
+
+=== ❌ Anti-Pattern: Layer Extends Chart
+
+[source,java]
+----
+// DO NOT DO THIS
+import org.cdk8s.Chart;  // ← WRONG import
+
+public final class CertManagerLayer extends Chart {  // ← WRONG base class
+
+  public CertManagerLayer(final Construct scope, final String id, final String version) {
+    super(scope, id);  // ← Creates NEW Chart, not Construct
+    // ...
+  }
+}
+----
+
+**Why this fails:**
+
+* Creates a nested Chart in the construct tree
+* CDK8s synthesizes it to a separate `.k8s.yaml` file
+* Exploder's pattern matching doesn't find it
+* Resources never reach `rke2-manifests.d/`
+
+=== Instantiation Pattern (ManifestUnit)
+
+All Layer classes are instantiated via their ManifestUnit's `apply(Chart chart)` method:
+
+[source,java]
+----
+public final class CertManagerManifestUnit extends AbstractManifestUnit {
+
+  public static final String MANIFEST_UNIT_ID =
+      ManifestDomainCatalog.CERT_MANAGER + "/cert-manager";
+
+  public CertManagerManifestUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
+  }
+
+  @Override
+  public void apply(final Chart chart) {
+    // Pass the Chart as scope to the Construct
+    new CertManagerLayer(chart, "layer-cert-manager", componentVersions().certManager());
+    //                    ^^^^^ The shared Chart from DefaultManifestSynthesisService
+  }
+}
+----
+
+The `chart` parameter comes from `DefaultManifestSynthesisService` line 110:
+
+[source,java]
+----
+final Chart chart = new Chart(app, "manifests");  // Single shared Chart
+final ManifestUnitDependencyApplier dependencyApplier =
+    new ManifestUnitDependencyApplier(
+        domainRegistry, manifestUnitRegistry, manifestUnitVisitor,
+        chart,  // ← Passed to all ManifestUnits
+        assemblyRegistry);
+----
+
+== Chart vs Construct Decision Tree
+
+[mermaid]
+....
+graph TD
+    Start[Creating a new class for K8s resources]
+
+    Start --> Q1{Is this a synthesis<br/>boundary that should<br/>output a separate file?}
+
+    Q1 -->|Yes| Chart[Extend Chart<br/>✓ Only for top-level organization]
+    Q1 -->|No| Q2{Does it compose<br/>K8s resources?}
+
+    Q2 -->|Yes| Construct[Extend Construct<br/>✓ This is 99% of Layer classes]
+    Q2 -->|No| Plain[Plain class or record<br/>✓ For data/config]
+
+    Chart --> Examples1[Examples:<br/>• Chart app, 'manifests'<br/>• SystemdChart app, 'systemd']
+    Construct --> Examples2[Examples:<br/>• CertManagerLayer<br/>• FluxOperatorLayer<br/>• All domain layers]
+    Plain --> Examples3[Examples:<br/>• PackageMetadataProfile<br/>• ComponentVersions]
+
+    style Chart fill:#90EE90
+    style Construct fill:#87CEEB
+    style Plain fill:#FFE4B5
+....
+
+**When to extend Chart:**
+
+* You're creating a top-level synthesis unit in `DefaultManifestSynthesisService`
+* You want a separate output file for a distinct subsystem
+* **Count in this codebase: 2** (main manifests Chart, systemd Chart)
+
+**When to extend Construct:**
+
+* You're creating a Layer that composes K8s ApiObjects
+* You're building reusable resource templates
+* You're implementing a domain's manifest units
+* **Count in this codebase: ~40+** (all domain layers)
+
+**When to use neither:**
+
+* Data classes (`ComponentVersions`, `ManifestDomainCatalog`)
+* Profiles (`PackageMetadataProfile`)
+* Registries (`LayerDomainRegistry`)
+
+== Why Single-Chart Model?
+
+=== Advantages of the Current Architecture
+
+[cols="1,3,3"]
+|===
+|Aspect |Single-Chart Model |Chart-per-Domain Alternative
+
+|**Cross-domain deps**
+|Natural - all in same construct tree. cluster-api can reference cert-manager's Namespace ApiObject
+|Requires CDK8s export/import pattern, adds complexity
+
+|**Ordering**
+|`ManifestUnitDependencyApplier` ensures correct application order based on declared dependencies
+|Would need explicit Chart ordering at App level or post-synthesis merge
+
+|**Flexibility**
+|Annotations (`kpt.dev/package-layer`, `kpt.dev/package-name`) create any directory structure: `gitops/flux-instance`, `gitops/flux-root`, `gitops/sops-age`
+|One Chart = one file = one directory. Would need 3 Charts for gitops subdirectories
+
+|**Output**
+|Single `manifests.k8s.yaml` - easy to checksum, version, track in git
+|11 separate files - need consolidation for deployment
+
+|**Testing**
+|Test whole system or mock dependencies
+|Test Charts independently (benefit for isolation)
+
+|**Build parallelization**
+|Single-threaded synthesis
+|Could synthesize Charts in parallel (benefit for large scale)
+
+|**Simplicity**
+|One synthesis → one explode → domain dirs
+|Synthesis → per-Chart processing → potential merge → domain dirs
+|===
+
+=== When Chart-per-Domain Would Make Sense
+
+If requirements changed to:
+
+* **Independent deployment**: gitops team deploys `gitops.yaml`, cluster-api team deploys `cluster-api.yaml`
+* **Per-domain versioning**: cert-manager v1.20, gitops v2.3 tracked separately
+* **Parallel synthesis bottleneck**: Build time CPU-bound on manifest generation
+* **No cross-domain references**: Truly isolated domains
+
+**Current reality:**
+
+* Atomic deployment (single host asset bundle)
+* Repo-level versioning (git commit hash in `MANIFEST.yaml`)
+* Synthesis is fast (~1-2s for all domains)
+* Cross-domain dependencies exist (cert-manager ← cluster-api, cicd)
+
+**Conclusion:** Single-Chart model is correct for this architecture.
+
+== Troubleshooting
+
+=== Symptom: Domain Directory Missing in rke2-manifests.d/
+
+[source,bash]
+----
+$ tree .local.d/bioskop/master/host.preview/rke2-manifests.d/
+...
+├── cluster-api
+├── gitops
+# cert-manager/ is missing!
+----
+
+**Check 1: Is the Layer class correct?**
+
+[source,bash]
+----
+$ grep "extends Chart" manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/certmanager/CertManagerLayer.java
+public final class CertManagerLayer extends Chart {  # ← WRONG
+----
+
+**Fix:**
+
+[source,bash]
+----
+# Change to extends Construct
+public final class CertManagerLayer extends Construct {
+----
+
+**Check 2: Are annotations present?**
+
+If the Layer extends Construct but output is still missing, check if `PackageMetadataProfile` annotations are stamped:
+
+[source,java]
+----
+private final PackageMetadataProfile packageProfile =
+    new PackageMetadataProfile("cert-manager", "cert-manager");
+
+// In ApiObject creation:
+.annotations(packageProfile.packageAnnotations("|Namespace||cert-manager"))
+----
+
+Without these annotations, the exploder routes resources to `default/unknown/` instead of the domain directory.
+
+**Check 3: Is the domain enabled in policy?**
+
+[source,bash]
+----
+$ cat .local.d/bioskop/master/host/.rke2lab-manifest.yaml | grep certManager
+certManager: true  # ← Should be true
+----
+
+If false, the domain is filtered out during synthesis. Check `ControlplanePolicy.java` line 60.
+
+=== Symptom: Systemd Service Skipped with ConditionPathExists
+
+[source,bash]
+----
+$ journalctl -u rke2lab-cert-manager-manifests.service
+Jun 01 06:20:11 systemd[1]: rke2lab-cert-manager-manifests.service - Install RKE2Lab cert-manager manifests from host share (post-server) skipped, unmet condition check ConditionPathExists=/srv/host/rke2-manifests.d/cert-manager
+----
+
+**Diagnosis:**
+
+The systemd service (synthesized in `CertManagerDomainRegistrar.synthesizeSystemdUnits()`) has:
+
+[source,systemd]
+----
+ConditionPathExists=/srv/host/rke2-manifests.d/cert-manager
+----
+
+But the directory doesn't exist because manifests weren't exploded there.
+
+**Root cause:** The Layer extends `Chart` instead of `Construct` (see previous troubleshooting section).
+
+=== Symptom: Multiple .k8s.yaml Files in synthOutdir
+
+[source,bash]
+----
+$ ls .local.d/bioskop/master/host.preview/manifests/
+1-manifests.k8s.yaml
+2-layer-cert-manager.k8s.yaml
+3-layer-flux-operator.k8s.yaml
+----
+
+**Diagnosis:**
+
+Multiple Charts exist in the App tree. The numeric prefixes are CDK8s's behavior when synthesizing multiple Charts.
+
+**Root cause:** Some Layer classes incorrectly extend `Chart`.
+
+**Fix:**
+
+[source,bash]
+----
+# Find all Layer classes extending Chart
+$ grep -r "extends Chart" manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/
+
+# Change each to extends Construct (except top-level Charts in DefaultManifestSynthesisService)
+----
+
+== Historical Context
+
+=== Bug Timeline
+
+* **2026-05-31 00:10** (commit 18f31fbb5): `feat(cert-manager): add cert-manager as a dedicated manifest domain`
+** Added `CertManagerLayer` extending `Chart` (incorrect)
+** Commit message claimed "verified end-to-end" but build outputs show no `cert-manager/` directory
+
+* **2026-05-31 00:12** (commit def79808): `fix(gitops): stamp package annotations on FluxOperatorLayer`
+** Added `PackageMetadataProfile` annotations to `FluxOperatorLayer`
+** Did NOT change `Chart` to `Construct` (still broken)
+
+* **2026-06-01 06:15**: Build output shows `cert-manager/` still missing
+
+* **2026-06-01** (commit 795bc4cf): `fix(manifests): change CertManagerLayer and FluxOperatorLayer to extend Construct`
+** Changed both to extend `Construct` (correct)
+** Build output now shows `cert-manager/` and `gitops/flux-operator/` directories
+
+=== Lesson Learned
+
+The "verified end-to-end" claim in commit 18f31fbb5 was incorrect. The verification likely checked that:
+
+* Code compiled ✓
+* Annotations were present ✓
+* Exploder logic looked correct ✓
+
+But did NOT verify:
+
+* Actual build output ✗
+* Presence of `cert-manager/` directory ✗
+* Systemd service condition passing ✗
+
+**Takeaway:** For synthesis-based features, verification MUST include checking the actual output directory structure, not just code inspection.
+
+== Enforcement
+
+=== Compile-Time Checks (Future Work)
+
+Consider adding a unit test that scans for the anti-pattern:
+
+[source,java]
+----
+@Test
+void allLayerClassesMustExtendConstruct() throws Exception {
+  // Scan manifests/src/main/java/.../layers/
+  // Find all *Layer.java classes
+  // Parse and verify they extend Construct, not Chart
+  // Exclude: layers in DefaultManifestSynthesisService (allowed to be Chart)
+}
+----
+
+=== Code Review Checklist
+
+When reviewing new Layer classes:
+
+- [ ] Does the class name end with `Layer`?
+- [ ] Does it extend `Construct` (NOT `Chart`)?
+- [ ] Does it create `PackageMetadataProfile` with correct layer/package names?
+- [ ] Are all `ApiObject` metadata stamped with `packageProfile.packageAnnotations(...)`?
+- [ ] Is it instantiated from a `ManifestUnit.apply(Chart chart)` method?
+- [ ] After synthesis, does the domain directory appear in `rke2-manifests.d/`?
+
+== Related Documentation
+
+* link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] - Single source of truth for domain IDs
+* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow patterns in seed-master
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Context access pattern for manifest units
+* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java] - Main synthesis orchestrator
+* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/DefaultManifestExplodeService.java[DefaultManifestExplodeService.java] - Annotation-driven manifest splitter
