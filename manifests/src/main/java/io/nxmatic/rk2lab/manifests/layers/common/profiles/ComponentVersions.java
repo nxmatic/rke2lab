@@ -89,7 +89,7 @@ public record ComponentVersions(
         .kubeVip("v0.8.7")
         .openebsZfsChart("2.8.0")
         .kubernetesReplicator("v2.12.2")
-        .fluxOperator("v0.36.0")
+        .fluxOperator("v0.50.0")
         .envoyGateway("v1.4.2")
         .tailscale("1.82.0")
         .clusterApiOperator("v0.27.0")

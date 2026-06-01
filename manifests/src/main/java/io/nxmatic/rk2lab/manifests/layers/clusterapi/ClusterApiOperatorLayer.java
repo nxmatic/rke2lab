@@ -27,9 +27,27 @@ public final class ClusterApiOperatorLayer extends Construct {
         "/upstream/clusterapi/operator/release-" + operatorVersion + ".yaml";
     new UpstreamYamlInclusion(this, operatorReleaseResource, packageProfile);
 
+    createProviderNamespaces();
     createCoreProvider(coreVersion);
     createInfrastructureProvider(incusProviderVersion);
     createControlPlaneProvider(rke2ProviderVersion);
+  }
+
+  private void createProviderNamespaces() {
+    for (String namespace : new String[] {"capi-system", "capn-system", "caprke2-system"}) {
+      new ApiObject(
+          this,
+          "namespace-" + namespace,
+          ApiObjectProps.builder()
+              .apiVersion("v1")
+              .kind("Namespace")
+              .metadata(
+                  ApiObjectMetadata.builder()
+                      .name(namespace)
+                      .annotations(packageProfile.packageAnnotations(namespace))
+                      .build())
+              .build());
+    }
   }
 
   private void createCoreProvider(final String version) {
