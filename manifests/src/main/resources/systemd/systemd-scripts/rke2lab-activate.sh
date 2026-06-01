@@ -25,14 +25,14 @@ ln -fs /run/systemd/resolve/resolv.conf /etc/resolv.conf
 : "Run systemd link setup"
 $RKE2LAB_SCRIPTS_DIR/rke2lab-systemd-link.sh
 
-: "Start network configuration service immediately"
-systemctl enable --now rke2lab-network.target
+: "Enable targets and services (without --now to avoid cloud-init deadlock)"
+# Note: Using --now here causes deadlock because this script runs inside cloud-final.service,
+# and rke2lab.target depends on cloud-final completing. The units will start automatically
+# via their WantedBy relationships once cloud-init finishes.
+systemctl enable rke2lab-network.target rke2lab-tools.target rke2lab.target zfs-early-umount.service rke2lab-install.service
 
-: "Enable RKE2 Lab tools target (Nix and Flox installation)"
-systemctl enable --now rke2lab-tools.target
-
-: "Enable RKE2 Lab target and all associated services"
-systemctl enable --now rke2lab.target zfs-early-umount.service rke2lab-install.service
+: "Trigger systemd to start the enabled targets asynchronously (no blocking)"
+systemctl start --no-block rke2lab-network.target rke2lab-tools.target rke2lab.target
 
 : "Load the RKE2 environment"
 source <(flox activate --dir /var/lib/rancher/rke2)
