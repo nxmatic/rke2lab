@@ -1,4 +1,4 @@
-package io.nxmatic.rk2lab.manifests.layers.certmanager;
+package io.nxmatic.rk2lab.manifests.layers.platform;
 
 import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import java.util.Map;
@@ -11,33 +11,15 @@ import software.constructs.Construct;
 public final class CertManagerLayer extends Construct {
 
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile("cert-manager", "cert-manager");
+      new PackageMetadataProfile("platform", "cert-manager");
 
   public CertManagerLayer(final Construct scope, final String id, final String version) {
     super(scope, id);
 
-    ApiObject namespace =
-        new ApiObject(
-            this,
-            "namespace-cert-manager",
-            ApiObjectProps.builder()
-                .apiVersion("v1")
-                .kind("Namespace")
-                .metadata(
-                    ApiObjectMetadata.builder()
-                        .name("cert-manager")
-                        .annotations(packageProfile.packageAnnotations("|Namespace||cert-manager"))
-                        .labels(
-                            Map.of(
-                                "app.kubernetes.io/name", "cert-manager",
-                                "app.kubernetes.io/managed-by", "rke2lab"))
-                        .build())
-                .build());
-
     // RKE2 helm-controller watches HelmChart CRs in kube-system and installs the chart into
-    // targetNamespace. cert-manager runs cluster-wide from its own namespace and provisions the
-    // webhook-serving certs (e.g. capi-operator-webhook-service-cert) that the CAPI and Tekton
-    // operators mount — without it those operator pods hang on FailedMount.
+    // targetNamespace. cert-manager is cluster-wide infrastructure deployed to kube-system and
+    // provisions webhook-serving certs (e.g. capi-operator-webhook-service-cert) that the CAPI
+    // and Tekton operators mount — without it those operator pods hang on FailedMount.
     ApiObject helmChart =
         new ApiObject(
             this,
@@ -55,8 +37,6 @@ public final class CertManagerLayer extends Construct {
                         .build())
                 .build());
 
-    helmChart.addDependency(namespace);
-
     helmChart.addJsonPatch(
         JsonPatch.add(
             "/spec",
@@ -68,7 +48,7 @@ public final class CertManagerLayer extends Construct {
                 "version",
                 version,
                 "targetNamespace",
-                "cert-manager",
+                "kube-system",
                 "valuesContent",
                 """
                 crds:

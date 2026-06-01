@@ -93,8 +93,8 @@ public record ManifestDomainPolicy(Map<String, Boolean> enabledByDomainId) {
       return this;
     }
 
-    public Builder certManager(boolean enabled) {
-      put(domainCatalog.certManager(), enabled);
+    public Builder platform(boolean enabled) {
+      put(domainCatalog.platform(), enabled);
       return this;
     }
 

@@ -20,7 +20,7 @@ public final class CicdDomainRegistrar implements LayerDomainRegistrar {
   public LayerDomain domain() {
     return new LayerDomain(
         CATALOG.cicd(),
-        List.of(CATALOG.gitops(), CATALOG.certManager()),
+        List.of(CATALOG.gitops(), CATALOG.platform()),
         List.of(new TektonPipelinesManifestUnit(), new TektonDashboardManifestUnit())) {
       @Override
       public void synthesizeSystemdUnits(

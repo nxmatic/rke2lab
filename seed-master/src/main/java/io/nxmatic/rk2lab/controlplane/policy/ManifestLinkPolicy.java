@@ -43,7 +43,7 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains, DebugPolicy debug
             .storage(storageEnabled)
             .mesh(meshEnabled)
             .clusterApi(clusterApiEnabled)
-            .certManager(true)
+            .platform(true)
             .build(),
         DebugPolicy.none());
   }
@@ -72,8 +72,8 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains, DebugPolicy debug
     return domains.isEnabled(MANIFEST_DOMAIN_CATALOG.clusterApi());
   }
 
-  public boolean certManagerEnabled() {
-    return domains.isEnabled(MANIFEST_DOMAIN_CATALOG.certManager());
+  public boolean platformEnabled() {
+    return domains.isEnabled(MANIFEST_DOMAIN_CATALOG.platform());
   }
 
   public Map<String, String> toEnvMap() {
@@ -90,8 +90,8 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains, DebugPolicy debug
         Boolean.toString(meshEnabled()),
         "RKE2LAB_POLICY_LINK_CLUSTER_API_ENABLED",
         Boolean.toString(clusterApiEnabled()),
-        "RKE2LAB_POLICY_LINK_CERT_MANAGER_ENABLED",
-        Boolean.toString(certManagerEnabled()));
+        "RKE2LAB_POLICY_LINK_PLATFORM_ENABLED",
+        Boolean.toString(platformEnabled()));
   }
 
   public Map<String, Object> toOutputMap() {
@@ -102,6 +102,6 @@ public record ManifestLinkPolicy(ManifestDomainPolicy domains, DebugPolicy debug
         "policyLinkStorageEnabled", storageEnabled(),
         "policyLinkMeshEnabled", meshEnabled(),
         "policyLinkClusterApiEnabled", clusterApiEnabled(),
-        "policyLinkCertManagerEnabled", certManagerEnabled());
+        "policyLinkPlatformEnabled", platformEnabled());
   }
 }

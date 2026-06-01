@@ -57,7 +57,7 @@ public record ControlplanePolicy(
                 .highAvailability(environment.bool("policy.link.highAvailability.enabled", true))
                 .cicd(environment.bool("policy.link.cicd.enabled", true))
                 .clusterApi(clusterApiEnabled)
-                .certManager(environment.bool("policy.link.certManager.enabled", true))
+                .platform(environment.bool("policy.link.platform.enabled", true))
                 .build(),
             new ManifestLinkPolicy.DebugPolicy(debugPolicy::domainDebug));
 
