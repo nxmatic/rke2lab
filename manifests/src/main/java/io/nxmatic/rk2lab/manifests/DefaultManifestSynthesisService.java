@@ -137,12 +137,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             .wantedBy("multi-user.target");
 
     // Sub-targets for better organization
-    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget bootstrapTarget =
-        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-bootstrap")
-            .description("RKE2 Lab Early Bootstrap (pre-server)")
-            .partOf(rke2labTarget.getUnitFileName())
-            .wantedBy(rke2labTarget.getUnitFileName());
-
+    // Create network target first (base dependency)
     final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget networkTarget =
         new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-network")
             .description("RKE2 Lab Network Infrastructure Target")
@@ -151,27 +146,39 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             .partOf(rke2labTarget.getUnitFileName())
             .wantedBy(rke2labTarget.getUnitFileName());
 
+    // Tools target depends on network
     final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget toolsTarget =
         new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-tools")
             .description("RKE2 Lab Tools and Utilities Target")
+            .after(networkTarget.getUnitFileName())
+            .wants(networkTarget.getUnitFileName())
             .partOf(rke2labTarget.getUnitFileName())
             .wantedBy(rke2labTarget.getUnitFileName());
 
-    // Bootstrap target depends on network and tools, enable them together
-    bootstrapTarget.also(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName());
+    // Bootstrap target depends on network and tools
+    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget bootstrapTarget =
+        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-bootstrap")
+            .description("RKE2 Lab Early Bootstrap (pre-server)")
+            .after(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName())
+            .requires(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName())
+            .partOf(rke2labTarget.getUnitFileName())
+            .wantedBy(rke2labTarget.getUnitFileName())
+            .also(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName());
 
+    // Manifests target comes after bootstrap and rke2-server
     final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget manifestsTarget =
         new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-manifests")
             .description("RKE2 Lab Manifest Installers (post-server)")
-            .after("rke2-server.service")
+            .after(bootstrapTarget.getUnitFileName(), "rke2-server.service")
             .requires("rke2-server.service")
             .partOf(rke2labTarget.getUnitFileName())
             .wantedBy(rke2labTarget.getUnitFileName());
 
+    // Secrets target comes after manifests (may depend on manifests being installed)
     final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget secretsTarget =
         new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-secrets")
             .description("RKE2 Lab Secrets Installers (post-server)")
-            .after("rke2-server.service")
+            .after(bootstrapTarget.getUnitFileName(), manifestsTarget.getUnitFileName(), "rke2-server.service")
             .requires("rke2-server.service")
             .partOf(rke2labTarget.getUnitFileName())
             .wantedBy(rke2labTarget.getUnitFileName());
@@ -198,6 +205,22 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
       LOG.debug("Synthesizing systemd units for domain '{}'", domain.domainId());
       domain.synthesizeSystemdUnits(systemdChart, systemdContext);
     }
+
+    // Add explicit dependencies to main target (makes hierarchy visible)
+    LOG.debug("Configuring main rke2lab.target dependencies");
+    rke2labTarget
+        .after(
+            networkTarget.getUnitFileName(),
+            toolsTarget.getUnitFileName(),
+            bootstrapTarget.getUnitFileName(),
+            "rke2-server.service")
+        .wants(
+            networkTarget.getUnitFileName(),
+            toolsTarget.getUnitFileName(),
+            bootstrapTarget.getUnitFileName(),
+            manifestsTarget.getUnitFileName(),
+            secretsTarget.getUnitFileName(),
+            "rke2-server.service");
 
     // Finalize target dependencies (add reciprocal Wants= from services' WantedBy=)
     LOG.debug("Finalizing systemd target dependencies");

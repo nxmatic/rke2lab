@@ -345,7 +345,8 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
-        .wantedBy("rke2-server.service");
+        .partOf(context.rke2labTarget().getUnitFileName())
+        .wantedBy(context.rke2labTarget().getUnitFileName());
   }
 
   private void configInstall() {
