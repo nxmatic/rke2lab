@@ -46,17 +46,17 @@ public record ControlplanePolicy(
             ManifestDomainPolicy.builder()
                 .domainCatalog(MANIFEST_DOMAIN_CATALOG)
                 .stageADefaults()
-                .cluster(environment.bool("policy.link.cluster.enabled", true))
+                .cluster(true) // Always enabled - creates rke2lab-system namespace
                 .storage(environment.bool("policy.link.storage.enabled", true))
                 .gitops(environment.bool("policy.link.gitops.enabled", true))
                 .porch(environment.bool("policy.link.porch.enabled", false))
-                .runtime(environment.bool("policy.link.runtime.enabled", true))
+                .runtime(true) // Always enabled - RKE2 config, Flox runtime, core bootstrap
                 .networking(environment.bool("policy.link.networking.enabled", true))
                 .mesh(environment.bool("policy.link.mesh.enabled", false))
                 .highAvailability(environment.bool("policy.link.highAvailability.enabled", true))
                 .cicd(environment.bool("policy.link.cicd.enabled", true))
                 .clusterApi(clusterApiEnabled)
-                .platform(environment.bool("policy.link.platform.enabled", true))
+                .platform(true) // Always enabled - cert-manager, kubernetes-replicator
                 .build(),
             new ManifestLinkPolicy.DebugPolicy(debugPolicy::domainDebug));
 

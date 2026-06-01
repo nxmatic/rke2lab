@@ -178,7 +178,10 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget secretsTarget =
         new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-secrets")
             .description("RKE2 Lab Secrets Installers (post-server)")
-            .after(bootstrapTarget.getUnitFileName(), manifestsTarget.getUnitFileName(), "rke2-server.service")
+            .after(
+                bootstrapTarget.getUnitFileName(),
+                manifestsTarget.getUnitFileName(),
+                "rke2-server.service")
             .requires("rke2-server.service")
             .partOf(rke2labTarget.getUnitFileName())
             .wantedBy(rke2labTarget.getUnitFileName());

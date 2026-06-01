@@ -120,7 +120,8 @@ public class SystemdChart extends Construct {
    *
    * <ul>
    *   <li>Services have {@code WantedBy=some.target} (enable symlink)
-   *   <li>Targets have {@code Wants=some.service} (runtime dependency, visible in list-dependencies)
+   *   <li>Targets have {@code Wants=some.service} (runtime dependency, visible in
+   *       list-dependencies)
    * </ul>
    */
   public void finalizeTargetDependencies() {
