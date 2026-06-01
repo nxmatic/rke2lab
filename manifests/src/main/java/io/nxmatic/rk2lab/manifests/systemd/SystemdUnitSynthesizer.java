@@ -79,6 +79,7 @@ public final class SystemdUnitSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
+        .partOf(context.manifestsTarget().getUnitFileName())
         .wantedBy(context.manifestsTarget().getUnitFileName());
   }
 
@@ -108,6 +109,7 @@ public final class SystemdUnitSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
+        .partOf(context.secretsTarget().getUnitFileName())
         .wantedBy(context.secretsTarget().getUnitFileName());
   }
 }

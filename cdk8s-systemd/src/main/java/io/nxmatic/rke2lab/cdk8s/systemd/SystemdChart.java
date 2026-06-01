@@ -5,7 +5,9 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import software.constructs.Construct;
 
 /**
@@ -33,6 +35,7 @@ import software.constructs.Construct;
 public class SystemdChart extends Construct {
 
   private final List<SystemdUnit> units = new ArrayList<>();
+  private final Map<String, List<String>> targetWantsRegistry = new LinkedHashMap<>();
 
   public SystemdChart(Construct scope, String id) {
     super(scope, id);
@@ -90,5 +93,54 @@ public class SystemdChart extends Construct {
       }
     }
     return null;
+  }
+
+  /**
+   * Registers a service with a target for automatic Wants= directive.
+   *
+   * <p>When a service calls {@code .wantedBy("some.target")}, this method tracks that relationship
+   * so that {@link #finalizeTargetDependencies()} can add reciprocal {@code Wants=some.service} to
+   * the target.
+   *
+   * <p>This makes the target-service hierarchy visible in {@code systemctl list-dependencies}.
+   *
+   * @param serviceName the service unit filename (e.g., "rke2lab-install.service")
+   * @param targetName the target unit filename (e.g., "rke2lab-bootstrap.target")
+   */
+  public void registerServiceWithTarget(String serviceName, String targetName) {
+    targetWantsRegistry.computeIfAbsent(targetName, k -> new ArrayList<>()).add(serviceName);
+  }
+
+  /**
+   * Finalizes target dependencies by adding Wants= directives for registered services.
+   *
+   * <p>Call this AFTER all units have been synthesized but BEFORE {@link #synthesize(Path)}.
+   *
+   * <p>This creates the reciprocal relationship:
+   *
+   * <ul>
+   *   <li>Services have {@code WantedBy=some.target} (enable symlink)
+   *   <li>Targets have {@code Wants=some.service} (runtime dependency, visible in list-dependencies)
+   * </ul>
+   */
+  public void finalizeTargetDependencies() {
+    for (Map.Entry<String, List<String>> entry : targetWantsRegistry.entrySet()) {
+      String targetName = entry.getKey();
+      List<String> serviceNames = entry.getValue();
+
+      // Find target by unit filename
+      SystemdUnit targetUnit = null;
+      for (SystemdUnit unit : units) {
+        if (unit.getUnitFileName().equals(targetName)) {
+          targetUnit = unit;
+          break;
+        }
+      }
+
+      if (targetUnit != null) {
+        // Add Wants= directives for all registered services
+        targetUnit.wants(serviceNames.toArray(String[]::new));
+      }
+    }
   }
 }

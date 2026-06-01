@@ -50,6 +50,7 @@ public final class CiliumConfigManifestUnit extends AbstractManifestUnit {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
+        .partOf(context.rke2labTarget().getUnitFileName())
         .wantedBy(context.rke2labTarget().getUnitFileName());
   }
 }

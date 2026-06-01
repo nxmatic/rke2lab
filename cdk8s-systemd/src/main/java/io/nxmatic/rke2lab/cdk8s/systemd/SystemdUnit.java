@@ -108,6 +108,14 @@ public abstract class SystemdUnit extends Construct {
     return this;
   }
 
+  /** Adds PartOf directive (lifecycle binding - stop/restart propagation). */
+  public SystemdUnit partOf(String... units) {
+    for (String unit : units) {
+      addUnitDirective("PartOf", unit);
+    }
+    return this;
+  }
+
   // === [Install] Section ===
 
   /** Adds WantedBy directive. */
@@ -122,6 +130,14 @@ public abstract class SystemdUnit extends Construct {
   public SystemdUnit requiredBy(String... targets) {
     for (String target : targets) {
       addInstallDirective("RequiredBy", target);
+    }
+    return this;
+  }
+
+  /** Adds Also directive (enable/disable propagation). */
+  public SystemdUnit also(String... units) {
+    for (String unit : units) {
+      addInstallDirective("Also", unit);
     }
     return this;
   }

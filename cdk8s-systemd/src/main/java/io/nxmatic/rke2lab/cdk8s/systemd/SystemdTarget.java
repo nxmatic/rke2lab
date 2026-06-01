@@ -107,4 +107,16 @@ public class SystemdTarget extends SystemdUnit {
     super.requiredBy(targets);
     return this;
   }
+
+  @Override
+  public SystemdTarget partOf(String... units) {
+    super.partOf(units);
+    return this;
+  }
+
+  @Override
+  public SystemdTarget also(String... units) {
+    super.also(units);
+    return this;
+  }
 }

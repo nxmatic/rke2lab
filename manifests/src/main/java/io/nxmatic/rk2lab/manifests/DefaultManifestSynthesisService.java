@@ -141,33 +141,41 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget bootstrapTarget =
         new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-bootstrap")
             .description("RKE2 Lab Early Bootstrap (pre-server)")
+            .partOf(rke2labTarget.getUnitFileName())
             .wantedBy(rke2labTarget.getUnitFileName());
+
+    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget networkTarget =
+        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-network")
+            .description("RKE2 Lab Network Infrastructure Target")
+            .after("network-online.target")
+            .wants("network-online.target")
+            .partOf(rke2labTarget.getUnitFileName())
+            .wantedBy(rke2labTarget.getUnitFileName());
+
+    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget toolsTarget =
+        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-tools")
+            .description("RKE2 Lab Tools and Utilities Target")
+            .partOf(rke2labTarget.getUnitFileName())
+            .wantedBy(rke2labTarget.getUnitFileName());
+
+    // Bootstrap target depends on network and tools, enable them together
+    bootstrapTarget.also(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName());
 
     final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget manifestsTarget =
         new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-manifests")
             .description("RKE2 Lab Manifest Installers (post-server)")
             .after("rke2-server.service")
             .requires("rke2-server.service")
-            .wantedBy("rke2-server.service", rke2labTarget.getUnitFileName());
+            .partOf(rke2labTarget.getUnitFileName())
+            .wantedBy(rke2labTarget.getUnitFileName());
 
     final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget secretsTarget =
         new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-secrets")
             .description("RKE2 Lab Secrets Installers (post-server)")
             .after("rke2-server.service")
             .requires("rke2-server.service")
-            .wantedBy("rke2-server.service", rke2labTarget.getUnitFileName());
-
-    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget networkTarget =
-        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-network")
-            .description("RKE2 Lab Network Infrastructure Target")
-            .after("network-online.target")
-            .wants("network-online.target");
-
-    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget toolsTarget =
-        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-tools")
-            .description("RKE2 Lab Tools and Utilities Target")
-            .after(rke2labTarget.getUnitFileName())
-            .wants(rke2labTarget.getUnitFileName());
+            .partOf(rke2labTarget.getUnitFileName())
+            .wantedBy(rke2labTarget.getUnitFileName());
 
     // Create synthesis context with target references and shared catalog
     final io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext systemdContext =
@@ -191,6 +199,10 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
       LOG.debug("Synthesizing systemd units for domain '{}'", domain.domainId());
       domain.synthesizeSystemdUnits(systemdChart, systemdContext);
     }
+
+    // Finalize target dependencies (add reciprocal Wants= from services' WantedBy=)
+    LOG.debug("Finalizing systemd target dependencies");
+    systemdChart.finalizeTargetDependencies();
 
     LOG.info("Calling app.synth() to synthesize K8s manifests to: {}", synthOutdir);
     app.synth();

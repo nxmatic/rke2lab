@@ -1,0 +1,799 @@
+= Systemd Dependency Structure Review and Improvements
+:toc: left
+:toclevels: 3
+
+== Current Issue
+
+Running `systemctl list-dependencies rke2lab.target` shows a flat structure rather than reflecting the hierarchical target organization:
+
+[source,bash]
+----
+rke2lab.target
+● ├─rke2-server.service
+● ├─rke2lab-bootstrap-env.service
+● ├─rke2lab-cilium-config-manifests.service
+● ├─rke2lab-dbus-tcp-system-bus.service
+● ├─rke2lab-install.service
+● └─rke2lab-bootstrap.target
+●   ├─rke2lab-bootstrap-env.service
+●   ├─rke2lab-config-install.service
+●   ├─rke2lab-containerd-zfs-mount-config.service
+●   ├─rke2lab-install.service
+●   └─rke2lab-systemd-link.service
+----
+
+Expected: services should be grouped under their logical targets (`rke2lab-bootstrap.target`, `rke2lab-manifests.target`, `rke2lab-secrets.target`, `rke2lab-network.target`, `rke2lab-tools.target`).
+
+Additionally, `rke2lab-manifests.target` exists but isn't properly integrated into the dependency tree (it has `WantedBy=rke2-server.service` and `WantedBy=rke2lab.target` but these don't create the intended hierarchy).
+
+== Current Architecture
+
+=== Target Hierarchy (designed)
+
+[source,text]
+----
+multi-user.target
+  └─ rke2lab.target (main target)
+       ├─ rke2lab-tools.target (Nix, Flox install)
+       ├─ rke2lab-network.target (network config, wait)
+       ├─ rke2lab-bootstrap.target (pre-server: env, config, install)
+       ├─ rke2-server.service
+       ├─ rke2lab-manifests.target (post-server: manifest installers)
+       └─ rke2lab-secrets.target (post-server: secret installers)
+----
+
+=== Service Groups (by target)
+
+==== rke2lab-tools.target
+* `rke2lab-nix-install.service`
+* `rke2lab-flox-install.service`
+* `rke2lab-cachix-watch-store.service`
+
+==== rke2lab-network.target
+* `rke2lab-route-cleanup.service`
+* `rke2lab-network-config.service`
+* `rke2lab-network-wait.service`
+* `rke2lab-network-debug.service`
+
+==== rke2lab-bootstrap.target (pre-server)
+* `rke2lab-bootstrap-env.service`
+* `rke2lab-config-install.service`
+* `rke2lab-install.service`
+* `rke2lab-systemd-link.service`
+* `rke2lab-containerd-zfs-mount-config.service`
+
+==== rke2lab-manifests.target (post-server)
+* `rke2lab-cilium-config-manifests.service` (special: runs BEFORE rke2-server)
+* `rke2lab-cluster-manifests.service`
+* `rke2lab-storage-manifests.service`
+* `rke2lab-replication-manifests.service`
+* `rke2lab-gitops-manifests.service`
+* `rke2lab-runtime-manifests.service`
+* `rke2lab-networking-manifests.service`
+* `rke2lab-mesh-manifests.service`
+* `rke2lab-high-availability-manifests.service`
+* `rke2lab-cluster-api-manifests.service`
+* (any other domain manifest installers)
+
+==== rke2lab-secrets.target (post-server)
+* `rke2lab-{domain}-secrets.service` (per domain that needs secrets)
+
+==== Direct rke2lab.target members (cross-cutting)
+* `rke2-server.service` (the main RKE2 server)
+* `rke2lab-dbus-tcp-system-bus.service`
+* `rke2lab-vip-kubeconfig.service`
+
+==== Special units (outside target tree)
+* `rke2lab-remount-shared.service` → `WantedBy=local-fs.target`
+* `zfs-early-umount.service` → `WantedBy=umount.target`
+
+== Systemd Directives Explained
+
+=== PartOf=
+
+**Purpose**: Defines stop/restart propagation (NOT start propagation).
+
+**Behavior**: When the target unit stops or restarts, units with `PartOf=` are also stopped/restarted.
+
+**Use case**: Services that should be lifecycle-bound to a target. If `rke2lab.target` stops, all services that are `PartOf=rke2lab.target` should also stop.
+
+**Does NOT affect**: Start ordering or dependency visualization.
+
+=== Also=
+
+**Purpose**: Enable/disable multiple units together (systemctl enable/disable synchronization).
+
+**Behavior**: When you run `systemctl enable foo.service`, systemd also enables units listed in `Also=`.
+
+**Use case**: Targets that should automatically enable their prerequisite targets.
+
+**Example**: `rke2lab.target` could have `Also=rke2lab-bootstrap.target rke2lab-manifests.target` so that enabling `rke2lab.target` automatically enables the sub-targets.
+
+**Does NOT affect**: Runtime dependencies or start/stop behavior.
+
+=== WantedBy= vs Requires=/Wants=
+
+**WantedBy=** (in [Install] section):
+
+* Creates symlinks in `/etc/systemd/system/<target>.wants/` during `systemctl enable`
+* Defines "this service should start when the target starts"
+* Does NOT define ordering (need `After=` for that)
+* Does NOT appear in `list-dependencies` unless combined with `Requires=` or `Wants=` in the target
+
+**Requires=/Wants=** (in [Unit] section of the TARGET):
+
+* Runtime dependency: target pulls in the service when starting
+* Shows up in `systemctl list-dependencies`
+* `Requires=` is strict (failure propagates), `Wants=` is weak (failure ignored)
+
+**Current Problem**: Our services have `WantedBy=<target>` but the targets don't have corresponding `Wants=` or `Requires=`, so `list-dependencies` doesn't show the hierarchy.
+
+== Proposed Solution
+
+=== Strategy
+
+1. **Use `PartOf=` in services**: Bind service lifecycle to their logical target
+2. **Use `Wants=` in targets**: Targets explicitly pull in their services (makes hierarchy visible)
+3. **Use `Also=` in targets**: Auto-enable prerequisite targets together
+4. **Keep `WantedBy=` in services**: For enable/disable symlink creation (systemctl enable behavior)
+
+This creates:
+
+* Clear lifecycle binding (PartOf)
+* Visible dependency tree (Wants)
+* Convenient enable/disable (Also + WantedBy)
+
+=== Implementation Pattern
+
+==== For sub-targets (e.g., rke2lab-bootstrap.target)
+
+[source,systemd]
+----
+[Unit]
+Description=RKE2 Lab Early Bootstrap (pre-server)
+PartOf=rke2lab.target
+
+[Install]
+WantedBy=rke2lab.target
+Also=rke2lab-network.target rke2lab-tools.target
+----
+
+`PartOf=rke2lab.target`: If `rke2lab.target` stops, this target stops too.
+
+`Also=...`: When enabling this target, also enable prerequisite targets.
+
+==== For services (e.g., rke2lab-bootstrap-env.service)
+
+[source,systemd]
+----
+[Unit]
+Description=RKE2Lab bootstrap environment
+After=... (existing dependencies)
+Requires=... (existing dependencies)
+PartOf=rke2lab-bootstrap.target
+
+[Service]
+Type=oneshot
+...
+
+[Install]
+WantedBy=rke2lab-bootstrap.target
+----
+
+`PartOf=rke2lab-bootstrap.target`: Lifecycle-bound to the target.
+
+`WantedBy=rke2lab-bootstrap.target`: Creates enable symlink.
+
+==== For targets (add Wants= for their services)
+
+[source,systemd]
+----
+[Unit]
+Description=RKE2 Lab Early Bootstrap (pre-server)
+Wants=rke2lab-bootstrap-env.service
+Wants=rke2lab-config-install.service
+Wants=rke2lab-install.service
+Wants=rke2lab-systemd-link.service
+Wants=rke2lab-containerd-zfs-mount-config.service
+PartOf=rke2lab.target
+
+[Install]
+WantedBy=rke2lab.target
+----
+
+`Wants=<service>`: Target explicitly pulls in services (visible in `list-dependencies`).
+
+**Note**: Use `Wants=` not `Requires=` because failure of one bootstrap service shouldn't kill the entire target (we want best-effort startup with individual service failure visibility).
+
+=== Special Cases
+
+==== rke2lab-manifests.target
+
+Current issue: It uses `WantedBy=rke2-server.service` which is unusual (targets normally don't use WantedBy on services).
+
+Proposed fix:
+
+[source,systemd]
+----
+[Unit]
+Description=RKE2 Lab Manifest Installers (post-server)
+After=rke2-server.service
+Requires=rke2-server.service
+PartOf=rke2lab.target
+Wants=rke2lab-cluster-manifests.service
+Wants=rke2lab-storage-manifests.service
+Wants=rke2lab-replication-manifests.service
+... (all manifest installer services)
+
+[Install]
+WantedBy=rke2lab.target
+----
+
+Remove: `WantedBy=rke2-server.service` (targets don't belong in service .wants/ dirs).
+
+Add: `PartOf=rke2lab.target` + explicit `Wants=` for all manifest services.
+
+==== rke2lab-cilium-config-manifests.service
+
+Special case: runs BEFORE rke2-server (not after like other manifest installers).
+
+Current:
+----
+WantedBy=rke2lab.target
+Before=rke2-server.service
+----
+
+Proposed: Keep current behavior but clarify grouping:
+
+[source,systemd]
+----
+[Unit]
+...
+Before=rke2-server.service
+After=rke2lab-install.service
+PartOf=rke2lab.target  # Direct member, not in manifests-target
+
+[Install]
+WantedBy=rke2lab.target  # Direct member
+----
+
+Rationale: `rke2lab-manifests.target` is for post-server installers. Cilium config is pre-server, so it's a direct member of `rke2lab.target`.
+
+==== rke2-server.service
+
+Not our unit (RKE2-owned), but we can make it a member of `rke2lab.target` via drop-in:
+
+[source,systemd]
+----
+# /etc/systemd/system/rke2-server.service.d/rke2lab.conf
+[Unit]
+PartOf=rke2lab.target
+
+[Install]
+WantedBy=rke2lab.target
+----
+
+This makes `rke2-server.service` stop when `rke2lab.target` stops.
+
+== Java Code Changes
+
+=== SystemdTarget: Add wants() Method
+
+Location: `cdk8s-systemd/src/main/java/io/nxmatic/rke2lab/cdk8s/systemd/SystemdTarget.java`
+
+[source,java]
+----
+public SystemdTarget wants(String... units) {
+  addUnitDirective("Wants", units);
+  return this;
+}
+----
+
+=== SystemdUnit: Add partOf() Method
+
+Location: `cdk8s-systemd/src/main/java/io/nxmatic/rke2lab/cdk8s/systemd/SystemdUnit.java`
+
+[source,java]
+----
+public T partOf(String unit) {
+  addUnitDirective("PartOf", unit);
+  return self();
+}
+----
+
+=== SystemdTarget: Add also() Method (for [Install] section)
+
+Location: `cdk8s-systemd/src/main/java/io/nxmatic/rke2lab/cdk8s/systemd/SystemdTarget.java`
+
+[source,java]
+----
+public SystemdTarget also(String... units) {
+  addInstallDirective("Also", units);
+  return this;
+}
+----
+
+=== Update Target Definitions
+
+Location: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/DefaultManifestSynthesisService.java`
+
+Lines 133-169 (current target creation):
+
+[source,java]
+----
+// Main target
+final SystemdTarget rke2labTarget =
+    new SystemdTarget(systemdChart, "rke2lab")
+        .description("RKE2 Lab Bootstrap Target")
+        .documentation("https://github.com/nxmatic/rke2lab")
+        .wantedBy("multi-user.target");
+
+// Bootstrap target
+final SystemdTarget bootstrapTarget =
+    new SystemdTarget(systemdChart, "rke2lab-bootstrap")
+        .description("RKE2 Lab Early Bootstrap (pre-server)")
+        .partOf(rke2labTarget.getUnitFileName())
+        .also(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName())  // Enable together
+        .wantedBy(rke2labTarget.getUnitFileName());
+
+// Manifests target
+final SystemdTarget manifestsTarget =
+    new SystemdTarget(systemdChart, "rke2lab-manifests")
+        .description("RKE2 Lab Manifest Installers (post-server)")
+        .after("rke2-server.service")
+        .requires("rke2-server.service")
+        .partOf(rke2labTarget.getUnitFileName())
+        .wantedBy(rke2labTarget.getUnitFileName());  // NOT rke2-server.service
+
+// Secrets target
+final SystemdTarget secretsTarget =
+    new SystemdTarget(systemdChart, "rke2lab-secrets")
+        .description("RKE2 Lab Secrets Installers (post-server)")
+        .after("rke2-server.service")
+        .requires("rke2-server.service")
+        .partOf(rke2labTarget.getUnitFileName())
+        .wantedBy(rke2labTarget.getUnitFileName());
+
+// Network target
+final SystemdTarget networkTarget =
+    new SystemdTarget(systemdChart, "rke2lab-network")
+        .description("RKE2 Lab Network Infrastructure Target")
+        .after("network-online.target")
+        .wants("network-online.target")
+        .partOf(rke2labTarget.getUnitFileName())
+        .wantedBy(rke2labTarget.getUnitFileName());
+
+// Tools target
+final SystemdTarget toolsTarget =
+    new SystemdTarget(systemdChart, "rke2lab-tools")
+        .description("RKE2 Lab Tools and Utilities Target")
+        .partOf(rke2labTarget.getUnitFileName())
+        .wantedBy(rke2labTarget.getUnitFileName());
+----
+
+**Note**: Targets are created before services, so we can't add `Wants=<service>` here. Instead, we need a second pass after all services are created.
+
+=== Add Target Service Registration Pass
+
+After all services are synthesized, update targets with their services:
+
+[source,java]
+----
+// After domain synthesis (line ~192), add target service registration:
+
+// Register bootstrap services with bootstrap target
+bootstrapTarget
+    .wants(
+        "rke2lab-bootstrap-env.service",
+        "rke2lab-config-install.service",
+        "rke2lab-install.service",
+        "rke2lab-systemd-link.service",
+        "rke2lab-containerd-zfs-mount-config.service");
+
+// Register tools services with tools target
+toolsTarget
+    .wants(
+        "rke2lab-nix-install.service",
+        "rke2lab-flox-install.service",
+        "rke2lab-cachix-watch-store.service");
+
+// Register network services with network target
+networkTarget
+    .wants(
+        "rke2lab-route-cleanup.service",
+        "rke2lab-network-config.service",
+        "rke2lab-network-wait.service",
+        "rke2lab-network-debug.service");
+
+// Manifest and secrets targets dynamically collect their services
+// (see SystemdUnitSynthesizer changes below)
+----
+
+=== Update Service Definitions to Use partOf()
+
+==== BootstrapInfrastructureSynthesizer
+
+Location: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/systemd/BootstrapInfrastructureSynthesizer.java`
+
+Pattern for each service method:
+
+[source,java]
+----
+private void bootstrapEnv() {
+    bootstrapEnvService =
+        new SystemdService(systemdChart, "rke2lab-bootstrap-env")
+            .description("RKE2Lab bootstrap environment (Nix + Flox + nocloud)")
+            .documentation("https://github.com/nxmatic/rke2lab")
+            .after(...)
+            .wants(...)
+            .requires(...)
+            .requiresMountsFor(...)
+            .conditionPathExists(...)
+            .type(ServiceType.ONESHOT)
+            .execStart("/srv/host/systemd-scripts.d/rke2lab-bootstrap-env.sh")
+            .remainAfterExit(true)
+            .standardOutput(StandardStream.JOURNAL)
+            .standardError(StandardStream.JOURNAL)
+            .partOf(context.bootstrapTarget().getUnitFileName())  // ADD THIS
+            .wantedBy(context.bootstrapTarget().getUnitFileName());
+}
+
+private void install() {
+    installService =
+        new SystemdService(systemdChart, "rke2lab-install")
+            .description("Run RKE2Lab Installation Script")
+            .after(...)
+            .wants(...)
+            .requires(...)
+            .requiresMountsFor(...)
+            .conditionPathExists(...)
+            .type(ServiceType.ONESHOT)
+            .execStartPre(...)
+            .execStart(...)
+            .execStartPost(...)
+            .remainAfterExit(true)
+            .standardOutput(StandardStream.JOURNAL)
+            .standardError(StandardStream.JOURNAL)
+            .partOf(context.bootstrapTarget().getUnitFileName())  // ADD THIS
+            .wantedBy(context.bootstrapTarget().getUnitFileName());
+}
+
+// Apply same pattern to:
+// - systemdLink() → partOf(bootstrapTarget)
+// - configInstall() → partOf(bootstrapTarget)
+// - containerdZfsMountConfig() → partOf(bootstrapTarget)
+// - nixInstall() → partOf(toolsTarget)
+// - floxInstall() → partOf(toolsTarget)
+// - cachixWatchStore() → partOf(toolsTarget)
+// - networkConfig() → partOf(networkTarget)
+// - networkWait() → partOf(networkTarget)
+// - networkDebug() → partOf(networkTarget)
+// - routeCleanup() → partOf(networkTarget)
+// - dbusTcpSystemBus() → partOf(rke2labTarget)
+// - vipKubeconfig() → partOf(rke2labTarget)
+----
+
+==== SystemdUnitSynthesizer
+
+Location: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/systemd/SystemdUnitSynthesizer.java`
+
+Update `manifestInstaller()` and `secretsInstaller()`:
+
+[source,java]
+----
+public SystemdService manifestInstaller() {
+    return new SystemdService(systemdChart, unitId("manifests"))
+        .description("Install RKE2Lab " + domainId + " manifests from host share (post-server)")
+        .requiresMountsFor("/srv/host/systemd-units.d", "/srv/host")
+        .after("local-fs.target", "rke2-server.service")
+        .requires("rke2-server.service")
+        .conditionPathExists(
+            "/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh",
+            "/srv/host/rke2-manifests.d/" + domainId)
+        .type(ServiceType.ONESHOT)
+        .execStart("/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh " + domainId)
+        .remainAfterExit(true)
+        .standardOutput(StandardStream.JOURNAL)
+        .standardError(StandardStream.JOURNAL)
+        .partOf(context.manifestsTarget().getUnitFileName())  // ADD THIS
+        .wantedBy(context.manifestsTarget().getUnitFileName());
+}
+
+public SystemdService secretsInstaller() {
+    return new SystemdService(systemdChart, unitId("secrets"))
+        .description("Apply RKE2Lab " + domainId + " secrets")
+        .requiresMountsFor("/srv/host/systemd-units.d", "/srv/host")
+        .after("local-fs.target", "rke2-server.service")
+        .requires("rke2-server.service")
+        .conditionPathExists("/srv/host/systemd-scripts.d/rke2lab-layer-secrets-apply.sh")
+        .type(ServiceType.ONESHOT)
+        .execStart("/srv/host/systemd-scripts.d/rke2lab-layer-secrets-apply.sh " + domainId)
+        .remainAfterExit(true)
+        .standardOutput(StandardStream.JOURNAL)
+        .standardError(StandardStream.JOURNAL)
+        .partOf(context.secretsTarget().getUnitFileName())  // ADD THIS
+        .wantedBy(context.secretsTarget().getUnitFileName());
+}
+----
+
+==== CiliumConfigManifestUnit (special case)
+
+Location: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/networking/CiliumConfigManifestUnit.java`
+
+[source,java]
+----
+new SystemdService(systemdChart, "rke2lab-cilium-config-manifests")
+    .description("Install RKE2Lab Cilium config manifests before server start")
+    .requiresMountsFor("/srv/host/systemd-units.d", "/srv/host")
+    .after("local-fs.target", installService.getUnitFileName())
+    .requires(installService.getUnitFileName())
+    .before("rke2-server.service")
+    .conditionPathExists(...)
+    .type(ServiceType.ONESHOT)
+    .execStart(...)
+    .remainAfterExit(true)
+    .standardOutput(StandardStream.JOURNAL)
+    .standardError(StandardStream.JOURNAL)
+    .partOf(context.rke2labTarget().getUnitFileName())  // ADD THIS (direct member)
+    .wantedBy(context.rke2labTarget().getUnitFileName());
+----
+
+=== Collect Service Names for Target wants()
+
+Challenge: Targets need to know which services belong to them, but services are created after targets.
+
+Solution: Two-pass approach.
+
+**Pass 1**: Create targets (current code).
+
+**Pass 2**: After all services are synthesized, walk the systemdChart and register services with their targets.
+
+Add to `DefaultManifestSynthesisService.synthesizeInContext()` after line 192:
+
+[source,java]
+----
+// After domain synthesis completes, register all services with their targets
+LOG.debug("Registering services with targets for dependency visualization");
+registerServicesWithTargets(systemdChart, systemdContext);
+----
+
+New method:
+
+[source,java]
+----
+private void registerServicesWithTargets(
+    SystemdChart systemdChart,
+    io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
+
+  // Collect all service unit names by iterating systemdChart
+  List<String> allServiceNames = new ArrayList<>();
+  for (var unit : systemdChart.findAllUnits()) {
+    String name = unit.getUnitFileName();
+    if (name.endsWith(".service")) {
+      allServiceNames.add(name);
+    }
+  }
+
+  // Filter services by their WantedBy target and register them
+  for (String serviceName : allServiceNames) {
+    if (serviceName.startsWith("rke2lab-bootstrap-") ||
+        List.of("rke2lab-config-install.service",
+                "rke2lab-install.service",
+                "rke2lab-systemd-link.service",
+                "rke2lab-containerd-zfs-mount-config.service").contains(serviceName)) {
+      context.bootstrapTarget().wants(serviceName);
+    } else if (serviceName.startsWith("rke2lab-nix-") ||
+               serviceName.startsWith("rke2lab-flox-") ||
+               serviceName.startsWith("rke2lab-cachix-")) {
+      context.toolsTarget().wants(serviceName);
+    } else if (serviceName.startsWith("rke2lab-network-") ||
+               serviceName.equals("rke2lab-route-cleanup.service")) {
+      context.networkTarget().wants(serviceName);
+    } else if (serviceName.matches("rke2lab-.*-manifests\\.service") &&
+               !serviceName.equals("rke2lab-cilium-config-manifests.service")) {
+      context.manifestsTarget().wants(serviceName);
+    } else if (serviceName.matches("rke2lab-.*-secrets\\.service")) {
+      context.secretsTarget().wants(serviceName);
+    } else if (List.of("rke2lab-dbus-tcp-system-bus.service",
+                       "rke2lab-vip-kubeconfig.service",
+                       "rke2lab-cilium-config-manifests.service").contains(serviceName)) {
+      context.rke2labTarget().wants(serviceName);
+    }
+  }
+
+  // Also make rke2labTarget want its sub-targets
+  context.rke2labTarget()
+      .wants(
+          context.bootstrapTarget().getUnitFileName(),
+          context.manifestsTarget().getUnitFileName(),
+          context.secretsTarget().getUnitFileName(),
+          context.networkTarget().getUnitFileName(),
+          context.toolsTarget().getUnitFileName(),
+          "rke2-server.service");
+}
+----
+
+**Better approach**: Make services register themselves with targets during creation (observer pattern).
+
+Add to `SystemdChart`:
+
+[source,java]
+----
+private final Map<String, List<String>> targetServiceRegistry = new LinkedHashMap<>();
+
+public void registerServiceWithTarget(String serviceName, String targetName) {
+    targetServiceRegistry.computeIfAbsent(targetName, k -> new ArrayList<>()).add(serviceName);
+}
+
+public void finalizeTargetDependencies() {
+    for (var entry : targetServiceRegistry.entrySet()) {
+        String targetName = entry.getKey();
+        List<String> services = entry.getValue();
+
+        var target = findUnit(targetName);
+        if (target instanceof SystemdTarget systemdTarget) {
+            systemdTarget.wants(services.toArray(String[]::new));
+        }
+    }
+}
+----
+
+Then in `SystemdService.wantedBy()`:
+
+[source,java]
+----
+public SystemdService wantedBy(String... targets) {
+    addInstallDirective("WantedBy", targets);
+
+    // Auto-register with target for Wants= directive
+    for (String target : targets) {
+        if (getChart() instanceof SystemdChart systemdChart) {
+            systemdChart.registerServiceWithTarget(getUnitFileName(), target);
+        }
+    }
+
+    return this;
+}
+----
+
+Then call `systemdChart.finalizeTargetDependencies()` after all synthesis.
+
+== Expected Result After Changes
+
+Running `systemctl list-dependencies rke2lab.target` will show:
+
+[source,bash]
+----
+rke2lab.target
+● ├─rke2-server.service
+● ├─rke2lab-dbus-tcp-system-bus.service
+● ├─rke2lab-cilium-config-manifests.service
+● ├─rke2lab-tools.target
+● │ ├─rke2lab-nix-install.service
+● │ ├─rke2lab-flox-install.service
+● │ └─rke2lab-cachix-watch-store.service
+● ├─rke2lab-network.target
+● │ ├─rke2lab-route-cleanup.service
+● │ ├─rke2lab-network-config.service
+● │ ├─rke2lab-network-wait.service
+● │ └─rke2lab-network-debug.service
+● ├─rke2lab-bootstrap.target
+● │ ├─rke2lab-bootstrap-env.service
+● │ ├─rke2lab-config-install.service
+● │ ├─rke2lab-install.service
+● │ ├─rke2lab-systemd-link.service
+● │ └─rke2lab-containerd-zfs-mount-config.service
+● ├─rke2lab-manifests.target
+● │ ├─rke2lab-cluster-manifests.service
+● │ ├─rke2lab-storage-manifests.service
+● │ ├─rke2lab-replication-manifests.service
+● │ ├─rke2lab-gitops-manifests.service
+● │ ├─rke2lab-runtime-manifests.service
+● │ ├─rke2lab-networking-manifests.service
+● │ ├─rke2lab-mesh-manifests.service
+● │ ├─rke2lab-high-availability-manifests.service
+● │ └─rke2lab-cluster-api-manifests.service
+● └─rke2lab-secrets.target
+●   └─rke2lab-{domain}-secrets.service (for domains that have secrets)
+----
+
+Clear hierarchical structure matching the designed architecture.
+
+== Lifecycle Benefits
+
+=== Stopping rke2lab.target
+
+[source,bash]
+----
+systemctl stop rke2lab.target
+----
+
+With `PartOf=rke2lab.target` in all services and sub-targets:
+
+* All `rke2lab-*` services stop
+* All sub-targets stop
+* `rke2-server.service` stops (if using drop-in with `PartOf=`)
+
+Without `PartOf=`, you'd have to stop each service individually.
+
+=== Restarting rke2lab.target
+
+[source,bash]
+----
+systemctl restart rke2lab.target
+----
+
+With `PartOf=`:
+
+* All bound services restart in dependency order
+* Clean slate for troubleshooting
+
+=== Enabling/Disabling
+
+[source,bash]
+----
+systemctl enable rke2lab.target
+----
+
+With `Also=` in targets:
+
+* Automatically enables `rke2lab-bootstrap.target`, `rke2lab-manifests.target`, etc.
+* No need to manually enable each sub-target
+
+== Summary of Changes
+
+[cols="1,2,2",options="header"]
+|===
+|Component |Current Behavior |After Changes
+
+|Targets
+|Isolated, no service visibility
+|Explicitly `wants()` their services → visible hierarchy
+
+|Services
+|`WantedBy=<target>` only
+|`WantedBy=<target>` + `partOf=<target>` → lifecycle-bound
+
+|Target relationships
+|Flat WantedBy links
+|`PartOf=` parent + `Also=` prerequisites → proper tree
+
+|rke2lab-manifests.target
+|`WantedBy=rke2-server.service` (odd)
+|`WantedBy=rke2lab.target` + `PartOf=rke2lab.target` (correct)
+
+|list-dependencies
+|Flat, duplicated services
+|Hierarchical tree matching design
+
+|Stop propagation
+|None
+|Stopping `rke2lab.target` stops all bound services
+
+|Enable propagation
+|Manual per target
+|`systemctl enable rke2lab.target` enables all sub-targets via `Also=`
+|===
+
+== Implementation Checklist
+
+[ ] Add `partOf()` method to `SystemdUnit` base class
+[ ] Add `wants()` method to `SystemdTarget`
+[ ] Add `also()` method to `SystemdTarget`
+[ ] Add `registerServiceWithTarget()` and `finalizeTargetDependencies()` to `SystemdChart`
+[ ] Update `SystemdService.wantedBy()` to auto-register with chart
+[ ] Update all target definitions in `DefaultManifestSynthesisService` to use `partOf()` and `also()`
+[ ] Update `BootstrapInfrastructureSynthesizer` services to use `partOf()`
+[ ] Update `SystemdUnitSynthesizer` methods to use `partOf()`
+[ ] Update `CiliumConfigManifestUnit` to use `partOf(rke2labTarget)`
+[ ] Call `systemdChart.finalizeTargetDependencies()` after all synthesis
+[ ] Remove `WantedBy=rke2-server.service` from `manifestsTarget` and `secretsTarget`
+[ ] Test on live system: `systemctl daemon-reload && systemctl list-dependencies rke2lab.target`
+[ ] Test lifecycle: `systemctl stop rke2lab.target` (should stop all services)
+[ ] Test enable propagation: `systemctl disable rke2lab.target && systemctl enable rke2lab.target`
+
+== Related Documentation
+
+* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - Overall synthesis system
+* link:systemd-dbus-adapter-architecture.adoc[Systemd D-Bus Adapter Architecture] - Runtime monitoring
+* link:bootstrap-contract.adoc[Bootstrap Contract] - Bootstrap phase definitions

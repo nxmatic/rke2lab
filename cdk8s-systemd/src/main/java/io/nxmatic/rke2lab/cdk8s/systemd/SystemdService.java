@@ -202,12 +202,33 @@ public class SystemdService extends SystemdUnit {
   @Override
   public SystemdService wantedBy(String... targets) {
     super.wantedBy(targets);
+
+    // Auto-register with SystemdChart for reciprocal Wants= in targets
+    var scope = getNode().getScope();
+    if (scope instanceof SystemdChart chart) {
+      for (String target : targets) {
+        chart.registerServiceWithTarget(getUnitFileName(), target);
+      }
+    }
+
     return this;
   }
 
   @Override
   public SystemdService requiredBy(String... targets) {
     super.requiredBy(targets);
+    return this;
+  }
+
+  @Override
+  public SystemdService partOf(String... units) {
+    super.partOf(units);
+    return this;
+  }
+
+  @Override
+  public SystemdService also(String... units) {
+    super.also(units);
     return this;
   }
 

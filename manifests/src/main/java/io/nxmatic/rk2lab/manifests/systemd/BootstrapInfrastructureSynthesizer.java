@@ -104,6 +104,7 @@ public final class BootstrapInfrastructureSynthesizer {
             .remainAfterExit(true)
             .standardOutput(StandardStream.JOURNAL)
             .standardError(StandardStream.JOURNAL)
+            .partOf(context.bootstrapTarget().getUnitFileName())
             .wantedBy(context.bootstrapTarget().getUnitFileName());
   }
 
@@ -138,6 +139,7 @@ public final class BootstrapInfrastructureSynthesizer {
             .remainAfterExit(true)
             .standardOutput(StandardStream.JOURNAL)
             .standardError(StandardStream.JOURNAL)
+            .partOf(context.bootstrapTarget().getUnitFileName())
             .wantedBy(context.bootstrapTarget().getUnitFileName());
   }
 
@@ -156,6 +158,7 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
+        .partOf(context.bootstrapTarget().getUnitFileName())
         .wantedBy(context.bootstrapTarget().getUnitFileName());
   }
 
@@ -170,6 +173,7 @@ public final class BootstrapInfrastructureSynthesizer {
             .remainAfterExit(true)
             .standardOutput(StandardStream.JOURNAL)
             .standardError(StandardStream.JOURNAL)
+            .partOf(context.toolsTarget().getUnitFileName())
             .wantedBy(context.toolsTarget().getUnitFileName());
   }
 
@@ -184,6 +188,7 @@ public final class BootstrapInfrastructureSynthesizer {
             .remainAfterExit(true)
             .standardOutput(StandardStream.JOURNAL)
             .standardError(StandardStream.JOURNAL)
+            .partOf(context.toolsTarget().getUnitFileName())
             .wantedBy(context.toolsTarget().getUnitFileName());
   }
 
@@ -197,6 +202,7 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
+        .partOf(context.toolsTarget().getUnitFileName())
         .wantedBy(context.toolsTarget().getUnitFileName());
   }
 
@@ -211,6 +217,7 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
+        .partOf(context.networkTarget().getUnitFileName())
         .wantedBy(context.networkTarget().getUnitFileName());
   }
 
@@ -224,6 +231,7 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
+        .partOf(context.networkTarget().getUnitFileName())
         .wantedBy(context.networkTarget().getUnitFileName());
   }
 
@@ -236,6 +244,7 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
+        .partOf(context.networkTarget().getUnitFileName())
         .wantedBy(context.networkTarget().getUnitFileName());
   }
 
@@ -249,6 +258,7 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
+        .partOf(context.networkTarget().getUnitFileName())
         .wantedBy(context.networkTarget().getUnitFileName());
   }
 
@@ -283,6 +293,7 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
+        .partOf(context.bootstrapTarget().getUnitFileName())
         .wantedBy(context.bootstrapTarget().getUnitFileName());
   }
 
@@ -295,6 +306,7 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
+        .partOf(context.rke2labTarget().getUnitFileName())
         .wantedBy(context.rke2labTarget().getUnitFileName());
   }
 
@@ -351,6 +363,7 @@ public final class BootstrapInfrastructureSynthesizer {
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
+        .partOf(context.bootstrapTarget().getUnitFileName())
         .wantedBy(context.bootstrapTarget().getUnitFileName());
   }
 }
