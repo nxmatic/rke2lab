@@ -148,14 +148,14 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             .description("RKE2 Lab Manifest Installers (post-server)")
             .after("rke2-server.service")
             .requires("rke2-server.service")
-            .wantedBy("rke2-server.service");
+            .wantedBy("rke2-server.service", rke2labTarget.getUnitFileName());
 
     final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget secretsTarget =
         new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-secrets")
             .description("RKE2 Lab Secrets Installers (post-server)")
             .after("rke2-server.service")
             .requires("rke2-server.service")
-            .wantedBy("rke2-server.service");
+            .wantedBy("rke2-server.service", rke2labTarget.getUnitFileName());
 
     final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget networkTarget =
         new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-network")
