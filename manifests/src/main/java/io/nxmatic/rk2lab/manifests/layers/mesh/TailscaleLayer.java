@@ -165,6 +165,7 @@ public final class TailscaleLayer extends Construct {
                 .build());
     secret.addDependency(namespace);
 
-    secret.addJsonPatch(JsonPatch.add("/type", "Opaque"));
+    secret.addJsonPatch(
+        JsonPatch.add("/type", "Opaque"), JsonPatch.add("/stringData", Map.of("_placeholder", "")));
   }
 }

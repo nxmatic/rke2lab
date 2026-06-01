@@ -58,7 +58,8 @@ public final class TektonPipelinesLayer extends Construct {
                         .labels(Map.of("app.kubernetes.io/replicated", "true"))
                         .build())
                 .build());
-    secret.addJsonPatch(JsonPatch.add("/type", type));
+    secret.addJsonPatch(
+        JsonPatch.add("/type", type), JsonPatch.add("/stringData", Map.of("_placeholder", "")));
   }
 
   private void createTektonConfig() {
