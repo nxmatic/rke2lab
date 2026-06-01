@@ -60,10 +60,8 @@ public final class FluxOperatorLayer extends Construct {
         JsonPatch.add(
             "/spec",
             Map.of(
-                "repo",
-                "oci://ghcr.io/controlplaneio-fluxcd/charts",
                 "chart",
-                "flux-operator",
+                "oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator",
                 "version",
                 version,
                 "targetNamespace",
