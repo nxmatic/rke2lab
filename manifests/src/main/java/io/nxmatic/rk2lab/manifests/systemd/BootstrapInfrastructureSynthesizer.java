@@ -37,13 +37,15 @@ public final class BootstrapInfrastructureSynthesizer {
     // Nix & Flox (must be before bootstrap-env which depends on flox-install)
     nixInstall();
     floxInstall();
-    cachixWatchStore();
 
     // Bootstrap & installation
     bootstrapEnv();
     configInstall();
     install();
     systemdLink();
+
+    // Cachix (after install, needs RKE2 Flox env)
+    cachixWatchStore();
 
     // Networking infrastructure
     networkConfig();
