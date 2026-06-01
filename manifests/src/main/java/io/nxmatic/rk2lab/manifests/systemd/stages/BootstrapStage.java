@@ -150,9 +150,8 @@ public final class BootstrapStage {
             toolsStage.getNixInstallService().getUnitFileName(), installService.getUnitFileName())
         .requires(
             toolsStage.getNixInstallService().getUnitFileName(), installService.getUnitFileName())
-        .type(ServiceType.ONESHOT)
+        .type(ServiceType.SIMPLE)
         .execStart("/srv/host/systemd-scripts.d/rke2lab-cachix-watch-store.sh")
-        .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)
         .partOf(context.bootstrapTarget().getUnitFileName())
