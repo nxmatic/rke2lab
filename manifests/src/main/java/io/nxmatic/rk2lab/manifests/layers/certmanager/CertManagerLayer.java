@@ -5,11 +5,10 @@ import java.util.Map;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
-import org.cdk8s.Chart;
 import org.cdk8s.JsonPatch;
 import software.constructs.Construct;
 
-public final class CertManagerLayer extends Chart {
+public final class CertManagerLayer extends Construct {
 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("cert-manager", "cert-manager");
