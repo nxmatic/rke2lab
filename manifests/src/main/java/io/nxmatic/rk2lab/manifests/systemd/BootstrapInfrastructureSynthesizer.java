@@ -185,8 +185,8 @@ public final class BootstrapInfrastructureSynthesizer {
   private void cachixWatchStore() {
     new SystemdService(systemdChart, "rke2lab-cachix-watch-store")
         .description("Watch Nix store and push to Cachix")
-        .after(nixInstallService.getUnitFileName())
-        .requires(nixInstallService.getUnitFileName())
+        .after(nixInstallService.getUnitFileName(), installService.getUnitFileName())
+        .requires(nixInstallService.getUnitFileName(), installService.getUnitFileName())
         .type(ServiceType.ONESHOT)
         .execStart("/srv/host/systemd-scripts.d/rke2lab-cachix-watch-store.sh")
         .remainAfterExit(true)

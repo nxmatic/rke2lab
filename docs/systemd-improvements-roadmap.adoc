@@ -1,0 +1,427 @@
+= Systemd Units Improvements Roadmap
+:toc: left
+:toclevels: 3
+
+== Completed Improvements ✅
+
+=== Phase 1: Dependency Structure (June 2026)
+
+**PartOf, Also, and Wants directives** (Commit b851fd2f)::
+- Added lifecycle binding via `PartOf=`
+- Auto-registration mechanism for reciprocal `Wants=`
+- Enable/disable propagation via `Also=`
+- All services properly grouped under targets
+
+**Target ordering and hierarchy** (Commit 1c4e4ad2)::
+- Explicit startup sequence: network → tools → bootstrap → server → manifests → secrets
+- Main target explicitly pulls in all sub-targets
+- Fixed vip-kubeconfig service dependencies
+
+**Result**: Clear hierarchical structure visible in `systemctl list-dependencies`, proper lifecycle management, predictable startup order.
+
+== Remaining Improvements
+
+=== High Priority
+
+==== 1. rke2-server.service Integration
+
+**Status**: Referenced but not formally part of rke2lab hierarchy
+
+**Current situation**:
+- `rke2-server.service` is an external unit (owned by RKE2 installer)
+- Our units reference it via `After=` and `Requires=`
+- It's pulled into `rke2lab.target` via `Wants=`
+- BUT it doesn't have `PartOf=rke2lab.target` (so stopping rke2lab.target doesn't stop the server)
+
+**Proposed solution**: Generate a systemd drop-in
+
+Create `.local.d/bioskop/master/host.staging.N/systemd.d/systemd-units.d/rke2-server.service.d/rke2lab.conf`:
+
+[source,systemd]
+----
+[Unit]
+# Bind rke2-server to rke2lab lifecycle
+PartOf=rke2lab.target
+
+[Install]
+# Make it part of rke2lab target
+WantedBy=rke2lab.target
+----
+
+**Benefit**: Stopping `systemctl stop rke2lab.target` will also stop rke2-server cleanly.
+
+**Implementation**:
+[source,java]
+----
+// In BootstrapInfrastructureSynthesizer or new DropInSynthesizer
+private void rke2ServerDropIn() {
+    // Create drop-in configuration
+    Path dropInDir = systemdOutdir.resolve("rke2-server.service.d");
+    Files.createDirectories(dropInDir);
+
+    String dropInContent = """
+        [Unit]
+        PartOf=rke2lab.target
+
+        [Install]
+        WantedBy=rke2lab.target
+        """;
+
+    Files.writeString(dropInDir.resolve("rke2lab.conf"), dropInContent);
+}
+----
+
+**Complexity**: Low (simple drop-in file generation)
+
+==== 2. Failure Handling Directives
+
+**Status**: Services fail silently or propagate to systemd default behavior
+
+**Current gap**: No explicit failure handling for critical services
+
+**Proposed improvements**:
+
+**Critical services** (bootstrap-env, install) should have:
+[source,systemd]
+----
+[Service]
+Type=oneshot
+# If this fails, trigger failure target
+OnFailure=rke2lab-failure.target
+# Don't retry automatically - operator should investigate
+----
+
+**Optional services** (network-debug, vip-kubeconfig) should have:
+[source,systemd]
+----
+[Service]
+Type=oneshot
+# Log failure but don't propagate
+FailureAction=none
+SuccessExitStatus=0 1  # 1 = warning, not failure
+----
+
+**Long-running prerequisite services** (could apply if we add monitoring):
+[source,systemd]
+----
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=120
+----
+
+**New failure target**:
+
+Create `rke2lab-failure.target` that gets triggered when critical services fail:
+
+[source,systemd]
+----
+[Unit]
+Description=RKE2 Lab Failure Recovery Target
+Documentation=https://github.com/nxmatic/rke2lab
+
+# When activated, this target can:
+# - Send notifications
+# - Dump diagnostic info
+# - Trigger cleanup
+----
+
+**Benefit**: Explicit failure handling, easier troubleshooting, controlled recovery
+
+**Complexity**: Medium (need to categorize services and add failure target)
+
+=== Medium Priority
+
+==== 3. Service Timeouts
+
+**Current gap**: Oneshot services have default timeout (90s typically)
+
+**Problem**: Some operations (Nix install, Flox install, manifest sync) can take longer
+
+**Proposed**:
+[source,java]
+----
+// For Nix install (can be slow on first run)
+.timeoutStartSec(600)  // 10 minutes
+
+// For Flox install (downloads packages)
+.timeoutStartSec(300)  // 5 minutes
+
+// For manifest install (usually fast)
+.timeoutStartSec(120)  // 2 minutes
+----
+
+Add to SystemdService:
+[source,java]
+----
+public SystemdService timeoutStartSec(int seconds) {
+    addServiceDirective("TimeoutStartSec", String.valueOf(seconds));
+    return this;
+}
+
+public SystemdService timeoutStopSec(int seconds) {
+    addServiceDirective("TimeoutStopSec", String.valueOf(seconds));
+    return this;
+}
+----
+
+**Benefit**: Prevents premature timeout failures, clearer expectations
+
+**Complexity**: Low (just add directives to slow services)
+
+==== 4. Logging Improvements
+
+**Current gap**: All services log to journal but aren't easily filterable
+
+**Proposed**: Add `SyslogIdentifier` for better journalctl filtering
+
+[source,systemd]
+----
+[Service]
+SyslogIdentifier=rke2lab-bootstrap
+----
+
+Then users can:
+[source,bash]
+----
+# All rke2lab logs
+journalctl -t rke2lab-*
+
+# Just bootstrap phase
+journalctl -t rke2lab-bootstrap
+
+# Just networking
+journalctl -t rke2lab-network
+----
+
+Add to SystemdService:
+[source,java]
+----
+public SystemdService syslogIdentifier(String identifier) {
+    addServiceDirective("SyslogIdentifier", identifier);
+    return this;
+}
+----
+
+Pattern: Use target name as syslog identifier prefix:
+- `rke2lab-bootstrap` for bootstrap target services
+- `rke2lab-network` for network target services
+- `rke2lab-manifests` for manifest installer services
+
+**Benefit**: Much easier log filtering and troubleshooting
+
+**Complexity**: Low (add one directive per service)
+
+==== 5. Condition Improvements
+
+**Current**: Basic `ConditionPathExists`
+
+**Proposed**: More sophisticated conditions
+
+Add to SystemdUnit:
+[source,java]
+----
+public SystemdUnit conditionFileNotEmpty(String path) {
+    addUnitDirective("ConditionFileNotEmpty", path);
+    return this;
+}
+
+public SystemdUnit conditionDirectoryNotEmpty(String path) {
+    addUnitDirective("ConditionDirectoryNotEmpty", path);
+    return this;
+}
+
+public SystemdUnit conditionFileIsExecutable(String path) {
+    addUnitDirective("ConditionFileIsExecutable", path);
+    return this;
+}
+
+public SystemdUnit conditionPathIsDirectory(String path) {
+    addUnitDirective("ConditionPathIsDirectory", path);
+    return this;
+}
+----
+
+**Use cases**:
+- `conditionDirectoryNotEmpty("/srv/host/rke2-manifests.d/networking")` - don't run manifest installer if no manifests
+- `conditionFileIsExecutable(scriptPath)` - verify script is executable before running
+- `conditionFileNotEmpty("/etc/rancher/rke2/config.yaml")` - verify config exists and isn't empty
+
+**Benefit**: More robust startup conditions, fewer failures
+
+**Complexity**: Low (just new methods)
+
+=== Low Priority
+
+==== 6. Security Hardening
+
+**Current**: Services run with minimal sandboxing
+
+**Proposed**: Add sandboxing directives to read-only services
+
+[source,systemd]
+----
+[Service]
+# Filesystem protections
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/rancher/rke2
+
+# Kernel protections
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Capability restrictions
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+----
+
+**When to apply**:
+- **Don't apply** to services that need broad filesystem access (install, bootstrap-env)
+- **Do apply** to manifest installers (just symlink operations)
+- **Do apply** to monitoring/diagnostic services (network-debug, network-wait)
+
+**Benefit**: Defense in depth, limits blast radius if service is compromised
+
+**Complexity**: High (need to test each service, can break functionality)
+
+==== 7. Resource Limits
+
+**Current**: No resource limits
+
+**Proposed**: Add limits to prevent resource exhaustion
+
+[source,systemd]
+----
+[Service]
+# CPU limits (50% of one core)
+CPUQuota=50%
+
+# Memory limits (256MB)
+MemoryMax=256M
+MemoryHigh=200M
+
+# Task limits
+TasksMax=50
+----
+
+**When to apply**:
+- Services that spawn subprocesses (bootstrap-env with Flox activation)
+- Services that might loop or hang (network-wait with retry logic)
+
+**Benefit**: Prevents runaway services from consuming all resources
+
+**Complexity**: Medium (need to profile services to set realistic limits)
+
+==== 8. Environment File Support
+
+**Current**: Environment variables hardcoded in scripts
+
+**Proposed**: Use `EnvironmentFile=` for cleaner config management
+
+[source,systemd]
+----
+[Service]
+EnvironmentFile=/etc/rke2lab/bootstrap.env
+EnvironmentFile=-/etc/rke2lab/bootstrap.env.local
+----
+
+(The `-` prefix makes the file optional)
+
+**Benefit**: Easier customization without editing systemd units
+
+**Complexity**: Medium (need to generate environment files, update scripts)
+
+==== 9. Documentation URLs
+
+**Current**: Most services have no documentation link
+
+**Proposed**: Add documentation for all services
+
+[source,systemd]
+----
+[Unit]
+Documentation=https://github.com/nxmatic/rke2lab
+Documentation=man:rke2lab-bootstrap(8)
+Documentation=file:///usr/share/doc/rke2lab/bootstrap.md
+----
+
+**Benefit**: `systemctl status` shows documentation links
+
+**Complexity**: Low (just add links to existing docs)
+
+== Implementation Priority
+
+=== Immediate (Next Session)
+
+1. **rke2-server drop-in** - Makes the hierarchy complete
+2. **Service timeouts** - Prevents spurious timeout failures
+3. **Logging improvements (SyslogIdentifier)** - Easy troubleshooting win
+
+**Effort**: ~1-2 hours, low risk
+
+=== Short Term (This Week)
+
+4. **Failure handling** - Critical for production stability
+5. **Condition improvements** - Better startup reliability
+
+**Effort**: ~2-3 hours, medium risk (need testing)
+
+=== Medium Term (When Needed)
+
+6. **Security hardening** - When security audit required
+7. **Resource limits** - If resource exhaustion becomes an issue
+8. **Environment files** - If customization becomes cumbersome
+
+**Effort**: ~4-6 hours, higher risk (can break services)
+
+=== Low Priority (Nice to Have)
+
+9. **Documentation URLs** - Polish for end users
+
+**Effort**: ~1 hour, no risk
+
+== Testing Strategy
+
+For each improvement:
+
+1. **Synthesize**: Generate new systemd units
+2. **Deploy**: Push to master node
+3. **Verify syntax**: `systemd-analyze verify /etc/systemd/system/rke2lab-*.service`
+4. **Test lifecycle**:
+   - `systemctl daemon-reload`
+   - `systemctl start rke2lab.target` (clean boot)
+   - `systemctl stop rke2lab.target` (clean shutdown)
+   - `systemctl restart rke2lab.target` (restart behavior)
+5. **Test failure**: Deliberately break a service, verify failure handling
+6. **Check logs**: `journalctl -u rke2lab.target` (verify logging improvements)
+
+== Decision Points
+
+**Question**: Do we want failure recovery automation or just notification?
+
+**Options**:
+- **Notify only**: OnFailure= sends notification, operator investigates
+- **Auto-retry**: Restart=on-failure attempts recovery
+- **Degraded mode**: OnFailure= triggers a degraded-mode target that disables optional features
+
+**Recommendation**: Start with notify-only for critical services, auto-retry for optional services.
+
+**Question**: How aggressive should resource limits be?
+
+**Options**:
+- **Permissive**: High limits, rarely hit (e.g., 1GB memory)
+- **Moderate**: Based on observed usage + 50% headroom
+- **Strict**: Tight limits to catch bugs early
+
+**Recommendation**: Start moderate, tighten after observing actual usage patterns.
+
+== Related Documentation
+
+* link:systemd-dependency-structure-review.adoc[Systemd Dependency Structure Review]
+* link:systemd-dependency-improvements-summary.adoc[Systemd Dependency Improvements Summary]
+* link:systemd-target-ordering-improvements.adoc[Systemd Target Ordering Improvements]
