@@ -22,10 +22,36 @@ public final class ReplicatorLayer extends Construct {
     super(scope, id);
     this.replicatorVersion = replicatorVersion;
 
+    createSourceNamespace();
     ApiObject clusterRole = createClusterRole();
     ApiObject serviceAccount = createServiceAccount();
     createClusterRoleBinding(clusterRole, serviceAccount);
     createDeployment(serviceAccount);
+  }
+
+  private void createSourceNamespace() {
+    new ApiObject(
+        this,
+        "namespace-rke2lab-replicator-source",
+        ApiObjectProps.builder()
+            .apiVersion("v1")
+            .kind("Namespace")
+            .metadata(
+                ApiObjectMetadata.builder()
+                    .name("rke2lab-replicator-source")
+                    .annotations(
+                        kptMetadata.packageAnnotations(
+                            LAYER_NAME,
+                            PACKAGE_NAME,
+                            "|Namespace|default|rke2lab-replicator-source"))
+                    .labels(
+                        Map.of(
+                            "app.kubernetes.io/name",
+                            "rke2lab-replicator-source",
+                            "app.kubernetes.io/managed-by",
+                            "rke2lab"))
+                    .build())
+            .build());
   }
 
   private ApiObject createClusterRole() {

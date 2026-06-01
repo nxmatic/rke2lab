@@ -33,7 +33,6 @@ if ! yq eval -e '.kubernetes' "${SECRETS_FILE}" >/dev/null 2>&1; then
 fi
 
 source_namespace="$(yq eval -r '.kubernetes.sourceNamespace // "rke2lab-replicator-source"' "${SECRETS_FILE}")"
-kubectl get namespace "${source_namespace}" >/dev/null 2>&1 || kubectl create namespace "${source_namespace}"
 
 rke2lab::kube:apply_secret() {
 	local namespace="$1" name="$2" type="$3" replicate_to="$4"
