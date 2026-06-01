@@ -71,7 +71,14 @@ public final class ClusterApiOperatorLayer extends Construct {
                         .build())
                 .build());
 
-    provider.addJsonPatch(JsonPatch.add("/spec", Map.of("version", version)));
+    provider.addJsonPatch(
+        JsonPatch.add(
+            "/spec",
+            Map.of(
+                "version",
+                version,
+                "fetchConfig",
+                Map.of("url", "https://github.com/nxmatic/cluster-api-provider-incus/releases"))));
   }
 
   private void createControlPlaneProvider(final String version) {
