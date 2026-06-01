@@ -866,6 +866,28 @@ public final class IncusResourceBootstrap {
     final App app = new App(AppProps.builder().outdir(tempDir.toString()).build());
     final Chart chart = new Chart(app, "staged-resources");
 
+    // capn-system is normally created by the CAPI operator when it reconciles the
+    // InfrastructureProvider (CAPN), but RKE2 auto-deploy applies this staged ConfigMap as soon as
+    // the file lands — before the operator has created the namespace — and does not retry a hard
+    // "namespace not found". Ship the namespace alongside the ConfigMap (rendered first via the
+    // dependency edge) so the bundle is self-contained; the operator adopts the existing namespace.
+    final ApiObject namespace =
+        new ApiObject(
+            chart,
+            "namespace-capn-system",
+            ApiObjectProps.builder()
+                .apiVersion("v1")
+                .kind("Namespace")
+                .metadata(
+                    ApiObjectMetadata.builder()
+                        .name("capn-system")
+                        .annotations(
+                            Map.of(
+                                "package", "cluster-api/image-state",
+                                "description", "Stage A → Stage B image identity handoff"))
+                        .build())
+                .build());
+
     // Create ConfigMap directly (no manifest unit, no context)
     final Map<String, String> data =
         Map.of(
@@ -893,6 +915,7 @@ public final class IncusResourceBootstrap {
                         .build())
                 .build());
 
+    configMap.addDependency(namespace);
     configMap.addJsonPatch(JsonPatch.add("/data", data));
 
     // CDK8s writes to disk, read it back
