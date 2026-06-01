@@ -1,7 +1,6 @@
 package io.nxmatic.rk2lab.manifests.layers.platform;
 
 import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
-import io.nxmatic.rk2lab.manifests.layers.certmanager.CertManagerLayer;
 import io.nxmatic.rk2lab.manifests.layers.common.AbstractManifestUnit;
 import java.util.List;
 import org.cdk8s.Chart;
