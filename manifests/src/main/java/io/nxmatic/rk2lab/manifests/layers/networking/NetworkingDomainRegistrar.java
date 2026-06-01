@@ -31,6 +31,23 @@ public final class NetworkingDomainRegistrar implements LayerDomainRegistrar {
         var synthesizer =
             new SystemdUnitSynthesizer(systemdChart, context.domainCatalog().networking(), context);
         synthesizer.manifestInstaller();
+
+        // Cilium operator scaling service - scales cilium-operator replicas based on control-plane
+        // node count
+        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdService(
+                systemdChart, "rke2lab-cilium-operator-scaling")
+            .description("Scale Cilium operator replicas based on control-plane node count")
+            .after("rke2-server.service", "rke2lab-networking-manifests.service")
+            .requires("rke2-server.service")
+            .requiresMountsFor("/srv/host/systemd-scripts.d")
+            .conditionPathExists("/srv/host/systemd-scripts.d/rke2lab-cilium-operator-scaling.sh")
+            .type(io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.ServiceType.ONESHOT)
+            .execStart("/srv/host/systemd-scripts.d/rke2lab-cilium-operator-scaling.sh")
+            .remainAfterExit(true)
+            .standardOutput(io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.StandardStream.JOURNAL)
+            .standardError(io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.StandardStream.JOURNAL)
+            .partOf(context.manifestsTarget().getUnitFileName())
+            .wantedBy(context.manifestsTarget().getUnitFileName());
       }
     };
   }
