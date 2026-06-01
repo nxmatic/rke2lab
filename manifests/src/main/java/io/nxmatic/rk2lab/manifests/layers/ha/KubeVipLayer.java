@@ -84,15 +84,8 @@ public final class KubeVipLayer extends Construct {
                     ApiObjectMetadata.builder()
                         .name("system:kube-vip-role")
                         .annotations(
-                            Map.of(
-                                "internal.kpt.dev/upstream-identifier",
-                                "rbac.authorization.k8s.io|ClusterRole|default|system:kube-vip-role",
-                                "kpt.dev/package-layer",
-                                "high-availability",
-                                "kpt.dev/package-name",
-                                "kube-vip",
-                                "rbac.authorization.kubernetes.io/autoupdate",
-                                "true"))
+                            packageProfile.packageAnnotations(
+                                "", Map.of("rbac.authorization.kubernetes.io/autoupdate", "true")))
                         .build())
                 .build());
 

@@ -1,7 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.storage;
 
-import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestAnnotations;
 import java.util.Map;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
@@ -14,7 +14,7 @@ public final class OpenebsZfsLayer extends Construct {
   private static final String LAYER_NAME = "storage";
   private static final String PACKAGE_NAME = "openebs-zfs";
 
-  private final KptMetadata kptMetadata = new KptMetadata();
+  private final ManifestAnnotations manifestAnnotations = new ManifestAnnotations();
 
   private final String chartVersion;
 
@@ -36,9 +36,7 @@ public final class OpenebsZfsLayer extends Construct {
             .metadata(
                 ApiObjectMetadata.builder()
                     .name("openebs")
-                    .annotations(
-                        kptMetadata.packageAnnotations(
-                            LAYER_NAME, PACKAGE_NAME, "|Namespace|default|openebs"))
+                    .annotations(manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
                     .build())
             .build());
   }
@@ -55,10 +53,9 @@ public final class OpenebsZfsLayer extends Construct {
                     ApiObjectMetadata.builder()
                         .name("openebs-zfs")
                         .annotations(
-                            kptMetadata.packageAnnotations(
+                            manifestAnnotations.packageAnnotations(
                                 LAYER_NAME,
                                 PACKAGE_NAME,
-                                "storage.k8s.io|StorageClass|default|openebs-zfs",
                                 Map.of("storageclass.kubernetes.io/is-default-class", "true")))
                         .build())
                 .build());
@@ -85,10 +82,7 @@ public final class OpenebsZfsLayer extends Construct {
                         .name("openebs-zfs")
                         .namespace("openebs")
                         .annotations(
-                            kptMetadata.packageAnnotations(
-                                LAYER_NAME,
-                                PACKAGE_NAME,
-                                "helm.cattle.io|HelmChart|openebs|openebs-zfs"))
+                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
                         .build())
                 .build());
 

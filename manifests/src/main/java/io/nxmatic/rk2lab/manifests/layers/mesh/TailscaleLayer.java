@@ -113,17 +113,13 @@ public final class TailscaleLayer extends Construct {
                     ApiObjectMetadata.builder()
                         .name("controlplane")
                         .annotations(
-                            Map.of(
-                                "config.kubernetes.io/depends-on",
-                                "helm.cattle.io/namespaces/"
-                                    + TAILSCALE_NAMESPACE
-                                    + "/HelmChart/tailscale-operator",
-                                "internal.kpt.dev/upstream-identifier",
-                                "tailscale.com|Connector|default|controlplane",
-                                "kpt.dev/package-layer",
-                                "mesh",
-                                "kpt.dev/package-name",
-                                "tailscale"))
+                            packageProfile.packageAnnotations(
+                                "",
+                                Map.of(
+                                    "config.kubernetes.io/depends-on",
+                                    "helm.cattle.io/namespaces/"
+                                        + TAILSCALE_NAMESPACE
+                                        + "/HelmChart/tailscale-operator")))
                         .build())
                 .build());
     connector.addDependency(helmChart);
@@ -152,20 +148,17 @@ public final class TailscaleLayer extends Construct {
                         .namespace(TAILSCALE_NAMESPACE)
                         .labels(Map.of("app.kubernetes.io/replicated", "true"))
                         .annotations(
-                            Map.of(
-                                "internal.kpt.dev/upstream-identifier",
-                                "|Secret|${tailscale-namespace}|operator-oauth",
-                                "kpt.dev/package-layer",
-                                "mesh",
-                                "kpt.dev/package-name",
-                                "tailscale",
-                                "replicator.v1.mittwald.de/replicate-from",
-                                "rke2lab-replicator-source/operator-oauth"))
+                            packageProfile.packageAnnotations(
+                                "",
+                                Map.of(
+                                    "replicator.v1.mittwald.de/replicate-from",
+                                    "rke2lab-replicator-source/operator-oauth")))
                         .build())
                 .build());
     secret.addDependency(namespace);
 
     secret.addJsonPatch(
-        JsonPatch.add("/type", "Opaque"), JsonPatch.add("/stringData", Map.of("_placeholder", "")));
+        JsonPatch.add("/type", "Opaque"),
+        JsonPatch.add("/stringData", Map.of("client_id", "", "client_secret", "")));
   }
 }

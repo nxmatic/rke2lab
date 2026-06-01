@@ -340,7 +340,6 @@ public final class HostSlotManifest extends Construct {
       manifestDomain.put("cluster", policy.manifestLink().domains().isEnabled(catalog.cluster()));
       manifestDomain.put("storage", policy.manifestLink().domains().isEnabled(catalog.storage()));
       manifestDomain.put("gitops", policy.manifestLink().domains().isEnabled(catalog.gitops()));
-      manifestDomain.put("porch", policy.manifestLink().domains().isEnabled(catalog.porch()));
       manifestDomain.put("runtime", policy.manifestLink().domains().isEnabled(catalog.runtime()));
       manifestDomain.put(
           "networking", policy.manifestLink().domains().isEnabled(catalog.networking()));

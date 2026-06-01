@@ -97,30 +97,7 @@ cicd)
 	fi
 	;;
 runtime | gitops)
-	porch_git_name="$(yq eval -r '.kubernetes.secrets.porch.git.name // "porch-git-auth"' "${SECRETS_FILE}")"
-	porch_git_replicate_to="$(yq eval -r '.kubernetes.secrets.porch.git.replicateTo // [] | join(",")' "${SECRETS_FILE}")"
-	porch_git_username="$(yq eval -r '.porch.git.username // ""' "${SECRETS_FILE}")"
-	porch_git_password="$(yq eval -r '.porch.git.password // ""' "${SECRETS_FILE}")"
-	if [[ -n "${porch_git_username}" && -n "${porch_git_password}" ]]; then
-		rke2lab::kube:apply_secret "${source_namespace}" "${porch_git_name}" "kubernetes.io/basic-auth" "${porch_git_replicate_to}" \
-			--from-literal=username="${porch_git_username}" \
-			--from-literal=password="${porch_git_password}"
-	fi
-
-	porch_ssh_name="$(yq eval -r '.kubernetes.secrets.porch.ssh.name // "porch-git-ssh"' "${SECRETS_FILE}")"
-	porch_ssh_replicate_to="$(yq eval -r '.kubernetes.secrets.porch.ssh.replicateTo // [] | join(",")' "${SECRETS_FILE}")"
-	porch_ssh_private_key="$(yq eval -r '.porch.ssh.privateKey // ""' "${SECRETS_FILE}")"
-	porch_ssh_known_hosts="$(yq eval -r '.porch.ssh.knownHosts // ""' "${SECRETS_FILE}")"
-	if [[ -n "${porch_ssh_private_key}" ]]; then
-		if [[ -n "${porch_ssh_known_hosts}" ]]; then
-			rke2lab::kube:apply_secret "${source_namespace}" "${porch_ssh_name}" "kubernetes.io/ssh-auth" "${porch_ssh_replicate_to}" \
-				--from-literal=ssh-privatekey="${porch_ssh_private_key}" \
-				--from-literal=known_hosts="${porch_ssh_known_hosts}"
-		else
-			rke2lab::kube:apply_secret "${source_namespace}" "${porch_ssh_name}" "kubernetes.io/ssh-auth" "${porch_ssh_replicate_to}" \
-				--from-literal=ssh-privatekey="${porch_ssh_private_key}"
-		fi
-	fi
+	log "No secrets to apply for ${layer}"
 	;;
 *)
 	log "Unknown layer '${layer}'"

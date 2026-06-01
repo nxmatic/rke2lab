@@ -49,7 +49,6 @@ public record ControlplanePolicy(
                 .cluster(true) // Always enabled - creates rke2lab-system namespace
                 .storage(environment.bool("policy.link.storage.enabled", true))
                 .gitops(environment.bool("policy.link.gitops.enabled", true))
-                .porch(environment.bool("policy.link.porch.enabled", false))
                 .runtime(true) // Always enabled - RKE2 config, Flox runtime, core bootstrap
                 .networking(environment.bool("policy.link.networking.enabled", true))
                 .mesh(environment.bool("policy.link.mesh.enabled", false))

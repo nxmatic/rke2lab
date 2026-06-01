@@ -24,10 +24,11 @@ import org.slf4j.LoggerFactory;
  * <p>Replaces the old {@code bin/explode-manifests.sh} that used {@code yq} — the synth itself runs
  * in seed-master at pulumi-up time now, and we don't want a {@code yq} runtime dep.
  *
- * <p>Layer and package come from {@code kpt.dev/package-layer} and {@code kpt.dev/package-name}
- * annotations stamped by layer code; defaults match the old script ({@code default} / {@code
- * unknown}). Order prefix is determined by kind: {@code 00-} for CRDs, {@code 01-} for other
- * cluster-scoped resources (no namespace), {@code 02-} for namespace-scoped resources.
+ * <p>Layer and package come from {@code io.nxmatic.rke2lab/layer} and {@code
+ * io.nxmatic.rke2lab/package} annotations stamped by layer code; defaults match the old script
+ * ({@code default} / {@code unknown}). Order prefix is determined by kind: {@code 00-} for CRDs,
+ * {@code 01-} for other cluster-scoped resources (no namespace), {@code 02-} for namespace-scoped
+ * resources.
  */
 public final class DefaultManifestExplodeService implements ManifestExplodeService {
 
@@ -64,8 +65,8 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
           continue;
         }
 
-        final String layer = annotation(document, "kpt.dev/package-layer", "default");
-        final String pkg = annotation(document, "kpt.dev/package-name", "unknown");
+        final String layer = annotation(document, "io.nxmatic.rke2lab/layer", "default");
+        final String pkg = annotation(document, "io.nxmatic.rke2lab/package", "unknown");
         final String kind = textOrNull(document.get("kind"));
         if (kind == null) {
           continue;

@@ -2,7 +2,7 @@
 package io.nxmatic.rk2lab.manifests.layers.runtime.daemonset;
 
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterLayerRefs;
-import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestAnnotations;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerRefs;
 import org.cdk8s.ApiObject;
@@ -20,7 +20,7 @@ public final class RuntimeDaemonsetScriptPolicyLayer extends Construct {
 
   private static final String PACKAGE_NAME = "daemonset";
 
-  private final KptMetadata kptMetadata = new KptMetadata();
+  private final ManifestAnnotations manifestAnnotations = new ManifestAnnotations();
 
   private final ManifestUnitReferenceRegistry registry;
 
@@ -52,14 +52,7 @@ public final class RuntimeDaemonsetScriptPolicyLayer extends Construct {
                         .namespace(
                             RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.namespaceName())
                         .annotations(
-                            kptMetadata.packageAnnotations(
-                                LAYER_NAME,
-                                PACKAGE_NAME,
-                                "|ConfigMap|"
-                                    + RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP
-                                        .namespaceName()
-                                    + "|"
-                                    + RuntimeLayerRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name()))
+                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
                         .build())
                 .build());
 

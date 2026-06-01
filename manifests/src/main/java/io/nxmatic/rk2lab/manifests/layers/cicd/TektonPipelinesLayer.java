@@ -58,8 +58,15 @@ public final class TektonPipelinesLayer extends Construct {
                         .labels(Map.of("app.kubernetes.io/replicated", "true"))
                         .build())
                 .build());
-    secret.addJsonPatch(
-        JsonPatch.add("/type", type), JsonPatch.add("/stringData", Map.of("_placeholder", "")));
+
+    Map<String, String> emptyData =
+        switch (type) {
+          case "kubernetes.io/basic-auth" -> Map.of("username", "", "password", "");
+          case "kubernetes.io/dockerconfigjson" -> Map.of(".dockerconfigjson", "");
+          default -> Map.of();
+        };
+
+    secret.addJsonPatch(JsonPatch.add("/type", type), JsonPatch.add("/stringData", emptyData));
   }
 
   private void createTektonConfig() {

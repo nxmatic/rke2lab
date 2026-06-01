@@ -1,7 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.platform;
 
-import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestAnnotations;
 import java.util.Map;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
@@ -14,7 +14,7 @@ public final class ReplicatorLayer extends Construct {
   private static final String LAYER_NAME = "platform";
   private static final String PACKAGE_NAME = "replicator";
 
-  private final KptMetadata kptMetadata = new KptMetadata();
+  private final ManifestAnnotations manifestAnnotations = new ManifestAnnotations();
 
   private final String replicatorVersion;
 
@@ -39,11 +39,7 @@ public final class ReplicatorLayer extends Construct {
             .metadata(
                 ApiObjectMetadata.builder()
                     .name("rke2lab-replicator-source")
-                    .annotations(
-                        kptMetadata.packageAnnotations(
-                            LAYER_NAME,
-                            PACKAGE_NAME,
-                            "|Namespace|default|rke2lab-replicator-source"))
+                    .annotations(manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
                     .labels(
                         Map.of(
                             "app.kubernetes.io/name",
@@ -66,10 +62,7 @@ public final class ReplicatorLayer extends Construct {
                     ApiObjectMetadata.builder()
                         .name("kubernetes-replicator")
                         .annotations(
-                            kptMetadata.packageAnnotations(
-                                LAYER_NAME,
-                                PACKAGE_NAME,
-                                "rbac.authorization.k8s.io|ClusterRole|default|kubernetes-replicator"))
+                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
                         .labels(commonLabels())
                         .build())
                 .build());
@@ -117,10 +110,7 @@ public final class ReplicatorLayer extends Construct {
                         .name("kubernetes-replicator")
                         .namespace("kube-system")
                         .annotations(
-                            kptMetadata.packageAnnotations(
-                                LAYER_NAME,
-                                PACKAGE_NAME,
-                                "|ServiceAccount|kube-system|kubernetes-replicator"))
+                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
                         .labels(commonLabels())
                         .build())
                 .build());
@@ -142,10 +132,7 @@ public final class ReplicatorLayer extends Construct {
                     ApiObjectMetadata.builder()
                         .name("kubernetes-replicator")
                         .annotations(
-                            kptMetadata.packageAnnotations(
-                                LAYER_NAME,
-                                PACKAGE_NAME,
-                                "rbac.authorization.k8s.io|ClusterRoleBinding|default|kubernetes-replicator"))
+                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
                         .labels(commonLabels())
                         .build())
                 .build());
@@ -189,10 +176,7 @@ public final class ReplicatorLayer extends Construct {
                         .name("kubernetes-replicator")
                         .namespace("kube-system")
                         .annotations(
-                            kptMetadata.packageAnnotations(
-                                LAYER_NAME,
-                                PACKAGE_NAME,
-                                "apps|Deployment|kube-system|kubernetes-replicator"))
+                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
                         .labels(commonLabels())
                         .build())
                 .build());
@@ -220,11 +204,7 @@ public final class ReplicatorLayer extends Construct {
                     "metadata",
                     Map.of(
                         "annotations",
-                        Map.of(
-                            "kpt.dev/package-layer",
-                            LAYER_NAME,
-                            "kpt.dev/package-name",
-                            PACKAGE_NAME),
+                        manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME),
                         "labels",
                         Map.of(
                             "app.kubernetes.io/instance",

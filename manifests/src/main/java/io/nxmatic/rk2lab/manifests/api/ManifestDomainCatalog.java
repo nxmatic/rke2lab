@@ -26,7 +26,6 @@ public final class ManifestDomainCatalog {
   public static final String CICD = "cicd";
   public static final String CLUSTER_API = "cluster-api";
   public static final String PLATFORM = "platform";
-  public static final String PORCH = "porch";
 
   private final List<String> all;
   private final List<String> stageALinkable;
@@ -80,10 +79,6 @@ public final class ManifestDomainCatalog {
     return PLATFORM;
   }
 
-  public String porch() {
-    return PORCH;
-  }
-
   public List<String> all() {
     return all;
   }
@@ -114,8 +109,7 @@ public final class ManifestDomainCatalog {
               HIGH_AVAILABILITY,
               CICD,
               CLUSTER_API,
-              PLATFORM,
-              PORCH));
+              PLATFORM));
     }
 
     public Builder addDefaultStageALinkableDomains() {

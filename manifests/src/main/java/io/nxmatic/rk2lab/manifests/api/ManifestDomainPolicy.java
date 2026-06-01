@@ -113,11 +113,6 @@ public record ManifestDomainPolicy(Map<String, Boolean> enabledByDomainId) {
       return this;
     }
 
-    public Builder porch(boolean enabled) {
-      put(domainCatalog.porch(), enabled);
-      return this;
-    }
-
     public Builder enableOnly(Iterable<String> enabledDomainIds) {
       resetAllDisabled();
       for (String domainId : enabledDomainIds) {

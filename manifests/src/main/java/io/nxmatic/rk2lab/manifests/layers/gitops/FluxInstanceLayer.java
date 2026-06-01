@@ -1,7 +1,7 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests.layers.gitops;
 
-import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestAnnotations;
 import java.util.Map;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
@@ -14,7 +14,7 @@ public final class FluxInstanceLayer extends Construct {
   private static final String LAYER_NAME = "gitops";
   private static final String PACKAGE_NAME = "flux-instance";
 
-  private final KptMetadata kptMetadata = new KptMetadata();
+  private final ManifestAnnotations manifestAnnotations = new ManifestAnnotations();
 
   private final String fluxOperatorVersion;
 
@@ -38,10 +38,7 @@ public final class FluxInstanceLayer extends Construct {
                         .name("flux")
                         .namespace("flux-system")
                         .annotations(
-                            kptMetadata.packageAnnotations(
-                                LAYER_NAME,
-                                PACKAGE_NAME,
-                                "fluxcd.controlplane.io|FluxInstance|flux-system|flux"))
+                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
                         .labels(
                             Map.of(
                                 "app.kubernetes.io/instance",

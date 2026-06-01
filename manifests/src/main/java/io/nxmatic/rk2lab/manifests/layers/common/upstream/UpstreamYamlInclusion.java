@@ -21,8 +21,8 @@ import software.constructs.Construct;
 
 /**
  * Wraps an upstream multi-document YAML release artifact (shipped as a classpath resource) into
- * cdk8s {@link ApiObject} instances stamped with the project's {@code kpt.*} annotations so the
- * manifest exploder writes them under the layer's package directory.
+ * cdk8s {@link ApiObject} instances stamped with the project's {@code io.nxmatic.rke2lab/*}
+ * annotations so the manifest exploder writes them under the layer's package directory.
  *
  * <p>This is the canonical way to bring an upstream operator's release manifest (e.g. {@code
  * https://infra.tekton.dev/.../release.yaml}) into the synth pipeline without translating each

@@ -52,8 +52,8 @@ import io.nxmatic.rk2lab.manifests.api.ManifestDomainPolicy;
  *   public LayerDomain domain(ManifestDomainPolicy policy) {
  *     List<ManifestUnit> units = new ArrayList<>();
  *     units.add(new FluxInstanceManifestUnit());
- *     if (policy.isEnabled(CATALOG.porch())) {
- *       units.add(new PorchResourcesManifestUnit());
+ *     if (policy.isEnabled(CATALOG.clusterApi())) {
+ *       units.add(new ClusterApiManifestUnit());
  *     }
  *     return new LayerDomain(CATALOG.gitops(), List.of(CATALOG.platform()), units);
  *   }

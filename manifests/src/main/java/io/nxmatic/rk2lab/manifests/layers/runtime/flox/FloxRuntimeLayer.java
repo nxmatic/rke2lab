@@ -2,7 +2,7 @@
 package io.nxmatic.rk2lab.manifests.layers.runtime.flox;
 
 import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterLayerRefs;
-import io.nxmatic.rk2lab.manifests.layers.common.KptMetadata;
+import io.nxmatic.rk2lab.manifests.layers.common.ManifestAnnotations;
 import io.nxmatic.rk2lab.manifests.layers.common.ManifestSynthesisContext;
 import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestUnitReferenceRegistry;
 import io.nxmatic.rk2lab.manifests.layers.mesh.MeshLayerRefs;
@@ -21,7 +21,7 @@ public final class FloxRuntimeLayer extends Construct {
 
   private static final String PACKAGE_NAME = "flox-runtime";
 
-  private final KptMetadata kptMetadata = new KptMetadata();
+  private final ManifestAnnotations manifestAnnotations = new ManifestAnnotations();
 
   private final ManifestUnitReferenceRegistry registry;
 
@@ -77,13 +77,9 @@ public final class FloxRuntimeLayer extends Construct {
                         .name(RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name())
                         .namespace(RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName())
                         .annotations(
-                            kptMetadata.packageAnnotations(
+                            manifestAnnotations.packageAnnotations(
                                 LAYER_NAME,
                                 PACKAGE_NAME,
-                                "|ConfigMap|"
-                                    + RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName()
-                                    + "|"
-                                    + RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.name(),
                                 Map.of(
                                     "replicator.v1.mittwald.de/replicate-to",
                                     MeshLayerRefs.HEADSCALE_SYSTEM_NAMESPACE.name())))
@@ -127,12 +123,7 @@ public final class FloxRuntimeLayer extends Construct {
                         .name("flox-nri-plugin-dyn")
                         .namespace(RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName())
                         .annotations(
-                            kptMetadata.packageAnnotations(
-                                LAYER_NAME,
-                                PACKAGE_NAME,
-                                "|ConfigMap|"
-                                    + RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName()
-                                    + "|flox-nri-plugin-dyn"))
+                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
                         .build())
                 .build());
 
@@ -157,12 +148,7 @@ public final class FloxRuntimeLayer extends Construct {
                         .name("flox-runtime-installer")
                         .namespace(RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName())
                         .annotations(
-                            kptMetadata.packageAnnotations(
-                                LAYER_NAME,
-                                PACKAGE_NAME,
-                                "|ServiceAccount|"
-                                    + RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName()
-                                    + "|flox-runtime-installer"))
+                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
                         .build())
                 .build());
     if (registry != null) {
@@ -187,12 +173,7 @@ public final class FloxRuntimeLayer extends Construct {
                         .name("flox-runtime-installer")
                         .namespace(RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName())
                         .annotations(
-                            kptMetadata.packageAnnotations(
-                                LAYER_NAME,
-                                PACKAGE_NAME,
-                                "apps|DaemonSet|"
-                                    + RuntimeLayerRefs.FLOX_ENV_CONFIGMAP.namespaceName()
-                                    + "|flox-runtime-installer"))
+                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
                         .labels(
                             Map.of(
                                 "app.kubernetes.io/component",

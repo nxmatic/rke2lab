@@ -28,8 +28,8 @@ public interface ManifestUnit {
    * or other units that support the K8s manifests synthesized by {@link #apply(Chart)}.
    *
    * <p><b>Design rationale</b>: Each ManifestUnit decides whether it needs systemd support. Domain
-   * manifest units (cluster-api, gitops, porch) emit installer services. Infrastructure units
-   * (network, tools) emit targets and support services.
+   * manifest units (cluster-api, gitops) emit installer services. Infrastructure units (network,
+   * tools) emit targets and support services.
    *
    * @param systemdChart the systemd chart to populate with units
    * @param context systemd synthesis context (contains references to common targets)

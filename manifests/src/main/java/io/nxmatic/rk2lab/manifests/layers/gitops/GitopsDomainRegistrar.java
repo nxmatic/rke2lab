@@ -29,10 +29,6 @@ public final class GitopsDomainRegistrar implements LayerDomainRegistrar {
     units.add(new SopsAgeSecretManifestUnit());
     units.add(new FluxRootManifestUnit());
 
-    if (policy.isEnabled(CATALOG.porch())) {
-      units.add(new PorchResourcesManifestUnit());
-    }
-
     return new LayerDomain(CATALOG.gitops(), List.of(CATALOG.platform()), units) {
       @Override
       public void synthesizeSystemdUnits(
