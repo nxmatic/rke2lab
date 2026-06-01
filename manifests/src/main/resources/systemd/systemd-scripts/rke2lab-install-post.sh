@@ -92,3 +92,8 @@ fi
 
 systemctl daemon-reload
 log "daemon-reload complete"
+
+: "Start RKE2 service now that installation is complete"
+# Use --no-block to avoid blocking the install service completion
+systemctl start --no-block "rke2-${RKE2LAB_NODE_KIND}"
+log "started rke2-${RKE2LAB_NODE_KIND}"

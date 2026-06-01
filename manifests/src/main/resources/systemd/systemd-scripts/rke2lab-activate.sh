@@ -47,5 +47,7 @@ if [ -d "$scripts_dir" ]; then
 	done
 fi
 
-: "Start the RKE2 service"
-systemctl start --no-block rke2-${RKE2LAB_NODE_KIND}
+: "Enable RKE2 service to start with multi-user.target"
+# Note: Don't start here - rke2-install may not have completed yet.
+# The service will be started by a post-install hook or manually.
+systemctl enable rke2-${RKE2LAB_NODE_KIND} 2>/dev/null || true
