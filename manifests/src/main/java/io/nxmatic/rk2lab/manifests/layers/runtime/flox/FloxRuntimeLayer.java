@@ -202,11 +202,7 @@ public final class FloxRuntimeLayer extends Construct {
                     "metadata",
                     Map.of(
                         "annotations",
-                        Map.of(
-                            "kpt.dev/package-layer",
-                            LAYER_NAME,
-                            "kpt.dev/package-name",
-                            PACKAGE_NAME),
+                        manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME),
                         "labels",
                         Map.of(
                             "app.kubernetes.io/component",

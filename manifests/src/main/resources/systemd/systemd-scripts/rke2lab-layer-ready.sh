@@ -339,7 +339,7 @@ loadMetadataFromManifestFiles() {
 
 	package_selector='.'
 	if [[ -n "${package_filter}" ]]; then
-		package_selector='select(.metadata.annotations["kpt.dev/package-name"] == "'"${package_filter}"'")'
+		package_selector='select(.metadata.annotations["io.nxmatic.rke2lab/package"] == "'"${package_filter}"'")'
 	fi
 
 	while IFS= read -r line; do
