@@ -233,7 +233,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     // Create drop-in for rke2-server to integrate pre/post-start hooks and manifests.target
     LOG.debug("Creating rke2-server.service drop-in for lifecycle hooks");
     new io.nxmatic.rke2lab.cdk8s.systemd.SystemdDropIn(
-            systemdChart, "rke2lab", "rke2-server.service")
+            systemdChart, "rke2lab-server-hooks", "rke2-server.service")
         .execStartPre("/srv/host/systemd-scripts.d/rke2lab-server-pre-start.sh")
         .execStartPost("/srv/host/systemd-scripts.d/rke2lab-server-post-start.sh")
         .wants(manifestsTarget.getUnitFileName());
