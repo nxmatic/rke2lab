@@ -1,9 +1,6 @@
 // @codebase
 package io.nxmatic.rk2lab.manifests;
 
-import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
-import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisResult;
-import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;

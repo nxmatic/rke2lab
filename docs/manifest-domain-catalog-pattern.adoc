@@ -266,3 +266,9 @@ A: Check these locations:
 **Q: Can I use domain ID strings in tests?**
 
 A: Yes, but prefer catalog methods even in tests for consistency. Only use strings when explicitly testing ID matching logic itself.
+
+== Related Documentation
+
+* link:manifest-system-architecture.adoc[Manifest System Architecture] - Comprehensive guide to the manifest system including domain organization and Component/ManifestUnit pattern
+* link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven filtering using domain IDs from this catalog
+* link:policy-configuration-guide.adoc[Policy Configuration Guide] - How domain policies are configured and applied

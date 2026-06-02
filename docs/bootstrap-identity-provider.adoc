@@ -568,3 +568,9 @@ No need to update `ManifestSynthesisContext` - it passes the entire `BootstrapId
 1. Add remote: `incus remote add nikopol https://192.168.1.2:8443`
 2. Verify remote name matches cluster name exactly
 3. Check `incus remote list` to see configured remotes
+
+== Related Documentation
+
+* link:manifest-system-architecture.adoc[Manifest System Architecture] - Comprehensive guide to the manifest system including how context flows through synthesis
+* link:manifest-apply-flow.adoc[Manifest Apply Flow] - How manifests flow from synthesis to cluster
+* link:bootstrap-contract.adoc[Bootstrap Contract] - Stage A bootstrap requirements and outputs

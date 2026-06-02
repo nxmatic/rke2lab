@@ -1,6 +1,6 @@
 package io.nxmatic.rk2lab.controlplane.incus;
 
-import io.nxmatic.rk2lab.manifests.layers.runtime.flox.FloxRuntimeAssets;
+import io.nxmatic.rk2lab.manifests.components.runtime.flox.FloxRuntimeAssets;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

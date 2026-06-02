@@ -1,9 +1,5 @@
 package io.nxmatic.rk2lab.manifests;
 
-import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
-import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisResult;
-import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
-import io.nxmatic.rk2lab.manifests.api.ManifestUpdateGate;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

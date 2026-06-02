@@ -1,7 +1,7 @@
 package io.nxmatic.rk2lab.manifests.layers.env;
 
-import io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity;
-import io.nxmatic.rk2lab.manifests.layers.common.profiles.NetworkTopology;
+import io.nxmatic.rk2lab.manifests.profiles.BootstrapIdentity;
+import io.nxmatic.rk2lab.manifests.profiles.NetworkTopology;
 import java.nio.file.Path;
 
 /**

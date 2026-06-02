@@ -16,8 +16,8 @@
     <module>systemd-contract</module>
     <module>cdk8s-systemd</module>
     <module>sdks/incus</module>
-    <module>seed-master</module>
     <module>manifests</module>
+    <module>seed-master</module>
   </modules>
 
   <properties>

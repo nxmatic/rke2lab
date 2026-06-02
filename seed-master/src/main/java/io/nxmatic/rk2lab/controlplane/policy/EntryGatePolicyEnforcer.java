@@ -1,6 +1,6 @@
 package io.nxmatic.rk2lab.controlplane.policy;
 
-import io.nxmatic.rk2lab.manifests.api.ManifestUpdateGate;
+import io.nxmatic.rk2lab.manifests.ManifestUpdateGate;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;

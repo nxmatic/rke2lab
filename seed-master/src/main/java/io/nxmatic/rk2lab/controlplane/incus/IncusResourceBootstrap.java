@@ -25,18 +25,18 @@ import io.nxmatic.rk2lab.controlplane.incus.image.PulumiIncusImageProvider;
 import io.nxmatic.rk2lab.controlplane.pipeline.OnFailure;
 import io.nxmatic.rk2lab.controlplane.pipeline.TopicRunner;
 import io.nxmatic.rk2lab.controlplane.policy.ControlplanePolicy;
-import io.nxmatic.rk2lab.manifests.api.ManifestExplodeRequest;
-import io.nxmatic.rk2lab.manifests.api.ManifestExplodeResult;
-import io.nxmatic.rk2lab.manifests.api.ManifestExplodeService;
-import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
-import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisResult;
-import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
-import io.nxmatic.rk2lab.manifests.api.ManifestYaml;
-import io.nxmatic.rk2lab.manifests.layers.common.profiles.ComponentVersions;
-import io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy;
+import io.nxmatic.rk2lab.manifests.ManifestExplodeRequest;
+import io.nxmatic.rk2lab.manifests.ManifestExplodeResult;
+import io.nxmatic.rk2lab.manifests.ManifestExplodeService;
+import io.nxmatic.rk2lab.manifests.ManifestSynthesisRequest;
+import io.nxmatic.rk2lab.manifests.ManifestSynthesisResult;
+import io.nxmatic.rk2lab.manifests.ManifestSynthesisService;
+import io.nxmatic.rk2lab.manifests.ManifestYaml;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
 import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributorRegistry;
+import io.nxmatic.rk2lab.manifests.profiles.ComponentVersions;
+import io.nxmatic.rk2lab.manifests.profiles.FloxDebugPolicy;
 import io.nxmatic.rk2lab.netplan.ClusterNetworkBlueprint;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -2207,7 +2207,7 @@ public final class IncusResourceBootstrap {
       }
 
       // Add discovered flox environments
-      final io.nxmatic.rk2lab.manifests.layers.runtime.flox.FloxRuntimeAssets floxAssets =
+      final io.nxmatic.rk2lab.manifests.components.runtime.flox.FloxRuntimeAssets floxAssets =
           systemdTarget.getFloxRuntimeAssets();
       if (floxAssets != null) {
         for (var env : floxAssets.getDiscoveredEnvironments()) {

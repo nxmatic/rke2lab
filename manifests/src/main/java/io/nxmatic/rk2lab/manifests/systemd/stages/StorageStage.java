@@ -1,6 +1,6 @@
 package io.nxmatic.rk2lab.manifests.systemd.stages;
 
-import io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext;
+import io.nxmatic.rk2lab.manifests.SystemdSynthesisContext;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.ServiceType;

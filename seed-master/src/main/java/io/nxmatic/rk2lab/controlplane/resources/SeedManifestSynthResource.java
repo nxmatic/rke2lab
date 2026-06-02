@@ -13,10 +13,9 @@ import java.util.Map;
  *
  * <p>The synth itself runs inside {@code IncusResourceBootstrap.prepareHostState()} at apply time;
  * this resource carries the checksum and per-layer breakdown produced there. {@code pulumi preview}
- * therefore shows a diff whenever the {@link
- * io.nxmatic.rk2lab.manifests.layers.common.profiles.FloxDebugPolicy} flips or any source resource
- * (layer code, classpath asset, manifest unit) changes shape — without each individual exploded
- * YAML becoming a Pulumi resource.
+ * therefore shows a diff whenever the {@link io.nxmatic.rk2lab.manifests.profiles.FloxDebugPolicy}
+ * flips or any source resource (layer code, classpath asset, manifest unit) changes shape — without
+ * each individual exploded YAML becoming a Pulumi resource.
  */
 public final class SeedManifestSynthResource extends ComponentResource {
 

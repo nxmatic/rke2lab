@@ -2,32 +2,19 @@ package io.nxmatic.rk2lab.manifests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.MappingIterator;
-import io.nxmatic.rk2lab.manifests.api.ManifestDomainCatalog;
-import io.nxmatic.rk2lab.manifests.api.ManifestDomainPolicy;
-import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisRequest;
-import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisResult;
-import io.nxmatic.rk2lab.manifests.api.ManifestSynthesisService;
-import io.nxmatic.rk2lab.manifests.api.ManifestYaml;
-import io.nxmatic.rk2lab.manifests.layers.cicd.CicdDomainRegistrar;
-import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterDomainRegistrar;
-import io.nxmatic.rk2lab.manifests.layers.clusterapi.ClusterApiDomainRegistrar;
-import io.nxmatic.rk2lab.manifests.layers.common.ApplyingManifestUnitVisitor;
-import io.nxmatic.rk2lab.manifests.layers.common.LayerDomain;
-import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistry;
-import io.nxmatic.rk2lab.manifests.layers.common.LayerDomainRegistryBuilder;
-import io.nxmatic.rk2lab.manifests.layers.common.ManifestSynthesisContext;
-import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnit;
-import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitDependencyApplier;
-import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitRegistry;
-import io.nxmatic.rk2lab.manifests.layers.common.ManifestUnitVisitor;
-import io.nxmatic.rk2lab.manifests.layers.common.registry.ManifestAssemblyRegistry;
-import io.nxmatic.rk2lab.manifests.layers.gitops.GitopsDomainRegistrar;
-import io.nxmatic.rk2lab.manifests.layers.ha.HighAvailabilityDomainRegistrar;
-import io.nxmatic.rk2lab.manifests.layers.mesh.MeshDomainRegistrar;
-import io.nxmatic.rk2lab.manifests.layers.networking.NetworkingDomainRegistrar;
-import io.nxmatic.rk2lab.manifests.layers.platform.PlatformDomainRegistrar;
-import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeDomainRegistrar;
-import io.nxmatic.rk2lab.manifests.layers.storage.StorageDomainRegistrar;
+// FIXME: DomainRegistrars deleted during layers→components migration
+// New domain registration pattern pending implementation
+// import io.nxmatic.rk2lab.manifests.layers.cicd.CicdDomainRegistrar;
+// import io.nxmatic.rk2lab.manifests.layers.cluster.ClusterDomainRegistrar;
+// import io.nxmatic.rk2lab.manifests.layers.clusterapi.ClusterApiDomainRegistrar;
+// import io.nxmatic.rk2lab.manifests.layers.gitops.GitopsDomainRegistrar;
+// import io.nxmatic.rk2lab.manifests.layers.ha.HighAvailabilityDomainRegistrar;
+// import io.nxmatic.rk2lab.manifests.layers.mesh.MeshDomainRegistrar;
+// import io.nxmatic.rk2lab.manifests.layers.networking.NetworkingDomainRegistrar;
+// import io.nxmatic.rk2lab.manifests.layers.platform.PlatformDomainRegistrar;
+// import io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeDomainRegistrar;
+// import io.nxmatic.rk2lab.manifests.layers.storage.StorageDomainRegistrar;
+import io.nxmatic.rk2lab.manifests.registry.ManifestAssemblyRegistry;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -188,8 +175,8 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             .wantedBy(rke2labTarget.getUnitFileName());
 
     // Create synthesis context with target references and shared catalog
-    final io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext systemdContext =
-        new io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext(
+    final io.nxmatic.rk2lab.manifests.SystemdSynthesisContext systemdContext =
+        new io.nxmatic.rk2lab.manifests.SystemdSynthesisContext(
             rke2labTarget,
             bootstrapTarget,
             manifestsTarget,
@@ -280,21 +267,27 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
   }
 
   private LayerDomainRegistry buildDomainRegistry(ManifestDomainPolicy policy) {
-    final ManifestDomainPolicy effectivePolicy =
-        policy != null ? policy : ManifestDomainPolicy.builder().build();
+    // FIXME: Temporarily disabled during layers→components migration
+    // DomainRegistrars deleted, new domain registration pattern pending
+    throw new UnsupportedOperationException(
+        "Domain registration temporarily disabled during layers→components migration. "
+            + "DomainRegistrars have been deleted; new domain pattern pending implementation.");
 
-    return new LayerDomainRegistryBuilder()
-        .register(new ClusterDomainRegistrar(), effectivePolicy)
-        .register(new StorageDomainRegistrar(), effectivePolicy)
-        .register(new GitopsDomainRegistrar(), effectivePolicy)
-        .register(new RuntimeDomainRegistrar(), effectivePolicy)
-        .register(new NetworkingDomainRegistrar(), effectivePolicy)
-        .register(new MeshDomainRegistrar(), effectivePolicy)
-        .register(new HighAvailabilityDomainRegistrar(), effectivePolicy)
-        .register(new CicdDomainRegistrar(), effectivePolicy)
-        .register(new ClusterApiDomainRegistrar(), effectivePolicy)
-        .register(new PlatformDomainRegistrar(), effectivePolicy)
-        .build();
+    // final ManifestDomainPolicy effectivePolicy =
+    //     policy != null ? policy : ManifestDomainPolicy.builder().build();
+    //
+    // return new LayerDomainRegistryBuilder()
+    //     .register(new ClusterDomainRegistrar(), effectivePolicy)
+    //     .register(new StorageDomainRegistrar(), effectivePolicy)
+    //     .register(new GitopsDomainRegistrar(), effectivePolicy)
+    //     .register(new RuntimeDomainRegistrar(), effectivePolicy)
+    //     .register(new NetworkingDomainRegistrar(), effectivePolicy)
+    //     .register(new MeshDomainRegistrar(), effectivePolicy)
+    //     .register(new HighAvailabilityDomainRegistrar(), effectivePolicy)
+    //     .register(new CicdDomainRegistrar(), effectivePolicy)
+    //     .register(new ClusterApiDomainRegistrar(), effectivePolicy)
+    //     .register(new PlatformDomainRegistrar(), effectivePolicy)
+    //     .build();
   }
 
   private LayerDomainRegistry applyManifestDomainPolicy(

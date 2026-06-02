@@ -49,8 +49,7 @@ public final class SynthesisPipeline {
   private SynthesisPipeline() {}
 
   public static ConfiguringPipeline forChart(
-      SystemdChart systemdChart,
-      io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
+      SystemdChart systemdChart, io.nxmatic.rk2lab.manifests.SystemdSynthesisContext context) {
     return new ConfiguringPipeline(new PipelineState(systemdChart, context));
   }
 
@@ -185,15 +184,14 @@ public final class SynthesisPipeline {
 
   private static final class PipelineState {
     final SystemdChart systemdChart;
-    final io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context;
+    final io.nxmatic.rk2lab.manifests.SystemdSynthesisContext context;
     SynthesisOnFailure onFailure;
     // Stage references passed between pipeline stages for cross-stage dependencies
     ToolsStage toolsStage;
     BootstrapStage bootstrapStage;
 
     PipelineState(
-        SystemdChart systemdChart,
-        io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
+        SystemdChart systemdChart, io.nxmatic.rk2lab.manifests.SystemdSynthesisContext context) {
       this.systemdChart = systemdChart;
       this.context = context;
     }

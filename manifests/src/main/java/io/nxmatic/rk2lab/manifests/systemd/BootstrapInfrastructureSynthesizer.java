@@ -22,11 +22,10 @@ public final class BootstrapInfrastructureSynthesizer {
       LoggerFactory.getLogger(BootstrapInfrastructureSynthesizer.class);
 
   private final SystemdChart systemdChart;
-  private final io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context;
+  private final io.nxmatic.rk2lab.manifests.SystemdSynthesisContext context;
 
   public BootstrapInfrastructureSynthesizer(
-      SystemdChart systemdChart,
-      io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
+      SystemdChart systemdChart, io.nxmatic.rk2lab.manifests.SystemdSynthesisContext context) {
     this.systemdChart = systemdChart;
     this.context = context;
   }

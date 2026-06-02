@@ -1,6 +1,6 @@
 package io.nxmatic.rk2lab.manifests.layers.env;
 
-import io.nxmatic.rk2lab.manifests.api.ManifestYaml;
+import io.nxmatic.rk2lab.manifests.ManifestYaml;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;

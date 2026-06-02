@@ -26,12 +26,12 @@ public final class SystemdUnitSynthesizer {
 
   private final SystemdChart systemdChart;
   private final String domainId;
-  private final io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context;
+  private final io.nxmatic.rk2lab.manifests.SystemdSynthesisContext context;
 
   public SystemdUnitSynthesizer(
       SystemdChart systemdChart,
       String domainId,
-      io.nxmatic.rk2lab.manifests.layers.common.SystemdSynthesisContext context) {
+      io.nxmatic.rk2lab.manifests.SystemdSynthesisContext context) {
     this.systemdChart = systemdChart;
     this.domainId = domainId;
     this.context = context;

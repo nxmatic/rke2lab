@@ -704,3 +704,10 @@ Clarity of purpose: when operators see `/srv/host/rke2-manifests.d/`, it's immed
 3. **Failure isolation**: One layer failing doesn't block unrelated layers
 4. **Policy control**: Each layer can be independently enabled/disabled
 5. **Observability**: `systemctl status rke2lab-networking-manifests.service` shows layer-specific state
+
+== Related Documentation
+
+* link:manifest-system-architecture.adoc[Manifest System Architecture] - Comprehensive guide to the manifest system including synthesis flow and Component/ManifestUnit pattern
+* link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven filtering before explosion
+* link:systemd-resource-provisioning.adoc[Systemd Resource Provisioning] - How systemd units are built and provisioned
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - How cluster identity flows through synthesis

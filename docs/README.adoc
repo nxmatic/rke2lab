@@ -33,14 +33,18 @@ Documentation for the RKE2Lab project - multi-cluster Kubernetes bootstrap via P
 
 === Manifest Synthesis
 
-* link:manifest-nomenclature.adoc[Manifest Nomenclature Guide] (📐 **START HERE**) - Clarifies terminology: deployment layers vs manifest domains/components/charts. Essential reading to understand the codebase structure.
+* link:manifest-system-architecture.adoc[Manifest System Architecture] (📐 **START HERE**) - Comprehensive guide to the manifest system: Component vs ManifestUnit pattern, synthesis flow, domain organization, and troubleshooting. Consolidates nomenclature and synthesis architecture into one authoritative reference.
 * link:manifest-apply-flow.adoc[Manifest Apply Flow] - Complete five-stage pipeline from CDK8s synthesis to live resources via RKE2 auto-deploy (no kubectl apply needed)
-* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How K8s manifests are generated from code
 * link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven optional manifest units within domains
 * link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] (✅ Enforced) - Single source of truth for domain IDs; prevents identifier mismatches like the clusterApi bug
 * link:cdk8s-chart-vs-construct-pattern.adoc[CDK8s Chart vs Construct Pattern] (✅ Enforced) - Critical distinction between synthesis boundaries (Chart) and composition (Construct); components MUST extend Construct, charts extend Chart
 * link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow patterns in seed-layer1
 * link:staged-post-cluster-resources.adoc[Staged Post-Cluster Resources] - Pattern for resources that need Pulumi Outputs but must exist before Stage B
+
+**Reference (superseded by Manifest System Architecture above):**
+
+* link:manifest-nomenclature.adoc[Manifest Nomenclature Guide] - Original terminology clarification (superseded by Manifest System Architecture)
+* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - Original synthesis flow doc (superseded by Manifest System Architecture)
 
 == GitOps & Cluster API
 

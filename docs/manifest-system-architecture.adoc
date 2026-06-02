@@ -1,0 +1,1234 @@
+= Manifest System Architecture
+:toc: left
+:toclevels: 3
+
+== Overview
+
+The manifest system generates Kubernetes YAML manifests and systemd unit files for the RKE2Lab bootstrap and runtime infrastructure through a declarative, context-aware pipeline. It uses CDK8s for type-safe K8s object creation and a custom cdk8s-systemd extension for systemd unit generation.
+
+The system transforms high-level domain specifications (networking, storage, GitOps, etc.) into both the infrastructure definitions (K8s manifests) and the bootstrap machinery (systemd services) needed to deploy them, all synthesized from the same source definitions.
+
+== Nomenclature and Structure
+
+=== System Level: Deployment Layers
+
+**Deployment Layers** are bootstrap stages for the cluster:
+
+[cols="2,3,3"]
+|===
+|Term |Module |Purpose
+
+|**seed-layer1**
+|`seed-layer1/`
+|Physical infrastructure: master node via Incus + Pulumi
+
+|**seed-layer2**
+|`seed-layer2/`
+|Virtual control plane: gitops-mgmt vCluster + Flux
+
+|**seed-layer3**
+|`seed-layer3/`
+|Workloads: GitOps manifests for core/peers/labs
+|===
+
+=== Manifest Level: Domain → Component → ManifestUnit
+
+**Manifest Organization** defines how Kubernetes resources are structured and synthesized:
+
+[cols="2,3,3"]
+|===
+|Term |Location |Purpose
+
+|**Domain**
+|`manifests/components/<domain>/`
+|Functional grouping (networking, mesh, storage, platform, cicd, runtime, gitops, clusterapi, cluster, ha)
+
+|**Component**
+|`manifests/components/<domain>/<Name>Component.java`
+|CDK8s reusable Construct that generates K8s YAML directly
+
+|**ManifestUnit**
+|`manifests/components/<domain>/<Name>ManifestUnit.java`
+|Wrapper that adds metadata, dependencies, policy control, and optional systemd unit generation
+
+|**Chart**
+|`manifests/charts/layer<N>/`
+|Aggregation boundary that selects which components to synthesize together
+|===
+
+=== Directory Structure
+
+```
+manifests/
+├─ src/main/java/io/nxmatic/rk2lab/manifests/
+│  ├─ ManifestDomainCatalog.java        (Domain ID registry)
+│  ├─ ManifestUnit.java                 (Interface for manifest units)
+│  ├─ AbstractManifestUnit.java         (Base class with context helpers)
+│  ├─ ManifestDomainPolicy.java         (Policy configuration)
+│  ├─ LayerDomain.java                  (Domain aggregator)
+│  ├─ LayerDomainRegistry.java          (Registry of all domains)
+│  ├─ ManifestSynthesisContext.java     (ThreadLocal runtime config)
+│  ├─ DefaultManifestSynthesisService.java  (Main orchestrator)
+│  │
+│  ├─ components/                       (Functional domains)
+│  │  ├─ networking/
+│  │  │  ├─ CiliumConfigComponent.java         (CDK8s Construct)
+│  │  │  ├─ CiliumConfigManifestUnit.java      (Wrapper + metadata)
+│  │  │  ├─ CiliumAdvancedComponent.java
+│  │  │  ├─ CiliumAdvancedManifestUnit.java
+│  │  │  ├─ KdnsComponent.java
+│  │  │  ├─ EnvoyGatewayComponent.java
+│  │  │  └─ NetworkingRefs.java                (Reference registry)
+│  │  │
+│  │  ├─ mesh/
+│  │  │  ├─ TailscaleComponent.java
+│  │  │  ├─ TailscaleManifestUnit.java
+│  │  │  ├─ HeadscaleComponent.java
+│  │  │  ├─ HeadplaneComponent.java
+│  │  │  └─ MeshSystemNamespaceComponent.java
+│  │  │
+│  │  ├─ storage/
+│  │  │  └─ OpenebsZfsComponent.java
+│  │  │
+│  │  ├─ platform/
+│  │  │  ├─ ReplicatorComponent.java
+│  │  │  └─ CertManagerComponent.java
+│  │  │
+│  │  ├─ cicd/
+│  │  │  ├─ TektonPipelinesComponent.java
+│  │  │  └─ TektonDashboardComponent.java
+│  │  │
+│  │  ├─ runtime/
+│  │  │  ├─ RuntimeRke2ConfigComponent.java
+│  │  │  └─ RuntimeEnvConfigComponent.java
+│  │  │
+│  │  ├─ gitops/
+│  │  │  ├─ FluxOperatorComponent.java
+│  │  │  ├─ VClusterOperatorComponent.java
+│  │  │  └─ FluxInstanceComponent.java
+│  │  │
+│  │  ├─ clusterapi/
+│  │  │  ├─ ClusterApiOperatorComponent.java
+│  │  │  ├─ IncusIdentitySecretManifestUnit.java
+│  │  │  └─ ImageStateConfigMapManifestUnit.java
+│  │  │
+│  │  ├─ cluster/
+│  │  │  └─ ClusterRuntimeNamespaceComponent.java
+│  │  │
+│  │  └─ ha/
+│  │     └─ (High availability components)
+│  │
+│  ├─ profiles/
+│  │  ├─ ComponentVersions.java         (Version catalog)
+│  │  └─ PackageMetadataProfile.java    (Annotation generator)
+│  │
+│  └─ registry/
+│     └─ ManifestUnitReferenceRegistry.java (Cross-unit references)
+```
+
+== Component vs ManifestUnit Pattern
+
+This is the KEY architectural pattern that often causes confusion. Understanding the relationship between these two abstractions is essential.
+
+=== The Two-Layer Abstraction
+
+The manifest system uses a two-layer pattern:
+
+1. **Component** (CDK8s layer): Pure Construct that generates YAML
+2. **ManifestUnit** (rke2lab layer): Wrapper that adds deployment concerns
+
+[source,java]
+----
+// COMPONENT: CDK8s Construct - generates YAML directly
+public final class CiliumConfigComponent extends Construct {
+  public CiliumConfigComponent(Construct scope, String id) {
+    super(scope, id);
+    // Creates K8s ApiObjects directly in the construct tree
+    new ApiObject(this, "helmchartconfig-rke2-cilium", ...);
+    new ApiObject(this, "configmap-clustermesh-remote-users", ...);
+  }
+}
+
+// MANIFEST UNIT: rke2lab wrapper - adds metadata, dependencies, policy
+public final class CiliumConfigManifestUnit extends AbstractManifestUnit {
+
+  public CiliumConfigManifestUnit() {
+    super(MANIFEST_UNIT_ID, List.of(/* dependencies */));
+  }
+
+  @Override
+  public void apply(Chart chart) {
+    // Delegates to Component
+    new CiliumConfigComponent(chart, "layer-networking-cilium-config");
+  }
+
+  @Override
+  public void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
+    // Optionally create systemd installer service
+    new SystemdService(systemdChart, "rke2lab-cilium-config-manifests")
+        .execStart("/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh networking/cilium-config")
+        ...;
+  }
+}
+----
+
+=== Why Both Exist
+
+[cols="2,3,3"]
+|===
+|Concern |Component (CDK8s) |ManifestUnit (rke2lab)
+
+|**Purpose**
+|Generate K8s resources
+|Control when/how/if they're deployed
+
+|**Extends**
+|`software.constructs.Construct`
+|`AbstractManifestUnit`
+
+|**Knows about**
+|K8s API, resource structure
+|Dependencies, policy, systemd bootstrap
+
+|**Creates**
+|`ApiObject` instances in Chart
+|Component + optional systemd units
+
+|**When used**
+|During synthesis (`apply()`)
+|During synthesis orchestration
+
+|**Reusability**
+|Can be used directly in any Chart
+|Bound to rke2lab deployment model
+
+|**Testing focus**
+|Generated YAML correctness
+|Dependency order, policy filtering
+|===
+
+=== When Each Is Used
+
+**Component** is instantiated:
+
+* BY a ManifestUnit's `apply()` method (most common)
+* OR directly in a Chart (for custom deployments)
+
+**ManifestUnit** is instantiated:
+
+* BY the synthesis service via LayerDomain
+* NEVER directly by user code
+
+=== Code Examples
+
+**Creating ONLY a Component (directly usable in any Chart):**
+
+[source,java]
+----
+public class CustomChart extends Chart {
+  public CustomChart(Construct scope, String id) {
+    super(scope, id);
+
+    // Direct Component usage - no ManifestUnit wrapper
+    new TailscaleComponent(this, "tailscale");
+    new CiliumConfigComponent(this, "cilium");
+  }
+}
+----
+
+**Creating Component + ManifestUnit (standard rke2lab pattern):**
+
+[source,java]
+----
+// 1. Component - CDK8s Construct
+public final class TailscaleComponent extends Construct {
+  public TailscaleComponent(Construct scope, String id) {
+    super(scope, id);
+    // Create K8s resources
+    new ApiObject(this, "helmchart-tailscale-operator", ...);
+    new ApiObject(this, "connector-controlplane", ...);
+  }
+}
+
+// 2. ManifestUnit - rke2lab wrapper
+public final class TailscaleManifestUnit extends AbstractManifestUnit {
+
+  public static final String MANIFEST_UNIT_ID = "mesh/tailscale";
+
+  public TailscaleManifestUnit() {
+    super(MANIFEST_UNIT_ID, List.of("mesh/system-namespace"));  // Dependencies
+  }
+
+  @Override
+  public void apply(Chart chart) {
+    // Instantiate Component
+    new TailscaleComponent(chart, "layer-mesh-tailscale");
+  }
+
+  // No systemd units for this component - default implementation does nothing
+}
+----
+
+=== Decision Guide: Component or ManifestUnit?
+
+**Create ONLY a Component when:**
+
+* Building a reusable K8s resource template
+* The resource has no rke2lab-specific deployment concerns
+* You might use it in different deployment contexts
+* Example: A generic HelmChart wrapper
+
+**Create Component + ManifestUnit when:**
+
+* Deploying into rke2lab's bootstrap pipeline
+* Need dependency ordering (must come after namespace creation)
+* Need policy control (enable/disable per environment)
+* Need systemd installer service (bootstrap pre-server or post-server)
+* Example: All infrastructure components (Cilium, Flux, Cluster API)
+
+**In practice:** Almost all rke2lab components follow the Component + ManifestUnit pattern because they're part of the bootstrap pipeline.
+
+=== Common Confusion Points
+
+[IMPORTANT]
+====
+**"Do I need to reference the Component from the ManifestUnit?"**
+
+Yes, always. The ManifestUnit's `apply()` method MUST instantiate the Component. This is the delegation that makes the pattern work.
+
+**"Can I put K8s resource creation directly in the ManifestUnit?"**
+
+No. Keep K8s logic in the Component. The ManifestUnit should only:
+
+* Instantiate the Component
+* Optionally create systemd units
+* Declare dependencies and metadata
+
+**"Why not merge them into one class?"**
+
+Separation of concerns:
+
+* Component = WHAT resources to create (pure CDK8s)
+* ManifestUnit = WHEN/IF/HOW to deploy them (rke2lab orchestration)
+
+This allows reusing Components in different contexts (testing, custom Charts) without dragging in rke2lab dependencies.
+====
+
+== Synthesis Architecture
+
+=== Key Components
+
+[cols="2,4"]
+|===
+|Component |Description
+
+|`DefaultManifestSynthesisService`
+|Main orchestrator for the entire synthesis pipeline
+
+|`ManifestSynthesisContext`
+|ThreadLocal runtime configuration (bootstrap identity, versions, topology)
+
+|`LayerDomainRegistry`
+|Registry of all LayerDomains, built from LayerDomainRegistrars
+
+|`LayerDomainRegistrar`
+|Interface that provides a LayerDomain (domain ID + list of ManifestUnits)
+
+|`LayerDomain`
+|Groups related ManifestUnits with dependency information
+
+|`ManifestUnit`
+|Interface: generates K8s resources via `apply()`, optionally systemd via `synthesizeSystemdUnits()`
+
+|`AbstractManifestUnit`
+|Base class with context helper methods (`bootstrapIdentity()`, `componentVersions()`, etc.)
+
+|`cdk8s App`
+|Root construct managing output directory
+
+|`cdk8s Chart`
+|Container for K8s objects (synthesis boundary for YAML output)
+
+|`SystemdChart`
+|Container for systemd units (synthesis boundary for .service/.target files)
+
+|`ManifestUnitReferenceRegistry`
+|Allows Components to reference ApiObjects created by other units (cross-unit dependencies)
+|===
+
+=== C4 Component Diagram
+
+[mermaid]
+----
+graph TB
+    subgraph SeedBootstrap["seed-layer1 module"]
+        Bootstrap["IncusResourceBootstrap<br/><i>Entry point for bootstrap synthesis</i>"]
+    end
+
+    subgraph ManifestsModule["manifests module"]
+        Service["DefaultManifestSynthesisService<br/><i>Orchestrates synthesis</i>"]
+        Context["ManifestSynthesisContext<br/><i>ThreadLocal runtime config</i>"]
+        Registry["LayerDomainRegistry<br/><i>Registry of domains</i>"]
+        Registrar["LayerDomainRegistrar<br/><i>Provides domains + units</i>"]
+        Domain["LayerDomain<br/><i>Groups units by function</i>"]
+        Unit["ManifestUnit<br/><i>Generates Component + systemd</i>"]
+        Component["Component<br/><i>CDK8s Construct</i>"]
+        App["cdk8s App<br/><i>Root construct</i>"]
+        Chart["cdk8s Chart<br/><i>K8s objects container</i>"]
+        SystemdChart["SystemdChart<br/><i>systemd units container</i>"]
+    end
+
+    CDK8S["cdk8s Framework<br/><i>YAML synthesizer</i>"]
+    SYSTEMD["SystemdChart<br/><i>.service/.target writer</i>"]
+
+    Bootstrap -->|"synthesize(request)"| Service
+    Service -->|"bind(context)"| Context
+    Service -->|"new App(outdir)"| App
+    Service -->|"new Chart(app)"| Chart
+    Service -->|"new SystemdChart(app)"| SystemdChart
+    Service -->|"build from registrars"| Registry
+    Registry -->|"domain()"| Registrar
+    Registrar -->|"provides"| Domain
+    Domain -->|"contains"| Unit
+    Service -->|"apply(chart)"| Unit
+    Unit -->|"new Component(chart)"| Component
+    Service -->|"synthesizeSystemdUnits(systemdChart)"| Unit
+    Unit -->|"current()"| Context
+    Component -->|"new ApiObject(chart)"| Chart
+    Unit -->|"new SystemdService(systemdChart)"| SystemdChart
+    App -->|"synth()"| CDK8S
+    SystemdChart -->|"synthesize(outdir)"| SYSTEMD
+    CDK8S -->|"manifests.k8s.yaml"| Service
+    SYSTEMD -->|"*.service, *.target"| Service
+
+    style CDK8S fill:#e1f5ff,stroke:#0066cc
+    style SYSTEMD fill:#e1f5ff,stroke:#0066cc
+    style Bootstrap fill:#fff4e6,stroke:#ff9900
+    style Service fill:#fff4e6,stroke:#ff9900
+    style Context fill:#ccffcc,stroke:#00cc66
+    style Registry fill:#fff4e6,stroke:#ff9900
+    style Registrar fill:#fff4e6,stroke:#ff9900
+    style Domain fill:#fff4e6,stroke:#ff9900
+    style Unit fill:#fff4e6,stroke:#ff9900
+    style Component fill:#87CEEB,stroke:#0066cc
+    style App fill:#e1f5ff,stroke:#0066cc
+    style Chart fill:#e1f5ff,stroke:#0066cc
+    style SystemdChart fill:#e1f5ff,stroke:#0066cc
+----
+
+**Legend:**
+
+* Orange: Internal rke2lab orchestration components
+* Green: ThreadLocal context (scoped to synthesis)
+* Light Blue: CDK8s Constructs (Components)
+* Bright Blue: CDK8s framework components
+
+**Key Relationships:**
+
+1. **Entry**: `IncusResourceBootstrap` creates request and calls synthesis service
+2. **Context Binding**: Service binds context to ThreadLocal for synthesis duration
+3. **CDK8s Setup**: Service creates App + Chart + SystemdChart
+4. **Domain Registry**: Service builds registry from all LayerDomainRegistrars
+5. **K8s Synthesis**: Service invokes each unit's `apply(chart)` method
+6. **Component Instantiation**: ManifestUnit creates Component in apply()
+7. **Systemd Synthesis**: Service invokes each unit's `synthesizeSystemdUnits()`
+8. **Context Access**: Units and Components read runtime config via `ManifestSynthesisContext.current()`
+9. **Dual Output**: cdk8s emits YAML, SystemdChart emits .service/.target files
+
+=== Synthesis Flow Sequence
+
+[mermaid]
+----
+sequenceDiagram
+    participant Op as Operator
+    participant Boot as IncusResourceBootstrap
+    participant Svc as DefaultManifestSynthesisService
+    participant Ctx as ManifestSynthesisContext
+    participant Reg as LayerDomainRegistry
+    participant Unit as ManifestUnit
+    participant Comp as Component
+    participant Chart as cdk8s Chart
+    participant SysChart as SystemdChart
+    participant App as cdk8s App
+
+    Op->>Boot: synthesizeAndExplodeManifests()
+    Boot->>Svc: synthesize(request)
+
+    Note over Svc,Ctx: Bind runtime config to ThreadLocal
+    Svc->>Ctx: bind(context)
+    activate Ctx
+
+    Note over Svc,App: Create cdk8s infrastructure
+    Svc->>App: new App(outdir)
+    Svc->>Chart: new Chart(app)
+    Svc->>SysChart: new SystemdChart(app)
+
+    Note over Svc,Reg: Build domain registry
+    Svc->>Reg: build from LayerDomainRegistrars
+    Reg-->>Svc: domain registry
+
+    Note over Svc,Reg: Apply policy filters
+    Svc->>Reg: applyPolicy(request)
+    Reg-->>Svc: filtered domains
+
+    Note over Svc,Unit: K8s synthesis loop
+    loop For each ManifestUnit
+        Svc->>Unit: apply(chart)
+
+        Note over Unit,Comp: Instantiate Component
+        Unit->>Comp: new Component(chart, id)
+
+        Note over Comp,Ctx: Read runtime config
+        Comp->>Ctx: current().bootstrapIdentity()
+        Ctx-->>Comp: cluster config
+
+        Note over Comp,Chart: Create K8s objects
+        Comp->>Chart: new ApiObject(chart, props)
+        Chart-->>Chart: register in construct tree
+    end
+
+    Note over Svc,Unit: Systemd synthesis loop
+    loop For each ManifestUnit
+        Svc->>Unit: synthesizeSystemdUnits(systemdChart, context)
+
+        Note over Unit,SysChart: Create systemd units
+        Unit->>SysChart: new SystemdService(systemdChart, props)
+        SysChart-->>SysChart: register in construct tree
+    end
+
+    Note over Svc,App: Synthesize K8s YAML
+    Svc->>App: synth()
+    App->>Chart: walk construct tree
+    Chart-->>App: K8s objects
+    App->>App: serialize to YAML
+    App-->>Svc: manifests.k8s.yaml written
+
+    Note over Svc,SysChart: Synthesize systemd units
+    Svc->>SysChart: synthesize(outdir)
+    SysChart->>SysChart: walk construct tree
+    SysChart->>SysChart: write .service/.target files
+    SysChart-->>Svc: unit files written
+
+    Note over Svc: Post-process YAML
+    Svc->>Svc: enforceLiteralBlockStyle()
+    Svc->>Svc: move to final location
+
+    deactivate Ctx
+    Svc-->>Boot: ManifestSynthesisResult
+    Boot-->>Op: success
+----
+
+=== Component Details
+
+==== Entry Point: ManifestSynthesisRequest
+
+Built in `seed-layer1/IncusResourceBootstrap.synthesizeAndExplodeManifests()`, contains:
+
+[cols="2,4"]
+|===
+|Field |Description
+
+|`floxDebugPolicy`
+|Per-domain debug toggles for development
+
+|`bootstrapIdentity`
+|Cluster name, ID, token, node identity
+
+|`networkTopology`
+|CIDRs, interface names, gateway addresses
+
+|`componentVersions`
+|Version pins for all bootstrap components
+
+|`manifestDomainPolicy`
+|Which domains to enable/disable
+
+|`synthOutdir`
+|Temporary synthesis directory
+
+|`synthManifestFile`
+|Final manifest file path
+|===
+
+==== Orchestrator: DefaultManifestSynthesisService
+
+Central orchestration logic:
+
+[source,java]
+----
+public ManifestSynthesisResult synthesize(ManifestSynthesisRequest request) {
+    // 1. Build context from request
+    final ManifestSynthesisContext context = ManifestSynthesisContext.of(
+        request.floxDebugPolicy(),
+        request.bootstrapIdentity(),
+        request.networkTopology(),
+        request.componentVersions());
+
+    // 2. Bind context to ThreadLocal for unit access
+    try (var ignored = ManifestSynthesisContext.bind(context)) {
+
+        // 3. Create cdk8s App + Chart + SystemdChart
+        final App app = new App(AppProps.builder().outdir(synthOutdir.toString()).build());
+        final Chart chart = new Chart(app, "manifests");
+        final SystemdChart systemdChart = new SystemdChart(app, "systemd");
+
+        // 4. Build domain registry from LayerDomainRegistrars
+        final LayerDomainRegistry registry = buildDomainRegistry();
+
+        // 5. Apply policy to filter domains
+        final LayerDomainRegistry filteredRegistry = applyPolicy(request, registry);
+
+        // 6. For each ManifestUnit: call apply(chart)
+        for (ManifestUnit unit : filteredRegistry.manifestUnits()) {
+            unit.apply(chart);  // ← ManifestUnit instantiates Component here
+        }
+
+        // 7. For each ManifestUnit: call synthesizeSystemdUnits(systemdChart)
+        for (ManifestUnit unit : filteredRegistry.manifestUnits()) {
+            unit.synthesizeSystemdUnits(systemdChart, systemdContext);
+        }
+
+        // 8. Synthesize YAML via cdk8s
+        app.synth();  // Writes to synthOutdir/manifests.k8s.yaml
+
+        // 9. Synthesize systemd units
+        systemdChart.synthesize(synthOutdir);  // Writes *.service, *.target
+
+        // 10. Post-process (enforce literal block style for ConfigMap scripts)
+        enforceLiteralBlockStyleForConfigMapScripts(synthesizedFile);
+
+        // 11. Move to final location
+        Files.move(synthesizedFile, synthManifestFile);
+    }
+}
+----
+
+==== Runtime Configuration: ManifestSynthesisContext
+
+Thread-local context for accessing runtime configuration.
+
+**Pattern**: Published by synthesizer, consumed by manifest units and components.
+
+[source,java]
+----
+// Synthesizer binds context
+try (var scope = ManifestSynthesisContext.bind(context)) {
+    // ... synthesis happens here ...
+}
+
+// Components read context
+class MyComponent extends Construct {
+    public MyComponent(Construct scope, String id) {
+        super(scope, id);
+        String clusterName = ManifestSynthesisContext.current()
+            .bootstrapIdentity()
+            .clusterName();
+        // ... create K8s objects ...
+    }
+}
+
+// ManifestUnits read context via helpers
+class MyManifestUnit extends AbstractManifestUnit {
+    @Override
+    public void apply(Chart chart) {
+        String version = componentVersions().cilium();  // Helper method
+        new MyComponent(chart, "my-component");
+    }
+}
+----
+
+**Context Slices** (orthogonal concerns as separate records):
+
+[cols="2,4"]
+|===
+|Slice |Description
+
+|`FloxDebugPolicy`
+|Per-domain debug toggle for flox NRI plugin development
+
+|`BootstrapIdentity`
+|Cluster + node identity (clusterName, clusterId, clusterToken, ...)
+
+|`NetworkTopology`
+|CIDRs, interface names, gateway addresses
+
+|`ComponentVersions`
+|Version pins for all components (cilium, flux, cluster-api, etc.)
+|===
+
+**Helper Methods in AbstractManifestUnit:**
+
+[source,java]
+----
+protected final BootstrapIdentity bootstrapIdentity() {
+    return ManifestSynthesisContext.current().bootstrapIdentity();
+}
+
+protected final ComponentVersions componentVersions() {
+    return ManifestSynthesisContext.current().componentVersions();
+}
+
+protected final NetworkTopology networkTopology() {
+    return ManifestSynthesisContext.current().networkTopology();
+}
+
+protected final FloxDebugPolicy floxDebugPolicy() {
+    return ManifestSynthesisContext.current().floxDebugPolicy();
+}
+----
+
+==== Domain Organization: LayerDomainRegistrar → LayerDomain → ManifestUnit
+
+**LayerDomainRegistrar** (interface):
+
+[source,java]
+----
+public interface LayerDomainRegistrar {
+    LayerDomain domain();
+}
+----
+
+Provides a `LayerDomain` with its manifest units. Implementations typically live in `DefaultManifestSynthesisService` as private static classes or separate classes in domain packages.
+
+**LayerDomain** (class):
+
+Groups related ManifestUnits with dependency information:
+
+[source,java]
+----
+public class LayerDomain {
+  private final String domainId;                      // e.g., "networking", "mesh"
+  private final List<String> dependsOnDomainIds;      // Domain dependencies
+  private final List<? extends ManifestUnit> layers;  // Historical name, actually units
+
+  // Synthesizes systemd units for this domain
+  public void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
+    for (ManifestUnit unit : layers) {
+      unit.synthesizeSystemdUnits(systemdChart, context);
+    }
+  }
+}
+----
+
+**ManifestUnit** (interface):
+
+[source,java]
+----
+public interface ManifestUnit {
+    String manifestUnitId();
+    List<String> dependsOnManifestUnitIds();
+
+    // K8s manifest synthesis - instantiates Component
+    void apply(Chart chart);
+
+    // Systemd unit synthesis (optional, default: no units)
+    default void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
+        // Override to emit systemd installer services
+    }
+}
+----
+
+=== CDK8s Construct Tree Pattern
+
+**How cdk8s tracks objects without explicit references:**
+
+1. **Object Creation**: When you create `new ApiObject(chart, "id", props)`
+   * `ApiObject` extends `Construct`
+   * Construct constructor registers itself in parent's children list
+   * `chart` is the parent, so chart tracks all created ApiObjects
+
+2. **Synthesis**: When you call `app.synth()`
+   * App walks the tree starting from root
+   * Visits each Chart
+   * Chart visits each child Construct (Components)
+   * Components visit each child Construct (ApiObjects)
+   * Serializes each ApiObject to YAML
+   * Writes single YAML file with all documents
+
+3. **No Reference Storage Needed**
+   * ManifestUnits just create Components in the chart
+   * Components just create ApiObjects in themselves
+   * cdk8s framework handles collection + serialization
+   * One-way data flow: create → register → synthesize
+
+This is why ManifestUnits and Components can be statically instantiated and just call `new ApiObject(this, ...)` without storing references - the construct tree tracks everything via parent-child relationships.
+
+== Chart Pattern
+
+**Chart** is a CDK8s synthesis boundary that produces a separate output file.
+
+[IMPORTANT]
+====
+**Critical Rule**: All Component classes MUST extend `Construct`, NEVER `Chart`.
+
+The only Charts in the codebase should be:
+
+* `Chart(app, "manifests")` in `DefaultManifestSynthesisService`
+* `SystemdChart(app, "systemd")` in `DefaultManifestSynthesisService`
+* Optional custom Charts in test code or deployment-layer-specific synthesis
+====
+
+=== Single-Chart Architecture
+
+RKE2Lab uses a **single-Chart model** where all domains feed into one consolidated Chart, then an exploder splits the output by annotations.
+
+**Why Single-Chart?**
+
+[cols="2,3,3"]
+|===
+|Aspect |Single-Chart Model |Chart-per-Domain Alternative
+
+|**Cross-domain deps**
+|Natural - all in same construct tree
+|Requires CDK8s export/import pattern
+
+|**Ordering**
+|ManifestUnit dependency graph ensures correct order
+|Would need explicit Chart ordering
+
+|**Flexibility**
+|Annotations create any directory structure
+|One Chart = one file = one directory
+
+|**Output**
+|Single `manifests.k8s.yaml` - easy to checksum
+|11 separate files need consolidation
+
+|**Simplicity**
+|One synthesis → one explode → domain dirs
+|Synthesis → per-Chart processing → merge
+|===
+
+**Current reality:**
+
+* Atomic deployment (single host asset bundle)
+* Repo-level versioning (git commit hash in `MANIFEST.yaml`)
+* Synthesis is fast (~1-2s for all domains)
+* Cross-domain dependencies exist (e.g., namespace must exist before HelmChart)
+
+=== Example: Layer1Chart (Hypothetical)
+
+While the current codebase uses LayerDomain for aggregation, a Chart could aggregate domains for a specific deployment layer:
+
+[source,java]
+----
+public class Layer1Chart extends Chart {
+  public Layer1Chart(Construct scope, String id, ManifestSynthesisRequest request) {
+    super(scope, id, ChartProps.builder().build());
+
+    // Instantiate Components directly
+    new CiliumConfigComponent(this, "cilium-config");
+    new FluxOperatorComponent(this, "flux-operator");
+    new ClusterApiOperatorComponent(this, "cluster-api-operator");
+  }
+}
+----
+
+**Note**: The current architecture doesn't use this pattern - it uses a single Chart with all domains synthesized into it.
+
+=== Anti-Pattern: Component Extends Chart
+
+[source,java]
+----
+// ❌ WRONG - Do not do this
+public final class CiliumConfigComponent extends Chart {  // ← WRONG base class
+  public CiliumConfigComponent(Construct scope, String id) {
+    super(scope, id);
+    // ...
+  }
+}
+----
+
+**Why this fails:**
+
+* Creates a nested Chart in the construct tree
+* CDK8s synthesizes it to a separate `.k8s.yaml` file with numeric prefix
+* Exploder's pattern matching doesn't find it (only looks for `*-manifests.k8s.yaml`)
+* Resources never reach `rke2-manifests.d/`
+* Systemd services fail with `ConditionPathExists=/srv/host/rke2-manifests.d/<domain>`
+
+**Correct pattern:**
+
+[source,java]
+----
+// ✅ CORRECT - Component extends Construct
+public final class CiliumConfigComponent extends Construct {  // ← CORRECT
+  public CiliumConfigComponent(Construct scope, String id) {
+    super(scope, id);
+    // ...
+  }
+}
+----
+
+== Systemd Unit Generation
+
+ManifestUnits can create systemd units using the `cdk8s-systemd` extension.
+
+=== Unified Synthesis Pattern
+
+A single ManifestUnit emits BOTH K8s manifests AND the systemd service that installs them:
+
+[source,java]
+----
+public class CiliumConfigManifestUnit extends AbstractManifestUnit {
+
+    @Override
+    public void apply(Chart chart) {
+        // Emit K8s manifests (HelmChartConfig, ConfigMap)
+        new CiliumConfigComponent(chart, "layer-networking-cilium-config");
+    }
+
+    @Override
+    public void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
+        // Emit systemd installer for those manifests
+        new SystemdService(systemdChart, "rke2lab-cilium-config-manifests")
+            .description("Install RKE2Lab Cilium config manifests before server start")
+            .requiresMountsFor("/srv/host/systemd-units.d", "/srv/host")
+            .after("local-fs.target", "rke2lab-install.service")
+            .before("rke2-server.service")  // Special: runs BEFORE server
+            .conditionPathExists(
+                "/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh",
+                "/srv/host/rke2-manifests.d")
+            .type(ServiceType.ONESHOT)
+            .execStart("/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh networking/cilium-config")
+            .remainAfterExit(true)
+            .standardOutput(StandardStream.JOURNAL)
+            .standardError(StandardStream.JOURNAL)
+            .partOf(context.rke2labTarget().getUnitFileName())
+            .wantedBy(context.rke2labTarget().getUnitFileName());
+    }
+}
+----
+
+**Result**: One domain definition produces BOTH:
+
+* The K8s YAML to install (via Component)
+* The systemd unit that installs it (via ManifestUnit)
+
+=== cdk8s-systemd Architecture
+
+[source,text]
+----
+software.constructs.Construct (AWS CDK core)
+  ↓
+SystemdChart extends Construct (container)
+  ↓
+SystemdUnit extends Construct (abstract base)
+  ├─ SystemdService (adds [Service] section)
+  └─ SystemdTarget (grouping units)
+----
+
+**Core Classes:**
+
+[cols="2,4"]
+|===
+|Class |Purpose
+
+|`SystemdChart`
+|Container for systemd units (like `org.cdk8s.Chart` for K8s)
+
+|`SystemdUnit`
+|Abstract base with [Unit] and [Install] section builders
+
+|`SystemdService`
+|Service unit with [Service] section, type-safe enums
+
+|`SystemdTarget`
+|Target unit (grouping, no execution)
+|===
+
+**Type-Safe API:**
+
+[source,java]
+----
+new SystemdService(systemdChart, "my-installer")
+    .description("Install manifests")
+    .type(ServiceType.ONESHOT)              // Service types
+    .execStart("/path/to/install.sh")
+    .after("network.target")                // Ordering
+    .requires("other.service")              // Dependencies
+    .conditionPathExists("/srv/host/data")  // Conditions
+    .standardOutput(StandardStream.JOURNAL) // Streams
+    .restart(RestartPolicy.ON_FAILURE)      // Restart
+    .wantedBy("multi-user.target");         // Install
+----
+
+== Data Flow Summary
+
+```
+IncusResourceBootstrap (seed-layer1)
+  ↓ creates ManifestSynthesisRequest with runtime config
+DefaultManifestSynthesisService
+  ↓ binds ManifestSynthesisContext to ThreadLocal
+  ↓ creates cdk8s App + Chart + SystemdChart
+  ↓ builds LayerDomainRegistry from LayerDomainRegistrars
+  ↓   ↳ each registrar provides LayerDomain with ManifestUnits
+  ↓ applies ManifestDomainPolicy to filter domains
+  ↓ for each ManifestUnit:
+  ↓   unit.apply(chart)
+  ↓     ↳ unit instantiates new Component(chart, id)
+  ↓     ↳ component reads ManifestSynthesisContext.current()
+  ↓     ↳ component creates new ApiObject(this, ...)
+  ↓       ↳ cdk8s registers object in construct tree
+  ↓ for each ManifestUnit:
+  ↓   unit.synthesizeSystemdUnits(systemdChart, context)
+  ↓     ↳ unit creates new SystemdService(systemdChart, ...)
+  ↓       ↳ SystemdChart registers unit in construct tree
+  ↓ app.synth()
+  ↓   ↳ cdk8s walks construct tree, emits manifests.k8s.yaml
+  ↓ systemdChart.synthesize(outdir)
+  ↓   ↳ SystemdChart walks construct tree, emits *.service/*.target files
+  ↓ post-process YAML (enforce literal block style for ConfigMap scripts)
+  ↓ move to final location
+ManifestSynthesisResult
+```
+
+== Registered Domains
+
+Current domains (as of Phase 1.5 refactoring):
+
+[cols="2,4"]
+|===
+|Domain ID |Description
+
+|`networking`
+|Network layer (Cilium CNI, KDns, Envoy Gateway)
+
+|`mesh`
+|Service mesh and VPN (Tailscale, Headscale, Headplane)
+
+|`storage`
+|Persistent storage (OpenEBS ZFS)
+
+|`platform`
+|Platform services (Replicator, CertManager)
+
+|`cicd`
+|CI/CD pipeline (Tekton Pipelines, Tekton Dashboard)
+
+|`runtime`
+|Runtime configuration (RKE2 config, environment, flox NRI plugin)
+
+|`gitops`
+|GitOps operators (Flux, vCluster) - merged from old `bootstrap` domain
+
+|`clusterapi`
+|Cluster API operators (CAPI, CAPIN, CAPRKE2)
+
+|`cluster`
+|Core cluster resources (namespace management)
+
+|`ha`
+|High availability resources
+|===
+
+**Note**: The `bootstrap` domain no longer exists - operators were moved to `gitops` and `clusterapi` domains.
+
+== Extending the System
+
+=== Adding a New Component + ManifestUnit
+
+**Step 1: Create the Component** (CDK8s Construct)
+
+[source,java]
+----
+// manifests/components/storage/MinioComponent.java
+package io.nxmatic.rk2lab.manifests.components.storage;
+
+import io.nxmatic.rk2lab.manifests.profiles.PackageMetadataProfile;
+import org.cdk8s.ApiObject;
+import software.constructs.Construct;
+
+public final class MinioComponent extends Construct {
+
+  private final PackageMetadataProfile packageProfile =
+      new PackageMetadataProfile("storage", "minio");
+
+  public MinioComponent(Construct scope, String id) {
+    super(scope, id);
+
+    // Create K8s resources
+    ApiObject namespace = new ApiObject(this, "namespace-minio", ...);
+    ApiObject helmChart = new ApiObject(this, "helmchart-minio", ...);
+    // ... more resources
+  }
+}
+----
+
+**Step 2: Create the ManifestUnit** (rke2lab wrapper)
+
+[source,java]
+----
+// manifests/components/storage/MinioManifestUnit.java
+package io.nxmatic.rk2lab.manifests.components.storage;
+
+import io.nxmatic.rk2lab.manifests.AbstractManifestUnit;
+import io.nxmatic.rk2lab.manifests.ManifestDomainCatalog;
+import java.util.List;
+import org.cdk8s.Chart;
+
+public final class MinioManifestUnit extends AbstractManifestUnit {
+
+  public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.STORAGE + "/minio";
+
+  public MinioManifestUnit() {
+    super(MANIFEST_UNIT_ID, List.of(/* dependencies */));
+  }
+
+  @Override
+  public void apply(Chart chart) {
+    new MinioComponent(chart, "layer-storage-minio");
+  }
+
+  // Optional: systemd installer service
+  @Override
+  public void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
+    new SystemdService(systemdChart, "rke2lab-minio-manifests")
+        .execStart("/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh storage/minio")
+        ...;
+  }
+}
+----
+
+**Step 3: Register in LayerDomainRegistrar**
+
+Add to the appropriate domain registrar in `DefaultManifestSynthesisService`:
+
+[source,java]
+----
+private static class StorageDomainRegistrar implements LayerDomainRegistrar {
+  @Override
+  public LayerDomain domain() {
+    return new LayerDomain(
+        ManifestDomainCatalog.STORAGE,
+        List.of(),  // Dependencies
+        List.of(
+            new OpenebsZfsManifestUnit(),
+            new MinioManifestUnit()  // ← Add here
+        )
+    );
+  }
+}
+----
+
+=== Extending ManifestSynthesisContext
+
+To add new runtime configuration, choose one of three patterns:
+
+**Option 1: Extend Existing Slice** (if data fits an existing concern)
+
+[source,java]
+----
+public record BootstrapIdentity(
+    String clusterName,
+    String clusterId,
+    String incusRemoteAddress  // NEW
+) { }
+----
+
+**Option 2: Add New Orthogonal Slice** (if data is a distinct concern)
+
+[source,java]
+----
+// 1. Create new record
+public record IncusConfig(String remoteAddress, Path configDir) { }
+
+// 2. Add field to ManifestSynthesisContext
+private final IncusConfig incusConfig;
+public IncusConfig incusConfig() { return incusConfig; }
+
+// 3. Update ManifestSynthesisContext.of() factory
+public static ManifestSynthesisContext of(..., IncusConfig incusConfig) { ... }
+
+// 4. Add helper to AbstractManifestUnit
+protected final IncusConfig incusConfig() {
+    return ManifestSynthesisContext.current().incusConfig();
+}
+----
+
+**Option 3: Read from Filesystem/Environment** (if data is truly static)
+
+[source,java]
+----
+@Override
+public void apply(Chart chart) {
+    Path configDir = Path.of(System.getProperty("user.home"), ".config", "incus");
+    // ...
+}
+----
+
+== Troubleshooting
+
+=== Domain Directory Missing in rke2-manifests.d/
+
+**Symptom:**
+
+```bash
+$ tree .local.d/bioskop/master/host.preview/rke2-manifests.d/
+...
+├── networking
+├── gitops
+# storage/ is missing!
+```
+
+**Check 1: Does Component extend Construct (not Chart)?**
+
+```bash
+$ grep "extends Chart" manifests/src/main/java/io/nxmatic/rk2lab/manifests/components/storage/*.java
+# Should return nothing (or only test files)
+```
+
+**Check 2: Are annotations present?**
+
+Components must stamp `PackageMetadataProfile` annotations on all resources:
+
+[source,java]
+----
+private final PackageMetadataProfile packageProfile =
+    new PackageMetadataProfile("storage", "minio");
+
+.annotations(packageProfile.packageAnnotations("|Namespace||minio"))
+----
+
+**Check 3: Is domain enabled in policy?**
+
+```bash
+$ cat .local.d/bioskop/master/host/.rke2lab-manifest.yaml | grep storage
+storage: true  # ← Should be true
+```
+
+=== Systemd Service Skipped with ConditionPathExists
+
+**Symptom:**
+
+```bash
+$ journalctl -u rke2lab-storage-manifests.service
+Condition check failed: ConditionPathExists=/srv/host/rke2-manifests.d/storage
+```
+
+**Root cause**: The manifests weren't exploded to that directory (see previous section).
+
+=== Multiple .k8s.yaml Files in synthOutdir
+
+**Symptom:**
+
+```bash
+$ ls .local.d/bioskop/master/host.preview/manifests/
+1-manifests.k8s.yaml
+2-layer-storage.k8s.yaml  # ← Extra files indicate nested Charts
+```
+
+**Diagnosis**: Some Component incorrectly extends `Chart` instead of `Construct`.
+
+**Fix**: Change all Component classes to extend `Construct`.
+
+== Related Documentation
+
+* link:manifest-nomenclature.adoc[Manifest Nomenclature Guide] - Original terminology clarification (superseded by this doc)
+* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - Original synthesis flow doc (superseded by this doc)
+* link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] - Single source of truth for domain IDs
+* link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-based filtering
+* link:manifest-apply-flow.adoc[Manifest Apply Flow] - How manifests flow from synthesis to cluster
+* link:cdk8s-chart-vs-construct-pattern.adoc[CDK8s Chart vs Construct Pattern] - When to use Chart vs Construct
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - How to access cluster/infrastructure identity
+* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow patterns
