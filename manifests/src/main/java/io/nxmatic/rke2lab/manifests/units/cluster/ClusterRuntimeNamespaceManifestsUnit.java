@@ -40,7 +40,8 @@ public final class ClusterRuntimeNamespaceManifestsUnit extends AbstractManifest
                         .name(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name())
                         .annotations(
                             packageProfile.packageAnnotations(
-                                "|Namespace|default|" + ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name()))
+                                "|Namespace|default|"
+                                    + ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name()))
                         .labels(Map.of("rke2lab.nxmatic.io/shared-namespace", "true"))
                         .build())
                 .build());

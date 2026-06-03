@@ -36,7 +36,8 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final String floxImage = ManifestSynthesisContext.current().floxDebugPolicy().prodImage();
 
-    ApiObject namespace = resolveNamespace(scope);
+    ApiObject namespace = context.registry().require(MeshRefs.MESH_SYSTEM_NAMESPACE);
+
     ApiObject saClient = createServiceAccount(scope, "headscale-client", namespace);
     ApiObject saBootstrap = createServiceAccount(scope, "headscale-bootstrap", namespace);
     ApiObject saGateway = createServiceAccount(scope, "headscale-gateway", namespace);
@@ -49,8 +50,12 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
 
     ApiObject cmFloxEnv = createConfigMapFloxEnv(scope, namespace);
     ApiObject cmHeadscaleConfig = createConfigMapHeadscaleConfig(scope, namespace);
+    context.registry().publish(MeshRefs.HEADSCALE_CONFIG_CONFIGMAP, cmHeadscaleConfig);
+
     ApiObject cmConfigInitScript = createConfigMapConfigInitScript(scope, namespace);
     ApiObject cmHeadscaleEnv = createConfigMapHeadscaleEnv(scope, namespace);
+    context.registry().publish(MeshRefs.HEADSCALE_ENV_CONFIGMAP, cmHeadscaleEnv);
+
     ApiObject cmBootstrapScript = createConfigMapBootstrapScript(scope, namespace);
     ApiObject cmClientScripts = createConfigMapClientScripts(scope, namespace);
     ApiObject cmAcl = createConfigMapAcl(scope, namespace);
@@ -101,23 +106,6 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
         cmClientScripts,
         bootstrapJob,
         serviceHeadscale);
-  }
-
-  private ApiObject resolveNamespace(final Construct scope) {
-    return new ApiObject(
-        scope,
-        "namespace-" + MeshRefs.MESH_SYSTEM_NAMESPACE.name(),
-        ApiObjectProps.builder()
-            .apiVersion("v1")
-            .kind("Namespace")
-            .metadata(
-                ApiObjectMetadata.builder()
-                    .name(HEADSCALE_NAMESPACE)
-                    .annotations(
-                        packageProfile.packageAnnotations(
-                            "|Namespace|default|${headscale-namespace}"))
-                    .build())
-            .build());
   }
 
   private ApiObject createServiceAccount(
