@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.manifests.HostAssetDeliveryPolicy;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import java.util.List;
+import software.constructs.Construct;
 
 /**
  * Disabled-by-default placeholder preserving the runtime/systemd-libexec host-asset use case.
@@ -25,8 +26,9 @@ public final class RuntimeSystemdLibexecPlaceholderManifestsUnit extends Abstrac
   private static final HostAssetDeliveryPolicy PLACEHOLDER_POLICY =
       HostAssetDeliveryPolicy.systemdLibexecPlaceholder();
 
-  public RuntimeSystemdLibexecPlaceholderManifestsUnit() {
-    super(MANIFEST_UNIT_ID, List.of());
+  public RuntimeSystemdLibexecPlaceholderManifestsUnit(final Construct scope, final String id) {
+    super(scope, id, MANIFEST_UNIT_ID, List.of());
+    // Placeholder unit: no manifests created
   }
 
   @Override

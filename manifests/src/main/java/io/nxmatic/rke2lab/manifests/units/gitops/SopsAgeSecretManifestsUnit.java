@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.manifests.layers.gitops;
+package io.nxmatic.rke2lab.manifests.units.gitops;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
@@ -12,8 +12,8 @@ import java.util.Map;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
-import org.cdk8s.Chart;
 import org.cdk8s.JsonPatch;
+import software.constructs.Construct;
 
 /**
  * Manifest unit that creates the SOPS age key Secret for Flux decryption.
@@ -54,24 +54,20 @@ public final class SopsAgeSecretManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("gitops", "sops-age");
 
-  public SopsAgeSecretManifestsUnit() {
-    super(MANIFEST_UNIT_ID, List.of());
-  }
-
-  @Override
-  public void apply(final Chart chart) {
+  public SopsAgeSecretManifestsUnit(final Construct scope, final String id) {
+    super(scope, id, MANIFEST_UNIT_ID, List.of());
     try {
       final String ageKey = readAgeKeyFromSSH();
-      createSopsAgeSecret(chart, ageKey);
+      createSopsAgeSecret(this, ageKey);
     } catch (Exception ex) {
       throw new IllegalStateException("Failed to materialize SOPS age secret", ex);
     }
   }
 
-  private void createSopsAgeSecret(Chart chart, String ageKey) {
+  private void createSopsAgeSecret(Construct scope, String ageKey) {
     ApiObject secret =
         new ApiObject(
-            chart,
+            scope,
             "secret-sops-age",
             ApiObjectProps.builder()
                 .apiVersion("v1")

@@ -21,7 +21,10 @@ public final class FluxOperatorManifestsUnit extends AbstractManifestsUnit {
 
   public FluxOperatorManifestsUnit(final Construct scope, final String id) {
     super(scope, id, MANIFEST_UNIT_ID, List.of());
+    createManifests();
+  }
 
+  private void createManifests() {
     final String version = componentVersions().fluxOperator();
 
     // flux-system namespace

@@ -8,8 +8,8 @@ import java.util.Map;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
-import org.cdk8s.Chart;
 import org.cdk8s.JsonPatch;
+import software.constructs.Construct;
 
 /**
  * Manifest unit that creates the Flux GitRepository and root Kustomization for GitOps bootstrap.
@@ -38,22 +38,17 @@ public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("gitops", "flux-root");
 
-  public FluxRootManifestsUnit() {
-    super(MANIFEST_UNIT_ID, List.of(FluxInstanceManifestsUnit.MANIFEST_UNIT_ID));
-  }
-
-  @Override
-  public void apply(final Chart chart) {
+  public FluxRootManifestsUnit(final Construct scope, final String id) {
+    super(scope, id, MANIFEST_UNIT_ID, List.of(FluxInstanceManifestsUnit.MANIFEST_UNIT_ID));
     final String clusterName = bootstrapIdentity().clusterName();
-
-    createGitRepository(chart, clusterName);
-    createRootKustomization(chart, clusterName);
+    createGitRepository(this, clusterName);
+    createRootKustomization(this, clusterName);
   }
 
-  private void createGitRepository(Chart chart, String clusterName) {
+  private void createGitRepository(Construct scope, String clusterName) {
     ApiObject gitRepo =
         new ApiObject(
-            chart,
+            scope,
             "gitrepository-rke2lab",
             ApiObjectProps.builder()
                 .apiVersion("source.toolkit.fluxcd.io/v1")
@@ -78,10 +73,10 @@ public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
                 "url", "https://github.com/nxmatic/rke2lab.git")));
   }
 
-  private void createRootKustomization(Chart chart, String clusterName) {
+  private void createRootKustomization(Construct scope, String clusterName) {
     ApiObject kustomization =
         new ApiObject(
-            chart,
+            scope,
             "kustomization-cluster",
             ApiObjectProps.builder()
                 .apiVersion("kustomize.toolkit.fluxcd.io/v1")

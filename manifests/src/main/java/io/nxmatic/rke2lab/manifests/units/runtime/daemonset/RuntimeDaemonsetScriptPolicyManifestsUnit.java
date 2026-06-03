@@ -4,9 +4,6 @@ package io.nxmatic.rke2lab.manifests.units.runtime.daemonset;
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
-import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.nxmatic.rke2lab.manifests.registry.ManifestsUnitReferenceRegistry;
-import io.nxmatic.rke2lab.manifests.units.cluster.ClusterRefs;
 import io.nxmatic.rke2lab.manifests.units.cluster.ClusterRuntimeNamespaceManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.runtime.RuntimeRefs;
 import java.util.List;
@@ -29,8 +26,6 @@ public final class RuntimeDaemonsetScriptPolicyManifestsUnit extends AbstractMan
 
   private final ManifestAnnotations manifestAnnotations = new ManifestAnnotations();
 
-  private final ManifestsUnitReferenceRegistry registry;
-
   private final RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets;
 
   public RuntimeDaemonsetScriptPolicyManifestsUnit(final Construct scope, final String id) {
@@ -39,25 +34,6 @@ public final class RuntimeDaemonsetScriptPolicyManifestsUnit extends AbstractMan
         id,
         MANIFEST_UNIT_ID,
         List.of(ClusterRuntimeNamespaceManifestsUnit.MANIFEST_UNIT_ID));
-    this.registry = null;
-    this.runtimeDaemonsetScriptPolicyAssets = RuntimeDaemonsetScriptPolicyAssets.builder().build();
-    createScriptPolicyConfigMap();
-  }
-
-  @Override
-  public void apply(final ManifestsUnitContext context) {
-    new RuntimeDaemonsetScriptPolicyManifestsUnit(
-        context.chart(), "layer-runtime-daemonset", context.registry());
-  }
-
-  private RuntimeDaemonsetScriptPolicyManifestsUnit(
-      final Construct scope, final String id, final ManifestsUnitReferenceRegistry registry) {
-    super(
-        scope,
-        id,
-        MANIFEST_UNIT_ID,
-        List.of(ClusterRuntimeNamespaceManifestsUnit.MANIFEST_UNIT_ID));
-    this.registry = registry;
     this.runtimeDaemonsetScriptPolicyAssets = RuntimeDaemonsetScriptPolicyAssets.builder().build();
     createScriptPolicyConfigMap();
   }
@@ -78,11 +54,6 @@ public final class RuntimeDaemonsetScriptPolicyManifestsUnit extends AbstractMan
                             manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
                         .build())
                 .build());
-
-    if (registry != null) {
-      configMap.addDependency(registry.require(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE));
-      registry.publish(RuntimeRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP, configMap);
-    }
 
     configMap.addJsonPatch(
         JsonPatch.add("/data", runtimeDaemonsetScriptPolicyAssets.configMapData()));

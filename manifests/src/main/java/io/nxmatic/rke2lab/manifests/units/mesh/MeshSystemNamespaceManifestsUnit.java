@@ -2,7 +2,6 @@ package io.nxmatic.rke2lab.manifests.units.mesh;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
-import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -39,10 +38,5 @@ public final class MeshSystemNamespaceManifestsUnit extends AbstractManifestsUni
                     .labels(Map.of("rke2lab.nxmatic.io/shared-namespace", "true"))
                     .build())
             .build());
-  }
-
-  @Override
-  public void apply(final ManifestsUnitContext context) {
-    new MeshSystemNamespaceManifestsUnit(context.chart(), "layer-mesh-system-namespace");
   }
 }

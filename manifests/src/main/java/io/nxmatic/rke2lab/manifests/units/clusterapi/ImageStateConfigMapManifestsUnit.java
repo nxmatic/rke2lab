@@ -10,8 +10,8 @@ import java.util.Map;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
-import org.cdk8s.Chart;
 import org.cdk8s.JsonPatch;
+import software.constructs.Construct;
 
 /**
  * Manifest unit that creates the image-state ConfigMap for Stage A → Stage B handoff.
@@ -60,25 +60,10 @@ public final class ImageStateConfigMapManifestsUnit extends AbstractManifestsUni
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("cluster-api", "image-state");
 
-  private final String clusterName;
+  public ImageStateConfigMapManifestsUnit(final Construct scope, final String id) {
+    super(scope, id, MANIFEST_UNIT_ID, List.of());
 
-  public ImageStateConfigMapManifestsUnit() {
-    this(null);
-  }
-
-  /**
-   * Constructor for staged synthesis with explicit clusterName. Used when synthesizing outside the
-   * normal ManifestSynthesisContext flow.
-   */
-  public ImageStateConfigMapManifestsUnit(String clusterName) {
-    super(MANIFEST_UNIT_ID, List.of());
-    this.clusterName = clusterName;
-  }
-
-  @Override
-  public void apply(final Chart chart) {
-    final String effectiveClusterName =
-        clusterName != null ? clusterName : bootstrapIdentity().clusterName();
+    final String effectiveClusterName = bootstrapIdentity().clusterName();
 
     // Skip synthesis when running in ephemeral/test mode without real bootstrap identity
     if (BootstrapIdentity.UNKNOWN.equals(effectiveClusterName)) {
@@ -101,14 +86,14 @@ public final class ImageStateConfigMapManifestsUnit extends AbstractManifestsUni
             "incusProject", state.incusProject(),
             "incusRemoteAddress", state.incusRemoteAddress());
 
-    createImageStateConfigMap(chart, effectiveClusterName, data);
+    createImageStateConfigMap(scope, effectiveClusterName, data);
   }
 
   private void createImageStateConfigMap(
-      Chart chart, String clusterName, Map<String, String> imageState) {
+      Construct scope, String clusterName, Map<String, String> imageState) {
     ApiObject configMap =
         new ApiObject(
-            chart,
+            scope,
             "configmap-image-state",
             ApiObjectProps.builder()
                 .apiVersion("v1")

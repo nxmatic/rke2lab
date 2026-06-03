@@ -7,7 +7,6 @@ import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.ServiceType;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.StandardStream;
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
-import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -24,15 +23,11 @@ public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("networking", "cilium-config");
 
+  // Direct-use constructor with scope (creates manifests immediately)
   public CiliumConfigManifestsUnit(final Construct scope, final String id) {
     super(scope, id, MANIFEST_UNIT_ID, List.of());
     createHelmChartConfig();
     createClustermeshRemoteUsersConfigMap();
-  }
-
-  @Override
-  public void apply(final ManifestsUnitContext context) {
-    new CiliumConfigManifestsUnit(context.chart(), "layer-networking-cilium-config");
   }
 
   private void createClustermeshRemoteUsersConfigMap() {

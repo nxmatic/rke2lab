@@ -29,6 +29,7 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("runtime", "rke2-config");
 
+  // Direct-use constructor with scope (creates manifests immediately)
   public RuntimeRke2ConfigManifestsUnit(final Construct scope, final String id) {
     super(scope, id, MANIFEST_UNIT_ID, List.of());
 

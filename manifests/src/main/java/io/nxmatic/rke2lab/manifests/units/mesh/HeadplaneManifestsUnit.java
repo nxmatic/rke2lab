@@ -4,7 +4,6 @@ package io.nxmatic.rke2lab.manifests.units.mesh;
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
-import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.profiles.FloxShellSidecarProfile;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
@@ -44,11 +43,6 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
     this.floxImage = ManifestSynthesisContext.current().floxDebugPolicy().prodImage();
 
     buildResources();
-  }
-
-  @Override
-  public void apply(final ManifestsUnitContext context) {
-    new HeadplaneManifestsUnit(context.chart(), "layer-mesh-headplane", context.registry());
   }
 
   private HeadplaneManifestsUnit(

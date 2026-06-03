@@ -16,8 +16,8 @@ import java.util.regex.Pattern;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
-import org.cdk8s.Chart;
 import org.cdk8s.JsonPatch;
+import software.constructs.Construct;
 
 /**
  * Manifest unit that creates the Incus identity secret for Cluster API Provider Incus (CAPN).
@@ -49,12 +49,9 @@ public final class IncusIdentitySecretManifestsUnit extends AbstractManifestsUni
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("cluster-api", "incus-identity");
 
-  public IncusIdentitySecretManifestsUnit() {
-    super(MANIFEST_UNIT_ID, List.of());
-  }
+  public IncusIdentitySecretManifestsUnit(final Construct scope, final String id) {
+    super(scope, id, MANIFEST_UNIT_ID, List.of());
 
-  @Override
-  public void apply(final Chart chart) {
     final BootstrapIdentity identity = bootstrapIdentity();
     final String clusterName = identity.clusterName();
     final String incusRemoteName = identity.incusRemoteName();
@@ -75,14 +72,14 @@ public final class IncusIdentitySecretManifestsUnit extends AbstractManifestsUni
       final String serverAddress = encodeBase64(remoteAddress);
 
       createIncusIdentitySecret(
-          chart, clusterName, serverAddress, serverCert, clientCert, clientKey);
+          this, clusterName, serverAddress, serverCert, clientCert, clientKey);
     } catch (IOException ex) {
       throw new IllegalStateException("Failed to materialize Incus identity secret", ex);
     }
   }
 
   private void createIncusIdentitySecret(
-      Chart chart,
+      Construct scope,
       String clusterName,
       String serverAddress,
       String serverCert,
@@ -90,7 +87,7 @@ public final class IncusIdentitySecretManifestsUnit extends AbstractManifestsUni
       String clientKey) {
     ApiObject secret =
         new ApiObject(
-            chart,
+            scope,
             "secret-incus-identity",
             ApiObjectProps.builder()
                 .apiVersion("v1")

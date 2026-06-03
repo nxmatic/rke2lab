@@ -19,7 +19,7 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("cluster-api", "cluster-api-operator");
 
-  public ClusterApiOperatorManifestsUnit(Construct scope, String id) {
+  public ClusterApiOperatorManifestsUnit(final Construct scope, final String id) {
     super(scope, id, MANIFEST_UNIT_ID, List.of());
 
     final String operatorVersion = componentVersions().clusterApiOperator();

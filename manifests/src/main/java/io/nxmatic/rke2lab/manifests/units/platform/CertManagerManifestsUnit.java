@@ -20,7 +20,10 @@ public final class CertManagerManifestsUnit extends AbstractManifestsUnit {
 
   public CertManagerManifestsUnit(final Construct scope, final String id) {
     super(scope, id, MANIFEST_UNIT_ID, List.of());
+    createHelmChart();
+  }
 
+  private void createHelmChart() {
     final String version = componentVersions().certManager();
 
     // RKE2 helm-controller watches HelmChart CRs in kube-system and installs the chart into

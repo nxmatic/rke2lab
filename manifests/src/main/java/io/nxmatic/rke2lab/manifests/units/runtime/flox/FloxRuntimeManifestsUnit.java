@@ -38,6 +38,42 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
 
   private final FloxRuntimeAssets floxRuntimeAssets;
 
+  // Direct-use constructor (creates manifests immediately)
+  public FloxRuntimeManifestsUnit(final Construct scope, final String id) {
+    super(
+        scope,
+        id,
+        MANIFEST_UNIT_ID,
+        List.of(
+            ClusterRuntimeNamespaceManifestsUnit.MANIFEST_UNIT_ID,
+            ReplicatorManifestsUnit.MANIFEST_UNIT_ID,
+            RuntimeDaemonsetScriptPolicyManifestsUnit.MANIFEST_UNIT_ID));
+    this.registry = null;
+    this.runtimeDaemonsetScriptPolicyAssets = RuntimeDaemonsetScriptPolicyAssets.builder().build();
+    this.floxRuntimeAssets =
+        FloxRuntimeAssets.builder()
+            .runtimeDaemonsetScriptPolicyAssets(runtimeDaemonsetScriptPolicyAssets)
+            .build();
+
+    // RuntimeClass no longer needed with NRI plugin approach
+    // NRI plugin intercepts based on flox.dev/environment annotation
+    //
+    // Installer assets used to ride a single ConfigMap, but the aggregate
+    // payload (scripts + nri-plugin source tree + env trees + flake) is well
+    // over Kubernetes' per-object 1 MiB limit. seed-master materializes
+    // the build-derived inputs to /srv/host/k8s-daemonset.d/runtime/flox/
+    // (FloxRuntimeAssets.writeInstallerAssetTree); the init container then
+    // copies that tree into the per-node mutable workspace at
+    // /var/run/k8s-daemonset.d/runtime/flox/ where nix build and flox
+    // activate write locks (overlayfs lower=NFS isn't supported, so the
+    // workspace must live on local fs).
+    ApiObject envConfigMap = createFloxEnvConfigMap();
+    ApiObject dynamicPluginConfigMap = createDynamicPluginConfigMap();
+    ApiObject serviceAccount = createServiceAccount();
+    createInstallerDaemonSet(envConfigMap, dynamicPluginConfigMap, serviceAccount);
+  }
+
+  // Direct-use constructor with scope (creates manifests immediately)
   private FloxRuntimeManifestsUnit(
       final Construct scope, final String id, final ManifestsUnitReferenceRegistry registry) {
     super(

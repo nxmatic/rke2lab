@@ -3,7 +3,6 @@ package io.nxmatic.rke2lab.manifests.units.networking;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
-import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -27,11 +26,6 @@ public final class CiliumAdvancedManifestsUnit extends AbstractManifestsUnit {
     createBgpAdvertisement();
     createL2AnnouncementPolicy();
     createBgpClusterConfig();
-  }
-
-  @Override
-  public void apply(final ManifestsUnitContext context) {
-    new CiliumAdvancedManifestsUnit(context.chart(), "layer-networking-cilium-advanced");
   }
 
   private void createLoadBalancerPools() {
