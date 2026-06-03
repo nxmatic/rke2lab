@@ -129,22 +129,22 @@ This inventory maps all 17 env variable sections to their owning layer domains, 
 ## Next Steps
 
 ### Phase 2A: Networking Layer Contributor
-Create `io.nxmatic.rk2lab.manifests.layers.networking.NetworkingLayerEnvContributor`:
+Create `io.nxmatic.rke2lab.manifests.layers.networking.NetworkingLayerEnvContributor`:
 - [ ] Contribute `cilium.env`, `network-cluster.env`, `network-node.env`, `network-lan-wan.env`
 - [ ] Write 4 ConfigMaps to runtime env-config directory during `NetworkingDomainRegistrar` init
 
 ### Phase 2B: HA Layer Contributor
-Create `io.nxmatic.rk2lab.manifests.layers.ha.HaLayerEnvContributor`:
+Create `io.nxmatic.rke2lab.manifests.layers.ha.HaLayerEnvContributor`:
 - [ ] Contribute `network-vip.env`
 - [ ] Write 1 ConfigMap to runtime env-config directory
 
 ### Phase 2C: Storage Layer Contributor
-Create `io.nxmatic.rk2lab.manifests.layers.storage.StorageLayerEnvContributor`:
+Create `io.nxmatic.rke2lab.manifests.layers.storage.StorageLayerEnvContributor`:
 - [ ] Contribute `etcdctl.env`
 - [ ] Write 1 ConfigMap to runtime env-config directory
 
 ### Phase 2D: Runtime Layer Contributor
-Create `io.nxmatic.rk2lab.manifests.layers.runtime.RuntimeLayerEnvContributor`:
+Create `io.nxmatic.rke2lab.manifests.layers.runtime.RuntimeLayerEnvContributor`:
 - [ ] Contribute `rke2.env`, `config.env`, `containerd.env`, `cri.env`, `helm.env`, `kubectl.env`, `user.env`
 - [ ] Write 7 ConfigMaps to runtime env-config directory
 
@@ -155,5 +155,5 @@ Update `IncusResourceBootstrap`:
 - [ ] Write aggregated 99-configmap-env-section-layer-contributions.yml during bootstrap
 
 ### Phase 3: GitOps/CICD Layer (deferred)
-Create `io.nxmatic.rk2lab.manifests.layers.gitops.GitOpsLayerEnvContributor`:
+Create `io.nxmatic.rke2lab.manifests.layers.gitops.GitOpsLayerEnvContributor`:
 - [ ] Contribute `kpt.env` after cluster is operational

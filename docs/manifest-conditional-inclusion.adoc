@@ -191,7 +191,7 @@ sequenceDiagram
 
 === LayerDomainRegistrar Interface
 
-The link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar] interface provides two methods:
+The link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar] interface provides two methods:
 
 [source,java]
 ----
@@ -208,7 +208,7 @@ public interface LayerDomainRegistrar {
 
 **Backwards compatibility**: Existing registrars that don't need conditional logic continue using the no-arg `domain()` method. The default implementation calls it automatically.
 
-**See also**: The interface JavaDoc includes a component diagram showing the policy flow. Navigate to link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java] for implementation details.
+**See also**: The interface JavaDoc includes a component diagram showing the policy flow. Navigate to link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java] for implementation details.
 
 === Registrar Implementation Pattern
 
@@ -250,7 +250,7 @@ public class GitopsDomainRegistrar implements LayerDomainRegistrar {
 }
 ----
 
-**Real implementation**: See link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java] and link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/package-info.java[gitops package-info] for the complete gitops domain architecture.
+**Real implementation**: See link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java] and link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/package-info.java[gitops package-info] for the complete gitops domain architecture.
 
 **Why this is better**:
 
@@ -298,7 +298,7 @@ config:
 
 Manifest units that need infrastructure configuration (Incus remote name, cluster name, etc.) access it via `bootstrapIdentity()`:
 
-✅ **Do this** (use link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/profiles/BootstrapIdentity.java[BootstrapIdentity] for infrastructure context):
+✅ **Do this** (use link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/profiles/BootstrapIdentity.java[BootstrapIdentity] for infrastructure context):
 
 [source,java]
 ----
@@ -324,7 +324,7 @@ public class IncusIdentitySecretManifestUnit extends AbstractManifestUnit {
 }
 ----
 
-**Real implementation**: See link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/clusterapi/IncusIdentitySecretManifestUnit.java[IncusIdentitySecretManifestUnit.java] and link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/clusterapi/package-info.java[cluster-api package-info] for complete implementation and architecture diagrams.
+**Real implementation**: See link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/clusterapi/IncusIdentitySecretManifestUnit.java[IncusIdentitySecretManifestUnit.java] and link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/clusterapi/package-info.java[cluster-api package-info] for complete implementation and architecture diagrams.
 
 **Why this pattern**:
 
@@ -471,32 +471,32 @@ This documentation is directly linked to the implementation. Navigate to these f
 
 **Core Interfaces**:
 
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java] - Policy-aware registration interface with component diagram
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomainRegistryBuilder.java[LayerDomainRegistryBuilder.java] - Builds domain registry with policy
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/api/ManifestDomainPolicy.java[ManifestDomainPolicy.java] - Policy API with enable/disable flags
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java] - Policy-aware registration interface with component diagram
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/LayerDomainRegistryBuilder.java[LayerDomainRegistryBuilder.java] - Builds domain registry with policy
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/api/ManifestDomainPolicy.java[ManifestDomainPolicy.java] - Policy API with enable/disable flags
 
 **Domain Implementations** (with package-info architecture diagrams):
 
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/package-info.java[gitops/package-info.java] - GitOps domain architecture, conditional Porch inclusion
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/clusterapi/package-info.java[clusterapi/package-info.java] - Cluster API domain architecture, bootstrap identity usage
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java] - Real conditional inclusion implementation
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/clusterapi/ClusterApiDomainRegistrar.java[ClusterApiDomainRegistrar.java] - Simple registrar (no conditional logic)
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/package-info.java[gitops/package-info.java] - GitOps domain architecture, conditional Porch inclusion
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/clusterapi/package-info.java[clusterapi/package-info.java] - Cluster API domain architecture, bootstrap identity usage
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java] - Real conditional inclusion implementation
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/clusterapi/ClusterApiDomainRegistrar.java[ClusterApiDomainRegistrar.java] - Simple registrar (no conditional logic)
 
 **Bootstrap Identity**:
 
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/profiles/BootstrapIdentity.java[BootstrapIdentity.java] - Identity record with infrastructure fields
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/node/NodeEnvContext.java[NodeEnvContext.java] - Environment context that builds BootstrapIdentity
-* link:../seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/incus/IncusResourceBootstrap.java[IncusResourceBootstrap.java] - Where `incusRemoteName()` is provided
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/profiles/BootstrapIdentity.java[BootstrapIdentity.java] - Identity record with infrastructure fields
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/node/NodeEnvContext.java[NodeEnvContext.java] - Environment context that builds BootstrapIdentity
+* link:../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/IncusResourceBootstrap.java[IncusResourceBootstrap.java] - Where `incusRemoteName()` is provided
 
 **Manifest Units** (showing patterns):
 
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/clusterapi/IncusIdentitySecretManifestUnit.java[IncusIdentitySecretManifestUnit.java] - Bootstrap identity access + ephemeral guard
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/PorchResourcesManifestUnit.java[PorchResourcesManifestUnit.java] - Optional unit excluded by policy
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/clusterapi/IncusIdentitySecretManifestUnit.java[IncusIdentitySecretManifestUnit.java] - Bootstrap identity access + ephemeral guard
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/PorchResourcesManifestUnit.java[PorchResourcesManifestUnit.java] - Optional unit excluded by policy
 
 **Orchestration**:
 
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java] - Synthesis service that distributes policy to registrars
-* link:../seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/policy/ControlplanePolicy.java[ControlplanePolicy.java] - Pulumi config → policy mapping
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java] - Synthesis service that distributes policy to registrars
+* link:../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/policy/ControlplanePolicy.java[ControlplanePolicy.java] - Pulumi config → policy mapping
 
 == Related Documentation
 

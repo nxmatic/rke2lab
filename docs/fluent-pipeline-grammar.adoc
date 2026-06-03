@@ -170,5 +170,5 @@ For those, prefer a plain method or a small builder without the topic/conjunctio
 
 == Cross-references
 
-* `seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/pipeline/` — implementation home.
+* `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/` — implementation home.
 * `controlplane/pipeline/stages/` — topic builder interfaces.

@@ -37,8 +37,8 @@ The netplan API already accepts an optional Net2Plan endpoint contract so mesh/t
 
 Configure via JVM properties:
 
-- `rk2lab.netplan.net2plan.endpoint` (example: `https://net2plan.example.internal:8443`)
-- `rk2lab.netplan.net2plan.path` (optional, default: `/api/network-plans`)
+- `rke2lab.netplan.net2plan.endpoint` (example: `https://net2plan.example.internal:8443`)
+- `rke2lab.netplan.net2plan.path` (optional, default: `/api/network-plans`)
 
 Or via environment variable:
 

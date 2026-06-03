@@ -187,7 +187,7 @@ sequenceDiagram
 
 === Entry Point: IncusResourceBootstrap
 
-Location: `seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/incus/IncusResourceBootstrap.java`
+Location: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/IncusResourceBootstrap.java`
 
 The `synthesizeAndExplodeManifests()` method builds a `ManifestSynthesisRequest` containing:
 
@@ -205,7 +205,7 @@ The `synthesizeAndExplodeManifests()` method builds a `ManifestSynthesisRequest`
 
 === Orchestrator: DefaultManifestSynthesisService
 
-Location: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/DefaultManifestSynthesisService.java`
+Location: `manifests/src/main/java/io/nxmatic/rke2lab/manifests/DefaultManifestSynthesisService.java`
 
 Central orchestration logic (lines 62-147):
 
@@ -251,7 +251,7 @@ public ManifestSynthesisResult synthesize(ManifestSynthesisRequest request) {
 
 === Runtime Configuration: ManifestSynthesisContext
 
-Location: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/ManifestSynthesisContext.java`
+Location: `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/ManifestSynthesisContext.java`
 
 Thread-local context for accessing runtime configuration (lines 29-123).
 
@@ -290,7 +290,7 @@ The context composes orthogonal concerns as separate records:
 
 ==== Helper Methods in AbstractManifestUnit
 
-Location: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/AbstractManifestUnit.java`
+Location: `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/AbstractManifestUnit.java`
 
 [source,java]
 ----
@@ -315,7 +315,7 @@ protected final FloxDebugPolicy floxDebugPolicy() {
 
 ==== DomainRegistrar
 
-Interface: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomainRegistrar.java`
+Interface: `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/LayerDomainRegistrar.java`
 
 Provides a `LayerDomain` with its manifest units.
 
@@ -337,7 +337,7 @@ public LayerDomain domain() {
 
 ==== LayerDomain
 
-Record: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomain.java`
+Record: `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/LayerDomain.java`
 
 Groups related manifest units with dependency ordering. **Synthesizes BOTH K8s manifests and systemd units**.
 
@@ -365,7 +365,7 @@ This allows domains to emit installer services (e.g., `rke2lab-cluster-api-manif
 
 ==== ManifestUnit
 
-Interface: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/ManifestUnit.java`
+Interface: `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/ManifestUnit.java`
 
 Generates BOTH Kubernetes resources AND systemd units via cdk8s.
 

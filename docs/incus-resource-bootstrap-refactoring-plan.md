@@ -181,17 +181,17 @@ private void cleanup() { /* focused 15 lines */ }
 Some nested classes are effectively separate services:
 
 1. **RuntimeEnvControlplaneOverlayWriter** - 91 lines
-   - Extract to: `io.nxmatic.rk2lab.controlplane.incus.env.RuntimeEnvWriter`
+   - Extract to: `io.nxmatic.rke2lab.controlplane.incus.env.RuntimeEnvWriter`
    - Benefits: reusable, testable, clearer responsibility
 
 2. **DaemonsetLogPolicy** - 53 lines
-   - Extract to: `io.nxmatic.rk2lab.controlplane.incus.daemonset.LogPolicy`
+   - Extract to: `io.nxmatic.rke2lab.controlplane.incus.daemonset.LogPolicy`
 
 3. **ProvisioningResourceInventory** - 48 lines
-   - Extract to: `io.nxmatic.rk2lab.controlplane.incus.inventory.ResourceInventory`
+   - Extract to: `io.nxmatic.rke2lab.controlplane.incus.inventory.ResourceInventory`
 
 4. **SystemdProvisioningInventory** - 34 lines
-   - Extract to: `io.nxmatic.rk2lab.controlplane.incus.inventory.SystemdInventory`
+   - Extract to: `io.nxmatic.rke2lab.controlplane.incus.inventory.SystemdInventory`
 
 **Decision Criteria**:
 - Is the class >50 lines?
@@ -258,7 +258,7 @@ If the file remains >2000 lines after above refactorings:
 ## References
 
 - [fluent-pipeline-grammar.adoc](./fluent-pipeline-grammar.adoc) - Full grammar spec
-- [ApplicationPipeline.java](../seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/pipeline/ApplicationPipeline.java) - Reference implementation
+- [ApplicationPipeline.java](../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/ApplicationPipeline.java) - Reference implementation
 
 ## Notes
 

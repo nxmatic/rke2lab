@@ -209,8 +209,8 @@ GitHub webhook triggers seed-peers in-cluster on relevant pushes; Tekton synthes
 
 **Phase 1**:
 - `manifests/src/main/resources/upstream/clusterapi/{core,infra-incus,cp-rke2}/release-vX.Y.Z.yaml` (new)
-- `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/clusterapi/{ClusterApiCoreLayer,ClusterApiInfraIncusLayer,ClusterApiCpRke2Layer,ClusterApiDomainRegistrar}.java` + ManifestUnits (new, mirrors Tekton pattern)
-- `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/FluxRootLayer.java` (new) — emits `GitRepository` + root `Kustomization` referencing this repo's `gitops/` subtree
+- `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/clusterapi/{ClusterApiCoreLayer,ClusterApiInfraIncusLayer,ClusterApiCpRke2Layer,ClusterApiDomainRegistrar}.java` + ManifestUnits (new, mirrors Tekton pattern)
+- `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/FluxRootLayer.java` (new) — emits `GitRepository` + root `Kustomization` referencing this repo's `gitops/` subtree
 - `seed-master/.../incus/IncusResourceBootstrap.java` HostStage — add identity-Secret materialization
 - `seed-master/.../policy/ManifestLinkPolicy.java` + `ControlplanePolicy.java` — add `policy.link.clusterApi.enabled`
 - `manifests/src/main/resources/systemd/systemd-{units,scripts}/rke2lab-{cluster-api,capn-provider}-install.{service,sh}` (delete)

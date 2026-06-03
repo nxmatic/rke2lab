@@ -173,5 +173,5 @@ parsed MAC strings, not a darwin derivation.
 
 * link:flake-build-entry-point.adoc[Flake as Build Entry Point] — the broader
   move to store-built, flake-sourced artifacts this complements.
-* link:../netplan/src/main/java/io/nxmatic/rk2lab/netplan/ClusterNetworkBlueprint.java[ClusterNetworkBlueprint.java] — the Java source of truth.
-* link:../netplan/src/main/java/io/nxmatic/rk2lab/netplan/BlueprintExportCommand.java[BlueprintExportCommand.java] — the `yamlExport` generator and the YAML schema.
+* link:../netplan/src/main/java/io/nxmatic/rke2lab/netplan/ClusterNetworkBlueprint.java[ClusterNetworkBlueprint.java] — the Java source of truth.
+* link:../netplan/src/main/java/io/nxmatic/rke2lab/netplan/BlueprintExportCommand.java[BlueprintExportCommand.java] — the `yamlExport` generator and the YAML schema.

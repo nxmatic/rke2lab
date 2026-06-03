@@ -94,7 +94,7 @@ graph TB
     style CONSOLIDATED fill:#fff3cd
 ....
 
-**Code location**: `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/networking/`
+**Code location**: `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/networking/`
 
 Each layer has multiple `ManifestUnit` implementations that generate Kubernetes resources via CDK8s. All units write to a single consolidated YAML file during synthesis.
 
@@ -111,7 +111,7 @@ sequenceDiagram
     Note over EXPLODER: Parse YAML stream<br/>Split by document separator (---)
 
     loop For each document
-        EXPLODER->>EXPLODER: Extract package annotation<br/>(io.nxmatic.rk2lab/package)
+        EXPLODER->>EXPLODER: Extract package annotation<br/>(io.nxmatic.rke2lab/package)
         EXPLODER->>EXPLODER: Determine layer/package path<br/>e.g. "networking/kdns"
         EXPLODER->>EXPLODER: Generate filename<br/>NN-kind-name.yml
         EXPLODER->>FS: Write to manifests.d/{layer}/{package}/
@@ -141,7 +141,7 @@ sequenceDiagram
 @Override
 public void apply(Chart chart) {
   packageProfile.packageAnnotations("|Deployment|rke2lab-system|kdns")
-  // Results in annotation: io.nxmatic.rk2lab/package: "networking/kdns"
+  // Results in annotation: io.nxmatic.rke2lab/package: "networking/kdns"
 }
 ```
 
@@ -486,7 +486,7 @@ public class MyLayerManifestUnit extends AbstractManifestUnit {
   @Override
   public void apply(Chart chart) {
     // Use packageProfile.packageAnnotations("|Kind|namespace|name")
-    // to set io.nxmatic.rk2lab/package annotation
+    // to set io.nxmatic.rke2lab/package annotation
   }
 }
 ```

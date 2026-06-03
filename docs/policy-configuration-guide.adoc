@@ -511,7 +511,7 @@ yq '.data."manifest.yaml" | from_yaml | .policy' \
 **Fix**: Force rebuild by touching a source file:
 [source,bash]
 ----
-touch seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/Main.java
+touch seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/Main.java
 ./mvnw clean package
 pulumi up
 ----
@@ -567,15 +567,15 @@ pulumi up
 
 **Policy Definitions**:
 
-* link:../seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/policy/ControlplanePolicy.java[ControlplanePolicy.java] - Top-level policy aggregation
-* link:../seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/policy/ManifestLinkPolicy.java[ManifestLinkPolicy.java] - Domain link policy
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/api/ManifestDomainPolicy.java[ManifestDomainPolicy.java] - Domain enable/disable map
+* link:../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/policy/ControlplanePolicy.java[ControlplanePolicy.java] - Top-level policy aggregation
+* link:../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/policy/ManifestLinkPolicy.java[ManifestLinkPolicy.java] - Domain link policy
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/api/ManifestDomainPolicy.java[ManifestDomainPolicy.java] - Domain enable/disable map
 
 **Policy Consumption**:
 
-* link:../seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/incus/HostSlotManifest.java[HostSlotManifest.java:306-329] - Policy serialization to slot manifest
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java] - Policy-driven domain filtering
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/AbstractManifestUnit.java[AbstractManifestUnit.java] - Domain-aware base class
+* link:../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/HostSlotManifest.java[HostSlotManifest.java:306-329] - Policy serialization to slot manifest
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java] - Policy-driven domain filtering
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/AbstractManifestUnit.java[AbstractManifestUnit.java] - Domain-aware base class
 
 == Related Documentation
 

@@ -141,7 +141,7 @@ The current codebase already has a concrete host-asset runtime contract:
 
 What it previously did not have was a single shared policy model that describes *how* a workflow delivers host assets.
 
-`HostAssetDeliveryPolicy` is now implemented as a shared Java type in `manifests/src/main/java/io/nxmatic/rk2lab/manifests/api/` alongside:
+`HostAssetDeliveryPolicy` is now implemented as a shared Java type in `manifests/src/main/java/io/nxmatic/rke2lab/manifests/api/` alongside:
 
 * `HostAssetDeliveryBackend`
 * `HostAssetMaterializationMode`

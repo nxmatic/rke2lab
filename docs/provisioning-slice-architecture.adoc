@@ -307,5 +307,5 @@ slices:
 == Related Documentation
 
 * link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow pattern used in slice checksum computation
-* link:../seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/incus/ProvisioningSlice.java[ProvisioningSlice.java] - Interface definition
-* link:../seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/incus/NodeSlice.java[NodeSlice.java] - Implementation example
+* link:../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/ProvisioningSlice.java[ProvisioningSlice.java] - Interface definition
+* link:../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/NodeSlice.java[NodeSlice.java] - Implementation example

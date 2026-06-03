@@ -60,7 +60,7 @@ The system transforms high-level domain specifications (networking, storage, Git
 
 ```
 manifests/
-├─ src/main/java/io/nxmatic/rk2lab/manifests/
+├─ src/main/java/io/nxmatic/rke2lab/manifests/
 │  ├─ ManifestDomainCatalog.java        (Domain ID registry)
 │  ├─ ManifestUnit.java                 (Interface for manifest units)
 │  ├─ AbstractManifestUnit.java         (Base class with context helpers)
@@ -1033,9 +1033,9 @@ Current domains (as of Phase 1.5 refactoring):
 [source,java]
 ----
 // manifests/components/storage/MinioComponent.java
-package io.nxmatic.rk2lab.manifests.components.storage;
+package io.nxmatic.rke2lab.manifests.components.storage;
 
-import io.nxmatic.rk2lab.manifests.profiles.PackageMetadataProfile;
+import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import org.cdk8s.ApiObject;
 import software.constructs.Construct;
 
@@ -1060,10 +1060,10 @@ public final class MinioComponent extends Construct {
 [source,java]
 ----
 // manifests/components/storage/MinioManifestUnit.java
-package io.nxmatic.rk2lab.manifests.components.storage;
+package io.nxmatic.rke2lab.manifests.components.storage;
 
-import io.nxmatic.rk2lab.manifests.AbstractManifestUnit;
-import io.nxmatic.rk2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.AbstractManifestUnit;
+import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import java.util.List;
 import org.cdk8s.Chart;
 
@@ -1174,7 +1174,7 @@ $ tree .local.d/bioskop/master/host.preview/rke2-manifests.d/
 **Check 1: Does Component extend Construct (not Chart)?**
 
 ```bash
-$ grep "extends Chart" manifests/src/main/java/io/nxmatic/rk2lab/manifests/components/storage/*.java
+$ grep "extends Chart" manifests/src/main/java/io/nxmatic/rke2lab/manifests/components/storage/*.java
 # Should return nothing (or only test files)
 ```
 

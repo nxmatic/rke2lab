@@ -2,7 +2,7 @@
 :toc: left
 :toclevels: 3
 
-This document captures the current Incus node distribution model implemented in `rke2lab` and normalizes it into a stable contract for `rk2lab-control-plane` Stage A and Stage B consumers.
+This document captures the current Incus node distribution model implemented in `rke2lab` and normalizes it into a stable contract for `rke2lab-control-plane` Stage A and Stage B consumers.
 
 It is intentionally derived from implementation evidence (Make targets + instance config) rather than greenfield design assumptions.
 
@@ -243,7 +243,7 @@ These outputs must be emitted by Stage A implementation after distribution conve
 |Phase semantics currently implicit in target graph.
 |===
 
-== Normalization decisions for `rk2lab-control-plane`
+== Normalization decisions for `rke2lab-control-plane`
 
 . Keep `control-node` as default alias, but always emit fingerprint in outputs.
 . Treat per-node instance name as runtime parameter, not hardcoded `master`.

@@ -1,0 +1,42 @@
+// @codebase
+package io.nxmatic.rke2lab.manifests.units.runtime.libexec;
+
+import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
+import io.nxmatic.rke2lab.manifests.HostAssetDeliveryPolicy;
+import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
+import java.util.List;
+
+/**
+ * Disabled-by-default placeholder preserving the runtime/systemd-libexec host-asset use case.
+ *
+ * <p>This unit intentionally emits no resources unless explicitly toggled on, but keeps the
+ * canonical host asset policy path in code (`/srv/host/systemd-libexec.d`) for future runtime
+ * contribution wiring from controlnode-managed systemd executable assets.
+ */
+public final class RuntimeSystemdLibexecPlaceholderManifestsUnit extends AbstractManifestsUnit {
+
+  public static final String MANIFEST_UNIT_ID =
+      ManifestDomainCatalog.RUNTIME + "/systemd-libexec-placeholder";
+
+  static final String ENABLE_PROPERTY =
+      "rke2lab.manifests.runtime.systemdLibexecPlaceholder.enabled";
+
+  private static final HostAssetDeliveryPolicy PLACEHOLDER_POLICY =
+      HostAssetDeliveryPolicy.systemdLibexecPlaceholder();
+
+  public RuntimeSystemdLibexecPlaceholderManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
+  }
+
+  @Override
+  public void apply(final ManifestsUnitContext context) {
+    if (!Boolean.getBoolean(ENABLE_PROPERTY)) {
+      return;
+    }
+
+    if (!PLACEHOLDER_POLICY.enabled()) {
+      return;
+    }
+  }
+}

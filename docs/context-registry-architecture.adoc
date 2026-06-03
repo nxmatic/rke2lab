@@ -578,7 +578,7 @@ void buildMetadata_registeredWithNull_thenUpdated() {
 
 == Implementation
 
-*Source:* `seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/incus/`
+*Source:* `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/incus/`
 
 * `ContextRegistry.java` - Type-safe registry implementation
 * `IncusResourceBootstrap.java` - ApplyState, BootstrapContext, stage definitions

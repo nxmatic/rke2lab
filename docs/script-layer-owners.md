@@ -14,14 +14,14 @@ This file is the canonical ownership map for shell script assets in this reposit
 | Script | Owner domain/layer | Owner manifest unit | Source path |
 |---|---|---|---|
 | `runtime-installer.sh` | `runtime/flox-runtime` | `runtime/flox-runtime` | `manifests/src/main/resources/runtime/flox-runtime/runtime-installer.sh` |
-| `install.sh` | `networking/envoy-gateway` | `networking/envoy-gateway` | `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/networking/EnvoyGatewayLayer.java` (inline ConfigMap data) |
-| `kdns-dlv.sh` | `networking/kdns` | `networking/kdns` | `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/networking/KdnsLayer.java` (inline ConfigMap data) |
-| `agent-sync.sh` | `mesh/headplane` | `mesh/headplane` | `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/mesh/HeadplaneLayer.java` (inline ConfigMap data) |
-| `config-init.sh` | `mesh/headscale` | `mesh/headscale` | `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/mesh/HeadscaleLayer.java` (inline ConfigMap data) |
-| `bootstrap.sh` | `mesh/headscale` | `mesh/headscale` | `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/mesh/HeadscaleLayer.java` (inline ConfigMap data) |
-| `tailscale-client.sh` | `mesh/headscale` | `mesh/headscale` | `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/mesh/HeadscaleLayer.java` (inline ConfigMap data) |
-| `wait-for-headscale.sh` | `mesh/headscale` | `mesh/headscale` | `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/mesh/HeadscaleLayer.java` (inline ConfigMap data) |
-| `gateway.sh` | `mesh/headscale` | `mesh/headscale` | `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/mesh/HeadscaleLayer.java` (inline ConfigMap data) |
+| `install.sh` | `networking/envoy-gateway` | `networking/envoy-gateway` | `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/networking/EnvoyGatewayLayer.java` (inline ConfigMap data) |
+| `kdns-dlv.sh` | `networking/kdns` | `networking/kdns` | `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/networking/KdnsLayer.java` (inline ConfigMap data) |
+| `agent-sync.sh` | `mesh/headplane` | `mesh/headplane` | `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/mesh/HeadplaneLayer.java` (inline ConfigMap data) |
+| `config-init.sh` | `mesh/headscale` | `mesh/headscale` | `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/mesh/HeadscaleLayer.java` (inline ConfigMap data) |
+| `bootstrap.sh` | `mesh/headscale` | `mesh/headscale` | `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/mesh/HeadscaleLayer.java` (inline ConfigMap data) |
+| `tailscale-client.sh` | `mesh/headscale` | `mesh/headscale` | `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/mesh/HeadscaleLayer.java` (inline ConfigMap data) |
+| `wait-for-headscale.sh` | `mesh/headscale` | `mesh/headscale` | `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/mesh/HeadscaleLayer.java` (inline ConfigMap data) |
+| `gateway.sh` | `mesh/headscale` | `mesh/headscale` | `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/mesh/HeadscaleLayer.java` (inline ConfigMap data) |
 
 ## Host systemd source tree (canonical)
 
@@ -35,7 +35,7 @@ This file is the canonical ownership map for shell script assets in this reposit
 These scripts are owned by the controlplane Incus bootstrap pipeline and are mounted as `/srv/host/systemd-scripts.d` in node instances.
 
 - Owner component: `controlplane/incus`
-- Owner code path: `controlplane/src/main/java/io/nxmatic/rk2lab/controlplane/incus/IncusResourceBootstrap.java`
+- Owner code path: `controlplane/src/main/java/io/nxmatic/rke2lab/controlplane/incus/IncusResourceBootstrap.java`
 - Owner source tree: `manifests/src/main/resources/host/systemd-scripts/`
 
 Scripts in this owner set:

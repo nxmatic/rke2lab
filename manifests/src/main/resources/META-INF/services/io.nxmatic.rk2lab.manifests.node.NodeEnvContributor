@@ -1,6 +1,0 @@
-io.nxmatic.rk2lab.manifests.units.cluster.ClusterNodeEnvContributor
-io.nxmatic.rk2lab.manifests.node.NodeEnvIdentityContributor
-io.nxmatic.rk2lab.manifests.units.networking.NetworkingNodeEnvContributor
-io.nxmatic.rk2lab.manifests.units.ha.HighAvailabilityNodeEnvContributor
-io.nxmatic.rk2lab.manifests.units.storage.StorageNodeEnvContributor
-io.nxmatic.rk2lab.manifests.units.runtime.env.RuntimeNodeEnvContributor

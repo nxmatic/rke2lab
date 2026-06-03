@@ -88,17 +88,17 @@ graph TB
 **Starting point**: Reading architecture documentation
 
 1. Read link:manifest-conditional-inclusion.adoc[manifest-conditional-inclusion.adoc] (system-level understanding)
-2. Click "See implementation" link → link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java] (interface + component diagram)
-3. Click "See example" link → link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/package-info.java[gitops/package-info.java] (domain architecture)
-4. Navigate to implementation → link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java] (actual code)
+2. Click "See implementation" link → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java] (interface + component diagram)
+3. Click "See example" link → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/package-info.java[gitops/package-info.java] (domain architecture)
+4. Navigate to implementation → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java] (actual code)
 
 === Pattern 2: Bottom-Up (Code → Context)
 
 **Starting point**: Working on a specific class
 
-1. Open link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/clusterapi/IncusIdentitySecretManifestUnit.java[IncusIdentitySecretManifestUnit.java] in IDE
+1. Open link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/clusterapi/IncusIdentitySecretManifestUnit.java[IncusIdentitySecretManifestUnit.java] in IDE
 2. Read JavaDoc → see package-info reference
-3. Click → link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/clusterapi/package-info.java[clusterapi/package-info.java] (domain architecture with diagram)
+3. Click → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/clusterapi/package-info.java[clusterapi/package-info.java] (domain architecture with diagram)
 4. See "Related Documentation" link
 5. Click → link:manifest-conditional-inclusion.adoc[manifest-conditional-inclusion.adoc] (system-level understanding)
 
@@ -106,20 +106,20 @@ graph TB
 
 **Starting point**: Understanding one domain, need to implement another
 
-1. Reading link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/package-info.java[gitops/package-info.java]
+1. Reading link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/package-info.java[gitops/package-info.java]
 2. See cross-reference to link:manifest-conditional-inclusion.adoc[manifest-conditional-inclusion.adoc]
-3. In doc, see cross-reference to link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/clusterapi/package-info.java[clusterapi/package-info.java]
+3. In doc, see cross-reference to link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/clusterapi/package-info.java[clusterapi/package-info.java]
 4. Compare patterns across domains
 
 === Pattern 4: Interface → Implementation
 
 **Starting point**: Understanding the contract
 
-1. Read link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java] (interface with component diagram)
+1. Read link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java] (interface with component diagram)
 2. IDE "Show Implementations" → list of all registrars
-3. Pick one → e.g., link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java]
+3. Pick one → e.g., link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java]
 4. See package-info reference
-5. Click → link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/package-info.java[gitops/package-info.java] (domain context)
+5. Click → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/package-info.java[gitops/package-info.java] (domain context)
 
 == Cross-Reference Syntax Reference
 
@@ -127,18 +127,18 @@ graph TB
 
 **Link to Java file** (GitHub/IDE clickable):
 ----
-link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java]
+link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java]
 ----
 
 **Link to package**:
 ----
-link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/package-info.java[gitops package-info]
+link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/package-info.java[gitops package-info]
 ----
 
 **Inline code reference**:
 ----
 The `LayerDomainRegistrar` interface...
-See link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/LayerDomainRegistrar.java[implementation] for details.
+See link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/LayerDomainRegistrar.java[implementation] for details.
 ----
 
 === In JavaDoc → AsciiDoc
@@ -159,7 +159,7 @@ See link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/La
 
 **Relative path calculation**:
 
-* From `manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/gitops/package-info.java`
+* From `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/package-info.java`
 * To `docs/manifest-conditional-inclusion.adoc`
 * Path: `../../../../../../../../../../docs/manifest-conditional-inclusion.adoc` (11 levels up)
 
@@ -171,7 +171,7 @@ See link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/La
 /**
  * @see LayerDomainRegistrar
  * @see ManifestDomainPolicy
- * @see io.nxmatic.rk2lab.manifests.layers.common.profiles.BootstrapIdentity
+ * @see io.nxmatic.rke2lab.manifests.layers.common.profiles.BootstrapIdentity
  */
 ----
 
@@ -179,7 +179,7 @@ See link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/La
 [source,java]
 ----
 /**
- * See {@link io.nxmatic.rk2lab.manifests.layers.gitops} package documentation
+ * See {@link io.nxmatic.rke2lab.manifests.layers.gitops} package documentation
  * for domain architecture and examples.
  */
 ----

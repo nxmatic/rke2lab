@@ -6,7 +6,7 @@
     </encoder>
   </appender>
 
-  <logger name="io.nxmatic.rk2lab.netplan" level="INFO"/>
+  <logger name="io.nxmatic.rke2lab.netplan" level="INFO"/>
 
   <root level="WARN">
     <appender-ref ref="STDOUT"/>

@@ -236,7 +236,7 @@ spec:
 **1. Create Bootstrap Domain** (NEW):
 
 ```
-manifests/src/main/java/io/nxmatic/rk2lab/manifests/
+manifests/src/main/java/io/nxmatic/rke2lab/manifests/
 ├─ domains/                          (renamed from layers/)
 │  └─ bootstrap/
 │     ├─ BootstrapDomain.java        (new, was BootstrapDomainRegistrar)
@@ -369,7 +369,7 @@ public final class ManifestDomainCatalog {
 **3. Clean Platform Domain** (KEEP components, adjust Layer1Chart):
 
 ```
-manifests/src/main/java/io/nxmatic/rk2lab/manifests/domains/platform/
+manifests/src/main/java/io/nxmatic/rke2lab/manifests/domains/platform/
 ├─ PlatformDomain.java               (update: keep all components)
 └─ components/
    ├─ ReplicatorComponent.java       (keep - used in Layer 1)
@@ -390,7 +390,7 @@ private List<ManifestUnit> getAllUnits() {
 **4. Keep CI/CD Domain** (components exist, not used in Layer 1):
 
 ```
-manifests/src/main/java/io/nxmatic/rk2lab/manifests/domains/cicd/
+manifests/src/main/java/io/nxmatic/rke2lab/manifests/domains/cicd/
 ├─ CicdDomain.java                   (keep)
 └─ components/
    ├─ TektonPipelinesComponent.java  (keep - used in Layer 3)
@@ -402,7 +402,7 @@ manifests/src/main/java/io/nxmatic/rk2lab/manifests/domains/cicd/
 **5. Create Layer1Chart** (NEW - aggregates domains):
 
 ```
-manifests/src/main/java/io/nxmatic/rk2lab/manifests/charts/layer1/
+manifests/src/main/java/io/nxmatic/rke2lab/manifests/charts/layer1/
 └─ Layer1Chart.java
 ```
 
@@ -504,7 +504,7 @@ After Phase 1.5:
 
 ```bash
 # Check module structure
-ls manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/
+ls manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/
 # Should show: bootstrap/, networking/, mesh/, storage/, platform/, runtime/
 # Should NOT show: cicd/ (deleted), gitops/ (moved to bootstrap/)
 
@@ -538,7 +538,7 @@ git status
 **1. Create GitopsMgmtVClusterLayer** in seed-master:
 
 ```
-seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/
+seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/
 ├─ vcluster/
 │  └─ GitopsMgmtVClusterLayer.java   (new)
 ```

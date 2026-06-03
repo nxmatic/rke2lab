@@ -155,9 +155,9 @@ graph TB
 
 [source,java]
 ----
-package io.nxmatic.rk2lab.manifests.layers.certmanager;
+package io.nxmatic.rke2lab.manifests.layers.certmanager;
 
-import io.nxmatic.rk2lab.manifests.layers.common.profiles.PackageMetadataProfile;
+import io.nxmatic.rke2lab.manifests.layers.common.profiles.PackageMetadataProfile;
 import java.util.Map;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
@@ -374,7 +374,7 @@ $ tree .local.d/bioskop/master/host.preview/rke2-manifests.d/
 
 [source,bash]
 ----
-$ grep "extends Chart" manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/certmanager/CertManagerLayer.java
+$ grep "extends Chart" manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/certmanager/CertManagerLayer.java
 public final class CertManagerLayer extends Chart {  # ← WRONG
 ----
 
@@ -453,7 +453,7 @@ Multiple Charts exist in the App tree. The numeric prefixes are CDK8s's behavior
 [source,bash]
 ----
 # Find all Layer classes extending Chart
-$ grep -r "extends Chart" manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/
+$ grep -r "extends Chart" manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/
 
 # Change each to extends Construct (except top-level Charts in DefaultManifestSynthesisService)
 ----
@@ -525,5 +525,5 @@ When reviewing new Layer classes:
 * link:manifest-domain-catalog-pattern.adoc[ManifestDomainCatalog Pattern] - Single source of truth for domain IDs
 * link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow patterns in seed-master
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Context access pattern for manifest units
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java] - Main synthesis orchestrator
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/DefaultManifestExplodeService.java[DefaultManifestExplodeService.java] - Annotation-driven manifest splitter
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/DefaultManifestSynthesisService.java[DefaultManifestSynthesisService.java] - Main synthesis orchestrator
+* link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/DefaultManifestExplodeService.java[DefaultManifestExplodeService.java] - Annotation-driven manifest splitter
