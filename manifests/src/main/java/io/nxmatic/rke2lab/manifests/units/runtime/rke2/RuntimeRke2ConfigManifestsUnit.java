@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
+import io.nxmatic.rke2lab.manifests.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
@@ -176,7 +177,9 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
                             packageProfile.packageAnnotations(
                                 upstreamIdentifier,
                                 Map.of(
-                                    "config.kubernetes.io/local-config",
+                                    ManifestAnnotations.LOCAL_CONFIG,
+                                    "true",
+                                    ManifestAnnotations.RKE2_CONFIG,
                                     "true",
                                     "description.kpt.dev",
                                     description)))

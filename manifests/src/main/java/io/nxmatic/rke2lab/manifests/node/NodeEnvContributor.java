@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.manifests.node;
 
+import io.nxmatic.rke2lab.manifests.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.ManifestYaml;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -61,7 +62,7 @@ public interface NodeEnvContributor {
   static Map<String, Object> buildConfigMapDocument(
       String name, String section, Map<String, String> variables) {
     final Map<String, Object> annotations = new LinkedHashMap<>();
-    annotations.put("config.kubernetes.io/local-config", "true");
+    annotations.put(ManifestAnnotations.LOCAL_CONFIG, "true");
     annotations.put("env.rke2lab.nxmatic.io/section", section);
     annotations.put("rke2lab.nxmatic.io/managed-by", "node-env-contributor");
 

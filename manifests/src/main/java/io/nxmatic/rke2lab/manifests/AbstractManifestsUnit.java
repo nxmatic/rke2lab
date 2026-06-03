@@ -115,7 +115,8 @@ public abstract class AbstractManifestsUnit implements ManifestsUnit {
 
   private Map<String, String> groupMarkerAnnotations(final String domainId) {
     final LinkedHashMap<String, String> annotations = new LinkedHashMap<>();
-    annotations.put("config.kubernetes.io/local-config", "true");
+    annotations.put(ManifestAnnotations.LOCAL_CONFIG, "true");
+    annotations.put(ManifestAnnotations.MANIFEST_GROUP, "true");
     annotations.put(ManifestAnnotations.DOMAIN, domainId);
     annotations.put(ManifestAnnotations.PACKAGE, outputDir());
     return Map.copyOf(annotations);

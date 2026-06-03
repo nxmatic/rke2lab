@@ -25,6 +25,7 @@ import io.nxmatic.rke2lab.controlplane.incus.image.PulumiIncusImageProvider;
 import io.nxmatic.rke2lab.controlplane.pipeline.OnFailure;
 import io.nxmatic.rke2lab.controlplane.pipeline.TopicRunner;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
+import io.nxmatic.rke2lab.manifests.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.ManifestExplodeRequest;
 import io.nxmatic.rke2lab.manifests.ManifestExplodeResult;
 import io.nxmatic.rke2lab.manifests.ManifestExplodeService;
@@ -1299,7 +1300,7 @@ public final class IncusResourceBootstrap {
         aggregatedVars.putAll(layerContributionVars);
 
         final Map<String, Object> annotations = new LinkedHashMap<>();
-        annotations.put("config.kubernetes.io/local-config", "true");
+        annotations.put(ManifestAnnotations.LOCAL_CONFIG, "true");
         annotations.put(
             "description.kpt.dev", "Controlplane runtime environment with layer contributions");
         annotations.put(

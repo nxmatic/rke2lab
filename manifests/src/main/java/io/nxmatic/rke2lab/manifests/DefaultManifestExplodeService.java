@@ -22,9 +22,15 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Domain and package come from {@code io.nxmatic.rke2lab/domain} and {@code
  * io.nxmatic.rke2lab/package} annotations stamped by domain code; defaults match the old script
- * ({@code default} / {@code unknown}). Order prefix is determined by kind: {@code 00-} for CRDs,
- * {@code 01-} for other cluster-scoped resources (no namespace), {@code 02-} for namespace-scoped
- * resources.
+ * ({@code default} / {@code unknown}).
+ *
+ * <p>The per-resource file name is annotation-driven (see {@link #fileNameFor}): {@link
+ * ManifestAnnotations#RKE2_CONFIG} resources are written verbatim ({@code <name>}) so {@code
+ * rke2lab-config-install.sh} can glob them; {@link ManifestAnnotations#MANIFEST_GROUP} and {@link
+ * ManifestAnnotations#LOCAL_CONFIG} resources become hidden dotfiles ({@code .<kind>-<name>.yml})
+ * that are never linked or globbed; everything else gets an {@code <order>-<kind>-<name>.yml} name
+ * for cluster apply, where order is {@code 00-} for CRDs, {@code 01-} for other cluster-scoped
+ * resources (no namespace), {@code 02-} for namespace-scoped resources.
  */
 public final class DefaultManifestExplodeService implements ManifestExplodeService {
 
@@ -70,18 +76,7 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
         final String namespace = textOrNull(document.path("metadata").get("namespace"));
         final String name = sanitizeFileSegment(textOrNull(document.path("metadata").get("name")));
 
-        // Group markers (local-config) become hidden dotfiles with no order prefix
-        final boolean isLocalConfig =
-            "true"
-                .equalsIgnoreCase(
-                    annotation(document, "config.kubernetes.io/local-config", "false"));
-        final String fileName;
-        if (isLocalConfig) {
-          fileName = "." + kind.toLowerCase(Locale.ROOT) + "-" + name + ".yml";
-        } else {
-          final String order = orderPrefixFor(kind, namespace);
-          fileName = order + "-" + kind.toLowerCase(Locale.ROOT) + "-" + name + ".yml";
-        }
+        final String fileName = fileNameFor(document, kind, namespace, name);
 
         final Path outFile = target.resolve(domain).resolve(pkg).resolve(fileName);
         ManifestYaml.writeDocument(outFile, document);
@@ -94,6 +89,33 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
     LOG.info("Exploded {} resources from {} into {}", written.size(), source.getFileName(), target);
 
     return new ManifestExplodeResult(target, written);
+  }
+
+  /**
+   * Resolves the per-resource file name from annotations, not from the resource name:
+   *
+   * <ul>
+   *   <li>{@link ManifestAnnotations#RKE2_CONFIG}: verbatim {@code <name>} (visible) so {@code
+   *       rke2lab-config-install.sh} can glob it into {@code config.yaml.d}.
+   *   <li>{@link ManifestAnnotations#MANIFEST_GROUP} or {@link ManifestAnnotations#LOCAL_CONFIG}:
+   *       hidden {@code .<kind>-<name>.yml} dotfile, never linked / globbed.
+   *   <li>otherwise: {@code <order>-<kind>-<name>.yml} for cluster apply.
+   * </ul>
+   */
+  private static String fileNameFor(JsonNode document, String kind, String namespace, String name) {
+    if (isAnnotated(document, ManifestAnnotations.RKE2_CONFIG)) {
+      return name;
+    }
+    if (isAnnotated(document, ManifestAnnotations.MANIFEST_GROUP)
+        || isAnnotated(document, ManifestAnnotations.LOCAL_CONFIG)) {
+      return "." + kind.toLowerCase(Locale.ROOT) + "-" + name + ".yml";
+    }
+    final String order = orderPrefixFor(kind, namespace);
+    return order + "-" + kind.toLowerCase(Locale.ROOT) + "-" + name + ".yml";
+  }
+
+  private static boolean isAnnotated(JsonNode document, String key) {
+    return "true".equalsIgnoreCase(annotation(document, key, "false"));
   }
 
   private static String orderPrefixFor(String kind, String namespace) {

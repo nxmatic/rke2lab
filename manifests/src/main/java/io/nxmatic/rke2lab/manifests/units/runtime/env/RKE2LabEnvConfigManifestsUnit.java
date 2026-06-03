@@ -2,6 +2,7 @@
 package io.nxmatic.rke2lab.manifests.units.runtime.env;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
+import io.nxmatic.rke2lab.manifests.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
@@ -85,7 +86,7 @@ public final class RKE2LabEnvConfigManifestsUnit extends AbstractManifestsUnit {
                             packageProfile.packageAnnotations(
                                 "|ConfigMap|default|" + cmName,
                                 Map.of(
-                                    "config.kubernetes.io/local-config",
+                                    ManifestAnnotations.LOCAL_CONFIG,
                                     "true",
                                     "description.kpt.dev",
                                     "Environment section " + section,

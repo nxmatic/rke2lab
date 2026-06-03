@@ -2,6 +2,7 @@
 package io.nxmatic.rke2lab.manifests.units.mesh;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
+import io.nxmatic.rke2lab.manifests.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
@@ -154,7 +155,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                             packageProfile.packageAnnotations(
                                 "|Secret|${headscale-namespace}|"
                                     + MeshRefs.HEADSCALE_CLIENT_AUTH_SECRET.name(),
-                                Map.of("config.kubernetes.io/local-config", "true")))
+                                Map.of(ManifestAnnotations.LOCAL_CONFIG, "true")))
                         .build())
                 .build());
     secret.addJsonPatch(JsonPatch.add("/type", "Opaque"), JsonPatch.add("/data", Map.of()));
