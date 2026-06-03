@@ -737,13 +737,14 @@ public final class IncusResourceBootstrap {
                     final String project = outputs.get(3);
                     final String remote = outputs.get(4);
 
-                    return synthesizeImageStateConfigMapYaml(
-                        context.config().clusterName(),
-                        alias,
-                        fingerprint,
-                        checksum,
-                        project,
-                        remote);
+                    return ImageStateConfig.builder(IncusResourceBootstrap.this)
+                        .clusterName(context.config().clusterName())
+                        .imageAlias(alias)
+                        .imageFingerprint(fingerprint)
+                        .imageBuildChecksum(checksum)
+                        .incusProject(project)
+                        .incusRemoteAddress(remote)
+                        .synthesize();
                   });
 
       // Write manifest via Output side-effect (runs during Pulumi apply)
@@ -847,7 +848,7 @@ public final class IncusResourceBootstrap {
    *
    * @return YAML manifest string
    */
-  private String synthesizeImageStateConfigMapYaml(
+  record ImageStateConfig(
       String clusterName,
       String imageAlias,
       String imageFingerprint,
@@ -855,7 +856,70 @@ public final class IncusResourceBootstrap {
       String incusProject,
       String incusRemoteAddress) {
 
-    // Create in-memory CDK8s app (temp dir for output)
+    static Builder builder(IncusResourceBootstrap instance) {
+      return new Builder(instance);
+    }
+
+    static final class Builder {
+      private final IncusResourceBootstrap instance;
+      private String clusterName;
+      private String imageAlias;
+      private String imageFingerprint;
+      private String imageBuildChecksum;
+      private String incusProject;
+      private String incusRemoteAddress;
+
+      private Builder(IncusResourceBootstrap instance) {
+        this.instance = instance;
+      }
+
+      Builder clusterName(String clusterName) {
+        this.clusterName = clusterName;
+        return this;
+      }
+
+      Builder imageAlias(String imageAlias) {
+        this.imageAlias = imageAlias;
+        return this;
+      }
+
+      Builder imageFingerprint(String imageFingerprint) {
+        this.imageFingerprint = imageFingerprint;
+        return this;
+      }
+
+      Builder imageBuildChecksum(String imageBuildChecksum) {
+        this.imageBuildChecksum = imageBuildChecksum;
+        return this;
+      }
+
+      Builder incusProject(String incusProject) {
+        this.incusProject = incusProject;
+        return this;
+      }
+
+      Builder incusRemoteAddress(String incusRemoteAddress) {
+        this.incusRemoteAddress = incusRemoteAddress;
+        return this;
+      }
+
+      ImageStateConfig build() {
+        return new ImageStateConfig(
+            clusterName,
+            imageAlias,
+            imageFingerprint,
+            imageBuildChecksum,
+            incusProject,
+            incusRemoteAddress);
+      }
+
+      String synthesize() {
+        return instance.synthesizeImageStateConfigMapYaml(build());
+      }
+    }
+  }
+
+  private String synthesizeImageStateConfigMapYaml(ImageStateConfig config) {
     final Path tempDir;
     try {
       tempDir = Files.createTempDirectory("cdk8s-staged-");
@@ -863,86 +927,88 @@ public final class IncusResourceBootstrap {
       throw new IllegalStateException("Failed to create temp dir for CDK8s synthesis", ex);
     }
 
-    final App app = new App(AppProps.builder().outdir(tempDir.toString()).build());
-    final Chart chart = new Chart(app, "staged-resources");
-
-    // capn-system is normally created by the CAPI operator when it reconciles the
-    // InfrastructureProvider (CAPN), but RKE2 auto-deploy applies this staged ConfigMap as soon as
-    // the file lands — before the operator has created the namespace — and does not retry a hard
-    // "namespace not found". Ship the namespace alongside the ConfigMap (rendered first via the
-    // dependency edge) so the bundle is self-contained; the operator adopts the existing namespace.
-    final ApiObject namespace =
-        new ApiObject(
-            chart,
-            "namespace-capn-system",
-            ApiObjectProps.builder()
-                .apiVersion("v1")
-                .kind("Namespace")
-                .metadata(
-                    ApiObjectMetadata.builder()
-                        .name("capn-system")
-                        .annotations(
-                            Map.of(
-                                "package", "cluster-api/image-state",
-                                "description", "Stage A → Stage B image identity handoff"))
-                        .build())
-                .build());
-
-    // Create ConfigMap directly (no manifest unit, no context)
-    final Map<String, String> data =
-        Map.of(
-            "imageAlias", imageAlias,
-            "imageFingerprint", imageFingerprint,
-            "imageBuildChecksum", imageBuildChecksum,
-            "incusProject", incusProject,
-            "incusRemoteAddress", incusRemoteAddress);
-
-    final ApiObject configMap =
-        new ApiObject(
-            chart,
-            "configmap-image-state",
-            ApiObjectProps.builder()
-                .apiVersion("v1")
-                .kind("ConfigMap")
-                .metadata(
-                    ApiObjectMetadata.builder()
-                        .name(clusterName + "-image-state")
-                        .namespace("capn-system")
-                        .annotations(
-                            Map.of(
-                                "package", "cluster-api/image-state",
-                                "description", "Stage A → Stage B image identity handoff"))
-                        .build())
-                .build());
-
-    configMap.addDependency(namespace);
-    configMap.addJsonPatch(JsonPatch.add("/data", data));
-
-    // CDK8s writes to disk, read it back
-    app.synth();
-
     try {
+      final App app = new App(AppProps.builder().outdir(tempDir.toString()).build());
+      final Chart chart = new Chart(app, "staged-resources");
+
+      final ApiObject namespace =
+          new ApiObject(
+              chart,
+              "namespace-capn-system",
+              ApiObjectProps.builder()
+                  .apiVersion("v1")
+                  .kind("Namespace")
+                  .metadata(
+                      ApiObjectMetadata.builder()
+                          .name("capn-system")
+                          .annotations(
+                              Map.of(
+                                  "package",
+                                  "cluster-api/image-state",
+                                  "description",
+                                  "Stage A → Stage B image identity handoff"))
+                          .build())
+                  .build());
+
+      final Map<String, String> configMapData =
+          Map.of(
+              "imageAlias",
+              config.imageAlias(),
+              "imageFingerprint",
+              config.imageFingerprint(),
+              "imageBuildChecksum",
+              config.imageBuildChecksum(),
+              "incusProject",
+              config.incusProject(),
+              "incusRemoteAddress",
+              config.incusRemoteAddress());
+
+      final ApiObject configMap =
+          new ApiObject(
+              chart,
+              "configmap-image-state",
+              ApiObjectProps.builder()
+                  .apiVersion("v1")
+                  .kind("ConfigMap")
+                  .metadata(
+                      ApiObjectMetadata.builder()
+                          .name(config.clusterName() + "-image-state")
+                          .namespace("capn-system")
+                          .annotations(
+                              Map.of(
+                                  "package",
+                                  "cluster-api/image-state",
+                                  "description",
+                                  "Stage A → Stage B image identity handoff"))
+                          .build())
+                  .build());
+
+      configMap.addDependency(namespace);
+      configMap.addJsonPatch(JsonPatch.add("/data", configMapData));
+
+      app.synth();
+
       final Path manifestFile = tempDir.resolve("staged-resources.k8s.yaml");
       if (!Files.exists(manifestFile)) {
         throw new IllegalStateException(
             "CDK8s synthesis did not produce expected file: " + manifestFile);
       }
-      final String yaml = Files.readString(manifestFile, StandardCharsets.UTF_8);
-
-      // Cleanup temp dir
-      Files.walk(tempDir)
-          .sorted((a, b) -> -a.compareTo(b)) // Delete files before dirs
-          .forEach(
-              path -> {
-                try {
-                  Files.delete(path);
-                } catch (IOException ignored) {
-                }
-              });
-
-      return yaml;
+      return Files.readString(manifestFile, StandardCharsets.UTF_8);
     } catch (IOException ex) {
       throw new IllegalStateException("Failed to read CDK8s synthesized manifest", ex);
+    } finally {
+      try {
+        Files.walk(tempDir)
+            .sorted((a, b) -> -a.compareTo(b))
+            .forEach(
+                path -> {
+                  try {
+                    Files.delete(path);
+                  } catch (IOException ignored) {
+                  }
+                });
+      } catch (IOException ignored) {
+      }
     }
   }
 
@@ -1751,125 +1817,144 @@ public final class IncusResourceBootstrap {
 
   private void ensureNetwork(
       IncusProviderContext context, String networkName, Resource projectDependency) {
-    if (networkName.equals(bootstrapContext.config().lanBridgeParent())) {
-      // lan-br is provisioned by the host (NixOS systemd-networkd in
-      // nix-darwin-home/modules/nixos/incus.nix);
-      // is incus-managed
-      // by this bootstrap and falls through to the create path below.
-      logInfo(
-          "incus network ensure: skipping canonical host-provided bridge (name="
-              + networkName
-              + ")");
-      return;
-    }
 
-    final String networkProject =
-        networkName.equals(bootstrapContext.config().vmnetNetworkName())
+    class NetworkSetup {
+      boolean shouldSkip() {
+        if (networkName.equals(bootstrapContext.config().lanBridgeParent())) {
+          logInfo(
+              "incus network ensure: skipping canonical host-provided bridge (name="
+                  + networkName
+                  + ")");
+          return true;
+        }
+
+        final String networkProject = resolveNetworkProject();
+        if (bootstrapContext
+            .incusImportLookup()
+            .isUnmanagedNetwork(context, networkName, networkProject)) {
+          logInfo(
+              "incus network ensure: skipping unmanaged bridge reported by provider (name="
+                  + networkName
+                  + ")");
+          return true;
+        }
+
+        return false;
+      }
+
+      String resolveNetworkProject() {
+        return networkName.equals(bootstrapContext.config().vmnetNetworkName())
             ? "default"
             : bootstrapContext.config().incusProject();
+      }
 
-    if (bootstrapContext
-        .incusImportLookup()
-        .isUnmanagedNetwork(context, networkName, networkProject)) {
-      // Additional safeguard for any non-canonical network that provider reports unmanaged.
-      logInfo(
-          "incus network ensure: skipping unmanaged bridge reported by provider (name="
-              + networkName
-              + ")");
-      return;
-    }
-
-    final String existingNetworkId =
-        bootstrapContext
+      String resolveExistingNetworkId(String networkProject) {
+        return bootstrapContext
             .incusImportLookup()
             .normalizeImportId(
                 bootstrapContext
                     .incusImportLookup()
                     .existingNetworkId(context, networkName, networkProject));
+      }
 
-    if (!existingNetworkId.isBlank()
-        && networkName.equals(bootstrapContext.config().vmnetNetworkName())) {
-      // Existing vmnet bridge is the canonical source of truth for Stage A.
-      // Managing it via import causes persistent provider import-replacement churn.
+      boolean shouldSkipExistingVmnet(String existingNetworkId) {
+        return !existingNetworkId.isBlank()
+            && networkName.equals(bootstrapContext.config().vmnetNetworkName());
+      }
+
+      NetworkArgs buildNetworkArgs(String networkProject, String existingNetworkId) {
+        final NetworkArgs.Builder builder = NetworkArgs.builder().name(networkName).type("bridge");
+
+        if (networkName.equals(bootstrapContext.config().vmnetNetworkName())) {
+          builder.project("default");
+          builder.config(vmnetBridgeConfig());
+        } else if (existingNetworkId.isBlank()) {
+          builder.project(networkProject);
+        }
+
+        return builder.build();
+      }
+
+      CustomResourceOptions buildNetworkOptions(String existingNetworkId) {
+        final List<String> networkIgnoreChanges = new ArrayList<>(List.of("project"));
+        if (!existingNetworkId.isBlank()) {
+          networkIgnoreChanges.addAll(List.of("config", "remote", "target"));
+        }
+
+        final CustomResourceOptions.Builder optionsBuilder =
+            CustomResourceOptions.builder()
+                .provider(context.provider())
+                .retainOnDelete(true)
+                .dependsOn(List.of(projectDependency))
+                .ignoreChanges(networkIgnoreChanges);
+
+        if (!existingNetworkId.isBlank()) {
+          optionsBuilder.importId(existingNetworkId);
+        }
+
+        return optionsBuilder.build();
+      }
+
+      Map<String, String> vmnetBridgeConfig() {
+        final ClusterNetworkBlueprint managementNodeBlueprint =
+            deriveBlueprint(bootstrapContext.config().nodeName());
+
+        final String clusterGatewayWithPrefix =
+            managementNodeBlueprint.host().clusterGatewayInetaddr().getHostAddress()
+                + "/"
+                + managementNodeBlueprint.host().clusterCidr().prefixLength();
+
+        final String dhcpRange = managementNodeBlueprint.wan().dhcpRange();
+
+        final String rawDnsmasq =
+            CLUSTER_NODE_NAMES.stream()
+                .map(IncusResourceBootstrap.this::deriveBlueprint)
+                .map(
+                    blueprint ->
+                        "dhcp-host="
+                            + blueprint.wan().hostMacaddr()
+                            + ","
+                            + blueprint.nodeNetwork().nodeHostInetaddr().getHostAddress()
+                            + ","
+                            + clusterNodeLeaseHostname(blueprint.node().name()))
+                .reduce((left, right) -> left + "\n" + right)
+                .orElse("");
+
+        return Map.of(
+            "ipv4.address",
+            clusterGatewayWithPrefix,
+            "ipv4.nat",
+            "false",
+            "ipv4.dhcp",
+            "true",
+            "ipv4.dhcp.ranges",
+            dhcpRange,
+            "dns.mode",
+            "none",
+            "bridge.driver",
+            "native",
+            "raw.dnsmasq",
+            rawDnsmasq);
+      }
+    }
+
+    final NetworkSetup setup = new NetworkSetup();
+
+    if (setup.shouldSkip()) {
       return;
     }
 
-    final NetworkArgs.Builder builder = NetworkArgs.builder().name(networkName).type("bridge");
+    final String networkProject = setup.resolveNetworkProject();
+    final String existingNetworkId = setup.resolveExistingNetworkId(networkProject);
 
-    if (networkName.equals(bootstrapContext.config().vmnetNetworkName())) {
-      // Incus restricts non-default projects to OVN networks only; bridges must
-      // live in the default project. Since the rke2lab project inherits
-      // networks from default (features.networks=NO), instances in rke2lab can
-      // still reference vmnet-br as a NIC parent.
-      builder.project("default");
-    } else if (existingNetworkId.isBlank()) {
-      builder.project(bootstrapContext.config().incusProject());
+    if (setup.shouldSkipExistingVmnet(existingNetworkId)) {
+      return;
     }
 
-    if (networkName.equals(bootstrapContext.config().vmnetNetworkName())) {
-      builder.config(vmnetBridgeConfig());
-    }
+    final NetworkArgs networkArgs = setup.buildNetworkArgs(networkProject, existingNetworkId);
+    final CustomResourceOptions resourceOptions = setup.buildNetworkOptions(existingNetworkId);
 
-    final List<String> networkIgnoreChanges = new ArrayList<>(List.of("project"));
-    if (!existingNetworkId.isBlank()) {
-      networkIgnoreChanges.add("config");
-      networkIgnoreChanges.add("remote");
-      networkIgnoreChanges.add("target");
-    }
-
-    final CustomResourceOptions.Builder optionsBuilder =
-        CustomResourceOptions.builder()
-            .provider(context.provider())
-            .retainOnDelete(true)
-            .dependsOn(List.of(projectDependency))
-            .ignoreChanges(networkIgnoreChanges);
-    if (!existingNetworkId.isBlank()) {
-      optionsBuilder.importId(existingNetworkId);
-    }
-
-    new Network("seed-network-" + networkName, builder.build(), optionsBuilder.build());
-  }
-
-  private Map<String, String> vmnetBridgeConfig() {
-    final ClusterNetworkBlueprint managementNodeBlueprint =
-        deriveBlueprint(bootstrapContext.config().nodeName());
-
-    final String clusterGatewayWithPrefix =
-        managementNodeBlueprint.host().clusterGatewayInetaddr().getHostAddress()
-            + "/"
-            + managementNodeBlueprint.host().clusterCidr().prefixLength();
-
-    final String dhcpRange = managementNodeBlueprint.wan().dhcpRange();
-
-    final String rawDnsmasq =
-        CLUSTER_NODE_NAMES.stream()
-            .map(this::deriveBlueprint)
-            .map(
-                blueprint ->
-                    "dhcp-host="
-                        + blueprint.wan().hostMacaddr()
-                        + ","
-                        + blueprint.nodeNetwork().nodeHostInetaddr().getHostAddress()
-                        + ","
-                        + clusterNodeLeaseHostname(blueprint.node().name()))
-            .reduce((left, right) -> left + "\n" + right)
-            .orElse("");
-
-    return Map.of(
-        "ipv4.address",
-        clusterGatewayWithPrefix,
-        "ipv4.nat",
-        "false",
-        "ipv4.dhcp",
-        "true",
-        "ipv4.dhcp.ranges",
-        dhcpRange,
-        "dns.mode",
-        "none",
-        "bridge.driver",
-        "native",
-        "raw.dnsmasq",
-        rawDnsmasq);
+    new Network("seed-network-" + networkName, networkArgs, resourceOptions);
   }
 
   private String clusterNodeLeaseHostname(String nodeName) {
@@ -2125,41 +2210,45 @@ public final class IncusResourceBootstrap {
         ControlplanePolicy policy,
         SystemdTarget systemdTarget) {
       try {
-        if (Files.exists(hostAssetRoot) && directoriesAreIdentical(stagingRoot, hostAssetRoot)) {
-          // No-op deploy: scratch matches host/ byte-for-byte. Discard scratch, don't rotate.
+        if (isNoOpDeploy(stagingRoot, hostAssetRoot)) {
           deleteRecursively(stagingRoot);
           return false;
         }
 
-        // Promote scratch to a numbered slot before any backup/sync so the slot is the canonical
-        // record of this run. Slot eviction (oldest mtime) happens here when retention is full.
-        final int slotSeq = allocateSlot(hostAssetRoot);
+        final int slotSeq = promoteToSlot(stagingRoot, hostAssetRoot);
         final Path slotPath = stagingPathFor(hostAssetRoot, slotSeq);
-        deleteRecursively(slotPath);
-        deleteRecursively(backupPathFor(hostAssetRoot, slotSeq));
-        Files.move(stagingRoot, slotPath);
 
-        // Write manifest to the slot directory for future inspection and renewal selection
         writeSlotManifest(slotPath, slotSeq, config, policy, systemdTarget);
 
-        if (Files.exists(hostAssetRoot)) {
-          // Backup existing state before sync (paired with the staging slot for this run).
-          backup(hostAssetRoot, backupPathFor(hostAssetRoot, slotSeq));
-
-          // Sync staging content to final location (preserves mount point inode)
-          syncDirectories(slotPath, hostAssetRoot);
-        } else {
-          // First deployment: copy staging to final location (keep staging for comparison)
-          backup(slotPath, hostAssetRoot);
-        }
-
-        // Symlink manifest to master level for operator visibility
+        syncToFinal(slotPath, hostAssetRoot, slotSeq);
         symlinkManifestToMasterLevel(hostAssetRoot);
 
         return true;
       } catch (IOException ex) {
         throw new IllegalStateException(
             "Failed to sync staging to final host asset root: " + hostAssetRoot, ex);
+      }
+    }
+
+    private boolean isNoOpDeploy(Path stagingRoot, Path hostAssetRoot) throws IOException {
+      return Files.exists(hostAssetRoot) && directoriesAreIdentical(stagingRoot, hostAssetRoot);
+    }
+
+    private int promoteToSlot(Path stagingRoot, Path hostAssetRoot) throws IOException {
+      final int slotSeq = allocateSlot(hostAssetRoot);
+      final Path slotPath = stagingPathFor(hostAssetRoot, slotSeq);
+      deleteRecursively(slotPath);
+      deleteRecursively(backupPathFor(hostAssetRoot, slotSeq));
+      Files.move(stagingRoot, slotPath);
+      return slotSeq;
+    }
+
+    private void syncToFinal(Path slotPath, Path hostAssetRoot, int slotSeq) throws IOException {
+      if (Files.exists(hostAssetRoot)) {
+        backup(hostAssetRoot, backupPathFor(hostAssetRoot, slotSeq));
+        syncDirectories(slotPath, hostAssetRoot);
+      } else {
+        backup(slotPath, hostAssetRoot);
       }
     }
 

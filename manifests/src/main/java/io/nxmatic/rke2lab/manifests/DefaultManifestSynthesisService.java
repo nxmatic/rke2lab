@@ -2,21 +2,23 @@ package io.nxmatic.rke2lab.manifests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.MappingIterator;
-// FIXME: DomainRegistrars deleted during layers→components migration
-// New domain registration pattern pending implementation
-// import io.nxmatic.rke2lab.manifests.layers.cicd.CicdDomainRegistrar;
-// import io.nxmatic.rke2lab.manifests.layers.cluster.ClusterDomainRegistrar;
-// import io.nxmatic.rke2lab.manifests.layers.clusterapi.ClusterApiDomainRegistrar;
-// import io.nxmatic.rke2lab.manifests.layers.gitops.GitopsDomainRegistrar;
-// import io.nxmatic.rke2lab.manifests.layers.ha.HighAvailabilityDomainRegistrar;
-// import io.nxmatic.rke2lab.manifests.layers.mesh.MeshDomainRegistrar;
-// import io.nxmatic.rke2lab.manifests.layers.networking.NetworkingDomainRegistrar;
-// import io.nxmatic.rke2lab.manifests.layers.platform.PlatformDomainRegistrar;
-// import io.nxmatic.rke2lab.manifests.layers.runtime.RuntimeDomainRegistrar;
-// import io.nxmatic.rke2lab.manifests.layers.storage.StorageDomainRegistrar;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
+import io.nxmatic.rke2lab.cdk8s.systemd.SystemdDropIn;
+import io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget;
+import io.nxmatic.rke2lab.manifests.domain.CicdDomainRegistrar;
+import io.nxmatic.rke2lab.manifests.domain.ClusterApiDomainRegistrar;
+import io.nxmatic.rke2lab.manifests.domain.ClusterDomainRegistrar;
+import io.nxmatic.rke2lab.manifests.domain.GitopsDomainRegistrar;
+import io.nxmatic.rke2lab.manifests.domain.HighAvailabilityDomainRegistrar;
+import io.nxmatic.rke2lab.manifests.domain.MeshDomainRegistrar;
+import io.nxmatic.rke2lab.manifests.domain.NetworkingDomainRegistrar;
+import io.nxmatic.rke2lab.manifests.domain.PlatformDomainRegistrar;
+import io.nxmatic.rke2lab.manifests.domain.RuntimeDomainRegistrar;
+import io.nxmatic.rke2lab.manifests.domain.StorageDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.registry.ManifestAssemblyRegistry;
+import io.nxmatic.rke2lab.manifests.systemd.BootstrapInfrastructureSynthesizer;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -25,8 +27,10 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.cdk8s.App;
 import org.cdk8s.AppProps;
 import org.cdk8s.Chart;
@@ -69,225 +73,38 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
   private ManifestSynthesisResult synthesizeInContext(ManifestSynthesisRequest request)
       throws IOException {
-    final Path synthOutdir = request.synthOutdir();
-    final Path synthManifestFile = request.synthManifestFile();
-    final Path systemdOutdir = synthOutdir.resolve("systemd");
-
-    final App app = new App(AppProps.builder().outdir(synthOutdir.toString()).build());
-    final Chart chart = new Chart(app, "manifests");
-    final SystemdChart systemdChart = new SystemdChart(app, "systemd");
-
-    final ManifestsDomainRegistry configuredDomainRegistry =
-        buildDomainRegistry(request.manifestDomainPolicy().orElse(null));
-
-    final ManifestsDomainRegistry domainRegistry =
-        applyManifestDomainPolicy(request, configuredDomainRegistry);
-
-    final List<ManifestsUnit> manifestUnits =
-        domainRegistry.manifestUnits().stream()
-            .sorted(Comparator.comparing(ManifestsUnit::manifestUnitId))
-            .toList();
-
-    final ManifestAssemblyRegistry assemblyRegistry = new ManifestAssemblyRegistry();
-    final ManifestsUnitRegistry manifestUnitRegistry = new ManifestsUnitRegistry(manifestUnits);
-    final ManifestsUnitVisitor manifestUnitVisitor = new ApplyingManifestsUnitVisitor();
-    final ManifestsUnitDependencyApplier dependencyApplier =
-        new ManifestsUnitDependencyApplier(
-            domainRegistry, manifestUnitRegistry, manifestUnitVisitor, chart, assemblyRegistry);
-
-    LOG.info("Configured {} manifest domains", domainRegistry.domains().size());
-    LOG.debug(
-        "Manifest domains: {}",
-        domainRegistry.domains().stream().map(domain -> domain.domainId()).sorted().toList());
-
-    int manifestUnitHitCount = 0;
-    for (ManifestsUnit manifestUnit : manifestUnits) {
-      manifestUnitHitCount++;
-      LOG.debug("Applying manifest unit '{}'", manifestUnit.manifestUnitId());
-      domainRegistry.applyManifestsUnitWithDomainDependencies(
-          manifestUnit.manifestUnitId(), dependencyApplier);
-    }
-
-    // Create shared domain catalog FIRST (single source of truth for domain IDs)
-    final ManifestDomainCatalog sharedDomainCatalog =
-        ManifestDomainCatalog.builder()
-            .addDefaultDomains()
-            .addDefaultStageALinkableDomains()
-            .build();
-
-    // Create targets FIRST (they're referenced by all services)
-    LOG.debug("Creating systemd targets");
-    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget rke2labTarget =
-        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab")
-            .description("RKE2 Lab Bootstrap Target")
-            .documentation("https://github.com/nxmatic/rke2lab")
-            .wantedBy("multi-user.target");
-
-    // Sub-targets for better organization
-    // Create network target first (base dependency)
-    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget networkTarget =
-        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-network")
-            .description("RKE2 Lab Network Infrastructure Target")
-            .after("network-online.target")
-            .wants("network-online.target")
-            .partOf(rke2labTarget.getUnitFileName())
-            .wantedBy(rke2labTarget.getUnitFileName());
-
-    // Tools target depends on network
-    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget toolsTarget =
-        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-tools")
-            .description("RKE2 Lab Tools and Utilities Target")
-            .after(networkTarget.getUnitFileName())
-            .wants(networkTarget.getUnitFileName())
-            .partOf(rke2labTarget.getUnitFileName())
-            .wantedBy(rke2labTarget.getUnitFileName());
-
-    // Bootstrap target depends on network and tools
-    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget bootstrapTarget =
-        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-bootstrap")
-            .description("RKE2 Lab Early Bootstrap (pre-server)")
-            .after(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName())
-            .requires(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName())
-            .partOf(rke2labTarget.getUnitFileName())
-            .wantedBy(rke2labTarget.getUnitFileName())
-            .also(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName());
-
-    // Manifests target comes after bootstrap and rke2-server
-    // Uses WantedBy=rke2-server.service to auto-start when rke2-server starts
-    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget manifestsTarget =
-        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-manifests")
-            .description("RKE2 Lab Manifest Installers (post-server)")
-            .after(bootstrapTarget.getUnitFileName(), "rke2-server.service")
-            .requires("rke2-server.service")
-            .partOf(rke2labTarget.getUnitFileName())
-            .wantedBy("rke2-server.service");
-
-    // Secrets target comes after manifests (may depend on manifests being installed)
-    final io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget secretsTarget =
-        new io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget(systemdChart, "rke2lab-secrets")
-            .description("RKE2 Lab Secrets Installers (post-server)")
-            .after(
-                bootstrapTarget.getUnitFileName(),
-                manifestsTarget.getUnitFileName(),
-                "rke2-server.service")
-            .requires("rke2-server.service")
-            .partOf(rke2labTarget.getUnitFileName())
-            .wantedBy(rke2labTarget.getUnitFileName());
-
-    // Create synthesis context with target references and shared catalog
-    final io.nxmatic.rke2lab.manifests.SystemdSynthesisContext systemdContext =
-        new io.nxmatic.rke2lab.manifests.SystemdSynthesisContext(
-            rke2labTarget,
-            bootstrapTarget,
-            manifestsTarget,
-            secretsTarget,
-            networkTarget,
-            toolsTarget,
-            sharedDomainCatalog);
-
-    // Bootstrap and infrastructure services MUST be created first (domains may reference them)
-    LOG.debug("Synthesizing bootstrap and infrastructure systemd units");
-    new io.nxmatic.rke2lab.manifests.systemd.BootstrapInfrastructureSynthesizer(
-            systemdChart, systemdContext)
-        .synthesizeAll();
-
-    // Now domains can reference both targets and bootstrap services
-    for (ManifestsDomain domain : domainRegistry.domains()) {
-      LOG.debug("Synthesizing systemd units for domain '{}'", domain.domainId());
-      domain.synthesizeSystemdUnits(systemdChart, systemdContext);
-    }
-
-    // Add explicit dependencies to main target (makes hierarchy visible)
-    LOG.debug("Configuring main rke2lab.target dependencies");
-    rke2labTarget
-        .after(
-            networkTarget.getUnitFileName(),
-            toolsTarget.getUnitFileName(),
-            bootstrapTarget.getUnitFileName(),
-            "rke2-server.service")
-        .wants(
-            networkTarget.getUnitFileName(),
-            toolsTarget.getUnitFileName(),
-            bootstrapTarget.getUnitFileName(),
-            manifestsTarget.getUnitFileName(),
-            secretsTarget.getUnitFileName(),
-            "rke2-server.service");
-
-    // Finalize target dependencies (add reciprocal Wants= from services' WantedBy=)
-    LOG.debug("Finalizing systemd target dependencies");
-    systemdChart.finalizeTargetDependencies();
-
-    // Create drop-in for rke2-server to integrate pre/post-start hooks and manifests.target
-    LOG.debug("Creating rke2-server.service drop-in for lifecycle hooks");
-    new io.nxmatic.rke2lab.cdk8s.systemd.SystemdDropIn(
-            systemdChart, "rke2lab-server-hooks", "rke2-server.service")
-        .execStartPre("/srv/host/systemd-scripts.d/rke2lab-server-pre-start.sh")
-        .execStartPost("/srv/host/systemd-scripts.d/rke2lab-server-post-start.sh")
-        .wants(manifestsTarget.getUnitFileName());
-
-    LOG.info("Calling app.synth() to synthesize K8s manifests to: {}", synthOutdir);
-    app.synth();
-    LOG.info("app.synth() completed, now synthesizing systemd units to: {}", systemdOutdir);
-    systemdChart.synthesize(systemdOutdir);
-    LOG.info("systemdChart.synthesize() completed");
-
-    // CDK8s adds numeric prefixes when multiple charts exist in App tree
-    // Find the K8s manifest file with pattern matching
-    Path synthesizedFile = null;
-    try (var files = Files.list(synthOutdir)) {
-      synthesizedFile =
-          files
-              .filter(
-                  p -> {
-                    String name = p.getFileName().toString();
-                    return name.endsWith("-manifests.k8s.yaml")
-                        || name.equals("manifests.k8s.yaml");
-                  })
-              .findFirst()
-              .orElse(null);
-    }
-
-    if (synthesizedFile == null || !Files.exists(synthesizedFile)) {
-      throw new IllegalStateException(
-          "Expected synthesized manifest file (manifests.k8s.yaml or *-manifests.k8s.yaml) is missing in: "
-              + synthOutdir);
-    }
-
-    enforceLiteralBlockStyleForConfigMapScripts(synthesizedFile);
-
-    Files.createDirectories(synthManifestFile.getParent());
-    Files.move(synthesizedFile, synthManifestFile, StandardCopyOption.REPLACE_EXISTING);
-
-    LOG.info(
-        "Synthesized K8s manifests and systemd units from canonical manifest units (manifest unit hits={})",
-        manifestUnitHitCount);
-
-    return new ManifestSynthesisResult(
-        synthManifestFile, systemdOutdir, manifestUnitHitCount, domainRegistry.domains().size());
+    return new SynthesisPipeline(request)
+        .onFailure((topic, cause) -> LOG.error("Synthesis failed in topic '{}'", topic, cause))
+        .during("cdk8s setup", setup -> setup.createChartsAndPaths())
+        .then()
+        .during("domain registry", registry -> registry.buildAndApplyUnits())
+        .then()
+        .during("systemd targets", targets -> targets.createTargetHierarchy())
+        .then()
+        .during("systemd units", units -> units.synthesizeInfrastructureAndDomains())
+        .then()
+        .during("target finalization", finalization -> finalization.finalizeAndCreateDropIn())
+        .then()
+        .during("synthesis", synthesis -> synthesis.synthAndPostprocess())
+        .complete();
   }
 
   private ManifestsDomainRegistry buildDomainRegistry(ManifestDomainPolicy policy) {
-    // FIXME: Temporarily disabled during layers→components migration
-    // DomainRegistrars deleted, new domain registration pattern pending
-    throw new UnsupportedOperationException(
-        "Domain registration temporarily disabled during layers→components migration. "
-            + "DomainRegistrars have been deleted; new domain pattern pending implementation.");
+    final ManifestDomainPolicy effectivePolicy =
+        policy != null ? policy : ManifestDomainPolicy.builder().build();
 
-    // final ManifestDomainPolicy effectivePolicy =
-    //     policy != null ? policy : ManifestDomainPolicy.builder().build();
-    //
-    // return new ManifestsDomainRegistryBuilder()
-    //     .register(new ClusterDomainRegistrar(), effectivePolicy)
-    //     .register(new StorageDomainRegistrar(), effectivePolicy)
-    //     .register(new GitopsDomainRegistrar(), effectivePolicy)
-    //     .register(new RuntimeDomainRegistrar(), effectivePolicy)
-    //     .register(new NetworkingDomainRegistrar(), effectivePolicy)
-    //     .register(new MeshDomainRegistrar(), effectivePolicy)
-    //     .register(new HighAvailabilityDomainRegistrar(), effectivePolicy)
-    //     .register(new CicdDomainRegistrar(), effectivePolicy)
-    //     .register(new ClusterApiDomainRegistrar(), effectivePolicy)
-    //     .register(new PlatformDomainRegistrar(), effectivePolicy)
-    //     .build();
+    return new ManifestsDomainRegistryBuilder()
+        .register(new ClusterDomainRegistrar(), effectivePolicy)
+        .register(new StorageDomainRegistrar(), effectivePolicy)
+        .register(new GitopsDomainRegistrar(), effectivePolicy)
+        .register(new RuntimeDomainRegistrar(), effectivePolicy)
+        .register(new NetworkingDomainRegistrar(), effectivePolicy)
+        .register(new MeshDomainRegistrar(), effectivePolicy)
+        .register(new HighAvailabilityDomainRegistrar(), effectivePolicy)
+        .register(new CicdDomainRegistrar(), effectivePolicy)
+        .register(new ClusterApiDomainRegistrar(), effectivePolicy)
+        .register(new PlatformDomainRegistrar(), effectivePolicy)
+        .build();
   }
 
   private ManifestsDomainRegistry applyManifestDomainPolicy(
@@ -300,7 +117,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     final Map<String, ManifestsDomain> configuredDomainsById =
         configuredDomainRegistry.domains().stream()
             .collect(
-                java.util.stream.Collectors.toMap(
+                Collectors.toMap(
                     ManifestsDomain::domainId,
                     domain -> domain,
                     (left, right) -> left,
@@ -404,7 +221,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
   }
 
   private boolean isScriptLikeConfigMapKey(String dataKey) {
-    final String key = dataKey.toLowerCase(java.util.Locale.ROOT);
+    final String key = dataKey.toLowerCase(Locale.ROOT);
     return SCRIPT_DATA_SUFFIXES.stream().anyMatch(key::endsWith) || key.contains("script");
   }
 
@@ -417,5 +234,525 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
       normalized = normalized + "\n";
     }
     return normalized;
+  }
+
+  @FunctionalInterface
+  interface OnFailure {
+    void accept(String topic, Throwable cause);
+  }
+
+  static final class PipelineStageFailure extends RuntimeException {
+    private final String topic;
+
+    PipelineStageFailure(String topic, Throwable cause) {
+      super("Pipeline stage '" + topic + "' failed: " + cause.getMessage(), cause);
+      this.topic = topic;
+    }
+
+    String topic() {
+      return topic;
+    }
+  }
+
+  /**
+   * Inner non-static pipeline for manifest synthesis workflow. Follows fluent grammar pattern from
+   * docs/fluent-pipeline-grammar.adoc.
+   *
+   * <p>Structure: setup → registry → targets → units → finalization → synthesis
+   */
+  final class SynthesisPipeline {
+    private final ManifestSynthesisRequest request;
+
+    SynthesisPipeline(ManifestSynthesisRequest request) {
+      this.request = request;
+    }
+
+    AwaitingOnFailure onFailure(OnFailure handler) {
+      return new AwaitingOnFailure(
+          new State(DefaultManifestSynthesisService.this, request, handler));
+    }
+
+    private static final class State {
+      final DefaultManifestSynthesisService service;
+      final ManifestSynthesisRequest request;
+      final OnFailure onFailure;
+
+      App app;
+      Chart chart;
+      SystemdChart systemdChart;
+      Path synthOutdir;
+      Path synthManifestFile;
+      Path systemdOutdir;
+
+      ManifestsDomainRegistry domainRegistry;
+      int manifestUnitHitCount;
+
+      ManifestDomainCatalog domainCatalog;
+
+      SystemdTarget rke2labTarget;
+      SystemdTarget networkTarget;
+      SystemdTarget toolsTarget;
+      SystemdTarget bootstrapTarget;
+      SystemdTarget manifestsTarget;
+      SystemdTarget secretsTarget;
+      SystemdSynthesisContext systemdContext;
+
+      State(
+          DefaultManifestSynthesisService service,
+          ManifestSynthesisRequest request,
+          OnFailure onFailure) {
+        this.service = service;
+        this.request = request;
+        this.onFailure = onFailure;
+      }
+    }
+
+    static final class AwaitingOnFailure {
+      private final State state;
+
+      AwaitingOnFailure(State state) {
+        this.state = state;
+      }
+
+      Cdk8sSetupDone during(
+          String topic, java.util.function.Function<Cdk8sSetupStage, Cdk8sSetupStage> body) {
+        final Cdk8sSetupStage stage = new Cdk8sSetupStage(state);
+        runDuring("manifest-synthesis", topic, stage, body, state.onFailure);
+        return new Cdk8sSetupDone(state);
+      }
+    }
+
+    static final class Cdk8sSetupStage {
+      private final State state;
+
+      Cdk8sSetupStage(State state) {
+        this.state = state;
+      }
+
+      Cdk8sSetupStage createChartsAndPaths() {
+        state.synthOutdir = state.request.synthOutdir();
+        state.synthManifestFile = state.request.synthManifestFile();
+        state.systemdOutdir = state.synthOutdir.resolve("systemd");
+
+        state.app = new App(AppProps.builder().outdir(state.synthOutdir.toString()).build());
+        state.chart = new Chart(state.app, "manifests");
+        state.systemdChart = new SystemdChart(state.app, "systemd");
+
+        return this;
+      }
+    }
+
+    static final class Cdk8sSetupDone {
+      private final State state;
+
+      Cdk8sSetupDone(State state) {
+        this.state = state;
+      }
+
+      AwaitingDomainRegistry then() {
+        return new AwaitingDomainRegistry(state);
+      }
+    }
+
+    static final class AwaitingDomainRegistry {
+      private final State state;
+
+      AwaitingDomainRegistry(State state) {
+        this.state = state;
+      }
+
+      DomainRegistryDone during(
+          String topic,
+          java.util.function.Function<DomainRegistryStage, DomainRegistryStage> body) {
+        final DomainRegistryStage stage = new DomainRegistryStage(state);
+        runDuring("manifest-synthesis", topic, stage, body, state.onFailure);
+        return new DomainRegistryDone(state);
+      }
+    }
+
+    static final class DomainRegistryStage {
+      private final State state;
+
+      DomainRegistryStage(State state) {
+        this.state = state;
+      }
+
+      DomainRegistryStage buildAndApplyUnits() {
+        final ManifestsDomainRegistry configuredDomainRegistry =
+            state.service.buildDomainRegistry(state.request.manifestDomainPolicy().orElse(null));
+
+        state.domainRegistry =
+            state.service.applyManifestDomainPolicy(state.request, configuredDomainRegistry);
+
+        final List<ManifestsUnit> manifestUnits =
+            state.domainRegistry.manifestUnits().stream()
+                .sorted(Comparator.comparing(ManifestsUnit::manifestUnitId))
+                .toList();
+
+        final ManifestAssemblyRegistry assemblyRegistry = new ManifestAssemblyRegistry();
+        final ManifestsUnitRegistry manifestUnitRegistry = new ManifestsUnitRegistry(manifestUnits);
+        final ManifestsUnitVisitor manifestUnitVisitor = new ApplyingManifestsUnitVisitor();
+        final ManifestsUnitDependencyApplier dependencyApplier =
+            new ManifestsUnitDependencyApplier(
+                state.domainRegistry,
+                manifestUnitRegistry,
+                manifestUnitVisitor,
+                state.chart,
+                assemblyRegistry);
+
+        LOG.info("Configured {} manifest domains", state.domainRegistry.domains().size());
+        LOG.debug(
+            "Manifest domains: {}",
+            state.domainRegistry.domains().stream()
+                .map(ManifestsDomain::domainId)
+                .sorted()
+                .toList());
+
+        state.manifestUnitHitCount = 0;
+        for (ManifestsUnit manifestUnit : manifestUnits) {
+          state.manifestUnitHitCount++;
+          LOG.debug("Applying manifest unit '{}'", manifestUnit.manifestUnitId());
+          state.domainRegistry.applyManifestsUnitWithDomainDependencies(
+              manifestUnit.manifestUnitId(), dependencyApplier);
+        }
+
+        return this;
+      }
+    }
+
+    static final class DomainRegistryDone {
+      private final State state;
+
+      DomainRegistryDone(State state) {
+        this.state = state;
+      }
+
+      AwaitingSystemdTargets then() {
+        return new AwaitingSystemdTargets(state);
+      }
+    }
+
+    static final class AwaitingSystemdTargets {
+      private final State state;
+
+      AwaitingSystemdTargets(State state) {
+        this.state = state;
+      }
+
+      SystemdTargetsDone during(
+          String topic,
+          java.util.function.Function<SystemdTargetsStage, SystemdTargetsStage> body) {
+        final SystemdTargetsStage stage = new SystemdTargetsStage(state);
+        runDuring("manifest-synthesis", topic, stage, body, state.onFailure);
+        return new SystemdTargetsDone(state);
+      }
+    }
+
+    static final class SystemdTargetsStage {
+      private final State state;
+
+      SystemdTargetsStage(State state) {
+        this.state = state;
+      }
+
+      SystemdTargetsStage createTargetHierarchy() {
+        state.domainCatalog =
+            ManifestDomainCatalog.builder()
+                .addDefaultDomains()
+                .addDefaultStageALinkableDomains()
+                .build();
+
+        LOG.debug("Creating systemd targets");
+        state.rke2labTarget =
+            new SystemdTarget(state.systemdChart, "rke2lab")
+                .description("RKE2 Lab Bootstrap Target")
+                .documentation("https://github.com/nxmatic/rke2lab")
+                .wantedBy("multi-user.target");
+
+        state.networkTarget =
+            new SystemdTarget(state.systemdChart, "rke2lab-network")
+                .description("RKE2 Lab Network Infrastructure Target")
+                .after("network-online.target")
+                .wants("network-online.target")
+                .partOf(state.rke2labTarget.getUnitFileName())
+                .wantedBy(state.rke2labTarget.getUnitFileName());
+
+        state.toolsTarget =
+            new SystemdTarget(state.systemdChart, "rke2lab-tools")
+                .description("RKE2 Lab Tools and Utilities Target")
+                .after(state.networkTarget.getUnitFileName())
+                .wants(state.networkTarget.getUnitFileName())
+                .partOf(state.rke2labTarget.getUnitFileName())
+                .wantedBy(state.rke2labTarget.getUnitFileName());
+
+        state.bootstrapTarget =
+            new SystemdTarget(state.systemdChart, "rke2lab-bootstrap")
+                .description("RKE2 Lab Early Bootstrap (pre-server)")
+                .after(state.networkTarget.getUnitFileName(), state.toolsTarget.getUnitFileName())
+                .requires(
+                    state.networkTarget.getUnitFileName(), state.toolsTarget.getUnitFileName())
+                .partOf(state.rke2labTarget.getUnitFileName())
+                .wantedBy(state.rke2labTarget.getUnitFileName())
+                .also(state.networkTarget.getUnitFileName(), state.toolsTarget.getUnitFileName());
+
+        state.manifestsTarget =
+            new SystemdTarget(state.systemdChart, "rke2lab-manifests")
+                .description("RKE2 Lab Manifest Installers (post-server)")
+                .after(state.bootstrapTarget.getUnitFileName(), "rke2-server.service")
+                .requires("rke2-server.service")
+                .partOf(state.rke2labTarget.getUnitFileName())
+                .wantedBy("rke2-server.service");
+
+        state.secretsTarget =
+            new SystemdTarget(state.systemdChart, "rke2lab-secrets")
+                .description("RKE2 Lab Secrets Installers (post-server)")
+                .after(
+                    state.bootstrapTarget.getUnitFileName(),
+                    state.manifestsTarget.getUnitFileName(),
+                    "rke2-server.service")
+                .requires("rke2-server.service")
+                .partOf(state.rke2labTarget.getUnitFileName())
+                .wantedBy(state.rke2labTarget.getUnitFileName());
+
+        state.systemdContext =
+            new SystemdSynthesisContext(
+                state.rke2labTarget,
+                state.bootstrapTarget,
+                state.manifestsTarget,
+                state.secretsTarget,
+                state.networkTarget,
+                state.toolsTarget,
+                state.domainCatalog);
+
+        return this;
+      }
+    }
+
+    static final class SystemdTargetsDone {
+      private final State state;
+
+      SystemdTargetsDone(State state) {
+        this.state = state;
+      }
+
+      AwaitingSystemdUnits then() {
+        return new AwaitingSystemdUnits(state);
+      }
+    }
+
+    static final class AwaitingSystemdUnits {
+      private final State state;
+
+      AwaitingSystemdUnits(State state) {
+        this.state = state;
+      }
+
+      SystemdUnitsDone during(
+          String topic, java.util.function.Function<SystemdUnitsStage, SystemdUnitsStage> body) {
+        final SystemdUnitsStage stage = new SystemdUnitsStage(state);
+        runDuring("manifest-synthesis", topic, stage, body, state.onFailure);
+        return new SystemdUnitsDone(state);
+      }
+    }
+
+    static final class SystemdUnitsStage {
+      private final State state;
+
+      SystemdUnitsStage(State state) {
+        this.state = state;
+      }
+
+      SystemdUnitsStage synthesizeInfrastructureAndDomains() {
+        LOG.debug("Synthesizing bootstrap and infrastructure systemd units");
+        new BootstrapInfrastructureSynthesizer(state.systemdChart, state.systemdContext)
+            .synthesizeAll();
+
+        for (ManifestsDomain domain : state.domainRegistry.domains()) {
+          LOG.debug("Synthesizing systemd units for domain '{}'", domain.domainId());
+          domain.synthesizeSystemdUnits(state.systemdChart, state.systemdContext);
+        }
+
+        return this;
+      }
+    }
+
+    static final class SystemdUnitsDone {
+      private final State state;
+
+      SystemdUnitsDone(State state) {
+        this.state = state;
+      }
+
+      AwaitingTargetFinalization then() {
+        return new AwaitingTargetFinalization(state);
+      }
+    }
+
+    static final class AwaitingTargetFinalization {
+      private final State state;
+
+      AwaitingTargetFinalization(State state) {
+        this.state = state;
+      }
+
+      TargetFinalizationDone during(
+          String topic,
+          java.util.function.Function<TargetFinalizationStage, TargetFinalizationStage> body) {
+        final TargetFinalizationStage stage = new TargetFinalizationStage(state);
+        runDuring("manifest-synthesis", topic, stage, body, state.onFailure);
+        return new TargetFinalizationDone(state);
+      }
+    }
+
+    static final class TargetFinalizationStage {
+      private final State state;
+
+      TargetFinalizationStage(State state) {
+        this.state = state;
+      }
+
+      TargetFinalizationStage finalizeAndCreateDropIn() {
+        LOG.debug("Configuring main rke2lab.target dependencies");
+        state
+            .rke2labTarget
+            .after(
+                state.networkTarget.getUnitFileName(),
+                state.toolsTarget.getUnitFileName(),
+                state.bootstrapTarget.getUnitFileName(),
+                "rke2-server.service")
+            .wants(
+                state.networkTarget.getUnitFileName(),
+                state.toolsTarget.getUnitFileName(),
+                state.bootstrapTarget.getUnitFileName(),
+                state.manifestsTarget.getUnitFileName(),
+                state.secretsTarget.getUnitFileName(),
+                "rke2-server.service");
+
+        LOG.debug("Finalizing systemd target dependencies");
+        state.systemdChart.finalizeTargetDependencies();
+
+        LOG.debug("Creating rke2-server.service drop-in for lifecycle hooks");
+        new SystemdDropIn(state.systemdChart, "rke2lab-server-hooks", "rke2-server.service")
+            .execStartPre("/srv/host/systemd-scripts.d/rke2lab-server-pre-start.sh")
+            .execStartPost("/srv/host/systemd-scripts.d/rke2lab-server-post-start.sh")
+            .wants(state.manifestsTarget.getUnitFileName());
+
+        return this;
+      }
+    }
+
+    static final class TargetFinalizationDone {
+      private final State state;
+
+      TargetFinalizationDone(State state) {
+        this.state = state;
+      }
+
+      AwaitingSynthesis then() {
+        return new AwaitingSynthesis(state);
+      }
+    }
+
+    static final class AwaitingSynthesis {
+      private final State state;
+
+      AwaitingSynthesis(State state) {
+        this.state = state;
+      }
+
+      SynthesisDone during(
+          String topic, java.util.function.Function<SynthesisStage, SynthesisStage> body) {
+        final SynthesisStage stage = new SynthesisStage(state);
+        runDuring("manifest-synthesis", topic, stage, body, state.onFailure);
+        return new SynthesisDone(state);
+      }
+    }
+
+    static final class SynthesisStage {
+      private final State state;
+
+      SynthesisStage(State state) {
+        this.state = state;
+      }
+
+      SynthesisStage synthAndPostprocess() {
+        try {
+          LOG.info("Calling app.synth() to synthesize K8s manifests to: {}", state.synthOutdir);
+          state.app.synth();
+          LOG.info(
+              "app.synth() completed, now synthesizing systemd units to: {}", state.systemdOutdir);
+          state.systemdChart.synthesize(state.systemdOutdir);
+          LOG.info("systemdChart.synthesize() completed");
+
+          Path synthesizedFile = null;
+          try (var files = Files.list(state.synthOutdir)) {
+            synthesizedFile =
+                files
+                    .filter(
+                        p -> {
+                          String name = p.getFileName().toString();
+                          return name.endsWith("-manifests.k8s.yaml")
+                              || name.equals("manifests.k8s.yaml");
+                        })
+                    .findFirst()
+                    .orElse(null);
+          }
+
+          if (synthesizedFile == null || !Files.exists(synthesizedFile)) {
+            throw new IllegalStateException(
+                "Expected synthesized manifest file (manifests.k8s.yaml or *-manifests.k8s.yaml) is missing in: "
+                    + state.synthOutdir);
+          }
+
+          state.service.enforceLiteralBlockStyleForConfigMapScripts(synthesizedFile);
+
+          Files.createDirectories(state.synthManifestFile.getParent());
+          Files.move(synthesizedFile, state.synthManifestFile, StandardCopyOption.REPLACE_EXISTING);
+
+          LOG.info(
+              "Synthesized K8s manifests and systemd units from canonical manifest units (manifest unit hits={})",
+              state.manifestUnitHitCount);
+
+          return this;
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      }
+    }
+
+    static final class SynthesisDone {
+      private final State state;
+
+      SynthesisDone(State state) {
+        this.state = state;
+      }
+
+      ManifestSynthesisResult complete() {
+        return new ManifestSynthesisResult(
+            state.synthManifestFile,
+            state.systemdOutdir,
+            state.manifestUnitHitCount,
+            state.domainRegistry.domains().size());
+      }
+    }
+
+    private static <S> void runDuring(
+        String scope,
+        String topic,
+        S stage,
+        java.util.function.Function<S, S> body,
+        OnFailure onFailure) {
+      LOG.debug("→ entering {}", topic);
+      final long start = System.nanoTime();
+      try {
+        body.apply(stage);
+      } catch (Throwable cause) {
+        onFailure.accept(topic, cause);
+        throw new PipelineStageFailure(topic, cause);
+      } finally {
+        final long elapsed = System.nanoTime() - start;
+        LOG.debug("← leaving {} (elapsed: {} ms)", topic, elapsed / 1_000_000);
+      }
+    }
   }
 }

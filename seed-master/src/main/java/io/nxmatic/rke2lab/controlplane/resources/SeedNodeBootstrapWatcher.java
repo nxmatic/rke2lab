@@ -26,12 +26,14 @@ public final class SeedNodeBootstrapWatcher {
     // Utility class
   }
 
+  public record WaitConfig(
+      Duration timeout, Duration retryInterval, Duration progressLogInterval) {}
+
   public static boolean waitForBootstrapPreconditions(
-      BootstrapConfig config,
-      Duration timeout,
-      Duration retryInterval,
-      Duration progressLogInterval,
-      Consumer<String> logger) {
+      BootstrapConfig config, WaitConfig waitConfig, Consumer<String> logger) {
+    final Duration timeout = waitConfig.timeout();
+    final Duration retryInterval = waitConfig.retryInterval();
+    final Duration progressLogInterval = waitConfig.progressLogInterval();
     final Consumer<String> effectiveLogger = logger == null ? message -> {} : logger;
     final Path snapshotPath = resolveSnapshotPath(config);
     effectiveLogger.accept(
@@ -63,15 +65,16 @@ public final class SeedNodeBootstrapWatcher {
       }
 
       lastSummary =
-          renderYamlSummary(
-              probeStatus,
-              mandatoryTarget,
-              mandatoryTargetState,
-              pendingJobCount,
-              failedUnitCount,
-              hostContext,
-              statusSnapshot,
-              adapterSummary);
+          YamlSummaryContext.builder()
+              .probeStatus(probeStatus)
+              .mandatoryTarget(mandatoryTarget)
+              .mandatoryTargetState(mandatoryTargetState)
+              .pendingJobCount(pendingJobCount)
+              .failedUnitCount(failedUnitCount)
+              .hostContext(hostContext)
+              .statusSnapshot(statusSnapshot)
+              .adapterSummary(adapterSummary)
+              .render();
       writeSnapshot(snapshotPath, lastSummary, effectiveLogger);
 
       final long now = System.nanoTime();
@@ -140,7 +143,7 @@ public final class SeedNodeBootstrapWatcher {
               .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
               .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR));
 
-  private static String renderYamlSummary(
+  record YamlSummaryContext(
       String probeStatus,
       String mandatoryTarget,
       String mandatoryTargetState,
@@ -149,36 +152,112 @@ public final class SeedNodeBootstrapWatcher {
       String hostContext,
       Map<String, Object> statusSnapshot,
       String adapterSummary) {
-    final Map<String, Object> root = new LinkedHashMap<>();
-    root.put("status", probeStatus);
-    final Map<String, Object> target = new LinkedHashMap<>();
-    target.put("unit", mandatoryTarget);
-    target.put("state", mandatoryTargetState);
-    root.put("mandatoryTarget", target);
-    root.put("pendingJobs", pendingJobCount);
 
-    final Object pendingJobsDetail = statusSnapshot.get("pendingJobDetails");
+    static Builder builder() {
+      return new Builder();
+    }
+
+    static final class Builder {
+      private String probeStatus;
+      private String mandatoryTarget;
+      private String mandatoryTargetState;
+      private int pendingJobCount;
+      private int failedUnitCount;
+      private String hostContext;
+      private Map<String, Object> statusSnapshot;
+      private String adapterSummary;
+
+      private Builder() {}
+
+      Builder probeStatus(String probeStatus) {
+        this.probeStatus = probeStatus;
+        return this;
+      }
+
+      Builder mandatoryTarget(String mandatoryTarget) {
+        this.mandatoryTarget = mandatoryTarget;
+        return this;
+      }
+
+      Builder mandatoryTargetState(String mandatoryTargetState) {
+        this.mandatoryTargetState = mandatoryTargetState;
+        return this;
+      }
+
+      Builder pendingJobCount(int pendingJobCount) {
+        this.pendingJobCount = pendingJobCount;
+        return this;
+      }
+
+      Builder failedUnitCount(int failedUnitCount) {
+        this.failedUnitCount = failedUnitCount;
+        return this;
+      }
+
+      Builder hostContext(String hostContext) {
+        this.hostContext = hostContext;
+        return this;
+      }
+
+      Builder statusSnapshot(Map<String, Object> statusSnapshot) {
+        this.statusSnapshot = statusSnapshot;
+        return this;
+      }
+
+      Builder adapterSummary(String adapterSummary) {
+        this.adapterSummary = adapterSummary;
+        return this;
+      }
+
+      YamlSummaryContext build() {
+        return new YamlSummaryContext(
+            probeStatus,
+            mandatoryTarget,
+            mandatoryTargetState,
+            pendingJobCount,
+            failedUnitCount,
+            hostContext,
+            statusSnapshot,
+            adapterSummary);
+      }
+
+      String render() {
+        return renderYamlSummary(build());
+      }
+    }
+  }
+
+  private static String renderYamlSummary(YamlSummaryContext context) {
+    final Map<String, Object> root = new LinkedHashMap<>();
+    root.put("status", context.probeStatus());
+    final Map<String, Object> target = new LinkedHashMap<>();
+    target.put("unit", context.mandatoryTarget());
+    target.put("state", context.mandatoryTargetState());
+    root.put("mandatoryTarget", target);
+    root.put("pendingJobs", context.pendingJobCount());
+
+    final Object pendingJobsDetail = context.statusSnapshot().get("pendingJobDetails");
     if (pendingJobsDetail instanceof Map<?, ?> pendingJobsMap && !pendingJobsMap.isEmpty()) {
       root.put("pendingJobDetails", pendingJobsMap);
     }
 
-    root.put("failedUnits", failedUnitCount);
+    root.put("failedUnits", context.failedUnitCount());
 
-    final Object failedUnitsDetail = statusSnapshot.get("failedUnitDetails");
+    final Object failedUnitsDetail = context.statusSnapshot().get("failedUnitDetails");
     if (failedUnitsDetail instanceof Map<?, ?> failedMap && !failedMap.isEmpty()) {
       root.put("failedUnitDetails", failedMap);
     }
 
-    root.put("hostContext", hostContext);
+    root.put("hostContext", context.hostContext());
 
-    final Object rawPending = statusSnapshot.get("pendingDependencies");
+    final Object rawPending = context.statusSnapshot().get("pendingDependencies");
     if (rawPending instanceof Map<?, ?> pendingMap && !pendingMap.isEmpty()) {
       root.put("pendingDependencies", pendingMap);
     } else {
       root.put("pendingDependencies", "none");
     }
 
-    root.put("summary", adapterSummary);
+    root.put("summary", context.adapterSummary());
 
     try {
       return YAML_MAPPER.writeValueAsString(root).stripTrailing();

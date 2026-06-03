@@ -53,7 +53,9 @@ public final class ClusterBootstrapReadinessVerifier {
     logInfo("timeouts: kubeconfig=" + timeout + ", api=" + timeout + ", controllers=" + timeout);
 
     if (!SeedNodeBootstrapWatcher.waitForBootstrapPreconditions(
-        config, timeout, RETRY_INTERVAL, LOG_PROGRESS_INTERVAL, bootstrapWatcherLogger)) {
+        config,
+        new SeedNodeBootstrapWatcher.WaitConfig(timeout, RETRY_INTERVAL, LOG_PROGRESS_INTERVAL),
+        bootstrapWatcherLogger)) {
       logInfo("readiness failed: seed node systemd/bootstrap gate did not converge in time");
       return VerificationResult.failed(
           false,

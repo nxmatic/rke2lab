@@ -34,6 +34,8 @@ When you encounter a builder with three or more boolean parameters or a sequence
 - **Multi-parameter methods**: When you encounter methods with 3+ parameters (especially booleans), note them as candidates for pipeline-based implementation. Consider whether the fluent grammar or a builder would improve readability and type safety.
 - **Prefer instances over helpers**: Pass object instances through the call graph rather than creating static helper methods. This makes dependencies explicit, enables testing/mocking, and keeps state encapsulated. See "Instance-passing discipline" below.
 - **Single source of truth for identifiers**: Use typed accessor methods from canonical registries (like `ManifestDomainCatalog`) instead of hardcoded string literals. This prevents identifier mismatches like the `clusterApi` bug where `"clusterApi"` string didn't match catalog's `"cluster-api"` ID. See "ManifestDomainCatalog discipline" below.
+- **No instances with incomplete state**: Never create objects with `null` scope, missing required fields, or partial initialization. If construction must be deferred, use Supplier/Factory pattern or interface static factory methods. See "Lazy instantiation pattern" below.
+- **Absolute uniformity in pattern implementation**: When N classes implement a pattern, ALL N must be identical — no "legacy" variants, no half-migrated code. Refactoring is atomic: migrate all or none. See "Uniformity enforcement" below.
 
 ### Instance-passing discipline
 
@@ -160,6 +162,157 @@ manifestDomain.put("clusterApi", policy.isEnabled("clusterApi")); // ❌ Mismatc
 - Grep in code review: `! grep -r 'isEnabled("' manifests/src/ seed-master/src/`
 - When adding a new domain, add the accessor method to `ManifestDomainCatalog` first
 - See `docs/manifest-domain-catalog-pattern.adoc` for full pattern documentation
+
+### Lazy instantiation pattern
+
+**Never create objects with incomplete state.** If an object requires constructor arguments not yet available (e.g., CDK8s Construct needing a Chart scope), use lazy instantiation.
+
+**Pattern**: Interface provides static factory method that returns anonymous implementation holding only metadata. Real instance created on-demand when arguments become available.
+
+**Example** (from ManifestsUnit):
+
+```java
+public interface ManifestsUnit {
+  static ManifestsUnit lazy(
+      String manifestUnitId,
+      List<String> dependsOnManifestsUnitIds,
+      BiFunction<Construct, String, ? extends ManifestsUnit> factory) {
+    return new ManifestsUnit() {
+      @Override public String manifestUnitId() { return manifestUnitId; }
+      @Override public List<String> dependsOnManifestsUnitIds() { return dependsOnManifestsUnitIds; }
+      @Override public void apply(Chart chart) {
+        factory.apply(chart, manifestUnitId.replace("/", "-"));
+      }
+    };
+  }
+}
+
+// Usage in registrar:
+ManifestsUnit.lazy(
+    XxxManifestsUnit.MANIFEST_UNIT_ID,
+    List.of(),
+    XxxManifestsUnit::new  // method reference to (Construct, String) constructor
+)
+```
+
+**Why this pattern**:
+
+1. No objects with `null` or incomplete state
+2. Type-safe: method reference verifies constructor signature at compile time
+3. Clean: factory lives in the interface, no separate wrapper class needed
+4. Defers construction until arguments available, avoiding "create then reinitialize" anti-pattern
+
+**Anti-patterns**:
+
+- ❌ `new XxxUnit(null, "temp")` — incomplete state
+- ❌ Separate `LazyXxxUnit` wrapper class — verbose, couples pattern to specific type
+- ❌ No-arg constructor + separate `initialize()` method — allows usage before initialization
+
+**When to apply**: Any time construction arguments aren't available at object creation time.
+
+### Local classes vs inner classes
+
+**Prefer local classes (defined within methods) over inner classes when the class is only used in that single method.** This reduces namespace pollution and makes the scope explicit.
+
+**When to use local classes:**
+
+- Class is used in only one method
+- Class is simple and short (< ~50 lines total)
+- Class encapsulates method-specific logic that doesn't need to be shared
+
+**When to use inner classes:**
+
+- Class is shared across multiple methods of the outer class
+- Class is complex/long (50+ lines) — putting it in a method would hurt readability
+- Class is part of a fluent pipeline pattern with many stages (e.g., `SynthesisPipeline`)
+
+**Static vs non-static:**
+
+- **Static** when the class doesn't need access to the outer instance's fields/methods
+- **Non-static** when it does need that access
+
+**Example** (local class for single-method usage):
+
+```java
+// ✅ DO: Local class defined in the method
+private String synthesizeImageStateConfigMapYaml(...) {
+  record ImageStateData(...) {}  // Local record
+  
+  final ImageStateData data = new ImageStateData(...);
+  
+  // Method body using data...
+  return result;
+}
+
+// ❌ DON'T: Inner class when only one method uses it
+private static final class ImageStateSynthesizer {
+  record ImageStateData(...) {}
+  String synthesize(...) { ... }
+}
+
+private String synthesizeImageStateConfigMapYaml(...) {
+  return new ImageStateSynthesizer().synthesize(...);  // Only call site
+}
+```
+
+**Example** (inner class for complex multi-method logic):
+
+```java
+// ✅ DO: Inner class when used by multiple methods or complex
+private final class NetworkSetup {
+  boolean shouldSkip() { ... }
+  String resolveProject() { ... }
+  NetworkArgs buildArgs() { ... }
+  // ... 7 methods total
+}
+
+private void ensureNetwork(...) {
+  final NetworkSetup setup = new NetworkSetup();
+  if (setup.shouldSkip()) return;
+  // ... use multiple methods
+}
+```
+
+**Refactoring from inner to local class:**
+
+When you find an inner class that:
+
+1. Has only ONE instantiation site (grep for `new ClassName()`)
+2. That instantiation is in ONE method
+3. The class is reasonably simple
+
+→ Move it into that method as a local class.
+
+**Benefits:**
+
+- Reduced namespace pollution in large classes (e.g., `IncusResourceBootstrap` had 171 private methods)
+- Explicit scope: impossible to accidentally use the class elsewhere
+- Easier to understand: logic is colocated with its single usage point
+- Refactoring: when you delete the method, the class goes with it
+
+**Pattern applied**: On 2026-06-03, refactored `ImageStateSynthesizer` and `NetworkEnsurer` from inner classes to local classes, reducing namespace pollution in `IncusResourceBootstrap`.
+
+### Uniformity enforcement
+
+**All implementations of a pattern must be identical.** If you're refactoring 27 classes to a new pattern, ALL 27 must follow the same structure — no "legacy" variants, no "compatibility" branches, no mixed old/new patterns.
+
+**Why absolute uniformity matters**:
+
+1. **Code review**: Spot deviations instantly — any difference is a bug
+2. **Maintenance**: Change pattern once, apply everywhere with confidence
+3. **Cognitive load**: One pattern to remember, not "pattern + 3 variants"
+4. **Refactoring safety**: Search/replace works when code is uniform
+
+**Enforcement**:
+
+- During refactor: Count classes affected. Before finishing, verify count matches (e.g., `grep -l "pattern" | wc -l`)
+- No "backward compatibility" constructors after refactor completes
+- Remove old pattern completely in same commit that adds new pattern
+- If 1 of N classes can't be migrated, find out why before proceeding with the other N-1
+
+**Code smell**: Comments like "legacy constructor for compatibility" or `@Deprecated` annotations in single-developer project = incomplete refactor. Delete old pattern entirely.
+
+**Example** (from this session): 27 ManifestsUnit classes all have exactly ONE constructor `(Construct scope, String id)` — no no-arg variants, no apply() overrides. Uniformity means any unit can be audited by reading just one, and changes apply to all 27.
 
 ### Single-source-of-truth pattern for identifiers
 
