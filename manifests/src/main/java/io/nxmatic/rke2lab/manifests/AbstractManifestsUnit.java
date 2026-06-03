@@ -14,15 +14,6 @@ public abstract class AbstractManifestsUnit extends Construct implements Manifes
   private final String manifestUnitId;
   private final List<String> dependsOnManifestsUnitIds;
 
-  // Old constructor - kept for backward compatibility with existing ManifestsUnits
-  protected AbstractManifestsUnit(
-      final String manifestUnitId, final List<String> dependsOnManifestsUnitIds) {
-    super(null, manifestUnitId); // Null scope for old pattern (will be created via apply())
-    this.manifestUnitId = manifestUnitId;
-    this.dependsOnManifestsUnitIds = List.copyOf(dependsOnManifestsUnitIds);
-  }
-
-  // New constructor - for merged ManifestsUnits that extend Construct
   protected AbstractManifestsUnit(
       final Construct scope,
       final String id,
