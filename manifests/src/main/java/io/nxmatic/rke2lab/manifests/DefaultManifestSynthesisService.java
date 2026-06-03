@@ -107,6 +107,8 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         SystemdTarget toolsTarget;
         SystemdTarget bootstrapTarget;
         SystemdTarget manifestsTarget;
+        SystemdTarget cniManifestsTarget;
+        SystemdTarget operatorManifestsTarget;
         SystemdTarget secretsTarget;
         SystemdSynthesisContext systemdContext;
 
@@ -312,6 +314,22 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                   .partOf(state.rke2labTarget.getUnitFileName())
                   .wantedBy("rke2-server.service");
 
+          state.cniManifestsTarget =
+              new SystemdTarget(state.systemdChart, "rke2lab-cni-manifests")
+                  .description("RKE2 Lab Manifest Installers (post-CNI-ready)")
+                  .after(state.manifestsTarget.getUnitFileName(), "rke2-server.service")
+                  .requires("rke2-server.service")
+                  .partOf(state.rke2labTarget.getUnitFileName())
+                  .wantedBy(state.rke2labTarget.getUnitFileName());
+
+          state.operatorManifestsTarget =
+              new SystemdTarget(state.systemdChart, "rke2lab-operator-manifests")
+                  .description("RKE2 Lab Manifest Installers (post-operator-ready)")
+                  .after(state.cniManifestsTarget.getUnitFileName(), "rke2-server.service")
+                  .requires("rke2-server.service")
+                  .partOf(state.rke2labTarget.getUnitFileName())
+                  .wantedBy(state.rke2labTarget.getUnitFileName());
+
           state.secretsTarget =
               new SystemdTarget(state.systemdChart, "rke2lab-secrets")
                   .description("RKE2 Lab Secrets Installers (post-server)")
@@ -324,14 +342,17 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                   .wantedBy(state.rke2labTarget.getUnitFileName());
 
           state.systemdContext =
-              new SystemdSynthesisContext(
-                  state.rke2labTarget,
-                  state.bootstrapTarget,
-                  state.manifestsTarget,
-                  state.secretsTarget,
-                  state.networkTarget,
-                  state.toolsTarget,
-                  state.domainCatalog);
+              SystemdSynthesisContext.builder()
+                  .rke2labTarget(state.rke2labTarget)
+                  .bootstrapTarget(state.bootstrapTarget)
+                  .manifestsTarget(state.manifestsTarget)
+                  .cniManifestsTarget(state.cniManifestsTarget)
+                  .operatorManifestsTarget(state.operatorManifestsTarget)
+                  .secretsTarget(state.secretsTarget)
+                  .networkTarget(state.networkTarget)
+                  .toolsTarget(state.toolsTarget)
+                  .domainCatalog(state.domainCatalog)
+                  .build();
 
           return this;
         }
@@ -434,6 +455,8 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                   state.toolsTarget.getUnitFileName(),
                   state.bootstrapTarget.getUnitFileName(),
                   state.manifestsTarget.getUnitFileName(),
+                  state.cniManifestsTarget.getUnitFileName(),
+                  state.operatorManifestsTarget.getUnitFileName(),
                   state.secretsTarget.getUnitFileName(),
                   "rke2-server.service");
 

@@ -72,6 +72,8 @@ public final class SystemdUnitSynthesizer {
   }
 
   private void applyPhaseOrdering(SystemdService installer, InstallPhase phase) {
+    final String target = context.targetFor(phase).getUnitFileName();
+
     if (phase.isPreServer()) {
       // Runs before rke2-server, gated on the install service that lays down the host share.
       final SystemdUnit install = requireUnit("rke2lab-install");
@@ -79,17 +81,15 @@ public final class SystemdUnitSynthesizer {
           .after("local-fs.target", install.getUnitFileName())
           .requires(install.getUnitFileName())
           .before("rke2-server.service")
-          .partOf(context.rke2labTarget().getUnitFileName())
-          .wantedBy(context.rke2labTarget().getUnitFileName());
+          .partOf(target)
+          .wantedBy(target);
       return;
     }
 
     // All post-server phases run after the API server; gated phases also wait on their gate.
     installer.after("local-fs.target", "rke2-server.service").requires("rke2-server.service");
     phase.readyGate().ifPresent(gate -> installer.after(ensureReadyGate(gate).getUnitFileName()));
-    installer
-        .partOf(context.manifestsTarget().getUnitFileName())
-        .wantedBy(context.manifestsTarget().getUnitFileName());
+    installer.partOf(target).wantedBy(target);
   }
 
   /**

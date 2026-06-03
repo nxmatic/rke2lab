@@ -82,6 +82,47 @@ NOTE: `POST_OPERATOR_READY` connects directly to the seed-vcluster work (see
 `.claude/seed-vcluster-plan.md`) — waiting for vCluster/Flux operators is the same
 "wait for CRDs" pattern as cilium-advanced.
 
+=== Phase ↔ target: do not build a parallel hierarchy
+
+A phase and a systemd *target* are two views of the same lifecycle moment. The target
+hierarchy in `systemd-architecture.adoc` already materializes the first two phases:
+
+[cols="1,2",options="header"]
+|===
+|Phase |Existing target that materializes it
+
+|`PRE_SERVER`
+|`rke2lab-bootstrap.target` ("pre-server initialization complete")
+
+|`POST_SERVER`
+|`rke2lab-manifests.target` ("post-server manifest installers")
+
+|`POST_CNI_READY`
+|none yet → new `rke2lab-cni-manifests.target` (ordered `After=rke2lab-manifests.target`)
+
+|`POST_OPERATOR_READY`
+|none yet → new `rke2lab-operator-manifests.target` (ordered after CNI)
+|===
+
+CAUTION: *The phase must not create targets.* Targets are created exactly once, in the
+synthesis pipeline (`DefaultManifestSynthesisService`'s `SystemdTargetsStage`), and exposed
+through `SystemdSynthesisContext` (`bootstrapTarget()`, `manifestsTarget()`, ...). The phase
+only *selects* which context target an installer is `WantedBy`/`PartOf`. Otherwise we'd have
+two creators for `bootstrap.target` / `manifests.target` — a parallel hierarchy that drifts
+from the pipeline's. So:
+
+* The pipeline stays the single source of truth for target creation. The two new targets
+  (`cni-manifests`, `operator-manifests`) are added there, alongside the existing six, and
+  exposed via new `SystemdSynthesisContext` accessors.
+* `InstallPhase` carries a *reference selector* (which context accessor), not a target it
+  builds. Derivation reads `context.<phase target>()` — same pattern as the ready-gate, but
+  the gate is a service we provision on demand whereas the target is pre-created.
+
+Today's gap (to fix when wiring targets): `PRE_SERVER` installers are currently `WantedBy`
+the root `rke2lab.target` instead of `rke2lab-bootstrap.target`, and `POST_CNI_READY` shares
+`rke2lab-manifests.target` instead of its own. The ordering is correct (the `After=` gate
+distinguishes them); only the target grouping is imprecise.
+
 == C4 — RKE2 lifecycle and manifest attachment
 
 [mermaid]
