@@ -9,16 +9,25 @@ import java.util.Map;
 
 /** Canonical operational policy derived from Pulumi config for Stage A bootstrap. */
 public record ControlplanePolicy(
-    DebugPolicy debug, NetworkPolicy network, ManifestLinkPolicy manifestLink) {
+    DebugPolicy debug,
+    NetworkPolicy network,
+    ProvisioningPolicy provisioning,
+    ManifestLinkPolicy manifestLink) {
 
   private static final ManifestDomainCatalog MANIFEST_DOMAIN_CATALOG =
       ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
 
+  public static Builder builder() {
+    return new Builder();
+  }
+
   public static ControlplanePolicy defaults() {
-    return new ControlplanePolicy(
-        new DebugPolicy(false, false, false),
-        new NetworkPolicy(true),
-        ManifestLinkPolicy.stageA(true, true, true, true, true));
+    return builder()
+        .debug(new DebugPolicy(false, false, false))
+        .network(new NetworkPolicy(true))
+        .provisioning(new ProvisioningPolicy(true))
+        .manifestLink(ManifestLinkPolicy.stageA(true, true, true, true, true))
+        .build();
   }
 
   public static ControlplanePolicy from(Config config) {
@@ -32,6 +41,9 @@ public record ControlplanePolicy(
 
     NetworkPolicy networkPolicy =
         new NetworkPolicy(environment.bool("policy.network.lan.binding.enabled", true));
+
+    ProvisioningPolicy provisioningPolicy =
+        new ProvisioningPolicy(environment.bool("policy.gitDirtyCheck.enabled", true));
 
     boolean clusterApiEnabled = environment.bool("policy.link.clusterApi.enabled", true);
     SeedLog.debug(
@@ -59,13 +71,19 @@ public record ControlplanePolicy(
                 .build(),
             new ManifestLinkPolicy.DebugPolicy(debugPolicy::domainDebug));
 
-    return new ControlplanePolicy(debugPolicy, networkPolicy, manifestLinkPolicy);
+    return builder()
+        .debug(debugPolicy)
+        .network(networkPolicy)
+        .provisioning(provisioningPolicy)
+        .manifestLink(manifestLinkPolicy)
+        .build();
   }
 
   public Map<String, String> toEnvMap() {
     Map<String, String> env = new LinkedHashMap<>();
     env.putAll(debug.toEnvMap());
     env.putAll(network.toEnvMap());
+    env.putAll(provisioning.toEnvMap());
     env.putAll(manifestLink.toEnvMap());
     return env;
   }
@@ -74,6 +92,7 @@ public record ControlplanePolicy(
     Map<String, Object> outputs = new LinkedHashMap<>();
     outputs.putAll(debug.toOutputMap());
     outputs.putAll(network.toOutputMap());
+    outputs.putAll(provisioning.toOutputMap());
     outputs.putAll(manifestLink.toOutputMap());
     return outputs;
   }
@@ -114,6 +133,49 @@ public record ControlplanePolicy(
 
     public Map<String, Object> toOutputMap() {
       return Map.of("network.lanBinding", lanBinding);
+    }
+  }
+
+  public record ProvisioningPolicy(boolean gitDirtyCheck) {
+    public Map<String, String> toEnvMap() {
+      return Map.of("PROVISIONING_GIT_DIRTY_CHECK", String.valueOf(gitDirtyCheck));
+    }
+
+    public Map<String, Object> toOutputMap() {
+      return Map.of("provisioning.gitDirtyCheck", gitDirtyCheck);
+    }
+  }
+
+  public static final class Builder {
+    private DebugPolicy debug;
+    private NetworkPolicy network;
+    private ProvisioningPolicy provisioning;
+    private ManifestLinkPolicy manifestLink;
+
+    private Builder() {}
+
+    public Builder debug(DebugPolicy debug) {
+      this.debug = debug;
+      return this;
+    }
+
+    public Builder network(NetworkPolicy network) {
+      this.network = network;
+      return this;
+    }
+
+    public Builder provisioning(ProvisioningPolicy provisioning) {
+      this.provisioning = provisioning;
+      return this;
+    }
+
+    public Builder manifestLink(ManifestLinkPolicy manifestLink) {
+      this.manifestLink = manifestLink;
+      return this;
+    }
+
+    public ControlplanePolicy build() {
+      return new ControlplanePolicy(debug, network, provisioning, manifestLink);
     }
   }
 

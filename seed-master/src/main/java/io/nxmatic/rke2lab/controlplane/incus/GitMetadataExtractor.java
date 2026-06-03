@@ -3,6 +3,8 @@ package io.nxmatic.rke2lab.controlplane.incus;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -24,9 +26,11 @@ public final class GitMetadataExtractor {
    * Extracts git metadata from the repository at the given directory.
    *
    * @param repoRoot the repository root (directory containing {@code .git/})
+   * @param dirtyCheckEnabled whether to compute the working-tree dirty flag; disabled during heavy
+   *     refactors via {@code policy.gitDirtyCheck.enabled=false} to avoid committing on every run
    * @return git metadata, or {@code null} if not a git repository
    */
-  public static HostSlotManifest.GitInfo extract(Path repoRoot) {
+  public static HostSlotManifest.GitInfo extract(Path repoRoot, boolean dirtyCheckEnabled) {
     try (Repository repo = openRepository(repoRoot)) {
       if (repo == null) {
         return null;
@@ -43,7 +47,7 @@ public final class GitMetadataExtractor {
         final String commitShort = head.abbreviate(8).name();
         final String commitFull = head.name();
         final String branch = repo.getBranch(); // "main", "feature/xyz", or commit SHA if detached
-        final boolean dirty = isDirty(repo);
+        final boolean dirty = dirtyCheckEnabled && isDirty(repo);
         final String commitMessage = commit.getShortMessage();
         final PersonIdent author = commit.getAuthorIdent();
         final String authorName = author.getName();
@@ -78,18 +82,13 @@ public final class GitMetadataExtractor {
     return builder.build();
   }
 
-  /**
-   * Checks if the working tree has uncommitted changes.
-   *
-   * <p>This is a simplified check - a full implementation would use {@code git.status().call()}
-   * from JGit's Git API, but that's heavier. For now, we just check if the index differs from HEAD.
-   */
+  /** Checks if the working tree has uncommitted changes (tracked, untracked, or staged). */
   private static boolean isDirty(Repository repo) {
-    try {
-      // Simple heuristic: if .git/index exists and is newer than the last commit, assume dirty
-      // A proper implementation would use Git.status(), but this is lightweight
-      return false; // TODO: Implement proper dirty check if needed
-    } catch (Exception ex) {
+    try (Git git = new Git(repo)) {
+      return !git.status().call().isClean();
+    } catch (GitAPIException ex) {
+      // Treat an unreadable status as clean rather than failing bootstrap.
+      System.err.println("Warning: Failed to compute git dirty status: " + ex.getMessage());
       return false;
     }
   }

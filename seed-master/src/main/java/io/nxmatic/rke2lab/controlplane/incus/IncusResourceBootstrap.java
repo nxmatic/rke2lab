@@ -2268,7 +2268,8 @@ public final class IncusResourceBootstrap {
 
       final java.time.Instant timestamp = java.time.Instant.now();
       final Path repoRoot = java.nio.file.Paths.get(System.getProperty("user.dir"));
-      final HostSlotManifest.GitInfo gitInfo = GitMetadataExtractor.extract(repoRoot);
+      final HostSlotManifest.GitInfo gitInfo =
+          GitMetadataExtractor.extract(repoRoot, policy.provisioning().gitDirtyCheck());
       final String buildId = GitMetadataExtractor.generateBuildId(gitInfo);
 
       // Build manifest using CDK8s
