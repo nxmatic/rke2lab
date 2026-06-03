@@ -7,14 +7,28 @@ import io.nxmatic.rk2lab.manifests.profiles.FloxDebugPolicy;
 import io.nxmatic.rk2lab.manifests.profiles.ImageState;
 import io.nxmatic.rk2lab.manifests.profiles.NetworkTopology;
 import java.util.List;
+import software.constructs.Construct;
 
-public abstract class AbstractManifestUnit implements ManifestUnit {
+public abstract class AbstractManifestUnit extends Construct implements ManifestUnit {
 
   private final String manifestUnitId;
   private final List<String> dependsOnManifestUnitIds;
 
+  // Old constructor - kept for backward compatibility with existing ManifestUnits
   protected AbstractManifestUnit(
       final String manifestUnitId, final List<String> dependsOnManifestUnitIds) {
+    super(null, manifestUnitId); // Null scope for old pattern (will be created via apply())
+    this.manifestUnitId = manifestUnitId;
+    this.dependsOnManifestUnitIds = List.copyOf(dependsOnManifestUnitIds);
+  }
+
+  // New constructor - for merged ManifestUnits that extend Construct
+  protected AbstractManifestUnit(
+      final Construct scope,
+      final String id,
+      final String manifestUnitId,
+      final List<String> dependsOnManifestUnitIds) {
+    super(scope, id);
     this.manifestUnitId = manifestUnitId;
     this.dependsOnManifestUnitIds = List.copyOf(dependsOnManifestUnitIds);
   }
