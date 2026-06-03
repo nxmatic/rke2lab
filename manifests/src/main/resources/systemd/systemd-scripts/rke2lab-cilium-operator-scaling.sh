@@ -1,6 +1,8 @@
 #!/usr/bin/env -S bash -exu -o pipefail
 
+set +x # Silence flox activation noise
 source <(flox activate --dir /var/lib/rancher/rke2)
+set -x
 
 : "Wait for at least one node to be ready"
 kubectl wait --for=condition=Ready \

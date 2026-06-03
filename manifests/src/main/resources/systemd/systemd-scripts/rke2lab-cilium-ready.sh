@@ -1,5 +1,7 @@
 #!/usr/bin/env -S bash -xu -o pipefail
+set +x # Silence flox activation noise
 source <(flox activate --dir /var/lib/rancher/rke2)
+set -x
 
 bool_is_true() {
 	case "${1:-}" in

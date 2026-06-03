@@ -1,7 +1,9 @@
 #!/usr/bin/env -S bash -exu -o pipefail
 
 : "Activate RKE2 flox environment (provides cachix command)"
+set +x # Silence flox activation noise
 source <(flox activate --dir=/var/lib/rancher/rke2)
+set -x
 
 log() {
 	printf '[cachix-watch-store] %s\n' "$*" >&2

@@ -1,6 +1,8 @@
 #!/usr/bin/env -S bash -exu -o pipefail
 
+set +x # Silence flox activation noise
 source <(flox activate --dir /var/lib/rancher/rke2)
+set -x
 
 : "Create working copy of kubeconfig"
 : "Ensure kubeconfig dir is provided"

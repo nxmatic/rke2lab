@@ -35,7 +35,9 @@ systemctl enable rke2lab-network.target rke2lab-tools.target rke2lab.target zfs-
 systemctl start --no-block rke2lab-network.target rke2lab-tools.target rke2lab.target
 
 : "Load the RKE2 environment"
+set +x # Silence flox activation noise
 source <(flox activate --dir /var/lib/rancher/rke2)
+set -x
 
 : "Expose bind-mounted helper scripts on PATH (strip .sh suffix)"
 scripts_dir=${RKE2LAB_SCRIPTS_DIR}

@@ -1,7 +1,9 @@
 #!/usr/bin/env -S bash -exu -o pipefail
 
 : "Load RKE2 environment" # @codebase
+set +x                    # Silence flox activation noise
 source <(flox activate --dir /var/lib/rancher/rke2)
+set -x
 
 MOUNT_UNIT_PATH=/etc/systemd/system/var-lib-rancher-rke2-agent-containerd-io.containerd.snapshotter.v1.zfs.mount
 MOUNT_UNIT_DROPIN_DIR="${MOUNT_UNIT_PATH}.d"

@@ -14,7 +14,9 @@ export RKE2_FLOX_SYSTEM
 	exit 1
 }
 flox install --dir=/var/lib/cloud git gh@^2.86
+set +x # Silence flox activation noise
 source <(flox activate --dir=/var/lib/cloud)
+set -x
 
 : "Load GitHub credentials from worktree secrets (hard-fail on missing keys)"
 rke2lab::secrets:load() {
@@ -143,7 +145,9 @@ cat <<'EoFloxCommonProfile' | cut -c 3- | tee /var/lib/rancher/rke2/.flox/env/pr
 EoFloxCommonProfile
 
 : "Load the RKE2 envrc"
+set +x # Silence flox activation noise
 source <(flox activate --dir="/var/lib/rancher/rke2")
+set -x
 
 : "Initialize krew and install plugins"
 KREW_ROOT="/var/lib/rancher/rke2/krew"

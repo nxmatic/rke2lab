@@ -1,6 +1,8 @@
 #!/usr/bin/env -S bash -exuo pipefail
 
+set +x # Silence flox activation noise
 source <(flox activate --dir /var/lib/rancher/rke2)
+set -x
 
 log() {
 	echo "[rke2-openebs-ready] $*"

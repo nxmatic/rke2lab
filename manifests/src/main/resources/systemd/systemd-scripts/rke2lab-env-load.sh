@@ -26,7 +26,9 @@ fi
 rke2lab::flox:ensure_manifest_tools() {
 	if [[ -d /var/lib/cloud/.flox ]]; then
 		: "Activate cloud flox environment for yq and dasel availability"
+		set +x # Silence flox activation noise
 		source <(flox activate --dir /var/lib/cloud)
+		set -x
 	fi
 
 	if command -v yq >/dev/null 2>&1 && command -v dasel >/dev/null 2>&1; then
@@ -39,7 +41,9 @@ rke2lab::flox:ensure_manifest_tools() {
 	flox config --set disable_metrics true
 	flox init --dir="${flox_tmpdir}"
 	flox install --dir="${flox_tmpdir}" yq-go dasel
+	set +x # Silence flox activation noise
 	source <(flox activate --dir="${flox_tmpdir}")
+	set -x
 }
 
 rke2lab::flox:configure_auth_from_secrets() {

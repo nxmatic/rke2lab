@@ -2,7 +2,9 @@
 
 set -euxo pipefail
 
+set +x # Silence flox activation noise
 source <(flox activate -v -v -v --dir /var/lib/cloud)
+set -x
 
 # Install RKE2 config fragments from ${RKE2LAB_CONFIG_DIR}
 # into /etc/rancher/rke2/config.yaml.d before rke2-server starts.

@@ -21,7 +21,9 @@ rke2lab::debug:flox:activate_if_present() {
 
 	if command -v flox >/dev/null 2>&1 && [[ -d "${flox_dir}" ]]; then
 		# shellcheck disable=SC1091
+		set +x # Silence flox activation noise
 		source <(flox activate --dir "${flox_dir}")
+		set -x
 	fi
 }
 

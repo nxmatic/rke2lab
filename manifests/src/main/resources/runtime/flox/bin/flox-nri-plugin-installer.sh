@@ -211,7 +211,9 @@ installer::host:flox:activate() {
 	source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 	: Activate the RKE2 flox env
 	# shellcheck disable=SC1090
+	set +x # Silence flox activation noise
 	source <(flox activate --dir /var/lib/rancher/rke2)
+	set -x
 }
 
 rke2lab::bool:is_true() {

@@ -1,7 +1,9 @@
 #!/usr/bin/env -S bash -exu -o pipefail
 
 : "Activate flox environment"
+set +x # Silence flox activation noise
 source <(flox activate --dir /var/lib/rancher/rke2)
+set -x
 
 : "Link committed RKE2 manifests from RKE2LAB_MANIFESTS_DIR into RKE2 server manifests directory"
 MANIFESTS_DIR=/var/lib/rancher/rke2/server/manifests

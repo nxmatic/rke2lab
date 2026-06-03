@@ -1,7 +1,9 @@
 #!/usr/bin/env -S bash -exu -o pipefail
 
 : "Load RKE2 flox environment for kubectl and tooling"
+set +x # Silence flox activation noise
 source <(flox activate --dir /var/lib/rancher/rke2)
+set -x
 
 if [[ -z "${RKE2LAB_MANIFESTS_DIR:-}" ]]; then
 	echo "[rke2-manifests-install] RKE2LAB_MANIFESTS_DIR is required (exported by incus env file)" >&2

@@ -7,7 +7,9 @@ exec > >(logger -t rke2-network-config) 2>&1
 source /srv/host/systemd-scripts.d/rke2lab-env-load.sh
 
 : "Load flox environment for yq and other tools"
+set +x # Silence flox activation noise
 source <(flox activate --dir /var/lib/cloud/seed/nocloud)
+set -x
 
 : "Resolve policy toggle for LAN binding (default enabled)"
 lan_binding_enabled="${RKE2LAB_POLICY_NETWORK_LAN_BINDING_ENABLED:-true}"

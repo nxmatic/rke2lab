@@ -2,7 +2,9 @@
 
 set -exu -o pipefail
 
+set +x # Silence flox activation noise
 source <(flox activate --dir /var/lib/rancher/rke2)
+set -x
 
 : "Wait for server is ready"
 until kubectl get --raw /readyz &>/dev/null; do

@@ -145,7 +145,9 @@ nocloud:env:bootstrap() {
 EoFloxCommonProfile
 
 	: "Activate first so dasel/yq from the freshly-installed env are on PATH for the manifest rewrite"
+	set +x # Silence flox activation noise
 	source <(flox activate --dir="${FLOX_ENV_DIR}")
+	set -x
 	dasel -i toml -o yaml <"${FLOX_ENV_DIR}/.flox/env/manifest.toml" |
 		yq eval '.options = {"systems": [env(RKE2_FLOX_SYSTEM)]}' - |
 		yq eval '.profile = { "common": "source ${FLOX_ENV_PROJECT}/.flox/env/profile-common.sh" }' - |
@@ -153,7 +155,9 @@ EoFloxCommonProfile
 		mv /tmp/manifest.toml.$$ "${FLOX_ENV_DIR}/.flox/env/manifest.toml"
 
 	: "Re-activate so the updated profile.common is baked into the activation hook for downstream scripts"
+	set +x # Silence flox activation noise
 	source <(flox activate --dir="${FLOX_ENV_DIR}")
+	set -x
 
 	: "Generate nocloud envrc to load environment variables"
 	cat >/var/lib/cloud/.envrc <<'EoEnvrc'
