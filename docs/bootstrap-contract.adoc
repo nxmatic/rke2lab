@@ -105,5 +105,5 @@ Operator observability improvement:
 == Related Documentation
 
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - How cluster identity is passed to manifest units
-* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How manifests are generated from identity
+* link:manifests-architecture.adoc[Manifests Architecture] - How manifests are generated from identity
 * link:gitops-cluster-api-transition-plan.adoc[GitOps + Cluster API Transition Plan] - Stage B handoff implementation

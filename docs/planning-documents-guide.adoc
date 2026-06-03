@@ -97,7 +97,7 @@ This guide helps navigate the multiple planning documents in rke2lab. As the pro
 
 1. **Read**: link:vcluster-implementation-plan.adoc#phase-15-refactor-manifests-module[vCluster Implementation Plan - Phase 1.5]
 2. **Reference**: link:vcluster-gitops-architecture.adoc#layer-1-rkе2-auto-deploy[vCluster Architecture - Layer 1] for rationale
-3. **Check**: link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] for CDK8s patterns
+3. **Check**: link:manifests-architecture.adoc[Manifests Architecture] for CDK8s patterns
 
 === Scenario 2: I need to understand why we chose gitops-mgmt vCluster
 
@@ -190,7 +190,6 @@ The work is preserved, just reorganized for better architecture.
 == Related Documentation
 
 * link:README.adoc[Documentation Index] - Complete documentation map
-* link:manifest-nomenclature.adoc[Manifest Nomenclature Guide] - **READ THIS FIRST** - Clarifies deployment layers vs manifest domains/components/charts
-* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - CDK8s patterns
+* link:manifests-architecture.adoc[Manifests Architecture] - CDK8s patterns
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Identity flow patterns
 * link:stagea-stageb-handoff-contract.adoc[Stage A/B Handoff Contract] - Bootstrap contracts

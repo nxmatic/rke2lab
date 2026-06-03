@@ -520,7 +520,7 @@ No need to update `ManifestSynthesisContext` - it passes the entire `BootstrapId
 
 == Related Documentation
 
-* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - Overall synthesis flow
+* link:manifests-architecture.adoc[Manifests Architecture] - Overall synthesis flow
 * link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] - Phase 1 deliverables
 * link:cluster-api-bootstrap-requirements.adoc[Cluster API Bootstrap Requirements] - Cleanup & flox environment architecture
 * link:bootstrap-contract.adoc[Stage A Bootstrap Contract] - Bootstrap outputs and handoff
@@ -571,6 +571,6 @@ No need to update `ManifestSynthesisContext` - it passes the entire `BootstrapId
 
 == Related Documentation
 
-* link:manifest-system-architecture.adoc[Manifest System Architecture] - Comprehensive guide to the manifest system including how context flows through synthesis
+* link:manifests-architecture.adoc[Manifests Architecture] - Comprehensive guide to the manifest system including how context flows through synthesis
 * link:manifest-apply-flow.adoc[Manifest Apply Flow] - How manifests flow from synthesis to cluster
 * link:bootstrap-contract.adoc[Bootstrap Contract] - Stage A bootstrap requirements and outputs

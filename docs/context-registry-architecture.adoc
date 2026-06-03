@@ -574,7 +574,7 @@ void buildMetadata_registeredWithNull_thenUpdated() {
 
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - ThreadLocal context pattern for manifest unit access
 * link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Pipeline orchestration with scoped lambdas
-* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How manifests flow through the pipeline
+* link:manifests-architecture.adoc[Manifests Architecture] - How manifests flow through the pipeline
 
 == Implementation
 

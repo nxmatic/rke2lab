@@ -14,7 +14,7 @@ This document traces the complete flow using the `networking` layer as the refer
 ....
 graph TB
     subgraph "Stage 1: Synthesis - Pulumi Apply"
-        SYNTH["CDK8s Java code<br/>ManifestUnit.apply"]
+        SYNTH["CDK8s Java code<br/>ManifestsUnit construction"]
         EXPLODE["ManifestExploder<br/>splits consolidated YAML"]
         LOCAL["host/manifests.d/<br/>networking/kdns/"]
     end
@@ -70,7 +70,7 @@ graph TB
 ....
 graph TB
     subgraph "Java Code - manifests module"
-        UNIT[KdnsManifestUnit<br/>extends AbstractManifestUnit]
+        UNIT[KdnsManifestsUnit<br/>extends AbstractManifestsUnit]
         CDK8S[CDK8s Chart.apply]
         RESOURCES[Deployment, ClusterRole,<br/>ServiceAccount, etc.]
     end
@@ -94,9 +94,9 @@ graph TB
     style CONSOLIDATED fill:#fff3cd
 ....
 
-**Code location**: `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/networking/`
+**Code location**: `manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/networking/`
 
-Each layer has multiple `ManifestUnit` implementations that generate Kubernetes resources via CDK8s. All units write to a single consolidated YAML file during synthesis.
+Each domain has multiple `ManifestsUnit` implementations that generate Kubernetes resources via CDK8s. All units write to a single consolidated YAML file during synthesis.
 
 === C4 Component: Manifest Explosion
 
@@ -136,12 +136,16 @@ sequenceDiagram
 └── ...
 ```
 
-**Package annotation** (in Java):
+**Package annotation** (in Java) — stamped on each `ApiObject` created in the unit constructor:
 ```java
-@Override
-public void apply(Chart chart) {
-  packageProfile.packageAnnotations("|Deployment|rke2lab-system|kdns")
-  // Results in annotation: io.nxmatic.rke2lab/package: "networking/kdns"
+public KdnsManifestsUnit(final Construct scope, final String id) {
+  super(scope, id, MANIFEST_UNIT_ID, List.of());
+  new ApiObject(this, "deployment-kdns", ApiObjectProps.builder()
+      .metadata(ApiObjectMetadata.builder()
+          .annotations(packageProfile.packageAnnotations("|Deployment|rke2lab-system|kdns"))
+          // Results in annotation: io.nxmatic.rke2lab/package: "networking/kdns"
+          .build())
+      .build());
 }
 ```
 
@@ -477,30 +481,44 @@ kubectl apply -f /srv/host/manifests/clusterapi/staged/image-state-configmap.yam
 | Watch and apply manifests automatically
 |===
 
-== Adding a New Layer
+== Adding a New ManifestsUnit
 
-**Step 1**: Create manifest units in `manifests/src/main/java/.../layers/{layer}/`
+**Step 1**: Create the unit in `manifests/src/main/java/.../units/{domain}/`, using the canonical
+`(Construct scope, String id)` constructor and stamping package annotations on every resource.
 
 ```java
-public class MyLayerManifestUnit extends AbstractManifestUnit {
-  @Override
-  public void apply(Chart chart) {
-    // Use packageProfile.packageAnnotations("|Kind|namespace|name")
-    // to set io.nxmatic.rke2lab/package annotation
+public final class MyManifestsUnit extends AbstractManifestsUnit {
+
+  public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.MY_DOMAIN + "/my-thing";
+
+  private final PackageMetadataProfile packageProfile =
+      new PackageMetadataProfile("my-domain", "my-thing");
+
+  public MyManifestsUnit(final Construct scope, final String id) {
+    super(scope, id, MANIFEST_UNIT_ID, List.of());
+    // Create ApiObjects on 'this', annotating with
+    // packageProfile.packageAnnotations("|Kind|namespace|name")
   }
 }
 ```
 
-**Step 2**: Register in domain registrar
+**Step 2**: Reference it from its domain registrar in `manifests/.../domain/`, via the lazy factory.
 
 ```java
-public class MyLayerDomainRegistrar implements ManifestDomainRegistrar {
+public final class MyDomainRegistrar implements ManifestsDomainRegistrar {
   @Override
-  public void registerUnits(ManifestUnitRegistry registry) {
-    registry.register(new MyLayerManifestUnit());
+  public ManifestsDomain domain() {
+    return new ManifestsDomain(
+        ManifestDomainCatalog.MY_DOMAIN,
+        List.of(),
+        List.of(ManifestsUnit.lazy(
+            MyManifestsUnit.MANIFEST_UNIT_ID, List.of(), MyManifestsUnit::new)));
   }
 }
 ```
+
+NOTE: domain registration is currently dormant — see
+link:manifests-architecture.adoc#domain-registry-status[Manifests Architecture → domain registry status].
 
 **Step 3**: Create systemd unit in `manifests/src/main/resources/systemd/systemd-units/`
 
@@ -672,9 +690,10 @@ Common causes:
 == Related Documentation
 
 * link:staged-post-cluster-resources.adoc[Staged Post-Cluster Resources] - Detailed pattern documentation
-* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How CDK8s synthesis works
+* link:manifests-architecture.adoc[Manifests Architecture] - How CDK8s synthesis works (the upstream of this pipeline)
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Context injection for synthesis
 * link:systemd-resource-provisioning.adoc[Systemd Resource Provisioning] - How systemd units/scripts are deployed
+* link:systemd-architecture.adoc[Systemd Architecture] - Target hierarchy and ordering for the installer services
 
 == Design Rationale
 
@@ -707,7 +726,5 @@ Clarity of purpose: when operators see `/srv/host/rke2-manifests.d/`, it's immed
 
 == Related Documentation
 
-* link:manifest-system-architecture.adoc[Manifest System Architecture] - Comprehensive guide to the manifest system including synthesis flow and Component/ManifestUnit pattern
+* link:manifests-architecture.adoc[Manifests Architecture] - Canonical guide to the manifest system: nomenclature, Chart-vs-Construct, synthesis flow
 * link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven filtering before explosion
-* link:systemd-resource-provisioning.adoc[Systemd Resource Provisioning] - How systemd units are built and provisioned
-* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - How cluster identity flows through synthesis

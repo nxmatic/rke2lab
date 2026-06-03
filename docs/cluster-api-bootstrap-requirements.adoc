@@ -449,7 +449,7 @@ Phase 1A complete when:
 
 * link:gitops-cluster-api-transition-plan.md[GitOps + Cluster API Transition Plan] - Phase 1 complete, Phase 2 roadmap
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Identity pattern, age key setup
-* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How manifest units work
+* link:manifests-architecture.adoc[Manifests Architecture] - How manifest units work
 * link:bootstrap-contract.adoc[Bootstrap Contract] - Stage A outputs and handoff
 * link:daemonset-host-assets-architecture.adoc[DaemonSet Host Assets Architecture] - Existing trampoline pattern
 

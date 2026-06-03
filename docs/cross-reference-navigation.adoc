@@ -10,76 +10,70 @@ This document visualizes the bidirectional cross-reference network between code 
 ----
 graph TB
     subgraph "AsciiDoc Documentation"
+        HUB[manifests-architecture.adoc]
         MCI[manifest-conditional-inclusion.adoc]
         BIP[bootstrap-identity-provider.adoc]
-        FPG[fluent-pipeline-grammar.adoc]
     end
 
-    subgraph "Package Documentation - JavaDoc"
-        GPI[gitops/package-info.java]
-        CPI[clusterapi/package-info.java]
+    subgraph "Package Documentation - package-info.java"
+        RPI[manifests/package-info.java]
+        DPI[domain/package-info.java]
+        GPI[units/gitops/package-info.java]
+        CPI[units/clusterapi/package-info.java]
     end
 
     subgraph "Core Interfaces - JavaDoc"
-        LDR[LayerDomainRegistrar.java]
+        LDR[ManifestsDomainRegistrar.java]
+        MU[ManifestsUnit.java]
         BI[BootstrapIdentity.java]
-        MDP[ManifestDomainPolicy.java]
     end
 
     subgraph "Implementations - JavaDoc"
-        GDR[GitopsDomainRegistrar.java]
-        IISU[IncusIdentitySecretManifestUnit.java]
+        GDR[domain/GitopsDomainRegistrar.java]
+        IISU[units/clusterapi/IncusIdentitySecretManifestsUnit.java]
         DMS[DefaultManifestSynthesisService.java]
     end
 
-    %% AsciiDoc → JavaDoc
-    MCI -->|"See implementation"| LDR
-    MCI -->|"See example"| GPI
-    MCI -->|"See example"| CPI
-    MCI -->|"See real code"| GDR
-    MCI -->|"See real code"| IISU
-    MCI -->|"See identity fields"| BI
+    %% AsciiDoc ↔ package-info
+    HUB <-->|"hub ↔ module overview"| RPI
+    MCI <-->|"policy ↔ registrar pkg"| DPI
+    HUB -->|"See interface"| MU
 
-    BIP -->|"See usage"| BI
-    BIP -->|"See usage"| IISU
+    %% package-info → implementation (contains)
+    RPI -.->|describes| MU
+    RPI -.->|describes| DMS
+    DPI -.->|describes| GDR
+    GPI -.->|describes| GDR
+    CPI -.->|describes| IISU
 
-    %% JavaDoc → AsciiDoc
-    LDR -->|"Related docs"| MCI
+    %% package-info → docs
     GPI -->|"Related docs"| MCI
-    GPI -->|"Related docs"| BIP
-    CPI -->|"Related docs"| MCI
     CPI -->|"Related docs"| BIP
-    BI -->|"Related docs"| BIP
 
     %% JavaDoc → JavaDoc
-    GPI -->|"@see"| GDR
-    CPI -->|"@see"| IISU
-    LDR -->|"@see"| MDP
-    IISU -->|"extends"| BI
-
-    %% Package → Implementation
-    GPI -.->|contains| GDR
-    CPI -.->|contains| IISU
+    GDR -->|"implements"| LDR
+    GDR -->|"references"| MU
+    IISU -->|"reads"| BI
 
     classDef docClass fill:#e1f5ff,stroke:#01579b,stroke-width:2px
     classDef pkgClass fill:#fff3e0,stroke:#e65100,stroke-width:2px
     classDef interfaceClass fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef implClass fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
 
-    class MCI,BIP,FPG docClass
-    class GPI,CPI pkgClass
-    class LDR,BI,MDP interfaceClass
+    class HUB,MCI,BIP docClass
+    class RPI,DPI,GPI,CPI pkgClass
+    class LDR,MU,BI interfaceClass
     class GDR,IISU,DMS implClass
 ----
 
 **Legend:**
 
 * Blue: System-level AsciiDoc documentation
-* Orange: Package-level JavaDoc (domain architecture)
+* Orange: Package-level `package-info.java` (domain architecture, co-located with code)
 * Purple: Interface/API JavaDoc
 * Green: Implementation JavaDoc
 * Solid lines: Direct cross-references
-* Dotted lines: Containment relationships
+* Dotted lines: Containment (a package-info describes the types in its package)
 
 == Navigation Patterns
 
@@ -87,39 +81,37 @@ graph TB
 
 **Starting point**: Reading architecture documentation
 
-1. Read link:manifest-conditional-inclusion.adoc[manifest-conditional-inclusion.adoc] (system-level understanding)
-2. Click "See implementation" link → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java] (interface + component diagram)
-3. Click "See example" link → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/package-info.java[gitops/package-info.java] (domain architecture)
-4. Navigate to implementation → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java] (actual code)
+1. Read link:manifests-architecture.adoc[manifests-architecture.adoc] (the canonical model and synthesis flow)
+2. Jump to the module's package overview → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/package-info.java[manifests/package-info.java]
+3. Click "See interface" → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsUnit.java[ManifestsUnit.java]
+4. Navigate to a concrete registrar → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[domain/GitopsDomainRegistrar.java] (actual code)
 
 === Pattern 2: Bottom-Up (Code → Context)
 
 **Starting point**: Working on a specific class
 
-1. Open link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/clusterapi/IncusIdentitySecretManifestUnit.java[IncusIdentitySecretManifestUnit.java] in IDE
-2. Read JavaDoc → see package-info reference
-3. Click → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/clusterapi/package-info.java[clusterapi/package-info.java] (domain architecture with diagram)
-4. See "Related Documentation" link
-5. Click → link:manifest-conditional-inclusion.adoc[manifest-conditional-inclusion.adoc] (system-level understanding)
+1. Open link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/clusterapi/IncusIdentitySecretManifestsUnit.java[units/clusterapi/IncusIdentitySecretManifestsUnit.java] in IDE
+2. Read the package's `package-info` → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/clusterapi/package-info.java[units/clusterapi/package-info.java] (domain overview + doc links)
+3. Click a "Related Documentation" link → link:manifest-conditional-inclusion.adoc[manifest-conditional-inclusion.adoc] for policy context, or
+   link:bootstrap-identity-provider.adoc[bootstrap-identity-provider.adoc] for identity access
 
 === Pattern 3: Lateral (Similar Concepts)
 
 **Starting point**: Understanding one domain, need to implement another
 
-1. Reading link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/package-info.java[gitops/package-info.java]
-2. See cross-reference to link:manifest-conditional-inclusion.adoc[manifest-conditional-inclusion.adoc]
-3. In doc, see cross-reference to link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/clusterapi/package-info.java[clusterapi/package-info.java]
-4. Compare patterns across domains
+1. Read link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/gitops/package-info.java[units/gitops/package-info.java] for the domain shape
+2. Compare with a sibling domain's overview, e.g.
+   link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/clusterapi/package-info.java[units/clusterapi/package-info.java]
+3. Both registrars (in `domain/`) follow the `new ManifestsDomain(catalog id, deps, List.of(ManifestsUnit.lazy(...)))` shape
 
 === Pattern 4: Interface → Implementation
 
 **Starting point**: Understanding the contract
 
-1. Read link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java] (interface with component diagram)
-2. IDE "Show Implementations" → list of all registrars
-3. Pick one → e.g., link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/GitopsDomainRegistrar.java[GitopsDomainRegistrar.java]
-4. See package-info reference
-5. Click → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/package-info.java[gitops/package-info.java] (domain context)
+1. Read link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java] (interface with component diagram)
+2. See the package overview → link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/domain/package-info.java[domain/package-info.java]
+3. IDE "Show Implementations" → all registrars in the `domain/` package
+4. Pick one → e.g., link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/domain/GitopsDomainRegistrar.java[domain/GitopsDomainRegistrar.java]
 
 == Cross-Reference Syntax Reference
 
@@ -127,18 +119,18 @@ graph TB
 
 **Link to Java file** (GitHub/IDE clickable):
 ----
-link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/LayerDomainRegistrar.java[LayerDomainRegistrar.java]
+link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[ManifestsDomainRegistrar.java]
 ----
 
-**Link to package**:
+**Link to a unit**:
 ----
-link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/package-info.java[gitops package-info]
+link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/gitops/FluxOperatorManifestsUnit.java[FluxOperatorManifestsUnit.java]
 ----
 
 **Inline code reference**:
 ----
-The `LayerDomainRegistrar` interface...
-See link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/LayerDomainRegistrar.java[implementation] for details.
+The `ManifestsDomainRegistrar` interface...
+See link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsDomainRegistrar.java[implementation] for details.
 ----
 
 === In JavaDoc → AsciiDoc
@@ -159,9 +151,9 @@ See link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/L
 
 **Relative path calculation**:
 
-* From `manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/gitops/package-info.java`
+* From `manifests/src/main/java/io/nxmatic/rke2lab/manifests/units/gitops/FluxOperatorManifestsUnit.java`
 * To `docs/manifest-conditional-inclusion.adoc`
-* Path: `../../../../../../../../../../docs/manifest-conditional-inclusion.adoc` (11 levels up)
+* Path: `../../../../../../../../../../docs/manifest-conditional-inclusion.adoc` (10 levels up)
 
 === In JavaDoc → JavaDoc
 
@@ -169,9 +161,9 @@ See link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/L
 [source,java]
 ----
 /**
- * @see LayerDomainRegistrar
+ * @see ManifestsDomainRegistrar
  * @see ManifestDomainPolicy
- * @see io.nxmatic.rke2lab.manifests.layers.common.profiles.BootstrapIdentity
+ * @see io.nxmatic.rke2lab.manifests.profiles.BootstrapIdentity
  */
 ----
 
@@ -179,8 +171,8 @@ See link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/L
 [source,java]
 ----
 /**
- * See {@link io.nxmatic.rke2lab.manifests.layers.gitops} package documentation
- * for domain architecture and examples.
+ * See {@link io.nxmatic.rke2lab.manifests.units.gitops} package
+ * for the gitops domain's manifest units.
  */
 ----
 
@@ -227,9 +219,9 @@ See link:../manifests/src/main/java/io/nxmatic/rke2lab/manifests/layers/common/L
 
 When updating architecture:
 
-- [ ] Update system-level AsciiDoc documentation
-- [ ] Update affected package-info.java files
-- [ ] Update affected interface JavaDoc
+- [ ] Update system-level AsciiDoc documentation (start with link:manifests-architecture.adoc[the hub])
+- [ ] Update affected `package-info.java` files (the manifests module has 15 — 5 core + 10 `units/<domain>`)
+- [ ] Update affected interface and implementation JavaDoc
 - [ ] Verify cross-references are bidirectional
 - [ ] Verify relative paths are correct
 - [ ] Update this navigation map if adding new docs
@@ -237,6 +229,7 @@ When updating architecture:
 
 == Related Documentation
 
-* link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Main architecture doc with cross-references
+* link:manifests-architecture.adoc[Manifests Architecture] - Canonical manifest-system reference and hub
+* link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven inclusion with code cross-references
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Identity flow patterns
 * link:README.adoc[Documentation Index] - All project documentation

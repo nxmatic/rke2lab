@@ -52,7 +52,7 @@ graph TD
 
 [source,java]
 ----
-public class GitopsDomainRegistrar implements LayerDomainRegistrar {
+public class GitopsDomainRegistrar implements ManifestsDomainRegistrar {
   private static final ManifestDomainCatalog CATALOG =
       ManifestDomainCatalog.builder()
           .addDefaultDomains()
@@ -60,17 +60,19 @@ public class GitopsDomainRegistrar implements LayerDomainRegistrar {
           .build();
 
   @Override
-  public LayerDomain domain(ManifestDomainPolicy policy) {
-    List<ManifestUnit> units = new ArrayList<>();
-    units.add(new FluxInstanceManifestUnit());
+  public ManifestsDomain domain(ManifestDomainPolicy policy) {
+    List<ManifestsUnit> units = new ArrayList<>();
+    units.add(ManifestsUnit.lazy(
+        FluxInstanceManifestsUnit.MANIFEST_UNIT_ID, List.of(), FluxInstanceManifestsUnit::new));
 
-    if (policy.isEnabled(CATALOG.porch())) {  // ✅ Type-safe, no mismatch possible
-      units.add(new PorchResourcesManifestUnit());
+    if (policy.isEnabled(CATALOG.clusterApi())) {  // ✅ Type-safe, no mismatch possible
+      units.add(ManifestsUnit.lazy(
+          ClusterApiManifestsUnit.MANIFEST_UNIT_ID, List.of(), ClusterApiManifestsUnit::new));
     }
 
-    return new LayerDomain(
+    return new ManifestsDomain(
         CATALOG.gitops(),                      // ✅ Single source
-        List.of(CATALOG.replication()),        // ✅ All IDs from catalog
+        List.of(CATALOG.platform()),           // ✅ All IDs from catalog
         units);
   }
 }
@@ -80,19 +82,21 @@ public class GitopsDomainRegistrar implements LayerDomainRegistrar {
 
 [source,java]
 ----
-public class GitopsDomainRegistrar implements LayerDomainRegistrar {
+public class GitopsDomainRegistrar implements ManifestsDomainRegistrar {
   @Override
-  public LayerDomain domain(ManifestDomainPolicy policy) {
-    List<ManifestUnit> units = new ArrayList<>();
-    units.add(new FluxInstanceManifestUnit());
+  public ManifestsDomain domain(ManifestDomainPolicy policy) {
+    List<ManifestsUnit> units = new ArrayList<>();
+    units.add(ManifestsUnit.lazy(
+        FluxInstanceManifestsUnit.MANIFEST_UNIT_ID, List.of(), FluxInstanceManifestsUnit::new));
 
-    if (policy.isEnabled("porch")) {  // ❌ Magic string - could typo to "Porch"
-      units.add(new PorchResourcesManifestUnit());
+    if (policy.isEnabled("cluster-api")) {  // ❌ Magic string - could typo to "clusterApi"
+      units.add(ManifestsUnit.lazy(
+          ClusterApiManifestsUnit.MANIFEST_UNIT_ID, List.of(), ClusterApiManifestsUnit::new));
     }
 
-    return new LayerDomain(
+    return new ManifestsDomain(
         "gitops",                      // ❌ Duplicates catalog definition
-        List.of("replication"),        // ❌ Could mismatch if catalog changes
+        List.of("platform"),           // ❌ Could mismatch if catalog changes
         units);
   }
 }
@@ -146,7 +150,7 @@ manifestDomain.put("clusterApi", policy.isEnabled(catalog.clusterApi()));
 **What**: Domain IDs like `"cluster-api"`, `"gitops"`, `"networking"` must NEVER appear as string literals in domain-related code.
 
 **Where it applies**:
-- `LayerDomainRegistrar` implementations
+- `ManifestsDomainRegistrar` implementations (in the `domain/` package)
 - `ManifestDomainPolicy` queries (`isEnabled()` calls)
 - Policy serialization (`HostSlotManifest`, etc.)
 - Policy loading (`ControlplanePolicy.from()`)
@@ -158,7 +162,7 @@ manifestDomain.put("clusterApi", policy.isEnabled(catalog.clusterApi()));
 **Violation examples**:
 [source,java]
 ----
-new LayerDomain("gitops", ...)           // ❌ Hardcoded
+new ManifestsDomain("gitops", ...)        // ❌ Hardcoded
 policy.isEnabled("cluster-api")           // ❌ Hardcoded
 manifestDomain.put("mesh", ...)           // ❌ Hardcoded
 ----
@@ -166,7 +170,7 @@ manifestDomain.put("mesh", ...)           // ❌ Hardcoded
 **Correct**:
 [source,java]
 ----
-new LayerDomain(CATALOG.gitops(), ...)                  // ✅
+new ManifestsDomain(CATALOG.gitops(), ...)              // ✅
 policy.isEnabled(CATALOG.clusterApi())                  // ✅
 manifestDomain.put("mesh", policy.isEnabled(CATALOG.mesh()))  // ✅
 ----
@@ -193,7 +197,7 @@ Add to CI pipeline (example):
 ----
 # Fail if any Java file uses hardcoded domain strings in wrong contexts
 ! grep -r 'isEnabled("' manifests/src/ seed-master/src/
-! grep -r 'new LayerDomain("' manifests/src/
+! grep -r 'new ManifestsDomain("' manifests/src/
 ----
 
 == Adding a New Domain
@@ -225,7 +229,7 @@ public String myNewDomain() {
 +
 [source,java]
 ----
-return new LayerDomain(CATALOG.myNewDomain(), ...);
+return new ManifestsDomain(CATALOG.myNewDomain(), ...);
 ----
 
 5. Add to policy loading in `ControlplanePolicy.from()`:
@@ -239,10 +243,9 @@ return new LayerDomain(CATALOG.myNewDomain(), ...);
 
 == Related Documentation
 
-* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - How domains become manifests
+* link:manifests-architecture.adoc[Manifests Architecture] - How domains become manifests; Chart-vs-Construct rule (all units MUST extend Construct)
 * link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven domain enablement
 * link:policy-configuration-guide.adoc[Policy Configuration Guide] - How to configure domain policies
-* link:cdk8s-chart-vs-construct-pattern.adoc[CDK8s Chart vs Construct Pattern] - Layer implementation rules (all MUST extend Construct)
 
 == Troubleshooting
 
@@ -266,9 +269,3 @@ A: Check these locations:
 **Q: Can I use domain ID strings in tests?**
 
 A: Yes, but prefer catalog methods even in tests for consistency. Only use strings when explicitly testing ID matching logic itself.
-
-== Related Documentation
-
-* link:manifest-system-architecture.adoc[Manifest System Architecture] - Comprehensive guide to the manifest system including domain organization and Component/ManifestUnit pattern
-* link:manifest-conditional-inclusion.adoc[Manifest Conditional Inclusion] - Policy-driven filtering using domain IDs from this catalog
-* link:policy-configuration-guide.adoc[Policy Configuration Guide] - How domain policies are configured and applied

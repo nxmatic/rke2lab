@@ -1230,11 +1230,9 @@ spec:
 
 === Implementation Patterns
 
-* link:manifest-nomenclature.adoc[Manifest Nomenclature Guide] - **READ THIS FIRST** - Clarifies deployment layers vs manifest domains/components/charts
-* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - CDK8s pattern used in seed-layer3 module
+* link:manifests-architecture.adoc[Manifests Architecture] - **READ THIS FIRST** - Canonical guide: nomenclature, Chart-vs-Construct, and the CDK8s synthesis flow
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Runtime config access pattern; parent-cluster-kubeconfig follows same principle
 * link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Multi-stage workflow pattern for seed-layer3 synth
-* link:cdk8s-chart-vs-construct-pattern.adoc[CDK8s Chart vs Construct Pattern] - Component classes must extend Construct, Chart classes extend Chart
 
 === Cross-Cutting Concerns
 

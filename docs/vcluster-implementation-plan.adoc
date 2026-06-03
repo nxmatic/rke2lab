@@ -1299,7 +1299,7 @@ Throughout implementation, these decisions may require adjustment:
 * link:stagea-stageb-handoff-contract.adoc[Stage A/B Handoff Contract] - Bootstrap contracts
 
 === Implementation Patterns
-* link:manifest-synthesis-architecture.adoc[Manifest Synthesis Architecture] - CDK8s patterns reused in seed-vclusters
+* link:manifests-architecture.adoc[Manifests Architecture] - CDK8s patterns reused in seed-vclusters
 * link:manifest-apply-flow.adoc[Manifest Apply Flow] - How Layer 1 RKE2 auto-deploy works
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Identity flow patterns
 * link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Pipeline patterns for seed-master

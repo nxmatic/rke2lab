@@ -683,6 +683,8 @@ systemctl show -p After,Wants,Requires <unit>
 
 == Related Documentation
 
+* link:manifests-architecture.adoc[Manifests Architecture] - How ManifestsUnits synthesize the installer services that populate this target hierarchy
+* link:manifest-apply-flow.adoc[Manifest Apply Flow] - The runtime journey those installer services drive
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - ThreadLocal context injection used by scripts
 * link:systemd-dbus-adapter-architecture.adoc[D-Bus TCP Adapter] - Remote systemd control via D-Bus
 * link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Seed-master workflow orchestration
