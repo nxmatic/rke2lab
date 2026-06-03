@@ -77,10 +77,10 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     final Chart chart = new Chart(app, "manifests");
     final SystemdChart systemdChart = new SystemdChart(app, "systemd");
 
-    final LayerDomainRegistry configuredDomainRegistry =
+    final ManifestsDomainRegistry configuredDomainRegistry =
         buildDomainRegistry(request.manifestDomainPolicy().orElse(null));
 
-    final LayerDomainRegistry domainRegistry =
+    final ManifestsDomainRegistry domainRegistry =
         applyManifestDomainPolicy(request, configuredDomainRegistry);
 
     final List<ManifestsUnit> manifestUnits =
@@ -192,7 +192,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         .synthesizeAll();
 
     // Now domains can reference both targets and bootstrap services
-    for (LayerDomain domain : domainRegistry.domains()) {
+    for (ManifestsDomain domain : domainRegistry.domains()) {
       LOG.debug("Synthesizing systemd units for domain '{}'", domain.domainId());
       domain.synthesizeSystemdUnits(systemdChart, systemdContext);
     }
@@ -266,7 +266,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         synthManifestFile, systemdOutdir, manifestUnitHitCount, domainRegistry.domains().size());
   }
 
-  private LayerDomainRegistry buildDomainRegistry(ManifestDomainPolicy policy) {
+  private ManifestsDomainRegistry buildDomainRegistry(ManifestDomainPolicy policy) {
     // FIXME: Temporarily disabled during layers→components migration
     // DomainRegistrars deleted, new domain registration pattern pending
     throw new UnsupportedOperationException(
@@ -276,7 +276,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     // final ManifestDomainPolicy effectivePolicy =
     //     policy != null ? policy : ManifestDomainPolicy.builder().build();
     //
-    // return new LayerDomainRegistryBuilder()
+    // return new ManifestsDomainRegistryBuilder()
     //     .register(new ClusterDomainRegistrar(), effectivePolicy)
     //     .register(new StorageDomainRegistrar(), effectivePolicy)
     //     .register(new GitopsDomainRegistrar(), effectivePolicy)
@@ -290,18 +290,18 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     //     .build();
   }
 
-  private LayerDomainRegistry applyManifestDomainPolicy(
-      ManifestSynthesisRequest request, LayerDomainRegistry configuredDomainRegistry) {
+  private ManifestsDomainRegistry applyManifestDomainPolicy(
+      ManifestSynthesisRequest request, ManifestsDomainRegistry configuredDomainRegistry) {
     if (request.manifestDomainPolicy().isEmpty()) {
       return configuredDomainRegistry;
     }
 
     final ManifestDomainPolicy manifestDomainPolicy = request.manifestDomainPolicy().orElseThrow();
-    final Map<String, LayerDomain> configuredDomainsById =
+    final Map<String, ManifestsDomain> configuredDomainsById =
         configuredDomainRegistry.domains().stream()
             .collect(
                 java.util.stream.Collectors.toMap(
-                    LayerDomain::domainId,
+                    ManifestsDomain::domainId,
                     domain -> domain,
                     (left, right) -> left,
                     LinkedHashMap::new));
@@ -336,22 +336,22 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         requestedEnabledDomainIds,
         effectiveDomainIds);
 
-    final List<LayerDomain> filteredDomains =
+    final List<ManifestsDomain> filteredDomains =
         configuredDomainRegistry.domains().stream()
             .filter(domain -> effectiveDomainIds.contains(domain.domainId()))
             .toList();
-    return new LayerDomainRegistry(filteredDomains);
+    return new ManifestsDomainRegistry(filteredDomains);
   }
 
   private void collectDomainDependencies(
       String domainId,
-      Map<String, LayerDomain> configuredDomainsById,
+      Map<String, ManifestsDomain> configuredDomainsById,
       Set<String> effectiveDomainIds) {
     if (!effectiveDomainIds.add(domainId)) {
       return;
     }
 
-    final LayerDomain domain = configuredDomainsById.get(domainId);
+    final ManifestsDomain domain = configuredDomainsById.get(domainId);
     if (domain == null) {
       throw new IllegalArgumentException(
           "Unknown manifest domain in policy resolution: " + domainId);

@@ -1,0 +1,1045 @@
+= Manifests Architecture: CDK8s Extension and Systemd Integration
+:toc: left
+:toclevels: 3
+
+== Overview
+
+The manifests module extends CDK8s (Cloud Development Kit for Kubernetes) to synthesize **both** Kubernetes manifests and systemd units in a unified workflow. This document explains:
+
+1. How we extend CDK8s's Construct pattern
+2. How systemd units integrate with K8s manifest synthesis
+3. The relationship between ManifestsUnits, LayerDomains, and systemd services
+
+== Core Concepts
+
+=== ManifestsUnit (Plural)
+
+A `ManifestsUnit` is a CDK8s `Construct` that synthesizes **multiple** K8s manifests and their corresponding systemd installation service.
+
+**Why plural?** One unit generates multiple K8s resources:
+
+[source,java]
+----
+// Example: CiliumConfigManifestsUnit creates 2 K8s resources
+new ApiObject(this, "helmchartconfig-rke2-cilium", ...);  // 1
+new ApiObject(this, "configmap-clustermesh-remote-users", ...);  // 2
+----
+
+**Dual responsibility:**
+
+1. **K8s synthesis** (constructor): Creates `ApiObject` instances as children of `this`
+2. **Systemd synthesis** (`synthesizeSystemdUnits()`): Creates a systemd service that **installs** those manifests
+
+=== LayerDomain
+
+A `LayerDomain` groups related `ManifestsUnits` that share a concern (networking, gitops, cluster-api, etc.).
+
+- Contains 1+ `ManifestsUnit` instances
+- Declares dependencies on other domains
+- Optionally synthesizes domain-level systemd units (e.g., a single installer service for all units in the domain)
+
+=== CDK8s Extension Strategy
+
+We extend CDK8s by:
+
+1. **Inheriting `Construct`**: `AbstractManifestsUnit extends Construct implements ManifestsUnit`
+2. **Using CDK8s App/Chart**: K8s synthesis happens via standard CDK8s `App.synth()`
+3. **Adding parallel systemd synthesis**: Custom `SystemdChart` construct for systemd units
+
+**Result**: One synthesis call produces **two** output trees:
+
+- `manifests.k8s.yaml` (via CDK8s)
+- `systemd/*.service` files (via `SystemdChart`)
+
+== Architecture Diagrams
+
+=== C4 Level 1: System Context - The Problem Space
+
+[mermaid]
+----
+graph TB
+    subgraph "Problem Domain"
+        Problem["<b>Challenge:</b><br/>Bootstrap Kubernetes cluster in Incus containers<br/>with proper lifecycle management"]
+    end
+
+    subgraph "Solution Components"
+        K8sManifests["Kubernetes Manifests<br/>(HelmChartConfig, ConfigMaps, Secrets)"]
+        SystemdUnits["Systemd Units<br/>(.service files for installation)"]
+        BootstrapFlow["Bootstrap Orchestration<br/>(seed-master)"]
+    end
+
+    subgraph "Requirements"
+        R1["R1: Synthesize K8s manifests<br/>programmatically (CDK8s)"]
+        R2["R2: Generate systemd units<br/>to install manifests"]
+        R3["R3: Maintain ordering<br/>(before/after rke2-server)"]
+        R4["R4: Single source of truth<br/>(1 ManifestsUnit = K8s + systemd)"]
+    end
+
+    Problem --> K8sManifests
+    Problem --> SystemdUnits
+    Problem --> BootstrapFlow
+
+    K8sManifests --> R1
+    SystemdUnits --> R2
+    BootstrapFlow --> R3
+    R1 --> R4
+    R2 --> R4
+    R3 --> R4
+
+    style Problem fill:#ffcccc
+    style R4 fill:#ccffcc
+----
+
+**Key Challenge:** How to **co-synthesize** K8s manifests and their systemd installers from a single source (ManifestsUnit) while maintaining proper ordering and dependencies?
+
+=== C4 Level 2: Container View - Extension Strategy
+
+[mermaid]
+----
+graph TB
+    subgraph "CDK8s Core [Upstream Library]"
+        direction TB
+        CDK8sApp["<b>App</b><br/>Root of construct tree<br/>Triggers synthesis"]
+        CDK8sChart["<b>Chart</b><br/>Container for K8s resources<br/>Synthesizes to YAML"]
+        CDK8sConstruct["<b>Construct</b><br/>Base class for all nodes<br/>Forms tree hierarchy"]
+        CDK8sApiObject["<b>ApiObject</b><br/>K8s resource (Pod, ConfigMap, etc.)<br/>Leaf node in tree"]
+
+        CDK8sApp -->|"contains"| CDK8sChart
+        CDK8sChart -->|"extends"| CDK8sConstruct
+        CDK8sApiObject -->|"extends"| CDK8sConstruct
+    end
+
+    subgraph "RKE2Lab Extension [Custom]"
+        direction TB
+        SystemdChart["<b>SystemdChart</b><br/>Parallel chart for systemd<br/>Synthesizes to .service files"]
+        AbstractManifestsUnit["<b>AbstractManifestsUnit</b><br/>Base for manifest units<br/>Extends Construct + implements ManifestsUnit"]
+        ManifestsUnitInterface["<b>ManifestsUnit</b> [Interface]<br/>apply(Chart) → K8s synthesis<br/>synthesizeSystemdUnits() → systemd synthesis"]
+        SystemdUnit["<b>SystemdUnit</b><br/>Base for systemd constructs<br/>Writes INI-style files"]
+        SystemdService["<b>SystemdService</b><br/>Systemd service unit<br/>ExecStart, After, Requires, etc."]
+
+        SystemdChart -->|"extends"| CDK8sConstruct
+        AbstractManifestsUnit -->|"extends"| CDK8sConstruct
+        AbstractManifestsUnit -->|"implements"| ManifestsUnitInterface
+        SystemdUnit -->|"extends"| CDK8sConstruct
+        SystemdService -->|"extends"| SystemdUnit
+    end
+
+    subgraph "Domain Model [Application]"
+        direction TB
+        LayerDomain["<b>LayerDomain</b><br/>Groups related ManifestsUnits<br/>(networking, gitops, etc.)"]
+        CiliumConfig["<b>CiliumConfigManifestsUnit</b><br/>Creates HelmChartConfig + ConfigMap<br/>+ systemd installer service"]
+        FluxOperator["<b>FluxOperatorManifestsUnit</b><br/>Creates HelmChart<br/>+ systemd installer service"]
+
+        LayerDomain -->|"contains"| CiliumConfig
+        LayerDomain -->|"contains"| FluxOperator
+        CiliumConfig -->|"extends"| AbstractManifestsUnit
+        FluxOperator -->|"extends"| AbstractManifestsUnit
+    end
+
+    CDK8sApp -.->|"creates"| SystemdChart
+    CDK8sChart -.->|"parent of"| CiliumConfig
+    SystemdChart -.->|"parent of"| SystemdService
+
+    CiliumConfig -->|"creates children"| CDK8sApiObject
+    CiliumConfig -->|"creates"| SystemdService
+
+    style CDK8sApp fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+    style CDK8sChart fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+    style CDK8sConstruct fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+    style CDK8sApiObject fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+
+    style SystemdChart fill:#ffe1e1,stroke:#cc0000,stroke-width:2px
+    style AbstractManifestsUnit fill:#ffe1e1,stroke:#cc0000,stroke-width:2px
+    style ManifestsUnitInterface fill:#ffe1e1,stroke:#cc0000,stroke-width:2px
+    style SystemdUnit fill:#ffe1e1,stroke:#cc0000,stroke-width:2px
+    style SystemdService fill:#ffe1e1,stroke:#cc0000,stroke-width:2px
+
+    style LayerDomain fill:#e1ffe1,stroke:#00cc00,stroke-width:2px
+    style CiliumConfig fill:#e1ffe1,stroke:#00cc00,stroke-width:2px
+    style FluxOperator fill:#e1ffe1,stroke:#00cc00,stroke-width:2px
+----
+
+**Legend:**
+
+- 🔵 **Blue**: CDK8s upstream (unchanged, reused as-is)
+- 🔴 **Red**: RKE2Lab extensions (custom implementations)
+- 🟢 **Green**: Domain model (application code)
+
+**Extension Strategy:**
+
+1. **Reuse CDK8s Construct pattern**: ManifestsUnit extends Construct → becomes part of CDK8s tree
+2. **Parallel SystemdChart**: Mirrors CDK8s Chart but synthesizes systemd units instead of YAML
+3. **Dual synthesis**: ManifestsUnit creates both ApiObjects (K8s) and SystemdServices (systemd)
+
+=== C4 Level 3: Component View - Construct Tree at Runtime
+
+[mermaid]
+----
+graph TB
+    subgraph "CDK8s App [Root]"
+        direction TB
+        App["App<br/>(outdir=/tmp/synthesis)"]
+
+        subgraph "K8s Chart [Left Branch]"
+            direction TB
+            Chart["Chart<br/>(id='manifests')"]
+
+            subgraph "Cilium ManifestsUnit"
+                CiliumUnit["CiliumConfigManifestsUnit<br/>(scope=Chart, id='layer-networking-cilium-config')"]
+                HelmChart["ApiObject<br/>(kind=HelmChartConfig)"]
+                ConfigMap["ApiObject<br/>(kind=ConfigMap)"]
+            end
+
+            subgraph "Flux ManifestsUnit"
+                FluxUnit["FluxOperatorManifestsUnit<br/>(scope=Chart, id='layer-gitops-flux-operator')"]
+                FluxHelm["ApiObject<br/>(kind=HelmChart)"]
+            end
+
+            Chart --> CiliumUnit
+            Chart --> FluxUnit
+            CiliumUnit --> HelmChart
+            CiliumUnit --> ConfigMap
+            FluxUnit --> FluxHelm
+        end
+
+        subgraph "Systemd Chart [Right Branch]"
+            direction TB
+            SysChart["SystemdChart<br/>(id='systemd')"]
+
+            Target1["SystemdTarget<br/>(rke2lab.target)"]
+            Target2["SystemdTarget<br/>(rke2lab-manifests.target)"]
+
+            Service1["SystemdService<br/>(rke2lab-cilium-config-manifests.service)"]
+            Service2["SystemdService<br/>(rke2lab-flux-operator-manifests.service)"]
+
+            SysChart --> Target1
+            SysChart --> Target2
+            SysChart --> Service1
+            SysChart --> Service2
+        end
+
+        App --> Chart
+        App --> SysChart
+    end
+
+    subgraph "Synthesis Outputs"
+        YamlOut["manifests.k8s.yaml<br/>---<br/>apiVersion: helm.cattle.io/v1<br/>kind: HelmChartConfig<br/>metadata:<br/>  name: rke2-cilium<br/>---<br/>apiVersion: v1<br/>kind: ConfigMap<br/>..."]
+
+        SysOut1["systemd/rke2lab-cilium-config-manifests.service<br/>[Unit]<br/>Description=Install Cilium config<br/>After=rke2lab-install.service<br/>Before=rke2-server.service<br/>[Service]<br/>Type=oneshot<br/>ExecStart=/srv/host/.../rke2lab-manifests-install.sh"]
+
+        SysOut2["systemd/rke2lab.target<br/>[Unit]<br/>Description=RKE2 Lab Bootstrap Target<br/>Documentation=https://github.com/nxmatic/rke2lab<br/>[Install]<br/>WantedBy=multi-user.target"]
+    end
+
+    Chart -.->|"app.synth()"| YamlOut
+    SysChart -.->|"systemdChart.synthesize()"| SysOut1
+    SysChart -.->|"systemdChart.synthesize()"| SysOut2
+
+    style App fill:#f9f9f9,stroke:#333,stroke-width:3px
+    style Chart fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+    style SysChart fill:#ffe1e1,stroke:#cc0000,stroke-width:2px
+
+    style CiliumUnit fill:#ccffcc,stroke:#00cc00,stroke-width:2px
+    style FluxUnit fill:#ccffcc,stroke:#00cc00,stroke-width:2px
+
+    style HelmChart fill:#e1f5ff
+    style ConfigMap fill:#e1f5ff
+    style FluxHelm fill:#e1f5ff
+
+    style Service1 fill:#ffe1e1
+    style Service2 fill:#ffe1e1
+    style Target1 fill:#ffe1e1
+    style Target2 fill:#ffe1e1
+
+    style YamlOut fill:#fff4e1,stroke:#cc9900,stroke-width:2px
+    style SysOut1 fill:#fff4e1,stroke:#cc9900,stroke-width:2px
+    style SysOut2 fill:#fff4e1,stroke:#cc9900,stroke-width:2px
+----
+
+**Key Observations:**
+
+1. **Parallel trees**: K8s Chart (left) and SystemdChart (right) coexist under same App
+2. **ManifestsUnit appears in K8s tree**: As parent of ApiObjects (HelmChart, ConfigMap)
+3. **ManifestsUnit creates systemd services**: Via `synthesizeSystemdUnits()` callback
+4. **Two synthesis outputs**: YAML (K8s) and INI files (systemd)
+
+=== C4 Level 4: Code View - ManifestsUnit Lifecycle
+
+[mermaid]
+----
+sequenceDiagram
+    autonumber
+    participant Constructor as ManifestsUnit<br/>Constructor
+    participant This as this<br/>(ManifestsUnit instance)
+    participant CDK8s as CDK8s<br/>Construct System
+    participant ApiObj as ApiObject<br/>(K8s resource)
+    participant SysCallback as synthesizeSystemdUnits()<br/>callback
+    participant SysChart as SystemdChart
+    participant SysService as SystemdService
+
+    Note over Constructor,SysService: Phase 1: Construction + K8s Synthesis
+
+    Constructor->>+This: new CiliumConfigManifestsUnit(scope, id)
+    This->>CDK8s: super(scope, id, unitId, deps)
+    CDK8s-->>This: Construct initialized
+
+    This->>+ApiObj: new ApiObject(this, "helmchart", props)
+    ApiObj->>CDK8s: Register as child of 'this'
+    CDK8s-->>ApiObj: Parent = CiliumConfigManifestsUnit
+    ApiObj-->>-This: HelmChartConfig created
+
+    This->>+ApiObj: new ApiObject(this, "configmap", props)
+    ApiObj->>CDK8s: Register as child of 'this'
+    ApiObj-->>-This: ConfigMap created
+
+    This-->>-Constructor: ManifestsUnit ready
+
+    Note over Constructor,SysService: Phase 2: Systemd Synthesis (later)
+
+    SysCallback->>+This: synthesizeSystemdUnits(systemdChart, context)
+    This->>SysChart: systemdChart.findUnit("rke2lab-install")
+    SysChart-->>This: installService reference
+
+    This->>+SysService: new SystemdService(systemdChart, "rke2lab-cilium-config-manifests")
+    SysService->>SysChart: Register with systemdChart
+    SysService->>SysService: .after(installService)<br/>.before("rke2-server.service")<br/>.execStart("...")
+    SysService-->>-This: Service configured
+
+    This-->>-SysCallback: Systemd synthesis complete
+
+    Note over Constructor,SysService: Result: K8s resources + systemd installer service
+----
+
+**Lifecycle Phases:**
+
+1. **Construction (steps 1-7)**: ManifestsUnit created, ApiObjects added as children
+2. **K8s Synthesis (implicit)**: CDK8s traverses tree, ApiObjects emit YAML
+3. **Systemd Synthesis (steps 8-12)**: Callback invoked, SystemdService created
+4. **Systemd File Output (implicit)**: SystemdChart writes .service files
+
+**Critical Insight:** ManifestsUnit IS-A Construct → participates in CDK8s tree traversal for K8s synthesis, but ALSO creates systemd units via separate callback.
+
+=== C4 Component: Full Synthesis Flow
+
+[mermaid]
+----
+sequenceDiagram
+    participant Request as ManifestSynthesisRequest
+    participant Service as DefaultManifestSynthesisService
+    participant App as CDK8s App
+    participant Chart as K8s Chart
+    participant SystemdChart as SystemdChart
+    participant Domain as LayerDomain
+    participant Unit as ManifestsUnit
+
+    Request->>Service: synthesize(request)
+    Service->>App: new App(outdir)
+    Service->>Chart: new Chart(app, "manifests")
+    Service->>SystemdChart: new SystemdChart(app, "systemd")
+
+    Service->>Domain: Create domains with ManifestsUnits
+
+    Note over Service,Unit: Phase 1: K8s Synthesis
+    Service->>Domain: applyManifestsUnit(...)
+    Domain->>Unit: apply(chart)
+    Unit->>Chart: new ApiObject(this, ...)
+    Chart-->>Unit: ApiObject created
+
+    Note over Service,Unit: Phase 2: Systemd Synthesis
+    Service->>SystemdChart: Create targets (rke2lab.target, etc.)
+    Service->>Domain: synthesizeSystemdUnits(systemdChart, context)
+    Domain->>Unit: synthesizeSystemdUnits(systemdChart, context)
+    Unit->>SystemdChart: new SystemdService(chart, "rke2lab-cilium-config-manifests")
+    SystemdChart-->>Unit: Service registered
+
+    Note over Service,App: Phase 3: Write Files
+    Service->>App: app.synth()
+    App->>Chart: Synthesize to manifests.k8s.yaml
+    Service->>SystemdChart: systemdChart.synthesize(systemdOutdir)
+    SystemdChart->>SystemdChart: Write *.service files
+
+    SystemdChart-->>Service: systemd/*.service files
+    Chart-->>Service: manifests.k8s.yaml
+    Service-->>Request: ManifestSynthesisResult
+----
+
+== How ManifestsUnits Extend Construct
+
+=== Two Constructors Pattern
+
+`AbstractManifestsUnit` has **two constructors** for backward compatibility during migration:
+
+[source,java]
+----
+// Old constructor - for units not yet merged with Component
+protected AbstractManifestsUnit(
+    String manifestUnitId,
+    List<String> dependsOnManifestsUnitIds) {
+  super(null, manifestUnitId);  // null scope - created via apply()
+  this.manifestUnitId = manifestUnitId;
+  this.dependsOnManifestsUnitIds = List.copyOf(dependsOnManifestsUnitIds);
+}
+
+// New constructor - for merged ManifestsUnits
+protected AbstractManifestsUnit(
+    Construct scope,
+    String id,
+    String manifestUnitId,
+    List<String> dependsOnManifestsUnitIds) {
+  super(scope, id);  // Proper CDK8s parent-child relationship
+  this.manifestUnitId = manifestUnitId;
+  this.dependsOnManifestsUnitIds = List.copyOf(dependsOnManifestsUnitIds);
+}
+----
+
+**New pattern (post-refactor):**
+
+[source,java]
+----
+public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
+
+  public CiliumConfigManifestsUnit(Construct scope, String id) {
+    super(scope, id, MANIFEST_UNIT_ID, List.of());
+
+    // Create K8s resources directly - 'this' is the parent Construct
+    new ApiObject(this, "helmchartconfig-rke2-cilium", ...);
+    new ApiObject(this, "configmap-clustermesh-remote-users", ...);
+  }
+}
+----
+
+**Why this works:**
+
+- `AbstractManifestsUnit extends Construct` → ManifestsUnit IS-A Construct
+- Constructor receives `scope` (the parent Chart)
+- `new ApiObject(this, ...)` → ManifestsUnit becomes parent of ApiObjects
+- CDK8s traverses tree: `App → Chart → ManifestsUnit → ApiObject`
+
+=== Construct Tree Example
+
+After synthesis, the CDK8s construct tree looks like:
+
+----
+App
+├─ Chart ("manifests")
+│  ├─ CiliumConfigManifestsUnit ("layer-networking-cilium-config")
+│  │  ├─ ApiObject ("helmchartconfig-rke2-cilium")
+│  │  └─ ApiObject ("configmap-clustermesh-remote-users")
+│  └─ FluxOperatorManifestsUnit ("layer-gitops-flux-operator")
+│     └─ ApiObject ("helmchart-flux-operator")
+└─ SystemdChart ("systemd")
+   ├─ SystemdTarget ("rke2lab")
+   ├─ SystemdTarget ("rke2lab-manifests")
+   └─ SystemdService ("rke2lab-cilium-config-manifests")
+----
+
+**Key insight**: `CiliumConfigManifestsUnit` appears in BOTH trees:
+
+1. **K8s tree** (left): As a Construct that owns ApiObjects
+2. **Systemd tree** (right): Creates a SystemdService that installs those ApiObjects
+
+== Systemd Integration
+
+=== Dual Synthesis: K8s + Systemd
+
+Each `ManifestsUnit` has **two synthesis phases**:
+
+[source,java]
+----
+public interface ManifestsUnit {
+
+  // Phase 1: K8s synthesis (called during app.apply())
+  default void apply(Chart chart) {
+    // Create ApiObject instances as children of 'this'
+  }
+
+  // Phase 2: Systemd synthesis (called after K8s synthesis)
+  default void synthesizeSystemdUnits(
+      SystemdChart systemdChart,
+      SystemdSynthesisContext context) {
+    // Create SystemdService instances
+  }
+}
+----
+
+=== Example: CiliumConfigManifestsUnit
+
+**Phase 1 - K8s Synthesis (constructor):**
+
+[source,java]
+----
+public CiliumConfigManifestsUnit(Construct scope, String id) {
+  super(scope, id, MANIFEST_UNIT_ID, List.of());
+
+  // Creates HelmChartConfig K8s resource
+  ApiObject helmChartConfig = new ApiObject(
+      this,
+      "helmchartconfig-rke2-cilium",
+      ApiObjectProps.builder()
+          .apiVersion("helm.cattle.io/v1")
+          .kind("HelmChartConfig")
+          .metadata(...)
+          .build());
+
+  // Creates ConfigMap K8s resource
+  new ApiObject(
+      this,
+      "configmap-clustermesh-remote-users",
+      ApiObjectProps.builder()
+          .apiVersion("v1")
+          .kind("ConfigMap")
+          .metadata(...)
+          .build());
+}
+----
+
+**Result**: Two K8s resources in `manifests.k8s.yaml`
+
+**Phase 2 - Systemd Synthesis:**
+
+[source,java]
+----
+@Override
+public void synthesizeSystemdUnits(
+    SystemdChart systemdChart,
+    SystemdSynthesisContext context) {
+
+  var installService = systemdChart.findUnit("rke2lab-install");
+
+  new SystemdService(systemdChart, "rke2lab-cilium-config-manifests")
+      .description("Install RKE2Lab Cilium config manifests before server start")
+      .after("local-fs.target", installService.getUnitFileName())
+      .before("rke2-server.service")  // ← Special case: runs BEFORE server
+      .type(ServiceType.ONESHOT)
+      .execStart(
+          "/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh networking/cilium-config")
+      .remainAfterExit(true)
+      .wantedBy(context.rke2labTarget().getUnitFileName());
+}
+----
+
+**Result**: File `systemd/rke2lab-cilium-config-manifests.service`
+
+[source,ini]
+----
+[Unit]
+Description=Install RKE2Lab Cilium config manifests before server start
+After=local-fs.target rke2lab-install.service
+Before=rke2-server.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh networking/cilium-config
+RemainAfterExit=true
+
+[Install]
+WantedBy=rke2lab.target
+----
+
+=== The Link: K8s Manifests → Systemd Installer
+
+**The critical connection:**
+
+1. ManifestsUnit constructor creates K8s resources → written to `manifests.k8s.yaml`
+2. `synthesizeSystemdUnits()` creates a systemd service that **installs** those manifests
+3. The installer script reads from `rke2-manifests.d/<domain>/<unit>/` directory
+4. Manifests are materialized to that directory by `seed-master` bootstrap
+
+**Flow:**
+
+----
+seed-master (bootstrap)
+  └─> Synthesize manifests → manifests.k8s.yaml
+      └─> Split into domain directories → rke2-manifests.d/networking/cilium-config/*.yaml
+          └─> Materialize to container → /srv/host/rke2-manifests.d/
+              └─> systemd service starts → rke2lab-cilium-config-manifests.service
+                  └─> ExecStart= runs script → reads manifests from directory
+                      └─> kubectl apply -f → Installs to cluster
+----
+
+=== Systemd Target Hierarchy
+
+The systemd units form a dependency hierarchy:
+
+[mermaid]
+----
+graph TB
+    MultiUser["multi-user.target<br/>(systemd default)"]
+    RKE2Lab["rke2lab.target<br/>(main target)"]
+    Network["rke2lab-network.target"]
+    Tools["rke2lab-tools.target"]
+    Bootstrap["rke2lab-bootstrap.target<br/>(pre-server)"]
+    RKE2Server["rke2-server.service<br/>(RKE2 control plane)"]
+    Manifests["rke2lab-manifests.target<br/>(post-server)"]
+    Secrets["rke2lab-secrets.target<br/>(post-manifests)"]
+
+    CiliumConfig["rke2lab-cilium-config-manifests.service<br/>(BEFORE server)"]
+    FluxOperator["rke2lab-gitops-manifests.service<br/>(AFTER server)"]
+
+    MultiUser -->|WantedBy| RKE2Lab
+    RKE2Lab -->|Wants| Network
+    RKE2Lab -->|Wants| Tools
+    RKE2Lab -->|Wants| Bootstrap
+
+    Network -->|After| Tools
+    Bootstrap -->|After| Network
+    Bootstrap -->|After| Tools
+
+    CiliumConfig -->|After| Bootstrap
+    CiliumConfig -->|Before| RKE2Server
+
+    RKE2Server -->|After| Bootstrap
+    Manifests -->|After| RKE2Server
+    FluxOperator -->|After| Manifests
+
+    Secrets -->|After| Manifests
+
+    RKE2Lab -->|Wants| RKE2Server
+    RKE2Lab -->|Wants| Manifests
+    RKE2Lab -->|Wants| Secrets
+
+    style MultiUser fill:#e1f5ff
+    style RKE2Server fill:#ffe1e1
+    style RKE2Lab fill:#e1ffe1
+    style Bootstrap fill:#e1ffe1
+    style Manifests fill:#e1ffe1
+    style Secrets fill:#e1ffe1
+    style CiliumConfig fill:#fff3e1
+    style FluxOperator fill:#fff3e1
+----
+
+**Key ordering:**
+
+- **Bootstrap phase**: `rke2lab-bootstrap.target` → services that run BEFORE rke2-server
+- **Server start**: `rke2-server.service` starts the RKE2 control plane
+- **Manifests phase**: `rke2lab-manifests.target` → services that install manifests AFTER server
+- **Secrets phase**: `rke2lab-secrets.target` → services that install secrets AFTER manifests
+
+**Special cases:**
+
+- `CiliumConfigManifestsUnit`: Runs BEFORE server (cilium must be configured before K8s starts)
+- Most other ManifestsUnits: Run AFTER server via `rke2lab-manifests.target`
+
+== SystemdChart: Parallel Construct Tree
+
+=== Design Rationale
+
+**Why not use CDK8s Chart for systemd?**
+
+CDK8s `Chart` synthesizes to **YAML**. Systemd uses **INI-style** unit files. We need a parallel construct tree that:
+
+1. Reuses CDK8s's `Construct` pattern (tree structure, parent-child relationships)
+2. Synthesizes to `.service`, `.target`, `.timer` files instead of YAML
+
+**Solution: `SystemdChart`**
+
+[source,java]
+----
+public class SystemdChart extends Construct {
+  private final List<SystemdUnit> units = new ArrayList<>();
+
+  // Children register themselves
+  void registerUnit(SystemdUnit unit) {
+    units.add(unit);
+  }
+
+  // Synthesize to INI files
+  public void synthesize(Path outdir) throws IOException {
+    for (SystemdUnit unit : units) {
+      Path unitFile = outdir.resolve(unit.getUnitFileName());
+      try (Writer writer = Files.newBufferedWriter(unitFile)) {
+        unit.writeUnitFile(writer);
+      }
+    }
+  }
+}
+----
+
+=== SystemdUnit: CDK8s Construct for Systemd
+
+[source,java]
+----
+public abstract class SystemdUnit extends Construct {
+
+  protected SystemdUnit(Construct scope, String id, String unitFileName) {
+    super(scope, id);  // CDK8s Construct constructor
+    this.unitFileName = unitFileName;
+
+    // Auto-register with parent SystemdChart
+    if (scope instanceof SystemdChart chart) {
+      chart.registerUnit(this);
+    }
+  }
+
+  // Fluent API for systemd directives
+  public SystemdUnit description(String desc) { ... }
+  public SystemdUnit after(String... units) { ... }
+  public SystemdUnit requires(String... units) { ... }
+
+  // Synthesize to INI format
+  abstract void writeUnitFile(Writer writer) throws IOException;
+}
+----
+
+**Key insight**: `SystemdUnit extends Construct` → it's a CDK8s construct, just like `ApiObject`.
+
+=== Example: Creating a SystemdService
+
+[source,java]
+----
+// Inside ManifestsUnit.synthesizeSystemdUnits():
+new SystemdService(systemdChart, "rke2lab-cilium-config-manifests")
+    .description("Install RKE2Lab Cilium config manifests")
+    .after("local-fs.target")
+    .before("rke2-server.service")
+    .type(ServiceType.ONESHOT)
+    .execStart("/srv/host/systemd-scripts.d/rke2lab-manifests-install.sh networking/cilium-config")
+    .remainAfterExit(true)
+    .wantedBy("rke2lab.target");
+----
+
+**Fluent API** (builder pattern) makes systemd unit creation readable and type-safe.
+
+=== Synthesis Flow Comparison
+
+[cols="1,1,1",options="header"]
+|===
+| Aspect | K8s Chart | SystemdChart
+
+| Base class | `org.cdk8s.Chart` | `SystemdChart extends Construct`
+| Child type | `ApiObject` | `SystemdUnit` (Service, Target, Timer)
+| Synthesis trigger | `App.synth()` | `systemdChart.synthesize(outdir)`
+| Output format | YAML (K8s manifests) | INI (systemd unit files)
+| Output location | `outdir/manifests.k8s.yaml` | `outdir/systemd/*.service`
+| Registration | Automatic (CDK8s tree) | Manual (`chart.registerUnit()`)
+|===
+
+== ManifestSynthesisService: Orchestration
+
+The `DefaultManifestSynthesisService` orchestrates both synthesis phases:
+
+[source,java]
+----
+@Override
+public ManifestSynthesisResult synthesize(ManifestSynthesisRequest request) {
+  // 1. Create CDK8s App (root of construct tree)
+  final App app = new App(AppProps.builder().outdir(synthOutdir.toString()).build());
+
+  // 2. Create parallel charts
+  final Chart chart = new Chart(app, "manifests");            // K8s
+  final SystemdChart systemdChart = new SystemdChart(app, "systemd");  // systemd
+
+  // 3. Build domain registry (groups ManifestsUnits by concern)
+  final LayerDomainRegistry domainRegistry = buildDomainRegistry(policy);
+
+  // 4. Phase 1: K8s synthesis
+  //    Apply all ManifestsUnits → creates ApiObjects as children of chart
+  for (ManifestsUnit unit : manifestUnits) {
+    domainRegistry.applyManifestsUnitWithDomainDependencies(unit.manifestUnitId(), applier);
+  }
+
+  // 5. Phase 2: Systemd synthesis
+  //    Create systemd targets first (referenced by services)
+  final SystemdTarget rke2labTarget = new SystemdTarget(systemdChart, "rke2lab")
+      .description("RKE2 Lab Bootstrap Target")
+      .wantedBy("multi-user.target");
+
+  final SystemdTarget manifestsTarget = new SystemdTarget(systemdChart, "rke2lab-manifests")
+      .description("RKE2 Lab Manifest Installers")
+      .after("rke2-server.service")
+      .wantedBy("rke2-server.service");
+
+  // Create synthesis context (shares targets with ManifestsUnits)
+  final SystemdSynthesisContext systemdContext =
+      new SystemdSynthesisContext(rke2labTarget, manifestsTarget, ...);
+
+  // Synthesize systemd units for each domain
+  for (LayerDomain domain : domainRegistry.domains()) {
+    domain.synthesizeSystemdUnits(systemdChart, systemdContext);
+  }
+
+  // 6. Finalize and write files
+  app.synth();  // → manifests.k8s.yaml
+  systemdChart.synthesize(systemdOutdir);  // → systemd/*.service
+
+  return new ManifestSynthesisResult(synthManifestFile, systemdOutdir, ...);
+}
+----
+
+**Key orchestration steps:**
+
+1. Create App (CDK8s root)
+2. Create parallel Chart (K8s) and SystemdChart (systemd)
+3. Build domain registry (groups ManifestsUnits)
+4. **Phase 1**: Apply ManifestsUnits → K8s ApiObjects
+5. **Phase 2**: Create systemd targets, then synthesize ManifestsUnit systemd services
+6. Write both K8s and systemd files
+
+== Patterns and Best Practices
+
+=== When to Override synthesizeSystemdUnits()
+
+**Override when:**
+
+- The ManifestsUnit needs a systemd service to **install** its K8s manifests
+- Special ordering required (BEFORE or AFTER rke2-server)
+- Custom installation logic (not just `kubectl apply`)
+
+**Don't override when:**
+
+- The ManifestsUnit only creates K8s resources (no installation service needed)
+- The domain handles systemd synthesis (domain-level installer service)
+
+=== Special Ordering: Before vs After rke2-server
+
+**BEFORE server** (`before("rke2-server.service")`):
+
+- Cilium config (network CNI must be configured before K8s starts)
+- RKE2 config (server configuration files)
+
+**AFTER server** (`after("rke2-server.service")`):
+
+- Most manifest installers (require K8s API to be available)
+- GitOps (Flux needs K8s to bootstrap)
+- Cluster API operators (need CRDs installed)
+
+=== Dependency Resolution
+
+**K8s dependency**: via `dependsOnManifestsUnitIds()`
+
+[source,java]
+----
+public FluxInstanceManifestsUnit() {
+  super(
+      MANIFEST_UNIT_ID,
+      List.of(FluxOperatorManifestsUnit.MANIFEST_UNIT_ID)  // ← depends on operator
+  );
+}
+----
+
+**Systemd dependency**: via `.after()` and `.requires()`
+
+[source,java]
+----
+new SystemdService(systemdChart, "rke2lab-flux-instance-manifests")
+    .after("rke2lab-flux-operator-manifests.service")  // ← systemd ordering
+    .requires("rke2-server.service");
+----
+
+**Both are necessary:**
+
+- K8s dependency ensures manifests are applied in order
+- Systemd dependency ensures services start in order
+
+== Anti-Patterns
+
+=== ❌ Don't: Create ApiObjects outside ManifestsUnit constructor
+
+[source,java]
+----
+// WRONG: ApiObjects created in helper method, not during construction
+public void apply(Chart chart) {
+  createResources(chart);  // ← Parent is 'chart', not 'this'
+}
+
+private void createResources(Construct parent) {
+  new ApiObject(parent, "resource", ...);  // ← Wrong parent!
+}
+----
+
+**Why wrong:** CDK8s tree doesn't include ManifestsUnit → loses construct hierarchy.
+
+**Correct:**
+
+[source,java]
+----
+public CiliumConfigManifestsUnit(Construct scope, String id) {
+  super(scope, id, MANIFEST_UNIT_ID, List.of());
+
+  // ApiObjects created during construction, parent is 'this'
+  new ApiObject(this, "resource", ...);  // ← Correct parent
+}
+----
+
+=== ❌ Don't: Create systemd units in constructor
+
+[source,java]
+----
+// WRONG: Systemd synthesis in constructor
+public CiliumConfigManifestsUnit(Construct scope, String id) {
+  super(scope, id, MANIFEST_UNIT_ID, List.of());
+
+  // ❌ SystemdChart doesn't exist yet during K8s synthesis!
+  new SystemdService(???, "my-service");
+}
+----
+
+**Why wrong:** SystemdChart is created separately; systemd synthesis happens AFTER K8s synthesis.
+
+**Correct:**
+
+[source,java]
+----
+@Override
+public void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
+  // ✅ Systemd synthesis in dedicated method
+  new SystemdService(systemdChart, "my-service");
+}
+----
+
+=== ❌ Don't: Hardcode systemd target names
+
+[source,java]
+----
+// WRONG: Hardcoded target name
+new SystemdService(systemdChart, "my-service")
+    .wantedBy("rke2lab-manifests.target");  // ❌ Magic string
+----
+
+**Why wrong:** Target might be renamed; typo causes silent failure.
+
+**Correct:**
+
+[source,java]
+----
+// ✅ Use context accessor
+new SystemdService(systemdChart, "my-service")
+    .wantedBy(context.manifestsTarget().getUnitFileName());
+----
+
+== Migration from Old Pattern
+
+=== Before: Component + ManifestUnit (2 files)
+
+**Component.java:**
+
+[source,java]
+----
+public final class CiliumConfigComponent extends Construct {
+  public CiliumConfigComponent(Construct scope, String id) {
+    super(scope, id);
+    new ApiObject(this, "helmchartconfig", ...);
+  }
+}
+----
+
+**ManifestUnit.java:**
+
+[source,java]
+----
+public final class CiliumConfigManifestUnit extends AbstractManifestsUnit {
+  public CiliumConfigManifestUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
+  }
+
+  @Override
+  public void apply(Chart chart) {
+    new CiliumConfigComponent(chart, "layer-networking-cilium-config");  // ← delegation
+  }
+}
+----
+
+**Problems:**
+
+- 2 files for 1 logical unit
+- Delegation via `apply()` hides construct hierarchy
+- Unclear who owns the ApiObjects (Component or ManifestUnit?)
+
+=== After: Merged ManifestsUnit (1 file)
+
+[source,java]
+----
+public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
+
+  public CiliumConfigManifestsUnit(Construct scope, String id) {
+    super(scope, id, MANIFEST_UNIT_ID, List.of());
+
+    // ApiObjects created directly, 'this' is the parent
+    new ApiObject(this, "helmchartconfig", ...);
+  }
+
+  @Override
+  public void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
+    new SystemdService(systemdChart, "rke2lab-cilium-config-manifests")
+        .execStart("...");
+  }
+}
+----
+
+**Benefits:**
+
+- 1 file, 1 class
+- Construct hierarchy clear: `ManifestsUnit → ApiObject`
+- Both K8s and systemd synthesis in same class
+
+== Related Documentation
+
+* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Pattern for multi-stage workflows in seed-master
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Context access pattern for manifest units
+* link:manifest-domain-catalog-pattern.adoc[Manifest Domain Catalog Pattern] - Single source of truth for domain IDs
+
+== Troubleshooting
+
+=== ApiObject parent is null
+
+**Symptom:**
+
+----
+java.lang.NullPointerException: Cannot invoke "software.constructs.Construct.getNode()" because "scope" is null
+----
+
+**Cause:** ApiObject created with null parent.
+
+**Fix:** Ensure ManifestsUnit uses new constructor:
+
+[source,java]
+----
+public MyManifestsUnit(Construct scope, String id) {
+  super(scope, id, MANIFEST_UNIT_ID, List.of());  // ← Pass scope, not null
+  new ApiObject(this, "resource", ...);
+}
+----
+
+=== Systemd service not created
+
+**Symptom:** Expected `.service` file missing in `systemd/` directory.
+
+**Cause:** `synthesizeSystemdUnits()` not called or not overridden.
+
+**Fix:** Override method and create SystemdService:
+
+[source,java]
+----
+@Override
+public void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
+  new SystemdService(systemdChart, "rke2lab-my-manifests")
+      .execStart("...");
+}
+----
+
+=== Systemd service ordering broken
+
+**Symptom:** Service starts before dependencies ready.
+
+**Cause:** Missing `.after()` or `.requires()` directives.
+
+**Fix:** Use context accessors for targets:
+
+[source,java]
+----
+new SystemdService(systemdChart, "rke2lab-my-manifests")
+    .after(context.bootstrapTarget().getUnitFileName())  // ← Use context
+    .requires("rke2-server.service")
+    .wantedBy(context.manifestsTarget().getUnitFileName());
+----
+
+=== Manifests not installed to cluster
+
+**Symptom:** K8s resources missing despite systemd service running successfully.
+
+**Cause:** Manifests not materialized to expected directory.
+
+**Fix:** Check:
+
+1. Manifests exist in `rke2-manifests.d/<domain>/<unit>/`
+2. ExecStart path matches materialized location
+3. systemd service runs after `rke2lab-install.service` (which copies files)

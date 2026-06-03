@@ -8,7 +8,7 @@ import org.cdk8s.Chart;
 
 public final class ManifestsUnitDependencyApplier {
 
-  private final LayerDomainRegistry layerDomainRegistry;
+  private final ManifestsDomainRegistry layerDomainRegistry;
   private final ManifestsUnitRegistry manifestUnitRegistry;
   private final ManifestsUnitVisitor manifestUnitVisitor;
   private final Chart chart;
@@ -17,7 +17,7 @@ public final class ManifestsUnitDependencyApplier {
   private final Set<String> visitingManifestsUnitIds = new HashSet<>();
 
   public ManifestsUnitDependencyApplier(
-      final LayerDomainRegistry layerDomainRegistry,
+      final ManifestsDomainRegistry layerDomainRegistry,
       final ManifestsUnitRegistry manifestUnitRegistry,
       final ManifestsUnitVisitor manifestUnitVisitor,
       final Chart chart,

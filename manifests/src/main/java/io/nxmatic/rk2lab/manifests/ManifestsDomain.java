@@ -10,29 +10,29 @@ import java.util.List;
  * <p>Domains correspond to installer services (e.g., "cluster-api" →
  * rke2lab-cluster-api-manifests.service).
  */
-public class LayerDomain {
+public class ManifestsDomain {
   private final String domainId;
   private final List<String> dependsOnDomainIds;
-  private final List<? extends ManifestsUnit> layers;
+  private final List<? extends ManifestsUnit> units;
 
-  public LayerDomain(
-      String domainId, List<String> dependsOnDomainIds, List<? extends ManifestsUnit> layers) {
+  public ManifestsDomain(
+      String domainId, List<String> dependsOnDomainIds, List<? extends ManifestsUnit> units) {
     if (domainId == null || domainId.isBlank()) {
       throw new IllegalArgumentException("Domain id must not be blank");
     }
     if (dependsOnDomainIds == null) {
       throw new IllegalArgumentException("Domain dependencies must not be null: " + domainId);
     }
-    if (layers == null || layers.isEmpty()) {
+    if (units == null || units.isEmpty()) {
       throw new IllegalArgumentException("Domain must define at least one layer: " + domainId);
     }
     this.domainId = domainId;
     this.dependsOnDomainIds = List.copyOf(dependsOnDomainIds);
-    this.layers = List.copyOf(layers);
+    this.units = List.copyOf(units);
   }
 
-  public LayerDomain(String domainId, List<? extends ManifestsUnit> layers) {
-    this(domainId, List.of(), layers);
+  public ManifestsDomain(String domainId, List<? extends ManifestsUnit> units) {
+    this(domainId, List.of(), units);
   }
 
   public String domainId() {
@@ -43,8 +43,8 @@ public class LayerDomain {
     return dependsOnDomainIds;
   }
 
-  public List<? extends ManifestsUnit> layers() {
-    return layers;
+  public List<? extends ManifestsUnit> units() {
+    return units;
   }
 
   /**
@@ -59,7 +59,7 @@ public class LayerDomain {
    */
   public void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
     // Delegate to each manifest unit
-    for (ManifestsUnit unit : layers) {
+    for (ManifestsUnit unit : units) {
       unit.synthesizeSystemdUnits(systemdChart, context);
     }
   }

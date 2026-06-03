@@ -9,10 +9,10 @@ package io.nxmatic.rk2lab.manifests;
  *
  * <pre>{@code
  * graph LR
- *     LDRB[LayerDomainRegistryBuilder]
- *     LDR[LayerDomainRegistrar]
+ *     LDRB[ManifestsDomainRegistryBuilder]
+ *     LDR[ManifestsDomainRegistrar]
  *     MDP[ManifestDomainPolicy]
- *     LD[LayerDomain]
+ *     LD[ManifestsDomain]
  *     MU[ManifestsUnit List]
  *
  *     LDRB -->|register registrar, policy| LDR
@@ -31,10 +31,10 @@ package io.nxmatic.rk2lab.manifests;
  * <p><b>Backwards compatible (no policy awareness):</b>
  *
  * <pre>{@code
- * public class SimpleDomainRegistrar implements LayerDomainRegistrar {
+ * public class SimpleDomainRegistrar implements ManifestsDomainRegistrar {
  *   @Override
- *   public LayerDomain domain() {
- *     return new LayerDomain("simple", List.of(new SomeManifestsUnit()));
+ *   public ManifestsDomain domain() {
+ *     return new ManifestsDomain("simple", List.of(new SomeManifestsUnit()));
  *   }
  * }
  * }</pre>
@@ -42,31 +42,31 @@ package io.nxmatic.rk2lab.manifests;
  * <p><b>Policy-aware (conditional units):</b>
  *
  * <pre>{@code
- * public class GitopsDomainRegistrar implements LayerDomainRegistrar {
+ * public class GitopsDomainRegistrar implements ManifestsDomainRegistrar {
  *   private static final ManifestDomainCatalog CATALOG =
  *       ManifestDomainCatalog.builder().addDefaultDomains().build();
  *
  *   @Override
- *   public LayerDomain domain(ManifestDomainPolicy policy) {
+ *   public ManifestsDomain domain(ManifestDomainPolicy policy) {
  *     List<ManifestsUnit> units = new ArrayList<>();
  *     units.add(new FluxInstanceManifestsUnit());
  *     if (policy.isEnabled(CATALOG.clusterApi())) {
  *       units.add(new ClusterApiManifestsUnit());
  *     }
- *     return new LayerDomain(CATALOG.gitops(), List.of(CATALOG.platform()), units);
+ *     return new ManifestsDomain(CATALOG.gitops(), List.of(CATALOG.platform()), units);
  *   }
  * }
  * }</pre>
  *
  * @see ManifestDomainPolicy
- * @see LayerDomain
- * @see LayerDomainRegistryBuilder
+ * @see ManifestsDomain
+ * @see ManifestsDomainRegistryBuilder
  */
-public interface LayerDomainRegistrar {
+public interface ManifestsDomainRegistrar {
 
-  LayerDomain domain();
+  ManifestsDomain domain();
 
-  default LayerDomain domain(ManifestDomainPolicy policy) {
+  default ManifestsDomain domain(ManifestDomainPolicy policy) {
     return domain();
   }
 }

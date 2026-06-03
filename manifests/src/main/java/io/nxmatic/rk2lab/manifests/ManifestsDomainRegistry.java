@@ -8,19 +8,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public final class LayerDomainRegistry {
+public final class ManifestsDomainRegistry {
 
-  private final Map<String, LayerDomain> domainsById;
+  private final Map<String, ManifestsDomain> domainsById;
   private final List<ManifestsUnit> manifestUnits;
   private final Map<String, String> domainIdByManifestsUnitId;
 
-  public LayerDomainRegistry(final List<LayerDomain> domains) {
+  public ManifestsDomainRegistry(final List<ManifestsDomain> domains) {
     if (domains == null || domains.isEmpty()) {
       throw new IllegalArgumentException("At least one domain must be configured");
     }
 
-    LinkedHashMap<String, LayerDomain> byId = new LinkedHashMap<>();
-    for (LayerDomain domain : domains) {
+    LinkedHashMap<String, ManifestsDomain> byId = new LinkedHashMap<>();
+    for (ManifestsDomain domain : domains) {
       if (byId.put(domain.domainId(), domain) != null) {
         throw new IllegalStateException("Duplicate domain id: " + domain.domainId());
       }
@@ -29,13 +29,13 @@ public final class LayerDomainRegistry {
     this.domainsById = Map.copyOf(byId);
     this.manifestUnits =
         byId.values().stream()
-            .flatMap(domain -> domain.layers().stream())
+            .flatMap(domain -> domain.units().stream())
             .map(layer -> (ManifestsUnit) layer)
             .toList();
 
     HashMap<String, String> byManifestsUnitId = new HashMap<>();
-    for (LayerDomain domain : byId.values()) {
-      for (ManifestsUnit manifestUnit : domain.layers()) {
+    for (ManifestsDomain domain : byId.values()) {
+      for (ManifestsUnit manifestUnit : domain.units()) {
         String previous = byManifestsUnitId.put(manifestUnit.manifestUnitId(), domain.domainId());
         if (previous != null) {
           throw new IllegalStateException(
@@ -49,7 +49,7 @@ public final class LayerDomainRegistry {
     validateManifestsUnitDependencies();
   }
 
-  public List<LayerDomain> domains() {
+  public List<ManifestsDomain> domains() {
     return List.copyOf(domainsById.values());
   }
 
@@ -78,7 +78,7 @@ public final class LayerDomainRegistry {
   }
 
   private void validateDomainDependencies() {
-    for (LayerDomain domain : domainsById.values()) {
+    for (ManifestsDomain domain : domainsById.values()) {
       for (String dependencyDomainId : domain.dependsOnDomainIds()) {
         if (!domainsById.containsKey(dependencyDomainId)) {
           throw new IllegalStateException(
@@ -139,7 +139,7 @@ public final class LayerDomainRegistry {
       return false;
     }
 
-    final LayerDomain domain = domainsById.get(domainId);
+    final ManifestsDomain domain = domainsById.get(domainId);
     if (domain == null) {
       return false;
     }
@@ -197,7 +197,7 @@ public final class LayerDomainRegistry {
       throw new IllegalStateException("Cyclic domain dependency detected at: " + domainId);
     }
 
-    LayerDomain domain = domainsById.get(domainId);
+    ManifestsDomain domain = domainsById.get(domainId);
     if (domain == null) {
       throw new IllegalStateException("Unknown domain dependency: " + domainId);
     }
@@ -207,7 +207,7 @@ public final class LayerDomainRegistry {
           dependencyDomainId, manifestUnitDependencyApplier, visitingDomainIds, appliedDomainIds);
     }
 
-    for (ManifestsUnit manifestUnit : domain.layers()) {
+    for (ManifestsUnit manifestUnit : domain.units()) {
       manifestUnitDependencyApplier.applyManifestsUnitWithDependencies(
           manifestUnit.manifestUnitId());
     }
