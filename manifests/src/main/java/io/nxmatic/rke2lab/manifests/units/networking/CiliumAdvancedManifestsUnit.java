@@ -2,7 +2,9 @@
 package io.nxmatic.rke2lab.manifests.units.networking;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
+import io.nxmatic.rke2lab.manifests.InstallPhase;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -20,18 +22,27 @@ public final class CiliumAdvancedManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("networking", "cilium-advanced");
 
-  public CiliumAdvancedManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of(CiliumConfigManifestsUnit.MANIFEST_UNIT_ID));
-    createLoadBalancerPools();
-    createBgpAdvertisement();
-    createL2AnnouncementPolicy();
-    createBgpClusterConfig();
+  public CiliumAdvancedManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of(CiliumConfigManifestsUnit.MANIFEST_UNIT_ID));
   }
 
-  private void createLoadBalancerPools() {
+  @Override
+  public InstallPhase installPhase() {
+    return InstallPhase.POST_CNI_READY;
+  }
+
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    createLoadBalancerPools(scope);
+    createBgpAdvertisement(scope);
+    createL2AnnouncementPolicy(scope);
+    createBgpClusterConfig(scope);
+  }
+
+  private void createLoadBalancerPools(final Construct scope) {
     ApiObject cluster =
         new ApiObject(
-            this,
+            scope,
             "ciliumloadbalancerippool-cluster",
             ApiObjectProps.builder()
                 .apiVersion("cilium.io/v2alpha1")
@@ -58,7 +69,7 @@ public final class CiliumAdvancedManifestsUnit extends AbstractManifestsUnit {
 
     ApiObject lan =
         new ApiObject(
-            this,
+            scope,
             "ciliumloadbalancerippool-lan",
             ApiObjectProps.builder()
                 .apiVersion("cilium.io/v2alpha1")
@@ -82,7 +93,7 @@ public final class CiliumAdvancedManifestsUnit extends AbstractManifestsUnit {
 
     ApiObject vip =
         new ApiObject(
-            this,
+            scope,
             "ciliumloadbalancerippool-vip",
             ApiObjectProps.builder()
                 .apiVersion("cilium.io/v2alpha1")
@@ -99,10 +110,10 @@ public final class CiliumAdvancedManifestsUnit extends AbstractManifestsUnit {
         JsonPatch.add("/spec", Map.of("blocks", List.of(Map.of("cidr", "10.80.7.0/24")))));
   }
 
-  private void createBgpAdvertisement() {
+  private void createBgpAdvertisement(final Construct scope) {
     ApiObject advertisement =
         new ApiObject(
-            this,
+            scope,
             "ciliumbgpadvertisement-control-plane-advertisement",
             ApiObjectProps.builder()
                 .apiVersion("cilium.io/v2")
@@ -132,10 +143,10 @@ public final class CiliumAdvancedManifestsUnit extends AbstractManifestsUnit {
                     Map.of("advertisementType", "PodCIDR")))));
   }
 
-  private void createL2AnnouncementPolicy() {
+  private void createL2AnnouncementPolicy(final Construct scope) {
     ApiObject policy =
         new ApiObject(
-            this,
+            scope,
             "ciliuml2announcementpolicy-host",
             ApiObjectProps.builder()
                 .apiVersion("cilium.io/v2alpha1")
@@ -167,7 +178,7 @@ public final class CiliumAdvancedManifestsUnit extends AbstractManifestsUnit {
                 Map.of("matchLabels", Map.of()))));
   }
 
-  private void createBgpClusterConfig() {
+  private void createBgpClusterConfig(final Construct scope) {
     // BGP Configuration Strategy for Multi-Host Cluster Mesh
     //
     // See docs/cilium-bgp-multi-host-topology.adoc for comprehensive documentation
@@ -186,7 +197,7 @@ public final class CiliumAdvancedManifestsUnit extends AbstractManifestsUnit {
 
     ApiObject bgpClusterConfig =
         new ApiObject(
-            this,
+            scope,
             "ciliumbgpclusterconfig-bgp-cluster-config",
             ApiObjectProps.builder()
                 .apiVersion("cilium.io/v2")

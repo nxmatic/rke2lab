@@ -68,7 +68,7 @@ public class ManifestsDomain {
     for (ManifestsUnit unit : units) {
       subpathsByPhase
           .computeIfAbsent(unit.installPhase(), p -> new java.util.ArrayList<>())
-          .add(unit.manifestUnitId());
+          .add(domainId + "/" + unit.outputDir());
     }
 
     final SystemdUnitSynthesizer synthesizer =

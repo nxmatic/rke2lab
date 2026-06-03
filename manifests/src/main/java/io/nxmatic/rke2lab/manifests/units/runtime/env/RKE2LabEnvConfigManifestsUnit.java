@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.manifests.units.runtime.env;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
 import io.nxmatic.rke2lab.manifests.node.NodeEnvContext;
 import io.nxmatic.rke2lab.manifests.node.NodeEnvContributor;
@@ -46,28 +47,33 @@ public final class RKE2LabEnvConfigManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("runtime", "env-config");
 
-  private final NodeEnvContext nodeEnvContext;
+  public RKE2LabEnvConfigManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
+  }
 
-  private final NodeEnvContributorRegistry envContributorRegistry;
-
-  public RKE2LabEnvConfigManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
-
-    this.nodeEnvContext = new DefaultNodeEnvContext();
-    this.envContributorRegistry = new NodeEnvContributorRegistry(nodeEnvContext);
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    final NodeEnvContext nodeEnvContext = new DefaultNodeEnvContext();
+    final NodeEnvContributorRegistry envContributorRegistry =
+        new NodeEnvContributorRegistry(nodeEnvContext);
 
     for (String section : ENV_SECTIONS) {
-      createSectionConfigMap(section);
+      createSectionConfigMap(scope, section, nodeEnvContext, envContributorRegistry);
     }
   }
 
-  private void createSectionConfigMap(final String section) {
+  private void createSectionConfigMap(
+      final Construct scope,
+      final String section,
+      final NodeEnvContext nodeEnvContext,
+      final NodeEnvContributorRegistry envContributorRegistry) {
     final String cmName = "env-section-" + section;
-    final Map<String, String> data = resolveEnvData(section);
+    final Map<String, String> data =
+        resolveEnvData(section, nodeEnvContext, envContributorRegistry);
 
     ApiObject configMap =
         new ApiObject(
-            this,
+            scope,
             "configmap-" + cmName,
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -91,8 +97,12 @@ public final class RKE2LabEnvConfigManifestsUnit extends AbstractManifestsUnit {
     configMap.addJsonPatch(JsonPatch.add("/data", data));
   }
 
-  private Map<String, String> resolveEnvData(final String section) {
-    final Map<String, String> contributorData = resolveContributorSection(section);
+  private static Map<String, String> resolveEnvData(
+      final String section,
+      final NodeEnvContext nodeEnvContext,
+      final NodeEnvContributorRegistry envContributorRegistry) {
+    final Map<String, String> contributorData =
+        resolveContributorSection(section, nodeEnvContext, envContributorRegistry);
     if (!contributorData.isEmpty()) {
       return contributorData;
     }
@@ -105,7 +115,10 @@ public final class RKE2LabEnvConfigManifestsUnit extends AbstractManifestsUnit {
     throw new IllegalStateException("Unsupported runtime env-config section: " + section);
   }
 
-  private Map<String, String> resolveContributorSection(final String section) {
+  private static Map<String, String> resolveContributorSection(
+      final String section,
+      final NodeEnvContext nodeEnvContext,
+      final NodeEnvContributorRegistry envContributorRegistry) {
     for (NodeEnvContributor contributor : envContributorRegistry.orderedContributors()) {
       if (!contributor.contributedSections().contains(section)) {
         continue;
@@ -123,7 +136,7 @@ public final class RKE2LabEnvConfigManifestsUnit extends AbstractManifestsUnit {
     return Map.of();
   }
 
-  private Map<String, String> resolveBuiltInSection(final String section) {
+  private static Map<String, String> resolveBuiltInSection(final String section) {
     return switch (section) {
       case "kpt" -> Map.of("KRM_FN_RUNTIME", "nerdctl");
       default -> Map.of();

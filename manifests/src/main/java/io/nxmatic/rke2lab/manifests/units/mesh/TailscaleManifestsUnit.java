@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.manifests.units.mesh;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -21,18 +22,21 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("mesh", "tailscale");
 
-  public TailscaleManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of(MeshSystemNamespaceManifestsUnit.MANIFEST_UNIT_ID));
-
-    ApiObject namespace = createNamespace();
-    createSecret(namespace);
-    ApiObject helmChart = createHelmChart(namespace);
-    createConnector(helmChart);
+  public TailscaleManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of(MeshSystemNamespaceManifestsUnit.MANIFEST_UNIT_ID));
   }
 
-  private ApiObject createNamespace() {
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    ApiObject namespace = createNamespace(scope);
+    createSecret(scope, namespace);
+    ApiObject helmChart = createHelmChart(scope, namespace);
+    createConnector(scope, helmChart);
+  }
+
+  private ApiObject createNamespace(final Construct scope) {
     return new ApiObject(
-        this,
+        scope,
         "namespace-" + TAILSCALE_NAMESPACE,
         ApiObjectProps.builder()
             .apiVersion("v1")
@@ -47,10 +51,10 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
             .build());
   }
 
-  private ApiObject createHelmChart(final ApiObject namespace) {
+  private ApiObject createHelmChart(final Construct scope, final ApiObject namespace) {
     ApiObject helmChart =
         new ApiObject(
-            this,
+            scope,
             "helmchart-tailscale-operator",
             ApiObjectProps.builder()
                 .apiVersion("helm.cattle.io/v1")
@@ -89,10 +93,10 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
     return helmChart;
   }
 
-  private void createConnector(final ApiObject helmChart) {
+  private void createConnector(final Construct scope, final ApiObject helmChart) {
     ApiObject connector =
         new ApiObject(
-            this,
+            scope,
             "connector-controlplane",
             ApiObjectProps.builder()
                 .apiVersion("tailscale.com/v1alpha1")
@@ -122,10 +126,10 @@ public final class TailscaleManifestsUnit extends AbstractManifestsUnit {
                 Map.of("advertiseRoutes", List.of("10.80.7.10/32", "10.80.0.64/26")))));
   }
 
-  private void createSecret(final ApiObject namespace) {
+  private void createSecret(final Construct scope, final ApiObject namespace) {
     ApiObject secret =
         new ApiObject(
-            this,
+            scope,
             "secret-operator-oauth",
             ApiObjectProps.builder()
                 .apiVersion("v1")

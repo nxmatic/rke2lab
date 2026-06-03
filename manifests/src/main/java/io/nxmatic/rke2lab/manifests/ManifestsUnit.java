@@ -3,9 +3,6 @@ package io.nxmatic.rke2lab.manifests;
 
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import java.util.List;
-import java.util.function.BiFunction;
-import org.cdk8s.Chart;
-import software.constructs.Construct;
 
 public interface ManifestsUnit {
 
@@ -23,80 +20,28 @@ public interface ManifestsUnit {
   }
 
   /**
-   * Creates a lazy ManifestsUnit that defers Construct instantiation until apply() is called.
-   *
-   * <p>Used by domain registrars to avoid creating Construct instances with null scope. The factory
-   * receives (Construct scope, String id) and returns a fully-constructed ManifestsUnit.
-   *
-   * <p>The {@link InstallPhase} is passed here (not declared on the unit class) because the systemd
-   * synthesis reads it from this wrapper <em>before</em> the real unit is constructed — the factory
-   * only runs during {@link #apply(Chart)}.
-   *
-   * <p><b>Usage:</b>
-   *
-   * <pre>{@code
-   * ManifestsUnit.lazy(
-   *   ClusterRuntimeNamespaceManifestsUnit.MANIFEST_UNIT_ID,
-   *   List.of(),
-   *   InstallPhase.POST_SERVER,
-   *   ClusterRuntimeNamespaceManifestsUnit::new
-   * )
-   * }</pre>
-   *
-   * @param manifestUnitId the manifest unit identifier
-   * @param dependsOnManifestsUnitIds list of unit IDs this unit depends on
-   * @param installPhase the RKE2 lifecycle phase this unit attaches to
-   * @param factory factory function (scope, id) -> ManifestsUnit instance
-   * @return lazy ManifestsUnit that creates the real instance in apply()
+   * The output directory segment (relative to the domain) where this unit's manifests are exploded
+   * — i.e. the {@code package} of its {@link
+   * io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile}. The systemd installer links
+   * {@code <domain>/<outputDir>}. Defaults to the last segment of {@link #manifestUnitId()} (the
+   * common case where id and package coincide); override only when they diverge (e.g. id {@code
+   * cluster-api/operator} but package {@code cluster-api-operator}).
    */
-  static ManifestsUnit lazy(
-      String manifestUnitId,
-      List<String> dependsOnManifestsUnitIds,
-      BiFunction<Construct, String, ? extends ManifestsUnit> factory) {
-    return lazy(manifestUnitId, dependsOnManifestsUnitIds, InstallPhase.POST_SERVER, factory);
+  default String outputDir() {
+    final String id = manifestUnitId();
+    final int slash = id.lastIndexOf('/');
+    return slash < 0 ? id : id.substring(slash + 1);
   }
 
   /**
-   * Like {@link #lazy(String, List, BiFunction)} but with an explicit {@link InstallPhase} — use
-   * this overload only when the unit is not the common {@link InstallPhase#POST_SERVER} case.
+   * Synthesizes this unit's Kubernetes manifests into the given context.
+   *
+   * <p>Implementations must extend {@link AbstractManifestsUnit} which provides the template method
+   * pattern: creates a scope Construct, calls {@link
+   * AbstractManifestsUnit#doSynthesize(software.constructs.Construct, ManifestsUnitContext)},
+   * introspects emitted ApiObjects, and emits a group marker ConfigMap.
    */
-  static ManifestsUnit lazy(
-      String manifestUnitId,
-      List<String> dependsOnManifestsUnitIds,
-      InstallPhase installPhase,
-      BiFunction<Construct, String, ? extends ManifestsUnit> factory) {
-    return new ManifestsUnit() {
-      @Override
-      public String manifestUnitId() {
-        return manifestUnitId;
-      }
-
-      @Override
-      public List<String> dependsOnManifestsUnitIds() {
-        return List.copyOf(dependsOnManifestsUnitIds);
-      }
-
-      @Override
-      public InstallPhase installPhase() {
-        return installPhase;
-      }
-
-      @Override
-      public void apply(Chart chart) {
-        factory.apply(chart, manifestUnitId.replace("/", "-"));
-      }
-    };
-  }
-
-  default void apply(ManifestsUnitContext context) {
-    apply(context.chart());
-  }
-
-  default void apply(Chart chart) {
-    throw new UnsupportedOperationException(
-        "ManifestsUnit must override apply(Chart) or apply(ManifestsUnitContext): "
-            + manifestUnitId());
-  }
+  void apply(ManifestsUnitContext context);
 
   /**
    * Synthesizes systemd units for this manifest unit.

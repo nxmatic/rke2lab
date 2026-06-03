@@ -15,13 +15,13 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Splits a consolidated multi-document YAML synth into one file per resource under {@code
- * <layer>/<package>/<order>-<kind>-<name>.yml}.
+ * <domain>/<package>/<order>-<kind>-<name>.yml}.
  *
  * <p>Replaces the old {@code bin/explode-manifests.sh} that used {@code yq} — the synth itself runs
  * in seed-master at pulumi-up time now, and we don't want a {@code yq} runtime dep.
  *
- * <p>Layer and package come from {@code io.nxmatic.rke2lab/layer} and {@code
- * io.nxmatic.rke2lab/package} annotations stamped by layer code; defaults match the old script
+ * <p>Domain and package come from {@code io.nxmatic.rke2lab/domain} and {@code
+ * io.nxmatic.rke2lab/package} annotations stamped by domain code; defaults match the old script
  * ({@code default} / {@code unknown}). Order prefix is determined by kind: {@code 00-} for CRDs,
  * {@code 01-} for other cluster-scoped resources (no namespace), {@code 02-} for namespace-scoped
  * resources.
@@ -61,18 +61,29 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
           continue;
         }
 
-        final String layer = annotation(document, "io.nxmatic.rke2lab/layer", "default");
-        final String pkg = annotation(document, "io.nxmatic.rke2lab/package", "unknown");
+        final String domain = annotation(document, ManifestAnnotations.DOMAIN, "default");
+        final String pkg = annotation(document, ManifestAnnotations.PACKAGE, "unknown");
         final String kind = textOrNull(document.get("kind"));
         if (kind == null) {
           continue;
         }
         final String namespace = textOrNull(document.path("metadata").get("namespace"));
         final String name = sanitizeFileSegment(textOrNull(document.path("metadata").get("name")));
-        final String order = orderPrefixFor(kind, namespace);
-        final String fileName = order + "-" + kind.toLowerCase(Locale.ROOT) + "-" + name + ".yml";
 
-        final Path outFile = target.resolve(layer).resolve(pkg).resolve(fileName);
+        // Group markers (local-config) become hidden dotfiles with no order prefix
+        final boolean isLocalConfig =
+            "true"
+                .equalsIgnoreCase(
+                    annotation(document, "config.kubernetes.io/local-config", "false"));
+        final String fileName;
+        if (isLocalConfig) {
+          fileName = "." + kind.toLowerCase(Locale.ROOT) + "-" + name + ".yml";
+        } else {
+          final String order = orderPrefixFor(kind, namespace);
+          fileName = order + "-" + kind.toLowerCase(Locale.ROOT) + "-" + name + ".yml";
+        }
+
+        final Path outFile = target.resolve(domain).resolve(pkg).resolve(fileName);
         ManifestYaml.writeDocument(outFile, document);
         written.add(outFile);
       }

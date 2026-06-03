@@ -4,6 +4,7 @@ package io.nxmatic.rke2lab.manifests.units.mesh;
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.profiles.FloxShellSidecarProfile;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
@@ -24,39 +25,44 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
 
   private static final String HEADSCALE_NAMESPACE = MeshRefs.MESH_SYSTEM_NAMESPACE.name();
 
-  private final String floxImage = ManifestSynthesisContext.current().floxDebugPolicy().prodImage();
-
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("mesh", "headscale");
 
-  public HeadscaleManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of(MeshSystemNamespaceManifestsUnit.MANIFEST_UNIT_ID));
+  public HeadscaleManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of(MeshSystemNamespaceManifestsUnit.MANIFEST_UNIT_ID));
+  }
 
-    ApiObject namespace = resolveNamespace();
-    ApiObject saClient = createServiceAccount("headscale-client", namespace);
-    ApiObject saBootstrap = createServiceAccount("headscale-bootstrap", namespace);
-    ApiObject saGateway = createServiceAccount("headscale-gateway", namespace);
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    final String floxImage = ManifestSynthesisContext.current().floxDebugPolicy().prodImage();
 
-    ApiObject clusterRoleClient = createClusterRoleClient();
-    createClusterRoleBindingClient(clusterRoleClient, saClient);
+    ApiObject namespace = resolveNamespace(scope);
+    ApiObject saClient = createServiceAccount(scope, "headscale-client", namespace);
+    ApiObject saBootstrap = createServiceAccount(scope, "headscale-bootstrap", namespace);
+    ApiObject saGateway = createServiceAccount(scope, "headscale-gateway", namespace);
 
-    ApiObject roleBootstrap = createRoleBootstrap(namespace);
-    createRoleBindingBootstrap(saBootstrap, roleBootstrap, namespace);
+    ApiObject clusterRoleClient = createClusterRoleClient(scope);
+    createClusterRoleBindingClient(scope, clusterRoleClient, saClient);
 
-    ApiObject cmFloxEnv = createConfigMapFloxEnv(namespace);
-    ApiObject cmHeadscaleConfig = createConfigMapHeadscaleConfig(namespace);
-    ApiObject cmConfigInitScript = createConfigMapConfigInitScript(namespace);
-    ApiObject cmHeadscaleEnv = createConfigMapHeadscaleEnv(namespace);
-    ApiObject cmBootstrapScript = createConfigMapBootstrapScript(namespace);
-    ApiObject cmClientScripts = createConfigMapClientScripts(namespace);
-    ApiObject cmAcl = createConfigMapAcl(namespace);
-    ApiObject cmDerp = createConfigMapDerp(namespace);
-    ApiObject cmExtraRecords = createConfigMapExtraRecords(namespace);
-    ApiObject cmGatewayScript = createConfigMapGatewayScript(namespace);
+    ApiObject roleBootstrap = createRoleBootstrap(scope, namespace);
+    createRoleBindingBootstrap(scope, saBootstrap, roleBootstrap, namespace);
 
-    ApiObject l2Policy = createLanPolicy();
+    ApiObject cmFloxEnv = createConfigMapFloxEnv(scope, namespace);
+    ApiObject cmHeadscaleConfig = createConfigMapHeadscaleConfig(scope, namespace);
+    ApiObject cmConfigInitScript = createConfigMapConfigInitScript(scope, namespace);
+    ApiObject cmHeadscaleEnv = createConfigMapHeadscaleEnv(scope, namespace);
+    ApiObject cmBootstrapScript = createConfigMapBootstrapScript(scope, namespace);
+    ApiObject cmClientScripts = createConfigMapClientScripts(scope, namespace);
+    ApiObject cmAcl = createConfigMapAcl(scope, namespace);
+    ApiObject cmDerp = createConfigMapDerp(scope, namespace);
+    ApiObject cmExtraRecords = createConfigMapExtraRecords(scope, namespace);
+    ApiObject cmGatewayScript = createConfigMapGatewayScript(scope, namespace);
+
+    ApiObject l2Policy = createLanPolicy(scope);
     ApiObject deploymentHeadscale =
         createDeploymentHeadscale(
+            scope,
+            floxImage,
             namespace,
             cmFloxEnv,
             cmHeadscaleConfig,
@@ -65,9 +71,11 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             cmDerp,
             cmExtraRecords,
             l2Policy);
-    ApiObject serviceHeadscale = createServiceHeadscale(namespace, deploymentHeadscale);
+    ApiObject serviceHeadscale = createServiceHeadscale(scope, namespace, deploymentHeadscale);
     ApiObject bootstrapJob =
         createBootstrapJob(
+            scope,
+            floxImage,
             namespace,
             saBootstrap,
             cmHeadscaleEnv,
@@ -75,8 +83,17 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             cmBootstrapScript,
             deploymentHeadscale);
     createDeploymentGateway(
-        namespace, saGateway, cmHeadscaleEnv, cmFloxEnv, cmGatewayScript, bootstrapJob);
+        scope,
+        floxImage,
+        namespace,
+        saGateway,
+        cmHeadscaleEnv,
+        cmFloxEnv,
+        cmGatewayScript,
+        bootstrapJob);
     createDaemonsetClient(
+        scope,
+        floxImage,
         namespace,
         saClient,
         cmHeadscaleEnv,
@@ -86,9 +103,9 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
         serviceHeadscale);
   }
 
-  private ApiObject resolveNamespace() {
+  private ApiObject resolveNamespace(final Construct scope) {
     return new ApiObject(
-        this,
+        scope,
         "namespace-" + MeshRefs.MESH_SYSTEM_NAMESPACE.name(),
         ApiObjectProps.builder()
             .apiVersion("v1")
@@ -103,10 +120,11 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
             .build());
   }
 
-  private ApiObject createServiceAccount(final String name, final ApiObject namespace) {
+  private ApiObject createServiceAccount(
+      final Construct scope, final String name, final ApiObject namespace) {
     ApiObject serviceAccount =
         new ApiObject(
-            this,
+            scope,
             "serviceaccount-" + name,
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -124,10 +142,10 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     return serviceAccount;
   }
 
-  private ApiObject createClusterRoleClient() {
+  private ApiObject createClusterRoleClient(final Construct scope) {
     ApiObject role =
         new ApiObject(
-            this,
+            scope,
             "clusterrole-headscale-client",
             ApiObjectProps.builder()
                 .apiVersion("rbac.authorization.k8s.io/v1")
@@ -169,10 +187,10 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
   }
 
   private void createClusterRoleBindingClient(
-      final ApiObject role, final ApiObject serviceAccount) {
+      final Construct scope, final ApiObject role, final ApiObject serviceAccount) {
     ApiObject roleBinding =
         new ApiObject(
-            this,
+            scope,
             "clusterrolebinding-headscale-client",
             ApiObjectProps.builder()
                 .apiVersion("rbac.authorization.k8s.io/v1")
@@ -209,10 +227,10 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                     HEADSCALE_NAMESPACE))));
   }
 
-  private ApiObject createRoleBootstrap(final ApiObject namespace) {
+  private ApiObject createRoleBootstrap(final Construct scope, final ApiObject namespace) {
     ApiObject role =
         new ApiObject(
-            this,
+            scope,
             "role-headscale-bootstrap",
             ApiObjectProps.builder()
                 .apiVersion("rbac.authorization.k8s.io/v1")
@@ -263,10 +281,13 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
   }
 
   private void createRoleBindingBootstrap(
-      final ApiObject serviceAccount, final ApiObject role, final ApiObject namespace) {
+      final Construct scope,
+      final ApiObject serviceAccount,
+      final ApiObject role,
+      final ApiObject namespace) {
     ApiObject roleBinding =
         new ApiObject(
-            this,
+            scope,
             "rolebinding-headscale-bootstrap",
             ApiObjectProps.builder()
                 .apiVersion("rbac.authorization.k8s.io/v1")
@@ -305,9 +326,10 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                     HEADSCALE_NAMESPACE))));
   }
 
-  private ApiObject createConfigMapFloxEnv(final ApiObject namespace) {
+  private ApiObject createConfigMapFloxEnv(final Construct scope, final ApiObject namespace) {
     ApiObject configMap =
         configMapWithData(
+            scope,
             RuntimeRefs.FLOX_ENV_CONFIGMAP.name(),
             "|ConfigMap|${headscale-namespace}|" + RuntimeRefs.FLOX_ENV_CONFIGMAP.name(),
             Map.of());
@@ -320,9 +342,11 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createConfigMapHeadscaleConfig(final ApiObject namespace) {
+  private ApiObject createConfigMapHeadscaleConfig(
+      final Construct scope, final ApiObject namespace) {
     ApiObject configMap =
         configMapWithData(
+            scope,
             MeshRefs.HEADSCALE_CONFIG_CONFIGMAP.name(),
             "|ConfigMap|${headscale-namespace}|" + MeshRefs.HEADSCALE_CONFIG_CONFIGMAP.name(),
             Map.of(
@@ -377,9 +401,11 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createConfigMapConfigInitScript(final ApiObject namespace) {
+  private ApiObject createConfigMapConfigInitScript(
+      final Construct scope, final ApiObject namespace) {
     ApiObject configMap =
         configMapWithData(
+            scope,
             "headscale-config-init-script",
             "|ConfigMap|${headscale-namespace}|headscale-config-init-script",
             Map.of(
@@ -397,9 +423,10 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createConfigMapHeadscaleEnv(final ApiObject namespace) {
+  private ApiObject createConfigMapHeadscaleEnv(final Construct scope, final ApiObject namespace) {
     ApiObject configMap =
         configMapWithData(
+            scope,
             MeshRefs.HEADSCALE_ENV_CONFIGMAP.name(),
             "|ConfigMap|${headscale-namespace}|" + MeshRefs.HEADSCALE_ENV_CONFIGMAP.name(),
             Map.of(
@@ -421,9 +448,11 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createConfigMapBootstrapScript(final ApiObject namespace) {
+  private ApiObject createConfigMapBootstrapScript(
+      final Construct scope, final ApiObject namespace) {
     ApiObject configMap =
         configMapWithData(
+            scope,
             "headscale-bootstrap-script",
             "|ConfigMap|${headscale-namespace}|headscale-bootstrap-script",
             Map.of(
@@ -483,9 +512,10 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createConfigMapClientScripts(final ApiObject namespace) {
+  private ApiObject createConfigMapClientScripts(final Construct scope, final ApiObject namespace) {
     ApiObject configMap =
         configMapWithData(
+            scope,
             "headscale-client-scripts",
             "|ConfigMap|${headscale-namespace}|headscale-client-scripts",
             Map.of(
@@ -537,9 +567,10 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createConfigMapAcl(final ApiObject namespace) {
+  private ApiObject createConfigMapAcl(final Construct scope, final ApiObject namespace) {
     ApiObject configMap =
         configMapWithData(
+            scope,
             "headscale-acl",
             "|ConfigMap|${headscale-namespace}|headscale-acl",
             Map.of(
@@ -573,9 +604,10 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createConfigMapDerp(final ApiObject namespace) {
+  private ApiObject createConfigMapDerp(final Construct scope, final ApiObject namespace) {
     ApiObject configMap =
         configMapWithData(
+            scope,
             "headscale-derp",
             "|ConfigMap|${headscale-namespace}|headscale-derp",
             Map.of(
@@ -590,9 +622,10 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createConfigMapExtraRecords(final ApiObject namespace) {
+  private ApiObject createConfigMapExtraRecords(final Construct scope, final ApiObject namespace) {
     ApiObject configMap =
         configMapWithData(
+            scope,
             "headscale-extra-records",
             "|ConfigMap|${headscale-namespace}|headscale-extra-records",
             Map.of(
@@ -613,9 +646,10 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createConfigMapGatewayScript(final ApiObject namespace) {
+  private ApiObject createConfigMapGatewayScript(final Construct scope, final ApiObject namespace) {
     ApiObject configMap =
         configMapWithData(
+            scope,
             "headscale-gateway-script",
             "|ConfigMap|${headscale-namespace}|headscale-gateway-script",
             Map.of(
@@ -643,10 +677,10 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createLanPolicy() {
+  private ApiObject createLanPolicy(final Construct scope) {
     ApiObject policy =
         new ApiObject(
-            this,
+            scope,
             "ciliuml2announcementpolicy-lan-policy",
             ApiObjectProps.builder()
                 .apiVersion("cilium.io/v2alpha1")
@@ -679,6 +713,8 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
   }
 
   private ApiObject createDeploymentHeadscale(
+      final Construct scope,
+      final String floxImage,
       final ApiObject namespace,
       final ApiObject cmFloxEnv,
       final ApiObject cmHeadscaleConfig,
@@ -689,7 +725,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
       final ApiObject l2Policy) {
     ApiObject deployment =
         new ApiObject(
-            this,
+            scope,
             "deployment-headscale",
             ApiObjectProps.builder()
                 .apiVersion("apps/v1")
@@ -879,10 +915,11 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
     return deployment;
   }
 
-  private ApiObject createServiceHeadscale(final ApiObject namespace, final ApiObject deployment) {
+  private ApiObject createServiceHeadscale(
+      final Construct scope, final ApiObject namespace, final ApiObject deployment) {
     ApiObject service =
         new ApiObject(
-            this,
+            scope,
             "service-headscale",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -922,6 +959,8 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
   }
 
   private ApiObject createBootstrapJob(
+      final Construct scope,
+      final String floxImage,
       final ApiObject namespace,
       final ApiObject serviceAccount,
       final ApiObject cmHeadscaleEnv,
@@ -930,7 +969,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
       final ApiObject deployment) {
     ApiObject job =
         new ApiObject(
-            this,
+            scope,
             "job-headscale-bootstrap",
             ApiObjectProps.builder()
                 .apiVersion("batch/v1")
@@ -1025,6 +1064,8 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
   }
 
   private void createDeploymentGateway(
+      final Construct scope,
+      final String floxImage,
       final ApiObject namespace,
       final ApiObject serviceAccount,
       final ApiObject cmHeadscaleEnv,
@@ -1033,7 +1074,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
       final ApiObject bootstrapJob) {
     ApiObject deployment =
         new ApiObject(
-            this,
+            scope,
             "deployment-headscale-gateway",
             ApiObjectProps.builder()
                 .apiVersion("apps/v1")
@@ -1205,6 +1246,8 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
   }
 
   private void createDaemonsetClient(
+      final Construct scope,
+      final String floxImage,
       final ApiObject namespace,
       final ApiObject serviceAccount,
       final ApiObject cmHeadscaleEnv,
@@ -1214,7 +1257,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
       final ApiObject serviceHeadscale) {
     ApiObject daemonSet =
         new ApiObject(
-            this,
+            scope,
             "daemonset-headscale-client",
             ApiObjectProps.builder()
                 .apiVersion("apps/v1")
@@ -1421,10 +1464,13 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
   }
 
   private ApiObject configMapWithData(
-      final String name, final String upstream, final Map<String, String> data) {
+      final Construct scope,
+      final String name,
+      final String upstream,
+      final Map<String, String> data) {
     ApiObject configMap =
         new ApiObject(
-            this,
+            scope,
             "configmap-" + name,
             ApiObjectProps.builder()
                 .apiVersion("v1")

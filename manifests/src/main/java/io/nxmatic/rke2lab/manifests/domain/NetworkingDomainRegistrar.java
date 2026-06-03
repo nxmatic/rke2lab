@@ -1,10 +1,8 @@
 package io.nxmatic.rke2lab.manifests.domain;
 
-import io.nxmatic.rke2lab.manifests.InstallPhase;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestsDomain;
 import io.nxmatic.rke2lab.manifests.ManifestsDomainRegistrar;
-import io.nxmatic.rke2lab.manifests.ManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.networking.CiliumAdvancedManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.networking.CiliumConfigManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.networking.EnvoyGatewayManifestsUnit;
@@ -17,24 +15,11 @@ public final class NetworkingDomainRegistrar implements ManifestsDomainRegistrar
   public ManifestsDomain domain() {
     return new ManifestsDomain(
         ManifestDomainCatalog.NETWORKING,
-        List.of(),
+        List.of(ManifestDomainCatalog.CLUSTER),
         List.of(
-            ManifestsUnit.lazy(
-                CiliumConfigManifestsUnit.MANIFEST_UNIT_ID,
-                List.of(),
-                InstallPhase.PRE_SERVER,
-                CiliumConfigManifestsUnit::new),
-            ManifestsUnit.lazy(
-                CiliumAdvancedManifestsUnit.MANIFEST_UNIT_ID,
-                List.of(),
-                InstallPhase.POST_CNI_READY,
-                CiliumAdvancedManifestsUnit::new),
-            ManifestsUnit.lazy(
-                EnvoyGatewayManifestsUnit.MANIFEST_UNIT_ID,
-                List.of(),
-                InstallPhase.POST_SERVER,
-                EnvoyGatewayManifestsUnit::new),
-            ManifestsUnit.lazy(
-                KdnsManifestsUnit.MANIFEST_UNIT_ID, List.of(), KdnsManifestsUnit::new)));
+            new CiliumConfigManifestsUnit(),
+            new CiliumAdvancedManifestsUnit(),
+            new EnvoyGatewayManifestsUnit(),
+            new KdnsManifestsUnit()));
   }
 }

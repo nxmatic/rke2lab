@@ -26,71 +26,39 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.RUNTIME + "/flox";
 
-  private static final String LAYER_NAME = "runtime";
+  /** Exploded package dir (relative to the runtime domain); diverges from the id segment. */
+  public static final String OUTPUT_DIR = "flox-runtime";
 
-  private static final String PACKAGE_NAME = "flox-runtime";
+  private static final String DOMAIN_NAME = ManifestDomainCatalog.RUNTIME;
+
+  private static final String PACKAGE_NAME = OUTPUT_DIR;
 
   private final ManifestAnnotations manifestAnnotations = new ManifestAnnotations();
 
-  private final ManifestsUnitReferenceRegistry registry;
+  private final RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets =
+      RuntimeDaemonsetScriptPolicyAssets.builder().build();
 
-  private final RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets;
+  private final FloxRuntimeAssets floxRuntimeAssets =
+      FloxRuntimeAssets.builder()
+          .runtimeDaemonsetScriptPolicyAssets(runtimeDaemonsetScriptPolicyAssets)
+          .build();
 
-  private final FloxRuntimeAssets floxRuntimeAssets;
-
-  // Direct-use constructor (creates manifests immediately)
-  public FloxRuntimeManifestsUnit(final Construct scope, final String id) {
+  public FloxRuntimeManifestsUnit() {
     super(
-        scope,
-        id,
         MANIFEST_UNIT_ID,
         List.of(
             ClusterRuntimeNamespaceManifestsUnit.MANIFEST_UNIT_ID,
             ReplicatorManifestsUnit.MANIFEST_UNIT_ID,
             RuntimeDaemonsetScriptPolicyManifestsUnit.MANIFEST_UNIT_ID));
-    this.registry = null;
-    this.runtimeDaemonsetScriptPolicyAssets = RuntimeDaemonsetScriptPolicyAssets.builder().build();
-    this.floxRuntimeAssets =
-        FloxRuntimeAssets.builder()
-            .runtimeDaemonsetScriptPolicyAssets(runtimeDaemonsetScriptPolicyAssets)
-            .build();
-
-    // RuntimeClass no longer needed with NRI plugin approach
-    // NRI plugin intercepts based on flox.dev/environment annotation
-    //
-    // Installer assets used to ride a single ConfigMap, but the aggregate
-    // payload (scripts + nri-plugin source tree + env trees + flake) is well
-    // over Kubernetes' per-object 1 MiB limit. seed-master materializes
-    // the build-derived inputs to /srv/host/k8s-daemonset.d/runtime/flox/
-    // (FloxRuntimeAssets.writeInstallerAssetTree); the init container then
-    // copies that tree into the per-node mutable workspace at
-    // /var/run/k8s-daemonset.d/runtime/flox/ where nix build and flox
-    // activate write locks (overlayfs lower=NFS isn't supported, so the
-    // workspace must live on local fs).
-    ApiObject envConfigMap = createFloxEnvConfigMap();
-    ApiObject dynamicPluginConfigMap = createDynamicPluginConfigMap();
-    ApiObject serviceAccount = createServiceAccount();
-    createInstallerDaemonSet(envConfigMap, dynamicPluginConfigMap, serviceAccount);
   }
 
-  // Direct-use constructor with scope (creates manifests immediately)
-  private FloxRuntimeManifestsUnit(
-      final Construct scope, final String id, final ManifestsUnitReferenceRegistry registry) {
-    super(
-        scope,
-        id,
-        MANIFEST_UNIT_ID,
-        List.of(
-            ClusterRuntimeNamespaceManifestsUnit.MANIFEST_UNIT_ID,
-            ReplicatorManifestsUnit.MANIFEST_UNIT_ID,
-            RuntimeDaemonsetScriptPolicyManifestsUnit.MANIFEST_UNIT_ID));
-    this.registry = registry;
-    this.runtimeDaemonsetScriptPolicyAssets = RuntimeDaemonsetScriptPolicyAssets.builder().build();
-    this.floxRuntimeAssets =
-        FloxRuntimeAssets.builder()
-            .runtimeDaemonsetScriptPolicyAssets(runtimeDaemonsetScriptPolicyAssets)
-            .build();
+  @Override
+  public String outputDir() {
+    return OUTPUT_DIR;
+  }
 
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     // RuntimeClass no longer needed with NRI plugin approach
     // NRI plugin intercepts based on flox.dev/environment annotation
     //
@@ -103,19 +71,21 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
     // /var/run/k8s-daemonset.d/runtime/flox/ where nix build and flox
     // activate write locks (overlayfs lower=NFS isn't supported, so the
     // workspace must live on local fs).
-    ApiObject envConfigMap = createFloxEnvConfigMap();
-    ApiObject dynamicPluginConfigMap = createDynamicPluginConfigMap();
-    ApiObject serviceAccount = createServiceAccount();
-    createInstallerDaemonSet(envConfigMap, dynamicPluginConfigMap, serviceAccount);
+    ApiObject envConfigMap = createFloxEnvConfigMap(scope, context.registry());
+    ApiObject dynamicPluginConfigMap = createDynamicPluginConfigMap(scope, context.registry());
+    ApiObject serviceAccount = createServiceAccount(scope, context.registry());
+    createInstallerDaemonSet(
+        scope, context.registry(), envConfigMap, dynamicPluginConfigMap, serviceAccount);
   }
 
   // RuntimeClass removed: NRI plugin approach doesn't need custom runtime handlers
   // The NRI plugin intercepts container creation based on flox.dev/environment Pod annotation
 
-  private ApiObject createFloxEnvConfigMap() {
+  private ApiObject createFloxEnvConfigMap(
+      final Construct scope, final ManifestsUnitReferenceRegistry registry) {
     ApiObject configMap =
         new ApiObject(
-            this,
+            scope,
             "configmap-" + RuntimeRefs.FLOX_ENV_CONFIGMAP.name(),
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -126,7 +96,7 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
                         .namespace(RuntimeRefs.FLOX_ENV_CONFIGMAP.namespaceName())
                         .annotations(
                             manifestAnnotations.packageAnnotations(
-                                LAYER_NAME,
+                                DOMAIN_NAME,
                                 PACKAGE_NAME,
                                 Map.of(
                                     "replicator.v1.mittwald.de/replicate-to",
@@ -153,7 +123,8 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createDynamicPluginConfigMap() {
+  private ApiObject createDynamicPluginConfigMap(
+      final Construct scope, final ManifestsUnitReferenceRegistry registry) {
     // Dynamic hot-reload ConfigMap for NRI plugin updates.
     // Initially empty; populated at runtime via kubectl apply by the dev tool.
     // Expected keys when populated:
@@ -161,7 +132,7 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
     //   nri-plugin.manifest.json — JSON manifest with archive/entry checksums
     ApiObject configMap =
         new ApiObject(
-            this,
+            scope,
             "configmap-flox-nri-plugin-dyn",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -171,7 +142,7 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
                         .name("flox-nri-plugin-dyn")
                         .namespace(RuntimeRefs.FLOX_ENV_CONFIGMAP.namespaceName())
                         .annotations(
-                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
+                            manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
                         .build())
                 .build());
 
@@ -183,10 +154,11 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createServiceAccount() {
+  private ApiObject createServiceAccount(
+      final Construct scope, final ManifestsUnitReferenceRegistry registry) {
     ApiObject serviceAccount =
         new ApiObject(
-            this,
+            scope,
             "serviceaccount-flox-runtime-installer",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -196,7 +168,7 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
                         .name("flox-runtime-installer")
                         .namespace(RuntimeRefs.FLOX_ENV_CONFIGMAP.namespaceName())
                         .annotations(
-                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
+                            manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
                         .build())
                 .build());
     if (registry != null) {
@@ -206,12 +178,14 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
   }
 
   private void createInstallerDaemonSet(
+      final Construct scope,
+      final ManifestsUnitReferenceRegistry registry,
       final ApiObject envConfigMap,
       final ApiObject dynamicPluginConfigMap,
       final ApiObject serviceAccount) {
     ApiObject daemonSet =
         new ApiObject(
-            this,
+            scope,
             "daemonset-flox-runtime-installer",
             ApiObjectProps.builder()
                 .apiVersion("apps/v1")
@@ -221,7 +195,7 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
                         .name("flox-runtime-installer")
                         .namespace(RuntimeRefs.FLOX_ENV_CONFIGMAP.namespaceName())
                         .annotations(
-                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
+                            manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
                         .labels(
                             Map.of(
                                 "app.kubernetes.io/component",
@@ -250,7 +224,7 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
                     "metadata",
                     Map.of(
                         "annotations",
-                        manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME),
+                        manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME),
                         "labels",
                         Map.of(
                             "app.kubernetes.io/component",
@@ -614,10 +588,5 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
                             }))),
                 "updateStrategy",
                 Map.of("rollingUpdate", Map.of("maxUnavailable", 1), "type", "RollingUpdate"))));
-  }
-
-  @Override
-  public void apply(final ManifestsUnitContext context) {
-    new FloxRuntimeManifestsUnit(context.chart(), "layer-runtime-flox-runtime", context.registry());
   }
 }

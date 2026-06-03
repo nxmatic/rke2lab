@@ -2,6 +2,8 @@ package io.nxmatic.rke2lab.manifests.units.gitops;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -38,11 +40,15 @@ public final class FluxRootManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("gitops", "flux-root");
 
-  public FluxRootManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of(FluxInstanceManifestsUnit.MANIFEST_UNIT_ID));
-    final String clusterName = bootstrapIdentity().clusterName();
-    createGitRepository(this, clusterName);
-    createRootKustomization(this, clusterName);
+  public FluxRootManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of(FluxInstanceManifestsUnit.MANIFEST_UNIT_ID));
+  }
+
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    final String clusterName = ManifestSynthesisContext.current().bootstrapIdentity().clusterName();
+    createGitRepository(scope, clusterName);
+    createRootKustomization(scope, clusterName);
   }
 
   private void createGitRepository(Construct scope, String clusterName) {

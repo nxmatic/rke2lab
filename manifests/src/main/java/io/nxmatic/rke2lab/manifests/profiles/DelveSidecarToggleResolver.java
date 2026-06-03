@@ -23,7 +23,7 @@ public final class DelveSidecarToggleResolver {
     return new Builder();
   }
 
-  public boolean resolveByDomainLayer(
+  public boolean resolveByDomainPackage(
       final String domain, final String layer, final boolean defaultValue) {
     String domainNormalized = sanitize(domain);
     String layerNormalized = sanitize(layer);

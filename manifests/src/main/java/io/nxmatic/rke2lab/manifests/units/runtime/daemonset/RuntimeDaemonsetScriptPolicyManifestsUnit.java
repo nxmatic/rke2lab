@@ -4,6 +4,7 @@ package io.nxmatic.rke2lab.manifests.units.runtime.daemonset;
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.units.cluster.ClusterRuntimeNamespaceManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.runtime.RuntimeRefs;
 import java.util.List;
@@ -20,28 +21,28 @@ public final class RuntimeDaemonsetScriptPolicyManifestsUnit extends AbstractMan
   public static final String SCRIPT_POLICY_CONFIGMAP_NAME =
       RuntimeRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name();
 
-  private static final String LAYER_NAME = "runtime";
+  private static final String DOMAIN_NAME = "runtime";
 
   private static final String PACKAGE_NAME = "daemonset";
 
   private final ManifestAnnotations manifestAnnotations = new ManifestAnnotations();
 
-  private final RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets;
+  private final RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets =
+      RuntimeDaemonsetScriptPolicyAssets.builder().build();
 
-  public RuntimeDaemonsetScriptPolicyManifestsUnit(final Construct scope, final String id) {
-    super(
-        scope,
-        id,
-        MANIFEST_UNIT_ID,
-        List.of(ClusterRuntimeNamespaceManifestsUnit.MANIFEST_UNIT_ID));
-    this.runtimeDaemonsetScriptPolicyAssets = RuntimeDaemonsetScriptPolicyAssets.builder().build();
-    createScriptPolicyConfigMap();
+  public RuntimeDaemonsetScriptPolicyManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of(ClusterRuntimeNamespaceManifestsUnit.MANIFEST_UNIT_ID));
   }
 
-  private void createScriptPolicyConfigMap() {
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    createScriptPolicyConfigMap(scope);
+  }
+
+  private void createScriptPolicyConfigMap(final Construct scope) {
     ApiObject configMap =
         new ApiObject(
-            this,
+            scope,
             "configmap-" + RuntimeRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name(),
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -51,7 +52,7 @@ public final class RuntimeDaemonsetScriptPolicyManifestsUnit extends AbstractMan
                         .name(RuntimeRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.name())
                         .namespace(RuntimeRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP.namespaceName())
                         .annotations(
-                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
+                            manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
                         .build())
                 .build());
 

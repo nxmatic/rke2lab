@@ -3,6 +3,8 @@ package io.nxmatic.rke2lab.manifests.units.platform;
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -15,27 +17,32 @@ public final class ReplicatorManifestsUnit extends AbstractManifestsUnit {
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.PLATFORM + "/replicator";
 
-  private static final String LAYER_NAME = "platform";
+  private static final String DOMAIN_NAME = "platform";
   private static final String PACKAGE_NAME = "replicator";
 
   private final ManifestAnnotations manifestAnnotations = new ManifestAnnotations();
 
-  private final String replicatorVersion;
+  private String replicatorVersion;
 
-  public ReplicatorManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
-    this.replicatorVersion = componentVersions().kubernetesReplicator();
-
-    createSourceNamespace();
-    ApiObject clusterRole = createClusterRole();
-    ApiObject serviceAccount = createServiceAccount();
-    createClusterRoleBinding(clusterRole, serviceAccount);
-    createDeployment(serviceAccount);
+  public ReplicatorManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
-  private void createSourceNamespace() {
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    this.replicatorVersion =
+        ManifestSynthesisContext.current().componentVersions().kubernetesReplicator();
+
+    createSourceNamespace(scope);
+    ApiObject clusterRole = createClusterRole(scope);
+    ApiObject serviceAccount = createServiceAccount(scope);
+    createClusterRoleBinding(scope, clusterRole, serviceAccount);
+    createDeployment(scope, serviceAccount);
+  }
+
+  private void createSourceNamespace(final Construct scope) {
     new ApiObject(
-        this,
+        scope,
         "namespace-rke2lab-replicator-source",
         ApiObjectProps.builder()
             .apiVersion("v1")
@@ -43,7 +50,7 @@ public final class ReplicatorManifestsUnit extends AbstractManifestsUnit {
             .metadata(
                 ApiObjectMetadata.builder()
                     .name("rke2lab-replicator-source")
-                    .annotations(manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
+                    .annotations(manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
                     .labels(
                         Map.of(
                             "app.kubernetes.io/name",
@@ -54,10 +61,10 @@ public final class ReplicatorManifestsUnit extends AbstractManifestsUnit {
             .build());
   }
 
-  private ApiObject createClusterRole() {
+  private ApiObject createClusterRole(final Construct scope) {
     ApiObject clusterRole =
         new ApiObject(
-            this,
+            scope,
             "clusterrole-kubernetes-replicator",
             ApiObjectProps.builder()
                 .apiVersion("rbac.authorization.k8s.io/v1")
@@ -66,7 +73,7 @@ public final class ReplicatorManifestsUnit extends AbstractManifestsUnit {
                     ApiObjectMetadata.builder()
                         .name("kubernetes-replicator")
                         .annotations(
-                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
+                            manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
                         .labels(commonLabels())
                         .build())
                 .build());
@@ -101,10 +108,10 @@ public final class ReplicatorManifestsUnit extends AbstractManifestsUnit {
     return clusterRole;
   }
 
-  private ApiObject createServiceAccount() {
+  private ApiObject createServiceAccount(final Construct scope) {
     ApiObject serviceAccount =
         new ApiObject(
-            this,
+            scope,
             "serviceaccount-kubernetes-replicator",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -114,7 +121,7 @@ public final class ReplicatorManifestsUnit extends AbstractManifestsUnit {
                         .name("kubernetes-replicator")
                         .namespace("kube-system")
                         .annotations(
-                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
+                            manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
                         .labels(commonLabels())
                         .build())
                 .build());
@@ -124,10 +131,10 @@ public final class ReplicatorManifestsUnit extends AbstractManifestsUnit {
   }
 
   private void createClusterRoleBinding(
-      final ApiObject clusterRole, final ApiObject serviceAccount) {
+      final Construct scope, final ApiObject clusterRole, final ApiObject serviceAccount) {
     ApiObject clusterRoleBinding =
         new ApiObject(
-            this,
+            scope,
             "clusterrolebinding-kubernetes-replicator",
             ApiObjectProps.builder()
                 .apiVersion("rbac.authorization.k8s.io/v1")
@@ -136,7 +143,7 @@ public final class ReplicatorManifestsUnit extends AbstractManifestsUnit {
                     ApiObjectMetadata.builder()
                         .name("kubernetes-replicator")
                         .annotations(
-                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
+                            manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
                         .labels(commonLabels())
                         .build())
                 .build());
@@ -167,10 +174,10 @@ public final class ReplicatorManifestsUnit extends AbstractManifestsUnit {
             }));
   }
 
-  private void createDeployment(final ApiObject serviceAccount) {
+  private void createDeployment(final Construct scope, final ApiObject serviceAccount) {
     ApiObject deployment =
         new ApiObject(
-            this,
+            scope,
             "deployment-kubernetes-replicator",
             ApiObjectProps.builder()
                 .apiVersion("apps/v1")
@@ -180,7 +187,7 @@ public final class ReplicatorManifestsUnit extends AbstractManifestsUnit {
                         .name("kubernetes-replicator")
                         .namespace("kube-system")
                         .annotations(
-                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
+                            manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
                         .labels(commonLabels())
                         .build())
                 .build());
@@ -208,7 +215,7 @@ public final class ReplicatorManifestsUnit extends AbstractManifestsUnit {
                     "metadata",
                     Map.of(
                         "annotations",
-                        manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME),
+                        manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME),
                         "labels",
                         Map.of(
                             "app.kubernetes.io/instance",

@@ -26,13 +26,12 @@ public final class RuntimeSystemdLibexecPlaceholderManifestsUnit extends Abstrac
   private static final HostAssetDeliveryPolicy PLACEHOLDER_POLICY =
       HostAssetDeliveryPolicy.systemdLibexecPlaceholder();
 
-  public RuntimeSystemdLibexecPlaceholderManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
-    // Placeholder unit: no manifests created
+  public RuntimeSystemdLibexecPlaceholderManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
   @Override
-  public void apply(final ManifestsUnitContext context) {
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     if (!Boolean.getBoolean(ENABLE_PROPERTY)) {
       return;
     }
@@ -40,5 +39,8 @@ public final class RuntimeSystemdLibexecPlaceholderManifestsUnit extends Abstrac
     if (!PLACEHOLDER_POLICY.enabled()) {
       return;
     }
+
+    // Conditional unit: if enabled, synthesis logic would go here.
+    // Currently just an empty marker (group marker emitted by base regardless).
   }
 }

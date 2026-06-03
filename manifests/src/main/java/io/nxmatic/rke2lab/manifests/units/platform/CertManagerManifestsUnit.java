@@ -2,6 +2,8 @@ package io.nxmatic.rke2lab.manifests.units.platform;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -18,13 +20,13 @@ public final class CertManagerManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("platform", "cert-manager");
 
-  public CertManagerManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
-    createHelmChart();
+  public CertManagerManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
-  private void createHelmChart() {
-    final String version = componentVersions().certManager();
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    final String version = ManifestSynthesisContext.current().componentVersions().certManager();
 
     // RKE2 helm-controller watches HelmChart CRs in kube-system and installs the chart into
     // targetNamespace. cert-manager is cluster-wide infrastructure deployed to kube-system and
@@ -32,7 +34,7 @@ public final class CertManagerManifestsUnit extends AbstractManifestsUnit {
     // and Tekton operators mount — without it those operator pods hang on FailedMount.
     ApiObject helmChart =
         new ApiObject(
-            this,
+            scope,
             "helmchart-cert-manager",
             ApiObjectProps.builder()
                 .apiVersion("helm.cattle.io/v1")

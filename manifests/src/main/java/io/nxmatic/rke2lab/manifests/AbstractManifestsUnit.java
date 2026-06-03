@@ -1,25 +1,38 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests;
 
-import io.nxmatic.rke2lab.manifests.profiles.BootstrapIdentity;
-import io.nxmatic.rke2lab.manifests.profiles.ComponentVersions;
-import io.nxmatic.rke2lab.manifests.profiles.FloxDebugPolicy;
-import io.nxmatic.rke2lab.manifests.profiles.ImageState;
-import io.nxmatic.rke2lab.manifests.profiles.NetworkTopology;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import org.cdk8s.ApiObject;
+import org.cdk8s.ApiObjectMetadata;
+import org.cdk8s.ApiObjectProps;
 import software.constructs.Construct;
 
-public abstract class AbstractManifestsUnit extends Construct implements ManifestsUnit {
+/**
+ * Base class for manifest units following the lifecycle model (see
+ * docs/manifests-unit-lifecycle.adoc): a plain object holding metadata, with synthesis happening in
+ * {@link #apply(ManifestsUnitContext)}.
+ *
+ * <p>The base implements a <b>template method</b>: {@code apply} creates a CDK8s scope Construct
+ * under the chart scope, calls the subclass {@link #doSynthesize(Construct, ManifestsUnitContext)}
+ * hook, introspects the resulting children, and emits a group marker ConfigMap that inventories
+ * them. The marker is a hidden dotfile ({@code .configmap-<package>.group.yml}) carrying {@code
+ * config.kubernetes.io/local-config: "true"}, so it creates the output directory deterministically
+ * but is never linked by the installer.
+ *
+ * <p><b>Subclass contract</b>: the constructor is pure initialization (assign metadata fields); all
+ * domain logic (creating ApiObjects) belongs in {@link #doSynthesize}. The scope passed to that
+ * hook is the scope for {@code new ApiObject(scope, ...)}.
+ */
+public abstract class AbstractManifestsUnit implements ManifestsUnit {
 
   private final String manifestUnitId;
   private final List<String> dependsOnManifestsUnitIds;
 
   protected AbstractManifestsUnit(
-      final Construct scope,
-      final String id,
-      final String manifestUnitId,
-      final List<String> dependsOnManifestsUnitIds) {
-    super(scope, id);
+      final String manifestUnitId, final List<String> dependsOnManifestsUnitIds) {
     this.manifestUnitId = manifestUnitId;
     this.dependsOnManifestsUnitIds = List.copyOf(dependsOnManifestsUnitIds);
   }
@@ -34,32 +47,77 @@ public abstract class AbstractManifestsUnit extends Construct implements Manifes
     return dependsOnManifestsUnitIds;
   }
 
+  @Override
+  public final void apply(final ManifestsUnitContext context) {
+    // Template method: create scope, call subclass hook, introspect, emit group marker
+    final Construct scope = new Construct(context.chart(), manifestUnitId.replace("/", "-"));
+
+    doSynthesize(scope, context);
+
+    emitGroupMarker(scope, context);
+  }
+
   /**
-   * Single accessor for the flox NRI debug toggle. Layers reach this through their owning manifest
-   * unit; the policy is published by the synthesizer for the duration of one {@code synthesize}
-   * call via {@link ManifestSynthesisContext}.
+   * Subclass hook where domain logic lives. Create ApiObjects in the given scope, read context for
+   * runtime config (component versions, bootstrap identity, network topology, etc.). The scope is a
+   * fresh Construct parented under the chart; it groups this unit's manifests under one CDK8s node.
+   *
+   * <p>The base calls this after creating the scope and before emitting the group marker.
+   *
+   * @param scope the CDK8s Construct scope for this unit's ApiObjects (replaces {@code this} in the
+   *     old model)
+   * @param context full synthesis context (chart, domain, unit id, reference registry)
    */
-  protected final FloxDebugPolicy floxDebugPolicy() {
-    return ManifestSynthesisContext.current().floxDebugPolicy();
+  protected abstract void doSynthesize(Construct scope, ManifestsUnitContext context);
+
+  private void emitGroupMarker(final Construct scope, final ManifestsUnitContext context) {
+    // Introspect the scope's children (what the subclass emitted)
+    final List<ApiObject> children =
+        scope.getNode().getChildren().stream()
+            .filter(c -> c instanceof ApiObject)
+            .map(c -> (ApiObject) c)
+            .toList();
+
+    // Build inventory: apiVersion|kind|namespace|name per child
+    final String inventory =
+        children.stream()
+            .map(
+                obj -> {
+                  final String ns = obj.getMetadata().getNamespace();
+                  return obj.getApiVersion()
+                      + "|"
+                      + obj.getKind()
+                      + "|"
+                      + (ns != null ? ns : "")
+                      + "|"
+                      + obj.getName();
+                })
+            .collect(Collectors.joining("\n"));
+
+    // Emit the marker: a ConfigMap carrying local-config annotation + the inventory
+    final String markerName = outputDir() + ".group";
+    ApiObject marker =
+        new ApiObject(
+            scope,
+            "group-marker",
+            ApiObjectProps.builder()
+                .apiVersion("v1")
+                .kind("ConfigMap")
+                .metadata(
+                    ApiObjectMetadata.builder()
+                        .name(markerName)
+                        .annotations(groupMarkerAnnotations(context.domainId()))
+                        .build())
+                .build());
+
+    marker.addJsonPatch(org.cdk8s.JsonPatch.add("/data", Map.of("members", inventory)));
   }
 
-  /** Cluster + node identity slice. */
-  protected final BootstrapIdentity bootstrapIdentity() {
-    return ManifestSynthesisContext.current().bootstrapIdentity();
-  }
-
-  /** Cluster network topology slice (CIDRs, interfaces, gateway addresses). */
-  protected final NetworkTopology networkTopology() {
-    return ManifestSynthesisContext.current().networkTopology();
-  }
-
-  /** Component-version slice (kube-vip, tailscale, …). */
-  protected final ComponentVersions componentVersions() {
-    return ManifestSynthesisContext.current().componentVersions();
-  }
-
-  /** Stage A → Stage B control-node image identity slice (alias, fingerprint, checksum, remote). */
-  protected final ImageState imageState() {
-    return ManifestSynthesisContext.current().imageState();
+  private Map<String, String> groupMarkerAnnotations(final String domainId) {
+    final LinkedHashMap<String, String> annotations = new LinkedHashMap<>();
+    annotations.put("config.kubernetes.io/local-config", "true");
+    annotations.put(ManifestAnnotations.DOMAIN, domainId);
+    annotations.put(ManifestAnnotations.PACKAGE, outputDir());
+    return Map.copyOf(annotations);
   }
 }

@@ -1,0 +1,18 @@
+{
+  "model": "us.anthropic.claude-opus-4-8[1m]",
+  "hooks": {
+    "PreCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ts=$(date '+%Y-%m-%d-%H%M'); checkpoint=\".claude/checkpoint-$ts.md\"; { echo \"# Checkpoint — $(date '+%Y-%m-%d, %Hh%M')\"; echo \"\"; echo \"> Auto-generated before compaction. Resume with this file.\"; echo \"\"; echo \"## Recent commits (last 5)\"; echo \"\"; git log --oneline -5 2>/dev/null || echo \"(no git history)\"; echo \"\"; echo \"## Current state\"; echo \"\"; git status --short 2>/dev/null | head -20 || echo \"(no changes)\"; echo \"\"; echo \"## Files in .claude/\"; echo \"\"; ls -1 .claude/*.md 2>/dev/null | tail -5 || echo \"(none)\"; echo \"\"; echo \"## Next steps\"; echo \"\"; echo \"- Review blockers/errors above\"; echo \"- Continue from last commit's goal\"; echo \"- Check .claude/terminology-refactor-plan.md for pending tasks\"; } > \"$checkpoint\"; echo \"{\\\"systemMessage\\\": \\\"Checkpoint created: $checkpoint\\\"}\"; cat \"$checkpoint\" >&2",
+            "statusMessage": "Creating checkpoint before compaction...",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

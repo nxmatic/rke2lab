@@ -3,6 +3,8 @@ package io.nxmatic.rke2lab.manifests.units.gitops;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -19,18 +21,22 @@ public final class FluxOperatorManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("gitops", "flux-operator");
 
-  public FluxOperatorManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
-    createManifests();
+  public FluxOperatorManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
-  private void createManifests() {
-    final String version = componentVersions().fluxOperator();
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    createManifests(scope);
+  }
+
+  private void createManifests(final Construct scope) {
+    final String version = ManifestSynthesisContext.current().componentVersions().fluxOperator();
 
     // flux-system namespace
     ApiObject namespace =
         new ApiObject(
-            this,
+            scope,
             "namespace-flux-system",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -49,7 +55,7 @@ public final class FluxOperatorManifestsUnit extends AbstractManifestsUnit {
     // Flux Operator HelmChart
     ApiObject helmChart =
         new ApiObject(
-            this,
+            scope,
             "helmchart-flux-operator",
             ApiObjectProps.builder()
                 .apiVersion("helm.cattle.io/v1")

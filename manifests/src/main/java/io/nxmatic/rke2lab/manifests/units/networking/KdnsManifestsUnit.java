@@ -4,6 +4,7 @@ package io.nxmatic.rke2lab.manifests.units.networking;
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.DelveSidecarProfile;
 import io.nxmatic.rke2lab.manifests.profiles.DelveSidecarToggleResolver;
 import io.nxmatic.rke2lab.manifests.profiles.FloxDebugPolicy;
@@ -30,29 +31,27 @@ public final class KdnsManifestsUnit extends AbstractManifestsUnit {
   private static final NetworkingDependencyIntents NETWORKING_DEPENDENCY_INTENTS =
       NetworkingDependencyIntents.builder().build();
 
-  private static final String LAYER_NAME = "networking";
+  private static final String DOMAIN_NAME = "networking";
   private static final String PACKAGE_NAME = "kdns";
   private static final String KDNS_NAMESPACE = ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name();
 
   private final DelveSidecarToggleResolver delveSidecarToggleResolver =
       DelveSidecarToggleResolver.builder().build();
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile(LAYER_NAME, PACKAGE_NAME);
+      new PackageMetadataProfile(DOMAIN_NAME, PACKAGE_NAME);
   private final KdnsAssets kdnsAssets = KdnsAssets.builder().build();
   private final RuntimePodProfile runtimePodProfile = new RuntimePodProfile();
   private final DelveSidecarProfile delveSidecarProfile =
       new DelveSidecarProfile(
-          delveSidecarToggleResolver.resolveByDomainLayer(LAYER_NAME, PACKAGE_NAME, false),
+          delveSidecarToggleResolver.resolveByDomainPackage(DOMAIN_NAME, PACKAGE_NAME, false),
           "debug.kdns.lab42/enabled",
           "false",
           "GO_DEBUG_ENABLED",
           "KDNS_DEBUG_PORT",
           "40000");
 
-  public KdnsManifestsUnit(final Construct scope, final String id) {
+  public KdnsManifestsUnit() {
     super(
-        scope,
-        id,
         MANIFEST_UNIT_ID,
         Stream.concat(
                 NETWORKING_DEPENDENCY_INTENTS
@@ -60,18 +59,21 @@ public final class KdnsManifestsUnit extends AbstractManifestsUnit {
                     .stream(),
                 Stream.of(ClusterRuntimeNamespaceManifestsUnit.MANIFEST_UNIT_ID))
             .toList());
-
-    ApiObject clusterRole = createClusterRole();
-    ApiObject serviceAccount = createServiceAccount();
-    ApiObject clusterRoleBinding = createClusterRoleBinding(clusterRole, serviceAccount);
-    ApiObject dlvScriptConfigMap = createDlvScriptConfigMap();
-    createDeployment(serviceAccount, dlvScriptConfigMap, clusterRoleBinding);
   }
 
-  private ApiObject createClusterRole() {
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    ApiObject clusterRole = createClusterRole(scope);
+    ApiObject serviceAccount = createServiceAccount(scope);
+    ApiObject clusterRoleBinding = createClusterRoleBinding(scope, clusterRole, serviceAccount);
+    ApiObject dlvScriptConfigMap = createDlvScriptConfigMap(scope);
+    createDeployment(scope, serviceAccount, dlvScriptConfigMap, clusterRoleBinding);
+  }
+
+  private ApiObject createClusterRole(final Construct scope) {
     ApiObject clusterRole =
         new ApiObject(
-            this,
+            scope,
             "clusterrole-kdns-ingress-reader",
             ApiObjectProps.builder()
                 .apiVersion("rbac.authorization.k8s.io/v1")
@@ -107,10 +109,10 @@ public final class KdnsManifestsUnit extends AbstractManifestsUnit {
     return clusterRole;
   }
 
-  private ApiObject createServiceAccount() {
+  private ApiObject createServiceAccount(final Construct scope) {
     ApiObject serviceAccount =
         new ApiObject(
-            this,
+            scope,
             "serviceaccount-kdns",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -138,10 +140,10 @@ public final class KdnsManifestsUnit extends AbstractManifestsUnit {
   }
 
   private ApiObject createClusterRoleBinding(
-      final ApiObject clusterRole, final ApiObject serviceAccount) {
+      final Construct scope, final ApiObject clusterRole, final ApiObject serviceAccount) {
     ApiObject clusterRoleBinding =
         new ApiObject(
-            this,
+            scope,
             "clusterrolebinding-kdns-ingress-reader-binding",
             ApiObjectProps.builder()
                 .apiVersion("rbac.authorization.k8s.io/v1")
@@ -174,10 +176,10 @@ public final class KdnsManifestsUnit extends AbstractManifestsUnit {
     return clusterRoleBinding;
   }
 
-  private ApiObject createDlvScriptConfigMap() {
+  private ApiObject createDlvScriptConfigMap(final Construct scope) {
     ApiObject configMap =
         new ApiObject(
-            this,
+            scope,
             "configmap-kdns-dlv-script",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -198,12 +200,13 @@ public final class KdnsManifestsUnit extends AbstractManifestsUnit {
   }
 
   private void createDeployment(
+      final Construct scope,
       final ApiObject serviceAccount,
       final ApiObject dlvScriptConfigMap,
       final ApiObject clusterRoleBinding) {
     ApiObject deployment =
         new ApiObject(
-            this,
+            scope,
             "deployment-kdns",
             ApiObjectProps.builder()
                 .apiVersion("apps/v1")

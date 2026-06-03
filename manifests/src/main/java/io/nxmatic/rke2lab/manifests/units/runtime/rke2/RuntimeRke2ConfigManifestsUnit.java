@@ -7,6 +7,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
 import io.nxmatic.rke2lab.manifests.node.NodeEnvContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
@@ -29,31 +30,37 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("runtime", "rke2-config");
 
-  // Direct-use constructor with scope (creates manifests immediately)
-  public RuntimeRke2ConfigManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
+  public RuntimeRke2ConfigManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
+  }
 
-    final NodeEnvContext context = new DefaultNodeEnvContext();
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    final NodeEnvContext nodeEnvContext = new DefaultNodeEnvContext();
 
     createConfigMap(
+        scope,
         "advertise-address.yaml",
         "Advertise address fragment",
         "|ConfigMap|default|rke2-advertise-address",
-        Map.of("advertise-address", context.nodeHostInetAddr()));
+        Map.of("advertise-address", nodeEnvContext.nodeHostInetAddr()));
     createConfigMap(
+        scope,
         "cidrs.yaml",
         "Network CIDRs fragment",
         "|ConfigMap|default|rke2-cidrs",
         orderedMap(
             entry("kube-controller-manager-arg", List.of("node-cidr-mask-size-ipv4=24")),
-            entry("service-cidr", context.clusterServiceCidr()),
-            entry("cluster-cidr", context.clusterPodCidr())));
+            entry("service-cidr", nodeEnvContext.clusterServiceCidr()),
+            entry("cluster-cidr", nodeEnvContext.clusterPodCidr())));
     createConfigMap(
+        scope,
         "cluster-init.yaml",
         "Cluster init flag (only true on first master)",
         "|ConfigMap|default|rke2-cluster-init",
         Map.of("cluster-init", true));
     createConfigMap(
+        scope,
         "core.yaml",
         "Core RKE2 settings",
         "|ConfigMap|default|rke2-core",
@@ -63,11 +70,13 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
             entry("ingress-controller", "traefik"),
             entry("cni", "cilium")));
     createConfigMap(
+        scope,
         "debug.yaml",
         "Enable RKE2 debug logging for manifest watcher",
         "|ConfigMap|default|debug",
         orderedMap(entry("v", "4"), entry("debug", "false")));
     createConfigMap(
+        scope,
         "disable.yaml",
         "Disable list fragment",
         "|ConfigMap|default|rke2-disable",
@@ -92,11 +101,13 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
                 // second snapshot-controller.
                 "rke2-ingress-nginx")));
     createConfigMap(
+        scope,
         "etcd-metrics.yaml",
         "Etcd metrics fragment",
         "|ConfigMap|default|rke2-etcd-metrics",
         Map.of("etcd-expose-metrics", true));
     createConfigMap(
+        scope,
         "etcd.yaml",
         "Etcd settings fragment",
         "|ConfigMap|default|rke2-etcd",
@@ -105,11 +116,13 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
             entry("node-name", "bioskop-master"),
             entry("etcd-expose-metrics", false)));
     createConfigMap(
+        scope,
         "node-inetaddr.yaml",
         "Node IP fragment",
         "|ConfigMap|default|rke2-node-inetaddr",
-        Map.of("node-ip", context.nodeHostInetAddr()));
+        Map.of("node-ip", nodeEnvContext.nodeHostInetAddr()));
     createConfigMap(
+        scope,
         "node-labels.yaml",
         "Node labels fragment",
         "|ConfigMap|default|rke2-node-labels",
@@ -120,6 +133,7 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
                 "node.kubernetes.io/instance-kind=server",
                 "flox.dev/enabled=true")));
     createConfigMap(
+        scope,
         "tls-san.yaml",
         "TLS SAN fragment",
         "|ConfigMap|default|rke2-tls-san",
@@ -130,11 +144,12 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
                 "gateway",
                 "0.0.0.0",
                 "127.0.0.1",
-                context.vipGatewayInetAddr(),
-                context.nodeNetworkGatewayAddr(),
-                context.nodeHostInetAddr(),
-                context.lanHostInetAddr())));
+                nodeEnvContext.vipGatewayInetAddr(),
+                nodeEnvContext.nodeNetworkGatewayAddr(),
+                nodeEnvContext.nodeHostInetAddr(),
+                nodeEnvContext.lanHostInetAddr())));
     createConfigMap(
+        scope,
         "token.yaml",
         "RKE2 token fragment",
         "|ConfigMap|default|rke2-token",
@@ -142,13 +157,14 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
   }
 
   private void createConfigMap(
+      final Construct scope,
       final String name,
       final String description,
       final String upstreamIdentifier,
       final Map<String, Object> data) {
     ApiObject configMap =
         new ApiObject(
-            this,
+            scope,
             "configmap-rke2-" + name.replace('.', '-'),
             ApiObjectProps.builder()
                 .apiVersion("v1")

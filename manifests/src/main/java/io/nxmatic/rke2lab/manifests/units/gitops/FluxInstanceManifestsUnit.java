@@ -4,6 +4,8 @@ package io.nxmatic.rke2lab.manifests.units.gitops;
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -16,23 +18,26 @@ public final class FluxInstanceManifestsUnit extends AbstractManifestsUnit {
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.GITOPS + "/flux-instance";
 
-  private static final String LAYER_NAME = "gitops";
+  private static final String DOMAIN_NAME = "gitops";
   private static final String PACKAGE_NAME = "flux-instance";
 
   private final ManifestAnnotations manifestAnnotations = new ManifestAnnotations();
 
-  private final String fluxOperatorVersion;
-
-  public FluxInstanceManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of(FluxOperatorManifestsUnit.MANIFEST_UNIT_ID));
-    this.fluxOperatorVersion = componentVersions().fluxOperator();
-    createFluxInstance();
+  public FluxInstanceManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of(FluxOperatorManifestsUnit.MANIFEST_UNIT_ID));
   }
 
-  private void createFluxInstance() {
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    final String fluxOperatorVersion =
+        ManifestSynthesisContext.current().componentVersions().fluxOperator();
+    createFluxInstance(scope, fluxOperatorVersion);
+  }
+
+  private void createFluxInstance(final Construct scope, final String fluxOperatorVersion) {
     ApiObject fluxInstance =
         new ApiObject(
-            this,
+            scope,
             "fluxinstance-flux",
             ApiObjectProps.builder()
                 .apiVersion("fluxcd.controlplane.io/v1")
@@ -42,7 +47,7 @@ public final class FluxInstanceManifestsUnit extends AbstractManifestsUnit {
                         .name("flux")
                         .namespace("flux-system")
                         .annotations(
-                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
+                            manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
                         .labels(
                             Map.of(
                                 "app.kubernetes.io/instance",

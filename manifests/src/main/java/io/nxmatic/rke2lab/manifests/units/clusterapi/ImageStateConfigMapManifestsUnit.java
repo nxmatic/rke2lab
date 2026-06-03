@@ -2,6 +2,8 @@ package io.nxmatic.rke2lab.manifests.units.clusterapi;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.BootstrapIdentity;
 import io.nxmatic.rke2lab.manifests.profiles.ImageState;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
@@ -60,17 +62,21 @@ public final class ImageStateConfigMapManifestsUnit extends AbstractManifestsUni
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("cluster-api", "image-state");
 
-  public ImageStateConfigMapManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
+  public ImageStateConfigMapManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
+  }
 
-    final String effectiveClusterName = bootstrapIdentity().clusterName();
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    final String effectiveClusterName =
+        ManifestSynthesisContext.current().bootstrapIdentity().clusterName();
 
     // Skip synthesis when running in ephemeral/test mode without real bootstrap identity
     if (BootstrapIdentity.UNKNOWN.equals(effectiveClusterName)) {
       return;
     }
 
-    final ImageState state = imageState();
+    final ImageState state = ManifestSynthesisContext.current().imageState();
 
     // Skip when seed-master supplied no real image identity (ephemeral/test synth): an
     // all-placeholder ConfigMap would mislead Stage B into pinning a non-existent image.

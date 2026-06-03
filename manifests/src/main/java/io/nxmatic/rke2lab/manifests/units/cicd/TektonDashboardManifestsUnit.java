@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.manifests.units.cicd;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -19,17 +20,20 @@ public final class TektonDashboardManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("cicd", "tekton-dashboard");
 
-  public TektonDashboardManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of(TektonPipelinesManifestsUnit.MANIFEST_UNIT_ID));
-
-    createMiddleware();
-    createIngress();
+  public TektonDashboardManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of(TektonPipelinesManifestsUnit.MANIFEST_UNIT_ID));
   }
 
-  private ApiObject createMiddleware() {
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    createMiddleware(scope);
+    createIngress(scope);
+  }
+
+  private ApiObject createMiddleware(final Construct scope) {
     ApiObject middleware =
         new ApiObject(
-            this,
+            scope,
             "middleware-tekton-dashboard-strip",
             ApiObjectProps.builder()
                 .apiVersion("traefik.containo.us/v1alpha1")
@@ -49,10 +53,10 @@ public final class TektonDashboardManifestsUnit extends AbstractManifestsUnit {
     return middleware;
   }
 
-  private ApiObject createIngress() {
+  private ApiObject createIngress(final Construct scope) {
     ApiObject ingress =
         new ApiObject(
-            this,
+            scope,
             "ingress-tekton-dashboard",
             ApiObjectProps.builder()
                 .apiVersion("networking.k8s.io/v1")

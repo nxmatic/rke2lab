@@ -2,6 +2,8 @@ package io.nxmatic.rke2lab.manifests.units.clusterapi;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import io.nxmatic.rke2lab.manifests.upstream.UpstreamYamlInclusion;
 import java.util.List;
@@ -16,31 +18,45 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.CLUSTER_API + "/operator";
 
+  /** Exploded package dir (relative to the cluster-api domain); diverges from the id segment. */
+  public static final String OUTPUT_DIR = "cluster-api-operator";
+
   private final PackageMetadataProfile packageProfile =
-      new PackageMetadataProfile("cluster-api", "cluster-api-operator");
+      new PackageMetadataProfile(ManifestDomainCatalog.CLUSTER_API, OUTPUT_DIR);
 
-  public ClusterApiOperatorManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
+  public ClusterApiOperatorManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
+  }
 
-    final String operatorVersion = componentVersions().clusterApiOperator();
-    final String coreVersion = componentVersions().capiCore();
-    final String incusProviderVersion = componentVersions().capiIncusProvider();
-    final String rke2ProviderVersion = componentVersions().capiRke2Provider();
+  @Override
+  public String outputDir() {
+    return OUTPUT_DIR;
+  }
+
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    final String operatorVersion =
+        ManifestSynthesisContext.current().componentVersions().clusterApiOperator();
+    final String coreVersion = ManifestSynthesisContext.current().componentVersions().capiCore();
+    final String incusProviderVersion =
+        ManifestSynthesisContext.current().componentVersions().capiIncusProvider();
+    final String rke2ProviderVersion =
+        ManifestSynthesisContext.current().componentVersions().capiRke2Provider();
 
     final String operatorReleaseResource =
         "/upstream/clusterapi/operator/release-" + operatorVersion + ".yaml";
-    new UpstreamYamlInclusion(this, operatorReleaseResource, packageProfile);
+    new UpstreamYamlInclusion(scope, operatorReleaseResource, packageProfile);
 
-    createProviderNamespaces();
-    createCoreProvider(coreVersion);
-    createInfrastructureProvider(incusProviderVersion);
-    createControlPlaneProvider(rke2ProviderVersion);
+    createProviderNamespaces(scope);
+    createCoreProvider(scope, coreVersion);
+    createInfrastructureProvider(scope, incusProviderVersion);
+    createControlPlaneProvider(scope, rke2ProviderVersion);
   }
 
-  private void createProviderNamespaces() {
+  private void createProviderNamespaces(final Construct scope) {
     for (String namespace : new String[] {"capi-system", "capn-system", "caprke2-system"}) {
       new ApiObject(
-          this,
+          scope,
           "namespace-" + namespace,
           ApiObjectProps.builder()
               .apiVersion("v1")
@@ -54,10 +70,10 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
     }
   }
 
-  private void createCoreProvider(final String version) {
+  private void createCoreProvider(final Construct scope, final String version) {
     ApiObject provider =
         new ApiObject(
-            this,
+            scope,
             "coreprovider-cluster-api",
             ApiObjectProps.builder()
                 .apiVersion("operator.cluster.x-k8s.io/v1alpha2")
@@ -75,10 +91,10 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
     provider.addJsonPatch(JsonPatch.add("/spec", Map.of("version", version)));
   }
 
-  private void createInfrastructureProvider(final String version) {
+  private void createInfrastructureProvider(final Construct scope, final String version) {
     ApiObject provider =
         new ApiObject(
-            this,
+            scope,
             "infrastructureprovider-incus",
             ApiObjectProps.builder()
                 .apiVersion("operator.cluster.x-k8s.io/v1alpha2")
@@ -103,10 +119,10 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
                 Map.of("url", "https://github.com/nxmatic/cluster-api-provider-incus/releases"))));
   }
 
-  private void createControlPlaneProvider(final String version) {
+  private void createControlPlaneProvider(final Construct scope, final String version) {
     ApiObject provider =
         new ApiObject(
-            this,
+            scope,
             "controlplaneprovider-rke2",
             ApiObjectProps.builder()
                 .apiVersion("operator.cluster.x-k8s.io/v1alpha2")

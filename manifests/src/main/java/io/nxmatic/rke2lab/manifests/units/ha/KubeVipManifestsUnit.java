@@ -3,6 +3,8 @@ package io.nxmatic.rke2lab.manifests.units.ha;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -22,24 +24,26 @@ public final class KubeVipManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("high-availability", "kube-vip");
 
-  private final String kubeVipVersion;
-
-  public KubeVipManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
-    this.kubeVipVersion = componentVersions().kubeVip();
-
-    ApiObject namespace = createNamespace();
-    ApiObject serviceAccount = createServiceAccount(namespace);
-    ApiObject clusterRole = createClusterRole();
-    ApiObject clusterRoleBinding = createClusterRoleBinding(clusterRole, serviceAccount);
-    createDaemonSet(namespace, serviceAccount, clusterRoleBinding);
-    createService();
+  public KubeVipManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
-  private ApiObject createNamespace() {
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    final String kubeVipVersion = ManifestSynthesisContext.current().componentVersions().kubeVip();
+
+    ApiObject namespace = createNamespace(scope);
+    ApiObject serviceAccount = createServiceAccount(scope, namespace);
+    ApiObject clusterRole = createClusterRole(scope);
+    ApiObject clusterRoleBinding = createClusterRoleBinding(scope, clusterRole, serviceAccount);
+    createDaemonSet(scope, namespace, serviceAccount, clusterRoleBinding, kubeVipVersion);
+    createService(scope);
+  }
+
+  private ApiObject createNamespace(final Construct scope) {
     ApiObject namespace =
         new ApiObject(
-            this,
+            scope,
             "namespace-kube-vip",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -56,10 +60,10 @@ public final class KubeVipManifestsUnit extends AbstractManifestsUnit {
     return namespace;
   }
 
-  private ApiObject createServiceAccount(final ApiObject namespace) {
+  private ApiObject createServiceAccount(final Construct scope, final ApiObject namespace) {
     ApiObject serviceAccount =
         new ApiObject(
-            this,
+            scope,
             "serviceaccount-kube-vip",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -77,10 +81,10 @@ public final class KubeVipManifestsUnit extends AbstractManifestsUnit {
     return serviceAccount;
   }
 
-  private ApiObject createClusterRole() {
+  private ApiObject createClusterRole(final Construct scope) {
     ApiObject clusterRole =
         new ApiObject(
-            this,
+            scope,
             "clusterrole-system-kube-vip-role",
             ApiObjectProps.builder()
                 .apiVersion("rbac.authorization.k8s.io/v1")
@@ -117,10 +121,10 @@ public final class KubeVipManifestsUnit extends AbstractManifestsUnit {
   }
 
   private ApiObject createClusterRoleBinding(
-      final ApiObject clusterRole, final ApiObject serviceAccount) {
+      final Construct scope, final ApiObject clusterRole, final ApiObject serviceAccount) {
     ApiObject clusterRoleBinding =
         new ApiObject(
-            this,
+            scope,
             "clusterrolebinding-system-kube-vip-binding",
             ApiObjectProps.builder()
                 .apiVersion("rbac.authorization.k8s.io/v1")
@@ -154,12 +158,14 @@ public final class KubeVipManifestsUnit extends AbstractManifestsUnit {
   }
 
   private void createDaemonSet(
+      final Construct scope,
       final ApiObject namespace,
       final ApiObject serviceAccount,
-      final ApiObject clusterRoleBinding) {
+      final ApiObject clusterRoleBinding,
+      final String kubeVipVersion) {
     ApiObject daemonSet =
         new ApiObject(
-            this,
+            scope,
             "daemonset-kube-vip-ds",
             ApiObjectProps.builder()
                 .apiVersion("apps/v1")
@@ -272,10 +278,10 @@ public final class KubeVipManifestsUnit extends AbstractManifestsUnit {
                             Map.of("effect", "NoExecute", "operator", "Exists")))))));
   }
 
-  private void createService() {
+  private void createService(final Construct scope) {
     ApiObject service =
         new ApiObject(
-            this,
+            scope,
             "service-control-plane-nodeport",
             ApiObjectProps.builder()
                 .apiVersion("v1")

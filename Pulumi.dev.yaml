@@ -24,6 +24,7 @@ config:
   "rke2lab:bootstrap.skipRecipes": "false"
   "rke2lab:readiness.enabled": "true"
   "rke2lab:entryGate.cleanWorktree.required": "false"
-  rke2lab:readiness.timeout: PT1M
-  rke2lab:policy.link.clusterApi.enabled: "true"
-  rke2lab:policy.link.gitops.enabled: "true"
+  "policy.gitDirtyCheck.enabled": "false "
+  "rke2lab:readiness.timeout": PT1M
+  "rke2lab:policy.link.clusterApi.enabled": "true"
+  "rke2lab:policy.link.gitops.enabled": "true"

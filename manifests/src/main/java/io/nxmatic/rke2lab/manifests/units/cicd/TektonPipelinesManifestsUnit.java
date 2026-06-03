@@ -3,6 +3,8 @@ package io.nxmatic.rke2lab.manifests.units.cicd;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import io.nxmatic.rke2lab.manifests.upstream.UpstreamYamlInclusion;
 import java.util.List;
@@ -20,10 +22,14 @@ public final class TektonPipelinesManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("cicd", "tekton-pipelines");
 
-  public TektonPipelinesManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
+  public TektonPipelinesManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
+  }
 
-    final String operatorVersion = componentVersions().tektonOperator();
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    final String operatorVersion =
+        ManifestSynthesisContext.current().componentVersions().tektonOperator();
 
     // Bundle the upstream operator release (Namespace, CRDs, RBAC, Service, Deployment,
     // ConfigMaps, webhooks). The bundle ships its own `tekton-operator` Namespace, so we no
@@ -32,22 +38,26 @@ public final class TektonPipelinesManifestsUnit extends AbstractManifestsUnit {
     // — the build will fail fast if it doesn't.
     final String operatorReleaseResource =
         "/upstream/cicd/tekton-operator/release-" + operatorVersion + ".yaml";
-    new UpstreamYamlInclusion(this, operatorReleaseResource, packageProfile);
+    new UpstreamYamlInclusion(scope, operatorReleaseResource, packageProfile);
 
     createReplicatedSecret(
-        "tekton-git-auth", "kubernetes.io/basic-auth", "rke2lab-replicator-source/tekton-git-auth");
+        scope,
+        "tekton-git-auth",
+        "kubernetes.io/basic-auth",
+        "rke2lab-replicator-source/tekton-git-auth");
     createReplicatedSecret(
+        scope,
         "tekton-docker-config",
         "kubernetes.io/dockerconfigjson",
         "rke2lab-replicator-source/tekton-docker-config");
-    createTektonConfig();
+    createTektonConfig(scope);
   }
 
   private void createReplicatedSecret(
-      final String name, final String type, final String replicateFrom) {
+      final Construct scope, final String name, final String type, final String replicateFrom) {
     ApiObject secret =
         new ApiObject(
-            this,
+            scope,
             "secret-" + name,
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -74,10 +84,10 @@ public final class TektonPipelinesManifestsUnit extends AbstractManifestsUnit {
     secret.addJsonPatch(JsonPatch.add("/type", type), JsonPatch.add("/stringData", emptyData));
   }
 
-  private void createTektonConfig() {
+  private void createTektonConfig(final Construct scope) {
     ApiObject config =
         new ApiObject(
-            this,
+            scope,
             "tektonconfig-config",
             ApiObjectProps.builder()
                 .apiVersion("operator.tekton.dev/v1alpha1")

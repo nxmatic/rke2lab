@@ -2,7 +2,9 @@
 package io.nxmatic.rke2lab.manifests.units.networking;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
+import io.nxmatic.rke2lab.manifests.InstallPhase;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -19,20 +21,28 @@ public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("networking", "cilium-config");
 
-  // Direct-use constructor with scope (creates manifests immediately)
-  public CiliumConfigManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
-    createHelmChartConfig();
-    createClustermeshRemoteUsersConfigMap();
+  public CiliumConfigManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
-  private void createClustermeshRemoteUsersConfigMap() {
+  @Override
+  public InstallPhase installPhase() {
+    return InstallPhase.PRE_SERVER;
+  }
+
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    createHelmChartConfig(scope);
+    createClustermeshRemoteUsersConfigMap(scope);
+  }
+
+  private void createClustermeshRemoteUsersConfigMap(final Construct scope) {
     // Mounted by clustermesh-apiserver as `etcd-users-config`; without this
     // ConfigMap the pod stays in Init:0/1 waiting for the volume. We ship it
     // with no data — peer entries get appended (out-of-band, by `cilium
     // clustermesh users add`) once federated clusters come online.
     new ApiObject(
-        this,
+        scope,
         "configmap-clustermesh-remote-users",
         ApiObjectProps.builder()
             .apiVersion("v1")
@@ -48,10 +58,10 @@ public final class CiliumConfigManifestsUnit extends AbstractManifestsUnit {
             .build());
   }
 
-  private void createHelmChartConfig() {
+  private void createHelmChartConfig(final Construct scope) {
     ApiObject helmChartConfig =
         new ApiObject(
-            this,
+            scope,
             "helmchartconfig-rke2-cilium",
             ApiObjectProps.builder()
                 .apiVersion("helm.cattle.io/v1")

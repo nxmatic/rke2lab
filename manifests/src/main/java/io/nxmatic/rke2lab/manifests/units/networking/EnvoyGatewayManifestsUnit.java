@@ -3,6 +3,8 @@ package io.nxmatic.rke2lab.manifests.units.networking;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -19,24 +21,29 @@ public final class EnvoyGatewayManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("networking", "envoy-gateway");
 
-  private final String envoyGatewayVersion;
-
-  public EnvoyGatewayManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of(CiliumAdvancedManifestsUnit.MANIFEST_UNIT_ID));
-    this.envoyGatewayVersion = componentVersions().envoyGateway();
-
-    ApiObject namespace = createNamespace();
-    ApiObject serviceAccount = createServiceAccount(namespace);
-    ApiObject clusterRoleBinding = createClusterRoleBinding(serviceAccount);
-    ApiObject configMap = createInstallerScriptConfigMap(namespace);
-    createInstallerJob(namespace, serviceAccount, configMap, clusterRoleBinding);
-    createGatewayClass();
+  public EnvoyGatewayManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of(CiliumAdvancedManifestsUnit.MANIFEST_UNIT_ID));
   }
 
-  private ApiObject createClusterRoleBinding(final ApiObject serviceAccount) {
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    final String envoyGatewayVersion =
+        ManifestSynthesisContext.current().componentVersions().envoyGateway();
+
+    ApiObject namespace = createNamespace(scope);
+    ApiObject serviceAccount = createServiceAccount(scope, namespace);
+    ApiObject clusterRoleBinding = createClusterRoleBinding(scope, serviceAccount);
+    ApiObject configMap = createInstallerScriptConfigMap(scope, namespace);
+    createInstallerJob(
+        scope, namespace, serviceAccount, configMap, clusterRoleBinding, envoyGatewayVersion);
+    createGatewayClass(scope);
+  }
+
+  private ApiObject createClusterRoleBinding(
+      final Construct scope, final ApiObject serviceAccount) {
     ApiObject clusterRoleBinding =
         new ApiObject(
-            this,
+            scope,
             "clusterrolebinding-envoy-gateway-installer",
             ApiObjectProps.builder()
                 .apiVersion("rbac.authorization.k8s.io/v1")
@@ -74,10 +81,10 @@ public final class EnvoyGatewayManifestsUnit extends AbstractManifestsUnit {
     return clusterRoleBinding;
   }
 
-  private void createGatewayClass() {
+  private void createGatewayClass(final Construct scope) {
     ApiObject gatewayClass =
         new ApiObject(
-            this,
+            scope,
             "gatewayclass-envoy",
             ApiObjectProps.builder()
                 .apiVersion("gateway.networking.k8s.io/v1")
@@ -96,9 +103,9 @@ public final class EnvoyGatewayManifestsUnit extends AbstractManifestsUnit {
             "/spec", Map.of("controllerName", "gateway.envoyproxy.io/gatewayclass-controller")));
   }
 
-  private ApiObject createNamespace() {
+  private ApiObject createNamespace(final Construct scope) {
     return new ApiObject(
-        this,
+        scope,
         "namespace-envoy-gateway-system",
         ApiObjectProps.builder()
             .apiVersion("v1")
@@ -113,10 +120,11 @@ public final class EnvoyGatewayManifestsUnit extends AbstractManifestsUnit {
             .build());
   }
 
-  private ApiObject createInstallerScriptConfigMap(final ApiObject namespace) {
+  private ApiObject createInstallerScriptConfigMap(
+      final Construct scope, final ApiObject namespace) {
     ApiObject configMap =
         new ApiObject(
-            this,
+            scope,
             "configmap-envoy-gateway-installer-script",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -151,10 +159,10 @@ public final class EnvoyGatewayManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createServiceAccount(final ApiObject namespace) {
+  private ApiObject createServiceAccount(final Construct scope, final ApiObject namespace) {
     ApiObject serviceAccount =
         new ApiObject(
-            this,
+            scope,
             "serviceaccount-envoy-gateway-installer",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -173,13 +181,15 @@ public final class EnvoyGatewayManifestsUnit extends AbstractManifestsUnit {
   }
 
   private void createInstallerJob(
+      final Construct scope,
       final ApiObject namespace,
       final ApiObject serviceAccount,
       final ApiObject configMap,
-      final ApiObject clusterRoleBinding) {
+      final ApiObject clusterRoleBinding,
+      final String envoyGatewayVersion) {
     ApiObject job =
         new ApiObject(
-            this,
+            scope,
             "job-envoy-gateway-installer",
             ApiObjectProps.builder()
                 .apiVersion("batch/v1")

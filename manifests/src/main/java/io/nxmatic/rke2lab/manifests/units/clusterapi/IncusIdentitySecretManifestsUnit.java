@@ -2,6 +2,8 @@ package io.nxmatic.rke2lab.manifests.units.clusterapi;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.BootstrapIdentity;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.io.IOException;
@@ -49,10 +51,13 @@ public final class IncusIdentitySecretManifestsUnit extends AbstractManifestsUni
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("cluster-api", "incus-identity");
 
-  public IncusIdentitySecretManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
+  public IncusIdentitySecretManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
+  }
 
-    final BootstrapIdentity identity = bootstrapIdentity();
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    final BootstrapIdentity identity = ManifestSynthesisContext.current().bootstrapIdentity();
     final String clusterName = identity.clusterName();
     final String incusRemoteName = identity.incusRemoteName();
 
@@ -72,7 +77,7 @@ public final class IncusIdentitySecretManifestsUnit extends AbstractManifestsUni
       final String serverAddress = encodeBase64(remoteAddress);
 
       createIncusIdentitySecret(
-          this, clusterName, serverAddress, serverCert, clientCert, clientKey);
+          scope, clusterName, serverAddress, serverCert, clientCert, clientKey);
     } catch (IOException ex) {
       throw new IllegalStateException("Failed to materialize Incus identity secret", ex);
     }

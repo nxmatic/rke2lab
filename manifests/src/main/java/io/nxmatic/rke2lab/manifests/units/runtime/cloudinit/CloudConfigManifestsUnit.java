@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.manifests.units.runtime.cloudinit;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import io.nxmatic.rke2lab.netplan.ClusterNetworkBlueprint;
 import java.util.List;
@@ -33,15 +34,19 @@ public final class CloudConfigManifestsUnit extends AbstractManifestsUnit {
   private final RuntimeCloudConfigAssets runtimeCloudConfigAssets =
       RuntimeCloudConfigAssets.builder().build();
 
-  public CloudConfigManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
-    createCloudConfigManifest();
+  public CloudConfigManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
-  private void createCloudConfigManifest() {
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    createCloudConfigManifest(scope);
+  }
+
+  private void createCloudConfigManifest(final Construct scope) {
     ApiObject configMap =
         new ApiObject(
-            this,
+            scope,
             "configmap-cloud-config",
             ApiObjectProps.builder()
                 .apiVersion("v1")

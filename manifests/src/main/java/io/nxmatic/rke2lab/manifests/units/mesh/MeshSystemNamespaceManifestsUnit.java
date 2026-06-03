@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.manifests.units.mesh;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
@@ -17,14 +18,14 @@ public final class MeshSystemNamespaceManifestsUnit extends AbstractManifestsUni
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("mesh", "system-namespace");
 
-  public MeshSystemNamespaceManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
-    createNamespace();
+  public MeshSystemNamespaceManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
-  private void createNamespace() {
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     new ApiObject(
-        this,
+        scope,
         "namespace-" + MeshRefs.MESH_SYSTEM_NAMESPACE.name(),
         ApiObjectProps.builder()
             .apiVersion("v1")

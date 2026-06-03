@@ -3,7 +3,6 @@ package io.nxmatic.rke2lab.manifests.domain;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestsDomain;
 import io.nxmatic.rke2lab.manifests.ManifestsDomainRegistrar;
-import io.nxmatic.rke2lab.manifests.ManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.runtime.cloudinit.CloudConfigManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.runtime.daemonset.RuntimeDaemonsetScriptPolicyManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.runtime.env.RKE2LabEnvConfigManifestsUnit;
@@ -18,31 +17,13 @@ public final class RuntimeDomainRegistrar implements ManifestsDomainRegistrar {
   public ManifestsDomain domain() {
     return new ManifestsDomain(
         ManifestDomainCatalog.RUNTIME,
-        List.of(),
+        List.of(ManifestDomainCatalog.CLUSTER, ManifestDomainCatalog.PLATFORM),
         List.of(
-            ManifestsUnit.lazy(
-                RKE2LabEnvConfigManifestsUnit.MANIFEST_UNIT_ID,
-                List.of(),
-                RKE2LabEnvConfigManifestsUnit::new),
-            ManifestsUnit.lazy(
-                RuntimeRke2ConfigManifestsUnit.MANIFEST_UNIT_ID,
-                List.of(),
-                RuntimeRke2ConfigManifestsUnit::new),
-            ManifestsUnit.lazy(
-                CloudConfigManifestsUnit.MANIFEST_UNIT_ID,
-                List.of(),
-                CloudConfigManifestsUnit::new),
-            ManifestsUnit.lazy(
-                FloxRuntimeManifestsUnit.MANIFEST_UNIT_ID,
-                List.of(),
-                FloxRuntimeManifestsUnit::new),
-            ManifestsUnit.lazy(
-                RuntimeSystemdLibexecPlaceholderManifestsUnit.MANIFEST_UNIT_ID,
-                List.of(),
-                RuntimeSystemdLibexecPlaceholderManifestsUnit::new),
-            ManifestsUnit.lazy(
-                RuntimeDaemonsetScriptPolicyManifestsUnit.MANIFEST_UNIT_ID,
-                List.of(),
-                RuntimeDaemonsetScriptPolicyManifestsUnit::new)));
+            new RKE2LabEnvConfigManifestsUnit(),
+            new RuntimeRke2ConfigManifestsUnit(),
+            new CloudConfigManifestsUnit(),
+            new FloxRuntimeManifestsUnit(),
+            new RuntimeSystemdLibexecPlaceholderManifestsUnit(),
+            new RuntimeDaemonsetScriptPolicyManifestsUnit()));
   }
 }

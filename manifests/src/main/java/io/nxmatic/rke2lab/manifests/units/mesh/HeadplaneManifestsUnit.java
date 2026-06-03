@@ -4,6 +4,7 @@ package io.nxmatic.rke2lab.manifests.units.mesh;
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.profiles.FloxShellSidecarProfile;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
@@ -29,52 +30,48 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
       new PackageMetadataProfile("mesh", "headplane");
 
   private final ManifestsUnitReferenceRegistry registry;
-  private final String floxImage;
 
-  public HeadplaneManifestsUnit(final Construct scope, final String id) {
+  public HeadplaneManifestsUnit() {
     super(
-        scope,
-        id,
         MANIFEST_UNIT_ID,
         List.of(
             MeshSystemNamespaceManifestsUnit.MANIFEST_UNIT_ID,
             HeadscaleManifestsUnit.MANIFEST_UNIT_ID));
     this.registry = null;
-    this.floxImage = ManifestSynthesisContext.current().floxDebugPolicy().prodImage();
-
-    buildResources();
   }
 
-  private HeadplaneManifestsUnit(
-      final Construct scope, final String id, final ManifestsUnitReferenceRegistry registry) {
+  private HeadplaneManifestsUnit(final ManifestsUnitReferenceRegistry registry) {
     super(
-        scope,
-        id,
         MANIFEST_UNIT_ID,
         List.of(
             MeshSystemNamespaceManifestsUnit.MANIFEST_UNIT_ID,
             HeadscaleManifestsUnit.MANIFEST_UNIT_ID));
     this.registry = registry;
-    this.floxImage = ManifestSynthesisContext.current().floxDebugPolicy().prodImage();
-
-    buildResources();
   }
 
-  private void buildResources() {
-    ApiObject serviceAccount = createServiceAccount();
-    ApiObject envConfigMap = createEnvConfigMap();
-    ApiObject syncScriptConfigMap = createSyncScriptConfigMap();
-    ApiObject configTemplateSecret = createConfigTemplateSecret();
-    ApiObject secretsSecret = createSecretsSecret();
-    ApiObject agentAuthSecret = createAgentAuthSecret();
-    ApiObject pvc = createDataPvc();
-    ApiObject agentSyncRole = createAgentSyncRole();
-    ApiObject agentSyncRoleBinding = createAgentSyncRoleBinding(serviceAccount, agentSyncRole);
-    ApiObject k8sIntegrationRole = createK8sIntegrationRole();
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    buildResources(scope);
+  }
+
+  private void buildResources(final Construct scope) {
+    final String floxImage = ManifestSynthesisContext.current().floxDebugPolicy().prodImage();
+    ApiObject serviceAccount = createServiceAccount(scope);
+    ApiObject envConfigMap = createEnvConfigMap(scope);
+    ApiObject syncScriptConfigMap = createSyncScriptConfigMap(scope);
+    ApiObject configTemplateSecret = createConfigTemplateSecret(scope);
+    ApiObject secretsSecret = createSecretsSecret(scope);
+    ApiObject agentAuthSecret = createAgentAuthSecret(scope);
+    ApiObject pvc = createDataPvc(scope);
+    ApiObject agentSyncRole = createAgentSyncRole(scope);
+    ApiObject agentSyncRoleBinding =
+        createAgentSyncRoleBinding(scope, serviceAccount, agentSyncRole);
+    ApiObject k8sIntegrationRole = createK8sIntegrationRole(scope);
     ApiObject k8sIntegrationRoleBinding =
-        createK8sIntegrationRoleBinding(serviceAccount, k8sIntegrationRole);
+        createK8sIntegrationRoleBinding(scope, serviceAccount, k8sIntegrationRole);
     ApiObject syncJob =
         createAgentSyncJob(
+            scope,
             serviceAccount,
             envConfigMap,
             syncScriptConfigMap,
@@ -82,6 +79,8 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
             agentSyncRoleBinding);
     ApiObject deployment =
         createDeployment(
+            scope,
+            floxImage,
             serviceAccount,
             envConfigMap,
             secretsSecret,
@@ -89,13 +88,13 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
             pvc,
             k8sIntegrationRoleBinding,
             syncJob);
-    ApiObject service = createService(deployment);
-    createIngress(service);
+    ApiObject service = createService(scope, deployment);
+    createIngress(scope, service);
   }
 
-  private ApiObject createServiceAccount() {
+  private ApiObject createServiceAccount(final Construct scope) {
     return new ApiObject(
-        this,
+        scope,
         "serviceaccount-headplane",
         ApiObjectProps.builder()
             .apiVersion("v1")
@@ -111,10 +110,10 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
             .build());
   }
 
-  private ApiObject createEnvConfigMap() {
+  private ApiObject createEnvConfigMap(final Construct scope) {
     ApiObject configMap =
         new ApiObject(
-            this,
+            scope,
             "configmap-" + MeshRefs.HEADPLANE_ENV_CONFIGMAP.name(),
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -152,10 +151,10 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createSyncScriptConfigMap() {
+  private ApiObject createSyncScriptConfigMap(final Construct scope) {
     ApiObject configMap =
         new ApiObject(
-            this,
+            scope,
             "configmap-headplane-agent-sync-script",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -195,10 +194,10 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
     return configMap;
   }
 
-  private ApiObject createConfigTemplateSecret() {
+  private ApiObject createConfigTemplateSecret(final Construct scope) {
     ApiObject secret =
         new ApiObject(
-            this,
+            scope,
             "secret-headplane-config-tmpl",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -243,10 +242,10 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
     return secret;
   }
 
-  private ApiObject createSecretsSecret() {
+  private ApiObject createSecretsSecret(final Construct scope) {
     ApiObject secret =
         new ApiObject(
-            this,
+            scope,
             "secret-" + MeshRefs.HEADPLANE_SECRETS_SECRET.name(),
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -273,10 +272,10 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
     return secret;
   }
 
-  private ApiObject createAgentAuthSecret() {
+  private ApiObject createAgentAuthSecret(final Construct scope) {
     ApiObject secret =
         new ApiObject(
-            this,
+            scope,
             "secret-headplane-agent-auth",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -298,10 +297,10 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
     return secret;
   }
 
-  private ApiObject createDataPvc() {
+  private ApiObject createDataPvc(final Construct scope) {
     ApiObject pvc =
         new ApiObject(
-            this,
+            scope,
             "persistentvolumeclaim-headplane-data",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -328,10 +327,10 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
     return pvc;
   }
 
-  private ApiObject createAgentSyncRole() {
+  private ApiObject createAgentSyncRole(final Construct scope) {
     ApiObject role =
         new ApiObject(
-            this,
+            scope,
             "role-headplane-agent-sync",
             ApiObjectProps.builder()
                 .apiVersion("rbac.authorization.k8s.io/v1")
@@ -362,10 +361,10 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
   }
 
   private ApiObject createAgentSyncRoleBinding(
-      final ApiObject serviceAccount, final ApiObject role) {
+      final Construct scope, final ApiObject serviceAccount, final ApiObject role) {
     ApiObject roleBinding =
         new ApiObject(
-            this,
+            scope,
             "rolebinding-headplane-agent-sync",
             ApiObjectProps.builder()
                 .apiVersion("rbac.authorization.k8s.io/v1")
@@ -407,10 +406,10 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
     return roleBinding;
   }
 
-  private ApiObject createK8sIntegrationRole() {
+  private ApiObject createK8sIntegrationRole(final Construct scope) {
     ApiObject role =
         new ApiObject(
-            this,
+            scope,
             "role-headplane-k8s-integration",
             ApiObjectProps.builder()
                 .apiVersion("rbac.authorization.k8s.io/v1")
@@ -455,10 +454,10 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
   }
 
   private ApiObject createK8sIntegrationRoleBinding(
-      final ApiObject serviceAccount, final ApiObject role) {
+      final Construct scope, final ApiObject serviceAccount, final ApiObject role) {
     ApiObject roleBinding =
         new ApiObject(
-            this,
+            scope,
             "rolebinding-headplane-k8s-integration",
             ApiObjectProps.builder()
                 .apiVersion("rbac.authorization.k8s.io/v1")
@@ -501,6 +500,7 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
   }
 
   private ApiObject createAgentSyncJob(
+      final Construct scope,
       final ApiObject serviceAccount,
       final ApiObject envConfigMap,
       final ApiObject syncScriptConfigMap,
@@ -508,7 +508,7 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
       final ApiObject roleBinding) {
     ApiObject job =
         new ApiObject(
-            this,
+            scope,
             "job-headplane-agent-sync",
             ApiObjectProps.builder()
                 .apiVersion("batch/v1")
@@ -637,6 +637,8 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
   }
 
   private ApiObject createDeployment(
+      final Construct scope,
+      final String floxImage,
       final ApiObject serviceAccount,
       final ApiObject envConfigMap,
       final ApiObject secretsSecret,
@@ -646,7 +648,7 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
       final ApiObject syncJob) {
     ApiObject deployment =
         new ApiObject(
-            this,
+            scope,
             "deployment-headplane",
             ApiObjectProps.builder()
                 .apiVersion("apps/v1")
@@ -854,10 +856,10 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
     return deployment;
   }
 
-  private ApiObject createService(final ApiObject deployment) {
+  private ApiObject createService(final Construct scope, final ApiObject deployment) {
     ApiObject service =
         new ApiObject(
-            this,
+            scope,
             "service-headplane",
             ApiObjectProps.builder()
                 .apiVersion("v1")
@@ -888,10 +890,10 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
     return service;
   }
 
-  private void createIngress(final ApiObject service) {
+  private void createIngress(final Construct scope, final ApiObject service) {
     ApiObject ingress =
         new ApiObject(
-            this,
+            scope,
             "ingress-headplane",
             ApiObjectProps.builder()
                 .apiVersion("networking.k8s.io/v1")

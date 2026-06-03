@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.manifests.units.gitops;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -54,11 +55,15 @@ public final class SopsAgeSecretManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("gitops", "sops-age");
 
-  public SopsAgeSecretManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
+  public SopsAgeSecretManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
+  }
+
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     try {
       final String ageKey = readAgeKeyFromSSH();
-      createSopsAgeSecret(this, ageKey);
+      createSopsAgeSecret(scope, ageKey);
     } catch (Exception ex) {
       throw new IllegalStateException("Failed to materialize SOPS age secret", ex);
     }

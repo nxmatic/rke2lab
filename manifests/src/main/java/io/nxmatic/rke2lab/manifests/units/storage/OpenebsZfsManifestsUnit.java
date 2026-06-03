@@ -4,6 +4,8 @@ package io.nxmatic.rke2lab.manifests.units.storage;
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
+import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
@@ -16,24 +18,27 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
 
   public static final String MANIFEST_UNIT_ID = ManifestDomainCatalog.STORAGE + "/openebs-zfs";
 
-  private static final String LAYER_NAME = "storage";
+  private static final String DOMAIN_NAME = "storage";
   private static final String PACKAGE_NAME = "openebs-zfs";
 
   private final ManifestAnnotations manifestAnnotations = new ManifestAnnotations();
 
-  private final String chartVersion;
-
-  public OpenebsZfsManifestsUnit(final Construct scope, final String id) {
-    super(scope, id, MANIFEST_UNIT_ID, List.of());
-    this.chartVersion = componentVersions().openebsZfsChart();
-    ApiObject namespace = createNamespace();
-    createStorageClass();
-    createHelmChart(namespace);
+  public OpenebsZfsManifestsUnit() {
+    super(MANIFEST_UNIT_ID, List.of());
   }
 
-  private ApiObject createNamespace() {
+  @Override
+  protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
+    final String chartVersion =
+        ManifestSynthesisContext.current().componentVersions().openebsZfsChart();
+    ApiObject namespace = createNamespace(scope);
+    createStorageClass(scope);
+    createHelmChart(scope, namespace, chartVersion);
+  }
+
+  private ApiObject createNamespace(final Construct scope) {
     return new ApiObject(
-        this,
+        scope,
         "namespace-openebs",
         ApiObjectProps.builder()
             .apiVersion("v1")
@@ -41,15 +46,15 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
             .metadata(
                 ApiObjectMetadata.builder()
                     .name("openebs")
-                    .annotations(manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
+                    .annotations(manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
                     .build())
             .build());
   }
 
-  private void createStorageClass() {
+  private void createStorageClass(final Construct scope) {
     ApiObject storageClass =
         new ApiObject(
-            this,
+            scope,
             "storageclass-openebs-zfs",
             ApiObjectProps.builder()
                 .apiVersion("storage.k8s.io/v1")
@@ -59,7 +64,7 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
                         .name("openebs-zfs")
                         .annotations(
                             manifestAnnotations.packageAnnotations(
-                                LAYER_NAME,
+                                DOMAIN_NAME,
                                 PACKAGE_NAME,
                                 Map.of("storageclass.kubernetes.io/is-default-class", "true")))
                         .build())
@@ -74,10 +79,11 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
         JsonPatch.add("/volumeBindingMode", "WaitForFirstConsumer"));
   }
 
-  private void createHelmChart(final ApiObject namespace) {
+  private void createHelmChart(
+      final Construct scope, final ApiObject namespace, final String chartVersion) {
     ApiObject helmChart =
         new ApiObject(
-            this,
+            scope,
             "helmchart-openebs-zfs",
             ApiObjectProps.builder()
                 .apiVersion("helm.cattle.io/v1")
@@ -87,7 +93,7 @@ public final class OpenebsZfsManifestsUnit extends AbstractManifestsUnit {
                         .name("openebs-zfs")
                         .namespace("openebs")
                         .annotations(
-                            manifestAnnotations.packageAnnotations(LAYER_NAME, PACKAGE_NAME))
+                            manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
                         .build())
                 .build());
 
