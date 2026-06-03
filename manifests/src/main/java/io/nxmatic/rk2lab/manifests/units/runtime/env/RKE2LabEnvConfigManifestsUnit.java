@@ -3,10 +3,10 @@ package io.nxmatic.rk2lab.manifests.units.runtime.env;
 
 import io.nxmatic.rk2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rk2lab.manifests.ManifestDomainCatalog;
-import io.nxmatic.rk2lab.manifests.layers.env.DefaultLayerEnvContext;
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributorRegistry;
+import io.nxmatic.rk2lab.manifests.node.DefaultNodeEnvContext;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContext;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContributor;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContributorRegistry;
 import io.nxmatic.rk2lab.manifests.profiles.PackageMetadataProfile;
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -46,15 +46,15 @@ public final class RKE2LabEnvConfigManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("runtime", "env-config");
 
-  private final LayerEnvContext layerEnvContext;
+  private final NodeEnvContext nodeEnvContext;
 
-  private final LayerEnvContributorRegistry envContributorRegistry;
+  private final NodeEnvContributorRegistry envContributorRegistry;
 
   public RKE2LabEnvConfigManifestsUnit(final Construct scope, final String id) {
     super(scope, id, MANIFEST_UNIT_ID, List.of());
 
-    this.layerEnvContext = new DefaultLayerEnvContext();
-    this.envContributorRegistry = new LayerEnvContributorRegistry(layerEnvContext);
+    this.nodeEnvContext = new DefaultNodeEnvContext();
+    this.envContributorRegistry = new NodeEnvContributorRegistry(nodeEnvContext);
 
     for (String section : ENV_SECTIONS) {
       createSectionConfigMap(section);
@@ -106,14 +106,14 @@ public final class RKE2LabEnvConfigManifestsUnit extends AbstractManifestsUnit {
   }
 
   private Map<String, String> resolveContributorSection(final String section) {
-    for (LayerEnvContributor contributor : envContributorRegistry.orderedContributors()) {
+    for (NodeEnvContributor contributor : envContributorRegistry.orderedContributors()) {
       if (!contributor.contributedSections().contains(section)) {
         continue;
       }
 
       try {
         return Map.copyOf(
-            new LinkedHashMap<>(contributor.contributeVariables(section, layerEnvContext)));
+            new LinkedHashMap<>(contributor.contributeVariables(section, nodeEnvContext)));
       } catch (IOException ex) {
         throw new IllegalStateException(
             "Failed to synthesize runtime env-config section from contributor: " + section, ex);

@@ -485,7 +485,7 @@ This documentation is directly linked to the implementation. Navigate to these f
 **Bootstrap Identity**:
 
 * link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/common/profiles/BootstrapIdentity.java[BootstrapIdentity.java] - Identity record with infrastructure fields
-* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/layers/env/LayerEnvContext.java[LayerEnvContext.java] - Environment context that builds BootstrapIdentity
+* link:../manifests/src/main/java/io/nxmatic/rk2lab/manifests/node/NodeEnvContext.java[NodeEnvContext.java] - Environment context that builds BootstrapIdentity
 * link:../seed-master/src/main/java/io/nxmatic/rk2lab/controlplane/incus/IncusResourceBootstrap.java[IncusResourceBootstrap.java] - Where `incusRemoteName()` is provided
 
 **Manifest Units** (showing patterns):

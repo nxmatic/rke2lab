@@ -24,7 +24,7 @@ public class ManifestsDomain {
       throw new IllegalArgumentException("Domain dependencies must not be null: " + domainId);
     }
     if (units == null || units.isEmpty()) {
-      throw new IllegalArgumentException("Domain must define at least one layer: " + domainId);
+      throw new IllegalArgumentException("Domain must define at least one unit: " + domainId);
     }
     this.domainId = domainId;
     this.dependsOnDomainIds = List.copyOf(dependsOnDomainIds);

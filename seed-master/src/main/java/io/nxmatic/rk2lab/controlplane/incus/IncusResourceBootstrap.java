@@ -32,9 +32,9 @@ import io.nxmatic.rk2lab.manifests.ManifestSynthesisRequest;
 import io.nxmatic.rk2lab.manifests.ManifestSynthesisResult;
 import io.nxmatic.rk2lab.manifests.ManifestSynthesisService;
 import io.nxmatic.rk2lab.manifests.ManifestYaml;
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributorRegistry;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContext;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContributor;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContributorRegistry;
 import io.nxmatic.rk2lab.manifests.profiles.ComponentVersions;
 import io.nxmatic.rk2lab.manifests.profiles.FloxDebugPolicy;
 import io.nxmatic.rk2lab.netplan.ClusterNetworkBlueprint;
@@ -270,7 +270,7 @@ public final class IncusResourceBootstrap {
               state.localPaths.assetsRoot().relativize(state.localPaths.manifestsRoot()));
 
       final BootstrapPaths stagingPaths = createStagingPaths(stagingRoot);
-      final LayerEnvContext layerContext = new DefaultBootstrapLayerEnvContext();
+      final NodeEnvContext layerContext = new DefaultBootstrapNodeEnvContext();
       final Map<String, Object> manifestSynthSummary =
           synthesizeAndExplodeManifests(
               stagingManifestsRoot,
@@ -341,7 +341,7 @@ public final class IncusResourceBootstrap {
     private Map<String, Object> materializeAndRegisterRke2labEnvTarget(
         ProvisioningTargetRegistry targetRegistry, StagingContext staging) {
       final BootstrapPaths stagingPaths = staging.stagingPaths();
-      final LayerEnvContext layerContext = staging.layerContext();
+      final NodeEnvContext layerContext = staging.layerContext();
 
       final List<String> hostMountNotes =
           context.hostMountSourceVerifier().ensureSources(stagingPaths);
@@ -412,7 +412,7 @@ public final class IncusResourceBootstrap {
         Path stagingRoot,
         BootstrapPaths stagingPaths,
         Path stagingManifestsRoot,
-        LayerEnvContext layerContext,
+        NodeEnvContext layerContext,
         Map<String, Object> manifestSynthSummary) {}
 
     private record TargetContext(
@@ -425,7 +425,7 @@ public final class IncusResourceBootstrap {
       Path manifestsRoot,
       Path systemdUnitsTarget,
       ControlplanePolicy policy,
-      LayerEnvContext layerContext) {
+      NodeEnvContext layerContext) {
     final long startedAt = System.nanoTime();
     Path synthScratch = null;
     try {
@@ -500,7 +500,7 @@ public final class IncusResourceBootstrap {
   private ManifestSynthesisResult synthesizeManifests(
       Path synthScratch,
       Path consolidated,
-      LayerEnvContext layerContext,
+      NodeEnvContext layerContext,
       FloxDebugPolicy floxDebugPolicy)
       throws IOException {
     final ComponentVersions componentVersions = ComponentVersions.defaults();
@@ -1212,13 +1212,13 @@ public final class IncusResourceBootstrap {
     private RuntimeEnvControlplaneOverlayWriter() {}
 
     private Map<String, Object> write(
-        Path runtimeEnvConfigRoot, LayerEnvContext layerContext, ControlplanePolicy policy) {
+        Path runtimeEnvConfigRoot, NodeEnvContext layerContext, ControlplanePolicy policy) {
       try {
         Files.createDirectories(runtimeEnvConfigRoot);
 
         // Write layer contributions first
-        LayerEnvContributorRegistry registry = new LayerEnvContributorRegistry(layerContext);
-        final List<LayerEnvContributor> orderedContributors = registry.orderedContributors();
+        NodeEnvContributorRegistry registry = new NodeEnvContributorRegistry(layerContext);
+        final List<NodeEnvContributor> orderedContributors = registry.orderedContributors();
         registry.writeAllContributions(runtimeEnvConfigRoot);
 
         // Aggregate all layer contributions and create 99-configmap with merged vars
@@ -1264,18 +1264,18 @@ public final class IncusResourceBootstrap {
     }
 
     private static Map<String, Object> buildRegistrySnapshot(
-        List<LayerEnvContributor> orderedContributors, Map<String, String> layerContributionVars) {
+        List<NodeEnvContributor> orderedContributors, Map<String, String> layerContributionVars) {
       final List<Map<String, Object>> contributors = new ArrayList<>();
-      final List<String> orderedLayers = new ArrayList<>();
+      final List<String> orderedDomains = new ArrayList<>();
       final List<String> contributedSections = new ArrayList<>();
 
-      for (LayerEnvContributor contributor : orderedContributors) {
+      for (NodeEnvContributor contributor : orderedContributors) {
         final List<String> sections = List.copyOf(contributor.contributedSections());
-        orderedLayers.add(contributor.layerId());
+        orderedDomains.add(contributor.domainId());
         contributedSections.addAll(sections);
         contributors.add(
             Map.of(
-                "layerId", contributor.layerId(),
+                "domainId", contributor.domainId(),
                 "contributorClass", contributor.getClass().getName(),
                 "sections", sections,
                 "sectionCount", sections.size()));
@@ -1284,14 +1284,14 @@ public final class IncusResourceBootstrap {
       return Map.of(
           "contributorCount", contributors.size(),
           "contributors", contributors,
-          "orderedLayers", List.copyOf(orderedLayers),
+          "orderedDomains", List.copyOf(orderedDomains),
           "contributedSections", List.copyOf(contributedSections),
           "contributedSectionCount", contributedSections.size(),
           "aggregatedVariableCount", layerContributionVars.size());
     }
   }
 
-  private final class DefaultBootstrapLayerEnvContext implements LayerEnvContext {
+  private final class DefaultBootstrapNodeEnvContext implements NodeEnvContext {
 
     private final ClusterNetworkBlueprint managementNodeBlueprint =
         deriveBlueprint(bootstrapContext.config().nodeName());
@@ -2627,14 +2627,14 @@ public final class IncusResourceBootstrap {
    */
   private static final class Rke2labEnvTarget implements ProvisioningTarget {
     private final RuntimeEnvControlplaneOverlayWriter overlayWriter;
-    private final LayerEnvContext layerContext;
+    private final NodeEnvContext layerContext;
     private final ControlplanePolicy policy;
     private final Path envConfigRoot;
     private Map<String, Object> layerEnvSummary = Map.of();
 
     private Rke2labEnvTarget(
         RuntimeEnvControlplaneOverlayWriter overlayWriter,
-        LayerEnvContext layerContext,
+        NodeEnvContext layerContext,
         ControlplanePolicy policy,
         Path envConfigRoot) {
       this.overlayWriter = overlayWriter;

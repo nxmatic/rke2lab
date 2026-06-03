@@ -1,4 +1,4 @@
-package io.nxmatic.rk2lab.manifests.layers.env;
+package io.nxmatic.rk2lab.manifests.node;
 
 import io.nxmatic.rk2lab.manifests.ManifestYaml;
 import java.io.IOException;
@@ -8,20 +8,20 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Contract for layer domains to contribute environment variables. Implementations are registered
- * via Java Service Provider Interface metadata, discovered through {@link java.util.ServiceLoader},
- * and aggregated by {@link LayerEnvContributorRegistry} for runtime env-config synthesis.
+ * Contract for domains to contribute node environment variables. Implementations are registered via
+ * Java Service Provider Interface metadata, discovered through {@link java.util.ServiceLoader}, and
+ * aggregated by {@link NodeEnvContributorRegistry} for runtime env-config synthesis.
  */
-public interface LayerEnvContributor {
+public interface NodeEnvContributor {
 
   /**
    * Unique identifier for this contributor (e.g., "networking", "storage", "high-availability").
    * Used for ConfigMap naming and override ordering.
    */
-  String layerId();
+  String domainId();
 
   /**
-   * List of environment sections this layer contributes. Examples: ["cilium", "network-cluster",
+   * List of environment sections this domain contributes. Examples: ["cilium", "network-cluster",
    * "network-node"]
    */
   List<String> contributedSections();
@@ -34,7 +34,7 @@ public interface LayerEnvContributor {
    * @return map of KEY=VALUE environment variables
    * @throws IOException if contribution fails
    */
-  Map<String, String> contributeVariables(String sectionName, LayerEnvContext context)
+  Map<String, String> contributeVariables(String sectionName, NodeEnvContext context)
       throws IOException;
 
   /**
@@ -45,12 +45,12 @@ public interface LayerEnvContributor {
    * @param context bootstrap context
    * @throws IOException if write fails
    */
-  default void writeConfigMap(Path outputDir, LayerEnvContext context) throws IOException {
+  default void writeConfigMap(Path outputDir, NodeEnvContext context) throws IOException {
     for (String section : contributedSections()) {
       final Map<String, Object> document =
           buildConfigMapDocument(
               "env-section-" + section, section, contributeVariables(section, context));
-      ManifestYaml.writeDocument(outputDir.resolve(layerId() + "-" + section + ".yml"), document);
+      ManifestYaml.writeDocument(outputDir.resolve(domainId() + "-" + section + ".yml"), document);
     }
   }
 
@@ -63,7 +63,7 @@ public interface LayerEnvContributor {
     final Map<String, Object> annotations = new LinkedHashMap<>();
     annotations.put("config.kubernetes.io/local-config", "true");
     annotations.put("env.rk2lab.nxmatic.io/section", section);
-    annotations.put("rk2lab.nxmatic.io/managed-by", "layer-contributor");
+    annotations.put("rk2lab.nxmatic.io/managed-by", "node-env-contributor");
 
     final Map<String, Object> metadata = new LinkedHashMap<>();
     metadata.put("annotations", annotations);

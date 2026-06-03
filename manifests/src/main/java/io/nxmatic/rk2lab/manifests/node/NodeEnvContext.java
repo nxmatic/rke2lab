@@ -1,14 +1,14 @@
-package io.nxmatic.rk2lab.manifests.layers.env;
+package io.nxmatic.rk2lab.manifests.node;
 
 import io.nxmatic.rk2lab.manifests.profiles.BootstrapIdentity;
 import io.nxmatic.rk2lab.manifests.profiles.NetworkTopology;
 import java.nio.file.Path;
 
 /**
- * Read-only bootstrap context passed to layer env contributors. Provides access to bootstrap-time
- * paths, node identity, and cluster topology.
+ * Read-only context passed to node-env contributors. Provides access to bootstrap-time paths, node
+ * identity, and cluster topology.
  */
-public interface LayerEnvContext {
+public interface NodeEnvContext {
 
   // Bootstrap Paths
   Path rootPath(); // /srv/host
@@ -45,7 +45,7 @@ public interface LayerEnvContext {
 
   String clusterDomain(); // "cluster.local"
 
-  // Network Topology (populated by networking layer during init)
+  // Network Topology (populated by networking domain during init)
   String clusterCidr(); // "10.80.0.0/21"
 
   String clusterPodCidr(); // "10.42.0.0/16"

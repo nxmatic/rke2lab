@@ -1,19 +1,19 @@
 package io.nxmatic.rk2lab.manifests.units.runtime.env;
 
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContext;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContributor;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Runtime layer environment variable contributor. Contributes: rke2, config, containerd, cri, helm,
- * kubectl, user, daemonset-script-policy, systemd
+ * Runtime domain node-env contributor. Contributes: rke2, config, containerd, cri, helm, kubectl,
+ * user, daemonset-script-policy, systemd
  */
-public final class RuntimeLayerEnvContributor implements LayerEnvContributor {
+public final class RuntimeNodeEnvContributor implements NodeEnvContributor {
 
   @Override
-  public String layerId() {
+  public String domainId() {
     return "runtime";
   }
 
@@ -32,7 +32,7 @@ public final class RuntimeLayerEnvContributor implements LayerEnvContributor {
   }
 
   @Override
-  public Map<String, String> contributeVariables(String sectionName, LayerEnvContext context)
+  public Map<String, String> contributeVariables(String sectionName, NodeEnvContext context)
       throws IOException {
     return switch (sectionName) {
       case "rke2" -> Map.of("RKE2_SERVER_MANIFESTS_DIR", "/var/lib/rancher/rke2/server/manifests");

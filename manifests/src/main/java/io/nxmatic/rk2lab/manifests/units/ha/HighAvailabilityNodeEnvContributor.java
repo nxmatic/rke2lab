@@ -1,20 +1,20 @@
 package io.nxmatic.rk2lab.manifests.units.ha;
 
 import io.nxmatic.rk2lab.manifests.ManifestDomainCatalog;
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContext;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContributor;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-/** HighAvailability layer environment variable contributor. Contributes: network-vip */
-public class HighAvailabilityLayerEnvContributor implements LayerEnvContributor {
+/** HighAvailability domain node-env contributor. Contributes: network-vip */
+public class HighAvailabilityNodeEnvContributor implements NodeEnvContributor {
 
   private final ManifestDomainCatalog manifestDomainCatalog =
       ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
 
   @Override
-  public String layerId() {
+  public String domainId() {
     return manifestDomainCatalog.highAvailability();
   }
 
@@ -24,7 +24,7 @@ public class HighAvailabilityLayerEnvContributor implements LayerEnvContributor 
   }
 
   @Override
-  public Map<String, String> contributeVariables(String sectionName, LayerEnvContext context)
+  public Map<String, String> contributeVariables(String sectionName, NodeEnvContext context)
       throws IOException {
     return switch (sectionName) {
       case "network-vip" ->

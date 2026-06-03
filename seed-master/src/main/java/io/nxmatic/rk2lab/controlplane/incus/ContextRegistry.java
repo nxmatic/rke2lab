@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <ul>
  *   <li>Computed records (BootstrapPaths, StagingContext, TargetContext)
  *   <li>Intermediate state (DeploymentMetadata, BuildMetadata)
- *   <li>Context objects with lifecycle (LayerEnvContext)
+ *   <li>Context objects with lifecycle (NodeEnvContext)
  * </ul>
  *
  * <p><b>DO NOT register:</b>

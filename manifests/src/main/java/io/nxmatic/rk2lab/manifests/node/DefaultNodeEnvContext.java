@@ -1,12 +1,12 @@
-package io.nxmatic.rk2lab.manifests.layers.env;
+package io.nxmatic.rk2lab.manifests.node;
 
 import io.nxmatic.rk2lab.netplan.ClusterNetworkBlueprint;
 import java.nio.file.Path;
 
 /**
- * Default synthesis-time {@link LayerEnvContext} backed by canonical netplan blueprint derivation.
+ * Default synthesis-time {@link NodeEnvContext} backed by canonical netplan blueprint derivation.
  */
-public final class DefaultLayerEnvContext implements LayerEnvContext {
+public final class DefaultNodeEnvContext implements NodeEnvContext {
 
   private static final Path ROOT_PATH = Path.of("/srv/host");
 

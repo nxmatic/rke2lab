@@ -1,16 +1,16 @@
 package io.nxmatic.rk2lab.manifests.units.storage;
 
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContext;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContributor;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-/** Storage layer environment variable contributor. Contributes: etcdctl */
-public class StorageLayerEnvContributor implements LayerEnvContributor {
+/** Storage domain node-env contributor. Contributes: etcdctl */
+public class StorageNodeEnvContributor implements NodeEnvContributor {
 
   @Override
-  public String layerId() {
+  public String domainId() {
     return "storage";
   }
 
@@ -20,7 +20,7 @@ public class StorageLayerEnvContributor implements LayerEnvContributor {
   }
 
   @Override
-  public Map<String, String> contributeVariables(String sectionName, LayerEnvContext context)
+  public Map<String, String> contributeVariables(String sectionName, NodeEnvContext context)
       throws IOException {
     return switch (sectionName) {
       case "etcdctl" ->

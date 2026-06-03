@@ -1,19 +1,19 @@
 package io.nxmatic.rk2lab.manifests.units.networking;
 
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContext;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContributor;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Networking layer environment variable contributor. Contributes: cilium, network-cluster,
- * network-node, network-lan-wan
+ * Networking domain node-env contributor. Contributes: cilium, network-cluster, network-node,
+ * network-lan-wan
  */
-public class NetworkingLayerEnvContributor implements LayerEnvContributor {
+public class NetworkingNodeEnvContributor implements NodeEnvContributor {
 
   @Override
-  public String layerId() {
+  public String domainId() {
     return "networking";
   }
 
@@ -23,7 +23,7 @@ public class NetworkingLayerEnvContributor implements LayerEnvContributor {
   }
 
   @Override
-  public Map<String, String> contributeVariables(String sectionName, LayerEnvContext context)
+  public Map<String, String> contributeVariables(String sectionName, NodeEnvContext context)
       throws IOException {
     return switch (sectionName) {
       case "cilium" ->

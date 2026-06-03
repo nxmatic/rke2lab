@@ -2,16 +2,15 @@
 package io.nxmatic.rk2lab.manifests.profiles;
 
 /**
- * Cross-cutting identity slice published to synth-time layers via {@link
+ * Cross-cutting identity slice published to synth-time domains via {@link
  * io.nxmatic.rk2lab.manifests.ManifestSynthesisContext}. Replaces the kpt-setter {@code
  * ${cluster-name}} / {@code ${cluster-env}} / {@code ${node-name}} placeholders the deprecated
  * branch carried through {@code apply-setters} — those values now resolve at synth time because the
  * rendered objects ship straight to the rke2 addon controller (no kpt round trip).
  *
- * <p>Mirrors the canonical accessors on {@link
- * io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext} (which env contributors already use), but
- * deliberately exposes only the identity subset — bootstrap paths and per-package config stay in
- * their owning layers.
+ * <p>Mirrors the canonical accessors on {@link io.nxmatic.rk2lab.manifests.node.NodeEnvContext}
+ * (which env contributors already use), but deliberately exposes only the identity subset —
+ * bootstrap paths and per-package config stay in their owning domains.
  *
  * <p>Incus cluster configuration: The Incus remote name ({@code incusRemoteName}) is configured per
  * cluster and may differ from the cluster name (e.g., cluster "bioskop" uses remote

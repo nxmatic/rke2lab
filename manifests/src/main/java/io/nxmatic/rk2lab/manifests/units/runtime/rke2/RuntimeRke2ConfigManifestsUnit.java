@@ -7,8 +7,8 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import io.nxmatic.rk2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rk2lab.manifests.ManifestDomainCatalog;
-import io.nxmatic.rk2lab.manifests.layers.env.DefaultLayerEnvContext;
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
+import io.nxmatic.rk2lab.manifests.node.DefaultNodeEnvContext;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContext;
 import io.nxmatic.rk2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -32,7 +32,7 @@ public final class RuntimeRke2ConfigManifestsUnit extends AbstractManifestsUnit 
   public RuntimeRke2ConfigManifestsUnit(final Construct scope, final String id) {
     super(scope, id, MANIFEST_UNIT_ID, List.of());
 
-    final LayerEnvContext context = new DefaultLayerEnvContext();
+    final NodeEnvContext context = new DefaultNodeEnvContext();
 
     createConfigMap(
         "advertise-address.yaml",

@@ -1,16 +1,14 @@
-package io.nxmatic.rk2lab.manifests.layers.node;
+package io.nxmatic.rk2lab.manifests.node;
 
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-/** Node layer environment variable contributor. Contributes: node, paths */
-public class NodeLayerEnvContributor implements LayerEnvContributor {
+/** Node-identity domain node-env contributor. Contributes: node, paths */
+public class NodeEnvIdentityContributor implements NodeEnvContributor {
 
   @Override
-  public String layerId() {
+  public String domainId() {
     return "node";
   }
 
@@ -20,7 +18,7 @@ public class NodeLayerEnvContributor implements LayerEnvContributor {
   }
 
   @Override
-  public Map<String, String> contributeVariables(String sectionName, LayerEnvContext context)
+  public Map<String, String> contributeVariables(String sectionName, NodeEnvContext context)
       throws IOException {
     return switch (sectionName) {
       case "node" ->

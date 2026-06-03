@@ -1,16 +1,16 @@
 package io.nxmatic.rk2lab.manifests.units.cluster;
 
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContext;
-import io.nxmatic.rk2lab.manifests.layers.env.LayerEnvContributor;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContext;
+import io.nxmatic.rk2lab.manifests.node.NodeEnvContributor;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-/** Cluster layer environment variable contributor. Contributes: cluster */
-public class ClusterLayerEnvContributor implements LayerEnvContributor {
+/** Cluster domain node-env contributor. Contributes: cluster */
+public class ClusterNodeEnvContributor implements NodeEnvContributor {
 
   @Override
-  public String layerId() {
+  public String domainId() {
     return "cluster";
   }
 
@@ -20,7 +20,7 @@ public class ClusterLayerEnvContributor implements LayerEnvContributor {
   }
 
   @Override
-  public Map<String, String> contributeVariables(String sectionName, LayerEnvContext context)
+  public Map<String, String> contributeVariables(String sectionName, NodeEnvContext context)
       throws IOException {
     return switch (sectionName) {
       case "cluster" ->
