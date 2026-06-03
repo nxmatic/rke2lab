@@ -2,7 +2,10 @@
 package io.nxmatic.rke2lab.manifests;
 
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
+import io.nxmatic.rke2lab.manifests.systemd.SystemdUnitSynthesizer;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A manifest domain groups related ManifestsUnits and optionally synthesizes systemd support units.
@@ -58,9 +61,18 @@ public class ManifestsDomain {
    * @param context systemd synthesis context (contains references to common targets)
    */
   public void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
-    // Delegate to each manifest unit
+    // Group this domain's units by lifecycle phase, then emit one installer service per phase
+    // present. The installer links the sub-paths of its phase; ordering is derived by the
+    // synthesizer from the phase (see InstallPhase / docs/rke2-install-phases.adoc).
+    final Map<InstallPhase, List<String>> subpathsByPhase = new LinkedHashMap<>();
     for (ManifestsUnit unit : units) {
-      unit.synthesizeSystemdUnits(systemdChart, context);
+      subpathsByPhase
+          .computeIfAbsent(unit.installPhase(), p -> new java.util.ArrayList<>())
+          .add(unit.manifestUnitId());
     }
+
+    final SystemdUnitSynthesizer synthesizer =
+        new SystemdUnitSynthesizer(systemdChart, domainId, context);
+    subpathsByPhase.forEach(synthesizer::phaseInstaller);
   }
 }

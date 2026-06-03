@@ -14,10 +14,23 @@ public interface ManifestsUnit {
   List<String> dependsOnManifestsUnitIds();
 
   /**
+   * Where this unit attaches to RKE2's lifecycle. The systemd synthesis derives ordering from this
+   * (see {@link InstallPhase} and docs/rke2-install-phases.adoc). Defaults to {@link
+   * InstallPhase#POST_SERVER}, the common case (RKE2 watches server/manifests after the API is up).
+   */
+  default InstallPhase installPhase() {
+    return InstallPhase.POST_SERVER;
+  }
+
+  /**
    * Creates a lazy ManifestsUnit that defers Construct instantiation until apply() is called.
    *
    * <p>Used by domain registrars to avoid creating Construct instances with null scope. The factory
    * receives (Construct scope, String id) and returns a fully-constructed ManifestsUnit.
+   *
+   * <p>The {@link InstallPhase} is passed here (not declared on the unit class) because the systemd
+   * synthesis reads it from this wrapper <em>before</em> the real unit is constructed — the factory
+   * only runs during {@link #apply(Chart)}.
    *
    * <p><b>Usage:</b>
    *
@@ -25,18 +38,32 @@ public interface ManifestsUnit {
    * ManifestsUnit.lazy(
    *   ClusterRuntimeNamespaceManifestsUnit.MANIFEST_UNIT_ID,
    *   List.of(),
+   *   InstallPhase.POST_SERVER,
    *   ClusterRuntimeNamespaceManifestsUnit::new
    * )
    * }</pre>
    *
    * @param manifestUnitId the manifest unit identifier
    * @param dependsOnManifestsUnitIds list of unit IDs this unit depends on
+   * @param installPhase the RKE2 lifecycle phase this unit attaches to
    * @param factory factory function (scope, id) -> ManifestsUnit instance
    * @return lazy ManifestsUnit that creates the real instance in apply()
    */
   static ManifestsUnit lazy(
       String manifestUnitId,
       List<String> dependsOnManifestsUnitIds,
+      BiFunction<Construct, String, ? extends ManifestsUnit> factory) {
+    return lazy(manifestUnitId, dependsOnManifestsUnitIds, InstallPhase.POST_SERVER, factory);
+  }
+
+  /**
+   * Like {@link #lazy(String, List, BiFunction)} but with an explicit {@link InstallPhase} — use
+   * this overload only when the unit is not the common {@link InstallPhase#POST_SERVER} case.
+   */
+  static ManifestsUnit lazy(
+      String manifestUnitId,
+      List<String> dependsOnManifestsUnitIds,
+      InstallPhase installPhase,
       BiFunction<Construct, String, ? extends ManifestsUnit> factory) {
     return new ManifestsUnit() {
       @Override
@@ -47,6 +74,11 @@ public interface ManifestsUnit {
       @Override
       public List<String> dependsOnManifestsUnitIds() {
         return List.copyOf(dependsOnManifestsUnitIds);
+      }
+
+      @Override
+      public InstallPhase installPhase() {
+        return installPhase;
       }
 
       @Override

@@ -35,6 +35,21 @@ public class SystemdService extends SystemdUnit {
     super(scope, id, ensureSuffix(id, ".service"));
   }
 
+  /**
+   * Creates a one-shot installer service with the directives every rke2lab installer shares: {@code
+   * Type=oneshot}, {@code RemainAfterExit=true}, host-share mounts, and journal logging. Callers
+   * add only the phase-specific ordering ({@code Before=}/{@code After=}), condition, exec, and
+   * target wiring.
+   */
+  public static SystemdService oneshotInstaller(Construct scope, String id) {
+    return new SystemdService(scope, id)
+        .type(ServiceType.ONESHOT)
+        .remainAfterExit(true)
+        .requiresMountsFor("/srv/host/systemd-units.d", "/srv/host")
+        .standardOutput(StandardStream.JOURNAL)
+        .standardError(StandardStream.JOURNAL);
+  }
+
   private static String ensureSuffix(String name, String suffix) {
     return name.endsWith(suffix) ? name : name + suffix;
   }
