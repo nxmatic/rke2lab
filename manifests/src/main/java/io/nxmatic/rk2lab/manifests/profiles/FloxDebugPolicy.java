@@ -4,7 +4,7 @@ package io.nxmatic.rk2lab.manifests.profiles;
 /**
  * Synth-scoped debug policy aligned by manifest domain. Carried on {@link
  * io.nxmatic.rk2lab.manifests.ManifestSynthesisRequest} and reachable from any manifest unit via
- * {@link io.nxmatic.rk2lab.manifests.AbstractManifestUnit#floxDebugPolicy()}.
+ * {@link io.nxmatic.rk2lab.manifests.AbstractManifestsUnit#floxDebugPolicy()}.
  *
  * <p>Three independent toggles:
  *

@@ -4,7 +4,7 @@ package io.nxmatic.rk2lab.manifests.profiles;
 /**
  * Typed registry of bootstrap-layer component versions. Surfaced through {@link
  * io.nxmatic.rk2lab.manifests.ManifestSynthesisContext} and reachable by every manifest unit via
- * {@link io.nxmatic.rk2lab.manifests.AbstractManifestUnit#componentVersions()}.
+ * {@link io.nxmatic.rk2lab.manifests.AbstractManifestsUnit#componentVersions()}.
  *
  * <p>Replaces both the kpt-setter {@code ${...-version}} placeholders the deprecated branch carried
  * (and which leaked unsubstituted into the cdk8s-rendered output, see {@code
@@ -38,6 +38,7 @@ public record ComponentVersions(
     String envoyGateway,
     String tailscale,
     String clusterApiOperator,
+    String capiCore,
     String capiIncusProvider,
     String capiRke2Provider,
     String certManager) {
@@ -51,6 +52,7 @@ public record ComponentVersions(
     envoyGateway = blankToEmpty(envoyGateway);
     tailscale = blankToEmpty(tailscale);
     clusterApiOperator = blankToEmpty(clusterApiOperator);
+    capiCore = blankToEmpty(capiCore);
     capiIncusProvider = blankToEmpty(capiIncusProvider);
     capiRke2Provider = blankToEmpty(capiRke2Provider);
     certManager = blankToEmpty(certManager);
@@ -74,6 +76,7 @@ public record ComponentVersions(
    *   <li>{@code fluxOperator}: matches {@code controlplane/flux-operator} releases
    *   <li>{@code envoyGateway} / {@code tailscale}: matched the existing per-component literals
    *   <li>{@code clusterApiOperator}: CAPI operator managing core + providers declaratively
+   *   <li>{@code capiCore}: {@code cluster-api/cluster-api} (CAPI) core provider version
    *   <li>{@code capiIncusProvider}: {@code lxc/cluster-api-provider-incus} (CAPN) version for
    *       provider CR
    *   <li>{@code capiRke2Provider}: {@code rancher/cluster-api-provider-rke2} (CAPRKE2) version for
@@ -92,6 +95,7 @@ public record ComponentVersions(
         .envoyGateway("v1.4.2")
         .tailscale("1.82.0")
         .clusterApiOperator("v0.27.0")
+        .capiCore("v1.9.4")
         .capiIncusProvider("v0.8.6")
         .capiRke2Provider("v0.24.4")
         .certManager("v1.20.2")
@@ -117,6 +121,7 @@ public record ComponentVersions(
         .envoyGateway(envoyGateway)
         .tailscale(tailscale)
         .clusterApiOperator(clusterApiOperator)
+        .capiCore(capiCore)
         .capiIncusProvider(capiIncusProvider)
         .capiRke2Provider(capiRke2Provider)
         .certManager(certManager);
@@ -135,6 +140,7 @@ public record ComponentVersions(
     private String envoyGateway = "";
     private String tailscale = "";
     private String clusterApiOperator = "";
+    private String capiCore = "";
     private String capiIncusProvider = "";
     private String capiRke2Provider = "";
     private String certManager = "";
@@ -181,6 +187,11 @@ public record ComponentVersions(
       return this;
     }
 
+    public Builder capiCore(final String v) {
+      this.capiCore = v;
+      return this;
+    }
+
     public Builder capiIncusProvider(final String v) {
       this.capiIncusProvider = v;
       return this;
@@ -210,6 +221,7 @@ public record ComponentVersions(
       if (!other.envoyGateway.isEmpty()) envoyGateway = other.envoyGateway;
       if (!other.tailscale.isEmpty()) tailscale = other.tailscale;
       if (!other.clusterApiOperator.isEmpty()) clusterApiOperator = other.clusterApiOperator;
+      if (!other.capiCore.isEmpty()) capiCore = other.capiCore;
       if (!other.capiIncusProvider.isEmpty()) capiIncusProvider = other.capiIncusProvider;
       if (!other.capiRke2Provider.isEmpty()) capiRke2Provider = other.capiRke2Provider;
       if (!other.certManager.isEmpty()) certManager = other.certManager;
@@ -226,6 +238,7 @@ public record ComponentVersions(
           envoyGateway,
           tailscale,
           clusterApiOperator,
+          capiCore,
           capiIncusProvider,
           capiRke2Provider,
           certManager);

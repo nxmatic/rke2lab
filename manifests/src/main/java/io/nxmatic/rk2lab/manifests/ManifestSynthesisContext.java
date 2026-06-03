@@ -11,7 +11,7 @@ import java.util.Objects;
 /**
  * Synthesis-scoped context exposing per-synth policies and identity data to layer code. The
  * synthesizer publishes the context for the duration of {@code synthesize(...)} and resets it on
- * exit; layers reach it through {@link AbstractManifestUnit} accessors without keeping a static
+ * exit; layers reach it through {@link AbstractManifestsUnit} accessors without keeping a static
  * dependency on a process-wide singleton.
  *
  * <p>The context composes orthogonal slices — each slice is its own record so adding fields to one

@@ -15,7 +15,7 @@ public final class NetworkingDependencyIntents {
     this.requiresCiliumConfigIntent = builder.requiresCiliumConfigIntent;
     this.profile =
         new LayerDependencyIntentProfile(
-            Map.of(this.requiresCiliumConfigIntent, List.of(builder.ciliumConfigManifestUnitId)));
+            Map.of(this.requiresCiliumConfigIntent, List.of(builder.ciliumConfigManifestsUnitId)));
   }
 
   public static Builder builder() {
@@ -32,7 +32,7 @@ public final class NetworkingDependencyIntents {
 
   public static final class Builder {
     private String requiresCiliumConfigIntent = "networking:requires-cilium-config";
-    private String ciliumConfigManifestUnitId = "networking/cilium-config";
+    private String ciliumConfigManifestsUnitId = "networking/cilium-config";
 
     private Builder() {}
 
@@ -41,8 +41,8 @@ public final class NetworkingDependencyIntents {
       return this;
     }
 
-    public Builder ciliumConfigManifestUnitId(String ciliumConfigManifestUnitId) {
-      this.ciliumConfigManifestUnitId = ciliumConfigManifestUnitId;
+    public Builder ciliumConfigManifestsUnitId(String ciliumConfigManifestsUnitId) {
+      this.ciliumConfigManifestsUnitId = ciliumConfigManifestsUnitId;
       return this;
     }
 

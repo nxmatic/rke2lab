@@ -13,7 +13,7 @@ package io.nxmatic.rk2lab.manifests;
  *     LDR[LayerDomainRegistrar]
  *     MDP[ManifestDomainPolicy]
  *     LD[LayerDomain]
- *     MU[ManifestUnit List]
+ *     MU[ManifestsUnit List]
  *
  *     LDRB -->|register registrar, policy| LDR
  *     LDR -->|queries| MDP
@@ -34,7 +34,7 @@ package io.nxmatic.rk2lab.manifests;
  * public class SimpleDomainRegistrar implements LayerDomainRegistrar {
  *   @Override
  *   public LayerDomain domain() {
- *     return new LayerDomain("simple", List.of(new SomeManifestUnit()));
+ *     return new LayerDomain("simple", List.of(new SomeManifestsUnit()));
  *   }
  * }
  * }</pre>
@@ -48,10 +48,10 @@ package io.nxmatic.rk2lab.manifests;
  *
  *   @Override
  *   public LayerDomain domain(ManifestDomainPolicy policy) {
- *     List<ManifestUnit> units = new ArrayList<>();
- *     units.add(new FluxInstanceManifestUnit());
+ *     List<ManifestsUnit> units = new ArrayList<>();
+ *     units.add(new FluxInstanceManifestsUnit());
  *     if (policy.isEnabled(CATALOG.clusterApi())) {
- *       units.add(new ClusterApiManifestUnit());
+ *       units.add(new ClusterApiManifestsUnit());
  *     }
  *     return new LayerDomain(CATALOG.gitops(), List.of(CATALOG.platform()), units);
  *   }

@@ -26,8 +26,8 @@ public final class DomainReferenceRegistry {
     return domainId;
   }
 
-  public ManifestUnitReferenceRegistry manifestUnitRegistry(final String manifestUnitId) {
-    return new ManifestUnitReferenceRegistry(this, manifestUnitId);
+  public ManifestsUnitReferenceRegistry manifestUnitRegistry(final String manifestUnitId) {
+    return new ManifestsUnitReferenceRegistry(this, manifestUnitId);
   }
 
   public Optional<ApiObject> resolve(final ApiObjectRef ref) {

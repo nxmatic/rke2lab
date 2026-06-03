@@ -4,7 +4,7 @@ package io.nxmatic.rk2lab.manifests.profiles;
 /**
  * Stage A → Stage B image-identity slice published to synth-time layers via {@link
  * io.nxmatic.rk2lab.manifests.ManifestSynthesisContext}. Backs the {@code <cluster>-image-state}
- * ConfigMap (see {@code ImageStateConfigMapManifestUnit}) that hands the control-node image's
+ * ConfigMap (see {@code ImageStateConfigMapManifestsUnit}) that hands the control-node image's
  * identity to the in-cluster Cluster API / CAPN provider, which has no access to Stage A's Pulumi
  * outputs and can only read Kubernetes objects.
  *

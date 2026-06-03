@@ -5,7 +5,7 @@ import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import java.util.List;
 
 /**
- * A manifest domain groups related ManifestUnits and optionally synthesizes systemd support units.
+ * A manifest domain groups related ManifestsUnits and optionally synthesizes systemd support units.
  *
  * <p>Domains correspond to installer services (e.g., "cluster-api" →
  * rke2lab-cluster-api-manifests.service).
@@ -13,10 +13,10 @@ import java.util.List;
 public class LayerDomain {
   private final String domainId;
   private final List<String> dependsOnDomainIds;
-  private final List<? extends ManifestUnit> layers;
+  private final List<? extends ManifestsUnit> layers;
 
   public LayerDomain(
-      String domainId, List<String> dependsOnDomainIds, List<? extends ManifestUnit> layers) {
+      String domainId, List<String> dependsOnDomainIds, List<? extends ManifestsUnit> layers) {
     if (domainId == null || domainId.isBlank()) {
       throw new IllegalArgumentException("Domain id must not be blank");
     }
@@ -31,7 +31,7 @@ public class LayerDomain {
     this.layers = List.copyOf(layers);
   }
 
-  public LayerDomain(String domainId, List<? extends ManifestUnit> layers) {
+  public LayerDomain(String domainId, List<? extends ManifestsUnit> layers) {
     this(domainId, List.of(), layers);
   }
 
@@ -43,15 +43,15 @@ public class LayerDomain {
     return dependsOnDomainIds;
   }
 
-  public List<? extends ManifestUnit> layers() {
+  public List<? extends ManifestsUnit> layers() {
     return layers;
   }
 
   /**
    * Synthesizes systemd units for this domain.
    *
-   * <p>Default implementation delegates to each ManifestUnit's {@link
-   * ManifestUnit#synthesizeSystemdUnits}. Domains can also emit their own installer service that
+   * <p>Default implementation delegates to each ManifestsUnit's {@link
+   * ManifestsUnit#synthesizeSystemdUnits}. Domains can also emit their own installer service that
    * installs all manifests in this domain.
    *
    * @param systemdChart the systemd chart to populate
@@ -59,7 +59,7 @@ public class LayerDomain {
    */
   public void synthesizeSystemdUnits(SystemdChart systemdChart, SystemdSynthesisContext context) {
     // Delegate to each manifest unit
-    for (ManifestUnit unit : layers) {
+    for (ManifestsUnit unit : layers) {
       unit.synthesizeSystemdUnits(systemdChart, context);
     }
   }

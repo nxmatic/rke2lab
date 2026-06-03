@@ -83,16 +83,16 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     final LayerDomainRegistry domainRegistry =
         applyManifestDomainPolicy(request, configuredDomainRegistry);
 
-    final List<ManifestUnit> manifestUnits =
+    final List<ManifestsUnit> manifestUnits =
         domainRegistry.manifestUnits().stream()
-            .sorted(Comparator.comparing(ManifestUnit::manifestUnitId))
+            .sorted(Comparator.comparing(ManifestsUnit::manifestUnitId))
             .toList();
 
     final ManifestAssemblyRegistry assemblyRegistry = new ManifestAssemblyRegistry();
-    final ManifestUnitRegistry manifestUnitRegistry = new ManifestUnitRegistry(manifestUnits);
-    final ManifestUnitVisitor manifestUnitVisitor = new ApplyingManifestUnitVisitor();
-    final ManifestUnitDependencyApplier dependencyApplier =
-        new ManifestUnitDependencyApplier(
+    final ManifestsUnitRegistry manifestUnitRegistry = new ManifestsUnitRegistry(manifestUnits);
+    final ManifestsUnitVisitor manifestUnitVisitor = new ApplyingManifestsUnitVisitor();
+    final ManifestsUnitDependencyApplier dependencyApplier =
+        new ManifestsUnitDependencyApplier(
             domainRegistry, manifestUnitRegistry, manifestUnitVisitor, chart, assemblyRegistry);
 
     LOG.info("Configured {} manifest domains", domainRegistry.domains().size());
@@ -101,10 +101,10 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         domainRegistry.domains().stream().map(domain -> domain.domainId()).sorted().toList());
 
     int manifestUnitHitCount = 0;
-    for (ManifestUnit manifestUnit : manifestUnits) {
+    for (ManifestsUnit manifestUnit : manifestUnits) {
       manifestUnitHitCount++;
       LOG.debug("Applying manifest unit '{}'", manifestUnit.manifestUnitId());
-      domainRegistry.applyManifestUnitWithDomainDependencies(
+      domainRegistry.applyManifestsUnitWithDomainDependencies(
           manifestUnit.manifestUnitId(), dependencyApplier);
     }
 

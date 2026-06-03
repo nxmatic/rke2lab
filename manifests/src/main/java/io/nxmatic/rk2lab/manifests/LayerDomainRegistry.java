@@ -11,8 +11,8 @@ import java.util.Set;
 public final class LayerDomainRegistry {
 
   private final Map<String, LayerDomain> domainsById;
-  private final List<ManifestUnit> manifestUnits;
-  private final Map<String, String> domainIdByManifestUnitId;
+  private final List<ManifestsUnit> manifestUnits;
+  private final Map<String, String> domainIdByManifestsUnitId;
 
   public LayerDomainRegistry(final List<LayerDomain> domains) {
     if (domains == null || domains.isEmpty()) {
@@ -30,35 +30,35 @@ public final class LayerDomainRegistry {
     this.manifestUnits =
         byId.values().stream()
             .flatMap(domain -> domain.layers().stream())
-            .map(layer -> (ManifestUnit) layer)
+            .map(layer -> (ManifestsUnit) layer)
             .toList();
 
-    HashMap<String, String> byManifestUnitId = new HashMap<>();
+    HashMap<String, String> byManifestsUnitId = new HashMap<>();
     for (LayerDomain domain : byId.values()) {
-      for (ManifestUnit manifestUnit : domain.layers()) {
-        String previous = byManifestUnitId.put(manifestUnit.manifestUnitId(), domain.domainId());
+      for (ManifestsUnit manifestUnit : domain.layers()) {
+        String previous = byManifestsUnitId.put(manifestUnit.manifestUnitId(), domain.domainId());
         if (previous != null) {
           throw new IllegalStateException(
               "Manifest unit is assigned to multiple domains: " + manifestUnit.manifestUnitId());
         }
       }
     }
-    this.domainIdByManifestUnitId = Map.copyOf(byManifestUnitId);
+    this.domainIdByManifestsUnitId = Map.copyOf(byManifestsUnitId);
 
     validateDomainDependencies();
-    validateManifestUnitDependencies();
+    validateManifestsUnitDependencies();
   }
 
   public List<LayerDomain> domains() {
     return List.copyOf(domainsById.values());
   }
 
-  public List<ManifestUnit> manifestUnits() {
+  public List<ManifestsUnit> manifestUnits() {
     return manifestUnits;
   }
 
-  public String requireDomainIdForManifestUnit(final String manifestUnitId) {
-    final String domainId = domainIdByManifestUnitId.get(manifestUnitId);
+  public String requireDomainIdForManifestsUnit(final String manifestUnitId) {
+    final String domainId = domainIdByManifestsUnitId.get(manifestUnitId);
     if (domainId == null) {
       throw new IllegalStateException(
           "Unable to resolve domain for manifest unit: " + manifestUnitId);
@@ -66,15 +66,15 @@ public final class LayerDomainRegistry {
     return domainId;
   }
 
-  public void applyManifestUnitWithDomainDependencies(
+  public void applyManifestsUnitWithDomainDependencies(
       final String manifestUnitId,
-      final ManifestUnitDependencyApplier manifestUnitDependencyApplier) {
-    String domainId = requireDomainIdForManifestUnit(manifestUnitId);
+      final ManifestsUnitDependencyApplier manifestUnitDependencyApplier) {
+    String domainId = requireDomainIdForManifestsUnit(manifestUnitId);
 
     applyDomainWithDependencies(
         domainId, manifestUnitDependencyApplier, new HashSet<>(), new HashSet<>());
 
-    manifestUnitDependencyApplier.applyManifestUnitWithDependencies(manifestUnitId);
+    manifestUnitDependencyApplier.applyManifestsUnitWithDependencies(manifestUnitId);
   }
 
   private void validateDomainDependencies() {
@@ -91,18 +91,18 @@ public final class LayerDomainRegistry {
     }
   }
 
-  private void validateManifestUnitDependencies() {
-    for (ManifestUnit manifestUnit : manifestUnits) {
+  private void validateManifestsUnitDependencies() {
+    for (ManifestsUnit manifestUnit : manifestUnits) {
       final String manifestUnitId = manifestUnit.manifestUnitId();
-      final String manifestUnitDomainId = requireDomainIdForManifestUnit(manifestUnitId);
-      for (String dependencyManifestUnitId : manifestUnit.dependsOnManifestUnitIds()) {
-        final String dependencyDomainId = domainIdByManifestUnitId.get(dependencyManifestUnitId);
+      final String manifestUnitDomainId = requireDomainIdForManifestsUnit(manifestUnitId);
+      for (String dependencyManifestsUnitId : manifestUnit.dependsOnManifestsUnitIds()) {
+        final String dependencyDomainId = domainIdByManifestsUnitId.get(dependencyManifestsUnitId);
         if (dependencyDomainId == null) {
           throw new IllegalStateException(
               "Manifest unit dependency references unknown unit: "
                   + manifestUnitId
                   + " -> "
-                  + dependencyManifestUnitId);
+                  + dependencyManifestsUnitId);
         }
         if (!manifestUnitDomainId.equals(dependencyDomainId)
             && !dependsOnDomainTransitively(manifestUnitDomainId, dependencyDomainId)) {
@@ -110,7 +110,7 @@ public final class LayerDomainRegistry {
               "Manifest unit dependency crosses domains without a matching domain dependency: "
                   + manifestUnitId
                   + " -> "
-                  + dependencyManifestUnitId
+                  + dependencyManifestsUnitId
                   + " ("
                   + manifestUnitDomainId
                   + " -> "
@@ -120,11 +120,11 @@ public final class LayerDomainRegistry {
       }
     }
 
-    final Set<String> visitingManifestUnitIds = new HashSet<>();
-    final Set<String> visitedManifestUnitIds = new HashSet<>();
-    for (ManifestUnit manifestUnit : manifestUnits) {
-      validateManifestUnitAcyclic(
-          manifestUnit.manifestUnitId(), visitingManifestUnitIds, visitedManifestUnitIds);
+    final Set<String> visitingManifestsUnitIds = new HashSet<>();
+    final Set<String> visitedManifestsUnitIds = new HashSet<>();
+    for (ManifestsUnit manifestUnit : manifestUnits) {
+      validateManifestsUnitAcyclic(
+          manifestUnit.manifestUnitId(), visitingManifestsUnitIds, visitedManifestsUnitIds);
     }
   }
 
@@ -154,19 +154,19 @@ public final class LayerDomainRegistry {
     return false;
   }
 
-  private void validateManifestUnitAcyclic(
+  private void validateManifestsUnitAcyclic(
       final String manifestUnitId,
-      final Set<String> visitingManifestUnitIds,
-      final Set<String> visitedManifestUnitIds) {
-    if (visitedManifestUnitIds.contains(manifestUnitId)) {
+      final Set<String> visitingManifestsUnitIds,
+      final Set<String> visitedManifestsUnitIds) {
+    if (visitedManifestsUnitIds.contains(manifestUnitId)) {
       return;
     }
-    if (!visitingManifestUnitIds.add(manifestUnitId)) {
+    if (!visitingManifestsUnitIds.add(manifestUnitId)) {
       throw new IllegalStateException(
           "Cyclic manifest unit dependency detected at: " + manifestUnitId);
     }
 
-    final ManifestUnit manifestUnit =
+    final ManifestsUnit manifestUnit =
         manifestUnits.stream()
             .filter(candidate -> candidate.manifestUnitId().equals(manifestUnitId))
             .findFirst()
@@ -175,18 +175,18 @@ public final class LayerDomainRegistry {
                     new IllegalStateException(
                         "Manifest unit dependency references unknown unit: " + manifestUnitId));
 
-    for (String dependencyManifestUnitId : manifestUnit.dependsOnManifestUnitIds()) {
-      validateManifestUnitAcyclic(
-          dependencyManifestUnitId, visitingManifestUnitIds, visitedManifestUnitIds);
+    for (String dependencyManifestsUnitId : manifestUnit.dependsOnManifestsUnitIds()) {
+      validateManifestsUnitAcyclic(
+          dependencyManifestsUnitId, visitingManifestsUnitIds, visitedManifestsUnitIds);
     }
 
-    visitingManifestUnitIds.remove(manifestUnitId);
-    visitedManifestUnitIds.add(manifestUnitId);
+    visitingManifestsUnitIds.remove(manifestUnitId);
+    visitedManifestsUnitIds.add(manifestUnitId);
   }
 
   private void applyDomainWithDependencies(
       final String domainId,
-      final ManifestUnitDependencyApplier manifestUnitDependencyApplier,
+      final ManifestsUnitDependencyApplier manifestUnitDependencyApplier,
       final Set<String> visitingDomainIds,
       final Set<String> appliedDomainIds) {
     if (appliedDomainIds.contains(domainId)) {
@@ -207,8 +207,8 @@ public final class LayerDomainRegistry {
           dependencyDomainId, manifestUnitDependencyApplier, visitingDomainIds, appliedDomainIds);
     }
 
-    for (ManifestUnit manifestUnit : domain.layers()) {
-      manifestUnitDependencyApplier.applyManifestUnitWithDependencies(
+    for (ManifestsUnit manifestUnit : domain.layers()) {
+      manifestUnitDependencyApplier.applyManifestsUnitWithDependencies(
           manifestUnit.manifestUnitId());
     }
 
