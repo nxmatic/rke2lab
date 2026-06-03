@@ -68,6 +68,11 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>cdk8s-systemd</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
