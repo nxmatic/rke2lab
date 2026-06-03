@@ -15,7 +15,6 @@ import io.nxmatic.rke2lab.manifests.domain.NetworkingDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.PlatformDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.RuntimeDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.StorageDomainRegistrar;
-import io.nxmatic.rke2lab.manifests.registry.ManifestAssemblyRegistry;
 import io.nxmatic.rke2lab.manifests.systemd.BootstrapInfrastructureSynthesizer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -199,7 +198,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                   .sorted(Comparator.comparing(ManifestsUnit::manifestUnitId))
                   .toList();
 
-          final ManifestAssemblyRegistry assemblyRegistry = new ManifestAssemblyRegistry();
+          final Cdk8sApiObjectResolver resolver = new Cdk8sApiObjectResolver(state.chart);
           final ManifestsUnitRegistry manifestUnitRegistry =
               new ManifestsUnitRegistry(manifestUnits);
           final ManifestsUnitVisitor manifestUnitVisitor = new ApplyingManifestsUnitVisitor();
@@ -209,7 +208,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                   manifestUnitRegistry,
                   manifestUnitVisitor,
                   state.chart,
-                  assemblyRegistry);
+                  resolver);
 
           LOG.info("Configured {} manifest domains", state.domainRegistry.domains().size());
           LOG.debug(

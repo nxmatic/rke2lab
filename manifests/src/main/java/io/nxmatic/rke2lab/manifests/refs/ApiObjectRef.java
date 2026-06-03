@@ -1,14 +1,21 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests.refs;
 
-/** Marker interface for stable references that can index realized cdk8s ApiObjects. */
+/**
+ * Stable reference to a realized cdk8s ApiObject, addressed by its Kubernetes coordinates.
+ *
+ * <p>A ref is the single source of truth for an object's identity: the producing unit creates the
+ * ApiObject under these coordinates and consumers resolve it from the cdk8s tree via {@code
+ * Cdk8sApiObjectResolver}.
+ */
 public interface ApiObjectRef {
 
   String referenceId();
 
-  ApiObjectRefLifecycle lifecycle();
+  String kind();
 
-  default boolean isRegistryOwned() {
-    return lifecycle() == ApiObjectRefLifecycle.SYNTHESIZED;
-  }
+  String name();
+
+  /** Namespace for namespaced resources; {@code null} for cluster-scoped resources. */
+  String namespace();
 }

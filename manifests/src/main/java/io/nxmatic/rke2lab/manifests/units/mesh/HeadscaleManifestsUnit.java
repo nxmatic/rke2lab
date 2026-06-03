@@ -36,7 +36,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final String floxImage = ManifestSynthesisContext.current().floxDebugPolicy().prodImage();
 
-    ApiObject namespace = context.registry().require(MeshRefs.MESH_SYSTEM_NAMESPACE);
+    ApiObject namespace = context.resolver().require(MeshRefs.MESH_SYSTEM_NAMESPACE);
 
     ApiObject saClient = createServiceAccount(scope, "headscale-client", namespace);
     ApiObject saBootstrap = createServiceAccount(scope, "headscale-bootstrap", namespace);
@@ -50,11 +50,18 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
 
     ApiObject cmFloxEnv = createConfigMapFloxEnv(scope, namespace);
     ApiObject cmHeadscaleConfig = createConfigMapHeadscaleConfig(scope, namespace);
-    context.registry().publish(MeshRefs.HEADSCALE_CONFIG_CONFIGMAP, cmHeadscaleConfig);
 
     ApiObject cmConfigInitScript = createConfigMapConfigInitScript(scope, namespace);
     ApiObject cmHeadscaleEnv = createConfigMapHeadscaleEnv(scope, namespace);
-    context.registry().publish(MeshRefs.HEADSCALE_ENV_CONFIGMAP, cmHeadscaleEnv);
+
+    // The bootstrap job creates the real client-auth Secret at runtime (with the
+    // preauth key extracted from headscale). We pre-create an empty placeholder
+    // carrying config.kubernetes.io/local-config so the resolver can address it
+    // during synthesis without it ever being applied to the cluster — the install
+    // script skips local-config manifests, so the runtime `kubectl create secret`
+    // remains the sole creator and the client's `kubectl wait --for=create` barrier
+    // still fires only on the real Secret.
+    createClientAuthSecretPlaceholder(scope, namespace);
 
     ApiObject cmBootstrapScript = createConfigMapBootstrapScript(scope, namespace);
     ApiObject cmClientScripts = createConfigMapClientScripts(scope, namespace);
@@ -128,6 +135,31 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                 .build());
     serviceAccount.addDependency(namespace);
     return serviceAccount;
+  }
+
+  private ApiObject createClientAuthSecretPlaceholder(
+      final Construct scope, final ApiObject namespace) {
+    ApiObject secret =
+        new ApiObject(
+            scope,
+            "secret-" + MeshRefs.HEADSCALE_CLIENT_AUTH_SECRET.name(),
+            ApiObjectProps.builder()
+                .apiVersion("v1")
+                .kind("Secret")
+                .metadata(
+                    ApiObjectMetadata.builder()
+                        .name(MeshRefs.HEADSCALE_CLIENT_AUTH_SECRET.name())
+                        .namespace(HEADSCALE_NAMESPACE)
+                        .annotations(
+                            packageProfile.packageAnnotations(
+                                "|Secret|${headscale-namespace}|"
+                                    + MeshRefs.HEADSCALE_CLIENT_AUTH_SECRET.name(),
+                                Map.of("config.kubernetes.io/local-config", "true")))
+                        .build())
+                .build());
+    secret.addJsonPatch(JsonPatch.add("/type", "Opaque"), JsonPatch.add("/data", Map.of()));
+    secret.addDependency(namespace);
+    return secret;
   }
 
   private ApiObject createClusterRoleClient(final Construct scope) {

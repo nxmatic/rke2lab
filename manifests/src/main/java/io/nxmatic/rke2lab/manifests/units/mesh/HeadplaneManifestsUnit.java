@@ -8,7 +8,6 @@ import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.manifests.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.profiles.FloxShellSidecarProfile;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
-import io.nxmatic.rke2lab.manifests.registry.ManifestsUnitReferenceRegistry;
 import io.nxmatic.rke2lab.manifests.units.runtime.RuntimeRefs;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -29,24 +28,12 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
   private final PackageMetadataProfile packageProfile =
       new PackageMetadataProfile("mesh", "headplane");
 
-  private final ManifestsUnitReferenceRegistry registry;
-
   public HeadplaneManifestsUnit() {
     super(
         MANIFEST_UNIT_ID,
         List.of(
             MeshSystemNamespaceManifestsUnit.MANIFEST_UNIT_ID,
             HeadscaleManifestsUnit.MANIFEST_UNIT_ID));
-    this.registry = null;
-  }
-
-  private HeadplaneManifestsUnit(final ManifestsUnitReferenceRegistry registry) {
-    super(
-        MANIFEST_UNIT_ID,
-        List.of(
-            MeshSystemNamespaceManifestsUnit.MANIFEST_UNIT_ID,
-            HeadscaleManifestsUnit.MANIFEST_UNIT_ID));
-    this.registry = registry;
   }
 
   @Override
@@ -143,10 +130,6 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
                 HEADSCALE_NAMESPACE,
                 "HEADSCALE_SERVICE_URL",
                 "http://headscale." + HEADSCALE_NAMESPACE + ".svc.cluster.local:8080")));
-
-    if (registry != null) {
-      registry.publish(MeshRefs.HEADPLANE_ENV_CONFIGMAP, configMap);
-    }
 
     return configMap;
   }
@@ -264,10 +247,6 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
     secret.addJsonPatch(
         JsonPatch.add("/stringData", Map.of("cookie_secret", "0123456789abcdef0123456789abcdef")),
         JsonPatch.add("/type", "Opaque"));
-
-    if (registry != null) {
-      registry.publish(MeshRefs.HEADPLANE_SECRETS_SECRET, secret);
-    }
 
     return secret;
   }
@@ -671,9 +650,6 @@ public final class HeadplaneManifestsUnit extends AbstractManifestsUnit {
     deployment.addDependency(pvc);
     deployment.addDependency(roleBinding);
     deployment.addDependency(syncJob);
-    if (registry != null) {
-      deployment.addDependency(registry.require(MeshRefs.HEADSCALE_CONFIG_CONFIGMAP));
-    }
 
     final FloxDebugPolicy debugPolicy = ManifestSynthesisContext.current().floxDebugPolicy();
     final FloxShellSidecarProfile shellSidecar =

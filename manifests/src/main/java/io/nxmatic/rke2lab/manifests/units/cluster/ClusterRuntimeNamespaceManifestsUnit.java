@@ -28,24 +28,20 @@ public final class ClusterRuntimeNamespaceManifestsUnit extends AbstractManifest
 
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
-    ApiObject namespace =
-        new ApiObject(
-            scope,
-            "namespace-" + ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name(),
-            ApiObjectProps.builder()
-                .apiVersion("v1")
-                .kind("Namespace")
-                .metadata(
-                    ApiObjectMetadata.builder()
-                        .name(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name())
-                        .annotations(
-                            packageProfile.packageAnnotations(
-                                "|Namespace|default|"
-                                    + ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name()))
-                        .labels(Map.of("rke2lab.nxmatic.io/shared-namespace", "true"))
-                        .build())
-                .build());
-
-    context.registry().publish(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE, namespace);
+    new ApiObject(
+        scope,
+        "namespace-" + ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name(),
+        ApiObjectProps.builder()
+            .apiVersion("v1")
+            .kind("Namespace")
+            .metadata(
+                ApiObjectMetadata.builder()
+                    .name(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name())
+                    .annotations(
+                        packageProfile.packageAnnotations(
+                            "|Namespace|default|" + ClusterRefs.RUNTIME_SYSTEM_NAMESPACE.name()))
+                    .labels(Map.of("rke2lab.nxmatic.io/shared-namespace", "true"))
+                    .build())
+            .build());
   }
 }

@@ -36,11 +36,6 @@ public final class RuntimeDaemonsetScriptPolicyManifestsUnit extends AbstractMan
 
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
-    createScriptPolicyConfigMap(scope, context);
-  }
-
-  private void createScriptPolicyConfigMap(
-      final Construct scope, final ManifestsUnitContext context) {
     ApiObject configMap =
         new ApiObject(
             scope,
@@ -59,7 +54,5 @@ public final class RuntimeDaemonsetScriptPolicyManifestsUnit extends AbstractMan
 
     configMap.addJsonPatch(
         JsonPatch.add("/data", runtimeDaemonsetScriptPolicyAssets.configMapData()));
-
-    context.registry().publish(RuntimeRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP, configMap);
   }
 }

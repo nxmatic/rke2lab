@@ -2,11 +2,11 @@
 package io.nxmatic.rke2lab.manifests.units.runtime.flox;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
+import io.nxmatic.rke2lab.manifests.Cdk8sApiObjectResolver;
 import io.nxmatic.rke2lab.manifests.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.nxmatic.rke2lab.manifests.registry.ManifestsUnitReferenceRegistry;
 import io.nxmatic.rke2lab.manifests.units.cluster.ClusterRefs;
 import io.nxmatic.rke2lab.manifests.units.cluster.ClusterRuntimeNamespaceManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.mesh.MeshRefs;
@@ -71,18 +71,18 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
     // /var/run/k8s-daemonset.d/runtime/flox/ where nix build and flox
     // activate write locks (overlayfs lower=NFS isn't supported, so the
     // workspace must live on local fs).
-    ApiObject envConfigMap = createFloxEnvConfigMap(scope, context.registry());
-    ApiObject dynamicPluginConfigMap = createDynamicPluginConfigMap(scope, context.registry());
-    ApiObject serviceAccount = createServiceAccount(scope, context.registry());
+    ApiObject envConfigMap = createFloxEnvConfigMap(scope, context.resolver());
+    ApiObject dynamicPluginConfigMap = createDynamicPluginConfigMap(scope, context.resolver());
+    ApiObject serviceAccount = createServiceAccount(scope, context.resolver());
     createInstallerDaemonSet(
-        scope, context.registry(), envConfigMap, dynamicPluginConfigMap, serviceAccount);
+        scope, context.resolver(), envConfigMap, dynamicPluginConfigMap, serviceAccount);
   }
 
   // RuntimeClass removed: NRI plugin approach doesn't need custom runtime handlers
   // The NRI plugin intercepts container creation based on flox.dev/environment Pod annotation
 
   private ApiObject createFloxEnvConfigMap(
-      final Construct scope, final ManifestsUnitReferenceRegistry registry) {
+      final Construct scope, final Cdk8sApiObjectResolver resolver) {
     ApiObject configMap =
         new ApiObject(
             scope,
@@ -105,10 +105,7 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
                         .build())
                 .build());
 
-    if (registry != null) {
-      configMap.addDependency(registry.require(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE));
-      registry.publish(RuntimeRefs.FLOX_ENV_CONFIGMAP, configMap);
-    }
+    configMap.addDependency(resolver.require(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE));
 
     configMap.addJsonPatch(
         JsonPatch.add(
@@ -124,7 +121,7 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
   }
 
   private ApiObject createDynamicPluginConfigMap(
-      final Construct scope, final ManifestsUnitReferenceRegistry registry) {
+      final Construct scope, final Cdk8sApiObjectResolver resolver) {
     // Dynamic hot-reload ConfigMap for NRI plugin updates.
     // Initially empty; populated at runtime via kubectl apply by the dev tool.
     // Expected keys when populated:
@@ -146,16 +143,14 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
                         .build())
                 .build());
 
-    if (registry != null) {
-      configMap.addDependency(registry.require(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE));
-    }
+    configMap.addDependency(resolver.require(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE));
 
     configMap.addJsonPatch(JsonPatch.add("/data", Map.of()));
     return configMap;
   }
 
   private ApiObject createServiceAccount(
-      final Construct scope, final ManifestsUnitReferenceRegistry registry) {
+      final Construct scope, final Cdk8sApiObjectResolver resolver) {
     ApiObject serviceAccount =
         new ApiObject(
             scope,
@@ -171,15 +166,13 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
                             manifestAnnotations.packageAnnotations(DOMAIN_NAME, PACKAGE_NAME))
                         .build())
                 .build());
-    if (registry != null) {
-      serviceAccount.addDependency(registry.require(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE));
-    }
+    serviceAccount.addDependency(resolver.require(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE));
     return serviceAccount;
   }
 
   private void createInstallerDaemonSet(
       final Construct scope,
-      final ManifestsUnitReferenceRegistry registry,
+      final Cdk8sApiObjectResolver resolver,
       final ApiObject envConfigMap,
       final ApiObject dynamicPluginConfigMap,
       final ApiObject serviceAccount) {
@@ -205,10 +198,8 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
                         .build())
                 .build());
 
-    if (registry != null) {
-      daemonSet.addDependency(registry.require(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE));
-      daemonSet.addDependency(registry.require(RuntimeRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP));
-    }
+    daemonSet.addDependency(resolver.require(ClusterRefs.RUNTIME_SYSTEM_NAMESPACE));
+    daemonSet.addDependency(resolver.require(RuntimeRefs.DAEMONSET_SCRIPT_POLICY_CONFIGMAP));
     daemonSet.addDependency(envConfigMap);
     daemonSet.addDependency(dynamicPluginConfigMap);
     daemonSet.addDependency(serviceAccount);

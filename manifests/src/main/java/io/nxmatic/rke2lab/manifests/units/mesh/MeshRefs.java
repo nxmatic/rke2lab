@@ -1,7 +1,6 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests.units.mesh;
 
-import io.nxmatic.rke2lab.manifests.refs.ApiObjectRefLifecycle;
 import io.nxmatic.rke2lab.manifests.refs.ConfigMapRef;
 import io.nxmatic.rke2lab.manifests.refs.NamespaceRef;
 import io.nxmatic.rke2lab.manifests.refs.SecretRef;
@@ -25,10 +24,7 @@ public final class MeshRefs {
 
   public static final SecretRef HEADSCALE_CLIENT_AUTH_SECRET =
       SecretRef.of(
-          "mesh/headscale-client-auth-secret",
-          MESH_SYSTEM_NAMESPACE,
-          "headscale-client-auth",
-          ApiObjectRefLifecycle.RUNTIME_CREATED);
+          "mesh/headscale-client-auth-secret", MESH_SYSTEM_NAMESPACE, "headscale-client-auth");
 
   public static final SecretRef HEADPLANE_SECRETS_SECRET =
       SecretRef.of("mesh/headplane-secrets-secret", MESH_SYSTEM_NAMESPACE, "headplane-secrets");

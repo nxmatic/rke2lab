@@ -24,23 +24,20 @@ public final class MeshSystemNamespaceManifestsUnit extends AbstractManifestsUni
 
   @Override
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
-    ApiObject namespace =
-        new ApiObject(
-            scope,
-            "namespace-" + MeshRefs.MESH_SYSTEM_NAMESPACE.name(),
-            ApiObjectProps.builder()
-                .apiVersion("v1")
-                .kind("Namespace")
-                .metadata(
-                    ApiObjectMetadata.builder()
-                        .name(MeshRefs.MESH_SYSTEM_NAMESPACE.name())
-                        .annotations(
-                            packageProfile.packageAnnotations(
-                                "|Namespace|default|" + MeshRefs.MESH_SYSTEM_NAMESPACE.name()))
-                        .labels(Map.of("rke2lab.nxmatic.io/shared-namespace", "true"))
-                        .build())
-                .build());
-
-    context.registry().publish(MeshRefs.MESH_SYSTEM_NAMESPACE, namespace);
+    new ApiObject(
+        scope,
+        "namespace-" + MeshRefs.MESH_SYSTEM_NAMESPACE.name(),
+        ApiObjectProps.builder()
+            .apiVersion("v1")
+            .kind("Namespace")
+            .metadata(
+                ApiObjectMetadata.builder()
+                    .name(MeshRefs.MESH_SYSTEM_NAMESPACE.name())
+                    .annotations(
+                        packageProfile.packageAnnotations(
+                            "|Namespace|default|" + MeshRefs.MESH_SYSTEM_NAMESPACE.name()))
+                    .labels(Map.of("rke2lab.nxmatic.io/shared-namespace", "true"))
+                    .build())
+            .build());
   }
 }

@@ -1,7 +1,6 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests;
 
-import io.nxmatic.rke2lab.manifests.registry.ManifestAssemblyRegistry;
 import java.util.HashSet;
 import java.util.Set;
 import org.cdk8s.Chart;
@@ -12,7 +11,7 @@ public final class ManifestsUnitDependencyApplier {
   private final ManifestsUnitRegistry manifestUnitRegistry;
   private final ManifestsUnitVisitor manifestUnitVisitor;
   private final Chart chart;
-  private final ManifestAssemblyRegistry assemblyRegistry;
+  private final Cdk8sApiObjectResolver resolver;
   private final Set<String> appliedManifestsUnitIds = new HashSet<>();
   private final Set<String> visitingManifestsUnitIds = new HashSet<>();
 
@@ -21,12 +20,12 @@ public final class ManifestsUnitDependencyApplier {
       final ManifestsUnitRegistry manifestUnitRegistry,
       final ManifestsUnitVisitor manifestUnitVisitor,
       final Chart chart,
-      final ManifestAssemblyRegistry assemblyRegistry) {
+      final Cdk8sApiObjectResolver resolver) {
     this.layerDomainRegistry = layerDomainRegistry;
     this.manifestUnitRegistry = manifestUnitRegistry;
     this.manifestUnitVisitor = manifestUnitVisitor;
     this.chart = chart;
-    this.assemblyRegistry = assemblyRegistry;
+    this.resolver = resolver;
   }
 
   public void applyManifestsUnitWithDependencies(final String manifestUnitId) {
@@ -47,11 +46,7 @@ public final class ManifestsUnitDependencyApplier {
 
     final String domainId = layerDomainRegistry.requireDomainIdForManifestsUnit(manifestUnitId);
     final ManifestsUnitContext context =
-        new ManifestsUnitContext(
-            chart,
-            domainId,
-            manifestUnitId,
-            assemblyRegistry.domainRegistry(domainId).manifestUnitRegistry(manifestUnitId));
+        new ManifestsUnitContext(chart, domainId, manifestUnitId, resolver);
     manifestUnitVisitor.visit(manifestUnit, context);
     appliedManifestsUnitIds.add(manifestUnitId);
     visitingManifestsUnitIds.remove(manifestUnitId);

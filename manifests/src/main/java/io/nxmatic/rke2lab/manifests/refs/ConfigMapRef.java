@@ -1,9 +1,8 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests.refs;
 
-/** Stable reference to a Kubernetes ConfigMap independent of realization lifecycle. */
-public record ConfigMapRef(
-    String referenceId, NamespaceRef namespaceRef, String name, ApiObjectRefLifecycle lifecycle)
+/** Stable reference to a Kubernetes ConfigMap. */
+public record ConfigMapRef(String referenceId, NamespaceRef namespaceRef, String name)
     implements ApiObjectRef {
 
   public ConfigMapRef {
@@ -16,22 +15,21 @@ public record ConfigMapRef(
     if (name == null || name.isBlank()) {
       throw new IllegalArgumentException("name must not be blank");
     }
-    if (lifecycle == null) {
-      throw new IllegalArgumentException("lifecycle must not be null");
-    }
   }
 
   public static ConfigMapRef of(
       final String referenceId, final NamespaceRef namespaceRef, final String name) {
-    return of(referenceId, namespaceRef, name, ApiObjectRefLifecycle.SYNTHESIZED);
+    return new ConfigMapRef(referenceId, namespaceRef, name);
   }
 
-  public static ConfigMapRef of(
-      final String referenceId,
-      final NamespaceRef namespaceRef,
-      final String name,
-      final ApiObjectRefLifecycle lifecycle) {
-    return new ConfigMapRef(referenceId, namespaceRef, name, lifecycle);
+  @Override
+  public String kind() {
+    return "ConfigMap";
+  }
+
+  @Override
+  public String namespace() {
+    return namespaceRef.name();
   }
 
   public String namespaceName() {
