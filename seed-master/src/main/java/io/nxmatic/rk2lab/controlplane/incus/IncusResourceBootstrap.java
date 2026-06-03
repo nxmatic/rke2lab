@@ -2207,7 +2207,7 @@ public final class IncusResourceBootstrap {
       }
 
       // Add discovered flox environments
-      final io.nxmatic.rk2lab.manifests.components.runtime.flox.FloxRuntimeAssets floxAssets =
+      final io.nxmatic.rk2lab.manifests.units.runtime.flox.FloxRuntimeAssets floxAssets =
           systemdTarget.getFloxRuntimeAssets();
       if (floxAssets != null) {
         for (var env : floxAssets.getDiscoveredEnvironments()) {
