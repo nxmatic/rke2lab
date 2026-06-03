@@ -8,13 +8,13 @@
  * <ul>
  *   <li>{@link io.nxmatic.rke2lab.manifests.systemd.BootstrapInfrastructureSynthesizer} — creates
  *       the bootstrap/infrastructure services (e.g. {@code rke2lab-install}) that domain installer
- *       services depend on; runs before the domain loop in the synthesis service.
+ *       services depend on; runs before the domain loop in the synthesis service. Hosts the
+ *       method-local staged-synthesis pipeline (see the fluent pipeline grammar).
  *   <li>{@link io.nxmatic.rke2lab.manifests.systemd.SystemdUnitSynthesizer} — the synthesis
  *       contract.
- *   <li>{@link io.nxmatic.rke2lab.manifests.systemd.SynthesisPipeline} / {@link
- *       io.nxmatic.rke2lab.manifests.systemd.SynthesisTopicRunner} / {@link
+ *   <li>{@link io.nxmatic.rke2lab.manifests.systemd.SynthesisTopicRunner} / {@link
  *       io.nxmatic.rke2lab.manifests.systemd.SynthesisStageFailure} — the staged-synthesis harness
- *       (see the fluent pipeline grammar).
+ *       (topic runner + failure type).
  * </ul>
  *
  * <p>The systemd target hierarchy itself (rke2lab, -network, -tools, -bootstrap, -manifests,

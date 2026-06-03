@@ -10,13 +10,13 @@ import org.slf4j.LoggerFactory;
  *
  * <p>See docs/fluent-pipeline-grammar.adoc for the grammar this implements.
  */
-public final class SynthesisTopicRunner {
+final class SynthesisTopicRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(SynthesisTopicRunner.class);
 
   private SynthesisTopicRunner() {}
 
-  public static <S> S runDuring(
+  static <S> S runDuring(
       String logScope, String topic, S stage, Function<S, S> body, SynthesisOnFailure onFailure) {
     final long startedAt = System.nanoTime();
     LOG.info("→ entering {}", topic);

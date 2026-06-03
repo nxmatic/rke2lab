@@ -2,6 +2,12 @@
 package io.nxmatic.rke2lab.manifests.systemd;
 
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
+import io.nxmatic.rke2lab.manifests.SystemdSynthesisContext;
+import io.nxmatic.rke2lab.manifests.systemd.stages.BootstrapStage;
+import io.nxmatic.rke2lab.manifests.systemd.stages.NetworkStage;
+import io.nxmatic.rke2lab.manifests.systemd.stages.StorageStage;
+import io.nxmatic.rke2lab.manifests.systemd.stages.ToolsStage;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,14 +24,13 @@ import org.slf4j.LoggerFactory;
  */
 public final class BootstrapInfrastructureSynthesizer {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(BootstrapInfrastructureSynthesizer.class);
+  static final Logger LOG = LoggerFactory.getLogger(BootstrapInfrastructureSynthesizer.class);
 
-  private final SystemdChart systemdChart;
-  private final io.nxmatic.rke2lab.manifests.SystemdSynthesisContext context;
+  final SystemdChart systemdChart;
+  final SystemdSynthesisContext context;
 
   public BootstrapInfrastructureSynthesizer(
-      SystemdChart systemdChart, io.nxmatic.rke2lab.manifests.SystemdSynthesisContext context) {
+      SystemdChart systemdChart, SystemdSynthesisContext context) {
     this.systemdChart = systemdChart;
     this.context = context;
   }
@@ -36,7 +41,86 @@ public final class BootstrapInfrastructureSynthesizer {
    * <p>Enforces proper ordering: tools → bootstrap → network → storage/system.
    */
   public void synthesizeAll() {
-    SynthesisPipeline.forChart(systemdChart, context)
+    // Local pipeline for bootstrap infrastructure systemd units (fluent grammar, see
+    // docs/fluent-pipeline-grammar.adoc).
+    // Structure: tools → bootstrap → network → storage/system
+    final class SynthesisPipeline {
+      final State state = new State();
+
+      final class State {
+        SynthesisOnFailure onFailure;
+        // Stage references threaded for cross-stage dependencies.
+        ToolsStage toolsStage;
+        BootstrapStage bootstrapStage;
+      }
+
+      AwaitingTools onFailure(SynthesisOnFailure handler) {
+        state.onFailure = handler;
+        return new AwaitingTools();
+      }
+
+      final class AwaitingTools {
+        ToolsDone during(String topic, Function<ToolsStage, ToolsStage> body) {
+          final ToolsStage stage = new ToolsStage(systemdChart, context);
+          SynthesisTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
+          state.toolsStage = stage;
+          return new ToolsDone();
+        }
+      }
+
+      final class ToolsDone {
+        AwaitingBootstrap then() {
+          return new AwaitingBootstrap();
+        }
+      }
+
+      final class AwaitingBootstrap {
+        BootstrapDone during(String topic, Function<BootstrapStage, BootstrapStage> body) {
+          final BootstrapStage stage = new BootstrapStage(systemdChart, context, state.toolsStage);
+          SynthesisTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
+          state.bootstrapStage = stage;
+          return new BootstrapDone();
+        }
+      }
+
+      final class BootstrapDone {
+        AwaitingNetwork then() {
+          return new AwaitingNetwork();
+        }
+      }
+
+      final class AwaitingNetwork {
+        NetworkDone during(String topic, Function<NetworkStage, NetworkStage> body) {
+          final NetworkStage stage = new NetworkStage(systemdChart, context, state.bootstrapStage);
+          SynthesisTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
+          return new NetworkDone();
+        }
+      }
+
+      final class NetworkDone {
+        AwaitingStorage then() {
+          return new AwaitingStorage();
+        }
+      }
+
+      final class AwaitingStorage {
+        StorageDone during(String topic, Function<StorageStage, StorageStage> body) {
+          final StorageStage stage =
+              new StorageStage(systemdChart, context, state.toolsStage, state.bootstrapStage);
+          SynthesisTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
+          return new StorageDone();
+        }
+      }
+
+      final class StorageDone {
+        // Terminal verb: complete the synthesis pipeline with no return value.
+        void complete() {
+          // Pipeline complete, all stages executed.
+        }
+      }
+    }
+
+    new SynthesisPipeline()
         .onFailure((topic, cause) -> LOG.error("Synthesis failed at topic: {}", topic, cause))
         .during("tools installation", tools -> tools.nixInstall().floxInstall())
         .then()

@@ -1,15 +1,15 @@
 package io.nxmatic.rke2lab.manifests.systemd;
 
-public final class SynthesisStageFailure extends RuntimeException {
+final class SynthesisStageFailure extends RuntimeException {
 
   private final String topic;
 
-  public SynthesisStageFailure(String topic, Throwable cause) {
+  SynthesisStageFailure(String topic, Throwable cause) {
     super(topic + ": " + cause.getMessage(), cause);
     this.topic = topic;
   }
 
-  public String topic() {
+  String topic() {
     return topic;
   }
 }
