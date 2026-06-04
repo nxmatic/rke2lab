@@ -1,35 +1,46 @@
-# BDD Diagnostic Scenario: SystemD Adapter Reachability
+# BDD Scenarios as Pulumi Resources
 
 **Date:** 2026-06-04
-**Status:** Approved for implementation
+**Status:** Design revision - BDD scenarios as ComponentResource
 **Author:** Claude (brainstorming session with user)
 
 ## Overview
 
-Implement the first BDD diagnostic scenario to unblock master provisioning. The scenario verifies that the systemd adapter dbus-over-TCP endpoint becomes reachable during bootstrap, capturing targeted diagnostics on failure and publishing actor-specific reports as Pulumi stack resources.
+**Fundamental insight:** BDD scenarios ARE the infrastructure, not tests OF infrastructure. Every Pulumi resource is provisioned through a BDD scenario that extends `ComponentResource`, making verification, diagnostics, and living documentation intrinsic to resource provisioning.
+
+**First implementation:** SystemD Adapter reachability scenario that wraps the dbus-tcp systemd unit provisioning, verifies endpoint reachability, and captures diagnostics on failure.
 
 **Current blocker:** Master provisioning fails at systemd adapter probe (port 12434 connection refused). This scenario will both document expected behavior AND provide diagnostic evidence to fix the issue.
 
 ## Goals
 
 1. **Unblock provisioning:** Diagnose why port 12434 dbus probe fails
-2. **Establish BDD pattern:** First implementation of BDD-as-readiness-gate architecture
-3. **Living documentation:** Scenario becomes permanent resource provisioning gate, not a one-time debug tool
+2. **Establish BDD pattern:** First implementation of BDD-as-ComponentResource architecture
+3. **Living documentation:** Scenario IS the Pulumi resource, verification intrinsic to provisioning
 4. **Actor-specific outputs:** System gets metrics, orchestrator gets decisions, operator gets troubleshooting guide
-5. **Robust provisioning:** Scenarios run as precondition checks between resources, blocking or allowing degraded mode based on severity
+5. **Robust provisioning:** Scenarios block or allow degraded mode based on severity + operator policy
+6. **Uniform abstraction:** Pulumi stack code only interacts with scenarios, not raw infrastructure resources
 
 ## Architecture
 
-### BDD Components as Nested Classes
+### BDD Scenario as ComponentResource
 
-All BDD components nest inside `SeedSystemdAdapterEndpointGate`:
+**Key principle:** Scenario extends Pulumi `ComponentResource` and wraps the actual infrastructure resource.
 
 ```
-SeedSystemdAdapterEndpointGate.java (production class)
-├── ensureReachable()                    (existing production method)
-├── waitForRuntimeProbe()                (existing production method)
-├── getSystemdUnitStatus()               (new: helper for diagnostics)
-├── getJournalLogs()                     (new: helper for diagnostics)
+SystemdAdapterScenario.java (extends ComponentResource)
+├── constructor(name, args, opts)        (Pulumi resource lifecycle)
+│   ├── provision wrapped resource       (SystemdUnit as child)
+│   ├── execute scenario (given/when/then)
+│   ├── handle result (severity + policy)
+│   └── register outputs
+├── instance()                           (Output<SystemdUnit>)
+├── scenarioResult()                     (Output<ScenarioResult>)
+├── diagnostics()                        (Output<Diagnostics>)
+├── severity()                           (returns: Severity enum)
+│
+├── getSystemdUnitStatus()               (helper for diagnostics)
+├── getJournalLogs()                     (helper for diagnostics)
 │
 ├── interface DiagnosticCollector        (new: stage-specific typed interface)
 │   ├── onDbusProbeStart(host, port)
@@ -72,15 +83,44 @@ SeedSystemdAdapterEndpointGate.java (production class)
 │   ├── systemd_adapter_probe_runs()     (DSL method)
 │   └── dbus_endpoint_responds()         (DSL method)
 │
-├── class DiagnosticScenario             (new: nested class)
+├── class JGivenScenario                 (new: nested class for JGiven execution)
 │   ├── extends ScenarioTest<...>        (JGiven scenario)
-│   ├── systemd_adapter_becomes_reachable() (scenario method)
-│   ├── severity()                       (returns: CRITICAL or WARNING)
-│   └── execute()                        (programmatic invocation, returns ScenarioResult)
+│   └── systemd_adapter_becomes_reachable() (scenario method)
 │
 └── enum Severity                        (new: scenario severity levels)
     ├── CRITICAL                         (stop provisioning on failure)
     └── WARNING                          (continue in degraded mode on failure)
+
+### Stack Usage
+
+Pulumi stack code only sees scenarios:
+
+```java
+// Stack.java
+public class Stack {
+  public Stack() {
+    // 1. Provision Incus instance (via scenario)
+    var masterScenario = new IncusInstanceScenario("master", IncusInstanceArgs.builder()
+        .image("bioskop-base")
+        .build());
+    
+    // 2. Provision systemd adapter (via scenario, depends on instance)
+    var adapterScenario = new SystemdAdapterScenario("dbus-adapter", 
+        SystemdAdapterArgs.builder()
+            .instance(masterScenario.instance())  // Wrapped resource reference
+            .port(12434)
+            .build(),
+        ComponentResourceOptions.builder()
+            .dependsOn(masterScenario)  // Explicit dependency
+            .build());
+    
+    // 3. Outputs - scenario exposes wrapped resource + diagnostics
+    ctx.export("masterInstance", masterScenario.instance());
+    ctx.export("adapterDiagnostics", adapterScenario.diagnostics());
+    ctx.export("stackStatus", adapterScenario.scenarioResult().apply(r -> 
+        r.failed() ? "DEGRADED" : "HEALTHY"));
+  }
+}
 ```
 
 **Key decisions:**
@@ -91,32 +131,106 @@ SeedSystemdAdapterEndpointGate.java (production class)
 - **Scenario owns severity:** Each scenario declares CRITICAL or WARNING based on domain knowledge
 - **Operator policy override:** Strict mode can force all failures to CRITICAL during debugging
 
-### Integration Point
+### Scenario as ComponentResource Implementation
 
-**Scenarios as readiness gates** between resource provisioning steps:
+**Core pattern:** Constructor provisions wrapped resource, runs verification, handles result.
 
 ```java
-// In IncusResourceBootstrap.java or similar provisioning code
-
-// 1. Provision Incus instance
-final Instance masterInstance = new Instance("bioskop-master", instanceArgs);
-
-// 2. Readiness gate: verify instance reachable
-final ScenarioResult instanceReachable = InstanceReachabilityScenario.execute(masterInstance);
-handleScenarioResult(instanceReachable);  // stop if CRITICAL failure
-
-// 3. Provision systemd dbus-tcp unit (depends on instance)
-final SystemdUnit dbusUnit = provisionDbusUnit(masterInstance);
-
-// 4. Readiness gate: verify systemd adapter endpoint
-final ScenarioResult adapterReachable = SystemdAdapterScenario.execute(dbusUnit);
-handleScenarioResult(adapterReachable);  // stop if CRITICAL, continue degraded if WARNING
-
-// 5. Provision manifest units (depend on systemd adapter)
-final List<ManifestUnit> units = provisionManifestUnits(dbusUnit);
+public class SystemdAdapterScenario extends ComponentResource {
+  private final SystemdUnit unit;
+  private final ScenarioResult result;
+  
+  public SystemdAdapterScenario(String name, SystemdAdapterArgs args, ComponentResourceOptions opts) {
+    super("rke2lab:bdd:SystemdAdapter", name, opts);
+    
+    // 1. Provision wrapped infrastructure resource
+    this.unit = new SystemdUnit(name + "-unit", SystemdUnitArgs.builder()
+        .instance(args.instance())
+        .serviceName("rke2lab-dbus-tcp-system-bus")
+        .scriptPath("/srv/host/systemd-scripts.d/rke2lab-dbus-tcp-system-bus.sh")
+        .port(args.port())
+        .build(),
+        ComponentResourceOptions.builder()
+            .parent(this)  // Scenario is parent
+            .build());
+    
+    // 2. Execute BDD scenario (given/when/then via JGiven)
+    this.result = executeScenario(args);
+    
+    // 3. Handle result based on severity + operator policy
+    handleScenarioResult(result);
+    
+    // 4. Publish diagnostics (ConfigMap, stack outputs, filesystem)
+    if (result.failed()) {
+      publishDiagnostics(result);
+    }
+    
+    // 5. Register Pulumi outputs
+    registerOutputs(Map.of(
+        "unit", unit,
+        "scenarioResult", result,
+        "diagnostics", result.diagnostics(),
+        "status", result.status()));
+  }
+  
+  public Output<SystemdUnit> unit() {
+    return Output.of(unit);
+  }
+  
+  public Output<ScenarioResult> scenarioResult() {
+    return Output.of(result);
+  }
+  
+  public Output<Diagnostics> diagnostics() {
+    return Output.of(result.diagnostics());
+  }
+  
+  public Severity severity() {
+    return Severity.WARNING;  // Adapter failure allows degraded mode
+  }
+  
+  private ScenarioResult executeScenario(SystemdAdapterArgs args) {
+    // Run JGiven scenario programmatically
+    final JGivenScenario scenario = new JGivenScenario();
+    return scenario.given().incus_instance_exists(args.instance())
+        .when().systemd_adapter_probe_runs(args.port())
+        .then().dbus_endpoint_responds()
+        .execute();
+  }
+  
+  private void handleScenarioResult(ScenarioResult result) {
+    final Severity effectiveSeverity = policy.isStrictMode() 
+        ? Severity.CRITICAL 
+        : severity();
+    
+    if (result.failed() && effectiveSeverity == Severity.CRITICAL) {
+      throw new ResourceException("Scenario failed: " + result.name());
+    }
+    
+    if (result.failed() && effectiveSeverity == Severity.WARNING) {
+      log.warn("Continuing in degraded mode: {}", result.name());
+    }
+  }
+  
+  // Nested BDD components (DiagnosticCollector, Generalist, Specialists, etc.)
+  // ... (same structure as before, now inside ComponentResource)
+}
 ```
 
-Scenarios run **programmatically** during provisioning, not as separate verification stage after bootstrap completes.
+**Migration impact:** Existing provisioning code that directly creates Pulumi resources must be refactored to use scenarios. Example:
+
+```java
+// OLD: Direct resource creation
+final Instance master = new Instance("master", instanceArgs);
+final SystemdUnit dbusUnit = new SystemdUnit("dbus-tcp", unitArgs);
+
+// NEW: Scenario-based provisioning
+final IncusInstanceScenario masterScenario = new IncusInstanceScenario("master", instanceArgs);
+final SystemdAdapterScenario adapterScenario = new SystemdAdapterScenario("dbus-adapter",
+    SystemdAdapterArgs.builder()
+        .instance(masterScenario.instance())  // Access wrapped resource
+        .build());
+```
 
 ## Implementation Scope
 
@@ -125,49 +239,75 @@ Scenarios run **programmatically** during provisioning, not as separate verifica
 **Maven dependencies:**
 - Add JGiven 1.3.1 to BOM (scope: `compile`, not `test`)
 - Add JUnit Jupiter API to seed-master (scope: `compile`)
+- Add Pulumi Java SDK (already present) - scenarios extend `ComponentResource`
 - **NO maven plugin needed** - scenarios run programmatically during pulumi up, not via `mvn test`
 
-**New production helpers:**
-- `SeedSystemdAdapterEndpointGate.getSystemdUnitStatus(String unitName)`
-- `SeedSystemdAdapterEndpointGate.getJournalLogs(String unitName)`
-- `SeedSystemdAdapterEndpointGate.checkPortListening(int port)`
+**New scenario resource:**
+- `SystemdAdapterScenario extends ComponentResource`
+- Constructor: provision → verify → handle result → register outputs
+- Wraps `SystemdUnit` as child resource
+- Exposes: `unit()`, `scenarioResult()`, `diagnostics()`
+- Declares `severity()` = WARNING
 
-**BDD nested components:**
+**BDD nested components** (inside SystemdAdapterScenario):
 - `DiagnosticCollector` interface (typed to dbus/systemd domain)
 - `GeneralistDiagnostic` (first-level triage, decides specialist referrals)
 - `DbusTcpSpecialist`, `NetworkSpecialist`, `IncusExecSpecialist` (deep-dive diagnostics)
 - `SystemDiagnostics`, `OrchestratorDiagnostics`, `OperatorDiagnostics` (actor implementations)
 - `Stages` (JGiven DSL vocabulary)
-- `DiagnosticScenario` (scenario logic, severity declaration, programmatic execution)
+- `JGivenScenario` (JGiven execution, given/when/then)
 - `Severity` enum (CRITICAL, WARNING)
 
-**Provisioning integration:**
-- Scenarios invoked directly in resource provisioning code (e.g., `IncusResourceBootstrap`)
-- `handleScenarioResult()` method evaluates severity and operator policy
-- Stop provisioning on CRITICAL failure, continue degraded on WARNING failure
-- Publish reports on any failure (ConfigMap, stack outputs, filesystem)
+**Production helpers:**
+- `getSystemdUnitStatus(String unitName)`
+- `getJournalLogs(String unitName)`
+- `checkPortListening(int port)`
+
+**Stack refactoring:**
+- Replace direct `SystemdUnit` instantiation with `SystemdAdapterScenario`
+- Update dependent resources to reference `scenario.unit()` instead of raw resource
+- Pulumi dependency graph: `masterScenario` → `adapterScenario` → downstream resources
+
+**Report publication:**
+- ConfigMap (YAML metrics for system)
+- Stack outputs (JSON decisions for orchestrator)
+- Filesystem via pulumi-command (AsciiDoc troubleshooting for operator)
 
 **Shared report utilities:**
 - `SharedMetricsCollector` (YAML output for system)
 - `SharedDecisionLog` (JSON output for orchestrator)
 - `SharedReportBuilder` (AsciiDoc output for operator)
 
-### Phase 2: DSL Composition (future)
+### Phase 2: Additional Scenarios (future)
 
-Extend DSL with stages from other production classes:
-- `IncusResourceBootstrap.Stages` (incus_instance_exists, incus_instance_is_running)
-- `SystemdTargetMonitor.Stages` (systemd_target_is_active, systemd_units_healthy)
+Wrap more resources in scenarios following the same ComponentResource pattern:
 
-Compose into richer scenarios:
+- `IncusInstanceScenario` - wraps Incus Instance provisioning
+- `ManifestUnitsScenario` - wraps manifest application
+- `RKE2ServerScenario` - wraps RKE2 server installation
+- `KubernetesApiScenario` - wraps Kubernetes API readiness
+
+Each follows the same structure:
+
 ```java
-given().incus_instance_exists("bioskop-master")    // IncusResourceBootstrap.Stages
-    .and().bootstrap_config_is_loaded();           // BootstrapConfig.Stages
-when().systemd_adapter_probe_runs();               // SeedSystemdAdapterEndpointGate.Stages
-then().dbus_endpoint_responds()                    // SeedSystemdAdapterEndpointGate.Stages
-    .and().systemd_target_is_active("rke2lab.target"); // SystemdTargetMonitor.Stages
+public class XxxScenario extends ComponentResource {
+  private final XxxResource resource;
+  private final ScenarioResult result;
+  
+  public XxxScenario(String name, XxxArgs args, ComponentResourceOptions opts) {
+    super("rke2lab:bdd:Xxx", name, opts);
+    this.resource = new XxxResource(..., ComponentResourceOptions.builder().parent(this).build());
+    this.result = executeScenario(args);
+    handleScenarioResult(result);
+    registerOutputs(...);
+  }
+  
+  public Output<XxxResource> resource() { return Output.of(resource); }
+  public Severity severity() { return CRITICAL; }  // or WARNING
+}
 ```
 
-**Out of scope for Phase 1:** Focus on single-class scenario to establish pattern. DSL composition comes after pattern validation.
+**Out of scope for Phase 1:** Focus on SystemdAdapterScenario to establish pattern. Additional scenarios come after pattern validation.
 
 ## Diagnostic Capture Strategy
 
@@ -443,30 +583,55 @@ public VerificationStage publishReports() {
 
 ## Testing Strategy
 
-**Phase 1:** Scenario runs as readiness gate during `pulumi up` resource provisioning.
+**Phase 1:** Scenario IS a Pulumi resource during `pulumi up`.
 
 **Expected outcome TODAY:**
 
-- Incus instance "master" provisioned
-- Systemd dbus-tcp unit provisioned
-- **Readiness gate:** SystemdAdapterScenario.execute()
-  - Probe fails (port 12434 connection refused)
-  - Generalist invoked → DbusTcpSpecialist diagnoses (socat missing, unit failed)
-  - RemediationPlan established
-  - Reports published (ConfigMap, stack outputs, AsciiDoc)
-  - Severity: WARNING → provisioning continues in degraded mode
-- Manifest units provisioned (without systemd-adapter available)
-- Stack marked as DEGRADED but READY
+```text
+pulumi up
+  → Creating SystemdAdapterScenario "dbus-adapter"
+    ├─→ Creating SystemdUnit "dbus-adapter-unit" (child)
+    ├─→ Executing JGiven scenario
+    │   ├─ given: incus_instance_exists ✓
+    │   ├─ when: systemd_adapter_probe_runs ✗ (connection refused)
+    │   └─ then: dbus_endpoint_responds ✗
+    ├─→ Generalist → DbusTcpSpecialist → RemediationPlan
+    ├─→ Publishing diagnostics (ConfigMap, stack output, filesystem)
+    ├─→ Severity: WARNING + lenient policy → continue degraded
+    └─→ Registering outputs (unit, scenarioResult, diagnostics)
+  → Stack status: DEGRADED
+```
+
+Stack outputs show:
+
+```json
+{
+  "adapterUnit": "<unit-urn>",
+  "adapterDiagnostics": {
+    "status": "failed",
+    "findings": ["socat missing", "unit inactive"],
+    "remediation": ["install socat", "restart unit"]
+  },
+  "stackStatus": "DEGRADED"
+}
+```
 
 **After fix:**
 
-- Same provisioning flow
-- Readiness gate passes (port 12434 reachable)
-- Clean report (checkmarks only)
-- Stack marked as HEALTHY
-- Scenario remains as permanent readiness gate
+```text
+pulumi up
+  → Updating SystemdAdapterScenario "dbus-adapter"
+    ├─→ SystemdUnit "dbus-adapter-unit" unchanged
+    ├─→ Executing JGiven scenario
+    │   ├─ given: incus_instance_exists ✓
+    │   ├─ when: systemd_adapter_probe_runs ✓
+    │   └─ then: dbus_endpoint_responds ✓
+    ├─→ No diagnostics needed (success)
+    └─→ Registering outputs (unit, scenarioResult)
+  → Stack status: HEALTHY
+```
 
-**This is the "doctor + gate" pattern:** block or allow based on severity, diagnose on failure, prevent regression forever.
+**This is "infrastructure as BDD":** every resource provisioned through a scenario that documents + verifies its contract.
 
 ## Dependencies
 
@@ -508,30 +673,44 @@ public VerificationStage publishReports() {
 ### Immediate (Phase 1)
 
 - [ ] JGiven dependencies added to BOM and seed-master (scope: compile)
-- [ ] `SeedSystemdAdapterEndpointGate` has all nested BDD components (DiagnosticCollector, GeneralistDiagnostic, Specialists, actor implementations, Stages, DiagnosticScenario, Severity enum)
-- [ ] Scenario runs as readiness gate during resource provisioning (not post-provisioning verification)
+- [ ] `SystemdAdapterScenario extends ComponentResource` created
+- [ ] Scenario wraps `SystemdUnit` as child resource
+- [ ] Constructor: provision → executeScenario → handleResult → registerOutputs
+- [ ] Nested BDD components inside scenario (DiagnosticCollector, GeneralistDiagnostic, Specialists, actor implementations, Stages, JGivenScenario, Severity enum)
 - [ ] Generalist diagnostic invokes appropriate specialists on failure
 - [ ] Doctor hierarchy establishes remediation plan
 - [ ] Severity declaration (WARNING for systemd-adapter) allows degraded mode
 - [ ] Operator policy override (strict mode) forces fail-fast when needed
+- [ ] Scenario exposes: `unit()`, `scenarioResult()`, `diagnostics()` outputs
+- [ ] Stack code refactored to use `new SystemdAdapterScenario(...)` instead of direct `SystemdUnit`
 - [ ] AsciiDoc report captures actual port 12434 failure with full doctor hierarchy output
 - [ ] ConfigMap, stack outputs, and filesystem reports all published on failure
-- [ ] Provisioning continues in degraded mode (systemd-adapter WARNING + lenient policy)
+- [ ] Pulumi up continues in degraded mode (systemd-adapter WARNING + lenient policy)
+- [ ] `pulumi stack export` shows scenario outputs in dependency graph
 
 ### Future (Post-Fix)
 
 - [ ] Fix actual socat/port 12434 issue based on diagnostic evidence
-- [ ] Scenario turns green
+- [ ] Scenario turns green (executeScenario returns success)
 - [ ] Clean report (checkmarks only) on successful deployment
-- [ ] Scenario remains in codebase as permanent readiness gate
+- [ ] Scenario remains in codebase as permanent ComponentResource
+
+### Phase 2 (After Pattern Validation)
+
+- [ ] Additional scenario resources: `IncusInstanceScenario`, `ManifestUnitsScenario`, `RKE2ServerScenario`, `KubernetesApiScenario`
+- [ ] Full stack refactoring: replace all direct resource instantiation with scenarios
+- [ ] Multi-class DSL composition (if needed)
+- [ ] Operator can query `pulumi stack output diagnosticReports` for troubleshooting
+- [ ] All Pulumi resources provisioned through BDD scenarios
 
 ## Non-Goals (Explicitly Out of Scope)
 
-- ❌ Multi-class DSL composition (Phase 2)
-- ❌ Additional scenarios beyond systemd-adapter (come after pattern validation)
-- ❌ Go bridge for Pulumi Automation API (not needed - scenarios run post-provisioning)
-- ❌ External bdd-operator-manual module (scenarios are embedded in production code)
+- ❌ Additional scenario resources beyond SystemdAdapterScenario (Phase 2, after pattern validation)
+- ❌ Multi-class DSL composition (defer until we have multiple scenarios working)
+- ❌ Go bridge for Pulumi Automation API (not needed - scenarios are Pulumi resources)
+- ❌ External bdd-operator-manual module (scenarios are embedded in ComponentResource classes)
 - ❌ Test-jar publication for stage sharing (defer until we have 2+ modules needing to share stages)
+- ❌ Full stack refactoring in Phase 1 (only refactor systemd-adapter provisioning path as exemplar)
 
 ## Related Documentation
 
@@ -661,10 +840,14 @@ public class SharedReportBuilder {
 
 ## Timeline Estimate
 
-**Phase 1 (this spec):** 2-3 days
+**Phase 1 (this spec):** 3-4 days
 
-- Day 1: Maven dependencies, Severity enum, doctor hierarchy classes (GeneralistDiagnostic, Specialists), shared utilities
-- Day 2: Nested BDD components in `SeedSystemdAdapterEndpointGate`, programmatic execution, severity + policy handling
-- Day 3: Report publication, integration as readiness gate in provisioning code, testing against real infrastructure
+- Day 1: Maven dependencies, Severity enum, `SystemdAdapterScenario extends ComponentResource` skeleton
+- Day 2: Doctor hierarchy classes (GeneralistDiagnostic, Specialists), nested BDD components (DiagnosticCollector, actors, Stages, JGivenScenario)
+- Day 3: Constructor implementation (provision → execute → handle → register), report publication (ConfigMap, stack output, filesystem)
+- Day 4: Stack refactoring (replace direct SystemdUnit with scenario), testing against real infrastructure, documentation updates
 
-**Phase 2 (DSL composition):** 1-2 days after pattern validation
+**Phase 2 (additional scenarios):** 1-2 weeks after pattern validation
+
+- Additional scenario resources for all major infrastructure components
+- Full stack refactoring to scenario-based provisioning
