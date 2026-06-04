@@ -31,6 +31,7 @@
     <logback.version>1.5.17</logback.version>
     <ipaddress.version>5.5.1</ipaddress.version>
     <commons.compress.version>1.27.1</commons.compress.version>
+    <jgiven.version>2.0.3</jgiven.version>
   </properties>
 
   <dependencyManagement>
@@ -162,6 +163,11 @@
         <groupId>ch.qos.logback</groupId>
         <artifactId>logback-classic</artifactId>
         <version>${logback.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.tngtech.jgiven</groupId>
+        <artifactId>jgiven-junit5</artifactId>
+        <version>${jgiven.version}</version>
       </dependency>
       <dependency>
         <groupId>com.github.seancfoley</groupId>
