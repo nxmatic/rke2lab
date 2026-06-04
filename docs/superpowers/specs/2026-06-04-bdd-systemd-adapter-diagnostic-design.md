@@ -21,6 +21,83 @@
 5. **Robust provisioning:** Scenarios block or allow degraded mode based on severity + operator policy
 6. **Uniform abstraction:** Pulumi stack code only interacts with scenarios, not raw infrastructure resources
 
+## Pulumi Drift Detection Integration
+
+**IMPORTANT:** Do not implement custom drift detection. Pulumi already has built-in drift detection via `pulumi refresh`. Our scenarios integrate with Pulumi's native mechanism instead of reinventing it.
+
+### Why Pulumi's Drift Detection?
+
+We initially considered implementing `checkDrift()` methods on scenarios, but this would duplicate Pulumi's existing functionality. Pulumi already tracks resource state and can detect drift - we just need to hook into its lifecycle.
+
+### Pulumi's Three States
+
+1. **Desired state** - What your program declares (the code)
+2. **Pulumi state** - What Pulumi thinks exists (stored in backend)
+3. **Actual state** - What actually exists in infrastructure
+
+### Normal Provisioning Flow
+
+```text
+pulumi up
+  ↓
+1. Read program → desired state
+2. Compare with Pulumi state
+3. Generate plan (create/update/delete)
+4. Execute plan
+5. Update Pulumi state to match actual
+```
+
+### Drift Detection Flow
+
+```text
+pulumi refresh  (or pulumi preview --refresh)
+  ↓
+1. Read Pulumi state (what we think exists)
+2. Call read() on each ComponentResource to get actual state
+3. Compare actual vs Pulumi state
+4. Show differences (drift)
+5. Update Pulumi state (refresh) OR just show it (preview)
+```
+
+### ComponentResource Lifecycle Hooks
+
+Pulumi calls these methods on our scenario resources:
+
+| Hook | When Called | Purpose |
+| --- | --- | --- |
+| `constructor()` | `pulumi up` | Provision infrastructure, execute scenario once |
+| `read()` | `pulumi refresh` | Query actual state, re-execute scenario for drift detection |
+| `delete()` | `pulumi destroy` | Clean up resources |
+
+### Operator Workflow
+
+```bash
+# Normal provisioning - scenario executes once
+$ pulumi up
+Creating SystemdAdapterScenario "dbus-adapter"
+  → Scenario executed: ✗ FAILED (port 12434 refused)
+  → Severity: WARNING, continuing degraded
+Resources: 1 created
+
+# Week later, check for drift - Pulumi calls read() on scenario
+$ pulumi refresh
+Refreshing SystemdAdapterScenario "dbus-adapter"
+  → Scenario re-executed: ✓ PASSED (socat fixed!)
+  ~ scenarioResult: {
+      - status: "failed"
+      + status: "passed"
+    }
+State refreshed
+
+# Or preview drift without updating state
+$ pulumi preview --refresh
+Previewing changes:
+  ~ SystemdAdapterScenario "dbus-adapter"
+    scenarioResult: "failed" → "passed" (drift detected)
+```
+
+**Key takeaway:** Use Pulumi's `read()` lifecycle hook for drift detection, not custom methods. This integrates with operator's existing workflow (`pulumi refresh`) instead of introducing new commands.
+
 ## Architecture
 
 ### BDD Scenario as ComponentResource
@@ -99,22 +176,33 @@ Pulumi stack code only sees scenarios:
 // Stack.java
 public class Stack {
   public Stack() {
-    // 1. Provision Incus instance (via scenario)
+    // 1. Provision Incus instance (via scenario) - scenario executes once
     var masterScenario = new IncusInstanceScenario("master", IncusInstanceArgs.builder()
         .image("bioskop-base")
         .build());
     
-    // 2. Provision systemd adapter (via scenario, depends on instance)
+    // 2. Provision systemd adapter (via scenario, depends on instance) - scenario executes once
     var adapterScenario = new SystemdAdapterScenario("dbus-adapter", 
         SystemdAdapterArgs.builder()
-            .instance(masterScenario.instance())  // Wrapped resource reference
+            .instance(masterScenario.instance())  // Reference wrapped resource, no re-execution
             .port(12434)
             .build(),
         ComponentResourceOptions.builder()
             .dependsOn(masterScenario)  // Explicit dependency
             .build());
     
-    // 3. Outputs - scenario exposes wrapped resource + diagnostics
+    // 3. Multiple resources reference adapter - no scenario re-execution
+    var manifestA = new ManifestUnitScenario("manifest-a",
+        ManifestUnitArgs.builder()
+            .systemdUnit(adapterScenario.unit())  // Just a reference, no check
+            .build());
+    
+    var manifestB = new ManifestUnitScenario("manifest-b",
+        ManifestUnitArgs.builder()
+            .systemdUnit(adapterScenario.unit())  // Just a reference, no check
+            .build());
+    
+    // 4. Outputs - scenario results cached in Pulumi state
     ctx.export("masterInstance", masterScenario.instance());
     ctx.export("adapterDiagnostics", adapterScenario.diagnostics());
     ctx.export("stackStatus", adapterScenario.scenarioResult().apply(r -> 
@@ -123,22 +211,60 @@ public class Stack {
 }
 ```
 
+**Drift detection** (Pulumi's native mechanism):
+
+```bash
+# Operator uses Pulumi's built-in refresh command
+$ pulumi refresh
+
+# Pulumi calls read() on all ComponentResources (including scenarios)
+# Scenarios re-execute and return actual state
+# Pulumi compares actual vs cached state and shows drift
+
+Refreshing (dev)
+  Type                                Name               Status      Info
+  pulumi:pulumi:Stack                 rke2lab-dev        
+  └─ rke2lab:bdd:SystemdAdapter      dbus-adapter       refreshed   2 changes
+  
+Resources:
+    ~ 1 to refresh
+
+Outputs:
+  ~ adapterDiagnostics: {
+      - status: "failed"
+      + status: "passed"
+    }
+```
+
+No custom drift detection logic needed - Pulumi handles it via `read()` lifecycle hook.
+
 **Key decisions:**
+
 - All BDD components are **nested** (impossible to forget)
 - Actor implementations are **non-static** (can access production helper methods directly)
-- **Uniform naming:** `DiagnosticCollector`, `SystemDiagnostics`, `OrchestratorDiagnostics`, `OperatorDiagnostics`, `Stages`, `DiagnosticScenario`, `Severity`
+- **Uniform naming:** `DiagnosticCollector`, `SystemDiagnostics`, `OrchestratorDiagnostics`, `OperatorDiagnostics`, `Stages`, `JGivenScenario`, `Severity`
 - **Doctor hierarchy:** Generalist always runs on failure → invokes Specialists → establishes RemediationPlan
 - **Scenario owns severity:** Each scenario declares CRITICAL or WARNING based on domain knowledge
 - **Operator policy override:** Strict mode can force all failures to CRITICAL during debugging
+- **Execution happens once per provision:** During provisioning (constructor), result cached in Pulumi state
+- **Resource references are free:** Other resources can reference `scenario.unit()` without re-triggering checks
+- **Drift detection via Pulumi:** Implement `read()` lifecycle hook, not custom methods - integrates with `pulumi refresh`
 
 ### Scenario as ComponentResource Implementation
 
-**Core pattern:** Constructor provisions wrapped resource, runs verification, handles result.
+**Core pattern:** Constructor provisions wrapped resource, runs verification ONCE, caches result.
+
+**IMPORTANT:** Scenario executes only:
+
+1. **During provisioning** (constructor) - result cached in Pulumi state
+2. **During drift detection** (`pulumi refresh`) - Pulumi calls `read()` lifecycle hook
+
+Multiple resource references do NOT re-trigger scenario execution.
 
 ```java
 public class SystemdAdapterScenario extends ComponentResource {
   private final SystemdUnit unit;
-  private final ScenarioResult result;
+  private final Output<ScenarioResult> result;  // Lazy Output, computed once
   
   public SystemdAdapterScenario(String name, SystemdAdapterArgs args, ComponentResourceOptions opts) {
     super("rke2lab:bdd:SystemdAdapter", name, opts);
@@ -154,35 +280,76 @@ public class SystemdAdapterScenario extends ComponentResource {
             .parent(this)  // Scenario is parent
             .build());
     
-    // 2. Execute BDD scenario (given/when/then via JGiven)
-    this.result = executeScenario(args);
+    // 2. Execute BDD scenario ONCE (given/when/then via JGiven)
+    //    Pulumi caches this result in state
+    final ScenarioResult executionResult = executeScenario(args);
+    this.result = Output.of(executionResult);
     
     // 3. Handle result based on severity + operator policy
-    handleScenarioResult(result);
+    handleScenarioResult(executionResult);
     
-    // 4. Publish diagnostics (ConfigMap, stack outputs, filesystem)
-    if (result.failed()) {
-      publishDiagnostics(result);
+    // 4. Publish diagnostics if failed (ConfigMap, stack outputs, filesystem)
+    if (executionResult.failed()) {
+      publishDiagnostics(executionResult);
     }
     
-    // 5. Register Pulumi outputs
+    // 5. Register Pulumi outputs (cached, not re-computed on reference)
     registerOutputs(Map.of(
         "unit", unit,
         "scenarioResult", result,
-        "diagnostics", result.diagnostics(),
-        "status", result.status()));
+        "diagnostics", Output.of(executionResult.diagnostics()),
+        "status", Output.of(executionResult.status())));
   }
   
+  // Other resources reference this - NO scenario re-execution
   public Output<SystemdUnit> unit() {
     return Output.of(unit);
   }
   
+  // Outputs for orchestrator/operator - read from cache
   public Output<ScenarioResult> scenarioResult() {
-    return Output.of(result);
+    return result;
   }
   
   public Output<Diagnostics> diagnostics() {
-    return Output.of(result.diagnostics());
+    return result.apply(ScenarioResult::diagnostics);
+  }
+  
+  // Pulumi lifecycle hook - called during "pulumi refresh" for drift detection
+  @Override
+  protected CompletableFuture<ReadResult> read(String id, ReadArgs args) {
+    // Pulumi calls this to get ACTUAL current state
+    
+    // 1. Re-execute scenario against live infrastructure
+    final ScenarioResult currentResult = executeScenario(argsFromState(args));
+    
+    // 2. Get cached result from Pulumi state
+    final Map<String, Object> stateProps = args.state();
+    final ScenarioResult cachedResult = (ScenarioResult) stateProps.get("scenarioResult");
+    
+    // 3. Detect drift (status changed)
+    final boolean drifted = !currentResult.status().equals(cachedResult.status());
+    
+    // 4. Return actual state to Pulumi (Pulumi will compare and show drift)
+    return CompletableFuture.completedFuture(ReadResult.builder()
+        .id(id)
+        .props(Map.of(
+            "unit", unit,
+            "scenarioResult", currentResult,  // ← New actual state
+            "diagnostics", currentResult.diagnostics(),
+            "status", currentResult.status(),
+            "driftDetected", drifted,
+            "lastChecked", Instant.now()))
+        .build());
+  }
+  
+  private SystemdAdapterArgs argsFromState(ReadArgs args) {
+    // Reconstruct args from Pulumi state for re-execution
+    final Map<String, Object> props = args.state();
+    return SystemdAdapterArgs.builder()
+        .instance((Instance) props.get("instance"))
+        .port((Integer) props.get("port"))
+        .build();
   }
   
   public Severity severity() {
@@ -220,16 +387,28 @@ public class SystemdAdapterScenario extends ComponentResource {
 **Migration impact:** Existing provisioning code that directly creates Pulumi resources must be refactored to use scenarios. Example:
 
 ```java
-// OLD: Direct resource creation
+// OLD: Direct resource creation + manual checks
 final Instance master = new Instance("master", instanceArgs);
 final SystemdUnit dbusUnit = new SystemdUnit("dbus-tcp", unitArgs);
+// Probe called multiple times by different consumers - wasteful
+checkSystemdReachable(dbusUnit);  // Consumer A checks
+checkSystemdReachable(dbusUnit);  // Consumer B checks
+checkSystemdReachable(dbusUnit);  // Consumer C checks
 
-// NEW: Scenario-based provisioning
+// NEW: Scenario-based provisioning - check once, reference many
 final IncusInstanceScenario masterScenario = new IncusInstanceScenario("master", instanceArgs);
 final SystemdAdapterScenario adapterScenario = new SystemdAdapterScenario("dbus-adapter",
     SystemdAdapterArgs.builder()
         .instance(masterScenario.instance())  // Access wrapped resource
-        .build());
+        .build());  // Scenario executes ONCE here
+
+// All consumers just reference - no re-execution
+final ManifestA a = new ManifestA(adapterScenario.unit());  // Free reference
+final ManifestB b = new ManifestB(adapterScenario.unit());  // Free reference
+final ManifestC c = new ManifestC(adapterScenario.unit());  // Free reference
+
+// Drift check is explicit, outside provisioning
+final Output<ScenarioResult> drift = adapterScenario.checkDrift();  // Operator-triggered
 ```
 
 ## Implementation Scope
@@ -262,6 +441,12 @@ final SystemdAdapterScenario adapterScenario = new SystemdAdapterScenario("dbus-
 - `getSystemdUnitStatus(String unitName)`
 - `getJournalLogs(String unitName)`
 - `checkPortListening(int port)`
+- `argsFromState(ReadArgs)` - reconstruct args from Pulumi state for drift detection
+
+**Pulumi lifecycle integration:**
+
+- `read(String id, ReadArgs args)` - re-execute scenario during `pulumi refresh`
+- Compare actual state vs cached state, return drift to Pulumi
 
 **Stack refactoring:**
 - Replace direct `SystemdUnit` instantiation with `SystemdAdapterScenario`
@@ -675,14 +860,18 @@ pulumi up
 - [ ] JGiven dependencies added to BOM and seed-master (scope: compile)
 - [ ] `SystemdAdapterScenario extends ComponentResource` created
 - [ ] Scenario wraps `SystemdUnit` as child resource
-- [ ] Constructor: provision → executeScenario → handleResult → registerOutputs
+- [ ] Constructor: provision → executeScenario (ONCE) → handleResult → registerOutputs
+- [ ] Result cached in Pulumi state via `Output<ScenarioResult>`
 - [ ] Nested BDD components inside scenario (DiagnosticCollector, GeneralistDiagnostic, Specialists, actor implementations, Stages, JGivenScenario, Severity enum)
 - [ ] Generalist diagnostic invokes appropriate specialists on failure
 - [ ] Doctor hierarchy establishes remediation plan
 - [ ] Severity declaration (WARNING for systemd-adapter) allows degraded mode
 - [ ] Operator policy override (strict mode) forces fail-fast when needed
 - [ ] Scenario exposes: `unit()`, `scenarioResult()`, `diagnostics()` outputs
+- [ ] `read()` lifecycle hook implements drift detection (called by `pulumi refresh`)
+- [ ] `argsFromState()` helper reconstructs args from Pulumi state for re-execution
 - [ ] Stack code refactored to use `new SystemdAdapterScenario(...)` instead of direct `SystemdUnit`
+- [ ] Multiple resources reference `scenario.unit()` without re-triggering checks
 - [ ] AsciiDoc report captures actual port 12434 failure with full doctor hierarchy output
 - [ ] ConfigMap, stack outputs, and filesystem reports all published on failure
 - [ ] Pulumi up continues in degraded mode (systemd-adapter WARNING + lenient policy)
@@ -698,9 +887,11 @@ pulumi up
 ### Phase 2 (After Pattern Validation)
 
 - [ ] Additional scenario resources: `IncusInstanceScenario`, `ManifestUnitsScenario`, `RKE2ServerScenario`, `KubernetesApiScenario`
+- [ ] Each scenario implements `read()` for drift detection via `pulumi refresh`
 - [ ] Full stack refactoring: replace all direct resource instantiation with scenarios
 - [ ] Multi-class DSL composition (if needed)
 - [ ] Operator can query `pulumi stack output diagnosticReports` for troubleshooting
+- [ ] Operator uses `pulumi refresh` to detect drift across all scenarios
 - [ ] All Pulumi resources provisioned through BDD scenarios
 
 ## Non-Goals (Explicitly Out of Scope)
@@ -711,6 +902,7 @@ pulumi up
 - ❌ External bdd-operator-manual module (scenarios are embedded in ComponentResource classes)
 - ❌ Test-jar publication for stage sharing (defer until we have 2+ modules needing to share stages)
 - ❌ Full stack refactoring in Phase 1 (only refactor systemd-adapter provisioning path as exemplar)
+- ❌ Custom drift detection mechanism (use Pulumi's built-in `refresh` instead - see "Pulumi Drift Detection Integration" section)
 
 ## Related Documentation
 
