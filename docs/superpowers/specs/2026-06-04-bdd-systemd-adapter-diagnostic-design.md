@@ -13,9 +13,10 @@ Implement the first BDD diagnostic scenario to unblock master provisioning. The 
 ## Goals
 
 1. **Unblock provisioning:** Diagnose why port 12434 dbus probe fails
-2. **Establish BDD pattern:** First implementation of BDD-as-system-component architecture
-3. **Living documentation:** Scenario becomes permanent deployment verification, not a one-time debug tool
+2. **Establish BDD pattern:** First implementation of BDD-as-readiness-gate architecture
+3. **Living documentation:** Scenario becomes permanent resource provisioning gate, not a one-time debug tool
 4. **Actor-specific outputs:** System gets metrics, orchestrator gets decisions, operator gets troubleshooting guide
+5. **Robust provisioning:** Scenarios run as precondition checks between resources, blocking or allowing degraded mode based on severity
 
 ## Architecture
 
@@ -34,10 +35,28 @@ SeedSystemdAdapterEndpointGate.java (production class)
 │   ├── onDbusProbeStart(host, port)
 │   ├── onDbusProbeSuccess(elapsed, status)
 │   ├── onDbusProbeFailure(cause)
-│   ├── captureSystemdUnitStatus(unit, status)
-│   ├── captureJournalLogs(unit, logs)
-│   ├── capturePortStatus(port, listening)
-│   └── suggestDbusRemediation(steps...)
+│   ├── requestGeneralistDiagnostic()    (returns: GeneralistDiagnostic)
+│   └── publishDiagnostic(generalist, plan)
+│
+├── class GeneralistDiagnostic           (new: first-level triage)
+│   ├── recordSymptom(name, details)
+│   ├── invokeSpecialists()              (decides which specialists needed)
+│   └── establishRemediationPlan()       (synthesizes findings → plan)
+│
+├── class DbusTcpSpecialist              (new: deep-dive on dbus-tcp)
+│   ├── captureSystemdUnitStatus()
+│   ├── captureJournalLogs()
+│   ├── capturePortStatus()
+│   └── suggestRemediation()
+│
+├── class NetworkSpecialist              (new: deep-dive on network)
+│   ├── checkDnsResolution()
+│   ├── checkRouting()
+│   └── checkFirewall()
+│
+├── class IncusExecSpecialist            (new: deep-dive on incus-exec)
+│   ├── checkInstanceState()
+│   └── checkExecPath()
 │
 ├── class SystemDiagnostics              (new: non-static inner class)
 │   └── implements DiagnosticCollector   (captures metrics only)
@@ -53,29 +72,51 @@ SeedSystemdAdapterEndpointGate.java (production class)
 │   ├── systemd_adapter_probe_runs()     (DSL method)
 │   └── dbus_endpoint_responds()         (DSL method)
 │
-└── class DiagnosticScenario             (new: nested class)
-    ├── extends ScenarioTest<...>        (JGiven scenario)
-    └── systemd_adapter_becomes_reachable() (test method)
+├── class DiagnosticScenario             (new: nested class)
+│   ├── extends ScenarioTest<...>        (JGiven scenario)
+│   ├── systemd_adapter_becomes_reachable() (scenario method)
+│   ├── severity()                       (returns: CRITICAL or WARNING)
+│   └── execute()                        (programmatic invocation, returns ScenarioResult)
+│
+└── enum Severity                        (new: scenario severity levels)
+    ├── CRITICAL                         (stop provisioning on failure)
+    └── WARNING                          (continue in degraded mode on failure)
 ```
 
 **Key decisions:**
 - All BDD components are **nested** (impossible to forget)
 - Actor implementations are **non-static** (can access production helper methods directly)
-- **Uniform naming:** `DiagnosticCollector`, `SystemDiagnostics`, `OrchestratorDiagnostics`, `OperatorDiagnostics`, `Stages`, `DiagnosticScenario`
+- **Uniform naming:** `DiagnosticCollector`, `SystemDiagnostics`, `OrchestratorDiagnostics`, `OperatorDiagnostics`, `Stages`, `DiagnosticScenario`, `Severity`
+- **Doctor hierarchy:** Generalist always runs on failure → invokes Specialists → establishes RemediationPlan
+- **Scenario owns severity:** Each scenario declares CRITICAL or WARNING based on domain knowledge
+- **Operator policy override:** Strict mode can force all failures to CRITICAL during debugging
 
 ### Integration Point
 
-New verification stage in bootstrap pipeline:
+**Scenarios as readiness gates** between resource provisioning steps:
 
 ```java
-// In BootstrapPipeline.java
-.then()
-.during("verification", verify -> verify
-    .runDiagnosticScenarios()
-    .publishReports())
-.then()
-.during("outputs", outputs -> outputs.exportOrPrint())
+// In IncusResourceBootstrap.java or similar provisioning code
+
+// 1. Provision Incus instance
+final Instance masterInstance = new Instance("bioskop-master", instanceArgs);
+
+// 2. Readiness gate: verify instance reachable
+final ScenarioResult instanceReachable = InstanceReachabilityScenario.execute(masterInstance);
+handleScenarioResult(instanceReachable);  // stop if CRITICAL failure
+
+// 3. Provision systemd dbus-tcp unit (depends on instance)
+final SystemdUnit dbusUnit = provisionDbusUnit(masterInstance);
+
+// 4. Readiness gate: verify systemd adapter endpoint
+final ScenarioResult adapterReachable = SystemdAdapterScenario.execute(dbusUnit);
+handleScenarioResult(adapterReachable);  // stop if CRITICAL, continue degraded if WARNING
+
+// 5. Provision manifest units (depend on systemd adapter)
+final List<ManifestUnit> units = provisionManifestUnits(dbusUnit);
 ```
+
+Scenarios run **programmatically** during provisioning, not as separate verification stage after bootstrap completes.
 
 ## Implementation Scope
 
@@ -84,7 +125,7 @@ New verification stage in bootstrap pipeline:
 **Maven dependencies:**
 - Add JGiven 1.3.1 to BOM (scope: `compile`, not `test`)
 - Add JUnit Jupiter API to seed-master (scope: `compile`)
-- Add jgiven-maven-plugin for AsciiDoc report generation
+- **NO maven plugin needed** - scenarios run programmatically during pulumi up, not via `mvn test`
 
 **New production helpers:**
 - `SeedSystemdAdapterEndpointGate.getSystemdUnitStatus(String unitName)`
@@ -93,14 +134,18 @@ New verification stage in bootstrap pipeline:
 
 **BDD nested components:**
 - `DiagnosticCollector` interface (typed to dbus/systemd domain)
+- `GeneralistDiagnostic` (first-level triage, decides specialist referrals)
+- `DbusTcpSpecialist`, `NetworkSpecialist`, `IncusExecSpecialist` (deep-dive diagnostics)
 - `SystemDiagnostics`, `OrchestratorDiagnostics`, `OperatorDiagnostics` (actor implementations)
 - `Stages` (JGiven DSL vocabulary)
-- `DiagnosticScenario` (test logic)
+- `DiagnosticScenario` (scenario logic, severity declaration, programmatic execution)
+- `Severity` enum (CRITICAL, WARNING)
 
-**Pipeline integration:**
-- New `VerificationStage` class in `pipeline/stages/`
-- `runDiagnosticScenarios()` method invokes scenarios programmatically
-- `publishReports()` method publishes to ConfigMap, stack outputs, filesystem
+**Provisioning integration:**
+- Scenarios invoked directly in resource provisioning code (e.g., `IncusResourceBootstrap`)
+- `handleScenarioResult()` method evaluates severity and operator policy
+- Stop provisioning on CRITICAL failure, continue degraded on WARNING failure
+- Publish reports on any failure (ConfigMap, stack outputs, filesystem)
 
 **Shared report utilities:**
 - `SharedMetricsCollector` (YAML output for system)
@@ -126,9 +171,31 @@ then().dbus_endpoint_responds()                    // SeedSystemdAdapterEndpoint
 
 ## Diagnostic Capture Strategy
 
-**Principle:** Targeted capture - clean output on success, detailed diagnostics only on failure.
+**Principle:** Targeted capture - clean output on success, doctor hierarchy on failure.
 
-**Implementation:**
+### Doctor Hierarchy
+
+On failure, always invoke the **Generalist** (first-level triage), which decides which **Specialists** to invoke:
+
+```text
+Scenario fails
+  ↓
+Generalist examines symptoms
+  ├─→ symptom: connection_refused
+  ├─→ symptom: port_unreachable
+  └─→ symptom: timeout
+  ↓
+Generalist invokes Specialists
+  ├─→ DbusTcpSpecialist (systemd status, journal, port check)
+  ├─→ NetworkSpecialist (DNS, routing, firewall) [if needed]
+  └─→ IncusExecSpecialist (instance state, exec path) [if needed]
+  ↓
+Generalist synthesizes findings
+  ↓
+Generalist establishes RemediationPlan
+```
+
+### Implementation
 
 ```java
 public Stages systemd_adapter_probe_runs() {
@@ -144,28 +211,107 @@ public Stages systemd_adapter_probe_runs() {
   } catch (Exception e) {
     diagnostics.onDbusProbeFailure(e);
 
-    // Capture diagnostics ONLY on failure
-    final String unitStatus = getSystemdUnitStatus("rke2lab-dbus-tcp-system-bus");
-    diagnostics.captureSystemdUnitStatus("rke2lab-dbus-tcp-system-bus", unitStatus);
-
-    if (unitStatus.contains("inactive") || unitStatus.contains("failed")) {
-      final List<String> logs = getJournalLogs("rke2lab-dbus-tcp-system-bus");
-      diagnostics.captureJournalLogs("rke2lab-dbus-tcp-system-bus", logs);
-    }
-
-    final boolean portListening = checkPortListening(12434);
-    diagnostics.capturePortStatus(12434, portListening);
-
-    diagnostics.suggestDbusRemediation(
-        "Check if socat is installed: incus exec master -- which socat",
-        "Verify script exists: incus exec master -- ls -la /srv/host/systemd-scripts.d/rke2lab-dbus-tcp-system-bus.sh",
-        "Check systemd unit: incus exec master -- systemctl status rke2lab-dbus-tcp-system-bus.service",
-        "View journal: incus exec master -- journalctl -u rke2lab-dbus-tcp-system-bus.service -n 50");
+    // ALWAYS invoke Generalist on failure
+    final GeneralistDiagnostic generalist = diagnostics.requestGeneralistDiagnostic();
+    generalist.recordSymptom("connection_refused", e);
+    
+    // Generalist decides which specialists to invoke
+    generalist.invokeSpecialists();  // → DbusTcpSpecialist, NetworkSpecialist, etc.
+    
+    // Generalist synthesizes specialist findings and establishes plan
+    final RemediationPlan plan = generalist.establishRemediationPlan();
+    
+    // Publish diagnostic + plan
+    diagnostics.publishDiagnostic(generalist, plan);
   }
 
   return self();
 }
 ```
+
+### Specialist Implementation Example
+
+```java
+class DbusTcpSpecialist {
+  List<Finding> diagnose(Symptom symptom) {
+    final List<Finding> findings = new ArrayList<>();
+    
+    // Deep-dive: systemd unit status
+    final String unitStatus = getSystemdUnitStatus("rke2lab-dbus-tcp-system-bus");
+    findings.add(Finding.systemdUnit(unitStatus));
+    
+    // Deep-dive: journal logs (if unit failed)
+    if (unitStatus.contains("inactive") || unitStatus.contains("failed")) {
+      final List<String> logs = getJournalLogs("rke2lab-dbus-tcp-system-bus");
+      findings.add(Finding.journalLogs(logs));
+    }
+    
+    // Deep-dive: port status
+    final boolean portListening = checkPortListening(12434);
+    findings.add(Finding.portStatus(12434, portListening));
+    
+    return findings;
+  }
+  
+  List<String> suggestRemediation(List<Finding> findings) {
+    return List.of(
+        "Check if socat is installed: incus exec master -- which socat",
+        "Verify script exists: incus exec master -- ls -la /srv/host/systemd-scripts.d/",
+        "Check systemd unit: incus exec master -- systemctl status rke2lab-dbus-tcp-system-bus.service",
+        "View journal: incus exec master -- journalctl -u rke2lab-dbus-tcp-system-bus.service -n 50");
+  }
+}
+```
+
+## Severity and Operator Policy
+
+### Scenario Owns Severity
+
+Each scenario declares its severity based on domain knowledge:
+
+```java
+class DiagnosticScenario {
+  public Severity severity() {
+    // SystemD adapter failure is WARNING - master can provision without it (degraded mode)
+    // Incus instance unreachable would be CRITICAL - nothing can proceed
+    return Severity.WARNING;
+  }
+}
+```
+
+### Operator Policy Override
+
+Operator can force strict mode during debugging:
+
+```java
+private void handleScenarioResult(ScenarioResult result) {
+  final Severity effectiveSeverity = policy.isStrictMode() 
+      ? Severity.CRITICAL  // Force fail-fast during debugging
+      : result.severity(); // Respect scenario's domain knowledge
+  
+  if (result.failed() && effectiveSeverity == Severity.CRITICAL) {
+    publishReports(result);
+    throw new PipelineStageFailure("blocked by scenario: " + result.name());
+  }
+  
+  if (result.failed() && effectiveSeverity == Severity.WARNING) {
+    publishReports(result);
+    markStackDegraded(result.name());
+    log.warn("Continuing in degraded mode: {}", result.name());
+    // Continue provisioning
+  }
+}
+```
+
+### Decision Matrix
+
+| Scenario Severity | Operator Policy | Result Failed | Action |
+| --- | --- | --- | --- |
+| CRITICAL | any | yes | Stop provisioning, publish reports |
+| CRITICAL | any | no | Continue |
+| WARNING | strict | yes | Stop provisioning, publish reports |
+| WARNING | lenient | yes | Continue degraded, publish reports |
+| WARNING | any | no | Continue |
 
 ## Report Publication
 
@@ -297,20 +443,30 @@ public VerificationStage publishReports() {
 
 ## Testing Strategy
 
-**Phase 1:** Scenario runs against existing `bioskop-master` infrastructure during `pulumi up`.
+**Phase 1:** Scenario runs as readiness gate during `pulumi up` resource provisioning.
 
 **Expected outcome TODAY:**
-- Scenario runs and captures the actual port 12434 failure
-- AsciiDoc report shows detailed diagnostics (socat missing, unit failed, journal logs)
-- Report provides remediation steps
-- This evidence guides fixing the actual issue (add socat to image, fix script, etc.)
+
+- Incus instance "master" provisioned
+- Systemd dbus-tcp unit provisioned
+- **Readiness gate:** SystemdAdapterScenario.execute()
+  - Probe fails (port 12434 connection refused)
+  - Generalist invoked → DbusTcpSpecialist diagnoses (socat missing, unit failed)
+  - RemediationPlan established
+  - Reports published (ConfigMap, stack outputs, AsciiDoc)
+  - Severity: WARNING → provisioning continues in degraded mode
+- Manifest units provisioned (without systemd-adapter available)
+- Stack marked as DEGRADED but READY
 
 **After fix:**
-- Scenario turns green
-- Report shows clean success (just checkmarks)
-- Scenario stays in codebase as permanent deployment verification
 
-**This is the "doctor" pattern:** diagnose now, prevent regression forever.
+- Same provisioning flow
+- Readiness gate passes (port 12434 reachable)
+- Clean report (checkmarks only)
+- Stack marked as HEALTHY
+- Scenario remains as permanent readiness gate
+
+**This is the "doctor + gate" pattern:** block or allow based on severity, diagnose on failure, prevent regression forever.
 
 ## Dependencies
 
@@ -344,44 +500,30 @@ public VerificationStage publishReports() {
   </dependency>
 </dependencies>
 
-<build>
-  <plugins>
-    <plugin>
-      <groupId>com.tngtech.jgiven</groupId>
-      <artifactId>jgiven-maven-plugin</artifactId>
-      <version>${jgiven.version}</version>
-      <executions>
-        <execution>
-          <goals>
-            <goal>report</goal>
-          </goals>
-          <phase>verify</phase>
-          <configuration>
-            <format>asciidoc</format>
-            <outputDirectory>${project.build.directory}/jgiven-reports</outputDirectory>
-          </configuration>
-        </execution>
-      </executions>
-    </plugin>
-  </plugins>
-</build>
+<!-- NO maven plugin needed - scenarios run programmatically during pulumi up -->
 ```
 
 ## Success Criteria
 
 ### Immediate (Phase 1)
-- [ ] JGiven dependencies added to BOM and seed-master
-- [ ] `SeedSystemdAdapterEndpointGate` has all nested BDD components
-- [ ] Scenario runs during `pulumi up` verification stage
-- [ ] AsciiDoc report captures actual port 12434 failure with diagnostics
-- [ ] Report provides actionable remediation steps
-- [ ] ConfigMap, stack outputs, and filesystem reports all published
+
+- [ ] JGiven dependencies added to BOM and seed-master (scope: compile)
+- [ ] `SeedSystemdAdapterEndpointGate` has all nested BDD components (DiagnosticCollector, GeneralistDiagnostic, Specialists, actor implementations, Stages, DiagnosticScenario, Severity enum)
+- [ ] Scenario runs as readiness gate during resource provisioning (not post-provisioning verification)
+- [ ] Generalist diagnostic invokes appropriate specialists on failure
+- [ ] Doctor hierarchy establishes remediation plan
+- [ ] Severity declaration (WARNING for systemd-adapter) allows degraded mode
+- [ ] Operator policy override (strict mode) forces fail-fast when needed
+- [ ] AsciiDoc report captures actual port 12434 failure with full doctor hierarchy output
+- [ ] ConfigMap, stack outputs, and filesystem reports all published on failure
+- [ ] Provisioning continues in degraded mode (systemd-adapter WARNING + lenient policy)
 
 ### Future (Post-Fix)
+
 - [ ] Fix actual socat/port 12434 issue based on diagnostic evidence
 - [ ] Scenario turns green
 - [ ] Clean report (checkmarks only) on successful deployment
-- [ ] Scenario remains in codebase as permanent verification
+- [ ] Scenario remains in codebase as permanent readiness gate
 
 ## Non-Goals (Explicitly Out of Scope)
 
@@ -520,8 +662,9 @@ public class SharedReportBuilder {
 ## Timeline Estimate
 
 **Phase 1 (this spec):** 2-3 days
-- Day 1: Maven dependencies, shared utilities, production helpers
-- Day 2: Nested BDD components in `SeedSystemdAdapterEndpointGate`, verification stage
-- Day 3: Report publication, testing against real infrastructure, documentation updates
+
+- Day 1: Maven dependencies, Severity enum, doctor hierarchy classes (GeneralistDiagnostic, Specialists), shared utilities
+- Day 2: Nested BDD components in `SeedSystemdAdapterEndpointGate`, programmatic execution, severity + policy handling
+- Day 3: Report publication, integration as readiness gate in provisioning code, testing against real infrastructure
 
 **Phase 2 (DSL composition):** 1-2 days after pattern validation
