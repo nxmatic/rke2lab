@@ -9,6 +9,9 @@ target/
 .pulumi/
 .pulumi-state/
 
+# Claude Code session checkpoints (private, auto-generated before compaction)
+.claude/checkpoint-*.md
+
 # GitHub temporary folders
 .github/**/tmp
 
