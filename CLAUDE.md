@@ -1,3 +1,56 @@
+# Quick Start
+
+## First-time setup
+
+```bash
+# Install flox (if not already installed)
+curl -L https://downloads.flox.dev/by-env/stable/install | sh
+
+# Activate flox environment (provides JDK 25 toolchain)
+flox activate
+```
+
+All Maven commands must run through flox: `flox activate -- ./mvnw ...`
+
+## Common commands
+
+```bash
+# Build all modules
+./mvnw clean install
+
+# Build specific module (use unprefixed artifact ID from module directory name)
+./mvnw -pl :seed-master clean install
+./mvnw -pl :manifests clean package
+
+# Run tests
+./mvnw test
+
+# Skip tests during build
+./mvnw clean install -DskipTests
+
+# Clean build artifacts
+./mvnw clean
+```
+
+## Project structure
+
+- `seed-master/` - Main bootstrap orchestration and Pulumi control plane
+- `manifests/` - Kubernetes manifest units (CDK8s-based, 27+ units)
+- `systemd-contract/` - Systemd unit abstractions and contracts
+- `cdk8s-systemd/` - CDK8s integration for systemd units
+- `netplan/` - Network configuration synthesis
+- `sdks/incus/` - Incus API client SDK
+- `bom/` - Bill of materials for dependency management
+- `docs/` - Architecture documentation (40+ AsciiDoc files)
+
+## Where to learn more
+
+- **Architecture**: Start with `docs/README.adoc` for navigation
+- **Bootstrap contract**: `docs/architecture/bootstrap/bootstrap-contract.adoc`
+- **Fluent pipeline grammar**: `docs/architecture/patterns/fluent-pipeline-grammar.adoc` (type-state workflow DSL)
+- **Manifest architecture**: `docs/architecture/manifests/manifests-architecture.adoc`
+- **Troubleshooting**: `docs/guides/troubleshooting-workflow.adoc`
+
 # Project conventions
 
 ## Build & module layout
@@ -9,7 +62,7 @@
 
 ## Fluent pipeline grammar
 
-Multi-stage workflows in seed-master follow a documented fluent grammar. The full design lives at [docs/fluent-pipeline-grammar.adoc](docs/fluent-pipeline-grammar.adoc). Summary:
+Multi-stage workflows in seed-master follow a documented fluent grammar. The full design lives at [docs/architecture/patterns/fluent-pipeline-grammar.adoc](docs/architecture/patterns/fluent-pipeline-grammar.adoc). Summary:
 
 - **Topic blocks** are entered with `.during("label", lambda)`. The lambda receives a topic-specific builder so only that topic's verbs are callable inside.
 - **Conjunctions** between topics are explicit: `.then()` is mandatory between `during(...)` calls. It exists for readability, not data flow.
@@ -161,7 +214,7 @@ manifestDomain.put("clusterApi", policy.isEnabled("clusterApi")); // ❌ Mismatc
 **Enforcement**:
 - Grep in code review: `! grep -r 'isEnabled("' manifests/src/ seed-master/src/`
 - When adding a new domain, add the accessor method to `ManifestDomainCatalog` first
-- See `docs/manifest-domain-catalog-pattern.adoc` for full pattern documentation
+- See `docs/architecture/manifests/manifest-domain-catalog-pattern.adoc` for full pattern documentation
 
 ### Lazy instantiation pattern
 
@@ -366,7 +419,7 @@ Document architectural decisions, patterns, and workflows proactively, especiall
 
 ### Documentation quality standard
 
-Follow the pattern established in `docs/bootstrap-identity-provider.adoc` (commit c324fa05):
+Follow the pattern established in `docs/architecture/bootstrap/bootstrap-identity-provider.adoc` (commit c324fa05):
 
 **Required elements**:
 
