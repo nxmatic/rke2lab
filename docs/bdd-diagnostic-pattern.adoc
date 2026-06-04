@@ -1,0 +1,543 @@
+= BDD Diagnostic Pattern: Scenarios as System Components
+:toc: left
+:toclevels: 3
+
+This document defines the pattern for embedding JGiven BDD scenarios directly into production code as deployment verification components.
+
+== Overview
+
+BDD diagnostic scenarios are **first-class system components**, not external tests. They run during deployment (`pulumi up`), verify infrastructure health, capture diagnostics on failure, and publish reports as stack resources.
+
+**What this solves:**
+- Living documentation that never drifts (scenarios co-located with production code)
+- Actor-specific diagnostic output (system metrics vs orchestrator decisions vs operator troubleshooting)
+- Deployment verification as part of infrastructure-as-code
+- Incremental improvement (scenarios evolve alongside production code)
+
+== Architecture
+
+=== C4 Context Diagram: BDD Scenarios in Deployment Flow
+
+[mermaid]
+----
+graph TB
+    subgraph Deployment["Pulumi Deployment"]
+        Resources[Pulumi Resources<br/><i>Incus, Systemd, Manifests</i>]
+        Verification[Verification Stage<br/><i>Runs BDD scenarios</i>]
+        Reports[Report Publishers<br/><i>ConfigMap, Stack outputs, Files</i>]
+    end
+
+    subgraph Production["Production Code"]
+        ProbeGate[SeedSystemdAdapterEndpointGate<br/><i>Production probe logic</i>]
+        Stages[Nested: Stages<br/><i>JGiven DSL</i>]
+        Collectors[Nested: DiagnosticCollectors<br/><i>Actor-specific capture</i>]
+        Scenario[Nested: DiagnosticScenario<br/><i>Test logic</i>]
+    end
+
+    subgraph Actors["Diagnostic Consumers"]
+        System[System<br/><i>Queries ConfigMap YAML</i>]
+        Orchestrator[Orchestrator<br/><i>Reads stack outputs JSON</i>]
+        Operator[Operator<br/><i>Reads filesystem AsciiDoc</i>]
+    end
+
+    Resources -->|infrastructure ready| Verification
+    Verification -->|invokes| Scenario
+    Scenario -->|uses| Stages
+    Stages -->|calls| ProbeGate
+    Stages -->|captures via| Collectors
+    Collectors -->|actor-specific data| Reports
+
+    Reports -->|ConfigMap YAML| System
+    Reports -->|Stack output JSON| Orchestrator
+    Reports -->|File AsciiDoc| Operator
+
+    style Production fill:#fff4e6,stroke:#ff9900
+    style Deployment fill:#ccffcc,stroke:#00cc66
+    style Actors fill:#e1f5ff,stroke:#0066cc
+----
+
+**Legend:**
+* Orange: Production code with nested BDD components
+* Green: Deployment flow
+* Blue: Diagnostic consumers (actors)
+
+**Key Separation of Concerns:**
+1. **Production logic** (what) - Probe infrastructure, capture state
+2. **Scenario logic** (when/then) - Verify expected behavior
+3. **Actor-specific collection** (how) - Format data per consumer
+4. **Multi-channel publication** (where) - ConfigMap, stack, filesystem
+
+=== C4 Component Diagram: Co-Located Nested Classes
+
+[mermaid]
+----
+classDiagram
+    class SeedSystemdAdapterEndpointGate {
+        +ensureReachable() Map~String,Object~
+        +waitForRuntimeProbe() Map~String,Object~
+        -getSystemdUnitStatus() String
+        -getJournalLogs() List~String~
+    }
+
+    class DiagnosticCollector {
+        <<interface>>
+        +onDbusProbeStart(host, port)
+        +onDbusProbeSuccess(elapsed, status)
+        +onDbusProbeFailure(cause)
+        +captureSystemdUnitStatus(unit, status)
+        +captureJournalLogs(unit, logs)
+    }
+
+    class SystemDiagnostics {
+        +onDbusProbeSuccess()
+        +onDbusProbeFailure()
+    }
+
+    class OrchestratorDiagnostics {
+        +onDbusProbeSuccess()
+        +onDbusProbeFailure()
+    }
+
+    class OperatorDiagnostics {
+        +onDbusProbeFailure()
+        +captureSystemdUnitStatus()
+        +captureJournalLogs()
+    }
+
+    class Stages {
+        -DiagnosticCollector diagnostics
+        +systemd_adapter_probe_runs() Stages
+        +dbus_endpoint_responds() Stages
+    }
+
+    class DiagnosticScenario {
+        +systemd_adapter_becomes_reachable()
+    }
+
+    SeedSystemdAdapterEndpointGate *-- DiagnosticCollector : defines interface
+    SeedSystemdAdapterEndpointGate *-- SystemDiagnostics : nested impl
+    SeedSystemdAdapterEndpointGate *-- OrchestratorDiagnostics : nested impl
+    SeedSystemdAdapterEndpointGate *-- OperatorDiagnostics : nested impl
+    SeedSystemdAdapterEndpointGate *-- Stages : nested DSL
+    SeedSystemdAdapterEndpointGate *-- DiagnosticScenario : nested scenario
+
+    DiagnosticCollector <|.. SystemDiagnostics
+    DiagnosticCollector <|.. OrchestratorDiagnostics
+    DiagnosticCollector <|.. OperatorDiagnostics
+
+    Stages --> DiagnosticCollector : uses
+    Stages --> SeedSystemdAdapterEndpointGate : calls production methods
+    DiagnosticScenario --> Stages : composes DSL
+----
+
+== The Pattern
+
+=== 1. Nested Class Co-Location
+
+All BDD components nest inside the production class they verify:
+
+[source,java]
+----
+public final class SeedSystemdAdapterEndpointGate {
+  // Production methods
+  public static Map<String, Object> ensureReachable(BootstrapConfig config, Consumer<String> logger) {
+    // ... actual probe logic
+  }
+
+  private static String getSystemdUnitStatus(String unitName) { /* ... */ }
+  private static List<String> getJournalLogs(String unitName) { /* ... */ }
+
+  // ===== BDD Components (all nested) =====
+
+  public interface DiagnosticCollector { /* ... */ }
+  public class SystemDiagnostics implements DiagnosticCollector { /* ... */ }
+  public class OrchestratorDiagnostics implements DiagnosticCollector { /* ... */ }
+  public class OperatorDiagnostics implements DiagnosticCollector { /* ... */ }
+  public class Stages extends Stage<Stages> { /* ... */ }
+  public class DiagnosticScenario extends ScenarioTest<...> { /* ... */ }
+}
+----
+
+**Benefits:**
+- Open production class → scenario is right there
+- Refactor/rename → scenario moves automatically
+- Code review → can't merge production code without its diagnostic
+
+=== 2. Stage-Specific Typed Collector Interface
+
+Each production class defines its own diagnostic collector interface:
+
+[source,java]
+----
+public interface DiagnosticCollector {
+  void onDbusProbeStart(String host, int port);
+  void onDbusProbeSuccess(Duration elapsed, Map<String, Object> adapterStatus);
+  void onDbusProbeFailure(Exception cause);
+  void captureSystemdUnitStatus(String unitName, String status);
+  void captureJournalLogs(String unitName, List<String> logs);
+  void capturePortStatus(int port, boolean listening);
+  void suggestDbusRemediation(String... steps);
+}
+----
+
+**Key principle:** The interface is typed to the domain (dbus probes, systemd units), not generic.
+
+=== 3. Actor-Specific Implementations
+
+Each actor (System, Orchestrator, Operator) implements the collector interface:
+
+[source,java]
+----
+public class SystemDiagnostics implements DiagnosticCollector {
+  private final SharedMetricsCollector metrics = new SharedMetricsCollector();
+
+  @Override
+  public void onDbusProbeSuccess(Duration elapsed, Map<String, Object> status) {
+    metrics.recordLatency("dbus-probe", elapsed);
+    metrics.captureFlag("dbusEndpointReachable", true);
+  }
+
+  @Override
+  public void suggestDbusRemediation(String... steps) {
+    // System ignores remediation (not actionable for automated systems)
+  }
+}
+
+public class OperatorDiagnostics implements DiagnosticCollector {
+  private final SharedReportBuilder report = new SharedReportBuilder();
+
+  @Override
+  public void onDbusProbeFailure(Exception cause) {
+    report.addSection("Dbus Probe Failure")
+        .addException(cause)
+        // Direct access to outer class methods via non-static inner class
+        .addDetail("Unit Status", getSystemdUnitStatus("rke2lab-dbus-tcp-system-bus"))
+        .addDetail("Journal", String.join("\n", getJournalLogs("rke2lab-dbus-tcp-system-bus")));
+  }
+
+  @Override
+  public void suggestDbusRemediation(String... steps) {
+    report.addRemediation(steps);  // Operator gets full troubleshooting steps
+  }
+}
+----
+
+**Pattern:** Actor implementations are **non-static inner classes** so they can access outer class production methods directly (no duplication).
+
+=== 4. JGiven Stages (DSL Building Blocks)
+
+Stages define reusable DSL vocabulary:
+
+[source,java]
+----
+public class Stages extends Stage<Stages> {
+  private final DiagnosticCollector diagnostics;
+  private final BootstrapConfig config;
+
+  public Stages(DiagnosticCollector diagnostics, BootstrapConfig config) {
+    this.diagnostics = diagnostics;
+    this.config = config;
+  }
+
+  public Stages systemd_adapter_probe_runs() {
+    diagnostics.onDbusProbeStart(config.systemdAdapterDbusHost(), config.systemdAdapterDbusPort());
+
+    try {
+      final long start = System.nanoTime();
+      final Map<String, Object> result = ensureReachable(config, null);  // Call production method
+      final Duration elapsed = Duration.ofNanos(System.nanoTime() - start);
+
+      diagnostics.onDbusProbeSuccess(elapsed, result);
+    } catch (Exception e) {
+      diagnostics.onDbusProbeFailure(e);
+
+      // Capture diagnostics on failure only (targeted capture)
+      final String unitStatus = getSystemdUnitStatus("rke2lab-dbus-tcp-system-bus");
+      diagnostics.captureSystemdUnitStatus("rke2lab-dbus-tcp-system-bus", unitStatus);
+
+      if (unitStatus.contains("inactive")) {
+        final List<String> logs = getJournalLogs("rke2lab-dbus-tcp-system-bus");
+        diagnostics.captureJournalLogs("rke2lab-dbus-tcp-system-bus", logs);
+      }
+
+      diagnostics.suggestDbusRemediation(
+          "Check if socat is installed: incus exec master -- which socat",
+          "Verify script is executable: incus exec master -- ls -la /srv/host/systemd-scripts.d/",
+          "Check systemd unit status: incus exec master -- systemctl status rke2lab-dbus-tcp-system-bus.service");
+    }
+
+    return self();
+  }
+
+  public Stages dbus_endpoint_responds() {
+    // Additional stage method
+    return self();
+  }
+}
+----
+
+**Pattern:** Stages call production methods directly, delegate diagnostic capture to the injected collector.
+
+=== 5. Diagnostic Scenario (Test Logic)
+
+Scenarios compose stages into readable specifications:
+
+[source,java]
+----
+public class DiagnosticScenario extends ScenarioTest<GivenStage, WhenStage, ThenStage> {
+  private final Actor targetActor;
+
+  public DiagnosticScenario(Actor targetActor) {
+    this.targetActor = targetActor;
+  }
+
+  @Test
+  public void systemd_adapter_becomes_reachable() {
+    given().incus_instance_exists("bioskop-master")           // From IncusResourceBootstrap.Stages
+        .and().bootstrap_config_is_loaded();                  // From BootstrapConfig.Stages
+
+    when().systemd_adapter_probe_runs();                      // From SeedSystemdAdapterEndpointGate.Stages
+
+    then().dbus_endpoint_responds()                           // From SeedSystemdAdapterEndpointGate.Stages
+        .and().systemd_target_is_active("rke2lab.target");   // From SystemdStages
+  }
+}
+----
+
+**Pattern:** Scenario runs once per actor. The actor parameter controls what diagnostics get captured and how they're formatted.
+
+=== 6. DSL Composition Across Classes
+
+Stages from different production classes compose into a single scenario:
+
+[source,java]
+----
+// IncusResourceBootstrap.java
+public class Stages extends Stage<Stages> {
+  public Stages incus_instance_exists(String name) { /* ... */ }
+}
+
+// SeedSystemdAdapterEndpointGate.java
+public class Stages extends Stage<Stages> {
+  public Stages systemd_adapter_probe_runs() { /* ... */ }
+  public Stages dbus_endpoint_responds() { /* ... */ }
+}
+
+// SystemdTargetMonitor.java
+public class Stages extends Stage<Stages> {
+  public Stages systemd_target_is_active(String target) { /* ... */ }
+}
+
+// Scenario composes all three
+public class DiagnosticScenario
+    extends ScenarioTest<IncusResourceBootstrap.Stages,
+                         SeedSystemdAdapterEndpointGate.Stages,
+                         SystemdTargetMonitor.Stages> {
+  // Uses vocabulary from all three stage classes
+}
+----
+
+**Key principle:** The DSL emerges naturally from composing domain-specific stage vocabularies.
+
+== Naming Conventions
+
+Enforce absolute uniformity across the codebase:
+
+[cols="1,2",options="header"]
+|===
+|Component |Naming Rule
+|Production class |Domain-specific name (e.g., `SeedSystemdAdapterEndpointGate`)
+|Collector interface |Always `DiagnosticCollector` (nested in production class)
+|Actor implementations |`SystemDiagnostics`, `OrchestratorDiagnostics`, `OperatorDiagnostics` (nested)
+|Stage class |Always `Stages` (nested in production class)
+|Scenario class |Always `DiagnosticScenario` (nested in production class)
+|===
+
+**Enforcement:** Every production class with diagnostics has exactly these nested components. No variations.
+
+== Invocation from Bootstrap Pipeline
+
+Scenarios run during deployment via the verification stage:
+
+[source,java]
+----
+// In BootstrapPipeline.java
+.then()
+.during("verification", verify -> verify
+    .runDiagnosticScenarios()
+    .publishReports())
+.then()
+.during("outputs", outputs -> outputs.exportOrPrint())
+----
+
+[source,java]
+----
+// In VerificationStage.java
+public VerificationStage runDiagnosticScenarios() {
+  final BootstrapConfig config = configSupplier.get();
+
+  // Run scenario once per actor
+  final SystemDiagnostics systemDiag = new SeedSystemdAdapterEndpointGate().new SystemDiagnostics();
+  final OrchestratorDiagnostics orchDiag = new SeedSystemdAdapterEndpointGate().new OrchestratorDiagnostics();
+  final OperatorDiagnostics opDiag = new SeedSystemdAdapterEndpointGate().new OperatorDiagnostics();
+
+  // Execute scenarios
+  new SeedSystemdAdapterEndpointGate.DiagnosticScenario(Actor.SYSTEM, systemDiag, config).execute();
+  new SeedSystemdAdapterEndpointGate.DiagnosticScenario(Actor.ORCHESTRATOR, orchDiag, config).execute();
+  new SeedSystemdAdapterEndpointGate.DiagnosticScenario(Actor.OPERATOR, opDiag, config).execute();
+
+  return this;
+}
+----
+
+== Report Publication (Multi-Actor)
+
+Each actor gets its diagnostic data in the format it needs:
+
+[source,java]
+----
+public VerificationStage publishReports() {
+  // A) ConfigMap - YAML for system (machine-readable metrics)
+  final String yamlReport = systemDiag.toYaml();
+  new ConfigMap("diagnostic-reports", ConfigMapArgs.builder()
+      .metadata(ObjectMetaArgs.builder()
+          .name("rke2lab-diagnostic-reports")
+          .namespace("rke2lab-system")
+          .build())
+      .data(Map.of("diagnostic-report.yaml", yamlReport))
+      .build());
+
+  // B) Stack outputs - JSON for orchestrator (structured decision data)
+  final Map<String, Object> jsonReport = orchDiag.toJson();
+  ctx.export("diagnosticReports", Output.of(jsonReport));
+
+  // C) File resources - AsciiDoc for operator (human-readable troubleshooting)
+  final String adocReport = opDiag.toAsciiDoc();
+  new local.Command("publish-diagnostic-reports-to-fs",
+      local.CommandArgs.builder()
+          .create(String.format(
+              "mkdir -p /var/lib/rke2lab/reports && echo '%s' > /var/lib/rke2lab/reports/diagnostic-report.adoc",
+              adocReport.replace("'", "'\\''")))
+          .build());
+
+  return this;
+}
+----
+
+**Actor-specific output examples:**
+
+**System (YAML):**
+```yaml
+apiVersion: rke2lab.nxmatic.io/v1alpha1
+kind: SystemDiagnostic
+status: healthy
+metrics:
+  dbusProbeLatencyMs: 45
+  dbusEndpointReachable: true
+  requiredServicesActive:
+    - rke2-server
+    - containerd
+    - rke2lab-dbus-tcp-system-bus
+```
+
+**Orchestrator (JSON):**
+```json
+{
+  "status": "healthy",
+  "shouldRollback": false,
+  "canProceedToNextStage": true,
+  "scenariosPassed": 5,
+  "scenariosTotal": 5,
+  "degradedResourceUrns": []
+}
+```
+
+**Operator (AsciiDoc):**
+```asciidoc
+= Diagnostic Report: systemd-adapter
+:toc: left
+
+== Scenario: systemd_adapter_becomes_reachable
+
+✓ Given incus instance exists
+✓ When systemd adapter probe runs
+✓ Then dbus endpoint responds
+
+Status: HEALTHY
+Probe latency: 45ms
+All systemd units active.
+```
+
+Or on failure:
+```asciidoc
+= Diagnostic Report: systemd-adapter
+
+== Scenario: systemd_adapter_becomes_reachable
+
+✓ Given incus instance exists
+✗ When systemd adapter probe runs
+
+=== Diagnostic: dbus-probe
+Connection refused at port 12434
+
+==== systemd-units
+rke2lab-dbus-tcp-system-bus.service: inactive (dead)
+
+==== journal-logs
+Jun 04 01:23:45 master systemd[1]: Starting rke2lab-dbus-tcp-system-bus.service...
+Jun 04 01:23:45 master rke2lab-dbus-tcp-system-bus.sh: /usr/bin/socat: not found
+
+==== Remediation
+1. Check if socat is installed: `incus exec master -- which socat`
+2. Verify script is executable: `incus exec master -- ls -la /srv/host/systemd-scripts.d/`
+3. Check unit status: `incus exec master -- systemctl status rke2lab-dbus-tcp-system-bus.service`
+```
+
+== Targeted Diagnostic Capture
+
+**Principle:** Clean output when healthy, detailed diagnostics only on failure.
+
+Implementation pattern:
+
+[source,java]
+----
+public Stages systemd_adapter_probe_runs() {
+  diagnostics.onProbeStart();
+
+  try {
+    result = ensureReachable(config, logger);
+    diagnostics.onProbeSuccess(result);  // Clean: just mark success
+
+  } catch (Exception e) {
+    diagnostics.onProbeFailure(e);
+
+    // Capture rich diagnostics ONLY on failure
+    diagnostics.captureSystemdUnitStatus("rke2lab-dbus-tcp-system-bus", getSystemdUnitStatus(...));
+    diagnostics.captureJournalLogs("rke2lab-dbus-tcp-system-bus", getJournalLogs(...));
+    diagnostics.capturePortStatus(12434, checkPortListening(12434));
+    diagnostics.suggestRemediation("Check socat installation", "Verify script exists");
+  }
+
+  return self();
+}
+----
+
+The report stays concise on success, expands with context on failure.
+
+== Related Patterns
+
+This pattern composes several existing rke2lab patterns:
+
+* **Fluent pipeline grammar** (link:fluent-pipeline-grammar.adoc[]) - Verification stage follows the `during("verification", ...)` pattern
+* **Bootstrap identity provider** (link:bootstrap-identity-provider.adoc[]) - Scenarios access identity via ThreadLocal
+* **ManifestDomainCatalog discipline** (link:manifest-domain-catalog-pattern.adoc[]) - Type-safe identifiers prevent mismatches
+* **Nested classes** (CLAUDE.md) - Co-location keeps scenarios with production code
+* **Non-static inner classes** (CLAUDE.md) - Actor implementations access outer class methods directly
+* **Instance-passing discipline** (CLAUDE.md) - Stages receive collector via constructor injection
+* **Uniformity enforcement** (CLAUDE.md) - All BDD components follow identical naming/structure
+
+== Related Documentation
+
+* link:bootstrap-contract.adoc[Bootstrap Contract] - Verification stage integration
+* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - How verification stage fits the pipeline
+* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Context access from scenarios

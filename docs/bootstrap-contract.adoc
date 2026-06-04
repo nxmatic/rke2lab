@@ -84,16 +84,108 @@ A successful Stage A run must provide enough information to install and reconcil
 . RKE2 server active and healthy on seed.
 . Kubernetes API reachable and responsive.
 . Minimum bootstrap manifests applied successfully.
+. **Verification stage** (added 2026-06-04): BDD diagnostic scenarios run post-provisioning to verify infrastructure health and publish actor-specific reports.
 
 Operator observability improvement:
 
 * Stage A exports `systemdRuntimeStatusSummary` as an explicit runtime-status contract so operators can see why readiness is blocked without ad-hoc host shelling.
+* **Diagnostic reports** (added 2026-06-04): Stage A publishes BDD scenario results as ConfigMap (YAML for system), stack outputs (JSON for orchestrator), and filesystem reports (AsciiDoc for operator). See link:bdd-diagnostic-pattern.adoc[BDD Diagnostic Pattern] for details.
+
+== Verification Stage
+
+**Added:** 2026-06-04
+
+The verification stage runs after infrastructure provisioning completes. It executes BDD diagnostic scenarios embedded in production code to verify deployment health and capture targeted diagnostics on failure.
+
+=== Integration Point
+
+The verification stage follows the fluent pipeline grammar:
+
+[source,java]
+----
+.then()
+.during("verification", verify -> verify
+    .runDiagnosticScenarios()
+    .publishReports())
+.then()
+.during("outputs", outputs -> outputs.exportOrPrint())
+----
+
+=== Verification Flow
+
+. Infrastructure resources provisioned (Incus instance, systemd units, manifests)
+. Verification stage invokes embedded diagnostic scenarios
+. Scenarios probe infrastructure using production code methods
+. Success: clean report (checkmarks only)
+. Failure: targeted diagnostic capture (systemd status, journal logs, port checks, remediation steps)
+. Reports published in three formats for three actors
+
+=== Actor-Specific Publication
+
+[cols="1,2,2",options="header"]
+|===
+|Actor |Format |Channel
+|System |YAML metrics |ConfigMap `rke2lab-diagnostic-reports`
+|Orchestrator |JSON decision data |Stack output `diagnosticReports`
+|Operator |AsciiDoc troubleshooting guide |Filesystem `/var/lib/rke2lab/reports/`
+|===
+
+=== Report Contents by Actor
+
+**System (YAML):**
+```yaml
+status: healthy
+metrics:
+  dbusProbeLatencyMs: 45
+  dbusEndpointReachable: true
+  requiredServicesActive: [rke2-server, containerd]
+```
+
+**Orchestrator (JSON):**
+```json
+{
+  "status": "healthy",
+  "shouldRollback": false,
+  "canProceedToNextStage": true,
+  "scenariosPassed": 5
+}
+```
+
+**Operator (AsciiDoc):**
+```asciidoc
+= Diagnostic Report
+
+== Scenario: systemd_adapter_becomes_reachable
+✓ Given incus instance exists
+✓ When systemd adapter probe runs
+✓ Then dbus endpoint responds
+
+Status: HEALTHY
+```
+
+Or on failure:
+```asciidoc
+✗ When systemd adapter probe runs
+
+=== Diagnostic: dbus-probe
+Connection refused at port 12434
+
+==== systemd-units
+rke2lab-dbus-tcp-system-bus.service: inactive (dead)
+
+==== Remediation
+1. Check if socat is installed
+2. Verify script exists at /srv/host/systemd-scripts.d/
+```
+
+See link:bdd-diagnostic-pattern.adoc[BDD Diagnostic Pattern] for full implementation details.
 
 == Failure semantics
 
 * Fail fast with explicit reason code and message.
 * Emit last successful phase for resumability.
 * Preserve diagnostics references for break-glass operations.
+* **Diagnostic scenarios** (added 2026-06-04): On verification failure, AsciiDoc reports contain targeted diagnostics (systemd status, logs, port checks) and remediation steps specific to the failure mode.
 
 == Acceptance criteria (Slice 1)
 
@@ -107,3 +199,5 @@ Operator observability improvement:
 * link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - How cluster identity is passed to manifest units
 * link:manifests-architecture.adoc[Manifests Architecture] - How manifests are generated from identity
 * link:gitops-cluster-api-transition-plan.adoc[GitOps + Cluster API Transition Plan] - Stage B handoff implementation
+* link:bdd-diagnostic-pattern.adoc[BDD Diagnostic Pattern] - How BDD scenarios verify deployment health and publish actor-specific reports
+* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - How verification stage integrates into the pipeline
