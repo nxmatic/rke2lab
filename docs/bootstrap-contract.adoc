@@ -84,41 +84,78 @@ A successful Stage A run must provide enough information to install and reconcil
 . RKE2 server active and healthy on seed.
 . Kubernetes API reachable and responsive.
 . Minimum bootstrap manifests applied successfully.
-. **Verification stage** (added 2026-06-04): BDD diagnostic scenarios run post-provisioning to verify infrastructure health and publish actor-specific reports.
+. **BDD Scenario Resources** (added 2026-06-04): Infrastructure provisioned through BDD scenarios (Pulumi ComponentResource) with built-in verification and drift detection.
 
 Operator observability improvement:
 
 * Stage A exports `systemdRuntimeStatusSummary` as an explicit runtime-status contract so operators can see why readiness is blocked without ad-hoc host shelling.
 * **Diagnostic reports** (added 2026-06-04): Stage A publishes BDD scenario results as ConfigMap (YAML for system), stack outputs (JSON for orchestrator), and filesystem reports (AsciiDoc for operator). See link:bdd-diagnostic-pattern.adoc[BDD Diagnostic Pattern] for details.
 
-== Verification Stage
+== BDD Scenarios as Infrastructure Resources
 
 **Added:** 2026-06-04
+**Updated:** 2026-06-04 (evolved from separate verification stage to ComponentResource pattern)
 
-The verification stage runs after infrastructure provisioning completes. It executes BDD diagnostic scenarios embedded in production code to verify deployment health and capture targeted diagnostics on failure.
+Infrastructure resources are provisioned through BDD scenarios that extend Pulumi `ComponentResource`. Scenarios wrap actual infrastructure as children, execute verification during provisioning, and integrate with Pulumi's native drift detection.
 
-=== Integration Point
+=== Architecture Pattern
 
-The verification stage follows the fluent pipeline grammar:
+**Scenarios ARE the infrastructure**, not tests OF infrastructure.
 
 [source,java]
 ----
-.then()
-.during("verification", verify -> verify
-    .runDiagnosticScenarios()
-    .publishReports())
-.then()
-.during("outputs", outputs -> outputs.exportOrPrint())
+// Scenario extends ComponentResource and wraps actual infrastructure
+public class SystemdAdapterScenario extends ComponentResource {
+  private final SystemdUnit unit;  // Wrapped resource (child)
+  private final Output<ScenarioResult> result;  // Cached verification result
+
+  public SystemdAdapterScenario(String name, Args args, ComponentResourceOptions opts) {
+    super("rke2lab:bdd:SystemdAdapter", name, opts);
+
+    // 1. Provision wrapped infrastructure
+    this.unit = new SystemdUnit(..., parent=this);
+
+    // 2. Execute scenario ONCE (given/when/then)
+    this.result = Output.of(executeScenario(args));
+
+    // 3. Handle failure based on severity
+    handleResult(result);
+
+    // 4. Register outputs (cached in Pulumi state)
+    registerOutputs(Map.of("unit", unit, "scenarioResult", result));
+  }
+
+  // Pulumi lifecycle hook for drift detection
+  @Override
+  protected CompletableFuture<ReadResult> read(String id, ReadArgs args) {
+    // Called during "pulumi refresh" - re-execute scenario
+    ScenarioResult actual = executeScenario(argsFromState(args));
+    return CompletableFuture.completedFuture(ReadResult.of(actual));
+  }
+}
 ----
 
-=== Verification Flow
+=== Provisioning Flow
 
-. Infrastructure resources provisioned (Incus instance, systemd units, manifests)
-. Verification stage invokes embedded diagnostic scenarios
-. Scenarios probe infrastructure using production code methods
-. Success: clean report (checkmarks only)
-. Failure: targeted diagnostic capture (systemd status, journal logs, port checks, remediation steps)
-. Reports published in three formats for three actors
+. Operator runs `pulumi up`
+. Pulumi creates scenario resource (`new SystemdAdapterScenario(...)`)
+. Scenario constructor:
+  .. Provisions wrapped infrastructure (SystemdUnit as child)
+  .. Executes BDD verification (given/when/then via JGiven)
+  .. Caches result in Pulumi state
+  .. Success: registers outputs
+  .. Failure: publishes diagnostics, continues degraded (WARNING) or fails (CRITICAL)
+. Other resources reference `scenario.unit()` without re-executing verification
+. Result cached in Pulumi state for drift detection
+
+=== Drift Detection Flow
+
+. Operator runs `pulumi refresh` (weeks/months later)
+. Pulumi calls `read()` on all ComponentResources
+. Scenario re-executes verification against live infrastructure
+. Compares actual state vs cached state
+. Drift detected → Pulumi shows diff in output
+. No custom drift detection needed (native Pulumi feature)
 
 === Actor-Specific Publication
 

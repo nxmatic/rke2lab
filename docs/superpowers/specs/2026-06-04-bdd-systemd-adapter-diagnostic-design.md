@@ -100,6 +100,117 @@ Previewing changes:
 
 ## Architecture
 
+### C4 Context Diagram: BDD Scenario as Infrastructure
+
+```mermaid
+graph TB
+    subgraph Operator
+        OP[Operator<br/>Manages infrastructure]
+    end
+    
+    subgraph PulumiStack["Pulumi Stack"]
+        SC[BDD Scenarios<br/>ComponentResource<br/>Infrastructure with built-in verification]
+        INFRA[Actual Infrastructure<br/>SystemD, Incus, K8s<br/>Managed resources]
+    end
+    
+    STATE[(Pulumi State<br/>Cached scenario results)]
+    REPORTS[Diagnostic Reports<br/>ConfigMap, Stack Outputs, Filesystem]
+    
+    OP -->|pulumi up / refresh| SC
+    SC -->|Provisions & verifies<br/>Given/When/Then| INFRA
+    SC -->|Caches results<br/>On provision| STATE
+    SC -->|Publishes on failure<br/>Multi-channel| REPORTS
+    STATE -.->|Compared during refresh<br/>Drift detection| SC
+    
+    style PulumiStack fill:#e1f5ff,stroke:#0066cc
+    style STATE fill:#fff4e6,stroke:#ff9900
+    style REPORTS fill:#ccffcc,stroke:#00cc66
+```
+
+### C4 Component Diagram: SystemdAdapterScenario Structure
+
+```mermaid
+graph TB
+    subgraph Scenario["SystemdAdapterScenario extends ComponentResource"]
+        CTOR[constructor<br/>Provision<br/>Provision → Execute → Cache]
+        READ[read<br/>Drift Detection<br/>Re-execute → Compare → Return]
+        OUT[Outputs<br/>Public API<br/>unit, scenarioResult, diagnostics]
+        
+        subgraph Wrapped["Wrapped Resources"]
+            UNIT[SystemdUnit<br/>Child Resource<br/>Actual infrastructure]
+        end
+        
+        subgraph BDD["BDD Components (Nested)"]
+            JGIVEN[JGivenScenario<br/>Execution<br/>given/when/then DSL]
+            STAGES[Stages<br/>DSL Vocabulary<br/>Scenario steps]
+            COLLECTOR[DiagnosticCollector<br/>Interface<br/>Typed capture methods]
+            GENERALIST[GeneralistDiagnostic<br/>Triage<br/>Decides specialists]
+            SPECIALISTS[Specialists<br/>Deep-dive<br/>DbusTcp, Network, IncusExec]
+            ACTORS[Actor Implementations<br/>Multi-channel<br/>System, Orchestrator, Operator]
+        end
+    end
+    
+    CTOR -->|Creates as parent| UNIT
+    CTOR -->|Executes once| JGIVEN
+    READ -->|Re-executes for drift| JGIVEN
+    JGIVEN -->|Uses| STAGES
+    STAGES -->|Calls on failure| COLLECTOR
+    COLLECTOR -->|Always invokes| GENERALIST
+    GENERALIST -->|Decides & invokes| SPECIALISTS
+    ACTORS -.->|Implement interface| COLLECTOR
+    
+    style Scenario fill:#e1f5ff,stroke:#0066cc
+    style Wrapped fill:#ccffcc,stroke:#00cc66
+    style BDD fill:#fff4e6,stroke:#ff9900
+```
+
+### C4 Sequence Diagram: Provisioning vs Drift Detection
+
+```mermaid
+sequenceDiagram
+    participant O as Operator
+    participant P as Pulumi
+    participant S as SystemdAdapterScenario
+    participant U as SystemdUnit (child)
+    participant J as JGivenScenario
+    participant ST as Pulumi State
+    
+    Note over O,ST: Provisioning Flow (pulumi up)
+    O->>P: pulumi up
+    P->>S: new SystemdAdapterScenario(...)
+    S->>U: new SystemdUnit(..., parent=this)
+    U-->>S: unit created
+    S->>J: executeScenario()
+    J->>J: given/when/then
+    alt Scenario fails
+        J->>S: ScenarioResult(failed, diagnostics)
+        S->>S: handleResult (check severity)
+        S->>O: Publish diagnostics (ConfigMap, etc)
+    else Scenario passes
+        J->>S: ScenarioResult(passed)
+    end
+    S->>ST: registerOutputs(unit, result, diagnostics)
+    ST-->>S: Outputs cached
+    S-->>P: Scenario ready
+    P-->>O: Stack updated
+    
+    Note over O,ST: Drift Detection Flow (pulumi refresh)
+    O->>P: pulumi refresh
+    P->>ST: Read cached state
+    P->>S: read(id, args)
+    S->>J: executeScenario() [re-run]
+    J->>J: given/when/then
+    J->>S: ScenarioResult(actual)
+    S->>ST: Compare actual vs cached
+    alt Drift detected
+        S-->>P: ReadResult(driftDetected=true, newState)
+        P->>O: Show drift: status changed
+    else No drift
+        S-->>P: ReadResult(driftDetected=false, sameState)
+        P->>O: No changes
+    end
+```
+
 ### BDD Scenario as ComponentResource
 
 **Key principle:** Scenario extends Pulumi `ComponentResource` and wraps the actual infrastructure resource.

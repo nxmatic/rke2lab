@@ -1,71 +1,135 @@
-= BDD Diagnostic Pattern: Scenarios as System Components
+= BDD Diagnostic Pattern: Scenarios as Pulumi Resources
 :toc: left
 :toclevels: 3
 
-This document defines the pattern for embedding JGiven BDD scenarios directly into production code as deployment verification components.
+This document defines the pattern for BDD scenarios as Pulumi `ComponentResource` - infrastructure resources with built-in verification, diagnostics, and drift detection.
 
 == Overview
 
-BDD diagnostic scenarios are **first-class system components**, not external tests. They run during deployment (`pulumi up`), verify infrastructure health, capture diagnostics on failure, and publish reports as stack resources.
+BDD diagnostic scenarios **ARE the infrastructure**, not tests OF infrastructure. Each scenario extends Pulumi's `ComponentResource`, wraps actual infrastructure resources as children, executes verification during provisioning, and integrates with Pulumi's native drift detection.
 
 **What this solves:**
+
 - Living documentation that never drifts (scenarios co-located with production code)
+- Verification intrinsic to provisioning (not bolted on after)
 - Actor-specific diagnostic output (system metrics vs orchestrator decisions vs operator troubleshooting)
-- Deployment verification as part of infrastructure-as-code
-- Incremental improvement (scenarios evolve alongside production code)
+- Native drift detection (via `pulumi refresh`, not custom mechanisms)
+- Uniform abstraction (all resources provisioned through scenarios)
+
+== Pattern Evolution
+
+**IMPORTANT:** This pattern evolved significantly during design. The current architecture (scenarios as ComponentResource) supersedes earlier approaches.
+
+=== Before: Scenarios as Separate Gates
+
+Initial design had scenarios as separate verification components that ran between provisioning steps:
+
+```
+Provision resource → Run scenario as gate → Continue or fail
+```
+
+**Problems:**
+
+- Duplication between Pulumi resource and scenario
+- Custom drift detection needed (reinventing Pulumi's wheel)
+- Scenarios executed on every resource reference (wasteful)
+- Separation between provisioning and verification
+
+=== After: Scenarios as ComponentResource
+
+Current design makes scenarios first-class Pulumi resources that wrap infrastructure:
+
+```
+Scenario IS the resource (extends ComponentResource) → Wraps actual infrastructure as child
+```
+
+**Benefits:**
+
+- Single abstraction (scenario = resource)
+- Pulumi's native drift detection (via `read()` lifecycle hook)
+- Execution once per provision (cached in Pulumi state)
+- Verification intrinsic to provisioning
 
 == Architecture
 
-=== C4 Context Diagram: BDD Scenarios in Deployment Flow
+=== C4 Context Diagram: Scenarios as Pulumi Resources
+
+[mermaid]
+----
+C4Context
+    title BDD Scenarios as First-Class Pulumi Resources
+
+    Person(operator, "Operator", "Manages infrastructure via Pulumi")
+
+    System_Boundary(stack, "Pulumi Stack") {
+        Container(scenarios, "BDD Scenario Resources", "ComponentResource", "Infrastructure with built-in verification")
+        Container(wrapped, "Wrapped Infrastructure", "SystemdUnit, Instance, etc", "Actual resources as children")
+    }
+
+    System_Ext(state, "Pulumi State Backend", "Caches scenario results")
+    System_Ext(actual, "Actual Infrastructure", "Incus, SystemD, K8s")
+    System_Ext(reports, "Diagnostic Reports", "ConfigMap, Stack Outputs, Filesystem")
+
+    Rel(operator, scenarios, "pulumi up", "Provision resources")
+    Rel(operator, scenarios, "pulumi refresh", "Check drift")
+    Rel(scenarios, wrapped, "Creates as children", "Parent-child relationship")
+    Rel(wrapped, actual, "Provisions", "Via Pulumi providers")
+    Rel(scenarios, actual, "Verifies", "Given/When/Then")
+    Rel(scenarios, state, "Caches results", "After verification")
+    Rel(scenarios, reports, "Publishes on failure", "Multi-channel")
+    Rel(state, scenarios, "read() compares", "Drift detection")
+----
+
+=== C4 Component Diagram: Before vs After
+
+**Before: Scenario as Separate Gate**
 
 [mermaid]
 ----
 graph TB
-    subgraph Deployment["Pulumi Deployment"]
-        Resources[Pulumi Resources<br/><i>Incus, Systemd, Manifests</i>]
-        Verification[Verification Stage<br/><i>Runs BDD scenarios</i>]
-        Reports[Report Publishers<br/><i>ConfigMap, Stack outputs, Files</i>]
+    subgraph Stack["Pulumi Stack"]
+        R1[SystemdUnit Resource]
     end
 
-    subgraph Production["Production Code"]
-        ProbeGate[SeedSystemdAdapterEndpointGate<br/><i>Production probe logic</i>]
-        Stages[Nested: Stages<br/><i>JGiven DSL</i>]
-        Collectors[Nested: DiagnosticCollectors<br/><i>Actor-specific capture</i>]
-        Scenario[Nested: DiagnosticScenario<br/><i>Test logic</i>]
+    subgraph VerificationStage["Verification Stage (after provisioning)"]
+        S1[SystemdAdapterScenario]
+        S1 -->|probes| R1
     end
 
-    subgraph Actors["Diagnostic Consumers"]
-        System[System<br/><i>Queries ConfigMap YAML</i>]
-        Orchestrator[Orchestrator<br/><i>Reads stack outputs JSON</i>]
-        Operator[Operator<br/><i>Reads filesystem AsciiDoc</i>]
-    end
-
-    Resources -->|infrastructure ready| Verification
-    Verification -->|invokes| Scenario
-    Scenario -->|uses| Stages
-    Stages -->|calls| ProbeGate
-    Stages -->|captures via| Collectors
-    Collectors -->|actor-specific data| Reports
-
-    Reports -->|ConfigMap YAML| System
-    Reports -->|Stack output JSON| Orchestrator
-    Reports -->|File AsciiDoc| Operator
-
-    style Production fill:#fff4e6,stroke:#ff9900
-    style Deployment fill:#ccffcc,stroke:#00cc66
-    style Actors fill:#e1f5ff,stroke:#0066cc
+    R1 -.->|provisioned| VerificationStage
 ----
 
-**Legend:**
-* Orange: Production code with nested BDD components
-* Green: Deployment flow
-* Blue: Diagnostic consumers (actors)
+**After: Scenario IS the Resource**
 
-**Key Separation of Concerns:**
-1. **Production logic** (what) - Probe infrastructure, capture state
-2. **Scenario logic** (when/then) - Verify expected behavior
-3. **Actor-specific collection** (how) - Format data per consumer
-4. **Multi-channel publication** (where) - ConfigMap, stack, filesystem
+[mermaid]
+----
+C4Component
+    title SystemdAdapterScenario Structure (Current)
+
+    Container_Boundary(scenario, "SystemdAdapterScenario extends ComponentResource") {
+        Component(constructor, "constructor()", "Provision", "Create child → Execute scenario → Cache")
+        Component(read, "read()", "Drift Detection", "Re-execute → Compare → Report")
+        Component(outputs, "outputs", "Public API", "unit(), scenarioResult(), diagnostics()")
+
+        Container_Boundary(child, "Child Resources") {
+            Component(unit, "SystemdUnit", "Wrapped Resource", "Actual infrastructure")
+        }
+
+        Container_Boundary(bdd, "Nested BDD Components") {
+            Component(jgiven, "JGivenScenario", "Execution")
+            Component(stages, "Stages", "DSL")
+            Component(generalist, "GeneralistDiagnostic", "Triage")
+            Component(specialists, "Specialists", "Deep-dive")
+        }
+    }
+
+    Rel(constructor, unit, "Creates as parent")
+    Rel(constructor, jgiven, "Executes once")
+    Rel(read, jgiven, "Re-executes for drift")
+    Rel(jgiven, stages, "Uses")
+    Rel(stages, generalist, "Invokes on failure")
+    Rel(generalist, specialists, "Decides & invokes")
+----
 
 === C4 Component Diagram: Co-Located Nested Classes
 
