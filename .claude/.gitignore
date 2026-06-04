@@ -1,0 +1,6 @@
+# Session checkpoints — private, auto-generated before compaction
+checkpoint-*.md
+
+# Track hook scripts: counter the root .gitignore's generic [Bb]in/ rule
+!bin/
+!bin/*.sh
