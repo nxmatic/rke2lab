@@ -52,35 +52,36 @@ Scenario IS the resource (extends ComponentResource) → Wraps actual infrastruc
 
 == Architecture
 
-=== C4 Context Diagram: Scenarios as Pulumi Resources
+=== Context: Scenarios as Pulumi Resources
 
 [mermaid]
 ----
-C4Context
-    title BDD Scenarios as First-Class Pulumi Resources
+graph TB
+    OP[Operator<br/>Manages infrastructure via Pulumi]
 
-    Person(operator, "Operator", "Manages infrastructure via Pulumi")
+    subgraph PulumiStack["Pulumi Stack"]
+        SC[BDD Scenario Resources<br/>ComponentResource<br/>Infrastructure with built-in verification]
+        WRAP[Wrapped Infrastructure<br/>SystemdUnit, Instance, ...<br/>Actual resources as children]
+    end
 
-    System_Boundary(stack, "Pulumi Stack") {
-        Container(scenarios, "BDD Scenario Resources", "ComponentResource", "Infrastructure with built-in verification")
-        Container(wrapped, "Wrapped Infrastructure", "SystemdUnit, Instance, etc", "Actual resources as children")
-    }
+    STATE[(Pulumi State Backend<br/>Caches scenario results)]
+    ACTUAL[Actual Infrastructure<br/>Incus, SystemD, K8s]
+    REPORTS[Diagnostic Reports<br/>ConfigMap, Stack Outputs, Filesystem]
 
-    System_Ext(state, "Pulumi State Backend", "Caches scenario results")
-    System_Ext(actual, "Actual Infrastructure", "Incus, SystemD, K8s")
-    System_Ext(reports, "Diagnostic Reports", "ConfigMap, Stack Outputs, Filesystem")
+    OP -->|pulumi up / refresh| SC
+    SC -->|Creates as children| WRAP
+    WRAP -->|Provisions via providers| ACTUAL
+    SC -->|Verifies: Given/When/Then| ACTUAL
+    SC -->|Caches results on provision| STATE
+    SC -->|Publishes on failure| REPORTS
+    STATE -.->|read compares: drift detection| SC
 
-    Rel(operator, scenarios, "pulumi up", "Provision resources")
-    Rel(operator, scenarios, "pulumi refresh", "Check drift")
-    Rel(scenarios, wrapped, "Creates as children", "Parent-child relationship")
-    Rel(wrapped, actual, "Provisions", "Via Pulumi providers")
-    Rel(scenarios, actual, "Verifies", "Given/When/Then")
-    Rel(scenarios, state, "Caches results", "After verification")
-    Rel(scenarios, reports, "Publishes on failure", "Multi-channel")
-    Rel(state, scenarios, "read() compares", "Drift detection")
+    style PulumiStack fill:#e1f5ff,stroke:#0066cc
+    style STATE fill:#fff4e6,stroke:#ff9900
+    style REPORTS fill:#ccffcc,stroke:#00cc66
 ----
 
-=== C4 Component Diagram: Before vs After
+=== Component View: Before vs After
 
 **Before: Scenario as Separate Gate**
 
@@ -103,42 +104,49 @@ graph TB
 
 [mermaid]
 ----
-C4Component
-    title SystemdAdapterScenario Structure (Current)
+graph TB
+    subgraph Scenario["SystemdAdapterScenario extends ComponentResource"]
+        CTOR[constructor<br/>Provision<br/>Create child → Execute → Cache]
+        READ[read<br/>Drift Detection<br/>Re-execute → Compare → Report]
+        OUT[outputs<br/>Public API<br/>unit, scenarioResult, diagnostics]
 
-    Container_Boundary(scenario, "SystemdAdapterScenario extends ComponentResource") {
-        Component(constructor, "constructor()", "Provision", "Create child → Execute scenario → Cache")
-        Component(read, "read()", "Drift Detection", "Re-execute → Compare → Report")
-        Component(outputs, "outputs", "Public API", "unit(), scenarioResult(), diagnostics()")
+        subgraph Child["Child Resources"]
+            UNIT[SystemdUnit<br/>Wrapped Resource<br/>Actual infrastructure]
+        end
 
-        Container_Boundary(child, "Child Resources") {
-            Component(unit, "SystemdUnit", "Wrapped Resource", "Actual infrastructure")
-        }
+        subgraph BDD["Nested BDD Components"]
+            JGIVEN[JGivenScenario<br/>Execution]
+            STAGES[Stages<br/>DSL]
+            GEN[GeneralistDiagnostic<br/>Triage]
+            SPEC[Specialists<br/>Deep-dive]
+        end
+    end
 
-        Container_Boundary(bdd, "Nested BDD Components") {
-            Component(jgiven, "JGivenScenario", "Execution")
-            Component(stages, "Stages", "DSL")
-            Component(generalist, "GeneralistDiagnostic", "Triage")
-            Component(specialists, "Specialists", "Deep-dive")
-        }
-    }
+    CTOR -->|Creates as parent| UNIT
+    CTOR -->|Executes once| JGIVEN
+    READ -->|Re-executes for drift| JGIVEN
+    JGIVEN -->|Uses| STAGES
+    STAGES -->|Invokes on failure| GEN
+    GEN -->|Decides & invokes| SPEC
 
-    Rel(constructor, unit, "Creates as parent")
-    Rel(constructor, jgiven, "Executes once")
-    Rel(read, jgiven, "Re-executes for drift")
-    Rel(jgiven, stages, "Uses")
-    Rel(stages, generalist, "Invokes on failure")
-    Rel(generalist, specialists, "Decides & invokes")
+    style Scenario fill:#e1f5ff,stroke:#0066cc
+    style Child fill:#ccffcc,stroke:#00cc66
+    style BDD fill:#fff4e6,stroke:#ff9900
 ----
 
-=== C4 Component Diagram: Co-Located Nested Classes
+=== Co-Located Nested Classes
 
 [mermaid]
 ----
 classDiagram
-    class SeedSystemdAdapterEndpointGate {
-        +ensureReachable() Map~String,Object~
-        +waitForRuntimeProbe() Map~String,Object~
+    class SystemdAdapterScenario {
+        <<ComponentResource>>
+        +unit() Output~SystemdUnit~
+        +scenarioResult() Output~ScenarioResult~
+        +diagnostics() Output~Diagnostics~
+        +severity() Severity
+        #read(id, args) ReadResult
+        -executeScenario(args) ScenarioResult
         -getSystemdUnitStatus() String
         -getJournalLogs() List~String~
     }
@@ -148,68 +156,73 @@ classDiagram
         +onDbusProbeStart(host, port)
         +onDbusProbeSuccess(elapsed, status)
         +onDbusProbeFailure(cause)
-        +captureSystemdUnitStatus(unit, status)
-        +captureJournalLogs(unit, logs)
+        +requestGeneralistDiagnostic() GeneralistDiagnostic
     }
 
-    class SystemDiagnostics {
-        +onDbusProbeSuccess()
-        +onDbusProbeFailure()
-    }
+    class SystemDiagnostics
+    class OrchestratorDiagnostics
+    class OperatorDiagnostics
 
-    class OrchestratorDiagnostics {
-        +onDbusProbeSuccess()
-        +onDbusProbeFailure()
+    class GeneralistDiagnostic {
+        +recordSymptom(name, cause)
+        +invokeSpecialists()
+        +establishRemediationPlan() RemediationPlan
     }
-
-    class OperatorDiagnostics {
-        +onDbusProbeFailure()
-        +captureSystemdUnitStatus()
-        +captureJournalLogs()
+    class DbusTcpSpecialist {
+        +diagnose(symptom) List~Finding~
     }
+    class NetworkSpecialist
+    class IncusExecSpecialist
 
     class Stages {
         -DiagnosticCollector diagnostics
         +systemd_adapter_probe_runs() Stages
         +dbus_endpoint_responds() Stages
     }
-
-    class DiagnosticScenario {
+    class JGivenScenario {
         +systemd_adapter_becomes_reachable()
     }
+    class Severity {
+        <<enum>>
+        CRITICAL
+        WARNING
+    }
 
-    SeedSystemdAdapterEndpointGate *-- DiagnosticCollector : defines interface
-    SeedSystemdAdapterEndpointGate *-- SystemDiagnostics : nested impl
-    SeedSystemdAdapterEndpointGate *-- OrchestratorDiagnostics : nested impl
-    SeedSystemdAdapterEndpointGate *-- OperatorDiagnostics : nested impl
-    SeedSystemdAdapterEndpointGate *-- Stages : nested DSL
-    SeedSystemdAdapterEndpointGate *-- DiagnosticScenario : nested scenario
+    SystemdAdapterScenario *-- DiagnosticCollector : defines interface
+    SystemdAdapterScenario *-- SystemDiagnostics : nested impl
+    SystemdAdapterScenario *-- OrchestratorDiagnostics : nested impl
+    SystemdAdapterScenario *-- OperatorDiagnostics : nested impl
+    SystemdAdapterScenario *-- GeneralistDiagnostic : nested triage
+    SystemdAdapterScenario *-- Stages : nested DSL
+    SystemdAdapterScenario *-- JGivenScenario : nested scenario
+    SystemdAdapterScenario *-- Severity : nested enum
 
     DiagnosticCollector <|.. SystemDiagnostics
     DiagnosticCollector <|.. OrchestratorDiagnostics
     DiagnosticCollector <|.. OperatorDiagnostics
 
+    GeneralistDiagnostic --> DbusTcpSpecialist : invokes
+    GeneralistDiagnostic --> NetworkSpecialist : invokes
+    GeneralistDiagnostic --> IncusExecSpecialist : invokes
+
     Stages --> DiagnosticCollector : uses
-    Stages --> SeedSystemdAdapterEndpointGate : calls production methods
-    DiagnosticScenario --> Stages : composes DSL
+    Stages --> SystemdAdapterScenario : calls production methods
+    JGivenScenario --> Stages : composes DSL
 ----
 
 == The Pattern
 
 === 1. Nested Class Co-Location
 
-All BDD components nest inside the production class they verify:
+All BDD components nest inside the scenario resource they belong to:
 
 [source,java]
 ----
-public final class SeedSystemdAdapterEndpointGate {
-  // Production methods
-  public static Map<String, Object> ensureReachable(BootstrapConfig config, Consumer<String> logger) {
-    // ... actual probe logic
-  }
-
-  private static String getSystemdUnitStatus(String unitName) { /* ... */ }
-  private static List<String> getJournalLogs(String unitName) { /* ... */ }
+public class SystemdAdapterScenario extends ComponentResource {
+  // Production methods (verification + diagnostic helpers)
+  private ScenarioResult executeScenario(SystemdAdapterArgs args) { /* given/when/then */ }
+  private String getSystemdUnitStatus(String unitName) { /* ... */ }
+  private List<String> getJournalLogs(String unitName) { /* ... */ }
 
   // ===== BDD Components (all nested) =====
 
@@ -217,8 +230,11 @@ public final class SeedSystemdAdapterEndpointGate {
   public class SystemDiagnostics implements DiagnosticCollector { /* ... */ }
   public class OrchestratorDiagnostics implements DiagnosticCollector { /* ... */ }
   public class OperatorDiagnostics implements DiagnosticCollector { /* ... */ }
+  public class GeneralistDiagnostic { /* triage → specialists → plan */ }
+  public class DbusTcpSpecialist { /* ... */ }
   public class Stages extends Stage<Stages> { /* ... */ }
-  public class DiagnosticScenario extends ScenarioTest<...> { /* ... */ }
+  public class JGivenScenario extends ScenarioTest<...> { /* ... */ }
+  public enum Severity { CRITICAL, WARNING }
 }
 ----
 
@@ -342,46 +358,45 @@ public class Stages extends Stage<Stages> {
 
 **Pattern:** Stages call production methods directly, delegate diagnostic capture to the injected collector.
 
-=== 5. Diagnostic Scenario (Test Logic)
+=== 5. JGiven Scenario (Verification Logic)
 
-Scenarios compose stages into readable specifications:
+The nested `JGivenScenario` composes stages into a readable specification. The scenario
+constructor runs it once per provision (and `read()` re-runs it for drift):
 
 [source,java]
 ----
-public class DiagnosticScenario extends ScenarioTest<GivenStage, WhenStage, ThenStage> {
-  private final Actor targetActor;
-
-  public DiagnosticScenario(Actor targetActor) {
-    this.targetActor = targetActor;
-  }
-
-  @Test
-  public void systemd_adapter_becomes_reachable() {
-    given().incus_instance_exists("bioskop-master")           // From IncusResourceBootstrap.Stages
+public class JGivenScenario extends ScenarioTest<GivenStage, WhenStage, ThenStage> {
+  public ScenarioResult systemd_adapter_becomes_reachable() {
+    given().incus_instance_exists("bioskop-master")           // From IncusInstanceScenario.Stages
         .and().bootstrap_config_is_loaded();                  // From BootstrapConfig.Stages
 
-    when().systemd_adapter_probe_runs();                      // From SeedSystemdAdapterEndpointGate.Stages
+    when().systemd_adapter_probe_runs();                      // From SystemdAdapterScenario.Stages
 
-    then().dbus_endpoint_responds()                           // From SeedSystemdAdapterEndpointGate.Stages
-        .and().systemd_target_is_active("rke2lab.target");   // From SystemdStages
+    then().dbus_endpoint_responds()                           // From SystemdAdapterScenario.Stages
+        .and().systemd_target_is_active("rke2lab.target");   // From SystemdTargetMonitor.Stages
+
+    return capturedResult();
   }
 }
 ----
 
-**Pattern:** Scenario runs once per actor. The actor parameter controls what diagnostics get captured and how they're formatted.
+**Pattern:** the scenario captures diagnostics through the injected `DiagnosticCollector`,
+so the same given/when/then feeds the system, orchestrator, and operator views without
+duplicating the flow.
 
-=== 6. DSL Composition Across Classes
+=== 6. DSL Composition Across Scenarios
 
-Stages from different production classes compose into a single scenario:
+Stages from different scenario resources compose into a single specification — the DSL
+vocabulary emerges from each domain's `Stages`:
 
 [source,java]
 ----
-// IncusResourceBootstrap.java
+// IncusInstanceScenario.java
 public class Stages extends Stage<Stages> {
   public Stages incus_instance_exists(String name) { /* ... */ }
 }
 
-// SeedSystemdAdapterEndpointGate.java
+// SystemdAdapterScenario.java
 public class Stages extends Stage<Stages> {
   public Stages systemd_adapter_probe_runs() { /* ... */ }
   public Stages dbus_endpoint_responds() { /* ... */ }
@@ -392,10 +407,10 @@ public class Stages extends Stage<Stages> {
   public Stages systemd_target_is_active(String target) { /* ... */ }
 }
 
-// Scenario composes all three
-public class DiagnosticScenario
-    extends ScenarioTest<IncusResourceBootstrap.Stages,
-                         SeedSystemdAdapterEndpointGate.Stages,
+// JGivenScenario composes all three vocabularies
+public class JGivenScenario
+    extends ScenarioTest<IncusInstanceScenario.Stages,
+                         SystemdAdapterScenario.Stages,
                          SystemdTargetMonitor.Stages> {
   // Uses vocabulary from all three stage classes
 }
@@ -410,57 +425,196 @@ Enforce absolute uniformity across the codebase:
 [cols="1,2",options="header"]
 |===
 |Component |Naming Rule
-|Production class |Domain-specific name (e.g., `SeedSystemdAdapterEndpointGate`)
-|Collector interface |Always `DiagnosticCollector` (nested in production class)
+|Scenario resource |Domain-specific name ending in `Scenario`, extends `ComponentResource` (e.g., `SystemdAdapterScenario`)
+|Collector interface |Always `DiagnosticCollector` (nested in the scenario)
 |Actor implementations |`SystemDiagnostics`, `OrchestratorDiagnostics`, `OperatorDiagnostics` (nested)
-|Stage class |Always `Stages` (nested in production class)
-|Scenario class |Always `DiagnosticScenario` (nested in production class)
+|Triage |Always `GeneralistDiagnostic` (nested); specialists named `<Domain>Specialist`
+|Stage class |Always `Stages` (nested in the scenario)
+|JGiven scenario |Always `JGivenScenario` (nested in the scenario)
+|Severity |Always `Severity` enum (`CRITICAL`, `WARNING`)
 |===
 
-**Enforcement:** Every production class with diagnostics has exactly these nested components. No variations.
+**Enforcement:** Every scenario resource has exactly these nested components. No variations.
 
-== Invocation from Bootstrap Pipeline
+== Lifecycle: Provision Once, Reference Free
 
-Scenarios run during deployment via the verification stage:
-
-[source,java]
-----
-// In BootstrapPipeline.java
-.then()
-.during("verification", verify -> verify
-    .runDiagnosticScenarios()
-    .publishReports())
-.then()
-.during("outputs", outputs -> outputs.exportOrPrint())
-----
+A scenario is a Pulumi resource. The stack provisions it like any other; dependent
+resources reference its wrapped output without re-triggering verification.
 
 [source,java]
 ----
-// In VerificationStage.java
-public VerificationStage runDiagnosticScenarios() {
-  final BootstrapConfig config = configSupplier.get();
+// In the stack
+var adapter = new SystemdAdapterScenario("dbus-adapter",
+    SystemdAdapterArgs.builder()
+        .instance(masterScenario.instance())  // reference, no re-execution
+        .port(12434)
+        .build(),
+    ComponentResourceOptions.builder().dependsOn(masterScenario).build());
 
-  // Run scenario once per actor
-  final SystemDiagnostics systemDiag = new SeedSystemdAdapterEndpointGate().new SystemDiagnostics();
-  final OrchestratorDiagnostics orchDiag = new SeedSystemdAdapterEndpointGate().new OrchestratorDiagnostics();
-  final OperatorDiagnostics opDiag = new SeedSystemdAdapterEndpointGate().new OperatorDiagnostics();
+// Downstream resources just reference the wrapped unit — verification does not re-run
+new ManifestUnitScenario("manifest-a", ManifestUnitArgs.builder()
+    .systemdUnit(adapter.unit())
+    .build());
+----
 
-  // Execute scenarios
-  new SeedSystemdAdapterEndpointGate.DiagnosticScenario(Actor.SYSTEM, systemDiag, config).execute();
-  new SeedSystemdAdapterEndpointGate.DiagnosticScenario(Actor.ORCHESTRATOR, orchDiag, config).execute();
-  new SeedSystemdAdapterEndpointGate.DiagnosticScenario(Actor.OPERATOR, opDiag, config).execute();
+The scenario constructor runs verification exactly **once** per provision and caches
+the result in Pulumi state via `Output<ScenarioResult>`:
 
-  return this;
+[source,java]
+----
+public SystemdAdapterScenario(String name, SystemdAdapterArgs args, ComponentResourceOptions opts) {
+  super("rke2lab:bdd:SystemdAdapter", name, opts);
+
+  this.unit = new SystemdUnit(name + "-unit", /* ... */,
+      ComponentResourceOptions.builder().parent(this).build());
+
+  final ScenarioResult result = executeScenario(args);   // given/when/then, ONCE
+  this.result = Output.of(result);
+
+  handleScenarioResult(result);                           // severity + operator policy
+  if (result.failed()) publishDiagnostics(result);        // multi-channel reports
+
+  registerOutputs(Map.of("unit", unit, "scenarioResult", this.result));
 }
 ----
+
+== Drift Detection: Use Pulumi's Native Mechanism
+
+**Do not build a custom drift mechanism.** Pulumi already detects drift via
+`pulumi refresh`; scenarios hook into it through the `read()` lifecycle method.
+We nearly reinvented this — the note below exists so we don't again.
+
+Pulumi reasons about three states:
+
+[cols="1,3",options="header"]
+|===
+|State |Meaning
+|Desired |What the program declares (the code)
+|Pulumi state |What Pulumi thinks exists (stored in the backend)
+|Actual |What actually exists in the infrastructure
+|===
+
+`pulumi up` reconciles *desired* against *Pulumi state*. `pulumi refresh` reconciles
+*Pulumi state* against *actual* — and that is where drift surfaces. Pulumi calls these
+hooks on each `ComponentResource`:
+
+[cols="1,1,2",options="header"]
+|===
+|Hook |When |Purpose
+|`constructor()` |`pulumi up` |Provision infrastructure, execute scenario once
+|`read()` |`pulumi refresh` |Query actual state, re-execute scenario for drift
+|`delete()` |`pulumi destroy` |Clean up resources
+|===
+
+The scenario implements `read()` to re-run verification against live infrastructure and
+hand the actual state back; Pulumi compares and reports the diff:
+
+[source,java]
+----
+@Override
+protected CompletableFuture<ReadResult> read(String id, ReadArgs args) {
+  final ScenarioResult actual = executeScenario(argsFromState(args));
+  // Return actual state; Pulumi compares against cached state and shows drift
+  return CompletableFuture.completedFuture(ReadResult.builder()
+      .id(id)
+      .props(Map.of("scenarioResult", actual, "status", actual.status()))
+      .build());
+}
+----
+
+[source,console]
+----
+$ pulumi refresh
+  ~ rke2lab:bdd:SystemdAdapter  dbus-adapter  refreshed
+    ~ scenarioResult: "failed" → "passed"   (socat fix detected)
+----
+
+This integrates with the operator's existing workflow (`pulumi refresh` /
+`pulumi preview --refresh`) instead of introducing new commands.
+
+== Doctor Hierarchy: Generalist → Specialists → Plan
+
+On failure the scenario always invokes a **Generalist** first. The generalist triages
+symptoms, decides which **Specialists** to consult, then synthesizes their findings into
+a single `RemediationPlan`. This keeps clean output on success and escalates depth only
+when something breaks.
+
+[mermaid]
+----
+graph TB
+    FAIL[Scenario fails] --> GEN[GeneralistDiagnostic<br/>examines symptoms]
+    GEN -->|connection_refused| DBUS[DbusTcpSpecialist<br/>unit status, journal, port]
+    GEN -->|name unresolvable| NET[NetworkSpecialist<br/>DNS, routing, firewall]
+    GEN -->|instance unreachable| INCUS[IncusExecSpecialist<br/>instance state, exec path]
+    DBUS --> PLAN[RemediationPlan]
+    NET --> PLAN
+    INCUS --> PLAN
+
+    style GEN fill:#fff4e6,stroke:#ff9900
+    style PLAN fill:#ccffcc,stroke:#00cc66
+----
+
+Specialists are invoked only when the generalist's triage points at their domain — the
+`NetworkSpecialist` and `IncusExecSpecialist` stay dormant for a plain socat failure.
+
+[source,java]
+----
+} catch (Exception e) {
+  diagnostics.onDbusProbeFailure(e);
+
+  final GeneralistDiagnostic generalist = diagnostics.requestGeneralistDiagnostic();
+  generalist.recordSymptom("connection_refused", e);
+  generalist.invokeSpecialists();                 // decides DbusTcp / Network / IncusExec
+  final RemediationPlan plan = generalist.establishRemediationPlan();
+  diagnostics.publishDiagnostic(generalist, plan);
+}
+----
+
+== Severity and Operator Policy
+
+Each scenario declares its own severity from domain knowledge — failure of a
+non-essential adapter is `WARNING` (provision degraded); failure of something nothing can
+proceed without is `CRITICAL` (stop). The operator can override to strict mode during
+debugging, forcing every failure to `CRITICAL`.
+
+[source,java]
+----
+public Severity severity() {
+  return Severity.WARNING;  // master can provision without the adapter (degraded)
+}
+
+private void handleScenarioResult(ScenarioResult result) {
+  final Severity effective = policy.isStrictMode() ? Severity.CRITICAL : severity();
+  if (result.failed() && effective == Severity.CRITICAL) {
+    publishDiagnostics(result);
+    throw new PipelineStageFailure("blocked by scenario: " + result.name());
+  }
+  if (result.failed() && effective == Severity.WARNING) {
+    publishDiagnostics(result);
+    log.warn("Continuing in degraded mode: {}", result.name());
+  }
+}
+----
+
+[cols="1,1,1,2",options="header"]
+|===
+|Scenario severity |Operator policy |Failed |Action
+|CRITICAL |any |yes |Stop, publish reports
+|WARNING |strict |yes |Stop, publish reports
+|WARNING |lenient |yes |Continue degraded, publish reports
+|any |any |no |Continue
+|===
 
 == Report Publication (Multi-Actor)
 
 Each actor gets its diagnostic data in the format it needs:
 
+Publication happens inside the scenario when verification fails (`publishDiagnostics`),
+emitting the same diagnostic data in three formats for three actors:
+
 [source,java]
 ----
-public VerificationStage publishReports() {
+private void publishDiagnostics(ScenarioResult result) {
   // A) ConfigMap - YAML for system (machine-readable metrics)
   final String yamlReport = systemDiag.toYaml();
   new ConfigMap("diagnostic-reports", ConfigMapArgs.builder()
@@ -483,8 +637,6 @@ public VerificationStage publishReports() {
               "mkdir -p /var/lib/rke2lab/reports && echo '%s' > /var/lib/rke2lab/reports/diagnostic-report.adoc",
               adocReport.replace("'", "'\\''")))
           .build());
-
-  return this;
 }
 ----
 
@@ -592,9 +744,9 @@ The report stays concise on success, expands with context on failure.
 
 This pattern composes several existing rke2lab patterns:
 
-* **Fluent pipeline grammar** (link:fluent-pipeline-grammar.adoc[]) - Verification stage follows the `during("verification", ...)` pattern
-* **Bootstrap identity provider** (link:bootstrap-identity-provider.adoc[]) - Scenarios access identity via ThreadLocal
-* **ManifestDomainCatalog discipline** (link:manifest-domain-catalog-pattern.adoc[]) - Type-safe identifiers prevent mismatches
+* **Fluent pipeline grammar** (link:../patterns/fluent-pipeline-grammar.adoc[]) - Stages within a scenario compose using the same type-state discipline
+* **Bootstrap identity provider** (link:../bootstrap/bootstrap-identity-provider.adoc[]) - Scenarios access identity via ThreadLocal
+* **ManifestDomainCatalog discipline** (link:../manifests/manifest-domain-catalog-pattern.adoc[]) - Type-safe identifiers prevent mismatches
 * **Nested classes** (CLAUDE.md) - Co-location keeps scenarios with production code
 * **Non-static inner classes** (CLAUDE.md) - Actor implementations access outer class methods directly
 * **Instance-passing discipline** (CLAUDE.md) - Stages receive collector via constructor injection
@@ -602,6 +754,6 @@ This pattern composes several existing rke2lab patterns:
 
 == Related Documentation
 
-* link:bootstrap-contract.adoc[Bootstrap Contract] - Verification stage integration
-* link:fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - How verification stage fits the pipeline
-* link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Context access from scenarios
+* link:../bootstrap/bootstrap-contract.adoc[Bootstrap Contract] - How scenario resources provision and verify Stage A
+* link:../patterns/fluent-pipeline-grammar.adoc[Fluent Pipeline Grammar] - Type-state discipline reused by scenario stages
+* link:../bootstrap/bootstrap-identity-provider.adoc[Bootstrap Identity Provider] - Context access from scenarios
