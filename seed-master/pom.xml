@@ -98,6 +98,10 @@
       <artifactId>dbus-java-transport-tcp</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-core</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
@@ -191,6 +195,12 @@
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <mainClass>io.nxmatic.rke2lab.controlplane.Main</mainClass>
+                  <manifestEntries>
+                    <!-- JGiven generates stage subclasses via byte-buddy, whose reflective class
+                         injector needs java.lang opened under JDK module encapsulation. Honored
+                         when Pulumi launches the exec jar with `java -jar`. -->
+                    <Add-Opens>java.base/java.lang</Add-Opens>
+                  </manifestEntries>
                 </transformer>
               </transformers>
               <filters>
