@@ -5,11 +5,13 @@ import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.text.PlainTextReporter;
 import io.nxmatic.rke2lab.controlplane.bdd.GivenSystemdAdapter;
+import io.nxmatic.rke2lab.controlplane.bdd.Severity;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.ThenSystemdAdapter;
 import io.nxmatic.rke2lab.controlplane.bdd.WhenSystemdAdapter;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.PipelineStageFailure;
+import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -26,17 +28,29 @@ public final class SystemdAdapterStage {
 
   private static final String JGIVEN_DRY_RUN = "jgiven.report.dry-run";
 
+  /** Override key + report label for this gate. */
+  private static final String SCENARIO_ID = "systemd-adapter";
+
+  /**
+   * Intrinsic severity: master can provision without the dbus adapter (degraded), so a failure is a
+   * WARNING unless the operator overrides it (e.g. strict debugging).
+   */
+  private static final Severity INTRINSIC_SEVERITY = Severity.WARNING;
+
   private final BootstrapConfig config;
+  private final ControlplanePolicy policy;
   private final boolean pulumiMode;
   private final Consumer<String> readinessLogger;
   private final Consumer<Map<String, Object>> sink;
 
   public SystemdAdapterStage(
       BootstrapConfig config,
+      ControlplanePolicy policy,
       boolean pulumiMode,
       Consumer<String> readinessLogger,
       Consumer<Map<String, Object>> sink) {
     this.config = config;
+    this.policy = policy;
     this.pulumiMode = pulumiMode;
     this.readinessLogger = readinessLogger;
     this.sink = sink;
@@ -55,6 +69,9 @@ public final class SystemdAdapterStage {
     if (dryRun) {
       System.setProperty(JGIVEN_DRY_RUN, "true");
     }
+
+    Map<String, Object> captured = null;
+    Throwable failure = null;
     try {
       final Scenario<GivenSystemdAdapter, WhenSystemdAdapter, ThenSystemdAdapter> scenario =
           Scenario.create(
@@ -65,14 +82,9 @@ public final class SystemdAdapterStage {
       scenario.when().the_systemd_adapter_probe_runs();
       scenario.then().the_dbus_endpoint_responds();
       scenario.finished();
-
-      // Dry-run skips step bodies, so no snapshot is produced; report the deferred-preview
-      // envelope.
-      final Map<String, Object> captured = scenario.then().capturedSnapshot();
-      sink.accept(
-          captured != null ? captured : SeedSystemdAdapterEndpointGate.deferredPreview(config));
+      captured = scenario.then().capturedSnapshot();
     } catch (Throwable cause) {
-      throw new PipelineStageFailure("systemd adapter", cause);
+      failure = cause;
     } finally {
       // The living-doc IS the gate's output: stream the Given/When/Then prose into the Pulumi log
       // so
@@ -85,7 +97,44 @@ public final class SystemdAdapterStage {
         System.setProperty(JGIVEN_DRY_RUN, previousDryRun);
       }
     }
+
+    if (failure == null) {
+      // Success — or dry-run, where step bodies are skipped so no snapshot is produced.
+      sink.accept(
+          captured != null ? captured : SeedSystemdAdapterEndpointGate.deferredPreview(config));
+      return this;
+    }
+
+    // Failure: the operator override wins over the scenario's intrinsic severity.
+    final Severity effective = policy.readiness().override(SCENARIO_ID).orElse(INTRINSIC_SEVERITY);
+    if (effective == Severity.CRITICAL) {
+      log("✗ " + SCENARIO_ID + " FAILED, severity=CRITICAL → stopping provisioning");
+      throw new PipelineStageFailure("systemd adapter", failure);
+    }
+    log("⚠ " + SCENARIO_ID + " FAILED, severity=WARNING → continuing in DEGRADED mode");
+    sink.accept(degradedEnvelope(failure));
     return this;
+  }
+
+  private Map<String, Object> degradedEnvelope(Throwable failure) {
+    return Map.of(
+        "status", "degraded",
+        "summary",
+            "dbusEndpoint="
+                + config.systemdAdapterDbusHost()
+                + ":"
+                + config.systemdAdapterDbusPort()
+                + " status=degraded ("
+                + failure.getMessage()
+                + ")",
+        "source", "systemd-adapter-endpoint-gate",
+        "probeMode", "systemd-adapter-runtime");
+  }
+
+  private void log(String message) {
+    if (readinessLogger != null) {
+      readinessLogger.accept(message);
+    }
   }
 
   private void logReport(ReportModel reportModel) {

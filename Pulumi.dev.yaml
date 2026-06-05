@@ -28,3 +28,7 @@ config:
   "rke2lab:readiness.timeout": PT1M
   "rke2lab:policy.link.clusterApi.enabled": "true"
   "rke2lab:policy.link.gitops.enabled": "true"
+  # Operator override of readiness-scenario severity, per scenario id. Absent → scenario decides.
+  # systemd-adapter is intrinsically WARNING (degraded); flip to "critical" to stop on failure.
+  "rke2lab:policy.readiness.override":
+    systemd-adapter: warning

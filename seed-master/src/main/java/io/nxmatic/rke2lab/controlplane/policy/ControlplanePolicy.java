@@ -2,17 +2,20 @@ package io.nxmatic.rke2lab.controlplane.policy;
 
 import com.pulumi.Config;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
+import io.nxmatic.rke2lab.controlplane.bdd.Severity;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestDomainPolicy;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /** Canonical operational policy derived from Pulumi config for Stage A bootstrap. */
 public record ControlplanePolicy(
     DebugPolicy debug,
     NetworkPolicy network,
     ProvisioningPolicy provisioning,
-    ManifestLinkPolicy manifestLink) {
+    ManifestLinkPolicy manifestLink,
+    ReadinessPolicy readiness) {
 
   private static final ManifestDomainCatalog MANIFEST_DOMAIN_CATALOG =
       ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
@@ -76,6 +79,7 @@ public record ControlplanePolicy(
         .network(networkPolicy)
         .provisioning(provisioningPolicy)
         .manifestLink(manifestLinkPolicy)
+        .readiness(new ReadinessPolicy(environment.severityOverrides("policy.readiness.override")))
         .build();
   }
 
@@ -94,6 +98,7 @@ public record ControlplanePolicy(
     outputs.putAll(network.toOutputMap());
     outputs.putAll(provisioning.toOutputMap());
     outputs.putAll(manifestLink.toOutputMap());
+    outputs.putAll(readiness.toOutputMap());
     return outputs;
   }
 
@@ -146,11 +151,40 @@ public record ControlplanePolicy(
     }
   }
 
+  /**
+   * Operator override of readiness-scenario severity, keyed by scenario id (e.g. {@code
+   * "systemd-adapter"}). An entry forces that scenario's effective severity regardless of the
+   * severity the scenario declares for itself; absent entries defer to the scenario.
+   */
+  public record ReadinessPolicy(Map<String, Severity> severityOverrides) {
+    public ReadinessPolicy {
+      severityOverrides = Map.copyOf(severityOverrides);
+    }
+
+    public static ReadinessPolicy none() {
+      return new ReadinessPolicy(Map.of());
+    }
+
+    /** The operator-forced severity for a scenario, if any. */
+    public Optional<Severity> override(String scenarioId) {
+      return Optional.ofNullable(severityOverrides.get(scenarioId));
+    }
+
+    public Map<String, Object> toOutputMap() {
+      final Map<String, Object> outputs = new LinkedHashMap<>();
+      severityOverrides.forEach(
+          (scenario, severity) ->
+              outputs.put("readiness.override." + scenario, severity.name().toLowerCase()));
+      return outputs;
+    }
+  }
+
   public static final class Builder {
     private DebugPolicy debug;
     private NetworkPolicy network;
     private ProvisioningPolicy provisioning;
     private ManifestLinkPolicy manifestLink;
+    private ReadinessPolicy readiness = ReadinessPolicy.none();
 
     private Builder() {}
 
@@ -174,8 +208,13 @@ public record ControlplanePolicy(
       return this;
     }
 
+    public Builder readiness(ReadinessPolicy readiness) {
+      this.readiness = readiness;
+      return this;
+    }
+
     public ControlplanePolicy build() {
-      return new ControlplanePolicy(debug, network, provisioning, manifestLink);
+      return new ControlplanePolicy(debug, network, provisioning, manifestLink, readiness);
     }
   }
 
@@ -195,6 +234,21 @@ public record ControlplanePolicy(
         case "0", "false", "no", "off" -> false;
         default -> throw new IllegalArgumentException("Invalid boolean for " + key + ": " + value);
       };
+    }
+
+    /**
+     * Reads a structured sub-map of scenario-id to severity (e.g. {@code systemd-adapter:
+     * warning}). Unparseable entries are dropped so a typo degrades to "defer to scenario", never a
+     * crash.
+     */
+    @SuppressWarnings({"unchecked", "null"})
+    Map<String, Severity> severityOverrides(String key) {
+      final Map<String, Object> raw = config.getObject(key, Map.class).orElse(Map.of());
+      final Map<String, Severity> parsed = new LinkedHashMap<>();
+      raw.forEach(
+          (scenario, value) ->
+              Severity.parse(String.valueOf(value)).ifPresent(s -> parsed.put(scenario, s)));
+      return parsed;
     }
   }
 }

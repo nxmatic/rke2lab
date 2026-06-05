@@ -209,6 +209,7 @@ public final class BootstrapPipeline {
       final SystemdAdapterStage stage =
           new SystemdAdapterStage(
               state.config,
+              state.policy,
               state.pulumiMode,
               state.readinessLogger,
               summary -> state.systemdAdapterLaunchSummary = summary);
