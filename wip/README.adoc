@@ -1,0 +1,27 @@
+= Work In Progress — Manifest
+:toc: left
+
+This directory holds work-in-progress design artifacts for the branch currently checked
+out. *One subject is active at a time* (one feature/refactor branch). The branch is the
+namespace (it names the subject); files are named by *role* (`spec.adoc`, `plan.adoc`),
+not by subject or date — this index carries the dates.
+
+== Conventions
+
+* *Branches* follow Conventional Commits types: `feature/<subject>`, `refactor/<subject>`,
+  `fix/<subject>`, … (strict CC by default, extend only when a case genuinely doesn't fit).
+* *WIP layout is flat* — documents sit directly in `wip/`. This index tracks them.
+* *Cross-references between WIP documents are relative* (e.g. `link:other-doc.adoc[]`).
+  References into durable docs use `link:../docs/architecture/...[]`.
+* *Landing place is decided just before merge.* When a subject is ready, its durable
+  substance migrates to `docs/architecture/...`. To preserve relative cross-references on
+  the way out, a subject may be moved into its own sub-folder at that point rather than
+  renamed file-by-file — chosen per subject, at merge time.
+
+== Index
+
+[cols="2,1,1,3",options="header"]
+|===
+|Document |Started |Branch |Status
+|link:spec.adoc[Runbook & Doctor — Design] |2026-06-05 |`feature/runbook-doctor` |Design written, awaiting review
+|===
