@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # PreCompact hook: snapshot the session before context compaction.
 #
-# Writes .claude/checkpoint-<session_id>.md. The filename is keyed by the
-# conversation's session id, so re-compacting the same conversation overwrites
-# its checkpoint (keep-last-1) and a checkpoint can be correlated back to its
-# transcript for garbage collection (see checkpoint-gc.sh).
+# Writes .claude/checkpoint-<session_id>-<timestamp>.md. The filename includes
+# both the session id (for GC correlation) and a timestamp (to keep multiple
+# checkpoints per session). The GC script will keep the N most recent per session.
 #
 # Non-destructive by design: this runs *before* compaction (which may be
 # blocked or fail), so it only ever writes — never deletes.
@@ -16,15 +15,16 @@ session_id="$(printf '%s' "$input" | yq -p json '.session_id // ""')"
 # Without a session id we cannot key (or later GC) the checkpoint. Fall back to
 # a timestamp so the snapshot is never silently lost.
 if [[ -z "$session_id" ]]; then
-  session_id="unkeyed-$(date '+%Y-%m-%d-%H%M')"
+  session_id="unkeyed-$(date '+%Y%m%d-%H%M%S')"
 fi
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-checkpoint="$repo_root/.claude/checkpoint-$session_id.md"
-now="$(date '+%Y-%m-%d, %Hh%M')"
+timestamp="$(date '+%Y%m%d-%H%M%S')"
+checkpoint="$repo_root/.claude/checkpoint-$session_id-$timestamp.md"
+now_display="$(date '+%Y-%m-%d, %Hh%M')"
 
 {
-  echo "# Checkpoint — $now"
+  echo "# Checkpoint — $now_display"
   echo ""
   echo "> Auto-generated before compaction. Session \`$session_id\`. Resume with this file."
   echo ""
@@ -42,4 +42,4 @@ now="$(date '+%Y-%m-%d, %Hh%M')"
   echo "- Continue from last commit's goal"
 } > "$checkpoint"
 
-printf '{"systemMessage": "Checkpoint created: %s"}\n' ".claude/checkpoint-$session_id.md"
+printf '{"systemMessage": "Checkpoint created: %s"}\n' ".claude/checkpoint-$session_id-$timestamp.md"
