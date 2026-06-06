@@ -17,10 +17,10 @@ class ClusterNetworkBlueprintTest {
   }
 
   @Test
-  void deriveRecipeModel_forAlcideMaster_producesDeterministicAddressing() {
+  void deriveRecipeModel_forNikopolMaster_producesDeterministicAddressing() {
     ClusterNetworkBlueprint blueprint =
         ClusterNetworkBlueprint.builder()
-            .cluster("alcide")
+            .cluster("nikopol")
             .node("master")
             .deriveRecipeModel()
             .build();

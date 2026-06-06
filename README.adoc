@@ -14,7 +14,7 @@ Primary near-term scope:
 * Deterministic readiness gating
 * Exported bootstrap outputs for Stage B handoff
 
-Current runtime path is intentionally Stage A-only. Workload-cluster (`alcide`, `nikopol`, etc.) provisioning manifests are applied after management bootstrap as Stage B concerns.
+Current runtime path is intentionally Stage A-only. Workload-cluster (`nikopol`, etc.) provisioning manifests are applied after management bootstrap as Stage B concerns.
 
 == Current status
 

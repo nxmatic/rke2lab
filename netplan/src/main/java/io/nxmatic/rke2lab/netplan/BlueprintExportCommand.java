@@ -15,8 +15,7 @@ import java.util.Map;
  * # Network blueprint metadata (source of truth)
  * clusters:
  *   bioskop: 0
- *   alcide: 1
- *   nikopol: 2
+ *   nikopol: 1
  *
  * nodes:
  *   master: 0

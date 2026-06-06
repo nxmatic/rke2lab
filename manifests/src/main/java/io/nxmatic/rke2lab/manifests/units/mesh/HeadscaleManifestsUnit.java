@@ -556,7 +556,7 @@ public final class HeadscaleManifestsUnit extends AbstractManifestsUnit {
                     + "  --login-server=$HEADSCALE_URL \\\n"
                     + "  --authkey=file:/var/secrets/authkey \\\n"
                     + "  --hostname=${DARWIN_HOST}-${RKE2_NODENAME} \\\n"
-                    + "  --advertise-tags=tag:rke2,tag:alcide \\\n"
+                    + "  --advertise-tags=tag:rke2,tag:nikopol \\\n"
                     + "  --accept-routes \\\n"
                     + "  --ssh \\\n"
                     + "  --reset\n\n"
