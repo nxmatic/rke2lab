@@ -44,6 +44,14 @@ class NestedRunbookTest {
     assertTrue(
         report.toLowerCase().contains("systemd adapter dependency"),
         "the nested systemd-adapter dependency step should render under the cluster scenario");
+
+    // Each readiness phase renders as its own step, named by its label — so the operator sees
+    // which phase passed and which failed, not one opaque "the readiness phases run" line.
+    for (ClusterReadinessPhase phase : ClusterReadinessPhase.values()) {
+      assertTrue(
+          report.contains(phase.label()),
+          "phase \"" + phase.label() + "\" should render as its own step");
+    }
   }
 
   @Test
@@ -102,6 +110,17 @@ class NestedRunbookTest {
     new RunbookRenderer(out, message -> {}).render(model);
     final String report = readAll(out.resolve("adoc"));
     assertTrue(report.contains("Cluster becomes ready"));
+
+    // Fail-fast decided by the step: the kubeconfig phase (upstream of the break) ran and renders;
+    // the api-ready phase is where the chain stopped; controllers (downstream) was never played, so
+    // it must not appear — the runbook shows the operator exactly where readiness broke.
+    assertTrue(
+        report.contains(ClusterReadinessPhase.KUBECONFIG_PUBLISHED.label()),
+        "the phase upstream of the break should have run and rendered");
+    assertFalse(
+        report.contains(ClusterReadinessPhase.CONTROLLERS_EFFECTIVE.label()),
+        "the phase downstream of the break must not be played (fail-fast)");
+
     assertFalse(
         report.contains("Diagnosis"), "node-level Diagnosis section is Increment C+ (deferred)");
   }

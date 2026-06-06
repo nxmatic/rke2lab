@@ -115,7 +115,7 @@ public final class ClusterReadinessStage {
       try {
         scenario
             .given()
-            .the_cluster(config.nodeName(), config)
+            .the_cluster(config.clusterName(), config)
             .with_phase_probe(phaseProbe)
             .depending_on_systemd_adapter(nestedSystemdAdapterProbe);
         scenario.when().the_systemd_adapter_dependency_is_satisfied().the_readiness_phases_run();
