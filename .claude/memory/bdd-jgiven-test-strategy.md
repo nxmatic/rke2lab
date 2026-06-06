@@ -94,6 +94,10 @@ parent (common to all modules). The first real two-tier scenarios exist in seed-
 (SystemdAdapter + ClusterReadiness checkpoints, runbook-played). The dedup pattern is settled: the
 TEST drives the production stage's `launch()` with an INJECTED probe (not a re-implemented scenario)
 — see [[runbook-doctor-state]] commit 0d2c7a4f. NESTING the Given/When/Then into nested static
-classes (the line 70-72 preference) is the next not-yet-done step of the quality pass.
+classes (the line 70-72 preference) is DONE (commit e3ac4b4d): the six stage files collapsed into
+`SystemdAdapterScenario` / `ClusterReadinessScenario`, each holding `public static class
+Given/When/Then`; cross-scenario edge kept via `@ScenarioStage SystemdAdapterScenario.Given` etc.
+Rendered prose byte-identical (step names = method names, unaffected by the type rename). The LAST
+pass item is BDD-style UNIT tests (Given/When/Then for the component tests).
 
 See [[working-style-narrate-progress]] and [[config-restructuring-state]] and [[runbook-doctor-state]].

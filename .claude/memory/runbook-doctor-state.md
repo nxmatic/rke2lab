@@ -72,12 +72,23 @@ runs offline. **GOTCHA:** `Deployment.getInstance()` returns `DeploymentInstance
 `properties` goal did not substitute the path → JVM got the literal string, crashed the fork);
 reverted entirely (no trace). Revisit with a tested approach when the JDK enforces it.
 
-**STILL IN THE PASS (next):** (a) NESTING — group each scenario's Given/When/Then into `static`
-nested classes under a per-scenario container, to cut the 23 top-level classes in `controlplane/bdd/`
-(JGiven supports nested static stages); (b) BDD UNIT TESTS — rewrite component tests (doctor,
-renderer, …) as readable Given/When/Then with Mockito for interactions. Localisation rule: a stage
-describing PROD behaviour lives in `main`; a stage that exists only to test lives in `test`. Order
-chosen: dedup (done) → BDD unit → nesting last.
+*4. Nesting (e3ac4b4d) — DONE.* The six top-level stage files (Given/When/Then × SystemdAdapter +
+ClusterReadiness) collapsed into TWO per-scenario containers `SystemdAdapterScenario` /
+`ClusterReadinessScenario`, each a `final` class with a private ctor holding `public static class
+Given/When/Then extends Stage<…>`. bdd/ top-level count 23→19. Cross-scenario edge preserved:
+`ClusterReadinessScenario.When` references `SystemdAdapterScenario.Given/When/Then` via
+`@ScenarioStage` (the nested dependency). Consumers rewired: both prod stages' `Scenario.create`,
+`SystemdAdapterScenarioTest extends ScenarioTest<Scenario.Given,…>`, `RunbookRenderingTest`.
+**Rendered prose is byte-identical** — JGiven derives step names from METHOD names + scenario titles
+from `startScenario(...)` strings, neither touched; only Java type names changed. Proven green by
+NestedRunbookTest asserting exact step text. 31/31.
+
+**STILL IN THE PASS (next, LAST item):** BDD UNIT TESTS — rewrite component tests (DoctorTest,
+RunbookRenderingTest, …) as readable Given/When/Then with Mockito for interactions. Localisation
+rule: a stage describing PROD behaviour lives in `main`; a stage that exists only to test lives in
+`test`. Order was: dedup (done) → nesting (done e3ac4b4d) → BDD unit (now). NOTE: the user chose
+"nesting first" on resume (2026-06-07), reversing the earlier "BDD-unit before nesting" — nesting is
+now done, BDD-unit is the only remaining pass item.
 
 **User's design seed for the deferred DAG model:** "it's the step/edge that decides fail-fast vs
 fail-at-end." Refined together: a step isn't fail-fast in the absolute — it BLOCKS its dependents
