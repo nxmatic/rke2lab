@@ -1,6 +1,6 @@
 ---
 name: runbook-doctor-state
-description: feature/runbook-doctor — Increments A, B, C all DONE & committed; NEXT = wire live verifier + shared report-node model (the two converged deferrals)
+description: feature/runbook-doctor — Increments A,B,C,D all DONE & committed; NEXT = shared report-node model (node-level Diagnosis/Mitigation + explicit dependsOn edges)
 metadata: 
   node_type: memory
   type: project
@@ -9,10 +9,25 @@ metadata:
 
 Active chantier on branch **`feature/runbook-doctor`**: build the runbook + doctor subsystem.
 Design DONE; **A DONE** (3b46b249), **B/doctor DONE** (aa55ced4), **C/checkpoint#2-nested DONE
-DSL-first** (9685793c, 2026-06-06). **NEXT = the converged follow-on** (see end): wire the live
-cluster verifier behind a production `ClusterReadinessProbe` + build the shared report-node model
-so the plan renders into each runbook node's Diagnosis/Mitigation (vs. today's inline log) and
-records `dependsOn` DAG edges.
+DSL-first** (9685793c), **D/live-cluster-wiring DONE** (fc91f127, 2026-06-06). **NEXT = the last
+deferral**: the shared report-node model so the plan renders into each runbook node's
+Diagnosis/Mitigation sections (vs. today's inline log) and records explicit `dependsOn` DAG edges
+(today the edge is shown via @NestedSteps nesting). Now unblocked: both checkpoints are live BDD
+scenarios.
+
+**Increment D delivered** (seed-master): cluster-readiness now played LIVE as a BDD scenario (was
+procedural verify() in a lazy Pulumi applyValue lambda → never hit the runbook). `ClusterReadinessStage`
+(mirror of SystemdAdapterStage) plays it EAGER in the pipeline thread (deps already concrete), so it
+records into the shared ReportModel before BootstrapStage's finally renders — avoids the applyValue
+fires-after-render empty-node trap. `ProductionClusterReadinessProbe` bridges each phase to a public
+per-phase check on the verifier (checkKubeconfigPublished/checkApiReady/checkControllersEffective; the
+phase-0 bootstrap-preconditions gate folded into phase 1); the two dead verify() overloads deleted.
+New typed Symptoms KUBECONFIG_MISSING/API_NOT_READY/CONTROLLER_NOT_READY routed in Generalist (domain
+CLUSTER) — named in runbook, no specialist yet → empty plan. **VerificationResult is now the
+projection of per-phase dossiers** via verifier public ready()/failed() factories — all 10 output
+keys + handoffReady→nextStep (Stage B gate) + bootstrapStatus byte-identical; ClusterReadinessProjectionTest
+pins it. ClusterReadinessResource = thin graph mirror (keeps dependsOn, no verify). runbook+generalist
+threaded BootstrapPipeline→ResourcesStage→ResourceManager→ResourceCreationPipeline→stage. 30/30 green.
 
 **Increment C delivered** (seed-master `controlplane.bdd`, DSL-first/offline): `ClusterReadinessPhase`
 (kubeconfig/API/controllers) as BDD steps, each driven by an injectable `ClusterReadinessProbe`→
