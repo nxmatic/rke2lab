@@ -97,7 +97,19 @@ TEST drives the production stage's `launch()` with an INJECTED probe (not a re-i
 classes (the line 70-72 preference) is DONE (commit e3ac4b4d): the six stage files collapsed into
 `SystemdAdapterScenario` / `ClusterReadinessScenario`, each holding `public static class
 Given/When/Then`; cross-scenario edge kept via `@ScenarioStage SystemdAdapterScenario.Given` etc.
-Rendered prose byte-identical (step names = method names, unaffected by the type rename). The LAST
-pass item is BDD-style UNIT tests (Given/When/Then for the component tests).
+Rendered prose byte-identical (step names = method names, unaffected by the type rename). BDD-style
+UNIT tests are now DONE too (commits 97d0b9d0 + 97383f0b): a shared `OperatorConfiguration` test DSL
+(`empty/mandatory/full` + `with/without` + `asLoader/asDto/asBootstrapConfig/asPolicy`) replaced the
+config fixtures duplicated across 6 files; `DoctorScenario`/`DoctorScenarioTest` tell the doctor's
+diagnosis as BDD while `DoctorTest` keeps the exhaustive type mechanics. **CONFIG-DELEGATION RULE
+(user, 2026-06-07):** when a test's SUBJECT is config behaviour, delegate to the `ConfigEntryGate`
+BDD stages (compose via `@ScenarioStage`); the DSL is for config-as-FIXTURE only. The whole
+BDD-quality pass is COMPLETE — see [[runbook-doctor-state]].
+
+**JUnit 6 watch-item:** can't bump JUnit alone — JUnit 6.0 removed 5.x APIs JGiven 2.0.3 compiled
+against. Latest released JGiven is 2.0.3 (no JUnit-6 release yet). Bump JUnit+JGiven TOGETHER when
+JGiven ships JUnit-6 support; import `junit-bom` before spring-boot in `bom/pom.xml`. Meanwhile avoid
+`@ParameterizedTest` under a JGiven `ScenarioTest` (it probes JUnit ≥5.13 `ParameterInfo`; we have
+5.10.5 → harmless NoClassDefFoundError noise). Prefer one explicit scenario per case.
 
 See [[working-style-narrate-progress]] and [[config-restructuring-state]] and [[runbook-doctor-state]].

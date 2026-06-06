@@ -1,6 +1,6 @@
 ---
 name: runbook-doctor-state
-description: feature/runbook-doctor — Increments A-D DONE; BDD-quality pass IN PROGRESS (explicit steps, probe-injection dedup, POM restructure all committed); NEXT in pass = nesting Given/When/Then + BDD unit tests; then the deferred shared report-node model
+description: feature/runbook-doctor — Increments A-D DONE; BDD-quality pass COMPLETE (explicit steps, probe-injection dedup, POM restructure, nesting, BDD unit tests all committed); only remaining future work = the deferred shared report-node DAG model (its own chantier)
 metadata: 
   node_type: memory
   type: project
@@ -83,12 +83,38 @@ Given/When/Then extends Stage<…>`. bdd/ top-level count 23→19. Cross-scenari
 from `startScenario(...)` strings, neither touched; only Java type names changed. Proven green by
 NestedRunbookTest asserting exact step text. 31/31.
 
-**STILL IN THE PASS (next, LAST item):** BDD UNIT TESTS — rewrite component tests (DoctorTest,
-RunbookRenderingTest, …) as readable Given/When/Then with Mockito for interactions. Localisation
-rule: a stage describing PROD behaviour lives in `main`; a stage that exists only to test lives in
-`test`. Order was: dedup (done) → nesting (done e3ac4b4d) → BDD unit (now). NOTE: the user chose
-"nesting first" on resume (2026-06-07), reversing the earlier "BDD-unit before nesting" — nesting is
-now done, BDD-unit is the only remaining pass item.
+*5. BDD unit tests — DONE (the LAST pass item, two commits).* **Commit 97d0b9d0 — shared fixture
+DSL.** The same `Map.of("incus"…"image"…"worktree"…) → ConfigLoader → from(dto)` block was
+copy-pasted across 6 test files (as `config()/policy()/dto()/loaderOf()/full()/mandatoryOnly()`).
+Extracted to ONE `src/test` DSL `controlplane/config/OperatorConfiguration`:
+`empty()/mandatory()/full()` + fluent `with(section,key,val)`/`without("incus.configDir")` +
+`asLoader/asDto/asBootstrapConfig/asPolicy`. All 7 tests rewired; mechanics tests (ConfigLoader,
+Rke2labConfig, BootstrapConfigFrom, ClusterReadinessProjection) KEEP exhaustive assert bodies — only
+input construction goes through the DSL (TDD/BDD split preserved). `without()` expresses
+missing-mandatory cases as `full().without(key)`. **DELEGATION RULE (user's, 2026-06-07):** when a
+test's SUBJECT is config behaviour (ready-vs-missing), delegate to the `ConfigEntryGate` BDD stages
+(compose via `@ScenarioStage`, the follow-the-chain pattern); the DSL is for config-as-FIXTURE only.
+**Commit 97383f0b — DoctorScenario.** `DoctorTest` mixed behaviour (consult→plan) + type mechanics
+(symptom parse, dossier round-trip). Split: new TEST-ONLY `DoctorScenario` (Given a doctor staffed /
+a failure presenting a symptom · When consulted · Then a prescription issued | no treatment but
+plan names the symptom) + `DoctorScenarioTest`; Generalist/Specialist/Dossier vocab IS the DSL.
+Stages live in `src/test` (doctor is consulted INSIDE checkpoints, never standalone in prod →
+localisation rule). The 3 recognized-but-untreated cluster symptoms = one scenario each (NOT
+`@ParameterizedTest`) — each renders its own runbook line AND avoids JGiven 2.0.3 probing the JUnit
+≥5.13 `ParameterInfo` class (we resolve 5.10.5 via spring-boot) which logged a harmless
+NoClassDefFoundError. 33/33 green.
+
+**THE BDD-QUALITY PASS IS COMPLETE.** All 5 items done. Remaining future work is the DEFERRED shared
+report-node DAG model (below) — its own chantier, not part of this pass.
+
+**JUNIT 6 / JGIVEN WATCH-ITEM (investigated 2026-06-07, user asked "why not bump to 6.1.0?"):**
+BLOCKED, not by caution — by the dependency graph. JUnit 6.0 REMOVED 5.x APIs JGiven 2.0.3 was
+compiled against (`PreconditionViolationException`, `ReflectionSupport.loadClass()`, …) → runtime
+`NoSuchMethodError`. JUnit + JGiven must move TOGETHER. **Latest RELEASED JGiven is 2.0.3** (Maven
+Central confirmed); JUnit-6 support exists only on JGiven's unmerged/unreleased `main`. So no bump
+until JGiven ships a JUnit-6 release. When it does: clean coordinated bump = import `junit-bom:6.x`
+BEFORE spring-boot-dependencies in our standalone `bom/pom.xml` (first `import` wins) + bump
+jgiven-* together. No functional gain today regardless.
 
 **User's design seed for the deferred DAG model:** "it's the step/edge that decides fail-fast vs
 fail-at-end." Refined together: a step isn't fail-fast in the absolute — it BLOCKS its dependents
