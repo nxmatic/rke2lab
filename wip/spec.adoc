@@ -168,8 +168,39 @@ Validated against Prometheus + cert-manager. Each scenario node renders as:
 |===
 
 On success, only Meaning + Impact render (clean). On failure, Diagnosis + Mitigation
-expand — the targeted-capture principle already in the pattern doc. (Until Increment B,
-Diagnosis + Mitigation are absent — the node shows Meaning + Impact + FAILED.)
+expand — the targeted-capture principle already in the pattern doc.
+
+*Absent Diagnosis/Mitigation is a first-class render state, not a hole.* Until Increment B
+the doctor does not exist, so a FAILED node shows Meaning + Impact + FAILED with *no*
+Diagnosis/Mitigation. The renderer must treat their absence as a deliberate state (and a
+test pins it), so the failure rendering is de-risked before the doctor is wired.
+
+*The symptom is sourced, never parsed.* The Diagnosis section names a typed symptom
+(`CONNECTION_REFUSED`, …). That value comes from the probe, which classifies its own
+failure — it is *not* reverse-engineered from an assertion message. See
+<<symptom-and-dossier>>.
+
+Example rendering:
+
+[source,asciidoc]
+----
+== Scenario: systemd-adapter-becomes-reachable
+
+=== Meaning
+The systemd adapter dbus-over-TCP proxy must respond...
+
+=== Diagnosis (on failure only)
+**Symptom:** CONNECTION_REFUSED
+**Dossier:**
+[source,yaml]
+----
+instanceName: master
+units:
+  rke2lab-dbus-tcp-system-bus.service:
+    status: inactive
+...
+----
+----
 
 === Collecting the DAG: one shared model, dependencies declared once
 
@@ -199,6 +230,37 @@ JGiven 2.0.3 provides the renderers natively (verified in the jar):
 
 The `.adoc` is rendered at end of provisioning (and at end of preview, including for
 ordered fake incidents).
+
+[#render-survives-critical]
+==== The render must survive a CRITICAL stop (constraint, not placement)
+
+A CRITICAL scenario stops provisioning by *throwing* `PipelineStageFailure` from inside the
+stage (`SystemdAdapterStage.launch()`). If the render were wired at the happy-path tail
+(`collectOutputs()` or a terminal `outputs` topic), that throw would unwind _past_ it and
+the runbook would never render — in exactly the failure case the runbook exists for.
+
+So the render is *not* an open question of placement; it is a constraint: *the shared model
+is created by the caller and rendered in a `finally`*. The caller (`BootstrapStage`, which
+already drives the whole `BootstrapPipeline` chain) owns the model, threads it in, and
+renders it whether the chain returns or throws:
+
+[source,java]
+----
+final ReportModel runbook = new ReportModel();   // one instance, owned by the caller
+try {
+  outputs = BootstrapPipeline.forCluster(config, policy)
+      .recordingInto(runbook)                     // threaded via PipelineState into each checkpoint
+      … .collectOutputs();
+} finally {
+  runbookRenderer.render(runbook);                // CRITICAL threw? still renders. degraded? renders.
+}
+----
+
+The throw stays where it is — aborting resource creation is what CRITICAL _means_ — but it
+unwinds _through_ the `finally`. This also satisfies the instance-passing discipline
+(CLAUDE.md): one model, created once, passed down the call graph, never re-created per stage
+nor reached through a static helper. It replaces today's per-stage `new ReportModel()` that
+is built and discarded.
 
 == The Doctor
 
@@ -270,6 +332,135 @@ RemediationPlan   = { symptom, List<Prescription>, generalistSummary }
 Prescription      = { programRef (typed catalog entry), payload (structured info), humanHint }
 ----
 
+[#symptom-and-dossier]
+=== Symptom and dossier: sourced and typed, never parsed
+
+The doctor's two inputs — the symptom (which `Then` failed, and _why_) and the dossier (the
+captured state) — must be _data the system already holds_, not values reconstructed at the
+catch site. Two decisions enforce this.
+
+*The probe classifies its own failure.* Today the only failure signal is the
+`AssertionError` _message_ from the `Then` step. Recovering `CONNECTION_REFUSED` by parsing
+that prose is precisely the magic-string fragility the `clusterApi` bug taught us to avoid.
+Instead, the probe — which _knows_ connection-refused vs timeout vs binary-missing, that
+being its domain — emits a *typed symptom in the envelope on a non-ok result*. The stage
+reads `snapshot.get("symptom")`; the Generalist never infers. Fault simulation then falls
+out for free: a canned failing probe simply _emits_ `symptom: CONNECTION_REFUSED`, no
+special path. *The probe emits the symptom from Increment A* (cheap; nothing routes on it
+yet) so the data source is correct from day one; the `Symptom` enum + routing arrive in
+Increment B.
+
+*The dossier is the typed successor of the probe envelope — one snapshot, not two.* The
+envelope `Map<String,Object>` already _is_ the captured snapshot, and it already flows to
+the sink → `SystemdAdapterResource`. Building a separate `Dossier` at the catch site would
+revive the two-sources-of-truth anti-pattern. So `Dossier` becomes the record the probe
+returns, exposing `toOutputMap()` (the established idiom — cf.
+`ControlplanePolicy.toOutputMap()`): one instance, two views — typed for the doctor, a map
+for the Pulumi outputs and the YAML block in the runbook.
+
+The retype is *atomic, in Increment B* (no compat shim, per CLAUDE.md): the probe contract
+changes from `Map<String,Object>` to `Dossier`, and the sink + `SystemdAdapterResource`
+update in the same change. Increment A stays on `Map` (no doctor yet); the typed form lands
+exactly when the doctor needs it. `Dossier` is a plain record — serializability (for a
+future MCP boundary) follows whenever Phase 2 picks a mechanism, and is not a Phase 1
+concern.
+
+== The AI-augmentation seam (Phase 2, not built here)
+
+This system is authored *with* AI (Claude Code), so it should one day be AI-augmentable at
+ops-time. We do *not* build that here, and we deliberately do *not* freeze an MCP API we
+have not designed — naming specific servers or tool signatures now would be a speculative
+abstraction that bit-rots against the real thing. What we _do_ commit to is the *seam*: the
+small set of Phase 1 design choices that let a future Phase 2 swap implementations without
+rewriting the Generalist, the runbook rendering, or the checkpoints.
+
+*Principle.* Phase 1 is deterministic Java with no AI dependency during bootstrap. The actor
+is always the *human operator*; if a future Phase 2 adds AI, the operator invokes it
+explicitly for troubleshooting — never the bootstrap itself. The medical analogy simply
+extends: the *Doctor* (Generalist) could be an AI agent, *Specialists* could be backed by
+out-of-process tools instead of Java classes, *Procedures* could be remote calls instead of
+methods — but the contracts between them are the same objects.
+
+=== What the seam is: contracts that don't change
+
+The interface boundary is designed so Phase 1 code survives a Phase 2 that replaces
+specialist _implementations_:
+
+[cols="1,2,2",options="header"]
+|===
+|Contract |Phase 1 |A future Phase 2
+|`Specialist.diagnose(Symptom, Dossier)` |Java impl reads the objects in-process |An adapter serializes the dossier, calls an out-of-process tool, deserializes the prescription
+|`Symptom` |Java enum (typed, sourced from the probe) |Same enum; its name is the tool's input discriminator
+|`Dossier` |plain record, `toOutputMap()` for the YAML view |Same record; serialized when a transport is chosen
+|`Prescription` |record: typed `programRef` + structured `payload` + prose `humanHint` |Same record; `humanHint` for humans, `payload`/`programRef` for an executor
+|Runbook sections |`== Meaning` / `== Diagnosis` / `== Mitigation`, typed vocabulary |Same headings; structured enough for a machine to parse
+|Generalist routing |deterministic symptom → specialist table |unchanged — routes to different _impls_, same table
+|===
+
+The `Generalist` does not know whether a `Specialist` is a local Java class or an adapter to
+something out-of-process — same interface, swappable implementation. That swappability is the
+*entire* Phase 2 surface we are protecting; everything else (transport, tool names, an
+executor, a config knob to mix impls) is deferred and intentionally unspecified.
+
+=== Why these specific Phase 1 choices
+
+The seam is the _reason_ for four choices that would otherwise look like over-engineering for
+a purely-programmatic doctor:
+
+. *Typed `Symptom`, sourced from the probe* (see <<symptom-and-dossier>>) — not a parsed
+  string. A typed discriminator is what any later out-of-process router would key on.
+. *`Dossier` as a plain record with `toOutputMap()`* — one snapshot, two views. Serializable
+  later by whatever mechanism Phase 2 picks; no serialization dependency pulled in now.
+. *`Prescription` with a structured `payload` beside the prose `humanHint`* — the operator
+  reads the hint today; a structured payload is what an executor would consume later. The
+  prescription is never reduced to a string.
+. *Structured runbook headings + typed vocabulary* — the `== Diagnosis`/`== Mitigation`
+  structure and names like `CONNECTION_REFUSED` are deterministic anchors a machine could
+  parse, without us designing that parser now.
+
+=== One picture: programmatic now, swappable later
+
+The before/after is kept only to show the seam — the Phase 2 side is deliberately generic
+(no named servers or tools, because none are designed):
+
+[mermaid]
+----
+graph TB
+    subgraph P1["Phase 1 — programmatic, this branch"]
+        FAIL1["checkpoint fails<br/>presents Symptom + Dossier"]
+        GEN1["Generalist - Java<br/>firstLook + deterministic routing"]
+        SPEC1["Specialist - Java class<br/>reads dossier, prescribes"]
+        PLAN1["RemediationPlan<br/>symptom + prescriptions"]
+        OPER1["Operator<br/>reads runbook prose, acts"]
+        FAIL1 --> GEN1 --> SPEC1 --> PLAN1 --> OPER1
+    end
+
+    subgraph P2["A future Phase 2 — same contracts, swapped impls"]
+        FAIL2["checkpoint fails<br/>presents Symptom + Dossier"]
+        GEN2["Doctor<br/>same routing table"]
+        SPEC2["Specialist - out-of-process adapter<br/>same interface"]
+        PLAN2["RemediationPlan<br/>same record"]
+        OPER2["Operator<br/>invokes + approves"]
+        FAIL2 --> GEN2 --> SPEC2 --> PLAN2 --> OPER2
+    end
+
+    SPEC1 -. same Specialist interface .-> SPEC2
+
+    style GEN1 fill:#fff4e6,stroke:#ff9900
+    style SPEC1 fill:#e1f5ff,stroke:#0066cc
+    style PLAN1 fill:#ccffcc,stroke:#00cc66
+    style GEN2 fill:#fff4e6,stroke:#ff9900
+    style SPEC2 fill:#e1f5ff,stroke:#0066cc
+    style PLAN2 fill:#ccffcc,stroke:#00cc66
+----
+
+*Why document the seam in the spec (not just memory):* it _justifies_ the four Phase 1
+choices above (otherwise they read as gold-plating), and it pins the contract so checkpoints
+#2 and #3 follow the same interface. The speculative MCP specifics that were here earlier —
+named servers, tool signatures, a `specialist-mode` knob, the rke2lab-as-MCP-server rationale
+— are intentionally removed: they would freeze an API we have not designed. They live in
+brainstorm history if needed.
+
 == Implementation: one design, three sequenced increments
 
 Think global (this design), deliver incremental. Each increment ships green.
@@ -278,22 +469,35 @@ Think global (this design), deliver incremental. Each increment ships green.
 
 Build the runbook mechanism on the *existing* systemd-adapter checkpoint.
 
-* Shared report model in `PipelineState`; checkpoints record into it instead of discarding
-  a local one.
+* *Shared report model, caller-owned (R1).* `BootstrapStage` creates one `ReportModel`,
+  threads it through `PipelineState` into each checkpoint (replacing today's per-stage
+  `new ReportModel()` that is built and discarded), and renders it in a `finally` so a
+  CRITICAL throw still produces a runbook.
 * Record the already-declared `dependsOn` with the runbook to form DAG edges.
-* Render `.adoc` (`AsciiDocReportGenerator`) at end of provisioning/preview, alongside the
-  existing inline text.
+* Render `.adoc` (`AsciiDocReportGenerator`) in that `finally`, alongside the existing
+  inline text.
+* *Probe emits the symptom (R2).* On a non-ok result the probe envelope carries a typed
+  failure-kind. Nothing routes on it yet (the doctor is absent), but the data source is
+  correct from day one and fault simulation reuses it directly.
 * *Fake-incident ordering:* `policy.readiness.simulate.<scenario>: <failure-kind>` config
-  sub-map; a simulated scenario lifts dry-run and runs a canned failing probe. Renders a
-  FAILED node + severity decision — *no prescription yet* (doctor absent).
+  sub-map beside the existing `override` map; a simulated scenario lifts dry-run and runs a
+  canned failing probe (which emits the symptom). Renders a FAILED node + severity decision
+  — *no prescription yet* (doctor absent).
+* *Absent Diagnosis/Mitigation is a tested state (R6).* A test pins that a FAILED node
+  renders cleanly with those sections absent (not a null hole), de-risking failure rendering
+  before the doctor exists.
 * *Green when:* `pulumi up` and `preview` produce `runbook.adoc` with the systemd-adapter
-  node and its result; and a `simulate` entry produces a FAILED node in preview without
-  touching infra.
+  node and its result; a `simulate` entry produces a FAILED node in preview without touching
+  infra; and a forced CRITICAL stop still renders the runbook.
 
 === Increment B — Doctor (diagnosis + prescription on failure)
 
 * `Generalist` (firstLook + deterministic routing), `Specialist` (reads dossier,
   prescribes), `Prescription` (typed program ref + structured payload), `RemediationPlan`.
+* *Atomic `Map` → `Dossier` retype (R3).* The probe contract changes from
+  `Map<String,Object>` to a typed `Dossier` record (with `toOutputMap()`); the sink and
+  `SystemdAdapterResource` update in the *same* change — no compat shim, no `Dossier.from(Map)`
+  adapter. One snapshot instance, two views.
 * The checkpoint consults the generalist on failure; the plan flows into the runbook node
   and the log. The fake-incident node from Increment A now fills its Diagnosis + Mitigation.
 * A `DbusTcpSpecialist` as the first concrete specialist (systemd domain).
@@ -324,12 +528,13 @@ Build the runbook mechanism on the *existing* systemd-adapter checkpoint.
 
 == Open questions (to resolve in the plan, flagged not hidden)
 
-. *Shared model lifecycle:* exactly where in `PipelineState` / `ApplicationPipeline` the
-  shared `ReportModel` is created and where the final render is triggered (end of
-  `BootstrapPipeline`? a new `outputs` stage step?).
 . *Prescription `programRef` catalog:* what the remediation-program catalog looks like
   (a `RemediationCatalog` à la `SystemdUnitCatalog`?) — defined when the first real
   prescription is written in Increment B.
+
+(Resolved while reviewing against the code, now constraints above, not open questions:
+*shared-model lifecycle* — caller-owned, rendered in a `finally`, see
+<<render-survives-critical>>; *symptom + dossier sourcing* — see <<symptom-and-dossier>>.)
 
 == Related documentation
 
