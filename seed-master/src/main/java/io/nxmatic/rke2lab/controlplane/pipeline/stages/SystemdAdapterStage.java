@@ -6,15 +6,13 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.text.PlainTextReporter;
 import io.nxmatic.rke2lab.controlplane.bdd.Dossier;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
-import io.nxmatic.rke2lab.controlplane.bdd.GivenSystemdAdapter;
 import io.nxmatic.rke2lab.controlplane.bdd.Prescription;
 import io.nxmatic.rke2lab.controlplane.bdd.RemediationPlan;
 import io.nxmatic.rke2lab.controlplane.bdd.Severity;
 import io.nxmatic.rke2lab.controlplane.bdd.SimulatedSystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.Symptom;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
-import io.nxmatic.rke2lab.controlplane.bdd.ThenSystemdAdapter;
-import io.nxmatic.rke2lab.controlplane.bdd.WhenSystemdAdapter;
+import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterScenario;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.PipelineStageFailure;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
@@ -120,9 +118,15 @@ public final class SystemdAdapterStage {
     Dossier captured = null;
     Throwable failure = null;
     try {
-      final Scenario<GivenSystemdAdapter, WhenSystemdAdapter, ThenSystemdAdapter> scenario =
-          Scenario.create(
-              GivenSystemdAdapter.class, WhenSystemdAdapter.class, ThenSystemdAdapter.class);
+      final Scenario<
+              SystemdAdapterScenario.Given,
+              SystemdAdapterScenario.When,
+              SystemdAdapterScenario.Then>
+          scenario =
+              Scenario.create(
+                  SystemdAdapterScenario.Given.class,
+                  SystemdAdapterScenario.When.class,
+                  SystemdAdapterScenario.Then.class);
       scenario.setModel(reportModel);
       scenario.startScenario("systemd adapter becomes reachable");
       try {

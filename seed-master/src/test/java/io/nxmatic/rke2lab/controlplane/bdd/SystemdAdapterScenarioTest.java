@@ -13,7 +13,8 @@ import org.junit.jupiter.api.Test;
  * Given/When/Then prose can be validated; production plays the same scenario with the real probe.
  */
 class SystemdAdapterScenarioTest
-    extends ScenarioTest<GivenSystemdAdapter, WhenSystemdAdapter, ThenSystemdAdapter> {
+    extends ScenarioTest<
+        SystemdAdapterScenario.Given, SystemdAdapterScenario.When, SystemdAdapterScenario.Then> {
 
   @Test
   void systemd_adapter_becomes_reachable() {

@@ -6,14 +6,12 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.text.PlainTextReporter;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessProbe;
+import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessScenario;
 import io.nxmatic.rke2lab.controlplane.bdd.Dossier;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
-import io.nxmatic.rke2lab.controlplane.bdd.GivenClusterReadiness;
 import io.nxmatic.rke2lab.controlplane.bdd.Prescription;
 import io.nxmatic.rke2lab.controlplane.bdd.RemediationPlan;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
-import io.nxmatic.rke2lab.controlplane.bdd.ThenClusterReadiness;
-import io.nxmatic.rke2lab.controlplane.bdd.WhenClusterReadiness;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
@@ -111,9 +109,15 @@ public final class ClusterReadinessStage {
 
     Throwable failure = null;
     try {
-      final Scenario<GivenClusterReadiness, WhenClusterReadiness, ThenClusterReadiness> scenario =
-          Scenario.create(
-              GivenClusterReadiness.class, WhenClusterReadiness.class, ThenClusterReadiness.class);
+      final Scenario<
+              ClusterReadinessScenario.Given,
+              ClusterReadinessScenario.When,
+              ClusterReadinessScenario.Then>
+          scenario =
+              Scenario.create(
+                  ClusterReadinessScenario.Given.class,
+                  ClusterReadinessScenario.When.class,
+                  ClusterReadinessScenario.Then.class);
       scenario.setModel(reportModel);
       scenario.startScenario("cluster becomes ready");
       try {

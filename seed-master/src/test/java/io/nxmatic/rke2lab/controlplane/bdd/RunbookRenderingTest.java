@@ -60,9 +60,13 @@ class RunbookRenderingTest {
    */
   private static ReportModel playFailingScenario() {
     final ReportModel model = new ReportModel();
-    final Scenario<GivenSystemdAdapter, WhenSystemdAdapter, ThenSystemdAdapter> scenario =
-        Scenario.create(
-            GivenSystemdAdapter.class, WhenSystemdAdapter.class, ThenSystemdAdapter.class);
+    final Scenario<
+            SystemdAdapterScenario.Given, SystemdAdapterScenario.When, SystemdAdapterScenario.Then>
+        scenario =
+            Scenario.create(
+                SystemdAdapterScenario.Given.class,
+                SystemdAdapterScenario.When.class,
+                SystemdAdapterScenario.Then.class);
     scenario.setModel(model);
     scenario.startScenario("systemd adapter becomes reachable");
     try {
