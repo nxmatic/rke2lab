@@ -94,6 +94,23 @@ public final class ConfigLoader {
     return optional(section, key).map(value -> Duration.parse(value.trim()));
   }
 
+  /**
+   * Reads a nested string→string sub-map (e.g. {@code policy.readiness.override} = {@code
+   * {systemd-adapter: warning}}). Empty map when the key is absent. Values are stringified so a
+   * non-string scalar degrades to its text form rather than crashing.
+   */
+  @SuppressWarnings("unchecked")
+  public Map<String, String> stringMap(String section, String key) {
+    final Object value = sectionReader.read(section).map(map -> map.get(key)).orElse(null);
+    if (!(value instanceof Map)) {
+      return Map.of();
+    }
+    final java.util.LinkedHashMap<String, String> result = new java.util.LinkedHashMap<>();
+    ((Map<String, Object>) value)
+        .forEach((entryKey, entryValue) -> result.put(entryKey, String.valueOf(entryValue)));
+    return result;
+  }
+
   // --- require* : accumulate on absence, return placeholder ---
 
   public Path requirePath(String section, String key) {

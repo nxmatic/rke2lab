@@ -4,6 +4,7 @@ import com.pulumi.Config;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -17,9 +18,11 @@ public record Rke2labConfig(
     InfraConfigRegistry infra,
     ClusterConfig cluster,
     NodeConfig node,
+    ProfileConfig profile,
     ApiConfig api,
     KubeconfigConfig kubeconfig,
     PolicyConfig policy,
+    ProvisioningPolicyConfig provisioning,
     ReadinessConfig readiness,
     EntryGateConfig entryGate,
     BboxConfig bbox) {
@@ -50,9 +53,13 @@ public record Rke2labConfig(
             infra,
             new ClusterConfig(loader.optional("cluster", "name")),
             new NodeConfig(loader.optional("node", "name")),
+            new ProfileConfig(loader.optional("profile", "name")),
             new ApiConfig(loader.optionalUri("api", "endpoint")),
             new KubeconfigConfig(loader.optionalPath("kubeconfig", "ref")),
             PolicyConfig.from(loader),
+            new ProvisioningPolicyConfig(
+                loader.optionalBoolean("policy.network.lan.binding", "enabled"),
+                loader.optionalBoolean("policy.gitDirtyCheck", "enabled")),
             new ReadinessConfig(
                 loader.optionalBoolean("readiness", "enabled"),
                 loader.optionalDuration("readiness", "timeout")),
@@ -125,11 +132,14 @@ public record Rke2labConfig(
 
   public record NodeConfig(Optional<String> name) {}
 
+  public record ProfileConfig(Optional<String> name) {}
+
   public record ApiConfig(Optional<URI> endpoint) {}
 
   public record KubeconfigConfig(Optional<Path> ref) {}
 
-  public record PolicyConfig(LinkPolicyConfig link, DebugPolicyConfig debug) {
+  public record PolicyConfig(
+      LinkPolicyConfig link, DebugPolicyConfig debug, Map<String, String> readinessOverride) {
     static PolicyConfig from(ConfigLoader loader) {
       return new PolicyConfig(
           new LinkPolicyConfig(
@@ -143,7 +153,8 @@ public record Rke2labConfig(
           new DebugPolicyConfig(
               loader.optionalBoolean("policy.debug.mesh", "enabled"),
               loader.optionalBoolean("policy.debug.networking", "enabled"),
-              loader.optionalBoolean("policy.debug.nriPlugins.flox", "enabled")));
+              loader.optionalBoolean("policy.debug.nriPlugins.flox", "enabled")),
+          loader.stringMap("policy.readiness", "override"));
     }
   }
 
@@ -158,6 +169,9 @@ public record Rke2labConfig(
 
   public record DebugPolicyConfig(
       Optional<Boolean> mesh, Optional<Boolean> networking, Optional<Boolean> nriPluginsFlox) {}
+
+  public record ProvisioningPolicyConfig(
+      Optional<Boolean> lanBinding, Optional<Boolean> gitDirtyCheck) {}
 
   public record ReadinessConfig(Optional<Boolean> enabled, Optional<Duration> timeout) {}
 

@@ -1,8 +1,8 @@
 package io.nxmatic.rke2lab.controlplane.policy;
 
-import com.pulumi.Config;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.controlplane.bdd.Severity;
+import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestDomainPolicy;
 import java.util.LinkedHashMap;
@@ -33,28 +33,23 @@ public record ControlplanePolicy(
         .build();
   }
 
-  public static ControlplanePolicy from(Config config) {
-    EnvironmentValues environment = new EnvironmentValues(config);
-
+  public static ControlplanePolicy from(Rke2labConfig config) {
+    final Rke2labConfig.DebugPolicyConfig debug = config.policy().debug();
     DebugPolicy debugPolicy =
         new DebugPolicy(
-            environment.bool("policy.debug.mesh.enabled", false),
-            environment.bool("policy.debug.networking.enabled", false),
-            environment.bool("policy.debug.nriPlugins.flox.enabled", false));
+            debug.mesh().orElse(false),
+            debug.networking().orElse(false),
+            debug.nriPluginsFlox().orElse(false));
 
     NetworkPolicy networkPolicy =
-        new NetworkPolicy(environment.bool("policy.network.lan.binding.enabled", true));
+        new NetworkPolicy(config.provisioning().lanBinding().orElse(true));
 
     ProvisioningPolicy provisioningPolicy =
-        new ProvisioningPolicy(environment.bool("policy.gitDirtyCheck.enabled", true));
+        new ProvisioningPolicy(config.provisioning().gitDirtyCheck().orElse(true));
 
-    boolean clusterApiEnabled = environment.bool("policy.link.clusterApi.enabled", true);
-    SeedLog.debug(
-        "policy",
-        "clusterApi raw='"
-            + environment.raw("policy.link.clusterApi.enabled")
-            + "' parsed="
-            + clusterApiEnabled);
+    final Rke2labConfig.LinkPolicyConfig link = config.policy().link();
+    boolean clusterApiEnabled = link.clusterApi().orElse(true);
+    SeedLog.debug("policy", "clusterApi parsed=" + clusterApiEnabled);
 
     ManifestLinkPolicy manifestLinkPolicy =
         new ManifestLinkPolicy(
@@ -62,13 +57,13 @@ public record ControlplanePolicy(
                 .domainCatalog(MANIFEST_DOMAIN_CATALOG)
                 .stageADefaults()
                 .cluster(true) // Always enabled - creates rke2lab-system namespace
-                .storage(environment.bool("policy.link.storage.enabled", true))
-                .gitops(environment.bool("policy.link.gitops.enabled", true))
+                .storage(link.storage().orElse(true))
+                .gitops(link.gitops().orElse(true))
                 .runtime(true) // Always enabled - RKE2 config, Flox runtime, core bootstrap
-                .networking(environment.bool("policy.link.networking.enabled", true))
-                .mesh(environment.bool("policy.link.mesh.enabled", false))
-                .highAvailability(environment.bool("policy.link.highAvailability.enabled", true))
-                .cicd(environment.bool("policy.link.cicd.enabled", true))
+                .networking(link.networking().orElse(true))
+                .mesh(link.mesh().orElse(false))
+                .highAvailability(link.highAvailability().orElse(true))
+                .cicd(link.cicd().orElse(true))
                 .clusterApi(clusterApiEnabled)
                 .platform(true) // Always enabled - cert-manager, kubernetes-replicator
                 .build(),
@@ -79,8 +74,14 @@ public record ControlplanePolicy(
         .network(networkPolicy)
         .provisioning(provisioningPolicy)
         .manifestLink(manifestLinkPolicy)
-        .readiness(new ReadinessPolicy(environment.severityOverrides("policy.readiness.override")))
+        .readiness(new ReadinessPolicy(toSeverityOverrides(config.policy().readinessOverride())))
         .build();
+  }
+
+  private static Map<String, Severity> toSeverityOverrides(Map<String, String> raw) {
+    final Map<String, Severity> parsed = new LinkedHashMap<>();
+    raw.forEach((scenario, value) -> Severity.parse(value).ifPresent(s -> parsed.put(scenario, s)));
+    return parsed;
   }
 
   public Map<String, String> toEnvMap() {
@@ -215,40 +216,6 @@ public record ControlplanePolicy(
 
     public ControlplanePolicy build() {
       return new ControlplanePolicy(debug, network, provisioning, manifestLink, readiness);
-    }
-  }
-
-  private record EnvironmentValues(Config config) {
-    @SuppressWarnings("null")
-    String raw(String key) {
-      return config.get(key).orElse("");
-    }
-
-    boolean bool(String key, boolean defaultValue) {
-      String value = raw(key);
-      if (value.isBlank()) {
-        return defaultValue;
-      }
-      return switch (value.trim().toLowerCase()) {
-        case "1", "true", "yes", "on" -> true;
-        case "0", "false", "no", "off" -> false;
-        default -> throw new IllegalArgumentException("Invalid boolean for " + key + ": " + value);
-      };
-    }
-
-    /**
-     * Reads a structured sub-map of scenario-id to severity (e.g. {@code systemd-adapter:
-     * warning}). Unparseable entries are dropped so a typo degrades to "defer to scenario", never a
-     * crash.
-     */
-    @SuppressWarnings({"unchecked", "null"})
-    Map<String, Severity> severityOverrides(String key) {
-      final Map<String, Object> raw = config.getObject(key, Map.class).orElse(Map.of());
-      final Map<String, Severity> parsed = new LinkedHashMap<>();
-      raw.forEach(
-          (scenario, value) ->
-              Severity.parse(String.valueOf(value)).ifPresent(s -> parsed.put(scenario, s)));
-      return parsed;
     }
   }
 }

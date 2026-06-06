@@ -1,10 +1,23 @@
 package io.nxmatic.rke2lab.controlplane.pipeline;
 
+import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
+
 public record BootstrapOptions(
     boolean readinessEnabled, boolean cleanWorktreeRequired, boolean bboxFailOnError) {
 
   public static Builder builder() {
     return new Builder();
+  }
+
+  /**
+   * Derive the bootstrap options from the root config DTO (defaults true, matching the prior gate).
+   */
+  public static BootstrapOptions from(Rke2labConfig config) {
+    return builder()
+        .readinessEnabled(config.readiness().enabled().orElse(true))
+        .cleanWorktreeRequired(config.entryGate().cleanWorktreeRequired().orElse(true))
+        .bboxFailOnError(config.bbox().failOnError().orElse(true))
+        .build();
   }
 
   public static final class Builder {

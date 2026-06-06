@@ -2,7 +2,7 @@ package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
 import com.pulumi.Context;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
-import io.nxmatic.rke2lab.controlplane.config.ConfigResolver;
+import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
@@ -46,35 +46,34 @@ public final class EnvironmentStage {
     return this;
   }
 
-  public EnvironmentStage loadBootstrapConfig() {
-    final BootstrapConfig.Builder builder = new BootstrapConfig.Builder();
-    if (pulumiContext != null) {
-      builder.applyConfig(pulumiContext.config("rke2lab"));
+  private Rke2labConfig config;
+
+  /**
+   * The root config DTO, read once. Production wraps the Pulumi config; offline (no context) uses
+   * defaults so the pipeline can run without operator YAML.
+   */
+  private Rke2labConfig config() {
+    if (config == null) {
+      config =
+          pulumiContext != null
+              ? Rke2labConfig.from(pulumiContext.config("rke2lab"))
+              : Rke2labConfig.defaults();
     }
-    sink.bootstrapConfig(builder.build());
+    return config;
+  }
+
+  public EnvironmentStage loadBootstrapConfig() {
+    sink.bootstrapConfig(BootstrapConfig.from(config()));
     return this;
   }
 
   public EnvironmentStage loadControlplanePolicy() {
-    sink.controlplanePolicy(
-        pulumiContext != null
-            ? ControlplanePolicy.from(pulumiContext.config("rke2lab"))
-            : ControlplanePolicy.defaults());
+    sink.controlplanePolicy(ControlplanePolicy.from(config()));
     return this;
   }
 
   public EnvironmentStage loadOptions() {
-    if (pulumiContext == null) {
-      sink.options(BootstrapOptions.builder().build());
-      return this;
-    }
-    final var config = pulumiContext.config("rke2lab");
-    sink.options(
-        BootstrapOptions.builder()
-            .readinessEnabled(ConfigResolver.resolveReadinessEnabled(config))
-            .cleanWorktreeRequired(ConfigResolver.resolveCleanWorktreeRequired(config))
-            .bboxFailOnError(ConfigResolver.resolveBboxFailOnError(config))
-            .build());
+    sink.options(BootstrapOptions.from(config()));
     return this;
   }
 
