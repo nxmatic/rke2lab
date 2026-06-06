@@ -1,20 +1,41 @@
 ---
 name: config-restructuring-state
-description: "Config refactor on branch refactor/config — diagram-first spec + migration plan committed in wip/, NOT yet implemented (no Java written)"
+description: "Config refactor on branch refactor/config — Increment 1 (migration) DONE & verified; Increment 2 (doctor) not started"
 metadata: 
   node_type: memory
   type: project
   originSessionId: 0ea4e055-08e0-405d-a509-7a32cda44c3e
 ---
 
-Restructuring rke2lab configuration. Branch `refactor/config`. Spec + plan COMMITTED in `wip/`,
-implementation NOT started (no Java written yet).
-- `wip/config-restructuring-spec.adoc` — diagram-first design (C4 + UML, no code), committed 55f69ecb
-- `wip/config-migration-plan.adoc` — TDD implementation plan, committed 69a49461
+Restructuring rke2lab configuration. Branch `refactor/config`.
+- `wip/config-restructuring-spec.adoc` — diagram-first design (C4 + UML), committed 55f69ecb
+- `wip/config-migration-plan.adoc` — TDD/BDD plan, committed 69a49461
+
+**Increment 1 (full config migration) — DONE & VERIFIED (2026-06-06).** Implemented + committed:
+MissingRequiredConfiguration, ConfigLoader (section-map reads over injectable SectionReader),
+InfraDomain enum (each constant contributes its sealed InfraConfigFragment — values() = the
+registration list), InfraConfigRegistry, Rke2labConfig DTO, ConfigEntryGate BDD (src/main nested
+stages, played-at-runtime, asserts ready-vs-missing OUTCOME only). Migrated BootstrapConfig /
+ControlplanePolicy / BootstrapOptions to derive from the DTO via EnvironmentStage (reads DTO once);
+DELETED BootstrapConfig.Builder/Defaults/applyConfig + env/JGit/user.home detection,
+ControlplanePolicy.EnvironmentValues, and the whole ConfigResolver. Pulumi.dev.yaml rewritten to
+nested sections. **Verified:** 18 seed-master tests green + `pulumi preview` converges (1 to create,
+23 unchanged, no config errors). Only com.pulumi.Config readers left: ConfigLoader + Rke2labConfig.
+Commits e1fcc06e → 3765e56d.
+
+KNOWN UNRELATED: `netplan` module's `ClusterNetworkBlueprintTest` fails pre-existing (network
+addressing, expected<1>was<7>, last touched 5a17dcfc7) — NOT this topic, do not fix here. It blocks
+a bare `-am test`; exclude with `-Dtest='!ClusterNetworkBlueprintTest'` to run seed-master tests.
+
+**Increment 2 (NOT started) = the doctor pattern's first use case:** build minimal doctor core
+(Generalist, specialist interface, Prescription, RemediationPlan); InfraDomain gains a per-constant
+specialist(); the ConfigEntryGate missing-inputs outcome routes by domain to specialists for
+operator prescriptions. Open question (spec Review): doctor-core ownership (config builds it vs
+shared neutral module).
 
 **Preview-only branch:** nothing deploys from refactor/config; `pulumi preview` is the only test.
 Combined with [[sequential-no-compat-workflow]]: no green-between-commits machinery, old code
-deleted in the same change that supersedes it. Branch only needs coherence when the topic is done.
+deleted in the same change that supersedes it.
 
 **Goal:** kill the fragmented config (3 independent Pulumi `Config` readers —
 `BootstrapConfig.Builder`, `ControlplanePolicy`, `ConfigResolver` — with divergent
