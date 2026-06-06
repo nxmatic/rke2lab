@@ -42,6 +42,94 @@
   </properties>
 
   <!--
+    The single dependencyManagement of the build. It imports the standalone BOM
+    (the external version catalog, on its own lifecycle/version) and manages the
+    rke2lab inter-module versions here at ${project.version} — they share the
+    project's lifecycle, so they belong to the project, not the third-party BOM.
+    Children carry NO dependencyManagement; they inherit this one.
+  -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>bom</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- rke2lab inter-module versions (project lifecycle) -->
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>seed-master</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>seed-master</artifactId>
+        <version>${project.version}</version>
+        <classifier>exec</classifier>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>manifests</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>netplan</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>systemd-contract</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>cdk8s-systemd</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab.sdks</groupId>
+        <artifactId>incus</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <!--
+    Test toolchain common to every module: JUnit 5 for assertions, JGiven for
+    behaviour-as-documentation (unit/component tests written as Given/When/Then),
+    and Mockito for interaction verification / multi-method collaborator doubles.
+    Declared once here so every module gets them without redeclaring; versions
+    come from the imported BOM (spring-boot-dependencies + jgiven). seed-master
+    additionally depends on jgiven-core in MAIN scope — it plays scenarios in
+    production to emit the runbook.
+  -->
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-junit5</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <!--
     Repository resolution order: Maven Central first (always), then the
     internal GH Packages repos as a fallback for io.nxmatic artifacts.
 

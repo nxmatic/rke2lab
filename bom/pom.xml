@@ -3,17 +3,22 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <parent>
-    <groupId>io.nxmatic.rke2lab</groupId>
-    <artifactId>parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
-  </parent>
-
+  <!--
+    Standalone third-party version catalog. The BOM has its own lifecycle and
+    version, independent of the project: it pins the EXTERNAL dependency versions
+    the modules build against. The rke2lab inter-module versions are NOT here —
+    they share the project's lifecycle and are managed by the parent at
+    ${project.version}. Having no <parent> is deliberate: it breaks the cycle that
+    would otherwise arise from the parent importing this BOM.
+  -->
+  <groupId>io.nxmatic.rke2lab</groupId>
   <artifactId>bom</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>bom</name>
 
   <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <dbus.java.version>5.2.0</dbus.java.version>
     <java-systemd.version>3.0.0-SNAPSHOT</java-systemd.version>
     <grpc.version>1.80.0</grpc.version>
@@ -50,6 +55,11 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <!--
+        spring-boot-dependencies manages JUnit, Mockito and byte-buddy in a
+        mutually consistent set (mockito 5.11.0 / byte-buddy 1.14.19 — the same
+        byte-buddy JGiven uses), so the test toolchain needs no explicit versions.
+      -->
       <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-dependencies</artifactId>
@@ -70,43 +80,6 @@
         <version>${grpc.version}</version>
         <type>pom</type>
         <scope>import</scope>
-      </dependency>
-      <!-- rke2lab dependencies -->
-      <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>seed-master</artifactId>
-        <version>${rke2lab.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>seed-master</artifactId>
-        <version>${rke2lab.version}</version>
-        <classifier>exec</classifier>
-      </dependency>
-      <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>manifests</artifactId>
-        <version>${rke2lab.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>netplan</artifactId>
-        <version>${rke2lab.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>systemd-contract</artifactId>
-        <version>${rke2lab.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>cdk8s-systemd</artifactId>
-        <version>${rke2lab.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.nxmatic.rke2lab.sdks</groupId>
-        <artifactId>incus</artifactId>
-        <version>${rke2lab.version}</version>
       </dependency>
       <!-- third-party dependencies -->
       <dependency>

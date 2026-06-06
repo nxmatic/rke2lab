@@ -23,18 +23,6 @@
     -->
   </properties>
 
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>bom</artifactId>
-        <version>${project.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
-
   <dependencies>
     <dependency>
       <groupId>org.cdk8s</groupId>
@@ -67,11 +55,6 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>cdk8s-systemd</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter</artifactId>
-      <scope>test</scope>
     </dependency>
   </dependencies>
 

@@ -13,18 +13,6 @@
   <name>cdk8s-systemd</name>
   <description>CDK8s extension for synthesizing systemd units</description>
 
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>bom</artifactId>
-        <version>${project.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
-
   <dependencies>
     <!-- Software Constructs (AWS CDK base - we extend Construct directly) -->
     <dependency>

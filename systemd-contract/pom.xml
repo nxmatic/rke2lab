@@ -13,18 +13,6 @@
   <artifactId>systemd-contract</artifactId>
   <name>systemd-contract</name>
 
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>bom</artifactId>
-        <version>${project.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
-
   <build>
     <plugins>
       <plugin>
