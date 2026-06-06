@@ -10,7 +10,6 @@ import io.nxmatic.rke2lab.controlplane.bdd.Dossier;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.bdd.GivenClusterReadiness;
 import io.nxmatic.rke2lab.controlplane.bdd.Prescription;
-import io.nxmatic.rke2lab.controlplane.bdd.ProductionClusterReadinessProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.RemediationPlan;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.ThenClusterReadiness;
@@ -44,6 +43,7 @@ public final class ClusterReadinessStage {
   private final Consumer<String> readinessLogger;
   private final ReportModel runbook;
   private final Generalist generalist;
+  private final ClusterReadinessProbe phaseProbe;
   private final Map<String, Object> systemdAdapterLaunchSummary;
   private final Consumer<VerificationResult> sink;
 
@@ -55,6 +55,7 @@ public final class ClusterReadinessStage {
       Consumer<String> readinessLogger,
       ReportModel runbook,
       Generalist generalist,
+      ClusterReadinessProbe phaseProbe,
       Map<String, Object> systemdAdapterLaunchSummary,
       Consumer<VerificationResult> sink) {
     this.config = config;
@@ -64,6 +65,7 @@ public final class ClusterReadinessStage {
     this.readinessLogger = readinessLogger;
     this.runbook = runbook;
     this.generalist = generalist;
+    this.phaseProbe = phaseProbe;
     this.systemdAdapterLaunchSummary =
         systemdAdapterLaunchSummary == null ? Map.of() : systemdAdapterLaunchSummary;
     this.sink = sink;
@@ -78,15 +80,17 @@ public final class ClusterReadinessStage {
       return this;
     }
 
-    // Capture each phase's dossier as the probe produces it, so the VerificationResult projection
-    // and the doctor consultation read data the scenario already computed (never JGiven stage state
-    // read back through a getter — JGiven intercepts those as steps).
+    // Capture each phase's dossier as the injected probe produces it, so the VerificationResult
+    // projection and the doctor consultation read data the scenario already computed (never JGiven
+    // stage state read back through a getter — JGiven intercepts those as steps). Production
+    // injects
+    // a ProductionClusterReadinessProbe; tests inject a simulated/fake probe and play the same
+    // launch(), so the scenario script lives in exactly one place.
     final Map<ClusterReadinessPhase, Dossier> phaseDossiers =
         new EnumMap<>(ClusterReadinessPhase.class);
-    final ClusterReadinessProbe live = new ProductionClusterReadinessProbe(policy, readinessLogger);
-    final ClusterReadinessProbe phaseProbe =
+    final ClusterReadinessProbe capturingProbe =
         (cfg, phase) -> {
-          final Dossier produced = live.probe(cfg, phase);
+          final Dossier produced = phaseProbe.probe(cfg, phase);
           phaseDossiers.put(phase, produced);
           return produced;
         };
@@ -116,7 +120,7 @@ public final class ClusterReadinessStage {
         scenario
             .given()
             .the_cluster(config.clusterName(), config)
-            .with_phase_probe(phaseProbe)
+            .with_phase_probe(capturingProbe)
             .depending_on_systemd_adapter(nestedSystemdAdapterProbe);
         scenario
             .when()

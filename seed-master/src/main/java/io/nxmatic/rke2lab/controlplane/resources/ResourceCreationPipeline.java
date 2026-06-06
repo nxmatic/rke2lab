@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.controlplane.resources;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
+import io.nxmatic.rke2lab.controlplane.bdd.ProductionClusterReadinessProbe;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.ClusterReadinessStage;
@@ -67,6 +68,7 @@ final class ResourceCreationPipeline {
             readinessLogger,
             runbook,
             generalist,
+            new ProductionClusterReadinessProbe(policy, readinessLogger),
             systemdAdapterLaunchSummary,
             result -> holder[0] = result)
         .launch();

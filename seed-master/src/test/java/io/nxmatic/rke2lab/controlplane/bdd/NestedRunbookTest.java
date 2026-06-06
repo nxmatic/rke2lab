@@ -3,38 +3,55 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
-import com.tngtech.jgiven.impl.Scenario;
+import com.pulumi.deployment.Deployment;
+import com.pulumi.deployment.DeploymentInstance;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.StepStatus;
 import io.nxmatic.rke2lab.controlplane.config.ConfigLoader;
 import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.pipeline.stages.ClusterReadinessStage;
+import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
+import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 /**
- * Increment C: the cluster-readiness checkpoint plays the systemd-adapter scenario nested (the
- * follow-the-chain dependency edge) and renders as a two-tier runbook. An ordered fake incident on
- * one nested phase produces a targeted runbook, and the doctor diagnoses the failing phase's
- * symptom — proving the pattern scales to a second checkpoint with the same machinery.
+ * The cluster-readiness checkpoint plays the systemd-adapter scenario nested (the follow-the-chain
+ * dependency edge) and renders as a two-tier runbook. These tests drive the REAL {@link
+ * ClusterReadinessStage#launch()} with an injected probe — the same code production runs — so the
+ * scenario script lives in exactly one place. An ordered fake incident on one phase produces a
+ * targeted runbook, and the stage consults the doctor on the failing phase's symptom.
  */
 class NestedRunbookTest {
 
+  private static final Map<String, Object> REACHABLE_SYSTEMD_ADAPTER =
+      Map.of("status", "ok", "summary", "dbusEndpoint reachable");
+
   @Test
   void cluster_readiness_renders_with_the_systemd_adapter_dependency_nested(@TempDir Path out) {
-    final ReportModel runbook = playClusterReadiness(FakeClusterReadinessProbes.allPhasesReady());
+    final ReportModel runbook = new ReportModel();
+    final VerificationResult result =
+        play(runbook, FakeClusterReadinessProbes.allPhasesReady(), false, readyGeneralist());
 
     assertEquals(1, runbook.getScenarios().size());
     assertEquals(ExecutionStatus.SUCCESS, runbook.getScenarios().get(0).getExecutionStatus());
+    assertEquals("Ready", result.bootstrapStatus(), "all phases ok projects to a ready result");
 
     new RunbookRenderer(out, message -> {}).render(runbook);
     final String report = readAll(out.resolve("adoc"));
@@ -58,23 +75,23 @@ class NestedRunbookTest {
 
   @Test
   void cluster_readiness_renders_its_shell_in_preview_dry_run(@TempDir Path out) {
-    // Preview sets JGiven dry-run so step bodies are skipped (no live infra), but the scenario is
-    // still played + finished so its shell renders — the fix that makes the cluster checkpoint
-    // appear in the runbook on `pulumi preview`, like the systemd-adapter checkpoint does.
-    final String previous = System.getProperty("jgiven.report.dry-run");
-    System.setProperty("jgiven.report.dry-run", "true");
-    final ReportModel runbook;
-    try {
-      runbook = playClusterReadiness(FakeClusterReadinessProbes.allPhasesReady());
-    } finally {
-      if (previous == null) {
-        System.clearProperty("jgiven.report.dry-run");
-      } else {
-        System.setProperty("jgiven.report.dry-run", previous);
-      }
+    // Preview = pulumiMode && Deployment.isDryRun(). Mock the static Pulumi seam so the stage takes
+    // its preview path: it sets JGiven dry-run (step bodies skipped, no live infra), still plays +
+    // finishes the scenario so its shell renders, and sinks a deferred result. This is the fix that
+    // makes the cluster checkpoint appear in the runbook on `pulumi preview`.
+    final ReportModel runbook = new ReportModel();
+    final DeploymentInstance dryRunDeployment = mock(DeploymentInstance.class);
+    when(dryRunDeployment.isDryRun()).thenReturn(true);
+
+    final VerificationResult result;
+    try (MockedStatic<Deployment> deployment = mockStatic(Deployment.class)) {
+      deployment.when(Deployment::getInstance).thenReturn(dryRunDeployment);
+      result = play(runbook, FakeClusterReadinessProbes.allPhasesReady(), true, readyGeneralist());
     }
 
     assertEquals(1, runbook.getScenarios().size());
+    assertFalse(result.handoffReady(), "a preview defers the live checks — no handoff");
+
     new RunbookRenderer(out, message -> {}).render(runbook);
     final String report = readAll(out.resolve("adoc"));
     assertTrue(
@@ -89,32 +106,20 @@ class NestedRunbookTest {
     final ClusterReadinessProbe simulated =
         SimulatedClusterReadinessProbe.failingAt(ClusterReadinessPhase.API_READY, Symptom.TIMEOUT);
 
-    final ReportModel model = playClusterReadiness(simulated);
+    final ReportModel model = new ReportModel();
+    final List<String> log = new ArrayList<>();
+    final VerificationResult result = play(model, simulated, false, networkGeneralist(), log::add);
 
-    // The targeted incident makes the cluster scenario FAIL — a targeted runbook.
+    // The targeted incident makes the cluster scenario FAIL — a targeted runbook — and the failed
+    // projection holds the handoff (the output contract the output layer + Stage B gate consume).
     assertEquals(ExecutionStatus.FAILED, model.getScenarios().get(0).getExecutionStatus());
-
-    // The failing phase's dossier carries the typed symptom the probe emitted; the doctor consults
-    // it. (In production the stage captures this dossier via the same probe-holder seam as the
-    // systemd-adapter checkpoint; here the simulation is the source of truth for what failed.)
-    final Dossier failing = simulated.probe(config(), ClusterReadinessPhase.API_READY);
-    assertEquals(Optional.of(Symptom.TIMEOUT), failing.symptom());
-
-    final Generalist generalist =
-        new Generalist(List.of(new DbusTcpSpecialist(config()), new FakeNetworkSpecialist()));
-    final RemediationPlan plan = generalist.consult(failing.symptom().orElseThrow(), failing);
-    assertTrue(
-        plan.hasPrescriptions(), "timeout routes to network; the network specialist treats it");
-    assertEquals(
-        RemediationProgramRef.CHECK_CONNECTIVITY,
-        plan.primaryPrescription().orElseThrow().programRef());
+    assertEquals("Failed", result.bootstrapStatus());
+    assertFalse(result.handoffReady());
 
     // Fail-fast is the fluent chain's own semantics: the failing step throws, so JGiven skips the
     // bodies of the downstream chained steps and marks them SKIPPED. The runbook still SHOWS every
-    // phase — the operator sees the one that broke and the ones not reached — which is strictly
-    // more
-    // informative than dropping them. Assert the per-step statuses, the rigorous proof the body of
-    // the downstream phase never ran.
+    // phase — the operator sees the one that broke and the ones not reached. Per-step statuses are
+    // the rigorous proof the downstream phase body never ran.
     final Map<String, StepStatus> stepStatuses = phaseStepStatuses(model);
     assertEquals(
         StepStatus.PASSED,
@@ -129,6 +134,14 @@ class NestedRunbookTest {
         stepStatuses.get("the required controllers are effective"),
         "the phase downstream of the break is skipped — body never played (fail-fast)");
 
+    // The stage itself consults the doctor on the failing phase's symptom (TIMEOUT routes to the
+    // network specialist) — proven by the prescription it logged, not by calling Generalist apart.
+    assertTrue(
+        log.stream().anyMatch(line -> line.contains("⚕")), "the stage should consult the doctor");
+    assertTrue(
+        log.stream().anyMatch(line -> line.contains(RemediationProgramRef.CHECK_CONNECTIVITY.id())),
+        "the network specialist's prescription should be logged");
+
     new RunbookRenderer(out, message -> {}).render(model);
     final String report = readAll(out.resolve("adoc"));
     assertTrue(report.contains("Cluster becomes ready"));
@@ -136,9 +149,42 @@ class NestedRunbookTest {
         report.contains("Diagnosis"), "node-level Diagnosis section is Increment C+ (deferred)");
   }
 
+  /** Play the real stage with no log capture. */
+  private static VerificationResult play(
+      ReportModel runbook, ClusterReadinessProbe probe, boolean pulumiMode, Generalist generalist) {
+    return play(runbook, probe, pulumiMode, generalist, message -> {});
+  }
+
+  /**
+   * Drive the production {@link ClusterReadinessStage#launch()} with an injected probe and capture
+   * its {@link VerificationResult}. This is the single owner of the scenario script — the test
+   * varies only the probe (fake/simulated), the runbook model, and the log sink.
+   */
+  private static VerificationResult play(
+      ReportModel runbook,
+      ClusterReadinessProbe probe,
+      boolean pulumiMode,
+      Generalist generalist,
+      java.util.function.Consumer<String> logger) {
+    final VerificationResult[] holder = new VerificationResult[1];
+    new ClusterReadinessStage(
+            config(),
+            policy(),
+            true,
+            pulumiMode,
+            logger,
+            runbook,
+            generalist,
+            probe,
+            REACHABLE_SYSTEMD_ADAPTER,
+            result -> holder[0] = result)
+        .launch();
+    return holder[0];
+  }
+
   /** Map each top-level When step's rendered name to its step status. */
   private static Map<String, StepStatus> phaseStepStatuses(ReportModel model) {
-    final Map<String, StepStatus> statuses = new java.util.LinkedHashMap<>();
+    final Map<String, StepStatus> statuses = new LinkedHashMap<>();
     model
         .getScenarios()
         .get(0)
@@ -147,6 +193,14 @@ class NestedRunbookTest {
         .getSteps()
         .forEach(step -> statuses.put(step.getName(), step.getStatus()));
     return statuses;
+  }
+
+  private static Generalist readyGeneralist() {
+    return new Generalist(List.of(new DbusTcpSpecialist(config())));
+  }
+
+  private static Generalist networkGeneralist() {
+    return new Generalist(List.of(new DbusTcpSpecialist(config()), new FakeNetworkSpecialist()));
   }
 
   /** A stand-in network specialist so a TIMEOUT (routed to NETWORK) yields a prescription. */
@@ -164,39 +218,6 @@ class NestedRunbookTest {
               Map.of("symptom", symptom.id()),
               "check connectivity to the API endpoint"));
     }
-  }
-
-  private static ReportModel playClusterReadiness(ClusterReadinessProbe phaseProbe) {
-    final ReportModel model = new ReportModel();
-    final Scenario<GivenClusterReadiness, WhenClusterReadiness, ThenClusterReadiness> scenario =
-        Scenario.create(
-            GivenClusterReadiness.class, WhenClusterReadiness.class, ThenClusterReadiness.class);
-    scenario.setModel(model);
-    scenario.startScenario("cluster becomes ready");
-    try {
-      try {
-        scenario
-            .given()
-            .the_cluster("nikopol", config())
-            .with_phase_probe(phaseProbe)
-            .depending_on_systemd_adapter(FakeSystemdAdapterProbes.reachable());
-        scenario
-            .when()
-            .the_systemd_adapter_dependency_is_satisfied()
-            .and()
-            .the_kubeconfig_is_published()
-            .and()
-            .the_api_is_ready()
-            .and()
-            .the_required_controllers_are_effective();
-        scenario.then().the_cluster_is_ready();
-      } finally {
-        scenario.finished();
-      }
-    } catch (Throwable expected) {
-      // simulated failure path
-    }
-    return model;
   }
 
   private static String readAll(Path dir) {
@@ -218,13 +239,20 @@ class NestedRunbookTest {
   }
 
   private static BootstrapConfig config() {
+    return BootstrapConfig.from(dto());
+  }
+
+  private static ControlplanePolicy policy() {
+    return ControlplanePolicy.from(dto());
+  }
+
+  private static Rke2labConfig dto() {
     final Map<String, Map<String, Object>> sections =
         Map.of(
             "incus", Map.of("configDir", "/tmp/rke2lab-bdd-incus"),
             "image", Map.of("sharedFolder", "/tmp/rke2lab-bdd-shared"),
             "worktree", Map.of("dir", "/tmp/rke2lab-bdd-worktree"));
-    final Rke2labConfig dto =
-        Rke2labConfig.from(ConfigLoader.of(section -> Optional.ofNullable(sections.get(section))));
-    return BootstrapConfig.from(dto);
+    return Rke2labConfig.from(
+        ConfigLoader.of(section -> Optional.ofNullable(sections.get(section))));
   }
 }

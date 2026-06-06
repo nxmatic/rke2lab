@@ -50,6 +50,7 @@ public final class SystemdAdapterStage {
   private final Consumer<String> readinessLogger;
   private final ReportModel runbook;
   private final Generalist generalist;
+  private final SystemdAdapterProbe liveProbe;
   private final Consumer<Map<String, Object>> sink;
 
   public SystemdAdapterStage(
@@ -59,6 +60,7 @@ public final class SystemdAdapterStage {
       Consumer<String> readinessLogger,
       ReportModel runbook,
       Generalist generalist,
+      SystemdAdapterProbe liveProbe,
       Consumer<Map<String, Object>> sink) {
     this.config = config;
     this.policy = policy;
@@ -66,6 +68,7 @@ public final class SystemdAdapterStage {
     this.readinessLogger = readinessLogger;
     this.runbook = runbook;
     this.generalist = generalist;
+    this.liveProbe = liveProbe;
     this.sink = sink;
   }
 
@@ -88,10 +91,11 @@ public final class SystemdAdapterStage {
     // Capture the dossier as the probe produces it, so it is available at the catch site for the
     // doctor even when the Then assertion throws (the failed dossier carries the typed symptom).
     final Dossier[] dossierHolder = new Dossier[1];
+    // The injected live probe is the default; a preview-only simulated incident overrides it (and
+    // only then). Production injects the real endpoint gate; tests inject a fake and play the same
+    // launch(), so the scenario script lives in one place.
     final SystemdAdapterProbe underlying =
-        simulated
-            .map(SimulatedSystemdAdapterProbe::of)
-            .orElse(cfg -> SeedSystemdAdapterEndpointGate.ensureReachable(cfg, readinessLogger));
+        simulated.<SystemdAdapterProbe>map(SimulatedSystemdAdapterProbe::of).orElse(liveProbe);
     final SystemdAdapterProbe probe =
         cfg -> {
           final Dossier produced = underlying.probe(cfg);

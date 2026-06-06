@@ -4,6 +4,7 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.bdd.DbusTcpSpecialist;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
+import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.BboxStage;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.IncusStage;
@@ -12,6 +13,7 @@ import io.nxmatic.rke2lab.controlplane.pipeline.stages.ResourcesStage;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.SystemdAdapterStage;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
+import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -221,6 +223,8 @@ public final class BootstrapPipeline {
     public SystemdAdapterDone during(
         String topic, Function<SystemdAdapterStage, SystemdAdapterStage> body) {
       final Generalist generalist = new Generalist(List.of(new DbusTcpSpecialist(state.config)));
+      final SystemdAdapterProbe liveProbe =
+          cfg -> SeedSystemdAdapterEndpointGate.ensureReachable(cfg, state.readinessLogger);
       final SystemdAdapterStage stage =
           new SystemdAdapterStage(
               state.config,
@@ -229,6 +233,7 @@ public final class BootstrapPipeline {
               state.readinessLogger,
               state.runbook,
               generalist,
+              liveProbe,
               summary -> state.systemdAdapterLaunchSummary = summary);
       TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
       return new SystemdAdapterDone(state);
