@@ -1,34 +1,65 @@
 encryptionsalt: v1:egSmVjEn+Rc=:v1:tDy9P3PFPKGpSmW7:ohDWaFDPxvO+kWbTRVEh6BJCDHHuag==
 config:
-  "rke2lab:cluster.name": bioskop
-  "rke2lab:node.name": master
-  "rke2lab:incus.project": rke2lab
-  "rke2lab:incus.defaultRemote": bioskop-nixos
-  "rke2lab:incus.remoteAddress": https://bioskop-nixos:8443
-  "rke2lab:image.alias": control-node
-  "rke2lab:image.builderBinary": distrobuilder
-  "rke2lab:image.builderHost": bioskop-nixos
-  "rke2lab:image.distrobuilderConfig": classpath:/incus/incus-distrobuilder.yaml
-  "rke2lab:image.sharedFolder": .local.d/images/distrobuilder
-  "rke2lab:network.lanBridgeParent": lan-br
-  "rke2lab:network.vmnetNetworkName": vmnet-br
-  "rke2lab:api.endpoint": https://10.66.106.10:6443
-  "rke2lab:policy.debug.nriPlugins.flox.enabled": "true"
-  "rke2lab:policy.debug.networking.enabled": "true"
-  "rke2lab:policy.debug.mesh.enabled": "true"
-  "rke2lab:policy.link.highAvailability.enabled": "true"
-  "rke2lab:policy.link.networking.enabled": "true"
-  "rke2lab:policy.link.replication.enabled": "true"
-  "rke2lab:policy.link.storage.enabled": "true"
-  "rke2lab:policy.link.mesh.enabled": "false"
-  "rke2lab:bootstrap.skipRecipes": "false"
-  "rke2lab:readiness.enabled": "true"
-  "rke2lab:entryGate.cleanWorktree.required": "false"
-  "policy.gitDirtyCheck.enabled": "false "
-  "rke2lab:readiness.timeout": PT1M
-  "rke2lab:policy.link.clusterApi.enabled": "true"
-  "rke2lab:policy.link.gitops.enabled": "true"
-  # Operator override of readiness-scenario severity, per scenario id. Absent → scenario decides.
-  # systemd-adapter is intrinsically WARNING (degraded); flip to "critical" to stop on failure.
-  "rke2lab:policy.readiness.override":
-    systemd-adapter: warning
+  rke2lab:cluster:
+    name: bioskop
+  rke2lab:node:
+    name: master
+  rke2lab:profile:
+    name: rke2lab
+  rke2lab:incus:
+    project: rke2lab
+    defaultRemote: bioskop-nixos
+    remoteAddress: https://bioskop-nixos:8443
+    configDir: /Users/nxmatic/.config/incus
+  rke2lab:image:
+    alias: control-node
+    builderHost: bioskop-nixos
+    distrobuilderConfig: classpath:/incus/incus-distrobuilder.yaml
+    sharedFolder: .local.d/images/distrobuilder
+  rke2lab:network:
+    lanBridgeParent: lan-br
+    vmnetNetworkName: vmnet-br
+  rke2lab:api:
+    endpoint: https://10.66.106.10:6443
+  rke2lab:worktree:
+    dir: /private/var/lib/git/nxmatic/rke2lab
+  rke2lab:systemd:
+    dbusHost: bioskop-master
+    dbusPort: "12434"
+  rke2lab:policy:
+    debug:
+      mesh:
+        enabled: "true"
+      networking:
+        enabled: "true"
+      nriPlugins:
+        flox:
+          enabled: "true"
+    network:
+      lan:
+        binding:
+          enabled: "true"
+    gitDirtyCheck:
+      enabled: "false"
+    link:
+      gitops: "true"
+      networking: "true"
+      clusterApi: "true"
+      storage: "true"
+      mesh: "false"
+      highAvailability: "true"
+      cicd: "true"
+    readiness:
+      override:
+        systemd-adapter: warning
+  rke2lab:readiness:
+    enabled: "true"
+    timeout: PT1M
+  rke2lab:entryGate:
+    cleanWorktree:
+      required: "false"
+  rke2lab:bbox:
+    reconcile:
+      failOnError: "true"
+  rke2lab:hostAsset:
+    rotationRetentionCount: "3"
