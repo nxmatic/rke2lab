@@ -118,7 +118,15 @@ public final class ClusterReadinessStage {
             .the_cluster(config.clusterName(), config)
             .with_phase_probe(phaseProbe)
             .depending_on_systemd_adapter(nestedSystemdAdapterProbe);
-        scenario.when().the_systemd_adapter_dependency_is_satisfied().the_readiness_phases_run();
+        scenario
+            .when()
+            .the_systemd_adapter_dependency_is_satisfied()
+            .and()
+            .the_kubeconfig_is_published()
+            .and()
+            .the_api_is_ready()
+            .and()
+            .the_required_controllers_are_effective();
         scenario.then().the_cluster_is_ready();
       } finally {
         scenario.finished();

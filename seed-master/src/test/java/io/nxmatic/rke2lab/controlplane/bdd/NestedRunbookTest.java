@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
+import com.tngtech.jgiven.report.model.StepStatus;
 import io.nxmatic.rke2lab.controlplane.config.ConfigLoader;
 import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
@@ -45,13 +46,14 @@ class NestedRunbookTest {
         report.toLowerCase().contains("systemd adapter dependency"),
         "the nested systemd-adapter dependency step should render under the cluster scenario");
 
-    // Each readiness phase renders as its own step, named by its label — so the operator sees
-    // which phase passed and which failed, not one opaque "the readiness phases run" line.
-    for (ClusterReadinessPhase phase : ClusterReadinessPhase.values()) {
-      assertTrue(
-          report.contains(phase.label()),
-          "phase \"" + phase.label() + "\" should render as its own step");
-    }
+    // Each readiness phase is its own fluent step — the operator reads which phase passed, not one
+    // opaque line. The narration is the step's clause (humanized method name), not the enum's short
+    // tag: "the kubeconfig is published" etc.
+    assertTrue(report.contains("the kubeconfig is published"), "kubeconfig phase should render");
+    assertTrue(report.contains("the api is ready"), "api phase should render");
+    assertTrue(
+        report.contains("the required controllers are effective"),
+        "controllers phase should render");
   }
 
   @Test
@@ -107,22 +109,44 @@ class NestedRunbookTest {
         RemediationProgramRef.CHECK_CONNECTIVITY,
         plan.primaryPrescription().orElseThrow().programRef());
 
+    // Fail-fast is the fluent chain's own semantics: the failing step throws, so JGiven skips the
+    // bodies of the downstream chained steps and marks them SKIPPED. The runbook still SHOWS every
+    // phase — the operator sees the one that broke and the ones not reached — which is strictly
+    // more
+    // informative than dropping them. Assert the per-step statuses, the rigorous proof the body of
+    // the downstream phase never ran.
+    final Map<String, StepStatus> stepStatuses = phaseStepStatuses(model);
+    assertEquals(
+        StepStatus.PASSED,
+        stepStatuses.get("the kubeconfig is published"),
+        "the phase upstream of the break ran and passed");
+    assertEquals(
+        StepStatus.FAILED,
+        stepStatuses.get("the api is ready"),
+        "the api phase is where the chain broke");
+    assertEquals(
+        StepStatus.SKIPPED,
+        stepStatuses.get("the required controllers are effective"),
+        "the phase downstream of the break is skipped — body never played (fail-fast)");
+
     new RunbookRenderer(out, message -> {}).render(model);
     final String report = readAll(out.resolve("adoc"));
     assertTrue(report.contains("Cluster becomes ready"));
-
-    // Fail-fast decided by the step: the kubeconfig phase (upstream of the break) ran and renders;
-    // the api-ready phase is where the chain stopped; controllers (downstream) was never played, so
-    // it must not appear — the runbook shows the operator exactly where readiness broke.
-    assertTrue(
-        report.contains(ClusterReadinessPhase.KUBECONFIG_PUBLISHED.label()),
-        "the phase upstream of the break should have run and rendered");
-    assertFalse(
-        report.contains(ClusterReadinessPhase.CONTROLLERS_EFFECTIVE.label()),
-        "the phase downstream of the break must not be played (fail-fast)");
-
     assertFalse(
         report.contains("Diagnosis"), "node-level Diagnosis section is Increment C+ (deferred)");
+  }
+
+  /** Map each top-level When step's rendered name to its step status. */
+  private static Map<String, StepStatus> phaseStepStatuses(ReportModel model) {
+    final Map<String, StepStatus> statuses = new java.util.LinkedHashMap<>();
+    model
+        .getScenarios()
+        .get(0)
+        .getScenarioCases()
+        .get(0)
+        .getSteps()
+        .forEach(step -> statuses.put(step.getName(), step.getStatus()));
+    return statuses;
   }
 
   /** A stand-in network specialist so a TIMEOUT (routed to NETWORK) yields a prescription. */
@@ -156,7 +180,15 @@ class NestedRunbookTest {
             .the_cluster("nikopol", config())
             .with_phase_probe(phaseProbe)
             .depending_on_systemd_adapter(FakeSystemdAdapterProbes.reachable());
-        scenario.when().the_systemd_adapter_dependency_is_satisfied().the_readiness_phases_run();
+        scenario
+            .when()
+            .the_systemd_adapter_dependency_is_satisfied()
+            .and()
+            .the_kubeconfig_is_published()
+            .and()
+            .the_api_is_ready()
+            .and()
+            .the_required_controllers_are_effective();
         scenario.then().the_cluster_is_ready();
       } finally {
         scenario.finished();

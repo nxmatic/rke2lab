@@ -1,7 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import com.tngtech.jgiven.Stage;
-import com.tngtech.jgiven.annotation.As;
 import com.tngtech.jgiven.annotation.ExpectedScenarioState;
 import com.tngtech.jgiven.annotation.NestedSteps;
 import com.tngtech.jgiven.annotation.ProvidedScenarioState;
@@ -13,11 +12,11 @@ import java.util.Map;
 /**
  * When stage for cluster readiness. First it walks the dependency chain — the systemd-adapter
  * scenario is replayed as nested steps (the cert-manager "follow the chain": cluster-ready depends
- * on systemd-adapter) — then it runs each cluster phase as its own nested step so the runbook shows
- * which phase passed and which failed. The phases form a strict chain (kubeconfig → API →
- * controllers): each is a precondition of the next, so a failing phase throws and the remaining
- * phases are never played — fail-fast decided by the step itself, no information lost (downstream
- * phases are undefined without their upstream).
+ * on systemd-adapter) — then each readiness phase is its own fluent step, chained in canonical
+ * order. The phases form a strict chain (kubeconfig → API → controllers): each is a precondition of
+ * the next, so a failing step throws and JGiven skips the bodies of the downstream chained steps,
+ * marking them SKIPPED in the runbook. Fail-fast is the fluent chain's own semantics — no manual
+ * break, and the operator still sees every phase, with the one that broke and the ones not reached.
  */
 public class WhenClusterReadiness extends Stage<WhenClusterReadiness> {
 
@@ -42,29 +41,29 @@ public class WhenClusterReadiness extends Stage<WhenClusterReadiness> {
     return self();
   }
 
-  /** Nested: each phase renders as its own step, named by the phase label. */
-  @NestedSteps
-  public WhenClusterReadiness the_readiness_phases_run() {
-    for (ClusterReadinessPhase phase : ClusterReadinessPhase.values()) {
-      checking(phase);
-      // Fail-fast decided by the chain: each phase is a precondition of the next, so once one is
-      // not ok we stop — the dependent downstream phases are never played. The break (not the
-      // throw) stops the loop: inside @NestedSteps JGiven defers a step's exception (it marks the
-      // step failed and re-throws only at finished()), so the throw alone would not unwind here.
-      if (!phaseDossiers.get(phase).isOk()) {
-        break;
-      }
-    }
-    return self();
+  public WhenClusterReadiness the_kubeconfig_is_published() {
+    return checking(ClusterReadinessPhase.KUBECONFIG_PUBLISHED);
   }
 
-  @As("$")
-  WhenClusterReadiness checking(ClusterReadinessPhase phase) {
+  public WhenClusterReadiness the_api_is_ready() {
+    return checking(ClusterReadinessPhase.API_READY);
+  }
+
+  public WhenClusterReadiness the_required_controllers_are_effective() {
+    return checking(ClusterReadinessPhase.CONTROLLERS_EFFECTIVE);
+  }
+
+  /**
+   * Probe one phase and record its dossier. A non-ok phase throws so its step is marked FAILED;
+   * because the phases are chained, JGiven then skips the downstream steps' bodies and marks them
+   * SKIPPED — the runbook shows exactly where readiness broke. The enum is the single join between
+   * the readable step and the probe (and the simulation target), so no phase identity is duplicated
+   * as a string.
+   */
+  private WhenClusterReadiness checking(ClusterReadinessPhase phase) {
     final Dossier dossier = phaseProbe.probe(config, phase);
     phaseDossiers.put(phase, dossier);
     if (!dossier.isOk()) {
-      // Throwing marks this phase's step failed (red) in the runbook; the loop above does the
-      // fail-fast stop. The exception is re-raised by JGiven at finished(), failing the scenario.
       throw new AssertionError(phase.label() + ": " + dossier.summary());
     }
     return self();

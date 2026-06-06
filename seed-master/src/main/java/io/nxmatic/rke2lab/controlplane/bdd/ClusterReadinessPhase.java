@@ -20,10 +20,4 @@ public enum ClusterReadinessPhase {
   public String label() {
     return label;
   }
-
-  /** The human label is the canonical rendering — it is what the runbook step shows. */
-  @Override
-  public String toString() {
-    return label;
-  }
 }
