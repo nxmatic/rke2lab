@@ -1,14 +1,20 @@
 ---
 name: config-restructuring-state
-description: "Config refactor on branch refactor/config — design spec in wip/, decisions locked, not yet implemented"
+description: "Config refactor on branch refactor/config — diagram-first spec + migration plan committed in wip/, NOT yet implemented (no Java written)"
 metadata: 
   node_type: memory
   type: project
   originSessionId: 0ea4e055-08e0-405d-a509-7a32cda44c3e
 ---
 
-Restructuring rke2lab configuration. Branch `refactor/config`. Design spec lives at
-`wip/config-restructuring-spec.adoc` (brainstorm phase — NOT yet implemented; no code written).
+Restructuring rke2lab configuration. Branch `refactor/config`. Spec + plan COMMITTED in `wip/`,
+implementation NOT started (no Java written yet).
+- `wip/config-restructuring-spec.adoc` — diagram-first design (C4 + UML, no code), committed 55f69ecb
+- `wip/config-migration-plan.adoc` — TDD implementation plan, committed 69a49461
+
+**Preview-only branch:** nothing deploys from refactor/config; `pulumi preview` is the only test.
+Combined with [[sequential-no-compat-workflow]]: no green-between-commits machinery, old code
+deleted in the same change that supersedes it. Branch only needs coherence when the topic is done.
 
 **Goal:** kill the fragmented config (3 independent Pulumi `Config` readers —
 `BootstrapConfig.Builder`, `ControlplanePolicy`, `ConfigResolver` — with divergent
@@ -44,13 +50,20 @@ don't exist.
   `Generalist` routes by domain. Loader ACCUMULATES all missing keys, consults ONCE. Reuses the
   runbook-doctor subsystem (see that branch's `wip/spec.adoc`).
 
-**Increments in spec:** A) DTO + ConfigLoader + nested YAML + dead-key cleanup; B) derive
-BootstrapConfig (delete Builder/Defaults/env-git detection); C) derive ControlplanePolicy +
-delete ConfigResolver + catalog-keyed link flags; D) doctor-backed remediation (depends on
-runbook-doctor Increment B).
+**Plan structure (MERGED, preview-only):** the spec's A/B/C collapse into ONE increment
+(`config-migration-plan.adoc`, 9 tasks): ConfigLoader+DTO+catalog+sealed-fragment+registry+6
+registrars → derive BootstrapConfig (delete Builder/Defaults/env-git) → derive ControlplanePolicy
+(delete EnvironmentValues, catalog-keyed links) → delete ConfigResolver + converge EnvironmentStage
+(reads DTO once) → nested Pulumi.dev.yaml + BDD helper. The doctor (spec's state D) is **Increment 2**,
+a separate plan = the doctor pattern's FIRST use case.
+
+Plan refinements vs spec: ConfigLoader uses **section-map reads** (`getObject(section)` → walk
+dotted names like `policy.link`) over an injectable `SectionReader`, so the DTO is unit-testable
+offline (in-memory maps) — NOT scalar key-by-key as the spec loosely said. DTO has a `defaults()`
+offline path (no mandatory validation, for EnvironmentStage's null-context branch). `BootstrapOptions`
+(readiness/cleanWorktree/bbox, ex-ConfigResolver) absorbed as cross-cutting DTO records.
 
 **Deferred:** [[domain-registry-abstraction]] — unify the two registry pairs later.
 
-**Next step when resuming:** spec self-review pass, then user review gate, then writing-plans.
-Open thread the user was probing: the schema is effectively defined by the diagram/record
-decomposition; field nullability resolved (mandatory=plain, optional=Optional).
+**Next step when resuming:** EXECUTE `wip/config-migration-plan.adoc` (subagent-driven or inline).
+Builds run by user via `flox activate -- ./mvnw`; agent proposes commands, never runs mvnw/pulumi.
