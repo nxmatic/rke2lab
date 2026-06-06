@@ -1,6 +1,6 @@
 ---
 name: runbook-doctor-state
-description: feature/runbook-doctor — Increment A DONE & committed; Increment B (the doctor) is next
+description: feature/runbook-doctor — Increments A & B DONE & committed; Increment C (checkpoint #2 nested) is next
 metadata: 
   node_type: memory
   type: project
@@ -8,8 +8,22 @@ metadata:
 ---
 
 Active chantier on branch **`feature/runbook-doctor`**: build the runbook + doctor subsystem.
-Design DONE; **Increment A DONE, verified & committed** (commit 3b46b249, 2026-06-06); **Increment
-B (the doctor) is next**.
+Design DONE; **Increment A DONE** (commit 3b46b249) and **Increment B (the doctor) DONE** (commit
+aa55ced4, 2026-06-06); **Increment C (checkpoint #2 = cluster-readiness, nested via @NestedSteps)
+is next**.
+
+**Increment B delivered** (seed-master `controlplane.bdd`): the doctor. `Dossier` (typed successor
+of the probe's Map envelope — status, `Optional<Symptom>`, summary, details + `toOutputMap()`);
+`Generalist` (deterministic symptom→`SpecialistDomain` routing → `RemediationPlan`); `Specialist`
+interface = the AI-ready seam (`Optional<Prescription> diagnose(Symptom, Dossier)`);
+`DbusTcpSpecialist` (connection-refused → `RESTART_UNIT`); `Prescription` + `RemediationProgramRef`
+(typed catalog, no magic strings) + `RemediationPlan`. **R3 Map→Dossier retype done atomically, no
+shim** — probe/gate/When/Then/fakes/sim/stage-sink moved together; sink converts via `toOutputMap()`
+so Pulumi outputs are byte-identical (retype confined to the BDD layer). Checkpoint consults the
+Generalist on failure (`consultDoctor`, dossier stashed even when the Then throws), logs `⚕`/`℞`
+inline. **DEFERRED to Increment C:** the plan flowing into the runbook *node's* Diagnosis/Mitigation
+sections (needs the shared report-node model that arrives with #2's DAG — same place the A
+edge-recording work was deferred). `DoctorTest` + retyped tests; 24/24 seed-master green.
 
 **Increment A delivered** (seed-master `controlplane/bdd` + `pipeline` + `policy`):
 `RunbookRenderer` (JGiven `ScenarioJsonWriter` → `AsciiDocReportGenerator`; emits a *directory*
