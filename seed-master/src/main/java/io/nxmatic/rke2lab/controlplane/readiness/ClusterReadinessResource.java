@@ -1,18 +1,20 @@
 package io.nxmatic.rke2lab.controlplane.readiness;
 
 import com.pulumi.core.Output;
-import com.pulumi.deployment.Deployment;
 import com.pulumi.resources.ComponentResource;
 import com.pulumi.resources.ComponentResourceOptions;
 import com.pulumi.resources.Resource;
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
-import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
 
-/** Component resource representing bootstrap readiness verification in the Pulumi graph. */
+/**
+ * Thin Pulumi-graph mirror of the cluster-readiness result. The checkpoint is played eagerly as a
+ * BDD scenario by {@code ClusterReadinessStage} (which records it into the runbook and consults the
+ * doctor); this resource only registers the already-computed {@link
+ * ClusterBootstrapReadinessVerifier.VerificationResult} as graph outputs and carries the {@code
+ * dependsOn} edge — the same shape as {@code SystemdAdapterResource}. No verification runs here.
+ */
 public final class ClusterReadinessResource extends ComponentResource {
 
   private static final String TYPE_TOKEN = "rke2lab:controlplane:ClusterReadiness";
@@ -21,25 +23,11 @@ public final class ClusterReadinessResource extends ComponentResource {
 
   public ClusterReadinessResource(
       String name,
-      BootstrapConfig config,
-      ControlplanePolicy policy,
-      boolean readinessEnabled,
-      Consumer<String> readinessLogger,
-      Object readinessTrigger,
+      ClusterBootstrapReadinessVerifier.VerificationResult result,
       Resource dependsOnResource) {
     super(TYPE_TOKEN, name, buildOptions(dependsOnResource));
 
-    this.verificationResult =
-        Output.of(readinessTrigger)
-            .applyValue(
-                ignored ->
-                    Deployment.getInstance().isDryRun()
-                        ? ClusterBootstrapReadinessVerifier.deferredPreview(policy, readinessLogger)
-                        : readinessEnabled
-                            ? ClusterBootstrapReadinessVerifier.verify(
-                                config, policy, readinessLogger)
-                            : ClusterBootstrapReadinessVerifier.skipped(policy, readinessLogger));
-
+    this.verificationResult = Output.of(result);
     registerOutputs(asResourceOutputs(verificationResult));
   }
 

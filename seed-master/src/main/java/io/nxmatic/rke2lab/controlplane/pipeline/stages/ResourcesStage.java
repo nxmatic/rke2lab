@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
+import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
@@ -17,6 +19,8 @@ public final class ResourcesStage {
   private final boolean readinessEnabled;
   private final boolean pulumiMode;
   private final Consumer<String> readinessLogger;
+  private final ReportModel runbook;
+  private final Generalist generalist;
   private final Supplier<IncusResourceBootstrap.BootstrapResult> bootstrapResultSupplier;
   private final Supplier<Map<String, Object>> systemdAdapterLaunchSupplier;
   private final Consumer<ResourceCreationResult> sink;
@@ -28,6 +32,8 @@ public final class ResourcesStage {
       boolean readinessEnabled,
       boolean pulumiMode,
       Consumer<String> readinessLogger,
+      ReportModel runbook,
+      Generalist generalist,
       Supplier<IncusResourceBootstrap.BootstrapResult> bootstrapResultSupplier,
       Supplier<Map<String, Object>> systemdAdapterLaunchSupplier,
       Consumer<ResourceCreationResult> sink) {
@@ -37,6 +43,8 @@ public final class ResourcesStage {
     this.readinessEnabled = readinessEnabled;
     this.pulumiMode = pulumiMode;
     this.readinessLogger = readinessLogger;
+    this.runbook = runbook;
+    this.generalist = generalist;
     this.bootstrapResultSupplier = bootstrapResultSupplier;
     this.systemdAdapterLaunchSupplier = systemdAdapterLaunchSupplier;
     this.sink = sink;
@@ -49,6 +57,8 @@ public final class ResourcesStage {
             policy,
             readinessEnabled,
             readinessLogger,
+            runbook,
+            generalist,
             bootstrapResultSupplier.get(),
             systemdAdapterLaunchSupplier.get(),
             pulumiMode));

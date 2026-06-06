@@ -1,8 +1,11 @@
 package io.nxmatic.rke2lab.controlplane.resources;
 
 import com.pulumi.deployment.Deployment;
+import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
+import io.nxmatic.rke2lab.controlplane.pipeline.stages.ClusterReadinessStage;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterReadinessResource;
@@ -23,6 +26,8 @@ final class ResourceCreationPipeline {
   private final ControlplanePolicy policy;
   private final boolean readinessEnabled;
   private final Consumer<String> readinessLogger;
+  private final ReportModel runbook;
+  private final Generalist generalist;
   private final IncusResourceBootstrap.BootstrapResult bootstrapResult;
   private final Map<String, Object> systemdAdapterLaunchSummary;
 
@@ -31,14 +36,41 @@ final class ResourceCreationPipeline {
       ControlplanePolicy policy,
       boolean readinessEnabled,
       Consumer<String> readinessLogger,
+      ReportModel runbook,
+      Generalist generalist,
       IncusResourceBootstrap.BootstrapResult bootstrapResult,
       Map<String, Object> systemdAdapterLaunchSummary) {
     this.config = config;
     this.policy = policy;
     this.readinessEnabled = readinessEnabled;
     this.readinessLogger = readinessLogger;
+    this.runbook = runbook;
+    this.generalist = generalist;
     this.bootstrapResult = bootstrapResult;
     this.systemdAdapterLaunchSummary = systemdAdapterLaunchSummary;
+  }
+
+  /**
+   * Play the cluster-readiness checkpoint as a BDD scenario, eager — the result is the same whether
+   * Pulumi-managed or standalone (the resource just mirrors it). Records into the shared runbook
+   * and consults the doctor on failure.
+   */
+  private ClusterBootstrapReadinessVerifier.VerificationResult playClusterReadiness(
+      boolean pulumiMode) {
+    final ClusterBootstrapReadinessVerifier.VerificationResult[] holder =
+        new ClusterBootstrapReadinessVerifier.VerificationResult[1];
+    new ClusterReadinessStage(
+            config,
+            policy,
+            readinessEnabled,
+            pulumiMode,
+            readinessLogger,
+            runbook,
+            generalist,
+            systemdAdapterLaunchSummary,
+            result -> holder[0] = result)
+        .launch();
+    return holder[0];
   }
 
   /** Executes the Pulumi resource creation pipeline. */
@@ -83,18 +115,12 @@ final class ResourceCreationPipeline {
     }
 
     PulumiResourceBuilder withReadiness() {
+      // The checkpoint is played eagerly as a BDD scenario (records into the runbook, consults the
+      // doctor); the resource is a thin graph mirror of the result + the dependsOn edge.
       this.readiness =
           new ClusterReadinessResource(
               "seed-cluster-readiness",
-              config,
-              policy,
-              readinessEnabled,
-              readinessLogger,
-              Map.of(
-                  "instanceStatus",
-                  bootstrapResult.instanceStatus(),
-                  "systemdAdapterLaunch",
-                  systemdAdapterLaunchSummary),
+              playClusterReadiness(true),
               bootstrapResult.readinessDependency());
       return this;
     }
@@ -162,10 +188,9 @@ final class ResourceCreationPipeline {
     private Object systemdRuntimeStatus;
 
     StandaloneResourceBuilder withReadiness() {
-      this.readinessOutput =
-          readinessEnabled
-              ? ClusterBootstrapReadinessVerifier.verify(config, policy, readinessLogger)
-              : ClusterBootstrapReadinessVerifier.skipped(policy, readinessLogger);
+      // Same eager BDD checkpoint as the Pulumi path; standalone keeps the plain VerificationResult
+      // (no Pulumi resource wrapping). Unified by the pulumiMode flag, as SystemdAdapterStage is.
+      this.readinessOutput = playClusterReadiness(false);
       return this;
     }
 

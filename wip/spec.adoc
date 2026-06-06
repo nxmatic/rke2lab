@@ -577,8 +577,49 @@ Build the runbook mechanism on the *existing* systemd-adapter checkpoint.
 The plan-into-runbook-*node* rendering (Diagnosis/Mitigation sections under each node, vs.
 today's inline log) and the explicit `dependsOn` DAG-edge recording both waited for "the
 shared report-node model that arrives with checkpoint #2". Checkpoint #2 now exists as a
-nested scenario, so that model can be built next — together with wiring the live verifier.
-This is the natural next increment, scoped separately from C's DSL-first delivery.
+nested scenario, so that model can be built next. (Live wiring is now done — see Increment D.)
+
+=== Increment D — Wire the live cluster-readiness checkpoint as a BDD scenario — DONE
+
+The cluster-readiness checkpoint is now played live as a BDD scenario, so it joins the runbook
+and consults the doctor — unifying it onto the systemd-adapter shape (*checkpoints are BDD
+scenarios*). Previously it ran the procedural `verify()` lazily inside a Pulumi
+`Output.applyValue` lambda, which never recorded into the shared `ReportModel`.
+
+* *Eager play, not lazy.* `ClusterReadinessStage` (mirror of `SystemdAdapterStage`) plays the
+  scenario in the pipeline thread — by the time it runs (in `ResourcesStage`, after the
+  systemd-adapter stage) the cluster's deps are already concrete values, so no `Output` await
+  is needed. This avoids the ordering trap: `applyValue` can fire *after* the synchronous
+  runbook render in `BootstrapStage`'s `finally`, which would render an empty node.
+* *Verifier reused, not rewritten.* `ProductionClusterReadinessProbe` bridges each
+  `ClusterReadinessPhase` to a public per-phase check on `ClusterBootstrapReadinessVerifier`
+  (`checkKubeconfigPublished`/`checkApiReady`/`checkControllersEffective`), mapping the outcome
+  to a `Dossier`. The phase-0 bootstrap-preconditions gate is folded into the first phase
+  (ordering preserved). The two old `verify()` overloads are deleted (no compat shim).
+* *New typed symptoms, named not treated.* `KUBECONFIG_MISSING`, `API_NOT_READY`,
+  `CONTROLLER_NOT_READY` added to `Symptom` + routed in `Generalist` (domain `CLUSTER`). The
+  doctor names them in the runbook; no specialist treats them yet → empty plan (symptom seen,
+  no treatment). Extensible without inventing treatments.
+* *Output contract preserved.* `VerificationResult` is now the *projection* of the per-phase
+  dossiers, built via the verifier's public `ready(...)`/`failed(...)` factories — single
+  source of truth = the dossiers. All 10 output keys, `handoffReady`→`nextStep` (the Stage B
+  gate), and `bootstrapStatus` are byte-identical. `ClusterReadinessResource` is now a thin
+  graph mirror (like `SystemdAdapterResource`); it keeps the `dependsOn` edge, runs no
+  verification. Both Pulumi and standalone paths play the same stage, unified by `pulumiMode`.
+  `ClusterReadinessProjectionTest` pins the contract.
+* *Nested dependency without double-probe.* The nested systemd-adapter step replays from the
+  already-captured launch summary (reconstructed as a `Dossier`), not a second live probe.
+* *Green:* 30/30 seed-master tests (cluster-symptom routing + kebab parse + projection
+  contract added). `pulumi preview` now shows BOTH scenarios in the runbook; on `pulumi up`
+  the cluster phases are checked live and the `VerificationResult` outputs are unchanged.
+
+==== Still open after D
+
+The plan still flows into the *inline log*, not yet into the runbook *node's*
+Diagnosis/Mitigation sections, and `dependsOn` edges are rendered via `@NestedSteps` nesting
+rather than recorded as explicit DAG edges. The shared report-node model (node-level
+Diagnosis/Mitigation + explicit edges) remains the last deferral — now unblocked since both
+checkpoints are live BDD scenarios.
 
 == Non-goals (explicit)
 

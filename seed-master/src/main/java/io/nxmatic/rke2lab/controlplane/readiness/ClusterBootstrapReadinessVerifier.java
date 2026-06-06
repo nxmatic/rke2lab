@@ -42,79 +42,86 @@ public final class ClusterBootstrapReadinessVerifier {
     // Utility class
   }
 
-  public static VerificationResult verify(BootstrapConfig config, ControlplanePolicy policy) {
-    final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
-    final Duration timeout = config.readinessTimeout();
-    final Consumer<String> bootstrapWatcherLogger = message -> logInfo(message);
-
-    logInfo("readiness check enabled");
-    logInfo("seed node: " + config.nodeName() + " (project=" + config.incusProject() + ")");
-    logInfo("kubeconfig path: " + kubeconfigPath);
-    logInfo("timeouts: kubeconfig=" + timeout + ", api=" + timeout + ", controllers=" + timeout);
-
-    if (!SeedNodeBootstrapWatcher.waitForBootstrapPreconditions(
-        config,
-        new SeedNodeBootstrapWatcher.WaitConfig(timeout, RETRY_INTERVAL, LOG_PROGRESS_INTERVAL),
-        bootstrapWatcherLogger)) {
-      logInfo("readiness failed: seed node systemd/bootstrap gate did not converge in time");
-      return VerificationResult.failed(
-          false,
-          false,
-          false,
-          "seed node bootstrap gate did not converge (systemd jobs/services + rke2 preconditions) for "
-              + config.nodeName()
-              + " in project "
-              + config.incusProject(),
-          requiredControllerRefs(policy));
-    }
-
-    if (!waitForKubeconfigPublished(kubeconfigPath, timeout)) {
-      logInfo("readiness failed: kubeconfig was not published in time");
-      return VerificationResult.failed(
-          false,
-          false,
-          false,
-          "kubeconfig was not published within timeout at: " + kubeconfigPath,
-          requiredControllerRefs(policy));
-    }
-
-    if (!waitForApiReady(kubeconfigPath, timeout)) {
-      logInfo("readiness failed: kubernetes API did not become ready in time");
-      return VerificationResult.failed(
-          true,
-          false,
-          false,
-          "kubernetes API did not report readyz=ok within timeout using kubeconfig: "
-              + kubeconfigPath,
-          requiredControllerRefs(policy));
-    }
-
-    final ControllerVerification controllers =
-        verifyRequiredControllers(kubeconfigPath, policy, timeout);
-    if (!controllers.ready()) {
-      logInfo("readiness failed: " + controllers.detail());
-      return VerificationResult.failed(
-          true,
-          true,
-          false,
-          "required bootstrap controllers are not effective: " + controllers.detail(),
-          controllers.requiredControllerRefs());
-    }
-
-    logInfo("readiness complete: kubeconfig published, API ready, required controllers effective");
-    return VerificationResult.ready(controllers.requiredControllerRefs());
+  /**
+   * One readiness phase checked in isolation — the per-phase seam the BDD checkpoint plays against
+   * (a production {@code ClusterReadinessProbe} maps this to a {@code Dossier}). Reuses the same
+   * private waiters as {@link #verify}, so the live logic is identical; the verifier stays free of
+   * any {@code bdd} types (no package cycle). {@code logger} is applied for the call.
+   */
+  public static PhaseOutcome checkKubeconfigPublished(
+      BootstrapConfig config, Consumer<String> logger) {
+    return runPhase(
+        logger,
+        () -> {
+          // Phase-0 gate (preserved from the former verify()): the seed node's systemd/bootstrap
+          // preconditions must converge before the kubeconfig can appear. Folded into the first
+          // phase so the live ordering is unchanged.
+          final Duration timeout = config.readinessTimeout();
+          if (!SeedNodeBootstrapWatcher.waitForBootstrapPreconditions(
+              config,
+              new SeedNodeBootstrapWatcher.WaitConfig(
+                  timeout, RETRY_INTERVAL, LOG_PROGRESS_INTERVAL),
+              ClusterBootstrapReadinessVerifier::logInfo)) {
+            return new PhaseOutcome(
+                false,
+                "seed node bootstrap gate did not converge (systemd jobs/services + rke2"
+                    + " preconditions) for "
+                    + config.nodeName()
+                    + " in project "
+                    + config.incusProject());
+          }
+          final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
+          final boolean ok = waitForKubeconfigPublished(kubeconfigPath, timeout);
+          return new PhaseOutcome(
+              ok,
+              ok
+                  ? "kubeconfig published at " + kubeconfigPath
+                  : "kubeconfig not published within timeout at " + kubeconfigPath);
+        });
   }
 
-  public static VerificationResult verify(
+  public static PhaseOutcome checkApiReady(BootstrapConfig config, Consumer<String> logger) {
+    return runPhase(
+        logger,
+        () -> {
+          final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
+          final boolean ok = waitForApiReady(kubeconfigPath, config.readinessTimeout());
+          return new PhaseOutcome(
+              ok,
+              ok ? "kubernetes API reports readyz=ok" : "kubernetes API did not report readyz=ok");
+        });
+  }
+
+  public static PhaseOutcome checkControllersEffective(
       BootstrapConfig config, ControlplanePolicy policy, Consumer<String> logger) {
+    return runPhase(
+        logger,
+        () -> {
+          final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
+          final ControllerVerification controllers =
+              verifyRequiredControllers(kubeconfigPath, policy, config.readinessTimeout());
+          return new PhaseOutcome(controllers.ready(), controllers.detail());
+        });
+  }
+
+  private static PhaseOutcome runPhase(
+      Consumer<String> logger, java.util.function.Supplier<PhaseOutcome> phase) {
     final Consumer<String> previous = ACTIVE_LOGGER.get();
     ACTIVE_LOGGER.set(logger == null ? DEFAULT_LOGGER : logger);
     try {
-      return verify(config, policy);
+      return phase.get();
     } finally {
       ACTIVE_LOGGER.set(previous);
     }
   }
+
+  /** The required-controller refs for a policy — exposed for the BDD output projection. */
+  public static List<String> controllerRefs(ControlplanePolicy policy) {
+    return requiredControllerRefs(policy);
+  }
+
+  /** Outcome of a single readiness phase: passed, plus a human detail line. */
+  public record PhaseOutcome(boolean ok, String detail) {}
 
   public static VerificationResult skipped(ControlplanePolicy policy) {
     logInfo("readiness check disabled by configuration (rke2lab:readiness.enabled=false)");
@@ -145,6 +152,30 @@ public final class ClusterBootstrapReadinessVerifier {
     } finally {
       ACTIVE_LOGGER.set(previous);
     }
+  }
+
+  /**
+   * Projection factories the BDD checkpoint uses to build a {@link VerificationResult} from the
+   * per-phase outcomes it played — the verifier stays the owner of result construction, so the
+   * output contract (handoffReady → nextStep, bootstrapStatus, the output keys) is produced in one
+   * place whether reached via {@link #verify} or via the scenario.
+   */
+  public static VerificationResult ready(ControlplanePolicy policy) {
+    return VerificationResult.ready(requiredControllerRefs(policy));
+  }
+
+  public static VerificationResult failed(
+      boolean kubeconfigPublished,
+      boolean apiReady,
+      boolean controllersEffective,
+      String summary,
+      ControlplanePolicy policy) {
+    return VerificationResult.failed(
+        kubeconfigPublished,
+        apiReady,
+        controllersEffective,
+        summary,
+        requiredControllerRefs(policy));
   }
 
   private static boolean waitForKubeconfigPublished(Path kubeconfigPath, Duration timeout) {

@@ -255,6 +255,7 @@ public final class BootstrapPipeline {
     }
 
     public ResourcesDone during(String topic, Function<ResourcesStage, ResourcesStage> body) {
+      final Generalist generalist = new Generalist(List.of(new DbusTcpSpecialist(state.config)));
       final ResourcesStage stage =
           new ResourcesStage(
               state.resourceManager,
@@ -263,6 +264,8 @@ public final class BootstrapPipeline {
               state.options.readinessEnabled(),
               state.pulumiMode,
               state.readinessLogger,
+              state.runbook,
+              generalist,
               () -> state.bootstrapResult,
               () -> state.systemdAdapterLaunchSummary,
               result -> state.resourceResult = result);

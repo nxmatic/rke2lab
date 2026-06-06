@@ -8,5 +8,6 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 public enum SpecialistDomain {
   SYSTEMD,
   NETWORK,
-  INCUS
+  INCUS,
+  CLUSTER
 }

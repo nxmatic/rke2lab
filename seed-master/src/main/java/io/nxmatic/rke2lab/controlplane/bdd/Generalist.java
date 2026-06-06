@@ -58,6 +58,11 @@ public final class Generalist {
     return switch (symptom) {
       case CONNECTION_REFUSED -> List.of(SpecialistDomain.SYSTEMD, SpecialistDomain.NETWORK);
       case TIMEOUT -> List.of(SpecialistDomain.NETWORK);
+      // Cluster-readiness symptoms are typed and named in the runbook from Increment D; no
+      // specialist treats them yet, so they route to the CLUSTER domain and yield an empty plan
+      // (symptom seen, no treatment offered) until a cluster specialist is added.
+      case KUBECONFIG_MISSING, CONTROLLER_NOT_READY -> List.of(SpecialistDomain.CLUSTER);
+      case API_NOT_READY -> List.of(SpecialistDomain.CLUSTER, SpecialistDomain.NETWORK);
     };
   }
 }

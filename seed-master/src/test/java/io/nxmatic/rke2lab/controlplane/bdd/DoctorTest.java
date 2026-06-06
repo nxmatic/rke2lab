@@ -58,6 +58,27 @@ class DoctorTest {
   }
 
   @Test
+  void generalist_recognizes_and_names_cluster_symptoms_without_a_treatment_yet() {
+    // Increment D: the cluster symptoms are typed and routed (so they are named in the runbook),
+    // but no specialist treats them yet — the doctor returns an empty plan, not a crash.
+    final Generalist generalist = new Generalist(List.of(new DbusTcpSpecialist(config())));
+    for (Symptom symptom :
+        List.of(Symptom.KUBECONFIG_MISSING, Symptom.API_NOT_READY, Symptom.CONTROLLER_NOT_READY)) {
+      final Dossier dossier = Dossier.failed(symptom, symptom.id(), Map.of());
+      final RemediationPlan plan = generalist.consult(symptom, dossier);
+      assertEquals(symptom, plan.symptom(), "the plan names the cluster symptom");
+      assertFalse(plan.hasPrescriptions(), "no cluster specialist yet → empty plan for " + symptom);
+    }
+  }
+
+  @Test
+  void cluster_symptoms_parse_from_their_kebab_ids() {
+    assertEquals(Optional.of(Symptom.KUBECONFIG_MISSING), Symptom.parse("kubeconfig-missing"));
+    assertEquals(Optional.of(Symptom.API_NOT_READY), Symptom.parse("api-not-ready"));
+    assertEquals(Optional.of(Symptom.CONTROLLER_NOT_READY), Symptom.parse("controller-not-ready"));
+  }
+
+  @Test
   void dossier_round_trips_through_its_output_map_view() {
     final Dossier dossier =
         Dossier.failed(
