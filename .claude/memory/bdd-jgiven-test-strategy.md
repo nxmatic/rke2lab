@@ -52,4 +52,23 @@ The user is starting a test discipline for rke2lab (near-zero coverage today: on
 
 **Bigger why (user's stated direction, 2026-06-04):** the user is tired of typing command lines and wants to move toward **automation with a natural-language-oriented interface**. BDD "tests = living manual" is a first step on that path (readable sentences that describe + verify behavior instead of commands to retype). Keep this north star in mind for future tooling choices, not just tests.
 
-See [[working-style-narrate-progress]].
+**TDD-in-test / BDD-in-main split (decided 2026-06-06, config refactor):** the two test styles
+have DIFFERENT jobs and must NOT duplicate coverage.
+
+- **TDD = plain JUnit in `src/test`** = the COVERAGE layer: exhaustive mechanics, every resolved
+  value, defaults, accumulation order, edge cases. Keep these (e.g. `ConfigLoaderTest`,
+  `Rke2labConfigTest`).
+- **BDD = JGiven in `src/main`** = only the BEHAVIOUR THE SYSTEM PLAYS at runtime. A scenario
+  earns its place in `src/main` ONLY by being runbook-played (e.g. the config entry gate the
+  doctor consults). It asserts the gate OUTCOME (ready vs missing-inputs), and STOPS — it does
+  NOT re-assert resolved values (that's TDD's job). Non-played scenarios would be dead BDD weight
+  in production.
+- Classpath rule confirmed in seed-master pom: **`jgiven-core` is compile-scope** (Stage<…>
+  subclasses can live in `src/main`), **`jgiven-junit5` is test-scope** (the `ScenarioTest`
+  runner stays in `src/test`). Precedent: SystemdAdapter — `Given/When/Then` stages in
+  `src/main/.../bdd/`, `SystemdAdapterScenarioTest` in `src/test`.
+- Structure preference: **nested static `Stage<…>` classes** colocated with the class they
+  describe (BDD documents the class's real logic for the reviewer), not separate stage files —
+  though SystemdAdapter currently uses separate files.
+
+See [[working-style-narrate-progress]] and [[config-restructuring-state]].
