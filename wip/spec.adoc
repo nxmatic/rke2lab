@@ -548,14 +548,37 @@ Build the runbook mechanism on the *existing* systemd-adapter checkpoint.
 * *Green:* `DoctorTest` (routing, no-treatment, empty-plan, dossier round-trip) + the
   retyped scenario/runbook tests; 24/24 seed-master tests pass.
 
-=== Increment C — Checkpoint #2 (cluster-readiness) nested
+=== Increment C — Checkpoint #2 (cluster-readiness) nested — DONE (DSL-first)
 
-* Convert `ClusterBootstrapReadinessVerifier` to BDD, *phases as steps with per-phase
-  injectable fakes* (DSL-first, offline-green before wiring the real verifier).
-* Express the dependency on systemd-adapter via `@NestedSteps` — the DAG edge becomes a
-  nested scenario, proving the two-tier narrative and the "follow the chain" walk.
-* *Green when:* cluster-readiness scenario renders nested under its dependency in the
-  runbook, and an ordered fake incident on a nested phase produces a targeted runbook.
+* Cluster-readiness modeled as a BDD scenario: `ClusterReadinessPhase` (kubeconfig / API /
+  controllers) as steps, each driven by an injectable `ClusterReadinessProbe` returning a
+  `Dossier` — so a phase shares the doctor's symptom vocabulary, and an ordered incident can
+  target one phase (`SimulatedClusterReadinessProbe.failingAt(phase, symptom)`).
+* The systemd-adapter dependency is expressed via `@NestedSteps`
+  (`WhenClusterReadiness.the_systemd_adapter_dependency_is_satisfied` injects the
+  systemd-adapter Given/When/Then with `@ScenarioStage`) — the DAG edge becomes a nested
+  scenario, the cert-manager "follow the chain" walk made real, and the second checkpoint
+  reuses the *same* machinery (Dossier, Symptom, Generalist) as the first.
+* *DSL-first, as scoped:* this is the offline scenario + nesting + rendering, proven by
+  `NestedRunbookTest`. Wiring the real `ClusterBootstrapReadinessVerifier` behind a
+  production `ClusterReadinessProbe` (so the live checkpoint plays this scenario, like
+  `SystemdAdapterStage` does) is the deliberate follow-on — the verifier's 4-phase logic is
+  untouched until then.
+* *State-read seam learned:* a Stage's captured-state must not be read back through a public
+  getter — JGiven intercepts public stage methods as steps (corrupts the model flush). The
+  production checkpoint captures the failing dossier via the probe-holder seam, exactly as
+  `SystemdAdapterStage` already does.
+* *Green:* `NestedRunbookTest` — the cluster scenario renders with the systemd-adapter
+  dependency nested; an ordered fake incident on the api-ready phase produces a targeted
+  FAILED runbook and the doctor diagnoses the phase's symptom. 41/41 seed-master tests pass.
+
+==== Still open after C (the two converged deferrals)
+
+The plan-into-runbook-*node* rendering (Diagnosis/Mitigation sections under each node, vs.
+today's inline log) and the explicit `dependsOn` DAG-edge recording both waited for "the
+shared report-node model that arrives with checkpoint #2". Checkpoint #2 now exists as a
+nested scenario, so that model can be built next — together with wiring the live verifier.
+This is the natural next increment, scoped separately from C's DSL-first delivery.
 
 == Non-goals (explicit)
 
