@@ -34,6 +34,7 @@ import java.util.function.Consumer;
  */
 public final class ClusterReadinessStage {
 
+  private static final String JGIVEN_DRY_RUN = "jgiven.report.dry-run";
   private static final String SCENARIO_ID = "cluster-readiness";
 
   private final BootstrapConfig config;
@@ -76,13 +77,6 @@ public final class ClusterReadinessStage {
       sink.accept(ClusterBootstrapReadinessVerifier.skipped(policy, readinessLogger));
       return this;
     }
-    if (preview) {
-      // Preview: walk the structure, emit the doc, no live checks — same deferred convergence as
-      // the systemd-adapter checkpoint. The scenario shell is not played against live infra.
-      log("cluster readiness deferred during preview; live checks run during apply");
-      sink.accept(ClusterBootstrapReadinessVerifier.deferredPreview(policy, readinessLogger));
-      return this;
-    }
 
     // Capture each phase's dossier as the probe produces it, so the VerificationResult projection
     // and the doctor consultation read data the scenario already computed (never JGiven stage state
@@ -102,6 +96,14 @@ public final class ClusterReadinessStage {
     final SystemdAdapterProbe nestedSystemdAdapterProbe = cfg -> capturedSystemdAdapterDossier();
 
     final ReportModel reportModel = runbook != null ? runbook : new ReportModel();
+
+    // Preview: set JGiven dry-run so the step bodies are skipped (no live infra touched), but still
+    // PLAY the scenario so its shell renders in the runbook — the same "walk structure, emit doc,
+    // no side effects" notion as the systemd-adapter checkpoint. The result stays deferred.
+    final String previousDryRun = System.getProperty(JGIVEN_DRY_RUN);
+    if (preview) {
+      System.setProperty(JGIVEN_DRY_RUN, "true");
+    }
 
     Throwable failure = null;
     try {
@@ -125,6 +127,18 @@ public final class ClusterReadinessStage {
       failure = cause;
     } finally {
       logReport(reportModel);
+      if (previousDryRun == null) {
+        System.clearProperty(JGIVEN_DRY_RUN);
+      } else {
+        System.setProperty(JGIVEN_DRY_RUN, previousDryRun);
+      }
+    }
+
+    if (preview) {
+      // Shell rendered; live checks are deferred to apply (no real verification ran).
+      log("cluster readiness deferred during preview; live checks run during apply");
+      sink.accept(ClusterBootstrapReadinessVerifier.deferredPreview(policy, readinessLogger));
+      return this;
     }
 
     if (failure == null) {

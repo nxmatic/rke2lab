@@ -47,6 +47,32 @@ class NestedRunbookTest {
   }
 
   @Test
+  void cluster_readiness_renders_its_shell_in_preview_dry_run(@TempDir Path out) {
+    // Preview sets JGiven dry-run so step bodies are skipped (no live infra), but the scenario is
+    // still played + finished so its shell renders — the fix that makes the cluster checkpoint
+    // appear in the runbook on `pulumi preview`, like the systemd-adapter checkpoint does.
+    final String previous = System.getProperty("jgiven.report.dry-run");
+    System.setProperty("jgiven.report.dry-run", "true");
+    final ReportModel runbook;
+    try {
+      runbook = playClusterReadiness(FakeClusterReadinessProbes.allPhasesReady());
+    } finally {
+      if (previous == null) {
+        System.clearProperty("jgiven.report.dry-run");
+      } else {
+        System.setProperty("jgiven.report.dry-run", previous);
+      }
+    }
+
+    assertEquals(1, runbook.getScenarios().size());
+    new RunbookRenderer(out, message -> {}).render(runbook);
+    final String report = readAll(out.resolve("adoc"));
+    assertTrue(
+        report.contains("Cluster becomes ready"),
+        "the cluster scenario shell should render in preview dry-run");
+  }
+
+  @Test
   void ordered_fake_incident_on_a_nested_phase_yields_a_targeted_runbook_and_diagnosis(
       @TempDir Path out) {
     // Order an incident at the api-ready phase; the dependency and the kubeconfig phase pass.
