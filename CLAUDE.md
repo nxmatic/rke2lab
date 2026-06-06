@@ -56,9 +56,11 @@ All Maven commands must run through flox: `flox activate -- ./mvnw ...`
 ## Build & module layout
 
 - Maven multi-module project. CLI selectors use the unprefixed module name: `./mvnw -pl :seed-master` (not `:rke2lab-seed-master`).
+- **Never install project artifacts to the local repo** (`~/.m2`). Inter-module dependencies must always resolve through the **reactor**, from each module's `target/` — so a module build always uses `-am` (also-make) to build its siblings from source: `./mvnw -pl :seed-master -am …`. A bare `-pl :seed-master` resolves siblings from installed/stale jars and fails (e.g. `NodeEnvContributor` not found). Do not `mvn install` to work around it.
+- Tests are skipped by default (root `.mvn` config). To actually execute them, pass `-DskipTests=false`. A build that prints `BUILD SUCCESS` with no `Tests run:` line means they were skipped, not passed.
 - Group ids are nested under `io.nxmatic.rke2lab` (and `io.nxmatic.rke2lab.sdks` for the `sdks/` tree). Artifact ids match the directory name.
 - `<name>` in each pom is the relative directory path from the repo root.
-- Toolchain is JDK 25 via flox. Always run Maven through `flox activate -- ./mvnw …`. Builds and provisioning are run by the user — propose fixes, don't run mvnw/pulumi/kubectl yourself.
+- Toolchain is JDK 25 via flox. Always run Maven through `flox activate -- ./mvnw …`. Claude may run any operation that does **not** mutate the provisioned system — compilation, tests, and dry-runs like `pulumi preview` are fine to run directly. Operations that change the live system (`pulumi up`, `kubectl apply`, and similar) are run by the user — propose them, don't execute them.
 
 ## Fluent pipeline grammar
 
