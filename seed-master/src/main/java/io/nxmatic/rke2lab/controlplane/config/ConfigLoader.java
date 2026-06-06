@@ -1,0 +1,138 @@
+package io.nxmatic.rke2lab.controlplane.config;
+
+import com.pulumi.Config;
+import java.net.URI;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * Fluent, section-aware reader over Pulumi config; the only class that touches {@link
+ * com.pulumi.Config}. Reads each top-level section once as a {@code Map} (nested YAML), pulling
+ * keys from it. Dotted section names ({@code "policy.link"}) walk into sub-maps. {@code optional*}
+ * returns {@link Optional}; {@code require*} records a domain-tagged symptom on absence and returns
+ * a placeholder, so the caller throws once via {@link #diagnoseIfIncomplete()}.
+ */
+public final class ConfigLoader {
+
+  @FunctionalInterface
+  public interface SectionReader {
+    Optional<Map<String, Object>> read(String section);
+  }
+
+  private final SectionReader sectionReader;
+  private final List<String> missingKeys = new ArrayList<>();
+
+  private ConfigLoader(SectionReader sectionReader) {
+    this.sectionReader = sectionReader;
+  }
+
+  public static ConfigLoader of(SectionReader sectionReader) {
+    return new ConfigLoader(sectionReader);
+  }
+
+  /**
+   * Production: read top-level sections via Pulumi getObject, walking dotted names into sub-maps.
+   */
+  @SuppressWarnings({"unchecked", "null"})
+  public static ConfigLoader of(Config config) {
+    return new ConfigLoader(
+        section -> {
+          final String[] parts = section.split("\\.");
+          final Optional<Map<String, Object>> top =
+              (Optional<Map<String, Object>>) (Optional<?>) config.getObject(parts[0], Map.class);
+          return walk(top.orElse(null), parts);
+        });
+  }
+
+  /** Offline/test: a root map keyed by top-level section; dotted names walk into sub-maps. */
+  public static ConfigLoader ofNestedRoot(Map<String, Object> root) {
+    return new ConfigLoader(
+        section -> walk(asMap(root.get(section.split("\\.")[0])), section.split("\\.")));
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Optional<Map<String, Object>> walk(Map<String, Object> top, String[] parts) {
+    Object current = top;
+    for (int i = 1; i < parts.length && current instanceof Map; i++) {
+      current = ((Map<String, Object>) current).get(parts[i]);
+    }
+    return current instanceof Map ? Optional.of((Map<String, Object>) current) : Optional.empty();
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> asMap(Object value) {
+    return value instanceof Map ? (Map<String, Object>) value : null;
+  }
+
+  // --- optional* : empty when absent/blank, no defaults here ---
+
+  public Optional<String> optional(String section, String key) {
+    return rawValue(section, key).map(String::trim).filter(value -> !value.isBlank());
+  }
+
+  public Optional<Path> optionalPath(String section, String key) {
+    return optional(section, key).map(value -> Path.of(value).toAbsolutePath().normalize());
+  }
+
+  public Optional<URI> optionalUri(String section, String key) {
+    return optional(section, key).map(URI::create);
+  }
+
+  public Optional<Boolean> optionalBoolean(String section, String key) {
+    return optional(section, key).map(ConfigLoader::parseBoolean);
+  }
+
+  public Optional<Integer> optionalInt(String section, String key) {
+    return optional(section, key).map(value -> Integer.parseInt(value.trim()));
+  }
+
+  public Optional<Duration> optionalDuration(String section, String key) {
+    return optional(section, key).map(value -> Duration.parse(value.trim()));
+  }
+
+  // --- require* : accumulate on absence, return placeholder ---
+
+  public Path requirePath(String section, String key) {
+    final Optional<Path> value = optionalPath(section, key);
+    if (value.isEmpty()) {
+      missingKeys.add(section + "." + key);
+      return Path.of("/__missing__/" + section + "/" + key);
+    }
+    return value.get();
+  }
+
+  public String require(String section, String key) {
+    final Optional<String> value = optional(section, key);
+    if (value.isEmpty()) {
+      missingKeys.add(section + "." + key);
+      return "";
+    }
+    return value.get();
+  }
+
+  public List<String> missingKeys() {
+    return List.copyOf(missingKeys);
+  }
+
+  public void diagnoseIfIncomplete() {
+    if (!missingKeys.isEmpty()) {
+      throw new MissingRequiredConfiguration(missingKeys);
+    }
+  }
+
+  private Optional<String> rawValue(String section, String key) {
+    return sectionReader.read(section).map(map -> map.get(key)).map(String::valueOf);
+  }
+
+  private static boolean parseBoolean(String raw) {
+    return switch (raw.trim().toLowerCase()) {
+      case "1", "true", "yes", "on" -> true;
+      case "0", "false", "no", "off" -> false;
+      default -> throw new IllegalArgumentException("Invalid boolean: " + raw);
+    };
+  }
+}
