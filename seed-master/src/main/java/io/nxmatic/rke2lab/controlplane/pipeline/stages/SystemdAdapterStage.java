@@ -6,6 +6,8 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.text.PlainTextReporter;
 import io.nxmatic.rke2lab.controlplane.bdd.GivenSystemdAdapter;
 import io.nxmatic.rke2lab.controlplane.bdd.Severity;
+import io.nxmatic.rke2lab.controlplane.bdd.SimulatedSystemdAdapterProbe;
+import io.nxmatic.rke2lab.controlplane.bdd.Symptom;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.ThenSystemdAdapter;
 import io.nxmatic.rke2lab.controlplane.bdd.WhenSystemdAdapter;
@@ -14,6 +16,7 @@ import io.nxmatic.rke2lab.controlplane.pipeline.PipelineStageFailure;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
@@ -41,6 +44,7 @@ public final class SystemdAdapterStage {
   private final ControlplanePolicy policy;
   private final boolean pulumiMode;
   private final Consumer<String> readinessLogger;
+  private final ReportModel runbook;
   private final Consumer<Map<String, Object>> sink;
 
   public SystemdAdapterStage(
@@ -48,22 +52,44 @@ public final class SystemdAdapterStage {
       ControlplanePolicy policy,
       boolean pulumiMode,
       Consumer<String> readinessLogger,
+      ReportModel runbook,
       Consumer<Map<String, Object>> sink) {
     this.config = config;
     this.policy = policy;
     this.pulumiMode = pulumiMode;
     this.readinessLogger = readinessLogger;
+    this.runbook = runbook;
     this.sink = sink;
   }
 
   public SystemdAdapterStage launch() {
-    final boolean dryRun = pulumiMode && Deployment.getInstance().isDryRun();
+    final boolean preview = pulumiMode && Deployment.getInstance().isDryRun();
+
+    // A fake incident is PREVIEW-ONLY: the simulate map is consulted only during `pulumi preview`,
+    // never during a real `pulumi up`. Gating purely on dry-run is the safety contract — a stale
+    // simulate entry can never inject a fake failure into real provisioning (which, at CRITICAL
+    // severity, would abort an apply over a defect that does not exist). In preview, the simulated
+    // scenario lifts dry-run and runs a canned failing probe (emitting the typed symptom) so the
+    // incident renders without touching live infrastructure.
+    final Optional<Symptom> simulated =
+        preview ? policy.preview().simulate(SCENARIO_ID) : Optional.empty();
+
+    // Normal preview skips step bodies (deferred-preview); a simulated preview runs them against
+    // the fake probe so the failure is visible.
+    final boolean dryRun = preview && simulated.isEmpty();
     final SystemdAdapterProbe probe =
-        cfg -> SeedSystemdAdapterEndpointGate.ensureReachable(cfg, readinessLogger);
+        simulated
+            .map(SimulatedSystemdAdapterProbe::of)
+            .orElse(cfg -> SeedSystemdAdapterEndpointGate.ensureReachable(cfg, readinessLogger));
+    if (simulated.isPresent()) {
+      log("⚙ " + SCENARIO_ID + " simulating incident: " + simulated.get().id());
+    }
 
     // Standalone (non-JUnit) scenarios have no report model wired; finished() NPEs without one.
-    // Held outside the try so the prose is logged even when the probe fails the scenario.
-    final ReportModel reportModel = new ReportModel();
+    // Record into the caller-owned runbook when present so this scenario joins the shared DAG;
+    // otherwise a local model (inline log only). Held outside the try so the prose is logged even
+    // when the probe fails the scenario.
+    final ReportModel reportModel = runbook != null ? runbook : new ReportModel();
 
     final String previousDryRun = System.getProperty(JGIVEN_DRY_RUN);
     if (dryRun) {
@@ -78,10 +104,16 @@ public final class SystemdAdapterStage {
               GivenSystemdAdapter.class, WhenSystemdAdapter.class, ThenSystemdAdapter.class);
       scenario.setModel(reportModel);
       scenario.startScenario("systemd adapter becomes reachable");
-      scenario.given().the_seed_node(config.systemdAdapterDbusHost(), config).probed_by(probe);
-      scenario.when().the_systemd_adapter_probe_runs();
-      scenario.then().the_dbus_endpoint_responds();
-      scenario.finished();
+      try {
+        scenario.given().the_seed_node(config.systemdAdapterDbusHost(), config).probed_by(probe);
+        scenario.when().the_systemd_adapter_probe_runs();
+        scenario.then().the_dbus_endpoint_responds();
+      } finally {
+        // finished() flushes the scenario (steps + status) into the model so the node RENDERS —
+        // pass or fail. It must run even when a step threw (it re-throws that failure, caught
+        // below); skipping it on failure leaves the failed node empty in the runbook.
+        scenario.finished();
+      }
       captured = scenario.then().capturedSnapshot();
     } catch (Throwable cause) {
       failure = cause;

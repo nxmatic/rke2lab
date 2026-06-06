@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane.policy;
 
 import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.controlplane.bdd.Severity;
+import io.nxmatic.rke2lab.controlplane.bdd.Symptom;
 import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
 import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestDomainPolicy;
@@ -15,7 +16,8 @@ public record ControlplanePolicy(
     NetworkPolicy network,
     ProvisioningPolicy provisioning,
     ManifestLinkPolicy manifestLink,
-    ReadinessPolicy readiness) {
+    ReadinessPolicy readiness,
+    PreviewPolicy preview) {
 
   private static final ManifestDomainCatalog MANIFEST_DOMAIN_CATALOG =
       ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
@@ -75,12 +77,19 @@ public record ControlplanePolicy(
         .provisioning(provisioningPolicy)
         .manifestLink(manifestLinkPolicy)
         .readiness(new ReadinessPolicy(toSeverityOverrides(config.policy().readinessOverride())))
+        .preview(new PreviewPolicy(toSimulations(config.policy().previewSimulate())))
         .build();
   }
 
   private static Map<String, Severity> toSeverityOverrides(Map<String, String> raw) {
     final Map<String, Severity> parsed = new LinkedHashMap<>();
     raw.forEach((scenario, value) -> Severity.parse(value).ifPresent(s -> parsed.put(scenario, s)));
+    return parsed;
+  }
+
+  private static Map<String, Symptom> toSimulations(Map<String, String> raw) {
+    final Map<String, Symptom> parsed = new LinkedHashMap<>();
+    raw.forEach((scenario, value) -> Symptom.parse(value).ifPresent(s -> parsed.put(scenario, s)));
     return parsed;
   }
 
@@ -100,6 +109,7 @@ public record ControlplanePolicy(
     outputs.putAll(provisioning.toOutputMap());
     outputs.putAll(manifestLink.toOutputMap());
     outputs.putAll(readiness.toOutputMap());
+    outputs.putAll(preview.toOutputMap());
     return outputs;
   }
 
@@ -155,7 +165,8 @@ public record ControlplanePolicy(
   /**
    * Operator override of readiness-scenario severity, keyed by scenario id (e.g. {@code
    * "systemd-adapter"}). An entry forces that scenario's effective severity regardless of the
-   * severity the scenario declares for itself; absent entries defer to the scenario.
+   * severity the scenario declares for itself; absent entries defer to the scenario. Applies in
+   * both preview and apply — it changes how a <em>real</em> failure is treated.
    */
   public record ReadinessPolicy(Map<String, Severity> severityOverrides) {
     public ReadinessPolicy {
@@ -180,12 +191,46 @@ public record ControlplanePolicy(
     }
   }
 
+  /**
+   * Operator control of {@code pulumi preview} behavior. Everything here is <em>preview-only by
+   * construction</em>: the engine alone decides whether we are previewing ({@code isDryRun()});
+   * this policy only says what to do <em>when</em> we are. Nothing here can affect a real {@code
+   * pulumi up} — which is the safety contract for fault simulation.
+   *
+   * <p><b>simulations</b> orders a fake incident: during preview the named scenario lifts dry-run
+   * and runs a canned failing probe emitting the mapped {@link Symptom}, so a runbook for that
+   * incident renders without touching live infrastructure. A stale entry left in config is simply
+   * never consulted during apply.
+   */
+  public record PreviewPolicy(Map<String, Symptom> simulations) {
+    public PreviewPolicy {
+      simulations = Map.copyOf(simulations);
+    }
+
+    public static PreviewPolicy none() {
+      return new PreviewPolicy(Map.of());
+    }
+
+    /** The fake-incident symptom ordered for a scenario, if any. */
+    public Optional<Symptom> simulate(String scenarioId) {
+      return Optional.ofNullable(simulations.get(scenarioId));
+    }
+
+    public Map<String, Object> toOutputMap() {
+      final Map<String, Object> outputs = new LinkedHashMap<>();
+      simulations.forEach(
+          (scenario, symptom) -> outputs.put("preview.simulate." + scenario, symptom.id()));
+      return outputs;
+    }
+  }
+
   public static final class Builder {
     private DebugPolicy debug;
     private NetworkPolicy network;
     private ProvisioningPolicy provisioning;
     private ManifestLinkPolicy manifestLink;
     private ReadinessPolicy readiness = ReadinessPolicy.none();
+    private PreviewPolicy preview = PreviewPolicy.none();
 
     private Builder() {}
 
@@ -214,8 +259,13 @@ public record ControlplanePolicy(
       return this;
     }
 
+    public Builder preview(PreviewPolicy preview) {
+      this.preview = preview;
+      return this;
+    }
+
     public ControlplanePolicy build() {
-      return new ControlplanePolicy(debug, network, provisioning, manifestLink, readiness);
+      return new ControlplanePolicy(debug, network, provisioning, manifestLink, readiness, preview);
     }
   }
 }

@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.pipeline;
 
+import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
@@ -15,6 +16,14 @@ final class PipelineState {
   BootstrapOptions options;
   Consumer<String> readinessLogger;
   boolean pulumiMode;
+
+  /**
+   * The runbook model, owned by the caller and threaded through every checkpoint so each records
+   * its scenario into one shared model (rather than the discarded per-stage model). Null until the
+   * caller calls {@code recordingInto}; checkpoints fall back to a local model when absent.
+   */
+  ReportModel runbook;
+
   BboxReconciliationOrchestrator bboxOrchestrator;
   ResourceManager resourceManager;
   OutputBuilder outputBuilder;

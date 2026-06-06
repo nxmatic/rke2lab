@@ -14,12 +14,13 @@ final class FakeSystemdAdapterProbes {
     return config -> envelope(config, "ok", "dbusEndpoint reachable");
   }
 
-  /** Endpoint refused: status=failed with the port-12434 connection-refused narrative. */
+  /** Endpoint refused: status=failed, carrying the typed symptom the doctor will read. */
   static SystemdAdapterProbe connectionRefused() {
     return config ->
         envelope(
             config,
             "failed",
+            Symptom.CONNECTION_REFUSED,
             "Connection refused at "
                 + config.systemdAdapterDbusHost()
                 + ":"
@@ -28,8 +29,16 @@ final class FakeSystemdAdapterProbes {
 
   private static Map<String, Object> envelope(
       BootstrapConfig config, String status, String detail) {
+    return envelope(config, status, null, detail);
+  }
+
+  private static Map<String, Object> envelope(
+      BootstrapConfig config, String status, Symptom symptom, String detail) {
     final LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
     payload.put("status", status);
+    if (symptom != null) {
+      payload.put(Symptom.ENVELOPE_KEY, symptom.id());
+    }
     payload.put(
         "summary",
         "dbusEndpoint="

@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.pipeline;
 
+import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.BboxStage;
@@ -87,6 +88,16 @@ public final class BootstrapPipeline {
     /** Optional: register a per-topic failure handler. Defaults to no-op when not called. */
     public ComponentBoundPipeline onFailure(OnFailure handler) {
       state.onFailure = handler;
+      return this;
+    }
+
+    /**
+     * Optional: record every checkpoint's scenario into one caller-owned runbook model. The caller
+     * renders it (in a {@code finally}, so a CRITICAL stop still produces a runbook). When not
+     * called, each checkpoint uses a discarded local model — inline log only, no runbook.
+     */
+    public ComponentBoundPipeline recordingInto(ReportModel runbook) {
+      state.runbook = runbook;
       return this;
     }
 
@@ -212,6 +223,7 @@ public final class BootstrapPipeline {
               state.policy,
               state.pulumiMode,
               state.readinessLogger,
+              state.runbook,
               summary -> state.systemdAdapterLaunchSummary = summary);
       TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
       return new SystemdAdapterDone(state);

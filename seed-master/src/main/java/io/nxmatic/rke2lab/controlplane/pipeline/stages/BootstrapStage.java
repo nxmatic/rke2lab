@@ -1,6 +1,8 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
+import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
+import io.nxmatic.rke2lab.controlplane.bdd.RunbookRenderer;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions;
 import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapPipeline;
@@ -8,6 +10,7 @@ import io.nxmatic.rke2lab.controlplane.pipeline.OnFailure;
 import io.nxmatic.rke2lab.controlplane.pipeline.OutputBuilder;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -49,37 +52,54 @@ public final class BootstrapStage {
   }
 
   public BootstrapStage runBootstrapPipeline() {
-    BootstrapPipeline.ComponentBoundPipeline ready =
-        BootstrapPipeline.forCluster(configSupplier.get(), policySupplier.get())
-            .withOptions(optionsSupplier.get())
-            .using(bboxOrchestrator, resourceManager, outputBuilder);
-    final OnFailure handler = onFailureSupplier.get();
-    if (handler != null) {
-      ready = ready.onFailure(handler);
+    // The runbook is owned here, recorded into by every checkpoint, and rendered in the finally so
+    // a CRITICAL stop (a checkpoint that throws to abort provisioning) still produces a runbook —
+    // exactly the failure the runbook exists to document.
+    final ReportModel runbook = new ReportModel();
+    try {
+      BootstrapPipeline.ComponentBoundPipeline ready =
+          BootstrapPipeline.forCluster(configSupplier.get(), policySupplier.get())
+              .withOptions(optionsSupplier.get())
+              .using(bboxOrchestrator, resourceManager, outputBuilder)
+              .recordingInto(runbook);
+      final OnFailure handler = onFailureSupplier.get();
+      if (handler != null) {
+        ready = ready.onFailure(handler);
+      }
+      final BootstrapPipeline.AwaitingPreflight primed =
+          pulumiMode
+              ? ready.runningInPulumi(readinessLogger)
+              : ready.runningStandalone(readinessLogger);
+      final Map<String, Object> outputs =
+          primed
+              .during(
+                  "preflight",
+                  preflight ->
+                      preflight
+                          .enforceEntryGates()
+                          .requireLocalCommands("ssh", "kubectl")
+                          .requireRemoteCommand("incus"))
+              .then()
+              .during("bbox reconciliation", bbox -> bbox.reconcileReservations())
+              .then()
+              .during("incus provisioning", incus -> incus.provisionInstance())
+              .then()
+              .during("systemd adapter", adapter -> adapter.launch())
+              .then()
+              .during("bootstrap resources", resources -> resources.createAll())
+              .collectOutputs();
+      outputsSink.accept(outputs);
+      return this;
+    } finally {
+      new RunbookRenderer(runbookOutputDir(), readinessLogger).render(runbook);
     }
-    final BootstrapPipeline.AwaitingPreflight primed =
-        pulumiMode
-            ? ready.runningInPulumi(readinessLogger)
-            : ready.runningStandalone(readinessLogger);
-    final Map<String, Object> outputs =
-        primed
-            .during(
-                "preflight",
-                preflight ->
-                    preflight
-                        .enforceEntryGates()
-                        .requireLocalCommands("ssh", "kubectl")
-                        .requireRemoteCommand("incus"))
-            .then()
-            .during("bbox reconciliation", bbox -> bbox.reconcileReservations())
-            .then()
-            .during("incus provisioning", incus -> incus.provisionInstance())
-            .then()
-            .during("systemd adapter", adapter -> adapter.launch())
-            .then()
-            .during("bootstrap resources", resources -> resources.createAll())
-            .collectOutputs();
-    outputsSink.accept(outputs);
-    return this;
+  }
+
+  /**
+   * Where the rendered runbook lands: under the build output tree (already git-ignored), resolved
+   * from the seed worktree so it sits beside the jar Pulumi runs.
+   */
+  private Path runbookOutputDir() {
+    return configSupplier.get().localWorktreePath().resolve("seed-master/target/runbook");
   }
 }

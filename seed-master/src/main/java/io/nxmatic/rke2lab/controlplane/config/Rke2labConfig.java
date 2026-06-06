@@ -139,7 +139,10 @@ public record Rke2labConfig(
   public record KubeconfigConfig(Optional<Path> ref) {}
 
   public record PolicyConfig(
-      LinkPolicyConfig link, DebugPolicyConfig debug, Map<String, String> readinessOverride) {
+      LinkPolicyConfig link,
+      DebugPolicyConfig debug,
+      Map<String, String> readinessOverride,
+      Map<String, String> previewSimulate) {
     static PolicyConfig from(ConfigLoader loader) {
       return new PolicyConfig(
           new LinkPolicyConfig(
@@ -154,7 +157,8 @@ public record Rke2labConfig(
               loader.optionalBoolean("policy.debug.mesh", "enabled"),
               loader.optionalBoolean("policy.debug.networking", "enabled"),
               loader.optionalBoolean("policy.debug.nriPlugins.flox", "enabled")),
-          loader.stringMap("policy.readiness", "override"));
+          loader.stringMap("policy.readiness", "override"),
+          loader.stringMap("policy.preview", "simulate"));
     }
   }
 
