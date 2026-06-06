@@ -1,0 +1,45 @@
+package io.nxmatic.rke2lab.controlplane.config.bdd;
+
+import com.tngtech.jgiven.junit5.ScenarioTest;
+import io.nxmatic.rke2lab.controlplane.config.ConfigLoader;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+
+/**
+ * The configuration entry gate, told as behaviour. Asserts the gate OUTCOME only — ready vs which
+ * mandatory inputs are missing. Resolved-value coverage lives in {@code Rke2labConfigTest} (the
+ * gate does not re-assert it, to avoid duplicating coverage). Production plays this same gate at
+ * provisioning time against the real Pulumi config loader.
+ */
+class ConfigEntryGateScenarioTest
+    extends ScenarioTest<ConfigEntryGate.Given, ConfigEntryGate.When, ConfigEntryGate.Then> {
+
+  private static ConfigLoader loaderOf(Map<String, Map<String, Object>> sections) {
+    return ConfigLoader.of(section -> Optional.ofNullable(sections.get(section)));
+  }
+
+  private static Map<String, Map<String, Object>> completeConfiguration() {
+    final Map<String, Map<String, Object>> sections = new HashMap<>();
+    sections.put("incus", Map.of("configDir", "/Users/nxmatic/.config/incus"));
+    sections.put("image", Map.of("sharedFolder", "/srv/distrobuilder"));
+    sections.put("worktree", Map.of("dir", "/private/var/lib/git/nxmatic/rke2lab"));
+    return sections;
+  }
+
+  @Test
+  void complete_configuration_passes_the_gate() {
+    given().the_operator_configuration(loaderOf(completeConfiguration()));
+    when().the_configuration_is_loaded();
+    then().the_configuration_is_ready();
+  }
+
+  @Test
+  void missing_mandatory_inputs_are_reported() {
+    // Empty configuration: every mandatory input absent, in InfraDomain.values() order.
+    given().the_operator_configuration(loaderOf(Map.of()));
+    when().the_configuration_is_loaded();
+    then().the_missing_inputs_are("incus.configDir", "image.sharedFolder", "worktree.dir");
+  }
+}

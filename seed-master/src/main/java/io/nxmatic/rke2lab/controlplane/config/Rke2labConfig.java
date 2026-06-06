@@ -33,8 +33,12 @@ public record Rke2labConfig(
     return build(ConfigLoader.of(section -> Optional.empty()), false);
   }
 
-  /** Package-visible seam for offline tests. Validates mandatory keys. */
-  static Rke2labConfig from(ConfigLoader loader) {
+  /**
+   * Build from any loader (production wraps Pulumi config; the entry gate and offline tests pass an
+   * in-memory loader). Validates mandatory keys — throws {@link MissingRequiredConfiguration}
+   * naming every absent one.
+   */
+  public static Rke2labConfig from(ConfigLoader loader) {
     return build(loader, true);
   }
 
