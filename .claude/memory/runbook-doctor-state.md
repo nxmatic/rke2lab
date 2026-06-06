@@ -1,12 +1,30 @@
 ---
 name: runbook-doctor-state
-description: "Next work: build runbook + doctor on feature/runbook-doctor — spec in wip/spec.adoc, design done, not yet implemented"
-metadata:
+description: feature/runbook-doctor — Increment A DONE & committed; Increment B (the doctor) is next
+metadata: 
+  node_type: memory
   type: project
+  originSessionId: fecaba54-8122-4dc1-8916-743ef5d2dec0
 ---
 
 Active chantier on branch **`feature/runbook-doctor`**: build the runbook + doctor subsystem.
-Design is DONE (brainstorm complete); **no code written yet** — implementation is the next step.
+Design DONE; **Increment A DONE, verified & committed** (commit 3b46b249, 2026-06-06); **Increment
+B (the doctor) is next**.
+
+**Increment A delivered** (seed-master `controlplane/bdd` + `pipeline` + `policy`):
+`RunbookRenderer` (JGiven `ScenarioJsonWriter` → `AsciiDocReportGenerator`; emits a *directory*
+`target/runbook/adoc/` with `index.asciidoc`, not one file), caller-owned shared `ReportModel`
+(`BootstrapStage` creates it, threads via `PipelineState.recordingInto`, renders in a `finally` so a
+CRITICAL throw still renders), typed `Symptom` carried in the probe envelope, and **preview-only**
+fault simulation. Key design correction made during the work: `simulate` moved from
+`policy.readiness.simulate` to **`policy.preview.simulate`** in a NEW `PreviewPolicy` (separate from
+`ReadinessPolicy.override`) — preview-only *by construction* (the apply path never reads the
+simulate map; engine `isDryRun()` is the sole gate). R6 test (`RunbookRenderingTest`) caught TWO
+real empty-runbook bugs, both fixed: (1) `finished()` was skipped on failure → now in a `finally`;
+(2) standalone-played model has null className → `RunbookRenderer.normalize()` names the feature.
+
+**Note:** DAG-edges-from-`dependsOn` was DEFERRED to Increment C — only one checkpoint exists today,
+so there are no edges to draw until checkpoint #2.
 
 **Read first:** `wip/spec.adoc` (the design) + `wip/README.adoc` (wip manifest). Lives in `wip/`
 while in progress; durable substance migrates to `docs/architecture/` before merge (and `wip/` must
