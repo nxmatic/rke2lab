@@ -1,6 +1,6 @@
 ---
 name: runbook-doctor-state
-description: feature/runbook-doctor — Increments A,B,C,D all DONE & committed; NEXT = shared report-node model (node-level Diagnosis/Mitigation + explicit dependsOn edges)
+description: feature/runbook-doctor — Increments A-D DONE; BDD-quality pass IN PROGRESS (explicit steps, probe-injection dedup, POM restructure all committed); NEXT in pass = nesting Given/When/Then + BDD unit tests; then the deferred shared report-node model
 metadata: 
   node_type: memory
   type: project
@@ -21,6 +21,71 @@ preview runbook); now it sets jgiven.report.dry-run (bodies skipped, no live inf
 plays+finish()es the scenario so the shell renders, then sinks deferredPreview. Verify after running
 pulumi: runbook at `seed-master/target/runbook/adoc/index.asciidoc` should show "Systemd adapter
 becomes reachable" AND "Cluster becomes ready" (with the nested systemd-adapter dependency).
+
+**BDD-QUALITY PASS (2026-06-07, IN PROGRESS) — triggered by the user reading the rendered runbook.**
+Four commits landed on `feature/runbook-doctor`, all 31/31 green; two chantiers remain in the pass.
+
+*1. Cluster naming + visible phases (34f2a1a9, then refined by 0b3eb45d).* The runbook showed
+`Given the cluster "master"` (it was passed `config.nodeName()`; fixed to `config.clusterName()` →
+"bioskop") and one opaque `the readiness phases run` line. **Final shape (0b3eb45d):** the three
+phases are EXPLICIT FLUENT STEPS chained in canonical order —
+`.the_kubeconfig_is_published().and().the_api_is_ready().and().the_required_controllers_are_effective()`
+— each delegating to a private `checking(ClusterReadinessPhase)` (the enum stays the single join to
+probe + simulation; method name is the narration, enum label is the short dossier tag). Replaced an
+intermediate `@NestedSteps`+loop+`break` attempt. **JGIVEN SEMANTICS (settled by a scratch probe):**
+a top-level fluent chain `a().and().b().and().c()` where `b` throws → JGiven SKIPS the bodies of the
+downstream chained steps and marks them SKIPPED (fail-fast is the chain's own semantics, no manual
+break). Contrast: inside `@NestedSteps` the exception is DEFERRED (re-thrown at finished()), so a
+loop there would NOT fail-fast. `ThenClusterReadiness` is now a thin closing assertion (reached only
+on full success); `failingPhase`/`failingDossier` deleted. NestedRunbookTest asserts per-step
+StepStatus PASSED/FAILED/SKIPPED — rigorous proof the downstream body never ran.
+
+*2. POM restructure (8ed3c513) — the user's call: BOM has its own lifecycle/version; children carry
+NO dependencyManagement.* `bom` is now STANDALONE (no `<parent>`, own version `1.0.0-SNAPSHOT`, only
+EXTERNAL version management — the rke2lab inter-module entries moved out). The PARENT holds the
+single `<dependencyManagement>` (imports the BOM + manages rke2lab modules at `${project.version}`)
+and a common test toolchain in `<dependencies>`: junit-jupiter + jgiven-junit5 + mockito-core +
+mockito-junit-jupiter (all test scope, versions from the BOM). The 6 children dropped their
+dependencyManagement and inherited test deps; seed-master keeps `jgiven-core` in MAIN scope (plays
+scenarios in prod). Mockito 5.11.0 + byte-buddy 1.14.19 come from spring-boot-dependencies, aligned
+with JGiven's byte-buddy. Verified two ways: full `clean install` AND from-source `package -pl
+:seed-master -am` (the parent importing a reactor BOM resolves without install — no cycle, because
+the BOM has no parent).
+
+*3. Test-double policy (decided) + scenario dedup (0d2c7a4f).* **Policy:** Mockito IS in the project
+now; rule = lambda for a single-method @FunctionalInterface with a canned return (the probes);
+Mockito when verifying an interaction or doubling a multi-method collaborator (the doctor) or a
+STATIC seam (`mockStatic(Deployment.class)` for the preview path); NEVER mock a JGiven Stage
+(byte-buddy already subclasses them). The user also wants BDD (Given/When/Then) for UNIT tests too,
+accepting two JGiven uses: main (scenarios ARE prod behaviour) + test (readable component tests).
+**Dedup:** `NestedRunbookTest` used to re-implement the cluster Given/When/Then by hand → the
+scenario lived in TWO places. Fixed by INJECTING the probe: `ClusterReadinessStage` and
+`SystemdAdapterStage` now take their probe as a ctor param (prod injects ProductionClusterReadinessProbe
+/ the dbus gate lambda; SystemdAdapter's preview-only simulate override still wins). The test now
+calls the REAL `new ClusterReadinessStage(...).launch()` with a fake/simulated probe + captured sink
+— same code prod runs — and also asserts the VerificationResult projection + that the stage consults
+the doctor (logged ⚕/℞). `pulumiMode=false` short-circuits `Deployment.getInstance()` so the stage
+runs offline. **GOTCHA:** `Deployment.getInstance()` returns `DeploymentInstance` (not `Deployment`)
+— mock that type. **KNOWN DEBT:** Mockito's inline mock-maker self-attaches the byte-buddy agent →
+"Java agent loaded dynamically" WARNING (non-blocking on JDK 25, forbidden in a future JDK). A
+`-javaagent:${net.bytebuddy:byte-buddy-agent:jar}` argLine attempt FAILED (the dependency-plugin
+`properties` goal did not substitute the path → JVM got the literal string, crashed the fork);
+reverted entirely (no trace). Revisit with a tested approach when the JDK enforces it.
+
+**STILL IN THE PASS (next):** (a) NESTING — group each scenario's Given/When/Then into `static`
+nested classes under a per-scenario container, to cut the 23 top-level classes in `controlplane/bdd/`
+(JGiven supports nested static stages); (b) BDD UNIT TESTS — rewrite component tests (doctor,
+renderer, …) as readable Given/When/Then with Mockito for interactions. Localisation rule: a stage
+describing PROD behaviour lives in `main`; a stage that exists only to test lives in `test`. Order
+chosen: dedup (done) → BDD unit → nesting last.
+
+**User's design seed for the deferred DAG model:** "it's the step/edge that decides fail-fast vs
+fail-at-end." Refined together: a step isn't fail-fast in the absolute — it BLOCKS its dependents
+when it's a precondition. Failure propagates fail-fast ALONG dependsOn edges (dependents skipped)
+and fail-at-end BETWEEN independent branches (all run, all report). Today's 3 phases are a linear
+chain so everything is fail-fast and correct; fail-at-end becomes meaningful only when the shared
+report-node DAG lands AND there's a genuine pair of INDEPENDENT checks (none in cluster yet — its
+phases are intrinsically sequential). Don't build per-step policy now (rule-of-three: one shape).
 
 **Verified earlier this session:** `.local.d/bioskop/master/host.preview` (synthesized config) is
 COMPLETE vs the applied `host/` — 0 config files changed/added; the 105 "missing" files are all

@@ -71,4 +71,29 @@ have DIFFERENT jobs and must NOT duplicate coverage.
   describe (BDD documents the class's real logic for the reviewer), not separate stage files —
   though SystemdAdapter currently uses separate files.
 
-See [[working-style-narrate-progress]] and [[config-restructuring-state]].
+**Test-double policy (decided 2026-06-07).** Mockito is now in the project (parent `<dependencies>`,
+test scope; version from the BOM via spring-boot-dependencies, 5.11.0 with byte-buddy 1.14.19 =
+JGiven's). Rule, by the NATURE of the seam:
+- **Lambda** for a single-method `@FunctionalInterface` with a canned return (e.g. the probes:
+  `ClusterReadinessProbe`, `SystemdAdapterProbe`). A lambda is shorter and clearer than mock+when.
+- **Mockito** when verifying an INTERACTION (`verify(x, never())…`), doubling a MULTI-METHOD
+  collaborator (the doctor's `Specialist`), or faking a STATIC seam — `mockStatic(Deployment.class)`
+  for the preview path (`Deployment.getInstance()` returns `DeploymentInstance`, mock THAT type).
+- **NEVER** mock a JGiven `Stage<…>` — byte-buddy already subclasses them; the two collide.
+The user also wants BDD (Given/When/Then) for UNIT tests, accepting two JGiven uses: `main` (scenarios
+ARE prod behaviour) + `test` (readable component tests). Localisation: a stage describing PROD
+behaviour lives in `main`; a stage that exists only to test lives in `test`.
+**KNOWN DEBT:** Mockito's inline mock-maker self-attaches the byte-buddy agent → "Java agent loaded
+dynamically" warning (non-blocking on JDK 25, future-forbidden). A `-javaagent` argLine fix attempt
+failed (dependency-plugin `properties` goal didn't substitute the path) and was reverted; revisit
+with a tested approach when the JDK enforces it.
+
+**Wiring status (2026-06-07):** JGiven IS wired now (supersedes the 2026-06-04 "not yet wired" note
+above): jgiven-core compile-scope in seed-master (main scenarios), jgiven-junit5 test-scope in the
+parent (common to all modules). The first real two-tier scenarios exist in seed-master
+(SystemdAdapter + ClusterReadiness checkpoints, runbook-played). The dedup pattern is settled: the
+TEST drives the production stage's `launch()` with an INJECTED probe (not a re-implemented scenario)
+— see [[runbook-doctor-state]] commit 0d2c7a4f. NESTING the Given/When/Then into nested static
+classes (the line 70-72 preference) is the next not-yet-done step of the quality pass.
+
+See [[working-style-narrate-progress]] and [[config-restructuring-state]] and [[runbook-doctor-state]].
