@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Catch-all backstop: refuse to push the protected branch (main) when the pushed commit carries
+# wip/. This is the gate that catches the failure mode pre-commit cannot — a fast-forward merge
+# that moves main onto a commit containing wip/ without creating any new commit. Push is the real
+# "publish" moment, and every path (commit, squash, ff-merge) funnels through it.
+#
+# git invokes: pre-push <remote-name> <remote-url>, feeding one line per ref on stdin:
+#   <local-ref> <local-sha> <remote-ref> <remote-sha>
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib-wip-guard.sh
+. "${here}/lib-wip-guard.sh"
+
+zero="0000000000000000000000000000000000000000"
+status=0
+
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+  # Only guard the protected branch; ignore deletions (local_sha all-zero).
+  case "${remote_ref}" in
+    "refs/heads/${PROTECTED_BRANCH}") ;;
+    *) continue ;;
+  esac
+  [ "${local_sha}" = "${zero}" ] && continue
+
+  if wip_present_in "${local_sha}"; then
+    reject "Refusing to push ${remote_ref}: commit ${local_sha:0:12} contains ${WIP_DIR}/."
+    status=1
+  fi
+done
+
+exit "${status}"
