@@ -26,6 +26,14 @@ real empty-runbook bugs, both fixed: (1) `finished()` was skipped on failure →
 **Note:** DAG-edges-from-`dependsOn` was DEFERRED to Increment C — only one checkpoint exists today,
 so there are no edges to draw until checkpoint #2.
 
+**DEFERRED (rule-of-three, decided 2026-06-06):** a *contributable fault-simulator seam* — a uniform
+contract by which each BDD scenario owner declares how its scenario fails under simulation. Today
+the stage hardcodes `SimulatedSystemdAdapterProbe::of` (one scenario). Considered building a
+`ScenarioSimulation`-style seam now; decided NOT to — same rule-of-three non-goal as the harness
+generalization (only one scenario; abstracting now guesses the wrong axes). Revisit at checkpoint #2.
+Operator UX is already fine: `policy.preview.simulate.<scenario>: <kind>` in `Pulumi.dev.yaml`
+(shipped commented as a template); preview-only by construction (apply never reads it).
+
 **Read first:** `wip/spec.adoc` (the design) + `wip/README.adoc` (wip manifest). Lives in `wip/`
 while in progress; durable substance migrates to `docs/architecture/` before merge (and `wip/` must
 not reach main — [[wip-guard-hooks]] enforces this).

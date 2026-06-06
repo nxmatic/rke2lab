@@ -52,6 +52,12 @@ config:
     readiness:
       override:
         systemd-adapter: warning
+    # Preview-only fault simulation (ignored during `pulumi up`). Uncomment to order a
+    # fake incident and get its runbook from `pulumi preview` without touching infra.
+    # Failure-kinds: connection-refused, timeout.
+    # preview:
+    #   simulate:
+    #     systemd-adapter: connection-refused
   rke2lab:readiness:
     enabled: "true"
     timeout: PT1M
