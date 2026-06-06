@@ -4,7 +4,11 @@ import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.text.PlainTextReporter;
+import io.nxmatic.rke2lab.controlplane.bdd.Dossier;
+import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.bdd.GivenSystemdAdapter;
+import io.nxmatic.rke2lab.controlplane.bdd.Prescription;
+import io.nxmatic.rke2lab.controlplane.bdd.RemediationPlan;
 import io.nxmatic.rke2lab.controlplane.bdd.Severity;
 import io.nxmatic.rke2lab.controlplane.bdd.SimulatedSystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.Symptom;
@@ -45,6 +49,7 @@ public final class SystemdAdapterStage {
   private final boolean pulumiMode;
   private final Consumer<String> readinessLogger;
   private final ReportModel runbook;
+  private final Generalist generalist;
   private final Consumer<Map<String, Object>> sink;
 
   public SystemdAdapterStage(
@@ -53,12 +58,14 @@ public final class SystemdAdapterStage {
       boolean pulumiMode,
       Consumer<String> readinessLogger,
       ReportModel runbook,
+      Generalist generalist,
       Consumer<Map<String, Object>> sink) {
     this.config = config;
     this.policy = policy;
     this.pulumiMode = pulumiMode;
     this.readinessLogger = readinessLogger;
     this.runbook = runbook;
+    this.generalist = generalist;
     this.sink = sink;
   }
 
@@ -77,10 +84,20 @@ public final class SystemdAdapterStage {
     // Normal preview skips step bodies (deferred-preview); a simulated preview runs them against
     // the fake probe so the failure is visible.
     final boolean dryRun = preview && simulated.isEmpty();
-    final SystemdAdapterProbe probe =
+
+    // Capture the dossier as the probe produces it, so it is available at the catch site for the
+    // doctor even when the Then assertion throws (the failed dossier carries the typed symptom).
+    final Dossier[] dossierHolder = new Dossier[1];
+    final SystemdAdapterProbe underlying =
         simulated
             .map(SimulatedSystemdAdapterProbe::of)
             .orElse(cfg -> SeedSystemdAdapterEndpointGate.ensureReachable(cfg, readinessLogger));
+    final SystemdAdapterProbe probe =
+        cfg -> {
+          final Dossier produced = underlying.probe(cfg);
+          dossierHolder[0] = produced;
+          return produced;
+        };
     if (simulated.isPresent()) {
       log("⚙ " + SCENARIO_ID + " simulating incident: " + simulated.get().id());
     }
@@ -96,7 +113,7 @@ public final class SystemdAdapterStage {
       System.setProperty(JGIVEN_DRY_RUN, "true");
     }
 
-    Map<String, Object> captured = null;
+    Dossier captured = null;
     Throwable failure = null;
     try {
       final Scenario<GivenSystemdAdapter, WhenSystemdAdapter, ThenSystemdAdapter> scenario =
@@ -114,9 +131,10 @@ public final class SystemdAdapterStage {
         // below); skipping it on failure leaves the failed node empty in the runbook.
         scenario.finished();
       }
-      captured = scenario.then().capturedSnapshot();
+      captured = scenario.then().capturedDossier();
     } catch (Throwable cause) {
       failure = cause;
+      captured = dossierHolder[0]; // the failed dossier (with its symptom), if the probe ran
     } finally {
       // The living-doc IS the gate's output: stream the Given/When/Then prose into the Pulumi log
       // so
@@ -131,36 +149,56 @@ public final class SystemdAdapterStage {
     }
 
     if (failure == null) {
-      // Success — or dry-run, where step bodies are skipped so no snapshot is produced.
-      sink.accept(
-          captured != null ? captured : SeedSystemdAdapterEndpointGate.deferredPreview(config));
+      // Success — or dry-run, where step bodies are skipped so no dossier is produced.
+      final Dossier dossier =
+          captured != null ? captured : SeedSystemdAdapterEndpointGate.deferredPreview(config);
+      sink.accept(dossier.toOutputMap());
       return this;
     }
 
-    // Failure: the operator override wins over the scenario's intrinsic severity.
+    // Failure: the patient consults. The doctor diagnoses the captured dossier's symptom into a
+    // remediation plan, which is logged and (Increment C) flows into the runbook node.
+    consultDoctor(captured);
+
+    // The operator override wins over the scenario's intrinsic severity.
     final Severity effective = policy.readiness().override(SCENARIO_ID).orElse(INTRINSIC_SEVERITY);
     if (effective == Severity.CRITICAL) {
       log("✗ " + SCENARIO_ID + " FAILED, severity=CRITICAL → stopping provisioning");
       throw new PipelineStageFailure("systemd adapter", failure);
     }
     log("⚠ " + SCENARIO_ID + " FAILED, severity=WARNING → continuing in DEGRADED mode");
-    sink.accept(degradedEnvelope(failure));
+    sink.accept(degradedDossier(failure).toOutputMap());
     return this;
   }
 
-  private Map<String, Object> degradedEnvelope(Throwable failure) {
-    return Map.of(
-        "status", "degraded",
-        "summary",
-            "dbusEndpoint="
-                + config.systemdAdapterDbusHost()
-                + ":"
-                + config.systemdAdapterDbusPort()
-                + " status=degraded ("
-                + failure.getMessage()
-                + ")",
-        "source", "systemd-adapter-endpoint-gate",
-        "probeMode", "systemd-adapter-runtime");
+  /**
+   * The patient consults the doctor on failure: route the captured dossier's symptom to the
+   * Generalist and log the prescriptions. A symptomless or absent dossier (e.g. failure before the
+   * probe ran) has nothing to route, so the consultation is skipped.
+   */
+  private void consultDoctor(Dossier dossier) {
+    if (dossier == null || dossier.symptom().isEmpty()) {
+      return;
+    }
+    final RemediationPlan plan = generalist.consult(dossier.symptom().get(), dossier);
+    log("⚕ " + SCENARIO_ID + " diagnosis: " + plan.generalistSummary());
+    for (Prescription prescription : plan.prescriptions()) {
+      log("  ℞ " + prescription.programRef().id() + " — " + prescription.humanHint());
+    }
+  }
+
+  private Dossier degradedDossier(Throwable failure) {
+    return Dossier.of(
+        "degraded",
+        Optional.empty(),
+        "dbusEndpoint="
+            + config.systemdAdapterDbusHost()
+            + ":"
+            + config.systemdAdapterDbusPort()
+            + " status=degraded ("
+            + failure.getMessage()
+            + ")",
+        Map.of("source", "systemd-adapter-endpoint-gate", "probeMode", "systemd-adapter-runtime"));
   }
 
   private void log(String message) {

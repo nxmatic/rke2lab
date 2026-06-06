@@ -4,18 +4,17 @@ import com.tngtech.jgiven.Stage;
 import com.tngtech.jgiven.annotation.ExpectedScenarioState;
 import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
-import java.util.Map;
 
-/** When stage: runs the injected probe and records the resulting snapshot. */
+/** When stage: runs the injected probe and records the resulting dossier. */
 public class WhenSystemdAdapter extends Stage<WhenSystemdAdapter> {
 
   @ExpectedScenarioState BootstrapConfig config;
   @ExpectedScenarioState SystemdAdapterProbe probe;
 
-  @ProvidedScenarioState Map<String, Object> snapshot;
+  @ProvidedScenarioState Dossier dossier;
 
   public WhenSystemdAdapter the_systemd_adapter_probe_runs() {
-    snapshot = probe.probe(config);
+    dossier = probe.probe(config);
     return self();
   }
 }

@@ -523,19 +523,30 @@ Build the runbook mechanism on the *existing* systemd-adapter checkpoint.
   fail); a `preview.simulate` entry produces a FAILED node without touching infra; a forced
   CRITICAL failure still renders the runbook. 19/19 seed-master tests pass.
 
-=== Increment B — Doctor (diagnosis + prescription on failure)
+=== Increment B — Doctor (diagnosis + prescription on failure) — DONE
 
-* `Generalist` (firstLook + deterministic routing), `Specialist` (reads dossier,
-  prescribes), `Prescription` (typed program ref + structured payload), `RemediationPlan`.
-* *Atomic `Map` → `Dossier` retype (R3).* The probe contract changes from
-  `Map<String,Object>` to a typed `Dossier` record (with `toOutputMap()`); the sink and
-  `SystemdAdapterResource` update in the *same* change — no compat shim, no `Dossier.from(Map)`
-  adapter. One snapshot instance, two views.
-* The checkpoint consults the generalist on failure; the plan flows into the runbook node
-  and the log. The fake-incident node from Increment A now fills its Diagnosis + Mitigation.
-* A `DbusTcpSpecialist` as the first concrete specialist (systemd domain).
-* *Green when:* a failing systemd-adapter scenario (real or simulated) produces a runbook
-  node with Diagnosis + Mitigation sections, prose-rendered.
+* `Generalist` (deterministic symptom→domain routing → synthesized `RemediationPlan`),
+  `Specialist` interface + `SpecialistDomain` (the AI-ready seam:
+  `Optional<Prescription> diagnose(Symptom, Dossier)`), `Prescription` (typed
+  `RemediationProgramRef` + structured `payload` + prose `humanHint`), `RemediationPlan`.
+* *Atomic `Map` → `Dossier` retype (R3) — done, no shim.* The probe contract changed from
+  `Map<String,Object>` to a typed `Dossier` record (status, `Optional<Symptom>`, summary,
+  details + `toOutputMap()`); the gate (`SeedSystemdAdapterEndpointGate`), the When/Then
+  stages, the fakes, the simulated probe, and the stage sink all moved in the same change.
+  The sink converts at the boundary via `dossier.toOutputMap()`, so the Pulumi output
+  surface is byte-identical — the retype is confined to the BDD probe/stage layer, the
+  resource layer is untouched. One snapshot instance, two views (a `DoctorTest` pins the
+  round-trip).
+* `DbusTcpSpecialist` is the first concrete specialist (systemd domain): on
+  `CONNECTION_REFUSED` it prescribes `RESTART_UNIT` for the adapter unit.
+* The checkpoint consults the Generalist on failure (`consultDoctor`); the captured dossier
+  (carrying its typed symptom, stashed even when the `Then` throws) is routed and the
+  prescriptions are logged inline (`⚕ diagnosis` / `℞`).
+* *Deferred to Increment C:* the plan flowing into the runbook *node's* Diagnosis/Mitigation
+  sections (vs. the inline log) — that needs the shared report-node model that arrives with
+  checkpoint #2's DAG, the same place the Increment A edge work was deferred to.
+* *Green:* `DoctorTest` (routing, no-treatment, empty-plan, dossier round-trip) + the
+  retyped scenario/runbook tests; 24/24 seed-master tests pass.
 
 === Increment C — Checkpoint #2 (cluster-readiness) nested
 

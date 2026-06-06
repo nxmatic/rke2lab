@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.systemd;
 
+import io.nxmatic.rke2lab.controlplane.bdd.Dossier;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -8,6 +9,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -32,15 +34,20 @@ public final class SeedSystemdAdapterEndpointGate {
     // Utility class
   }
 
-  public static Map<String, Object> deferredPreview(BootstrapConfig config) {
-    return envelope(
+  public static Dossier deferredPreview(BootstrapConfig config) {
+    return Dossier.of(
         "deferred-preview",
+        Optional.empty(),
         "adapter endpoint gate deferred during preview",
-        Map.of("source", "systemd-adapter-endpoint-gate", "probeMode", "systemd-adapter-runtime"));
+        details(
+            Map.of(
+                "source",
+                "systemd-adapter-endpoint-gate",
+                "probeMode",
+                "systemd-adapter-runtime")));
   }
 
-  public static Map<String, Object> ensureReachable(
-      BootstrapConfig config, Consumer<String> logger) {
+  public static Dossier ensureReachable(BootstrapConfig config, Consumer<String> logger) {
     waitForInstanceReachable(config, logger);
 
     final Map<String, Object> runtimeSnapshot = waitForRuntimeProbe(config, logger);
@@ -58,16 +65,16 @@ public final class SeedSystemdAdapterEndpointGate {
       logger.accept("systemd adapter endpoint gate: " + summary);
     }
 
-    return envelope(
-        "ok",
+    return Dossier.ok(
         summary,
-        Map.of(
-            "source",
-            "systemd-adapter-endpoint-gate",
-            "probeMode",
-            "systemd-adapter-runtime",
-            "adapterStatus",
-            Map.copyOf(runtimeSnapshot)));
+        details(
+            Map.of(
+                "source",
+                "systemd-adapter-endpoint-gate",
+                "probeMode",
+                "systemd-adapter-runtime",
+                "adapterStatus",
+                Map.copyOf(runtimeSnapshot))));
   }
 
   private static Map<String, Object> waitForRuntimeProbe(
@@ -267,17 +274,20 @@ public final class SeedSystemdAdapterEndpointGate {
     return value.lines().map(String::trim).filter(line -> !line.isBlank()).findFirst().orElse("");
   }
 
-  private static Map<String, Object> envelope(
-      String status, String summary, Map<String, Object> details) {
-    final LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
-    payload.put("apiVersion", API_VERSION);
-    payload.put("kind", KIND);
-    payload.put("status", status);
-    payload.put("summary", summary);
-    if (details != null && !details.isEmpty()) {
-      payload.putAll(details);
+  /**
+   * The gate's resource-identity metadata ({@code apiVersion}/{@code kind}) merged ahead of the
+   * call-site details, forming the {@link Dossier}'s details map. {@code status}/{@code summary}
+   * are the dossier's own fields and are re-added by {@link Dossier#toOutputMap()}, so the flat
+   * output keys are unchanged from the former envelope.
+   */
+  private static Map<String, Object> details(Map<String, Object> callerDetails) {
+    final LinkedHashMap<String, Object> map = new LinkedHashMap<>();
+    map.put("apiVersion", API_VERSION);
+    map.put("kind", KIND);
+    if (callerDetails != null) {
+      map.putAll(callerDetails);
     }
-    return Map.copyOf(payload);
+    return map;
   }
 
   private record CommandResult(int exitCode, String stdout, String stderr) {

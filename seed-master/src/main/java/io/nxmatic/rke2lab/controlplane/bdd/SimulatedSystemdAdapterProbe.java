@@ -1,7 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -18,20 +17,16 @@ public final class SimulatedSystemdAdapterProbe {
 
   private SimulatedSystemdAdapterProbe() {}
 
-  /** A probe that fails with the given symptom, mirroring the real gate's failed-envelope shape. */
+  /** A probe that fails with the given symptom, mirroring the real gate's failed dossier shape. */
   public static SystemdAdapterProbe of(Symptom symptom) {
-    return config -> envelope(config, symptom);
+    return config -> dossier(config, symptom);
   }
 
-  private static Map<String, Object> envelope(BootstrapConfig config, Symptom symptom) {
+  private static Dossier dossier(BootstrapConfig config, Symptom symptom) {
     final String endpoint = config.systemdAdapterDbusHost() + ":" + config.systemdAdapterDbusPort();
-    final LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
-    payload.put("status", "failed");
-    payload.put(Symptom.ENVELOPE_KEY, symptom.id());
-    payload.put(
-        "summary",
-        "dbusEndpoint=" + endpoint + " status=failed (simulated incident: " + symptom.id() + ")");
-    payload.put("source", "fault-simulation");
-    return Map.copyOf(payload);
+    return Dossier.failed(
+        symptom,
+        "dbusEndpoint=" + endpoint + " status=failed (simulated incident: " + symptom.id() + ")",
+        Map.of("source", "fault-simulation"));
   }
 }
