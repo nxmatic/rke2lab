@@ -4,8 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.controlplane.config.ConfigLoader;
-import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
+import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import java.util.List;
 import java.util.Map;
@@ -103,13 +102,6 @@ class DoctorTest {
   }
 
   private static BootstrapConfig config() {
-    final Map<String, Map<String, Object>> sections =
-        Map.of(
-            "incus", Map.of("configDir", "/tmp/rke2lab-bdd-incus"),
-            "image", Map.of("sharedFolder", "/tmp/rke2lab-bdd-shared"),
-            "worktree", Map.of("dir", "/tmp/rke2lab-bdd-worktree"));
-    final Rke2labConfig dto =
-        Rke2labConfig.from(ConfigLoader.of(section -> Optional.ofNullable(sections.get(section))));
-    return BootstrapConfig.from(dto);
+    return OperatorConfiguration.mandatory().asBootstrapConfig();
   }
 }

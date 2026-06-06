@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.config;
 
+import static io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration.loaderOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -11,10 +12,6 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class ConfigLoaderTest {
-
-  private static ConfigLoader loaderOf(Map<String, Map<String, Object>> sections) {
-    return ConfigLoader.of(section -> Optional.ofNullable(sections.get(section)));
-  }
 
   @Test
   void optional_empty_when_section_or_key_absent() {

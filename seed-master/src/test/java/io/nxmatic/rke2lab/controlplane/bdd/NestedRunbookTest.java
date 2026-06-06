@@ -12,8 +12,7 @@ import com.pulumi.deployment.DeploymentInstance;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.StepStatus;
-import io.nxmatic.rke2lab.controlplane.config.ConfigLoader;
-import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
+import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.ClusterReadinessStage;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
@@ -239,20 +238,10 @@ class NestedRunbookTest {
   }
 
   private static BootstrapConfig config() {
-    return BootstrapConfig.from(dto());
+    return OperatorConfiguration.mandatory().asBootstrapConfig();
   }
 
   private static ControlplanePolicy policy() {
-    return ControlplanePolicy.from(dto());
-  }
-
-  private static Rke2labConfig dto() {
-    final Map<String, Map<String, Object>> sections =
-        Map.of(
-            "incus", Map.of("configDir", "/tmp/rke2lab-bdd-incus"),
-            "image", Map.of("sharedFolder", "/tmp/rke2lab-bdd-shared"),
-            "worktree", Map.of("dir", "/tmp/rke2lab-bdd-worktree"));
-    return Rke2labConfig.from(
-        ConfigLoader.of(section -> Optional.ofNullable(sections.get(section))));
+    return OperatorConfiguration.mandatory().asPolicy();
   }
 }

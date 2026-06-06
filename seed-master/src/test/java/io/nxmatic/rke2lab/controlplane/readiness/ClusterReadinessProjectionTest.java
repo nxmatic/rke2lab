@@ -4,12 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.controlplane.config.ConfigLoader;
-import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
+import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -50,13 +48,6 @@ class ClusterReadinessProjectionTest {
   }
 
   private static ControlplanePolicy policy() {
-    final Map<String, Map<String, Object>> sections =
-        Map.of(
-            "incus", Map.of("configDir", "/tmp/rke2lab-bdd-incus"),
-            "image", Map.of("sharedFolder", "/tmp/rke2lab-bdd-shared"),
-            "worktree", Map.of("dir", "/tmp/rke2lab-bdd-worktree"));
-    final Rke2labConfig dto =
-        Rke2labConfig.from(ConfigLoader.of(section -> Optional.ofNullable(sections.get(section))));
-    return ControlplanePolicy.from(dto);
+    return OperatorConfiguration.mandatory().asPolicy();
   }
 }

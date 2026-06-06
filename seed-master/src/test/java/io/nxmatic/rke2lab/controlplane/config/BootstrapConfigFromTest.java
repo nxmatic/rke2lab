@@ -6,29 +6,13 @@ import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class BootstrapConfigFromTest {
 
-  private static Rke2labConfig dto(Map<String, Map<String, Object>> sections) {
-    return Rke2labConfig.from(
-        ConfigLoader.of(section -> Optional.ofNullable(sections.get(section))));
-  }
-
-  private static Map<String, Map<String, Object>> mandatoryOnly() {
-    final Map<String, Map<String, Object>> sections = new HashMap<>();
-    sections.put("incus", Map.of("configDir", "/Users/nxmatic/.config/incus"));
-    sections.put("image", Map.of("sharedFolder", "/srv/distrobuilder"));
-    sections.put("worktree", Map.of("dir", "/private/var/lib/git/nxmatic/rke2lab"));
-    return sections;
-  }
-
   @Test
   void mandatory_values_pass_through() {
-    final BootstrapConfig boot = BootstrapConfig.from(dto(mandatoryOnly()));
+    final BootstrapConfig boot = OperatorConfiguration.mandatory().asBootstrapConfig();
     assertEquals(Path.of("/private/var/lib/git/nxmatic/rke2lab"), boot.worktreeDir());
     assertEquals(Path.of("/Users/nxmatic/.config/incus"), boot.incusConfigDir());
     assertEquals(Path.of("/srv/distrobuilder"), boot.imageSharedFolder());
@@ -36,7 +20,7 @@ class BootstrapConfigFromTest {
 
   @Test
   void omitted_optionals_get_defaults() {
-    final BootstrapConfig boot = BootstrapConfig.from(dto(mandatoryOnly()));
+    final BootstrapConfig boot = OperatorConfiguration.mandatory().asBootstrapConfig();
     assertEquals("bioskop", boot.clusterName());
     assertEquals("master", boot.nodeName());
     assertEquals("rke2lab", boot.incusProject());
@@ -57,7 +41,7 @@ class BootstrapConfigFromTest {
 
   @Test
   void kubeconfig_ref_defaults_to_cluster_scoped_path() {
-    final BootstrapConfig boot = BootstrapConfig.from(dto(mandatoryOnly()));
+    final BootstrapConfig boot = OperatorConfiguration.mandatory().asBootstrapConfig();
     assertEquals(Path.of(".local.d/bioskop/kubeconfig.yaml"), boot.kubeconfigRef());
   }
 }

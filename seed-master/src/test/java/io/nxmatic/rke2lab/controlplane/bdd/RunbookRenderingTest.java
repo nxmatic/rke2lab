@@ -7,14 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
-import io.nxmatic.rke2lab.controlplane.config.ConfigLoader;
-import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
+import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -105,13 +102,6 @@ class RunbookRenderingTest {
   }
 
   private static BootstrapConfig config() {
-    final Map<String, Map<String, Object>> sections =
-        Map.of(
-            "incus", Map.of("configDir", "/tmp/rke2lab-bdd-incus"),
-            "image", Map.of("sharedFolder", "/tmp/rke2lab-bdd-shared"),
-            "worktree", Map.of("dir", "/tmp/rke2lab-bdd-worktree"));
-    final Rke2labConfig dto =
-        Rke2labConfig.from(ConfigLoader.of(section -> Optional.ofNullable(sections.get(section))));
-    return BootstrapConfig.from(dto);
+    return OperatorConfiguration.mandatory().asBootstrapConfig();
   }
 }
