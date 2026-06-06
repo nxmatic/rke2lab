@@ -1,6 +1,6 @@
 ---
 name: runbook-doctor-state
-description: feature/runbook-doctor — Increments A & B DONE & committed; Increment C (checkpoint #2 nested) is next
+description: feature/runbook-doctor — Increments A, B, C all DONE & committed; NEXT = wire live verifier + shared report-node model (the two converged deferrals)
 metadata: 
   node_type: memory
   type: project
@@ -8,9 +8,21 @@ metadata:
 ---
 
 Active chantier on branch **`feature/runbook-doctor`**: build the runbook + doctor subsystem.
-Design DONE; **Increment A DONE** (commit 3b46b249) and **Increment B (the doctor) DONE** (commit
-aa55ced4, 2026-06-06); **Increment C (checkpoint #2 = cluster-readiness, nested via @NestedSteps)
-is next**.
+Design DONE; **A DONE** (3b46b249), **B/doctor DONE** (aa55ced4), **C/checkpoint#2-nested DONE
+DSL-first** (9685793c, 2026-06-06). **NEXT = the converged follow-on** (see end): wire the live
+cluster verifier behind a production `ClusterReadinessProbe` + build the shared report-node model
+so the plan renders into each runbook node's Diagnosis/Mitigation (vs. today's inline log) and
+records `dependsOn` DAG edges.
+
+**Increment C delivered** (seed-master `controlplane.bdd`, DSL-first/offline): `ClusterReadinessPhase`
+(kubeconfig/API/controllers) as BDD steps, each driven by an injectable `ClusterReadinessProbe`→
+`Dossier`; the systemd-adapter dependency replayed via **`@NestedSteps`** (`WhenClusterReadiness`
+injects systemd-adapter Given/When/Then with `@ScenarioStage`) = the cert-manager follow-the-chain
+DAG edge, reusing the same Dossier/Symptom/Generalist machinery. `SimulatedClusterReadinessProbe.
+failingAt(phase, symptom)` targets one phase. `NestedRunbookTest` proves nested render + targeted
+fake incident + doctor diagnosis. **GOTCHA learned:** never read a JGiven Stage's captured-state via
+a public getter — JGiven intercepts public stage methods as STEPS and corrupts the model flush; use
+the probe-holder seam (as `SystemdAdapterStage` does). 41/41 seed-master green.
 
 **Increment B delivered** (seed-master `controlplane.bdd`): the doctor. `Dossier` (typed successor
 of the probe's Map envelope — status, `Optional<Symptom>`, summary, details + `toOutputMap()`);
