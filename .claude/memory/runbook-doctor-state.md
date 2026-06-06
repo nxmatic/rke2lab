@@ -124,6 +124,30 @@ chain so everything is fail-fast and correct; fail-at-end becomes meaningful onl
 report-node DAG lands AND there's a genuine pair of INDEPENDENT checks (none in cluster yet — its
 phases are intrinsically sequential). Don't build per-step policy now (rule-of-three: one shape).
 
+**PREREQUISITE BEFORE THE DAG — unify the Dossier/output shape (user-raised 2026-06-07, order
+decided "shaping first, then DAG").** The two checkpoints DON'T share an output shape, and the DAG
+nodes would inherit the fork (they'd special-case one vs the other). Diagnosis:
+- *systemd-adapter:* one `Dossier` per checkpoint → `Dossier.toOutputMap()` (flat map) →
+  `SystemdAdapterResource.asResourceOutputs` (`Output.of` per key). Clean, Dossier-native.
+- *cluster:* the stage computes per-phase `Dossier`s, then THROWS them away into a hand-maintained
+  `VerificationResult` (record at `ClusterBootstrapReadinessVerifier.java:441`, 8 fields:
+  readinessEnabled/kubeconfigPublished/apiReady/controllersEffective/handoffReady/bootstrapStatus/
+  summary/requiredControllerRefs; factories ready/skipped/deferredPreview/failed; `asOutputs()` :504
+  emits 7 `cluster*` keys). Then `ReadinessOutputMapper.mapToOutputs` (dual-mode Output|plain) adds
+  handoffReady/bootstrapStatus/nextStep; consumed at `OutputBuilder.java:85`. `ClusterReadinessResource`
+  is a thin mirror holding `Output<VerificationResult>`. This is the LEGACY pre-Dossier path surviving
+  inside an otherwise-BDD checkpoint — `ClusterReadinessStage.failedProjection()` rebuilds a
+  VerificationResult from the phase Dossiers (lossy).
+TWO shape problems: (1) **output-path divergence** — `toOutputMap()` vs `ReadinessOutputMapper`/
+`VerificationResult` for the same concept; a checkpoint should have ONE way to become outputs. (2)
+**Dossier granularity** — systemd = 1 Dossier/checkpoint; cluster = N phase-Dossiers with NO
+first-class checkpoint-level Dossier aggregating them. The DAG wants exactly node=checkpoint=1
+Dossier(+plan+edges). *Target:* cluster gains a checkpoint-level `Dossier` (aggregating its phases),
+outputs via `toOutputMap()` like systemd; `VerificationResult`/`ReadinessOutputMapper` become a thin
+view over it OR are deleted (no-compat: same change). **HARD GUARD:** the Stage-B handoff keys must
+stay byte-identical — handoffReady→nextStep + the 7 `cluster*` keys + bootstrapStatus;
+`ClusterReadinessProjectionTest` is the pin. THIS LANDS BEFORE THE DAG.
+
 **DAG MODEL — START-HERE for next session (code anchors + the real architectural decision).**
 *Where the plan lives TODAY (what the DAG replaces):* both checkpoint stages call a private
 `consultDoctor(...)` that ONLY `log()`s the diagnosis inline — `ClusterReadinessStage.java:203` (sym
