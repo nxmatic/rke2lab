@@ -9,11 +9,30 @@ metadata:
 
 Active chantier on branch **`feature/runbook-doctor`**: build the runbook + doctor subsystem.
 Design DONE; **A DONE** (3b46b249), **B/doctor DONE** (aa55ced4), **C/checkpoint#2-nested DONE
-DSL-first** (9685793c), **D/live-cluster-wiring DONE** (fc91f127, 2026-06-06). **NEXT = the last
-deferral**: the shared report-node model so the plan renders into each runbook node's
-Diagnosis/Mitigation sections (vs. today's inline log) and records explicit `dependsOn` DAG edges
-(today the edge is shown via @NestedSteps nesting). Now unblocked: both checkpoints are live BDD
-scenarios.
+DSL-first** (9685793c), **D/live-cluster-wiring DONE** (fc91f127), **D-preview-fix DONE** (140414cb,
+2026-06-06). **NEXT = the last deferral**: the shared report-node model so the plan renders into each
+runbook node's Diagnosis/Mitigation sections (vs. today's inline log) and records explicit
+`dependsOn` DAG edges (today the edge is shown via @NestedSteps nesting). Now unblocked: both
+checkpoints are live BDD scenarios.
+
+**Both checkpoints now render in the runbook on BOTH `pulumi preview` AND `pulumi up`.** The preview
+fix (140414cb): ClusterReadinessStage was early-returning in preview (cluster absent from the
+preview runbook); now it sets jgiven.report.dry-run (bodies skipped, no live infra) but still
+plays+finish()es the scenario so the shell renders, then sinks deferredPreview. Verify after running
+pulumi: runbook at `seed-master/target/runbook/adoc/index.asciidoc` should show "Systemd adapter
+becomes reachable" AND "Cluster becomes ready" (with the nested systemd-adapter dependency).
+
+**Verified earlier this session:** `.local.d/bioskop/master/host.preview` (synthesized config) is
+COMPLETE vs the applied `host/` — 0 config files changed/added; the 105 "missing" files are all
+runtime flox artifacts (.flox/log, .flox/cache) + cluster-api/staged/image-state-configmap.yaml
+(written at pulumi-apply time by design, IncusResourceBootstrap.createImageStateConfigMap, the
+chicken-and-egg fingerprint pattern — docs/staged-post-cluster-resources.adoc). So A–D changed only
+the seed-master control-plane (runbook/doctor), NOT the synthesized host manifests — applying is
+essentially a no-op on the host-state side.
+
+**Build/test invariant (use this exact command — repo build-cache can give stale reactor jars):**
+`flox activate -- ./mvnw package -Dmaven.build.cache.skipCache=false -pl :seed-master -am
+-DskipTests=false`. 31/31 seed-master tests green. NEVER `mvn install` to ~/.m2 (CLAUDE.md).
 
 **Increment D delivered** (seed-master): cluster-readiness now played LIVE as a BDD scenario (was
 procedural verify() in a lazy Pulumi applyValue lambda → never hit the runbook). `ClusterReadinessStage`
