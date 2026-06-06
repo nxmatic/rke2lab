@@ -124,6 +124,29 @@ chain so everything is fail-fast and correct; fail-at-end becomes meaningful onl
 report-node DAG lands AND there's a genuine pair of INDEPENDENT checks (none in cluster yet — its
 phases are intrinsically sequential). Don't build per-step policy now (rule-of-three: one shape).
 
+**DAG MODEL — START-HERE for next session (code anchors + the real architectural decision).**
+*Where the plan lives TODAY (what the DAG replaces):* both checkpoint stages call a private
+`consultDoctor(...)` that ONLY `log()`s the diagnosis inline — `ClusterReadinessStage.java:203` (sym
+"⚕"/"℞" at :210/:212) and `SystemdAdapterStage.java:187` (:192/:194). The `RemediationPlan` is
+computed, logged, and dropped; it never reaches the runbook node. *The goal:* that plan renders into
+the node's own Diagnosis/Mitigation sections + the `dependsOn` edge becomes explicit DAG data (today
+the edge is shown only via `@NestedSteps` nesting).
+**THE DECISION the next session must make first (under-recorded until now):** the runbook is NOT a
+free-form template — `RunbookRenderer` (bdd/RunbookRenderer.java) renders via JGiven's own
+`AsciiDocReportGenerator` reading a JGiven `ReportModel`/`ScenarioModel`. So "add Diagnosis/Mitigation
+to each node" forces a choice between THREE routes: (a) attach the plan into the JGiven model as
+step `InfoTag`s / attachments / extended description so JGiven's AsciiDoc emits it (stays inside
+JGiven, but JGiven controls layout); (b) STOP using `AsciiDocReportGenerator` and write our OWN
+renderer over `ReportModel` so we own the node layout (Diagnosis/Mitigation/dependsOn sections) — more
+work, full control; (c) a hybrid: keep JGiven for the scenario body, post-process/append our node
+sections. Pick the route BEFORE coding — it's the fork the whole chantier hangs on. RunbookRendering
+Test already asserts "no Diagnosis/Mitigation section before the doctor exists", so the test that
+flips that assertion is the natural TDD entry point. PREREQUISITE still standing: a genuine pair of
+INDEPENDENT checks must exist before fail-at-end is even exercisable (cluster's phases are a linear
+chain) — so landing the node-render (plan→sections) is independently useful NOW, but the edge-policy
+(fail-fast-along-edges vs fail-at-end-between-branches) stays dormant until a branching checkpoint
+appears. Sequence suggestion: node-render first (useful immediately), edge-policy when rule-of-three hits.
+
 **Verified earlier this session:** `.local.d/bioskop/master/host.preview` (synthesized config) is
 COMPLETE vs the applied `host/` — 0 config files changed/added; the 105 "missing" files are all
 runtime flox artifacts (.flox/log, .flox/cache) + cluster-api/staged/image-state-configmap.yaml
