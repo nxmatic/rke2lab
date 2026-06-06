@@ -4,17 +4,34 @@ This directory contains hook scripts that run during Claude Code session lifecyc
 
 ## Checkpoint System
 
-The checkpoint system automatically creates snapshots of your work before context compaction, allowing you to recover state if needed.
+The checkpoint system automatically creates snapshots of your work before context compaction, allowing you to recover state if needed. It merges **agent-authored session context** with **git state** for complete recovery points.
 
 ### How it works
 
-1. **PreCompact** (`checkpoint-write.sh`): Creates a checkpoint before compaction
+1. **SessionStart** (`session-start-reminder.sh`): Reminds Claude to maintain checkpoint draft
+   - Checks if draft exists and is current (< 30 minutes old)
+   - Reminds Claude to create/update draft using `precompact-session-state` skill
+   - Ensures draft stays fresh during long sessions
+
+2. **Agent Draft** (`.claude/checkpoint-draft-<session_id>.md`): Session context
+   - Written by Claude using the `precompact-session-state` skill
+   - Contains conversation-specific state git cannot capture:
+     - Current task and motivation
+     - Approach taken and decisions made
+     - Discoveries and learnings
+     - Blockers and open questions
+     - Concrete next steps with file paths
+   - Updated periodically (~20-30 turns) or at milestones
+   - Ephemeral: deleted after merge into final checkpoint
+
+3. **PreCompact** (`checkpoint-write.sh`): Creates checkpoint before compaction
    - Filename format: `checkpoint-<session_id>-<timestamp>.md`
    - Timestamp format: `YYYYMMDD-HHMMSS` (e.g., `20260605-191826`)
-   - Contains: recent commits, git status, suggested next steps
+   - **If agent draft exists**: merges agent context + git state → complete recovery point
+   - **If no draft**: falls back to git state only (commits, status, generic next steps)
    - Non-destructive: only writes, never deletes
 
-2. **PostCompact** (`checkpoint-gc.sh`): Garbage-collects old checkpoints
+4. **PostCompact** (`checkpoint-gc.sh`): Garbage-collects old checkpoints
    - Phase 1: Removes ALL checkpoints for deleted sessions (orphans)
    - Phase 2: For active sessions, keeps only the N most recent checkpoints
    - Default: keep last 3 checkpoints per session
@@ -36,9 +53,11 @@ Default is 3 if not set.
 
 ### Files
 
-- `checkpoint-write.sh` - PreCompact hook (creates checkpoints)
+- `session-start-reminder.sh` - SessionStart hook (reminds Claude to maintain draft)
+- `checkpoint-write.sh` - PreCompact hook (merges draft + git state)
 - `checkpoint-gc.sh` - PostCompact hook (garbage collection)
 - Generated checkpoints: `.claude/checkpoint-*.md` (gitignored)
+- Agent drafts: `.claude/checkpoint-draft-*.md` (ephemeral, cleaned after merge)
 
 ### Manual operations
 
@@ -56,13 +75,76 @@ rm .claude/checkpoint-*.md
 rm .claude/checkpoint-<session_id>-*.md
 ```
 
+### Checkpoint Structure
+
+**With agent context** (complete recovery):
+
+```markdown
+# Checkpoint — 2026-06-06, 14h30
+
+> Session `abc-123`. Resume with this file.
+
+---
+
+## Current Task
+Refactoring 27 ManifestsUnit classes to lazy instantiation pattern.
+
+## Context & Motivation
+CDK8s Constructs require Chart scope, but units registered statically...
+
+## Discoveries & Learnings
+- Records can't have private canonical constructors
+- Uniformity critical for pattern audits
+
+## Next Steps
+1. `./mvnw -pl :manifests clean install`
+2. `grep -r "ManifestsUnit()" manifests/src/`
+3. If clean: commit "refactor: lazy instantiation"
+
+---
+
+## Git State
+
+### Recent commits (last 5)
+abc1234 refactor: migrate units to lazy pattern
+def5678 feat: add checkpoint system
+
+### Working tree status
+M manifests/src/.../FluxResourcesManifestUnit.java
+```
+
+**Without agent context** (fallback):
+
+```markdown
+# Checkpoint — 2026-06-06, 14h30
+
+> Session `abc-123`. Resume with this file.
+
+## Recent commits (last 5)
+...
+
+## Current state
+M file1.java
+M file2.java
+
+## Next steps
+- Review blockers/errors above
+- Continue from last commit's goal
+```
+
 ### Troubleshooting
 
 **No checkpoints created?**
 
 - Check that `yq` (yq-go v4) is available: `yq --version`
 - Check hook execution in Claude Code output
-- Verify `.claude/settings.json` has PreCompact/PostCompact hooks configured
+- Verify `.claude/settings.json` has SessionStart/PreCompact/PostCompact hooks configured
+
+**Checkpoints missing agent context?**
+
+- Claude must write `.claude/checkpoint-draft-<session_id>.md` before compaction
+- Use the `precompact-session-state` skill to create/update the draft
+- SessionStart hook will remind Claude if draft is missing/stale
 
 **Too many/few checkpoints kept?**
 
@@ -74,7 +156,25 @@ rm .claude/checkpoint-<session_id>-*.md
 - GC only runs after successful compaction
 - Unkeyed checkpoints (`unkeyed-*`) are never auto-cleaned (manual cleanup needed)
 
+## Usage Tips
+
+**For Claude:**
+
+1. Create checkpoint draft early in complex sessions using `precompact-session-state` skill
+2. Update draft periodically (~20-30 turns) or after major milestones
+3. Be specific in "Next Steps" - include file paths, commands, line numbers
+4. Capture what git cannot: intent, decisions, failed attempts, blockers
+
+**For Users:**
+
+1. If context is lost, check `.claude/checkpoint-<session>-<timestamp>.md` files
+2. Most recent checkpoint has latest timestamp
+3. Copy checkpoint content to new session to resume work
+4. Draft files are ephemeral - don't rely on them for recovery (they're merged into checkpoints)
+
 ## Related Documentation
 
 - [Claude Code hooks documentation](https://docs.anthropic.com/claude-code/hooks)
+- `.claude/skills/precompact-session-state.md` - Agent skill for authoring drafts
 - Session checkpoint commit: `c1f053d1` (2026-06-04)
+- Agent-authored checkpoints commit: `<pending>` (2026-06-06)

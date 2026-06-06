@@ -1,6 +1,19 @@
 {
   "model": "us.anthropic.claude-opus-4-8[1m]",
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/bin/session-start-reminder.sh\"",
+            "statusMessage": "Checking checkpoint draft status...",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "PreCompact": [
       {
         "matcher": "manual|auto",

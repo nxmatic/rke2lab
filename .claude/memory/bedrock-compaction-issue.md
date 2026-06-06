@@ -25,8 +25,12 @@ User has no visibility into token count and hits the limit unexpectedly.
 
 Do NOT wait for automatic compaction to kick in — it demonstrably doesn't work in this environment.
 
-**Recovery mechanism (2026-06-05):**
-- PreCompact hook creates `.claude/checkpoint-<session_id>-<timestamp>.md` before each compaction
-- Keeps last 3 checkpoints per session (configurable via `CLAUDE_CHECKPOINT_KEEP_LAST`)
-- If compaction fails or context lost, user can resume from most recent checkpoint
-- See `.claude/bin/README.md` for details
+**Recovery mechanism (enhanced 2026-06-06):**
+
+- **Agent-authored drafts**: Claude writes `.claude/checkpoint-draft-<session_id>.md` with conversation context (task, approach, discoveries, blockers, concrete next steps) using `precompact-session-state` skill
+- **Intelligent merge**: PreCompact hook merges agent context + git state → complete recovery point
+- **Graceful fallback**: If no draft exists, creates git-only checkpoint (commits + status)
+- **Retention**: Keeps last 3 checkpoints per session (configurable via `CLAUDE_CHECKPOINT_KEEP_LAST`)
+- **Reminders**: SessionStart hook reminds Claude to maintain draft if missing or stale (30+ min)
+- If compaction fails or context lost, user can resume from most recent checkpoint with full conversation context
+- See `.claude/bin/README.md` and `.claude/skills/precompact-session-state.md` for details
