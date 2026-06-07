@@ -4,9 +4,11 @@ import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;
 import com.pulumi.resources.ComponentResourceOptions;
 import com.pulumi.resources.Resource;
+import io.nxmatic.rke2lab.controlplane.bdd.ConsultationReport;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Component resource representing systemd adapter launch/availability status in the Pulumi graph.
@@ -18,11 +20,14 @@ public final class SystemdAdapterResource extends ComponentResource {
   private final Map<String, Object> summary;
 
   public SystemdAdapterResource(
-      String name, Map<String, Object> summary, Resource dependsOnResource) {
+      String name,
+      Map<String, Object> summary,
+      Optional<ConsultationReport> consultation,
+      Resource dependsOnResource) {
     super(TYPE_TOKEN, name, buildOptions(dependsOnResource));
 
     this.summary = Map.copyOf(summary == null ? Map.of() : summary);
-    registerOutputs(asResourceOutputs(this.summary));
+    registerOutputs(asResourceOutputs(this.summary, consultation));
   }
 
   public Map<String, Object> summary() {
@@ -37,9 +42,14 @@ public final class SystemdAdapterResource extends ComponentResource {
     return optionsBuilder.build();
   }
 
-  private static Map<String, Output<?>> asResourceOutputs(Map<String, Object> summary) {
+  private static Map<String, Output<?>> asResourceOutputs(
+      Map<String, Object> summary, Optional<ConsultationReport> consultation) {
     final LinkedHashMap<String, Output<?>> outputs = new LinkedHashMap<>();
     summary.forEach((key, value) -> outputs.put(key, Output.of(value)));
+    // Additive, per-node only: the diagnostic layer lives under this component resource in state,
+    // never at top level (the Stage-B stack contract stays byte-identical).
+    consultation.ifPresent(
+        report -> outputs.put("consultationReport", Output.of(report.toOutputMap())));
     return outputs;
   }
 }

@@ -4,9 +4,11 @@ import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;
 import com.pulumi.resources.ComponentResourceOptions;
 import com.pulumi.resources.Resource;
+import io.nxmatic.rke2lab.controlplane.bdd.ConsultationReport;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Thin Pulumi-graph mirror of the cluster-readiness result. The checkpoint is played eagerly as a
@@ -24,11 +26,12 @@ public final class ClusterReadinessResource extends ComponentResource {
   public ClusterReadinessResource(
       String name,
       ClusterBootstrapReadinessVerifier.VerificationResult result,
+      Optional<ConsultationReport> consultation,
       Resource dependsOnResource) {
     super(TYPE_TOKEN, name, buildOptions(dependsOnResource));
 
     this.verificationResult = Output.of(result);
-    registerOutputs(asResourceOutputs(verificationResult));
+    registerOutputs(asResourceOutputs(verificationResult, consultation));
   }
 
   public Output<ClusterBootstrapReadinessVerifier.VerificationResult> verificationResult() {
@@ -44,7 +47,8 @@ public final class ClusterReadinessResource extends ComponentResource {
   }
 
   private static Map<String, Output<?>> asResourceOutputs(
-      Output<ClusterBootstrapReadinessVerifier.VerificationResult> verificationResult) {
+      Output<ClusterBootstrapReadinessVerifier.VerificationResult> verificationResult,
+      Optional<ConsultationReport> consultation) {
     final LinkedHashMap<String, Output<?>> outputs = new LinkedHashMap<>();
 
     outputs.put(
@@ -66,6 +70,11 @@ public final class ClusterReadinessResource extends ComponentResource {
     outputs.put("clusterReadinessSummary", verificationResult.applyValue(value -> value.summary()));
     outputs.put("handoffReady", verificationResult.applyValue(value -> value.handoffReady()));
     outputs.put("bootstrapStatus", verificationResult.applyValue(value -> value.bootstrapStatus()));
+
+    // Additive, per-node only: the diagnostic layer lives under this component resource in state,
+    // never at top level (the Stage-B stack contract stays byte-identical).
+    consultation.ifPresent(
+        report -> outputs.put("consultationReport", Output.of(report.toOutputMap())));
 
     return outputs;
   }

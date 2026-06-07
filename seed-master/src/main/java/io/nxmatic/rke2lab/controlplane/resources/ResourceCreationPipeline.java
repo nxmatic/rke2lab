@@ -4,6 +4,7 @@ import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bdd.Checkpoint;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
+import io.nxmatic.rke2lab.controlplane.bdd.ConsultationReport;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.bdd.ProductionClusterReadinessProbe;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
@@ -15,6 +16,7 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterReadinessResource;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.controlplane.systemd.SystemdAdapterResource;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
@@ -81,6 +83,19 @@ final class ResourceCreationPipeline {
     return holder[0];
   }
 
+  /**
+   * Joins the shared {@link ConsultationLog} on the checkpoint's slug — the report exists only when
+   * that checkpoint raised a symptom (reactive consultation), so a healthy node yields empty.
+   */
+  private Optional<ConsultationReport> consultationFor(Checkpoint checkpoint) {
+    if (consultations == null) {
+      return Optional.empty();
+    }
+    return consultations.consultations().stream()
+        .filter(r -> r.checkpointId().equals(checkpoint.slug()))
+        .findFirst();
+  }
+
   /** Executes the Pulumi resource creation pipeline. */
   PulumiResources createPulumiResources() {
     return new PulumiResourceBuilder()
@@ -118,6 +133,7 @@ final class ResourceCreationPipeline {
           new SystemdAdapterResource(
               Checkpoint.SYSTEMD_ADAPTER.resourceName(),
               systemdAdapterLaunchSummary,
+              consultationFor(Checkpoint.SYSTEMD_ADAPTER),
               bootstrapResult.readinessDependency());
       return this;
     }
@@ -126,11 +142,15 @@ final class ResourceCreationPipeline {
       // The checkpoint is played eagerly as a BDD scenario (records into the runbook, consults the
       // doctor); the resource is a thin graph mirror of the result + the dependsOn edge. The edge
       // points at the systemd-adapter resource (the real business dependency), so the persisted
-      // Pulumi graph matches the runbook's BDD nesting.
+      // Pulumi graph matches the runbook's BDD nesting. Play before the join so any raised report
+      // is already in the shared log when consultationFor reads it.
+      final ClusterBootstrapReadinessVerifier.VerificationResult result =
+          playClusterReadiness(true);
       this.readiness =
           new ClusterReadinessResource(
               Checkpoint.CLUSTER_READINESS.resourceName(),
-              playClusterReadiness(true),
+              result,
+              consultationFor(Checkpoint.CLUSTER_READINESS),
               this.systemdAdapter);
       return this;
     }
