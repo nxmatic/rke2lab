@@ -3,13 +3,11 @@ package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
-import com.tngtech.jgiven.report.text.PlainTextReporter;
 import io.nxmatic.rke2lab.controlplane.bdd.Checkpoint;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationReport;
 import io.nxmatic.rke2lab.controlplane.bdd.Dossier;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
-import io.nxmatic.rke2lab.controlplane.bdd.Prescription;
 import io.nxmatic.rke2lab.controlplane.bdd.RemediationPlan;
 import io.nxmatic.rke2lab.controlplane.bdd.Severity;
 import io.nxmatic.rke2lab.controlplane.bdd.SimulatedSystemdAdapterProbe;
@@ -151,11 +149,6 @@ public final class SystemdAdapterStage {
       failure = cause;
       captured = dossierHolder[0]; // the failed dossier (with its symptom), if the probe ran
     } finally {
-      // The living-doc IS the gate's output: stream the Given/When/Then prose into the Pulumi log
-      // so
-      // the operator reads what was verified — inline, during preview and provisioning, pass or
-      // fail.
-      logReport(reportModel);
       if (previousDryRun == null) {
         System.clearProperty(JGIVEN_DRY_RUN);
       } else {
@@ -197,10 +190,6 @@ public final class SystemdAdapterStage {
       return;
     }
     final RemediationPlan plan = generalist.consult(dossier.symptom().get(), dossier);
-    log("⚕ " + SCENARIO_ID + " diagnosis: " + plan.generalistSummary());
-    for (Prescription prescription : plan.prescriptions()) {
-      log("  ℞ " + prescription.programRef().id() + " — " + prescription.humanHint());
-    }
     if (consultations != null) {
       consultations.record(new ConsultationReport(SCENARIO_ID, List.of(dossier), plan));
     }
@@ -223,17 +212,6 @@ public final class SystemdAdapterStage {
   private void log(String message) {
     if (readinessLogger != null) {
       readinessLogger.accept(message);
-    }
-  }
-
-  private void logReport(ReportModel reportModel) {
-    if (readinessLogger == null) {
-      return;
-    }
-    try {
-      PlainTextReporter.toString(reportModel).lines().forEach(readinessLogger);
-    } catch (Exception ignored) {
-      // The report is a narration aid; never let rendering it fail the gate.
     }
   }
 }

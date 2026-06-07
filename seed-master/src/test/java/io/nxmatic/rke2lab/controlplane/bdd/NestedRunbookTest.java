@@ -20,7 +20,6 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifi
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -106,8 +105,9 @@ class NestedRunbookTest {
         SimulatedClusterReadinessProbe.failingAt(ClusterReadinessPhase.API_READY, Symptom.TIMEOUT);
 
     final ReportModel model = new ReportModel();
-    final List<String> log = new ArrayList<>();
-    final VerificationResult result = play(model, simulated, false, networkGeneralist(), log::add);
+    final ConsultationLog consultations = new ConsultationLog();
+    final VerificationResult result =
+        play(model, consultations, simulated, false, networkGeneralist());
 
     // The targeted incident makes the cluster scenario FAIL — a targeted runbook — and the failed
     // projection holds the handoff (the output contract the output layer + Stage B gate consume).
@@ -134,12 +134,20 @@ class NestedRunbookTest {
         "the phase downstream of the break is skipped — body never played (fail-fast)");
 
     // The stage itself consults the doctor on the failing phase's symptom (TIMEOUT routes to the
-    // network specialist) — proven by the prescription it logged, not by calling Generalist apart.
-    assertTrue(
-        log.stream().anyMatch(line -> line.contains("⚕")), "the stage should consult the doctor");
-    assertTrue(
-        log.stream().anyMatch(line -> line.contains(RemediationProgramRef.CHECK_CONNECTIVITY.id())),
-        "the network specialist's prescription should be logged");
+    // network specialist) — proven by the consultation it recorded into the shared log, not by
+    // calling Generalist apart. The diagnosis is no longer scraped from the Pulumi log: it reads
+    // from the ConsultationLog (and renders into the runbook), the authoritative surface.
+    assertEquals(1, consultations.consultations().size(), "the stage should consult the doctor");
+    assertEquals(
+        RemediationProgramRef.CHECK_CONNECTIVITY,
+        consultations
+            .consultations()
+            .get(0)
+            .plan()
+            .primaryPrescription()
+            .orElseThrow()
+            .programRef(),
+        "the network specialist's prescription is kept on the consultation");
 
     new RunbookRenderer(out, message -> {}).render(model, new ConsultationLog());
     final String report = readAll(out.resolve("adoc"));
