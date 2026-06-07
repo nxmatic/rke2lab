@@ -338,6 +338,57 @@ graph TB
 . The generalist synthesizes the prescriptions into a single `RemediationPlan` (its global
   view), which flows into the runbook node and the inline log.
 
+[#recruiting-a-specialist]
+=== When the doctor doesn't know: recruiting a specialist
+
+The consultation flow has two dead ends today, both already named in the Generalist: *no
+specialist routes* for the symptom, and *routed but none prescribed* (the specialists were
+consulted and had nothing to offer). Today each is a terminus — an empty plan, a "no
+treatment offered" log line. This model turns both into a *prescription to recruit a
+specialist*: the system's own lack of knowledge becomes a diagnosable symptom, and its
+remediation is the growth of the clinic. The two gaps recruit differently:
+
+[cols="1,2,2",options="header"]
+|===
+|Dead end |The gap |Recruits
+|*no route* for the symptom |no domain claims it |a *new specialty* (a new domain)
+|*routed but empty* |the domain exists, the specialist has no treatment |a *deeper* specialist in that domain
+|===
+
+The recruiter is a *meta-specialist* whose domain is the clinic itself — it diagnoses not
+the patient but the clinic's missing capability. Recruiting is the most dangerous
+prescription there is (a system writing its own specialists), so it goes through the exact
+same channel as any remediation: the doctor *proposes* the recruitment in the record, the
+operator *disposes* (reviews the new specialist before it joins the roster). It is never
+self-applied mid-flight — the <<loop-closure>> rule covers it by construction.
+
+*How recruitment is honored — a gradient from ad-hoc to codified (the chosen direction).* The
+working hypothesis: a generic Claude-backed specialist serves as a universal fallback that
+treats the unknown case *ad hoc* (it reasons over the dossier and prescribes), while the
+consultation also emits a recruitment prescription. If the same frontier symptom recurs and
+the ad-hoc reasoning proves stable, the operator *codifies* it into a deterministic
+`Specialist` — testable, free, no LLM call at bootstrap. Whether the fallback is always
+present, invoked on demand, or staged some other way is left open. The existing `DbusTcpSpecialist` is the codified end of this gradient; the
+Claude-backed fallback is its starting end. This is the AI-native realization of the seam in
+<<ai-seam>>: routing an unknown symptom to a `Specialist` instantiated for that symptom is
+precisely what a subagent dispatch is — a fresh, focused agent given just the dossier as its
+context.
+
+[NOTE]
+====
+*Dogfooding.* "Codify a recruited specialist" is not an exotic mechanism to build — it is
+the design loop itself: the operator and Claude re-enter brainstorm → design to conceive the
+new specialist, triggered by a real remediation exercise (e.g. healing the live
+`systemd-adapter degraded` symptom on master). The list of recruitment prescriptions in the
+runbook is therefore a self-generated backlog of the specialists still to build. The clinic
+recruits by running its own design process.
+====
+
+This is the concrete reason the *open roster + contributed routing* (deferred in the open
+tensions as T3) stops being speculative: the unknown-symptom case *requires* it. A `switch`
+over a closed enum cannot recruit; the recruitment prescription is what forces routing to
+become contributed data and the `Symptom`/`SpecialistDomain` sets to be open.
+
 === Prescription: an action addressed to a remediation program
 
 A prescription is *not* shell commands. It is a corrective action _addressed to a
@@ -363,6 +414,90 @@ Rough shape (to be refined in the plan, not frozen here):
 RemediationPlan   = { symptom, List<Prescription>, generalistSummary }
 Prescription      = { programRef (typed catalog entry), payload (structured info), humanHint }
 ----
+
+[#the-remediator]
+=== The remediator: who fills the prescription
+
+The prescription is a _referral_, not the act itself. The doctor *prescribes*; it never
+touches the live system. A distinct role — the *remediator* — *administers* the treatment.
+This keeps the doctor pure (it reads and writes the record, nothing more) and confines the
+entire live-system risk to one role. The `programRef` a prescription already carries is a
+natural referral address — one could route a prescription to a remediator much as the
+Generalist routes a symptom to a specialist, so the two halves of the model read as mirror
+images. Whether the routing actually keys on `programRef`, and what shape that routing takes,
+is left to the plan.
+
+[cols="1,2,2",options="header"]
+|===
+|Side |Routes by |To
+|*Diagnosis* (exists) |`Symptom` → `SpecialistDomain` |a `Specialist` (reads, correlates, prescribes — never acts)
+|*Remediation* (this model) |`Prescription` → `programRef` |a *remediator* (administers the treatment)
+|===
+
+Remediators come in *kinds*, each a distinct mode of action — the medical archetypes are not
+decoration, they are the real ops shapes:
+
+* *nurse* — an imperative one-shot gesture: restart a unit (`RESTART_UNIT`, today's only
+  case). Idempotent, reversible.
+* *pharmacist* — dispenses a remedy: apply a manifest, fill a missing config input, install
+  a unit. An idempotent change of _desired state_.
+* *physiotherapist* — a progressive, repeated, convergent treatment: a retry/backoff loop, a
+  gradual rollout, a drain-and-reschedule. Not one-shot — iterative rehabilitation.
+
+This suggests remediation splits along one structural axis worth keeping in view:
+
+* *Declarative remediation* (e.g. the pharmacist filling a missing config input): the
+  operator changes the desired state, and *the Pulumi engine itself is the remediator* — the
+  next `up` converges, with no separate executor.
+* *Imperative remediation* (e.g. the nurse restarting dbus): there is no "desired restarted
+  state" to converge toward, so it would seem to need an *explicit remediator* that performs
+  the gesture.
+
+We can suppose this axis matters and that something — perhaps `programRef` — will carry the
+gesture's nature; how it is carried, and how the path is selected, is not decided here. See
+<<loop-closure>> for _when_ the gesture is administered, and <<ai-seam>> for the action
+surface (MCP) a future imperative remediator might use.
+
+[#loop-closure]
+=== Loop closure: the next visit, on the operator's terms
+
+A treatment is not administered mid-flight, in the middle of a `pulumi up`. The system
+provisions in flux; acting on it then is both fragile and a breach of the project rule
+"operations that change the live system are run by the operator — propose, don't execute".
+Instead the loop closes *between visits*, through *two distinct voices*:
+
+[mermaid]
+----
+flowchart LR
+    subgraph VN["Visit N — pulumi up"]
+        DOC["Doctor prescribes"] --> REC["prescription in the<br/>medical record (state)"]
+    end
+    subgraph BETWEEN["Between visits"]
+        OP["Operator reads the record,<br/>decides, encodes a directive<br/>in the stack config"]
+    end
+    subgraph VN1["Visit N+1 — the follow-up"]
+        EXEC["remediator administers<br/>per the config directive"] --> REOBS["the up re-observes<br/>= the check-up"]
+    end
+    REC --> OP --> EXEC
+
+    style REC fill:#e1f5ff,stroke:#0066cc
+    style OP fill:#fff4e6,stroke:#ff9900
+    style REOBS fill:#ccffcc,stroke:#00cc66
+----
+
+* *The medical record is the doctor's voice.* It _proposes_ — the prescription persists in
+  the stack state (layer 3).
+* *The stack config is the operator's voice.* It _disposes_ — the operator reads the record
+  and encodes a directive in `Pulumi.<stack>.yaml`, the admission context of the next visit.
+* *The next `up` is the check-up.* It administers what the operator authorized and
+  re-observes the result — which is exactly the locked decision "the re-observe cycle is the
+  program re-running, not a provider `Read`".
+
+The CLAUDE.md line holds *structurally*, with no amendment: the doctor _proposes_ (record),
+the operator _disposes_ (config), the engine _executes_ (converges). No tier crosses the
+line. An unattended CI run at 3 a.m. does not "go autonomous" — it converges on what the
+operator already authorized in version-controlled, reviewable config. The live-system risk
+stops being a question of trusting an agent and becomes a question of config content.
 
 [#symptom-and-dossier]
 === Symptom and dossier: sourced and typed, never parsed
@@ -397,6 +532,7 @@ exactly when the doctor needs it. `Dossier` is a plain record — serializabilit
 future MCP boundary) follows whenever Phase 2 picks a mechanism, and is not a Phase 1
 concern.
 
+[#ai-seam]
 == The AI-augmentation seam (Phase 2, not built here)
 
 This system is authored *with* AI (Claude Code), so it should one day be AI-augmentable at
@@ -407,11 +543,25 @@ small set of Phase 1 design choices that let a future Phase 2 swap implementatio
 rewriting the Generalist, the runbook rendering, or the checkpoints.
 
 *Principle.* Phase 1 is deterministic Java with no AI dependency during bootstrap. The actor
-is always the *human operator*; if a future Phase 2 adds AI, the operator invokes it
-explicitly for troubleshooting — never the bootstrap itself. The medical analogy simply
-extends: the *Doctor* (Generalist) could be an AI agent, *Specialists* could be backed by
-out-of-process tools instead of Java classes, *Procedures* could be remote calls instead of
-methods — but the contracts between them are the same objects.
+is always the *human operator*; if a future Phase 2 adds AI, it never acts on the bootstrap
+on its own initiative. The medical analogy extends across *both halves of the model* —
+diagnosis and administration — and an AI augments each at a different altitude:
+
+* *Diagnosis seam (read-only).* The *Doctor* (Generalist) could be an AI agent and
+  *Specialists* could be backed by out-of-process tools instead of Java classes. This is also
+  where the recruitment gradient's ad-hoc end lives (<<recruiting-a-specialist>>): a
+  Claude-backed specialist as the fallback for an unrouted symptom. A diagnosis-seam actor
+  *reads and prescribes — it never touches the live system* (it mirrors a read-only subagent).
+* *Administration seam (acts).* The <<the-remediator,remediator>> that *fills* a prescription
+  could be an out-of-process tool too. This is the only seam that touches the live system, and
+  it stays bound by the <<loop-closure,loop-closure>> discipline: the doctor _proposes_ (the
+  prescription, in the record), the operator _disposes_ (a directive in the stack config), the
+  next `up` _executes_. So even an AI remediator never self-applies mid-flight — it administers
+  what the operator already authorized.
+
+In every case the contracts between the actors are the same objects; only the implementations
+swap. *How* either seam is wired out-of-process (transport, tool surface, where the remediator
+runs) is deliberately left open here.
 
 === What the seam is: contracts that don't change
 
@@ -452,38 +602,47 @@ a purely-programmatic doctor:
 
 === One picture: programmatic now, swappable later
 
-The before/after is kept only to show the seam — the Phase 2 side is deliberately generic
-(no named servers or tools, because none are designed):
+The before/after is kept only to show the *two seams* — diagnosis and administration — and the
+Phase 2 side is deliberately generic (no named servers or tools, because none are designed). The
+*administration* half ends at a live gesture, so the operator's disposition (<<loop-closure>>)
+gates it in both columns:
 
 [mermaid]
 ----
 graph TB
     subgraph P1["Phase 1 — programmatic, this branch"]
+        direction TB
         FAIL1["checkpoint fails<br/>presents Symptom + Dossier"]
         GEN1["Generalist - Java<br/>firstLook + deterministic routing"]
         SPEC1["Specialist - Java class<br/>reads dossier, prescribes"]
-        PLAN1["RemediationPlan<br/>symptom + prescriptions"]
-        OPER1["Operator<br/>reads runbook prose, acts"]
-        FAIL1 --> GEN1 --> SPEC1 --> PLAN1 --> OPER1
+        PLAN1["RemediationPlan<br/>prescription → programRef"]
+        OPER1["Operator disposes<br/>reads runbook, decides"]
+        REM1["Remediator = the operator<br/>acts by hand"]
+        FAIL1 --> GEN1 --> SPEC1 --> PLAN1 --> OPER1 --> REM1
     end
 
     subgraph P2["A future Phase 2 — same contracts, swapped impls"]
+        direction TB
         FAIL2["checkpoint fails<br/>presents Symptom + Dossier"]
         GEN2["Doctor<br/>same routing table"]
-        SPEC2["Specialist - out-of-process adapter<br/>same interface"]
+        SPEC2["Specialist - out-of-process<br/>diagnosis seam · read-only"]
         PLAN2["RemediationPlan<br/>same record"]
-        OPER2["Operator<br/>invokes + approves"]
-        FAIL2 --> GEN2 --> SPEC2 --> PLAN2 --> OPER2
+        OPER2["Operator disposes<br/>authorizes in stack config"]
+        REM2["Remediator - out-of-process<br/>administration seam · bounded formulary"]
+        FAIL2 --> GEN2 --> SPEC2 --> PLAN2 --> OPER2 --> REM2
     end
 
     SPEC1 -. same Specialist interface .-> SPEC2
+    REM1 -. same programRef referral .-> REM2
 
     style GEN1 fill:#fff4e6,stroke:#ff9900
     style SPEC1 fill:#e1f5ff,stroke:#0066cc
     style PLAN1 fill:#ccffcc,stroke:#00cc66
+    style REM1 fill:#ffe1e1,stroke:#cc0000
     style GEN2 fill:#fff4e6,stroke:#ff9900
     style SPEC2 fill:#e1f5ff,stroke:#0066cc
     style PLAN2 fill:#ccffcc,stroke:#00cc66
+    style REM2 fill:#ffe1e1,stroke:#cc0000
 ----
 
 *Why document the seam in the spec (not just memory):* it _justifies_ the four Phase 1
@@ -492,6 +651,15 @@ choices above (otherwise they read as gold-plating), and it pins the contract so
 named servers, tool signatures, a `specialist-mode` knob, the rke2lab-as-MCP-server rationale
 — are intentionally removed: they would freeze an API we have not designed. They live in
 brainstorm history if needed.
+
+*The administration seam's action surface is bounded by a formulary.* When the remediator
+(<<the-remediator>>) becomes an out-of-process tool, the gestures it may perform are *not*
+arbitrary shell: the `programRef` catalog _is_ the *therapeutic formulary* — the bounded list
+of authorized treatments. A future action surface (MCP is the candidate, deliberately
+undesigned here) would expose exactly those catalog entries as tools, nothing more. This is
+what makes an AI remediator safe to contemplate at all: it can only administer named,
+pre-authorized treatments, and only on the operator's terms (<<loop-closure>>). We commit
+only to the seam — a typed referral addressed to a bounded formulary — never to a transport.
 
 == Implementation: one design, three sequenced increments
 
@@ -618,13 +786,14 @@ scenarios*). Previously it ran the procedural `verify()` lazily inside a Pulumi
   contract added). `pulumi preview` now shows BOTH scenarios in the runbook; on `pulumi up`
   the cluster phases are checked live and the `VerificationResult` outputs are unchanged.
 
-==== Still open after D
+==== Still open after D — now CLOSED by Increment E (layers 2/3)
 
-The plan still flows into the *inline log*, not yet into the runbook *node's*
-Diagnosis/Mitigation sections, and `dependsOn` edges are rendered via `@NestedSteps` nesting
-rather than recorded as explicit DAG edges. The shared report-node model (node-level
-Diagnosis/Mitigation + explicit edges) remains the last deferral — now unblocked since both
-checkpoints are live BDD scenarios. This deferral is now designed as Increment E below.
+Both deferrals named here are now done. The plan no longer flows only into the inline log: it is
+kept on a `ConsultationReport` (layer 2, commit `0cd2b2f5`), serialized per-node into state
+(layer-3 write-side), and *rendered into the runbook node* at runtime (layer-3 read-side part 1,
+commit `0ed98c13`). The `dependsOn` edge is no longer only `@NestedSteps` nesting: it is recorded as
+an explicit resource edge in the state (commit `13bb7715`), and the nesting becomes a view of it.
+See Increment E below.
 
 === Increment E — the medical model, refined (design; execution in link:plan.adoc[plan.adoc])
 
@@ -722,45 +891,53 @@ non-runbook use case), (3) future contexts.
   — an expert reading engine errors — remains possible later as just another `Specialist`, distinct
   from this persistence question.)
 
-==== Layer 3 — the medical record (the deferred DAG chantier; decisions LOCKED, code in a fresh session)
+==== Layer 3 — the medical record: write-side DONE, recadred to diagnostic-only per-node serialization
 
 The medical record is the patient-stack's aggregate of its visit's consultations + admission
-context. Decisions locked 2026-06-07 (to be CODED in a fresh session — this conversation is far past
-its context budget and serialization + the phantom-diff constraint deserve a clean start):
+context. The *write-side is DONE* (2026-06-07, 4 commits `52781714`→`4e8e71d1`); the full,
+authoritative argument with C4/UML lives in
+link:layer3-medical-record-design.adoc[layer3-medical-record-design.adoc]. This summary is kept in
+sync with it; on any divergence, that document is the source.
 
 * *Our model is the SOURCE; runbook and `VerificationResult` are VIEWS.* The medical record is OUR
-  aggregate (nodes = checkpoints, explicit `dependsOn` edges, admission context, each node's
-  dossiers + plan). This *reverses today's dependency*: currently the JGiven `ReportModel` IS the
-  structure and the runbook renders from it; instead our model-record becomes the source and the
-  JGiven `ReportModel` is *derived from it* for rendering. JGiven becomes one render backend, not the
-  structure owner. `VerificationResult` likewise becomes a view computed from the record's cluster
-  node. This resolves the renderer fork toward "our own renderer over our model" (JGiven still usable
-  as a backend).
+  aggregate (nodes = checkpoints, the `dependsOn` edge read from state, admission context, each
+  node's dossiers + plan). `VerificationResult` stays a *distinct* always-present Stage-B projection
+  (layer 2 proved the two are not merge-able), not folded into the record.
 * *Runtime = in-memory; state = its serialization; post-hoc = reconstruction.* Two moments that were
-  conflated: (1) *during a run* the program gets no graph back and checkpoints play eager (before
-  downstream registers), so the record MUST be an in-memory model — you cannot read it from the
-  not-yet-written state; (2) *post-hoc* it is reconstructed from the persisted state.
-* *Full serialization into state (user's call): the WHOLE record — plans included — is written to
-  the outputs* so it reconstructs 100% faithfully from the state alone (not just the skeleton). This
-  is "the medical record IS the Pulumi state" in the strong sense.
+  conflated: (1) *during a run* the program gets no graph back and checkpoints play eager, so the
+  record is an in-memory model; (2) *post-hoc* it is reconstructed from the persisted state.
 
-*HARD CONSEQUENCE — the byte-identical guard is RENEGOTIATED, not just respected.* Writing the full
-record adds output keys, which contradicts the "no output changes" stance held all session. The
-redefined guard:
+*The serialization decision was RECADRED (commit `a8c37c75`) — it REVERSES what an earlier draft of
+this section locked.* The earlier "serialize the WHOLE record into a new top-level `medicalRecord`
+key, then solve the phantom diff" was a false-dilemma: Pulumi already holds most of the record and
+must not be duplicated. The shipped decision:
 
-* *Unchanged (the Stage-B contract an EXTERNAL orchestrator reads):* `handoffReady`, `nextStep`,
-  `bootstrapStatus`, the 7 `cluster*` keys, the systemd flat keys.
-* *Added (additive — does not break existing readers):* a new key (e.g. `medicalRecord`) carrying the
-  serialized record.
+* *Pulumi is the authority on what it already knows; the record persists ONLY the delta Pulumi
+  ignores.* The *graph* lives in the stack state (`dependencies`/`parent`); the *when/git/config*
+  lives in the Pulumi update history; only the *diagnostic layer* (`Symptom` / `Dossier` /
+  `RemediationPlan`) is ours to serialize.
+* *Per-node, NOT a top-level blob.* Each checkpoint `ComponentResource` registers an *additive*
+  output carrying ITS own `ConsultationReport` (via `toOutputMap()`), indexed by `Checkpoint.slug()`
+  — `registerOutputs`, per Option A. A top-level aggregate would itself copy the structure (the very
+  drift being removed).
+* *Top-level guard UNTOUCHED (not renegotiated).* The Stage-B contract `OutputBuilder` builds stays
+  *literally unchanged* — the diagnostic data lives *under* the checkpoint resource, not in the
+  stack's top-level outputs. The phantom-diff problem *dissolved*: nothing varying (no timestamp, no
+  edges) is serialized, so a no-op `up` shows no output diff; a healthy checkpoint raises no symptom
+  → the output is absent → deterministic at constant state.
+* *Single-source edge shipped.* `ClusterReadinessResource` now really `dependsOn`
+  `SystemdAdapterResource` (commit `13bb7715`), so the business edge is in the state's
+  `dependencies`; the `@NestedSteps` nesting becomes a render *view* of that single source. The join
+  key is the `Checkpoint` enum (commit `52781714`, identity only — never topology).
 
-*HARD PROBLEM to solve FIRST when coding — the phantom diff.* `OutputBuilder` *deliberately omits*
-`timestamp` today with the comment "it would change every run and produce phantom output diffs on
-no-op pulumi up". The full record contains admission (timestamp, git commit) and possibly varying
-plans → serializing it re-introduces exactly that phantom diff (every `up`, even a no-op, shows an
-output diff; the operator can't tell a real change from a clock tick). Parades (exclude timestamp
-from the serialized blob, or a stable hash) tension with "100% faithful reconstruction" — if the
-timestamp is excluded to avoid the phantom diff, it is no longer 100% faithful. Resolve this
-trade-off at the top of the layer-3 work.
+*Read-side part 1 — runtime enrichment — also DONE* (4 commits `c8c7116f`→`daa34928`): the doctor's
+`⚕`/`℞` now renders INTO the runbook node at runtime (Approach A — inject `extendedDescription` on
+the JGiven model, joined by `Checkpoint.scenarioTitle()`), and the Pulumi log was made
+reference-pure. Design + plan in
+link:layer3-readside-runtime-enrichment-design.adoc[layer3-readside-runtime-enrichment-design.adoc].
+*Still deferred (user's call): post-hoc reconstruction* — the offline tool that parses `pulumi stack
+export`, rebuilds the DAG, grafts the serialized `consultationReport`, and re-renders. The write-side
+made it possible; it is to be re-discussed with the rendered runbook in front of us, not pre-built.
 
 ==== Layer 2 — DONE (commit 0cd2b2f5): the doctor's plan is kept, not dropped
 
@@ -816,15 +993,16 @@ implementing the doctor(s) is in place"):
   runtime context (git, mode, `simulate`, timestamp) is the admission of *a visit*, not the
   patient's identity. Decides where the data attaches in the types.
 
-==== Renderer-route fork (decide before coding layer 3)
+==== Renderer-route fork — RESOLVED (Approach A)
 
 The runbook is rendered by JGiven's own `AsciiDocReportGenerator` over a `ReportModel` — it is
-_not_ a free-form template. Adding node-level Diagnosis/Mitigation forces a choice: (a) attach the
-plan into the JGiven model (InfoTags / attachments / extended description — stays in JGiven,
-JGiven owns layout); (b) replace `AsciiDocReportGenerator` with our own renderer over
-`ReportModel` (full control, more work); (c) hybrid (JGiven body + our appended node sections).
-`RunbookRenderingTest` asserts "no Diagnosis/Mitigation before the doctor exists" — flipping that
-assertion is the TDD entry point.
+_not_ a free-form template. Adding node-level Diagnosis/Mitigation forced a choice between (a)
+attaching the plan into the JGiven model, (b) replacing the generator with our own renderer, and (c)
+a hybrid. *Resolved to (a)* in layer-3 read-side part 1: the diagnosis is injected as the JGiven
+model's `extendedDescription` on the failing node, joined by `Checkpoint.scenarioTitle()`, so JGiven
+keeps ownership of layout and we add the least surface. The deferred "our model = source" renderer
+rewrite is a separate, larger ambition (post-hoc reconstruction), not this step. Full rationale in
+link:layer3-readside-runtime-enrichment-design.adoc[layer3-readside-runtime-enrichment-design.adoc].
 
 == Non-goals (explicit)
 
