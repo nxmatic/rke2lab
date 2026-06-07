@@ -1,0 +1,548 @@
+= Runbook & Doctor — Layer 3 Plan (write side: serialize the diagnostic layer)
+:toc: left
+
+> *For agentic workers:* implement task-by-task; steps use `- [ ]` for tracking. Builds/tests are
+> runnable by Claude (compile/test/`pulumi preview` are dry-runs — CLAUDE.md). Single-dev,
+> sequential, NO compat shims: when a path is superseded, delete it and update all call sites in the
+> same change.
+
+*Goal:* make the stack state self-describing — each checkpoint `ComponentResource` carries its own
+serialized consultation report (diagnostic layer only), and the cluster→systemd edge becomes a real
+persisted `dependsOn`, behind a single-source `Checkpoint` enum join key.
+
+*Architecture:* per the design (link:layer3-medical-record-design.adoc[layer3-medical-record-design.adoc]):
+Pulumi state holds the graph, update history holds the time; we serialize ONLY the diagnostic layer
+(`Symptom`/`Dossier`/`RemediationPlan`), per node, additively. The stack's top-level outputs
+(`OutputBuilder`) are *untouched* — the Stage-B contract stays byte-identical.
+
+*Tech stack:* Java 25 (flox toolchain), Pulumi-java `ComponentResource`, JGiven (render), JUnit5 +
+Mockito (test). Build: `flox activate -- ./mvnw … -pl :seed-master -am`.
+
+*Scope — this plan is the WRITE side only.* The post-hoc reconstruction tool (parse `pulumi stack
+export` → rebuild DAG → graft → render) and the "our model = source" renderer flip
+(`RunbookRenderingTest` assertion) are a SEPARATE follow-up plan. Reason: you cannot reconstruct what
+is not yet written; the write side is independently valuable (state becomes queryable via `pulumi
+stack output`) and the runtime runbook already renders from the in-memory model, unchanged.
+
+== Hard guard (do not break)
+
+Top-level stack outputs (everything `OutputBuilder.buildOutputs(...)` emits) stay *byte-identical*:
+`handoffReady`→`nextStep`, `bootstrapStatus`, the 7 `cluster*` keys, the systemd-adapter flat keys.
+The new diagnostic data lives ONLY *under* each checkpoint `ComponentResource` (via
+`registerOutputs`), never at top level. `ClusterReadinessProjectionTest` is the pin and must stay
+green unchanged.
+
+---
+
+== Task 1: `Checkpoint` enum — the single-source join key
+
+Replaces the two hand-aligned literal pairs (`"cluster-readiness"` ↔ `"seed-cluster-readiness"`,
+`"systemd-adapter"` ↔ `"seed-systemd-adapter"`) with one source. Identity ONLY — never the edge.
+
+*Files:*
+
+* Create: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/bdd/Checkpoint.java`
+* Test: `seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/bdd/CheckpointTest.java`
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/ClusterReadinessStage.java:38`
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/SystemdAdapterStage.java:40`
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/resources/ResourceCreationPipeline.java:118,129`
+
+- [ ] *Step 1 — write the failing test.*
+
+[source,java]
+----
+package io.nxmatic.rke2lab.controlplane.bdd;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.Test;
+
+class CheckpointTest {
+
+  @Test
+  void resource_name_is_derived_from_the_slug() {
+    assertEquals("cluster-readiness", Checkpoint.CLUSTER_READINESS.slug());
+    assertEquals("seed-cluster-readiness", Checkpoint.CLUSTER_READINESS.resourceName());
+    assertEquals("systemd-adapter", Checkpoint.SYSTEMD_ADAPTER.slug());
+    assertEquals("seed-systemd-adapter", Checkpoint.SYSTEMD_ADAPTER.resourceName());
+  }
+}
+----
+
+- [ ] *Step 2 — run it, verify it fails.*
+
+Run: `flox activate -- ./mvnw test -Dmaven.build.cache.skipCache=false -pl :seed-master -am -DskipTests=false -Dtest=CheckpointTest`
+
+Expected: FAIL — `Checkpoint` does not exist (compilation error).
+
+- [ ] *Step 3 — create the enum.*
+
+[source,java]
+----
+package io.nxmatic.rke2lab.controlplane.bdd;
+
+/**
+ * The closed set of readiness checkpoints — the single source of truth for a checkpoint's identity,
+ * consumed by BOTH the BDD layer (the scenario id / {@code ConsultationReport.checkpointId}) and the
+ * Pulumi resources (the resource {@code name} → URN). The resource name is DERIVED from the slug, so
+ * the {@code "cluster-readiness"} ↔ {@code "seed-cluster-readiness"} correspondence is structural,
+ * not hand-maintained (the clusterApi/cluster-api silent-failure pattern the project guards against).
+ *
+ * <p>Identity ONLY — never topology. The cluster→systemd-adapter dependency edge lives in the
+ * resource's {@code dependsOn} (read back from the persisted state), NOT here; encoding it here would
+ * recreate the duplication the medical-record design removes.
+ */
+public enum Checkpoint {
+  SYSTEMD_ADAPTER("systemd-adapter"),
+  CLUSTER_READINESS("cluster-readiness");
+
+  private final String slug;
+
+  Checkpoint(String slug) {
+    this.slug = slug;
+  }
+
+  /** The BDD identity: the scenario id and {@code ConsultationReport.checkpointId}. */
+  public String slug() {
+    return slug;
+  }
+
+  /** The Pulumi resource name (→ URN), derived from the slug. */
+  public String resourceName() {
+    return "seed-" + slug;
+  }
+}
+----
+
+- [ ] *Step 4 — run the test, verify it passes.*
+
+Run: `flox activate -- ./mvnw test -Dmaven.build.cache.skipCache=false -pl :seed-master -am -DskipTests=false -Dtest=CheckpointTest`
+
+Expected: PASS.
+
+- [ ] *Step 5 — wire the stages to the enum.* In `ClusterReadinessStage.java` line 38, replace:
+
+[source,java]
+----
+  private static final String SCENARIO_ID = "cluster-readiness";
+----
+
+with:
+
+[source,java]
+----
+  private static final String SCENARIO_ID = Checkpoint.CLUSTER_READINESS.slug();
+----
+
+Add the import `import io.nxmatic.rke2lab.controlplane.bdd.Checkpoint;` (alphabetical, before `ClusterReadinessPhase`). In `SystemdAdapterStage.java` line 40, replace:
+
+[source,java]
+----
+  private static final String SCENARIO_ID = "systemd-adapter";
+----
+
+with:
+
+[source,java]
+----
+  private static final String SCENARIO_ID = Checkpoint.SYSTEMD_ADAPTER.slug();
+----
+
+Add the import `import io.nxmatic.rke2lab.controlplane.bdd.Checkpoint;` (alphabetical, before `ConsultationLog`).
+
+- [ ] *Step 6 — wire the resource names to the enum.* In `ResourceCreationPipeline.java`, add the
+import `import io.nxmatic.rke2lab.controlplane.bdd.Checkpoint;` (alphabetical, before
+`ConsultationLog`). At line 118 replace `"seed-systemd-adapter"` with
+`Checkpoint.SYSTEMD_ADAPTER.resourceName()`; at line 129 replace `"seed-cluster-readiness"` with
+`Checkpoint.CLUSTER_READINESS.resourceName()`.
+
+- [ ] *Step 7 — full build, all green (the literals are gone, nothing else changed).*
+
+Run: `flox activate -- ./mvnw package -Dmaven.build.cache.skipCache=false -pl :seed-master -am -DskipTests=false`
+
+Expected: BUILD SUCCESS; `Tests run:` line present, all green (33+ tests).
+
+- [ ] *Step 8 — commit.*
+
+[source,bash]
+----
+git add seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/bdd/Checkpoint.java \
+        seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/bdd/CheckpointTest.java \
+        seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/ClusterReadinessStage.java \
+        seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/SystemdAdapterStage.java \
+        seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/resources/ResourceCreationPipeline.java
+git commit -m "feat(doctor): Checkpoint enum — single-source join key for the medical record"
+----
+
+---
+
+== Task 2: the single-source edge — cluster resource really `dependsOn` systemd resource
+
+Today both resources are siblings under `readinessDependency()`; the cluster→systemd edge lives only
+in the BDD nesting. Move it to where the state persists it. No unit-test seam for the resource graph
+(no Pulumi mock-test precedent) → verified by compile + `pulumi preview`.
+
+*Files:*
+
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/resources/ResourceCreationPipeline.java:124-132` (`withReadiness()`)
+
+- [ ] *Step 1 — repoint the dependency.* In `PulumiResourceBuilder.withReadiness()`, the third
+constructor argument is currently `bootstrapResult.readinessDependency()`. Replace it with
+`this.systemdAdapter` so the persisted edge is cluster → systemd-adapter:
+
+[source,java]
+----
+    PulumiResourceBuilder withReadiness() {
+      // The checkpoint is played eagerly as a BDD scenario (records into the runbook, consults the
+      // doctor); the resource is a thin graph mirror of the result + the dependsOn edge. The edge is
+      // the systemd-adapter resource (the real business dependency), so the persisted graph matches
+      // the runbook's — the medical record reads it back from state, not from a serialized copy.
+      this.readiness =
+          new ClusterReadinessResource(
+              Checkpoint.CLUSTER_READINESS.resourceName(),
+              playClusterReadiness(true),
+              this.systemdAdapter);
+      return this;
+    }
+----
+
+NOTE: `withSystemdAdapter()` runs before `withReadiness()` in `createPulumiResources()` (the builder
+chain), so `this.systemdAdapter` is set. The eager scenario play is ordered by the builder, NOT by
+`dependsOn`, so this changes only the persisted graph — verified safe in design review. The
+standalone path (`StandaloneResourceBuilder`) builds no `ClusterReadinessResource`, so it is
+unaffected.
+
+- [ ] *Step 2 — compile + existing tests green.*
+
+Run: `flox activate -- ./mvnw package -Dmaven.build.cache.skipCache=false -pl :seed-master -am -DskipTests=false`
+
+Expected: BUILD SUCCESS, all tests green (no test asserts the resource graph; this is a graph-only
+change).
+
+- [ ] *Step 3 — verify the persisted edge via preview.*
+
+Run: `flox activate -- pulumi preview --cwd seed-master --diff 2>&1 | grep -iA2 "cluster-readiness\|ClusterReadiness"`
+
+Expected: the `seed-cluster-readiness` component shows its parent/dependency on
+`seed-systemd-adapter` (no longer only the common `readinessDependency`). If preview cannot run in
+this environment (provisioning is blocked on the dbus probe per memory), record that and defer this
+check to a user-run preview — the compile in Step 2 is the blocking gate.
+
+- [ ] *Step 4 — commit.*
+
+[source,bash]
+----
+git add seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/resources/ResourceCreationPipeline.java
+git commit -m "feat(doctor): persist the cluster→systemd-adapter edge on the resource (single source)"
+----
+
+---
+
+== Task 3: serialize the diagnostic layer — `toOutputMap()` on plan, prescription, report
+
+Pure functions, fully TDD-able. The serialized form is what each resource will register in Task 4.
+
+*Files:*
+
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/bdd/Prescription.java`
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/bdd/RemediationPlan.java`
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/bdd/ConsultationReport.java`
+* Test: `seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/bdd/ConsultationReportSerializationTest.java`
+
+- [ ] *Step 1 — write the failing test.*
+
+[source,java]
+----
+package io.nxmatic.rke2lab.controlplane.bdd;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+
+class ConsultationReportSerializationTest {
+
+  @Test
+  void report_serializes_dossiers_and_plan_to_a_flat_map() {
+    final Dossier dossier =
+        Dossier.failed(
+            Symptom.CONNECTION_REFUSED, "dbus refused", Map.of("source", "endpoint-gate"));
+    final Prescription prescription =
+        Prescription.of(
+            RemediationProgramRef.RESTART_UNIT, Map.of("unit", "systemd-adapter"), "restart it");
+    final RemediationPlan plan =
+        new RemediationPlan(
+            Symptom.CONNECTION_REFUSED, List.of(prescription), "adapter unreachable");
+    final ConsultationReport report =
+        new ConsultationReport(
+            Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(dossier), plan);
+
+    final Map<String, Object> map = report.toOutputMap();
+
+    assertEquals("systemd-adapter", map.get("checkpointId"));
+    assertEquals(Symptom.CONNECTION_REFUSED.id(), ((Map<?, ?>) map.get("plan")).get("symptom"));
+    assertEquals(
+        "restart-systemd-unit",
+        ((Map<?, ?>) ((List<?>) ((Map<?, ?>) map.get("plan")).get("prescriptions")).get(0))
+            .get("programRef"));
+    assertTrue(map.get("dossiers") instanceof List<?>);
+  }
+}
+----
+
+NOTE: `Symptom.CONNECTION_REFUSED` is the systemd-adapter dbus symptom (id `"connection-refused"`,
+the one `DbusTcpSpecialist` routes); `Symptom.id()` returns the kebab id the assertions expect.
+
+- [ ] *Step 2 — run it, verify it fails.*
+
+Run: `flox activate -- ./mvnw test -Dmaven.build.cache.skipCache=false -pl :seed-master -am -DskipTests=false -Dtest=ConsultationReportSerializationTest`
+
+Expected: FAIL — `toOutputMap()` undefined on `ConsultationReport` (compilation error).
+
+- [ ] *Step 3 — add `toOutputMap()` to `Prescription`.* Insert into the record body:
+
+[source,java]
+----
+  public Map<String, Object> toOutputMap() {
+    return Map.of(
+        "programRef", programRef.id(),
+        "payload", payload,
+        "humanHint", humanHint);
+  }
+----
+
+- [ ] *Step 4 — add `toOutputMap()` to `RemediationPlan`.* Insert into the record body (needs
+`import java.util.Map;`):
+
+[source,java]
+----
+  public Map<String, Object> toOutputMap() {
+    return Map.of(
+        "symptom", symptom.id(),
+        "generalistSummary", generalistSummary,
+        "prescriptions", prescriptions.stream().map(Prescription::toOutputMap).toList());
+  }
+----
+
+- [ ] *Step 5 — add `toOutputMap()` to `ConsultationReport`.* Insert into the record body (needs
+`import java.util.Map;`):
+
+[source,java]
+----
+  public Map<String, Object> toOutputMap() {
+    return Map.of(
+        "checkpointId", checkpointId,
+        "dossiers", dossiers.stream().map(Dossier::toOutputMap).toList(),
+        "plan", plan.toOutputMap());
+  }
+----
+
+- [ ] *Step 6 — run the test, verify it passes.*
+
+Run: `flox activate -- ./mvnw test -Dmaven.build.cache.skipCache=false -pl :seed-master -am -DskipTests=false -Dtest=ConsultationReportSerializationTest`
+
+Expected: PASS.
+
+- [ ] *Step 7 — commit.*
+
+[source,bash]
+----
+git add seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/bdd/Prescription.java \
+        seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/bdd/RemediationPlan.java \
+        seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/bdd/ConsultationReport.java \
+        seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/bdd/ConsultationReportSerializationTest.java
+git commit -m "feat(doctor): serialize the consultation report (diagnostic layer) to a flat map"
+----
+
+---
+
+== Task 4: per-node `registerOutputs` — graft the report onto each resource
+
+Each checkpoint resource registers its OWN consultation report (when present) as an additive output,
+joined from the shared `ConsultationLog` by `Checkpoint.slug()` at construction time. Top-level
+outputs untouched.
+
+*Files:*
+
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/systemd/SystemdAdapterResource.java`
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/readiness/ClusterReadinessResource.java`
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/resources/ResourceCreationPipeline.java` (`withSystemdAdapter()`, `withReadiness()`)
+
+- [ ] *Step 1 — `SystemdAdapterResource` accepts and registers an optional report.* Add the
+constructor param and the additive output. New imports:
+`import io.nxmatic.rke2lab.controlplane.bdd.ConsultationReport;` and `import java.util.Optional;`.
+Replace the constructor and `asResourceOutputs`:
+
+[source,java]
+----
+  public SystemdAdapterResource(
+      String name,
+      Map<String, Object> summary,
+      Optional<ConsultationReport> consultation,
+      Resource dependsOnResource) {
+    super(TYPE_TOKEN, name, buildOptions(dependsOnResource));
+
+    this.summary = Map.copyOf(summary == null ? Map.of() : summary);
+    registerOutputs(asResourceOutputs(this.summary, consultation));
+  }
+
+  private static Map<String, Output<?>> asResourceOutputs(
+      Map<String, Object> summary, Optional<ConsultationReport> consultation) {
+    final LinkedHashMap<String, Output<?>> outputs = new LinkedHashMap<>();
+    summary.forEach((key, value) -> outputs.put(key, Output.of(value)));
+    consultation.ifPresent(
+        report -> outputs.put("consultationReport", Output.of(report.toOutputMap())));
+    return outputs;
+  }
+----
+
+- [ ] *Step 2 — `ClusterReadinessResource` accepts and registers an optional report.* Add the param
+and the additive output. New imports:
+`import io.nxmatic.rke2lab.controlplane.bdd.ConsultationReport;` and `import java.util.Optional;`.
+Change the constructor to thread the consultation into the output map:
+
+[source,java]
+----
+  public ClusterReadinessResource(
+      String name,
+      ClusterBootstrapReadinessVerifier.VerificationResult result,
+      Optional<ConsultationReport> consultation,
+      Resource dependsOnResource) {
+    super(TYPE_TOKEN, name, buildOptions(dependsOnResource));
+
+    this.verificationResult = Output.of(result);
+    registerOutputs(asResourceOutputs(verificationResult, consultation));
+  }
+
+  private static Map<String, Output<?>> asResourceOutputs(
+      Output<ClusterBootstrapReadinessVerifier.VerificationResult> verificationResult,
+      Optional<ConsultationReport> consultation) {
+    final LinkedHashMap<String, Output<?>> outputs = new LinkedHashMap<>();
+
+    outputs.put(
+        "clusterReadinessEnabled",
+        verificationResult.applyValue(value -> value.readinessEnabled()));
+    outputs.put(
+        "clusterReadinessSkipped",
+        verificationResult.applyValue(value -> !value.readinessEnabled()));
+    outputs.put(
+        "clusterKubeconfigPublished",
+        verificationResult.applyValue(value -> value.kubeconfigPublished()));
+    outputs.put("clusterApiReady", verificationResult.applyValue(value -> value.apiReady()));
+    outputs.put(
+        "clusterControllersEffective",
+        verificationResult.applyValue(value -> value.controllersEffective()));
+    outputs.put(
+        "clusterRequiredControllers",
+        verificationResult.applyValue(value -> value.requiredControllerRefs()));
+    outputs.put("clusterReadinessSummary", verificationResult.applyValue(value -> value.summary()));
+    outputs.put("handoffReady", verificationResult.applyValue(value -> value.handoffReady()));
+    outputs.put("bootstrapStatus", verificationResult.applyValue(value -> value.bootstrapStatus()));
+
+    consultation.ifPresent(
+        report -> outputs.put("consultationReport", Output.of(report.toOutputMap())));
+
+    return outputs;
+  }
+----
+
+NOTE: the `consultationReport` key is registered on the COMPONENT resource, not at top level — the
+9 existing `cluster*`/`handoffReady`/`bootstrapStatus` keys are unchanged, preserving the guard.
+
+- [ ] *Step 3 — add the join helper in `ResourceCreationPipeline`.* Add a private method that finds a
+checkpoint's report in the shared log by slug (the write-time join):
+
+[source,java]
+----
+  private Optional<ConsultationReport> consultationFor(Checkpoint checkpoint) {
+    if (consultations == null) {
+      return Optional.empty();
+    }
+    return consultations.consultations().stream()
+        .filter(report -> report.checkpointId().equals(checkpoint.slug()))
+        .findFirst();
+  }
+----
+
+New imports: `import io.nxmatic.rke2lab.controlplane.bdd.ConsultationReport;` and
+`import java.util.Optional;`.
+
+- [ ] *Step 4 — pass the reports at construction.* In `withSystemdAdapter()`:
+
+[source,java]
+----
+    PulumiResourceBuilder withSystemdAdapter() {
+      this.systemdAdapter =
+          new SystemdAdapterResource(
+              Checkpoint.SYSTEMD_ADAPTER.resourceName(),
+              systemdAdapterLaunchSummary,
+              consultationFor(Checkpoint.SYSTEMD_ADAPTER),
+              bootstrapResult.readinessDependency());
+      return this;
+    }
+----
+
+In `withReadiness()` (note: `playClusterReadiness(true)` runs first, so the cluster report is already
+in the log by the time `consultationFor` is called):
+
+[source,java]
+----
+    PulumiResourceBuilder withReadiness() {
+      // The checkpoint is played eagerly as a BDD scenario (records into the runbook, consults the
+      // doctor); the resource mirrors the result + the dependsOn edge + (on a symptom) the report.
+      final ClusterBootstrapReadinessVerifier.VerificationResult result = playClusterReadiness(true);
+      this.readiness =
+          new ClusterReadinessResource(
+              Checkpoint.CLUSTER_READINESS.resourceName(),
+              result,
+              consultationFor(Checkpoint.CLUSTER_READINESS),
+              this.systemdAdapter);
+      return this;
+    }
+----
+
+- [ ] *Step 5 — full build, all green (guard held; outputs additive only).*
+
+Run: `flox activate -- ./mvnw package -Dmaven.build.cache.skipCache=false -pl :seed-master -am -DskipTests=false`
+
+Expected: BUILD SUCCESS, all green — in particular `ClusterReadinessProjectionTest` unchanged (it
+asserts the top-level handoff keys, which did not move).
+
+- [ ] *Step 6 — verify the diagnostic output appears only on a simulated failure.*
+
+Run: `flox activate -- pulumi preview --cwd seed-master -c rke2lab:policy.preview.simulate.systemd-adapter=connection-refused 2>&1 | grep -i "consultationReport\|systemd-adapter"`
+
+Expected: under the `seed-systemd-adapter` component, a `consultationReport` output appears (the
+simulated incident raised a symptom → a report was recorded → it serialized). A healthy preview
+(no simulate) shows NO `consultationReport` key (reactive model). If preview cannot run here, defer
+to a user-run preview and rely on the Step 5 build + the Task 3 serialization test.
+
+- [ ] *Step 7 — commit.*
+
+[source,bash]
+----
+git add seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/systemd/SystemdAdapterResource.java \
+        seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/readiness/ClusterReadinessResource.java \
+        seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/resources/ResourceCreationPipeline.java
+git commit -m "feat(doctor): register the per-node consultation report into the checkpoint resource state"
+----
+
+---
+
+== Verification (end of plan)
+
+* `flox activate -- ./mvnw package -Dmaven.build.cache.skipCache=false -pl :seed-master -am -DskipTests=false` → all green; `ClusterReadinessProjectionTest` unchanged (the guard).
+* The two literal pairs are gone (`grep -rn '"seed-cluster-readiness"\|"seed-systemd-adapter"' seed-master/src/main` returns nothing outside `Checkpoint.java`).
+* `pulumi preview` (user-run if blocked here): top-level outputs byte-identical to today; a simulated
+  incident adds a `consultationReport` output UNDER the checkpoint component; a healthy run adds none.
+
+== After this plan (the follow-up — read side)
+
+The post-hoc reconstruction tool (`pulumi stack export` → DAG from `dependencies` → graft the
+`consultationReport` by `Checkpoint.slug()` → render) and the "our model = source" renderer flip
+(`RunbookRenderingTest`'s "no Diagnosis/Mitigation" assertion) are the next plan. The correctness
+criterion — runtime in-memory render and post-hoc reconstructed render produce the SAME view — is
+proven there. The open tensions T2/T3/T4 resume per spec Increment E once a first reconstruction
+exists.
