@@ -1,6 +1,6 @@
 ---
 name: runbook-doctor-state
-description: feature/runbook-doctor — Increments A-D DONE; BDD-quality pass COMPLETE (explicit steps, probe-injection dedup, POM restructure, nesting, BDD unit tests all committed); only remaining future work = the deferred shared report-node DAG model (its own chantier)
+description: feature/runbook-doctor — Increments A-D DONE; BDD-quality pass COMPLETE; DAG chantier now has a LOCKED design spec (medical model — ExamReport/ConsultationReport/medical-record layers; Doctor supertype; edge-propagated access). NEXT executable = layer 2 ConsultationReport (rename Dossier→ExamReport, persist the plan, VerificationResult→projection). Full spec in plan file parallel-floating-corbato.md
 metadata: 
   node_type: memory
   type: project
@@ -124,52 +124,56 @@ chain so everything is fail-fast and correct; fail-at-end becomes meaningful onl
 report-node DAG lands AND there's a genuine pair of INDEPENDENT checks (none in cluster yet — its
 phases are intrinsically sequential). Don't build per-step policy now (rule-of-three: one shape).
 
-**PREREQUISITE BEFORE THE DAG — unify the Dossier/output shape (user-raised 2026-06-07, order
-decided "shaping first, then DAG").** The two checkpoints DON'T share an output shape, and the DAG
-nodes would inherit the fork (they'd special-case one vs the other). Diagnosis:
-- *systemd-adapter:* one `Dossier` per checkpoint → `Dossier.toOutputMap()` (flat map) →
-  `SystemdAdapterResource.asResourceOutputs` (`Output.of` per key). Clean, Dossier-native.
-- *cluster:* the stage computes per-phase `Dossier`s, then THROWS them away into a hand-maintained
-  `VerificationResult` (record at `ClusterBootstrapReadinessVerifier.java:441`, 8 fields:
-  readinessEnabled/kubeconfigPublished/apiReady/controllersEffective/handoffReady/bootstrapStatus/
-  summary/requiredControllerRefs; factories ready/skipped/deferredPreview/failed; `asOutputs()` :504
-  emits 7 `cluster*` keys). Then `ReadinessOutputMapper.mapToOutputs` (dual-mode Output|plain) adds
-  handoffReady/bootstrapStatus/nextStep; consumed at `OutputBuilder.java:85`. `ClusterReadinessResource`
-  is a thin mirror holding `Output<VerificationResult>`. This is the LEGACY pre-Dossier path surviving
-  inside an otherwise-BDD checkpoint — `ClusterReadinessStage.failedProjection()` rebuilds a
-  VerificationResult from the phase Dossiers (lossy).
-TWO shape problems: (1) **output-path divergence** — `toOutputMap()` vs `ReadinessOutputMapper`/
-`VerificationResult` for the same concept; a checkpoint should have ONE way to become outputs. (2)
-**Dossier granularity** — systemd = 1 Dossier/checkpoint; cluster = N phase-Dossiers with NO
-first-class checkpoint-level Dossier aggregating them. The DAG wants exactly node=checkpoint=1
-Dossier(+plan+edges). *Target:* cluster gains a checkpoint-level `Dossier` (aggregating its phases),
-outputs via `toOutputMap()` like systemd; `VerificationResult`/`ReadinessOutputMapper` become a thin
-view over it OR are deleted (no-compat: same change). **HARD GUARD:** the Stage-B handoff keys must
-stay byte-identical — handoffReady→nextStep + the 7 `cluster*` keys + bootstrapStatus;
-`ClusterReadinessProjectionTest` is the pin. THIS LANDS BEFORE THE DAG.
+**DAG CHANTIER — THE MEDICAL MODEL, LOCKED (terminology session 2026-06-07; full spec in plan file
+`~/.claude/plans/parallel-floating-corbato.md`).** The "shape the Dossier/outputs first, then build
+the DAG" framing RESOLVED into a single layered model — shaping and DAG are LAYERS 2 and 3 of one
+thing, not two chantiers. The medical analogy, made precise:
+- **Doctor** is a SUPERTYPE ("a specialist IS a doctor") → `Doctor` ← `Generalist`, `Specialist`.
+  Today they have NO common parent (`Generalist` final class, `Specialist` interface). The
+  capability *read the medical records* belongs to `Doctor` → both have it.
+- **Several patients** = several checkpoints (user first tried "single patient = the bootstrap",
+  then REVERTED — too poor to carry "a doctor with several addressed patients accessing their
+  records"). Each checkpoint is a patient with its own medical record.
+- **Access is consultation-bounded, PROPAGATED along `dependsOn` edges:** a doctor sees only the
+  records of patients who consult it; consulting *for* cluster extends access along its chain (→
+  systemd-adapter upstream). The edge is the ACCESS CHANNEL, not just display = cert-manager
+  follow-the-chain to root cause.
 
-**DAG MODEL — START-HERE for next session (code anchors + the real architectural decision).**
-*Where the plan lives TODAY (what the DAG replaces):* both checkpoint stages call a private
-`consultDoctor(...)` that ONLY `log()`s the diagnosis inline — `ClusterReadinessStage.java:203` (sym
-"⚕"/"℞" at :210/:212) and `SystemdAdapterStage.java:187` (:192/:194). The `RemediationPlan` is
-computed, logged, and dropped; it never reaches the runbook node. *The goal:* that plan renders into
-the node's own Diagnosis/Mitigation sections + the `dependsOn` edge becomes explicit DAG data (today
-the edge is shown only via `@NestedSteps` nesting).
-**THE DECISION the next session must make first (under-recorded until now):** the runbook is NOT a
-free-form template — `RunbookRenderer` (bdd/RunbookRenderer.java) renders via JGiven's own
-`AsciiDocReportGenerator` reading a JGiven `ReportModel`/`ScenarioModel`. So "add Diagnosis/Mitigation
-to each node" forces a choice between THREE routes: (a) attach the plan into the JGiven model as
-step `InfoTag`s / attachments / extended description so JGiven's AsciiDoc emits it (stays inside
-JGiven, but JGiven controls layout); (b) STOP using `AsciiDocReportGenerator` and write our OWN
-renderer over `ReportModel` so we own the node layout (Diagnosis/Mitigation/dependsOn sections) — more
-work, full control; (c) a hybrid: keep JGiven for the scenario body, post-process/append our node
-sections. Pick the route BEFORE coding — it's the fork the whole chantier hangs on. RunbookRendering
-Test already asserts "no Diagnosis/Mitigation section before the doctor exists", so the test that
-flips that assertion is the natural TDD entry point. PREREQUISITE still standing: a genuine pair of
-INDEPENDENT checks must exist before fail-at-end is even exercisable (cluster's phases are a linear
-chain) — so landing the node-render (plan→sections) is independently useful NOW, but the edge-policy
-(fail-fast-along-edges vs fail-at-end-between-branches) stays dormant until a branching checkpoint
-appears. Sequence suggestion: node-render first (useful immediately), edge-policy when rule-of-three hits.
+THREE LAYERS (= the three work-pieces):
+- *Layer 1 — exam report (one measurement):* RENAME today's `Dossier` → **`ExamReport`** (≈15
+  usages, atomic, no compat shim; `toOutputMap()` stays). DONE-equivalent concept already exists.
+- *Layer 2 — consultation report (one visit) = THE NEXT EXECUTABLE STEP (user chose "couche 2
+  persistée"):* NEW **`ConsultationReport`** aggregating `List<ExamReport>` + failing `Symptom` +
+  `RemediationPlan` + status/summary. systemd-adapter builds one with 1 exam; cluster with 3 phase
+  exams (= node=checkpoint=one-report). PERSIST it (plan included) in a shared model threaded like
+  `ReportModel` — TODAY the plan is computed in `consultDoctor(...)`, logged `⚕`/`℞`, then DROPPED
+  (`ClusterReadinessStage.java:203` :210/:212; `SystemdAdapterStage.java:187` :192/:194). Persisting
+  is the prerequisite for layer-3 "doctor sees the records". `VerificationResult` becomes a
+  PROJECTION (view) of the cluster ConsultationReport; `ReadinessOutputMapper`/`VerificationResult`
+  reduce to thin views or are deleted (no-compat). **HARD GUARD — byte-identical Stage-B contract:**
+  handoffReady→nextStep (`bootstrap-management-cluster-then-apply-stageb-cluster-manifests` /
+  `wait-for-cluster-readiness`), bootstrapStatus, 7 `cluster*` keys, systemd flat keys.
+  `ClusterReadinessProjectionTest` is the pin; `docs/architecture/bootstrap/bootstrap-contract.adoc`
+  documents it; an EXTERNAL Stage-B orchestrator reads `nextStep` from stack outputs.
+- *Layer 3 — medical record (a patient's history) = the DEFERRED DAG proper:* render each
+  consultation's diagnosis+plan into the runbook NODE's Diagnosis/Mitigation sections; promote the
+  implicit `@NestedSteps` edge to explicit `dependsOn` DAG data WE own (Pulumi can't be queried for
+  reverse deps — see below); introduce the `Doctor` supertype + edge-propagated record access.
+  RULE-OF-THREE: Doctor supertype + access have NO consumer until layer 3 → build them WITH layer 3,
+  not in layer 2 (speculative abstraction otherwise).
+
+**PULUMI / REVERSE-DEPS (user asked, 2026-06-07):** Pulumi IS our state backend; resources declare
+`dependsOn` FORWARD via ctor param, but the running program gets NO graph back and reverse edges
+aren't knowable at runtime (checkpoints play eager, before downstream registers). ⇒ **our DAG owns
+its edges as explicit data**, mirroring (never querying) Pulumi's dependsOn. Pulumi owns resource
+convergence; our model owns the diagnostic narrative graph.
+
+**RENDERER-ROUTE DECISION (layer 3, decide BEFORE coding it):** runbook is NOT a free-form template —
+`RunbookRenderer` uses JGiven's `AsciiDocReportGenerator` over a `ReportModel`. Adding node sections
+forces: (a) attach plan into the JGiven model (InfoTags/attachments — JGiven owns layout); (b)
+replace `AsciiDocReportGenerator` with our own renderer over `ReportModel` (full control, more work);
+(c) hybrid. `RunbookRenderingTest` asserts "no Diagnosis/Mitigation before the doctor exists" → the
+test that flips it is the TDD entry point.
 
 **Verified earlier this session:** `.local.d/bioskop/master/host.preview` (synthesized config) is
 COMPLETE vs the applied `host/` — 0 config files changed/added; the 105 "missing" files are all
