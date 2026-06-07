@@ -710,13 +710,17 @@ non-runbook use case), (3) future contexts.
   closed `switch` inside the core*. A generic doctor cannot contain that switch — the
   *symptom→domain routing must itself be contributed data*, not a core method. This is the real
   extraction work.
-* *How the module integrates with Pulumi (open).* Since the medical record = the stack state,
-  the doctor needs a *Pulumi specialization* — but is it a persistence adapter (where records
-  live: ComponentResource vs provider-backed CustomResource) or a Pulumi-domain Specialist (an
-  expert reading engine state)? The two Pulumi entity worlds (application vs provider) and the
-  ComponentResource-vs-Provider fork are laid out with C4/UML diagrams in
-  link:pulumi-doctor-integration.adoc[pulumi-doctor-integration.adoc]. Decision still open;
-  facts to confirm first (does pulumi-java support inline providers?).
+* *How the module integrates with Pulumi (RESOLVED 2026-06-07).* The doctor is NOT a Pulumi
+  resource — resources are *provisioned* toward a desired state, but a doctor is behaviour and the
+  patient is the stack (modelling either as a resource walks on Pulumi's toes). The doctor stays
+  *application logic*; only the *consultation report* (the result) is carried into the state as
+  `registerOutputs` on the checkpoint's existing `ComponentResource` (Option A) — an output-carrier,
+  not a provisioned actor. Provider-backed CustomResource (Option B) is rejected: re-observation
+  already happens in-program (the probes re-run each up), so a provider `Read` reconstructs managed
+  external state we don't have. Full argument + C4/UML diagrams in
+  link:pulumi-doctor-integration.adoc[pulumi-doctor-integration.adoc]. (A Pulumi-*domain* Specialist
+  — an expert reading engine errors — remains possible later as just another `Specialist`, distinct
+  from this persistence question.)
 
 ==== The medical record IS the Pulumi state; the DAG is reconstructed from it
 
