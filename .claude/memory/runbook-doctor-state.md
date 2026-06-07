@@ -1,6 +1,6 @@
 ---
 name: runbook-doctor-state
-description: feature/runbook-doctor — Increments A-D DONE; BDD-quality pass COMPLETE; DAG chantier has a refined medical-model design (patient=Pulumi stack, Dossier=consultation report, Set<Symptom> bounded by observability, Doctor=generic module, medical record=reconstructable state). Source of truth = wip/spec.adoc + wip/plan.adoc + wip/pulumi-doctor-integration.adoc (committed 930069c1). NEXT executable = layer 2 (persist the consultation report). Pulumi-integration fork RESOLVED (doctor = app logic, NOT a resource; report carried as ComponentResource outputs — Option A). T2/T3/T4 still open.
+description: feature/runbook-doctor — Increments A-D DONE; BDD-quality pass COMPLETE; DAG chantier has a refined medical-model design (patient=Pulumi stack, Dossier=consultation report, Set<Symptom> bounded by observability, Doctor=generic module, medical record=reconstructable state). Source of truth = wip/spec.adoc + wip/plan.adoc + wip/pulumi-doctor-integration.adoc (committed 930069c1). Layer 2 DONE (0cd2b2f5: doctor's plan kept, not dropped — ConsultationReport + ConsultationLog). Layer 2's other steps DISSOLVED (no ExamReport rename; no Set<Symptom>=rule-of-three; VerificationResult-as-projection-of-report impossible — 2 distinct aggregates). NEXT = layer 3 (medical record) in a FRESH session: our model = source, runbook+VerificationResult = views, full record serialized into state, guard renegotiated, phantom-diff to solve first. Pulumi fork RESOLVED (doctor = app logic, Option A). T2/T3/T4 open.
 metadata: 
   node_type: memory
   type: project
@@ -157,15 +157,39 @@ LOCKED in this session:
   `Symptom`/`SpecialistDomain` + symptom→domain ROUTING becomes contributed data, not the hard-coded
   `Generalist.routeBySymptom()` switch); physical Maven extraction DEFERRED.
 
-NEXT EXECUTABLE STEP = layer 2 (`wip/plan.adoc`): persist the consultation report — keep the plan
-(today computed in `consultDoctor(...)`, logged `⚕`/`℞` at `ClusterReadinessStage.java:203` /
-`SystemdAdapterStage.java:187`, then DROPPED); cluster folds its 3 phase dossiers into ONE report
-carrying the symptom set; `VerificationResult` becomes a PROJECTION (ReadinessOutputMapper reduces
-to a view or is deleted). HARD GUARD byte-identical: handoffReady→nextStep
-(`bootstrap-management-cluster-then-apply-stageb-cluster-manifests` / `wait-for-cluster-readiness`),
-bootstrapStatus, 7 `cluster*` keys (`ClusterBootstrapReadinessVerifier.java:504`), systemd flat keys
-(`Dossier.toOutputMap()`); `ClusterReadinessProjectionTest` pins it. Layer 2 is independent of all
-open tensions and ships first.
+**LAYER 2 — DONE (0cd2b2f5).** Shipped a `ConsultationReport` (raised dossiers plus the
+`RemediationPlan`) and a caller-owned `ConsultationLog`, threaded like the runbook `ReportModel`
+(`recordingInto(runbook, consultations)` → `PipelineState` → BOTH stages). On a raised symptom each
+stage records a report → the plan (was computed-logged-then-DROPPED in `consultDoctor`) is kept.
+Reactive model: a healthy checkpoint raises no symptom → no report. In-memory only, Pulumi outputs
+UNTOUCHED (guard held, `ClusterReadinessProjectionTest` unchanged). 35/35 green (+2). **Layer 2's
+other planned steps DISSOLVED on contact with the code** (plan predated the reactive model): no
+`ExamReport` rename (no exam layer); no `Set<Symptom>` (cluster is a fail-fast precondition chain →
+always size 1 → rule-of-three speculation); and "`VerificationResult` = projection of the
+consultation report" is IMPOSSIBLE+already-half-done — a healthy checkpoint produces NO report but a
+`VerificationResult` ALWAYS exists; they are TWO DISTINCT AGGREGATES (`VerificationResult` = the
+always-present Stage-B HANDOFF projection, already a projection of the phase dossiers since Inc D;
+`ConsultationReport` = MEDICAL, only on a symptom). The DAG consumes the reports, NEVER the
+`VerificationResult`. So layer 2's "unify the output shape" goal was layer 3 in disguise: making
+`VerificationResult` a *view of the medical record* IS building the medical record. Only real
+residual dup = the 7 `cluster*` keys defined twice (`asOutputs` + `ReadinessOutputMapper`) — optional
+handoff-side cleanup, unrelated to the medical model.
+
+**LAYER 3 = NEXT, in a FRESH session (decisions LOCKED 2026-06-07, code in `wip/spec.adoc` Inc E).**
+The medical record (one per patient-stack) is OUR aggregate and becomes the SOURCE; the runbook AND
+`VerificationResult` become VIEWS — this REVERSES today's dependency (JGiven `ReportModel` is the
+structure today; instead our model is the source and the JGiven model is *derived* for rendering →
+resolves the renderer fork toward "our own renderer, JGiven as one backend"). Runtime = in-memory
+model (state not yet written; checkpoints eager); state = its SERIALIZATION; post-hoc =
+reconstruction. **User's call: serialize the WHOLE record (plans included) into the outputs** for
+100%-faithful reconstruction from state alone. **GUARD RENEGOTIATED** (reverses the all-session
+"no output changes" stance): Stage-B contract keys UNCHANGED (handoffReady/nextStep/bootstrapStatus/
+7 `cluster*`/systemd flat), a NEW ADDITIVE key (e.g. `medicalRecord`) carries the serialized record.
+**FIRST PROBLEM TO SOLVE when coding: the PHANTOM DIFF** — `OutputBuilder` deliberately omits
+`timestamp` ("changes every run → phantom diff on no-op up"); the full record carries admission
+(timestamp/git) + varying plans → re-introduces it. Parade (exclude timestamp / stable hash) tensions
+with "100% faithful". Deferred to fresh session because this conversation is FAR past its context
+budget and serialization deserves a clean start.
 
 **PULUMI-INTEGRATION FORK — RESOLVED (a949f3bb): doctor is NOT a resource; Option A.** User's
 argument: Pulumi resources are PROVISIONED toward a desired state, not used/invoked as actors. A
@@ -182,14 +206,15 @@ the program re-running, not a provider Read. Full argument + C4/UML in `wip/pulu
 A Pulumi-DOMAIN Specialist (reads engine errors to diagnose) stays possible later as just another
 `Specialist` — distinct from persistence, does not make the doctor a resource.
 
+RENDERER-ROUTE — RESOLVED (2026-06-07) into the layer-3 "our model = source" decision: the
+medical-record model is the source, the JGiven `ReportModel` is DERIVED from it for rendering (our
+own renderer, JGiven as one backend). `RunbookRenderingTest` asserts "no Diagnosis/Mitigation before
+the doctor exists" → flipping it is the TDD entry point when layer 3 lands.
+
 STILL OPEN (deferred until a first doctor version exists):
 - **T2** stateless doctor vs panel (access as `consult()` param vs internal state). **T3** routing
   contributed (see module-ready). **T4** runtime context = the VISIT's admission, not the patient's
   persistent identity (`org/project/stack`) — decides where it attaches.
-- **RENDERER-ROUTE** (layer 3): runbook = JGiven `AsciiDocReportGenerator` over a `ReportModel`, NOT
-  free-form. Node Diagnosis/Mitigation forces: (a) attach into JGiven model (InfoTags/attachments);
-  (b) own renderer over ReportModel; (c) hybrid. `RunbookRenderingTest` asserts "no Diagnosis/Mitigation
-  before the doctor exists" → flipping it is the TDD entry point.
 
 **Verified earlier this session:** `.local.d/bioskop/master/host.preview` (synthesized config) is
 COMPLETE vs the applied `host/` — 0 config files changed/added; the 105 "missing" files are all
