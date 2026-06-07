@@ -1,6 +1,6 @@
 ---
 name: runbook-doctor-state
-description: feature/runbook-doctor — Increments A-D DONE; BDD-quality pass COMPLETE; DAG chantier now has a LOCKED design spec (medical model — ExamReport/ConsultationReport/medical-record layers; Doctor supertype; edge-propagated access). NEXT executable = layer 2 ConsultationReport (rename Dossier→ExamReport, persist the plan, VerificationResult→projection). Full spec in plan file parallel-floating-corbato.md
+description: feature/runbook-doctor — Increments A-D DONE; BDD-quality pass COMPLETE; DAG chantier has a refined medical-model design (patient=Pulumi stack, Dossier=consultation report, Set<Symptom> bounded by observability, Doctor=generic module, medical record=reconstructable state). Source of truth = wip/spec.adoc + wip/plan.adoc + wip/pulumi-doctor-integration.adoc (committed 930069c1). NEXT executable = layer 2 (persist the consultation report). Pulumi-integration fork + T2/T3/T4 OPEN.
 metadata: 
   node_type: memory
   type: project
@@ -124,56 +124,68 @@ chain so everything is fail-fast and correct; fail-at-end becomes meaningful onl
 report-node DAG lands AND there's a genuine pair of INDEPENDENT checks (none in cluster yet — its
 phases are intrinsically sequential). Don't build per-step policy now (rule-of-three: one shape).
 
-**DAG CHANTIER — THE MEDICAL MODEL, LOCKED (terminology session 2026-06-07; full spec in plan file
-`~/.claude/plans/parallel-floating-corbato.md`).** The "shape the Dossier/outputs first, then build
-the DAG" framing RESOLVED into a single layered model — shaping and DAG are LAYERS 2 and 3 of one
-thing, not two chantiers. The medical analogy, made precise:
-- **Doctor** is a SUPERTYPE ("a specialist IS a doctor") → `Doctor` ← `Generalist`, `Specialist`.
-  Today they have NO common parent (`Generalist` final class, `Specialist` interface). The
-  capability *read the medical records* belongs to `Doctor` → both have it.
-- **Several patients** = several checkpoints (user first tried "single patient = the bootstrap",
-  then REVERTED — too poor to carry "a doctor with several addressed patients accessing their
-  records"). Each checkpoint is a patient with its own medical record.
-- **Access is consultation-bounded, PROPAGATED along `dependsOn` edges:** a doctor sees only the
-  records of patients who consult it; consulting *for* cluster extends access along its chain (→
-  systemd-adapter upstream). The edge is the ACCESS CHANNEL, not just display = cert-manager
-  follow-the-chain to root cause.
+**DAG CHANTIER — THE MEDICAL MODEL (terminology session 2026-06-07). SOURCE OF TRUTH = the wip
+docs in the repo, NOT the scratch plan file.** Read `wip/spec.adoc` (Increment E), `wip/plan.adoc`
+(the layer-2 step), `wip/pulumi-doctor-integration.adoc` (C4/UML + the open Pulumi fork). Committed
+930069c1; wip-guard blocks them from main. (The `~/.claude/plans/parallel-floating-corbato.md`
+scratch file is SUPERSEDED by these — it predates the model evolution below.) Model is a DIRECTION,
+deliberately NOT frozen — several tensions left open until a first working doctor version exists.
 
-THREE LAYERS (= the three work-pieces):
-- *Layer 1 — exam report (one measurement):* RENAME today's `Dossier` → **`ExamReport`** (≈15
-  usages, atomic, no compat shim; `toOutputMap()` stays). DONE-equivalent concept already exists.
-- *Layer 2 — consultation report (one visit) = THE NEXT EXECUTABLE STEP (user chose "couche 2
-  persistée"):* NEW **`ConsultationReport`** aggregating `List<ExamReport>` + failing `Symptom` +
-  `RemediationPlan` + status/summary. systemd-adapter builds one with 1 exam; cluster with 3 phase
-  exams (= node=checkpoint=one-report). PERSIST it (plan included) in a shared model threaded like
-  `ReportModel` — TODAY the plan is computed in `consultDoctor(...)`, logged `⚕`/`℞`, then DROPPED
-  (`ClusterReadinessStage.java:203` :210/:212; `SystemdAdapterStage.java:187` :192/:194). Persisting
-  is the prerequisite for layer-3 "doctor sees the records". `VerificationResult` becomes a
-  PROJECTION (view) of the cluster ConsultationReport; `ReadinessOutputMapper`/`VerificationResult`
-  reduce to thin views or are deleted (no-compat). **HARD GUARD — byte-identical Stage-B contract:**
-  handoffReady→nextStep (`bootstrap-management-cluster-then-apply-stageb-cluster-manifests` /
-  `wait-for-cluster-readiness`), bootstrapStatus, 7 `cluster*` keys, systemd flat keys.
-  `ClusterReadinessProjectionTest` is the pin; `docs/architecture/bootstrap/bootstrap-contract.adoc`
-  documents it; an EXTERNAL Stage-B orchestrator reads `nextStep` from stack outputs.
-- *Layer 3 — medical record (a patient's history) = the DEFERRED DAG proper:* render each
-  consultation's diagnosis+plan into the runbook NODE's Diagnosis/Mitigation sections; promote the
-  implicit `@NestedSteps` edge to explicit `dependsOn` DAG data WE own (Pulumi can't be queried for
-  reverse deps — see below); introduce the `Doctor` supertype + edge-propagated record access.
-  RULE-OF-THREE: Doctor supertype + access have NO consumer until layer 3 → build them WITH layer 3,
-  not in layer 2 (speculative abstraction otherwise).
+LOCKED in this session:
+- **Patient = the Pulumi STACK** (`org/project/stack`, persistent identity). Several patients =
+  several stacks. (Evolved: "the bootstrap" → "the checkpoint" → finally "the stack".) A checkpoint
+  is NOT the patient — it is where the patient SELF-OBSERVES a subsystem.
+- **Flow is patient→doctor:** the patient self-observes, raises its own `Symptom`s, and consults.
+  A visit = one `pulumi up`/preview, carrying the admission context (git commit/branch, preview-vs-up,
+  call params = Pulumi stack config incl. `simulate`, timestamp — mostly already in `OutputBuilder`,
+  NOT yet in the runbook).
+- **A consultation carries a `Set<Symptom>` (0..n), BOUNDED BY OBSERVABILITY:** a precondition chain
+  (cluster's kubeconfig→API→controllers — downstream unobservable if upstream fails) collects up to
+  the first blocker (≈1 today); independent observations collect all. = the user's "edge decides".
+- **NO separate exam/observation layer** (ExamReport rename ABANDONED). Today's `Dossier` IS the
+  consultation report (status + raised symptoms + summary + details + the plan). `Symptom` unchanged.
+- **Medical record = the Pulumi STATE, reconstructable from it** (user correction): at runtime you
+  can't query reverse deps (program gets no graph, checkpoints play eager) → runbook built from an
+  in-memory model DURING a run; but POST-HOC the DAG is IN the state (each resource carries outputs
+  = the node + `dependsOn` = the edges) → reconstructable off-line. DESIGN CRITERION: the model is
+  correct when the DAG can be fully reconstructed from the stack state ⇒ the WHOLE consultation
+  report (plan included) must land in resource OUTPUTS (→ state), not just the in-memory model.
+- **T1 RESOLVED: reactive consult** (on a symptom, as today — not systematic per visit; root-cause
+  correlation comes from edge-propagated record access instead).
+- **Doctor = generic pluggable MODULE** (settles the config↔doctor open question: neutral module,
+  config remediation is its 2nd use case; rule-of-three met). Design MODULE-READY now (open
+  `Symptom`/`SpecialistDomain` + symptom→domain ROUTING becomes contributed data, not the hard-coded
+  `Generalist.routeBySymptom()` switch); physical Maven extraction DEFERRED.
 
-**PULUMI / REVERSE-DEPS (user asked, 2026-06-07):** Pulumi IS our state backend; resources declare
-`dependsOn` FORWARD via ctor param, but the running program gets NO graph back and reverse edges
-aren't knowable at runtime (checkpoints play eager, before downstream registers). ⇒ **our DAG owns
-its edges as explicit data**, mirroring (never querying) Pulumi's dependsOn. Pulumi owns resource
-convergence; our model owns the diagnostic narrative graph.
+NEXT EXECUTABLE STEP = layer 2 (`wip/plan.adoc`): persist the consultation report — keep the plan
+(today computed in `consultDoctor(...)`, logged `⚕`/`℞` at `ClusterReadinessStage.java:203` /
+`SystemdAdapterStage.java:187`, then DROPPED); cluster folds its 3 phase dossiers into ONE report
+carrying the symptom set; `VerificationResult` becomes a PROJECTION (ReadinessOutputMapper reduces
+to a view or is deleted). HARD GUARD byte-identical: handoffReady→nextStep
+(`bootstrap-management-cluster-then-apply-stageb-cluster-manifests` / `wait-for-cluster-readiness`),
+bootstrapStatus, 7 `cluster*` keys (`ClusterBootstrapReadinessVerifier.java:504`), systemd flat keys
+(`Dossier.toOutputMap()`); `ClusterReadinessProjectionTest` pins it. Layer 2 is independent of all
+open tensions and ships first.
 
-**RENDERER-ROUTE DECISION (layer 3, decide BEFORE coding it):** runbook is NOT a free-form template —
-`RunbookRenderer` uses JGiven's `AsciiDocReportGenerator` over a `ReportModel`. Adding node sections
-forces: (a) attach plan into the JGiven model (InfoTags/attachments — JGiven owns layout); (b)
-replace `AsciiDocReportGenerator` with our own renderer over `ReportModel` (full control, more work);
-(c) hybrid. `RunbookRenderingTest` asserts "no Diagnosis/Mitigation before the doctor exists" → the
-test that flips it is the TDD entry point.
+OPEN (deferred until a first doctor version exists):
+- **The Pulumi-integration fork** (`wip/pulumi-doctor-integration.adoc`): how the doctor specializes
+  for Pulumi. Mechanism EXISTS today — `SystemdAdapterResource`/`ClusterReadinessResource` are
+  `ComponentResource`s doing `registerOutputs`(node) + `dependsOn`(edges). Fork: (A) keep
+  ComponentResource (logical node, re-derived each run, NO Read/Diff) vs (B) provider-backed
+  CustomResource (Create=1st diagnosis, Read/refresh=re-observe, Diff=changed?, Update=re-diagnose,
+  Delete=discharge — maps 1:1 to "record=reconstructable state", but a Java provider is a heavy
+  separate gRPC plugin). FACTS TO CONFIRM (not from memory): does pulumi-java support inline/dynamic
+  providers (TS/Python do; Java maybe not)? cost of a minimal provider? is checkpoint outputs+dependsOn
+  enough to reconstruct the DAG? Working hypothesis: the core stays neutral (produces a neutral
+  ConsultationReport); Pulumi-ness lives in the seed-master ADAPTER — so maybe NO Pulumi specialization
+  inside the module at all. Also distinguish: persistence-adapter vs a Pulumi-DOMAIN Specialist.
+- **T2** stateless doctor vs panel (access as `consult()` param vs internal state). **T3** routing
+  contributed (see module-ready). **T4** runtime context = the VISIT's admission, not the patient's
+  persistent identity (`org/project/stack`) — decides where it attaches.
+- **RENDERER-ROUTE** (layer 3): runbook = JGiven `AsciiDocReportGenerator` over a `ReportModel`, NOT
+  free-form. Node Diagnosis/Mitigation forces: (a) attach into JGiven model (InfoTags/attachments);
+  (b) own renderer over ReportModel; (c) hybrid. `RunbookRenderingTest` asserts "no Diagnosis/Mitigation
+  before the doctor exists" → flipping it is the TDD entry point.
 
 **Verified earlier this session:** `.local.d/bioskop/master/host.preview` (synthesized config) is
 COMPLETE vs the applied `host/` — 0 config files changed/added; the 105 "missing" files are all
