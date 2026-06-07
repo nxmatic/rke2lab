@@ -22,7 +22,7 @@
     <dbus.java.version>5.2.0</dbus.java.version>
     <java-systemd.version>3.0.0-SNAPSHOT</java-systemd.version>
     <grpc.version>1.80.0</grpc.version>
-    <pulumi.version>1.0.0</pulumi.version>
+    <pulumi.version>1.28.0</pulumi.version>
     <pulumi.command.version>1.2.1</pulumi.command.version>
     <spring.boot.version>3.3.12</spring.boot.version>
     <jsr305.version>3.0.2</jsr305.version>

@@ -1,6 +1,6 @@
 ---
 name: doctor-remediation-model
-description: "Doctor model extended by the 2026-06-07 subagent brainstorm — Remediator tier, next-visit loop closure, recruit-a-specialist gradient. Enriched wip/spec.adoc (Prescription + The Doctor + AI-seam sections); not yet implemented."
+description: "Doctor model design (2026-06-07): Remediator tier, next-visit loop closure, recruit-a-specialist gradient + consultation as a Referral/Prescription/ReferralReply round-trip (specialist sees siblings+longitudinal by ref). Enriched wip/spec.adoc; not yet implemented."
 metadata: 
   node_type: memory
   type: project
@@ -55,6 +55,28 @@ over a closed enum cannot recruit. **DOGFOODING (user: "on fait du dogfooding à
 brainstorm→design, triggered by a REAL remediation exercise (healing the live
 `systemd-adapter degraded` on master, the dbus-tcp:12434 symptom in [[master-provisioning-state]]).
 The runbook's recruitment prescriptions = a self-generated backlog of specialists to build.
+
+**4. Consultation = a referral round-trip (2026-06-07 session-3 enrichment; DESIGN, not yet
+implemented).** Today `diagnose(Symptom, Dossier) → Optional<Prescription>` is a one-shot with NO
+context: the specialist sees only its symptom + dossier, never the sibling prescriptions written THIS
+run nor the longitudinal record (verified in `Generalist.consult` — the accumulating `List<Prescription>`
+is never passed back into later `diagnose` calls; the sole call site is `diagnose(symptom, dossier)`).
+The user's model fixes this as the real medical circuit, THREE objects with clear recipients:
+(a) **Referral** (REQUEST, generalist → a NAMED specialist): the patient + the symptom (the *why*) +
+*references* (not copies) to the longitudinal patient record AND the sibling prescriptions already made
+THIS run by the generalist to other specialists; (b) **Prescription** (specialist → PATIENT): the
+treatment to administer (today's `Prescription`, unchanged role); (c) **ReferralReply** (RESPONSE,
+specialist → generalist, doctor-to-doctor): explains what it found, and **references the Referral**
+(request↔response linkage). So the shape becomes ~`diagnose(Referral) → ReferralReply` where the reply
+CARRIES the Prescription (if any) + the explanation + a pointer to the request. Cheap: both refs
+(longitudinal record + this-run log) are already in memory; the Referral only points. Wins: (1) the
+addressing is TRACED end-to-end → resolves the patient↔specialist `authoredBy` gap the Drools prototype
+flagged, for free; (2) a "nothing to offer" case is a ReferralReply WITHOUT a Prescription (keeps the
+*why*, unlike today's `Optional.empty()` which drops it); (3) serves the planner inner loop — when a
+downstream symptom is unmasked and re-consulted, the new Referral references the sibling prescriptions
+already emitted, so the next specialist sees the run context (ordering matters: specialist N sees
+siblings 1..N-1). This is the doctor model, NOT the what-if (see [[preview-whatif-topic]] for that).
+Open at impl: Prescription contained-in vs separate-from the ReferralReply.
 
 **Two seams, not one (clarified in `[#ai-seam]`):** diagnosis seam = READ-ONLY (Specialist
 correlates+prescribes, never acts — like a read-only subagent); remediation seam = where the
