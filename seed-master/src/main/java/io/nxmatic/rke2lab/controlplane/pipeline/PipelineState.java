@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane.pipeline;
 
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
+import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
@@ -23,6 +24,14 @@ final class PipelineState {
    * caller calls {@code recordingInto}; checkpoints fall back to a local model when absent.
    */
   ReportModel runbook;
+
+  /**
+   * The consultation log, owned by the caller and threaded through every checkpoint so each records
+   * its doctor consultation (the raised dossiers + the plan) into one shared log instead of
+   * dropping the plan after the inline log. Null until {@code recordingInto}; checkpoints fall back
+   * to a discarded local one when absent. In-memory only — does not touch the Pulumi outputs.
+   */
+  ConsultationLog consultations;
 
   BboxReconciliationOrchestrator bboxOrchestrator;
   ResourceManager resourceManager;

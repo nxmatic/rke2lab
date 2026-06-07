@@ -7,6 +7,8 @@ import com.tngtech.jgiven.report.text.PlainTextReporter;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessScenario;
+import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
+import io.nxmatic.rke2lab.controlplane.bdd.ConsultationReport;
 import io.nxmatic.rke2lab.controlplane.bdd.Dossier;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.bdd.Prescription;
@@ -17,6 +19,7 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -40,6 +43,7 @@ public final class ClusterReadinessStage {
   private final boolean pulumiMode;
   private final Consumer<String> readinessLogger;
   private final ReportModel runbook;
+  private final ConsultationLog consultations;
   private final Generalist generalist;
   private final ClusterReadinessProbe phaseProbe;
   private final Map<String, Object> systemdAdapterLaunchSummary;
@@ -52,6 +56,7 @@ public final class ClusterReadinessStage {
       boolean pulumiMode,
       Consumer<String> readinessLogger,
       ReportModel runbook,
+      ConsultationLog consultations,
       Generalist generalist,
       ClusterReadinessProbe phaseProbe,
       Map<String, Object> systemdAdapterLaunchSummary,
@@ -62,6 +67,7 @@ public final class ClusterReadinessStage {
     this.pulumiMode = pulumiMode;
     this.readinessLogger = readinessLogger;
     this.runbook = runbook;
+    this.consultations = consultations;
     this.generalist = generalist;
     this.phaseProbe = phaseProbe;
     this.systemdAdapterLaunchSummary =
@@ -199,7 +205,11 @@ public final class ClusterReadinessStage {
     return dossier != null && dossier.isOk();
   }
 
-  /** The patient consults the doctor on the first failing phase's symptom. */
+  /**
+   * The patient consults the doctor on the first failing phase's symptom. The resulting plan is
+   * kept on a {@link ConsultationReport} in the shared log (no longer logged-then-dropped) — the
+   * raised dossiers it brought plus the plan the doctor wrote.
+   */
   private void consultDoctor(Map<ClusterReadinessPhase, Dossier> phaseDossiers) {
     phaseDossiers.values().stream()
         .filter(dossier -> dossier.symptom().isPresent())
@@ -210,6 +220,10 @@ public final class ClusterReadinessStage {
               log("⚕ " + SCENARIO_ID + " diagnosis: " + plan.generalistSummary());
               for (Prescription prescription : plan.prescriptions()) {
                 log("  ℞ " + prescription.programRef().id() + " — " + prescription.humanHint());
+              }
+              if (consultations != null) {
+                consultations.record(
+                    new ConsultationReport(SCENARIO_ID, List.copyOf(phaseDossiers.values()), plan));
               }
             });
   }

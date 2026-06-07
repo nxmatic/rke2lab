@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
+import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.bdd.RunbookRenderer;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions;
@@ -56,12 +57,13 @@ public final class BootstrapStage {
     // a CRITICAL stop (a checkpoint that throws to abort provisioning) still produces a runbook —
     // exactly the failure the runbook exists to document.
     final ReportModel runbook = new ReportModel();
+    final ConsultationLog consultations = new ConsultationLog();
     try {
       BootstrapPipeline.ComponentBoundPipeline ready =
           BootstrapPipeline.forCluster(configSupplier.get(), policySupplier.get())
               .withOptions(optionsSupplier.get())
               .using(bboxOrchestrator, resourceManager, outputBuilder)
-              .recordingInto(runbook);
+              .recordingInto(runbook, consultations);
       final OnFailure handler = onFailureSupplier.get();
       if (handler != null) {
         ready = ready.onFailure(handler);

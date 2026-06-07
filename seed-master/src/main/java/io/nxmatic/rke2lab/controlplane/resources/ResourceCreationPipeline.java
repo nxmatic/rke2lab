@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane.resources;
 
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.bdd.ProductionClusterReadinessProbe;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
@@ -28,6 +29,7 @@ final class ResourceCreationPipeline {
   private final boolean readinessEnabled;
   private final Consumer<String> readinessLogger;
   private final ReportModel runbook;
+  private final ConsultationLog consultations;
   private final Generalist generalist;
   private final IncusResourceBootstrap.BootstrapResult bootstrapResult;
   private final Map<String, Object> systemdAdapterLaunchSummary;
@@ -38,6 +40,7 @@ final class ResourceCreationPipeline {
       boolean readinessEnabled,
       Consumer<String> readinessLogger,
       ReportModel runbook,
+      ConsultationLog consultations,
       Generalist generalist,
       IncusResourceBootstrap.BootstrapResult bootstrapResult,
       Map<String, Object> systemdAdapterLaunchSummary) {
@@ -46,6 +49,7 @@ final class ResourceCreationPipeline {
     this.readinessEnabled = readinessEnabled;
     this.readinessLogger = readinessLogger;
     this.runbook = runbook;
+    this.consultations = consultations;
     this.generalist = generalist;
     this.bootstrapResult = bootstrapResult;
     this.systemdAdapterLaunchSummary = systemdAdapterLaunchSummary;
@@ -67,6 +71,7 @@ final class ResourceCreationPipeline {
             pulumiMode,
             readinessLogger,
             runbook,
+            consultations,
             generalist,
             new ProductionClusterReadinessProbe(policy, readinessLogger),
             systemdAdapterLaunchSummary,

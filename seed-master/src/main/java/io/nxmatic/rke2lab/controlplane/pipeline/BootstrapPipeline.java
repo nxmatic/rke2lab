@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane.pipeline;
 
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
+import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.bdd.DbusTcpSpecialist;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
@@ -97,12 +98,16 @@ public final class BootstrapPipeline {
     }
 
     /**
-     * Optional: record every checkpoint's scenario into one caller-owned runbook model. The caller
-     * renders it (in a {@code finally}, so a CRITICAL stop still produces a runbook). When not
-     * called, each checkpoint uses a discarded local model — inline log only, no runbook.
+     * Optional: record every checkpoint's scenario into one caller-owned runbook model, and every
+     * doctor consultation into one caller-owned {@link ConsultationLog}. The caller renders the
+     * runbook (in a {@code finally}, so a CRITICAL stop still produces one); the consultation log
+     * is the in-memory accumulation the medical record (layer 3) will read. When not called, each
+     * checkpoint uses discarded local instances — inline log only.
      */
-    public ComponentBoundPipeline recordingInto(ReportModel runbook) {
+    public ComponentBoundPipeline recordingInto(
+        ReportModel runbook, ConsultationLog consultations) {
       state.runbook = runbook;
+      state.consultations = consultations;
       return this;
     }
 
@@ -232,6 +237,7 @@ public final class BootstrapPipeline {
               state.pulumiMode,
               state.readinessLogger,
               state.runbook,
+              state.consultations,
               generalist,
               liveProbe,
               summary -> state.systemdAdapterLaunchSummary = summary);
@@ -270,6 +276,7 @@ public final class BootstrapPipeline {
               state.pulumiMode,
               state.readinessLogger,
               state.runbook,
+              state.consultations,
               generalist,
               () -> state.bootstrapResult,
               () -> state.systemdAdapterLaunchSummary,

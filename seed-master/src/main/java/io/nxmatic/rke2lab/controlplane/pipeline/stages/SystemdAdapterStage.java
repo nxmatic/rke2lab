@@ -4,6 +4,8 @@ import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.text.PlainTextReporter;
+import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
+import io.nxmatic.rke2lab.controlplane.bdd.ConsultationReport;
 import io.nxmatic.rke2lab.controlplane.bdd.Dossier;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.bdd.Prescription;
@@ -17,6 +19,7 @@ import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.PipelineStageFailure;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -47,6 +50,7 @@ public final class SystemdAdapterStage {
   private final boolean pulumiMode;
   private final Consumer<String> readinessLogger;
   private final ReportModel runbook;
+  private final ConsultationLog consultations;
   private final Generalist generalist;
   private final SystemdAdapterProbe liveProbe;
   private final Consumer<Map<String, Object>> sink;
@@ -57,6 +61,7 @@ public final class SystemdAdapterStage {
       boolean pulumiMode,
       Consumer<String> readinessLogger,
       ReportModel runbook,
+      ConsultationLog consultations,
       Generalist generalist,
       SystemdAdapterProbe liveProbe,
       Consumer<Map<String, Object>> sink) {
@@ -65,6 +70,7 @@ public final class SystemdAdapterStage {
     this.pulumiMode = pulumiMode;
     this.readinessLogger = readinessLogger;
     this.runbook = runbook;
+    this.consultations = consultations;
     this.generalist = generalist;
     this.liveProbe = liveProbe;
     this.sink = sink;
@@ -181,8 +187,9 @@ public final class SystemdAdapterStage {
 
   /**
    * The patient consults the doctor on failure: route the captured dossier's symptom to the
-   * Generalist and log the prescriptions. A symptomless or absent dossier (e.g. failure before the
-   * probe ran) has nothing to route, so the consultation is skipped.
+   * Generalist, log the prescriptions, and keep the plan on a {@link ConsultationReport} in the
+   * shared log (no longer dropped). A symptomless or absent dossier (e.g. failure before the probe
+   * ran) has nothing to route, so the consultation is skipped.
    */
   private void consultDoctor(Dossier dossier) {
     if (dossier == null || dossier.symptom().isEmpty()) {
@@ -192,6 +199,9 @@ public final class SystemdAdapterStage {
     log("⚕ " + SCENARIO_ID + " diagnosis: " + plan.generalistSummary());
     for (Prescription prescription : plan.prescriptions()) {
       log("  ℞ " + prescription.programRef().id() + " — " + prescription.humanHint());
+    }
+    if (consultations != null) {
+      consultations.record(new ConsultationReport(SCENARIO_ID, List.of(dossier), plan));
     }
   }
 

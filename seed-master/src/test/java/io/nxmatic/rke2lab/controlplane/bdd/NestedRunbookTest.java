@@ -148,19 +148,85 @@ class NestedRunbookTest {
         report.contains("Diagnosis"), "node-level Diagnosis section is Increment C+ (deferred)");
   }
 
+  @Test
+  void a_failing_consultation_keeps_its_plan_in_the_shared_log() {
+    // The doctor's plan must no longer be computed-logged-then-dropped: a failing checkpoint
+    // records
+    // a ConsultationReport (the raised dossiers + the plan) into the shared, caller-owned log — the
+    // prerequisite for the medical record (layer 3). Pulumi outputs are untouched (the
+    // byte-identical
+    // Stage-B contract holds); this only adds an in-memory accumulation.
+    final ClusterReadinessProbe simulated =
+        SimulatedClusterReadinessProbe.failingAt(ClusterReadinessPhase.API_READY, Symptom.TIMEOUT);
+    final ConsultationLog consultations = new ConsultationLog();
+
+    play(new ReportModel(), consultations, simulated, false, networkGeneralist());
+
+    assertEquals(
+        1,
+        consultations.consultations().size(),
+        "the failing checkpoint should record one consultation");
+    final ConsultationReport consultation = consultations.consultations().get(0);
+    assertEquals(
+        Symptom.TIMEOUT, consultation.symptom(), "the consultation names the raised symptom");
+    assertTrue(
+        consultation.plan().hasPrescriptions(),
+        "the network specialist's prescription is kept on the report, not dropped");
+    assertEquals(
+        RemediationProgramRef.CHECK_CONNECTIVITY,
+        consultation.plan().primaryPrescription().orElseThrow().programRef());
+  }
+
+  @Test
+  void a_healthy_consultation_records_nothing() {
+    // Reactive-consultation model: no symptom raised → no doctor consultation → no report.
+    final ConsultationLog consultations = new ConsultationLog();
+
+    play(
+        new ReportModel(),
+        consultations,
+        FakeClusterReadinessProbes.allPhasesReady(),
+        false,
+        readyGeneralist());
+
+    assertTrue(
+        consultations.consultations().isEmpty(),
+        "a checkpoint that raises no symptom records no consultation");
+  }
+
   /** Play the real stage with no log capture. */
   private static VerificationResult play(
       ReportModel runbook, ClusterReadinessProbe probe, boolean pulumiMode, Generalist generalist) {
     return play(runbook, probe, pulumiMode, generalist, message -> {});
   }
 
+  private static VerificationResult play(
+      ReportModel runbook,
+      ClusterReadinessProbe probe,
+      boolean pulumiMode,
+      Generalist generalist,
+      java.util.function.Consumer<String> logger) {
+    return play(runbook, new ConsultationLog(), probe, pulumiMode, generalist, logger);
+  }
+
+  private static VerificationResult play(
+      ReportModel runbook,
+      ConsultationLog consultations,
+      ClusterReadinessProbe probe,
+      boolean pulumiMode,
+      Generalist generalist) {
+    return play(runbook, consultations, probe, pulumiMode, generalist, message -> {});
+  }
+
   /**
    * Drive the production {@link ClusterReadinessStage#launch()} with an injected probe and capture
    * its {@link VerificationResult}. This is the single owner of the scenario script — the test
-   * varies only the probe (fake/simulated), the runbook model, and the log sink.
+   * varies only the probe (fake/simulated), the runbook model, the consultation log, and the log
+   * sink.
    */
   private static VerificationResult play(
       ReportModel runbook,
+      ConsultationLog consultations,
       ClusterReadinessProbe probe,
       boolean pulumiMode,
       Generalist generalist,
@@ -173,6 +239,7 @@ class NestedRunbookTest {
             pulumiMode,
             logger,
             runbook,
+            consultations,
             generalist,
             probe,
             REACHABLE_SYSTEMD_ADAPTER,

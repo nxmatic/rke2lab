@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.resources;
 
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
@@ -17,6 +18,7 @@ public final class ResourceManager {
       boolean readinessEnabled,
       Consumer<String> readinessLogger,
       ReportModel runbook,
+      ConsultationLog consultations,
       Generalist generalist,
       IncusResourceBootstrap.BootstrapResult bootstrapResult,
       Map<String, Object> systemdAdapterLaunchSummary,
@@ -29,6 +31,7 @@ public final class ResourceManager {
             readinessEnabled,
             readinessLogger,
             runbook,
+            consultations,
             generalist,
             bootstrapResult,
             systemdAdapterLaunchSummary);
