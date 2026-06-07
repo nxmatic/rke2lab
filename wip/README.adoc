@@ -31,12 +31,14 @@ not by subject or date — this index carries the dates.
 |link:layer3-readside-runtime-enrichment-design.adoc[Layer 3 — Read-side part 1 (runtime enrichment) Design] |2026-06-07 |`feature/runbook-doctor` |DONE (4 commits c8c7116f→daa34928); Approach A — inject diagnosis into the JGiven node via extendedDescription; post-hoc reconstruction deferred
 |link:layer3-readside-runtime-enrichment-plan.adoc[Layer 3 — Read-side part 1 Plan] |2026-06-07 |`feature/runbook-doctor` |DONE — TDD plan (4 tasks) for the runtime enrichment above
 |link:dsl-unification-exploration.adoc[JGiven as Shared Engine — pipeline ↔ BDD] |2026-06-07 |`refactor/jgiven-shared-engine` _(future)_ |PARKED exploration capture; direction = one engine (JGiven), two layers, Mapping B (one report, one scenario per topic); `during/then` stays the authoring surface; open question = state model; prototype `PreflightScenario` first; lands after runbook-doctor
+|link:preview-whatif-replay-exploration.adoc[Preview as counterfactual BDD replay (what-if)] |2026-06-07 |`feature/runbook-doctor` _(future)_ |PARKED exploration capture; preview replays the BDD logic on a fact base = observed ⊕ remediation hypothesis (propagates along the dependsOn edge); subsumes "reconstruction"; (b) StackReference resolves in preview = PROVEN by a real test; one blocker = diagnostic placement (per-node is invisible to StackReference; needs a top-level channel); decide cold next session
 |===
 
 [NOTE]
 ====
-The JGiven-shared-engine row is a *parked future subject*, not part of the active
-`feature/runbook-doctor` work. It is captured here so it can be resumed cold; it intentionally
-breaks the "one active subject" rule as a holding note and will get its own branch
-(`refactor/jgiven-shared-engine`) when started.
+The last two rows (JGiven-shared-engine, preview what-if) are *parked future subjects*, captured here
+so they can be resumed cold. The JGiven-shared-engine row intentionally breaks the "one active
+subject" rule as a holding note and will get its own branch (`refactor/jgiven-shared-engine`). The
+what-if row renegotiates a layer-3 write-side decision, so it likely stays on `feature/runbook-doctor`
+— its branch is decided when picked up.
 ====

@@ -1,0 +1,230 @@
+= Preview as counterfactual BDD replay — the "what-if" exploration
+:toc: left
+:toclevels: 3
+
+*Date:* 2026-06-07 +
+*Status:* EXPLORATION captured cold — brainstorm only, no spec, no plan, no code. One mechanical
+fact was *proven by a real test* (see <<proven>>); everything else is a validated direction with
+open tensions named. +
+*Branch (when started):* likely `feature/runbook-doctor` (it renegotiates a layer-3 write-side
+decision) — to be decided when picked up. +
+*Workshop:* parked in `wip/` deliberately. This is a *different subject* from the doctor-model
+extensions already in link:spec.adoc[spec.adoc]; captured here so it can be resumed cold. Do NOT
+interleave it with the active doctor work until picked up as its own subject.
+
+== How we got here (read this first)
+
+The thread evolved through several reframings during the 2026-06-07 session. Recording the path
+matters because each turn *killed* a wrong framing — restarting from the wrong one would re-litigate
+settled ground.
+
+. *Subagent → doctor brainstorm* (the parent conversation) extended the doctor with three tiers:
+  the pure *Doctor*, the *Prescription* as a referral, and a new *Remediator* that administers the
+  treatment. The loop closes on the *next visit*: doctor _proposes_ (in the record), operator
+  _disposes_ (a directive in the stack config), the next `up` _executes_ and re-observes. See
+  link:spec.adoc[spec.adoc] sections `[#the-remediator]`, `[#loop-closure]`, `[#recruiting-a-specialist]`.
+. *"Do we need offline reconstruction?"* — first the user doubted the post-hoc reconstruction tool
+  had any use case; we nearly dropped it as YAGNI.
+. *The user surfaced a real gap:* preparing a master update — wanting to see master's last real
+  diagnosed state *without* running an `up` — is NOT served by a normal preview, because checkpoints
+  *defer* in dry-run (they do not re-probe).
+. *Then the user reframed it sharply, and this is the real subject:* the preview already *replays the
+  BDD logic to build the next state*. So the question is not "reconstruct a past runbook" — it is
+  *how the Given/When/Then clauses could feed on the current state's outputs* instead of deferring.
+. *Final crystallization (the user's):* take the "dbus degraded → restart prescribed" case. The
+  operator wants to administer the remediation. Before doing so, they want to *replay in dry-run with
+  an updated fact base* — assume "dbus operational" (the prescription's expected result) and let the
+  BDD logic propagate along the dependency chain to show *what that unblocks downstream and what
+  stays broken*. That is a **counterfactual replay** (a "what-if"), not a reconstruction.
+
+The reconstruction framing is therefore *subsumed*, not revived: a plain "show the last real state"
+is just the what-if with **zero hypotheses injected** (the degenerate case). One mechanism, not two.
+
+== What the system does TODAY (grounded in the code)
+
+Checked against `seed-master` during the session:
+
+* *The checkpoint plays a JGiven scenario.* `SystemdAdapterStage.launch()` and
+  `ClusterReadinessStage.launch()` create a `Scenario`, `startScenario(...)`, run Given/When/Then,
+  `finished()`. The same scenario runs offline (tests) and live (the stage).
+* *The `When` does NOT probe inline — it calls an injected `probe`.* `SystemdAdapterProbe` /
+  `ClusterReadinessProbe` are functional interfaces. The `When` step is literally
+  `dossier = probe.probe(config)`. The stage already injects *different* probe implementations:
++
+[cols="2,2,3",options="header"]
+|===
+|Probe source |When |What the `When` reads
+|`ProductionClusterReadinessProbe` |apply (`up`) |the *live* infra
+|`SimulatedSystemdAdapterProbe` |preview + ordered incident |a *canned* failure
+|_(body skipped — dry-run)_ |normal preview |*nothing* → `deferred-preview`
+|===
+* *Normal preview renders an empty shell.* In preview the stage sets `jgiven.report.dry-run=true`,
+  which skips step *bodies*, but still plays the scenario so the *shell* (Given/When/Then lines)
+  renders into the runbook. No probe runs → no observation → `deferredPreview`. This is the
+  `deferred-preview` status seen in `pulumi.log`.
+* *The dependency edge is a nested replay.* `ClusterReadinessScenario` replays the systemd-adapter
+  Given/When/Then via `@NestedSteps` / `depending_on_systemd_adapter(...)` — the cluster→systemd
+  edge as a *follow-the-chain* walk. Cluster phases downstream of a failing precondition are marked
+  SKIPPED (fail-fast along the chain) — "downstream unobservable if upstream fails".
+
+== The idea — preview as counterfactual BDD replay
+
+The `When` reading an *injected probe* is the seam. The what-if adds a **fourth probe source**: in
+preview, instead of skipping the `When`, inject a probe that returns a `Dossier` built from *a fact
+base* = (the last real observations) overlaid with (the operator's hypotheses, e.g. "dbus
+operational"). The Given/When/Then text does **not change**; only the injected implementation does.
+
+.The four probe sources — the what-if is the fourth, in the existing seam
+[mermaid]
+....
+flowchart TB
+  When["When step<br/>dossier = probe.probe(cfg)"]
+  subgraph Sources["probe implementations (injected)"]
+    Prod["Production probe<br/>reads LIVE infra · apply"]
+    Sim["Simulated probe<br/>canned failure · preview+incident"]
+    Defer["(skipped)<br/>normal preview → deferred"]
+    WhatIf["What-if probe (NEW)<br/>fact base = observed ⊕ hypotheses<br/>· preview"]
+  end
+  Prod --> When
+  Sim --> When
+  Defer -. today .-> When
+  WhatIf ==> When
+
+  classDef new fill:#d4f8d4,stroke:#1a7f37,color:#0a3d12;
+  class WhatIf new;
+....
+
+Crucially, the **propagation engine already exists**: it is the `@NestedSteps` dependency replay. If
+the fact base says "dbus ok", the nested systemd-adapter step passes, so the downstream cluster
+phases — previously SKIPPED — become *evaluable*, and the replay shows what the remediation would
+unblock. The what-if *exercises* the "edge decides" model: flip an upstream fact, the DAG re-derives
+the reachable downstream.
+
+.The counterfactual replay for "dbus degraded → restart" (sequence)
+[mermaid]
+....
+sequenceDiagram
+  participant OP as Operator
+  participant FB as Fact base
+  participant BDD as BDD replay (dry-run)
+  participant RB as Runbook (what-if view)
+
+  Note over FB: observed at last up:<br/>dbus = degraded
+  OP->>FB: inject hypothesis<br/>"dbus operational"<br/>(the prescription's expected result)
+  OP->>BDD: pulumi preview (no live probe)
+  BDD->>FB: When reads dbus → "operational"
+  BDD->>BDD: nested edge passes →<br/>cluster phases now evaluable
+  BDD->>RB: render: what the restart unblocks<br/>+ what stays broken
+  Note over RB: marked COUNTERFACTUAL<br/>(not a real up)
+....
+
+=== Why this is the right framing (not just a nice one)
+
+* *It uses the DAG for what it was built for.* The single-source `cluster dependsOn systemd-adapter`
+  edge (shipped, commit `13bb7715`) is exactly what the replay propagates along.
+* *It makes a prescription testable BEFORE administration.* This is the missing link of the
+  Remediator tier: today the doctor _proposes_ and the operator _disposes_ blind. The what-if gives
+  the operator the *simulated consequence* of the prescription before deciding — "the physician
+  simulates the treatment's effect on the chain before administering it".
+* *It subsumes reconstruction.* "Show the last real state" = what-if with zero hypotheses. No second
+  feature.
+
+[#proven]
+== What was PROVEN (a real test, not an inference)
+
+The whole idea rests on one mechanical question: *can a program read its own previous outputs during
+a dry-run?* We tested it directly (throwaway YAML stacks, local file backend in `/tmp`, no real
+infra, master untouched; fixture destroyed after).
+
+* *Setup:* a `producer` stack exporting `dbusStatus: "degraded"` (one `up`), and a `consumer` stack
+  with a `pulumi:pulumi:StackReference` to it, exporting `seenDbusStatus: ${ref.outputs.dbusStatus}`.
+* *Result of `pulumi preview` on the consumer (never `up`):*
++
+[source]
+----
+> pulumi:pulumi:StackReference: (read)
+    outputs: { dbusStatus: "degraded" }
+seenDbusStatus: "degraded"
+----
+* *Conclusion (PROVEN):* a `StackReference` does a *Read*, and the referenced stack's outputs resolve
+  to *known values during preview* (not `unknown`). By extension a stack that references *itself*
+  would read its own last-`up` outputs during its own preview. **The mechanical pillar of the what-if
+  holds.**
+
+== The lock — placement of the diagnostic in the state (the one real blocker)
+
+Everything hard is already in place (injected-probe seam, nested-edge propagation). The single
+blocker is **where the last-real diagnostic lives in the state**, and it is now a *fact*, not a
+guess:
+
+* *`StackReference` reads ONLY top-level outputs* (proven from source: its `outputs` map = what
+  `ctx.export(...)` publishes; there is no API to reach a child resource's outputs).
+* *The shipped layer-3 write-side serializes the `ConsultationReport` PER-NODE, under each
+  `ComponentResource`* (the recadrage, commit `a8c37c75` / `4e8e71d1`) — deliberately NOT top-level,
+  to keep the Stage-B contract byte-identical and avoid the phantom diff.
+* ⇒ *the per-node diagnostic is INVISIBLE to `StackReference`.* The only channel a program can read
+  back in preview is top-level — exactly the one the recadrage avoided.
+
+[cols="1,2,2",options="header"]
+|===
+|Dimension |Recadrage decision (shipped) |What the what-if requires
+|Diagnostic placement |per-node, under the ComponentResource |top-level (only channel a program can read in preview)
+|Rationale |keep Stage-B contract byte-identical; no phantom diff |let the program re-read the last dossier as the fact base
+|===
+
+These are in *frontal tension*. The recadrage optimized "don't pollute the external contract",
+*assuming no consumer*. The what-if **is** that consumer — so the assumption no longer holds. This is
+a *renegotiation*, not a contradiction: the open decision is whether to add a **top-level additive**
+channel (e.g. a `medicalRecord` exported via `ctx.export`, readable by a self-`StackReference`) *in
+addition to* the per-node serialization (which keeps the state self-describing) — or *instead of* it.
+
+== Open tensions (named, not resolved)
+
+. *Placement (the blocker above).* Top-level additive vs per-node — to be decided in the next
+  session. The user chose to capture first and decide cold.
+. *Semantics — baseline vs prediction vs counterfactual.* Settled toward *counterfactual* (observed
+  ⊕ hypothesis). It must be rendered as clearly COUNTERFACTUAL in the runbook — it is a simulation
+  ("if the remediation works AND the dependency model is correct, then…"), not a guarantee. Risk:
+  the operator reads it as a promise.
+. *Where the hypothesis comes from.* Could the `Prescription` itself carry "the expected state after
+  administration"? That would give the Remediator tier extra meaning (a prescription predicts its
+  own success condition). Not frozen.
+. *Hypothesis shape.* A boolean flip ("dbus → ok") vs a rich hypothetical `Dossier` (status +
+  summary). Open.
+. *Should preview re-probe instead of defer?* A separate, legitimate subject the thread surfaced:
+  probes are *reads* (no side effects), so a preview *could* re-probe live and reflect "what the next
+  up would find" — today it defers (probably to stay offline / not depend on master's reachability).
+  Distinct from the what-if; noted so it is not conflated.
+
+== Next step (when picked up — NOT now)
+
+. Decide the *placement* lock (top-level additive vs per-node) — the only blocker; (b) is already
+  proven.
+. Then prototype a `WhatIfProbe` reading a self-`StackReference`'s top-level diagnostic + applying a
+  hypothesis, and confirm the nested edge propagates as expected end-to-end.
+. Only then: real brainstorm → spec → plan. This doc is none of those.
+
+== Key files (entry points)
+
+* `seed-master/.../pipeline/stages/SystemdAdapterStage.java` — the injected-probe seam; `dryRun`
+  gating; `deferredPreview`.
+* `seed-master/.../pipeline/stages/ClusterReadinessStage.java` — mirror; the nested systemd-adapter
+  replay (`capturedSystemdAdapterDossier`); preview defer path.
+* `seed-master/.../bdd/SystemdAdapterScenario.java` — Given/When/Then; `When` = `probe.probe(config)`
+  (the seam the what-if plugs into).
+* `seed-master/.../resources/ResourceCreationPipeline.java` — `consultationFor(...)`; where the
+  per-node `ConsultationReport` is registered on each ComponentResource (the placement to renegotiate).
+* `seed-master/.../pipeline/OutputBuilder.java` — the top-level outputs (where a `medicalRecord`
+  channel would live if placement moves top-level); deliberately omits `timestamp`.
+* Pulumi `StackReference` — `com.pulumi.resources.StackReference` (pulumi-java 1.0.0): reads
+  top-level `outputs` only; resolves on a Read in preview (proven).
+
+== Relationship to other subjects
+
+* link:spec.adoc[runbook-doctor] — the Remediator / loop-closure / recruitment tiers this what-if
+  serves; the layer-3 write-side placement it renegotiates.
+* link:layer3-medical-record-design.adoc[layer3-medical-record-design] — the per-node serialization
+  decision (the placement lock). The "self-describing state" justification there stays; the what-if
+  adds a *second* potential justification (a readable top-level channel) that doc did not consider.
+* link:dsl-unification-exploration.adoc[dsl-unification] — a separate parked subject (JGiven shared
+  engine); both touch the BDD layer but are independent.
