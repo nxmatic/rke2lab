@@ -78,6 +78,34 @@ already emitted, so the next specialist sees the run context (ordering matters: 
 siblings 1..N-1). This is the doctor model, NOT the what-if (see [[preview-whatif-topic]] for that).
 Open at impl: Prescription contained-in vs separate-from the ReferralReply.
 
+**5. The exchange consolidated = an agenda-owning generalist (2026-06-07 session-4, VALIDATED;
+written to `wip/spec.adoc` `[#consultation-flow]`).** Building on pt.4's referral round-trip, the
+user fixed how the consultation is *scheduled*. NINE invariants: (1) three objects —
+`Referral` (request, generalist→specialist) / `Prescription` (→patient) / `ReferralReply`
+(response, doctor→doctor); (2) seam `diagnose(Referral) → ReferralReply`, the reply keeps the *why*
+even with no prescription; (3) refs not copies (longitudinal record + this-run log, already in
+memory); (4) **base case = TWO PHASES** (specialists diagnose independently → generalist
+synthesizes+detects conflicts) — order only materializes if needed (graceful degradation); (5)
+context is **RUN-WIDE** — the generalist already carries replies from *other* checkpoints, not just
+the current one; (6) the generalist **may impose an order a priori** (it knows the diagnostic
+topology); (7) a consulted specialist keeps **agency** — it can ② *defer* ("wait for domain X's
+diagnosis, I depend on it") or ③ *refer* ("address the patient to domain Y too"); (8) **②/③ ALWAYS
+go through the generalist** (user's call) — specialists don't know each other (decoupled), the
+generalist is the SOLE coordinator, resolves the target via `treats()`, adds it to its agenda; (9)
+`treats()` = practitioner is sole authority, `domain()` only seeds the default (the
+[[runbook-doctor-state]] rules-engine/Drools clarification). The generalist-coordinator is
+STRUCTURALLY an *agenda loop* (a worklist that grows as specialists defer/refer — forward-reasoning,
+not a flat router; the 3rd time forward-chaining surfaced, alongside Drools-substrate and the
+what-if planner — assumed as an explicit agenda, NOT a hidden engine). TWO GUARDS the plan must
+honor: *determinism* (stable tie-break when several consultations are ready — candidate: checkpoint
+topological order, then specialist registration order) and *termination* (visited set
+`(patient,symptom,specialist)` at most once + deadlock detection). The defer/refer graph (runtime
+diagnosis-dependency between specialists) is DISTINCT from the checkpoints' resource `dependsOn`
+topology — do not conflate. Supersedes the old `firstLook`+hard-coded-`switch` flow (deleted from
+spec). The planner inner loop ([[preview-whatif-topic]]) LOOPS on these round-trips: each
+re-consultation on an unmasked downstream symptom is one Referral carrying the sibling prescriptions
+— round-trip = the unit, planner = the loop over units.
+
 **Two seams, not one (clarified in `[#ai-seam]`):** diagnosis seam = READ-ONLY (Specialist
 correlates+prescribes, never acts — like a read-only subagent); remediation seam = where the
 ACTION SURFACE lives (MCP is the candidate, still deliberately undesigned). The `programRef`

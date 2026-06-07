@@ -304,39 +304,78 @@ failure: "the patient consults." No magic listener, no nesting inside a Componen
 Package separation is for reuse/readability; the explicit call keeps fidelity to the
 medical model.
 
-=== Consultation flow
+[#consultation-flow]
+=== Consultation flow — a referral round-trip on a generalist-owned agenda
+
+NOTE: This supersedes the earlier `firstLook` + hard-coded `switch` routing. The 2026-06-07
+sessions evolved the generalist↔specialist exchange into a *referral round-trip* and the
+generalist into an *agenda-owning coordinator*. The shape below is the consolidated, validated
+direction (DESIGN — not yet implemented). The routing key is the practitioner's self-declared
+`treats()` — the specialist provides its own symptom set, the `domain()` only seeds a default
+repertoire it inherits (sole authority = the practitioner) — not a table the generalist holds. This
+is the same "routing must be contributed" move the open-roster tier already calls for (the
+hard-coded `routeBySymptom` switch is deleted).
+
+The exchange is a *medical referral circuit* of three objects with clear recipients:
+
+* *`Referral`* (REQUEST, generalist → a specialist resolved via `treats()`): the patient + the
+  *symptom* (the why) + *references* (not copies) to the longitudinal patient record AND the
+  sibling prescriptions already made THIS run (run-wide — including consultations from *other*
+  checkpoints the generalist already conducted).
+* *`Prescription`* (specialist → PATIENT): the treatment to administer (today's `Prescription`,
+  unchanged role).
+* *`ReferralReply`* (RESPONSE, specialist → generalist, doctor-to-doctor): explains what it found,
+  *references the Referral* (request↔response linkage), and *carries* the `Prescription` if any.
+
+So the seam becomes `diagnose(Referral) → ReferralReply`. A "nothing to offer" case is a
+`ReferralReply` *without* a `Prescription` — it keeps the *why* (unlike today's `Optional.empty()`,
+which drops it).
 
 [mermaid]
 ----
 graph TB
-    FAIL["scenario step fails<br/>(the patient is ill)"] --> GEN["Generalist.consult<br/>(snapshot, symptom)"]
-    GEN --> FL{"firstLook<br/>conclusive?"}
-    FL -->|yes| PLAN["RemediationPlan<br/>(direct)"]
-    FL -->|no| ROUTE["deterministic routing<br/>by symptom"]
-    ROUTE -->|connection_refused| DBUS["DbusTcpSpecialist"]
-    ROUTE -->|connection_refused| NET["NetworkSpecialist"]
-    ROUTE -->|instance_not_found| INCUS["IncusExecSpecialist"]
-    DBUS --> PLAN
-    NET --> PLAN
-    INCUS --> PLAN
+    FAIL["scenario step fails<br/>(the patient is ill)"] --> GEN["Generalist — AGENDA OWNER<br/>(sole coordinator, run-wide context)"]
+    GEN -->|"Referral (request)<br/>patient + symptom + refs (longitudinal + run siblings)"| SPEC["Specialist<br/>(independent lens)"]
+    SPEC -->|"ReferralReply (response, doctor→doctor)<br/>refs the Referral · carries Prescription or keeps the why"| GEN
+    SPEC -.->|"② DEFER: 'I depend on domain X's diagnosis'<br/>→ handed to the GENERALIST (never peer-to-peer)"| GEN
+    SPEC -.->|"③ REFER: 'address the patient to domain Y too'<br/>→ handed to the GENERALIST (never peer-to-peer)"| GEN
+    GEN -->|"resolve X/Y via treats(), add to agenda"| GEN
+    GEN --> PLAN["RemediationPlan<br/>(synthesis of the replies)"]
 
     style GEN fill:#fff4e6,stroke:#ff9900
     style PLAN fill:#ccffcc,stroke:#00cc66
 ----
 
-. The checkpoint catches the scenario failure and presents the *dossier* (the snapshot
-  already captured: target state, pending jobs, failed units) + the *symptom* (which
-  `Then` failed) to the `Generalist`.
-. `firstLook` — a first-level diagnosis. If conclusive, the generalist writes the plan
-  directly (specialists not disturbed for an obvious case).
-. If inconclusive, the generalist routes *deterministically* by symptom to the relevant
-  specialists (a readable, testable rules table — no inference "to start"). Irrelevant
-  specialists stay dormant.
-. Each routed `Specialist` *reads the dossier first* (the snapshot _is_ the
-  Status/Conditions, the cert-manager way), probes further only if needed, and writes a
-  `Prescription`.
-. The generalist synthesizes the prescriptions into a single `RemediationPlan` (its global
-  view), which flows into the runbook node and the inline log.
+. *Base case — two phases.* The checkpoint presents the *dossier* (the captured snapshot: target
+  state, pending jobs, failed units) + the *symptom* to the `Generalist`. Phase 1: the relevant
+  specialists (those whose `treats()` covers the symptom) diagnose *independently*. Phase 2: the
+  generalist synthesizes the replies into one `RemediationPlan` and detects conflicts. With no
+  defer and no peer referral, the consultation *is* just these two phases (graceful degradation).
+. *The generalist may impose an order a priori.* It knows the diagnostic topology, so it can seed
+  the agenda in the order diagnoses should be posed — but order-dependence only *materializes* when
+  a specialist actually needs it.
+. *A specialist keeps agency, always via the generalist.* A consulted specialist may (②) *defer* —
+  ask to wait for another domain's diagnosis it depends on — or (③) *refer* — address the patient to
+  another domain the generalist did not foresee. Both are *handed back to the generalist*, which
+  resolves the target via `treats()` and adds it to the agenda. Specialists do not know each other
+  (decoupled); the generalist stays the *sole coordinator*.
+. *Each `Specialist` reads the dossier first* (the snapshot _is_ the Status/Conditions, the
+  cert-manager way), probes further only if needed, and replies.
+. *The generalist synthesizes* the replies into a single `RemediationPlan` (its global view), which
+  flows into the runbook node and the inline log.
+
+The generalist-coordinator is, structurally, *an agenda loop* (a worklist that grows as specialists
+defer/refer) — a forward-reasoning shape, not a flat router. Two guards keep it testable, and the
+plan must honor both:
+
+* *Determinism* — when several consultations are ready at once, the tie-break must be *stable* (else
+  the runbook is not reproducible). Candidate order: the checkpoints' topological order, then the
+  specialists' registration order. (To confirm in the plan.)
+* *Termination* — defers (②) and peer referrals (③) risk a cycle (X waits for Y, Y waits for X) or a
+  referral loop. Minimum guard: a *visited set* `(patient, symptom, specialist)` consulted at most
+  once, plus deadlock detection on the defer graph. NOTE this *defer/referral* graph (a runtime
+  diagnosis-dependency between specialists) is *distinct* from the checkpoints' resource `dependsOn`
+  topology — do not conflate the two.
 
 [#recruiting-a-specialist]
 === When the doctor doesn't know: recruiting a specialist
@@ -571,12 +610,12 @@ specialist _implementations_:
 [cols="1,2,2",options="header"]
 |===
 |Contract |Phase 1 |A future Phase 2
-|`Specialist.diagnose(Symptom, Dossier)` |Java impl reads the objects in-process |An adapter serializes the dossier, calls an out-of-process tool, deserializes the prescription
+|`Specialist.diagnose(Referral) → ReferralReply` |Java impl reads the referral (dossier + refs) in-process, replies |An adapter serializes the referral, calls an out-of-process tool, deserializes the reply
 |`Symptom` |Java enum (typed, sourced from the probe) |Same enum; its name is the tool's input discriminator
 |`Dossier` |plain record, `toOutputMap()` for the YAML view |Same record; serialized when a transport is chosen
 |`Prescription` |record: typed `programRef` + structured `payload` + prose `humanHint` |Same record; `humanHint` for humans, `payload`/`programRef` for an executor
 |Runbook sections |`== Meaning` / `== Diagnosis` / `== Mitigation`, typed vocabulary |Same headings; structured enough for a machine to parse
-|Generalist routing |deterministic symptom → specialist table |unchanged — routes to different _impls_, same table
+|Generalist routing |asks each practitioner's self-declared `treats()` (no central table) |unchanged — asks different _impls_ the same way
 |===
 
 The `Generalist` does not know whether a `Specialist` is a local Java class or an adapter to
@@ -613,8 +652,8 @@ graph TB
     subgraph P1["Phase 1 — programmatic, this branch"]
         direction TB
         FAIL1["checkpoint fails<br/>presents Symptom + Dossier"]
-        GEN1["Generalist - Java<br/>firstLook + deterministic routing"]
-        SPEC1["Specialist - Java class<br/>reads dossier, prescribes"]
+        GEN1["Generalist - Java<br/>agenda owner · asks treats() · referral round-trip"]
+        SPEC1["Specialist - Java class<br/>reads dossier, replies (prescription or why)"]
         PLAN1["RemediationPlan<br/>prescription → programRef"]
         OPER1["Operator disposes<br/>reads runbook, decides"]
         REM1["Remediator = the operator<br/>acts by hand"]
@@ -624,7 +663,7 @@ graph TB
     subgraph P2["A future Phase 2 — same contracts, swapped impls"]
         direction TB
         FAIL2["checkpoint fails<br/>presents Symptom + Dossier"]
-        GEN2["Doctor<br/>same routing table"]
+        GEN2["Doctor<br/>same agenda · asks treats()"]
         SPEC2["Specialist - out-of-process<br/>diagnosis seam · read-only"]
         PLAN2["RemediationPlan<br/>same record"]
         OPER2["Operator disposes<br/>authorizes in stack config"]
