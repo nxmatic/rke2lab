@@ -7,6 +7,91 @@ metadata:
   originSessionId: fecaba54-8122-4dc1-8916-743ef5d2dec0
 ---
 
+**LAYER 3 WRITE-SIDE — DONE (2026-06-07, this session). 38/38 green, guard HELD, final review SOUND & READY.**
+The phantom-diff dilemma was DISSOLVED by a recadrage (brainstormed + validated): Pulumi already
+holds the graph (state `dependencies`) and the longitudinal log (update history) → we serialize ONLY
+the diagnostic layer Pulumi ignores, per-node, additively; NOT a top-level `medicalRecord` blob, NOT
+edges, NOT timestamp. This REVERSES the previously-locked spec-IncE decisions (top-level blob / full
+record / renegotiated guard) — see `wip/layer3-medical-record-design.adoc` (a8c37c75) + its plan
+(`wip/layer3-medical-record-plan.adoc`, 9b9302d9; both prose+C4/UML, no Java — [[docs-diagrams-not-java]]).
+4 commits: **52781714** `Checkpoint` enum (single-source join key: `slug()` + derived
+`resourceName()`="seed-"+slug; both stages' SCENARIO_ID + both resource names consume it — kills the
+clusterApi/cluster-api hand-aligned-literal risk; identity ONLY, never topology). **13bb7715** the
+cluster→systemd edge is now a REAL `dependsOn` on the resource (`this.systemdAdapter`, not the common
+`readinessDependency` parent) → persisted graph matches the runbook nesting; the BDD `@NestedSteps`
+nesting becomes a render VIEW, not the edge source. **3eb12587** `toOutputMap()` on
+Prescription/RemediationPlan/ConsultationReport (flat, kebab ids via `.id()`, TDD). **4e8e71d1**
+per-node `registerOutputs`: each checkpoint ComponentResource registers an ADDITIVE `consultationReport`
+output, joined from the shared `ConsultationLog` by `Checkpoint.slug()`, `ifPresent` only (healthy node
+= no symptom = no output = no phantom diff). GUARD: `OutputBuilder` UNTOUCHED, the 9 cluster*/handoff/
+bootstrapStatus keys unmoved, `ClusterReadinessProjectionTest` green unchanged — top-level Stage-B
+contract byte-identical; the diagnostic data lives only UNDER the component resources in state.
+Review's 2 MINOR non-blocking findings (left as-is, YAGNI): dossier-element serialization weakly
+pinned in the test; `Map.of` null-fragility (acceptable fail-fast). NOTE: `pulumi preview` ran but
+can't VISUALLY confirm — `dependsOn` is structural (not a diffable property) and the live probe
+returned ok (no symptom → no report); confirm both via a user-run `pulumi up` + state graph inspection.
+
+**READ-SIDE PART 1 — RUNTIME ENRICHMENT — DONE (2026-06-07, user-validated in the VSCode preview AND
+the Pulumi log: "exactement ce que je voulais, la séparation des points de vue est respectée", "le
+rapport texte a bien disparu").** Renderer fork RESOLVED = Approach A (inject into the JGiven model;
+JGiven's AsciiDoc renderer keeps rendering — the ONLY renderer we use). 4 commits on
+`feature/runbook-doctor`, all 40/40 green, guard HELD (no Pulumi output change — the diagnosis lives on
+the in-memory ReportModel only):
+- **c8c7116f** `Checkpoint.scenarioTitle()` — a THIRD single-source identity (slug + resourceName +
+  scenarioTitle, still identity-only never topology); both stages pass it to `startScenario(...)`.
+- **0ed98c13** `RunbookRenderer.render(ReportModel, ConsultationLog)` injects the diagnosis: for each
+  `ConsultationReport`, join to the `ScenarioModel` by `getDescription().equals(checkpoint.scenarioTitle())`
+  (JGiven stores the title VERBATIM; only display-capitalized) and set `extendedDescription` to a
+  Diagnosis(⚕)/Mitigation(℞) block (AsciiDoc visitor emits extendedDescription — VERIFIED via javap).
+  Flipped `RunbookRenderingTest` (the TDD entry): asserts the runbook now CONTAINS the
+  `restart-systemd-unit` prescription + "Diagnosis"/"Mitigation" (was asserting their ABSENCE). Added
+  `Checkpoint.fromSlug()` (identity lookup belongs on the identity type). Fixed all `render(...)`
+  callers (BootstrapStage passes the in-scope ConsultationLog → absorbed the plan's Task 3).
+- **daa34928** Pulumi log REFERENCE-PURE: deleted both stages' `logReport(...)` (the verbose
+  PlainTextReporter Given/When/Then + "Test Class: null" dump) and the inline ⚕/℞ `log(...)` lines; KEPT
+  `consultations.record(...)` (feeds the runbook), the ✓/⚠/✗ status lines, the ⚙ simulate notice, and
+  the renderer's "runbook rendered → path" reference. `NestedRunbookTest` (which scraped the log for ⚕)
+  re-pointed to assert via the `ConsultationLog` (the authoritative surface). Separation of concerns:
+  the log REFERENCES, the runbook NARRATES.
+
+**NEXT = RE-DISCUSS POST-HOC RECONSTRUCTION (deferred; user's call to revisit now that runtime ships
+and the rendered runbook is concrete).** See the deferred bullet below.
+
+(historical: the original 3-step framing was)
+- ~~NOW = RUNTIME ENRICHMENT only~~ — DONE, see above. Approach A; join by scenario title; flip
+  RunbookRenderingTest; strip the log last (the operator-UX decision — done in daa34928).
+- **THEN = RE-DISCUSS POST-HOC RECONSTRUCTION (user's call: revisit AFTER the runtime change ships,
+  with the rendered runbook in front of us).** Deferred, NOT abandoned — the write-side already made it
+  POSSIBLE (the diagnostic is in state). Decide it on concrete output, not in the abstract; the runtime
+  render may reframe it as "just reproduce this render from `stack export`", which sharpens the
+  no-drift criterion (runtime render == reconstructed render). Do NOT build it pre-emptively.
+
+(historical framing kept:) the post-hoc reconstruction tool (`pulumi stack export`
+→ rebuild DAG from `dependencies` → graft `consultationReport` by `Checkpoint.slug()` → render) + the
+"our model = source" renderer flip (flip `RunbookRenderingTest`'s "no Diagnosis/Mitigation" assertion
+= the TDD entry point — VERIFIED 2026-06-07 the rendered runbook shows the FAILURE but NOT the ⚕/℞
+diagnosis yet: `seed-master/target/runbook/adoc/features/runbook.asciidoc` has the AssertionError, no
+prescription/Mitigation section). CORRECTNESS CRITERION proven there: runtime in-memory render ==
+post-hoc reconstructed render (same view) = the no-drift proof. Then T2/T3/T4 (spec IncE) once a first
+reconstruction exists. Uncommitted parking files (dsl-unification) left untouched in the tree by user's
+call.
+
+**OPERATOR-UX DECISION (2026-06-07, user) — Pulumi log = REFERENCE ONLY; the runbook .adoc preview in
+VSCode is the readable surface.** Target: stop dumping JGiven's `PlainTextReporter.toString(...)` prose
+(the verbose Given/When/Then blocks + `Test Class: null`) into the Pulumi log; keep only a reference to
+the rendered runbook path + status. User chose "REFERENCE PURE" (cut ⚕/℞ from the log too, not just the
+prose). **SEQUENCING (user's call): this log cleanup is the LAST step of the read-side, NOT a
+pre0requisite** — because today the ⚕/℞ prescription (e.g. `incus exec master -- systemctl restart
+rke2lab-dbus-tcp-system-bus.service`) lives ONLY in the log (lines ~117-118 of a simulated-incident
+preview); it is NOT yet in the rendered runbook. Cutting it before the renderer-flip injects
+Diagnosis/Mitigation into the .adoc would lose the remediation command from BOTH places. So: read-side
+first (diagnosis into the runbook), THEN strip the log to reference-pure. IMPLEMENTATION ANCHOR for the
+cut: the two `logReport(reportModel)` calls in `SystemdAdapterStage`/`ClusterReadinessStage` produce the
+verbose prose; the actionable `⚕`/`℞`/`⚠` lines come from separate `log(...)` calls; the reference
+already exists (`runbook rendered → …/index.asciidoc`).
+
+---
+
 Active chantier on branch **`feature/runbook-doctor`**: build the runbook + doctor subsystem.
 Design DONE; **A DONE** (3b46b249), **B/doctor DONE** (aa55ced4), **C/checkpoint#2-nested DONE
 DSL-first** (9685793c), **D/live-cluster-wiring DONE** (fc91f127), **D-preview-fix DONE** (140414cb,
