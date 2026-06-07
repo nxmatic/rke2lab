@@ -150,25 +150,11 @@ Two vocabularies are implicitly aligned today, with nothing guaranteeing the cor
 `clusterApi`/`cluster-api` silent-failure pattern the project CLAUDE.md documents at length. We apply
 the project's "single source of truth for identifiers" discipline, *as an enum* (the set of
 checkpoints is finite and closed → closing it at compile time is the invariant we want; same idiom as
-the config `InfraDomain` enum):
+the config `InfraDomain` enum). The enum's shape is in the UML class diagram below.
 
-[source,java]
-----
-public enum Checkpoint {
-  SYSTEMD_ADAPTER("systemd-adapter"),
-  CLUSTER_READINESS("cluster-readiness");
-
-  private final String slug;
-  Checkpoint(String slug) { this.slug = slug; }
-
-  public String slug() { return slug; }                  // BDD identity (ConsultationReport.checkpointId)
-  public String resourceName() { return "seed-" + slug; } // Pulumi name → URN
-}
-----
-
-One source (`slug`); the resource name is *derived*, so the correspondence is *structural*, not
-hand-maintained. Both sides consume the enum: the stage's `SCENARIO_ID` becomes
-`Checkpoint.CLUSTER_READINESS.slug()`; the resource wiring's literal becomes `.resourceName()`.
+One source — the `slug`; the resource name is *derived* from it (`"seed-" + slug`), so the
+correspondence is *structural*, not hand-maintained. Both sides consume the enum: the stage's
+scenario id becomes the enum's `slug()`; the resource wiring's literal becomes its `resourceName()`.
 
 *The enum carries identity, NEVER topology.* It does NOT encode `CLUSTER_READINESS dependsOn
 SYSTEMD_ADAPTER` — that edge lives in the resource's `dependsOn` (the single source, read from
