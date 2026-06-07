@@ -135,7 +135,7 @@ public final class SystemdAdapterStage {
                   SystemdAdapterScenario.When.class,
                   SystemdAdapterScenario.Then.class);
       scenario.setModel(reportModel);
-      scenario.startScenario("systemd adapter becomes reachable");
+      scenario.startScenario(Checkpoint.SYSTEMD_ADAPTER.scenarioTitle());
       try {
         scenario.given().the_seed_node(config.systemdAdapterDbusHost(), config).probed_by(probe);
         scenario.when().the_systemd_adapter_probe_runs();

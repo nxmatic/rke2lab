@@ -22,4 +22,14 @@ class CheckpointTest {
     assertEquals("systemd-adapter", Checkpoint.SYSTEMD_ADAPTER.slug());
     assertEquals("seed-systemd-adapter", Checkpoint.SYSTEMD_ADAPTER.resourceName());
   }
+
+  @Test
+  void cluster_readiness_exposes_its_scenario_title() {
+    assertEquals("cluster becomes ready", Checkpoint.CLUSTER_READINESS.scenarioTitle());
+  }
+
+  @Test
+  void systemd_adapter_exposes_its_scenario_title() {
+    assertEquals("systemd adapter becomes reachable", Checkpoint.SYSTEMD_ADAPTER.scenarioTitle());
+  }
 }

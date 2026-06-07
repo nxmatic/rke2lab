@@ -7,17 +7,19 @@ package io.nxmatic.rke2lab.controlplane.bdd;
  * correspondence between the two layers is structural rather than hand-maintained — this guards
  * against the clusterApi/cluster-api silent-failure pattern documented in CLAUDE.md.
  *
- * <p>Identity ONLY — never topology. The cluster→systemd dependency edge lives on the resource
- * {@code dependsOn}, not here.
+ * <p>Identity is slug + resourceName + scenarioTitle — ONLY identity, never topology. The
+ * cluster→systemd dependency edge lives on the resource {@code dependsOn}, not here.
  */
 public enum Checkpoint {
-  SYSTEMD_ADAPTER("systemd-adapter"),
-  CLUSTER_READINESS("cluster-readiness");
+  SYSTEMD_ADAPTER("systemd-adapter", "systemd adapter becomes reachable"),
+  CLUSTER_READINESS("cluster-readiness", "cluster becomes ready");
 
   private final String slug;
+  private final String scenarioTitle;
 
-  Checkpoint(String slug) {
+  Checkpoint(String slug, String scenarioTitle) {
     this.slug = slug;
+    this.scenarioTitle = scenarioTitle;
   }
 
   /** The kebab-case identity used as the BDD scenario id. */
@@ -28,5 +30,10 @@ public enum Checkpoint {
   /** The Pulumi resource name, derived from the slug so it cannot drift from the BDD identity. */
   public String resourceName() {
     return "seed-" + slug;
+  }
+
+  /** The human title the stage passes to JGiven's {@code startScenario(...)}. */
+  public String scenarioTitle() {
+    return scenarioTitle;
   }
 }

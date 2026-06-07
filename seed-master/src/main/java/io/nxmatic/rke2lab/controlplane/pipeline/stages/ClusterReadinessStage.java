@@ -126,7 +126,7 @@ public final class ClusterReadinessStage {
                   ClusterReadinessScenario.When.class,
                   ClusterReadinessScenario.Then.class);
       scenario.setModel(reportModel);
-      scenario.startScenario("cluster becomes ready");
+      scenario.startScenario(Checkpoint.CLUSTER_READINESS.scenarioTitle());
       try {
         scenario
             .given()
