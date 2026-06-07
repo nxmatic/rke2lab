@@ -4,6 +4,7 @@ import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.text.PlainTextReporter;
+import io.nxmatic.rke2lab.controlplane.bdd.Checkpoint;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessScenario;
@@ -35,7 +36,7 @@ import java.util.function.Consumer;
 public final class ClusterReadinessStage {
 
   private static final String JGIVEN_DRY_RUN = "jgiven.report.dry-run";
-  private static final String SCENARIO_ID = "cluster-readiness";
+  private static final String SCENARIO_ID = Checkpoint.CLUSTER_READINESS.slug();
 
   private final BootstrapConfig config;
   private final ControlplanePolicy policy;

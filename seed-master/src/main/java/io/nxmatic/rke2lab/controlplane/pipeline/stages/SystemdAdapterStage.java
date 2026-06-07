@@ -4,6 +4,7 @@ import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.text.PlainTextReporter;
+import io.nxmatic.rke2lab.controlplane.bdd.Checkpoint;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationReport;
 import io.nxmatic.rke2lab.controlplane.bdd.Dossier;
@@ -37,7 +38,7 @@ public final class SystemdAdapterStage {
   private static final String JGIVEN_DRY_RUN = "jgiven.report.dry-run";
 
   /** Override key + report label for this gate. */
-  private static final String SCENARIO_ID = "systemd-adapter";
+  private static final String SCENARIO_ID = Checkpoint.SYSTEMD_ADAPTER.slug();
 
   /**
    * Intrinsic severity: master can provision without the dbus adapter (degraded), so a failure is a

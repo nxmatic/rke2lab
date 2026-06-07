@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane.resources;
 
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.controlplane.bdd.Checkpoint;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.bdd.ProductionClusterReadinessProbe;
@@ -115,7 +116,7 @@ final class ResourceCreationPipeline {
     PulumiResourceBuilder withSystemdAdapter() {
       this.systemdAdapter =
           new SystemdAdapterResource(
-              "seed-systemd-adapter",
+              Checkpoint.SYSTEMD_ADAPTER.resourceName(),
               systemdAdapterLaunchSummary,
               bootstrapResult.readinessDependency());
       return this;
@@ -126,7 +127,7 @@ final class ResourceCreationPipeline {
       // doctor); the resource is a thin graph mirror of the result + the dependsOn edge.
       this.readiness =
           new ClusterReadinessResource(
-              "seed-cluster-readiness",
+              Checkpoint.CLUSTER_READINESS.resourceName(),
               playClusterReadiness(true),
               bootstrapResult.readinessDependency());
       return this;
