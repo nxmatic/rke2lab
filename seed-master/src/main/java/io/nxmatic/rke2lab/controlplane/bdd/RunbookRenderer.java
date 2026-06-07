@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -41,9 +42,15 @@ public final class RunbookRenderer {
     this.logger = logger;
   }
 
-  /** Render the model to {@link #outputDir}, logging the entry path. Best-effort: never throws. */
-  public void render(ReportModel model) {
+  /**
+   * Render the model to {@link #outputDir}, logging the entry path, after injecting the doctor's
+   * diagnosis onto each consulted node. Best-effort: never throws — a runbook that fails to render
+   * (or a malformed report) must not also fail the provisioning it documents.
+   */
+  public void render(ReportModel model, ConsultationLog consultations) {
     try {
+      injectDiagnosis(model, consultations);
+
       final Path jsonDir = outputDir.resolve("json");
       final Path adocDir = outputDir.resolve("adoc");
       recreate(jsonDir);
@@ -86,6 +93,46 @@ public final class RunbookRenderer {
         scenario.setClassName(RUNBOOK_FEATURE);
       }
     }
+  }
+
+  /**
+   * Set each consulted scenario's {@code extendedDescription} to its diagnosis block. The doctor's
+   * record and the runbook's {@code ReportModel} are siblings, joined here by the verbatim scenario
+   * title — JGiven stores the {@code startScenario(...)} string in {@code getDescription()} (only
+   * capitalized for display), so the raw join is {@code getDescription().equals(scenarioTitle())}.
+   * The AsciiDoc model visitor emits {@code extendedDescription}, so the block reaches the .adoc.
+   */
+  private void injectDiagnosis(ReportModel model, ConsultationLog consultations) {
+    if (consultations == null || consultations.consultations().isEmpty()) {
+      return;
+    }
+    for (ConsultationReport report : consultations.consultations()) {
+      Checkpoint.fromSlug(report.checkpointId())
+          .flatMap(checkpoint -> scenarioFor(model, checkpoint))
+          .ifPresent(scenario -> scenario.setExtendedDescription(diagnosisBlock(report.plan())));
+    }
+  }
+
+  private Optional<ScenarioModel> scenarioFor(ReportModel model, Checkpoint checkpoint) {
+    return model.getScenarios().stream()
+        .filter(scenario -> checkpoint.scenarioTitle().equals(scenario.getDescription()))
+        .findFirst();
+  }
+
+  /**
+   * The Diagnosis (⚕ generalist summary) + Mitigation (℞ prescriptions) block, as AsciiDoc text.
+   */
+  private String diagnosisBlock(RemediationPlan plan) {
+    final StringBuilder block = new StringBuilder();
+    block.append("⚕ Diagnosis: ").append(plan.generalistSummary());
+    for (Prescription prescription : plan.prescriptions()) {
+      block
+          .append("\n\n℞ Mitigation (")
+          .append(prescription.programRef().id())
+          .append("): ")
+          .append(prescription.humanHint());
+    }
+    return block.toString();
   }
 
   private void recreate(Path dir) throws IOException {

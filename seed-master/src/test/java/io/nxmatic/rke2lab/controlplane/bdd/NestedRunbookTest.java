@@ -52,7 +52,7 @@ class NestedRunbookTest {
     assertEquals(ExecutionStatus.SUCCESS, runbook.getScenarios().get(0).getExecutionStatus());
     assertEquals("Ready", result.bootstrapStatus(), "all phases ok projects to a ready result");
 
-    new RunbookRenderer(out, message -> {}).render(runbook);
+    new RunbookRenderer(out, message -> {}).render(runbook, new ConsultationLog());
     final String report = readAll(out.resolve("adoc"));
 
     // The cluster checkpoint and its nested systemd-adapter dependency both appear — the two-tier
@@ -91,7 +91,7 @@ class NestedRunbookTest {
     assertEquals(1, runbook.getScenarios().size());
     assertFalse(result.handoffReady(), "a preview defers the live checks — no handoff");
 
-    new RunbookRenderer(out, message -> {}).render(runbook);
+    new RunbookRenderer(out, message -> {}).render(runbook, new ConsultationLog());
     final String report = readAll(out.resolve("adoc"));
     assertTrue(
         report.contains("Cluster becomes ready"),
@@ -141,7 +141,7 @@ class NestedRunbookTest {
         log.stream().anyMatch(line -> line.contains(RemediationProgramRef.CHECK_CONNECTIVITY.id())),
         "the network specialist's prescription should be logged");
 
-    new RunbookRenderer(out, message -> {}).render(model);
+    new RunbookRenderer(out, message -> {}).render(model, new ConsultationLog());
     final String report = readAll(out.resolve("adoc"));
     assertTrue(report.contains("Cluster becomes ready"));
     assertFalse(

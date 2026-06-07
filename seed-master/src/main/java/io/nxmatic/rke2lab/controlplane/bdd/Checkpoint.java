@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import java.util.Optional;
+
 /**
  * The single source of truth for a checkpoint's IDENTITY, consumed by BOTH the BDD layer (the
  * scenario id / {@link ConsultationReport#checkpointId()}) and the Pulumi resources (the resource
@@ -35,5 +37,15 @@ public enum Checkpoint {
   /** The human title the stage passes to JGiven's {@code startScenario(...)}. */
   public String scenarioTitle() {
     return scenarioTitle;
+  }
+
+  /** Resolve the checkpoint a {@link ConsultationReport#checkpointId()} names; unknown → empty. */
+  public static Optional<Checkpoint> fromSlug(String slug) {
+    for (Checkpoint checkpoint : values()) {
+      if (checkpoint.slug.equals(slug)) {
+        return Optional.of(checkpoint);
+      }
+    }
+    return Optional.empty();
   }
 }

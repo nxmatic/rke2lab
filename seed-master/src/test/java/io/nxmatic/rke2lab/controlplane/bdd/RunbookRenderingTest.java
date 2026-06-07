@@ -1,7 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tngtech.jgiven.impl.Scenario;
@@ -12,42 +11,66 @@ import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * R6: a FAILED node is a first-class render state. Before the doctor exists (Increment A), a failed
- * scenario must render cleanly — FAILED, with the Diagnosis/Mitigation sections simply absent, not
- * a null hole. This de-risks the runbook's failure rendering before any doctor is wired.
+ * A FAILED node is a first-class render state, and the doctor's diagnosis is rendered onto it. A
+ * failed scenario renders FAILED; when a {@link ConsultationReport} is recorded for that
+ * checkpoint, its Diagnosis (⚕ generalist summary) and Mitigation (℞ prescriptions) appear on the
+ * node, joined to the {@code ScenarioModel} by {@link Checkpoint#scenarioTitle()}.
  *
  * <p>Plays the systemd-adapter scenario the same way the checkpoint does on failure (the {@code
- * Then} throws, so {@code finished()} is skipped), then renders the shared model and asserts the
- * FAILED scenario survives into a readable runbook.
+ * Then} throws, so {@code finished()} is skipped), then renders the shared model with a
+ * consultation log and asserts the doctor's prescription survives into a readable runbook.
  */
 class RunbookRenderingTest {
 
   @Test
-  void failed_node_records_into_the_shared_model_without_a_doctor(@TempDir Path outputDir) {
+  void failed_node_renders_the_doctor_diagnosis(@TempDir Path outputDir) {
     final ReportModel runbook = playFailingScenario();
 
     // The model itself must carry the FAILED scenario — proving the checkpoint's skipped-finished()
-    // failure path still produces a renderable node (the core Increment A risk).
+    // failure path still produces a renderable node onto which the doctor's diagnosis is injected.
     assertEquals(1, runbook.getScenarios().size());
     assertEquals(ExecutionStatus.FAILED, runbook.getScenarios().get(0).getExecutionStatus());
 
-    new RunbookRenderer(outputDir, message -> {}).render(runbook);
+    final ConsultationLog consultations = new ConsultationLog();
+    consultations.record(
+        new ConsultationReport(
+            Checkpoint.SYSTEMD_ADAPTER.slug(),
+            List.of(
+                Dossier.failed(
+                    Symptom.CONNECTION_REFUSED,
+                    "dbus refused",
+                    Map.of("source", "systemd-adapter-probe"))),
+            new RemediationPlan(
+                Symptom.CONNECTION_REFUSED,
+                List.of(
+                    Prescription.of(
+                        RemediationProgramRef.RESTART_UNIT,
+                        Map.of("unit", "rke2lab-systemd-adapter.service"),
+                        "restart the systemd-adapter unit")),
+                "the dbus-over-TCP endpoint refused the connection")));
+
+    new RunbookRenderer(outputDir, message -> {}).render(runbook, consultations);
 
     final Path index = outputDir.resolve("adoc").resolve(RunbookRenderer.INDEX_FILE);
     assertTrue(Files.exists(index), "runbook index should be rendered");
 
     final String report = readAll(outputDir.resolve("adoc"));
-    // FAILED rendered; and the doctor's sections are absent (first-class state, not a null hole).
+    // FAILED rendered; and the doctor's diagnosis is now injected onto the failed node.
     assertTrue(
         report.contains("Systemd adapter becomes reachable"),
         "runbook should name the failed scenario");
-    assertFalse(report.contains("Diagnosis"), "no Diagnosis section before the doctor exists");
-    assertFalse(report.contains("Mitigation"), "no Mitigation section before the doctor exists");
+    assertTrue(report.contains("Diagnosis"), "the doctor's Diagnosis section should render");
+    assertTrue(report.contains("Mitigation"), "the doctor's Mitigation section should render");
+    assertTrue(
+        report.contains(RemediationProgramRef.RESTART_UNIT.id()),
+        "the restart-systemd-unit prescription should render");
   }
 
   /**

@@ -93,7 +93,7 @@ public final class BootstrapStage {
       outputsSink.accept(outputs);
       return this;
     } finally {
-      new RunbookRenderer(runbookOutputDir(), readinessLogger).render(runbook);
+      new RunbookRenderer(runbookOutputDir(), readinessLogger).render(runbook, consultations);
     }
   }
 
