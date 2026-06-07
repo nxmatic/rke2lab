@@ -124,12 +124,14 @@ final class ResourceCreationPipeline {
 
     PulumiResourceBuilder withReadiness() {
       // The checkpoint is played eagerly as a BDD scenario (records into the runbook, consults the
-      // doctor); the resource is a thin graph mirror of the result + the dependsOn edge.
+      // doctor); the resource is a thin graph mirror of the result + the dependsOn edge. The edge
+      // points at the systemd-adapter resource (the real business dependency), so the persisted
+      // Pulumi graph matches the runbook's BDD nesting.
       this.readiness =
           new ClusterReadinessResource(
               Checkpoint.CLUSTER_READINESS.resourceName(),
               playClusterReadiness(true),
-              bootstrapResult.readinessDependency());
+              this.systemdAdapter);
       return this;
     }
 
