@@ -1,6 +1,6 @@
 ---
 name: runbook-doctor-state
-description: feature/runbook-doctor — Increments A-D DONE; BDD-quality pass COMPLETE; DAG chantier has a refined medical-model design (patient=Pulumi stack, Dossier=consultation report, Set<Symptom> bounded by observability, Doctor=generic module, medical record=reconstructable state). Source of truth = wip/spec.adoc + wip/plan.adoc + wip/pulumi-doctor-integration.adoc (committed 930069c1). NEXT executable = layer 2 (persist the consultation report). Pulumi-integration fork + T2/T3/T4 OPEN.
+description: feature/runbook-doctor — Increments A-D DONE; BDD-quality pass COMPLETE; DAG chantier has a refined medical-model design (patient=Pulumi stack, Dossier=consultation report, Set<Symptom> bounded by observability, Doctor=generic module, medical record=reconstructable state). Source of truth = wip/spec.adoc + wip/plan.adoc + wip/pulumi-doctor-integration.adoc (committed 930069c1). NEXT executable = layer 2 (persist the consultation report). Pulumi-integration fork RESOLVED (doctor = app logic, NOT a resource; report carried as ComponentResource outputs — Option A). T2/T3/T4 still open.
 metadata: 
   node_type: memory
   type: project
@@ -167,18 +167,22 @@ bootstrapStatus, 7 `cluster*` keys (`ClusterBootstrapReadinessVerifier.java:504`
 (`Dossier.toOutputMap()`); `ClusterReadinessProjectionTest` pins it. Layer 2 is independent of all
 open tensions and ships first.
 
-OPEN (deferred until a first doctor version exists):
-- **The Pulumi-integration fork** (`wip/pulumi-doctor-integration.adoc`): how the doctor specializes
-  for Pulumi. Mechanism EXISTS today — `SystemdAdapterResource`/`ClusterReadinessResource` are
-  `ComponentResource`s doing `registerOutputs`(node) + `dependsOn`(edges). Fork: (A) keep
-  ComponentResource (logical node, re-derived each run, NO Read/Diff) vs (B) provider-backed
-  CustomResource (Create=1st diagnosis, Read/refresh=re-observe, Diff=changed?, Update=re-diagnose,
-  Delete=discharge — maps 1:1 to "record=reconstructable state", but a Java provider is a heavy
-  separate gRPC plugin). FACTS TO CONFIRM (not from memory): does pulumi-java support inline/dynamic
-  providers (TS/Python do; Java maybe not)? cost of a minimal provider? is checkpoint outputs+dependsOn
-  enough to reconstruct the DAG? Working hypothesis: the core stays neutral (produces a neutral
-  ConsultationReport); Pulumi-ness lives in the seed-master ADAPTER — so maybe NO Pulumi specialization
-  inside the module at all. Also distinguish: persistence-adapter vs a Pulumi-DOMAIN Specialist.
+**PULUMI-INTEGRATION FORK — RESOLVED (a949f3bb): doctor is NOT a resource; Option A.** User's
+argument: Pulumi resources are PROVISIONED toward a desired state, not used/invoked as actors. A
+doctor is behaviour (no desired state); the patient is the stack (modelling it as an inner resource
+is circular) → doctor/patient-as-resource walks on Pulumi's toes. Option B (provider-backed
+CustomResource) ALSO rejected: re-observation already happens IN-PROGRAM (probes re-run each up), so
+a provider `Read` reconstructs managed external state we don't have — heavy Java gRPC plugin for ~no
+gain. ⇒ the "does pulumi-java support inline providers?" question is MOOT. **Verdict (Option A):**
+doctor stays APPLICATION LOGIC (a module, never a resource); only the consultation report is carried
+into state via `registerOutputs` on the checkpoint's EXISTING `ComponentResource` — an output-CARRIER
+(ComponentResource is the one kind NOT provisioned toward a target), not a provisioned actor. "Record
+= reconstructable state" = re-read the checkpoint's outputs + `dependsOn`; the "re-observe" cycle is
+the program re-running, not a provider Read. Full argument + C4/UML in `wip/pulumi-doctor-integration.adoc`.
+A Pulumi-DOMAIN Specialist (reads engine errors to diagnose) stays possible later as just another
+`Specialist` — distinct from persistence, does not make the doctor a resource.
+
+STILL OPEN (deferred until a first doctor version exists):
 - **T2** stateless doctor vs panel (access as `consult()` param vs internal state). **T3** routing
   contributed (see module-ready). **T4** runtime context = the VISIT's admission, not the patient's
   persistent identity (`org/project/stack`) — decides where it attaches.
