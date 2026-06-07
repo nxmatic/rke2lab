@@ -1,0 +1,206 @@
+= Runbook & Doctor — Layer 3 Read-Side part 1: runtime enrichment (plan)
+:toc: left
+
+> *For agentic workers:* implement task-by-task; steps use `- [ ]`. Builds/tests runnable by Claude
+> (compile/test/`pulumi preview` are dry-runs — CLAUDE.md). Single-dev, sequential, NO compat shims.
+> *Docs convention:* prose + diagrams, no Java snippets (the executor has codebase context). Design:
+> link:layer3-readside-runtime-enrichment-design.adoc[layer3-readside-runtime-enrichment-design.adoc].
+
+*Goal:* the doctor's diagnosis (`⚕` summary + `℞` prescriptions) appears in the rendered runbook
+(`target/runbook/adoc/…`, the VSCode-previewed surface), injected at runtime via the JGiven model;
+then the Pulumi log is stripped to reference-pure.
+
+*Architecture:* approach A — set `ScenarioModel.extendedDescription` (verified rendered by JGiven's
+AsciiDoc visitor) from the `ConsultationLog`, joined to the scenario by a new
+`Checkpoint.scenarioTitle()` identity. No Pulumi output changes (in-memory `ReportModel` only).
+
+*Tech stack:* Java 25 (flox), JGiven 2.0.3 (`ReportModel`/`ScenarioModel`), JUnit5. Build:
+`flox activate -- ./mvnw … -pl :seed-master -am -DskipTests=false`.
+
+== Hard guard (do not break)
+No Pulumi outputs change (the `extendedDescription` lives on the in-memory `ReportModel`, never in
+state). `OutputBuilder` untouched; the write-side per-node `consultationReport` outputs untouched;
+`ClusterReadinessProjectionTest` stays green. Scenario TITLES stay byte-identical (only their source
+moves to the enum), so `NestedRunbookTest` and `RunbookRenderingTest` title assertions stay valid.
+
+== Task order
+
+[mermaid]
+....
+flowchart LR
+  T1["Task 1<br/>Checkpoint.scenarioTitle()<br/>+ rewire 2 startScenario"]
+  T2["Task 2<br/>render(ReportModel, ConsultationLog)<br/>injects diagnosis (flip test)"]
+  T3["Task 3<br/>BootstrapStage passes<br/>consultations to render()"]
+  T4["Task 4<br/>Pulumi log → reference-pure"]
+  T1 --> T2 --> T3 --> T4
+  classDef t fill:#d4f8d4,stroke:#1a7f37,color:#0a3d12;
+  class T1,T2,T3,T4 t;
+....
+
+T2 depends on T1 (needs `scenarioTitle()` for the join). T4 is LAST (diagnosis must already be in the
+runbook before it leaves the log).
+
+---
+
+== Task 1: `Checkpoint.scenarioTitle()` — the third identity
+
+*Files:*
+
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/bdd/Checkpoint.java`
+* Modify: `seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/bdd/CheckpointTest.java`
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/SystemdAdapterStage.java:138`
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/ClusterReadinessStage.java:129`
+
+*Steps:*
+
+- [ ] *Step 1 — extend the failing test.* Add a `CheckpointTest` case asserting the scenario titles:
+  `CLUSTER_READINESS.scenarioTitle()` == "cluster becomes ready"; `SYSTEMD_ADAPTER.scenarioTitle()`
+  == "systemd adapter becomes reachable". (Use the EXACT current `startScenario(...)` strings — they
+  must stay byte-identical so the existing title assertions in NestedRunbookTest/RunbookRenderingTest
+  keep passing.)
+- [ ] *Step 2 — run it, expect FAIL* (`scenarioTitle()` undefined):
+  `flox activate -- ./mvnw test … -Dtest=CheckpointTest`.
+- [ ] *Step 3 — add the attribute.* Give each `Checkpoint` constant a second constructor field
+  `scenarioTitle` (the human title) alongside `slug`; expose `scenarioTitle()`. Keep `slug()` /
+  `resourceName()` unchanged. Update the enum Javadoc: identity now = slug + resourceName +
+  scenarioTitle, still NEVER topology.
+- [ ] *Step 4 — run the test, expect PASS.*
+- [ ] *Step 5 — rewire the two prod call-sites.* In `SystemdAdapterStage:138` replace the literal in
+  `scenario.startScenario("systemd adapter becomes reachable")` with
+  `Checkpoint.SYSTEMD_ADAPTER.scenarioTitle()`; in `ClusterReadinessStage:129` replace
+  `"cluster becomes ready"` with `Checkpoint.CLUSTER_READINESS.scenarioTitle()`. (`Checkpoint` is
+  already imported in both — it was wired in the write-side Task 1.)
+- [ ] *Step 6 — full suite green.* `flox activate -- ./mvnw package … -DskipTests=false` → BUILD
+  SUCCESS, 38 tests (NestedRunbookTest/RunbookRenderingTest still green — titles unchanged).
+- [ ] *Step 7 — commit.* `feat(doctor): Checkpoint.scenarioTitle() — third single-source identity for the runbook join`.
+
+---
+
+== Task 2: `render(ReportModel, ConsultationLog)` injects the diagnosis (TDD flip)
+
+This is the core task and the TDD entry point. `RunbookRenderer.render` gains the `ConsultationLog`
+and, before generating, sets each consulted scenario's `extendedDescription` to the formatted
+diagnosis.
+
+*Files:*
+
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/bdd/RunbookRenderer.java`
+* Modify: `seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/bdd/RunbookRenderingTest.java`
+
+*Behaviour to implement in `render`:*
+
+* New signature `render(ReportModel model, ConsultationLog consultations)` (no old overload kept —
+  no-compat). Null-safe: a null/empty log injects nothing (healthy run renders exactly as today).
+* For each `ConsultationReport` in the log: resolve its `Checkpoint` from `checkpointId()` (== slug),
+  find the `ScenarioModel` in `model.getScenarios()` whose name matches `checkpoint.scenarioTitle()`,
+  and set its `extendedDescription` to a formatted block: a "Diagnosis" line (the `⚕`
+  `plan.generalistSummary()`) and one "Mitigation" line per prescription (`℞` programRef id + human
+  hint + the remediation command from the payload/hint). Keep the formatting simple AsciiDoc text.
+* Matching scenario name — VERIFIED: JGiven stores the `startScenario(...)` title VERBATIM in
+  `ScenarioModel.getDescription()` (the AsciiDoc generator only capitalizes it for DISPLAY — the
+  rendered "Systemd adapter becomes reachable" vs the stored lowercase "systemd adapter becomes
+  reachable"). So the join is `scenario.getDescription().equals(checkpoint.scenarioTitle())` on the
+  RAW string — derive from `scenarioTitle()`, do not hardcode, and do not account for the display
+  capitalization (it is not in the stored value).
+
+*Steps:*
+
+- [ ] *Step 1 — flip the test (write the new expectation first).* Rewrite
+  `RunbookRenderingTest.failed_node_records_into_the_shared_model_without_a_doctor` (and rename it to
+  reflect the doctor now exists, e.g. `failed_node_renders_the_doctor_diagnosis`). It must: play the
+  failing systemd-adapter scenario as today, BUT also build a `ConsultationLog` containing one
+  `ConsultationReport` for `Checkpoint.SYSTEMD_ADAPTER.slug()` with a `RemediationPlan` whose
+  prescription is `RemediationProgramRef.RESTART_UNIT`; call `render(model, consultations)`; then
+  assert the rendered report NOW CONTAINS the diagnosis — the `restart-systemd-unit` text (replacing
+  the old `assertFalse(... "Diagnosis")` / `assertFalse(... "Mitigation")` assertions, which become
+  `assertTrue` on the diagnosis content). Keep the existing assertions that the FAILED scenario and
+  its title still render.
+- [ ] *Step 2 — run it, expect FAIL* (current `render` has no `ConsultationLog` param / does not
+  inject): `flox activate -- ./mvnw test … -Dtest=RunbookRenderingTest`.
+- [ ] *Step 3 — implement the new `render(ReportModel, ConsultationLog)`* per the behaviour above.
+  Format the diagnosis from `RemediationPlan.generalistSummary()` and `Prescription` (programRef id +
+  humanHint). Null-safe on empty log.
+- [ ] *Step 4 — run the test, expect PASS.*
+- [ ] *Step 5 — fix the OTHER caller now broken by the signature change.* `RunbookRenderingTest` was
+  one caller; the production caller is `BootstrapStage` (Task 3 rewires it). To keep Task 2
+  self-contained and green, TEMPORARILY confirm what breaks: run the full suite
+  (`flox activate -- ./mvnw package … -DskipTests=false`). If `BootstrapStage` fails to compile
+  because it still calls the old `render(model)`, that is expected — fix it minimally HERE by passing
+  the `consultations` it already owns (this overlaps Task 3 Step 1; doing it here keeps the build
+  green). Confirm 38 tests green, `ClusterReadinessProjectionTest` unchanged.
+- [ ] *Step 6 — commit.* `feat(doctor): render the doctor diagnosis into the runbook node (extendedDescription)`.
+
+NOTE: if Step 5 already rewired `BootstrapStage`, Task 3 becomes a verification-only checkpoint
+(confirm + the simulated-preview check). That is fine — do not undo it to re-do it in Task 3.
+
+---
+
+== Task 3: `BootstrapStage` passes the consultation log to the renderer
+
+If Task 2 Step 5 already did this (to keep the build green), this task is verification-only.
+
+*Files:*
+
+* Modify (if not already): `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/BootstrapStage.java:96`
+
+*Steps:*
+
+- [ ] *Step 1 — ensure the wiring.* `BootstrapStage`'s `finally` calls
+  `new RunbookRenderer(...).render(runbook, consultations)` — `consultations` is the `ConsultationLog`
+  already created at line 60. Confirm it is passed.
+- [ ] *Step 2 — full suite green.* `flox activate -- ./mvnw package … -DskipTests=false` → 38 tests.
+- [ ] *Step 3 — user-run simulated preview (verify the diagnosis renders).*
+  `flox activate -- pulumi preview --cwd seed-master -c rke2lab:policy.preview.simulate.systemd-adapter=connection-refused`
+  then read `seed-master/target/runbook/adoc/features/runbook.asciidoc` — it should now contain the
+  `restart-systemd-unit` diagnosis under the failed systemd-adapter node. If the agent cannot run
+  preview, defer to the user; the flipped `RunbookRenderingTest` is the blocking gate.
+- [ ] *Step 4 — commit IF this task changed anything* (skip if Task 2 already committed the wiring).
+  `feat(doctor): wire the consultation log into the runbook render`.
+
+---
+
+== Task 4: Pulumi log → reference-pure (LAST)
+
+Only now that the diagnosis lives in the rendered runbook, remove it (and the verbose JGiven prose)
+from the Pulumi log.
+
+*Files:*
+
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/SystemdAdapterStage.java`
+* Modify: `seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/ClusterReadinessStage.java`
+
+*What to remove:*
+
+* The `logReport(reportModel)` call AND the private `logReport(...)` method in BOTH stages (it streams
+  `PlainTextReporter.toString(...)` — the verbose Given/When/Then + "Test Class: null" prose). Remove
+  the now-unused `PlainTextReporter` import.
+* The `log("⚕ … diagnosis: …")` and the `log("  ℞ …")` lines inside each stage's
+  `consultDoctor(...)`. KEEP the `consultations.record(...)` (the data still flows to the runbook) and
+  KEEP the status lines (`✓`/`⚠`/`✗ … severity=…`) and the simulate notice (`⚙ … simulating
+  incident`). The `RunbookRenderer` already logs `runbook rendered → …path` — that is the reference.
+
+*Steps:*
+
+- [ ] *Step 1 — remove `logReport` from both stages* (call + method + `PlainTextReporter` import).
+- [ ] *Step 2 — remove the `⚕`/`℞` log lines from both `consultDoctor(...)`* (keep `record(...)` and
+  the status/severity logs).
+- [ ] *Step 3 — full suite green.* `flox activate -- ./mvnw package … -DskipTests=false` → 38 tests.
+  (No test asserts the removed log lines; if one does, update it — the runbook now carries that info.)
+- [ ] *Step 4 — user-run preview to confirm the log is concise.* Same simulated-incident command;
+  the Pulumi log should now show the status + `runbook rendered → path` but NOT the Given/When/Then
+  prose nor the inline `⚕`/`℞`. The diagnosis is read in the runbook `.adoc`.
+- [ ] *Step 5 — commit.* `refactor(doctor): Pulumi log is reference-pure — diagnosis reads from the runbook`.
+
+---
+
+== Verification (end of plan)
+
+* `flox activate -- ./mvnw package … -DskipTests=false` → 38 tests green; `ClusterReadinessProjectionTest` unchanged.
+* `RunbookRenderingTest` asserts the diagnosis IS present (flipped).
+* User-run simulated preview: diagnosis visible in `target/runbook/adoc/…`; Pulumi log reference-pure.
+* No Pulumi output change (guard held — diagnosis is in the in-memory ReportModel, not state).
+
+== After this plan
+
+Re-open the post-hoc reconstruction discussion (deferred, write-side made it possible), with the
+rendered runbook as concrete reference. Then tensions T2/T3/T4 (spec Increment E).
