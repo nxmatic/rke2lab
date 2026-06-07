@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * One consultation of one checkpoint: what the patient brought to the doctor (the {@link Dossier}s
@@ -23,5 +24,16 @@ public record ConsultationReport(
   /** The symptom the doctor diagnosed (the plan's subject). */
   public Symptom symptom() {
     return plan.symptom();
+  }
+
+  /** Flat map view; {@code dossiers} and {@code plan} are themselves flat map views. */
+  public Map<String, Object> toOutputMap() {
+    return Map.of(
+        "checkpointId",
+        checkpointId,
+        "dossiers",
+        dossiers.stream().map(Dossier::toOutputMap).toList(),
+        "plan",
+        plan.toOutputMap());
   }
 }

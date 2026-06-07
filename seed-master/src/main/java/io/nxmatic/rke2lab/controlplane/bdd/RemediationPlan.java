@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -23,5 +24,16 @@ public record RemediationPlan(
   /** The first prescription, if any — convenience for single-treatment cases. */
   public Optional<Prescription> primaryPrescription() {
     return prescriptions.isEmpty() ? Optional.empty() : Optional.of(prescriptions.get(0));
+  }
+
+  /** Flat map view; {@code symptom} is the kebab id, prescriptions are nested flat maps. */
+  public Map<String, Object> toOutputMap() {
+    return Map.of(
+        "symptom",
+        symptom.id(),
+        "generalistSummary",
+        generalistSummary,
+        "prescriptions",
+        prescriptions.stream().map(Prescription::toOutputMap).toList());
   }
 }

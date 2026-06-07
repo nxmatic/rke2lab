@@ -21,4 +21,9 @@ public record Prescription(
       RemediationProgramRef programRef, Map<String, Object> payload, String humanHint) {
     return new Prescription(programRef, payload, humanHint);
   }
+
+  /** Flat map view; {@code programRef} is the kebab catalog id, never the enum name. */
+  public Map<String, Object> toOutputMap() {
+    return Map.of("programRef", programRef.id(), "payload", payload, "humanHint", humanHint);
+  }
 }
