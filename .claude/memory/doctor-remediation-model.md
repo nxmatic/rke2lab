@@ -1,6 +1,6 @@
 ---
 name: doctor-remediation-model
-description: "Doctor model design (2026-06-07): Remediator tier, next-visit loop closure, recruit-a-specialist gradient + consultation as a Referral/Prescription/ReferralReply round-trip (specialist sees siblings+longitudinal by ref). Enriched wip/spec.adoc; not yet implemented."
+description: "Doctor model design (2026-06-07): Remediator tier, next-visit loop closure, recruit-a-specialist gradient + consultation as a Referral/Prescription/ReferralReply round-trip (specialist sees siblings+longitudinal by ref). Enriched docs/architecture/doctor/runbook-doctor.adoc; not yet implemented."
 metadata: 
   node_type: memory
   type: project
@@ -9,7 +9,7 @@ metadata:
 
 A 2026-06-07 brainstorm (trigger: the user noticed Claude's *subagent* feature mirrors the
 doctor's AI-ready `Specialist` seam) extended the medical model with three LOCKED decisions,
-written into `wip/spec.adoc` (sections `[#the-remediator]`, `[#loop-closure]`,
+written into `docs/architecture/doctor/runbook-doctor.adoc` (sections `[#the-remediator]`, `[#loop-closure]`,
 `[#recruiting-a-specialist]`, anchor `[#ai-seam]`). DESIGN ONLY — no code yet. Builds on
 [[runbook-doctor-state]]; the doctor core already exists (Generalist + DbusTcpSpecialist).
 
@@ -79,7 +79,7 @@ siblings 1..N-1). This is the doctor model, NOT the what-if (see [[preview-whati
 Open at impl: Prescription contained-in vs separate-from the ReferralReply.
 
 **5. The exchange consolidated = an agenda-owning generalist (2026-06-07 session-4, VALIDATED;
-written to `wip/spec.adoc` `[#consultation-flow]`).** Building on pt.4's referral round-trip, the
+written to `docs/architecture/doctor/runbook-doctor.adoc` `[#consultation-flow]`).** Building on pt.4's referral round-trip, the
 user fixed how the consultation is *scheduled*. NINE invariants: (1) three objects —
 `Referral` (request, generalist→specialist) / `Prescription` (→patient) / `ReferralReply`
 (response, doctor→doctor); (2) seam `diagnose(Referral) → ReferralReply`, the reply keeps the *why*

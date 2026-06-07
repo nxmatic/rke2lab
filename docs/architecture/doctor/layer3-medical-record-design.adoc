@@ -1,12 +1,12 @@
 = Runbook & Doctor — Layer 3 Design (the medical record, recadred)
 :toc: left
 
-> *Workshop:* lives in `wip/` alongside link:spec.adoc[spec.adoc], link:plan.adoc[plan.adoc] and
-> link:pulumi-doctor-integration.adoc[pulumi-doctor-integration.adoc] while `feature/runbook-doctor`
-> is in progress. Durable substance migrates to `docs/architecture/` before merge; `wip/` must not
-> reach `main` (the wip-guard hooks enforce this).
+> *Context:* the write-side of Increment E layer 3, sibling to
+> link:runbook-doctor.adoc[runbook-doctor] and
+> link:pulumi-doctor-integration.adoc[pulumi-doctor-integration].
 >
-> *Status:* design, validated section-by-section in a brainstorming session (2026-06-07). This
+> *Status:* ✅ IMPLEMENTED (4 commits 52781714→4e8e71d1). Design validated section-by-section in a
+> brainstorming session (2026-06-07). This
 > *recadres* (reframes) the layer-3 decisions previously locked in spec Increment E — see
 > "What this changes vs the locked decisions" below. No code written yet.
 
@@ -18,7 +18,7 @@ plans included — into the stack outputs* for "100% faithful reconstruction fro
 a new additive top-level `medicalRecord` output key.
 
 That framing carried a *hard problem*: the *phantom diff*. `OutputBuilder` deliberately omits
-`timestamp` (link:../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/OutputBuilder.java[OutputBuilder.java]
+`timestamp` (link:../../../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/OutputBuilder.java[OutputBuilder.java]
 lines 37-46) because "it would change every run and produce phantom output diffs on no-op pulumi
 up". A full record carries admission (timestamp, git) → re-introduces exactly that phantom diff. The
 parade (exclude the timestamp) tensions with "100% faithful".
@@ -91,7 +91,7 @@ state*. Today it is NOT:
 
 * The two checkpoint resources are *siblings* under a common parent — both receive
   `bootstrapResult.readinessDependency()` as their `dependsOn`
-  (link:../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/resources/ResourceCreationPipeline.java[ResourceCreationPipeline.java]
+  (link:../../../seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/resources/ResourceCreationPipeline.java[ResourceCreationPipeline.java]
   lines 120, 131). The cluster resource does NOT depend on the systemd-adapter resource.
 * The cluster→systemd-adapter edge lives only in the *BDD nesting* (`@NestedSteps` /
   `.depending_on_systemd_adapter(...)`).

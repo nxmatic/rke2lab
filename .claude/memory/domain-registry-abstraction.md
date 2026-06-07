@@ -15,7 +15,7 @@ Once both taxonomies exist — `ManifestDomainCatalog` (Stage B, deployment) and
 is abstractable into a generic `DomainCatalog` / `DomainRegistry<D>` core.
 
 **Do NOT do this during the config work.** Recorded as a deferred non-goal in the config
-restructuring spec's Future Work (`wip/config-restructuring-spec.adoc` on branch
+restructuring spec's Future Work (`docs/architecture/config/config-restructuring-spec.adoc` on branch
 `feature/runbook-doctor`). Deferring is deliberate (rule of three):
 
 1. The two registries differ exactly where abstraction is hard — manifest contribution is

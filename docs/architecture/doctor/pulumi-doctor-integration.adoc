@@ -2,7 +2,7 @@
 :toc: left
 :toclevels: 3
 
-> *Workshop:* lives in `wip/` on `feature/runbook-doctor` alongside link:spec.adoc[spec.adoc]
+> *Workshop:* lives in `wip/` on `feature/runbook-doctor` alongside link:runbook-doctor.adoc[spec.adoc]
 > (which references this from Increment E). Durable substance migrates to `docs/architecture/`
 > before merge. This doc exists because the question "the doctor needs a Pulumi specialization —
 > how do we implement it in Pulumi?" cannot be answered without first laying out *what entities a
@@ -252,7 +252,7 @@ off-line — a verification when layer 3 is built, not a fork.
 
 == Related
 
-* link:spec.adoc[Runbook & Doctor — Design] — Increment E references this doc for the
+* link:runbook-doctor.adoc[Runbook & Doctor — Design] — Increment E references this doc for the
   doctor↔Pulumi integration question.
-* link:plan.adoc[Runbook & Doctor — Plan] — the layer-2 step (persist the consultation report) is
-  independent of this fork and ships first.
+* link:layer3-medical-record-design.adoc[Layer 3 — Medical record] — the write-side that persists the
+  consultation report per-node (the resolution of this integration fork, now implemented).

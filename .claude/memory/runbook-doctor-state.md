@@ -1,6 +1,6 @@
 ---
 name: runbook-doctor-state
-description: feature/runbook-doctor — Increments A-D DONE; BDD-quality pass COMPLETE; DAG chantier has a refined medical-model design (patient=Pulumi stack, Dossier=consultation report, Set<Symptom> bounded by observability, Doctor=generic module, medical record=reconstructable state). Source of truth = wip/spec.adoc + wip/plan.adoc + wip/pulumi-doctor-integration.adoc (committed 930069c1). Layer 2 DONE (0cd2b2f5: doctor's plan kept, not dropped — ConsultationReport + ConsultationLog). Layer 2's other steps DISSOLVED (no ExamReport rename; no Set<Symptom>=rule-of-three; VerificationResult-as-projection-of-report impossible — 2 distinct aggregates). NEXT = layer 3 (medical record) in a FRESH session: our model = source, runbook+VerificationResult = views, full record serialized into state, guard renegotiated, phantom-diff to solve first. Pulumi fork RESOLVED (doctor = app logic, Option A). T2/T3/T4 open.
+description: feature/runbook-doctor — Increments A-D DONE; BDD-quality pass COMPLETE; DAG chantier has a refined medical-model design (patient=Pulumi stack, Dossier=consultation report, Set<Symptom> bounded by observability, Doctor=generic module, medical record=reconstructable state). Source of truth = docs/architecture/doctor/runbook-doctor.adoc + docs/architecture/doctor/pulumi-doctor-integration.adoc (committed 930069c1). Layer 2 DONE (0cd2b2f5: doctor's plan kept, not dropped — ConsultationReport + ConsultationLog). Layer 2's other steps DISSOLVED (no ExamReport rename; no Set<Symptom>=rule-of-three; VerificationResult-as-projection-of-report impossible — 2 distinct aggregates). NEXT = layer 3 (medical record) in a FRESH session: our model = source, runbook+VerificationResult = views, full record serialized into state, guard renegotiated, phantom-diff to solve first. Pulumi fork RESOLVED (doctor = app logic, Option A). T2/T3/T4 open.
 metadata: 
   node_type: memory
   type: project
@@ -12,8 +12,8 @@ The phantom-diff dilemma was DISSOLVED by a recadrage (brainstormed + validated)
 holds the graph (state `dependencies`) and the longitudinal log (update history) → we serialize ONLY
 the diagnostic layer Pulumi ignores, per-node, additively; NOT a top-level `medicalRecord` blob, NOT
 edges, NOT timestamp. This REVERSES the previously-locked spec-IncE decisions (top-level blob / full
-record / renegotiated guard) — see `wip/layer3-medical-record-design.adoc` (a8c37c75) + its plan
-(`wip/layer3-medical-record-plan.adoc`, 9b9302d9; both prose+C4/UML, no Java — [[docs-diagrams-not-java]]).
+record / renegotiated guard) — see `docs/architecture/doctor/layer3-medical-record-design.adoc` (a8c37c75) + its plan
+(the layer-3 design (committed 9b9302d9); both prose+C4/UML, no Java — [[docs-diagrams-not-java]]).
 4 commits: **52781714** `Checkpoint` enum (single-source join key: `slug()` + derived
 `resourceName()`="seed-"+slug; both stages' SCENARIO_ID + both resource names consume it — kills the
 clusterApi/cluster-api hand-aligned-literal risk; identity ONLY, never topology). **13bb7715** the
@@ -209,10 +209,10 @@ chain so everything is fail-fast and correct; fail-at-end becomes meaningful onl
 report-node DAG lands AND there's a genuine pair of INDEPENDENT checks (none in cluster yet — its
 phases are intrinsically sequential). Don't build per-step policy now (rule-of-three: one shape).
 
-**DAG CHANTIER — THE MEDICAL MODEL (terminology session 2026-06-07). SOURCE OF TRUTH = the wip
-docs in the repo, NOT the scratch plan file.** Read `wip/spec.adoc` (Increment E), `wip/plan.adoc`
-(the layer-2 step), `wip/pulumi-doctor-integration.adoc` (C4/UML + the open Pulumi fork). Committed
-930069c1; wip-guard blocks them from main. (The `~/.claude/plans/parallel-floating-corbato.md`
+**DAG CHANTIER — THE MEDICAL MODEL (terminology session 2026-06-07). SOURCE OF TRUTH = the design
+docs in the repo.** Read `docs/architecture/doctor/runbook-doctor.adoc` (Increment E) and
+`docs/architecture/doctor/pulumi-doctor-integration.adoc` (C4/UML + the resolved Pulumi fork). The
+layer-2/3 plans were executed and removed at the wip→docs migration (the code is the record). (The `~/.claude/plans/parallel-floating-corbato.md`
 scratch file is SUPERSEDED by these — it predates the model evolution below.) Model is a DIRECTION,
 deliberately NOT frozen — several tensions left open until a first working doctor version exists.
 
@@ -260,7 +260,7 @@ always-present Stage-B HANDOFF projection, already a projection of the phase dos
 residual dup = the 7 `cluster*` keys defined twice (`asOutputs` + `ReadinessOutputMapper`) — optional
 handoff-side cleanup, unrelated to the medical model.
 
-**LAYER 3 = NEXT, in a FRESH session (decisions LOCKED 2026-06-07, code in `wip/spec.adoc` Inc E).**
+**LAYER 3 = NEXT, in a FRESH session (decisions LOCKED 2026-06-07, code in `docs/architecture/doctor/runbook-doctor.adoc` Inc E).**
 The medical record (one per patient-stack) is OUR aggregate and becomes the SOURCE; the runbook AND
 `VerificationResult` become VIEWS — this REVERSES today's dependency (JGiven `ReportModel` is the
 structure today; instead our model is the source and the JGiven model is *derived* for rendering →
@@ -287,7 +287,7 @@ doctor stays APPLICATION LOGIC (a module, never a resource); only the consultati
 into state via `registerOutputs` on the checkpoint's EXISTING `ComponentResource` — an output-CARRIER
 (ComponentResource is the one kind NOT provisioned toward a target), not a provisioned actor. "Record
 = reconstructable state" = re-read the checkpoint's outputs + `dependsOn`; the "re-observe" cycle is
-the program re-running, not a provider Read. Full argument + C4/UML in `wip/pulumi-doctor-integration.adoc`.
+the program re-running, not a provider Read. Full argument + C4/UML in `docs/architecture/doctor/pulumi-doctor-integration.adoc`.
 A Pulumi-DOMAIN Specialist (reads engine errors to diagnose) stays possible later as just another
 `Specialist` — distinct from persistence, does not make the doctor a resource.
 
@@ -373,9 +373,8 @@ generalization (only one scenario; abstracting now guesses the wrong axes). Revi
 Operator UX is already fine: `policy.preview.simulate.<scenario>: <kind>` in `Pulumi.dev.yaml`
 (shipped commented as a template); preview-only by construction (apply never reads it).
 
-**Read first:** `wip/spec.adoc` (the design) + `wip/README.adoc` (wip manifest). Lives in `wip/`
-while in progress; durable substance migrates to `docs/architecture/` before merge (and `wip/` must
-not reach main — [[wip-guard-hooks]] enforces this).
+**Read first:** `docs/architecture/doctor/runbook-doctor.adoc` (the design). Migrated from `wip/` to
+`docs/architecture/doctor/` at merge time ([[wip-guard-hooks]] enforces that `wip/` never reaches main).
 
 **What it is (two intertwined subsystems):**
 - *Runbook* — the deliverable: a rendered `.adoc` DAG (git model) of the readiness scenarios played

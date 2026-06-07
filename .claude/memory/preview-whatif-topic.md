@@ -1,14 +1,14 @@
 ---
 name: preview-whatif-topic
-description: PARKED exploration (2026-06-07, 2 sessions) — preview as counterfactual BDD replay (what-if). Session 2 DISSOLVED the placement blocker (re-probe live in preview → nothing to read back) and grew it into a closed-loop diagnostic planner. Full capture in wip/preview-whatif-replay-exploration.adoc. Resume cold.
+description: PARKED exploration (2026-06-07, 2 sessions) — preview as counterfactual BDD replay (what-if). Session 2 DISSOLVED the placement blocker (re-probe live in preview → nothing to read back) and grew it into a closed-loop diagnostic planner. Full capture in docs/architecture/doctor/preview-whatif-replay-exploration.adoc. Resume cold.
 metadata: 
   node_type: memory
   type: project
   originSessionId: 6d3faadb-1da7-486c-9310-99b6dd4c49b5
 ---
 
-PARKED exploration, captured cold in `rke2lab/wip/preview-whatif-replay-exploration.adoc` (indexed in
-`wip/README.adoc`). Likely lands on `feature/runbook-doctor`. EXPLORATION ONLY — no spec, no plan, no
+PARKED exploration, captured cold in `rke2lab/docs/architecture/doctor/preview-whatif-replay-exploration.adoc` (indexed in
+`docs/README.adoc`). Likely lands on `feature/runbook-doctor`. EXPLORATION ONLY — no spec, no plan, no
 code. Two sessions on 2026-06-07; **session 2 overturned session 1's blocker** — read the wip doc, it
 is fully rewritten.
 

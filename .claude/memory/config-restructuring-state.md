@@ -10,8 +10,8 @@ metadata:
 Restructuring rke2lab configuration. Increment 1 merged to `main` (fast-forward, `wip/` then
 removed from main per convention). The design spec + migration plan + Increment 2 continue as
 WIP on branch `feature/runbook-doctor` (NOT on main):
-- `wip/config-restructuring-spec.adoc` (on feature/runbook-doctor) — diagram-first design (C4 + UML)
-- `wip/config-migration-plan.adoc` (on feature/runbook-doctor) — TDD/BDD plan
+- `docs/architecture/config/config-restructuring-spec.adoc` (on feature/runbook-doctor) — diagram-first design (C4 + UML)
+- TDD/BDD migration plan (executed; removed at merge — the code is the record)
 Durable docs/ relocation is deferred until the whole config feature (incl. Increment 2) lands.
 
 **Increment 1 (full config migration) — DONE & VERIFIED (2026-06-06).** Implemented + committed:
@@ -72,7 +72,7 @@ don't exist.
   NO `ConfigSpecialist` — the config layer only knows structural facts; the existing per-domain
   specialist (e.g. IncusExecSpecialist) owns the meaning (why/example). Single shared
   `Generalist` routes by domain. Loader ACCUMULATES all missing keys, consults ONCE. Reuses the
-  runbook-doctor subsystem (see that branch's `wip/spec.adoc`).
+  runbook-doctor subsystem (see that branch's `docs/architecture/doctor/runbook-doctor.adoc`).
 
 **Plan structure (MERGED, preview-only):** the spec's A/B/C collapse into ONE increment
 (`config-migration-plan.adoc`, 9 tasks): ConfigLoader+DTO+catalog+sealed-fragment+registry+6
@@ -90,6 +90,6 @@ offline path (no mandatory validation, for EnvironmentStage's null-context branc
 **Deferred:** [[domain-registry-abstraction]] — unify the two registry pairs later.
 
 **Next step when resuming:** start Increment 2 (doctor) on `feature/runbook-doctor` — see that
-branch's `wip/spec.adoc`. Build commands: `flox activate -- ./mvnw -pl :seed-master -am test
+branch's `docs/architecture/doctor/runbook-doctor.adoc`. Build commands: `flox activate -- ./mvnw -pl :seed-master -am test
 -DskipTests=false` (reactor; tests skipped by default — see [[sequential-no-compat-workflow]] and
 CLAUDE.md build conventions; Claude may run compile/test/preview, not live-system mutations).

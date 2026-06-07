@@ -2,11 +2,11 @@
 :toc: left
 :toclevels: 3
 
-*Date:* 2026-06-05 +
-*Status:* Design (brainstorm complete, awaiting review) +
-*Workshop:* this lives in `wip/` on branch `feature/runbook-doctor` while in progress
-(see link:README.adoc[wip manifest]). Durable substance migrates to `docs/architecture/`
-just before merge; `wip/` holds living process artifacts (brainstorm → spec → plan).
+*Date:* 2026-06-05 (landed in `docs/architecture/doctor/` 2026-06-07) +
+*Status:* ✅ Increments A–D + Increment E (layers 2 + 3 write-side + read-side part 1) IMPLEMENTED on
+`feature/runbook-doctor`. ⚠️ The medical-model extensions (remediator, loop closure, recruitment, the
+referral round-trip, the closed-loop planner) are *Design Only* — seam-level, not yet built. See the
+sibling design docs in this folder.
 
 == Vocabulary
 
@@ -32,7 +32,7 @@ if the current one is in order).
 
 We have one readiness checkpoint working: `systemd-adapter` plays a Given/When/Then
 scenario during `pulumi up`/`preview`, streams its prose into the Pulumi log, and decides
-stop-vs-degraded by severity (see link:../docs/architecture/bdd/bdd-diagnostic-pattern.adoc[bdd-diagnostic-pattern]).
+stop-vs-degraded by severity (see link:../bdd/bdd-diagnostic-pattern.adoc[bdd-diagnostic-pattern]).
 
 This design extends that into two intertwined subsystems:
 
@@ -222,8 +222,8 @@ Example rendering:
 The systemd adapter dbus-over-TCP proxy must respond...
 
 === Diagnosis (on failure only)
-**Symptom:** CONNECTION_REFUSED
-**Dossier:**
+*Symptom:* CONNECTION_REFUSED
+*Dossier:*
 [source,yaml]
 ----
 instanceName: master
@@ -834,7 +834,7 @@ commit `0ed98c13`). The `dependsOn` edge is no longer only `@NestedSteps` nestin
 an explicit resource edge in the state (commit `13bb7715`), and the nesting becomes a view of it.
 See Increment E below.
 
-=== Increment E — the medical model, refined (design; execution in link:plan.adoc[plan.adoc])
+=== Increment E — the medical model, refined (design; layers 2 + 3 implemented)
 
 A terminology session (2026-06-07) turned the medical analogy into a precise *layered* model
 and resolved that the "shape the snapshot/outputs first" work and the "build the DAG" work are
@@ -862,7 +862,7 @@ nothing; it receives the raised symptoms and diagnoses/prescribes.
   context: git commit/branch (already captured in `OutputBuilder` `seedDeploymentMetadata.git`),
   preview-vs-up mode (`Deployment.getInstance().isDryRun()`), the *call parameters* = the Pulumi
   stack config (incl. `policy.preview.simulate.<scenario>`, the ordered fake incident), and a
-  timestamp. Much of this is already assembled in `OutputBuilder` but does **not** reach the
+  timestamp. Much of this is already assembled in `OutputBuilder` but does *not* reach the
   runbook today — wiring it in is part of this increment.
 * *A checkpoint is where the patient self-observes* one subsystem (systemd-adapter, cluster, …)
   and raises symptoms. It is NOT a patient, and NOT something the doctor examines.
@@ -903,8 +903,8 @@ symptom today; the `Set<Symptom>` shape is ready for more when an independent pa
 
 The user's call: the Doctor must be *an actor of the system — a generic module plugged into
 seed-master, reusable in other contexts*. This settles the long-open question recorded in
-link:../.claude/memory/config-restructuring-state.md[config-restructuring-state] /
-link:../.claude/memory/domain-registry-abstraction.md[domain-registry-abstraction]: the doctor
+link:../../../.claude/memory/config-restructuring-state.md[config-restructuring-state] /
+link:../../../.claude/memory/domain-registry-abstraction.md[domain-registry-abstraction]: the doctor
 core is a *neutral module*, not seed-master-bound. Rule of three is reached — (1) runbook
 checkpoints, (2) config missing-input remediation (config's "Increment 2", the doctor's first
 non-runbook use case), (3) future contexts.
@@ -1068,5 +1068,5 @@ link:layer3-readside-runtime-enrichment-design.adoc[layer3-readside-runtime-enri
 
 == Related documentation
 
-* link:../docs/architecture/bdd/bdd-diagnostic-pattern.adoc[BDD Diagnostic Pattern] — the pattern this extends (doctor hierarchy, actor-specific reports, severity)
-* link:../docs/architecture/bootstrap/bootstrap-contract.adoc[Bootstrap Contract] — where checkpoints fit Stage A
+* link:../bdd/bdd-diagnostic-pattern.adoc[BDD Diagnostic Pattern] — the pattern this extends (doctor hierarchy, actor-specific reports, severity)
+* link:../bootstrap/bootstrap-contract.adoc[Bootstrap Contract] — where checkpoints fit Stage A

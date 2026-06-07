@@ -9,7 +9,7 @@ idea into a closed-loop diagnostic model. Captured so it can be resumed cold. +
 *Branch (when started):* likely `feature/runbook-doctor` (it renegotiates a layer-3 write-side
 decision) — to be decided when picked up. +
 *Workshop:* parked in `wip/` deliberately. A *different subject* from the doctor-model extensions
-already in link:spec.adoc[spec.adoc]; do NOT interleave it with the active doctor work until picked
+already in link:runbook-doctor.adoc[spec.adoc]; do NOT interleave it with the active doctor work until picked
 up as its own subject.
 
 [IMPORTANT]
@@ -153,7 +153,7 @@ would re-litigate settled ground.
 . *Subagent → doctor brainstorm* extended the doctor with three tiers: the pure *Doctor*, the
   *Prescription* as a referral, and a *Remediator* that administers treatment. The loop closes on the
   *next visit*: doctor _proposes_ (in the record), operator _disposes_ (a directive in stack config),
-  the next `up` _executes_ and re-observes. See link:spec.adoc[spec.adoc] `[#the-remediator]`,
+  the next `up` _executes_ and re-observes. See link:runbook-doctor.adoc[spec.adoc] `[#the-remediator]`,
   `[#loop-closure]`, `[#recruiting-a-specialist]`.
 . *"Do we need offline reconstruction?"* — nearly dropped as YAGNI.
 . *Real gap surfaced:* preparing a master update — seeing master's last diagnosed state *without* an
@@ -435,7 +435,7 @@ The user's inversion: the *specialist declares the symptoms it treats*; the gene
 its set of symptoms. The `domain()` only *seeds* a *default repertoire* — the symptoms a specialist of
 that specialty *can* treat — which the practitioner *inherits*; but the effective list is always the
 practitioner's own, *adding* (sub-specialization) or *removing* (a procedure it does not perform). The
-domain is the **seed, never a second source** that co-owns the answer. Exactly real medicine: the
+domain is the *seed, never a second source* that co-owns the answer. Exactly real medicine: the
 specialty says what is treatable in the field; the individual practitioner declares what *they* treat.
 
 [cols="2,3",options="header"]
@@ -456,7 +456,7 @@ Three benefits chain into the rest of the model:
 
 . *Single source of truth* — the competence lives where the treatment lives; the `switch` is deleted;
   the domain seeds a default, it does not co-own a second copy.
-. *Recruitment trigger* (link:spec.adoc[spec.adoc] `[#recruiting-a-specialist]`, memory
+. *Recruitment trigger* (link:runbook-doctor.adoc[spec.adoc] `[#recruiting-a-specialist]`, memory
   `doctor-remediation-model`) — a symptom *no* practitioner's `treats()` covers is, by definition, the
   recruitment signal. The seed/owner split still refines *what* to recruit: a symptom no domain *can*
   treat = a *specialty gap* (recruit a new domain); a symptom the domain can treat but every
@@ -507,7 +507,7 @@ the doctor reads from (inception vs. external orchestrator) is its own open deci
 the registry pairs once the rule-of-three is met). Not a blocker; the actual architecture to design.
 
 This *is* the rules-engine doc's *Option ① (give `Checkpoint` topology)* — which that agent
-**discarded** (pursuing only the specialist track). For a one-off refactor, discarding ① is defensible;
+*discarded* (pursuing only the specialist track). For a one-off refactor, discarding ① is defensible;
 but the closed-loop planner *cannot exist* without a walkable topology, so ① is a hard *prerequisite*
 here, not a nice-to-have. That is a sequencing fact for whoever picks up the planner — not a contradiction
 of their choice (their choice was scoped to de-duplication, which ① is optional for; the planner raises
@@ -768,9 +768,9 @@ methods as rules (no inference), a bounded DAG sweep as propagation (no RETE net
   above it); intersections — the `treats()` shape has *converged* (domain seeds, practitioner owns),
   and the case-history read path has also *converged* (the accumulator IS the persisted store they
   wanted; the patient↔specialist edge is resolved both sides).
-* link:spec.adoc[runbook-doctor] — the Remediator / loop-closure / recruitment tiers this what-if
+* link:runbook-doctor.adoc[runbook-doctor] — the Remediator / loop-closure / recruitment tiers this what-if
   serves; `recruiting-a-specialist` is now *triggered* by `treats()` returning no declarer.
 * link:layer3-medical-record-design.adoc[layer3-medical-record-design] — the per-node serialization
   decision *stays intact* (the what-if no longer needs a top-level channel; the placement fight is off).
-* link:dsl-unification-exploration.adoc[dsl-unification] — separate parked subject (JGiven shared
+* link:../patterns/dsl-unification-exploration.adoc[dsl-unification] — separate parked subject (JGiven shared
   engine); both touch the BDD layer but are independent. The DAG-as-data tension may interact with it.

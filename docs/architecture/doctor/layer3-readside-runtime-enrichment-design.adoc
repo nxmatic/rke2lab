@@ -1,10 +1,10 @@
 = Runbook & Doctor — Layer 3 Read-Side, part 1: runtime enrichment (design)
 :toc: left
 
-> *Workshop:* lives in `wip/` alongside the layer-3 write-side docs
-> (link:layer3-medical-record-design.adoc[design], link:layer3-medical-record-plan.adoc[plan]) while
-> `feature/runbook-doctor` is in progress; durable substance migrates to `docs/architecture/` before
-> merge; `wip/` must not reach `main` (the wip-guard hooks enforce this).
+> *Context:* the read-side (part 1) of Increment E layer 3, sibling to the write-side
+> link:layer3-medical-record-design.adoc[design].
+>
+> *Status:* ✅ IMPLEMENTED (4 commits c8c7116f→daa34928).
 >
 > *Convention:* prose + C4/UML Mermaid, never Java snippets.
 >

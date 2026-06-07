@@ -8,7 +8,7 @@ metadata:
 ---
 
 PARKED future subject (not the active runbook-doctor branch). Capture lives at
-`rke2lab/wip/dsl-unification-exploration.adoc` (REWRITTEN 2026-06-07), indexed in `wip/README.adoc`
+`rke2lab/docs/architecture/patterns/dsl-unification-exploration.adoc` (REWRITTEN 2026-06-07), indexed in `docs/README.adoc`
 with a NOTE marking it as a holding exception to the one-active-subject rule. Branch when started =
 `refactor/jgiven-shared-engine`.
 

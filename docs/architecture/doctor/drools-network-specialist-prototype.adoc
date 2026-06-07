@@ -16,7 +16,7 @@ exploration] — it is the *honest fourth option* (②′) that exploration name
 
 The rules-engine exploration rejected *option ③ — Drools as substrate* because it would subsume the
 `Generalist` and `Checkpoint`, and its working memory is hidden mutable global state (vs the
-project's instance-passing discipline). This doc explores the **inverse containment**: the
+project's instance-passing discipline). This doc explores the *inverse containment*: the
 architecture is unchanged and *contains* Drools inside a single `Specialist` implementation.
 
 .The two shapes — substrate (rejected) vs contained (this doc)
@@ -48,8 +48,8 @@ Why containment is legitimate where substrate was not:
   assumption about implementation … a future Phase 2 could back the same interface with an
   out-of-process tool."_ A Drools-backed specialist is one such implementation; the Generalist
   neither knows nor cares.
-* The working-memory objection **dissolves**: the `KieSession` is created, fed (`insert`),
-  `fireAllRules()`, and disposed **within one `diagnose()` call**. It is a local, short-lived
+* The working-memory objection *dissolves*: the `KieSession` is created, fed (`insert`),
+  `fireAllRules()`, and disposed *within one `diagnose()` call*. It is a local, short-lived
   computation — not hidden global state. Instance-passing is respected because the session never
   escapes the method.
 
@@ -65,7 +65,7 @@ codebase already points at exactly one:
   The `NETWORK` `SpecialistDomain` exists; no specialist fills it yet.
 * A network failure is *intrinsically multi-condition*: the same symptom (`TIMEOUT`) can come from a
   missing route, a closed firewall port, an MTU/path-MTU mismatch, or DNS — and the *right*
-  prescription depends on **which combination** of facts the dossier shows. That is the canonical
+  prescription depends on *which combination* of facts the dossier shows. That is the canonical
   shape RETE was built for.
 
 == Where the facts come from — the PATIENT record IS the fact base (patient-centric, not practitioner-centric)
@@ -233,7 +233,7 @@ reviews fastest. Each row is a rule: a *when* (a conjunction of fact patterns) a
 |`CHECK_CONNECTIVITY`
 |===
 
-The point this table makes: **the rows interact.** "Port closed" means different things when the
+The point this table makes: *the rows interact.* "Port closed" means different things when the
 host is unreachable (route) vs reachable (firewall) vs reachable-and-refused (dead unit). In a Java
 `if/else` cascade this becomes nested conditions whose order is load-bearing and easy to get wrong.
 In RETE the *facts* drive matching and *salience* drives precedence — declaratively.
@@ -265,7 +265,7 @@ sequenceDiagram
 ....
 
 The `KieContainer` (the compiled rule base) *can* be a stateless, immutable, long-lived singleton
-(rules don't change at runtime); only the **stateful session** is per-call. That split is the clean
+(rules don't change at runtime); only the *stateful session* is per-call. That split is the clean
 mapping onto the project's values: immutable rule base (shared, safe) + ephemeral session (local,
 disposed).
 
@@ -329,7 +329,7 @@ argument for trying it *here* rather than as a substrate.
 |❌ KIE on the classpath, DRL/decision-table tooling, a second mental model
 |===
 
-*Reading:* the win is real **only** at the "several interacting conditions" row. The NetworkSpecialist
+*Reading:* the win is real *only* at the "several interacting conditions" row. The NetworkSpecialist
 plausibly reaches it; DbusTcp never will. So the design conclusion is conditional, not absolute:
 *Drools belongs in this system at most as one or two genuinely-correlating specialists — never as the
 default specialist shape, and never above the seam.*
@@ -367,7 +367,7 @@ default specialist shape, and never above the seam.*
   this doc is its option ②′ (contained Drools), distinct from the rejected option ③ (substrate).
   Options ① (Checkpoint topology) and ② (self-declaring specialists) are independent of this and
   remain the recommended "open set" wins.
-* link:spec.adoc[runbook-doctor] — the `Specialist`/`Generalist`/`Prescription` model this prototype
+* link:runbook-doctor.adoc[runbook-doctor] — the `Specialist`/`Generalist`/`Prescription` model this prototype
   extends; the `NETWORK` `SpecialistDomain` it would finally fill.
 * link:preview-whatif-replay-exploration.adoc[preview-whatif] — orthogonal; the what-if propagates
   along the *checkpoint* edge, not inside a specialist. No interaction.
