@@ -16,7 +16,12 @@ just before merge; `wip/` holds living process artifacts (brainstorm → spec �
 |*Runbook* |the deliverable artifact — a rendered `.adoc` DAG of the scenarios played during a provisioning, with results and (on failure) diagnosis + remediation. Dynamic, on-demand.
 |*Readiness checkpoint* |the mechanism — an _intermediate_ controlled passage (a sas between provisioning steps) that plays a Given/When/Then scenario, decides stop-vs-degraded, and feeds the runbook. Today's `SystemdAdapterStage`.
 |*Entry gate* |(existing, unchanged) preconditions checked _before_ provisioning — `EntryGatePolicyEnforcer` (clean worktree, flake coherence). A different species of door: the front door, not the intermediate landing.
-|*Doctor* |the diagnosis engine consulted on failure: Generalist → Specialists → Prescription → RemediationPlan.
+|*Doctor* |the diagnosis engine the patient consults: Generalist → Specialists → Prescription → RemediationPlan. *Direction (Increment E):* a *generic, pluggable module* (used beyond seed-master), with `Doctor` a supertype of `Generalist`/`Specialist`. See Increment E and its open tensions.
+|*Patient* |(Increment E direction) the *Pulumi stack* (`org/project/stack`, e.g. `bioskop/dev`) — a persistent identity. Several patients = several stacks (dev/prod/clusters). A checkpoint is NOT the patient; the patient self-observes _via_ its checkpoints.
+|*Visit* |(Increment E direction) one `pulumi up`/`preview` run, carrying its *admission context* = the runtime context (git commit/branch, preview-vs-up mode, call parameters = the Pulumi stack config incl. `simulate`, timestamp).
+|*Symptom* |(exists, unchanged) the typed complaint the patient *raises about its own state* while self-observing — the routing key the Generalist uses, never parsed from prose. A consultation carries a *set* of them (0..n).
+|*Consultation report* |(Increment E — today's `Dossier`, re-understood) what the patient brings to the doctor + what the doctor produces: status + the raised `Symptom`(s) + summary + details + the `RemediationPlan` (today computed then dropped — to be kept). NOT a separate "exam" layer below it.
+|*Medical record* |(Increment E direction) the *patient-stack's* longitudinal history — its visits over time (Pulumi state = the latest; the git-versioned runbook `.adoc` = the longitudinal record). The runbook DAG. One per patient.
 |===
 
 The door analogy is deliberate: `EntryGate` is the front door (you pass it to *enter*);
@@ -619,7 +624,169 @@ The plan still flows into the *inline log*, not yet into the runbook *node's*
 Diagnosis/Mitigation sections, and `dependsOn` edges are rendered via `@NestedSteps` nesting
 rather than recorded as explicit DAG edges. The shared report-node model (node-level
 Diagnosis/Mitigation + explicit edges) remains the last deferral — now unblocked since both
-checkpoints are live BDD scenarios.
+checkpoints are live BDD scenarios. This deferral is now designed as Increment E below.
+
+=== Increment E — the medical model, refined (design; execution in link:plan.adoc[plan.adoc])
+
+A terminology session (2026-06-07) turned the medical analogy into a precise *layered* model
+and resolved that the "shape the snapshot/outputs first" work and the "build the DAG" work are
+*not two chantiers* — they are *layers of one model*. This supersedes the flat "everything is a
+`Dossier`" granularity used through Increment D.
+
+NOTE: This section captures a *direction*, deliberately NOT frozen. The model moved a lot during
+the session (patient went from "the provisioned system" → "the checkpoint" → finally "the Pulumi
+stack"; the Doctor became a generic module). Rather than freeze a moving target, we record the
+direction + the open tensions, and we will only settle them once a *first working version of the
+doctor(s)* is in place (the user's call). The concrete *next executable step* (layer 2 below) is
+stable and does not depend on the unsettled tensions.
+
+==== The patient is the Pulumi stack; it self-observes and consults about its symptoms
+
+The flow is *patient → doctor*, not doctor → patient. The patient self-observes, *raises its
+own symptoms* about its state, and *comes to consult* the doctor about them. The doctor measures
+nothing; it receives the raised symptoms and diagnoses/prescribes.
+
+* *Patient = the Pulumi stack* (`org/project/stack`, e.g. `bioskop/dev`) — a *persistent*
+  identity. Several patients = several stacks (dev/prod, different clusters). (We tried
+  "patient = the provisioned system", then "patient = the checkpoint"; both were too poor. The
+  stack is the entity with a durable identity and a history.)
+* *A visit* = one `pulumi up`/`preview`. It carries the *admission context* = the runtime
+  context: git commit/branch (already captured in `OutputBuilder` `seedDeploymentMetadata.git`),
+  preview-vs-up mode (`Deployment.getInstance().isDryRun()`), the *call parameters* = the Pulumi
+  stack config (incl. `policy.preview.simulate.<scenario>`, the ordered fake incident), and a
+  timestamp. Much of this is already assembled in `OutputBuilder` but does **not** reach the
+  runbook today — wiring it in is part of this increment.
+* *A checkpoint is where the patient self-observes* one subsystem (systemd-adapter, cluster, …)
+  and raises symptoms. It is NOT a patient, and NOT something the doctor examines.
+* *The medical record* = the patient-stack's longitudinal history of visits. Pulumi state holds
+  only the *latest* visit; the *git-versioned runbook `.adoc`* is the longitudinal record.
+
+*No separate "exam"/"observation" layer.* An earlier draft put an `ExamReport`/`Observation` type
+below the consultation; that was one abstraction too many. There are two model types only: the
+`Symptom` the patient raises, and the *consultation report* it brings to the doctor (today's
+`Dossier`, re-understood — see below). The runbook DAG is the third, the medical record.
+
+==== A consultation carries a SET of symptoms, bounded by observability
+
+The patient self-observes across its checkpoint's points (the cluster's three phases:
+kubeconfig → API → controllers) and raises *all* the symptoms it finds — a consultation carries a
+*set* (0..n), and the doctor sees the set (so it can correlate). BUT how many a given patient can
+actually raise is bounded by *observability*:
+
+* *Independent observations* (a future pair of unrelated checks) → all are observable → the full
+  set is raised.
+* *A precondition chain* (the cluster today: you cannot reach the API without the kubeconfig, nor
+  the controllers without the API) → downstream points are *physically unobservable* once an
+  upstream one fails → the set collected is bounded at the first blocking symptom.
+
+This is exactly the user's "the edge decides": fail-fast *along* a precondition chain (downstream
+not observable), all-together *between* independent observations. The cluster therefore raises ≈1
+symptom today; the `Set<Symptom>` shape is ready for more when an independent pair appears.
+
+.The layers (= the work-pieces)
+[cols="1,2,2",options="header"]
+|===
+|Layer |Medical concept → type |Cardinality / who builds it
+|2 |consultation report → today's `Dossier`, re-understood (status + raised `Symptom`s + summary + details + the `RemediationPlan`) |one per checkpoint consultation; the checkpoint stage builds it, *keeping the plan* (today dropped)
+|3 |medical record → the runbook DAG (a patient-stack's visits) |one per patient; the shared model aggregates the visit's consultations + admission context
+|===
+
+==== The Doctor is a generic, pluggable module (design module-ready now; extract later)
+
+The user's call: the Doctor must be *an actor of the system — a generic module plugged into
+seed-master, reusable in other contexts*. This settles the long-open question recorded in
+link:../.claude/memory/config-restructuring-state.md[config-restructuring-state] /
+link:../.claude/memory/domain-registry-abstraction.md[domain-registry-abstraction]: the doctor
+core is a *neutral module*, not seed-master-bound. Rule of three is reached — (1) runbook
+checkpoints, (2) config missing-input remediation (config's "Increment 2", the doctor's first
+non-runbook use case), (3) future contexts.
+
+* *Decision:* design layers 2/3 *module-ready* now — the doctor core must know *no concrete
+  symptom or context*. Physical extraction into a dedicated Maven module + wiring config to it is
+  a *separate, later* chantier (churn controlled).
+* *What "module-ready" forces (deeper than it first looks):* not only must `Symptom` and
+  `SpecialistDomain` become *open* (each context contributes its own — today they are closed
+  enums mixing systemd + cluster symptoms), but `Generalist.routeBySymptom()` is a *hard-coded
+  closed `switch` inside the core*. A generic doctor cannot contain that switch — the
+  *symptom→domain routing must itself be contributed data*, not a core method. This is the real
+  extraction work.
+* *How the module integrates with Pulumi (open).* Since the medical record = the stack state,
+  the doctor needs a *Pulumi specialization* — but is it a persistence adapter (where records
+  live: ComponentResource vs provider-backed CustomResource) or a Pulumi-domain Specialist (an
+  expert reading engine state)? The two Pulumi entity worlds (application vs provider) and the
+  ComponentResource-vs-Provider fork are laid out with C4/UML diagrams in
+  link:pulumi-doctor-integration.adoc[pulumi-doctor-integration.adoc]. Decision still open;
+  facts to confirm first (does pulumi-java support inline providers?).
+
+==== The medical record IS the Pulumi state; the DAG is reconstructed from it
+
+*Corrected understanding (user, 2026-06-07):* the medical record is *stored in Pulumi* — it is the
+stack's states. So *each medical record's DAG must be reconstructable from those states.* Two
+distinct moments, which earlier got conflated:
+
+* *At runtime, inside the program:* you CANNOT query reverse dependencies — the program gets no
+  graph back, and checkpoints play eager (before downstream resources register). So *during* a run
+  the runbook is built from an in-memory model.
+* *Post-hoc, from the persisted state:* the DAG IS in the state — each resource carries its outputs
+  (the node = the consultation report) AND its `dependsOn` edges. So the DAG can be *reconstructed*
+  off-line (and even reversed: "who depends on me").
+
+This gives a hard design criterion: *the model is correct when the medical-record DAG can be fully
+reconstructed from the stack state.* Consequence for layer 2: the *entire* consultation report —
+*including the plan, today dropped* — must be captured in the resource OUTPUTS (→ state), not just
+in the in-memory model. And the in-memory model and the state must stay *consistent* (the model
+must faithfully BECOME the outputs + edges). The git-versioned runbook `.adoc` is a *rendering* of
+the reconstructed view, not the storage; the longitudinal record is the sequence of stack states
+(Pulumi update history), of which Pulumi keeps the latest. (This is also why the longitudinal record
+also lives in the git-versioned runbook,
+not in Pulumi state, which keeps only the latest visit.)
+
+==== Layer 2 is the next executable step (stable, independent of the open tensions)
+
+The consultation report (today's `Dossier`, re-understood) gains the `RemediationPlan` so it is
+*no longer dropped after the inline log* — that persistence is the prerequisite for layer 3's "the
+doctor sees the records". The cluster's per-phase dossiers fold into one consultation carrying the
+raised `Set<Symptom>`; `VerificationResult` becomes a *projection* of it. `Dossier` is NOT renamed
+to `ExamReport` (that draft is abandoned — no exam layer). This is shippable without resolving the
+tensions below. *HARD GUARD:* the Stage-B handoff contract stays byte-identical
+(`handoffReady`→`nextStep`, `bootstrapStatus`, the 7 `cluster*` keys, systemd flat keys;
+`ClusterReadinessProjectionTest` is the pin). Execution detail in link:plan.adoc[plan.adoc].
+
+==== Settled during the session (no longer open)
+
+* *T1 — when is the doctor consulted?* RESOLVED: *reactively, on a symptom* (as the code does
+  today — `consultDoctor` only in the failure branch), NOT systematically per visit. The
+  root-cause correlation that a systematic end-of-visit consultation would give is obtained
+  instead via edge-propagated record access (T2). Systematic consultation is inappropriate: it
+  would run even when fail-fast wants to stop, and decouple the diagnosis from the symptom's
+  fresh context.
+* *Flow + terminology.* RESOLVED: patient → doctor (the patient self-observes and raises
+  symptoms); no `ExamReport`/`Observation` layer; today's `Dossier` *is* the consultation report.
+
+==== Open tensions — DEFERRED until a first doctor(s) version is in place
+
+Recorded, not resolved (user: "note all the tensions; tackle them once our first version
+implementing the doctor(s) is in place"):
+
+. *Stateless doctor vs panel.* If the Doctor is a shared module, is record access an *internal
+  state* of the doctor (a panel of patients) or a *parameter passed to each* `consult()` (the
+  record + its `dependsOn` chain)? The latter fits a stateless module and the "access propagated
+  along edges" idea; it tensions with "the doctor has a panel".
+. *Routing must be contributed.* (See module-ready above.) `routeBySymptom` hard-coded in the core
+  contradicts genericity — routing becomes contributed data. Deeper than opening the enums.
+. *Context: patient vs visit.* The persistent patient identity is only `org/project/stack`; the
+  runtime context (git, mode, `simulate`, timestamp) is the admission of *a visit*, not the
+  patient's identity. Decides where the data attaches in the types.
+
+==== Renderer-route fork (decide before coding layer 3)
+
+The runbook is rendered by JGiven's own `AsciiDocReportGenerator` over a `ReportModel` — it is
+_not_ a free-form template. Adding node-level Diagnosis/Mitigation forces a choice: (a) attach the
+plan into the JGiven model (InfoTags / attachments / extended description — stays in JGiven,
+JGiven owns layout); (b) replace `AsciiDocReportGenerator` with our own renderer over
+`ReportModel` (full control, more work); (c) hybrid (JGiven body + our appended node sections).
+`RunbookRenderingTest` asserts "no Diagnosis/Mitigation before the doctor exists" — flipping that
+assertion is the TDD entry point.
 
 == Non-goals (explicit)
 

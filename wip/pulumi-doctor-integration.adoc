@@ -1,0 +1,233 @@
+= Pulumi entity model & the Doctor's Pulumi integration
+:toc: left
+:toclevels: 3
+
+> *Workshop:* lives in `wip/` on `feature/runbook-doctor` alongside link:spec.adoc[spec.adoc]
+> (which references this from Increment E). Durable substance migrates to `docs/architecture/`
+> before merge. This doc exists because the question "the doctor needs a Pulumi specialization —
+> how do we implement it in Pulumi?" cannot be answered without first laying out *what entities a
+> Pulumi application manipulates* vs *what entities a Pulumi provider manipulates*. The medical
+> record = the stack state (see spec), so the doctor's relationship to Pulumi is structural, not
+> an afterthought.
+
+== Why this matters
+
+The doctor core is a *generic module* (reused in config and elsewhere), yet the *medical record is
+the Pulumi state* and "each medical record's DAG must be reconstructable from the states". Those
+reconcile only if the Pulumi-ness lives in a *specialization*, never in the core. To choose the
+shape of that specialization we must be precise about Pulumi's two entity worlds — the
+*application* world (what our seed-master code touches) and the *provider* world (what a plugin
+touches). The fork at the end (ComponentResource vs Provider) hangs entirely on this distinction.
+
+== 1. C4 Container view — the Pulumi system at deploy time
+
+[mermaid]
+----
+flowchart TB
+    OP([Operator])
+
+    subgraph ENGINE["Pulumi CLI / Engine — orchestration, diff, state"]
+        RM["Resource Monitor<br/>gRPC: RegisterResource,<br/>RegisterResourceOutputs, ReadResource"]
+        DEP["Deployment engine<br/>desired vs actual,<br/>drives providers"]
+    end
+
+    subgraph HOST["Language Host — runs OUR program (Java / seed-master)"]
+        APP["The application<br/>registers Resources,<br/>builds Outputs"]
+    end
+
+    subgraph PROV["Provider plugin(s) — gRPC ResourceProvider"]
+        CRUD["Check / Diff /<br/>Create / Read / Update / Delete /<br/>Construct / Invoke"]
+    end
+
+    STATE[("State backend — checkpoint/snapshot:<br/>per-resource inputs+outputs<br/>+ dependsOn edges")]
+    WORLD([Real infrastructure<br/>AWS, Incus, k8s…])
+
+    OP -->|pulumi up / preview| ENGINE
+    ENGINE -->|starts, asks to run| HOST
+    APP -->|RegisterResource… via gRPC| RM
+    RM --> DEP
+    DEP -->|CRUD over gRPC| PROV
+    PROV -->|talks to the real world| WORLD
+    DEP -->|writes / reads| STATE
+----
+
+*The load-bearing fact:* our code (seed-master) runs *inside the Language Host*. It *never writes
+state directly* — it *declares* resources to the Resource Monitor; the *engine* writes state; the
+*providers* talk to the real world. So "persist into the state" has exactly two routes: a
+*ComponentResource* (`registerOutputs`) or a *CustomResource backed by a provider* (CRUD).
+
+== 2. UML — entities an APPLICATION manipulates
+
+[mermaid]
+----
+classDiagram
+    class Resource {
+        +URN urn
+        +ResourceOptions options
+    }
+    class ComponentResource {
+        +registerOutputs(Map outputs)
+    }
+    class CustomResource {
+        +Output~String~ id
+    }
+    class ProviderResource
+    class Output~T~ {
+        +applyValue(fn)
+        +dependencies : Resource[]
+    }
+    class ResourceOptions {
+        +dependsOn : Resource[]
+        +parent : Resource
+        +provider : ProviderResource
+        +protect / ignoreChanges
+    }
+    class ResourceArgs {
+        +Input fields (desired state)
+    }
+    class Deployment {
+        +isDryRun()
+        +stackName / projectName / org
+    }
+    class Context {
+        +export(name, Output)
+    }
+    class Config {
+        +get / getObject (stack config)
+    }
+
+    Resource <|-- ComponentResource
+    Resource <|-- CustomResource
+    CustomResource <|-- ProviderResource
+    Resource o-- ResourceOptions
+    ResourceOptions o-- Resource : dependsOn
+    CustomResource ..> ResourceArgs : created from
+    Resource ..> Output : exposes
+    Context ..> Output : exports
+----
+
+Notes:
+
+* `ComponentResource` = a *logical grouping*; NO provider, NO CRUD lifecycle. It is re-registered
+  every run. `registerOutputs(...)` writes its outputs to state; `dependsOn` records edges. This is
+  what `SystemdAdapterResource` and `ClusterReadinessResource` are today.
+* `CustomResource` = backed by a provider; has a physical `id` and a CRUD lifecycle.
+* `Config` = the stack config = the *call parameters* = the "admission context" of a visit
+  (incl. `policy.preview.simulate.<scenario>`). `Deployment.isDryRun()` = preview vs up.
+* `Output` carries `dependencies` — the data-flow edges Pulumi tracks automatically.
+
+== 3. UML — entities a PROVIDER manipulates
+
+[mermaid]
+----
+classDiagram
+    class ResourceProvider {
+        +Configure(config)
+        +Check(olds, news) inputs+failures
+        +Diff(id, olds, news) DiffResult
+        +Create(inputs) (id, outputs)
+        +Read(id, inputs, state) (id, props)
+        +Update(id, olds, news) outputs
+        +Delete(id, state)
+        +Construct(...) component providers
+        +Invoke / GetSchema
+    }
+    class URN {
+        +stack::project::type::name
+    }
+    class ID {
+        +provider-assigned physical id
+    }
+    class PropertyMap {
+        +inputs (desired)
+        +outputs (actual)
+        +olds (previous state)
+    }
+    class Schema {
+        +ResourceType[]
+        +PropertySchema (in/out)
+        +Function[]
+    }
+    class ResourceState {
+        +URN urn
+        +ID id
+        +PropertyMap props
+        +dependencies
+    }
+
+    ResourceProvider ..> PropertyMap : reads/writes
+    ResourceProvider ..> ID : assigns
+    ResourceProvider ..> Schema : describes
+    ResourceState o-- URN
+    ResourceState o-- ID
+    ResourceState o-- PropertyMap
+----
+
+*The concept that decides the fork: `Read`.* A provider has `Read` = "reconstruct the actual state
+from the world" (this is `pulumi refresh`), and `Diff` = "has it changed?". A `ComponentResource`
+has *none* of this — it is re-registered each run and never "re-reads". This is exactly the
+"medical record = state, reconstructable" idea, expressed as a provider verb.
+
+== 4. The Doctor superimposed — where the real fork is
+
+[mermaid]
+----
+flowchart LR
+    subgraph CORE["Doctor core — generic module, NO Pulumi"]
+        SYM["Symptom (set)"]
+        GEN["Generalist → Specialist"]
+        PLAN["RemediationPlan"]
+        REP["ConsultationReport<br/>(today's Dossier + the plan)"]
+    end
+
+    subgraph SEED["seed-master — the Pulumi adapter"]
+        A["Option A: ComponentResource<br/>registerOutputs(report) + dependsOn<br/>= logical node, re-derived each run"]
+        B["Option B: CustomResource + provider<br/>Create = first diagnosis · Read = re-observe<br/>Diff = condition changed? · Update = re-diagnose<br/>Delete = discharge"]
+    end
+
+    STATE[("Pulumi state<br/>= the medical record")]
+
+    REP --> A
+    REP --> B
+    A -->|outputs + edges| STATE
+    B -->|CRUD + Read| STATE
+----
+
+== The decision this doc frames (still open)
+
+Two doctor↔Pulumi relations must NOT be conflated:
+
+. *Persistence* — where the records live (the stack state). This is the "Pulumi specialization" in
+  the storage sense.
+. *A Pulumi-domain Specialist* — a diagnosis expert that reads Pulumi state/outputs/engine errors.
+  That is a business expert, not persistence.
+
+Two candidate shapes for the persistence specialization:
+
+[cols="1,3,3",options="header"]
+|===
+|Shape |Fits |Cost / risk
+|*A — ComponentResource* (as today) |Zero new abstraction; native outputs+edges; matches current `SystemdAdapterResource` |No `Read`/`Diff` — "reconstructable" is limited to re-reading the checkpoint's outputs+edges, no medical lifecycle
+|*B — CustomResource + provider* |`Create`/`Read`/`Diff`/`Update`/`Delete` map 1:1 onto first-consult / re-observe / changed? / re-diagnose / discharge — exactly "record = reconstructable state" |A real provider in Java is a *separate gRPC plugin* — heavy. *To confirm:* pulumi-java has no inline "dynamic providers" (only TS/Python do), so Option B may be costly in our stack
+|===
+
+*Reconciling frontier (working hypothesis, not locked):* the doctor core produces/consumes a
+*neutral* `ConsultationReport` (data); the fact that seed-master carries it on a `ComponentResource`
+(today) or a provider-backed `CustomResource` (maybe) is an *adapter* decision in seed-master, not
+in the module. So there may be *no Pulumi specialization inside the module at all* — the Pulumi-ness
+lives in the seed-master adapter. This must be validated against the user's intent ("the module
+needs a Pulumi specialization").
+
+*Facts to confirm before choosing* (do not decide from memory):
+
+* Does pulumi-java support dynamic/inline providers, or only out-of-process plugins?
+* What exactly does the checkpoint/state contain for a `ComponentResource` — are outputs + `dependsOn`
+  enough to reconstruct the DAG off-line?
+* Cost of a minimal Java provider (or a non-Java dynamic provider) for this use.
+
+== Related
+
+* link:spec.adoc[Runbook & Doctor — Design] — Increment E references this doc for the
+  doctor↔Pulumi integration question.
+* link:plan.adoc[Runbook & Doctor — Plan] — the layer-2 step (persist the consultation report) is
+  independent of this fork and ships first.

@@ -23,5 +23,7 @@ not by subject or date — this index carries the dates.
 [cols="2,1,1,3",options="header"]
 |===
 |Document |Started |Branch |Status
-|link:spec.adoc[Runbook & Doctor — Design] |2026-06-05 |`feature/runbook-doctor` |Design written, awaiting review
+|link:spec.adoc[Runbook & Doctor — Design] |2026-06-05 |`feature/runbook-doctor` |Increments A-D DONE; Increment E (medical model) = a direction + deferred tensions
+|link:plan.adoc[Runbook & Doctor — Plan (Increment E, layer 2)] |2026-06-07 |`feature/runbook-doctor` |Next executable step — persist the consultation report
+|link:pulumi-doctor-integration.adoc[Pulumi entity model & Doctor integration] |2026-06-07 |`feature/runbook-doctor` |C4/UML diagrams; ComponentResource-vs-Provider fork (open)
 |===
