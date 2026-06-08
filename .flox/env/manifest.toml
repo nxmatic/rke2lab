@@ -40,6 +40,8 @@ incus-client.flake = "github:nxmatic/rke2lab#incus-client"
 ## `github:` (not `path:.`) rationale as incus-client above; bump with
 ## `flox upgrade` after pushing flake changes.
 jdk25.flake = "github:nxmatic/rke2lab#jdk25"
+jdk25.priority = 1
+maven.flake = "github:nxmatic/rke2lab#maven"
 shfmt.flake = "github:nxmatic/rke2lab#shfmt"
 shellcheck.flake = "github:nxmatic/rke2lab#shellcheck"
 
@@ -105,7 +107,6 @@ on-activate = '''
 [include]
   environments = [
     { dir = "../fleet/flox/git" },
-    ## Removed fleet/jdk - we install jdk25 from flake directly above
     { dir = "../fleet/flox/k8s" },
     { dir = "../fleet/flox/keyhole" },
     { dir = "../fleet/flox/pulumi" },

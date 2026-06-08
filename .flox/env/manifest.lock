@@ -82,7 +82,8 @@
         "flake": "github:nxmatic/rke2lab#incus-client"
       },
       "jdk25": {
-        "flake": "github:nxmatic/rke2lab#jdk25"
+        "flake": "github:nxmatic/rke2lab#jdk25",
+        "priority": 1
       },
       "keychain": {
         "pkg-path": "keychain",
@@ -153,6 +154,9 @@
         "pkg-path": "kubernetes-helm",
         "pkg-group": "k8s-kubectl-tools",
         "outputs": "all"
+      },
+      "maven": {
+        "flake": "github:nxmatic/rke2lab#maven"
       },
       "moreutils": {
         "pkg-path": "moreutils"
@@ -2898,7 +2902,7 @@
     },
     {
       "install_id": "jdk25",
-      "locked-url": "github:nxmatic/rke2lab/1144fd9bb5e98b2ea3815998eb863d54b788838b?narHash=sha256-pi0%2BYn7sAta6Gqk9QAXqTSa32/uUsKcYtPKpVYNgtzE%3D",
+      "locked-url": "github:nxmatic/rke2lab/b58073d8e4d8579fe83531a18e3eb63e7fc9ec4c?narHash=sha256-QV99Jrtp1RgMvrZ%2B77TNy2Y1BI7vC7d8cuKfwc1EMqo%3D",
       "flake-description": "RKE2 lab infrastructure and network blueprints",
       "locked-flake-attr-path": "packages.aarch64-darwin.jdk25",
       "derivation": "/nix/store/m2c0cgjyg7ixazl8wf2p9g3kbah9hk3f-zulu-ca-jdk-25.0.0.drv",
@@ -2923,11 +2927,11 @@
       ],
       "broken": false,
       "unfree": false,
-      "priority": 5
+      "priority": 1
     },
     {
       "install_id": "jdk25",
-      "locked-url": "github:nxmatic/rke2lab/1144fd9bb5e98b2ea3815998eb863d54b788838b?narHash=sha256-pi0%2BYn7sAta6Gqk9QAXqTSa32/uUsKcYtPKpVYNgtzE%3D",
+      "locked-url": "github:nxmatic/rke2lab/b58073d8e4d8579fe83531a18e3eb63e7fc9ec4c?narHash=sha256-QV99Jrtp1RgMvrZ%2B77TNy2Y1BI7vC7d8cuKfwc1EMqo%3D",
       "flake-description": "RKE2 lab infrastructure and network blueprints",
       "locked-flake-attr-path": "packages.aarch64-linux.jdk25",
       "derivation": "/nix/store/8n8xkbnvc2hn8sfp0m9haxyqxvrrf686-openjdk-25.0.2+10.drv",
@@ -2954,7 +2958,7 @@
       ],
       "broken": false,
       "unfree": false,
-      "priority": 5
+      "priority": 1
     },
     {
       "install_id": "podman-wrapper",
@@ -3133,6 +3137,64 @@
       "broken": false,
       "unfree": false,
       "priority": 5
+    },
+    {
+      "install_id": "maven",
+      "locked-url": "github:nxmatic/rke2lab/b58073d8e4d8579fe83531a18e3eb63e7fc9ec4c?narHash=sha256-QV99Jrtp1RgMvrZ%2B77TNy2Y1BI7vC7d8cuKfwc1EMqo%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-darwin.maven",
+      "derivation": "/nix/store/h9axl6drwfh94xi6kpv93920apjg0pdv-maven-3.9.11.drv",
+      "outputs": {
+        "out": "/nix/store/rhdcf51rndrisr6wz4lhbib6ghhfqrn4-maven-3.9.11"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-darwin",
+      "system": "aarch64-darwin",
+      "name": "maven-3.9.11",
+      "pname": "maven",
+      "version": "3.9.11",
+      "description": "Build automation tool (used primarily for Java projects)",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "maven",
+      "locked-url": "github:nxmatic/rke2lab/b58073d8e4d8579fe83531a18e3eb63e7fc9ec4c?narHash=sha256-QV99Jrtp1RgMvrZ%2B77TNy2Y1BI7vC7d8cuKfwc1EMqo%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-linux.maven",
+      "derivation": "/nix/store/vll9r13jidmx4nndh0aa6qkq2521mpi2-maven-3.9.11.drv",
+      "outputs": {
+        "out": "/nix/store/r2lkjdqmnyw7wyvld5j59xka4yq7m1h6-maven-3.9.11"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "maven-3.9.11",
+      "pname": "maven",
+      "version": "3.9.11",
+      "description": "Build automation tool (used primarily for Java projects)",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
     }
   ],
   "compose": {
@@ -3159,7 +3221,11 @@
           "flake": "github:nxmatic/rke2lab#incus-client"
         },
         "jdk25": {
-          "flake": "github:nxmatic/rke2lab#jdk25"
+          "flake": "github:nxmatic/rke2lab#jdk25",
+          "priority": 1
+        },
+        "maven": {
+          "flake": "github:nxmatic/rke2lab#maven"
         },
         "pulumi": {
           "pkg-path": "pulumi-bin"
