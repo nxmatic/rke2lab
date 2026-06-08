@@ -88,6 +88,7 @@ implemented; the medical-model extensions are Design Only. All docs live in `arc
 
 * link:architecture/systemd/systemd-dbus-adapter-architecture.adoc[Systemd DBus Adapter Architecture] - Systemd state monitoring via DBus
 * link:guides/troubleshooting-workflow.adoc[Troubleshooting Workflow] - Common debugging patterns
+* link:guides/diagram-preview-kroki.adoc[Diagram Preview with a Local Kroki] - Rendering Mermaid/PlantUML in the VSCode preview via a local Kroki on the `nerd-nixos` Docker context (`.dev/kroki`)
 
 == Implementation Plans
 

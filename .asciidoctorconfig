@@ -1,0 +1,6 @@
+// Picked up automatically by the asciidoctor-vscode extension and prefixed to every
+// .adoc in the repo, so the Kroki server URL is set ONCE here instead of per-document.
+// The extension reads kroki-server-url only from the document header (it ignores
+// .vscode settings for this), and .asciidoctorconfig injects it into that header.
+// URL = local Kroki on bioskop-nixos (tailscale). See docs/guides/diagram-preview-kroki.adoc.
+:kroki-server-url: http://100.64.0.15:8000
