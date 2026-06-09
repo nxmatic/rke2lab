@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +18,14 @@ import java.util.Map;
 public record ConsultationReport(
     String checkpointId, List<Dossier> dossiers, RemediationPlan plan) {
 
+  /**
+   * The Pulumi output key under which a checkpoint registers its report — the single source of
+   * truth shared by the writers ({@code SystemdAdapterResource}, {@code ClusterReadinessResource})
+   * and the reader ({@code MedicalRecordReader}), so a write/read drift cannot silently break
+   * reconstruction.
+   */
+  public static final String OUTPUT_KEY = "consultationReport";
+
   public ConsultationReport {
     dossiers = dossiers == null ? List.of() : List.copyOf(dossiers);
   }
@@ -28,12 +37,10 @@ public record ConsultationReport(
 
   /** Flat map view; {@code dossiers} and {@code plan} are themselves flat map views. */
   public Map<String, Object> toOutputMap() {
-    return Map.of(
-        "checkpointId",
-        checkpointId,
-        "dossiers",
-        dossiers.stream().map(Dossier::toOutputMap).toList(),
-        "plan",
-        plan.toOutputMap());
+    final LinkedHashMap<String, Object> map = new LinkedHashMap<>();
+    map.put("checkpointId", checkpointId);
+    map.put("dossiers", dossiers.stream().map(Dossier::toOutputMap).toList());
+    map.put("plan", plan.toOutputMap());
+    return map;
   }
 }

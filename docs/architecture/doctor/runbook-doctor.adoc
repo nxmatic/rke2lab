@@ -4,9 +4,12 @@
 
 *Date:* 2026-06-05 (landed in `docs/architecture/doctor/` 2026-06-07) +
 *Status:* ✅ Increments A–D + Increment E (layers 2 + 3 write-side + read-side part 1) IMPLEMENTED on
-`feature/runbook-doctor`. ⚠️ The medical-model extensions (remediator, loop closure, recruitment, the
-referral round-trip, the closed-loop planner) are *Design Only* — seam-level, not yet built. See the
-sibling design docs in this folder.
+`feature/runbook-doctor`; ✅ read-side part 2 — the medical-record *query API* reconstructed on-demand
+from Pulumi — IMPLEMENTED on `feature/medical-record-accumulator` (see
+link:medical-record-query-api-design.adoc[medical-record-query-api-design.adoc]). ⚠️ The medical-model
+extensions (remediator, loop closure, recruitment, the referral round-trip, the closed-loop planner)
+and post-hoc *re-rendering* of the runbook `.adoc` are *Design Only* — seam-level, not yet built. See
+the sibling design docs in this folder.
 
 == Vocabulary
 
@@ -974,9 +977,18 @@ must not be duplicated. The shipped decision:
 the JGiven model, joined by `Checkpoint.scenarioTitle()`), and the Pulumi log was made
 reference-pure. Design + plan in
 link:layer3-readside-runtime-enrichment-design.adoc[layer3-readside-runtime-enrichment-design.adoc].
-*Still deferred (user's call): post-hoc reconstruction* — the offline tool that parses `pulumi stack
-export`, rebuilds the DAG, grafts the serialized `consultationReport`, and re-renders. The write-side
-made it possible; it is to be re-discussed with the rendered runbook in front of us, not pre-built.
+*Read-side part 2 — post-hoc reconstruction — now DONE as a query API* (`feature/medical-record-accumulator`).
+The reconstruction the write-side made possible is shipped: the medical record is rebuilt *on demand*
+from Pulumi (the single source) — current state for the present complaint, the historical checkpoints
+for the past — answering four clinical questions (`currentComplaint` / `historyOf` / `efficacyOf` /
+`correlatedWith`). It lives in the reusable `pulumi-automation-ext` module plus the doctor's
+`MedicalRecordReader`, with an offline `MedicalRecordDump` (YAML) as the transient entry point. Full
+design + the as-built mapping in
+link:medical-record-query-api-design.adoc[medical-record-query-api-design.adoc]. Note the *accumulator*
+this section's heading anticipated was *abandoned* there: nothing extra is exported; Pulumi is not
+duplicated. *Still open:* re-*rendering* the runbook `.adoc` post-hoc on top of this reconstruction
+(distinct from reconstructing the record itself) — to be discussed with the rendered runbook in front
+of us, not pre-built.
 
 ==== Layer 2 — DONE (commit 0cd2b2f5): the doctor's plan is kept, not dropped
 
@@ -1070,3 +1082,4 @@ link:layer3-readside-runtime-enrichment-design.adoc[layer3-readside-runtime-enri
 
 * link:../bdd/bdd-diagnostic-pattern.adoc[BDD Diagnostic Pattern] — the pattern this extends (doctor hierarchy, actor-specific reports, severity)
 * link:../bootstrap/bootstrap-contract.adoc[Bootstrap Contract] — where checkpoints fit Stage A
+* link:medical-record-query-api-design.adoc[Medical Record — Query API] — how a practitioner reads the patient's past (the four clinical questions, reconstructed on-demand from Pulumi)

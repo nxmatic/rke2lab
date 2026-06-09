@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -24,6 +25,10 @@ public record Prescription(
 
   /** Flat map view; {@code programRef} is the kebab catalog id, never the enum name. */
   public Map<String, Object> toOutputMap() {
-    return Map.of("programRef", programRef.id(), "payload", payload, "humanHint", humanHint);
+    final LinkedHashMap<String, Object> map = new LinkedHashMap<>();
+    map.put("programRef", programRef.id());
+    map.put("payload", payload);
+    map.put("humanHint", humanHint);
+    return map;
   }
 }

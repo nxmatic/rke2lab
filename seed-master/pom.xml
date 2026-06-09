@@ -39,6 +39,16 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>pulumi-automation-ext</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>pulumi-automation-ext-testkit</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests</artifactId>
       <version>${project.version}</version>
     </dependency>
@@ -112,6 +122,17 @@
           <!-- JGiven generates stage subclasses with byte-buddy, whose reflective
                class injector needs java.lang opened under JDK module encapsulation. -->
           <argLine>--add-opens java.base/java.lang=ALL-UNNAMED</argLine>
+          <!-- JGiven's text report writes Given/When/Then straight to the fork's native
+               stream. By default surefire's fork channel rides that same stdout pipe, so the
+               writes corrupt it ("Corrupted channel by directly writing to native stream").
+               Move the channel onto TCP (the surefire FAQ remedy for tests that legitimately
+               print to the console): the encoded protocol no longer shares stdout, so the
+               human-facing text report can stay ON. -->
+          <forkNode implementation="org.apache.maven.plugin.surefire.extensions.SurefireForkNodeFactory"/>
+          <systemPropertyVariables>
+            <jgiven.report.dir>${project.build.directory}/jgiven-reports/json</jgiven.report.dir>
+            <jgiven.report.text>true</jgiven.report.text>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
       <plugin>

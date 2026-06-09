@@ -1,6 +1,12 @@
 # Session checkpoints — private, auto-generated before compaction
 checkpoint-*.md
 
+# Diagram preview scratch — overwritten every query, never committed
+claude-preview.adoc
+
+# Local, machine-specific Claude settings
+settings.local.json
+
 # Track hook scripts: counter the root .gitignore's generic [Bb]in/ rule
 !bin/
 !bin/*.sh

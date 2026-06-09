@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,12 +29,10 @@ public record RemediationPlan(
 
   /** Flat map view; {@code symptom} is the kebab id, prescriptions are nested flat maps. */
   public Map<String, Object> toOutputMap() {
-    return Map.of(
-        "symptom",
-        symptom.id(),
-        "generalistSummary",
-        generalistSummary,
-        "prescriptions",
-        prescriptions.stream().map(Prescription::toOutputMap).toList());
+    final LinkedHashMap<String, Object> map = new LinkedHashMap<>();
+    map.put(Symptom.ENVELOPE_KEY, symptom.id());
+    map.put("generalistSummary", generalistSummary);
+    map.put("prescriptions", prescriptions.stream().map(Prescription::toOutputMap).toList());
+    return map;
   }
 }

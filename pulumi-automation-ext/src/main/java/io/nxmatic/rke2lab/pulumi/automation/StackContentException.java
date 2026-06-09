@@ -1,0 +1,14 @@
+package io.nxmatic.rke2lab.pulumi.automation;
+
+import java.nio.file.Path;
+
+/**
+ * Invalid content — malformed JSON, missing required fields, or rejected by StackDeployment.
+ * Retrying will not help; the content itself is broken.
+ */
+public final class StackContentException extends StackException {
+
+  public StackContentException(Path path, Throwable cause) {
+    super(path, "stack content invalid at " + path, cause);
+  }
+}

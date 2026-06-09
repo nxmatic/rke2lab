@@ -13,7 +13,7 @@
   -->
   <groupId>io.nxmatic.rke2lab</groupId>
   <artifactId>bom</artifactId>
-  <version>1.0.0-SNAPSHOT</version>
+  <version>1.0.0</version>
   <packaging>pom</packaging>
   <name>bom</name>
 

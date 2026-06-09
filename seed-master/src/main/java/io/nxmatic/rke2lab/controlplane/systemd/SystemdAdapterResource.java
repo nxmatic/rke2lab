@@ -49,7 +49,7 @@ public final class SystemdAdapterResource extends ComponentResource {
     // Additive, per-node only: the diagnostic layer lives under this component resource in state,
     // never at top level (the Stage-B stack contract stays byte-identical).
     consultation.ifPresent(
-        report -> outputs.put("consultationReport", Output.of(report.toOutputMap())));
+        report -> outputs.put(ConsultationReport.OUTPUT_KEY, Output.of(report.toOutputMap())));
     return outputs;
   }
 }
