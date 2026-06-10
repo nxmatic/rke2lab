@@ -1,66 +1,69 @@
 ---
 name: doctor-live-record-roadmap
-description: "NEXT WORK (fresh session, 2026-06-09 agreed). 3-step chain off main: (1) wire MedicalRecord into the live doctor [foundation], (2) remediation model, (3) what-if planner. Step 1 first because step 2 hard-requires it. Start with a brainstorm + design doc, then code. New branch off clean main (query API shipped b3e01bfd)."
+description: "Doctor roadmap (3-step chain). STEP 1 SHIPPED to main 2026-06-10 (squash df41a3be): clinical-vocabulary refactor + live MedicalRecord wired into the doctor (latent/wire-only). Steps 2 (remediation round-trip) & 3 (what-if/correlation) NOT started. NEXT TOPIC DELIBERATELY UNDECIDED — user picks it in a fresh session with the shipped code in hand."
 metadata:
   node_type: memory
   type: project
   originSessionId: 4d3d8a2e-f292-4cbe-a699-fb4abfbd1e6c
 ---
 
-The medical-record query API is SHIPPED to main ([[medical-record-impl-complete]], squash `b3e01bfd`,
-pushed to origin/main; old `feature/medical-record-accumulator` kept LOCAL-ONLY as history archive).
-Shipping it UNBLOCKED the next chantier and changed what's possible. This memory is the agreed
-roadmap to resume from in a FRESH session — the user explicitly stopped here to start clean.
+The 3-step chain off the medical-record query API ([[medical-record-impl-complete]]).
 
-**THE AGREED 3-STEP CHAIN (user-confirmed dependency order, 2026-06-09):**
+**STEP 1 — SHIPPED to main 2026-06-10 (squash `df41a3be`, pushed; rebased onto origin's
+`b3e01bfd`, the local duplicate `ab9c4d65` dropped; feature branch deleted).** Two chantiers:
+- *Clinical-vocabulary refactor* (atomic, no-compat): the code named the patient-presented probe
+  snapshot `Dossier` — French, and the INVERTED concept (clinical "dossier" = the patient FILE =
+  `MedicalRecord`). Renamed to US clinical terms: **Dossier→Observation** (+ Pulumi output key
+  `dossiers`→`observations`, both writer & reader), **SpecialistDomain→Specialty**,
+  **Complaint→ChiefComplaint** (`currentComplaint`→`chiefComplaint`),
+  **SymptomCorrelation→Comorbidity** (`correlatedWith`→`comorbiditiesWith`), and the misnomer fix
+  **DiagnosisReader→ConsultationReportReader** (frees the word `Diagnosis`). Added
+  `docs/architecture/doctor/glossary.adoc` (vocabulary source of truth); froze the dated
+  exploration docs with a glossary pointer.
+- *Live-record wiring* (latent/wire-only): a `MedicalRecordRegistry` seam the `Generalist` HOLDS +
+  `LiveMedicalRecordRegistry` (lazy, file-backend-bound, memoized, degrade-to-empty, NEVER throws).
+  The Generalist holds `(registry, currentPatient)` and retrieves the record as the FIRST act of
+  `consult` — available but NOT yet driving routing (the step-2 seam). `BootstrapPipeline` derives
+  the patient from `Deployment` (guarded) + builds the registry once per run; the two readiness
+  stages log a proof-of-wire line. `consult(Symptom, Observation)` signature UNCHANGED. Verified
+  103 tests green; reconstruction confirmed vs real dev state (283 checkpoints, reports empty = dev
+  predates the doctor). Design+plan: `docs/architecture/doctor/vocabulary-and-live-record-{design,
+  plan}.adoc`.
 
-1. **Wire MedicalRecord into the LIVE doctor** — the foundation, do FIRST. Smallest step; it cashes in
-   the merge and is the hard prerequisite for steps 2 & 3.
-2. **Remediation model** ([[doctor-remediation-model]]) — Referral→ReferralReply round-trip, Remediator
-   tier (nurse/pharmacist/physiotherapist), recruit-a-specialist. Mature DESIGN already in
-   `docs/architecture/doctor/runbook-doctor.adoc`.
-3. **What-if planner** ([[preview-whatif-topic]]) — counterfactual replay over `dependsOn`; its inner
-   loop LOOPS over the step-2 round-trips and CONSUMES the record. Real first move there = DAG-as-data
-   (topology as data, not the hard-coded stage order), NOT placement (placement is gone).
+**STEP 2 — remediation round-trip (NOT started).** [[doctor-remediation-model]] +
+`runbook-doctor.adoc` `[#consultation-flow]`: `diagnose(Referral) → ReferralReply`, the Remediator
+tier, recruit-a-specialist, and the SOAP "Assessment" gap (a specialist with findings but no
+prescription is silent today). REAL DRIVER waiting: the `systemd-adapter degraded` healing
+([[master-provisioning-state]]). The `Referral` it introduces is the seam the step-3 access-control
+layer rides on.
 
-**WHY THIS ORDER (the user's own reasoning, validated against code):**
-- The CONCRETE GAP (grep-verified 2026-06-09): `Generalist.consult(Symptom, Dossier)` takes **NO
-  record**. `historyOf`/`efficacyOf` exist + are tested, but the ONLY live caller of
-  `MedicalRecordReader` is the OFFLINE `MedicalRecordDump`. The in-run doctor is still MEMORYLESS — it
-  cannot yet ask "seen this symptom before? did the last Rx work?". This was deliberately parked: see
-  [[task14-readonly-preview-integration]] "option a — in-run reader, ctx.dryRun guard — deferred".
-- Step 2 HARD-REQUIRES step 1: a `Referral` carries *references (not copies) to the longitudinal
-  patient record AND sibling prescriptions* ([[doctor-remediation-model]] pt.4). No live record ⇒ no
-  Referral. Prerequisite, not mere benefit.
-- Step 3 sits last: [[preview-whatif-topic]] calls the patient record ESSENTIAL and its planner inner
-  loop "loops on these round-trips" — so it needs BOTH step 1 (record) and step 2 (round-trip).
+**STEP 3 — what-if planner + cross-patient correlation (NOT started).** [[preview-whatif-topic]]
+inner loop over the step-2 round-trips. Cross-patient correlation = the HealthSystem layer below.
 
-**STEP 1 — OPEN DESIGN QUESTIONS to brainstorm BEFORE coding (do NOT guess the seam):**
-- Param vs held: does `consult` TAKE a `MedicalRecord` (aligns with T1 "reactive consult, record
-  accessed as a param / edge-propagated" — [[runbook-doctor-state]]), or does the Generalist HOLD one
-  (instance-passing)? T2 in runbook-doctor-state is exactly this open tension (stateless vs panel).
-- WHERE the in-run read happens: the doctor runs INSIDE the Pulumi program; the record is reconstructed
-  lock-free in-process (PROVEN by the abandoned sandbox). Need the ctx.dryRun guard story from
-  [[task14-readonly-preview-integration]] (the in-run reader was option a there).
-- The query API surface is concrete now: `MedicalRecordReader.read(Patient) → MedicalRecord` (patient
-  bound once), fed by `SnapshotSource` whose Pulumi impl is `StackHandleSnapshotSource` over
-  `StackHandle` (module `pulumi-automation-ext`). Design at
-  `docs/architecture/doctor/medical-record-query-api-design.adoc`.
+**★ THE HEALTHSYSTEM NORTH-STAR (designed 2026-06-10, NOT built — see
+[[healthsystem-access-control-model]]).** A long brainstorm grew the access-control + correlation
+layer: a `HealthSystem` entity owns the EHR (= the registry), employs providers by stable **NPI**
+(open roster), admits patients by **MRN**; access gated by a `(NPI, MRN)` grant table (grants
+DERIVED from referrals, not stored); cross-patient correlation consent-bounded to a provider's
+granted cohort, emitting de-identified findings only. CRUX: shared by IDENTITY (same code, same
+NPIs), NOT by a shared stack — nothing cross-cutting persisted, all derived per run over the shared
+backend (the single-source principle that retired the accumulator). Captured as a NORTH-STAR
+(validate-against-code, not a build-spec) at
+`docs/architecture/doctor/healthsystem-access-control-design.adoc`. The layer is ADDITIVE — it wraps
+the shipped `recordFor(Patient)` with `recordFor(Referral)` + a grant check — so step 1 needed NO
+rework and step 2/3 grow on top.
 
-**PROCESS for the fresh session (the pattern that's served us):**
-- New branch off the now-clean `main` (e.g. `feature/doctor-live-record`). main has EVERYTHING.
-- BRAINSTORM the wiring seam first → land a design in `docs/architecture/doctor/` (prose + C4/UML
-  mermaid, [[docs-diagrams-not-java]]) → THEN subagent-driven execution. [[works-best-from-concrete-code]]
-  + design-before-code.
-- Conventions in force: [[sequential-no-compat-workflow]] (no compat, delete old paths same change),
-  [[error-handling-layered-contract]] (Optional vs typed checked exception), [[build-verification-gotchas]]
-  (count surefire, never trust BUILD SUCCESS; `flox activate -- ./mvnw ... -Dmaven.build.cache.skipCache=true
-  -DskipTests=false`), [[wip-guard-hooks]] (wip/ never reaches main; migrate docs before merge),
-  [[working-style-narrate-progress]] (narrate intent before each tool batch — user is anxious in silence).
+**NEXT TOPIC = DELIBERATELY UNDECIDED (user's call, 2026-06-10).** Foundation-first discipline:
+step 1 is the tested foundation; decide the next chantier in a FRESH session with the working code
+in hand ([[works-best-from-concrete-code]]). My standing advice when resumed: step 2 (remediation/
+Referral) has the real driver and is the natural precursor to the HealthSystem gating — do NOT jump
+straight to HealthSystem (over-investment for a population of one). Adjacent unrelated chantiers if
+the user pivots: [[seed-vcluster]], [[config-restructuring-state]] Increment 2.
 
-**NON-BLOCKING carry-overs (documented, not gating):** deferred backlog #4 `StackCheckpoint.snapshot`
-catch-all narrowing + #5 efficacy first-Rx provisional ([[efficacy-first-prescription-provisional]]);
-2 pre-existing Dependabot vulns flagged on the repo at push (1 critical/1 moderate, NOT from this
-branch); post-hoc RE-RENDERING of the runbook .adoc still Design-Only (distinct from the record
-reconstruction we shipped). Adjacent unrelated chantiers if the user pivots: [[seed-vcluster]],
-[[config-restructuring-state]] Increment 2 (the doctor's first declared use case — also needs step 1).
+**Carry-over backlog (non-blocking, from the final review):** (a)
+`BootstrapPipeline.reportingReadinessTo` doesn't set `pulumiMode` → derives the placeholder patient
+even under engine (pre-existing; harmless while record is latent; revisit when it drives behavior);
+(b) the ~12-line proof-of-wire log block is duplicated in both stages (below rule-of-three;
+consolidate at a 3rd consult site); (c) `ConsultationReportReader` javadoc still says "diagnosis" in
+prose (cosmetic); (d) 2 pre-existing Dependabot vulns on the repo (1 critical/1 moderate, NOT from
+this work).
