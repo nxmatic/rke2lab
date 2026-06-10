@@ -40,35 +40,35 @@ public final class SystemdAdapterScenario {
     }
   }
 
-  /** When: runs the injected probe and records the resulting dossier. */
+  /** When: runs the injected probe and records the resulting observation. */
   public static class When extends Stage<When> {
 
     @ExpectedScenarioState BootstrapConfig config;
     @ExpectedScenarioState SystemdAdapterProbe probe;
 
-    @ProvidedScenarioState Dossier dossier;
+    @ProvidedScenarioState Observation observation;
 
     public When the_systemd_adapter_probe_runs() {
-      dossier = probe.probe(config);
+      observation = probe.probe(config);
       return self();
     }
   }
 
   /**
-   * Then: asserts on the recorded dossier. Plain {@code AssertionError} (not JUnit) keeps this
+   * Then: asserts on the recorded observation. Plain {@code AssertionError} (not JUnit) keeps this
    * runnable from production when the gate plays the scenario — JGiven marks a throwing step
    * failed.
    */
   public static class Then extends Stage<Then> {
 
-    @ExpectedScenarioState Dossier dossier;
+    @ExpectedScenarioState Observation observation;
 
     public Then the_dbus_endpoint_responds() {
       return the_probe_reports_status("ok");
     }
 
     public Then the_probe_reports_status(@Quoted String expectedStatus) {
-      final String actual = dossier.status();
+      final String actual = observation.status();
       if (!expectedStatus.equals(actual)) {
         throw new AssertionError(
             "expected status \"" + expectedStatus + "\" but was \"" + actual + "\"");
@@ -77,17 +77,19 @@ public final class SystemdAdapterScenario {
     }
 
     public Then the_summary_mentions(@Quoted String fragment) {
-      final String summary = dossier.summary();
+      final String summary = observation.summary();
       if (summary == null || !summary.contains(fragment)) {
         throw new AssertionError("expected summary to contain \"" + fragment + "\": " + summary);
       }
       return self();
     }
 
-    /** Hidden from the report: lets the gate read the captured dossier back as its sink payload. */
+    /**
+     * Hidden from the report: lets the gate read the captured observation back as its sink payload.
+     */
     @Hidden
-    public Dossier capturedDossier() {
-      return dossier;
+    public Observation capturedObservation() {
+      return observation;
     }
   }
 }

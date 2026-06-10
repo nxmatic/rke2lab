@@ -71,7 +71,7 @@ public final class ClusterReadinessScenario {
     @ScenarioStage SystemdAdapterScenario.Then thenSystemdAdapter;
 
     @ProvidedScenarioState
-    Map<ClusterReadinessPhase, Dossier> phaseDossiers = new LinkedHashMap<>();
+    Map<ClusterReadinessPhase, Observation> phaseObservations = new LinkedHashMap<>();
 
     /** Nested: replay the upstream systemd-adapter scenario as sub-steps of this checkpoint. */
     @NestedSteps
@@ -97,17 +97,17 @@ public final class ClusterReadinessScenario {
     }
 
     /**
-     * Probe one phase and record its dossier. A non-ok phase throws so its step is marked FAILED;
-     * because the phases are chained, JGiven then skips the downstream steps' bodies and marks them
-     * SKIPPED — the runbook shows exactly where readiness broke. The enum is the single join
-     * between the readable step and the probe (and the simulation target), so no phase identity is
-     * duplicated as a string.
+     * Probe one phase and record its observation. A non-ok phase throws so its step is marked
+     * FAILED; because the phases are chained, JGiven then skips the downstream steps' bodies and
+     * marks them SKIPPED — the runbook shows exactly where readiness broke. The enum is the single
+     * join between the readable step and the probe (and the simulation target), so no phase
+     * identity is duplicated as a string.
      */
     private When checking(ClusterReadinessPhase phase) {
-      final Dossier dossier = phaseProbe.probe(config, phase);
-      phaseDossiers.put(phase, dossier);
-      if (!dossier.isOk()) {
-        throw new AssertionError(phase.label() + ": " + dossier.summary());
+      final Observation observation = phaseProbe.probe(config, phase);
+      phaseObservations.put(phase, observation);
+      if (!observation.isOk()) {
+        throw new AssertionError(phase.label() + ": " + observation.summary());
       }
       return self();
     }
@@ -116,9 +116,10 @@ public final class ClusterReadinessScenario {
   /**
    * Then: the cluster is ready. A failing phase throws in the When stage (fail-fast), so this step
    * is only ever reached once every phase passed — it is the readable closing assertion of the
-   * scenario, not where phase evaluation happens. The failing phase's dossier (with its symptom) is
-   * captured by the stage via the probe-holder seam, not read back through a stage getter (JGiven
-   * intercepts public stage methods as steps), exactly as {@code SystemdAdapterStage} does.
+   * scenario, not where phase evaluation happens. The failing phase's observation (with its
+   * symptom) is captured by the stage via the probe-holder seam, not read back through a stage
+   * getter (JGiven intercepts public stage methods as steps), exactly as {@code
+   * SystemdAdapterStage} does.
    */
   public static class Then extends Stage<Then> {
 

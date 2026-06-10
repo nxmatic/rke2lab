@@ -34,8 +34,15 @@ stacked causes, in order of discovery:
    74a081c6).
 2. *The extension reads the server URL ONLY from the doc attribute* `kroki-server-url`
    (`document.getAttribute('kroki-server-url') || 'https://kroki.io'`), NOT from `.vscode` settings.
-   FIX: put `:kroki-server-url: http://100.64.0.15:8000` once in a repo-root `.asciidoctorconfig`
-   (the extension prefixes it to every .adoc). bioskop-nixos tailscale IP = 100.64.0.15.
+   FIX: put `:kroki-server-url: http://bioskop-nixos.local:8000` once in a repo-root
+   `.asciidoctorconfig` (the extension prefixes it to every .adoc). **ADDRESS CORRECTED 2026-06-10 —
+   use the mDNS name, never a tailscale IP.** TOPOLOGY (the thing to remember): seed-master is ALWAYS
+   operated from `bioskop` (reached via screen-sharing to the RDP host); `bioskop` and the kroki host
+   `bioskop-nixos` are on the same LAN, so `bioskop-nixos.local` (→ 192.168.1.130) is the reliable
+   channel that BOTH this shell and the VSCode webview resolve. The stale `100.64.0.15` tailscale IP
+   gave empty frames; the earlier "tailscale is stable across networks" rationale was a mix-up with a
+   DIFFERENT machine (`nikopol`, on a guest hotspot) — irrelevant to the bioskop work environment.
+   Verified live: POST to `http://bioskop-nixos.local:8000/mermaid/svg` returned a real SVG (HTTP 200).
 3. *The webview CSP allows `img-src https:` but NOT `http:` at the default security level* — so the
    http:// kroki image was blocked even though the server rendered it (verified: server logged
    "Request received /mermaid/svg" + "Convert took 170ms"). FIX: VSCode palette → "AsciiDoc: Change

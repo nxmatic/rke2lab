@@ -6,8 +6,9 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bdd.Checkpoint;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationReport;
-import io.nxmatic.rke2lab.controlplane.bdd.Dossier;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
+import io.nxmatic.rke2lab.controlplane.bdd.MedicalRecord;
+import io.nxmatic.rke2lab.controlplane.bdd.Observation;
 import io.nxmatic.rke2lab.controlplane.bdd.RemediationPlan;
 import io.nxmatic.rke2lab.controlplane.bdd.Severity;
 import io.nxmatic.rke2lab.controlplane.bdd.SimulatedSystemdAdapterProbe;
@@ -91,9 +92,11 @@ public final class SystemdAdapterStage {
     // the fake probe so the failure is visible.
     final boolean dryRun = preview && simulated.isEmpty();
 
-    // Capture the dossier as the probe produces it, so it is available at the catch site for the
-    // doctor even when the Then assertion throws (the failed dossier carries the typed symptom).
-    final Dossier[] dossierHolder = new Dossier[1];
+    // Capture the observation as the probe produces it, so it is available at the catch site for
+    // the
+    // doctor even when the Then assertion throws (the failed observation carries the typed
+    // symptom).
+    final Observation[] observationHolder = new Observation[1];
     // The injected live probe is the default; a preview-only simulated incident overrides it (and
     // only then). Production injects the real endpoint gate; tests inject a fake and play the same
     // launch(), so the scenario script lives in one place.
@@ -101,8 +104,8 @@ public final class SystemdAdapterStage {
         simulated.<SystemdAdapterProbe>map(SimulatedSystemdAdapterProbe::of).orElse(liveProbe);
     final SystemdAdapterProbe probe =
         cfg -> {
-          final Dossier produced = underlying.probe(cfg);
-          dossierHolder[0] = produced;
+          final Observation produced = underlying.probe(cfg);
+          observationHolder[0] = produced;
           return produced;
         };
     if (simulated.isPresent()) {
@@ -120,7 +123,7 @@ public final class SystemdAdapterStage {
       System.setProperty(JGIVEN_DRY_RUN, "true");
     }
 
-    Dossier captured = null;
+    Observation captured = null;
     Throwable failure = null;
     try {
       final Scenario<
@@ -144,10 +147,11 @@ public final class SystemdAdapterStage {
         // below); skipping it on failure leaves the failed node empty in the runbook.
         scenario.finished();
       }
-      captured = scenario.then().capturedDossier();
+      captured = scenario.then().capturedObservation();
     } catch (Throwable cause) {
       failure = cause;
-      captured = dossierHolder[0]; // the failed dossier (with its symptom), if the probe ran
+      captured =
+          observationHolder[0]; // the failed observation (with its symptom), if the probe ran
     } finally {
       if (previousDryRun == null) {
         System.clearProperty(JGIVEN_DRY_RUN);
@@ -157,14 +161,14 @@ public final class SystemdAdapterStage {
     }
 
     if (failure == null) {
-      // Success — or dry-run, where step bodies are skipped so no dossier is produced.
-      final Dossier dossier =
+      // Success — or dry-run, where step bodies are skipped so no observation is produced.
+      final Observation observation =
           captured != null ? captured : SeedSystemdAdapterEndpointGate.deferredPreview(config);
-      sink.accept(dossier.toOutputMap());
+      sink.accept(observation.toOutputMap());
       return this;
     }
 
-    // Failure: the patient consults. The doctor diagnoses the captured dossier's symptom into a
+    // Failure: the patient consults. The doctor diagnoses the captured observation's symptom into a
     // remediation plan, which is logged and (Increment C) flows into the runbook node.
     consultDoctor(captured);
 
@@ -175,28 +179,38 @@ public final class SystemdAdapterStage {
       throw new PipelineStageFailure("systemd adapter", failure);
     }
     log("⚠ " + SCENARIO_ID + " FAILED, severity=WARNING → continuing in DEGRADED mode");
-    sink.accept(degradedDossier(failure).toOutputMap());
+    sink.accept(degradedObservation(failure).toOutputMap());
     return this;
   }
 
   /**
-   * The patient consults the doctor on failure: route the captured dossier's symptom to the
+   * The patient consults the doctor on failure: route the captured observation's symptom to the
    * Generalist, log the prescriptions, and keep the plan on a {@link ConsultationReport} in the
-   * shared log (no longer dropped). A symptomless or absent dossier (e.g. failure before the probe
-   * ran) has nothing to route, so the consultation is skipped.
+   * shared log (no longer dropped). A symptomless or absent observation (e.g. failure before the
+   * probe ran) has nothing to route, so the consultation is skipped.
    */
-  private void consultDoctor(Dossier dossier) {
-    if (dossier == null || dossier.symptom().isEmpty()) {
+  private void consultDoctor(Observation observation) {
+    if (observation == null || observation.symptom().isEmpty()) {
       return;
     }
-    final RemediationPlan plan = generalist.consult(dossier.symptom().get(), dossier);
+    final Symptom symptom = observation.symptom().get();
+    final MedicalRecord record = generalist.recordForCurrentPatient();
+    log(
+        "⚕ consulted with "
+            + record.visits().size()
+            + " prior visit(s); "
+            + symptom.id()
+            + " seen "
+            + record.historyOf(symptom).count()
+            + "× before");
+    final RemediationPlan plan = generalist.consult(symptom, observation);
     if (consultations != null) {
-      consultations.record(new ConsultationReport(SCENARIO_ID, List.of(dossier), plan));
+      consultations.record(new ConsultationReport(SCENARIO_ID, List.of(observation), plan));
     }
   }
 
-  private Dossier degradedDossier(Throwable failure) {
-    return Dossier.of(
+  private Observation degradedObservation(Throwable failure) {
+    return Observation.of(
         "degraded",
         Optional.empty(),
         "dbusEndpoint="

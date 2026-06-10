@@ -98,13 +98,13 @@ class MedicalRecordReaderTest {
 
   /**
    * A snapshot carrying exactly one consultationReport output that round-trips through {@link
-   * DiagnosisReader} into a real {@link ConsultationReport} for {@code symptom}.
+   * ConsultationReportReader} into a real {@link ConsultationReport} for {@code symptom}.
    */
   private static StackSnapshot snapshotOf(Symptom symptom) {
     final String envelope =
         "{\"version\":3,\"deployment\":{\"resources\":[{\"outputs\":{\"consultationReport\":{"
             + "\"checkpointId\":\"systemd-adapter\","
-            + "\"dossiers\":[],"
+            + "\"observations\":[],"
             + "\"plan\":{\"symptom\":\""
             + symptom.id()
             + "\",\"generalistSummary\":\"s\",\"prescriptions\":[]}"
@@ -145,7 +145,7 @@ class MedicalRecordReaderTest {
     assertEquals(v2.when(), record.visits().get(1).when());
 
     // End-to-end: the fold produced a record the clinical views can actually answer.
-    final Complaint current = record.currentComplaint();
+    final ChiefComplaint current = record.chiefComplaint();
     assertEquals(1, current.reports().size());
     assertEquals(Symptom.CONNECTION_REFUSED, current.reports().get(0).symptom());
     assertEquals(1, record.historyOf(Symptom.TIMEOUT).occurrences().size());
@@ -172,7 +172,7 @@ class MedicalRecordReaderTest {
     // A healthy run is a visit that happened, not a failure and not a skipped entry.
     assertEquals(1, record.visits().size());
     assertTrue(record.visits().get(0).reports().isEmpty());
-    assertTrue(record.currentComplaint().isEmpty());
+    assertTrue(record.chiefComplaint().isEmpty());
   }
 
   @Test

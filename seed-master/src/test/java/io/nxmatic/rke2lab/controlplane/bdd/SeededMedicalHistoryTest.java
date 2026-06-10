@@ -17,10 +17,10 @@ import org.junit.jupiter.api.io.TempDir;
  * Seeds a throwaway file backend with a multi-visit clinical history — the longitudinal axis dev's
  * real state cannot exercise (it predates the doctor write-side) and that {@code pulumi import}
  * cannot build (it writes no history entry). Each seeded report is in the real {@link
- * ConsultationReport#toOutputMap()} shape and carries a {@code seeded} tag in its dossier details,
- * so the reconstructed record is honestly distinguishable from doctor-produced data. Proves the
- * record reconstructs a recurring symptom (chronic) and a treatment's efficacy across deployments,
- * end to end through {@link StackHandle} + {@link MedicalRecordReader}.
+ * ConsultationReport#toOutputMap()} shape and carries a {@code seeded} tag in its observation
+ * details, so the reconstructed record is honestly distinguishable from doctor-produced data.
+ * Proves the record reconstructs a recurring symptom (chronic) and a treatment's efficacy across
+ * deployments, end to end through {@link StackHandle} + {@link MedicalRecordReader}.
  */
 class SeededMedicalHistoryTest {
 
@@ -44,15 +44,15 @@ class SeededMedicalHistoryTest {
 
   /** A tagged report for {@code symptom}, optionally prescribing {@code program}. */
   private static ConsultationReport seededReport(Symptom symptom, RemediationProgramRef program) {
-    final Dossier dossier =
-        Dossier.failed(symptom, "seeded " + symptom.id(), Map.of("seeded", SEEDED_TAG));
+    final Observation observation =
+        Observation.failed(symptom, "seeded " + symptom.id(), Map.of("seeded", SEEDED_TAG));
     final List<Prescription> prescriptions =
         program == null
             ? List.of()
             : List.of(Prescription.of(program, Map.of("seeded", SEEDED_TAG), "seeded hint"));
     return new ConsultationReport(
         "seeded-systemd-adapter",
-        List.of(dossier),
+        List.of(observation),
         new RemediationPlan(symptom, prescriptions, "seeded generalist summary"));
   }
 
@@ -93,6 +93,6 @@ class SeededMedicalHistoryTest {
 
     // The seeded tag survived reconstruction (additive key-bag) — the data is honestly labelled.
     final ConsultationReport firstReport = record.visits().get(0).reports().get(0);
-    assertEquals(SEEDED_TAG, firstReport.dossiers().get(0).details().get("seeded"));
+    assertEquals(SEEDED_TAG, firstReport.observations().get(0).details().get("seeded"));
   }
 }

@@ -9,9 +9,11 @@ import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessScenario;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationReport;
-import io.nxmatic.rke2lab.controlplane.bdd.Dossier;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
+import io.nxmatic.rke2lab.controlplane.bdd.MedicalRecord;
+import io.nxmatic.rke2lab.controlplane.bdd.Observation;
 import io.nxmatic.rke2lab.controlplane.bdd.RemediationPlan;
+import io.nxmatic.rke2lab.controlplane.bdd.Symptom;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
@@ -28,8 +30,9 @@ import java.util.function.Consumer;
  * unified onto the systemd-adapter shape (Increment D). It runs eager in the pipeline thread (the
  * dependencies are already concrete values by the time it runs), records into the shared runbook,
  * replays the systemd-adapter dependency nested (the follow-the-chain DAG edge), consults the
- * doctor on failure, and projects the per-phase dossiers into the {@link VerificationResult} the
- * output layer already consumes. {@code ClusterReadinessResource} is a thin mirror of the result.
+ * doctor on failure, and projects the per-phase observations into the {@link VerificationResult}
+ * the output layer already consumes. {@code ClusterReadinessResource} is a thin mirror of the
+ * result.
  */
 public final class ClusterReadinessStage {
 
@@ -83,24 +86,25 @@ public final class ClusterReadinessStage {
       return this;
     }
 
-    // Capture each phase's dossier as the injected probe produces it, so the VerificationResult
+    // Capture each phase's observation as the injected probe produces it, so the VerificationResult
     // projection and the doctor consultation read data the scenario already computed (never JGiven
     // stage state read back through a getter — JGiven intercepts those as steps). Production
     // injects
     // a ProductionClusterReadinessProbe; tests inject a simulated/fake probe and play the same
     // launch(), so the scenario script lives in exactly one place.
-    final Map<ClusterReadinessPhase, Dossier> phaseDossiers =
+    final Map<ClusterReadinessPhase, Observation> phaseObservations =
         new EnumMap<>(ClusterReadinessPhase.class);
     final ClusterReadinessProbe capturingProbe =
         (cfg, phase) -> {
-          final Dossier produced = phaseProbe.probe(cfg, phase);
-          phaseDossiers.put(phase, produced);
+          final Observation produced = phaseProbe.probe(cfg, phase);
+          phaseObservations.put(phase, produced);
           return produced;
         };
 
     // The nested systemd-adapter dependency replays from the already-captured launch summary — no
     // second live probe. Its status reflects what the systemd-adapter checkpoint already found.
-    final SystemdAdapterProbe nestedSystemdAdapterProbe = cfg -> capturedSystemdAdapterDossier();
+    final SystemdAdapterProbe nestedSystemdAdapterProbe =
+        cfg -> capturedSystemdAdapterObservation();
 
     final ReportModel reportModel = runbook != null ? runbook : new ReportModel();
 
@@ -167,57 +171,72 @@ public final class ClusterReadinessStage {
       return this;
     }
 
-    // Failure: the patient consults, then project the per-phase dossiers into a failed result so
+    // Failure: the patient consults, then project the per-phase observations into a failed result
+    // so
     // the output contract (handoffReady → nextStep, bootstrapStatus) is preserved.
-    consultDoctor(phaseDossiers);
-    sink.accept(failedProjection(phaseDossiers));
+    consultDoctor(phaseObservations);
+    sink.accept(failedProjection(phaseObservations));
     return this;
   }
 
-  /** Reconstruct the systemd-adapter dependency's dossier from its already-captured summary. */
-  private Dossier capturedSystemdAdapterDossier() {
+  /** Reconstruct the systemd-adapter dependency's observation from its already-captured summary. */
+  private Observation capturedSystemdAdapterObservation() {
     final String status =
         String.valueOf(systemdAdapterLaunchSummary.getOrDefault("status", "unknown"));
     final String summary =
         String.valueOf(systemdAdapterLaunchSummary.getOrDefault("summary", "systemd adapter"));
-    return Dossier.of(status, Optional.empty(), summary, systemdAdapterLaunchSummary);
+    return Observation.of(status, Optional.empty(), summary, systemdAdapterLaunchSummary);
   }
 
-  /** Project the per-phase dossiers into the VerificationResult the output layer consumes. */
-  private VerificationResult failedProjection(Map<ClusterReadinessPhase, Dossier> phaseDossiers) {
-    final boolean kubeconfig = phaseOk(phaseDossiers, ClusterReadinessPhase.KUBECONFIG_PUBLISHED);
-    final boolean api = phaseOk(phaseDossiers, ClusterReadinessPhase.API_READY);
-    final boolean controllers = phaseOk(phaseDossiers, ClusterReadinessPhase.CONTROLLERS_EFFECTIVE);
+  /** Project the per-phase observations into the VerificationResult the output layer consumes. */
+  private VerificationResult failedProjection(
+      Map<ClusterReadinessPhase, Observation> phaseObservations) {
+    final boolean kubeconfig =
+        phaseOk(phaseObservations, ClusterReadinessPhase.KUBECONFIG_PUBLISHED);
+    final boolean api = phaseOk(phaseObservations, ClusterReadinessPhase.API_READY);
+    final boolean controllers =
+        phaseOk(phaseObservations, ClusterReadinessPhase.CONTROLLERS_EFFECTIVE);
     final String summary =
-        phaseDossiers.values().stream()
-            .filter(dossier -> !dossier.isOk())
-            .map(Dossier::summary)
+        phaseObservations.values().stream()
+            .filter(observation -> !observation.isOk())
+            .map(Observation::summary)
             .findFirst()
             .orElse("cluster readiness failed");
     return ClusterBootstrapReadinessVerifier.failed(kubeconfig, api, controllers, summary, policy);
   }
 
   private static boolean phaseOk(
-      Map<ClusterReadinessPhase, Dossier> phaseDossiers, ClusterReadinessPhase phase) {
-    final Dossier dossier = phaseDossiers.get(phase);
-    return dossier != null && dossier.isOk();
+      Map<ClusterReadinessPhase, Observation> phaseObservations, ClusterReadinessPhase phase) {
+    final Observation observation = phaseObservations.get(phase);
+    return observation != null && observation.isOk();
   }
 
   /**
    * The patient consults the doctor on the first failing phase's symptom. The resulting plan is
    * kept on a {@link ConsultationReport} in the shared log (no longer logged-then-dropped) — the
-   * raised dossiers it brought plus the plan the doctor wrote.
+   * raised observations it brought plus the plan the doctor wrote.
    */
-  private void consultDoctor(Map<ClusterReadinessPhase, Dossier> phaseDossiers) {
-    phaseDossiers.values().stream()
-        .filter(dossier -> dossier.symptom().isPresent())
+  private void consultDoctor(Map<ClusterReadinessPhase, Observation> phaseObservations) {
+    phaseObservations.values().stream()
+        .filter(observation -> observation.symptom().isPresent())
         .findFirst()
         .ifPresent(
-            dossier -> {
-              final RemediationPlan plan = generalist.consult(dossier.symptom().get(), dossier);
+            observation -> {
+              final Symptom symptom = observation.symptom().get();
+              final MedicalRecord record = generalist.recordForCurrentPatient();
+              log(
+                  "⚕ consulted with "
+                      + record.visits().size()
+                      + " prior visit(s); "
+                      + symptom.id()
+                      + " seen "
+                      + record.historyOf(symptom).count()
+                      + "× before");
+              final RemediationPlan plan = generalist.consult(symptom, observation);
               if (consultations != null) {
                 consultations.record(
-                    new ConsultationReport(SCENARIO_ID, List.copyOf(phaseDossiers.values()), plan));
+                    new ConsultationReport(
+                        SCENARIO_ID, List.copyOf(phaseObservations.values()), plan));
               }
             });
   }

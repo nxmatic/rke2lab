@@ -19,7 +19,7 @@ class DoctorRecordsTest {
         java.util.Arrays.stream(programs).map(p -> Prescription.of(p, Map.of(), "hint")).toList();
     return new ConsultationReport(
         checkpointId,
-        List.of(Dossier.failed(symptom, "summary", Map.of())),
+        List.of(Observation.failed(symptom, "summary", Map.of())),
         new RemediationPlan(symptom, prescriptions, "summary"));
   }
 
@@ -69,10 +69,10 @@ class DoctorRecordsTest {
   }
 
   @Test
-  void complaint_isEmpty_reflects_its_reports() {
-    assertTrue(new Complaint(List.of()).isEmpty());
-    assertTrue(new Complaint(null).isEmpty());
-    assertFalse(new Complaint(List.of(report("a", Symptom.CONNECTION_REFUSED))).isEmpty());
+  void chiefComplaint_isEmpty_reflects_its_reports() {
+    assertTrue(new ChiefComplaint(List.of()).isEmpty());
+    assertTrue(new ChiefComplaint(null).isEmpty());
+    assertFalse(new ChiefComplaint(List.of(report("a", Symptom.CONNECTION_REFUSED))).isEmpty());
   }
 
   @Test
@@ -119,16 +119,16 @@ class DoctorRecordsTest {
   }
 
   @Test
-  void symptomCorrelation_lists_its_cooccurring_symptoms() {
-    final SymptomCorrelation correlation =
-        new SymptomCorrelation(
+  void comorbidity_lists_its_cooccurring_symptoms() {
+    final Comorbidity comorbidity =
+        new Comorbidity(
             Symptom.CONNECTION_REFUSED, List.of(Symptom.TIMEOUT, Symptom.API_NOT_READY));
 
-    assertEquals(List.of(Symptom.TIMEOUT, Symptom.API_NOT_READY), correlation.cooccurring());
+    assertEquals(List.of(Symptom.TIMEOUT, Symptom.API_NOT_READY), comorbidity.cooccurring());
   }
 
   @Test
-  void symptomCorrelation_normalizes_null() {
-    assertTrue(new SymptomCorrelation(Symptom.TIMEOUT, null).cooccurring().isEmpty());
+  void comorbidity_normalizes_null() {
+    assertTrue(new Comorbidity(Symptom.TIMEOUT, null).cooccurring().isEmpty());
   }
 }

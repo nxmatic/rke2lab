@@ -17,18 +17,25 @@ import java.util.Map;
  * are test-only — the doctor is consulted <em>inside</em> the checkpoint stages ({@code
  * SystemdAdapterStage}, {@code ClusterReadinessStage}), never played as a standalone scenario in
  * production, so per the localisation rule they live in {@code src/test}. The exhaustive type
- * mechanics (symptom parsing, dossier round-trip) stay in {@code DoctorTest}.
+ * mechanics (symptom parsing, observation round-trip) stay in {@code DoctorTest}.
  */
 public final class DoctorScenario {
 
+  private static final Patient TEST_PATIENT = new Patient("organization", "rke2lab", "test");
+
+  /** The scenario asserts plan synthesis, not history, so the held record is always empty. */
+  private static final MedicalRecordRegistry EMPTY_RECORDS = p -> new MedicalRecord(p, List.of());
+
   private DoctorScenario() {}
 
-  /** Given: the doctor's roster of specialists and the failure (symptom + dossier) it will read. */
+  /**
+   * Given: the doctor's roster of specialists and the failure (symptom + observation) it will read.
+   */
   public static class Given extends Stage<Given> {
 
     @ProvidedScenarioState final List<Specialist> specialists = new ArrayList<>();
     @ProvidedScenarioState Symptom symptom;
-    @ProvidedScenarioState Dossier dossier;
+    @ProvidedScenarioState Observation observation;
 
     public Given a_doctor_staffed_with_the_dbus_specialist() {
       specialists.add(new DbusTcpSpecialist(OperatorConfiguration.mandatory().asBootstrapConfig()));
@@ -37,7 +44,8 @@ public final class DoctorScenario {
 
     public Given a_failure_presenting(@Quoted Symptom symptom) {
       this.symptom = symptom;
-      this.dossier = Dossier.failed(symptom, symptom.id(), Map.of("source", "doctor-scenario"));
+      this.observation =
+          Observation.failed(symptom, symptom.id(), Map.of("source", "doctor-scenario"));
       return self();
     }
   }
@@ -47,12 +55,12 @@ public final class DoctorScenario {
 
     @ExpectedScenarioState List<Specialist> specialists;
     @ExpectedScenarioState Symptom symptom;
-    @ExpectedScenarioState Dossier dossier;
+    @ExpectedScenarioState Observation observation;
 
     @ProvidedScenarioState RemediationPlan plan;
 
     public When the_doctor_is_consulted() {
-      plan = new Generalist(specialists).consult(symptom, dossier);
+      plan = new Generalist(specialists, EMPTY_RECORDS, TEST_PATIENT).consult(symptom, observation);
       return self();
     }
   }

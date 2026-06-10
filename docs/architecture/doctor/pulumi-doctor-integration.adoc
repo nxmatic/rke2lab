@@ -178,7 +178,7 @@ flowchart LR
         SYM["Symptom (set)"]
         GEN["Generalist → Specialist"]
         PLAN["RemediationPlan"]
-        REP["ConsultationReport<br/>(today's Dossier + the plan)"]
+        REP["ConsultationReport<br/>(today's Observation + the plan)"]
     end
 
     subgraph SEED["seed-master — the Pulumi adapter"]

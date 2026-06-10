@@ -5,7 +5,7 @@ package io.nxmatic.rke2lab.controlplane.bdd;
  * domain is relevant. Kept a small closed set the doctor owns; the config subsystem's infra-domain
  * model can map onto it later (the config↔doctor seam) without the doctor depending on config.
  */
-public enum SpecialistDomain {
+public enum Specialty {
   SYSTEMD,
   NETWORK,
   INCUS,

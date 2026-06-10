@@ -29,7 +29,7 @@ class MedicalRecordTest {
   }
 
   @Test
-  void currentComplaint_returnsLatestVisitReports() {
+  void chiefComplaint_returnsLatestVisitReports() {
     MedicalRecord record =
         new MedicalRecord(
             PATIENT,
@@ -37,7 +37,7 @@ class MedicalRecordTest {
                 visit(1, report("c1", Symptom.TIMEOUT)),
                 visit(2, report("c2", Symptom.CONNECTION_REFUSED))));
 
-    Complaint complaint = record.currentComplaint();
+    ChiefComplaint complaint = record.chiefComplaint();
 
     assertFalse(complaint.isEmpty());
     assertEquals(1, complaint.reports().size());
@@ -45,7 +45,7 @@ class MedicalRecordTest {
   }
 
   @Test
-  void currentComplaint_isRobustToInputOrder() {
+  void chiefComplaint_isRobustToInputOrder() {
     MedicalRecord record =
         new MedicalRecord(
             PATIENT,
@@ -54,16 +54,16 @@ class MedicalRecordTest {
                 visit(1, report("c1", Symptom.TIMEOUT)),
                 visit(3, report("c3", Symptom.API_NOT_READY))));
 
-    Complaint complaint = record.currentComplaint();
+    ChiefComplaint complaint = record.chiefComplaint();
 
     assertEquals(Symptom.API_NOT_READY, complaint.reports().get(0).symptom());
   }
 
   @Test
-  void currentComplaint_noVisits_isEmpty() {
+  void chiefComplaint_noVisits_isEmpty() {
     MedicalRecord record = new MedicalRecord(PATIENT, List.of());
 
-    assertTrue(record.currentComplaint().isEmpty());
+    assertTrue(record.chiefComplaint().isEmpty());
   }
 
   @Test
@@ -208,20 +208,20 @@ class MedicalRecordTest {
   }
 
   @Test
-  void correlatedWith_listsOtherCooccurringSymptoms() {
+  void comorbiditiesWith_listsOtherCooccurringSymptoms() {
     MedicalRecord record =
         new MedicalRecord(
             PATIENT,
             List.of(
                 visit(1, report("c1", Symptom.CONNECTION_REFUSED), report("c2", Symptom.TIMEOUT))));
 
-    SymptomCorrelation correlation = record.correlatedWith(Symptom.CONNECTION_REFUSED);
+    Comorbidity comorbidity = record.comorbiditiesWith(Symptom.CONNECTION_REFUSED);
 
-    assertEquals(List.of(Symptom.TIMEOUT), correlation.cooccurring());
+    assertEquals(List.of(Symptom.TIMEOUT), comorbidity.cooccurring());
   }
 
   @Test
-  void correlatedWith_isDistinctAcrossVisits() {
+  void comorbiditiesWith_isDistinctAcrossVisits() {
     MedicalRecord record =
         new MedicalRecord(
             PATIENT,
@@ -233,9 +233,9 @@ class MedicalRecordTest {
                     report("c4", Symptom.TIMEOUT),
                     report("c5", Symptom.API_NOT_READY))));
 
-    SymptomCorrelation correlation = record.correlatedWith(Symptom.CONNECTION_REFUSED);
+    Comorbidity comorbidity = record.comorbiditiesWith(Symptom.CONNECTION_REFUSED);
 
-    assertEquals(List.of(Symptom.TIMEOUT, Symptom.API_NOT_READY), correlation.cooccurring());
+    assertEquals(List.of(Symptom.TIMEOUT, Symptom.API_NOT_READY), comorbidity.cooccurring());
   }
 
   @Test
@@ -243,7 +243,7 @@ class MedicalRecordTest {
     MedicalRecord record = new MedicalRecord(PATIENT, null);
 
     assertTrue(record.visits().isEmpty());
-    assertTrue(record.currentComplaint().isEmpty());
+    assertTrue(record.chiefComplaint().isEmpty());
   }
 
   @Test

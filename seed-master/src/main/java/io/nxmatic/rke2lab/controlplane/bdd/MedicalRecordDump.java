@@ -15,11 +15,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The offline entry point that serializes a {@link Patient}'s dossier as YAML. It is the FIRST
- * lenient caller of the reconstruction: when the timeline reads cleanly the full record is emitted
- * (exit 0); when some entries are unreadable the partial record is STILL emitted and the per-entry
- * failures are surfaced (non-zero exit). The policy decision lives here, in the caller — never
- * deported to a log, never a silent swallow.
+ * The offline entry point that serializes a {@link Patient}'s medical record as YAML. It is the
+ * FIRST lenient caller of the reconstruction: when the timeline reads cleanly the full record is
+ * emitted (exit 0); when some entries are unreadable the partial record is STILL emitted and the
+ * per-entry failures are surfaced (non-zero exit). The policy decision lives here, in the caller —
+ * never deported to a log, never a silent swallow.
  */
 public final class MedicalRecordDump {
 
@@ -28,7 +28,7 @@ public final class MedicalRecordDump {
   private MedicalRecordDump() {}
 
   /**
-   * The serialized dossier plus the policy outcome: the YAML, an exit code, the surfaced failures.
+   * The serialized record plus the policy outcome: the YAML, an exit code, the surfaced failures.
    */
   public record Result(String yaml, int exitCode, List<String> failures) {
     public Result {
@@ -69,7 +69,7 @@ public final class MedicalRecordDump {
 
   /**
    * Assembles the reader over the injected {@code source}, reads the record, and decides the
-   * policy. On a clean read: full YAML, exit 0. On reconstruction failure: the partial dossier is
+   * policy. On a clean read: full YAML, exit 0. On reconstruction failure: the partial record is
    * still worth dumping (a readable history of visits has value to the operator), so we emit {@code
    * toYaml(partialRecord)} AND surface every suppressed {@link EntryFailure} — the human is both
    * served the partial and informed of what was lost. The {@code source} is injected so a test

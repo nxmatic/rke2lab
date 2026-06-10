@@ -43,7 +43,7 @@ final class MedicalRecordReader {
         final StackSnapshot snapshot = source.at(entry);
         final List<ConsultationReport> reports =
             snapshot.outputsNamed(ConsultationReport.OUTPUT_KEY).stream()
-                .map(DiagnosisReader::fromOutputMap)
+                .map(ConsultationReportReader::fromOutputMap)
                 .flatMap(Optional::stream)
                 .toList();
         visits.add(new Visit(entry.version(), entry.when(), reports));

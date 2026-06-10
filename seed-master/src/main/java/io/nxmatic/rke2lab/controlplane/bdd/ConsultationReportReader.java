@@ -13,13 +13,13 @@ import java.util.Optional;
  * Optional#empty()} — so a stale or partially-written record degrades instead of crashing the read.
  *
  * <p>Additive by design: the schema evolves by adding keys, never by a version number. The reader
- * pulls each known key by name and ignores the rest; for a {@link Dossier} the "rest" is preserved
- * (details = everything that is not a canonical key), so a key the producer adds tomorrow survives
- * a round-trip through a reader written today.
+ * pulls each known key by name and ignores the rest; for an {@link Observation} the "rest" is
+ * preserved (details = everything that is not a canonical key), so a key the producer adds tomorrow
+ * survives a round-trip through a reader written today.
  */
-final class DiagnosisReader {
+final class ConsultationReportReader {
 
-  private DiagnosisReader() {}
+  private ConsultationReportReader() {}
 
   /**
    * Three keys are HARD requirements, because the target records cannot be honestly built without
@@ -40,21 +40,22 @@ final class DiagnosisReader {
       return Optional.empty();
     }
     return Optional.of(
-        new ConsultationReport(checkpointId, dossiersFrom(map.get("dossiers")), plan.get()));
+        new ConsultationReport(
+            checkpointId, observationsFrom(map.get("observations")), plan.get()));
   }
 
-  private static List<Dossier> dossiersFrom(Object raw) {
+  private static List<Observation> observationsFrom(Object raw) {
     if (!(raw instanceof List<?> list)) {
       return List.of();
     }
-    final List<Dossier> dossiers = new ArrayList<>(list.size());
+    final List<Observation> observations = new ArrayList<>(list.size());
     for (Object element : list) {
-      dossierFrom(element).ifPresent(dossiers::add);
+      observationFrom(element).ifPresent(observations::add);
     }
-    return dossiers;
+    return observations;
   }
 
-  private static Optional<Dossier> dossierFrom(Object raw) {
+  private static Optional<Observation> observationFrom(Object raw) {
     if (!(raw instanceof Map<?, ?> map)) {
       return Optional.empty();
     }
@@ -72,7 +73,7 @@ final class DiagnosisReader {
       }
       details.put(key, entry.getValue());
     }
-    return Optional.of(Dossier.of(status, symptom, summary, details));
+    return Optional.of(Observation.of(status, symptom, summary, details));
   }
 
   private static Optional<RemediationPlan> planFrom(Object raw) {

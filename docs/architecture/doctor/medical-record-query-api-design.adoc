@@ -52,10 +52,10 @@ These are the questions a practitioner actually asks about a patient. They are t
 [cols="1,2,2",options="header"]
 |===
 |Clinical question |API (practitioner-facing) |What it needs
-|*Present complaint* — what hurts now |`currentComplaint(patient)` |the latest deployment only
+|*Present complaint* — what hurts now |`chiefComplaint(patient)` |the latest deployment only
 |*History of a symptom* — had it before, how often, acute vs chronic |`historyOf(patient, symptom)` |scan the diagnosis across past deployments
 |*Treatment efficacy* — what we prescribed, and whether it worked |`efficacyOf(patient, symptom)` |pair the symptom with the prescription and the next visit
-|*Correlations* — which symptoms co-occur or cascade |`correlatedWith(patient, symptom)` |symptoms grouped per visit + walked along `dependsOn`
+|*Correlations* — which symptoms co-occur or cascade |`comorbiditiesWith(patient, symptom)` |symptoms grouped per visit + walked along `dependsOn`
 |===
 
 === They reduce to one primitive
@@ -66,10 +66,10 @@ All four are expressed over a single primitive: *the diagnostic layer of one dep
 ----
 graph TB
     subgraph Questions
-        Q1["currentComplaint"]
+        Q1["chiefComplaint"]
         Q2["historyOf"]
         Q3["efficacyOf"]
-        Q4["correlatedWith"]
+        Q4["comorbiditiesWith"]
     end
     subgraph Primitive
         P["the diagnosis at one deployment<br/>the consultationReports of ONE checkpoint<br/>symptoms, prescriptions"]
@@ -134,7 +134,7 @@ So there are *three* layers, each in its place:
   hierarchy.
 * *the doctor (in seed-master for now)* — the *neutral* clinical model: the `MedicalRecord` (the four
   questions), reconstructed for one `Patient` from a `SnapshotSource` by `MedicalRecordReader`, with
-  `DiagnosisReader` doing the tolerant navigate+map of each checkpoint. The doctor's physical
+  `ConsultationReportReader` doing the tolerant navigate+map of each checkpoint. The doctor's physical
   extraction into its own module is *deferred* (a separate, larger chantier); until then this lives in
   seed-master, but it depends only on the generic module, not on Pulumi directly.
 * *seed-master* — wires `StackHandleSnapshotSource` (the `SnapshotSource` impl that adapts the generic
@@ -147,7 +147,7 @@ So there are *three* layers, each in its place:
 graph TB
     subgraph doctor_in_seedmaster
         GEN["Generalist or Specialist<br/>asks the record while diagnosing"]
-        API["MedicalRecord<br/>currentComplaint, historyOf,<br/>efficacyOf, correlatedWith<br/>NEUTRAL, no Pulumi"]
+        API["MedicalRecord<br/>chiefComplaint, historyOf,<br/>efficacyOf, comorbiditiesWith<br/>NEUTRAL, no Pulumi"]
         READER["MedicalRecordReader<br/>reconstructs a MedicalRecord for one Patient<br/>fail-at-end over the timeline"]
         SRC["StackHandleSnapshotSource<br/>the SnapshotSource impl<br/>adapts StackHandle to the doctor"]
     end
@@ -179,13 +179,13 @@ point.
 
 This document was written as the design and kept as the rationale. A few names in the prose and
 diagrams are design-time shorthands; the table below maps each to the shipped type so the doc stays
-navigable against the code. The clinical *questions* (`currentComplaint`, `historyOf`, `efficacyOf`,
-`correlatedWith`) shipped verbatim.
+navigable against the code. The clinical *questions* (`chiefComplaint`, `historyOf`, `efficacyOf`,
+`comorbiditiesWith`) shipped verbatim.
 
 [cols="1,1,2",options="header"]
 |===
 |Design-time name |Shipped type |Note
-|"diagnosisAt(version)" |`DiagnosisReader` over a `StackSnapshot`, addressed by `StackHistory.Entry` |the primitive; addressed by *deployment instant*, never a version number
+|"diagnosisAt(version)" |`ConsultationReportReader` over a `StackSnapshot`, addressed by `StackHistory.Entry` |the primitive; addressed by *deployment instant*, never a version number
 |"the ordered version sequence" |`StackHistory` / `StackHistory.Entry` |ordered by the filename-nanos deployment instant
 |`MedicalRecord` interface |`MedicalRecord` (a concrete class, patient bound at construction) |the four questions take no patient argument — the patient is fixed by `read(...)`
 |`PulumiMedicalRecord` adapter |split: `MedicalRecordReader` (reconstructs) + `StackHandleSnapshotSource` (the `SnapshotSource` impl) |no single "adapter" type; the reconstruction and the Pulumi-backing are separate, each testable alone
@@ -315,7 +315,7 @@ Three roles, each with one job (the same discipline as instance-passing — each
 [cols="1,2",options="header"]
 |===
 |Situation |Behaviour
-|Healthy run, no symptom raised |`currentComplaint` returns _nothing-to-report_ (empty) — not an error
+|Healthy run, no symptom raised |`chiefComplaint` returns _nothing-to-report_ (empty) — not an error
 |First run / empty history |`latest` is `Optional.empty()`, `timeline()` is an empty list — nothing-here
 |A present checkpoint cannot be read (deleted mid-read, I/O error) |`StackAccessException` propagates — retryable, never degraded to empty
 |Checkpoint corrupt or unexpected shape |`StackContentException` (with the offending `path()`) — never-retry
@@ -409,7 +409,7 @@ losslessly, until a breaking change asks for it.
 
 * *Unit, no Pulumi (where the risk is).* Feed `.checkpoint.json` fixtures to the navigate+map step
   and assert the `ConsultationReport`s are extracted; run the aggregations
-  (`historyOf`/`efficacyOf`/`correlatedWith`) over synthetic version sequences; cover the error
+  (`historyOf`/`efficacyOf`/`comorbiditiesWith`) over synthetic version sequences; cover the error
   cases (healthy run, missing version, corrupt checkpoint).
 * *Integration, real Pulumi (the seam).* Proven by a throwaway sandbox program before implementation:
   in-process lock-free read of the program's own history+state, and per-node read-back across runs.

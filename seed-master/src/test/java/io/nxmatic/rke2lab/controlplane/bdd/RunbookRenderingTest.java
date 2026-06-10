@@ -43,7 +43,7 @@ class RunbookRenderingTest {
         new ConsultationReport(
             Checkpoint.SYSTEMD_ADAPTER.slug(),
             List.of(
-                Dossier.failed(
+                Observation.failed(
                     Symptom.CONNECTION_REFUSED,
                     "dbus refused",
                     Map.of("source", "systemd-adapter-probe"))),

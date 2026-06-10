@@ -44,9 +44,9 @@ public final class ClusterBootstrapReadinessVerifier {
 
   /**
    * One readiness phase checked in isolation — the per-phase seam the BDD checkpoint plays against
-   * (a production {@code ClusterReadinessProbe} maps this to a {@code Dossier}). Reuses the same
-   * private waiters as {@link #verify}, so the live logic is identical; the verifier stays free of
-   * any {@code bdd} types (no package cycle). {@code logger} is applied for the call.
+   * (a production {@code ClusterReadinessProbe} maps this to an {@code Observation}). Reuses the
+   * same private waiters as {@link #verify}, so the live logic is identical; the verifier stays
+   * free of any {@code bdd} types (no package cycle). {@code logger} is applied for the call.
    */
   public static PhaseOutcome checkKubeconfigPublished(
       BootstrapConfig config, Consumer<String> logger) {

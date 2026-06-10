@@ -91,13 +91,18 @@ prefixes its content to every `.adoc` it renders:
 [source]
 ----
 # .asciidoctorconfig (repo root)
-:kroki-server-url: http://100.64.0.15:8000
+:kroki-server-url: http://bioskop-nixos.local:8000
 ----
 
-`100.64.0.15` is the *tailscale* IP of `bioskop-nixos` — stable across networks (preferred over the
-LAN `192.168.1.130`, which changes with location). Individual `.adoc` files stay clean: no per-machine
-URL inside them, and the one place to change (or drop, to fall back to a public Kroki) is this root
-file. Only `asciidoc.extensions.enableKroki: true` stays in `.vscode/settings.json`.
+`bioskop-nixos.local` is the *mDNS* name of the host running the Kroki container. seed-master is always
+operated from `bioskop` (reached by screen-sharing the RDP host → VSCode), and `bioskop-nixos` sits on
+the same LAN, so both this shell and the VSCode webview resolve `bioskop-nixos.local` directly — no
+tailscale route involved. (An earlier revision pinned the *tailscale* IP `100.64.0.15` as "stable
+across networks"; that was a mix-up with a different machine on a guest network — it is not routable
+from `bioskop` and gave empty frames. The mDNS name is the reliable channel for this work environment.)
+Individual `.adoc` files stay clean: no per-machine URL inside them, and the one place to change (or
+drop, to fall back to a public Kroki) is this root file. Only `asciidoc.extensions.enableKroki: true`
+stays in `.vscode/settings.json`.
 
 == Allow the http:// image in the webview (the last, non-obvious step)
 
@@ -134,7 +139,7 @@ A direct POST proves a *fresh* render (not a cache hit):
 [source,console]
 ----
 $ printf 'graph TB\n subgraph G[x]\n A[ping]-->B[pong]\n end\n' \
-    | curl -s -X POST http://100.64.0.15:8000/mermaid/svg --data-binary @- \
+    | curl -s -X POST http://bioskop-nixos.local:8000/mermaid/svg --data-binary @- \
       -o /dev/null -w "HTTP %{http_code}\n"
 HTTP 200
 ----

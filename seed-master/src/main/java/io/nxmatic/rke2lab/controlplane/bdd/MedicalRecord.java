@@ -8,10 +8,10 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The full dossier of one {@link Patient}: its visits in chronological order. The four clinical
- * questions a doctor asks of a record — the current complaint, a symptom's history, a treatment's
- * efficacy, and symptom correlation — are answered here as pure folds over the visits, with no
- * Pulumi, I/O, or mutation.
+ * The full medical record of one {@link Patient}: its visits in chronological order. The four
+ * clinical questions a doctor asks of a record — the chief complaint, a symptom's history, a
+ * treatment's efficacy, and a symptom's comorbidity — are answered here as pure folds over the
+ * visits, with no Pulumi, I/O, or mutation.
  */
 public record MedicalRecord(Patient patient, List<Visit> visits) {
 
@@ -28,11 +28,11 @@ public record MedicalRecord(Patient patient, List<Visit> visits) {
                 .toList();
   }
 
-  public Complaint currentComplaint() {
+  public ChiefComplaint chiefComplaint() {
     if (visits.isEmpty()) {
-      return new Complaint(List.of());
+      return new ChiefComplaint(List.of());
     }
-    return new Complaint(visits.get(visits.size() - 1).reports());
+    return new ChiefComplaint(visits.get(visits.size() - 1).reports());
   }
 
   public SymptomHistory historyOf(Symptom symptom) {
@@ -81,7 +81,7 @@ public record MedicalRecord(Patient patient, List<Visit> visits) {
         .findFirst();
   }
 
-  public SymptomCorrelation correlatedWith(Symptom symptom) {
+  public Comorbidity comorbiditiesWith(Symptom symptom) {
     final Set<Symptom> cooccurring = new LinkedHashSet<>();
     for (Visit visit : visits) {
       final Set<Symptom> raised = visit.symptomsRaised();
@@ -89,7 +89,7 @@ public record MedicalRecord(Patient patient, List<Visit> visits) {
         raised.stream().filter(other -> other != symptom).forEach(cooccurring::add);
       }
     }
-    return new SymptomCorrelation(symptom, List.copyOf(cooccurring));
+    return new Comorbidity(symptom, List.copyOf(cooccurring));
   }
 
   private static String firstCheckpointRaising(Visit visit, Symptom symptom) {

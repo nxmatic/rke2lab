@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.systemd;
 
-import io.nxmatic.rke2lab.controlplane.bdd.Dossier;
+import io.nxmatic.rke2lab.controlplane.bdd.Observation;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -34,8 +34,8 @@ public final class SeedSystemdAdapterEndpointGate {
     // Utility class
   }
 
-  public static Dossier deferredPreview(BootstrapConfig config) {
-    return Dossier.of(
+  public static Observation deferredPreview(BootstrapConfig config) {
+    return Observation.of(
         "deferred-preview",
         Optional.empty(),
         "adapter endpoint gate deferred during preview",
@@ -47,7 +47,7 @@ public final class SeedSystemdAdapterEndpointGate {
                 "systemd-adapter-runtime")));
   }
 
-  public static Dossier ensureReachable(BootstrapConfig config, Consumer<String> logger) {
+  public static Observation ensureReachable(BootstrapConfig config, Consumer<String> logger) {
     waitForInstanceReachable(config, logger);
 
     final Map<String, Object> runtimeSnapshot = waitForRuntimeProbe(config, logger);
@@ -65,7 +65,7 @@ public final class SeedSystemdAdapterEndpointGate {
       logger.accept("systemd adapter endpoint gate: " + summary);
     }
 
-    return Dossier.ok(
+    return Observation.ok(
         summary,
         details(
             Map.of(
@@ -276,9 +276,9 @@ public final class SeedSystemdAdapterEndpointGate {
 
   /**
    * The gate's resource-identity metadata ({@code apiVersion}/{@code kind}) merged ahead of the
-   * call-site details, forming the {@link Dossier}'s details map. {@code status}/{@code summary}
-   * are the dossier's own fields and are re-added by {@link Dossier#toOutputMap()}, so the flat
-   * output keys are unchanged from the former envelope.
+   * call-site details, forming the {@link Observation}'s details map. {@code status}/{@code
+   * summary} are the observation's own fields and are re-added by {@link
+   * Observation#toOutputMap()}, so the flat output keys are unchanged from the former envelope.
    */
   private static Map<String, Object> details(Map<String, Object> callerDetails) {
     final LinkedHashMap<String, Object> map = new LinkedHashMap<>();

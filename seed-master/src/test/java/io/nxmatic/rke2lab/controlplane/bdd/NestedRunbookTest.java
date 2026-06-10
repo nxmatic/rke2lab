@@ -41,6 +41,11 @@ class NestedRunbookTest {
   private static final Map<String, Object> REACHABLE_SYSTEMD_ADAPTER =
       Map.of("status", "ok", "summary", "dbusEndpoint reachable");
 
+  private static final Patient TEST_PATIENT = new Patient("organization", "rke2lab", "test");
+
+  /** These tests exercise routing/rendering, not history, so the held record is always empty. */
+  private static final MedicalRecordRegistry EMPTY_RECORDS = p -> new MedicalRecord(p, List.of());
+
   @Test
   void cluster_readiness_renders_with_the_systemd_adapter_dependency_nested(@TempDir Path out) {
     final ReportModel runbook = new ReportModel();
@@ -160,7 +165,8 @@ class NestedRunbookTest {
   void a_failing_consultation_keeps_its_plan_in_the_shared_log() {
     // The doctor's plan must no longer be computed-logged-then-dropped: a failing checkpoint
     // records
-    // a ConsultationReport (the raised dossiers + the plan) into the shared, caller-owned log — the
+    // a ConsultationReport (the raised observations + the plan) into the shared, caller-owned log —
+    // the
     // prerequisite for the medical record (layer 3). Pulumi outputs are untouched (the
     // byte-identical
     // Stage-B contract holds); this only adds an in-memory accumulation.
@@ -270,22 +276,25 @@ class NestedRunbookTest {
   }
 
   private static Generalist readyGeneralist() {
-    return new Generalist(List.of(new DbusTcpSpecialist(config())));
+    return new Generalist(List.of(new DbusTcpSpecialist(config())), EMPTY_RECORDS, TEST_PATIENT);
   }
 
   private static Generalist networkGeneralist() {
-    return new Generalist(List.of(new DbusTcpSpecialist(config()), new FakeNetworkSpecialist()));
+    return new Generalist(
+        List.of(new DbusTcpSpecialist(config()), new FakeNetworkSpecialist()),
+        EMPTY_RECORDS,
+        TEST_PATIENT);
   }
 
   /** A stand-in network specialist so a TIMEOUT (routed to NETWORK) yields a prescription. */
   private static final class FakeNetworkSpecialist implements Specialist {
     @Override
-    public SpecialistDomain domain() {
-      return SpecialistDomain.NETWORK;
+    public Specialty domain() {
+      return Specialty.NETWORK;
     }
 
     @Override
-    public Optional<Prescription> diagnose(Symptom symptom, Dossier dossier) {
+    public Optional<Prescription> diagnose(Symptom symptom, Observation observation) {
       return Optional.of(
           Prescription.of(
               RemediationProgramRef.CHECK_CONNECTIVITY,

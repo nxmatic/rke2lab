@@ -8,16 +8,16 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the flat, string-keyed serialization of the diagnostic layer (symptom / dossiers / plan) —
- * the form a checkpoint resource registers as an additive Pulumi output. Ids are kebab ({@link
+ * Pins the flat, string-keyed serialization of the diagnostic layer (symptom / observations / plan)
+ * — the form a checkpoint resource registers as an additive Pulumi output. Ids are kebab ({@link
  * Symptom#id()} / {@link RemediationProgramRef#id()}), never enum {@code name()}.
  */
 class ConsultationReportSerializationTest {
 
   @Test
   void report_serializes_to_a_flat_kebab_keyed_map() {
-    final Dossier dossier =
-        Dossier.failed(
+    final Observation observation =
+        Observation.failed(
             Symptom.CONNECTION_REFUSED, "dbus refused", Map.of("source", "endpoint-gate"));
     final Prescription prescription =
         Prescription.of(
@@ -26,7 +26,7 @@ class ConsultationReportSerializationTest {
         new RemediationPlan(
             Symptom.CONNECTION_REFUSED, List.of(prescription), "adapter unreachable");
     final ConsultationReport report =
-        new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(dossier), plan);
+        new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(observation), plan);
 
     final Map<String, Object> map = report.toOutputMap();
 
@@ -38,6 +38,6 @@ class ConsultationReportSerializationTest {
     final Map<?, ?> firstPrescription = (Map<?, ?>) ((List<?>) planMap.get("prescriptions")).get(0);
     assertEquals("restart-systemd-unit", firstPrescription.get("programRef"));
 
-    assertInstanceOf(List.class, map.get("dossiers"));
+    assertInstanceOf(List.class, map.get("observations"));
   }
 }

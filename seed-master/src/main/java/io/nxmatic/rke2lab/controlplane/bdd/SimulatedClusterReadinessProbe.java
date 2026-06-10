@@ -17,10 +17,10 @@ public final class SimulatedClusterReadinessProbe {
       ClusterReadinessPhase failingPhase, Symptom symptom) {
     return (config, phase) ->
         phase == failingPhase
-            ? Dossier.failed(
+            ? Observation.failed(
                 symptom,
                 phase.label() + " failed (simulated incident: " + symptom.id() + ")",
                 Map.of("source", "fault-simulation", "phase", phase.name()))
-            : Dossier.ok(phase.label() + " ok", Map.of("phase", phase.name()));
+            : Observation.ok(phase.label() + " ok", Map.of("phase", phase.name()));
   }
 }

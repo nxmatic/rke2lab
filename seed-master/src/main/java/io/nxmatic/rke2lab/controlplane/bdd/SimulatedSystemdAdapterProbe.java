@@ -17,14 +17,16 @@ public final class SimulatedSystemdAdapterProbe {
 
   private SimulatedSystemdAdapterProbe() {}
 
-  /** A probe that fails with the given symptom, mirroring the real gate's failed dossier shape. */
+  /**
+   * A probe that fails with the given symptom, mirroring the real gate's failed observation shape.
+   */
   public static SystemdAdapterProbe of(Symptom symptom) {
-    return config -> dossier(config, symptom);
+    return config -> observation(config, symptom);
   }
 
-  private static Dossier dossier(BootstrapConfig config, Symptom symptom) {
+  private static Observation observation(BootstrapConfig config, Symptom symptom) {
     final String endpoint = config.systemdAdapterDbusHost() + ":" + config.systemdAdapterDbusPort();
-    return Dossier.failed(
+    return Observation.failed(
         symptom,
         "dbusEndpoint=" + endpoint + " status=failed (simulated incident: " + symptom.id() + ")",
         Map.of("source", "fault-simulation"));

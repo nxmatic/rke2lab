@@ -23,7 +23,7 @@ the sibling design docs in this folder.
 |*Patient* |(Increment E direction) the *Pulumi stack* (`org/project/stack`, e.g. `bioskop/dev`) — a persistent identity. Several patients = several stacks (dev/prod/clusters). A checkpoint is NOT the patient; the patient self-observes _via_ its checkpoints.
 |*Visit* |(Increment E direction) one `pulumi up`/`preview` run, carrying its *admission context* = the runtime context (git commit/branch, preview-vs-up mode, call parameters = the Pulumi stack config incl. `simulate`, timestamp).
 |*Symptom* |(exists, unchanged) the typed complaint the patient *raises about its own state* while self-observing — the routing key the Generalist uses, never parsed from prose. A consultation carries a *set* of them (0..n).
-|*Consultation report* |(Increment E — today's `Dossier`, re-understood) what the patient brings to the doctor + what the doctor produces: status + the raised `Symptom`(s) + summary + details + the `RemediationPlan` (today computed then dropped — to be kept). NOT a separate "exam" layer below it.
+|*Consultation report* |(Increment E — today's `Observation`, re-understood) what the patient brings to the doctor + what the doctor produces: status + the raised `Symptom`(s) + summary + details + the `RemediationPlan` (today computed then dropped — to be kept). NOT a separate "exam" layer below it.
 |*Medical record* |(Increment E direction) the *patient-stack's* longitudinal history — its visits over time (Pulumi state = the latest; the git-versioned runbook `.adoc` = the longitudinal record). The runbook DAG. One per patient.
 |===
 
@@ -79,7 +79,7 @@ system and shaped two structural decisions:
   resource's live `Status`/`Conditions`/`Events` (`kubectl describe`), not by firing
   commands blindly. Our equivalent: the *snapshot the checkpoint already captured* (target
   state, pending jobs, failed units) IS the Status/Conditions. So the specialist *reads the
-  dossier first*, and only probes further if it is inconclusive — the doctor's `firstLook`.
+  observation first*, and only probes further if it is inconclusive — the doctor's `firstLook`.
 . *Follow the chain of linked resources.* cert-manager troubleshoots by walking
   `Certificate → CertificateRequest → Issuer → Order → Challenge`, reading each. This is
   _literally_ our DAG: when `cluster-ready` fails, the operator walks _up_ the dependency
@@ -213,7 +213,7 @@ that would otherwise have rendered an _empty_ runbook on every real failure.
 *The symptom is sourced, never parsed.* The Diagnosis section names a typed symptom
 (`CONNECTION_REFUSED`, …). That value comes from the probe, which classifies its own
 failure — it is *not* reverse-engineered from an assertion message. See
-<<symptom-and-dossier>>.
+<<symptom-and-observation>>.
 
 Example rendering:
 
@@ -226,7 +226,7 @@ The systemd adapter dbus-over-TCP proxy must respond...
 
 === Diagnosis (on failure only)
 *Symptom:* CONNECTION_REFUSED
-*Dossier:*
+*Observation:*
 [source,yaml]
 ----
 instanceName: master
@@ -349,7 +349,7 @@ graph TB
     style PLAN fill:#ccffcc,stroke:#00cc66
 ----
 
-. *Base case — two phases.* The checkpoint presents the *dossier* (the captured snapshot: target
+. *Base case — two phases.* The checkpoint presents the *observation* (the captured snapshot: target
   state, pending jobs, failed units) + the *symptom* to the `Generalist`. Phase 1: the relevant
   specialists (those whose `treats()` covers the symptom) diagnose *independently*. Phase 2: the
   generalist synthesizes the replies into one `RemediationPlan` and detects conflicts. With no
@@ -362,7 +362,7 @@ graph TB
   another domain the generalist did not foresee. Both are *handed back to the generalist*, which
   resolves the target via `treats()` and adds it to the agenda. Specialists do not know each other
   (decoupled); the generalist stays the *sole coordinator*.
-. *Each `Specialist` reads the dossier first* (the snapshot _is_ the Status/Conditions, the
+. *Each `Specialist` reads the observation first* (the snapshot _is_ the Status/Conditions, the
   cert-manager way), probes further only if needed, and replies.
 . *The generalist synthesizes* the replies into a single `RemediationPlan` (its global view), which
   flows into the runbook node and the inline log.
@@ -406,14 +406,14 @@ self-applied mid-flight — the <<loop-closure>> rule covers it by construction.
 
 *How recruitment is honored — a gradient from ad-hoc to codified (the chosen direction).* The
 working hypothesis: a generic Claude-backed specialist serves as a universal fallback that
-treats the unknown case *ad hoc* (it reasons over the dossier and prescribes), while the
+treats the unknown case *ad hoc* (it reasons over the observation and prescribes), while the
 consultation also emits a recruitment prescription. If the same frontier symptom recurs and
 the ad-hoc reasoning proves stable, the operator *codifies* it into a deterministic
 `Specialist` — testable, free, no LLM call at bootstrap. Whether the fallback is always
 present, invoked on demand, or staged some other way is left open. The existing `DbusTcpSpecialist` is the codified end of this gradient; the
 Claude-backed fallback is its starting end. This is the AI-native realization of the seam in
 <<ai-seam>>: routing an unknown symptom to a `Specialist` instantiated for that symptom is
-precisely what a subagent dispatch is — a fresh, focused agent given just the dossier as its
+precisely what a subagent dispatch is — a fresh, focused agent given just the observation as its
 context.
 
 [NOTE]
@@ -429,7 +429,7 @@ recruits by running its own design process.
 This is the concrete reason the *open roster + contributed routing* (deferred in the open
 tensions as T3) stops being speculative: the unknown-symptom case *requires* it. A `switch`
 over a closed enum cannot recruit; the recruitment prescription is what forces routing to
-become contributed data and the `Symptom`/`SpecialistDomain` sets to be open.
+become contributed data and the `Symptom`/`Specialty` sets to be open.
 
 === Prescription: an action addressed to a remediation program
 
@@ -472,7 +472,7 @@ is left to the plan.
 [cols="1,2,2",options="header"]
 |===
 |Side |Routes by |To
-|*Diagnosis* (exists) |`Symptom` → `SpecialistDomain` |a `Specialist` (reads, correlates, prescribes — never acts)
+|*Diagnosis* (exists) |`Symptom` → `Specialty` |a `Specialist` (reads, correlates, prescribes — never acts)
 |*Remediation* (this model) |`Prescription` → `programRef` |a *remediator* (administers the treatment)
 |===
 
@@ -541,10 +541,10 @@ line. An unattended CI run at 3 a.m. does not "go autonomous" — it converges o
 operator already authorized in version-controlled, reviewable config. The live-system risk
 stops being a question of trusting an agent and becomes a question of config content.
 
-[#symptom-and-dossier]
-=== Symptom and dossier: sourced and typed, never parsed
+[#symptom-and-observation]
+=== Symptom and observation: sourced and typed, never parsed
 
-The doctor's two inputs — the symptom (which `Then` failed, and _why_) and the dossier (the
+The doctor's two inputs — the symptom (which `Then` failed, and _why_) and the observation (the
 captured state) — must be _data the system already holds_, not values reconstructed at the
 catch site. Two decisions enforce this.
 
@@ -559,18 +559,18 @@ special path. *The probe emits the symptom from Increment A* (cheap; nothing rou
 yet) so the data source is correct from day one; the `Symptom` enum + routing arrive in
 Increment B.
 
-*The dossier is the typed successor of the probe envelope — one snapshot, not two.* The
+*The observation is the typed successor of the probe envelope — one snapshot, not two.* The
 envelope `Map<String,Object>` already _is_ the captured snapshot, and it already flows to
-the sink → `SystemdAdapterResource`. Building a separate `Dossier` at the catch site would
-revive the two-sources-of-truth anti-pattern. So `Dossier` becomes the record the probe
+the sink → `SystemdAdapterResource`. Building a separate `Observation` at the catch site would
+revive the two-sources-of-truth anti-pattern. So `Observation` becomes the record the probe
 returns, exposing `toOutputMap()` (the established idiom — cf.
 `ControlplanePolicy.toOutputMap()`): one instance, two views — typed for the doctor, a map
 for the Pulumi outputs and the YAML block in the runbook.
 
 The retype is *atomic, in Increment B* (no compat shim, per CLAUDE.md): the probe contract
-changes from `Map<String,Object>` to `Dossier`, and the sink + `SystemdAdapterResource`
+changes from `Map<String,Object>` to `Observation`, and the sink + `SystemdAdapterResource`
 update in the same change. Increment A stays on `Map` (no doctor yet); the typed form lands
-exactly when the doctor needs it. `Dossier` is a plain record — serializability (for a
+exactly when the doctor needs it. `Observation` is a plain record — serializability (for a
 future MCP boundary) follows whenever Phase 2 picks a mechanism, and is not a Phase 1
 concern.
 
@@ -613,9 +613,9 @@ specialist _implementations_:
 [cols="1,2,2",options="header"]
 |===
 |Contract |Phase 1 |A future Phase 2
-|`Specialist.diagnose(Referral) → ReferralReply` |Java impl reads the referral (dossier + refs) in-process, replies |An adapter serializes the referral, calls an out-of-process tool, deserializes the reply
+|`Specialist.diagnose(Referral) → ReferralReply` |Java impl reads the referral (observation + refs) in-process, replies |An adapter serializes the referral, calls an out-of-process tool, deserializes the reply
 |`Symptom` |Java enum (typed, sourced from the probe) |Same enum; its name is the tool's input discriminator
-|`Dossier` |plain record, `toOutputMap()` for the YAML view |Same record; serialized when a transport is chosen
+|`Observation` |plain record, `toOutputMap()` for the YAML view |Same record; serialized when a transport is chosen
 |`Prescription` |record: typed `programRef` + structured `payload` + prose `humanHint` |Same record; `humanHint` for humans, `payload`/`programRef` for an executor
 |Runbook sections |`== Meaning` / `== Diagnosis` / `== Mitigation`, typed vocabulary |Same headings; structured enough for a machine to parse
 |Generalist routing |asks each practitioner's self-declared `treats()` (no central table) |unchanged — asks different _impls_ the same way
@@ -631,9 +631,9 @@ executor, a config knob to mix impls) is deferred and intentionally unspecified.
 The seam is the _reason_ for four choices that would otherwise look like over-engineering for
 a purely-programmatic doctor:
 
-. *Typed `Symptom`, sourced from the probe* (see <<symptom-and-dossier>>) — not a parsed
+. *Typed `Symptom`, sourced from the probe* (see <<symptom-and-observation>>) — not a parsed
   string. A typed discriminator is what any later out-of-process router would key on.
-. *`Dossier` as a plain record with `toOutputMap()`* — one snapshot, two views. Serializable
+. *`Observation` as a plain record with `toOutputMap()`* — one snapshot, two views. Serializable
   later by whatever mechanism Phase 2 picks; no serialization dependency pulled in now.
 . *`Prescription` with a structured `payload` beside the prose `humanHint`* — the operator
   reads the hint today; a structured payload is what an executor would consume later. The
@@ -654,9 +654,9 @@ gates it in both columns:
 graph TB
     subgraph P1["Phase 1 — programmatic, this branch"]
         direction TB
-        FAIL1["checkpoint fails<br/>presents Symptom + Dossier"]
+        FAIL1["checkpoint fails<br/>presents Symptom + Observation"]
         GEN1["Generalist - Java<br/>agenda owner · asks treats() · referral round-trip"]
-        SPEC1["Specialist - Java class<br/>reads dossier, replies (prescription or why)"]
+        SPEC1["Specialist - Java class<br/>reads observation, replies (prescription or why)"]
         PLAN1["RemediationPlan<br/>prescription → programRef"]
         OPER1["Operator disposes<br/>reads runbook, decides"]
         REM1["Remediator = the operator<br/>acts by hand"]
@@ -665,7 +665,7 @@ graph TB
 
     subgraph P2["A future Phase 2 — same contracts, swapped impls"]
         direction TB
-        FAIL2["checkpoint fails<br/>presents Symptom + Dossier"]
+        FAIL2["checkpoint fails<br/>presents Symptom + Observation"]
         GEN2["Doctor<br/>same agenda · asks treats()"]
         SPEC2["Specialist - out-of-process<br/>diagnosis seam · read-only"]
         PLAN2["RemediationPlan<br/>same record"]
@@ -726,7 +726,7 @@ Build the runbook mechanism on the *existing* systemd-adapter checkpoint.
   <failure-kind>` config sub-map in a dedicated `PreviewPolicy` (separate from
   `ReadinessPolicy.override`); a simulated scenario lifts dry-run and runs a canned failing
   probe (which emits the symptom). Renders a FAILED node + severity decision — *no
-  prescription yet* (doctor absent). Consulted only in preview (see <<symptom-and-dossier>>'s
+  prescription yet* (doctor absent). Consulted only in preview (see <<symptom-and-observation>>'s
   sibling safety note above).
 * *Absent Diagnosis/Mitigation is a tested state (R6).* `RunbookRenderingTest` pins that a
   FAILED node renders cleanly with those sections absent (not a null hole). Doing this first
@@ -741,39 +741,39 @@ Build the runbook mechanism on the *existing* systemd-adapter checkpoint.
 === Increment B — Doctor (diagnosis + prescription on failure) — DONE
 
 * `Generalist` (deterministic symptom→domain routing → synthesized `RemediationPlan`),
-  `Specialist` interface + `SpecialistDomain` (the AI-ready seam:
-  `Optional<Prescription> diagnose(Symptom, Dossier)`), `Prescription` (typed
+  `Specialist` interface + `Specialty` (the AI-ready seam:
+  `Optional<Prescription> diagnose(Symptom, Observation)`), `Prescription` (typed
   `RemediationProgramRef` + structured `payload` + prose `humanHint`), `RemediationPlan`.
-* *Atomic `Map` → `Dossier` retype (R3) — done, no shim.* The probe contract changed from
-  `Map<String,Object>` to a typed `Dossier` record (status, `Optional<Symptom>`, summary,
+* *Atomic `Map` → `Observation` retype (R3) — done, no shim.* The probe contract changed from
+  `Map<String,Object>` to a typed `Observation` record (status, `Optional<Symptom>`, summary,
   details + `toOutputMap()`); the gate (`SeedSystemdAdapterEndpointGate`), the When/Then
   stages, the fakes, the simulated probe, and the stage sink all moved in the same change.
-  The sink converts at the boundary via `dossier.toOutputMap()`, so the Pulumi output
+  The sink converts at the boundary via `observation.toOutputMap()`, so the Pulumi output
   surface is byte-identical — the retype is confined to the BDD probe/stage layer, the
   resource layer is untouched. One snapshot instance, two views (a `DoctorTest` pins the
   round-trip).
 * `DbusTcpSpecialist` is the first concrete specialist (systemd domain): on
   `CONNECTION_REFUSED` it prescribes `RESTART_UNIT` for the adapter unit.
-* The checkpoint consults the Generalist on failure (`consultDoctor`); the captured dossier
+* The checkpoint consults the Generalist on failure (`consultDoctor`); the captured observation
   (carrying its typed symptom, stashed even when the `Then` throws) is routed and the
   prescriptions are logged inline (`⚕ diagnosis` / `℞`).
 * *Deferred to Increment C:* the plan flowing into the runbook *node's* Diagnosis/Mitigation
   sections (vs. the inline log) — that needs the shared report-node model that arrives with
   checkpoint #2's DAG, the same place the Increment A edge work was deferred to.
-* *Green:* `DoctorTest` (routing, no-treatment, empty-plan, dossier round-trip) + the
+* *Green:* `DoctorTest` (routing, no-treatment, empty-plan, observation round-trip) + the
   retyped scenario/runbook tests; 24/24 seed-master tests pass.
 
 === Increment C — Checkpoint #2 (cluster-readiness) nested — DONE (DSL-first)
 
 * Cluster-readiness modeled as a BDD scenario: `ClusterReadinessPhase` (kubeconfig / API /
   controllers) as steps, each driven by an injectable `ClusterReadinessProbe` returning a
-  `Dossier` — so a phase shares the doctor's symptom vocabulary, and an ordered incident can
+  `Observation` — so a phase shares the doctor's symptom vocabulary, and an ordered incident can
   target one phase (`SimulatedClusterReadinessProbe.failingAt(phase, symptom)`).
 * The systemd-adapter dependency is expressed via `@NestedSteps`
   (`WhenClusterReadiness.the_systemd_adapter_dependency_is_satisfied` injects the
   systemd-adapter Given/When/Then with `@ScenarioStage`) — the DAG edge becomes a nested
   scenario, the cert-manager "follow the chain" walk made real, and the second checkpoint
-  reuses the *same* machinery (Dossier, Symptom, Generalist) as the first.
+  reuses the *same* machinery (Observation, Symptom, Generalist) as the first.
 * *DSL-first, as scoped:* this is the offline scenario + nesting + rendering, proven by
   `NestedRunbookTest`. Wiring the real `ClusterBootstrapReadinessVerifier` behind a
   production `ClusterReadinessProbe` (so the live checkpoint plays this scenario, like
@@ -781,7 +781,7 @@ Build the runbook mechanism on the *existing* systemd-adapter checkpoint.
   untouched until then.
 * *State-read seam learned:* a Stage's captured-state must not be read back through a public
   getter — JGiven intercepts public stage methods as steps (corrupts the model flush). The
-  production checkpoint captures the failing dossier via the probe-holder seam, exactly as
+  production checkpoint captures the failing observation via the probe-holder seam, exactly as
   `SystemdAdapterStage` already does.
 * *Green:* `NestedRunbookTest` — the cluster scenario renders with the systemd-adapter
   dependency nested; an ordered fake incident on the api-ready phase produces a targeted
@@ -809,21 +809,21 @@ scenarios*). Previously it ran the procedural `verify()` lazily inside a Pulumi
 * *Verifier reused, not rewritten.* `ProductionClusterReadinessProbe` bridges each
   `ClusterReadinessPhase` to a public per-phase check on `ClusterBootstrapReadinessVerifier`
   (`checkKubeconfigPublished`/`checkApiReady`/`checkControllersEffective`), mapping the outcome
-  to a `Dossier`. The phase-0 bootstrap-preconditions gate is folded into the first phase
+  to a `Observation`. The phase-0 bootstrap-preconditions gate is folded into the first phase
   (ordering preserved). The two old `verify()` overloads are deleted (no compat shim).
 * *New typed symptoms, named not treated.* `KUBECONFIG_MISSING`, `API_NOT_READY`,
   `CONTROLLER_NOT_READY` added to `Symptom` + routed in `Generalist` (domain `CLUSTER`). The
   doctor names them in the runbook; no specialist treats them yet → empty plan (symptom seen,
   no treatment). Extensible without inventing treatments.
 * *Output contract preserved.* `VerificationResult` is now the *projection* of the per-phase
-  dossiers, built via the verifier's public `ready(...)`/`failed(...)` factories — single
-  source of truth = the dossiers. All 10 output keys, `handoffReady`→`nextStep` (the Stage B
+  observations, built via the verifier's public `ready(...)`/`failed(...)` factories — single
+  source of truth = the observations. All 10 output keys, `handoffReady`→`nextStep` (the Stage B
   gate), and `bootstrapStatus` are byte-identical. `ClusterReadinessResource` is now a thin
   graph mirror (like `SystemdAdapterResource`); it keeps the `dependsOn` edge, runs no
   verification. Both Pulumi and standalone paths play the same stage, unified by `pulumiMode`.
   `ClusterReadinessProjectionTest` pins the contract.
 * *Nested dependency without double-probe.* The nested systemd-adapter step replays from the
-  already-captured launch summary (reconstructed as a `Dossier`), not a second live probe.
+  already-captured launch summary (reconstructed as a `Observation`), not a second live probe.
 * *Green:* 30/30 seed-master tests (cluster-symptom routing + kebab parse + projection
   contract added). `pulumi preview` now shows BOTH scenarios in the runbook; on `pulumi up`
   the cluster phases are checked live and the `VerificationResult` outputs are unchanged.
@@ -842,7 +842,7 @@ See Increment E below.
 A terminology session (2026-06-07) turned the medical analogy into a precise *layered* model
 and resolved that the "shape the snapshot/outputs first" work and the "build the DAG" work are
 *not two chantiers* — they are *layers of one model*. This supersedes the flat "everything is a
-`Dossier`" granularity used through Increment D.
+`Observation`" granularity used through Increment D.
 
 NOTE: This section captures a *direction*, deliberately NOT frozen. The model moved a lot during
 the session (patient went from "the provisioned system" → "the checkpoint" → finally "the Pulumi
@@ -875,7 +875,7 @@ nothing; it receives the raised symptoms and diagnoses/prescribes.
 *No separate "exam"/"observation" layer.* An earlier draft put an `ExamReport`/`Observation` type
 below the consultation; that was one abstraction too many. There are two model types only: the
 `Symptom` the patient raises, and the *consultation report* it brings to the doctor (today's
-`Dossier`, re-understood — see below). The runbook DAG is the third, the medical record.
+`Observation`, re-understood — see below). The runbook DAG is the third, the medical record.
 
 ==== A consultation carries a SET of symptoms, bounded by observability
 
@@ -898,7 +898,7 @@ symptom today; the `Set<Symptom>` shape is ready for more when an independent pa
 [cols="1,2,2",options="header"]
 |===
 |Layer |Medical concept → type |Cardinality / who builds it
-|2 |consultation report → today's `Dossier`, re-understood (status + raised `Symptom`s + summary + details + the `RemediationPlan`) |one per checkpoint consultation; the checkpoint stage builds it, *keeping the plan* (today dropped)
+|2 |consultation report → today's `Observation`, re-understood (status + raised `Symptom`s + summary + details + the `RemediationPlan`) |one per checkpoint consultation; the checkpoint stage builds it, *keeping the plan* (today dropped)
 |3 |medical record → the runbook DAG (a patient-stack's visits) |one per patient; the shared model aggregates the visit's consultations + admission context
 |===
 
@@ -916,7 +916,7 @@ non-runbook use case), (3) future contexts.
   symptom or context*. Physical extraction into a dedicated Maven module + wiring config to it is
   a *separate, later* chantier (churn controlled).
 * *What "module-ready" forces (deeper than it first looks):* not only must `Symptom` and
-  `SpecialistDomain` become *open* (each context contributes its own — today they are closed
+  `Specialty` become *open* (each context contributes its own — today they are closed
   enums mixing systemd + cluster symptoms), but `Generalist.routeBySymptom()` is a *hard-coded
   closed `switch` inside the core*. A generic doctor cannot contain that switch — the
   *symptom→domain routing must itself be contributed data*, not a core method. This is the real
@@ -943,7 +943,7 @@ sync with it; on any divergence, that document is the source.
 
 * *Our model is the SOURCE; runbook and `VerificationResult` are VIEWS.* The medical record is OUR
   aggregate (nodes = checkpoints, the `dependsOn` edge read from state, admission context, each
-  node's dossiers + plan). `VerificationResult` stays a *distinct* always-present Stage-B projection
+  node's observations + plan). `VerificationResult` stays a *distinct* always-present Stage-B projection
   (layer 2 proved the two are not merge-able), not folded into the record.
 * *Runtime = in-memory; state = its serialization; post-hoc = reconstruction.* Two moments that were
   conflated: (1) *during a run* the program gets no graph back and checkpoints play eager, so the
@@ -956,7 +956,7 @@ must not be duplicated. The shipped decision:
 
 * *Pulumi is the authority on what it already knows; the record persists ONLY the delta Pulumi
   ignores.* The *graph* lives in the stack state (`dependencies`/`parent`); the *when/git/config*
-  lives in the Pulumi update history; only the *diagnostic layer* (`Symptom` / `Dossier` /
+  lives in the Pulumi update history; only the *diagnostic layer* (`Symptom` / `Observation` /
   `RemediationPlan`) is ours to serialize.
 * *Per-node, NOT a top-level blob.* Each checkpoint `ComponentResource` registers an *additive*
   output carrying ITS own `ConsultationReport` (via `toOutputMap()`), indexed by `Checkpoint.slug()`
@@ -980,8 +980,8 @@ link:layer3-readside-runtime-enrichment-design.adoc[layer3-readside-runtime-enri
 *Read-side part 2 — post-hoc reconstruction — now DONE as a query API* (`feature/medical-record-accumulator`).
 The reconstruction the write-side made possible is shipped: the medical record is rebuilt *on demand*
 from Pulumi (the single source) — current state for the present complaint, the historical checkpoints
-for the past — answering four clinical questions (`currentComplaint` / `historyOf` / `efficacyOf` /
-`correlatedWith`). It lives in the reusable `pulumi-automation-ext` module plus the doctor's
+for the past — answering four clinical questions (`chiefComplaint` / `historyOf` / `efficacyOf` /
+`comorbiditiesWith`). It lives in the reusable `pulumi-automation-ext` module plus the doctor's
 `MedicalRecordReader`, with an offline `MedicalRecordDump` (YAML) as the transient entry point. Full
 design + the as-built mapping in
 link:medical-record-query-api-design.adoc[medical-record-query-api-design.adoc]. Note the *accumulator*
@@ -992,7 +992,7 @@ of us, not pre-built.
 
 ==== Layer 2 — DONE (commit 0cd2b2f5): the doctor's plan is kept, not dropped
 
-Shipped: `ConsultationReport` (the raised `Dossier`s + the `RemediationPlan` the doctor wrote) +
+Shipped: `ConsultationReport` (the raised `Observation`s + the `RemediationPlan` the doctor wrote) +
 a caller-owned `ConsultationLog`, threaded through the pipeline exactly like the runbook
 `ReportModel` (`recordingInto(runbook, consultations)` → `PipelineState` → both checkpoint stages).
 On a raised symptom each stage records a `ConsultationReport` into the shared log — so the plan,
@@ -1002,15 +1002,15 @@ BOTH stages. In-memory only; Pulumi outputs untouched (the byte-identical guard 
 
 *Scope corrections found while implementing (the plan was written before the reactive model):*
 
-* `Dossier` is NOT renamed to `ExamReport` — there is no exam layer (resolved earlier).
+* `Observation` is NOT renamed to `ExamReport` — there is no exam layer (resolved earlier).
 * `Set<Symptom>` was NOT built — the cluster phases are a fail-fast precondition chain, so the set
   is always size 1 today; building it now is the rule-of-three speculation we deferred. The report
-  already carries *all* phase dossiers; a multi-symptom shape waits for a genuine independent pair.
+  already carries *all* phase observations; a multi-symptom shape waits for a genuine independent pair.
 * "`VerificationResult` becomes a projection of the *consultation report*" turned out to be
   *impossible AND already-half-done*: a healthy checkpoint raises no symptom → produces NO
   consultation report, yet a `VerificationResult` always exists (success/fail/skipped/deferred).
   They are TWO distinct aggregates — `VerificationResult` = the always-present *Stage-B handoff*
-  projection (already a projection of the phase dossiers since Increment D); `ConsultationReport` =
+  projection (already a projection of the phase observations since Increment D); `ConsultationReport` =
   the *medical* data, only on a symptom. They must NOT be merged. The DAG (layer 3) consumes the
   consultation reports, never the `VerificationResult`. So the old "unify the output shape" goal of
   layer 2 dissolved — it was layer 3 in disguise (making `VerificationResult` a *view of the medical
@@ -1027,7 +1027,7 @@ BOTH stages. In-memory only; Pulumi outputs untouched (the byte-identical guard 
   would run even when fail-fast wants to stop, and decouple the diagnosis from the symptom's
   fresh context.
 * *Flow + terminology.* RESOLVED: patient → doctor (the patient self-observes and raises
-  symptoms); no `ExamReport`/`Observation` layer; today's `Dossier` *is* the consultation report.
+  symptoms); no `ExamReport`/`Observation` layer; today's `Observation` *is* the consultation report.
 
 ==== Open tensions — DEFERRED until a first doctor(s) version is in place
 
@@ -1076,10 +1076,11 @@ link:layer3-readside-runtime-enrichment-design.adoc[layer3-readside-runtime-enri
 
 (Resolved while reviewing against the code, now constraints above, not open questions:
 *shared-model lifecycle* — caller-owned, rendered in a `finally`, see
-<<render-survives-critical>>; *symptom + dossier sourcing* — see <<symptom-and-dossier>>.)
+<<render-survives-critical>>; *symptom + observation sourcing* — see <<symptom-and-observation>>.)
 
 == Related documentation
 
+* link:glossary.adoc[Doctor Glossary] — the clinical vocabulary source of truth (every term, its Pulumi mapping, the 2026-06-10 rename map)
 * link:../bdd/bdd-diagnostic-pattern.adoc[BDD Diagnostic Pattern] — the pattern this extends (doctor hierarchy, actor-specific reports, severity)
 * link:../bootstrap/bootstrap-contract.adoc[Bootstrap Contract] — where checkpoints fit Stage A
 * link:medical-record-query-api-design.adoc[Medical Record — Query API] — how a practitioner reads the patient's past (the four clinical questions, reconstructed on-demand from Pulumi)

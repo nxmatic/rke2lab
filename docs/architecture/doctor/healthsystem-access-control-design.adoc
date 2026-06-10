@@ -1,0 +1,201 @@
+= HealthSystem — the doctor's access-control + correlation layer (design)
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* EXPLORATION / NORTH-STAR — a vision to *validate against working code*, not a build-spec
+to implement to the letter. It captures the 2026-06-10 brainstorm of the doctor's access-control +
+correlation layer (step 2/3: remediation round-trip + cross-patient correlation). It is deliberately
+designed *ahead* of need — there is one patient (stack) today, and most of this serves multiple
+patients and correlation that do not yet exist. NONE of it is built in the
+`feature/doctor-live-record` branch, which stays *step-1 wire-only* (the live doctor retrieves the
+record, latent). Treat like the other exploration docs (link:preview-whatif-replay-exploration.adoc[],
+link:rules-engine-checkpoint-topology-exploration.adoc[]): a thinking artifact that *will change on
+contact with real code*. The substrate it grows on is real and the layer is *additive* (it wraps the
+shipped `recordFor(Patient)` with a grant check — see "Relationship to what is built"), so banking it
+costs nothing and de-risks step 2/3. Build it when a real driver appears (a second patient, a real
+correlation need, or the `systemd-adapter degraded` remediation exercise) and let that code correct
+this model.
+====
+
+== Overview
+
+The doctor diagnoses provisioning failures by consulting a patient's longitudinal record. As the
+model gained multiple practitioners (Generalist + Specialists) and the prospect of multiple patients
+(stacks), three questions surfaced that the bare "registry returns a record" seam could not answer:
+
+. *Who may read whose record?* A specialist should see a patient's file only when that patient was
+  referred to it — not ambient access to everyone.
+. *What may a practitioner share?* It may use a record in its analysis but emit only *deductions*
+  (conclusions), never copy one patient's specifics into another's file.
+. *How does cross-patient correlation work* without a shared data store, given each patient's record
+  lives in its own stack?
+
+The answer is a keystone entity — the *HealthSystem* — that owns a shared records system (the EHR),
+employs the practitioners (each with a stable identity, an NPI), and admits patients (each with an
+MRN). Access is gated by a grant table; correlation is consent-bounded to a practitioner's granted
+cohort; and *nothing cross-cutting is persisted centrally* — the HealthSystem is shared by
+*identity* (same code, same NPIs in every run), not by a shared stack.
+
+== The entity model
+
+[mermaid]
+....
+flowchart TB
+    HS["HealthSystem<br/>owns the EHR, employs providers, admits patients"]
+    EHR["EHR = MedicalRecordRegistry<br/>one shared records system"]
+    GT["grant table<br/>keyed by NPI plus MRN, derived from referrals"]
+    GEN["Generalist<br/>provider, has an NPI"]
+    SP["Specialist<br/>provider, has an NPI"]
+    PT["Patient<br/>has an MRN = the stack identity"]
+    FILE["MedicalRecord<br/>one file per MRN, in the stack's own history"]
+
+    HS -->|owns| EHR
+    EHR --- GT
+    HS -->|employs, open roster| GEN
+    HS -->|employs, open roster| SP
+    HS -->|admits| PT
+    EHR -->|serves one| FILE
+    PT -->|identified by MRN| FILE
+....
+
+=== Vocabulary (real US-healthcare terms)
+
+[cols="1,3",options="header"]
+|===
+| Term | Meaning
+
+| *HealthSystem*
+| The umbrella that operates the shared EHR and employs the providers. *Flat* for now — it employs
+  providers directly, with no facility/Clinic sub-tier (a documented future, for multi-facility or
+  specialty-by-site). One HealthSystem is instantiated per run; the patient is admitted to it.
+
+| *EHR*
+| The electronic health record system = the `MedicalRecordRegistry`. One shared records system the
+  HealthSystem owns; every provider reads through it. It does not *hold* records — it
+  *reconstructs* them on demand (see "Derived, not stored").
+
+| *NPI*
+| National Provider Identifier — a provider's stable, *self-declared* string id (kebab-case, like
+  `treats()`/`programRef`). The join key for grants and cohort correlation. The roster is *open* so
+  a recruited provider joins with a fresh NPI (a closed enum could not recruit — aligns with
+  link:runbook-doctor.adoc[recruit-a-specialist]).
+
+| *MRN*
+| Medical Record Number — the patient's identity within the system = the stack identity (today's
+  `Patient` org/project/stack). One file per MRN.
+
+| *grant*
+| The right of an NPI to read an MRN's file. Keyed `(NPI, MRN)`. *Derived from referrals already in
+  the files*, never separately stored.
+
+| *Referral*
+| The request that mints a grant: carries the requesting/target NPI + the MRN. Builds on the
+  existing `Referral` in `[#consultation-flow]` — this layer makes it the *access key*.
+
+| *granted cohort*
+| The set of MRNs a given NPI holds grants on. A provider may correlate across its cohort but emit
+  only de-identified findings.
+|===
+
+== Gated access — the EHR + grant table
+
+One EHR. A provider reads a patient file by presenting a `Referral` (carrying its NPI + the target
+MRN); the EHR checks its grant table for `(NPI, MRN)` and serves the file only if granted —
+otherwise it returns an empty record and logs the reason (the degrade-to-empty contract; the EHR
+never throws into provisioning). Grants are *derived from referrals already recorded in the files*,
+not separately persisted.
+
+* The *Generalist's* own access is a *self-grant* minted when the patient is admitted (admission is
+  the visit).
+* Routing to a *Specialist* mints that specialist's `(NPI, MRN)` grant — the referral round-trip
+  already in `[#consultation-flow]` is what mints it.
+* `consult(Symptom, Observation)` and `diagnose(Referral) → ReferralReply` keep their shapes —
+  providers hold the EHR and their own NPI; the MRN comes from admission, not a new call parameter.
+
+[mermaid]
+....
+flowchart TB
+    FAIL["checkpoint fails<br/>patient presents"] --> ADMIT["HealthSystem admits the MRN<br/>mint self-grant Generalist-NPI plus MRN"]
+    ADMIT --> CONSULT["Generalist consults symptom observation"]
+    CONSULT -->|reads via held EHR plus its NPI| EHR["EHR checks grant NPI plus MRN"]
+    CONSULT -->|routes to specialist, mint grant Specialist-NPI plus MRN| ROUTE["referral minted"]
+    ROUTE --> DIAG["Specialist diagnoses"]
+    DIAG -->|reads via held EHR plus its NPI| EHR
+    EHR -->|granted, serve file| OK["MedicalRecord served"]
+    EHR -->|not granted, refuse| EMPTY["empty plus log"]
+    DIAG -->|may correlate| COHORT["granted-cohort query<br/>MRNs this NPI holds grants on"]
+    COHORT -->|fold in memory| DED["de-identified deduction<br/>seen across cohort, no MRN named"]
+    DED -->|lands in CURRENT MRN file only| OK
+....
+
+== Cross-patient correlation — confidentiality-safe
+
+The EHR offers a provider a *granted-cohort query*: the files for the MRNs that provider holds
+grants on. Derived, not stored — enumerate the stacks in the shared backend, reconstruct each
+record from its own history, filter by `(NPI, MRN)` grant. The provider folds over its cohort and
+emits an *aggregate, de-identified deduction* (e.g. "this symptom is environmental, seen across the
+cohort") into *only the current patient's file* — no other MRN is ever named.
+
+This is epidemiology by consent: a provider correlates only over patients legitimately referred to
+it, and the population insight is published as an aggregate (the way real epidemiology shares
+findings as statistics, never as another patient's chart). The cohort is read-input; the only write
+is the de-identified finding to the patient in the room.
+
+== Derived, not stored — the no-shared-stack bridge
+
+The crux that keeps this lightweight: *the HealthSystem is shared by identity, not by a store.* It
+is the same code, with the same provider NPIs, instantiated in every run. Therefore nothing
+cross-cutting is persisted centrally — it is all derived per run:
+
+* a *patient file* is folded from that patient's *own stack history* (already in the shared
+  backend);
+* a *grant* is implied by a *referral* recorded in that MRN's own consultation report (the per-node
+  runbook read-side already shipped);
+* the *granted cohort* is enumerated by scanning the *sibling stacks in the shared backend*
+  (lock-free — reconstruction reads do not take the stack lock);
+* the *roster/NPIs* are self-declared by the provider code.
+
+So the EHR is a *view over the union of per-patient stacks* plus per-run code. This is the same
+single-source-of-truth principle that retired the earlier self-referential accumulator: do not
+store what you can re-derive from a stable key. A dedicated EHR/clinic stack (persisting the grant
+index centrally, written via the Automation API) is the *heavy, lock-bound fallback* — reached only
+if a finding ever genuinely cannot be re-derived. It is not the design.
+
+=== Boundary
+
+This holds while *all patients share one backend* — enumerate-and-fold reaches sibling stacks only
+within a backend. Multi-backend (patients on different Pulumi services) breaks enumerate-and-fold
+and would force a real shared store. Noted as the boundary, not designed.
+
+== Relationship to what is built
+
+* The shipped `MedicalRecordReader` + `SnapshotSource` + `LiveMedicalRecordRegistry` already
+  reconstruct a patient file from a stack's history, backend-bound (not stack-bound) — so the
+  *read* substrate for enumerate-and-fold already exists.
+* `LiveMedicalRecordRegistry.recordFor(Patient)` is the *ungated* seam. This layer wraps it with the
+  grant check: `recordFor(Referral)` resolves `(NPI, MRN)`, checks the grant, then delegates. The
+  ungated `recordFor(Patient)` stays valid for the Generalist's self-granted read.
+* The `Referral`/`ReferralReply` round-trip in `[#consultation-flow]` is where grants are minted —
+  this layer gives those referrals their *access-control* meaning.
+
+== Step scope
+
+* *Step 1 (the `feature/doctor-live-record` branch):* NONE of this is built. No `HealthSystem` type,
+  no grant table, no NPI scheme. Step 1 wires the live doctor to retrieve `recordFor(Patient)`,
+  latent and wire-only. This document is the *target* the wiring grows toward, recorded so the thin
+  step-1 wiring is understood in context.
+* *Step 2 (remediation round-trip):* introduces `HealthSystem`, NPI, the grant table, and
+  `recordFor(Referral)` — the gated access on the referral round-trip.
+* *Step 3 (correlation / what-if):* introduces the granted-cohort query and de-identified population
+  findings.
+
+== Related documentation
+
+* link:runbook-doctor.adoc[Runbook & Doctor] — the referral round-trip (`[#consultation-flow]`),
+  remediator tier, and recruit-a-specialist this layer builds on.
+* link:glossary.adoc[Doctor Glossary] — the clinical vocabulary; HealthSystem/EHR/NPI/MRN are added
+  there as the access-control terms.
+* link:medical-record-query-api-design.adoc[Medical-record Query API] — the reconstruction substrate
+  (reader, snapshot source) this layer reads through.

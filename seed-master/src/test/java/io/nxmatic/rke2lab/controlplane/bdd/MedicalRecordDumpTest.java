@@ -87,7 +87,7 @@ class MedicalRecordDumpTest {
     final String envelope =
         "{\"version\":3,\"deployment\":{\"resources\":[{\"outputs\":{\"consultationReport\":{"
             + "\"checkpointId\":\"systemd-adapter\","
-            + "\"dossiers\":[],"
+            + "\"observations\":[],"
             + "\"plan\":{\"symptom\":\""
             + symptom.id()
             + "\",\"generalistSummary\":\"s\",\"prescriptions\":[]}"
@@ -105,7 +105,7 @@ class MedicalRecordDumpTest {
         new ConsultationReport(
             "systemd-adapter",
             List.of(
-                Dossier.failed(
+                Observation.failed(
                     Symptom.CONNECTION_REFUSED,
                     "dbus port refused",
                     Map.of("source", "systemd-adapter"))),
@@ -188,7 +188,7 @@ class MedicalRecordDumpTest {
 
     final MedicalRecordDump.Result result = MedicalRecordDump.dump(PATIENT, source);
 
-    // The caller decided: a partial dossier is still emitted (the two readable visits).
+    // The caller decided: a partial record is still emitted (the two readable visits).
     assertNotEquals(0, result.exitCode());
     final Map<String, Object> parsed = parseYaml(result.yaml());
     final List<Map<String, Object>> visits = (List<Map<String, Object>>) parsed.get("visits");

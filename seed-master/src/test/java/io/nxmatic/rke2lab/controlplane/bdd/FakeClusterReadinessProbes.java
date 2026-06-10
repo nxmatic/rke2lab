@@ -9,6 +9,6 @@ final class FakeClusterReadinessProbes {
 
   /** Every phase passes. */
   static ClusterReadinessProbe allPhasesReady() {
-    return (config, phase) -> Dossier.ok(phase.label() + " ok", Map.of("phase", phase.name()));
+    return (config, phase) -> Observation.ok(phase.label() + " ok", Map.of("phase", phase.name()));
   }
 }

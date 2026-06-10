@@ -33,7 +33,7 @@ Pulumi already maintains two authoritative memories, and the record must duplica
 |Dimension |Pulumi's authoritative memory |Therefore the record…
 |Dependency graph (`dependencies`, `parent`) |*State* (`pulumi stack export`) — reconstructible offline |never serializes edges
 |The "when" + git commit + run config |*Update history* (one timestamped entry per `up`) |never serializes timestamp/git
-|Diagnostic semantics (`Symptom`, `Dossier`, `RemediationPlan`) |*Pulumi knows nothing of these* |serializes ONLY this
+|Diagnostic semantics (`Symptom`, `Observation`, `RemediationPlan`) |*Pulumi knows nothing of these* |serializes ONLY this
 |===
 
 *Guiding principle:* **Pulumi is the authority on everything Pulumi already knows; the medical
@@ -49,7 +49,7 @@ flowchart TB
     History["Update HISTORY<br/>one entry per up<br/>timestamp · git · config<br/>= the LONGITUDINAL log"]
   end
   subgraph Ours["Medical record (ours — only the delta Pulumi ignores)"]
-    Diag["Diagnostic layer<br/>Symptom · Dossier · RemediationPlan<br/>per checkpoint node"]
+    Diag["Diagnostic layer<br/>Symptom · Observation · RemediationPlan<br/>per checkpoint node"]
   end
   Recon["Post-hoc reconstruction<br/>= STATE graph ⋈ HISTORY ⋈ Diagnostic<br/>joined by Checkpoint.slug()"]
   State --> Recon
@@ -77,7 +77,7 @@ Consequences, each answering a tension:
 === A note on `pulumi refresh`
 
 `refresh` reconciles the *body of the patient* (provisioned resources — it runs each provider's
-`Read` against the real world). It does NOT reconcile the *consultation* (symptoms/dossier/plan):
+`Read` against the real world). It does NOT reconcile the *consultation* (symptoms/observation/plan):
 those are *events* produced by running a probe at an instant, not a current external state to
 re-read. Re-observing is a `pulumi up` (the probes re-run), not a `refresh`. This is the same reason
 Option B (provider-backed `CustomResource`) was rejected (commit a949f3bb): there is no managed
@@ -178,8 +178,8 @@ order) → the drift we just removed. Instead, per Option A (the resolved Pulumi
 the checkpoint's `ComponentResource` in the state, indexed by `Checkpoint.slug()`. This is the
 *per-node strict* choice (validated) — no top-level aggregate, no structure copy.
 
-*What is serialized — the diagnostic layer only.* `ConsultationReport(checkpointId, dossiers, plan)`:
-`Dossier` already has `toOutputMap()`; `Symptom` is an enum (`name()`); only `RemediationPlan` /
+*What is serialized — the diagnostic layer only.* `ConsultationReport(checkpointId, observations, plan)`:
+`Observation` already has `toOutputMap()`; `Symptom` is an enum (`name()`); only `RemediationPlan` /
 `Prescription` need a serialized form (a concrete sub-task, no blocker). A healthy checkpoint raises
 no symptom → the output is absent/empty → deterministic at constant state → no phantom diff, no
 timestamp anywhere.
@@ -198,11 +198,11 @@ classDiagram
   class ConsultationReport {
     <<record>>
     +checkpointId String
-    +dossiers List~Dossier~
+    +observations List~Observation~
     +plan RemediationPlan
     +toOutputMap() Map
   }
-  class Dossier {
+  class Observation {
     +toOutputMap() Map
   }
   class RemediationPlan
@@ -216,7 +216,7 @@ classDiagram
 
   ComponentResource <|-- SystemdAdapterResource
   ComponentResource <|-- ClusterReadinessResource
-  ConsultationReport "1" o-- "1..*" Dossier
+  ConsultationReport "1" o-- "1..*" Observation
   ConsultationReport "1" --> "1" RemediationPlan
 
   ClusterReadinessResource ..> SystemdAdapterResource : dependsOn (persisted edge)
@@ -275,7 +275,7 @@ sequenceDiagram
 * The full "our model = source" renderer rewrite: the TDD entry point is flipping
   `RunbookRenderingTest`'s assertion ("no Diagnosis/Mitigation before the doctor exists"). Noted; we
   do NOT rewrite the JGiven renderer wholesale here.
-* Opening `Symptom`/`SpecialistDomain`/routing into contributed data (the module-extraction
+* Opening `Symptom`/`Specialty`/routing into contributed data (the module-extraction
   chantier) — unchanged from the spec's deferral.
 
 == What this changes vs the locked decisions (spec Increment E)

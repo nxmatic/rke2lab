@@ -5,9 +5,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The doctor's diagnosis behaviour, told as scenarios: a presenting symptom is consulted and the
- * doctor returns a remediation plan. The same Generalist/Specialist/Dossier vocabulary the
+ * doctor returns a remediation plan. The same Generalist/Specialist/Observation vocabulary the
  * checkpoints use in production is the scenario's DSL. Type-level contracts (symptom parsing,
- * dossier round-trip, a specialist declining an unrelated symptom) stay in {@code DoctorTest}.
+ * observation round-trip, a specialist declining an unrelated symptom) stay in {@code DoctorTest}.
  */
 class DoctorScenarioTest
     extends ScenarioTest<DoctorScenario.Given, DoctorScenario.When, DoctorScenario.Then> {

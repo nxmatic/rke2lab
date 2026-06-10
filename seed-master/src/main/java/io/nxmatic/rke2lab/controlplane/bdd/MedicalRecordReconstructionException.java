@@ -28,7 +28,7 @@ public final class MedicalRecordReconstructionException extends Exception {
     this.partialRecord = partialRecord;
   }
 
-  /** The dossier reconstructed from the readable entries — what the caller can still proceed on. */
+  /** The record reconstructed from the readable entries — what the caller can still proceed on. */
   public MedicalRecord partialRecord() {
     return partialRecord;
   }

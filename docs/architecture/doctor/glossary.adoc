@@ -1,0 +1,178 @@
+= Doctor model glossary — the clinical vocabulary
+:toc: left
+:toclevels: 2
+
+The single source of truth for the doctor subsystem's domain vocabulary. The model speaks
+*American clinical English*: the diagnostic flow is framed as a patient consulting a doctor,
+because that metaphor maps cleanly onto "a stack reports symptoms during provisioning and the
+system reasons about remediation." This page defines every term, its mapping to the underlying
+Pulumi concept where relevant, and — for the terms renamed on 2026-06-10 — the old name with the
+reason it changed.
+
+== Why the vocabulary matters
+
+Code has a compiler that catches a stale name; prose does not. A precise, collision-free
+vocabulary is load-bearing for the whole subsystem — the remediation round-trip and the what-if
+planner both speak it intensively. The 2026-06-10 rename fixed one word that named the *opposite*
+of what it meant (`Dossier`) and tightened three others to standard clinical terms.
+
+== Core terms
+
+[cols="1,3,2",options="header"]
+|===
+| Term | Meaning | Pulumi / system mapping
+
+| *Patient*
+| The subject under care — the thing that exists over time and is repeatedly treated.
+| A Pulumi *stack*, identified by `org/project/stack`.
+
+| *Visit*
+| One encounter with the patient at a point in time. The record is a sequence of visits.
+| One *deployment / update* — one entry in the stack's history (one `pulumi up`).
+
+| *MedicalRecord*
+| The patient's complete file: every visit, in chronological order. The longitudinal
+  accumulation the doctor reads. US "medical record" / "chart" is exactly the French _dossier
+  médical_ — so *this* is the patient's "dossier", in English.
+| Reconstructed on demand by folding the stack's whole deployment history; nothing extra is stored.
+
+| *Observation*
+| The self-observed snapshot a readiness probe produces at a checkpoint: `status`, an optional
+  typed `symptom`, a `summary`, and producer `details`. The SOAP "objective". What the patient
+  *presents*. (Renamed — see below.)
+| The typed successor of the probe's former `Map<String,Object>` envelope; flows to Pulumi outputs
+  via `toOutputMap()`.
+
+| *Symptom*
+| A typed readiness-failure kind (e.g. `connection-refused`, `api-not-ready`). The routing key the
+  doctor reasons on — never reverse-engineered from a message.
+| Recorded by the probe in the observation envelope under the `symptom` key.
+
+| *ChiefComplaint*
+| What the patient brings to a single consultation — the reports raised at the latest visit. An
+  empty chief complaint is the healthy case. (Renamed — see below.)
+| Derived view over the latest visit's reports.
+
+| *ConsultationReport*
+| What the doctor documents at one checkpoint within a visit: the observations the patient raised
+  there plus the `RemediationPlan` produced. The artifact the `MedicalRecord` aggregates.
+| Serialized per node under the Pulumi output key `observations` + `plan`; read back by
+  `ConsultationReportReader`.
+
+| *Generalist*
+| The doctor's coordinator (≈ GP). Takes the symptom + observation, routes deterministically to
+  specialists, and synthesizes a plan. Holds its specialists by interface (the AI-ready seam).
+| —
+
+| *Specialist*
+| A domain expert the Generalist routes to. Reads the observation, optionally probes further, and
+  writes a `Prescription` — or none. Plays the *prescriber* role (see Roles).
+| —
+
+| *Specialty*
+| The domain a Specialist covers — the Generalist's routing key (`SYSTEMD`, `NETWORK`, `INCUS`,
+  `CLUSTER`). (Renamed — see below.)
+| —
+
+| *RemediationPlan*
+| The Generalist's synthesis: the diagnosed symptom, the prescriptions the consulted specialists
+  wrote, and a one-line generalist summary. An empty prescription list is a valid plan.
+| Flows into the runbook node's mitigation section and the per-node output.
+
+| *Prescription*
+| A corrective action addressed to a remediation program (a typed `RemediationProgramRef`), with a
+  structured payload and a human hint — never raw shell commands.
+| —
+
+| *RemediationProgramRef*
+| The closed, typed set of remediation programs a prescription can address (e.g.
+  `install-package`, `restart-systemd-unit`). Typed from the start so it can be dispatched on, not
+  parsed. Today the operator _is_ the remediation program.
+| —
+
+| *Comorbidity*
+| The symptoms that tend to co-occur with a given one within the same visit — a shared-root-cause
+  view. (Renamed — see below.)
+| Derived view over the visits; computed, not stored.
+
+| *ConsultationReportReader*
+| Reconstructs `ConsultationReport`s from a snapshot's output maps (tolerant: read-by-key,
+  ignore-unknown, absent = empty). (Renamed — see below.)
+| Reads the `observations`/`plan` output keys back into typed records.
+|===
+
+== Roles (not types)
+
+* *Prescriber* — one who writes a prescription. This is a ROLE the `Specialist` plays (it writes
+  the `Prescription`), not a separate type. ("Prescriptor" is not an English word.)
+* *Remediator* — the one who later fills/administers the order (clinically a pharmacist/nurse).
+  A step-2 concept; today the operator is the remediator.
+
+== The 2026-06-10 rename (old → new)
+
+[cols="1,1,3",options="header"]
+|===
+| Old | New | Why
+
+| `Dossier`
+| `Observation`
+| `Dossier` is French and, in clinical English, means the patient's *file* — the opposite of what
+  the type held (the presented snapshot). The file is `MedicalRecord`; the snapshot is the SOAP
+  "objective" → `Observation`. The Pulumi output key `dossiers` → `observations` on both writer and
+  reader.
+
+| `SpecialistDomain`
+| `Specialty`
+| The clinical word for the domain a specialist covers. (`Specialist.domain()` keeps its method
+  name; only the type changed. Enum constants unchanged.)
+
+| `Complaint`
+| `ChiefComplaint`
+| "Chief complaint" is the standard US phrase for what the patient presents with. Method
+  `currentComplaint()` → `chiefComplaint()`.
+
+| `SymptomCorrelation`
+| `Comorbidity`
+| The clinical term for co-occurring conditions (the javadoc already used "comorbidity"). Method
+  `correlatedWith()` → `comorbiditiesWith()`.
+
+| `DiagnosisReader`
+| `ConsultationReportReader`
+| Misnomer fix: it reads `ConsultationReport`s from output maps, not "diagnoses". The rename also
+  frees the word `Diagnosis` for a future return type.
+|===
+
+== Reserved for step 2 (not yet built)
+
+* *Diagnosis* — the intended return of `Specialist.diagnose(...)`: it would carry an *Assessment*
+  (always) plus an optional `Prescription`, so a specialist always communicates its findings even
+  when it has no treatment.
+* *Assessment* — the SOAP "assessment": the specialist's reasoning/"why", persisted on the
+  `ConsultationReport` and thus in the `MedicalRecord`, readable by every practitioner. The
+  `MedicalRecord` is the shared communication channel between practitioners.
+
+=== Access-control + correlation layer (step 2/3, north-star)
+
+These name the access-control model — designed, not built. See
+link:healthsystem-access-control-design.adoc[the HealthSystem design].
+
+* *HealthSystem* — the umbrella entity that owns the shared EHR and employs the providers (flat:
+  no facility tier yet). Per-run code, not a stack — shared by *identity* (same code, same NPIs),
+  not by a store.
+* *EHR* — the shared records system = the `MedicalRecordRegistry`; reconstructs files on demand,
+  holds nothing.
+* *NPI* — a provider's stable self-declared id (the join key for grants + cohort correlation); open
+  roster so recruited providers join with fresh NPIs.
+* *MRN* — the patient's id within the system = the stack identity.
+* *grant* — the right of an NPI to read an MRN's file, keyed `(NPI, MRN)`; *derived from referrals*,
+  never stored centrally.
+* *granted cohort* — the MRNs an NPI may correlate across; findings emitted de-identified into the
+  current patient's file only.
+
+== Related documentation
+
+* link:runbook-doctor.adoc[Runbook doctor] — the overall doctor design.
+* link:medical-record-query-api-design.adoc[Medical-record query API] — how the record is
+  reconstructed from Pulumi.
+* link:healthsystem-access-control-design.adoc[HealthSystem access-control design] — the step-2/3
+  access-control + correlation layer (north-star).

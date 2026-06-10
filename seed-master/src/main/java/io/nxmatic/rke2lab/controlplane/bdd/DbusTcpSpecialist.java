@@ -5,11 +5,11 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Systemd-domain specialist for the dbus-over-TCP adapter. Reads the dossier first (the captured
- * snapshot _is_ the Status/Conditions) and, for a connection-refused symptom, prescribes restarting
- * the adapter unit — the deterministic first treatment for an unreachable dbus-TCP endpoint. The
- * unit name is this specialist's own domain knowledge (it owns the systemd unit it remediates), not
- * a string reached across modules.
+ * Systemd-domain specialist for the dbus-over-TCP adapter. Reads the observation first (the
+ * captured snapshot _is_ the Status/Conditions) and, for a connection-refused symptom, prescribes
+ * restarting the adapter unit — the deterministic first treatment for an unreachable dbus-TCP
+ * endpoint. The unit name is this specialist's own domain knowledge (it owns the systemd unit it
+ * remediates), not a string reached across modules.
  */
 public final class DbusTcpSpecialist implements Specialist {
 
@@ -23,12 +23,12 @@ public final class DbusTcpSpecialist implements Specialist {
   }
 
   @Override
-  public SpecialistDomain domain() {
-    return SpecialistDomain.SYSTEMD;
+  public Specialty domain() {
+    return Specialty.SYSTEMD;
   }
 
   @Override
-  public Optional<Prescription> diagnose(Symptom symptom, Dossier dossier) {
+  public Optional<Prescription> diagnose(Symptom symptom, Observation observation) {
     if (symptom != Symptom.CONNECTION_REFUSED) {
       return Optional.empty();
     }

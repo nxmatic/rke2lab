@@ -12,16 +12,17 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The inverse contract of {@link ConsultationReport#toOutputMap()} and its nested {@code
- * toOutputMap}s: feed a real round-tripped output map back into {@link DiagnosisReader}, assert the
- * report rebuilds identically. Also pins the tolerance/additivity guarantee (unknown keys survive
- * into {@code details}, absent optional keys degrade to empty) and the three hard requirements that
- * make reconstruction impossible (no map / no checkpointId / no parseable diagnosis).
+ * toOutputMap}s: feed a real round-tripped output map back into {@link ConsultationReportReader},
+ * assert the report rebuilds identically. Also pins the tolerance/additivity guarantee (unknown
+ * keys survive into {@code details}, absent optional keys degrade to empty) and the three hard
+ * requirements that make reconstruction impossible (no map / no checkpointId / no parseable
+ * diagnosis).
  */
-class DiagnosisReaderTest {
+class ConsultationReportReaderTest {
 
   private static ConsultationReport sampleReport() {
-    final Dossier dossier =
-        Dossier.failed(
+    final Observation observation =
+        Observation.failed(
             Symptom.CONNECTION_REFUSED, "dbus refused", Map.of("source", "endpoint-gate"));
     final Prescription prescription =
         Prescription.of(
@@ -29,13 +30,13 @@ class DiagnosisReaderTest {
     final RemediationPlan plan =
         new RemediationPlan(
             Symptom.CONNECTION_REFUSED, List.of(prescription), "adapter unreachable");
-    return new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(dossier), plan);
+    return new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(observation), plan);
   }
 
   @Test
   void round_trips_a_full_report() {
     final ConsultationReport rebuilt =
-        DiagnosisReader.fromOutputMap(sampleReport().toOutputMap()).orElseThrow();
+        ConsultationReportReader.fromOutputMap(sampleReport().toOutputMap()).orElseThrow();
 
     assertEquals("systemd-adapter", rebuilt.checkpointId());
     assertEquals(Symptom.CONNECTION_REFUSED, rebuilt.symptom());
@@ -46,35 +47,35 @@ class DiagnosisReaderTest {
     assertEquals("systemd-adapter", rebuiltPrescription.payload().get("unit"));
     assertEquals("restart it", rebuiltPrescription.humanHint());
 
-    final Dossier rebuiltDossier = rebuilt.dossiers().get(0);
-    assertEquals("failed", rebuiltDossier.status());
-    assertEquals("dbus refused", rebuiltDossier.summary());
-    assertEquals(Optional.of(Symptom.CONNECTION_REFUSED), rebuiltDossier.symptom());
-    assertEquals("endpoint-gate", rebuiltDossier.details().get("source"));
+    final Observation rebuiltObservation = rebuilt.observations().get(0);
+    assertEquals("failed", rebuiltObservation.status());
+    assertEquals("dbus refused", rebuiltObservation.summary());
+    assertEquals(Optional.of(Symptom.CONNECTION_REFUSED), rebuiltObservation.symptom());
+    assertEquals("endpoint-gate", rebuiltObservation.details().get("source"));
   }
 
   @Test
   void null_returns_empty() {
-    assertTrue(DiagnosisReader.fromOutputMap(null).isEmpty());
+    assertTrue(ConsultationReportReader.fromOutputMap(null).isEmpty());
   }
 
   @Test
   void non_map_returns_empty() {
-    assertTrue(DiagnosisReader.fromOutputMap("not a map").isEmpty());
+    assertTrue(ConsultationReportReader.fromOutputMap("not a map").isEmpty());
   }
 
   @Test
   void missing_checkpointId_returns_empty() {
     final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
     raw.remove("checkpointId");
-    assertTrue(DiagnosisReader.fromOutputMap(raw).isEmpty());
+    assertTrue(ConsultationReportReader.fromOutputMap(raw).isEmpty());
   }
 
   @Test
   void missing_plan_returns_empty() {
     final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
     raw.remove("plan");
-    assertTrue(DiagnosisReader.fromOutputMap(raw).isEmpty());
+    assertTrue(ConsultationReportReader.fromOutputMap(raw).isEmpty());
   }
 
   @Test
@@ -83,23 +84,26 @@ class DiagnosisReaderTest {
     final Map<String, Object> plan = new LinkedHashMap<>((Map<String, Object>) raw.get("plan"));
     plan.put("symptom", "not-a-real-symptom");
     raw.put("plan", plan);
-    assertTrue(DiagnosisReader.fromOutputMap(raw).isEmpty());
+    assertTrue(ConsultationReportReader.fromOutputMap(raw).isEmpty());
   }
 
   @Test
-  void unknown_dossier_key_survives_into_details() {
-    final Dossier dossier =
-        Dossier.failed(
+  void unknown_observation_key_survives_into_details() {
+    final Observation observation =
+        Observation.failed(
             Symptom.CONNECTION_REFUSED,
             "dbus refused",
             Map.of("source", "endpoint-gate", "futureField", "tomorrow"));
     final RemediationPlan plan =
         new RemediationPlan(Symptom.CONNECTION_REFUSED, List.of(), "adapter unreachable");
     final ConsultationReport report =
-        new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(dossier), plan);
+        new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(observation), plan);
 
-    final Dossier rebuilt =
-        DiagnosisReader.fromOutputMap(report.toOutputMap()).orElseThrow().dossiers().get(0);
+    final Observation rebuilt =
+        ConsultationReportReader.fromOutputMap(report.toOutputMap())
+            .orElseThrow()
+            .observations()
+            .get(0);
 
     assertEquals("tomorrow", rebuilt.details().get("futureField"));
     assertEquals("endpoint-gate", rebuilt.details().get("source"));
@@ -113,15 +117,15 @@ class DiagnosisReaderTest {
   void extra_top_level_key_does_not_break_reconstruction() {
     final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
     raw.put("correspondence", Map.of("seenBy", "future-doctor"));
-    assertTrue(DiagnosisReader.fromOutputMap(raw).isPresent());
+    assertTrue(ConsultationReportReader.fromOutputMap(raw).isPresent());
   }
 
   @Test
-  void missing_dossiers_yields_empty_list() {
+  void missing_observations_yields_empty_list() {
     final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
-    raw.remove("dossiers");
-    final ConsultationReport rebuilt = DiagnosisReader.fromOutputMap(raw).orElseThrow();
-    assertTrue(rebuilt.dossiers().isEmpty());
+    raw.remove("observations");
+    final ConsultationReport rebuilt = ConsultationReportReader.fromOutputMap(raw).orElseThrow();
+    assertTrue(rebuilt.observations().isEmpty());
   }
 
   @Test
@@ -135,7 +139,7 @@ class DiagnosisReaderTest {
     planMap.remove("prescriptions");
     raw.put("plan", planMap);
 
-    final ConsultationReport rebuilt = DiagnosisReader.fromOutputMap(raw).orElseThrow();
+    final ConsultationReport rebuilt = ConsultationReportReader.fromOutputMap(raw).orElseThrow();
     assertTrue(rebuilt.plan().prescriptions().isEmpty());
   }
 
@@ -151,7 +155,11 @@ class DiagnosisReaderTest {
     raw.put("plan", planMap);
 
     final Prescription rebuilt =
-        DiagnosisReader.fromOutputMap(raw).orElseThrow().plan().primaryPrescription().orElseThrow();
+        ConsultationReportReader.fromOutputMap(raw)
+            .orElseThrow()
+            .plan()
+            .primaryPrescription()
+            .orElseThrow();
     assertTrue(rebuilt.payload().isEmpty());
   }
 
@@ -164,7 +172,7 @@ class DiagnosisReaderTest {
     planMap.put("prescriptions", List.of(garbage));
     raw.put("plan", planMap);
 
-    final ConsultationReport rebuilt = DiagnosisReader.fromOutputMap(raw).orElseThrow();
+    final ConsultationReport rebuilt = ConsultationReportReader.fromOutputMap(raw).orElseThrow();
     assertTrue(rebuilt.plan().prescriptions().isEmpty());
   }
 }

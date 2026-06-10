@@ -56,7 +56,7 @@ class RealGraphInjectionTest {
         new ConsultationReport(
             "seeded-systemd-adapter",
             List.of(
-                Dossier.failed(
+                Observation.failed(
                     Symptom.CONNECTION_REFUSED,
                     "seeded into real dev graph",
                     Map.of("seeded", SEEDED_TAG))),
@@ -79,10 +79,10 @@ class RealGraphInjectionTest {
 
     // One visit, whose report was extracted from the real 23-node graph and is honestly tagged.
     assertEquals(1, record.visits().size());
-    assertFalse(record.currentComplaint().isEmpty());
+    assertFalse(record.chiefComplaint().isEmpty());
     final ConsultationReport extracted = record.visits().get(0).reports().get(0);
     assertEquals(Symptom.CONNECTION_REFUSED, extracted.symptom());
-    assertEquals(SEEDED_TAG, extracted.dossiers().get(0).details().get("seeded"));
+    assertEquals(SEEDED_TAG, extracted.observations().get(0).details().get("seeded"));
   }
 
   /**

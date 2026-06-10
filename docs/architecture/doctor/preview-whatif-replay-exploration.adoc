@@ -2,6 +2,14 @@
 :toc: left
 :toclevels: 3
 
+[NOTE]
+====
+This document predates the 2026-06-10 clinical-vocabulary rename (`Dossier`→`Observation`,
+`SpecialistDomain`→`Specialty`, `Complaint`→`ChiefComplaint`, `SymptomCorrelation`→`Comorbidity`,
+`DiagnosisReader`→`ConsultationReportReader`). Terms are kept as written at the time to preserve
+the point-in-time thinking; see link:glossary.adoc[the glossary] for current names.
+====
+
 *Date:* 2026-06-07 (two sessions) +
 *Status:* EXPLORATION — brainstorm only, no spec, no plan, no code. The first session (parked cold)
 named a *placement blocker*; the second session (this rewrite) *dissolved that blocker* and grew the
