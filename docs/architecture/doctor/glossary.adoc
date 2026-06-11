@@ -151,23 +151,30 @@ of what it meant (`Dossier`) and tightened three others to standard clinical ter
   `ConsultationReport` and thus in the `MedicalRecord`, readable by every practitioner. The
   `MedicalRecord` is the shared communication channel between practitioners.
 
-=== Access-control + correlation layer (step 2/3, north-star)
+=== Access-control + correlation layer (keystone, design)
 
-These name the access-control model — designed, not built. See
-link:healthsystem-access-control-design.adoc[the HealthSystem design].
+These name the access-control model. The medical metaphor is a design tool, not a target — so the
+healthcare *jargon* identifiers (NPI, MRN, EHR) are deliberately NOT code terms: each is just a
+synonym for something already named. We keep only terms that are crystal-clear to a developer. See
+link:healthsystem-access-control-design.adoc[the HealthSystem design] and
+link:integration-atlas.adoc[the integration atlas].
 
-* *HealthSystem* — the umbrella entity that owns the shared EHR and employs the providers (flat:
-  no facility tier yet). Per-run code, not a stack — shared by *identity* (same code, same NPIs),
-  not by a store.
-* *EHR* — the shared records system = the `MedicalRecordRegistry`; reconstructs files on demand,
-  holds nothing.
-* *NPI* — a provider's stable self-declared id (the join key for grants + cohort correlation); open
-  roster so recruited providers join with fresh NPIs.
-* *MRN* — the patient's id within the system = the stack identity.
-* *grant* — the right of an NPI to read an MRN's file, keyed `(NPI, MRN)`; *derived from referrals*,
-  never stored centrally.
-* *granted cohort* — the MRNs an NPI may correlate across; findings emitted de-identified into the
-  current patient's file only.
+* *HealthSystem* — the per-run keystone that holds the shared `MedicalRecordRegistry` and the
+  `GrantPolicy`, employs the clinicians, and admits the current patient (flat: no facility tier
+  yet). Per-run code, not a stack — shared by *identity* (same code, same ids), not by a store.
+* *Clinician* — the supertype over `Generalist` and `Specialist`: an employed actor with a stable
+  `ClinicianId`. (Replaces the jargon "provider/NPI"; nothing else in the codebase is a Clinician.)
+* *ClinicianId* — a clinician's stable self-declared id; the join key for grants + cohort
+  correlation. Open roster so recruited clinicians join with fresh ids.
+* *ClinicalAccess* — the grant-checked, id-bound view a clinician reads records through. Minted by
+  the HealthSystem at employment, with the clinician's `ClinicianId` closed over (not a call
+  parameter) — so a clinician cannot read as another id, nor mint its own access.
+* *Grant* — the right of a `ClinicianId` to read a `Patient`'s record, keyed `(ClinicianId,
+  Patient)`. (No separate "MRN" type — `Patient` already *is* the identity.)
+* *GrantPolicy* — mints and checks grants. Today from explicit interim rules (self-grant on
+  admission; same-backend cohort granted); the seam where referral-derivation plugs in later.
+* *granted cohort* — the patients a `ClinicianId` may correlate across; findings emitted
+  de-identified into the current patient's record only.
 
 == Related documentation
 

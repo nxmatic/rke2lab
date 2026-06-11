@@ -1,0 +1,280 @@
+= Doctor models — integration atlas
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* LIVING INTEGRATION VIEW — maintained, not frozen. This atlas is the one place that holds
+the whole doctor *specification* corpus together and proves each new model is *additive* against the
+others. It is reopened at the START of every doctor design activity (see "The ritual"). It carries
+no implementation detail of its own; it is a map of models and their seams.
+====
+
+== Why this atlas exists
+
+The doctor subsystem accumulated a dozen design models across many sessions — some implemented, some
+explorations. Each new model risks silently contradicting or duplicating the others. This atlas is
+the antidote: a single view that lists every model, draws how they connect, and — when a model is
+added — *proves it is additive* by a simple visual test.
+
+*The test of "additive" is MONOTONE before/after.* Draw the model constellation without the new
+model (before), then with it (after). Additive means: *no box erased, no arrow rewired, only
+additions.* If "after" cannot be drawn without rubbing out a line of "before", the model is not
+additive — and the figure says so out loud. This operationalizes the project principle that *a
+well-integrated spec is itself the proof we are on the right path.*
+
+Legend used throughout: thin/blue = IMPLEMENTED (built); thick/green = the model under design;
+dashed/amber = EXPLORATION (not built, future); grey = cross-cutting foundation.
+
+== The model inventory
+
+[cols="1,2,2",options="header"]
+|===
+| Tier | Model | Status
+
+| foundation
+| link:glossary.adoc[glossary]
+| Cross-cutting vocabulary source of truth.
+
+| substrate
+| link:runbook-doctor.adoc[runbook-doctor]
+| ✅ Implemented (Increments A–E). The overall doctor design.
+
+| substrate
+| link:medical-record-query-api-design.adoc[medical-record-query-api]
+| ✅ Implemented. The record reconstructed on demand from Pulumi — the read substrate.
+
+| substrate
+| link:layer3-medical-record-design.adoc[layer3-medical-record (write-side)]
+| ✅ Implemented. Per-node serialization of the diagnostic layer.
+
+| substrate
+| link:layer3-readside-runtime-enrichment-design.adoc[layer3 read-side]
+| ✅ Implemented. Diagnosis rendered into the runbook.
+
+| substrate
+| link:vocabulary-and-live-record-design.adoc[vocabulary-and-live-record]
+| ✅ Implemented (step 1). Clinical-vocabulary refactor + live record wired in (latent).
+
+| substrate
+| link:pulumi-doctor-integration.adoc[pulumi-doctor-integration]
+| The Pulumi entity model and the doctor's Pulumi seam.
+
+| KEYSTONE
+| link:healthsystem-access-control-design.adoc[healthsystem-access-control]
+| ✅ Implemented 2026-06-11 on `feature/healthsystem-keystone` (keystone + interim gate). The
+  per-run HealthSystem holds the registry + GrantPolicy, employs the Generalist with a credentialed
+  ClinicalAccess, admits the patient. Cohort read promoted off `@Spike`. The model this atlas first
+  proved additive — now shipped, and the additivity held in code (no built box was rewritten, only
+  wrapped).
+
+| proof
+| link:cohort-correlation-proof.adoc[cohort-correlation-proof]
+| ✅ Proof record. Phase 1 unit + Phase 2 live `pulumi preview` evidence that the read half of
+  cross-patient correlation works; motivated the keystone, kept as the empirical record.
+
+| exploration
+| link:preview-whatif-replay-exploration.adoc[preview-whatif-replay]
+| ⬜ Not built (step 3). The what-if planner.
+
+| exploration
+| link:rules-engine-checkpoint-topology-exploration.adoc[rules-engine-topology]
+| ⬜ Not built. Three ways to dissolve diagnosis-layer redundancy.
+
+| exploration
+| link:drools-network-specialist-prototype.adoc[drools-network-specialist]
+| ⬜ Not built. Drools behind the Specialist seam.
+|===
+
+== Diagram A — model constellation: BEFORE (without HealthSystem)
+
+[mermaid]
+....
+flowchart TB
+    GLO["glossary<br/>vocabulary SoT"]
+
+    subgraph BUILT[implemented substrate]
+        RB["runbook-doctor<br/>overall design"]
+        QAPI["medical-record-query-api<br/>read substrate"]
+        L3W["layer3 write-side<br/>per-node serialize"]
+        L3R["layer3 read-side<br/>runbook enrichment"]
+        VLR["vocabulary-and-live-record<br/>step 1, latent record"]
+        PDI["pulumi-doctor-integration<br/>Pulumi entity seam"]
+    end
+
+    subgraph EXPL[explorations, not built]
+        WHATIF["preview-whatif-replay"]
+        RULES["rules-engine-topology"]
+        DROOLS["drools-network-specialist"]
+    end
+
+    GLO -.->|defines terms for| RB
+    RB --> QAPI
+    QAPI --> L3W
+    L3W --> L3R
+    RB --> VLR
+    QAPI --> VLR
+    PDI --> QAPI
+    WHATIF -.->|loops over| RB
+    RULES -.->|reshapes| RB
+    DROOLS -.->|behind| RB
+
+    classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+    classDef expl fill:#ffd,stroke:#aa2,stroke-width:1px,stroke-dasharray:4 3;
+    classDef found fill:#eee,stroke:#999,stroke-width:1px;
+    class RB,QAPI,L3W,L3R,VLR,PDI built;
+    class WHATIF,RULES,DROOLS expl;
+    class GLO found;
+....
+
+== Diagram B — model constellation: AFTER (+ HealthSystem, monotone)
+
+Same graph, nothing erased or rewired. HealthSystem (green) is added, wrapping the read substrate and
+giving the explorations a real seam to attach to. Every blue box and arrow is identical to BEFORE.
+
+[mermaid]
+....
+flowchart TB
+    GLO["glossary<br/>vocabulary SoT"]
+
+    subgraph BUILT[implemented substrate]
+        RB["runbook-doctor<br/>overall design"]
+        QAPI["medical-record-query-api<br/>read substrate"]
+        L3W["layer3 write-side<br/>per-node serialize"]
+        L3R["layer3 read-side<br/>runbook enrichment"]
+        VLR["vocabulary-and-live-record<br/>step 1, latent record"]
+        PDI["pulumi-doctor-integration<br/>Pulumi entity seam"]
+    end
+
+    HS["healthsystem-access-control<br/>keystone: gate plus cohort"]
+
+    subgraph EXPL[explorations, not built]
+        WHATIF["preview-whatif-replay"]
+        RULES["rules-engine-topology"]
+        DROOLS["drools-network-specialist"]
+    end
+
+    GLO -.->|defines terms for| RB
+    RB --> QAPI
+    QAPI --> L3W
+    L3W --> L3R
+    RB --> VLR
+    QAPI --> VLR
+    PDI --> QAPI
+    WHATIF -.->|loops over| RB
+    RULES -.->|reshapes| RB
+    DROOLS -.->|behind| RB
+
+    GLO -.->|defines HealthSystem terms| HS
+    HS -->|wraps without changing| QAPI
+    HS -->|employs clinicians from| VLR
+    WHATIF -.->|needs the patient record from| HS
+    HS -.->|grant seam awaits referrals from| RULES
+
+    classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+    classDef expl fill:#ffd,stroke:#aa2,stroke-width:1px,stroke-dasharray:4 3;
+    classDef found fill:#eee,stroke:#999,stroke-width:1px;
+    classDef neu fill:#dfd,stroke:#2a2,stroke-width:3px;
+    class RB,QAPI,L3W,L3R,VLR,PDI built;
+    class WHATIF,RULES,DROOLS expl;
+    class GLO found;
+    class HS neu;
+....
+
+== Diagram C — internal seam: BEFORE vs AFTER (where HealthSystem clips onto built code)
+
+The class-level view of the same additive claim. Blue = shipped types, untouched. Green = added. The
+shipped read core (recordFor, the folds) is wrapped, never edited.
+
+[mermaid]
+....
+flowchart LR
+    subgraph B[before, shipped]
+        b_reg["MedicalRecordRegistry"]
+        b_live["LiveMedicalRecordRegistry<br/>recordFor plus cohortFor, Spike-marked"]
+        b_gen["Generalist holds registry plus patient"]
+        b_rec["MedicalRecord folds"]
+        b_gen --> b_reg
+        b_reg --> b_live
+        b_live --> b_rec
+    end
+
+    subgraph A[after, wrapped, monotone]
+        a_hs["HealthSystem, new"]
+        a_gp["GrantPolicy, new"]
+        a_acc["ClinicalAccess, new"]
+        a_reg["MedicalRecordRegistry, unchanged"]
+        a_live["LiveMedicalRecordRegistry<br/>cohortFor promoted off Spike"]
+        a_gen["Generalist, now employed, holds access"]
+        a_rec["MedicalRecord folds, unchanged"]
+        a_hs --> a_gp
+        a_hs --> a_acc
+        a_hs --> a_gen
+        a_acc --> a_gp
+        a_acc --> a_reg
+        a_reg --> a_live
+        a_live --> a_rec
+    end
+
+    classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+    classDef neu fill:#dfd,stroke:#2a2,stroke-width:3px;
+    class b_reg,b_live,b_gen,b_rec,a_reg,a_live,a_rec built;
+    class a_hs,a_gp,a_acc,a_gen neu;
+....
+
+== Verdict — does it hold?
+
+An honest reading of the three figures:
+
+. *Monotone: yes.* No blue box or arrow is erased or rewired from A to B, or within C. Every change
+  is an addition. The HealthSystem model is additive against the whole constellation.
+
+. *Two honest edits (changes, not deletions):*
+.. `Generalist` gains a held `ClinicalAccess` (it held registry + patient before). That is a *changed
+   collaborator*, but the read core it ultimately calls is unchanged — the wrap is real, not a
+   rewrite.
+.. `LiveMedicalRecordRegistry.cohortFor` loses its `@Spike` marker on promotion. A marker strip, not
+   a logic change.
+
+. *The explorations gain seams, lose nothing:* the what-if planner now has a concrete patient-record
+  provider (the HealthSystem), and the rules-engine / referral work has the named grant seam to plug
+  into. The keystone does not merely sit beside the explorations — it makes them more buildable.
+
+. *The one not-yet-proven edge* is the amber dashed "grant seam awaits referrals". It is proven only
+  when step 2 plugs referral-derived grants into the GrantPolicy. Everything else is solid today.
+
+Conclusion: the constellation holds, and HealthSystem is additive.
+
+[NOTE]
+====
+*Confirmed in code (2026-06-11).* HealthSystem shipped on `feature/healthsystem-keystone`, and the
+additivity the figures predicted held: no built box was rewritten — `Generalist` swapped its held
+collaborator (registry+patient → `ClinicalAccess`) but the read core it calls is unchanged, and the
+only other touch was stripping the `@Spike` marker. The 121-test build stayed green throughout. The
+before/after figures above are kept *frozen* as the design-time proof; the inventory row carries the
+live ✅ status. The amber "grant seam awaits referrals" edge remains the single not-yet-proven edge,
+deferred to step 2.
+====
+
+== The ritual — how this atlas stays alive
+
+Reopen this atlas at the START of every doctor design activity, before writing a new model's spec:
+
+. *Add the new model* as a green box in a fresh before/after pair (or extend Diagrams A–C).
+. *Prove monotone:* confirm no existing box or arrow is erased or rewired. If you must erase one,
+  STOP — the new model is not additive; rework the seam until it is, or record explicitly why a
+  breaking change is justified.
+. *List honest edits:* any changed collaborator (not just additions) is named in the verdict, as
+  the two edits above are.
+. *Flip green→blue* when a model ships, and update its inventory status.
+. *Update the inventory table* with the new model and its links.
+
+This keeps "a well-integrated spec is the proof we are on the right path" a standing practice, not a
+one-time exercise.
+
+== Related documentation
+
+* link:glossary.adoc[Doctor glossary] — the vocabulary every model on this atlas speaks.
+* link:healthsystem-access-control-design.adoc[HealthSystem access-control design] — the keystone
+  model this atlas first proved additive.
+* link:runbook-doctor.adoc[Runbook & Doctor] — the overall design the substrate models elaborate.

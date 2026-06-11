@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import java.util.List;
+
 /**
  * The live doctor's standing access to patient records. Unlike a one-shot reconstruction, the
  * registry is held by the {@link Generalist} for its lifetime, so {@link #recordFor} must never
@@ -10,4 +12,13 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 public interface MedicalRecordRegistry {
 
   MedicalRecord recordFor(Patient patient);
+
+  /**
+   * The records of the current patient's cohort — the sibling patients sharing the backend. The
+   * {@link ClinicalAccess} applies the {@code (ClinicianId, Patient)} grant filter over this list;
+   * an implementation with no notion of siblings returns just the current patient's record.
+   */
+  default List<MedicalRecord> cohortFor(Patient current) {
+    return List.of(recordFor(current));
+  }
 }

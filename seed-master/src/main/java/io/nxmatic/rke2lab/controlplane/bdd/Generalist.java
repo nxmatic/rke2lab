@@ -8,44 +8,64 @@ import java.util.List;
  * symptom + the captured {@link Observation}, and synthesizes a {@link RemediationPlan}.
  *
  * <ol>
- *   <li><b>firstLook</b> — retrieves the patient's {@link MedicalRecord} from the held registry
- *       (the first act of the visit); in step 1 it is available but does not yet drive routing.
- *   <li><b>route</b> — otherwise route <em>deterministically</em> by symptom to the relevant
- *       specialists (a readable, testable rules table — no inference). Irrelevant specialists stay
- *       dormant.
+ *   <li><b>firstLook</b> — retrieves the patient's {@link MedicalRecord} through its {@link
+ *       ClinicalAccess} (the first act of the visit); it does not yet drive routing.
+ *   <li><b>route</b> — route <em>deterministically</em> by symptom to the relevant specialties (a
+ *       readable rules table — no inference). Irrelevant specialists stay dormant.
  *   <li><b>synthesize</b> — collect each routed specialist's prescription (if any) into one plan.
  * </ol>
  *
- * The Generalist holds its specialists by the {@link Specialist} interface, so it is unaware
- * whether each is a Java impl or a future out-of-process one — the AI-ready seam.
+ * The Generalist reads records only through its {@link ClinicalAccess} (bound to its id by the
+ * {@link HealthSystem} at employment); it holds no registry or patient directly.
  */
-public final class Generalist {
+public final class Generalist implements Clinician {
+
+  /** The Generalist's stable id — the grant policy's join key for the general practitioner. */
+  public static final ClinicianId GENERALIST_ID = new ClinicianId("generalist");
 
   private final List<Specialist> specialists;
-  private final MedicalRecordRegistry records;
-  private final Patient currentPatient;
+  private final ClinicalAccess access;
 
-  public Generalist(
-      List<Specialist> specialists, MedicalRecordRegistry records, Patient currentPatient) {
+  public Generalist(List<Specialist> specialists, ClinicalAccess access) {
     this.specialists = List.copyOf(specialists);
-    this.records = records;
-    this.currentPatient = currentPatient;
+    this.access = access;
+  }
+
+  @Override
+  public ClinicianId clinicianId() {
+    return GENERALIST_ID;
+  }
+
+  /** The admitted patient's record, read through the held access. */
+  public MedicalRecord recordForCurrentPatient() {
+    return access.record();
   }
 
   /**
-   * The held registry's record for the patient under care. Memoized per patient by the registry, so
-   * the stage may read it for a proof-of-wire log without double-reading the consultation's own
-   * retrieval.
+   * A one-line cross-patient finding for the symptom, folded across the granted cohort. Empty
+   * cohort (or no backend) yields a finding over just the current patient.
    */
-  public MedicalRecord recordForCurrentPatient() {
-    return records.recordFor(currentPatient);
+  public String cohortFinding(Symptom symptom) {
+    final List<MedicalRecord> cohort = access.cohort();
+    final long withSymptom = cohort.stream().filter(r -> r.historyOf(symptom).count() > 0).count();
+    final long treatedAndResolved =
+        cohort.stream().filter(r -> r.efficacyOf(symptom).everWorked()).count();
+    return "cohort: "
+        + symptom.id()
+        + " seen on "
+        + withSymptom
+        + " of "
+        + cohort.size()
+        + " patient(s); "
+        + treatedAndResolved
+        + " prior treatment(s) resolved it";
   }
 
   /**
    * The patient consults: diagnose the symptom against the observation, return a remediation plan.
    */
   public RemediationPlan consult(Symptom symptom, Observation observation) {
-    final MedicalRecord record = records.recordFor(currentPatient);
+    final MedicalRecord record = access.record();
     firstLook(record, symptom, observation);
     final List<Specialty> route = routeBySymptom(symptom);
     if (route.isEmpty()) {
@@ -68,7 +88,7 @@ public final class Generalist {
   }
 
   private void firstLook(MedicalRecord record, Symptom symptom, Observation observation) {
-    // step 1: record retrieved + available; step-2 reasoning attaches here
+    // record retrieved + available; step-2 reasoning attaches here
   }
 
   /**

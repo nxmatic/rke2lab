@@ -13,6 +13,11 @@ public final class PulumiBackendLayout {
 
   /** The history directory for a stack under a file-backend root. */
   public static Path historyDir(Path backendDir, String project, String stack) {
-    return backendDir.resolve(".pulumi/history").resolve(project).resolve(stack);
+    return stacksDir(backendDir, project).resolve(stack);
+  }
+
+  /** The directory whose children are the project's stacks (each a patient, in doctor terms). */
+  public static Path stacksDir(Path backendDir, String project) {
+    return backendDir.resolve(".pulumi/history").resolve(project);
   }
 }

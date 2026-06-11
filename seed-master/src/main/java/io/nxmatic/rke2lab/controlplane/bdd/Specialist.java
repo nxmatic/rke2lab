@@ -13,7 +13,7 @@ import java.util.Optional;
  * Phase 2 could back the same interface with an out-of-process tool (serialize the observation,
  * call the tool, deserialize the prescription). The Generalist does not know or care which.
  */
-public interface Specialist {
+public interface Specialist extends Clinician {
 
   /** Domain this specialist covers — the Generalist's routing key. */
   Specialty domain();
@@ -24,4 +24,13 @@ public interface Specialist {
    * the others).
    */
   Optional<Prescription> diagnose(Symptom symptom, Observation observation);
+
+  /**
+   * A specialist's identity defaults to its specialty kebab-cased, e.g. CLUSTER_API →
+   * "cluster-api".
+   */
+  @Override
+  default ClinicianId clinicianId() {
+    return new ClinicianId(domain().name().toLowerCase().replace('_', '-'));
+  }
 }

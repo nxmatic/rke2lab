@@ -3,8 +3,7 @@ package io.nxmatic.rke2lab.controlplane.pipeline;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
-import io.nxmatic.rke2lab.controlplane.bdd.MedicalRecordRegistry;
-import io.nxmatic.rke2lab.controlplane.bdd.Patient;
+import io.nxmatic.rke2lab.controlplane.bdd.HealthSystem;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
@@ -36,13 +35,11 @@ final class PipelineState {
   ConsultationLog consultations;
 
   /**
-   * The live doctor's standing access to patient records and the patient (this stack) under care.
-   * Built once per run and held by every {@link io.nxmatic.rke2lab.controlplane.bdd.Generalist} the
-   * stages construct, so the record retrieval is the first act of each consultation.
+   * The doctor's keystone for this run: holds the records registry + grant policy, employs the
+   * clinicians, admits the patient under care (this stack). Built once at the readiness transition;
+   * the stages consult the generalist it employs.
    */
-  MedicalRecordRegistry records;
-
-  Patient currentPatient;
+  HealthSystem healthSystem;
 
   BboxReconciliationOrchestrator bboxOrchestrator;
   ResourceManager resourceManager;

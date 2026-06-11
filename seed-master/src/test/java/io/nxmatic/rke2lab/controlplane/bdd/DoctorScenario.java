@@ -60,7 +60,12 @@ public final class DoctorScenario {
     @ProvidedScenarioState RemediationPlan plan;
 
     public When the_doctor_is_consulted() {
-      plan = new Generalist(specialists, EMPTY_RECORDS, TEST_PATIENT).consult(symptom, observation);
+      final GrantPolicy policy =
+          GrantPolicy.empty().withSelfGrant(Generalist.GENERALIST_ID, TEST_PATIENT);
+      final ClinicalAccess access =
+          new ClinicalAccess(
+              Generalist.GENERALIST_ID, TEST_PATIENT, policy, EMPTY_RECORDS, msg -> {});
+      plan = new Generalist(specialists, access).consult(symptom, observation);
       return self();
     }
   }

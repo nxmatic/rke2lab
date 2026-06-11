@@ -19,6 +19,14 @@ class GeneralistRecordRetrievalTest {
 
   private static final Patient PATIENT = new Patient("organization", "rke2lab", "test");
 
+  private static Generalist generalistOver(
+      List<Specialist> specialists, MedicalRecordRegistry registry) {
+    final GrantPolicy policy = GrantPolicy.empty().withSelfGrant(Generalist.GENERALIST_ID, PATIENT);
+    final ClinicalAccess access =
+        new ClinicalAccess(Generalist.GENERALIST_ID, PATIENT, policy, registry, msg -> {});
+    return new Generalist(specialists, access);
+  }
+
   /** Captures the patient it was asked about and counts calls; returns a fixed known record. */
   private static final class SpyRegistry implements MedicalRecordRegistry {
     private final MedicalRecord record;
@@ -42,7 +50,7 @@ class GeneralistRecordRetrievalTest {
     final SpyRegistry spy = new SpyRegistry(new MedicalRecord(PATIENT, List.of()));
     final List<Specialist> specialists =
         List.of(new DbusTcpSpecialist(OperatorConfiguration.mandatory().asBootstrapConfig()));
-    final Generalist generalist = new Generalist(specialists, spy, PATIENT);
+    final Generalist generalist = generalistOver(specialists, spy);
     final Observation observation =
         Observation.failed(
             Symptom.CONNECTION_REFUSED, "dbus refused", Map.of("source", "doctor-scenario"));
@@ -58,7 +66,7 @@ class GeneralistRecordRetrievalTest {
     final SpyRegistry spy = new SpyRegistry(new MedicalRecord(PATIENT, List.of()));
     final List<Specialist> specialists =
         List.of(new DbusTcpSpecialist(OperatorConfiguration.mandatory().asBootstrapConfig()));
-    final Generalist generalist = new Generalist(specialists, spy, PATIENT);
+    final Generalist generalist = generalistOver(specialists, spy);
     final Observation observation =
         Observation.failed(
             Symptom.CONNECTION_REFUSED, "dbus refused", Map.of("source", "doctor-scenario"));
@@ -77,7 +85,7 @@ class GeneralistRecordRetrievalTest {
   void record_for_current_patient_returns_the_registry_record() {
     final MedicalRecord known = new MedicalRecord(PATIENT, List.of());
     final SpyRegistry spy = new SpyRegistry(known);
-    final Generalist generalist = new Generalist(List.of(), spy, PATIENT);
+    final Generalist generalist = generalistOver(List.of(), spy);
 
     assertSame(known, generalist.recordForCurrentPatient());
     assertEquals(PATIENT, spy.lastRequested);

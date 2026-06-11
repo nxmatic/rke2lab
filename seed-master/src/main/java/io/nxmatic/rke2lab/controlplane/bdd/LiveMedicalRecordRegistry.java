@@ -1,11 +1,18 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import io.nxmatic.rke2lab.pulumi.automation.PulumiBackendLayout;
 import io.nxmatic.rke2lab.pulumi.automation.StackHandle;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 /**
  * The Pulumi file-backend implementation of {@link MedicalRecordRegistry}. It reconstructs each
@@ -45,6 +52,45 @@ public final class LiveMedicalRecordRegistry implements MedicalRecordRegistry {
   @Override
   public MedicalRecord recordFor(Patient patient) {
     return cache.computeIfAbsent(patient, this::reconstruct);
+  }
+
+  /**
+   * The current patient's cohort — every stack under the same {@code
+   * <backend>/.pulumi/history/<project>/}, each reconstructed via {@link #recordFor}, the current
+   * patient first. Backend enumeration is the genuinely new capability (the registry could already
+   * read any named patient, but nothing discovered which patients exist). The grant filter is
+   * applied by {@link ClinicalAccess}, not here. With no backend, the cohort is just the current
+   * patient's (degraded) record.
+   */
+  @Override
+  public List<MedicalRecord> cohortFor(Patient current) {
+    final List<MedicalRecord> cohort = new ArrayList<>();
+    for (Patient sibling : siblings(current)) {
+      cohort.add(recordFor(sibling));
+    }
+    return cohort;
+  }
+
+  private List<Patient> siblings(Patient current) {
+    if (backendDir == null) {
+      return List.of(current);
+    }
+    final Path stacksDir = PulumiBackendLayout.stacksDir(backendDir, current.project());
+    if (!Files.isDirectory(stacksDir)) {
+      return List.of(current);
+    }
+    try (Stream<Path> entries = Files.list(stacksDir)) {
+      return entries
+          .filter(Files::isDirectory)
+          .map(dir -> dir.getFileName().toString())
+          .map(stack -> new Patient(current.org(), current.project(), stack))
+          .sorted(
+              Comparator.comparing((Patient p) -> p.stack().equals(current.stack()) ? 0 : 1)
+                  .thenComparing(Patient::stack))
+          .toList();
+    } catch (IOException e) {
+      throw new UncheckedIOException("cannot enumerate cohort under " + stacksDir, e);
+    }
   }
 
   private MedicalRecord reconstruct(Patient patient) {

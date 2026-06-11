@@ -8,6 +8,7 @@ import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessScenario;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
+import io.nxmatic.rke2lab.controlplane.bdd.ConsultationNarration;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationReport;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.bdd.MedicalRecord;
@@ -224,14 +225,7 @@ public final class ClusterReadinessStage {
             observation -> {
               final Symptom symptom = observation.symptom().get();
               final MedicalRecord record = generalist.recordForCurrentPatient();
-              log(
-                  "⚕ consulted with "
-                      + record.visits().size()
-                      + " prior visit(s); "
-                      + symptom.id()
-                      + " seen "
-                      + record.historyOf(symptom).count()
-                      + "× before");
+              log("⚕ " + ConsultationNarration.consultedLine(record, symptom));
               final RemediationPlan plan = generalist.consult(symptom, observation);
               if (consultations != null) {
                 consultations.record(

@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.bdd.DbusTcpSpecialist;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
+import io.nxmatic.rke2lab.controlplane.bdd.HealthSystem;
 import io.nxmatic.rke2lab.controlplane.bdd.LiveMedicalRecordRegistry;
 import io.nxmatic.rke2lab.controlplane.bdd.Patient;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
@@ -32,7 +33,7 @@ import java.util.function.Function;
  *     .withOptions(options)
  *     .using(bboxOrchestrator, resourceManager, outputBuilder)
  *     .onFailure(SeedLog::error)
- *     .reportingReadinessTo(logger)
+ *     .runningInPulumi(logger)
  *     .during("preflight", preflight -&gt; preflight
  *         .enforceEntryGates()
  *         .requireLocalCommands("ssh", "kubectl")
@@ -114,12 +115,6 @@ public final class BootstrapPipeline {
       return this;
     }
 
-    public AwaitingPreflight reportingReadinessTo(Consumer<String> readinessLogger) {
-      state.readinessLogger = readinessLogger;
-      bindMedicalRecord(state);
-      return new AwaitingPreflight(state);
-    }
-
     public AwaitingPreflight runningStandalone(Consumer<String> readinessLogger) {
       state.readinessLogger = readinessLogger;
       state.pulumiMode = false;
@@ -138,14 +133,16 @@ public final class BootstrapPipeline {
      * Built once at the readiness transition (logger + mode settled): the patient under care is
      * this Pulumi stack's org/project/stack when running under the engine, a placeholder otherwise
      * (the registry degrades to an empty record either way when no file:// backend is configured).
-     * Held by every Generalist the stages construct so the record is the first thing each
-     * consultation reads.
+     * Admits the patient into the HealthSystem keystone the stages consult.
      */
     private static void bindMedicalRecord(PipelineState state) {
       final Consumer<String> logger =
           state.readinessLogger != null ? state.readinessLogger : msg -> {};
-      state.records = LiveMedicalRecordRegistry.fromEnvironment(logger);
-      state.currentPatient = currentPatient(state.pulumiMode);
+      final LiveMedicalRecordRegistry registry = LiveMedicalRecordRegistry.fromEnvironment(logger);
+      final Patient patient = currentPatient(state.pulumiMode);
+      state.healthSystem =
+          HealthSystem.admit(
+              patient, registry, List.of(new DbusTcpSpecialist(state.config)), logger);
     }
 
     private static Patient currentPatient(boolean pulumiMode) {
@@ -263,9 +260,7 @@ public final class BootstrapPipeline {
 
     public SystemdAdapterDone during(
         String topic, Function<SystemdAdapterStage, SystemdAdapterStage> body) {
-      final Generalist generalist =
-          new Generalist(
-              List.of(new DbusTcpSpecialist(state.config)), state.records, state.currentPatient);
+      final Generalist generalist = state.healthSystem.generalist();
       final SystemdAdapterProbe liveProbe =
           cfg -> SeedSystemdAdapterEndpointGate.ensureReachable(cfg, state.readinessLogger);
       final SystemdAdapterStage stage =
@@ -304,9 +299,7 @@ public final class BootstrapPipeline {
     }
 
     public ResourcesDone during(String topic, Function<ResourcesStage, ResourcesStage> body) {
-      final Generalist generalist =
-          new Generalist(
-              List.of(new DbusTcpSpecialist(state.config)), state.records, state.currentPatient);
+      final Generalist generalist = state.healthSystem.generalist();
       final ResourcesStage stage =
           new ResourcesStage(
               state.resourceManager,

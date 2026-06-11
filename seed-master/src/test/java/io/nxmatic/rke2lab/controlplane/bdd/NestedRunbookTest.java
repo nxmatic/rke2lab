@@ -262,6 +262,15 @@ class NestedRunbookTest {
     return holder[0];
   }
 
+  private static Generalist generalistWith(List<Specialist> specialists) {
+    final GrantPolicy policy =
+        GrantPolicy.empty().withSelfGrant(Generalist.GENERALIST_ID, TEST_PATIENT);
+    final ClinicalAccess access =
+        new ClinicalAccess(
+            Generalist.GENERALIST_ID, TEST_PATIENT, policy, EMPTY_RECORDS, msg -> {});
+    return new Generalist(specialists, access);
+  }
+
   /** Map each top-level When step's rendered name to its step status. */
   private static Map<String, StepStatus> phaseStepStatuses(ReportModel model) {
     final Map<String, StepStatus> statuses = new LinkedHashMap<>();
@@ -276,14 +285,11 @@ class NestedRunbookTest {
   }
 
   private static Generalist readyGeneralist() {
-    return new Generalist(List.of(new DbusTcpSpecialist(config())), EMPTY_RECORDS, TEST_PATIENT);
+    return generalistWith(List.of(new DbusTcpSpecialist(config())));
   }
 
   private static Generalist networkGeneralist() {
-    return new Generalist(
-        List.of(new DbusTcpSpecialist(config()), new FakeNetworkSpecialist()),
-        EMPTY_RECORDS,
-        TEST_PATIENT);
+    return generalistWith(List.of(new DbusTcpSpecialist(config()), new FakeNetworkSpecialist()));
   }
 
   /** A stand-in network specialist so a TIMEOUT (routed to NETWORK) yields a prescription. */
