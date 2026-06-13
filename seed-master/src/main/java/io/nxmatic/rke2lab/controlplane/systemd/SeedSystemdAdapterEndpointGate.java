@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.systemd;
 
 import io.nxmatic.rke2lab.controlplane.bdd.Observation;
+import io.nxmatic.rke2lab.controlplane.bdd.Symptom;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -12,6 +13,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.LongSupplier;
 
 /** Pulumi-side gate that waits for the dbus-on-TCP probe to report ok. */
 public final class SeedSystemdAdapterEndpointGate {
@@ -30,8 +33,32 @@ public final class SeedSystemdAdapterEndpointGate {
   private static final Duration PROGRESS_LOG_INTERVAL = Duration.ofSeconds(15);
   private static final Duration INSTANCE_READY_RETRY_INTERVAL = Duration.ofSeconds(2);
 
-  private SeedSystemdAdapterEndpointGate() {
-    // Utility class
+  // Injected collaborators: the gate's real-world I/O (wall clock, sleep, the dbus runtime probe,
+  // the incus-exec reachability check). production() wires the live ones; tests substitute fakes so
+  // the deadline paths are reachable without real infrastructure or wall-clock waits.
+  private final LongSupplier nanoClock;
+  private final Consumer<Duration> sleeper;
+  private final Function<BootstrapConfig, Map<String, Object>> runtimeProbe;
+  private final Function<BootstrapConfig, Optional<String>> instanceReachability;
+
+  SeedSystemdAdapterEndpointGate(
+      LongSupplier nanoClock,
+      Consumer<Duration> sleeper,
+      Function<BootstrapConfig, Map<String, Object>> runtimeProbe,
+      Function<BootstrapConfig, Optional<String>> instanceReachability) {
+    this.nanoClock = nanoClock;
+    this.sleeper = sleeper;
+    this.runtimeProbe = runtimeProbe;
+    this.instanceReachability = instanceReachability;
+  }
+
+  /** The live gate, wired to the real wall clock, sleep, dbus runtime probe, and incus exec. */
+  public static SeedSystemdAdapterEndpointGate production() {
+    return new SeedSystemdAdapterEndpointGate(
+        System::nanoTime,
+        SeedSystemdAdapterEndpointGate::sleep,
+        config -> SeedSystemdAdapterRuntimeStatusSnapshot.snapshot(config, null),
+        SeedSystemdAdapterEndpointGate::probeInstanceReachable);
   }
 
   public static Observation deferredPreview(BootstrapConfig config) {
@@ -47,57 +74,42 @@ public final class SeedSystemdAdapterEndpointGate {
                 "systemd-adapter-runtime")));
   }
 
-  public static Observation ensureReachable(BootstrapConfig config, Consumer<String> logger) {
-    waitForInstanceReachable(config, logger);
-
-    final Map<String, Object> runtimeSnapshot = waitForRuntimeProbe(config, logger);
-    final String runtimeStatus = String.valueOf(runtimeSnapshot.getOrDefault("status", "unknown"));
-
-    final String summary =
-        "dbusEndpoint="
-            + config.systemdAdapterDbusHost()
-            + ":"
-            + config.systemdAdapterDbusPort()
-            + " status="
-            + runtimeStatus
-            + " probeMode=systemd-adapter-runtime";
-    if (logger != null) {
-      logger.accept("systemd adapter endpoint gate: " + summary);
+  /**
+   * Wait for the dbus-on-TCP adapter to report ok, returning the captured {@link Observation}. The
+   * contract the {@code SystemdAdapterProbe} interface promises: a reachable adapter yields an ok
+   * observation; a deadline that the instance never came up, or that dbus never answered, yields a
+   * non-ok observation carrying the typed {@link Symptom} — never a bare exception. The symptom and
+   * the last summary's "why" flow into the captured observation so the doctor is consulted on a
+   * real {@code pulumi up}, not only in preview-simulate.
+   */
+  public Observation ensureReachable(BootstrapConfig config, Consumer<String> logger) {
+    final Optional<Observation> instanceFailure = waitForInstanceReachable(config, logger);
+    if (instanceFailure.isPresent()) {
+      return instanceFailure.get();
     }
 
-    return Observation.ok(
-        summary,
-        details(
-            Map.of(
-                "source",
-                "systemd-adapter-endpoint-gate",
-                "probeMode",
-                "systemd-adapter-runtime",
-                "adapterStatus",
-                Map.copyOf(runtimeSnapshot))));
+    return waitForRuntimeProbe(config, logger);
   }
 
-  private static Map<String, Object> waitForRuntimeProbe(
-      BootstrapConfig config, Consumer<String> logger) {
+  private Observation waitForRuntimeProbe(BootstrapConfig config, Consumer<String> logger) {
     final Duration tolerance = config.readinessTimeout();
-    final long startedAt = System.nanoTime();
+    final long startedAt = nanoClock.getAsLong();
     final long deadlineNanos = startedAt + tolerance.toNanos();
     long nextProgressLogAt = startedAt;
 
     Map<String, Object> lastSnapshot = Map.of();
-    while (System.nanoTime() < deadlineNanos) {
-      final Map<String, Object> runtimeSnapshot =
-          SeedSystemdAdapterRuntimeStatusSnapshot.snapshot(config, null);
+    while (nanoClock.getAsLong() < deadlineNanos) {
+      final Map<String, Object> runtimeSnapshot = runtimeProbe.apply(config);
       final String runtimeStatus =
           String.valueOf(runtimeSnapshot.getOrDefault("status", "unknown")).trim();
 
       if ("ok".equalsIgnoreCase(runtimeStatus)) {
-        return runtimeSnapshot;
+        return reachableObservation(config, runtimeSnapshot, logger);
       }
 
       lastSnapshot = runtimeSnapshot;
 
-      final long now = System.nanoTime();
+      final long now = nanoClock.getAsLong();
       if (logger != null && now >= nextProgressLogAt) {
         logger.accept(
             "systemd adapter runtime probe not ready yet; status="
@@ -113,12 +125,12 @@ public final class SeedSystemdAdapterEndpointGate {
       // Adaptive retry interval: slower during early boot, faster as we approach readiness
       final long elapsedSeconds = Duration.ofNanos(now - startedAt).toSeconds();
       final Duration retryInterval = computeRuntimeProbeRetryInterval(elapsedSeconds);
-      sleep(retryInterval);
+      sleeper.accept(retryInterval);
     }
 
     final String lastSummary = String.valueOf(lastSnapshot.getOrDefault("summary", "unknown"));
     final String lastStatus = String.valueOf(lastSnapshot.getOrDefault("status", "unknown"));
-    throw new IllegalStateException(
+    final String summary =
         "Adapter runtime probe failed at "
             + config.systemdAdapterDbusHost()
             + ":"
@@ -129,7 +141,51 @@ public final class SeedSystemdAdapterEndpointGate {
             + lastStatus
             + ", summary="
             + lastSummary
-            + ")");
+            + ")";
+    if (logger != null) {
+      logger.accept("systemd adapter endpoint gate: " + summary);
+    }
+    // A refused/unanswered dbus deadline is a CONNECTION_REFUSED symptom, not a bare throw: the
+    // snapshot stamps status=ok the instant dbus answers, so reaching this deadline means the
+    // connection itself never succeeded. The last summary carries the dbus "why" — preserved in
+    // details so the doctor consults and the runbook stays loquacious.
+    return Observation.failed(
+        Symptom.CONNECTION_REFUSED,
+        summary,
+        details(
+            Map.of(
+                "source",
+                "systemd-adapter-endpoint-gate",
+                "probeMode",
+                "systemd-adapter-runtime",
+                "adapterStatus",
+                Map.copyOf(lastSnapshot))));
+  }
+
+  private Observation reachableObservation(
+      BootstrapConfig config, Map<String, Object> runtimeSnapshot, Consumer<String> logger) {
+    final String runtimeStatus = String.valueOf(runtimeSnapshot.getOrDefault("status", "unknown"));
+    final String summary =
+        "dbusEndpoint="
+            + config.systemdAdapterDbusHost()
+            + ":"
+            + config.systemdAdapterDbusPort()
+            + " status="
+            + runtimeStatus
+            + " probeMode=systemd-adapter-runtime";
+    if (logger != null) {
+      logger.accept("systemd adapter endpoint gate: " + summary);
+    }
+    return Observation.ok(
+        summary,
+        details(
+            Map.of(
+                "source",
+                "systemd-adapter-endpoint-gate",
+                "probeMode",
+                "systemd-adapter-runtime",
+                "adapterStatus",
+                Map.copyOf(runtimeSnapshot))));
   }
 
   /**
@@ -165,18 +221,20 @@ public final class SeedSystemdAdapterEndpointGate {
   // registers the instance resource concurrently with this Main-driven gate
   // call, so on first apply the instance may not yet exist when ensureReachable
   // runs. Retry the cheapest no-op probe until incus exec succeeds.
-  private static void waitForInstanceReachable(BootstrapConfig config, Consumer<String> logger) {
+  private Optional<Observation> waitForInstanceReachable(
+      BootstrapConfig config, Consumer<String> logger) {
     final Duration tolerance = config.readinessTimeout();
-    final long startedAt = System.nanoTime();
+    final long startedAt = nanoClock.getAsLong();
     final long deadlineNanos = startedAt + tolerance.toNanos();
     long nextProgressLogAt = startedAt;
-    CommandResult lastResult = null;
-    while (System.nanoTime() < deadlineNanos) {
-      lastResult = runCommand(incusExec(config, "true"));
-      if (lastResult.exitCode() == 0) {
-        return;
+    String lastFailureSummary = null;
+    while (nanoClock.getAsLong() < deadlineNanos) {
+      final Optional<String> failure = instanceReachability.apply(config);
+      if (failure.isEmpty()) {
+        return Optional.empty();
       }
-      final long now = System.nanoTime();
+      lastFailureSummary = failure.get();
+      final long now = nanoClock.getAsLong();
       if (logger != null && now >= nextProgressLogAt) {
         logger.accept(
             "instance "
@@ -184,15 +242,15 @@ public final class SeedSystemdAdapterEndpointGate {
                 + " in project "
                 + config.incusProject()
                 + " not reachable yet via incus exec; "
-                + lastResult.summary()
+                + lastFailureSummary
                 + " (retrying for up to "
                 + tolerance
                 + ")");
         nextProgressLogAt = now + PROGRESS_LOG_INTERVAL.toNanos();
       }
-      sleep(INSTANCE_READY_RETRY_INTERVAL);
+      sleeper.accept(INSTANCE_READY_RETRY_INTERVAL);
     }
-    throw new IllegalStateException(
+    final String summary =
         "Instance "
             + config.nodeName()
             + " in project "
@@ -200,8 +258,30 @@ public final class SeedSystemdAdapterEndpointGate {
             + " did not become reachable via incus exec within "
             + tolerance
             + " (last result: "
-            + (lastResult == null ? "<no attempts>" : lastResult.summary())
-            + ")");
+            + (lastFailureSummary == null ? "<no attempts>" : lastFailureSummary)
+            + ")";
+    if (logger != null) {
+      logger.accept("systemd adapter endpoint gate: " + summary);
+    }
+    // The instance never came up within tolerance. Distinct from a refused dbus port: the infra
+    // isn't there yet, so this is a TIMEOUT symptom (no dedicated "instance-not-found" kind), still
+    // carrying the why so the doctor consults rather than the gate throwing past the captured slot.
+    return Optional.of(
+        Observation.failed(
+            Symptom.TIMEOUT,
+            summary,
+            details(
+                Map.of(
+                    "source",
+                    "systemd-adapter-endpoint-gate",
+                    "probeMode",
+                    "systemd-adapter-runtime"))));
+  }
+
+  /** The live instance-reachability check: empty when reachable, the failure summary otherwise. */
+  private static Optional<String> probeInstanceReachable(BootstrapConfig config) {
+    final CommandResult result = runCommand(incusExec(config, "true"));
+    return result.exitCode() == 0 ? Optional.empty() : Optional.of(result.summary());
   }
 
   private static CommandResult runCommand(List<String> command) {

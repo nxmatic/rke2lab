@@ -269,8 +269,8 @@ public final class BootstrapPipeline {
     public SystemdAdapterDone during(
         String topic, Function<SystemdAdapterStage, SystemdAdapterStage> body) {
       final Generalist generalist = state.healthSystem.generalist();
-      final SystemdAdapterProbe liveProbe =
-          cfg -> SeedSystemdAdapterEndpointGate.ensureReachable(cfg, state.readinessLogger);
+      final SeedSystemdAdapterEndpointGate gate = SeedSystemdAdapterEndpointGate.production();
+      final SystemdAdapterProbe liveProbe = cfg -> gate.ensureReachable(cfg, state.readinessLogger);
       final SystemdAdapterStage stage =
           new SystemdAdapterStage(
               state.config,
