@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,23 @@ public record ConsultationReport(
   /** The symptom the doctor diagnosed (the plan's subject). */
   public Symptom symptom() {
     return plan.symptom();
+  }
+
+  /**
+   * What this consultation predicts: one {@link Expectation} per prescription — that the diagnosed
+   * symptom resolves by the next visit ({@link ResolutionPredicate}). A plan with no prescription
+   * predicts nothing (empty list). Pure derivation; the caller supplies the run instant.
+   */
+  public List<Expectation> expectations(Instant recordedAt) {
+    return plan.prescriptions().stream()
+        .map(
+            prescription ->
+                new Expectation(
+                    symptom(),
+                    prescription.programRef(),
+                    new ResolutionPredicate(symptom()),
+                    recordedAt))
+        .toList();
   }
 
   /** Flat map view; {@code observations} and {@code plan} are themselves flat map views. */

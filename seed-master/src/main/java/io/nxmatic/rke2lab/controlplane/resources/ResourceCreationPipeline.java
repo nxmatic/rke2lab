@@ -134,6 +134,7 @@ final class ResourceCreationPipeline {
               Checkpoint.SYSTEMD_ADAPTER.resourceName(),
               systemdAdapterLaunchSummary,
               consultationFor(Checkpoint.SYSTEMD_ADAPTER),
+              bootstrapResult.deployment().timestamp(),
               bootstrapResult.readinessDependency());
       return this;
     }
