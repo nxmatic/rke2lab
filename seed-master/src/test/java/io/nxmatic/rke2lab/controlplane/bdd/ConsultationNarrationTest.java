@@ -27,9 +27,10 @@ class ConsultationNarrationTest {
     final ConsultationReport timeoutReport = report(Symptom.TIMEOUT);
 
     final Visit visit1 =
-        new Visit(1, Instant.ofEpochSecond(1_780_000_001L), List.of(connectionRefusedReport));
+        new Visit(
+            1, Instant.ofEpochSecond(1_780_000_001L), List.of(connectionRefusedReport), List.of());
     final Visit visit2 =
-        new Visit(2, Instant.ofEpochSecond(1_780_000_002L), List.of(timeoutReport));
+        new Visit(2, Instant.ofEpochSecond(1_780_000_002L), List.of(timeoutReport), List.of());
 
     final MedicalRecord record = new MedicalRecord(PATIENT, List.of(visit1, visit2));
 

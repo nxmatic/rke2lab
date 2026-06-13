@@ -46,7 +46,17 @@ final class MedicalRecordReader {
                 .map(ConsultationReportReader::fromOutputMap)
                 .flatMap(Optional::stream)
                 .toList();
-        visits.add(new Visit(entry.version(), entry.when(), reports));
+        // One level deeper than reports: consultationReport is a single Map per resource, but
+        // expectations was registered as Output.of(List<Map>), so outputsNamed returns a
+        // list-of-lists (one inner list per resource). Flatten the inner lists before parsing.
+        final List<Expectation> expectations =
+            snapshot.outputsNamed(Expectation.OUTPUT_KEY).stream()
+                .filter(List.class::isInstance)
+                .flatMap(perResource -> ((List<?>) perResource).stream())
+                .map(ExpectationReader::fromOutputMap)
+                .flatMap(Optional::stream)
+                .toList();
+        visits.add(new Visit(entry.version(), entry.when(), reports, expectations));
       } catch (StackException e) {
         // Identity-enrichment: a subordinate read failure does not decide policy; record WHICH
         // entry failed (the leaf carries only the file path) and keep folding.

@@ -19,11 +19,11 @@ class ResolutionPredicateTest {
   }
 
   private static Visit visitRaisingNothing() {
-    return new Visit(1, Instant.ofEpochSecond(1), List.of());
+    return new Visit(1, Instant.ofEpochSecond(1), List.of(), List.of());
   }
 
   private static Visit visitRaising(Symptom symptom) {
-    return new Visit(1, Instant.ofEpochSecond(1), List.of(report(symptom)));
+    return new Visit(1, Instant.ofEpochSecond(1), List.of(report(symptom)), List.of());
   }
 
   @Test

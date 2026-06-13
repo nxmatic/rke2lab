@@ -35,7 +35,8 @@ class DoctorRecordsTest {
             List.of(
                 report("a", Symptom.CONNECTION_REFUSED, RemediationProgramRef.RESTART_UNIT),
                 report("b", Symptom.TIMEOUT),
-                report("c", Symptom.CONNECTION_REFUSED)));
+                report("c", Symptom.CONNECTION_REFUSED)),
+            List.of());
 
     assertEquals(Set.of(Symptom.CONNECTION_REFUSED, Symptom.TIMEOUT), visit.symptomsRaised());
   }
@@ -52,7 +53,8 @@ class DoctorRecordsTest {
                     Symptom.CONNECTION_REFUSED,
                     RemediationProgramRef.RESTART_UNIT,
                     RemediationProgramRef.CHECK_CONNECTIVITY),
-                report("b", Symptom.TIMEOUT, RemediationProgramRef.RESTART_UNIT)));
+                report("b", Symptom.TIMEOUT, RemediationProgramRef.RESTART_UNIT)),
+            List.of());
 
     assertEquals(
         List.of(
@@ -64,7 +66,7 @@ class DoctorRecordsTest {
 
   @Test
   void visit_normalizes_null_reports_without_npe() {
-    final Visit visit = new Visit(1, Instant.EPOCH, null);
+    final Visit visit = new Visit(1, Instant.EPOCH, null, null);
 
     assertTrue(visit.reports().isEmpty());
     assertTrue(visit.symptomsRaised().isEmpty());

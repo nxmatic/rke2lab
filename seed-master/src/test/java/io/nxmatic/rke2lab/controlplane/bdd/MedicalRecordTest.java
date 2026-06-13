@@ -25,7 +25,7 @@ class MedicalRecordTest {
   }
 
   private static Visit visit(int version, ConsultationReport... reports) {
-    return new Visit(version, Instant.ofEpochSecond(version), List.of(reports));
+    return new Visit(version, Instant.ofEpochSecond(version), List.of(reports), List.of());
   }
 
   @Test

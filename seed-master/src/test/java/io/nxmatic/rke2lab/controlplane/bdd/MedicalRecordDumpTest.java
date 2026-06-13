@@ -118,8 +118,8 @@ class MedicalRecordDumpTest {
                             Map.of("port", 12434),
                             "verify the dbus-over-tcp listener is up"))),
                 "the adapter could not reach dbus"));
-    final Visit v1 = new Visit(1, Instant.ofEpochSecond(1000), List.of(report));
-    final Visit v2 = new Visit(2, Instant.ofEpochSecond(2000), List.of());
+    final Visit v1 = new Visit(1, Instant.ofEpochSecond(1000), List.of(report), List.of());
+    final Visit v2 = new Visit(2, Instant.ofEpochSecond(2000), List.of(), List.of());
     return new MedicalRecord(PATIENT, List.of(v1, v2));
   }
 
