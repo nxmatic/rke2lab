@@ -1,21 +1,26 @@
-= Doctor models — integration atlas
+= Integration atlas — do the specification models hold together?
 :toc: left
 :toclevels: 3
 
 [NOTE]
 ====
-*Status:* LIVING INTEGRATION VIEW — maintained, not frozen. This atlas is the one place that holds
-the whole doctor *specification* corpus together and proves each new model is *additive* against the
-others. It is reopened at the START of every doctor design activity (see "The ritual"). It carries
-no implementation detail of its own; it is a map of models and their seams.
+*Status:* LIVING INTEGRATION VIEW — maintained, not frozen. This atlas proves each new model is
+*additive* against the others via monotone before/after figures. It is reopened at the START of
+every design activity. It carries no implementation detail of its own; it is a map of models and
+their seams.
 ====
 
 == Why this atlas exists
 
-The doctor subsystem accumulated a dozen design models across many sessions — some implemented, some
-explorations. Each new model risks silently contradicting or duplicating the others. This atlas is
-the antidote: a single view that lists every model, draws how they connect, and — when a model is
-added — *proves it is additive* by a simple visual test.
+The atlas's *function* — prove the specification models hold together via a monotone-before/after
+additivity test, reopened at every design activity — is **cross-subsystem, not subsystem-specific**.
+This placement (`docs/architecture/integration-atlas.adoc`) reflects that transverse structure. The
+content today is **doctor-only** (the first per-subsystem view below); honest caveat: transverse in
+structure, doctor-only in content until a second subsystem adopts the ritual.
+
+Each new model risks silently contradicting or duplicating the others. This atlas is the antidote: a
+single view that lists every model, draws how they connect, and — when a model is added — *proves it
+is additive* by a simple visual test.
 
 *The test of "additive" is MONOTONE before/after.* Draw the model constellation without the new
 model (before), then with it (after). Additive means: *no box erased, no arrow rewired, only
@@ -26,42 +31,55 @@ well-integrated spec is itself the proof we are on the right path.*
 Legend used throughout: thin/blue = IMPLEMENTED (built); thick/green = the model under design;
 dashed/amber = EXPLORATION (not built, future); grey = cross-cutting foundation.
 
-== The model inventory
+== Per-subsystem index
+
+* <<doctor-view,Doctor subsystem>> — the diagnostic layer (remediation round-trip, medical record,
+  HealthSystem keystone, what-if planner) — FIRST (currently only) per-subsystem view.
+
+Future subsystems that adopt the ritual will be added here.
+
+[[doctor-view]]
+== Doctor subsystem — per-subsystem view
+
+This section holds the doctor model inventory, the additivity figures (HealthSystem keystone,
+referral round-trip), the ritual, and the related-documentation links.
+
+=== The model inventory
 
 [cols="1,2,2",options="header"]
 |===
 | Tier | Model | Status
 
 | foundation
-| link:glossary.adoc[glossary]
+| link:doctor/glossary.adoc[glossary]
 | Cross-cutting vocabulary source of truth.
 
 | substrate
-| link:runbook-doctor.adoc[runbook-doctor]
+| link:doctor/runbook-doctor.adoc[runbook-doctor]
 | ✅ Implemented (Increments A–E). The overall doctor design.
 
 | substrate
-| link:medical-record-query-api-design.adoc[medical-record-query-api]
+| link:doctor/medical-record-query-api-design.adoc[medical-record-query-api]
 | ✅ Implemented. The record reconstructed on demand from Pulumi — the read substrate.
 
 | substrate
-| link:layer3-medical-record-design.adoc[layer3-medical-record (write-side)]
+| link:doctor/layer3-medical-record-design.adoc[layer3-medical-record (write-side)]
 | ✅ Implemented. Per-node serialization of the diagnostic layer.
 
 | substrate
-| link:layer3-readside-runtime-enrichment-design.adoc[layer3 read-side]
+| link:doctor/layer3-readside-runtime-enrichment-design.adoc[layer3 read-side]
 | ✅ Implemented. Diagnosis rendered into the runbook.
 
 | substrate
-| link:vocabulary-and-live-record-design.adoc[vocabulary-and-live-record]
+| link:doctor/vocabulary-and-live-record-design.adoc[vocabulary-and-live-record]
 | ✅ Implemented (step 1). Clinical-vocabulary refactor + live record wired in (latent).
 
 | substrate
-| link:pulumi-doctor-integration.adoc[pulumi-doctor-integration]
+| link:doctor/pulumi-doctor-integration.adoc[pulumi-doctor-integration]
 | The Pulumi entity model and the doctor's Pulumi seam.
 
 | KEYSTONE
-| link:healthsystem-access-control-design.adoc[healthsystem-access-control]
+| link:doctor/healthsystem-access-control-design.adoc[healthsystem-access-control]
 | ✅ Implemented 2026-06-11 on `feature/healthsystem-keystone` (keystone + interim gate). The
   per-run HealthSystem holds the registry + GrantPolicy, employs the Generalist with a credentialed
   ClinicalAccess, admits the patient. Cohort read promoted off `@Spike`. The model this atlas first
@@ -69,24 +87,26 @@ dashed/amber = EXPLORATION (not built, future); grey = cross-cutting foundation.
   wrapped).
 
 | proof
-| link:cohort-correlation-proof.adoc[cohort-correlation-proof]
+| link:doctor/cohort-correlation-proof.adoc[cohort-correlation-proof]
 | ✅ Proof record. Phase 1 unit + Phase 2 live `pulumi preview` evidence that the read half of
   cross-patient correlation works; motivated the keystone, kept as the empirical record.
 
 | exploration
-| link:preview-whatif-replay-exploration.adoc[preview-whatif-replay]
+| link:doctor/preview-whatif-replay-exploration.adoc[preview-whatif-replay]
 | ⬜ Not built (step 3). The what-if planner.
 
 | exploration
-| link:rules-engine-checkpoint-topology-exploration.adoc[rules-engine-topology]
+| link:doctor/rules-engine-checkpoint-topology-exploration.adoc[rules-engine-topology]
 | ⬜ Not built. Three ways to dissolve diagnosis-layer redundancy.
 
 | exploration
-| link:drools-network-specialist-prototype.adoc[drools-network-specialist]
+| link:doctor/drools-network-specialist-prototype.adoc[drools-network-specialist]
 | ⬜ Not built. Drools behind the Specialist seam.
 |===
 
-== Diagram A — model constellation: BEFORE (without HealthSystem)
+=== Additivity proof: HealthSystem keystone (shipped 2026-06-11)
+
+==== Diagram A — model constellation: BEFORE (without HealthSystem)
 
 [mermaid]
 ....
@@ -127,7 +147,7 @@ flowchart TB
     class GLO found;
 ....
 
-== Diagram B — model constellation: AFTER (+ HealthSystem, monotone)
+==== Diagram B — model constellation: AFTER (+ HealthSystem, monotone)
 
 Same graph, nothing erased or rewired. HealthSystem (green) is added, wrapping the read substrate and
 giving the explorations a real seam to attach to. Every blue box and arrow is identical to BEFORE.
@@ -181,7 +201,7 @@ flowchart TB
     class HS neu;
 ....
 
-== Diagram C — internal seam: BEFORE vs AFTER (where HealthSystem clips onto built code)
+==== Diagram C — internal seam: BEFORE vs AFTER (where HealthSystem clips onto built code)
 
 The class-level view of the same additive claim. Blue = shipped types, untouched. Green = added. The
 shipped read core (recordFor, the folds) is wrapped, never edited.
@@ -222,7 +242,7 @@ flowchart LR
     class a_hs,a_gp,a_acc,a_gen neu;
 ....
 
-== Verdict — does it hold?
+==== Verdict — does it hold?
 
 An honest reading of the three figures:
 
@@ -256,9 +276,108 @@ live ✅ status. The amber "grant seam awaits referrals" edge remains the single
 deferred to step 2.
 ====
 
-== The ritual — how this atlas stays alive
+=== Additivity proof: Referral round-trip (shipped 2026-06-13)
 
-Reopen this atlas at the START of every doctor design activity, before writing a new model's spec:
+The referral round-trip flips the diagnosis seam from `diagnose(Symptom, Observation) →
+Optional<Prescription>` (the why drops on `Optional.empty()`) to `diagnose(Referral) →
+ReferralReply` (the why — an `Assessment` — ALWAYS survives, prescription or not). Four new types
+(`Referral`, `ReferralReply`, `Assessment`, `SchemaRef`) plus a persisted-shape change
+(`RemediationPlan` carries `List<ReferralReply>` not `List<Prescription>`, with `prescriptions()` as
+a derived view). The changed collaborator (`Prescription.humanHint` shrinks to action-only; the
+reasoning migrates into `Assessment`). Two exemplar specialists (`NetworkSpecialist`,
+`ClusterSpecialist`) co-consult.
+
+==== Diagram D — type model: BEFORE vs AFTER (the seam flip, monotone)
+
+The seam before and after, with the ONE honest changed collaborator (amber) and the additive new
+types (green). Plain = existing, unchanged.
+
+[mermaid]
+....
+flowchart TD
+    subgraph BEFORE[Before: Optional Prescription drops the why]
+        b_spec["Specialist<br/>diagnose symptom,observation → Optional Prescription"]
+        b_gen["Generalist<br/>consult, synthesize"]
+        b_plan["RemediationPlan<br/>List Prescription<br/>generalistSummary"]
+        b_presc["Prescription<br/>humanHint = reasoning + action"]
+        b_obs["Observation"]
+        b_spec -->|returns, may be empty| b_presc
+        b_gen -->|synthesizes| b_plan
+        b_plan -->|collects| b_presc
+        b_obs -->|read by| b_spec
+    end
+
+    subgraph AFTER[After: ReferralReply always carries the why]
+        a_spec["Specialist<br/>diagnose Referral → ReferralReply"]
+        a_gen["Generalist<br/>consult, synthesize"]
+        a_plan["RemediationPlan<br/>List ReferralReply<br/>prescriptions is derived"]
+        a_ref["Referral — NEW<br/>patient, symptom, observation, record"]
+        a_reply["ReferralReply — NEW<br/>assessment ALWAYS<br/>prescription OPTIONAL"]
+        a_assess["Assessment — NEW<br/>schemaRef, payload, summary"]
+        a_schema["SchemaRef — NEW<br/>open self-declared id"]
+        a_presc["Prescription — CHANGED<br/>humanHint = action ONLY"]
+        a_obs["Observation"]
+        a_spec -->|builds and sends| a_ref
+        a_spec -->|returns, always carries assessment| a_reply
+        a_gen -->|synthesizes| a_plan
+        a_plan -->|collects| a_reply
+        a_reply -->|always| a_assess
+        a_reply -->|optionally| a_presc
+        a_assess -->|declares| a_schema
+        a_obs -->|flows into| a_ref
+    end
+
+    classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+    classDef new fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
+    classDef changed fill:#fff3cd,stroke:#f57f17,stroke-width:2px;
+    class b_spec,b_gen,b_plan,b_obs,a_spec,a_gen,a_obs built;
+    class b_presc changed;
+    class a_ref,a_reply,a_assess,a_schema new;
+    class a_presc changed;
+....
+
+==== Verdict — does it hold?
+
+An honest reading:
+
+. *Monotone at the persisted-shape level: yes.* `RemediationPlan` carries a new collection (`replies`)
+  and a derived view (`prescriptions()`) — the old `prescriptions` field is gone, BUT the persisted
+  output map gains a `replies` key (additive) and loses nothing (the doctor predates any persisted
+  remediation plan in the dev stack, so no real data is rewritten). `ConsultationReport` gains the
+  `assessment` key under each reply in `plan.replies`, additive. The negative check: no other
+  shipped box or serialized shape was rewritten; `Observation`, `Symptom`, `ConsultationReport`
+  envelope, and all read/write paths for them are untouched.
+
+. *One honest changed collaborator:* `Prescription.humanHint` shrinks from "reasoning + action" to
+  "action only" — the reasoning migrates into the reply's `Assessment`. This is a changed
+  collaborator, not an erased one. The `Prescription` box itself remains; only its content shifts.
+
+. *The seam method signature changed* (`diagnose(Symptom, Observation)` → `diagnose(Referral)`), but
+  both the `Specialist` box and all its existing collaborators (`Patient`, `Observation`, `Symptom`,
+  `MedicalRecord`, `HealthSystem`) remain — the flip adds a request/response envelope, rewires
+  nothing downstream.
+
+. *Two fake exemplar specialists added* (`NetworkSpecialist`, `ClusterSpecialist`) to show the
+  integration seams (treatment vs decline-with-why). These are NEW boxes, not rewrites.
+
+Conclusion: the referral round-trip is additive. The seam flip is monotone; the one changed
+collaborator (`Prescription.humanHint` shrink) is honest and isolated.
+
+[NOTE]
+====
+*Confirmed in code (2026-06-13).* The referral round-trip shipped on `feature/referral-roundtrip`,
+and the additivity the figure predicted held: no built box was rewritten beyond the
+`Prescription.humanHint` shrink and the `RemediationPlan` collection swap (which is additive at the
+persisted-shape level — the new `replies` key appears; no old key vanishes). The driver specialist
+(`DbusTcpSpecialist`) returns a `ReferralReply` with an `Assessment` even when declining (no longer
+mute on `Optional.empty()`). The runbook renders the `Assessment` distinctly. The above figure is
+kept as the design-time proof; the inventory will carry the ✅ status when this chunk lands.
+====
+
+=== The ritual — how this atlas stays alive
+
+Reopen this atlas at the START of every design activity (doctor or another subsystem), before
+writing a new model's spec:
 
 . *Add the new model* as a green box in a fresh before/after pair (or extend Diagrams A–C).
 . *Prove monotone:* confirm no existing box or arrow is erased or rewired. If you must erase one,
@@ -274,7 +393,7 @@ one-time exercise.
 
 == Related documentation
 
-* link:glossary.adoc[Doctor glossary] — the vocabulary every model on this atlas speaks.
-* link:healthsystem-access-control-design.adoc[HealthSystem access-control design] — the keystone
+* link:doctor/glossary.adoc[Doctor glossary] — the vocabulary every model on this atlas speaks.
+* link:doctor/healthsystem-access-control-design.adoc[HealthSystem access-control design] — the keystone
   model this atlas first proved additive.
-* link:runbook-doctor.adoc[Runbook & Doctor] — the overall design the substrate models elaborate.
+* link:doctor/runbook-doctor.adoc[Runbook & Doctor] — the overall design the substrate models elaborate.

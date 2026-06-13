@@ -90,7 +90,7 @@ class MedicalRecordDumpTest {
             + "\"observations\":[],"
             + "\"plan\":{\"symptom\":\""
             + symptom.id()
-            + "\",\"generalistSummary\":\"s\",\"prescriptions\":[]}"
+            + "\",\"generalistSummary\":\"s\",\"replies\":[]}"
             + "}}}]}}";
     try {
       return StackSnapshot.of(StackDeployment.fromJson(envelope));
@@ -112,10 +112,11 @@ class MedicalRecordDumpTest {
             new RemediationPlan(
                 Symptom.CONNECTION_REFUSED,
                 List.of(
-                    Prescription.of(
-                        RemediationProgramRef.CHECK_CONNECTIVITY,
-                        Map.of("port", 12434),
-                        "verify the dbus-over-tcp listener is up")),
+                    ReferralReplies.treating(
+                        Prescription.of(
+                            RemediationProgramRef.CHECK_CONNECTIVITY,
+                            Map.of("port", 12434),
+                            "verify the dbus-over-tcp listener is up"))),
                 "the adapter could not reach dbus"));
     final Visit v1 = new Visit(1, Instant.ofEpochSecond(1000), List.of(report));
     final Visit v2 = new Visit(2, Instant.ofEpochSecond(2000), List.of());

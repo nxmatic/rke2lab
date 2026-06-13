@@ -112,13 +112,15 @@ class LiveMedicalRecordRegistryTest {
   private static ConsultationReport seededReport(Symptom symptom, RemediationProgramRef program) {
     final Observation observation =
         Observation.failed(symptom, "seeded " + symptom.id(), Map.of("seeded", SEEDED_TAG));
-    final List<Prescription> prescriptions =
+    final List<ReferralReply> replies =
         program == null
             ? List.of()
-            : List.of(Prescription.of(program, Map.of("seeded", SEEDED_TAG), "seeded hint"));
+            : List.of(
+                ReferralReplies.treating(
+                    Prescription.of(program, Map.of("seeded", SEEDED_TAG), "seeded hint")));
     return new ConsultationReport(
         "seeded-systemd-adapter",
         List.of(observation),
-        new RemediationPlan(symptom, prescriptions, "seeded generalist summary"));
+        new RemediationPlan(symptom, replies, "seeded generalist summary"));
   }
 }

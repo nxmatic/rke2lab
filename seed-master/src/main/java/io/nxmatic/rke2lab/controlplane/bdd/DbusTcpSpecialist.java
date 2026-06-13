@@ -2,14 +2,14 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Systemd-domain specialist for the dbus-over-TCP adapter. Reads the observation first (the
  * captured snapshot _is_ the Status/Conditions) and, for a connection-refused symptom, prescribes
  * restarting the adapter unit — the deterministic first treatment for an unreachable dbus-TCP
  * endpoint. The unit name is this specialist's own domain knowledge (it owns the systemd unit it
- * remediates), not a string reached across modules.
+ * remediates), not a string reached across modules. For any other symptom it declines with a
+ * reasoned {@link Assessment} (the "why") and no prescription.
  */
 public final class DbusTcpSpecialist implements Specialist {
 
@@ -28,21 +28,30 @@ public final class DbusTcpSpecialist implements Specialist {
   }
 
   @Override
-  public Optional<Prescription> diagnose(Symptom symptom, Observation observation) {
+  public ReferralReply diagnose(Referral referral) {
+    final Symptom symptom = referral.symptom();
     if (symptom != Symptom.CONNECTION_REFUSED) {
-      return Optional.empty();
+      final Assessment assessment =
+          Assessment.of(
+              SchemaRef.of("dbus-tcp/declined/v1"),
+              Map.of("declinedSymptom", symptom.id()),
+              "not a dbus-TCP symptom — the systemd adapter has no treatment for " + symptom.id());
+      return ReferralReply.assessing(referral, assessment);
     }
     final String endpoint = config.systemdAdapterDbusHost() + ":" + config.systemdAdapterDbusPort();
-    return Optional.of(
+    final Assessment assessment =
+        Assessment.of(
+            SchemaRef.of("dbus-tcp/connection-refused/v1"),
+            Map.of("endpoint", endpoint, "unit", ADAPTER_UNIT),
+            "dbus-TCP endpoint "
+                + endpoint
+                + " refused the connection — the adapter unit is the deterministic first treatment "
+                + "for an unreachable dbus-TCP endpoint.");
+    final Prescription prescription =
         Prescription.of(
             RemediationProgramRef.RESTART_UNIT,
             Map.of("unit", ADAPTER_UNIT, "host", config.systemdAdapterDbusHost()),
-            "dbus-TCP endpoint "
-                + endpoint
-                + " refused the connection — restart the adapter unit on the seed node: "
-                + "incus exec "
-                + config.nodeName()
-                + " -- systemctl restart "
-                + ADAPTER_UNIT));
+            "incus exec " + config.nodeName() + " -- systemctl restart " + ADAPTER_UNIT);
+    return ReferralReply.prescribing(referral, assessment, prescription);
   }
 }

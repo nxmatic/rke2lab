@@ -10,7 +10,7 @@ vision: the vocabulary is fixed, the seams are named against real types, and the
 half is already proven by the spike. It stays a *design* (no code yet on this doc's own account)
 until promoted on a `feature/` branch. The model is *additive* — it wraps the shipped
 `recordFor(Patient)` and registry without editing the read core (see
-link:integration-atlas.adoc[the integration atlas], which proves the additivity before/after).
+link:../integration-atlas.adoc[the integration atlas], which proves the additivity before/after).
 ====
 
 == Overview
@@ -236,7 +236,7 @@ would force a real shared store. Noted as the boundary, not designed.
 
 == Related documentation
 
-* link:integration-atlas.adoc[Integration atlas] — proves this model additive against the doctor
+* link:../integration-atlas.adoc[Integration atlas] — proves this model additive against the doctor
   constellation; the living view reopened at each design activity.
 * link:runbook-doctor.adoc[Runbook & Doctor] — the referral round-trip (`[#consultation-flow]`),
   remediator tier, and recruit-a-specialist this layer builds on.

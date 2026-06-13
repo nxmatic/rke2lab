@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tngtech.jgiven.impl.Scenario;
@@ -13,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -50,10 +52,16 @@ class RunbookRenderingTest {
             new RemediationPlan(
                 Symptom.CONNECTION_REFUSED,
                 List.of(
-                    Prescription.of(
-                        RemediationProgramRef.RESTART_UNIT,
-                        Map.of("unit", "rke2lab-systemd-adapter.service"),
-                        "restart the systemd-adapter unit")),
+                    ReferralReply.reconstructed(
+                        Assessment.of(
+                            SchemaRef.of("dbus-tcp/connection-refused/v1"),
+                            Map.of(),
+                            "dbus-TCP endpoint refused the connection"),
+                        Optional.of(
+                            Prescription.of(
+                                RemediationProgramRef.RESTART_UNIT,
+                                Map.of("unit", "rke2lab-systemd-adapter.service"),
+                                "restart the systemd-adapter unit")))),
                 "the dbus-over-TCP endpoint refused the connection")));
 
     new RunbookRenderer(outputDir, message -> {}).render(runbook, consultations);
@@ -67,10 +75,53 @@ class RunbookRenderingTest {
         report.contains("Systemd adapter becomes reachable"),
         "runbook should name the failed scenario");
     assertTrue(report.contains("Diagnosis"), "the doctor's Diagnosis section should render");
+    assertTrue(report.contains("Assessment"), "the doctor's Assessment section should render");
+    assertTrue(
+        report.contains("dbus-TCP endpoint refused the connection"),
+        "the assessment summary should render");
     assertTrue(report.contains("Mitigation"), "the doctor's Mitigation section should render");
     assertTrue(
         report.contains(RemediationProgramRef.RESTART_UNIT.id()),
         "the restart-systemd-unit prescription should render");
+  }
+
+  @Test
+  void declined_reply_renders_a_why_not_silence(@TempDir Path outputDir) {
+    final ReportModel runbook = playFailingScenario();
+
+    final ReferralReply declined =
+        ReferralReply.reconstructed(
+            Assessment.of(
+                SchemaRef.of("network/reachability/v1"),
+                Map.of("symptom", "connection-refused"),
+                "endpoint unreachable at the TCP layer; no network-level remediation — the listener is down, not the path"),
+            Optional.empty());
+    final RemediationPlan plan =
+        new RemediationPlan(
+            Symptom.CONNECTION_REFUSED, List.of(declined), "consulted [NETWORK]; assessment only");
+    final ConsultationReport report =
+        new ConsultationReport(
+            Checkpoint.SYSTEMD_ADAPTER.slug(),
+            List.of(
+                Observation.failed(
+                    Symptom.CONNECTION_REFUSED,
+                    "dbus refused",
+                    Map.of("source", "systemd-adapter-probe"))),
+            plan);
+
+    final ConsultationLog consultations = new ConsultationLog();
+    consultations.record(report);
+
+    new RunbookRenderer(outputDir, message -> {}).render(runbook, consultations);
+
+    final String rendered = readAll(outputDir.resolve("adoc"));
+    assertTrue(rendered.contains("Assessment"), "a declining reply should render its Assessment");
+    assertTrue(
+        rendered.contains("endpoint unreachable at the TCP layer"),
+        "the decline summary should render");
+    assertFalse(
+        rendered.contains("℞ Mitigation"),
+        "a declining reply (no prescription) should NOT render Mitigation");
   }
 
   /**

@@ -42,12 +42,14 @@ class LiveMedicalRecordRegistryCohortTest {
 
   private static ConsultationReport report(Symptom symptom, RemediationProgramRef program) {
     final Observation observation = Observation.failed(symptom, "seeded " + symptom.id(), Map.of());
-    final List<Prescription> prescriptions =
-        program == null ? List.of() : List.of(Prescription.of(program, Map.of(), "seeded hint"));
+    final List<ReferralReply> replies =
+        program == null
+            ? List.of()
+            : List.of(ReferralReplies.treating(Prescription.of(program, Map.of(), "seeded hint")));
     return new ConsultationReport(
         "seeded-systemd-adapter",
         List.of(observation),
-        new RemediationPlan(symptom, prescriptions, "seeded"));
+        new RemediationPlan(symptom, replies, "seeded"));
   }
 
   @Test

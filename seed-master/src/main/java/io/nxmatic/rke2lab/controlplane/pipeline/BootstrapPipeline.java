@@ -3,11 +3,13 @@ package io.nxmatic.rke2lab.controlplane.pipeline;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
+import io.nxmatic.rke2lab.controlplane.bdd.ClusterSpecialist;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.bdd.DbusTcpSpecialist;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.bdd.HealthSystem;
 import io.nxmatic.rke2lab.controlplane.bdd.LiveMedicalRecordRegistry;
+import io.nxmatic.rke2lab.controlplane.bdd.NetworkSpecialist;
 import io.nxmatic.rke2lab.controlplane.bdd.Patient;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
@@ -142,7 +144,13 @@ public final class BootstrapPipeline {
       final Patient patient = currentPatient(state.pulumiMode);
       state.healthSystem =
           HealthSystem.admit(
-              patient, registry, List.of(new DbusTcpSpecialist(state.config)), logger);
+              patient,
+              registry,
+              List.of(
+                  new DbusTcpSpecialist(state.config),
+                  new NetworkSpecialist(),
+                  new ClusterSpecialist()),
+              logger);
     }
 
     private static Patient currentPatient(boolean pulumiMode) {

@@ -120,17 +120,26 @@ public final class RunbookRenderer {
   }
 
   /**
-   * The Diagnosis (⚕ generalist summary) + Mitigation (℞ prescriptions) block, as AsciiDoc text.
+   * The Diagnosis (⚕ generalist summary) + Assessment (🔬 specialist reasoning) + Mitigation (℞
+   * prescriptions) block, as AsciiDoc text. Each reply's assessment is always rendered; its
+   * prescription (mitigation) is rendered only when present.
    */
   private String diagnosisBlock(RemediationPlan plan) {
     final StringBuilder block = new StringBuilder();
     block.append("⚕ Diagnosis: ").append(plan.generalistSummary());
-    for (Prescription prescription : plan.prescriptions()) {
+    for (ReferralReply reply : plan.replies()) {
       block
-          .append("\n\n℞ Mitigation (")
-          .append(prescription.programRef().id())
+          .append("\n\n🔬 Assessment (")
+          .append(reply.assessment().schemaRef().id())
           .append("): ")
-          .append(prescription.humanHint());
+          .append(reply.assessment().summary());
+      if (reply.hasPrescription()) {
+        block
+            .append("\n\n℞ Mitigation (")
+            .append(reply.prescription().get().programRef().id())
+            .append("): ")
+            .append(reply.prescription().get().humanHint());
+      }
     }
     return block.toString();
   }

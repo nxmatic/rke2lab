@@ -62,7 +62,9 @@ public final class Generalist implements Clinician {
   }
 
   /**
-   * The patient consults: diagnose the symptom against the observation, return a remediation plan.
+   * The patient consults: refer the symptom + observation to the routed specialists, collect each
+   * specialist's {@link ReferralReply} (always an assessment, optionally a prescription), return a
+   * remediation plan carrying the replies.
    */
   public RemediationPlan consult(Symptom symptom, Observation observation) {
     final MedicalRecord record = access.record();
@@ -73,18 +75,27 @@ public final class Generalist implements Clinician {
           symptom, List.of(), "no specialist routes for symptom " + symptom.id());
     }
 
-    final List<Prescription> prescriptions = new ArrayList<>();
+    final Referral referral = Referral.of(record.patient(), symptom, observation, record);
+    final List<ReferralReply> replies = new ArrayList<>();
     for (Specialist specialist : specialists) {
       if (route.contains(specialist.domain())) {
-        specialist.diagnose(symptom, observation).ifPresent(prescriptions::add);
+        replies.add(specialist.diagnose(referral));
       }
     }
 
+    final long prescribed = replies.stream().filter(ReferralReply::hasPrescription).count();
     final String summary =
-        prescriptions.isEmpty()
-            ? "consulted " + route + " for " + symptom.id() + "; no treatment offered"
-            : prescriptions.size() + " prescription(s) for " + symptom.id() + " from " + route;
-    return new RemediationPlan(symptom, prescriptions, summary);
+        replies.isEmpty()
+            ? "consulted " + route + " for " + symptom.id() + "; no specialist replied"
+            : replies.size()
+                + " reply(ies) for "
+                + symptom.id()
+                + " from "
+                + route
+                + "; "
+                + prescribed
+                + " prescription(s)";
+    return new RemediationPlan(symptom, replies, summary);
   }
 
   private void firstLook(MedicalRecord record, Symptom symptom, Observation observation) {

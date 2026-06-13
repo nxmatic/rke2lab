@@ -125,6 +125,6 @@ is minted from an interim same-backend rule today) — see the design's "grant s
 
 * link:healthsystem-access-control-design.adoc[HealthSystem access-control design] — the keystone
   this proof motivated; cites these results as the read-half evidence.
-* link:integration-atlas.adoc[Integration atlas] — where the keystone is recorded as shipped.
+* link:../integration-atlas.adoc[Integration atlas] — where the keystone is recorded as shipped.
 * link:medical-record-query-api-design.adoc[Medical-record query API] — the reconstruction substrate
   the cohort fold reads through.

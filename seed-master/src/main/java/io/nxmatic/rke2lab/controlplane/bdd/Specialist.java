@@ -1,17 +1,15 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import java.util.Optional;
-
 /**
- * A domain expert the Generalist routes to. Given a symptom and the captured {@link Observation},
- * it reads the observation first (the snapshot _is_ the Status/Conditions — the cert-manager way),
- * probes further only if needed, and writes a {@link Prescription} — or none if it has no treatment
- * for what it sees.
+ * A domain expert the Generalist routes to. Given a {@link Referral} (the typed request carrying
+ * the symptom, the captured {@link Observation}, and the patient's record), it reads the
+ * observation first (the snapshot _is_ the Status/Conditions — the cert-manager way), probes
+ * further only if needed, and returns a {@link ReferralReply}.
  *
- * <p>This interface is the AI-ready seam: {@code diagnose(Symptom, Observation)} makes no
- * assumption about implementation. Phase 1 is a Java class reading the objects in-process; a future
- * Phase 2 could back the same interface with an out-of-process tool (serialize the observation,
- * call the tool, deserialize the prescription). The Generalist does not know or care which.
+ * <p>This interface is the AI-ready seam: {@code diagnose(Referral)} makes no assumption about
+ * implementation. Phase 1 is a Java class reading the objects in-process; a future Phase 2 could
+ * back the same interface with an out-of-process tool (serialize the referral, call the tool,
+ * deserialize the reply). The Generalist does not know or care which.
  */
 public interface Specialist extends Clinician {
 
@@ -19,11 +17,12 @@ public interface Specialist extends Clinician {
   Specialty domain();
 
   /**
-   * Diagnose the symptom against the observation. Returns a prescription, or empty when this
-   * specialist has nothing to offer for what the observation shows (the Generalist then relies on
-   * the others).
+   * Diagnose the referral. ALWAYS returns a reply carrying an {@link Assessment} (the "why",
+   * present even when the specialist declines), and a {@link Prescription} only when this
+   * specialist has a treatment for what the observation shows. A reply without a prescription is an
+   * explicit, reasoned decline — never silence.
    */
-  Optional<Prescription> diagnose(Symptom symptom, Observation observation);
+  ReferralReply diagnose(Referral referral);
 
   /**
    * A specialist's identity defaults to its specialty kebab-cased, e.g. CLUSTER_API →

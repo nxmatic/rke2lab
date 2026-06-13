@@ -15,12 +15,12 @@ class MedicalRecordTest {
 
   private static ConsultationReport report(
       String checkpointId, Symptom symptom, RemediationProgramRef... programs) {
-    final List<Prescription> prescriptions =
+    final List<ReferralReply> replies =
         List.of(programs).stream()
             .map(program -> new Prescription(program, Map.of(), "hint:" + program.id()))
+            .map(ReferralReplies::treating)
             .toList();
-    final RemediationPlan plan =
-        new RemediationPlan(symptom, prescriptions, "summary:" + symptom.id());
+    final RemediationPlan plan = new RemediationPlan(symptom, replies, "summary:" + symptom.id());
     return new ConsultationReport(checkpointId, List.of(), plan);
   }
 

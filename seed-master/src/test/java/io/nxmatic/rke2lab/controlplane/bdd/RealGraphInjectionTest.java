@@ -63,7 +63,9 @@ class RealGraphInjectionTest {
             new RemediationPlan(
                 Symptom.CONNECTION_REFUSED,
                 List.of(
-                    Prescription.of(RemediationProgramRef.RESTART_UNIT, Map.of(), "seeded hint")),
+                    ReferralReplies.treating(
+                        Prescription.of(
+                            RemediationProgramRef.RESTART_UNIT, Map.of(), "seeded hint"))),
                 "seeded generalist summary"));
     injectIntoSystemdAdapter(latest, seeded);
 

@@ -8,8 +8,10 @@ import java.util.Map;
  * it; a remediation program fills it. It names a treatment ({@link #programRef}, a typed catalog
  * entry) and gives the indications ({@link #payload}, structured info the program needs), plus a
  * {@link #humanHint} for the operator who _is_ the remediation program today (reads the prose,
- * acts). The dual form is deliberate: prose is rendered into the runbook now; the structured
- * payload keeps the model open for a real executor later, never reducing the action to a string.
+ * acts). The {@code humanHint} carries the operator phrasing of the ACTION ONLY — the reasoning
+ * (the "why" this treatment) lives in the reply's {@link Assessment}, not here. The dual form is
+ * deliberate: prose is rendered into the runbook now; the structured payload keeps the model open
+ * for a real executor later, never reducing the action to a string.
  */
 public record Prescription(
     RemediationProgramRef programRef, Map<String, Object> payload, String humanHint) {

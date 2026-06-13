@@ -29,7 +29,9 @@ class ConsultationReportReaderTest {
             RemediationProgramRef.RESTART_UNIT, Map.of("unit", "systemd-adapter"), "restart it");
     final RemediationPlan plan =
         new RemediationPlan(
-            Symptom.CONNECTION_REFUSED, List.of(prescription), "adapter unreachable");
+            Symptom.CONNECTION_REFUSED,
+            List.of(ReferralReplies.treating(prescription)),
+            "adapter unreachable");
     return new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(observation), plan);
   }
 
@@ -129,17 +131,18 @@ class ConsultationReportReaderTest {
   }
 
   @Test
-  void missing_prescriptions_yields_empty_list() {
+  void missing_replies_yields_empty_lists() {
     final RemediationPlan plan =
         new RemediationPlan(Symptom.CONNECTION_REFUSED, List.of(), "adapter unreachable");
     final ConsultationReport report =
         new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(), plan);
     final Map<String, Object> raw = new LinkedHashMap<>(report.toOutputMap());
     final Map<String, Object> planMap = new LinkedHashMap<>((Map<String, Object>) raw.get("plan"));
-    planMap.remove("prescriptions");
+    planMap.remove("replies");
     raw.put("plan", planMap);
 
     final ConsultationReport rebuilt = ConsultationReportReader.fromOutputMap(raw).orElseThrow();
+    assertTrue(rebuilt.plan().replies().isEmpty());
     assertTrue(rebuilt.plan().prescriptions().isEmpty());
   }
 
@@ -147,11 +150,13 @@ class ConsultationReportReaderTest {
   void prescription_without_payload_yields_empty_map() {
     final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
     final Map<String, Object> planMap = new LinkedHashMap<>((Map<String, Object>) raw.get("plan"));
-    final List<?> prescriptions = (List<?>) planMap.get("prescriptions");
+    final List<?> replies = (List<?>) planMap.get("replies");
+    final Map<String, Object> reply = new LinkedHashMap<>((Map<String, Object>) replies.get(0));
     final Map<String, Object> presc =
-        new LinkedHashMap<>((Map<String, Object>) prescriptions.get(0));
+        new LinkedHashMap<>((Map<String, Object>) reply.get("prescription"));
     presc.remove("payload");
-    planMap.put("prescriptions", List.of(presc));
+    reply.put("prescription", presc);
+    planMap.put("replies", List.of(reply));
     raw.put("plan", planMap);
 
     final Prescription rebuilt =
@@ -164,15 +169,109 @@ class ConsultationReportReaderTest {
   }
 
   @Test
-  void unparseable_prescription_programRef_is_skipped() {
+  void unparseable_prescription_programRef_is_dropped_but_reply_keeps_its_assessment() {
     final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
     final Map<String, Object> planMap = new LinkedHashMap<>((Map<String, Object>) raw.get("plan"));
-    final Map<String, Object> garbage =
-        Map.of("programRef", "no-such-program", "payload", Map.of(), "humanHint", "ignored");
-    planMap.put("prescriptions", List.of(garbage));
+    final List<?> replies = (List<?>) planMap.get("replies");
+    final Map<String, Object> reply = new LinkedHashMap<>((Map<String, Object>) replies.get(0));
+    reply.put(
+        "prescription",
+        Map.of("programRef", "no-such-program", "payload", Map.of(), "humanHint", "ignored"));
+    planMap.put("replies", List.of(reply));
     raw.put("plan", planMap);
 
-    final ConsultationReport rebuilt = ConsultationReportReader.fromOutputMap(raw).orElseThrow();
-    assertTrue(rebuilt.plan().prescriptions().isEmpty());
+    final RemediationPlan rebuilt =
+        ConsultationReportReader.fromOutputMap(raw).orElseThrow().plan();
+    // The malformed prescription drops, but the reply survives — its assessment (the "why") stands.
+    assertTrue(rebuilt.prescriptions().isEmpty());
+    assertEquals(1, rebuilt.replies().size());
+    assertFalse(rebuilt.replies().get(0).hasPrescription());
+  }
+
+  @Test
+  void reply_without_a_parseable_assessment_is_dropped() {
+    final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
+    final Map<String, Object> planMap = new LinkedHashMap<>((Map<String, Object>) raw.get("plan"));
+    final List<?> replies = (List<?>) planMap.get("replies");
+    final Map<String, Object> reply = new LinkedHashMap<>((Map<String, Object>) replies.get(0));
+    reply.remove("assessment");
+    planMap.put("replies", List.of(reply));
+    raw.put("plan", planMap);
+
+    // A reply with no "why" is not a reply — it is dropped, leaving an empty (but valid) plan.
+    final RemediationPlan rebuilt =
+        ConsultationReportReader.fromOutputMap(raw).orElseThrow().plan();
+    assertTrue(rebuilt.replies().isEmpty());
+  }
+
+  @Test
+  void round_trips_a_declined_reply_preserving_the_why() {
+    final Assessment assessment =
+        Assessment.of(
+            SchemaRef.of("dbus-tcp/declined/v1"),
+            Map.of(),
+            "not a dbus-TCP symptom — the systemd adapter has no treatment for timeout");
+    final ReferralReply reply = ReferralReply.reconstructed(assessment, Optional.empty());
+    final RemediationPlan plan =
+        new RemediationPlan(Symptom.CONNECTION_REFUSED, List.of(reply), "adapter unreachable");
+    final ConsultationReport report =
+        new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(), plan);
+
+    final ConsultationReport rebuilt =
+        ConsultationReportReader.fromOutputMap(report.toOutputMap()).orElseThrow();
+
+    assertEquals(1, rebuilt.plan().replies().size());
+    final ReferralReply rebuiltReply = rebuilt.plan().replies().get(0);
+    assertFalse(rebuiltReply.hasPrescription());
+    assertEquals("dbus-tcp/declined/v1", rebuiltReply.assessment().schemaRef().id());
+    assertEquals(
+        "not a dbus-TCP symptom — the systemd adapter has no treatment for timeout",
+        rebuiltReply.assessment().summary());
+  }
+
+  @Test
+  void round_trips_a_prescribing_reply_preserving_its_assessment() {
+    final Assessment assessment =
+        Assessment.of(
+            SchemaRef.of("dbus-tcp/connection-refused/v1"),
+            Map.of("unit", "rke2lab-dbus-tcp-system-bus.service"),
+            "dbus-TCP endpoint refused the connection");
+    final Prescription prescription =
+        Prescription.of(
+            RemediationProgramRef.RESTART_UNIT,
+            Map.of("unit", "rke2lab-dbus-tcp-system-bus.service"),
+            "incus exec master -- systemctl restart rke2lab-dbus-tcp-system-bus.service");
+    final ReferralReply reply = ReferralReply.reconstructed(assessment, Optional.of(prescription));
+    final RemediationPlan plan =
+        new RemediationPlan(Symptom.CONNECTION_REFUSED, List.of(reply), "adapter unreachable");
+    final ConsultationReport report =
+        new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(), plan);
+
+    final ConsultationReport rebuilt =
+        ConsultationReportReader.fromOutputMap(report.toOutputMap()).orElseThrow();
+
+    assertEquals(1, rebuilt.plan().replies().size());
+    final ReferralReply rebuiltReply = rebuilt.plan().replies().get(0);
+    assertTrue(rebuiltReply.hasPrescription());
+    assertEquals(
+        RemediationProgramRef.RESTART_UNIT, rebuiltReply.prescription().get().programRef());
+    assertEquals("dbus-tcp/connection-refused/v1", rebuiltReply.assessment().schemaRef().id());
+    assertEquals("dbus-TCP endpoint refused the connection", rebuiltReply.assessment().summary());
+  }
+
+  @Test
+  void unknown_reply_key_survives_reconstruction() {
+    final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
+    final Map<String, Object> planMap = new LinkedHashMap<>((Map<String, Object>) raw.get("plan"));
+    final List<?> replies = (List<?>) planMap.get("replies");
+    final Map<String, Object> reply = new LinkedHashMap<>((Map<String, Object>) replies.get(0));
+    reply.put("correspondence", Map.of("seenBy", "future"));
+    planMap.put("replies", List.of(reply));
+    raw.put("plan", planMap);
+
+    final Optional<ConsultationReport> rebuilt = ConsultationReportReader.fromOutputMap(raw);
+    assertTrue(rebuilt.isPresent());
+    assertEquals(1, rebuilt.get().plan().replies().size());
+    assertEquals("dbus refused", rebuilt.get().observations().get(0).summary());
   }
 }

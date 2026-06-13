@@ -142,14 +142,34 @@ of what it meant (`Dossier`) and tightened three others to standard clinical ter
   frees the word `Diagnosis` for a future return type.
 |===
 
-== Reserved for step 2 (not yet built)
+== Referral round-trip (built)
 
-* *Diagnosis* — the intended return of `Specialist.diagnose(...)`: it would carry an *Assessment*
-  (always) plus an optional `Prescription`, so a specialist always communicates its findings even
-  when it has no treatment.
-* *Assessment* — the SOAP "assessment": the specialist's reasoning/"why", persisted on the
-  `ConsultationReport` and thus in the `MedicalRecord`, readable by every practitioner. The
-  `MedicalRecord` is the shared communication channel between practitioners.
+* *ReferralReply* — the RESPONSE a specialist returns from `Specialist.diagnose(Referral)`: ALWAYS
+  carries an `Assessment` (the specialist's reasoning, the "why"), OPTIONALLY a `Prescription` (the
+  action to take). Named for the request↔response round-trip. A "nothing to offer" reply is one
+  _with_ an `Assessment` and _without_ a `Prescription` — the why survives even when the specialist
+  has no treatment. Holds a transient back-reference to the `Referral` (present on the live
+  round-trip; empty on read-back from persistence). NOTE: the word `Diagnosis` (previously reserved
+  as a return-type name in the glossary) was DROPPED as ambiguous (the act of diagnosing vs the
+  document) in favour of `ReferralReply`; there is no `Diagnosis` type.
+* *Referral* — the REQUEST a generalist sends a specialist: the patient identity, the symptom (the
+  routing key, the "why" behind the referral), the `Observation` read first (the snapshot the patient
+  presented), and a transient read-only reference to the patient's full `MedicalRecord` (a seam for a
+  future history-aware specialist; the current driver specialist does not yet read it). A transient
+  object, never serialized.
+* *Assessment* — the SOAP "assessment": the specialist's reasoning about what it found. ALWAYS
+  present in a `ReferralReply` (a specialist may have nothing to prescribe but always explains why).
+  Self-describing via a `SchemaRef` (the declared shape): carries an open structured `payload` (the
+  reasoning details, whose shape is declared by the `SchemaRef`) and a human `summary` (never blank —
+  a reply without reasoning is incomplete state). Persisted on the `ConsultationReport` and thus in
+  the `MedicalRecord` (the channel between practitioners across visits), and rendered distinctly in
+  the runbook under a `🔬 Assessment` line (separate from the `℞ Mitigation`).
+* *SchemaRef* — an open, self-declared coordinate a specialist uses to declare the shape of its
+  reasoning `payload` in an `Assessment` (e.g., `"dbus-tcp/connection-refused/v1"`). Open set (NOT
+  an enum, NO central registry) — any non-blank string is valid. Round-tripped verbatim through
+  persistence; resolving or validating a payload against it is a future concern with no consumer yet
+  in this chunk (the runbook renders only the human `summary`; the reader tolerantly reconstructs
+  both `schemaRef` and `payload` exactly as `Observation.details` are already reconstructed).
 
 === Access-control + correlation layer (keystone, design)
 
@@ -157,7 +177,7 @@ These name the access-control model. The medical metaphor is a design tool, not 
 healthcare *jargon* identifiers (NPI, MRN, EHR) are deliberately NOT code terms: each is just a
 synonym for something already named. We keep only terms that are crystal-clear to a developer. See
 link:healthsystem-access-control-design.adoc[the HealthSystem design] and
-link:integration-atlas.adoc[the integration atlas].
+link:../integration-atlas.adoc[the integration atlas].
 
 * *HealthSystem* — the per-run keystone that holds the shared `MedicalRecordRegistry` and the
   `GrantPolicy`, employs the clinicians, and admits the current patient (flat: no facility tier

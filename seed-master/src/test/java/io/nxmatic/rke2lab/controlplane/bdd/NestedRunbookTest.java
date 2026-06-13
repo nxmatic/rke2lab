@@ -23,7 +23,6 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -300,12 +299,18 @@ class NestedRunbookTest {
     }
 
     @Override
-    public Optional<Prescription> diagnose(Symptom symptom, Observation observation) {
-      return Optional.of(
+    public ReferralReply diagnose(Referral referral) {
+      final Assessment assessment =
+          Assessment.of(
+              SchemaRef.of("network/check-connectivity/v1"),
+              Map.of("symptom", referral.symptom().id()),
+              "the API endpoint may be unreachable — verify network connectivity first");
+      final Prescription prescription =
           Prescription.of(
               RemediationProgramRef.CHECK_CONNECTIVITY,
-              Map.of("symptom", symptom.id()),
-              "check connectivity to the API endpoint"));
+              Map.of("symptom", referral.symptom().id()),
+              "check connectivity to the API endpoint");
+      return ReferralReply.prescribing(referral, assessment, prescription);
     }
   }
 

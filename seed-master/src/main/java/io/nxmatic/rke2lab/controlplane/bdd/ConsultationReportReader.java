@@ -26,7 +26,8 @@ final class ConsultationReportReader {
    * them: {@code raw} must be a map, {@code checkpointId} must be a present string, and the {@code
    * plan} must carry a parseable {@link Symptom} (the diagnosis is the reason a consultation
    * exists, and {@link RemediationPlan} demands a non-null symptom). Everything else degrades to
-   * empty/default.
+   * empty/default — including replies, which degrade individually: a reply with no parseable {@link
+   * Assessment} (no "why") is dropped, but its absence does not sink the plan.
    */
   public static Optional<ConsultationReport> fromOutputMap(Object raw) {
     if (!(raw instanceof Map<?, ?> map)) {
@@ -87,19 +88,53 @@ final class ConsultationReportReader {
     return Optional.of(
         new RemediationPlan(
             symptom.get(),
-            prescriptionsFrom(map.get("prescriptions")),
+            repliesFrom(map.get("replies")),
             stringOrEmpty(map.get("generalistSummary"))));
   }
 
-  private static List<Prescription> prescriptionsFrom(Object raw) {
+  private static List<ReferralReply> repliesFrom(Object raw) {
     if (!(raw instanceof List<?> list)) {
       return List.of();
     }
-    final List<Prescription> prescriptions = new ArrayList<>(list.size());
+    final List<ReferralReply> replies = new ArrayList<>(list.size());
     for (Object element : list) {
-      prescriptionFrom(element).ifPresent(prescriptions::add);
+      replyFrom(element).ifPresent(replies::add);
     }
-    return prescriptions;
+    return replies;
+  }
+
+  /**
+   * A reply needs its {@link Assessment} (the "why"); without a parseable one it is not a reply and
+   * is dropped. The prescription is optional — a malformed or absent one yields empty, and the
+   * reply keeps its assessment.
+   */
+  private static Optional<ReferralReply> replyFrom(Object raw) {
+    if (!(raw instanceof Map<?, ?> map)) {
+      return Optional.empty();
+    }
+    final Optional<Assessment> assessment = assessmentFrom(map.get("assessment"));
+    if (assessment.isEmpty()) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        ReferralReply.reconstructed(assessment.get(), prescriptionFrom(map.get("prescription"))));
+  }
+
+  private static Optional<Assessment> assessmentFrom(Object raw) {
+    if (!(raw instanceof Map<?, ?> map)) {
+      return Optional.empty();
+    }
+    // No declared shape (schemaRef) = unusable; no summary = the "why" is missing. Degrade rather
+    // than throw on the Assessment invariants (non-null schemaRef, non-blank summary).
+    final Optional<SchemaRef> schemaRef = SchemaRef.parse(stringOrEmpty(map.get("schemaRef")));
+    if (schemaRef.isEmpty()) {
+      return Optional.empty();
+    }
+    final String summary = stringOrEmpty(map.get("summary"));
+    if (summary.isBlank()) {
+      return Optional.empty();
+    }
+    return Optional.of(Assessment.of(schemaRef.get(), mapOrEmpty(map.get("payload")), summary));
   }
 
   private static Optional<Prescription> prescriptionFrom(Object raw) {

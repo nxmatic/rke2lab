@@ -15,12 +15,15 @@ class DoctorRecordsTest {
 
   private static ConsultationReport report(
       String checkpointId, Symptom symptom, RemediationProgramRef... programs) {
-    final List<Prescription> prescriptions =
-        java.util.Arrays.stream(programs).map(p -> Prescription.of(p, Map.of(), "hint")).toList();
+    final List<ReferralReply> replies =
+        java.util.Arrays.stream(programs)
+            .map(p -> Prescription.of(p, Map.of(), "hint"))
+            .map(ReferralReplies::treating)
+            .toList();
     return new ConsultationReport(
         checkpointId,
         List.of(Observation.failed(symptom, "summary", Map.of())),
-        new RemediationPlan(symptom, prescriptions, "summary"));
+        new RemediationPlan(symptom, replies, "summary"));
   }
 
   @Test
