@@ -18,6 +18,16 @@ public final class InterventionLedgerLayout {
   private InterventionLedgerLayout() {}
 
   /**
+   * The typed identity of the intervention-ledger stack. The writer (C3, via the Automation API)
+   * and the reader (C4, via {@link io.nxmatic.rke2lab.pulumi.automation.StackHandle}) resolve the
+   * stack coordinate through this method, so project/stack parameter swaps become type errors at
+   * compile time.
+   */
+  public static StackCoordinate ledger() {
+    return StackCoordinate.builder().project(PROJECT).stack(STACK).build();
+  }
+
+  /**
    * The ledger's own stacks directory under a file-backend root, with {@link #PROJECT} pre-bound.
    * Mirrors the reader path, which locates a stack through {@link
    * PulumiBackendLayout#stacksDir(Path, String)} (see {@code LiveMedicalRecordRegistry}).

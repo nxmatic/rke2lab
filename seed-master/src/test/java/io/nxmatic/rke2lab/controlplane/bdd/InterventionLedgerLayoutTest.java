@@ -30,4 +30,22 @@ class InterventionLedgerLayoutTest {
         PulumiBackendLayout.stacksDir(backendDir, "intervention-ledger"),
         InterventionLedgerLayout.stacksDir(backendDir));
   }
+
+  @Test
+  void ledger_returns_stack_coordinate_with_project_and_stack() {
+    final StackCoordinate coordinate = InterventionLedgerLayout.ledger();
+
+    assertEquals(
+        StackCoordinate.builder().project("intervention-ledger").stack("dev").build(), coordinate);
+  }
+
+  @Test
+  void ledger_coordinate_project_matches_PROJECT_constant() {
+    assertEquals(InterventionLedgerLayout.PROJECT, InterventionLedgerLayout.ledger().project());
+  }
+
+  @Test
+  void ledger_coordinate_stack_matches_STACK_constant() {
+    assertEquals(InterventionLedgerLayout.STACK, InterventionLedgerLayout.ledger().stack());
+  }
 }
