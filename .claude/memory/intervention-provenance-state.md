@@ -1,17 +1,82 @@
 ---
 name: intervention-provenance-state
-description: "★ PARKED 2026-06-14, branch improve/operator-intervention-provenance NOT merged (16 commits, all on-branch). A first-class Intervention-with-Provenance for the doctor so efficacyOf stops crediting un-applied prescriptions. Increments A (Intervention types) + B (Expectation) + C1/C2b (Layout/StackCoordinate) BUILT & reviewed; C3 writer + 2 spikes BUILT then SUPERSEDED (wrong model — see [[model-substrate-alignment]]). HALTED because the chantier outgrew itself: the model became 'specialist-as-ledger + multi-time consultation + two memories' (see [[specialist-as-ledger-northstar]]). RESUME = FRESH session: finish that brainstorm → write ONE spec of the full model → decide what of A/B/C survives → re-spec & build. Nothing merged; the fresh brainstorm decides what to keep."
+description: "★ EXECUTING 2026-06-14 on NEW branch feature/problem-oriented-provenance (worktree .claude/worktrees/feature+problem-oriented-provenance, fresh from origin/main). The 2026-06-14 brainstorm RESOLVED the model (problem-oriented medical record; spec+plan committed in wip/superpowers/). Subagent-driven exec UNDERWAY: Tasks 0-4 of 14 DONE & green (foundation cherry-picked + ProblemRef + Expectation/Intervention tagged). The OLD branch improve/operator-intervention-provenance stays a FROZEN cherry-pick reservoir (do not touch). See [[specialist-as-ledger-northstar]] for the model, [[model-substrate-alignment]] for why the old C3 writer was dropped."
 metadata: 
   node_type: memory
   type: project
   originSessionId: 6fa6b30b-f578-4ee4-9ffa-806a1172c020
 ---
 
-**★★ PARKED — RESUME POINT (read this first, 2026-06-14).** The branch is parked, NOT merged, by
-deliberate decision: A+B are LATENT (Expectation is written/read but nothing consumes it yet — D was
-never built), and the fresh brainstorm may relocate where the Expectation lives, so merging latent code
-that could churn was rejected. The chantier outgrew its original scope mid-flight — it is now the
-"specialist-as-ledger" model.
+**★★ EXECUTING — RESUME POINT (read this first, 2026-06-14 PM).** The brainstorm is DONE and the model
+is RESOLVED (problem-oriented medical record). Work is now on a NEW branch
+`feature/problem-oriented-provenance` (worktree `.claude/worktrees/feature+problem-oriented-provenance`,
+branched FRESH from origin/main; sops re-smudged on creation per [[sops-worktree-smudge-noise]]).
+
+SPEC: `wip/superpowers/specs/2026-06-14-problem-oriented-provenance-design.md` (committed).
+PLAN: `wip/superpowers/plans/2026-06-14-problem-oriented-provenance.md` (committed, 14 tasks / 6 increments).
+Exec mode = subagent-driven (fresh subagent per task + spec-review then code-quality review).
+
+**★★ SHIPPED TO MAIN 2026-06-14 (origin/main `7e5ec7d1`, pushed). All 14 tasks + final review done;
+260 tests green (1 unrelated pre-existing skip). The 3 `wip/` commits (spec+plan) were STRIPPED at
+merge via `git rebase --onto main fbc1d9af` (they were contiguous pure-wip at the base → 24 code-only
+commits replayed, main has zero `wip/`), then FF + push. Worktree + feature branch REMOVED (branch
+`-d` confirmed fully merged). The ONE remaining item = the e2e LIVE proof, GATED on
+[[pulumi-stack-per-worktree-backlog]] — it's the operator's `pulumi up` gesture, not Claude's; every
+0-5 task is already verified Java-pure + `@TempDir` (incl. a real headless `up()` in DriftReviewWiringTest).**
+
+Commits (origin/main..HEAD, in order): foundation cherry-picks → `f80d4a5c` ProblemRef →
+`fc432de0` Expectation-by-ProblemRef → `d70b862c` Intervention-tagged → `381da85c` Resource+Writer
+(STABLE name `"intervention"`) → `835b3e29` LedgerSource → `f891c20e` RecordInterventionCommand →
+`e34b75eb` ProblemReview → `f2eb4a2f` DriftSpecialist.review → `30431adc` Generalist.reviewOpenProblems
+(+BUILDER, see [[builder-for-multisite-constructor]]) → `4235e362` idempotent inference →
+`1c90a60b` reviewDriftAtReconstruction wiring → `d89e9a11` confounded efficacy (the payoff) →
+`c1b8b842` restore manifest.lock (worktree re-lock noise, see below) → `82932bcf` final-review fixes.
+
+WHAT SHIPPED, by increment:
+- **0-3 (substrate):** ProblemRef = (Checkpoint, Optional<Symptom>) deterministic join key
+  (`explains` = checkpoint-only covers all symptoms / symptom-specific covers its own;
+  `explainsSymptom` checkpoint-agnostic = efficacy key). Expectation re-indexed by ProblemRef.
+  Intervention tagged + persisted via STABLE-name InterventionResource + history-fold (writer/reader
+  twins of SystemdAdapterResource/MedicalRecordReader — the [[model-substrate-alignment]] win; the
+  "make the name unique" CRITICAL was correctly REJECTED).
+- **Task 8:** RecordInterventionCommand operator CLI (`--problem/--what/--provenance/--prescription-ref/
+  --when/--backend`; testable core takes injected Instant + writer, never reads the wall clock).
+- **4 (drift specialist, the heart):** ProblemReview (transient) → DriftSpecialist.review (window
+  `(prior,next]` filtered by explains + !=PULUMI_ENGINE; OPERATOR_MANUAL → confounded-DECLARED no-append;
+  prior EXTERNAL_CHANGE_DETECTED in window → confounded-inferred no-append = IDEMPOTENT; else infer +
+  append; both assessment-only `ReferralReply.reconstructed`, no Prescription) → Generalist.reviewOpenProblems
+  (folds the record; held OUTSIDE acute roster; Generalist gained a BUILDER, no-op-writer default) →
+  BootstrapPipeline.reviewDriftAtReconstruction (symptom-INDEPENDENT, every run, no-op when no file:// backend).
+- **5 (the payoff):** TreatmentEfficacy.Attempt(+confounded); efficacyOf(Symptom, InterventionLedger)
+  marks confounded when a non-PULUMI_ENGINE intervention in the window explainsSymptom; everWorked()
+  excludes confounded; single-arg DELETED (no shim), all 14 callers migrated.
+
+FINAL REVIEW (full-branch reviewer subagent, fixes in `d80a1023`): one real CRITICAL — LedgerSource.load()
+swallowed EVERY StackException into empty(), but absence never throws (entries() returns [] on a missing
+history dir), so the catch fired ONLY on corruption/I-O → silently resurrecting the false-efficacy bug.
+FIXED to propagate + a corruption-propagation test. Plus: malformed `--when` → uniform usage
+IllegalArgumentException (was escaping main's catch) + test; DriftSpecialist two confounded-inferred letters
+folded into one helper; stale InterventionResource javadoc (described the rejected unique-name design)
+corrected. The stable-name + history-fold design was re-affirmed as correct.
+
+★ USER CORRECTION mid-review (the principle, now its own note → [[validate-at-the-boundary]]): the
+reviewer's "add requireNonNull to Intervention" was REJECTED. Validation belongs at the BOUNDARY DELEGATE
+that plugs a foreign-API hole, NOT as a defensive guard in our own domain type. `parseWhen` (adapts
+`Instant.parse`'s DateTimeParseException — a foreign API breaking our contract) is the legit delegate that
+"bouche le trou". But `Intervention`'s only foreign-data entry is `InterventionReader`, ALREADY rejecting a
+missing required field to Optional.empty() at the boundary — so a requireNonNull in the record only guards
+OUR OWN callers = defensive smell. ALL guards removed (incl. the pre-existing `problem` one, for uniformity);
+the record enforces no-incomplete-state STRUCTURALLY (can't construct without every field).
+
+Exec discipline that held all session: CONTROLLER runs the authoritative test (`-am` + `skipCache`),
+reviewers READ CODE only; the CRITICAL was VERIFIED against the substrate (StackHistory.entries() source)
+before fixing, not taken on faith.
+
+---
+
+**(historical — the parking decision, now superseded by the EXECUTING banner above)** The OLD branch was
+parked because A+B were latent and the brainstorm might relocate the Expectation. The brainstorm resolved
+it (problem-oriented model), so A/B/C were cherry-picked forward and extended with `ProblemRef`.
 
 **★ WHERE THE BRANCH LIVES NOW (workspace cleanup, 2026-06-14).** The branch was extracted from the main
 checkout into a DEDICATED worktree: `.claude/worktrees/improve+operator-intervention-provenance` (tip
