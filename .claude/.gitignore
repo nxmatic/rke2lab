@@ -3,6 +3,10 @@ checkpoint-*.md
 
 # Diagram preview scratch — overwritten every query, never committed
 claude-preview.adoc
+diag-*.svg
+
+# Per-conversation git worktrees (Workspace isolation rule) — never committed
+worktrees/
 
 # Local, machine-specific Claude settings
 settings.local.json
