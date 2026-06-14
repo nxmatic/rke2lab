@@ -72,13 +72,6 @@ on-activate = '''
   if command -v gh >/dev/null 2>&1 && [ -z "${GH_TOKEN:-}" ]; then
     GH_TOKEN="$(gh auth token 2>/dev/null)" && export GH_TOKEN
   fi
-  # Activate the repo-tracked git hooks (.githooks/) so the wip/-on-main guard travels with
-  # every clone — .git/hooks/ is local-only and would not be shared. Idempotent.
-  if [ -d "${FLOX_ENV_PROJECT}/.githooks" ] && command -v git >/dev/null 2>&1; then
-    if [ "$(git -C "${FLOX_ENV_PROJECT}" config core.hooksPath 2>/dev/null)" != ".githooks" ]; then
-      git -C "${FLOX_ENV_PROJECT}" config core.hooksPath .githooks
-    fi
-  fi
 '''
 
 
