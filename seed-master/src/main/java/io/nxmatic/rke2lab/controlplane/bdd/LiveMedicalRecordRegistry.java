@@ -49,6 +49,14 @@ public final class LiveMedicalRecordRegistry implements MedicalRecordRegistry {
     return Path.of(pulumiBackendUrl.substring(FILE_SCHEME.length()));
   }
 
+  /**
+   * The file-backend root this registry reads from, or {@code null} when no file:// backend is
+   * configured.
+   */
+  public Path backendDir() {
+    return backendDir;
+  }
+
   @Override
   public MedicalRecord recordFor(Patient patient) {
     return cache.computeIfAbsent(patient, this::reconstruct);

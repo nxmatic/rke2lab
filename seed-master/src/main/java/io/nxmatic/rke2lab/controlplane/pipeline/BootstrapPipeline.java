@@ -6,11 +6,17 @@ import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterSpecialist;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.bdd.DbusTcpSpecialist;
+import io.nxmatic.rke2lab.controlplane.bdd.DriftSpecialist;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.bdd.HealthSystem;
+import io.nxmatic.rke2lab.controlplane.bdd.InterventionLedger;
+import io.nxmatic.rke2lab.controlplane.bdd.InterventionLedgerLayout;
+import io.nxmatic.rke2lab.controlplane.bdd.InterventionLedgerSource;
 import io.nxmatic.rke2lab.controlplane.bdd.LiveMedicalRecordRegistry;
+import io.nxmatic.rke2lab.controlplane.bdd.MedicalRecord;
 import io.nxmatic.rke2lab.controlplane.bdd.NetworkSpecialist;
 import io.nxmatic.rke2lab.controlplane.bdd.Patient;
+import io.nxmatic.rke2lab.controlplane.bdd.PulumiInterventionLedgerWriter;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.BboxStage;
@@ -21,6 +27,7 @@ import io.nxmatic.rke2lab.controlplane.pipeline.stages.SystemdAdapterStage;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -57,6 +64,23 @@ public final class BootstrapPipeline {
 
   public static ConfiguringPipeline forCluster(BootstrapConfig config, ControlplanePolicy policy) {
     return new ConfiguringPipeline(new PipelineState(config, policy));
+  }
+
+  /**
+   * The symptom-independent follow-up: after the record is reconstructed for the run's patient,
+   * load the intervention ledger and let the generalist review every resolved problem. The drift
+   * specialist persists any inferred external change through its own writer. A no-op when no
+   * file:// backend is configured (nothing to load or persist).
+   */
+  static void reviewDriftAtReconstruction(HealthSystem healthSystem, Path backendDir) {
+    if (backendDir == null) {
+      return;
+    }
+    final Generalist generalist = healthSystem.generalist();
+    final MedicalRecord record = generalist.recordForCurrentPatient();
+    final InterventionLedger ledger =
+        new InterventionLedgerSource(backendDir, InterventionLedgerLayout.ledger()).load();
+    generalist.reviewOpenProblems(record, ledger);
   }
 
   public static final class ConfiguringPipeline {
@@ -142,6 +166,13 @@ public final class BootstrapPipeline {
           state.readinessLogger != null ? state.readinessLogger : msg -> {};
       final LiveMedicalRecordRegistry registry = LiveMedicalRecordRegistry.fromEnvironment(logger);
       final Patient patient = currentPatient(state.pulumiMode);
+      final Path backendDir = registry.backendDir();
+      // No file:// backend → nothing to persist against; the drift specialist runs with a no-op
+      // writer (inference computed, never stored), mirroring the registry's no-backend degrade.
+      final DriftSpecialist driftSpecialist =
+          backendDir != null
+              ? new DriftSpecialist(new PulumiInterventionLedgerWriter(backendDir))
+              : new DriftSpecialist(intervention -> {});
       state.healthSystem =
           HealthSystem.admit(
               patient,
@@ -150,7 +181,9 @@ public final class BootstrapPipeline {
                   new DbusTcpSpecialist(state.config),
                   new NetworkSpecialist(),
                   new ClusterSpecialist()),
+              driftSpecialist,
               logger);
+      reviewDriftAtReconstruction(state.healthSystem, backendDir);
     }
 
     private static Patient currentPatient(boolean pulumiMode) {

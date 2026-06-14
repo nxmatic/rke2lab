@@ -20,9 +20,14 @@ class HealthSystemTest {
     return List.of(new DbusTcpSpecialist(OperatorConfiguration.mandatory().asBootstrapConfig()));
   }
 
+  private static DriftSpecialist noopDrift() {
+    return new DriftSpecialist(intervention -> {});
+  }
+
   @Test
   void admit_employs_a_generalist_that_can_read_its_own_patient() {
-    final HealthSystem hs = HealthSystem.admit(DEV, singlePatientRegistry(), roster(), msg -> {});
+    final HealthSystem hs =
+        HealthSystem.admit(DEV, singlePatientRegistry(), roster(), noopDrift(), msg -> {});
     final Generalist generalist = hs.generalist();
     assertNotNull(generalist);
     assertEquals(DEV, generalist.recordForCurrentPatient().patient());
@@ -30,7 +35,8 @@ class HealthSystemTest {
 
   @Test
   void the_employed_generalist_still_consults_normally() {
-    final HealthSystem hs = HealthSystem.admit(DEV, singlePatientRegistry(), roster(), msg -> {});
+    final HealthSystem hs =
+        HealthSystem.admit(DEV, singlePatientRegistry(), roster(), noopDrift(), msg -> {});
     final Observation observation =
         Observation.failed(Symptom.CONNECTION_REFUSED, "dbus refused", java.util.Map.of());
     final RemediationPlan plan = hs.generalist().consult(Symptom.CONNECTION_REFUSED, observation);
@@ -42,7 +48,7 @@ class HealthSystemTest {
   void the_admitted_generalist_reads_its_own_patient_but_a_stranger_is_outside_the_cohort() {
     // cohortFor surfaces only DEV at admission, so only DEV is granted.
     final MedicalRecordRegistry registry = patient -> new MedicalRecord(patient, List.of());
-    final HealthSystem hs = HealthSystem.admit(DEV, registry, roster(), msg -> {});
+    final HealthSystem hs = HealthSystem.admit(DEV, registry, roster(), noopDrift(), msg -> {});
     // Self-read works (admitted + self-granted).
     assertEquals(DEV, hs.generalist().recordForCurrentPatient().patient());
     // The cohort is exactly the admitted patient — no ungranted stranger leaks in.

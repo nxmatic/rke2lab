@@ -24,12 +24,14 @@ public final class HealthSystem {
 
   /**
    * Build the keystone: hold the registry, admit the patient (mint this run's grants), employ the
-   * generalist with a credentialed access bound to its id.
+   * generalist (holding the run's {@link DriftSpecialist}) with a credentialed access bound to its
+   * id.
    */
   public static HealthSystem admit(
       Patient patient,
       MedicalRecordRegistry registry,
       List<Specialist> specialists,
+      DriftSpecialist driftSpecialist,
       Consumer<String> logger) {
     final ClinicianId generalistId = Generalist.GENERALIST_ID;
     final List<Patient> cohortPatients =
@@ -40,7 +42,12 @@ public final class HealthSystem {
             .withCohortGrant(generalistId, cohortPatients);
     final ClinicalAccess access =
         new ClinicalAccess(generalistId, patient, policy, registry, logger);
-    return new HealthSystem(Generalist.builder().specialists(specialists).access(access).build());
+    return new HealthSystem(
+        Generalist.builder()
+            .specialists(specialists)
+            .access(access)
+            .driftSpecialist(driftSpecialist)
+            .build());
   }
 
   /** The employed generalist a stage consults. */
