@@ -87,7 +87,8 @@ class SeededMedicalHistoryTest {
     assertTrue(history.isChronic());
 
     // v1 prescribed a restart, v2 still raised the symptom → the treatment did not work.
-    final TreatmentEfficacy efficacy = record.efficacyOf(Symptom.CONNECTION_REFUSED);
+    final TreatmentEfficacy efficacy =
+        record.efficacyOf(Symptom.CONNECTION_REFUSED, InterventionLedger.empty());
     assertEquals(1, efficacy.attempts().size());
     assertEquals(RemediationProgramRef.RESTART_UNIT.id(), efficacy.attempts().get(0).programRef());
     assertTrue(efficacy.attempts().get(0).recurred());

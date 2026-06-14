@@ -47,7 +47,7 @@ public record MedicalRecord(Patient patient, List<Visit> visits) {
     return new SymptomHistory(symptom, occurrences);
   }
 
-  public TreatmentEfficacy efficacyOf(Symptom symptom) {
+  public TreatmentEfficacy efficacyOf(Symptom symptom, InterventionLedger ledger) {
     final List<TreatmentEfficacy.Attempt> attempts = new ArrayList<>();
     for (int i = 0; i < visits.size(); i++) {
       final Visit visit = visits.get(i);
@@ -60,9 +60,17 @@ public record MedicalRecord(Patient patient, List<Visit> visits) {
       // us nothing.
       if (treatment.isPresent() && hasFollowing) {
         final Visit next = visits.get(i + 1);
+        final boolean recurred = next.symptomsRaised().contains(symptom);
+        // Confounded: a non-engine intervention in the window (visit.when(), next.when()] explains
+        // this symptom, so the resolution cannot be credited to the prescription. explainsSymptom
+        // is checkpoint-agnostic — the symptom is the efficacy join key.
+        final boolean confounded =
+            ledger.between(visit.when(), next.when()).stream()
+                .filter(it -> it.provenance() != Provenance.PULUMI_ENGINE)
+                .anyMatch(it -> it.problem().explainsSymptom(symptom));
         attempts.add(
             new TreatmentEfficacy.Attempt(
-                visit.version(), treatment.get().id(), next.symptomsRaised().contains(symptom)));
+                visit.version(), treatment.get().id(), recurred, confounded));
       }
     }
     return new TreatmentEfficacy(symptom, attempts);

@@ -90,7 +90,9 @@ public final class Generalist implements Clinician {
     final List<MedicalRecord> cohort = access.cohort();
     final long withSymptom = cohort.stream().filter(r -> r.historyOf(symptom).count() > 0).count();
     final long treatedAndResolved =
-        cohort.stream().filter(r -> r.efficacyOf(symptom).everWorked()).count();
+        cohort.stream()
+            .filter(r -> r.efficacyOf(symptom, InterventionLedger.empty()).everWorked())
+            .count();
     return "cohort: "
         + symptom.id()
         + " seen on "

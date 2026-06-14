@@ -125,7 +125,8 @@ class MedicalRecordTest {
                     report("c3", Symptom.CONNECTION_REFUSED, RemediationProgramRef.RESTART_UNIT)),
                 visit(4, report("c4", Symptom.CONNECTION_REFUSED))));
 
-    TreatmentEfficacy efficacy = record.efficacyOf(Symptom.CONNECTION_REFUSED);
+    TreatmentEfficacy efficacy =
+        record.efficacyOf(Symptom.CONNECTION_REFUSED, InterventionLedger.empty());
 
     assertEquals(1, efficacy.attempts().size());
     TreatmentEfficacy.Attempt attempt = efficacy.attempts().get(0);
@@ -146,7 +147,8 @@ class MedicalRecordTest {
                     report("c3", Symptom.CONNECTION_REFUSED, RemediationProgramRef.RESTART_UNIT)),
                 visit(4, report("c4", Symptom.TIMEOUT))));
 
-    TreatmentEfficacy efficacy = record.efficacyOf(Symptom.CONNECTION_REFUSED);
+    TreatmentEfficacy efficacy =
+        record.efficacyOf(Symptom.CONNECTION_REFUSED, InterventionLedger.empty());
 
     assertEquals(1, efficacy.attempts().size());
     TreatmentEfficacy.Attempt attempt = efficacy.attempts().get(0);
@@ -165,7 +167,8 @@ class MedicalRecordTest {
                     2,
                     report("c2", Symptom.CONNECTION_REFUSED, RemediationProgramRef.RESTART_UNIT))));
 
-    TreatmentEfficacy efficacy = record.efficacyOf(Symptom.CONNECTION_REFUSED);
+    TreatmentEfficacy efficacy =
+        record.efficacyOf(Symptom.CONNECTION_REFUSED, InterventionLedger.empty());
 
     assertTrue(efficacy.attempts().isEmpty());
   }
@@ -179,7 +182,8 @@ class MedicalRecordTest {
                 visit(1, report("c1", Symptom.CONNECTION_REFUSED)),
                 visit(2, report("c2", Symptom.CONNECTION_REFUSED))));
 
-    TreatmentEfficacy efficacy = record.efficacyOf(Symptom.CONNECTION_REFUSED);
+    TreatmentEfficacy efficacy =
+        record.efficacyOf(Symptom.CONNECTION_REFUSED, InterventionLedger.empty());
 
     assertTrue(efficacy.attempts().isEmpty());
   }
@@ -199,10 +203,13 @@ class MedicalRecordTest {
                 visit(2, report("c3", Symptom.CONNECTION_REFUSED))));
 
     assertTrue(
-        record.efficacyOf(Symptom.CONNECTION_REFUSED).attempts().isEmpty(),
+        record
+            .efficacyOf(Symptom.CONNECTION_REFUSED, InterventionLedger.empty())
+            .attempts()
+            .isEmpty(),
         "untreated symptom must not borrow another symptom's prescription");
 
-    TreatmentEfficacy timeout = record.efficacyOf(Symptom.TIMEOUT);
+    TreatmentEfficacy timeout = record.efficacyOf(Symptom.TIMEOUT, InterventionLedger.empty());
     assertEquals(1, timeout.attempts().size());
     assertEquals(RemediationProgramRef.RESTART_UNIT.id(), timeout.attempts().get(0).programRef());
   }

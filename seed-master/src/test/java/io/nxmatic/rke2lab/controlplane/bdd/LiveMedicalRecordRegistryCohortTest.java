@@ -79,17 +79,26 @@ class LiveMedicalRecordRegistryCohortTest {
     final long patientsWithSymptom =
         cohort.stream().filter(r -> r.historyOf(Symptom.CONNECTION_REFUSED).count() > 0).count();
     final long priorTreatmentsThatWorked =
-        cohort.stream().filter(r -> r.efficacyOf(Symptom.CONNECTION_REFUSED).everWorked()).count();
+        cohort.stream()
+            .filter(
+                r ->
+                    r.efficacyOf(Symptom.CONNECTION_REFUSED, InterventionLedger.empty())
+                        .everWorked())
+            .count();
 
     assertEquals(2, patientsWithSymptom); // dev (now) + peer (history)
     assertEquals(1, priorTreatmentsThatWorked); // peer's RESTART_UNIT held
 
     // dev alone knows nothing about a working treatment; the BENEFIT comes only from the sibling.
-    assertFalse(registry.recordFor(dev).efficacyOf(Symptom.CONNECTION_REFUSED).everWorked());
+    assertFalse(
+        registry
+            .recordFor(dev)
+            .efficacyOf(Symptom.CONNECTION_REFUSED, InterventionLedger.empty())
+            .everWorked());
     assertTrue(
         registry
             .recordFor(new Patient("organization", PROJECT, "peer"))
-            .efficacyOf(Symptom.CONNECTION_REFUSED)
+            .efficacyOf(Symptom.CONNECTION_REFUSED, InterventionLedger.empty())
             .everWorked());
   }
 }

@@ -106,15 +106,15 @@ class DoctorRecordsTest {
     final TreatmentEfficacy neverWorked =
         new TreatmentEfficacy(
             Symptom.CONNECTION_REFUSED,
-            List.of(new TreatmentEfficacy.Attempt(1, "restart-systemd-unit", true)));
+            List.of(new TreatmentEfficacy.Attempt(1, "restart-systemd-unit", true, false)));
     assertFalse(neverWorked.everWorked());
 
     final TreatmentEfficacy worked =
         new TreatmentEfficacy(
             Symptom.CONNECTION_REFUSED,
             List.of(
-                new TreatmentEfficacy.Attempt(1, "restart-systemd-unit", true),
-                new TreatmentEfficacy.Attempt(2, "restart-systemd-unit", false)));
+                new TreatmentEfficacy.Attempt(1, "restart-systemd-unit", true, false),
+                new TreatmentEfficacy.Attempt(2, "restart-systemd-unit", false, false)));
     assertTrue(worked.everWorked());
   }
 
