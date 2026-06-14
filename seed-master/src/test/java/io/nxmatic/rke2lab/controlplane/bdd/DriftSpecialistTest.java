@@ -59,6 +59,29 @@ class DriftSpecialistTest {
   }
 
   @Test
+  void priorInferenceIsNotRecordedTwice() {
+    final ProblemRef problem =
+        ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED);
+    final Intervention priorInference =
+        new Intervention(
+            Provenance.EXTERNAL_CHANGE_DETECTED,
+            T1,
+            "unexplained resolution ...",
+            problem,
+            Optional.empty(),
+            Map.of());
+    final ProblemReview review =
+        reviewFor(problem, new InterventionLedger(List.of(priorInference)), 0, 1);
+
+    final CapturingWriter writer = new CapturingWriter();
+    final ReferralReply reply = new DriftSpecialist(writer).review(review);
+
+    assertEquals("drift/confounded-inferred/v1", reply.assessment().schemaRef().id());
+    assertTrue(reply.prescription().isEmpty());
+    assertTrue(writer.captured.isEmpty());
+  }
+
+  @Test
   void checkpointOnlyDeclarationExplainsSymptomSpecificResolution() {
     final ProblemRef declaredProblem = ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER);
     final Intervention declared =

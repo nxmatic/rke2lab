@@ -17,6 +17,9 @@ import java.util.Optional;
  * the specialist explains a resolution, it does not propose a treatment. The reply is built with
  * {@link ReferralReply#reconstructed} — there is no synthetic live {@link Referral}, because that
  * transient back-ref belongs only to the acute {@code diagnose} round-trip, not to this follow-up.
+ *
+ * <p>The inference is idempotent across reruns: a prior inferred external change already in the
+ * window suppresses re-recording, so one real change is never recorded N times over N runs.
  */
 public final class DriftSpecialist {
 
@@ -43,6 +46,23 @@ public final class DriftSpecialist {
               SchemaRef.of("drift/confounded-declared/v1"),
               Map.of("declaredWhat", m.what()),
               "resolved by a declared operator intervention; the prescription is confounded");
+      return ReferralReply.reconstructed(assessment, Optional.empty());
+    }
+
+    // Idempotent inference: if a prior run already inferred an external change for this problem in
+    // this window, the resolution is still confounded but the fact is already recorded — do not
+    // append it again (the specialist must not record one real change N times across N runs).
+    final boolean alreadyInferred =
+        candidates.stream().anyMatch(i -> i.provenance() == Provenance.EXTERNAL_CHANGE_DETECTED);
+    if (alreadyInferred) {
+      final Assessment assessment =
+          new Assessment(
+              SchemaRef.of("drift/confounded-inferred/v1"),
+              Map.of(
+                  "windowFrom", review.priorVisit().when().toString(),
+                  "windowTo", review.nextVisit().when().toString()),
+              "resolved with no administered prescription and no declaration — external change"
+                  + " inferred; the prescription is confounded");
       return ReferralReply.reconstructed(assessment, Optional.empty());
     }
 
