@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Map;
 import java.util.Optional;
 
@@ -107,7 +108,7 @@ public final class RecordInterventionCommand {
                           () ->
                               new IllegalArgumentException(
                                   "unknown --prescription-ref: " + prescriptionRefArg)));
-      final Instant when = whenArg == null ? null : Instant.parse(whenArg);
+      final Instant when = whenArg == null ? null : parseWhen(whenArg);
       return new Args(problem, what, provenance, prescriptionRef, when);
     }
 
@@ -125,6 +126,17 @@ public final class RecordInterventionCommand {
         throw new IllegalArgumentException("missing value for flag: " + flag);
       }
       return args[i];
+    }
+
+    // A malformed --when must reach the operator as the same usage error as any other bad flag, not
+    // a raw DateTimeParseException stacktrace (main only catches IllegalArgumentException).
+    private static Instant parseWhen(String whenArg) {
+      try {
+        return Instant.parse(whenArg);
+      } catch (DateTimeParseException e) {
+        throw new IllegalArgumentException(
+            "invalid --when (expected ISO-8601 instant): " + whenArg);
+      }
     }
   }
 }

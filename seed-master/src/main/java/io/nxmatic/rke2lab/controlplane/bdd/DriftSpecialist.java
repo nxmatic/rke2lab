@@ -55,20 +55,10 @@ public final class DriftSpecialist {
     final boolean alreadyInferred =
         candidates.stream().anyMatch(i -> i.provenance() == Provenance.EXTERNAL_CHANGE_DETECTED);
     if (alreadyInferred) {
-      final Assessment assessment =
-          new Assessment(
-              SchemaRef.of("drift/confounded-inferred/v1"),
-              Map.of(
-                  "windowFrom", review.priorVisit().when().toString(),
-                  "windowTo", review.nextVisit().when().toString()),
-              "resolved with no administered prescription and no declaration — external change"
-                  + " inferred; the prescription is confounded");
-      return ReferralReply.reconstructed(assessment, Optional.empty());
+      return confoundedInferred(review);
     }
 
-    final String windowFrom = review.priorVisit().when().toString();
-    final String windowTo = review.nextVisit().when().toString();
-    final Intervention inferred =
+    writer.append(
         new Intervention(
             Provenance.EXTERNAL_CHANGE_DETECTED,
             review.nextVisit().when(),
@@ -80,13 +70,24 @@ public final class DriftSpecialist {
                 + review.nextVisit().version(),
             review.problem(),
             Optional.empty(),
-            Map.of("windowFrom", windowFrom, "windowTo", windowTo));
-    writer.append(inferred);
+            Map.of(
+                "windowFrom", review.priorVisit().when().toString(),
+                "windowTo", review.nextVisit().when().toString())));
+    return confoundedInferred(review);
+  }
 
+  /**
+   * The confounded-inferred letter — returned both when this run infers a fresh external change and
+   * when a prior run already did (idempotent path). Same assessment either way; only the append
+   * differs.
+   */
+  private static ReferralReply confoundedInferred(ProblemReview review) {
     final Assessment assessment =
         new Assessment(
             SchemaRef.of("drift/confounded-inferred/v1"),
-            Map.of("windowFrom", windowFrom, "windowTo", windowTo),
+            Map.of(
+                "windowFrom", review.priorVisit().when().toString(),
+                "windowTo", review.nextVisit().when().toString()),
             "resolved with no administered prescription and no declaration — external change"
                 + " inferred; the prescription is confounded");
     return ReferralReply.reconstructed(assessment, Optional.empty());

@@ -3,7 +3,6 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -25,7 +24,6 @@ public record Intervention(
     Map<String, Object> details) {
 
   public Intervention {
-    Objects.requireNonNull(problem, "problem must not be null");
     prescriptionRef = prescriptionRef == null ? Optional.empty() : prescriptionRef;
     details = details == null ? Map.of() : Map.copyOf(details);
   }

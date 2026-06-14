@@ -39,9 +39,14 @@ public final class InterventionLedgerSource {
     try {
       entries = handle.history().entries();
     } catch (StackException e) {
-      // An unwritten ledger is genuine absence, not failure — degrade to empty (the contract
-      // mirrors LiveMedicalRecordRegistry: absence is nothing-here, never an exception).
-      return InterventionLedger.empty();
+      // Absence is already the empty path: an unwritten ledger leaves no history dir, so entries()
+      // returns an empty list WITHOUT throwing. A StackException here therefore means the history
+      // is
+      // present but unreadable — corruption or an I/O fault. Masking it as an empty ledger would
+      // silently resurrect the dishonesty this ledger exists to kill: efficacy would compute as if
+      // no intervention ever happened. Propagate (matching the per-entry read below); never mask.
+      throw new RuntimeException(
+          "intervention ledger present but unreadable under " + backendDir, e);
     }
 
     final List<Intervention> interventions = new ArrayList<>();

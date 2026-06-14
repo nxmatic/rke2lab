@@ -9,8 +9,10 @@ import java.util.Map;
  * registers no children and touches no real infrastructure — it exists solely to persist an
  * intervention's data as a per-resource output under {@link InterventionLedgerLayout#OUTPUT_KEY}.
  *
- * <p>Each intervention is registered as a distinct resource instance with a unique name, so
- * successive appends to the ledger each create their own history entry.
+ * <p>The resource name is stable across appends (it does not encode the intervention): accumulation
+ * is the history fold, one entry per {@code up()}, exactly as the medical record accumulates Visits
+ * under {@code SystemdAdapterResource}'s stable name. The sequence lives in history, not in
+ * distinct resource names.
  */
 final class InterventionResource extends ComponentResource {
 

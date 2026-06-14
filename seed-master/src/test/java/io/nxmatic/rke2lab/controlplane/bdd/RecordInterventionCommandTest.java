@@ -129,4 +129,23 @@ class RecordInterventionCommandTest {
                 Instant.parse("2026-06-14T09:30:00Z"),
                 writer));
   }
+
+  @Test
+  void malformedWhenIsRejectedAsUsageError() {
+    // A bad --when must surface as IllegalArgumentException (the uniform usage-error contract main
+    // catches), not a raw DateTimeParseException that escapes the catch.
+    final CapturingWriter writer = new CapturingWriter();
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            RecordInterventionCommand.record(
+                new String[] {
+                  "--problem", "systemd-adapter/connection-refused",
+                  "--what", "nft delete ...",
+                  "--when", "not-a-timestamp"
+                },
+                Instant.parse("2026-06-14T09:30:00Z"),
+                writer));
+  }
 }
