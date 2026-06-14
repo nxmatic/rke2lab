@@ -52,7 +52,8 @@ class FakeSpecialistsTest {
         List.of(
             new DbusTcpSpecialist(OperatorConfiguration.mandatory().asBootstrapConfig()),
             new NetworkSpecialist());
-    final Generalist generalist = new Generalist(specialists, access);
+    final Generalist generalist =
+        Generalist.builder().specialists(specialists).access(access).build();
 
     final Observation observation =
         Observation.failed(Symptom.CONNECTION_REFUSED, "dbus refused", Map.of("source", "probe"));

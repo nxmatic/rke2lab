@@ -65,7 +65,12 @@ public final class DoctorScenario {
       final ClinicalAccess access =
           new ClinicalAccess(
               Generalist.GENERALIST_ID, TEST_PATIENT, policy, EMPTY_RECORDS, msg -> {});
-      plan = new Generalist(specialists, access).consult(symptom, observation);
+      plan =
+          Generalist.builder()
+              .specialists(specialists)
+              .access(access)
+              .build()
+              .consult(symptom, observation);
       return self();
     }
   }

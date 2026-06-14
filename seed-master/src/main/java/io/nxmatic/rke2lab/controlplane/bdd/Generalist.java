@@ -25,10 +25,51 @@ public final class Generalist implements Clinician {
 
   private final List<Specialist> specialists;
   private final ClinicalAccess access;
+  private final DriftSpecialist driftSpecialist;
 
-  public Generalist(List<Specialist> specialists, ClinicalAccess access) {
+  private Generalist(
+      List<Specialist> specialists, ClinicalAccess access, DriftSpecialist driftSpecialist) {
     this.specialists = List.copyOf(specialists);
     this.access = access;
+    this.driftSpecialist = driftSpecialist;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static final class Builder {
+
+    private List<Specialist> specialists = List.of();
+    private ClinicalAccess access;
+    private DriftSpecialist driftSpecialist;
+
+    public Builder specialists(List<Specialist> specialists) {
+      this.specialists = specialists;
+      return this;
+    }
+
+    public Builder access(ClinicalAccess access) {
+      this.access = access;
+      return this;
+    }
+
+    public Builder driftSpecialist(DriftSpecialist driftSpecialist) {
+      this.driftSpecialist = driftSpecialist;
+      return this;
+    }
+
+    public Generalist build() {
+      if (access == null) {
+        throw new IllegalStateException("access is required");
+      }
+      // No ledger wired → the drift inference is computed and returned but not persisted, coherent
+      // with the registry's no-backend degrade. The real writer is wired at the reconstruction
+      // site.
+      final DriftSpecialist drift =
+          driftSpecialist != null ? driftSpecialist : new DriftSpecialist(intervention -> {});
+      return new Generalist(specialists, access, drift);
+    }
   }
 
   @Override
@@ -96,6 +137,32 @@ public final class Generalist implements Clinician {
                 + prescribed
                 + " prescription(s)";
     return new RemediationPlan(symptom, replies, summary);
+  }
+
+  /**
+   * The follow-up coordination at synthesis: for each visit with a following visit, for each
+   * Expectation on that visit whose predicate held at the next visit (the symptom resolved), review
+   * the problem with the drift specialist and collect its letters. The ledger is loaded once by the
+   * caller (the reconstruction wiring) and passed in — no no-ledger overload.
+   *
+   * <p>"Resolved-but-unadministered" today is simply "resolved": no engine administers fixes yet,
+   * so every resolved expectation is reviewed.
+   */
+  public List<ReferralReply> reviewOpenProblems(MedicalRecord record, InterventionLedger ledger) {
+    final List<ReferralReply> letters = new ArrayList<>();
+    final List<Visit> visits = record.visits();
+    for (int i = 0; i + 1 < visits.size(); i++) {
+      final Visit visit = visits.get(i);
+      final Visit nextVisit = visits.get(i + 1);
+      for (Expectation expectation : visit.expectations()) {
+        if (expectation.predicate().heldAt(nextVisit)) {
+          final ProblemReview review =
+              new ProblemReview(expectation.problem(), expectation, visit, nextVisit, ledger);
+          letters.add(driftSpecialist.review(review));
+        }
+      }
+    }
+    return letters;
   }
 
   private void firstLook(MedicalRecord record, Symptom symptom, Observation observation) {

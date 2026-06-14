@@ -267,7 +267,7 @@ class NestedRunbookTest {
     final ClinicalAccess access =
         new ClinicalAccess(
             Generalist.GENERALIST_ID, TEST_PATIENT, policy, EMPTY_RECORDS, msg -> {});
-    return new Generalist(specialists, access);
+    return Generalist.builder().specialists(specialists).access(access).build();
   }
 
   /** Map each top-level When step's rendered name to its step status. */

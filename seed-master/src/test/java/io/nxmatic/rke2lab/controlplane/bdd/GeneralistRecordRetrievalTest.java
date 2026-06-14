@@ -24,7 +24,7 @@ class GeneralistRecordRetrievalTest {
     final GrantPolicy policy = GrantPolicy.empty().withSelfGrant(Generalist.GENERALIST_ID, PATIENT);
     final ClinicalAccess access =
         new ClinicalAccess(Generalist.GENERALIST_ID, PATIENT, policy, registry, msg -> {});
-    return new Generalist(specialists, access);
+    return Generalist.builder().specialists(specialists).access(access).build();
   }
 
   /** Captures the patient it was asked about and counts calls; returns a fixed known record. */

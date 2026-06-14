@@ -40,7 +40,7 @@ public final class HealthSystem {
             .withCohortGrant(generalistId, cohortPatients);
     final ClinicalAccess access =
         new ClinicalAccess(generalistId, patient, policy, registry, logger);
-    return new HealthSystem(new Generalist(specialists, access));
+    return new HealthSystem(Generalist.builder().specialists(specialists).access(access).build());
   }
 
   /** The employed generalist a stage consults. */
