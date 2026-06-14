@@ -11,7 +11,15 @@ metadata:
 deliberate decision: A+B are LATENT (Expectation is written/read but nothing consumes it yet — D was
 never built), and the fresh brainstorm may relocate where the Expectation lives, so merging latent code
 that could churn was rejected. The chantier outgrew its original scope mid-flight — it is now the
-"specialist-as-ledger" model. **RESUME in a FRESH session, NOT by continuing C/D here:**
+"specialist-as-ledger" model.
+
+**★ WHERE THE BRANCH LIVES NOW (workspace cleanup, 2026-06-14).** The branch was extracted from the main
+checkout into a DEDICATED worktree: `.claude/worktrees/improve+operator-intervention-provenance` (tip
+b3ede92d, clean). The main checkout is back on `main`, read-only ([[worktree-per-conversation]] rule). The
+branch's sole role now = **a cherry-pick reservoir** — do NOT rebase or merge it (a rebase would rewrite
+the SHAs and defeat cherry-picking the KEEP-candidate commits listed below). On creation the worktree's
+sops secrets came out encrypted and were re-smudged → see [[sops-worktree-smudge-noise]]. **RESUME in a
+FRESH session, NOT by continuing C/D here:**
 1. Re-read [[specialist-as-ledger-northstar]] (the full model: two memories, multi-time consultation =
    the deferred agenda loop, ledger-backed specialist whose domain is outside seed-master's field) and
    [[model-substrate-alignment]] (why the C3 writer's mechanism was wrong).
@@ -77,6 +85,9 @@ back into the plan.
 ABANDONED (C3's mechanism was the wrong model). Do NOT resume it. Resume = the fresh-session brainstorm
 described in the parking banner ([[specialist-as-ledger-northstar]] is the model to finish + spec).
 
-**Adjacent git state (unchanged):** main carries the live-probe fix ([[master-provisioning-state]]),
-merged LOCALLY but NOT pushed (user's GitHub auth was failing — gh token invalid; a parallel session's
-[[maven-github-token-resolution]] addresses that). This improve/ branch is independent of that.
+**Adjacent git state (2026-06-14):** `origin/main` is current and PUSHED — the workspace-cleanup session
+pushed 3 chore commits (gitignore + memory notes) via the `gh` credential-helper workaround
+(`GH_TOKEN= git -c credential.helper='!gh auth git-credential' push`), so the earlier "auth failing / not
+pushed" state is resolved for routine pushes (the [[maven-github-token-resolution]] backlog still stands
+for the Maven build path). NOTE: the live-probe fix ([[master-provisioning-state]]) lives on its own
+branch `fix/systemd-live-probe-contract`, NOT merged. This improve/ branch is independent of both.
