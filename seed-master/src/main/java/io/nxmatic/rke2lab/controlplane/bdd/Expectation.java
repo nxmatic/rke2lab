@@ -12,7 +12,7 @@ import java.util.Map;
  * prescription's intent and the operator's intervention that (hopefully) fulfilled it.
  */
 public record Expectation(
-    Symptom symptom,
+    ProblemRef problem,
     RemediationProgramRef fromPrescription,
     ExpectationPredicate predicate,
     Instant recordedAt) {
@@ -25,12 +25,20 @@ public record Expectation(
   public static final String OUTPUT_KEY = "expectations";
 
   /**
+   * Convenience accessor for the symptom. An expectation's problem always names a symptom (it
+   * opened from an observed one).
+   */
+  public Symptom symptom() {
+    return problem.symptom().orElseThrow();
+  }
+
+  /**
    * Flat map view for persistence. The {@code predicate} is itself a flat map (dispatched via its
    * {@code kind} discriminator), so this structure is fully serializable.
    */
   public Map<String, Object> toOutputMap() {
     final LinkedHashMap<String, Object> map = new LinkedHashMap<>();
-    map.put("symptom", symptom.id());
+    map.put("problem", problem.toRef());
     map.put("fromPrescription", fromPrescription.id());
     map.put("predicate", predicate.toOutputMap());
     map.put("recordedAt", recordedAt.toString());

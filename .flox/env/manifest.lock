@@ -2961,6 +2961,64 @@
       "priority": 1
     },
     {
+      "install_id": "maven",
+      "locked-url": "github:nxmatic/rke2lab/b58073d8e4d8579fe83531a18e3eb63e7fc9ec4c?narHash=sha256-QV99Jrtp1RgMvrZ%2B77TNy2Y1BI7vC7d8cuKfwc1EMqo%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-darwin.maven",
+      "derivation": "/nix/store/h9axl6drwfh94xi6kpv93920apjg0pdv-maven-3.9.11.drv",
+      "outputs": {
+        "out": "/nix/store/rhdcf51rndrisr6wz4lhbib6ghhfqrn4-maven-3.9.11"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-darwin",
+      "system": "aarch64-darwin",
+      "name": "maven-3.9.11",
+      "pname": "maven",
+      "version": "3.9.11",
+      "description": "Build automation tool (used primarily for Java projects)",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "maven",
+      "locked-url": "github:nxmatic/rke2lab/b58073d8e4d8579fe83531a18e3eb63e7fc9ec4c?narHash=sha256-QV99Jrtp1RgMvrZ%2B77TNy2Y1BI7vC7d8cuKfwc1EMqo%3D",
+      "flake-description": "RKE2 lab infrastructure and network blueprints",
+      "locked-flake-attr-path": "packages.aarch64-linux.maven",
+      "derivation": "/nix/store/vll9r13jidmx4nndh0aa6qkq2521mpi2-maven-3.9.11.drv",
+      "outputs": {
+        "out": "/nix/store/r2lkjdqmnyw7wyvld5j59xka4yq7m1h6-maven-3.9.11"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "requested-outputs-to-install": [],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "maven-3.9.11",
+      "pname": "maven",
+      "version": "3.9.11",
+      "description": "Build automation tool (used primarily for Java projects)",
+      "licenses": [
+        "Apache-2.0"
+      ],
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
       "install_id": "podman-wrapper",
       "locked-url": "git+https://github.com/nxmatic/fleet?dir=flox/k8s/.flox/flakes/podman-wrapper&ref=refs/heads/main&rev=30444c66a6ef778ddc479c32e7789eb66823e125",
       "flake-description": "podman-wrapper flake for k8s env",
@@ -3133,64 +3191,6 @@
       "description": "Shell parser and formatter",
       "licenses": [
         "BSD-3-Clause"
-      ],
-      "broken": false,
-      "unfree": false,
-      "priority": 5
-    },
-    {
-      "install_id": "maven",
-      "locked-url": "github:nxmatic/rke2lab/b58073d8e4d8579fe83531a18e3eb63e7fc9ec4c?narHash=sha256-QV99Jrtp1RgMvrZ%2B77TNy2Y1BI7vC7d8cuKfwc1EMqo%3D",
-      "flake-description": "RKE2 lab infrastructure and network blueprints",
-      "locked-flake-attr-path": "packages.aarch64-darwin.maven",
-      "derivation": "/nix/store/h9axl6drwfh94xi6kpv93920apjg0pdv-maven-3.9.11.drv",
-      "outputs": {
-        "out": "/nix/store/rhdcf51rndrisr6wz4lhbib6ghhfqrn4-maven-3.9.11"
-      },
-      "output-names": [
-        "out"
-      ],
-      "outputs-to-install": [
-        "out"
-      ],
-      "requested-outputs-to-install": [],
-      "package-system": "aarch64-darwin",
-      "system": "aarch64-darwin",
-      "name": "maven-3.9.11",
-      "pname": "maven",
-      "version": "3.9.11",
-      "description": "Build automation tool (used primarily for Java projects)",
-      "licenses": [
-        "Apache-2.0"
-      ],
-      "broken": false,
-      "unfree": false,
-      "priority": 5
-    },
-    {
-      "install_id": "maven",
-      "locked-url": "github:nxmatic/rke2lab/b58073d8e4d8579fe83531a18e3eb63e7fc9ec4c?narHash=sha256-QV99Jrtp1RgMvrZ%2B77TNy2Y1BI7vC7d8cuKfwc1EMqo%3D",
-      "flake-description": "RKE2 lab infrastructure and network blueprints",
-      "locked-flake-attr-path": "packages.aarch64-linux.maven",
-      "derivation": "/nix/store/vll9r13jidmx4nndh0aa6qkq2521mpi2-maven-3.9.11.drv",
-      "outputs": {
-        "out": "/nix/store/r2lkjdqmnyw7wyvld5j59xka4yq7m1h6-maven-3.9.11"
-      },
-      "output-names": [
-        "out"
-      ],
-      "outputs-to-install": [
-        "out"
-      ],
-      "requested-outputs-to-install": [],
-      "package-system": "aarch64-linux",
-      "system": "aarch64-linux",
-      "name": "maven-3.9.11",
-      "pname": "maven",
-      "version": "3.9.11",
-      "description": "Build automation tool (used primarily for Java projects)",
-      "licenses": [
-        "Apache-2.0"
       ],
       "broken": false,
       "unfree": false,

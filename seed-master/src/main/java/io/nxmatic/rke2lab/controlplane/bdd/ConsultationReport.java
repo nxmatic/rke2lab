@@ -39,14 +39,17 @@ public record ConsultationReport(
   /**
    * What this consultation predicts: one {@link Expectation} per prescription — that the diagnosed
    * symptom resolves by the next visit ({@link ResolutionPredicate}). A plan with no prescription
-   * predicts nothing (empty list). Pure derivation; the caller supplies the run instant.
+   * predicts nothing (empty list). Pure derivation; the caller supplies the run instant. Fails fast
+   * on an unknown checkpointId (single-source-of-truth discipline).
    */
   public List<Expectation> expectations(Instant recordedAt) {
+    final ProblemRef problem =
+        ProblemRef.of(Checkpoint.fromSlug(checkpointId).orElseThrow(), symptom());
     return plan.prescriptions().stream()
         .map(
             prescription ->
                 new Expectation(
-                    symptom(),
+                    problem,
                     prescription.programRef(),
                     new ResolutionPredicate(symptom()),
                     recordedAt))

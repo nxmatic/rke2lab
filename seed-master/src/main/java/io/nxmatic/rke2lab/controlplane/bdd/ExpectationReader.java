@@ -16,10 +16,10 @@ final class ExpectationReader {
   private ExpectationReader() {}
 
   /**
-   * All four fields are HARD requirements: {@code symptom} (must parse to a valid {@link Symptom}),
-   * {@code fromPrescription} (must parse to a valid {@link RemediationProgramRef}), {@code
-   * predicate} (must parse via {@link ExpectationPredicate#fromOutputMap}), and {@code recordedAt}
-   * (must parse to an {@link Instant}). Any missing or unparseable field yields empty.
+   * All four fields are HARD requirements: {@code problem} (must parse to a valid {@link
+   * ProblemRef}), {@code fromPrescription} (must parse to a valid {@link RemediationProgramRef}),
+   * {@code predicate} (must parse via {@link ExpectationPredicate#fromOutputMap}), and {@code
+   * recordedAt} (must parse to an {@link Instant}). Any missing or unparseable field yields empty.
    */
   public static Optional<Expectation> fromOutputMap(Object raw) {
     if (!(raw instanceof Map<?, ?> uncheckedMap)) {
@@ -28,13 +28,13 @@ final class ExpectationReader {
     @SuppressWarnings("unchecked")
     final Map<String, Object> map = (Map<String, Object>) uncheckedMap;
 
-    // symptom is required
-    final Object symptomRaw = map.get("symptom");
-    if (!(symptomRaw instanceof String symptomId)) {
+    // problem is required
+    final Object problemRaw = map.get("problem");
+    if (!(problemRaw instanceof String problemRef)) {
       return Optional.empty();
     }
-    final Optional<Symptom> symptom = Symptom.parse(symptomId);
-    if (symptom.isEmpty()) {
+    final Optional<ProblemRef> problem = ProblemRef.parse(problemRef);
+    if (problem.isEmpty()) {
       return Optional.empty();
     }
 
@@ -69,6 +69,6 @@ final class ExpectationReader {
     }
 
     return Optional.of(
-        new Expectation(symptom.get(), fromPrescription.get(), predicate.get(), recordedAt));
+        new Expectation(problem.get(), fromPrescription.get(), predicate.get(), recordedAt));
   }
 }

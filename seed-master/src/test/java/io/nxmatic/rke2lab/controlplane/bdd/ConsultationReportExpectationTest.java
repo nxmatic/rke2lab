@@ -1,11 +1,13 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -38,6 +40,7 @@ class ConsultationReportExpectationTest {
     assertEquals(1, expectations.size());
     final Expectation expectation = expectations.get(0);
     assertEquals(Symptom.CONNECTION_REFUSED, expectation.symptom());
+    assertEquals("systemd-adapter/connection-refused", expectation.problem().toRef());
     assertEquals(RemediationProgramRef.RESTART_UNIT, expectation.fromPrescription());
     assertEquals(new ResolutionPredicate(Symptom.CONNECTION_REFUSED), expectation.predicate());
     assertEquals(RECORDED_AT, expectation.recordedAt());
@@ -61,5 +64,24 @@ class ConsultationReportExpectationTest {
         new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(observation), plan);
 
     assertTrue(report.expectations(RECORDED_AT).isEmpty());
+  }
+
+  @Test
+  void a_report_with_unknown_checkpoint_id_throws_on_expectations() {
+    final Observation observation =
+        Observation.failed(
+            Symptom.CONNECTION_REFUSED, "dbus refused", Map.of("source", "endpoint-gate"));
+    final Prescription prescription =
+        Prescription.of(
+            RemediationProgramRef.RESTART_UNIT, Map.of("unit", "systemd-adapter"), "restart it");
+    final RemediationPlan plan =
+        new RemediationPlan(
+            Symptom.CONNECTION_REFUSED,
+            List.of(ReferralReplies.treating(prescription)),
+            "adapter unreachable");
+    final ConsultationReport report =
+        new ConsultationReport("not-a-checkpoint", List.of(observation), plan);
+
+    assertThrows(NoSuchElementException.class, () -> report.expectations(RECORDED_AT));
   }
 }

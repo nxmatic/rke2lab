@@ -16,14 +16,15 @@ class ExpectationTest {
   void to_output_map_serializes_all_fields() {
     final Expectation expectation =
         new Expectation(
-            Symptom.CONNECTION_REFUSED,
+            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
             RemediationProgramRef.RESTART_UNIT,
             new ResolutionPredicate(Symptom.CONNECTION_REFUSED),
             Instant.parse("2026-06-13T10:00:00Z"));
 
     final Map<String, Object> map = expectation.toOutputMap();
 
-    assertEquals("connection-refused", map.get("symptom"));
+    assertEquals("systemd-adapter/connection-refused", map.get("problem"));
+    assertFalse(map.containsKey("symptom"));
     assertEquals("restart-systemd-unit", map.get("fromPrescription"));
     assertEquals("2026-06-13T10:00:00Z", map.get("recordedAt"));
 
@@ -39,7 +40,7 @@ class ExpectationTest {
   void round_trip_via_reader_succeeds() {
     final Expectation original =
         new Expectation(
-            Symptom.CONNECTION_REFUSED,
+            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
             RemediationProgramRef.RESTART_UNIT,
             new ResolutionPredicate(Symptom.CONNECTION_REFUSED),
             Instant.parse("2026-06-13T10:00:00Z"));
@@ -62,9 +63,25 @@ class ExpectationTest {
   }
 
   @Test
-  void from_output_map_returns_empty_when_symptom_missing() {
+  void from_output_map_returns_empty_when_problem_missing() {
     final Map<String, Object> map =
         Map.of(
+            "fromPrescription",
+            "restart-systemd-unit",
+            "predicate",
+            Map.of("kind", "resolution", "symptom", "connection-refused"),
+            "recordedAt",
+            "2026-06-13T10:00:00Z");
+
+    assertTrue(ExpectationReader.fromOutputMap(map).isEmpty());
+  }
+
+  @Test
+  void from_output_map_returns_empty_when_problem_unparseable() {
+    final Map<String, Object> map =
+        Map.of(
+            "problem",
+            "not-a-valid-problem",
             "fromPrescription",
             "restart-systemd-unit",
             "predicate",
@@ -79,8 +96,8 @@ class ExpectationTest {
   void from_output_map_returns_empty_when_from_prescription_missing() {
     final Map<String, Object> map =
         Map.of(
-            "symptom",
-            "connection-refused",
+            "problem",
+            "systemd-adapter/connection-refused",
             "predicate",
             Map.of("kind", "resolution", "symptom", "connection-refused"),
             "recordedAt",
@@ -93,8 +110,8 @@ class ExpectationTest {
   void from_output_map_returns_empty_when_predicate_missing() {
     final Map<String, Object> map =
         Map.of(
-            "symptom",
-            "connection-refused",
+            "problem",
+            "systemd-adapter/connection-refused",
             "fromPrescription",
             "restart-systemd-unit",
             "recordedAt",
@@ -107,8 +124,8 @@ class ExpectationTest {
   void from_output_map_returns_empty_when_recorded_at_missing() {
     final Map<String, Object> map =
         Map.of(
-            "symptom",
-            "connection-refused",
+            "problem",
+            "systemd-adapter/connection-refused",
             "fromPrescription",
             "restart-systemd-unit",
             "predicate",
@@ -121,8 +138,8 @@ class ExpectationTest {
   void from_output_map_returns_empty_when_recorded_at_unparseable() {
     final Map<String, Object> map =
         Map.of(
-            "symptom",
-            "connection-refused",
+            "problem",
+            "systemd-adapter/connection-refused",
             "fromPrescription",
             "restart-systemd-unit",
             "predicate",
@@ -131,5 +148,17 @@ class ExpectationTest {
             "not-an-instant");
 
     assertFalse(ExpectationReader.fromOutputMap(map).isPresent());
+  }
+
+  @Test
+  void symptom_accessor_returns_the_problems_symptom() {
+    final Expectation expectation =
+        new Expectation(
+            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
+            RemediationProgramRef.RESTART_UNIT,
+            new ResolutionPredicate(Symptom.CONNECTION_REFUSED),
+            Instant.parse("2026-06-13T10:00:00Z"));
+
+    assertEquals(Symptom.CONNECTION_REFUSED, expectation.symptom());
   }
 }

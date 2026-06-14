@@ -124,7 +124,10 @@ class MedicalRecordReaderExpectationTest {
 
   private static Expectation expectation(Symptom symptom, RemediationProgramRef program) {
     return new Expectation(
-        symptom, program, new ResolutionPredicate(symptom), Instant.ofEpochSecond(1_780_000_000L));
+        ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, symptom),
+        program,
+        new ResolutionPredicate(symptom),
+        Instant.ofEpochSecond(1_780_000_000L));
   }
 
   @Test
