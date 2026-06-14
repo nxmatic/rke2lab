@@ -1,0 +1,74 @@
+package io.nxmatic.rke2lab.controlplane.bdd;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * The follow-up specialist held OUTSIDE the acute roster: it never treats a symptom, so it is not
+ * consulted on the acute {@code diagnose} seam. Instead, at a later visit, it reviews a problem
+ * whose prescription's {@link Expectation} now holds and answers the only question that makes
+ * efficacy honest — WHO actually fixed it. Since no engine administers fixes today, a resolution is
+ * either a declared operator intervention already in the ledger, or an unexplained external change
+ * the specialist must infer and record into its own ledger.
+ *
+ * <p>Both branches return an assessment-only {@link ReferralReply} with no {@link Prescription}:
+ * the specialist explains a resolution, it does not propose a treatment. The reply is built with
+ * {@link ReferralReply#reconstructed} — there is no synthetic live {@link Referral}, because that
+ * transient back-ref belongs only to the acute {@code diagnose} round-trip, not to this follow-up.
+ */
+public final class DriftSpecialist {
+
+  private final InterventionLedgerWriter writer;
+
+  public DriftSpecialist(InterventionLedgerWriter writer) {
+    this.writer = Objects.requireNonNull(writer, "writer");
+  }
+
+  public ReferralReply review(ProblemReview review) {
+    final List<Intervention> candidates =
+        review.ledger().between(review.priorVisit().when(), review.nextVisit().when()).stream()
+            .filter(i -> i.problem().explains(review.problem()))
+            .filter(i -> i.provenance() != Provenance.PULUMI_ENGINE)
+            .toList();
+
+    final Optional<Intervention> declared =
+        candidates.stream().filter(i -> i.provenance() == Provenance.OPERATOR_MANUAL).findFirst();
+
+    if (declared.isPresent()) {
+      final Intervention m = declared.get();
+      final Assessment assessment =
+          new Assessment(
+              SchemaRef.of("drift/confounded-declared/v1"),
+              Map.of("declaredWhat", m.what()),
+              "resolved by a declared operator intervention; the prescription is confounded");
+      return ReferralReply.reconstructed(assessment, Optional.empty());
+    }
+
+    final String windowFrom = review.priorVisit().when().toString();
+    final String windowTo = review.nextVisit().when().toString();
+    final Intervention inferred =
+        new Intervention(
+            Provenance.EXTERNAL_CHANGE_DETECTED,
+            review.nextVisit().when(),
+            "unexplained resolution of "
+                + review.problem().toRef()
+                + " between v"
+                + review.priorVisit().version()
+                + " and v"
+                + review.nextVisit().version(),
+            review.problem(),
+            Optional.empty(),
+            Map.of("windowFrom", windowFrom, "windowTo", windowTo));
+    writer.append(inferred);
+
+    final Assessment assessment =
+        new Assessment(
+            SchemaRef.of("drift/confounded-inferred/v1"),
+            Map.of("windowFrom", windowFrom, "windowTo", windowTo),
+            "resolved with no administered prescription and no declaration — external change"
+                + " inferred; the prescription is confounded");
+    return ReferralReply.reconstructed(assessment, Optional.empty());
+  }
+}
