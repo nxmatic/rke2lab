@@ -18,11 +18,29 @@ class InterventionLedgerTest {
     final Instant t3 = Instant.parse("2026-06-13T10:10:00Z");
 
     final Intervention i1 =
-        new Intervention(Provenance.OPERATOR_MANUAL, t1, "fix1", Optional.empty(), Map.of());
+        new Intervention(
+            Provenance.OPERATOR_MANUAL,
+            t1,
+            "fix1",
+            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
+            Optional.empty(),
+            Map.of());
     final Intervention i2 =
-        new Intervention(Provenance.OPERATOR_MANUAL, t2, "fix2", Optional.empty(), Map.of());
+        new Intervention(
+            Provenance.OPERATOR_MANUAL,
+            t2,
+            "fix2",
+            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
+            Optional.empty(),
+            Map.of());
     final Intervention i3 =
-        new Intervention(Provenance.OPERATOR_MANUAL, t3, "fix3", Optional.empty(), Map.of());
+        new Intervention(
+            Provenance.OPERATOR_MANUAL,
+            t3,
+            "fix3",
+            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
+            Optional.empty(),
+            Map.of());
 
     // Pass OUT of order: [t3, t1, t2]
     final InterventionLedger ledger = new InterventionLedger(List.of(i3, i1, i2));
@@ -42,11 +60,29 @@ class InterventionLedgerTest {
     final Instant t3 = Instant.parse("2026-06-13T10:10:00Z");
 
     final Intervention i1 =
-        new Intervention(Provenance.OPERATOR_MANUAL, t1, "fix1", Optional.empty(), Map.of());
+        new Intervention(
+            Provenance.OPERATOR_MANUAL,
+            t1,
+            "fix1",
+            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
+            Optional.empty(),
+            Map.of());
     final Intervention i2 =
-        new Intervention(Provenance.OPERATOR_MANUAL, t2, "fix2", Optional.empty(), Map.of());
+        new Intervention(
+            Provenance.OPERATOR_MANUAL,
+            t2,
+            "fix2",
+            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
+            Optional.empty(),
+            Map.of());
     final Intervention i3 =
-        new Intervention(Provenance.OPERATOR_MANUAL, t3, "fix3", Optional.empty(), Map.of());
+        new Intervention(
+            Provenance.OPERATOR_MANUAL,
+            t3,
+            "fix3",
+            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
+            Optional.empty(),
+            Map.of());
 
     final InterventionLedger ledger = new InterventionLedger(List.of(i1, i2, i3));
 
@@ -64,11 +100,29 @@ class InterventionLedgerTest {
     final Instant t3 = Instant.parse("2026-06-13T10:10:00Z");
 
     final Intervention i1 =
-        new Intervention(Provenance.OPERATOR_MANUAL, t1, "fix1", Optional.empty(), Map.of());
+        new Intervention(
+            Provenance.OPERATOR_MANUAL,
+            t1,
+            "fix1",
+            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
+            Optional.empty(),
+            Map.of());
     final Intervention i2 =
-        new Intervention(Provenance.OPERATOR_MANUAL, t2, "fix2", Optional.empty(), Map.of());
+        new Intervention(
+            Provenance.OPERATOR_MANUAL,
+            t2,
+            "fix2",
+            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
+            Optional.empty(),
+            Map.of());
     final Intervention i3 =
-        new Intervention(Provenance.OPERATOR_MANUAL, t3, "fix3", Optional.empty(), Map.of());
+        new Intervention(
+            Provenance.OPERATOR_MANUAL,
+            t3,
+            "fix3",
+            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
+            Optional.empty(),
+            Map.of());
 
     final InterventionLedger ledger = new InterventionLedger(List.of(i1, i2, i3));
 

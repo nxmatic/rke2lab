@@ -18,6 +18,7 @@ class InterventionReaderTest {
             Provenance.OPERATOR_MANUAL,
             Instant.parse("2026-06-13T10:13:50Z"),
             "nft delete ...",
+            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
             Optional.empty(),
             Map.of());
 
@@ -35,6 +36,7 @@ class InterventionReaderTest {
             Provenance.PULUMI_ENGINE,
             Instant.parse("2026-06-13T10:13:50Z"),
             "systemctl restart ...",
+            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.TIMEOUT),
             Optional.of(RemediationProgramRef.RESTART_UNIT),
             Map.of("windowFrom", "t1", "unitName", "rke2-server"));
 
@@ -88,6 +90,7 @@ class InterventionReaderTest {
             Provenance.OPERATOR_MANUAL,
             Instant.parse("2026-06-13T10:13:50Z"),
             "nft delete ...",
+            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
             Optional.empty(),
             Map.of("futureField", "tomorrow-value"));
 
@@ -100,6 +103,7 @@ class InterventionReaderTest {
     assertFalse(intervention.details().containsKey("provenance"));
     assertFalse(intervention.details().containsKey("when"));
     assertFalse(intervention.details().containsKey("what"));
+    assertFalse(intervention.details().containsKey("problem"));
     assertFalse(intervention.details().containsKey("prescriptionRef"));
   }
 
@@ -109,7 +113,8 @@ class InterventionReaderTest {
         Map.of(
             "provenance", "operator-manual",
             "when", "2026-06-13T10:13:50Z",
-            "what", "foo");
+            "what", "foo",
+            "problem", "systemd-adapter/connection-refused");
 
     final Optional<Intervention> reconstructed = InterventionReader.fromOutputMap(map);
 
@@ -124,11 +129,31 @@ class InterventionReaderTest {
             "provenance", "operator-manual",
             "when", "2026-06-13T10:13:50Z",
             "what", "foo",
+            "problem", "systemd-adapter/connection-refused",
             "prescriptionRef", "not-a-valid-ref");
 
     final Optional<Intervention> reconstructed = InterventionReader.fromOutputMap(map);
 
     assertTrue(reconstructed.isPresent());
     assertTrue(reconstructed.get().prescriptionRef().isEmpty());
+  }
+
+  @Test
+  void fromOutputMap_without_problem_is_empty() {
+    final Map<String, Object> map =
+        Map.of(
+            "provenance", "operator-manual", "when", "2026-06-13T10:13:50Z", "what", "something");
+    assertTrue(InterventionReader.fromOutputMap(map).isEmpty());
+  }
+
+  @Test
+  void fromOutputMap_with_unparseable_problem_is_empty() {
+    final Map<String, Object> map =
+        Map.of(
+            "provenance", "operator-manual",
+            "when", "2026-06-13T10:13:50Z",
+            "what", "something",
+            "problem", "not-a-checkpoint/x");
+    assertTrue(InterventionReader.fromOutputMap(map).isEmpty());
   }
 }

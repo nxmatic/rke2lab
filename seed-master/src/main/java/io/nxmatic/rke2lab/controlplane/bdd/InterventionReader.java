@@ -22,11 +22,11 @@ final class InterventionReader {
   private InterventionReader() {}
 
   /**
-   * Two keys are HARD requirements: {@code provenance} (must parse to a valid {@link Provenance})
-   * and {@code when} (must parse to an {@link Instant}). The {@code what} string defaults to empty
-   * if absent. The {@code prescriptionRef} is optional — absence yields {@link Optional#empty()},
-   * as does an unparseable value. Everything else in the map goes into {@code details} — the
-   * additive contract.
+   * Three keys are HARD requirements: {@code provenance} (must parse to a valid {@link
+   * Provenance}), {@code when} (must parse to an {@link Instant}), and {@code problem} (must parse
+   * to a valid {@link ProblemRef}). The {@code what} string defaults to empty if absent. The {@code
+   * prescriptionRef} is optional — absence yields {@link Optional#empty()}, as does an unparseable
+   * value. Everything else in the map goes into {@code details} — the additive contract.
    */
   public static Optional<Intervention> fromOutputMap(Object raw) {
     if (!(raw instanceof Map<?, ?> uncheckedMap)) {
@@ -52,24 +52,32 @@ final class InterventionReader {
     // what defaults to empty string
     final String what = stringOrEmpty(map.get("what"));
 
+    // problem is required — the tag that lets us join the intervention to the Problem
+    final Optional<ProblemRef> problem = ProblemRef.parse(stringOrEmpty(map.get("problem")));
+    if (problem.isEmpty()) {
+      return Optional.empty();
+    }
+
     // prescriptionRef is optional — absent or unparseable → empty
     final Optional<RemediationProgramRef> prescriptionRef =
         RemediationProgramRef.parse(stringOrEmpty(map.get("prescriptionRef")));
 
-    // details = everything else: drop the four canonical keys, keep all the rest
+    // details = everything else: drop the five canonical keys, keep all the rest
     final LinkedHashMap<String, Object> details = new LinkedHashMap<>();
     for (Map.Entry<String, Object> entry : map.entrySet()) {
       final String key = entry.getKey();
       if (key.equals("provenance")
           || key.equals("when")
           || key.equals("what")
+          || key.equals("problem")
           || key.equals("prescriptionRef")) {
         continue;
       }
       details.put(key, entry.getValue());
     }
 
-    return Optional.of(new Intervention(provenance.get(), when, what, prescriptionRef, details));
+    return Optional.of(
+        new Intervention(provenance.get(), when, what, problem.get(), prescriptionRef, details));
   }
 
   private static String stringOrEmpty(Object value) {
