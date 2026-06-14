@@ -19,18 +19,6 @@
       <groupId>software.constructs</groupId>
       <artifactId>constructs</artifactId>
     </dependency>
-
-    <!-- CDK8s Core (for App integration) -->
-    <dependency>
-      <groupId>org.cdk8s</groupId>
-      <artifactId>cdk8s</artifactId>
-    </dependency>
-
-    <!-- SLF4J for logging -->
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-    </dependency>
   </dependencies>
 
   <build>
