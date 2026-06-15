@@ -125,7 +125,7 @@ flowchart TD
   end
   subgraph real[Real rke2lab structure - read, never modified]
     POM["reactor poms"]
-    REG["ManifestsDomainRegistry 11 public registrars all-enabled policy"]
+    REG["ManifestsDomainRegistry 10 public registrars all-enabled policy"]
   end
   subgraph proof[seed-master test scope - the proof harness]
     RMC["ReactorModuleCatalog 9 module ids plus edges hand-transcribed"]
@@ -152,9 +152,10 @@ flowchart TD
 
 ### Grounded construction facts
 
-- The 11 domain registrars are **public** — the test builds the real registry via
-  the public `ManifestsDomainRegistryBuilder` + the 11 `*DomainRegistrar`
-  classes; no need to reach the package-private
+- The 10 concrete domain registrars are **public** — the test builds the real
+  registry via the public `ManifestsDomainRegistryBuilder` + the 10
+  `*DomainRegistrar` classes (the 11th file is the `ManifestsDomainRegistrar`
+  interface); no need to reach the package-private
   `DefaultManifestSynthesisService.buildDomainRegistry`.
 - An all-enabled `ManifestDomainPolicy` comes from `enableOnly(catalog.all())`
   (the builder starts all-disabled via `resetAllDisabled()`).
@@ -172,7 +173,7 @@ node."
 
 ```mermaid
 flowchart LR
-  A["all-enabled ManifestDomainPolicy"] --> B["ManifestsDomainRegistryBuilder 11 registrars"]
+  A["all-enabled ManifestDomainPolicy"] --> B["ManifestsDomainRegistryBuilder 10 registrars"]
   B --> C["ManifestsDomainRegistry"]
   C --> D["ManifestsUniverse domain plus unit UnitResources"]
   E["ReactorModuleCatalog module UnitResources"] --> F["UniverseBuilder"]
@@ -199,8 +200,8 @@ failure.
 ### Test 1 — `resolvesRealCrossLayerClosureFromSeedMaster`
 
 1. Build all-enabled `ManifestDomainPolicy` (`enableOnly(catalog.all())`);
-   assemble the real `ManifestsDomainRegistry` via the public builder + 11
-   registrars.
+   assemble the real `ManifestsDomainRegistry` via the public builder + 10
+   concrete registrars.
 2. `ManifestsUniverse` emits domain-units (10) + manifest-units (28), each with
    membership attributes and real `dependsOnDomainIds` / `dependsOnManifestsUnitIds`
    edges. `ReactorModuleCatalog` emits 9 module-units + Maven edges.
