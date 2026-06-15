@@ -1,0 +1,10 @@
+{
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "atlassian@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": []
+  }
+}
