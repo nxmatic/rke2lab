@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.osgi.resource.Capability;
+import org.osgi.resource.Namespace;
 import org.osgi.resource.Requirement;
 import org.osgi.resource.Resource;
 
@@ -35,6 +36,24 @@ public final class UnitResource implements Resource {
   /** Require a capability via an LDAP {@code filter:} directive (= {@code dependsOn…}). */
   public UnitResource require(String namespace, String filter) {
     requirements.add(new UnitRequirement(namespace, Map.of("filter", filter), Map.of(), this));
+    return this;
+  }
+
+  /**
+   * Require <em>every</em> capability matching the {@code filter:} ({@code cardinality:=multiple}).
+   * Used for containment edges: a parent gathers all its members with one requirement.
+   */
+  public UnitResource requireAll(String namespace, String filter) {
+    requirements.add(
+        new UnitRequirement(
+            namespace,
+            Map.of(
+                "filter",
+                filter,
+                Namespace.REQUIREMENT_CARDINALITY_DIRECTIVE,
+                Namespace.CARDINALITY_MULTIPLE),
+            Map.of(),
+            this));
     return this;
   }
 

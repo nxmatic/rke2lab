@@ -69,4 +69,20 @@ final class UnitResolverTest {
         () -> resolver.resolve(orphan),
         "an unmet requirement is a diagnosable failure, not a silent empty closure");
   }
+
+  @Test
+  void requireAllWiresEveryMatchingProvider() throws ResolutionException {
+    UnitResource memberA = new UnitResource("member-a").provide(NS_DOMAIN, Map.of("group", "g1"));
+    UnitResource memberB = new UnitResource("member-b").provide(NS_DOMAIN, Map.of("group", "g1"));
+    UnitResource memberC = new UnitResource("member-c").provide(NS_DOMAIN, Map.of("group", "g1"));
+
+    UnitResource parent = new UnitResource("parent").requireAll(NS_DOMAIN, "(group=g1)");
+
+    UnitResolver resolver = new UnitResolver(List.of(memberA, memberB, memberC, parent));
+    Map<Resource, List<Wire>> wiring = resolver.resolve(parent);
+
+    // parent must wire to ALL three members (cardinality:=multiple), not just one
+    assertEquals(3, wiring.get(parent).size(), "requireAll fans out to every match");
+    assertEquals(4, wiring.size(), "closure = parent + three members");
+  }
 }
