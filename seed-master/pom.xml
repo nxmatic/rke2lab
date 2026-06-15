@@ -49,6 +49,12 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>unitrepo-core</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests</artifactId>
       <version>${project.version}</version>
     </dependency>
