@@ -491,3 +491,7 @@ Before considering architecture work complete:
 Without documentation, this mistake would have been discovered later during actual synthesis, requiring rework. The doc caught it at design time.
 
 **Impact**: High-quality docs let you context-switch away from a subsystem and return weeks later without re-learning. They prevent architectural mistakes during future work. They make code review more effective because reviewers can understand the "why" behind decisions.
+
+# Common instructions (shared via the claude-hub subtree)
+
+@.claude/hub/instructions.md
