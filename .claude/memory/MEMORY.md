@@ -1,6 +1,6 @@
 # Memory index — rke2lab
 
-Project-specific memory for rke2lab. Cross-cutting facts (profile, conventions, principles) + cross-repo chantiers (maven fleet, docrepo, wip-guard) live in the **hub** ([[hub:MEMORY]] at `/private/var/lib/git/nxmatic/claude-memory`), auto-loaded as the session root. One line per entry; detail in the file. Links: `[[name]]` = rke2lab-local, `[[hub:name]]` = hub.
+Project-specific memory for rke2lab. Cross-cutting facts (profile, conventions, principles) + cross-repo chantiers (maven fleet, docrepo, wip-guard) live in the **hub** ([[hub:MEMORY]] at `/private/var/lib/git/nxmatic/claude-hub.d/main`), auto-loaded as the session root. One line per entry; detail in the file. Links: `[[name]]` = rke2lab-local, `[[hub:name]]` = hub.
 
 ## Active chantiers
 
