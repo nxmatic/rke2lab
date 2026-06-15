@@ -16,6 +16,13 @@ SPEC: `wip/superpowers/specs/2026-06-14-problem-oriented-provenance-design.md` (
 PLAN: `wip/superpowers/plans/2026-06-14-problem-oriented-provenance.md` (committed, 14 tasks / 6 increments).
 Exec mode = subagent-driven (fresh subagent per task + spec-review then code-quality review).
 
+**★ OLD-BRANCH FATE CLOSED 2026-06-15.** The frozen cherry-pick reservoir `improve/operator-intervention-provenance`
+(content already landed in main, see below) had its husk worktree DELETED and the local-only ref renamed to
+`archived/operator-intervention-provenance` (tip `b3ede92d`, unchanged — commits preserved, cherry-pickable). This
+established the `archived/` terminal namespace (= shipped+kept-for-provenance, vs `deprecated/` = abandoned) — see
+[[hub:branch-namespaces]]. No origin churn (branch was never pushed). The ONLY remaining open item stays the e2e LIVE
+proof (below), still gated on [[pulumi-stack-per-worktree-backlog]].
+
 **★★ SHIPPED TO MAIN 2026-06-14 (origin/main `7e5ec7d1`, pushed). All 14 tasks + final review done;
 260 tests green (1 unrelated pre-existing skip). The 3 `wip/` commits (spec+plan) were STRIPPED at
 merge via `git rebase --onto main fbc1d9af` (they were contiguous pure-wip at the base → 24 code-only
