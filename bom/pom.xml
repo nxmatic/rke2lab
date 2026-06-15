@@ -37,6 +37,8 @@
     <ipaddress.version>5.5.1</ipaddress.version>
     <commons.compress.version>1.27.1</commons.compress.version>
     <jgiven.version>2.0.3</jgiven.version>
+    <felix.resolver.version>2.0.4</felix.resolver.version>
+    <osgi.core.version>8.0.0</osgi.core.version>
   </properties>
 
   <dependencyManagement>
@@ -151,6 +153,16 @@
         <groupId>com.github.seancfoley</groupId>
         <artifactId>ipaddress</artifactId>
         <version>${ipaddress.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.felix</groupId>
+        <artifactId>org.apache.felix.resolver</artifactId>
+        <version>${felix.resolver.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.osgi</groupId>
+        <artifactId>osgi.core</artifactId>
+        <version>${osgi.core.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
