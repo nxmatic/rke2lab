@@ -244,9 +244,11 @@ class ReactorModuleCatalogTest {
     assertTrue(byId.containsKey("cdk8s-systemd"));
     assertTrue(byId.containsKey("netplan"));
 
-    // every module provides the unitrepo.module capability with its id
-    List<UnitResource> all = catalog.all();
-    assertEquals(8, all.size());
+    // every module provides the unitrepo.module capability carrying its own id
+    UnitResource seedMaster = byId.get("seed-master");
+    List<Capability> moduleCaps = seedMaster.getCapabilities(ReactorModuleCatalog.NS_MODULE);
+    assertEquals(1, moduleCaps.size(), "one unitrepo.module capability");
+    assertEquals("seed-master", moduleCaps.get(0).getAttributes().get("module"));
   }
 }
 ```
