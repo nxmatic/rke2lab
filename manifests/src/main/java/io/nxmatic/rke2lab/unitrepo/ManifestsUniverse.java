@@ -44,7 +44,7 @@ public final class ManifestsUniverse {
       UnitResource unitResource =
           new UnitResource(id).provide(NS_UNIT, Map.of(ATTR_UNIT, id, ATTR_DOMAIN, domainId));
       for (String dep : unit.dependsOnManifestsUnitIds()) {
-        unitResource.require(NS_UNIT, "(unit=" + dep + ")");
+        unitResource.require(NS_UNIT, "(" + ATTR_UNIT + "=" + dep + ")");
       }
       if (byId.put(id, unitResource) != null) {
         throw new IllegalStateException(
