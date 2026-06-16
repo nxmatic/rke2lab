@@ -56,7 +56,6 @@ final class ManifestsVisitOrderTest {
 
     ManifestsDomainRegistry registry = new ManifestsDomainRegistry(List.of(a, b));
     ManifestsUniverse universe = new ManifestsUniverse(registry);
-    UnitResolver resolver = new UnitResolver(universe.universe());
     UnitResource root = synthesisRoot();
     Map<Resource, List<Wire>> wiring =
         new UnitResolver(append(universe.universe(), root)).resolve(root);

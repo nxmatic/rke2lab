@@ -19,13 +19,18 @@ public final class ManifestsUniverse {
   public static final String NS_UNIT = "unitrepo.unit";
   public static final String MANIFESTS_MODULE = "manifests";
 
+  public static final String ATTR_DOMAIN = "domain";
+  public static final String ATTR_UNIT = "unit";
+  public static final String ATTR_MODULE = "module";
+
   private final Map<String, UnitResource> byId = new LinkedHashMap<>();
 
   public ManifestsUniverse(ManifestsDomainRegistry registry) {
     for (ManifestsDomain domain : registry.domains()) {
       String id = domain.domainId();
       UnitResource domainResource =
-          new UnitResource(id).provide(NS_DOMAIN, Map.of("domain", id, "module", MANIFESTS_MODULE));
+          new UnitResource(id)
+              .provide(NS_DOMAIN, Map.of(ATTR_DOMAIN, id, ATTR_MODULE, MANIFESTS_MODULE));
       for (String dep : domain.dependsOnDomainIds()) {
         domainResource.require(NS_DOMAIN, "(domain=" + dep + ")");
       }
@@ -37,7 +42,7 @@ public final class ManifestsUniverse {
       String id = unit.manifestUnitId();
       String domainId = registry.requireDomainIdForManifestsUnit(id);
       UnitResource unitResource =
-          new UnitResource(id).provide(NS_UNIT, Map.of("unit", id, "domain", domainId));
+          new UnitResource(id).provide(NS_UNIT, Map.of(ATTR_UNIT, id, ATTR_DOMAIN, domainId));
       for (String dep : unit.dependsOnManifestsUnitIds()) {
         unitResource.require(NS_UNIT, "(unit=" + dep + ")");
       }

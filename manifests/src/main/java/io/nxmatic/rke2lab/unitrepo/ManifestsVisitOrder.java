@@ -124,7 +124,11 @@ public final class ManifestsVisitOrder {
         continue;
       }
       String id = entry.getKey();
-      String domain = (String) unitCaps.getFirst().getAttributes().get("domain");
+      String domain =
+          (String) unitCaps.getFirst().getAttributes().get(ManifestsUniverse.ATTR_DOMAIN);
+      if (domain == null) {
+        throw new IllegalStateException("unit " + id + " is missing its domain attribute");
+      }
       unitsOfDomain.computeIfAbsent(domain, k -> new LinkedHashSet<>()).add(id);
       graph.putIfAbsent(id, new LinkedHashSet<>());
     }
