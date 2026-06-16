@@ -62,11 +62,7 @@ final class ManifestsUniverse {
   }
 
   private static ManifestsDomainRegistry buildRealRegistry() {
-    ManifestDomainCatalog catalog =
-        ManifestDomainCatalog.builder()
-            .addDefaultDomains()
-            .addDefaultStageALinkableDomains()
-            .build();
+    ManifestDomainCatalog catalog = ManifestDomainCatalog.builder().addDefaultDomains().build();
     ManifestDomainPolicy allEnabled =
         ManifestDomainPolicy.builder().enableOnly(catalog.all()).build();
     // Mirrors the package-private DefaultManifestSynthesisService.buildDomainRegistry, which is
