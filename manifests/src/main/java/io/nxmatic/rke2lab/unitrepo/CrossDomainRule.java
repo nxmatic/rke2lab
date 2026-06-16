@@ -51,7 +51,8 @@ public final class CrossDomainRule {
       String unitId = entry.getKey();
       String unitDomainId = requireDomainId(domainIdByUnitId, unitId);
       for (String dependencyUnitId : entry.getValue()) {
-        String dependencyDomainId = requireDomainId(domainIdByUnitId, dependencyUnitId);
+        String dependencyDomainId =
+            requireDomainIdWithContext(domainIdByUnitId, unitId, dependencyUnitId);
         if (!unitDomainId.equals(dependencyDomainId)
             && !dependsOnDomainTransitively(dependsOnDomainIds, unitDomainId, dependencyDomainId)) {
           throw new IllegalStateException(
@@ -74,6 +75,19 @@ public final class CrossDomainRule {
     if (domainId == null) {
       throw new IllegalStateException(
           "Manifest unit dependency references unknown unit: " + unitId);
+    }
+    return domainId;
+  }
+
+  private static String requireDomainIdWithContext(
+      Map<String, String> domainIdByUnitId, String requiringUnitId, String dependencyUnitId) {
+    String domainId = domainIdByUnitId.get(dependencyUnitId);
+    if (domainId == null) {
+      throw new IllegalStateException(
+          "Manifest unit dependency references unknown unit: "
+              + requiringUnitId
+              + " -> "
+              + dependencyUnitId);
     }
     return domainId;
   }

@@ -32,9 +32,9 @@ public final class ManifestsUniverse {
           new UnitResource(id)
               .provide(NS_DOMAIN, Map.of(ATTR_DOMAIN, id, ATTR_MODULE, MANIFESTS_MODULE));
       for (String dep : domain.dependsOnDomainIds()) {
-        domainResource.require(NS_DOMAIN, "(domain=" + dep + ")");
+        domainResource.require(NS_DOMAIN, "(" + ATTR_DOMAIN + "=" + dep + ")");
       }
-      domainResource.requireAll(NS_UNIT, "(domain=" + id + ")");
+      domainResource.requireAll(NS_UNIT, "(" + ATTR_DOMAIN + "=" + id + ")");
       byId.put(id, domainResource);
     }
 
