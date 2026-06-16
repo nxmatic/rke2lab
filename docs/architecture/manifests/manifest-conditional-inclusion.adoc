@@ -22,9 +22,9 @@ method, but:
 
 * No registrar in the `domain/` package currently overrides it — they all use the plain `domain()`
   form with a fixed unit list (see `GitopsDomainRegistrar`).
-* The registry that would consume them is itself disabled: `buildDomainRegistry` throws
-  `UnsupportedOperationException` (see
-  link:manifests-architecture.adoc#domain-registry-status[Manifests Architecture → domain registry status]).
+* So while the registry itself is live (it assembles the domains and `resolve()` orders them — see
+  link:manifests-architecture.adoc#ordering-and-coherence[Manifests Architecture → visit order and coherence]),
+  the *policy-driven conditional* hook that would vary a domain's unit list is not yet exercised.
 
 The **Porch** example used throughout this document is *illustrative only* — there is no
 `PorchResourcesManifestsUnit` or `catalog.porch()` in the codebase. Read this as the intended

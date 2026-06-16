@@ -17,8 +17,8 @@ import org.osgi.service.resolver.ResolutionException;
 
 /**
  * The proof: the standalone Felix resolver computes rke2lab's real cross-layer closure (modules +
- * manifest domains + units) in one resolve, replacing the hand-rolled {@code
- * ManifestsUnitDependencyApplier} over real data.
+ * manifest domains + units) in one resolve, replacing the retired hand-rolled dependency-applier
+ * walker over real data.
  */
 class RealGraphResolutionTest {
 

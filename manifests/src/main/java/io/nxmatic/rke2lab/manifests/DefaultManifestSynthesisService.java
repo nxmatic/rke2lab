@@ -22,7 +22,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -193,22 +192,8 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
           state.domainRegistry = applyManifestDomainPolicy(state.request, configuredDomainRegistry);
 
-          final List<ManifestsUnit> manifestUnits =
-              state.domainRegistry.manifestUnits().stream()
-                  .sorted(Comparator.comparing(ManifestsUnit::manifestUnitId))
-                  .toList();
-
           final Cdk8sApiObjectResolver resolver = new Cdk8sApiObjectResolver(state.chart);
-          final ManifestsUnitRegistry manifestUnitRegistry =
-              new ManifestsUnitRegistry(manifestUnits);
           final ManifestsUnitVisitor manifestUnitVisitor = new ApplyingManifestsUnitVisitor();
-          final ManifestsUnitDependencyApplier dependencyApplier =
-              new ManifestsUnitDependencyApplier(
-                  state.domainRegistry,
-                  manifestUnitRegistry,
-                  manifestUnitVisitor,
-                  state.chart,
-                  resolver);
 
           LOG.info("Configured {} manifest domains", state.domainRegistry.domains().size());
           LOG.debug(
@@ -218,12 +203,17 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                   .sorted()
                   .toList());
 
+          final CoherentManifestsDomainRegistry coherent = state.domainRegistry.resolve();
+
           state.manifestUnitHitCount = 0;
-          for (ManifestsUnit manifestUnit : manifestUnits) {
+          for (ManifestsUnit manifestUnit : coherent.visitOrder()) {
             state.manifestUnitHitCount++;
-            LOG.debug("Applying manifest unit '{}'", manifestUnit.manifestUnitId());
-            state.domainRegistry.applyManifestsUnitWithDomainDependencies(
-                manifestUnit.manifestUnitId(), dependencyApplier);
+            final String manifestUnitId = manifestUnit.manifestUnitId();
+            LOG.debug("Applying manifest unit '{}'", manifestUnitId);
+            final String domainId = coherent.requireDomainIdForManifestsUnit(manifestUnitId);
+            manifestUnitVisitor.visit(
+                manifestUnit,
+                new ManifestsUnitContext(state.chart, domainId, manifestUnitId, resolver));
           }
 
           return this;

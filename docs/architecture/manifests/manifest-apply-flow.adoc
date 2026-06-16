@@ -517,8 +517,9 @@ public final class MyDomainRegistrar implements ManifestsDomainRegistrar {
 }
 ```
 
-NOTE: domain registration is currently dormant — see
-link:manifests-architecture.adoc#domain-registry-status[Manifests Architecture → domain registry status].
+NOTE: the registrar provides a `ManifestsDomain`; the assembled registry's `resolve()` then orders
+the units and checks coherence — see
+link:manifests-architecture.adoc#ordering-and-coherence[Manifests Architecture → visit order and coherence].
 
 **Step 3**: Create systemd unit in `manifests/src/main/resources/systemd/systemd-units/`
 
