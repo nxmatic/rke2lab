@@ -18,8 +18,10 @@ import org.junit.jupiter.api.Test;
  * ManifestsDomainRegistry.validateManifestsUnitDependencies}. The resolver cannot re-establish it
  * on its own — a domain-scoped require filter does not fail resolution but silently prunes the
  * offending unit via the {@code cardinality:=multiple} containment requirement. So the rule lives
- * in {@link CrossDomainRule}, exercised here in its graph form (the illegal case cannot be built
- * through the still-validating registry) and via a real registry for the legal controls.
+ * in {@link CrossDomainRule}, invoked by {@code resolve()} (the registry no longer validates at
+ * construction). The illegal case is exercised in graph form for a focused unit test; the
+ * registry-level path is covered by {@code RegistryResolveTest}. Legal controls use a real
+ * registry.
  */
 final class CrossDomainRuleTest {
 

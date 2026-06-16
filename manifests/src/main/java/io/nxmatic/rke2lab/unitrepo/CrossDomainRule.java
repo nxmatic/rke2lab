@@ -38,9 +38,8 @@ public final class CrossDomainRule {
   }
 
   /**
-   * Graph form, testable independently of the registry constructor (which still rejects illegal
-   * cross-domain deps at construction). {@code dependsOnDomainIds}: domain id → its direct domain
-   * deps; {@code unitDependencies}: unit id → its {@code dependsOn} unit ids; {@code
+   * Graph form, testable directly without a registry. {@code dependsOnDomainIds}: domain id → its
+   * direct domain deps; {@code unitDependencies}: unit id → its {@code dependsOn} unit ids; {@code
    * domainIdByUnitId}: unit id → its owning domain id.
    */
   static void check(
