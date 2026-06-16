@@ -15,6 +15,21 @@ Claude's config is *worktree-rooted*, in three layers (read specific→general):
 2. **GENERAL** — a squashed git subtree of `claude-hub`'s `.claude/` at `<worktree>/.claude/hub` (shared `instructions.md`, USER-scope `settings.json` with `enabledPlugins`+marketplaces, `memory/`, `skills/`). Reached last.
 3. **EPHEMERAL** — gitignored, per-worktree (lands under `.claude/hub/` when that is the CONFIG_DIR).
 
+**★ STARTUP RECIPE — how to CREATE a worktree under this model (the gesture, not just the
+fact; learned 2026-06-16 when a cold session used the `EnterWorktree` harness tool and landed
+under `.claude/worktrees/` — the WRONG place this model rejects).** `EnterWorktree` hard-codes
+`.claude/worktrees/<branch>` and is FORBIDDEN here; use plain `git worktree add` at the external
+path. Run from `<repo>.d/main`:
+
+1. `git fetch origin <default-branch>` — base = fresh `origin/<default-branch>`.
+2. `git worktree add -b <namespace>/<slug> <repo>.d/<namespace>/<slug> origin/<default-branch>`
+   (namespace by kind: `feature/`/`chore/`/`design/`/`refactor/`/`spike/`).
+3. **Re-smudge sops** (the checkout precedes `.sops.yaml` visibility → secrets land ENCRYPTED):
+   for each still-encrypted sops file `rm <file> && git checkout -- <file>`; verify no real secret
+   keeps `ENC[` — beware false positives (docs/code/schemas can mention `ENC[` as literal text).
+   Full diagnosis in [[sops-worktree-smudge-noise]].
+4. `cd` into the new worktree. The cleanup/finish recipe (the mirror gesture) is below.
+
 **★ UPDATE 2026-06-16 — config-home SHIPPED; transcript + memory bridges restored;
 hub link-memory.sh FIXED (both repos, pushed).** The wrapper (`claudeProcessWrapper`
 in rke2lab.code-workspace → hub/bin/claude-config-home-wrapper.sh) is live: it sets
