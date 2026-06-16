@@ -1,0 +1,524 @@
+= Step 1 — Retire the manifest dependency walker — implementation plan
+:toc: left
+:toclevels: 3
+:sectnums:
+
+[NOTE]
+====
+*For agentic workers:* REQUIRED SUB-SKILL — use superpowers:subagent-driven-development
+(recommended) or superpowers:executing-plans to implement this plan task-by-task.
+Steps use checkbox (`- [ ]`) syntax for tracking.
+
+*No-Java-in-docs convention* ([[docs-diagrams-not-java]]): this plan describes each
+TDD step's *behaviour* in prose, with diagrams for tricky interactions. Exact file
+paths and shell commands are kept (they aid execution). The implementer has the
+codebase in context, so prose suffices — do NOT expect Java snippets here.
+====
+
+*Goal:* Make the merged Felix `UnitResolver` drive production manifest synthesis,
+retiring the hand-rolled ordering trio, behind a type-state (`AssembledRegistry` →
+`resolve` → `CoherentRegistry`) so the constructor only builds and `resolve` is the
+single coherence gate.
+
+*Architecture:* The fine-layer `UnitResource` universe (domains + units) is built
+from the *already-assembled, policy-applied* `ManifestsDomainRegistry` by a promoted
+`ManifestsUniverse` adapter; `resolve` runs `UnitResolver`, topo-sorts the `require`
+edges (excluding `requireAll` containment), and returns a `CoherentRegistry` carrying
+the visit order; `DefaultManifestSynthesisService` drives the unchanged visitor over
+that order.
+
+*Tech Stack:* Java 25 (flox toolchain), Maven reactor (`-am`, never `install`),
+Apache Felix Resolver 2.0.4 + `org.osgi:osgi.core:8.0.0` (already in `unitrepo-core`),
+JUnit 5.
+
+*Spec:* `wip/superpowers/specs/2026-06-16-walker-retirement-design.adoc`.
+
+== Build & verification conventions (read once, apply to every task)
+
+* All Maven runs go through flox: `flox activate -- ./mvnw …`
+* Always `-am` so siblings build from reactor source, never installed jars. Never
+  `mvn install`.
+* Tests are skipped by default (root `.mvn` config). To run them pass
+  `-DskipTests=false`. A `BUILD SUCCESS` with no `Tests run:` line means *skipped*,
+  not passed.
+* Build-cache can replay stale results — add `-Dmaven.build.cache.skipCache=true`
+  for a guaranteed real run.
+* *Verify by COUNTING surefire reports*, never by trusting console filtering:
++
+[source,bash]
+----
+cat manifests/target/surefire-reports/*<TestClass>*.txt | grep -E 'Tests run'
+----
+* CLI module selector is the unprefixed dir name: `-pl :manifests`, `-pl :seed-master`.
+* Worktree: all work happens in the external worktree on branch
+  `design/step1-walker-retirement-spec` (or its execution successor). The
+  `.flox/env/manifest.lock` and sops files show as modified — that is expected
+  re-smudge noise ([[sops-worktree-smudge-noise]]); never stage them.
+
+== File structure
+
+[cols="2,1,3", options="header"]
+|===
+| File | Action | Responsibility
+| `manifests/pom.xml` | modify | add compile dep on `unitrepo-core`
+| `manifests/src/main/java/io/nxmatic/rke2lab/unitrepo/ManifestsUniverse.java` | create (promote) | map an existing `ManifestsDomainRegistry` to the fine-layer `UnitResource` universe value
+| `manifests/src/main/java/io/nxmatic/rke2lab/unitrepo/ManifestsVisitOrder.java` | create | topo-sort the `require` edges of a resolved wiring into a unit visit order
+| `manifests/src/main/java/io/nxmatic/rke2lab/manifests/CoherentManifestsDomainRegistry.java` | create | the post-`resolve` state: carries the visit order; the only type exposing an order
+| `manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsDomainRegistry.java` | modify | become the *assembled* state: build-only constructor (no validation), add `resolve()`; delete the ordering + validation methods
+| `manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsUnitDependencyApplier.java` | delete | the unit-DFS walker, in full
+| `manifests/src/main/java/io/nxmatic/rke2lab/manifests/DefaultManifestSynthesisService.java` | modify | call `resolve()` and drive the visitor over `CoherentRegistry`'s order
+| `manifests/src/test/java/io/nxmatic/rke2lab/unitrepo/ManifestsUniverseTest.java` | create | unit test for the promoted adapter (from a given registry)
+| `manifests/src/test/java/io/nxmatic/rke2lab/unitrepo/ManifestsVisitOrderTest.java` | create | unit tests for the topo-sort behaviour
+| `manifests/src/test/java/io/nxmatic/rke2lab/manifests/RegistryResolveTest.java` | create | type-state + coherence-gate tests
+|===
+
+*Unchanged* (verified, do not touch): `ManifestsUnitVisitor`, `ManifestsUnitContext`,
+`Cdk8sApiObjectResolver` (manifests), `UnitResolver` + `UnitResource` (unitrepo-core),
+and the test-only `ReactorModuleCatalog` / `UniverseBuilder` / `RealGraphResolutionTest`
+in seed-master (the proof; stays as cross-layer demonstration).
+
+== The key production difference — registry-as-input
+
+[IMPORTANT]
+====
+The seed-master *test* `ManifestsUniverse` builds its OWN registry via a private
+`buildRealRegistry()` with an all-enabled policy. *Production must not do that.* In
+production the registry already exists and is *policy-filtered*
+(`DefaultManifestSynthesisService` builds it via `buildDomainRegistry` then
+`applyManifestDomainPolicy`). So the promoted adapter takes an existing
+`ManifestsDomainRegistry` as a constructor parameter and reads its `domains()` /
+`manifestUnits()` / `requireDomainIdForManifestsUnit()` — it never builds its own.
+This is the faithful production form of the test adapter, not a new decision.
+====
+
+[mermaid]
+....
+flowchart TB
+  POL["policy-filtered registry assembled"]
+  ADAPT["ManifestsUniverse from registry"]
+  UNIV["UnitResource universe fine layer"]
+  RESOLVE["UnitResolver resolve"]
+  ORDER["ManifestsVisitOrder topo-sort require"]
+  COH["CoherentRegistry visit order"]
+  POL --> ADAPT
+  ADAPT --> UNIV
+  UNIV --> RESOLVE
+  RESOLVE --> ORDER
+  ORDER --> COH
+....
+
+---
+
+== Task 1: Add `unitrepo-core` as a compile dependency of `manifests`
+
+*Files:* modify `manifests/pom.xml`.
+
+`manifests` does not yet depend on `unitrepo-core` (today it is test-scope in
+seed-master only). The promoted adapter and `resolve` need `UnitResource` /
+`UnitResolver` at compile scope.
+
+- [ ] *Step 1: Add the dependency.* In `manifests/pom.xml`, inside `<dependencies>`,
+  add an `io.nxmatic.rke2lab:unitrepo-core` dependency with
+  `<version>${project.version}</version>` and *no* `<scope>` (compile), matching the
+  sibling style already used for the `netplan` and `cdk8s-systemd` deps in the same
+  file. Place it beside those intra-reactor deps.
+
+- [ ] *Step 2: Verify the reactor still resolves and manifests compiles.*
++
+[source,bash]
+----
+flox activate -- ./mvnw clean test-compile -pl :manifests -am -Dmaven.build.cache.skipCache=true
+----
++
+Expected: `BUILD SUCCESS`. (No tests yet — this only confirms the new dep resolves
+through the reactor and `unitrepo-core` builds before `manifests`.)
+
+- [ ] *Step 3: Commit.*
++
+[source,bash]
+----
+git add manifests/pom.xml
+git commit -m "build(manifests): compile dep on unitrepo-core for the resolver path"
+----
+
+---
+
+== Task 2: Promote `ManifestsUniverse` to `manifests/src/main`, parameterized by the registry
+
+*Files:*
+
+* Create: `manifests/src/main/java/io/nxmatic/rke2lab/unitrepo/ManifestsUniverse.java`
+* Test: `manifests/src/test/java/io/nxmatic/rke2lab/unitrepo/ManifestsUniverseTest.java`
+
+The production adapter maps an *existing* `ManifestsDomainRegistry` to the fine-layer
+`UnitResource` universe (domains + units only — no module layer). It mirrors the
+test adapter's capability shape but takes the registry as input instead of building
+its own.
+
+*Behaviour to build* (same capability model the proof established, per the spec):
+
+* For each domain in `registry.domains()`: a `UnitResource` providing namespace
+  `unitrepo.manifest.domain` with attributes `domain=<id>` and `module=manifests`;
+  a `require` on `unitrepo.manifest.domain` for each `dependsOnDomainIds()` entry;
+  and a `requireAll` on `unitrepo.unit` filtered to `domain=<id>` (containment).
+* For each unit in `registry.manifestUnits()`: a `UnitResource` providing
+  `unitrepo.unit` with `unit=<id>` and `domain=<its domain>` (via
+  `requireDomainIdForManifestsUnit`); a `require` on `unitrepo.unit` for each
+  `dependsOnManifestsUnitIds()` entry.
+* Expose: `universe()` returning the `List<UnitResource>` (domains + units), and a
+  `byId()` map from id to `UnitResource` for correlating wiring back to ids.
+* The constructor takes `ManifestsDomainRegistry`. No `buildRealRegistry`, no policy,
+  no `ReactorModuleCatalog`.
+
+- [ ] *Step 1: Write the failing test.* Create `ManifestsUniverseTest` that builds a
+  *small hand-made* `ManifestsDomainRegistry` (two domains, one depending on the
+  other; a few units including a real depends-on chain) and asserts: `universe()`
+  has one resource per domain + one per unit; `byId()` resolves a known domain id and
+  a known unit id; a domain resource carries both the `domain` and `module=manifests`
+  attributes; a unit resource carries both `unit` and `domain`. Assert on counts and
+  attribute presence, not on resolver behaviour (that is Task 3+).
+
+- [ ] *Step 2: Run it; verify it fails to compile.*
++
+[source,bash]
+----
+flox activate -- ./mvnw clean test -pl :manifests -am -Dmaven.build.cache.skipCache=true -DskipTests=false -Dtest=ManifestsUniverseTest
+----
++
+Expected: compile failure — `ManifestsUniverse` does not exist.
+
+- [ ] *Step 3: Implement `ManifestsUniverse`* per the behaviour above, reading the
+  passed registry. Reuse the namespace/attribute constants the spec names
+  (`unitrepo.manifest.domain`, `unitrepo.unit`, `module=manifests`).
+
+- [ ] *Step 4: Run it; verify it passes; count the report.*
++
+[source,bash]
+----
+flox activate -- ./mvnw clean test -pl :manifests -am -Dmaven.build.cache.skipCache=true -DskipTests=false -Dtest=ManifestsUniverseTest
+cat manifests/target/surefire-reports/*ManifestsUniverseTest*.txt | grep -E 'Tests run'
+----
++
+Expected: `Tests run: 1, Failures: 0, Errors: 0, Skipped: 0`.
+
+- [ ] *Step 5: Commit.*
++
+[source,bash]
+----
+git add manifests/src/main/java/io/nxmatic/rke2lab/unitrepo/ManifestsUniverse.java \
+        manifests/src/test/java/io/nxmatic/rke2lab/unitrepo/ManifestsUniverseTest.java
+git commit -m "feat(manifests): ManifestsUniverse adapter over an existing registry (fine layer)"
+----
+
+---
+
+== Task 3: `ManifestsVisitOrder` — topo-sort the `require` edges into a visit order
+
+*Files:*
+
+* Create: `manifests/src/main/java/io/nxmatic/rke2lab/unitrepo/ManifestsVisitOrder.java`
+* Test: `manifests/src/test/java/io/nxmatic/rke2lab/unitrepo/ManifestsVisitOrderTest.java`
+
+Given a resolved wiring (`Map<Resource, List<Wire>>` from `UnitResolver.resolve`) and
+the universe's `byId` map, produce the *manifest-unit* visit order: a topological
+order over the `require` edges only, excluding `requireAll` containment edges.
+
+*Behaviour:* build a dependency graph whose nodes are the manifest-units in the
+closure and whose edges are the `require` wires whose capability namespace is
+`unitrepo.unit` (the real `dependsOnManifestsUnitIds` edges); ignore wires on the
+`unitrepo.manifest.domain` containment namespace and any `requireAll`-sourced wire;
+topologically sort so a unit appears after all units it requires; return the ordered
+`List<ManifestsUnit>` (or ordered unit ids the caller maps back). A cycle (no valid
+linearization) throws a diagnosable exception naming the offending units.
+
+[mermaid]
+....
+flowchart LR
+  WIRING["resolved wiring"]
+  PICK["pick require wires on unitrepo.unit"]
+  DROP["drop requireAll containment wires"]
+  GRAPH["dependency graph units"]
+  TOPO["topological sort"]
+  ORDER["unit visit order"]
+  WIRING --> PICK
+  PICK --> GRAPH
+  WIRING --> DROP
+  GRAPH --> TOPO
+  TOPO --> ORDER
+....
+
+- [ ] *Step 1: Write the failing tests.* Create `ManifestsVisitOrderTest` with three
+  behaviours, each driven against a small hand-made universe resolved by `UnitResolver`:
+  (a) *order validity* — for a real depends-on chain (A requires B requires C), the
+  order places C before B before A, and a domain before a domain that depends on it;
+  (b) *containment excluded* — two sibling units in the same domain with no
+  depends-on between them are not forced into a relative order by their shared domain
+  membership (assert both present, no spurious ordering constraint); (c) *cycle fails*
+  — a unit-level cycle makes the sort throw a diagnosable exception.
+
+- [ ] *Step 2: Run; verify it fails to compile* (`ManifestsVisitOrder` missing). Same
+  `-Dtest=ManifestsVisitOrderTest` command shape as Task 2 Step 2.
+
+- [ ] *Step 3: Implement `ManifestsVisitOrder`* per the behaviour above (filter
+  `require` wires on the unit namespace, build the graph, Kahn or DFS topo-sort with
+  cycle detection). Keep it a pure function of (wiring, byId) — no synthesis side
+  effects.
+
+- [ ] *Step 4: Run; verify pass; count.*
++
+[source,bash]
+----
+flox activate -- ./mvnw clean test -pl :manifests -am -Dmaven.build.cache.skipCache=true -DskipTests=false -Dtest=ManifestsVisitOrderTest
+cat manifests/target/surefire-reports/*ManifestsVisitOrderTest*.txt | grep -E 'Tests run'
+----
++
+Expected: `Tests run: 3, Failures: 0, Errors: 0, Skipped: 0`.
+
+- [ ] *Step 5: Commit.*
++
+[source,bash]
+----
+git add manifests/src/main/java/io/nxmatic/rke2lab/unitrepo/ManifestsVisitOrder.java \
+        manifests/src/test/java/io/nxmatic/rke2lab/unitrepo/ManifestsVisitOrderTest.java
+git commit -m "feat(manifests): ManifestsVisitOrder — topo-sort require edges to a visit order"
+----
+
+---
+
+== Task 4: The cross-domain rule — settle the open question by TDD
+
+*Files:* the test from Task 2/3 area; possibly `ManifestsUniverse.java` (option a) or a
+new small check on the coherent type (option b, decided in Task 5).
+
+This is the spec's single open question (section 5 WARNING). The old
+`validateManifestsUnitDependencies` enforced: a unit in domain A may depend on a unit
+in domain B only if A depends on B transitively. A plain `require(unit=X)` ignores
+domains, so this rule may be lost.
+
+*TDD approach — try option a first, fall back to b:*
+
+- [ ] *Step 1: Write the failing test* (in `ManifestsVisitOrderTest` or a new
+  `CrossDomainRuleTest`): a hand-made registry with a unit in domain A that
+  `dependsOn` a unit in domain B where A does *not* depend on B. The expectation: the
+  resolve/order step *fails* (the illegal cross-domain dependency is rejected),
+  mirroring the old guard. Run it; it will currently *not* fail (the rule is not yet
+  enforced) — that is the red.
+
+- [ ] *Step 2: Attempt option a — encode in the universe.* In `ManifestsUniverse`,
+  make a unit's `unitrepo.unit` capability carry its domain such that a cross-domain
+  `require` only matches when routed through a domain edge that exists — so an illegal
+  cross-domain dependency becomes an *unsatisfiable* requirement and `UnitResolver`
+  throws `ResolutionException`. Re-run the test.
++
+Expected if natural: the test passes (resolve throws on the illegal case, still
+resolves the legal case). Confirm the legal-chain tests from Tasks 2–3 still pass.
+
+- [ ] *Step 3: If option a is unnatural* (it distorts the `requireAll` containment or
+  the legal cases break), *fall back to option b*: keep a single explicit
+  cross-domain check, invoked by `resolve` (Task 5), NOT by the constructor —
+  reusing the transitive-domain logic from the old `dependsOnDomainTransitively`.
+  Make the test assert the check throws on the illegal case. Document in the commit
+  which option was chosen and why.
+
+- [ ] *Step 4: Run the full manifests test set; count.*
++
+[source,bash]
+----
+flox activate -- ./mvnw clean test -pl :manifests -am -Dmaven.build.cache.skipCache=true -DskipTests=false
+----
++
+Expected: all new tests green; confirm the cross-domain test's report line.
+
+- [ ] *Step 5: Commit.*
++
+[source,bash]
+----
+git add -A manifests/src
+git commit -m "feat(manifests): enforce the cross-domain rule via the resolver (option a/b)"
+----
+
+---
+
+== Task 5: Introduce the type-state and rewire synthesis; delete the trio + validation
+
+*Files:*
+
+* Create: `manifests/src/main/java/io/nxmatic/rke2lab/manifests/CoherentManifestsDomainRegistry.java`
+* Modify: `manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsDomainRegistry.java`
+* Modify: `manifests/src/main/java/io/nxmatic/rke2lab/manifests/DefaultManifestSynthesisService.java`
+* Delete: `manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsUnitDependencyApplier.java`
+* Test: `manifests/src/test/java/io/nxmatic/rke2lab/manifests/RegistryResolveTest.java`
+
+This is the integration task: it makes `ManifestsDomainRegistry` the *assembled*
+state, adds the `resolve` transition returning a `CoherentManifestsDomainRegistry`
+that carries the visit order, rewires the synthesis loop to that order, and deletes
+the trio and the constructor validation in the same change.
+
+[mermaid]
+....
+flowchart TB
+  ASM["ManifestsDomainRegistry assembled build only"]
+  RESOLVE["resolve build universe run resolver topo-sort"]
+  COH["CoherentManifestsDomainRegistry visit order"]
+  SYNTH["DefaultManifestSynthesisService drive visitor"]
+  VISITOR["manifestUnitVisitor UNCHANGED"]
+  ASM --> RESOLVE
+  RESOLVE --> COH
+  COH --> SYNTH
+  SYNTH --> VISITOR
+....
+
+*Behaviour:*
+
+* `ManifestsDomainRegistry` constructor: keep the index building
+  (`domainsById`, `manifestUnits`, `domainIdByManifestsUnitId`); *remove* the two
+  `validate*` calls. It must never throw on a malformed graph — only on the existing
+  structural guards (duplicate domain id, duplicate unit assignment, empty domains),
+  which are construction invariants, not coherence checks.
+* Add `resolve()` on `ManifestsDomainRegistry`: builds the fine-layer universe
+  (`ManifestsUniverse`), resolves it with `UnitResolver` from a synthesis root that
+  `requireAll`s every domain, derives the order via `ManifestsVisitOrder`, and returns
+  a `CoherentManifestsDomainRegistry` holding the ordered `List<ManifestsUnit>` (and
+  whatever the visitor loop needs). Incoherence (cycle, unsatisfiable, cross-domain
+  per Task 4) surfaces here as a thrown exception.
+* `CoherentManifestsDomainRegistry`: exposes the visit order (e.g. `visitOrder()`
+  returning `List<ManifestsUnit>`) and the model accessors the synthesis still needs
+  (`requireDomainIdForManifestsUnit`, delegating to the assembled registry). It does
+  NOT expose a way to re-resolve. This is the only type with an order.
+* Delete `ManifestsUnitDependencyApplier` entirely, and delete from
+  `ManifestsDomainRegistry`: `applyManifestsUnitWithDomainDependencies`,
+  `applyDomainWithDependencies`, `validateDomainDependencies`,
+  `validateManifestsUnitDependencies`, `dependsOnDomainTransitively`,
+  `validateManifestsUnitAcyclic`.
+* `DefaultManifestSynthesisService.buildAndApplyUnits` (the inner `DomainRegistryStage`):
+  replace the per-unit loop that called `applyManifestsUnitWithDomainDependencies`
+  with: call `registry.resolve()` once, then iterate `coherent.visitOrder()` calling
+  `manifestUnitVisitor.visit(unit, context)` per unit, building the same
+  `ManifestsUnitContext(chart, domainId, manifestUnitId, resolver)` it builds today.
+  Drop the `ManifestsUnitDependencyApplier` and `ManifestsUnitRegistry` instantiation
+  if they become unused (verify `ManifestsUnitRegistry` has no other consumer; if it
+  does, leave it).
+
+- [ ] *Step 1: Write the failing tests* in `RegistryResolveTest`: (a) *construction
+  never throws* — building a `ManifestsDomainRegistry` over a graph that the old
+  validation would have rejected (e.g. an acyclic but cross-domain-irregular graph)
+  succeeds at construction; (b) *type-state* — there is no visit order on the
+  assembled registry; `resolve()` returns a `CoherentManifestsDomainRegistry` that
+  exposes `visitOrder()`; (c) *cycle throws at resolve* — a unit cycle makes
+  `resolve()` throw, not the constructor. (The "no order on assembled" check is an
+  API-shape assertion: the assembled type simply has no `visitOrder` method.)
+
+- [ ] *Step 2: Run; verify failure* (`CoherentManifestsDomainRegistry` / `resolve`
+  missing). `-Dtest=RegistryResolveTest`.
+
+- [ ] *Step 3: Implement* the type-state (`resolve` + `CoherentManifestsDomainRegistry`),
+  remove the constructor validation calls, delete the six registry methods, and delete
+  the `ManifestsUnitDependencyApplier` file. Rewire
+  `DefaultManifestSynthesisService.buildAndApplyUnits` to the resolve + visit-order
+  loop. Update all call sites in the same change (no compatibility branch).
+
+- [ ] *Step 4: Run the manifests + seed-master tests; count.*
++
+[source,bash]
+----
+flox activate -- ./mvnw clean test -pl :manifests -am -Dmaven.build.cache.skipCache=true -DskipTests=false
+cat manifests/target/surefire-reports/*RegistryResolveTest*.txt | grep -E 'Tests run'
+----
++
+Expected: `RegistryResolveTest` green; the existing manifests tests still green.
+
+- [ ] *Step 5: Commit.*
++
+[source,bash]
+----
+git add -A manifests/src
+git commit -m "refactor(manifests): type-state resolve replaces the ordering trio; delete walker + validation"
+----
+
+---
+
+== Task 6: Synthesis parity + full-reactor verification
+
+*Files:* possibly a parity test under `manifests/src/test` or `seed-master/src/test`;
+otherwise verification only.
+
+The retirement must change *how* the order is computed, not *what* is synthesized.
+
+- [ ] *Step 1: Synthesis parity.* If a synthesis-level test exists that can capture
+  the produced CDK8s ApiObject set (check `manifests/src/test` and the seed-master
+  synthesis tests the explorer flagged), assert the set of ApiObjects produced through
+  the new resolve-driven order equals a recorded baseline for the same registry. If no
+  such harness exists, add a focused test that runs `buildAndApplyUnits` over a known
+  registry and asserts the produced unit set + that each consumer's producer appears
+  earlier in `visitOrder()` (the `Cdk8sApiObjectResolver` contract). Do not assert an
+  exact total ordering (topologically-equivalent orders are all valid) — assert the
+  *constraints* hold.
+
+- [ ] *Step 2: Structural deletion check.* Add (or include in an existing test) an
+  assertion that the retired surface is gone — `ManifestsUnitDependencyApplier` no
+  longer exists and the registry no longer exposes `applyManifestsUnitWithDomainDependencies`
+  or the `validate*` methods. A reflective/source check or simply the compile success
+  of the rewired service plus a grep in the verification step below.
+
+- [ ] *Step 3: Full-reactor build with all tests.*
++
+[source,bash]
+----
+flox activate -- ./mvnw clean package -pl :seed-master -am -Dmaven.build.cache.skipCache=true -DskipTests=false
+----
++
+Expected: `BUILD SUCCESS`. seed-master depends on manifests, so this exercises the
+rewired synthesis through the whole closure.
+
+- [ ] *Step 4: Count every relevant surefire report.*
++
+[source,bash]
+----
+for t in ManifestsUniverseTest ManifestsVisitOrderTest RegistryResolveTest; do
+  echo "== $t =="
+  cat manifests/target/surefire-reports/*$t*.txt | grep -E 'Tests run'
+done
+----
++
+Confirm each shows the expected counts (Task 2: 1, Task 3: 3, Task 5: 3, plus the
+Task-4 cross-domain test and any parity test).
+
+- [ ] *Step 5: Confirm the trio is gone from the tree.*
++
+[source,bash]
+----
+test ! -f manifests/src/main/java/io/nxmatic/rke2lab/manifests/ManifestsUnitDependencyApplier.java && echo "walker deleted: OK"
+grep -rn "applyManifestsUnitWithDomainDependencies\|validateManifestsUnitDependencies" manifests/src/main || echo "no trio/validation references: OK"
+----
++
+Expected: both lines print OK.
+
+- [ ] *Step 6: Final state.* `git status -s` shows only the expected
+  `.flox/env/manifest.lock` + sops re-smudge noise, unstaged. Nothing else uncommitted.
+
+---
+
+== Done criteria
+
+* `manifests` depends on `unitrepo-core` (compile).
+* `ManifestsUniverse` (production, registry-parameterized) + `ManifestsVisitOrder` +
+  the `AssembledRegistry → resolve → CoherentRegistry` type-state exist and are tested.
+* The ordering trio (`ManifestsUnitDependencyApplier` + the two `apply*` methods) and
+  the constructor validation (`validate*` + helpers) are deleted; `resolve` is the
+  single coherence gate; construction never throws on a malformed graph.
+* The cross-domain rule is enforced at `resolve` (option a or b, settled by Task 4).
+* Synthesis parity holds (same ApiObjects; producer-before-consumer constraints met).
+* All counts confirmed via surefire reports; full reactor `BUILD SUCCESS`.
+* The visitor seam (`ManifestsUnitVisitor` / `ManifestsUnitContext` /
+  `Cdk8sApiObjectResolver`) is untouched.
+
+== Self-review notes (spec coverage)
+
+* Spec §3 type-state → Task 5. Spec §3 universe/root (fine layer) → Tasks 2 + 5.
+* Spec §3 deriving-order (require only, exclude requireAll) → Task 3.
+* Spec §5 blast radius (delete trio + validation, keep accessors) → Task 5.
+* Spec §5 WARNING cross-domain → Task 4 (TDD a→b).
+* Spec §7 error handling (one gate, compile-time guard) → Tasks 3 (cycle) + 5
+  (construction never throws, type-state).
+* Spec §8 testing (order validity, containment excluded, cycle, cross-domain,
+  synthesis parity, deletion) → Tasks 2/3/4/5/6.
