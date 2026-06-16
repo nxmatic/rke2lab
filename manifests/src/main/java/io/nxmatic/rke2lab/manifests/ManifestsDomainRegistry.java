@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.unitrepo.ManifestsUniverse;
 import io.nxmatic.rke2lab.unitrepo.ManifestsVisitOrder;
 import io.nxmatic.rke2lab.unitrepo.core.UnitResolver;
 import io.nxmatic.rke2lab.unitrepo.core.UnitResource;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -102,7 +103,7 @@ public final class ManifestsDomainRegistry {
                     + ManifestsUniverse.MANIFESTS_MODULE
                     + ")");
 
-    final List<UnitResource> closure = new java.util.ArrayList<>(universe.universe());
+    final List<UnitResource> closure = new ArrayList<>(universe.universe());
     closure.add(root);
 
     final Map<Resource, List<Wire>> wiring;

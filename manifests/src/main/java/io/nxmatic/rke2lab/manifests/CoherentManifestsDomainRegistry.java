@@ -11,13 +11,12 @@ import java.util.List;
 public final class CoherentManifestsDomainRegistry {
 
   private final ManifestsDomainRegistry assembled;
-  private final ManifestsUnitRegistry unitsById;
   private final List<ManifestsUnit> visitOrder;
 
   CoherentManifestsDomainRegistry(
       final ManifestsDomainRegistry assembled, final List<String> orderedUnitIds) {
     this.assembled = assembled;
-    this.unitsById = new ManifestsUnitRegistry(assembled.manifestUnits());
+    final ManifestsUnitRegistry unitsById = new ManifestsUnitRegistry(assembled.manifestUnits());
     this.visitOrder = orderedUnitIds.stream().map(unitsById::requireById).toList();
   }
 
