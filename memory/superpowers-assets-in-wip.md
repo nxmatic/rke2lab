@@ -25,3 +25,13 @@ either removed or left in `wip/` (the squash-merge / wip-guard excludes it from 
 First correction: 2026-06-11, during the HealthSystem keystone chantier
 ([[rke2lab:healthsystem-keystone-state]]) — the plan was written to `docs/superpowers/plans/` and had to be
 removed before the squash-merge to main.
+
+Second correction: 2026-06-16, the walker-retirement step-1 spec — written to `docs/superpowers/specs/`
+again (the unitrepo proof's specs set a bad precedent there), moved to `wip/superpowers/specs/` as
+`.adoc` (user wants AsciiDoc so content versions cleanly into the real docs at merge). **★ NAMING
+DECISION + BACKLOG:** the user PREFERS `.wip/` (dotted, the docrepo convention that strips at
+squash-merge), but the rke2lab wip-guard hooks currently match only `wip/` (non-dotted). So use
+**`wip/`** now (guard-protected today) and **BACKLOG: converge `wip/` → `.wip/` once the wip-guard
+learns the dotted form** (tracked alongside [[global-wip-guard-hooks-state]]). NB rke2lab has no
+`.githooks/` wip-guard installed in-tree yet — the guard lives in the separate global-wip-guard chantier;
+until it's wired here, keeping the spec/plan off `main` is MANUAL vigilance at merge time.

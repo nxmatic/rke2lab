@@ -25,3 +25,20 @@ them, kroki-safe dialect per [[diagram-preview-file]]; (3) THEN use AskUserQuest
 what is on screen. Authored in American English (content may feed real docs later). This composes
 with [[brainstorm-vocabulary-view-first]] (vocabulary view first, then option views, then the
 chosen design).
+
+**★ LANGUAGE + VOCABULARY DISCIPLINE (reinforced 2026-06-16, the user said it twice).** Previews are
+NOT just "in English" — they must use the *exact American-English vocabulary of the code and docs*, so
+we are certain we speak about the SAME thing and never diverge from what a figure will say when it
+later feeds the real docs. Two distinct requirements, both load-bearing:
+(a) *Language* — write the prose AND the node/edge labels in American English. (I repeatedly slipped
+    into French this session — `synthèse`, `couche de médiation`, `actualise`, `déclencheur` — that is
+    the failure mode to avoid. Every preview, every label, en-US.)
+(b) *Vocabulary fidelity* — use the real identifiers as they appear in code/docs (`UnitResolver`,
+    `ResourceDescription`, `ComponentResource`, `requireAll`, `mediation seam`, `north-bound`/
+    `south-bound`, `manifests-model`), NOT translated paraphrases. A French paraphrase of a code term
+    reads as agreement while quietly diverging; the figure then won't reconcile with the doc/code when
+    it migrates. If a term doesn't yet exist in code, coin it in en-US and reuse it verbatim thereafter.
+Why: the user reviews from diagrams and the diagrams seed the durable docs ([[docs-diagrams-not-java]],
+[[shared-artifacts-in-english]]); a language/vocabulary gap between preview and doc forces a silent
+re-translation exactly when a figure graduates. Composes with [[brainstorm-vocabulary-view-first]]
+(the vocabulary view is read faithfully from the code — same en-US-identifiers rule).

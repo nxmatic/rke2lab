@@ -10,7 +10,13 @@
 # Idempotent and safe: refuses to clobber a real (non-symlink) memory dir.
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"   # .claude/bin -> repo root
+# Resolve the repo root from the script's location. The script ships at two
+# nesting depths — `.claude/bin/` in the claude-hub repo, `.claude/hub/bin/` in a
+# subtree consumer — so a fixed `../..` is wrong in one of them. Ask git for the
+# toplevel (correct at any depth); fall back to the two-level relative climb only
+# when git is unavailable.
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null || (cd "$script_dir/../.." && pwd))"
 repo_memory="$repo_root/.claude/memory"
 
 if [[ ! -d "$repo_memory" ]]; then

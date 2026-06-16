@@ -19,10 +19,11 @@ The cross-cutting hub, auto-loaded as the session root. One line per entry (<~18
 - [[sequential-no-compat-workflow]] — single dev, one topic at a time; NEVER backwards-compat; delete old paths same change.
 - [[shared-artifacts-in-english]] — docs/comments/commits en-US, never French.
 - [[feedback-verify-working-directory]] — verify CWD before shell commands (sandbox can be in any directory).
+- [[standing-approval-subagent-execution]] — user pre-approves subagent-driven plan execution; default to it, don't re-ask approach (still review between tasks).
 
 ## Cross-cutting: git / workspace / build
 
-- [[external-worktree-operating-model-state]] — ★ ACTIVE chantier: external worktrees `<repo>.d/<ns>/<branch>` (one VSCode window = indexed code + chat); rke2lab MIGRATED+reconciled; NEXT = probe CLAUDE_CONFIG_DIR, then version-control Claude config in the hub.
+- [[external-worktree-operating-model-state]] — ★ ACTIVE chantier: worktree-rooted Claude config. 3 layers (specific=repo .claude/ → general=claude-hub subtree at .claude/hub → ephemeral). CONFIG_DIR=<worktree>/.claude/hub, native settings cascade. Spec+plan written, step-1 PROVEN. GOTCHA: extension needs ABSOLUTE CONFIG_DIR (no ${workspaceFolder} subst). NEXT = wire real workspace + integrate to main.
 - [[claude-auto-memory-mechanics]] — hard facts: auto-memory is REPO-WIDE (per-branch isolation impossible); autoMemoryDirectory UNVERIFIED on darwin; link-memory slug = replace / AND . ; CLAUDE_CONFIG_DIR macOS-scope undocumented.
 - [[worktree-per-conversation]] — PROMOTED to global CLAUDE.md rule; each conversation its OWN worktree, main READ-ONLY, base=fresh from origin/main.
 - [[branch-namespaces]] — kind-prefixed branches (feature/refactor/deprecated/spike/); wip-guard keys off the wip/ DIR not the branch.
