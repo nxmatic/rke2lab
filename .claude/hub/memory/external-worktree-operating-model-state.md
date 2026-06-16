@@ -106,6 +106,46 @@ the test workspace shows the correct per-worktree config home.
 - Generalize to other repos (maven fleet, docrepo); write canonical `hub/docs/operating-model.adoc`.
 - The new permissions policy hasn't run a full real session yet — keep `~bak-perms` until validated in use.
 
+**★ CLEANUP / FINISHING PROVENANCE (cross-repo rule, learned 2026-06-16 rke2lab walker-retirement).**
+Because every worktree lives at `<repo>.d/<namespace>/<branch>` (sibling of `main`), NOT under
+`.claude/worktrees/`, the `superpowers:finishing-a-development-branch` skill's provenance check is
+WRONG for this operating model: that skill only treats worktrees under `.claude/worktrees/` (or
+`worktrees/`, `~/.config/superpowers/worktrees/`) as "ours to clean up" and leaves everything else
+as "harness-owned, do not remove". Under THIS model a `<repo>.d/<branch>` worktree IS user-managed
+and removing it once merged is the normal, expected finish — do not refuse on provenance grounds.
+Recipe (run from `<repo>.d/main`, never cwd-inside the target): confirm not-inside + branch merged
+(`git branch --merged HEAD`) + tree clean (ignore the expected `.flox/env/manifest.lock` + sops
+re-smudge noise, `--force` is fine for that) → `git worktree remove [--force] <repo>.d/<branch>` →
+`git worktree prune` → `git branch -d <branch>` (use `-d`, refuses if unmerged). NOTE: a
+`<repo>.d/<namespace>/` parent dir (e.g. `rke2lab.d/feature/`) legitimately retains a `.flox.d`
+symlink (→ fleet flox) after removal — that is the include-resolution scaffolding for the next
+worktree placed there, NOT residue; leave it. See [[rke2lab:sops-worktree-smudge-noise]].
+
+**★ DEV-FLOW DISCIPLINE — hub-subtree sync at BOTH ends of a session (the gap we hit 2026-06-16).**
+The hub subtree is BIDIRECTIONAL (see README-SUBTREE.md): a consumer like rke2lab can originate hub
+edits and push them up. The discipline that was MISSED must become systematic — belongs in the
+canonical `hub/docs/operating-model.adoc` (the open "generalize" item above):
+
+- **AT SESSION START** (opening a worktree): sync-down the hub subtree first
+  (`subtree pull --prefix=.claude/hub claude-hub split/claude-hub/dot-claude --squash`) so you build
+  on the current hub, not a stale squash. Also verify the standalone `claude-hub.d/main` has no
+  unpushed commits — if it does, that is an ERROR to fix (verify + push) before starting, else the
+  split you pull from is behind.
+- **DURING**: normally make hub edits in the CONSUMER subtree (`<repo>.d/main/.claude/hub/…`) and
+  publish them up via split. You MAY instead edit `claude-hub.d/main` directly — but then those
+  edits MUST be made available by an immediate `git push origin main` (the mirror of our case: a
+  direct hub edit left unpushed makes every consumer pull a split branch that is behind the real
+  hub). "Edited the hub directly" and "pushed the hub" are one atomic step.
+- **AT SESSION END, BEFORE THE MERGE**: sync-up — `subtree split --prefix=.claude/hub
+  --branch=split/<repo>/dot-claude --rejoin HEAD` → `git push claude-hub split/<repo>/dot-claude` →
+  in the hub `subtree pull --prefix=.claude origin split/<repo>/dot-claude --squash`, then push the
+  hub. Keep `--squash` consistent both directions; the `--rejoin` adds a merge commit on the source
+  side — push it too.
+- WHAT WENT WRONG this time: `claude-hub.d/main` carried 6 unpushed doc-only commits AND rke2lab's
+  subtree was behind the hub origin, so a naive sync-up would have built on a stale base. Proven
+  correct order: push the hub's pending commits → re-split + push the split branch → sync-down into
+  rke2lab (resolve the squash conflict, theirs = hub canonical) → THEN edit + sync-up.
+
 **DESIGN PIVOTS (dead, do not revive):** old "single global CLAUDE_CONFIG_DIR=hub"
 runbook → SUPERSEDED by this worktree-rooted model. Per-branch/per-worktree memory
 isolation = IMPOSSIBLE (auto-memory is repo-wide, [[claude-auto-memory-mechanics]]).
