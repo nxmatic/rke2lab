@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -100,5 +101,60 @@ final class RegistryResolveTest {
     assertTrue(
         failure.getMessage().contains("a/A") && failure.getMessage().contains("b/B"),
         "cross-domain diagnosis names the offending units: " + failure.getMessage());
+  }
+
+  @Test
+  void visitOrderSatisfiesProducerBeforeConsumerForEveryDependency() {
+    // Synthesis-parity invariant: Cdk8sApiObjectResolver lets a consuming unit look up an ApiObject
+    // produced by a unit it depends on, assuming the producer ran first. The retired ordering trio
+    // is gone; resolve()/visitOrder() must still place every producer before its consumer.
+    //
+    // Unit chain x/C <- x/B <- x/A inside domain x, plus a cross-domain dep y/Y -> x/A. Domain y
+    // dependsOn domain x, so the cross-domain unit dep is legal under CrossDomainRule.
+    ManifestsUnit xC = new StubUnit("x/C", List.of());
+    ManifestsUnit xB = new StubUnit("x/B", List.of("x/C"));
+    ManifestsUnit xA = new StubUnit("x/A", List.of("x/B"));
+    ManifestsUnit yY = new StubUnit("y/Y", List.of("x/A"));
+    ManifestsUnit yZ = new StubUnit("y/Z", List.of());
+
+    ManifestsDomain x = new ManifestsDomain("x", List.of(), List.of(xC, xB, xA));
+    ManifestsDomain y = new ManifestsDomain("y", List.of("x"), List.of(yY, yZ));
+
+    ManifestsDomainRegistry registry = new ManifestsDomainRegistry(List.of(x, y));
+
+    List<ManifestsUnit> order = registry.resolve().visitOrder();
+
+    List<String> ids = order.stream().map(ManifestsUnit::manifestUnitId).toList();
+
+    // Completeness: every registered unit appears exactly once — nothing silently pruned.
+    assertEquals(5, order.size(), "every unit present exactly once");
+    assertEquals(
+        Set.of("x/A", "x/B", "x/C", "y/Y", "y/Z"),
+        Set.copyOf(ids),
+        "visitOrder contains exactly the registered units");
+    assertEquals(ids.size(), Set.copyOf(ids).size(), "no unit appears more than once");
+
+    // Producer-before-consumer, asserted generically over the whole order rather than hand-picked
+    // pairs: for every unit, each of its declared dependencies must precede it.
+    for (ManifestsUnit unit : order) {
+      int consumerIndex = ids.indexOf(unit.manifestUnitId());
+      for (String dependencyId : unit.dependsOnManifestsUnitIds()) {
+        int producerIndex = ids.indexOf(dependencyId);
+        assertTrue(
+            producerIndex >= 0,
+            "dependency " + dependencyId + " of " + unit.manifestUnitId() + " is present in order");
+        assertTrue(
+            producerIndex < consumerIndex,
+            "producer "
+                + dependencyId
+                + " (index "
+                + producerIndex
+                + ") must precede consumer "
+                + unit.manifestUnitId()
+                + " (index "
+                + consumerIndex
+                + ")");
+      }
+    }
   }
 }
