@@ -44,17 +44,24 @@ Hub drift is silent and bites later. Bracket every work session that *might* tou
 
 Keep `--squash` consistent in **both** directions, always.
 
+> **⚠️ Do NOT use `--rejoin`.** Once a side has done a `subtree pull --squash` (which both sides
+> do here), a later `subtree split --rejoin` fails with `fatal: refusing to merge unrelated
+> histories` — the squash commit shares no ancestry with the synthetic split history. Always split
+> **without** `--rejoin`; it only caches the split point (a perf hint), and the receiving side
+> does a `--squash` pull regardless, so nothing is lost. Delete the ephemeral split branch after
+> each transfer.
+
 ## Sync down (claude-hub → this repo)
 
-Run the split+push in the hub (regenerates the down branch from the hub's *current* state), then
-pull the squash into the consumer:
+Regenerate the down branch from the hub's *current* state, publish it, then pull the squash into
+the consumer:
 
 ```bash
-git -C <hub> subtree split --prefix=.claude --branch=split/claude-hub/dot-claude --rejoin HEAD
+git -C <hub> subtree split --prefix=.claude --branch=split/claude-hub/dot-claude   # no --rejoin
 git -C <hub> push origin split/claude-hub/dot-claude        # publish the down branch
-git -C <hub> push origin main                               # --rejoin adds a merge commit; push it too
 git fetch claude-hub split/claude-hub/dot-claude
 git subtree pull --prefix=.claude/hub claude-hub split/claude-hub/dot-claude --squash
+git -C <hub> branch -D split/claude-hub/dot-claude          # cleanup; delete remote copy too when done
 ```
 
 If the squash bases diverged you may get a conflict (typically because the consumer copy was
@@ -64,14 +71,16 @@ have genuine local consumer-only edits to preserve. Then `git commit` the merge.
 ## Sync up (this repo → claude-hub)
 
 ```bash
-git subtree split --prefix=.claude/hub --branch=split/rke2lab/dot-claude --rejoin HEAD
-git push origin main                                        # --rejoin adds a merge commit; push it too
+git subtree split --prefix=.claude/hub --branch=split/rke2lab/dot-claude          # no --rejoin
 git push claude-hub split/rke2lab/dot-claude
 git -C <hub> subtree pull --prefix=.claude origin split/rke2lab/dot-claude --squash
 git -C <hub> push origin main                               # publish the synced-up hub
+git branch -D split/rke2lab/dot-claude                      # cleanup local + delete the remote branch
+git push claude-hub --delete split/rke2lab/dot-claude
 ```
 
-(Replace `rke2lab` with the actual consumer repo name in the up-branch.)
+(Replace `rke2lab` with the actual consumer repo name in the up-branch.) Splitting without
+`--rejoin` does not touch `main`, so there is no rejoin merge commit to push on the source side.
 
 ## Editing rules (so the flow stays clean)
 
