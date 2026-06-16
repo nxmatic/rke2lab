@@ -1,13 +1,27 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests;
 
+import io.nxmatic.rke2lab.unitrepo.CrossDomainRule;
+import io.nxmatic.rke2lab.unitrepo.ManifestsUniverse;
+import io.nxmatic.rke2lab.unitrepo.ManifestsVisitOrder;
+import io.nxmatic.rke2lab.unitrepo.core.UnitResolver;
+import io.nxmatic.rke2lab.unitrepo.core.UnitResource;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import org.osgi.resource.Resource;
+import org.osgi.resource.Wire;
+import org.osgi.service.resolver.ResolutionException;
 
+/**
+ * The ASSEMBLED state: an indexed view of policy-filtered domains and units that enforces only
+ * structural invariants (no duplicate domain ids, no unit in two domains, no empty domain). It
+ * deliberately does NOT validate coherence (unknown refs, cycles, cross-domain) — that is the job
+ * of {@link #resolve()}, the single coherence gate. Construction never throws on a coherence
+ * violation; a malformed-but-structurally-sound graph is buildable and reports its problems only at
+ * resolve.
+ */
 public final class ManifestsDomainRegistry {
 
   private final Map<String, ManifestsDomain> domainsById;
@@ -44,9 +58,6 @@ public final class ManifestsDomainRegistry {
       }
     }
     this.domainIdByManifestsUnitId = Map.copyOf(byManifestsUnitId);
-
-    validateDomainDependencies();
-    validateManifestsUnitDependencies();
   }
 
   public List<ManifestsDomain> domains() {
@@ -66,153 +77,44 @@ public final class ManifestsDomainRegistry {
     return domainId;
   }
 
-  public void applyManifestsUnitWithDomainDependencies(
-      final String manifestUnitId,
-      final ManifestsUnitDependencyApplier manifestUnitDependencyApplier) {
-    String domainId = requireDomainIdForManifestsUnit(manifestUnitId);
+  /**
+   * The single coherence gate. It folds in the three guarantees of the retired hand-rolled trio:
+   * cross-domain (CrossDomainRule), unknown/unsatisfiable refs (UnitResolver, as
+   * ResolutionException wrapped here), and cycles (ManifestsVisitOrder.order(), the carry-forward
+   * of the old acyclic check). CrossDomainRule runs first: it yields the most specific,
+   * domain-aware diagnosis, so it wins when several problems coexist; the resolver and topo-sort
+   * then catch the structural failures it does not model. The OSGi {@link ResolutionException} is
+   * wrapped into an {@link IllegalStateException} so callers and the synthesis pipeline never
+   * depend on OSGi types.
+   */
+  public CoherentManifestsDomainRegistry resolve() {
+    CrossDomainRule.check(this);
 
-    applyDomainWithDependencies(
-        domainId, manifestUnitDependencyApplier, new HashSet<>(), new HashSet<>());
+    final ManifestsUniverse universe = new ManifestsUniverse(this);
 
-    manifestUnitDependencyApplier.applyManifestsUnitWithDependencies(manifestUnitId);
-  }
+    final UnitResource root =
+        new UnitResource("synthesis-root")
+            .requireAll(
+                ManifestsUniverse.NS_DOMAIN,
+                "("
+                    + ManifestsUniverse.ATTR_MODULE
+                    + "="
+                    + ManifestsUniverse.MANIFESTS_MODULE
+                    + ")");
 
-  private void validateDomainDependencies() {
-    for (ManifestsDomain domain : domainsById.values()) {
-      for (String dependencyDomainId : domain.dependsOnDomainIds()) {
-        if (!domainsById.containsKey(dependencyDomainId)) {
-          throw new IllegalStateException(
-              "Domain dependency references unknown domain: "
-                  + domain.domainId()
-                  + " -> "
-                  + dependencyDomainId);
-        }
-      }
-    }
-  }
+    final List<UnitResource> closure = new java.util.ArrayList<>(universe.universe());
+    closure.add(root);
 
-  private void validateManifestsUnitDependencies() {
-    for (ManifestsUnit manifestUnit : manifestUnits) {
-      final String manifestUnitId = manifestUnit.manifestUnitId();
-      final String manifestUnitDomainId = requireDomainIdForManifestsUnit(manifestUnitId);
-      for (String dependencyManifestsUnitId : manifestUnit.dependsOnManifestsUnitIds()) {
-        final String dependencyDomainId = domainIdByManifestsUnitId.get(dependencyManifestsUnitId);
-        if (dependencyDomainId == null) {
-          throw new IllegalStateException(
-              "Manifest unit dependency references unknown unit: "
-                  + manifestUnitId
-                  + " -> "
-                  + dependencyManifestsUnitId);
-        }
-        if (!manifestUnitDomainId.equals(dependencyDomainId)
-            && !dependsOnDomainTransitively(manifestUnitDomainId, dependencyDomainId)) {
-          throw new IllegalStateException(
-              "Manifest unit dependency crosses domains without a matching domain dependency: "
-                  + manifestUnitId
-                  + " -> "
-                  + dependencyManifestsUnitId
-                  + " ("
-                  + manifestUnitDomainId
-                  + " -> "
-                  + dependencyDomainId
-                  + ")");
-        }
-      }
-    }
-
-    final Set<String> visitingManifestsUnitIds = new HashSet<>();
-    final Set<String> visitedManifestsUnitIds = new HashSet<>();
-    for (ManifestsUnit manifestUnit : manifestUnits) {
-      validateManifestsUnitAcyclic(
-          manifestUnit.manifestUnitId(), visitingManifestsUnitIds, visitedManifestsUnitIds);
-    }
-  }
-
-  private boolean dependsOnDomainTransitively(
-      final String domainId, final String dependencyDomainId) {
-    return dependsOnDomainTransitively(domainId, dependencyDomainId, new HashSet<>());
-  }
-
-  private boolean dependsOnDomainTransitively(
-      final String domainId, final String dependencyDomainId, final Set<String> visitedDomainIds) {
-    if (!visitedDomainIds.add(domainId)) {
-      return false;
-    }
-
-    final ManifestsDomain domain = domainsById.get(domainId);
-    if (domain == null) {
-      return false;
-    }
-
-    for (String directDependencyDomainId : domain.dependsOnDomainIds()) {
-      if (directDependencyDomainId.equals(dependencyDomainId)
-          || dependsOnDomainTransitively(
-              directDependencyDomainId, dependencyDomainId, visitedDomainIds)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private void validateManifestsUnitAcyclic(
-      final String manifestUnitId,
-      final Set<String> visitingManifestsUnitIds,
-      final Set<String> visitedManifestsUnitIds) {
-    if (visitedManifestsUnitIds.contains(manifestUnitId)) {
-      return;
-    }
-    if (!visitingManifestsUnitIds.add(manifestUnitId)) {
+    final Map<Resource, List<Wire>> wiring;
+    try {
+      wiring = new UnitResolver(closure).resolve(root);
+    } catch (ResolutionException cause) {
       throw new IllegalStateException(
-          "Cyclic manifest unit dependency detected at: " + manifestUnitId);
+          "manifest closure is incoherent: " + cause.getMessage(), cause);
     }
 
-    final ManifestsUnit manifestUnit =
-        manifestUnits.stream()
-            .filter(candidate -> candidate.manifestUnitId().equals(manifestUnitId))
-            .findFirst()
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "Manifest unit dependency references unknown unit: " + manifestUnitId));
+    final List<String> orderedUnitIds = new ManifestsVisitOrder(wiring, universe.byId()).order();
 
-    for (String dependencyManifestsUnitId : manifestUnit.dependsOnManifestsUnitIds()) {
-      validateManifestsUnitAcyclic(
-          dependencyManifestsUnitId, visitingManifestsUnitIds, visitedManifestsUnitIds);
-    }
-
-    visitingManifestsUnitIds.remove(manifestUnitId);
-    visitedManifestsUnitIds.add(manifestUnitId);
-  }
-
-  private void applyDomainWithDependencies(
-      final String domainId,
-      final ManifestsUnitDependencyApplier manifestUnitDependencyApplier,
-      final Set<String> visitingDomainIds,
-      final Set<String> appliedDomainIds) {
-    if (appliedDomainIds.contains(domainId)) {
-      return;
-    }
-
-    if (!visitingDomainIds.add(domainId)) {
-      throw new IllegalStateException("Cyclic domain dependency detected at: " + domainId);
-    }
-
-    ManifestsDomain domain = domainsById.get(domainId);
-    if (domain == null) {
-      throw new IllegalStateException("Unknown domain dependency: " + domainId);
-    }
-
-    for (String dependencyDomainId : domain.dependsOnDomainIds()) {
-      applyDomainWithDependencies(
-          dependencyDomainId, manifestUnitDependencyApplier, visitingDomainIds, appliedDomainIds);
-    }
-
-    for (ManifestsUnit manifestUnit : domain.units()) {
-      manifestUnitDependencyApplier.applyManifestsUnitWithDependencies(
-          manifestUnit.manifestUnitId());
-    }
-
-    visitingDomainIds.remove(domainId);
-    appliedDomainIds.add(domainId);
+    return new CoherentManifestsDomainRegistry(this, orderedUnitIds);
   }
 }
