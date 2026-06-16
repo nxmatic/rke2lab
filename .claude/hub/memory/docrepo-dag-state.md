@@ -1,6 +1,6 @@
 ---
 name: docrepo-dag-state
-description: "docrepo-dag-wip — a NEW repo: an OSGi-resolution + P2P-provisioning UNIT REPOSITORY (git-like DAG, self-hosting). MODEL COMPLETE; V1 SPEC WRITTEN. Code ABSORBED into rke2lab reactor (branch feature/unitrepo-resolution-core, 4 commits ahead, NOT merged). NOW PARKED mid-execution of the resolution-track real-graph proof: design+plan committed, Task 1 (requireAll verb) DONE+spec-reviewed. RESUME = Task-1 quality-review then Tasks 2-8 (see the ★★ RESOLUTION-TRACK PROOF section). User parking to apply a new rke2lab workflow first; rebase branch on resume."
+description: "docrepo-dag-wip — a NEW repo: an OSGi-resolution + P2P-provisioning UNIT REPOSITORY (git-like DAG, self-hosting). MODEL COMPLETE; V1 SPEC WRITTEN. Code ABSORBED into rke2lab reactor (branch feature/unitrepo-resolution-core, now 9 commits ahead, local-only, NOT merged/pushed, KEPT as-is). ★ RESOLUTION-TRACK REAL-GRAPH PROOF COMPLETE (all 8 TDD tasks done, subagent-driven w/ spec+quality review each, surefire-verified): standalone Felix UnitResolver computes rke2lab's REAL cross-layer closure (8 modules + 10 domains + 28 units = 46 in one resolve), subsuming the hand-rolled ManifestsUnitDependencyApplier. NEXT = the MIGRATION track (retire the walker) or fold forward; see the ★★ RESOLUTION-TRACK PROOF section."
 metadata: 
   node_type: memory
   type: project
@@ -333,14 +333,24 @@ user chose to DEFER it to step 5 (the loading track) → unitrepo-* stay plain-J
 libs for now. NEXT when resumed: commit decision for this branch, then either continue the resolution
 track (leaf modules declare capabilities: systemd-contract pilot) or fold into the migration plan.
 
-## ★★ RESOLUTION-TRACK PROOF — design+plan committed, Task 1 done (2026-06-15, PARKED mid-execution)
+## ★★ RESOLUTION-TRACK PROOF — COMPLETE + MERGED TO origin/main (2026-06-16)
 
-Continued the resolution track (option a of the prior NEXT). Same worktree
-`.claude/worktrees/feature+unitrepo-resolution-core`, branch **`feature/unitrepo-resolution-core`**
-(NOT merged; main still db66bb3e). Branch is **4 commits ahead**: d13961ea (resolution-core, prior
-session) → **d734c199** (design spec) → **1e3ae5c2** (impl plan) → **583edf62** (Task 1 code). Only
-working-tree change = `.flox/env/manifest.lock` re-smudge noise (never staged, per
-[[sops-worktree-smudge-noise]]). EVERYTHING DURABLE IS COMMITTED — safe to park.
+Resumed, FINISHED, and **MERGED** the resolution track. **★ origin/main is now `ce6782b9`** (merge
+commit, no-ff) — the user reversed the earlier "keep local-only" call so the OTHER conversation could
+start its `fresh` from updated main. Sequence: merged `feature/unitrepo-resolution-core` into local
+main (clean, disjoint file sets) → verified on the merged result (**`Tests run: 265, Failures: 0`** full
+seed-master closure, the 4 realgraph tests + UnitResolverTest + all 260 controlplane/bdd) → pushed
+`7e5ec7d1..ce6782b9` (fast-forward) → **removed the external worktree + deleted the branch** (fully in
+origin/main, only manifest.lock re-smudge noise present). The 9 proof commits (d13961ea resolution-core
++ d734c199 spec + 1e3ae5c2 plan + the 6 task commits 583edf62→aa3071da) are preserved under the merge.
+
+The 6 proof commits on top of the prior session's 3 (d13961ea resolution-core + d734c199 spec +
+1e3ae5c2 plan): **583edf62** (Task 1 requireAll verb) → **ab758927** (T2 seed-master test dep) →
+**30fb360c** (T3 ReactorModuleCatalog) → **9e46fa3a** (T4 ManifestsUniverse) → **8113e7ad** (T5
+UniverseBuilder) → **c8ec4b61** (T6 happy-path proof) → **57dafbcb** (T7 unsatisfiable-throws) →
+**aa3071da** (final-review fix: drop inert addDefaultStageALinkableDomains). Executed via
+subagent-driven-development — fresh implementer + spec-review + code-quality-review PER TASK, every
+green VERIFIED by COUNTING surefire reports (never trusting BUILD SUCCESS), per [[build-verification-gotchas]].
 
 **THE GOAL (this proof):** make the just-shipped Felix `UnitResolver` compute the REAL rke2lab
 cross-layer closure in ONE resolve, replacing the synthetic `UnitResolverTest` fixtures — validating
@@ -367,22 +377,183 @@ unitrepo-real-graph-resolution-design.md`):**
 - **Placement FORCED:** harness lives in **seed-master TEST scope** (only seed-master depends on both
   manifests + unitrepo-core; unitrepo-core sits below manifests). Sole prod change = `requireAll` verb.
 
-**THE PLAN = `docs/superpowers/plans/2026-06-15-unitrepo-real-graph-resolution.md`** — 8 TDD tasks,
-surefire-counted. Executing via subagent-driven-development (fresh implementer + spec-review +
-quality-review per task). **★ RESUME POINT: Task 1 DONE (583edf62, `requireAll` verb, UnitResolverTest
-Tests run: 3) + SPEC-REVIEW PASSED; the CODE-QUALITY review was NOT run (parked before it). When
-resuming: run the Task-1 code-quality review (BASE 1e3ae5c2 / HEAD 583edf62) — or skip it and proceed —
-then Tasks 2–8.** Tasks: 2=seed-master test dep on unitrepo-core; 3=ReactorModuleCatalog; 4=Manifests-
-Universe; 5=UniverseBuilder (merge + cross-layer manifests→domains edge); 6=RealGraphResolutionTest
-happy path + cardinality fan-out ANTI-CHEAT; 7=unsatisfiable-throws; 8=full-reactor verify. Grounded
-literals already in the plan: cardinality dir="cardinality"/multiple="multiple"; 10 CONCRETE registrars
-(11th file is the interface — spec corrected); module graph (manifests→cdk8s-systemd+netplan; seed-
-master→incus,manifests,netplan,pulumi-automation-ext,-testkit,systemd-contract); gitops→platform.
+**THE PLAN = `docs/superpowers/plans/2026-06-15-unitrepo-real-graph-resolution.md`** (8 TDD tasks).
+**★ FINAL STATE — ALL GREEN, surefire-counted on a full-reactor `clean package -pl :seed-master -am
+-DskipTests=false` (BUILD SUCCESS):** UnitResolverTest **3**, ReactorModuleCatalogTest **1**,
+ManifestsUniverseTest **1**, UniverseBuilderTest **1**, RealGraphResolutionTest **2**. The universe =
+**8 modules + 10 domains + 28 units = 46 UnitResources**, resolved from the `seed-master` module-unit in
+ONE `resolve()`; the closure spans all three layers, the **cardinality:=multiple anti-cheat** holds
+(gitops `requireAll` fanned out to >1 unit), and the **unsatisfiable case throws** ResolutionException.
+**Sole production change = the `requireAll` verb (+19 lines in UnitResource.java)** — verified: nothing
+else in any module's `src/main` changed since the resolution-core baseline; the manifests
+`ManifestsUnitDependencyApplier` walker is UNTOUCHED (its retirement is the MIGRATION track's job).
 
-**NB user is PARKING to apply a NEW rke2lab workflow change BEFORE resuming this worktree to live** —
-so when resumed the worktree base may have moved; check main and rebase the branch if needed before
-continuing Task 2. New feedback memory this session: [[decision-options-in-preview]] (render option
-diagrams in the preview before asking).
+**Findings the per-task reviews caught (value of the two-stage review):** T3 dead `all()` method
+removed (+ tautological test replaced with a real capability assertion); T4 implementer mis-counted
+units as 27 — a spec-review LIVE PROBE corrected it to **28** (missed `gitops/sops-age`), confirming
+the plan's 46; T5 shared-mutable-instance invariant clarified (capture `moduleById` once, drop a
+redundant `Map.copyOf`); final review dropped the inert `addDefaultStageALinkableDomains()` (the harness
+reads only `catalog.all()`; user chose no-dead-code over prod-fidelity).
+
+**NB the corrected unit count is 28** (10 domains: cluster 1, storage 1, gitops 4, runtime 6,
+networking 4, mesh 4, high-availability 1, cicd 2, cluster-api 3, platform 2). New feedback
+memory this session: [[decision-options-in-preview]] (render option diagrams in the preview before asking).
+
+## ★★ STEP-2 TARGET (decomposition + APIs) — design decisions captured via preview-driven brainstorming (2026-06-16)
+
+After the merge, the user reopened "do we now switch the logic into seed-master for real + restructure
+into OSGi plugins?". We split it into **TWO SEQUENCED chantiers** (user picked "les deux, séquencés"):
+- **STEP 1 = retire the walker** (resolution track, in production, framework-free): make `UnitResolver`
+  drive production manifest synthesis. **★ SPEC + PLAN BOTH WRITTEN & COMMITTED — ready to EXECUTE.**
+  Branch **`design/step1-walker-retirement-spec`** (external worktree `rke2lab.d/feature/step1-walker-
+  retirement-spec`, base origin/main `abc56741`). Two committed `.adoc` files in `wip/superpowers/`
+  (NOT `docs/`, per [[superpowers-assets-in-wip]]; `.adoc` so it versions into real docs at merge):
+  spec `wip/superpowers/specs/2026-06-16-walker-retirement-design.adoc` (commit `028fb863`), plan
+  `wip/superpowers/plans/2026-06-16-walker-retirement-plan.adoc` (commit `951d3ad7`, 6 TDD tasks).
+  **★ DESIGN (post type-state revision — supersedes any earlier "keep validation" note):** the walker is
+  a TRIO (unit-DFS `ManifestsUnitDependencyApplier` + domain-DFS `applyDomainWithDependencies` + entry
+  `applyManifestsUnitWithDomainDependencies`) — DELETE all three. The resolver subsumes BOTH DFS levels in
+  one resolve (proven). Visit order = topo-sort the `require` edges ONLY, excluding `requireAll`
+  containment (structural, not temporal); cycle → topo-sort failure. **★ TYPE-STATE (the user's key
+  objection — a constructor must BUILD, not run logic that throws):** model the missed state —
+  `ManifestsDomainRegistry` becomes the *assembled* state (build-only, never throws on a malformed graph)
+  → `resolve()` → `CoherentManifestsDomainRegistry` (carries the visit order; the ONLY type exposing an
+  order). So DELETE the constructor validation too (`validate*` + helpers); `resolve` is the SINGLE
+  coherence gate — compile-time guard (can't use an unresolved registry) + one runtime gate. **KEEP**
+  the model accessors + the visitor seam (`ManifestsUnitVisitor`/`ManifestsUnitContext`/
+  `Cdk8sApiObjectResolver`) UNCHANGED. **ADD** `manifests`→`unitrepo-core` compile dep + a registry-
+  PARAMETERIZED `ManifestsUniverse` in `manifests/src/main` (production must read the EXISTING policy-
+  filtered registry, NOT build its own all-enabled one like the test adapter does — the one production
+  subtlety) + `ManifestsVisitOrder` + the type-state. Universe = FINE layer only (domains+units, root
+  `requireAll`s all domains = the walker's scope); module layer stays the proof's/step-2's concern.
+  **★ ONE OPEN QUESTION left to the plan's Task 4 (TDD):** the cross-domain rule (unit in A may depend on
+  unit in B only if A→B) — a plain `require(unit=X)` ignores domains, so deleting `validate*` may drop it.
+  Plan tries option a (encode in the universe → illegal cross-domain becomes an unsatisfiable resolve,
+  proven by a failing-resolve test); falls back to option b (one explicit check on `CoherentRegistry`,
+  invoked by resolve not the constructor) if encoding is unnatural.
+  **★ RESUME = EXECUTE via [[subagent-driven-development]]** (user's standing choice — fresh implementer +
+  spec-review + code-quality-review per task, surefire-COUNTED never trusting BUILD SUCCESS, per
+  [[build-verification-gotchas]]). 6 tasks in order: 1 pom dep, 2 ManifestsUniverse, 3 ManifestsVisitOrder,
+  4 cross-domain (a/b), 5 type-state + delete trio + rewire `DefaultManifestSynthesisService.buildAndApplyUnits`,
+  6 synthesis-parity + full-reactor verify. The plan has exact paths/signatures/line-ranges + flox commands.
+- **STEP 2 = decomposition + APIs** (migration track, gated on the OSGi-gRPC spike already passed).
+
+**★ GROUNDED THE AVANT/APRÈS MAP (3 parallel Explore agents over post-merge `src/main`, gRPC import
+count = the bundle/host signal — the #1565 ServiceLoader-TCCL constraint).** THREE SURPRISES vs the
+prior bundle-decomposition note, all verified at the counter: (1) **`manifests` = ZERO gRPC** (note had
+said "1 gRPC file to isolate" — there are NONE; it is the biggest but cleanest bundle candidate, ~100
+classes pure domain + CDK8s synthesis); (2) **the bundle/host line runs INSIDE seed-master, not between
+modules** — `bdd/` is BIFURCATED: 58 pure-diagnostic classes (bundle-eligible) vs 10 that glue the
+ledger to Pulumi stack history (host); `policy/` (5 cl.) is pure too; (3) **`pulumi-automation-ext` has
+a clean gRPC-free domain core** (`StackHandle`/`StackSnapshot`, pure file-I/O) — host only via its pom
+dragging the Pulumi SDK. `sdks/incus` = 175 generated-gRPC classes = host-OBLIGATORY. seed-master
+depends directly on `grpc-netty`.
+
+**★ THE REFINED OSGi/HOST LINE (user's intuition affined, the key correction):** the line is NOT
+"OSGi = seed-master's own resources, host = generated SDKs". The PITFALL: seed-master's OWN
+`ComponentResource`s (`SeedManifestSynthResource`, `ClusterReadinessResource`, `InterventionResource`,
+`SystemdAdapterResource`, `BboxReservationResource`) are ALSO host — because a Pulumi `ComponentResource`
+calls the engine over gRPC AT CONSTRUCTION (`registerResource`/`registerResourceOutputs`). The real,
+prettier split: **OSGi MODELS (the *what* — declarative domain + resolved closure + a pure DESCRIPTION
+of resources to create); the HOST ACTUALIZES (the *how* — thin `ComponentResource` shells that receive
+the description and register it via the engine).** This is exactly [[model-substrate-alignment]] /
+[[specialist-as-ledger-northstar]]: pure model, host-actualized substrate.
+
+**★ DECIDED — the model/host boundary is a NEUTRAL declarative description (user voted option 1).** The
+OSGi bundle emits a pure `ResourceDescription` (record: type, name, args, dependsOn) carrying ZERO Pulumi
+types. NOT `com.pulumi.core.Output` (risk: transitive gRPC re-contamination — rejected). The seam
+translates Description → ComponentResource host-side.
+
+**★ DECIDED — the mediation seam (`unitrepo-pulumi`) is an ACL with TWO EXPLICIT PORTS (hexagonal):**
+NORTH-BOUND port = faces the OSGi domain, pure domain vocabulary, accepts `ResourceDescription`, ZERO
+Pulumi types — lives in the bundle (or `unitrepo-handler-api`, the already-born-bundle SPI). SOUTH-BOUND
+port = faces the engine, the narrow ~7-method gRPC façade (`registerResource`, `registerResourceOutputs`,
+`readResource`/`invoke` — the surface already inventoried vs Pulumi SDK 1.28.0) — lives host-side. The
+bundle sees ONLY north; the host implements ONLY south; the seam is the sole point knowing both. Same
+shape as the `UnitHandler`/`osgi.extender` SPI already started.
+
+**★ KEY SEQUENCING INSIGHT — STEP 1 IS the trigger for splitting `manifests`.** Question "manifests = 1
+or 2 bundles?" was parked as "depends on a future engine". The figures showed the real answer: NOT a
+hypothetical 2nd synthesis backend (helm/kustomize — no signal the user wants it). The trigger is STEP 1
+itself: putting the resolver in PRODUCTION gives `manifests-model` (units/domains/catalog) a 2nd real
+consumer (resolver + synthesis), maturing the rule-of-three case to split. ⇒ **DECISION leaning: keep
+manifests as ONE bundle for now (splitting now = speculative per [[rke2lab:refactor-pipeline-candidates]]
+no-speculative-abstraction); STEP 1 will empirically reveal the model surface the resolver consumes, and
+THAT justifies the split.** Reinforces the agreed order: STEP 1 first, it informs STEP 2's carving.
+
+**STILL OPEN for STEP 2 (not yet brainstormed):** where exactly to cut seed-master (`bdd-core` 58 vs
+`bdd-ledger` 10 — needs a domain interface between them); the exact `ResourceDescription` record shape;
+netplan re-carve (`/api` vs impl/CLI). Migration order (leaves-first): 1 systemd-contract pilot → 2
+netplan+cdk8s-systemd → 3 manifests (= STEP 1, retire walker) → 4 unitrepo-core/-handler (born bundles)
+→ 5 host+mediation seam (THE gated spike). Steps 1–4 additive/risk-free; step 5 gated on the passed spike.
+
+## ★★ RECRUIT-A-SPECIALIST = DECLARATIVE recruitment (v2 target, brainstormed 2026-06-16)
+
+User asked: when a NEW specialist appears in the universe answering a new seed-master need, how does
+seed-master recruit it? **The shape the user proposed is correct** (another node publishes a new
+doctor-specialist type → seed-master instantiates it in its unit graph and calls its services), with
+THREE precisions, all grounded in the model's own prior decisions:
+
+- **PULL not push (serve-own-DAG).** The user's "makes it visible/available to others" is the one word
+  to correct: node B does NOT push to seed-master. Node B **serves its own DAG**; seed-master **pulls**
+  the closure (≈ git clone) WHEN its need demands. Visibility = reachability via ownership replication,
+  no broker/registry/push. This is the P2P thesis vs p2's central repo.
+- **Node homogeneity, not "another application".** Node B (domain=doctor-specialists) and seed-master
+  (domain=provisioning) are PEER NODES (the homogeneity axiom: same kind, differ by domain). The
+  "shared docstore competence" the user named IS the unitrepo itself — they speak the same capability
+  vocabulary, which is what makes recruit work without coupling.
+- **"Call its services" has gates.** resolve (wire provider↔need) = PROVEN; **uses: coherence** = the
+  resolver REFUSES an incoherent closure and narrates why (the recruit safety guarantee); **load** the
+  behavior via the extender `UnitHandler` = v2-deferred (framework-move); and for an ACCUMULATING
+  specialist (drift/intervention, NOT the reactive DbusTcp/Network) the recruit = a **StackReference
+  edge to its ledger stack** ([[specialist-as-ledger-northstar]]), "calling its services" = folding its
+  ledger history.
+
+**★ HOW A NEED IS DECLARED — it EMERGES from a Referral, the operator codifies it (the user's real
+question).** The need is NOT hand-coded. Mechanism (the user's framing, confirmed): need is named
+**by-symptom**, where a **domain** defines the baseline of treatable symptoms and a **specialist
+inherits-then-adds/removes** (the same override model already applied to specialists) — expressed as a
+capability: specialist `provide handles-symptom=X`, need `require handles-symptom=X`. The TYPE-vs-symptom
+mix the user wants = exactly this inherit-with-override pattern. **The new need's SOURCE = an unmet
+`Referral`:** a symptom appears at runtime → the current specialist can't treat it → it emits a
+`Referral` = unmet-need-with-why (`ReferralReply`/`Assessment`) → THAT unmet referral IS the new need.
+The **operator** then promotes the ad-hoc observed referral into a durable codified `Require-Capability`
+(the ad-hoc→codified gradient of [[doctor-remediation-model]]). Then the recruit loop closes:
+codified need → a new specialist unit appears providing `handles-symptom` → seed-master pulls its
+closure → resolver wires it. Ties to the atlas deferred edge `grant-seam-awaits-referrals` (the Referral
+is already the intended trigger). Already half-built in the shipped doctor (`Referral`/`ReferralReply`/
+`Assessment` exist — [[referral-roundtrip-state]]).
+
+**STILL OPEN on recruit (deferred):** Referral → grant-seam (GrantPolicy) wiring; the STATIC→RUNTIME
+frontier (today the universe is known at construction; a unit appearing AT RUNTIME needs live
+re-resolution = the deferred hot-swap edge, rewire-before-prune).
+
+**★ RECRUITABILITY IS A 2ND DECOMPOSITION CRITERION (user insight 2026-06-16).** Until now the
+decomposition line had ONE criterion: gRPC coupling (bundle vs host). The user identified a SECOND that
+sets the GRAIN of units INSIDE the bundle layer: **recruitability**. For a specialist unit to be
+recruitable it must be SELF-CONTAINED — declare its own Provide (`handles-symptom`) and its own Require
+(what it needs), limited to ONLY what concerns it, no leak into a neighbor. The anti-pattern it forbids:
+a unit that reaches a neighbor through UNDECLARED coupling (not in its Require) — the resolver can't wire
+what it can't see, so the recruit fails and the boundary is proven wrong. **★ THE PAYOFF — the criterion
+is SELF-VERIFYING: the just-merged resolver is the DECOMPOSITION ORACLE.** Express a candidate split as
+each unit's Provide/Require, run resolve; a missing Require or an incoherent `uses:` closure → the
+resolver REFUSES → the frontier is wrong, proven not judged. This is the thesis's `uses:`-coherence
+applied to decomposition itself. **SEQUENCING CONSEQUENCE (the wisdom point, user asked which path is
+safest):** the oracle exists IN PRODUCTION only AFTER step 1 (which promotes the universe-builder
+test→`src/main`). So designing step-2 splits NOW would be hand-judging without the oracle — the very
+subjectivity the criterion replaces. ⇒ **STEP 1 FORGES THE TOOL THAT VALIDATES STEP 2.** Do step 1
+first; then step 2 has a real executable oracle (express candidate Provide/Require → resolve → refusals
+prove bad frontiers). Same empirical-trigger logic already accepted for the manifests split. The open
+`bdd-core` vs `bdd-ledger` cut is the first case to run through this oracle once it is in prod.
+
+**NEXT (user picked "capture then finish step 1"):** resolve the STEP-1 spec's open root-of-resolution
+ambiguity (the production universe = the FINE layer only — domains+units resolved from a root that
+`requireAll`s all domains, i.e. the walker's exact scope; NOT the module layer, which would drag Maven
+module→module edges synthesis doesn't need), then self-review + submit the spec
+`docs/superpowers/specs/2026-06-16-walker-retirement-design.md` (drafted on branch
+`design/step1-walker-retirement-spec`, base origin/main 7739d154, NOT yet committed). Preview-driven
+throughout, per [[decision-options-in-preview]] + [[diagram-preview-file]] (`.claude/claude-preview.adoc`,
+kroki-safe + en-US + faithful vocabulary).
 
 ## Atlas
 

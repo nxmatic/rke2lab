@@ -23,6 +23,20 @@ re-look after I say I've updated it.
 scratch file is a *view*, not the source of truth. The repo-root `.asciidoctorconfig` (kroki URL)
 reaches `.claude/` too, since resolution walks up to the repo root.
 
+**★ REVERSAL 2026-06-16 — the ONLINE `kroki.io` is now the DEFAULT and renders everything; the LOCAL
+container was the failing one.** The repo switched `.asciidoctorconfig` to the public server by default
+(rke2lab main commit `abc56741` "chore(kroki): use online server by default" — the `:kroki-server-url:`
+line is now commented out, so the extension falls back to its built-in `https://kroki.io`). With the
+online server, figures that the LOCAL `bioskop-nixos` container rejected NOW RENDER FINE — including the
+"long-label + several subgraphs" diagrams that 400'd locally (see the 2026-06-15 long-label gotcha
+below). So that 400 was a limit of the LOCAL kroki/mermaid BUILD, **not** a universal mermaid rule, and
+**not** the public server. This also INVERTS the 2026-06-08 claim that "public kroki.io only serves its
+cache and can't fresh-render from this network" — today it fresh-renders new/edited diagrams correctly
+(network/topology changed, or that 2026-06-08 diagnosis was partial). **PRACTICAL RULE NOW:** default to
+the online server (no `:kroki-server-url:` needed); short labels remain good hygiene for readability but
+are NO LONGER a hard constraint; https also sidesteps the http-CSP webview gotcha entirely. The
+local-kroki + CSP material below is retained as history in case the local server is ever reinstated.
+
 **PROVEN ROOT CAUSE of the empty-frame saga (2026-06-08) — it was the KROKI SERVER + the webview CSP,
 NOT the mermaid syntax.** All my earlier syntax theories were WRONG and are retracted (it was NOT
 strict-ASCII, NOT quoted edge labels, NOT dotted arrows, NOT multi-block, NOT subgraph). Three real,
@@ -60,3 +74,22 @@ empty-frame symptom as the edge-quote issue. Safe-dialect checklist for kroki me
 `@ + / :` and unicode inside the block. **Edge labels must contain NO parentheses** (2026-06-08:
 `-->|snapshotFor(entry)|` broke the render; `-->|snapshotFor entry|` fixed it). Parens are fine inside
 node text `ID["foo(bar)"]`, only edge-label text rejects them — same class as the edge-quote issue.
+
+**Refinement (2026-06-15): `subgraph "Title"` (QUOTED title, no id bracket) renders fine** — it is
+`subgraph id["Title"]` (id + bracket) that 400s, not a titled subgraph per se. Use the quoted form.
+
+**NEW root cause found 2026-06-15 — a LONG-LABEL layout threshold.** Two long node labels combined
+with several subgraphs reproducibly 400 the local kroki/mermaid build (`Error 400: Internal Server
+Error`, not a lexical error), even though each long node renders fine in isolation. It is a dagre
+layout limit, NOT a syntax/token issue. FIX: keep node + subgraph labels SHORT (a few words). A whole
+afternoon of line-by-line bisection traced it here — don't re-bisect; shorten labels first.
+
+**NEW operational gotcha 2026-06-15 — "Allow insecure content" is per-workspace-PATH.** After the repo
+moved to an external-worktree path (`rke2lab.d/main`), the local http kroki rendered (server logged the
+request) but the webview stayed blank: the CSP "allow insecure content" grant was tied to the OLD path
+and does NOT carry to the new one. Re-grant it for the new workspace (palette → AsciiDoc: Change Preview
+Security Settings → Allow insecure content). DIAGNOSIS that nailed it: pointing `.asciidoctorconfig` at
+the public `https://kroki.io` made figures appear (https bypasses the http-CSP) — proving server+syntax
+were fine and the blocker was the http CSP. Caveat: public kroki only serves its cache, so revert to the
+local URL + the CSP grant for new/edited diagrams. Also: `.asciidoctorconfig` is read at preview OPEN —
+a plain re-render won't pick up a change; do Developer: Reload Window.
