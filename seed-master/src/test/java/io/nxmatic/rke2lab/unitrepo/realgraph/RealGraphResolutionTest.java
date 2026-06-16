@@ -1,10 +1,12 @@
 package io.nxmatic.rke2lab.unitrepo.realgraph;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.unitrepo.core.UnitResolver;
 import io.nxmatic.rke2lab.unitrepo.core.UnitResource;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -54,6 +56,26 @@ class RealGraphResolutionTest {
             .count();
     assertTrue(
         gitopsUnitWires > 1, "gitops requireAll must fan out to >1 unit, got " + gitopsUnitWires);
+  }
+
+  @Test
+  void unsatisfiableCrossLayerRequirementThrows() {
+    UniverseBuilder builder = new UniverseBuilder();
+
+    // a rogue unit that requires a manifest domain nobody provides
+    UnitResource rogue =
+        new UnitResource("rogue-module")
+            .require(ManifestsUniverse.NS_DOMAIN, "(domain=does-not-exist)");
+
+    List<UnitResource> universe = new ArrayList<>(builder.universe());
+    universe.add(rogue);
+
+    UnitResolver resolver = new UnitResolver(universe);
+
+    assertThrows(
+        ResolutionException.class,
+        () -> resolver.resolve(rogue),
+        "an unmet cross-layer requirement is a diagnosable failure, not a silent empty closure");
   }
 
   private static void assertContains(
