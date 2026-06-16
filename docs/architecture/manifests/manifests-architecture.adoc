@@ -430,36 +430,71 @@ final String cluster = bootstrapIdentity().clusterName();
 This is the documented context-access pattern; see
 link:bootstrap-identity-provider.adoc[Bootstrap Identity Provider].
 
-[[domain-registry-status]]
-=== Domain registry: current status
+[[ordering-and-coherence]]
+=== Visit order and coherence: the resolver-driven type-state
 
-[CAUTION]
-====
-**The `ManifestsDomainRegistrar` → `ManifestsDomain` registry path is not functional today.**
+The unit *visit order* — the sequence in which `manifestUnitVisitor.visit(unit, …)` runs during
+K8s synthesis — is load-bearing: `Cdk8sApiObjectResolver` lets a consuming unit look up an
+`ApiObject` produced by a unit it depends on, and that contract assumes the producer ran first.
+So the order must be *producer-before-consumer* — a topological order over the real dependency
+edges (`dependsOnManifestsUnitIds` between units, `dependsOnDomainIds` between domains).
 
-`DefaultManifestSynthesisService.buildDomainRegistry(...)` (called early in `synthesize`)
-currently throws:
+That order, and the coherence checks that guard it, are computed by the standalone Apache Felix
+`UnitResolver` (in `unitrepo-core`) — **not** a hand-rolled walker. The old depth-first ordering
+trio and the constructor validation it relied on have been retired. The design is a *type-state*:
 
-[source,java]
+[mermaid]
 ----
-throw new UnsupportedOperationException(
-    "Domain registration temporarily disabled during layers→components migration. "
-        + "DomainRegistrars have been deleted; new domain pattern pending implementation.");
+flowchart LR
+  ASM["ManifestsDomainRegistry\n(assembled — build-only, never throws\non a malformed graph; only structural\ninvariants: no dup id, no multi-domain\nunit, no empty domain)"]
+  RES["resolve()\nthe single coherence gate"]
+  COH["CoherentManifestsDomainRegistry\n(the ONLY type exposing visitOrder())"]
+  ASM -->|resolve| RES --> COH
 ----
 
-The exception message says registrars "have been deleted", but that is itself out of date: the
-`ManifestsDomainRegistrar` interface, the `ManifestsDomainRegistry` / `ManifestsDomainRegistryBuilder`
-types, **and** the ten concrete registrars (`GitopsDomainRegistrar`, `ClusterApiDomainRegistrar`,
-… in the `domain/` package) all exist today. Each already uses the current pattern —
-`new ManifestsDomain(ManifestDomainCatalog.GITOPS, List.of(...), List.of(ManifestsUnit.lazy(...)))`.
-What is missing is the *wiring*: `buildDomainRegistry` does not instantiate them (their imports are
-commented out in the service), so the intended design — registrars provide `ManifestsDomain`s, the
-registry orders them, the service iterates units — does not run.
+* **`ManifestsDomainRegistry` (assembled).** Construction only builds indices; it does **not**
+  check dependency coherence and never throws on a malformed graph. It exposes `domains()`,
+  `manifestUnits()`, `requireDomainIdForManifestsUnit(…)`, and `resolve()` — but **no** visit
+  order.
+* **`resolve()` is the single coherence-rule coordinator.** It builds a fine-layer `UnitResource`
+  universe (`ManifestsUniverse`, domains + units in the resolver's Provide/Require vocabulary),
+  resolves it with `UnitResolver` from a synthesis root that `requireAll`s every domain, derives
+  the visit order by topologically sorting the *real-dependency* (`require`) edges while excluding
+  the `requireAll` containment edges, and runs the cross-domain policy check. It returns a
+  `CoherentManifestsDomainRegistry`.
+* **`CoherentManifestsDomainRegistry` (coherent)** is the only type that carries `visitOrder()`.
+  A caller therefore *cannot* synthesize from an unresolved registry — it does not compile. The
+  old build-time fail-fast is replaced by a stronger compile-time guarantee plus one runtime gate.
 
-Treat any description of a live, registrar-driven synthesis as aspirational until `buildDomainRegistry`
-is restored. The systemd target creation and the `BootstrapInfrastructureSynthesizer` path that
-follow it are real.
-====
+==== The three coherence checks `resolve()` coordinates
+
+A *coherence rule* is a pure function of the assembled registry (the context every rule reads).
+Today three checks run at the gate, with three owners:
+
+[cols="1,2,2",options="header"]
+|===
+|Check |Owner |How a violation surfaces
+|Satisfiability (unknown domain/unit reference) |`UnitResolver` |an unsatisfiable `require` → `ResolutionException` (wrapped as `IllegalStateException`)
+|Acyclicity (no dependency cycle) |`ManifestsVisitOrder` topo-sort |no valid linearization → `IllegalStateException` naming the units
+|Cross-domain policy |`CrossDomainRule` |an illegal cross-domain dependency → `IllegalStateException` naming the units + domains
+|===
+
+The **cross-domain rule** — *a unit in domain A may depend on a unit in domain B only if A
+transitively `dependsOn` B* — is enforced by an explicit pure check, **not** by encoding it into
+the resolver's filters. Encoding it there was tried and rejected: because each unit enters the
+closure via its domain's `requireAll` containment (`cardinality:=multiple`), an offending unit
+whose own `require` cannot be satisfied is **silently pruned** from the closure rather than
+failing — a misconfigured unit would vanish from synthesis with no error. The governing principle
+is that the system must *report* a misconfiguration for a human to fix, never silently
+auto-resolve it. The dependency target genuinely exists, so the violation is invisible to
+resolution itself: it is a *policy above resolution*, hence an explicit rule that throws.
+
+`CrossDomainRule` is the exemplar of the "pure function of the assembled registry" shape; the
+other two checks have different owners and shapes, so a shared `CoherenceRule` abstraction is
+deliberately deferred until a third same-shaped policy rule appears (rule-of-three). The visitor
+seam (`ManifestsUnitVisitor` / `ManifestsUnitContext` / `Cdk8sApiObjectResolver`) is unchanged by
+all of this — only the *source* of the order moved, from a DFS walker to the resolver wiring plus
+a topological sort.
 
 == Systemd Integration
 
@@ -541,9 +576,10 @@ link:manifest-domain-catalog-pattern.adoc[the catalog pattern].
   `PackageMetadataProfile.packageAnnotations(...)` on each so the exploder routes them.
 . If it needs an installer, override `synthesizeSystemdUnits`, using
   `SystemdSynthesisContext` accessors for target names.
-. Register the unit in its domain. **Note:** domain registration is currently disabled — see
-  <<domain-registry-status>>. Until the registry is restored, follow the wiring used by the
-  units that are synthesized today.
+. Register the unit in its domain (via the domain's `ManifestsDomainRegistrar`). If it depends on
+  another unit, declare that in `dependsOnManifestsUnitIds`; if the dependency lives in another
+  domain, that domain must be reachable through `dependsOnDomainIds` (the cross-domain rule — see
+  <<ordering-and-coherence>>), or `resolve()` will reject it.
 
 == Troubleshooting
 
@@ -565,9 +601,25 @@ base class; only the two top-level Charts may exist.
 The manifests were not exploded to the expected directory — almost always the Chart-vs-Construct
 bug above. Verify the directory exists before debugging the unit file.
 
-=== `app.synth()` throws UnsupportedOperationException
+=== Synthesis fails with "manifest closure is incoherent: …"
 
-You hit the disabled domain registry — see <<domain-registry-status>>.
+`resolve()` could not resolve the unit/domain graph — an `dependsOn…` references a unit or domain
+that no enabled domain provides. The wrapped cause is the resolver's `ResolutionException`. Fix the
+offending `dependsOnManifestsUnitIds` / `dependsOnDomainIds`, or enable the domain that provides the
+missing dependency. See <<ordering-and-coherence>>.
+
+=== Synthesis fails with "Cyclic manifest unit dependency detected: …"
+
+Two or more units depend on each other (directly or transitively), so no producer-before-consumer
+order exists. The message names the units on the cycle. Break the cycle by removing one
+`dependsOnManifestsUnitIds` edge.
+
+=== Synthesis fails with "… crosses domains without a matching domain dependency …"
+
+A unit in domain A declares a `dependsOn` on a unit in domain B, but A does not (transitively)
+`dependsOn` B. This is the cross-domain rule (<<ordering-and-coherence>>). Either add the missing
+`dependsOnDomainIds` edge from A to B, or move the unit so the dependency stays within reachable
+domains. The error names both units and both domains.
 
 == Package Overviews (co-located docs)
 
