@@ -11,6 +11,31 @@ metadata:
 the chat"; became a full operating-model migration.** Context window hit its limit
 mid-flight — this note + [[claude-auto-memory-mechanics]] are the handoff.
 
+**★ UPDATE 2026-06-16 — config-home SHIPPED; transcript + memory bridges restored;
+hub link-memory.sh FIXED (both repos, pushed).** The wrapper (`claudeProcessWrapper`
+in rke2lab.code-workspace → hub/bin/claude-config-home-wrapper.sh) is live: it sets
+`CLAUDE_CONFIG_DIR=<worktree>/.claude/hub` for the spawned CLI. KEY GOTCHA proven this
+session: **the wrapper only sets the var for its CHILD (the CLI), NOT for the VSCode
+EXTENSION HOST that paints the sidebar.** The sidebar's `fetchSessions()` runs IN the
+ext host and reads its OWN `process.env.CLAUDE_CONFIG_DIR` (via `Ss()` in extension.js)
+— UNSET, because VSCode is Dock/Finder-launched (no shell env). Parent-chain probe:
+ext-host depth-3 = unset, CLI depth-2 = set-by-wrapper. So after the config switch the
+sidebar read `$HOME/.claude/projects/<slug>` (emptied of flat transcripts by a PRIOR
+move that pushed them into the hub) → looked empty, nothing actually lost. FIX (per-slug,
+machine-local, in NO repo): `~/.claude/projects/<slug>` → symlink → `hub/projects/<slug>`;
+ext host follows it, finds the 65 transcripts. The 27 orphaned sidecar dirs (subagents/
+tool-results/workflows) were copied into the hub first. `environmentVariables` setting
+can't help — `$d()` copies process.env for the child spawn only, never mutates ext host.
+Only var-based alternatives (launchctl setenv / shell-launch VSCode) are GLOBAL → break
+per-worktree isolation; the symlink is the per-worktree-correct lever, same pattern as
+the memory bridge. Memory bridge also restored: `hub/projects/<slug>/memory` → symlink →
+`repo/.claude/memory` (32 versioned files, single source of truth in the project).
+**link-memory.sh bug fixed**: it shipped at two depths (`.claude/bin` in claude-hub,
+`.claude/hub/bin` in subtree consumer) so the hardcoded `../..` was wrong in the subtree
+(computed `<root>/.claude` → bogus `.claude/.claude/memory` + wrong slug). Now derives
+root via `git rev-parse --show-toplevel` (correct at any depth). Shipped to main in BOTH
+repos + resynced via subtree split/push/pull. See [[claude-auto-memory-mechanics]].
+
 **THE GOAL (settled):** every checkout is an external worktree under
 `<repo>.d/<namespace>/<branch>` (NOT nested in `.claude/worktrees/`), so VSCode
 roots a window at the worktree → indexed code + chat in ONE window. `main` becomes
