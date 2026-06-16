@@ -1,0 +1,444 @@
+= Step 1 — Retire the manifest dependency walker — design
+:toc: left
+:toclevels: 2
+:sectnums:
+
+*Date:* 2026-06-16 +
+*Branch:* `design/step1-walker-retirement-spec` (rebased on `origin/main` `fdb6eda5`) +
+*Status:* design, awaiting user review
+
+== Goal and scope
+
+Replace the hand-rolled manifest ordering machinery with the already-merged,
+already-proven standalone Felix `UnitResolver`, in *production* synthesis. The
+resolution-track proof established that one `resolve()` computes rke2lab's real
+cross-layer closure (modules + domains + units). This step makes that closure
+*drive the real synthesis*, retiring the hand-rolled traversal.
+
+This is the *resolution track in production*: framework-free, zero exposure to
+the v2 OSGi framework-move spike. It is also the empirical trigger for the later
+`manifests-model` bundle split (the resolver becomes a second real consumer of
+the model), but that split is *out of scope here*.
+
+=== In scope
+
+* Delete the *ordering trio* in the `manifests` module (the two hand-rolled
+  depth-first traversals plus their entry point).
+* Delete the *constructor validation* and model the missed state with a type-state
+  (`AssembledRegistry` build-only → `resolve` → `CoherentRegistry`); `resolve`
+  becomes the single coherence gate.
+* Build the `UnitResource` universe from the real registry in *production* via an
+  exposed `UniverseBuilder` (promote the test adapter to `src/main`).
+* Derive the synthesis *visit order* from the resolver wiring by topologically
+  sorting only the real-dependency (`require`) edges.
+
+=== Out of scope (deferred, faithful to the agreed sequencing)
+
+* Splitting `manifests` into model + synthesis bundles — triggered *by* this
+  step, designed later.
+* Any OSGi framework, classloading, bnd headers, or the host/bundle migration —
+  the v2 migration track.
+* Touching the `seed-master` host layer, the mediation seam, or
+  `ResourceDescription` — those are step-2 (decomposition) concerns.
+
+=== Success criterion
+
+Production manifest synthesis produces the *same* CDK8s ApiObjects in a *valid
+producer-before-consumer order*, computed by `UnitResolver` + a topological sort,
+with the ordering trio deleted, and all existing synthesis tests green
+(surefire-counted).
+
+== What exists today — the ordering trio
+
+The current ordering is *not* one walker; it is three entangled pieces in the
+`manifests` module, plus a build-time validation pass that is separate from the
+ordering path.
+
+[mermaid]
+....
+flowchart TB
+  ENTRY["entry point applyWithDomainDependencies"]
+  DOMDFS["domain DFS applyDomainWithDependencies"]
+  WALKER["unit DFS ManifestsUnitDependencyApplier"]
+  VISITOR["manifestUnitVisitor visit"]
+  CDK["CDK8s ApiObjects in the chart"]
+  ENTRY --> DOMDFS
+  ENTRY --> WALKER
+  DOMDFS --> WALKER
+  WALKER --> VISITOR
+  VISITOR --> CDK
+....
+
+* *`applyManifestsUnitWithDomainDependencies`* (on `ManifestsDomainRegistry`):
+  the entry point. Applies the unit's whole domain with its domain dependencies
+  first, then the unit itself.
+* *`applyDomainWithDependencies`* (on `ManifestsDomainRegistry`): a DFS over
+  `dependsOnDomainIds`, applying every unit of each domain through the walker.
+* *`ManifestsUnitDependencyApplier`* (its own class): a DFS over
+  `dependsOnManifestsUnitIds`, with an `appliedManifestsUnitIds` idempotence
+  guard and a `visitingManifestsUnitIds` cycle guard that throws on a cycle.
+
+The traversal calls the *visitor seam* for each unit in dependency order:
+`manifestUnitVisitor.visit(unit, context)` where the context carries the CDK8s
+`chart`, the `domainId`, the `manifestUnitId`, and the `Cdk8sApiObjectResolver`.
+
+=== Why the order is load-bearing
+
+`Cdk8sApiObjectResolver` lets a consuming unit look up an ApiObject produced by a
+dependency. Its contract assumes the producer ran first. So the visit order must
+be producer-before-consumer — a topological order over the real dependency edges.
+
+=== The validation-in-the-constructor smell
+
+The `ManifestsDomainRegistry` *constructor* runs two validations at build time,
+before any ordering happens:
+
+* `validateDomainDependencies` — every `dependsOnDomainIds` entry references a
+  known domain.
+* `validateManifestsUnitDependencies` — every unit dependency references a known
+  unit, the graph is acyclic, and a *cross-domain rule* holds: a unit in domain A
+  may depend on a unit in domain B only if A depends on B transitively.
+
+A constructor should *build*, not run logic that throws. This validation is a
+*symptom*: what it checks — acyclicity and the cross-domain coherence rule — is
+exactly what `resolve` computes (`uses:`-coherence). So the constructor *resolves
+in secret*. The missed state is that a freshly built registry is **assembled but
+not yet resolved**; resolution is the *transition* to a **coherent** registry.
+The revision (section 3) models that transition explicitly with a type-state and
+makes `resolve` the single coherence gate — so this constructor validation is
+**deleted**, not kept.
+
+== What changes — resolve plus topological sort
+
+The resolver already computes the closure across *both* levels (domain-to-domain
+and unit-to-unit) in a single pass. The proof demonstrated this on the real graph
+(the gitops-to-platform domain edge and the flux-root to flux-instance to
+flux-operator unit chain both resolve). So the resolver subsumes *both*
+hand-rolled DFS, not only the unit one.
+
+[mermaid]
+....
+flowchart TB
+  REG["registry model accessors"]
+  UNIV["build UnitResource universe"]
+  RESOLVE["UnitResolver resolve from root"]
+  WIRING["wiring map unordered"]
+  FILTER["keep require drop requireAll"]
+  TOPO["topological sort"]
+  ORDER["producer-before-consumer order"]
+  VISITOR["manifestUnitVisitor UNCHANGED"]
+  CDK["CDK8s ApiObjects in the chart"]
+  REG --> UNIV
+  UNIV --> RESOLVE
+  RESOLVE --> WIRING
+  WIRING --> FILTER
+  FILTER --> TOPO
+  TOPO --> ORDER
+  ORDER --> VISITOR
+  VISITOR --> CDK
+....
+
+=== Deriving the order — dependency edges only
+
+The wiring mixes two edge kinds. They must be treated differently:
+
+[mermaid]
+....
+flowchart LR
+  REQUIRE["require edge real dependency"]
+  REQUIREALL["requireAll edge containment"]
+  KEEP["topo-sort require edges only"]
+  REQUIRE --> KEEP
+  REQUIREALL -.excluded.-> KEEP
+....
+
+* A *require* edge re-expresses a real `dependsOnDomainIds` /
+  `dependsOnManifestsUnitIds` dependency — it constrains order (producer before
+  consumer).
+* A *requireAll* edge re-expresses containment (a module gathers its domains, a
+  domain gathers its units) — it is structural, not temporal, and must *not*
+  constrain the order.
+
+So the visit order is the topological sort of the subgraph of `require` edges
+only. A cycle in that subgraph has no valid linearization and must fail
+equivalently to the walker's old cycle guard.
+
+=== The root of resolution — the fine layer only
+
+The proof resolved the *full* cross-layer universe (reactor modules + domains +
+units, rooted at the `seed-master` module-unit) in order to *demonstrate* that the
+resolver subsumes the walker across both granularities. Production synthesis needs
+less: the walker only ever ordered *domains and units*, never the reactor module
+layer.
+
+[mermaid]
+....
+flowchart TB
+  ROOT["synthesis root requireAll all domains"]
+  DOM["domain layer the 10 domains"]
+  UNIT["unit layer the 28 units"]
+  ROOT --> DOM
+  DOM --> UNIT
+....
+
+So the *production universe is the fine layer only* — domains and units —
+resolved from a synthesis root that `requireAll`s every domain. This is exactly
+the walker's scope. The module layer is deliberately excluded: it carries Maven
+module-to-module edges that express *build* order, irrelevant to manifest
+*synthesis* order; including it would be scope creep. The module layer remains the
+proof's concern (demonstrating subsumption) and, later, the step-2 decomposition's.
+
+=== The type-state — Assembled then Coherent
+
+The constructor-validation smell (section 2) and the new order source meet in one
+clean model: name the *missed state*. A registry is built in an **assembled**
+state — present, but not yet checked for coherence; `resolve` is the *transition*
+to a **coherent** state that carries the visit order. Construction does no logic
+and never throws; `resolve` is the single coherence gate.
+
+[mermaid]
+....
+flowchart LR
+  ASM["AssembledRegistry build only no throw"]
+  RES["resolve the transition"]
+  COH["CoherentRegistry resolved carries order"]
+  ASM --> RES
+  RES --> COH
+....
+
+The two states expose different surfaces, and that is the point:
+
+* *AssembledRegistry* — the model accessors (`domains`, `manifestUnits`,
+  `requireDomainIdForManifestsUnit`) and the `resolve` method. No visit order
+  here.
+* *CoherentRegistry* — the topologically sorted visit order and the wiring. This
+  is the only type that exposes an order.
+
+So a caller *cannot* synthesize from an unresolved registry — there is no order
+method on `AssembledRegistry`; it does not compile. The fail-fast that the old
+constructor validation gave at build time is replaced by something stronger: a
+**compile-time** guarantee (you cannot use an unresolved registry) plus a single
+runtime coherence gate at `resolve` (acyclicity + cross-domain + satisfiability,
+all checked once; incoherence throws `ResolutionException`).
+
+=== Who owns the universe — separation of roles
+
+The `UnitResource` universe is a *first-class value*, built by a distinct
+`UniverseBuilder` (promoted from the test adapter), not hidden inside `resolve`.
+Each component has one role: the builder maps the assembled registry to the
+universe; `UnitResolver` resolves it; the registry carries the type-state. The
+deciding reason is step 2: the resolver is to be the *decomposition oracle*
+(express a candidate split's Provide/Require, resolve, read the refusals — the
+recruitability check). That oracle needs the universe as a manipulable value, so
+exposing the builder now forges the oracle once, in step 1, rather than hiding the
+universe and re-exposing it later. All three pieces already exist as test code;
+promoting them is re-expression, not speculation.
+
+[mermaid]
+....
+flowchart TB
+  ASM["AssembledRegistry"]
+  UB["UniverseBuilder from registry"]
+  UNIV["UnitResource universe value"]
+  RESOLVE["UnitResolver resolve"]
+  COH["CoherentRegistry order"]
+  ASM --> UB
+  UB --> UNIV
+  UNIV --> RESOLVE
+  RESOLVE --> COH
+....
+
+== The seam that does not move
+
+The visitor and its context are the actual CDK8s synthesis side-effect. They are
+*unchanged*. Only the *source of the order* changes: from the walker's DFS
+recursion to the resolver wiring plus topological sort.
+
+[mermaid]
+....
+flowchart TB
+  ORDER["topo-sorted unit order NEW source"]
+  VISITOR["manifestUnitVisitor visit"]
+  CONTEXT["context chart domainId unitId resolver"]
+  CDK["CDK8s ApiObjects in the chart"]
+  ORDER --> VISITOR
+  VISITOR --> CONTEXT
+  CONTEXT --> CDK
+....
+
+== Blast radius on ManifestsDomainRegistry
+
+[mermaid]
+....
+flowchart TB
+  subgraph "KEEP on AssembledRegistry"
+    K1["constructor build only no throw"]
+    K2["domains and manifestUnits"]
+    K3["requireDomainIdForManifestsUnit"]
+  end
+  subgraph "DELETE the trio"
+    D1["entry point"]
+    D2["domain DFS"]
+    D3["unit DFS applier class"]
+  end
+  subgraph "DELETE constructor validation"
+    V1["validateDomainDependencies"]
+    V2["validateManifestsUnitDependencies"]
+  end
+  subgraph "MOVE to resolve"
+    R1["coherence gate acyclic cross-domain"]
+  end
+  V1 -.folded into.-> R1
+  V2 -.folded into.-> R1
+....
+
+* *KEEP — model accessors on `AssembledRegistry`*: `domains`, `manifestUnits`,
+  `requireDomainIdForManifestsUnit`, and the constructor index building — now
+  *build-only*, no validation, never throws. These are exactly what the universe
+  builder reads.
+* *DELETE — the ordering trio*: the two DFS and their entry point, plus the
+  `ManifestsUnitDependencyApplier` class in full.
+* *DELETE — the constructor validation*: `validateDomainDependencies` and
+  `validateManifestsUnitDependencies` (plus their helpers
+  `dependsOnDomainTransitively`, `validateManifestsUnitAcyclic`). Acyclicity and
+  unknown-reference checks are *folded into* `resolve` — a cycle has no
+  linearization, an unknown reference is an unsatisfiable `require`. One coherence
+  gate, not two.
++
+[WARNING]
+====
+*Open verification — the cross-domain rule.* The old
+`validateManifestsUnitDependencies` enforces a rule the resolver does *not*
+obviously enforce: a unit in domain A may depend on a unit in domain B only if A
+depends on B transitively. A plain `require(unit=X)` resolves to X regardless of
+domain edges, so deleting the validation may *drop* this rule. Before deleting it,
+the plan must establish ONE of: (a) encode the rule in the universe so an illegal
+cross-domain `require` becomes unsatisfiable (e.g. scope the unit capability by
+its domain and require through the domain), proven by a failing-resolve test; or
+(b) keep this one cross-domain check as an explicit method on `CoherentRegistry`
+(invoked by `resolve`, not the constructor) if encoding it in capabilities proves
+unnatural. This is the single open question the type-state revision must close;
+the rest of the validation folds cleanly into `resolve`.
+====
+
+Per the project's code-hygiene rule, the trio is deleted *entirely* in the same
+change that introduces the resolver path — no dead code, no compatibility branch,
+all call sites updated together.
+
+== Components
+
+[mermaid]
+....
+flowchart TB
+  subgraph "manifests production"
+    ASM["AssembledRegistry build only"]
+    UNIV["UniverseBuilder NEW"]
+    COH["CoherentRegistry carries order NEW"]
+    SYNTH["synthesis service modified"]
+    VISITOR["visitor UNCHANGED"]
+  end
+  subgraph "unitrepo-core"
+    RESOLVER["UnitResolver UNCHANGED"]
+  end
+  ASM --> UNIV
+  UNIV --> RESOLVER
+  RESOLVER --> COH
+  COH --> SYNTH
+  SYNTH --> VISITOR
+....
+
+[cols="1,1,2", options="header"]
+|===
+| Component | Status | Responsibility
+| `UnitResolver` (unitrepo-core) | unchanged | resolve the closure + wiring over the given universe (here the fine layer)
+| `UniverseBuilder` | new | map an `AssembledRegistry` to the fine-layer `UnitResource` universe value — domains + units (the test adapter, promoted to `src/main`)
+| `AssembledRegistry` | new (from the reduced registry) | build-only model: `domains`, `manifestUnits`, `requireDomainIdForManifestsUnit`, and `resolve`; never throws at construction
+| `CoherentRegistry` | new | the post-`resolve` state: carries the topo-sorted visit order + wiring; the only type exposing an order
+| `resolve` (transition) | new | build universe via `UniverseBuilder`, run `UnitResolver`, topo-sort `require` edges; the single coherence gate (throws `ResolutionException` on incoherence)
+| `DefaultManifestSynthesisService` | modified | call `resolve` then drive the visitor over `CoherentRegistry`'s order, instead of the trio entry point
+| `manifestUnitVisitor` + `ManifestsUnitContext` | unchanged | synthesize CDK8s ApiObjects per unit in the given order
+|===
+
+=== Placement note
+
+`manifests` already depends on no gRPC and is the home of both the model and the
+synthesis. `unitrepo-core` sits below `manifests` (the dependency direction the
+proof established), so the production universe builder and the ordering step live
+in `manifests` `src/main`, consuming `UnitResolver` as a library. This adds a
+production dependency from `manifests` on `unitrepo-core` (today it is test-scope
+in seed-master only) — a leaves-first, framework-free dependency.
+
+== Error handling — one coherence gate at resolve
+
+[mermaid]
+....
+flowchart TB
+  CONSTRUCT["construct AssembledRegistry never throws"]
+  USE["use order without resolve"]
+  COMPILE["compile error no order on Assembled"]
+  RESOLVE["resolve the gate"]
+  CYCLE["cycle no linearization throws"]
+  UNKNOWN["unknown ref unsatisfiable require throws"]
+  CONSTRUCT --> RESOLVE
+  USE --> COMPILE
+  RESOLVE --> CYCLE
+  RESOLVE --> UNKNOWN
+....
+
+The old design had two guard sites (constructor validation + walker cycle check).
+The revision has *one* runtime gate (`resolve`) plus a *compile-time* guard:
+
+* *Using an unresolved registry*: impossible — `AssembledRegistry` exposes no
+  order, so synthesizing without `resolve` does not compile. This replaces the
+  old build-time fail-fast with a stronger compile-time one.
+* *Cycle*: the walker threw `IllegalStateException` on a back-edge. The topo-sort
+  detects the same cycle (no valid linearization) and must fail at `resolve` with
+  a diagnosable error naming the offending units.
+* *Unknown reference*: an unknown `dependsOn…` becomes an unsatisfiable `require`,
+  so `resolve` throws `ResolutionException` (proven) — no separate pre-check.
+* *Cross-domain rule*: see the open-verification warning in section 5 — this is
+  the one check that does not fold trivially into `resolve` and whose handling
+  (encode-in-universe vs explicit method on `CoherentRegistry`) the plan must
+  settle.
+
+== Testing (the deliverable)
+
+Behavior-first, surefire-counted (per the build-verification discipline: count the
+report, never trust `BUILD SUCCESS`). The tests assert *behavior*, described in
+prose here (no code in this spec).
+
+* *Order validity*: for the real registry, the derived visit order is a valid
+  topological order of the `require` edges — every unit appears after all its
+  `dependsOnManifestsUnitIds` and every domain after its `dependsOnDomainIds`.
+  Assert on the known real chain (flux-root before flux-instance before
+  flux-operator) and the known domain edge (platform before gitops).
+* *Containment excluded*: a `requireAll` containment edge does *not* force an order
+  between siblings — assert that two sibling units with no real dependency are not
+  spuriously ordered by their shared domain membership.
+* *Cycle fails*: an injected unit-level cycle makes `resolve` fail with a
+  diagnosable error (parity with the old walker guard).
+* *Type-state*: `AssembledRegistry` exposes no visit order — the order lives only
+  on `CoherentRegistry` returned by `resolve`. A compile-fail fixture (or an
+  equivalent API-shape assertion) confirms you cannot obtain an order without
+  resolving. Construction itself never throws on a malformed graph.
+* *Cross-domain rule*: an illegal cross-domain dependency (a unit in A depending
+  on a unit in B with no A→B domain edge) must fail at `resolve` — this is the
+  test that proves whichever handling the plan picks (encode-in-universe →
+  `ResolutionException`, or explicit `CoherentRegistry` check). Parity with the old
+  `validateManifestsUnitDependencies` cross-domain guard.
+* *Synthesis parity*: the set of CDK8s ApiObjects produced through the new order
+  equals the set produced by the old trio for the same registry — the retirement
+  changes *how* the order is computed, not *what* is synthesized.
+* *Trio + validation deleted*: a structural check that
+  `ManifestsUnitDependencyApplier`, the two `apply*` methods, and the constructor
+  `validate*` methods no longer exist (no dead code, no second coherence gate).
+
+== Relationship to the larger arc
+
+* This is the *resolution track in production* — framework-free, zero spike
+  exposure. It does what the proof promised: lets the resolver *drive* synthesis.
+* It is the empirical *trigger* for the `manifests-model` bundle split (the
+  resolver becomes a second real consumer of the model), but the split itself is
+  the step-2 decomposition's call, designed later.
+* It keeps the visitor seam intact, so the step-2 host/bundle line (OSGi models,
+  host actualizes) is unaffected and unprejudiced by this change.
