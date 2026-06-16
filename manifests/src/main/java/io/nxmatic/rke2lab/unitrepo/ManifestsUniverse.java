@@ -41,7 +41,10 @@ public final class ManifestsUniverse {
       for (String dep : unit.dependsOnManifestsUnitIds()) {
         unitResource.require(NS_UNIT, "(unit=" + dep + ")");
       }
-      byId.put(id, unitResource);
+      if (byId.put(id, unitResource) != null) {
+        throw new IllegalStateException(
+            "unit id collides with an existing domain or unit id: " + id);
+      }
     }
   }
 
