@@ -26,6 +26,8 @@ Project-specific memory for rke2lab. Cross-cutting facts (profile, conventions, 
 
 ## Infra / manifests / config
 
+- [Coherence-rules coordinator](coherence-rules-coordinator.md) — walker-retirement Task 4: cross-domain rule = option B (explicit pure check that REPORTS, throws), NOT option A (silent Felix prune). resolve()=single coherence-rule coordinator; rule=pure fn of AssembledRegistry; CoherenceRule interface DEFERRED to rule-of-three.
+
 - [Config restructuring state](config-restructuring-state.md) — Inc1 (Rke2labConfig DTO + InfraDomain enum) MERGED; Inc2 (doctor remediation) waits on doctor work.
 - [Manifests doc consolidation](manifests-doc-consolidation.md) — DONE: hub manifests-architecture.adoc + 4 companions; domain-registry path documented as dormant.
 - [Terminology refactor state](terminology-refactor-state.md) — manifests renames done (ManifestsUnit/Domain/NodeEnv); BootstrapPhase + DomainRegistrars pending.
