@@ -6,4 +6,4 @@
 // tailscale IP was stale/unroutable from here; bioskop-nixos.local always resolves
 // since both the shell and the VSCode webview run on bioskop. See
 // docs/guides/diagram-preview-kroki.adoc.
-:kroki-server-url: http://bioskop-nixos.local:8000
+// :kroki-server-url: http://bioskop-nixos.local:8000
