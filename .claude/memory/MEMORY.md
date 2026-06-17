@@ -6,6 +6,7 @@ Project-specific memory for rke2lab. Cross-cutting facts (profile, conventions, 
 
 - [Intervention-provenance state](intervention-provenance-state.md) — **★ SHIPPED to main 2026-06-14 (origin/main 7e5ec7d1; 260 tests green).** Problem=(Checkpoint+opt Symptom) join key; DriftSpecialist infers/explains resolutions (idempotent) → efficacy marks confounded. ONLY OPEN = e2e LIVE proof, gated on [[pulumi-stack-per-worktree-backlog]]. See [[hub:specialist-as-ledger-northstar]] [[hub:model-substrate-alignment]] [[validate-at-the-boundary]] [[builder-for-multisite-constructor]].
 - [Master provisioning state](master-provisioning-state.md) — **★ live-probe contract FIXED+PROVEN vs real master** (branch fix/systemd-live-probe-contract, not merged): gate returns Observation.failed→doctor consulted→runbook persisted. PARKED. NEXT-topic seed = operator's out-of-band intervention not in stack history → the drift specialist data source.
+- [Step 2 decomposition state](step2-decomposition-state.md) — **★ IN DESIGN, spike-first** (worktree design/step2-decomposition-spec). jdeps coupling DONE+hardened (SCC+articulation); roles named; **PIVOT: config = cas-zero of the generic bundle↔host contract, doctor = an instance**. Model B (capability: Require config-key → resolver wires) CHOSEN, conditional on a spike. NEXT = write SPIKE B, then atlas ritual, then spec→wip/specs/. See [[docrepo-dag-state]] [[coherence-rules-coordinator]].
 
 ## Doctor / health system (the big subsystem)
 
