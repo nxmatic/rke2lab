@@ -7,7 +7,7 @@ import com.tngtech.jgiven.annotation.NestedSteps;
 import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.Quoted;
 import com.tngtech.jgiven.annotation.ScenarioStage;
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import java.util.LinkedHashMap;
 import java.util.Map;
 

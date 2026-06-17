@@ -7,7 +7,7 @@ import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationReport;
 import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.bdd.ProductionClusterReadinessProbe;
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.ClusterReadinessStage;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;

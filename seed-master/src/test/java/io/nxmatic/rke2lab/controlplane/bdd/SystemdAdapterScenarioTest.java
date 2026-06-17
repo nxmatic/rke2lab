@@ -1,8 +1,8 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import com.tngtech.jgiven.junit5.ScenarioTest;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import org.junit.jupiter.api.Test;
 
 /**

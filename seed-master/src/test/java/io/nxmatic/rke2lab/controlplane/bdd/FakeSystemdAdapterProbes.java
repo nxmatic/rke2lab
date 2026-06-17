@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import java.util.Map;
 import java.util.Optional;
 

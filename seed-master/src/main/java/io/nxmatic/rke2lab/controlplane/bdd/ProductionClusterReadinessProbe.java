@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.PhaseOutcome;
@@ -26,8 +27,7 @@ public final class ProductionClusterReadinessProbe implements ClusterReadinessPr
   }
 
   @Override
-  public Observation probe(
-      io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig config, ClusterReadinessPhase phase) {
+  public Observation probe(BootstrapConfig config, ClusterReadinessPhase phase) {
     return switch (phase) {
       case KUBECONFIG_PUBLISHED ->
           toObservation(

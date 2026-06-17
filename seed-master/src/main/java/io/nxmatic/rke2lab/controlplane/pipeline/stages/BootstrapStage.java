@@ -4,7 +4,7 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
 import io.nxmatic.rke2lab.controlplane.bdd.RunbookRenderer;
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions;
 import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapPipeline;
 import io.nxmatic.rke2lab.controlplane.pipeline.OnFailure;

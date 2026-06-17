@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.readiness;
 
 import io.nxmatic.rke2lab.controlplane.SeedLog;
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.SeedNodeBootstrapWatcher;
 import java.io.IOException;

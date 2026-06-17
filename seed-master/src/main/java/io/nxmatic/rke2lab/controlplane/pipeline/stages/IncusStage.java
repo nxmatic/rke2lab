@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap.BootstrapResult;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;

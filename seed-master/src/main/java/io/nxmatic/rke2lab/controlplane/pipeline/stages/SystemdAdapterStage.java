@@ -16,7 +16,7 @@ import io.nxmatic.rke2lab.controlplane.bdd.SimulatedSystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.Symptom;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterScenario;
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.PipelineStageFailure;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;

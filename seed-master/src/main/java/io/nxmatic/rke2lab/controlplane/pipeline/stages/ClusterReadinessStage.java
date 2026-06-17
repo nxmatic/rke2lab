@@ -16,7 +16,7 @@ import io.nxmatic.rke2lab.controlplane.bdd.Observation;
 import io.nxmatic.rke2lab.controlplane.bdd.RemediationPlan;
 import io.nxmatic.rke2lab.controlplane.bdd.Symptom;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;

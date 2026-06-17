@@ -4,7 +4,7 @@ import com.pulumi.Context;
 import com.pulumi.Pulumi;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.BootstrapStage;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.EnvironmentStage;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.OutputsStage;

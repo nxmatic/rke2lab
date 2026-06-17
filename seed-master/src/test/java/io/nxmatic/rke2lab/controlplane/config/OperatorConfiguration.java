@@ -1,6 +1,5 @@
 package io.nxmatic.rke2lab.controlplane.config;
 
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import java.util.LinkedHashMap;
 import java.util.Map;

@@ -1,6 +1,5 @@
-package io.nxmatic.rke2lab.controlplane.incus;
+package io.nxmatic.rke2lab.controlplane.config;
 
-import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;

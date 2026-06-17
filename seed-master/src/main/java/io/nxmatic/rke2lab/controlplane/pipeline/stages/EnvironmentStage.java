@@ -2,8 +2,8 @@ package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
 import com.pulumi.Context;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import java.util.function.Consumer;

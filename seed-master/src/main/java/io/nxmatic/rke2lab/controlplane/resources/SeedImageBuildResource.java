@@ -4,7 +4,7 @@ import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;
 import com.pulumi.resources.ComponentResourceOptions;
 import com.pulumi.resources.Resource;
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

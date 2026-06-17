@@ -18,7 +18,7 @@ import io.nxmatic.rke2lab.controlplane.bdd.NetworkSpecialist;
 import io.nxmatic.rke2lab.controlplane.bdd.Patient;
 import io.nxmatic.rke2lab.controlplane.bdd.PulumiInterventionLedgerWriter;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.BboxStage;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.IncusStage;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.PreflightStage;

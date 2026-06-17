@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import io.nxmatic.rke2lab.controlplane.incus.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 
 /**
  * The readiness probe the scenario runs. Production plays the scenario with the real probe ({@code
