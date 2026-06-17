@@ -31,6 +31,56 @@ well-integrated spec is itself the proof we are on the right path.*
 Legend used throughout: thin/blue = IMPLEMENTED (built); thick/green = the model under design;
 dashed/amber = EXPLORATION (not built, future); grey = cross-cutting foundation.
 
+== The two spaces — OSGi and host
+
+Every model on this atlas sits in one of two spaces, and the line between them is the application's
+deepest seam. This framing is the *purity axis* made structural: it is the backdrop each per-subsystem
+view is read against.
+
+* *OSGi space* — pure models that *describe*: the resolution oracle (`UnitResolver`), the
+  manifests universe, the doctor record model, the config records. No `com.pulumi`, no `io.grpc`.
+* *Host space* — code that *actualises* the description over the Pulumi engine: orchestration, the
+  ledger write-side, `ConfigLoader`. This is where the engine imports live.
+
+The only edge that legitimately crosses is the *bundle/host contract*: a bundle declares a need
+(`Require osgi.extender`), the host satisfies it (`Provide` + the `SectionReader` SPI for values). A
+pure model reaching directly into host code — as `Rke2labConfig → ConfigLoader` does today — is a
+crossing in the WRONG direction, a decomposition defect to invert.
+
+[mermaid]
+....
+flowchart TB
+  subgraph OSGI["OSGi space — pure, describes"]
+    res["UnitResolver the oracle"]
+    man["manifests universe pure closed"]
+    doc["doctor-core record model"]
+    cfg["Rke2labConfig plus BootstrapConfig pure"]
+  end
+  subgraph HOST["host space — actualises over Pulumi"]
+    orch["orchestration IncusResourceBootstrap"]
+    lw["ledger-write imports com.pulumi"]
+    loader["ConfigLoader reads Pulumi"]
+  end
+  contract["bundle host contract — Require osgi.extender plus SectionReader"]
+  cfg -->|describes| man
+  res -->|validates| man
+  doc -->|read by| lw
+  orch -->|drives| lw
+  cfg -.->|crosses via| contract
+  contract -.->|satisfied by| loader
+
+  classDef osgi fill:#eef,stroke:#88a,stroke-width:1px;
+  classDef host fill:#fde,stroke:#a58,stroke-width:1px;
+  classDef seam fill:#eee,stroke:#999,stroke-width:2px,stroke-dasharray:4 3;
+  class res,man,doc,cfg osgi;
+  class orch,lw,loader host;
+  class contract seam;
+....
+
+Each per-subsystem view below lives inside this frame: the doctor constellation is OSGi-space (pure
+record model) wrapped by a host-space ledger write-side; the Step-2 config view (when it lands) is the
+first to draw the crossing contract explicitly.
+
 == Per-subsystem index
 
 * <<doctor-view,Doctor subsystem>> — the diagnostic layer (remediation round-trip, medical record,
