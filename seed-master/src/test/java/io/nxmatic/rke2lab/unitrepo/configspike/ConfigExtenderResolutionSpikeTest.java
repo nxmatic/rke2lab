@@ -9,6 +9,7 @@ import io.nxmatic.rke2lab.unitrepo.core.UnitResource;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.osgi.resource.Resource;
 import org.osgi.resource.Wire;
@@ -31,7 +32,8 @@ import org.osgi.service.resolver.ResolutionException;
  * Requires an extender, the host Provides it, the resolver wires them; a missing extender is a loud
  * ResolutionException, not a silent empty closure (the coherence rule: report, never auto-resolve).
  */
-class ConfigExtenderResolutionSpike {
+@Tag("spike")
+class ConfigExtenderResolutionSpikeTest {
 
   // org.osgi.namespace.extender.ExtenderNamespace (verified on the 1.0.1 jar)
   static final String NS_EXTENDER = "osgi.extender";

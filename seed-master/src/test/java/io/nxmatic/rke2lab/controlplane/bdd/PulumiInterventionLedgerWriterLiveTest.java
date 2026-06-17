@@ -13,10 +13,22 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 
-final class PulumiInterventionLedgerWriterTest {
+/**
+ * Both cases drive a real Pulumi inline {@code up()} via the writer, so this class is tagged {@code
+ * host} + {@code live} (excluded from the default run) and registers {@link
+ * GrpcChannelNoiseCapture} for the benign gRPC channel noise the inline deployment leaves behind.
+ */
+@Tag("host")
+@Tag("live")
+final class PulumiInterventionLedgerWriterLiveTest {
+
+  @RegisterExtension
+  static final GrpcChannelNoiseCapture GRPC_NOISE = new GrpcChannelNoiseCapture();
 
   @Test
   void appendInterventionToLedgerStack(@TempDir Path backendDir) throws Exception {

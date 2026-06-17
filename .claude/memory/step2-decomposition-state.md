@@ -1,6 +1,6 @@
 ---
 name: step2-decomposition-state
-description: "Step 2 (decomposition + APIs, the docrepo->rke2lab migration track) — DESIGN SHIPPED to origin/main d5a23458 (4 OSGi planes + 2 axes + static->dynamic 6-stage roadmap; Model B REJECTED by the OSGi-standard review). IMPLEMENTATION STARTED 2026-06-17 eve: worktree rke2lab.d/refactor/bootstrap-config-relocate exists. Slice 1 scope DECIDED = the BIGGER cut (BootstrapConfig relocate + doctor-core/ledger-read/ledger-write split, validated by the resolver oracle). GATING NEXT STEP = re-run jdeps on fresh bytecode before coding."
+description: "Step 2 (decomposition + APIs, the docrepo->rke2lab migration track) — DESIGN SHIPPED (4 OSGi planes + 2 axes + static->dynamic 6-stage roadmap; Model B REJECTED). SLICE 1 SHIPPED to origin/main 689e2fff 2026-06-17 = the BootstrapConfig relocate ALONE (host incus -> pure config, ~33 call-sites, 265 green). Fresh jdeps corrected 3 spec facts (edge count=33 not 8; doctor split = boundary CREATION not relocate, re-scoped to its own slice; NO OSGi runtime in prod -> stages 3-4 = real lift). NEXT = slice 2 (config-extender, cheap, resolution-plane) or slice 3 (doctor split, cartography-first). Test-infra tagged by zone/cost, shipped."
 metadata: 
   node_type: memory
   type: project
@@ -207,30 +207,48 @@ TASK RESULTS (all closed this session):
    only, oracle-backed); the proven config-extender contract is slice 2, not slice 1 (sequence keeps each
    merge monotone vs the atlas).
 
-## NEXT SESSION — BUILDING SLICE 1 (design shipped; impl STARTED 2026-06-17 eve)
+## SLICE 1 SHIPPED to origin/main 2026-06-17 eve (`689e2fff`)
 
-Design phase COMPLETE + merged to origin/main `d5a23458`. Implementation track STARTED this session:
-- **EXTERNAL worktree `rke2lab.d/refactor/bootstrap-config-relocate` EXISTS** (branch off `origin/main`
-  d5a23458, sops re-smudged — `keys.yaml` decrypted, `keys.schema.yaml` was a false positive: its `ENC[`
-  / `sops:` hits are comments + a JSON-schema property, not real ciphertext). Full clean build green
-  (cache disabled → `target/classes` populated for jdeps). NOT EnterWorktree — `git worktree add`.
-- **SLICE 1 SCOPE DECIDED (user, this session) = the BIGGER cut**: the `BootstrapConfig` relocate
-  **AND** the doctor-core / ledger-read / ledger-write split — the complete static cut at once, NOT just
-  the relocate. (Resolves the §8-vs-§12 ambiguity I raised in the merged spec; §12 says "relocate", §8
-  lists the doctor split too — user chose §8's fuller scope.) Reconcile spec §12 to §8 ON the refactor
-  branch, ships with the slice.
-- **GATING FIRST STEP before coding**: re-generate the jdeps coupling on the FRESH bytecode — the
-  load-bearing "8 `bdd→incus` edges → `bdd→config`" claim + the doctor/ledger-read/ledger-write borders
-  come from the EPHEMERAL `/tmp/step2-jdeps/` (regenerate per [[build-verification-gotchas]]: build with
-  `-Dmaven.build.cache.skipCache=true` first, then jdeps `-verbose:class -filter:none` over the 8
-  non-incus modules). A big static cut deserves fresh data, not stale /tmp.
-- **`BootstrapConfig` relocate**: pure record, sole dep `Rke2labConfig`, move from host
-  `controlplane.incus` to the pure config layer; flips the `bdd→incus` edges to `bdd→config`. Express the
-  candidate cut as Provide/Require, validate against the resolver ORACLE (a refusal = wrong border).
-  TDD/spike per [[bdd-jgiven-test-strategy]]; build-verify per [[build-verification-gotchas]] (`clean
-  package -pl :seed-master -am -Dmaven.build.cache.skipCache=true -DskipTests=false`, count surefire).
-- Slice 2 (config-extender, stage 2) lands AFTER this static cut exists. RENAME `InfraConfigFragment`
-  (misnamed — it's an ObjectClassDefinition, not an OSGi fragment) as part of that slice.
+Slice 1 = **the `BootstrapConfig` relocate ALONE** (host `controlplane.incus` → pure
+`controlplane.config`, sole dep `Rke2labConfig`). Pure ~33-call-site `import` rewrite, 265 tests green.
+Merged direct (no PR — rke2lab is solo, see [[hub:...]] dev prefs). Commits on main:
+- `a2cdb0d3` spec §12↔§8 reconcile; `9f722c6d` the relocate; `e51f7bd9` FQN/shell cleanup;
+  `5abe3f39` spec corrections; `689e2fff` test-infra (separate dedicated branch, squashed).
+
+**THREE design facts CORRECTED this session by a FRESH jdeps pass (the /tmp data was stale/wrong) —
+the merged spec now carries the fixes:**
+1. *Edge count was wrong.* `BootstrapConfig` is imported by **33 classes across 9 packages** (bdd 10,
+   pipeline+stages 10, resources 5, systemd 3, readiness 2, config 2, incus 2), NOT "8 bdd→incus edges".
+   The relocate is a ~33-site mechanical move.
+2. *The doctor split is NOT a relocate — it is boundary CREATION.* There are **no `doctor*`/`ledger*`
+   packages today**; the record model + read-side + host write-side are interleaved across
+   `bdd`+`readiness`+`resources`. So it needs a cartography phase first (map class→module), THEN express
+   as Provide/Require for the oracle. Re-scoped OUT of slice 1 to its own later slice. (This reverses the
+   "bigger cut" decision once the data showed the split's true nature.)
+3. *There is NO OSGi framework runtime in production.* Felix is used only as a resolution ALGORITHM
+   (`new ResolverImpl(...)` in `UnitResolver`); no `BundleContext`/Config Admin/DS/Metatype runtime;
+   entrypoint is plain `main()`→Pulumi. So roadmap stages 3–4 (DELIVERY=Config Admin, ACTIVATION=DS) are
+   a real architectural LIFT (stand up/emulate a runtime), NOT small increments. Only stages 1–2
+   (resolution plane) + Metatype-as-descriptive-types are cheap.
+
+## NEXT SESSION — pick the next slice
+
+- **Slice 2 = config-extender (stage 2), resolution-plane, CHEAP.** The `Require osgi.extender` contract
+  (spike-proven) + adopt the Metatype *shape* (`ObjectClassDefinition`) as pure types + RENAME
+  `InfraConfigFragment` (it's an ObjectClassDefinition, NOT an OSGi fragment). No runtime needed.
+- **Slice 3 = the doctor split**, cartography-first (see corrected fact 2). Bigger/riskier; do the
+  class→module mapping before expressing borders to the oracle.
+- Stages 3–4 (delivery/activation) gated on the runtime-lift decision (fact 3) — sequence deliberately.
+- Also invert the `Rke2labConfig → ConfigLoader` seam behind the existing `SectionReader` SPI (stage 3).
+- jdeps scripts are EPHEMERAL (`/tmp/step2-jdeps/`); regenerate per [[build-verification-gotchas]]
+  (build `-Dmaven.build.cache.skipCache=true` first, then jdeps over the 8 non-incus modules). Slice 1
+  proved the /tmp data can be STALE — always re-derive load-bearing coupling claims on fresh bytecode.
+
+## Test infrastructure (shipped this session, `689e2fff`) — see [[test-tag-taxonomy-by-zone]]
+
+Tagged the suite by zone/cost (host/osgi/live/spike), added `GrpcChannelNoiseCapture` (host-space JUL
+extension), unified `*LiveTest`/`*SpikeTest` naming, tag-driven default exclusion (`live | spike`).
+Also surfaced [[seedlog-logback-migration-backlog]] (host-space logging unification, deferred).
 
 Real config keys (from InfraDomain, for Metatype schema): INCUS requires configDir (opt
 project/defaultRemote/remoteAddress); IMAGE requires sharedFolder (opt alias/builderHost/distrobuilderConfig);

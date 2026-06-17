@@ -38,6 +38,15 @@
     <maven.enforcer.plugin.version>3.6.3</maven.enforcer.plugin.version>
     <maven.dependency.plugin.version>3.11.0</maven.dependency.plugin.version>
     <maven.surefire.plugin.version>3.5.6</maven.surefire.plugin.version>
+    <!-- Default test run excludes the slow/throwaway tests (JUnit5 tag expression).
+         Orthogonal tags, mapped to the integration-atlas two spaces + cost/nature:
+           host  = exercises host space (the Pulumi/gRPC engine);
+           osgi  = exercises OSGi space (the resolver / pure model);
+           live  = drives a real Pulumi inline up() (seconds each, spawns gRPC);
+           spike = throwaway proof, not a regression test.
+         Override with -Plive / -Pspike / -Phost / -Posgi / -Pall-tests. -->
+    <surefire.groups/>
+    <surefire.excludedGroups>live | spike</surefire.excludedGroups>
     <spotless.version>3.6.0</spotless.version>
     <shellcheck.maven.plugin.version>0.5.1</shellcheck.maven.plugin.version>
     <google-java-format.version>1.35.0</google-java-format.version>
@@ -240,6 +249,18 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
           <version>${maven.surefire.plugin.version}</version>
+          <configuration>
+            <!-- JUnit5 tag expressions, both property-driven so the profiles below
+                 (and -D overrides) can steer them. Orthogonal tags map to the
+                 integration-atlas two spaces + cost/nature:
+                   host  = exercises host space (the Pulumi/gRPC engine);
+                   osgi  = exercises OSGi space (the resolver / pure model);
+                   live  = drives a real Pulumi inline up() (gRPC, seconds each);
+                   spike = throwaway proof, not a regression test.
+                 Default: groups empty (all), excludedGroups 'live | spike'. -->
+            <groups>${surefire.groups}</groups>
+            <excludedGroups>${surefire.excludedGroups}</excludedGroups>
+          </configuration>
         </plugin>
         <plugin>
           <groupId>com.diffplug.spotless</groupId>
@@ -347,4 +368,49 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!-- Test selection by tag. The default build excludes 'live | spike'
+         (see the surefire.excludedGroups property). These profiles re-include
+         or narrow by tag; -Dgroups=… / -DexcludedGroups=… still work for ad hoc
+         boolean expressions (host, osgi, live, spike). -->
+    <profile>
+      <!-- Run everything, including the slow live deployments and the spikes. -->
+      <id>all-tests</id>
+      <properties>
+        <surefire.excludedGroups/>
+      </properties>
+    </profile>
+    <profile>
+      <!-- Add the live (real Pulumi inline up()) tests back to the default run. -->
+      <id>live</id>
+      <properties>
+        <surefire.excludedGroups>spike</surefire.excludedGroups>
+      </properties>
+    </profile>
+    <profile>
+      <!-- Run ONLY the throwaway spikes (named *SpikeTest, tagged spike). -->
+      <id>spike</id>
+      <properties>
+        <surefire.groups>spike</surefire.groups>
+        <surefire.excludedGroups/>
+      </properties>
+    </profile>
+    <profile>
+      <!-- Run ONLY host-space tests (the Pulumi/gRPC engine side). -->
+      <id>host</id>
+      <properties>
+        <surefire.groups>host</surefire.groups>
+        <surefire.excludedGroups/>
+      </properties>
+    </profile>
+    <profile>
+      <!-- Run ONLY OSGi-space tests (the resolver / pure model side). -->
+      <id>osgi</id>
+      <properties>
+        <surefire.groups>osgi</surefire.groups>
+        <surefire.excludedGroups/>
+      </properties>
+    </profile>
+  </profiles>
 </project>

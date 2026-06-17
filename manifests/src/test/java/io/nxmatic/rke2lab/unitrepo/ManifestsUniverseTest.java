@@ -11,8 +11,10 @@ import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
 import io.nxmatic.rke2lab.unitrepo.core.UnitResource;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("osgi")
 class ManifestsUniverseTest {
 
   private record StubUnit(String manifestUnitId, List<String> dependsOnManifestsUnitIds)
