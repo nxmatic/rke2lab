@@ -1,0 +1,196 @@
+= Step 2 — config bundle/host contract (the cas-zero of decomposition)
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* DESIGN, proven by spike. This spec freezes the architecture decisions for the first
+vertical slice of Step 2 (decomposition + APIs). It lives in `wip/` and must be redistributed into
+the durable docs (`docs/architecture/`) at merge — the atlas enrichment in section 6 in particular
+graduates into `docs/architecture/integration-atlas.adoc` as a second per-subsystem view.
+====
+
+== 1. Overview — what this is and why it exists
+
+Step 1 retired the hand-rolled manifest dependency walker: the standalone Felix `UnitResolver` now
+drives production manifest synthesis behind a type-state (`assembled → resolve() → coherent`), and
+`resolve()` is the single coherence-rule coordinator. That shipped resolver is the *decomposition
+oracle*: a candidate module boundary is expressed as each unit's Provide/Require, fed to `resolve()`,
+and a missing requirement or incoherent closure makes the resolver REFUSE — the boundary is proven
+wrong, not judged by hand.
+
+Step 2 is the migration track: re-cut the reactor into role-based modules and define the APIs/SPIs
+between them. This spec covers the *first* slice: the configuration / bootstrap subsystem. Config is
+not one role among many — it is the *cas-zero of the generic bundle/host contract*. Nailing it
+defines the contract every other bundle (the doctor, manifests…) reuses to declare a need that the
+host, which talks to the Pulumi engine, satisfies.
+
+== 2. How the boundary was found (bottom-up, then proven)
+
+The decomposition was derived from the *real* class-dependency graph (jdeps over compiled bytecode,
+the eight non-generated reactor modules: 284 coupled classes, 1099 edges, 26 host-marked classes that
+import `com.pulumi`/`io.grpc`), not from the inherited Maven module borders. The graph was hardened
+with objective metrics (strongly-connected components = dependency cycles; articulation points =
+natural cut hinges) crossed with a manual reading. Three coupling galaxies emerged: a host-heavy
+orchestration galaxy, a pure closed manifests galaxy, and a dense bridge from the diagnostic code to
+the persistence substrate.
+
+The config subsystem surfaced as the cas-zero when establishing the doctor frontier: the doctor's
+dependency on configuration pointed at a record (`BootstrapConfig`) that is *pure* (no engine type)
+but mislocated in a host package, and at a config-loading seam that is *inverted* (a pure record
+depending on a host loader). Both are decomposition smells the cut must correct.
+
+== 3. The config subsystem today (the starting point)
+
+The config package already half-codes a per-domain contribution model:
+
+* `InfraDomain` is a closed enum; each constant *is a registrar* that knows how to load its own
+  config fragment. Each `contribute(loader)` declares the domain's needs (e.g. the incus domain
+  requires a config directory; the image domain requires a shared folder) and the host loader
+  satisfies them.
+* `InfraConfigFragment` is the per-domain contribution (a sealed type); `InfraConfigRegistry`
+  aggregates the fragments keyed by domain id; `Rke2labConfig` exposes them typed.
+* `ConfigLoader` is the only class that touches the Pulumi config; it is already built around a pure
+  SPI (`SectionReader`), with one host implementation that reads Pulumi.
+
+Two structural defects, both proven from the graph:
+
+. *Mislocated pure data.* `BootstrapConfig` is a pure record derived from `Rke2labConfig`; its only
+  outgoing dependency is `Rke2labConfig`; yet it lives in the host `incus` package, where eight
+  diagnostic classes reach into it. It is not a host leak — it is config in the wrong package.
+. *Inverted seam.* The pure `Rke2labConfig` depends directly on the host `ConfigLoader`, bypassing
+  the `SectionReader` SPI that already exists. The pure side depends on the host side — the wrong
+  direction.
+
+== 4. Decision — model B: config as a resolved capability
+
+Two models were weighed.
+
+* *Model A (pull via SPI):* each bundle owns its fragment and pulls its config through the
+  `SectionReader` SPI; the host provides one implementation that reads Pulumi. Minimal change, but
+  config stays imperative and invisible to the resolver, keeping its own error mechanism beside the
+  resolver's.
+* *Model B (declare via capability):* a bundle declares no loader at all. It only declares a need —
+  `Require config-key=X`. The host provides `config-value=X` capabilities (read from Pulumi). The
+  resolver wires need to provider. Config joins the same Provide/Require closure as everything else:
+  a missing config-key becomes an unsatisfiable resolve — a loud, diagnosable failure, the same
+  coherence mechanism as a missing unit.
+
+*Model B is chosen*, conditional on the spike proving it holds (section 5). B unifies coherence under
+one mechanism (the coordinator `resolve()` reports, never auto-resolves), and it is the first concrete
+instance of the generic bundle/host mediation contract that the whole of Step 2 aims at. The
+value-injection cost B carries (the resolver wires a *name*, not a *value*) is not an unknown: the
+existing `InfraConfigRegistry` is already a map keyed by domain id — that map is the injection point,
+and A→B is incremental on the same map.
+
+There is no bootstrap self-reference: the resolver consumes no configuration (verified — neither the
+resolver nor the manifests universe reads `Rke2labConfig`), so config can join the resolved closure
+without an amorçage paradox.
+
+== 5. Proof — the spike
+
+A throwaway spike (`ConfigCapabilityResolutionSpike`, seed-master test scope) expresses the config
+frontier in model B against the real shipped resolver, using the real hard config keys transcribed
+from `InfraDomain`: a host unit provides one config-value capability per key; one bundle per domain
+requires its own keys; the Felix resolver wires them.
+
+Three assertions, all green (surefire-counted, full reactor rebuilt with the build-cache disabled):
+
+. *The contract holds.* Resolving each domain bundle reaches the host provider, and every declared
+  config-key wires to a provider (the wire count is asserted, not merely "it resolved").
+. *Missing config fails loudly.* With the host deliberately missing one key, the resolve throws a
+  resolution exception — not a silent empty closure. This is the anti-cheat: the resolver
+  discriminates a bad frontier.
+. *The universe is well-formed* (one host plus one bundle per domain).
+
+The spike is throwaway; the kept artifact is this spec plus the verdict. The production change it
+points to is small and additive.
+
+== 6. Atlas enrichment (graduates to the durable atlas at merge)
+
+The integration atlas (`docs/architecture/integration-atlas.adoc`) is doctor-only today and
+explicitly awaits a second subsystem adopting the ritual. This slice IS that second subsystem. The
+ritual's monotone before/after test, run for model B.
+
+*Before* — the config seam today, with the inverted dependency:
+
+[mermaid]
+....
+flowchart TB
+  subgraph "built - config today"
+    rke2b["Rke2labConfig pure record"]
+    loaderb["ConfigLoader imports com.pulumi HOST"]
+    spib["SectionReader SPI exists"]
+    domainb["InfraDomain enum contribute loader"]
+  end
+  resolverb["UnitResolver consumes no config"]
+  bundlesb["incus image worktree pipeline doctor"]
+  domainb -->|contribute pulls loader| loaderb
+  rke2b -->|INVERTED pure depends on host| loaderb
+  loaderb --> spib
+  bundlesb -->|read| rke2b
+....
+
+*After* — model B added, nothing blue erased; the inverted edge replaced by resolution:
+
+[mermaid]
+....
+flowchart TB
+  subgraph "built unchanged"
+    rke2a["Rke2labConfig pure record"]
+    spia["SectionReader SPI"]
+    resolvera["UnitResolver still consumes no config"]
+    bundlesa["incus image worktree pipeline doctor"]
+  end
+  subgraph "model B green"
+    needs["each bundle Require config-key"]
+    provides["config-host Provide config-value per key"]
+    hostread["host reads values via SectionReader from Pulumi"]
+  end
+  mediation["Pulumi mediation layer unitrepo-pulumi ACL - deferred"]
+  bundlesa --> needs
+  needs -->|resolved by| resolvera
+  provides -->|resolved by| resolvera
+  resolvera -->|wires need to provider| provides
+  provides --> hostread
+  hostread --> spia
+  hostread -.->|realizes| mediation
+  needs -.->|fills| rke2a
+....
+
+*Verdict:*
+
+[mermaid]
+....
+flowchart TB
+  v1["MONOTONE yes - no built box erased. Resolver unchanged, still consumes no config so no bootstrap loop. Doctor and Step-1 type-state untouched."]
+  v2["ONE honest changed edge - Rke2labConfig to ConfigLoader inverted pull is REPLACED by resolution plus SectionReader. The pure record no longer depends on the concrete host loader."]
+  v3["REALIZES a deferred edge - config-as-capability is the first concrete instance of the atlas Pulumi mediation layer, the unitrepo-pulumi ACL. Green realizes amber."]
+  v4["PROVEN not asserted - the spike resolved real keys to the host provider and threw on a missing key."]
+  v1 --> v2 --> v3 --> v4
+....
+
+At merge this becomes a second per-subsystem view in the durable atlas, its green boxes flipped to
+blue when the slice ships.
+
+== 7. Scope and deferrals
+
+In scope (this slice): the config bundle/host contract under model B; relocating `BootstrapConfig` to
+the pure config layer; inverting the `Rke2labConfig → ConfigLoader` dependency behind the resolved
+capability + `SectionReader`.
+
+Captured as a guarantee, not built: the composite specialist model (independent → cabinet → clinic →
+hospital as fractal Units aggregating their members' Provide/Require) — capturing it is what forces
+one-specialist-one-Unit at the leaf; nothing composite is constructed here. The doctor frontier is an
+*instance* of the same contract, parked for a later slice.
+
+Deferred (v2): live re-resolution / hot-swap (the "living" restructuring of composites); the dynamic
+discovery that would turn the closed `InfraDomain` enum into contributed bundles.
+
+== 8. Related documentation
+
+* `docs/architecture/integration-atlas.adoc` — the living integration view this slice extends as a
+  second per-subsystem view.
+* `docs/architecture/manifests/manifests-architecture.adoc` — the Step-1 type-state resolver now in
+  production (the oracle this slice relies on).
+* `docs/architecture/config/` — the config subsystem this slice re-cuts.
