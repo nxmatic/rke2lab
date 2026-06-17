@@ -188,9 +188,15 @@ Two defects, both proven from the graph:
 
 . *Mislocated pure data.* `BootstrapConfig` is a pure record derived from `Rke2labConfig` (Path/URI/
   Duration, zero Pulumi); its only outgoing dependency is `Rke2labConfig`; yet it lives in the host
-  `controlplane.incus` package, where eight diagnostic classes reach into it. It is not a host leak — it
-  is config in the wrong package. Resolution: RELOCATE to the pure config layer (then eight
-  `bdd → incus` edges become `bdd → config`).
+  `controlplane.incus` package. It is not a host leak — it is config in the wrong package. Resolution:
+  RELOCATE to the pure config layer next to `Rke2labConfig`.
++
+NOTE: a fresh jdeps pass on current bytecode (correcting an earlier draft that said "eight
+`bdd → incus` edges") shows `BootstrapConfig` is imported by *33 classes across 9 packages* —
+`bdd` (10), `pipeline` + `pipeline.stages` (10), `resources` (5), `systemd` (3), `readiness` (2),
+`config` (2), `incus` (+ `incus.image`) (2) — of which 6 main-scope importers sit in `bdd`. So the
+relocate is a ~33-call-site mechanical move (a pure `import` rewrite, no logic change), not the small
+8-edge flip the draft implied. SHIPPED as the first slice (see section 12).
 . *Inverted seam.* The pure `Rke2labConfig` depends directly on the host `ConfigLoader`, short-circuiting
   the `SectionReader` SPI that already exists. The pure side depends on the host side — the wrong
   direction.
@@ -265,7 +271,25 @@ flowchart LR
 
 Status: PROVEN/shipped = the Step-1 resolver, the config-extender spike
 (`ConfigExtenderResolutionSpike`), the `SystemdDropIn` + `NodeEnvContributor` exemplars.
-DESIGNED-not-built = stages 1–5 frontiers. DEFERRED v2 = stage 6.
+DESIGNED-not-built = stages 2–5 frontiers. SHIPPED = stage 1, slice 1 (the `BootstrapConfig`
+relocate). DEFERRED v2 = stage 6.
+
+[IMPORTANT]
+====
+*There is no OSGi framework runtime in production today.* Verified on the bytecode + poms: rke2lab
+uses Felix only as a resolution ALGORITHM — `new ResolverImpl(...)` called directly inside
+`UnitResolver`; the only OSGi artifact on the classpath is `org.apache.felix.resolver`. There is no
+`BundleContext`, no framework launch, no Config Admin (`felix.cm`), no DS/SCR (`felix.scr`), no Metatype
+runtime; `seed-master`'s entrypoint is a plain `main()` → Pulumi. This splits the roadmap by cost, not
+just by risk:
+
+* Stages 1–2 (RESOLUTION plane) ride the shipped resolver algorithm — cheap, oracle-backed.
+* Stage 2's *Metatype* piece is just descriptive types (`ObjectClassDefinition` shape) + the
+  `InfraConfigFragment` rename — pure modelling, no runtime needed.
+* Stages 3–4 (DELIVERY = Config Admin push-by-PID; ACTIVATION = DS `configuration-policy`) are genuine
+  *runtime* mechanisms with NO container to host them. They are a real architectural lift (stand up or
+  emulate an OSGi runtime), NOT small increments — sequence them deliberately, after the static cut.
+====
 
 == 9. Proof — the spike
 
@@ -351,20 +375,29 @@ attach-mechanism opening (stage 5) that turns the closed `InfraDomain` enum into
 
 == 12. The first shippable slice
 
-Decided scope = *the full Stage 1 static decomposition* — the `BootstrapConfig` relocate *and* the
-doctor-core / ledger-read / ledger-write split, the lowest-risk, oracle-backed cut. (This is Stage 1 of
-section 8 in full; the two are one slice, not the relocate alone.) Rationale:
+SHIPPED scope = *the `BootstrapConfig` relocate, ALONE*, the lowest-risk oracle-backed cut. (An
+earlier draft folded the doctor-core / ledger-read / ledger-write split into this same slice; a fresh
+jdeps pass corrected that — see the note below — so the split is re-scoped to a later slice.) Rationale:
 
 * It rests entirely on the resolution plane, which the shipped Step-1 oracle already validates — no new
-  runtime mechanism (Config Admin, DS, the registry) is introduced. Every candidate border is expressed
-  as Provide/Require and proven by the resolver: a refusal means the border is wrong.
+  runtime mechanism (Config Admin, DS, the registry) is introduced.
 * The `BootstrapConfig` relocate is a pure move with a single dependency (`Rke2labConfig`); it corrects
-  a proven graph defect and flips the `bdd → incus` edges to `bdd → config` with no logic change. The
-  doctor split separates the pure record model (doctor-core) from the host ledger write-side and the
-  near-pure ledger read-side — the same purity line, applied to the diagnostic subsystem.
+  a proven graph defect (config in a host package) with no logic change — a mechanical ~33-call-site
+  `import` rewrite (section 6).
 * It defers every concern that carries runtime risk (delivery values, activation policy, the living
   registry) and the orthogonal attach-mechanism opening, keeping the first slice on one plane and
   reviewable as a single static cut.
+
+[IMPORTANT]
+====
+*The doctor-core / ledger-read / ledger-write "split" is NOT a relocate — it is boundary CREATION.*
+Verified on current bytecode: there are no `doctor*` or `ledger*` packages today; the doctor record
+model, the read-side and the host write-side are interleaved across `bdd` + `readiness` + `resources`.
+So that slice must first MAP which class belongs to which new module (a cartography phase), then express
+each as a Unit's Provide/Require for the oracle to validate — materially larger and riskier than the
+relocate. It is therefore its own later slice, not part of slice 1. This is why slice 1 shipped as the
+relocate alone.
+====
 
 NOTE: the exact module borders (which classes land in doctor-core vs ledger-read vs ledger-write, and
 the precise `bdd → incus` edge count) are RE-DERIVED from a fresh jdeps run on current bytecode before
