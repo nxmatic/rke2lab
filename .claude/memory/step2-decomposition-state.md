@@ -1,9 +1,10 @@
 ---
 name: step2-decomposition-state
-description: "Step 2 (decomposition + APIs, the docrepo->rke2lab migration track) — IN DESIGN, spike-first. Bottom-up jdeps coupling analysis DONE + hardened (SCC + articulation). Roles named, candidate module découpage drawn. PIVOT: config is the cas-zero of the generic bundle<->host contract; doctor = an instance. Model B (capability) CHOSEN, conditional on a spike proving it holds. NEXT = write SPIKE B (config frontier as Provide/Require -> resolve()). Worktree rke2lab.d/design/step2-decomposition-spec."
-metadata:
+description: "Step 2 (decomposition + APIs, the docrepo->rke2lab migration track) — DESIGN SHIPPED to origin/main d5a23458 (4 OSGi planes + 2 axes + static->dynamic 6-stage roadmap; Model B REJECTED by the OSGi-standard review). IMPLEMENTATION STARTED 2026-06-17 eve: worktree rke2lab.d/refactor/bootstrap-config-relocate exists. Slice 1 scope DECIDED = the BIGGER cut (BootstrapConfig relocate + doctor-core/ledger-read/ledger-write split, validated by the resolver oracle). GATING NEXT STEP = re-run jdeps on fresh bytecode before coding."
+metadata: 
   node_type: memory
   type: project
+  originSessionId: 2a081aec-b4d1-4baf-a048-40c7d5fa7f04
 ---
 
 **Chantier = Step 2** of the docrepo/unitrepo absorption: decomposition + APIs (the migration
@@ -183,13 +184,53 @@ attach-mechanism closed/fragment/extender). The 6 stages:
 Status: PROVEN/shipped = Step-1 resolver, config-extender spike, SystemdDropIn + NodeEnvContributor exemplars.
 DESIGNED-not-built = stages 1–5 frontiers. DEFERRED v2 = stage 6.
 
-## NEXT SESSION (consolidation done this session: memory + spike commit)
+## SESSION 2026-06-17 (afternoon) — SPEC REWRITTEN, ATLAS ENRICHED, all 3 tasks DONE
 
-The in-`wip` spec `wip/specs/2026-06-17-config-bundle-host-contract-design.adoc` still describes the REJECTED
-Model B — REWRITE it to the 4-plane model + 2 axes + 6-stage roadmap (it is the FIRST thing to do; do not
-trust its current content). Then: dig the FRAGMENT end of the attach axis (which domains/units AUGMENT a host
-vs are discovered; SystemdDropIn the exemplar). Then decide the FIRST shippable slice scope (likely Stage 1
-static decomposition + the BootstrapConfig relocate, the lowest-risk oracle-backed cut).
+**★ SHIPPED to origin/main 2026-06-17 (origin/main = `d5a23458`, fast-forward, 3 doc-only commits).**
+Branch `design/step2-decomposition-spec` MERGED + worktree REMOVED + branch deleted (the design phase is
+done; impl is a fresh branch). The 3 commits:
+- `b633d486` spike (was 27b3c740 pre-rebase) — the config-extender spike, unchanged.
+- `f4cc599d` — **REWROTE** `wip/specs/2026-06-17-config-bundle-host-contract-design.adoc` to the correct
+  model: 4 OSGi planes (resolution/delivery/activation/registry) + 2 orthogonal axes (purity model/host;
+  attach closed/fragment/extender) + static→dynamic 6-stage roadmap + atlas additivity test. Model B now
+  recorded ONLY as the rejected alternative (§4). §7 digs the FRAGMENT end; §12 decides the first slice.
+- `d5a23458` — **ENRICHED the durable atlas** `docs/architecture/integration-atlas.adoc`: new section
+  "The two spaces — OSGi and host" (variant A: two swimlanes, the purity axis made STRUCTURAL), placed
+  between legend and per-subsystem index so every view reads against it. User explicitly valued this.
+
+TASK RESULTS (all closed this session):
+1. ✅ Spec rewritten (above). 2. ✅ FRAGMENT end dug — `SystemdDropIn` is the SOLE prod fragment instance
+   (1 site: rke2lab-server-hooks); fragment = augment-an-existing-host (names targetUnitName, merges a
+   delta, `osgi.wiring.host`) vs extender = new-autonomous-domain (NodeEnvContributor, ServiceLoader, 6
+   impls). `NodeEnvContributor` IS the extender-form of `InfraDomain` confirmed in code. 3. ✅ FIRST SLICE
+   DECIDED = **Stage 1 static decomposition + the BootstrapConfig relocate** (lowest-risk, resolution-plane
+   only, oracle-backed); the proven config-extender contract is slice 2, not slice 1 (sequence keeps each
+   merge monotone vs the atlas).
+
+## NEXT SESSION — BUILDING SLICE 1 (design shipped; impl STARTED 2026-06-17 eve)
+
+Design phase COMPLETE + merged to origin/main `d5a23458`. Implementation track STARTED this session:
+- **EXTERNAL worktree `rke2lab.d/refactor/bootstrap-config-relocate` EXISTS** (branch off `origin/main`
+  d5a23458, sops re-smudged — `keys.yaml` decrypted, `keys.schema.yaml` was a false positive: its `ENC[`
+  / `sops:` hits are comments + a JSON-schema property, not real ciphertext). Full clean build green
+  (cache disabled → `target/classes` populated for jdeps). NOT EnterWorktree — `git worktree add`.
+- **SLICE 1 SCOPE DECIDED (user, this session) = the BIGGER cut**: the `BootstrapConfig` relocate
+  **AND** the doctor-core / ledger-read / ledger-write split — the complete static cut at once, NOT just
+  the relocate. (Resolves the §8-vs-§12 ambiguity I raised in the merged spec; §12 says "relocate", §8
+  lists the doctor split too — user chose §8's fuller scope.) Reconcile spec §12 to §8 ON the refactor
+  branch, ships with the slice.
+- **GATING FIRST STEP before coding**: re-generate the jdeps coupling on the FRESH bytecode — the
+  load-bearing "8 `bdd→incus` edges → `bdd→config`" claim + the doctor/ledger-read/ledger-write borders
+  come from the EPHEMERAL `/tmp/step2-jdeps/` (regenerate per [[build-verification-gotchas]]: build with
+  `-Dmaven.build.cache.skipCache=true` first, then jdeps `-verbose:class -filter:none` over the 8
+  non-incus modules). A big static cut deserves fresh data, not stale /tmp.
+- **`BootstrapConfig` relocate**: pure record, sole dep `Rke2labConfig`, move from host
+  `controlplane.incus` to the pure config layer; flips the `bdd→incus` edges to `bdd→config`. Express the
+  candidate cut as Provide/Require, validate against the resolver ORACLE (a refusal = wrong border).
+  TDD/spike per [[bdd-jgiven-test-strategy]]; build-verify per [[build-verification-gotchas]] (`clean
+  package -pl :seed-master -am -Dmaven.build.cache.skipCache=true -DskipTests=false`, count surefire).
+- Slice 2 (config-extender, stage 2) lands AFTER this static cut exists. RENAME `InfraConfigFragment`
+  (misnamed — it's an ObjectClassDefinition, not an OSGi fragment) as part of that slice.
 
 Real config keys (from InfraDomain, for Metatype schema): INCUS requires configDir (opt
 project/defaultRemote/remoteAddress); IMAGE requires sharedFolder (opt alias/builderHost/distrobuilderConfig);
