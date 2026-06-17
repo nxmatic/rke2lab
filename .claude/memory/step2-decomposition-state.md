@@ -231,12 +231,22 @@ the merged spec now carries the fixes:**
    a real architectural LIFT (stand up/emulate a runtime), NOT small increments. Only stages 1–2
    (resolution plane) + Metatype-as-descriptive-types are cheap.
 
-## NEXT SESSION — pick the next slice
+## NEXT SESSION — SLICE 2 DECIDED (user, 2026-06-17): config-extender
 
-- **Slice 2 = config-extender (stage 2), resolution-plane, CHEAP.** The `Require osgi.extender` contract
-  (spike-proven) + adopt the Metatype *shape* (`ObjectClassDefinition`) as pure types + RENAME
-  `InfraConfigFragment` (it's an ObjectClassDefinition, NOT an OSGi fragment). No runtime needed.
-- **Slice 3 = the doctor split**, cartography-first (see corrected fact 2). Bigger/riskier; do the
+**Slice 2 = config-extender (stage 2), resolution-plane, CHEAP — CHOSEN.** Build it next:
+- The `Require osgi.extender` contract — already spike-proven (`ConfigExtenderResolutionSpikeTest`,
+  `@Tag("spike")`); promote that proof into the real config bundle/host wiring.
+- Adopt the Metatype *shape* (`ObjectClassDefinition` + `AttributeDefinition`) as PURE descriptive types
+  — no runtime. `InfraDomain.contribute` + `InfraConfigFragment` already reinvent this schema inline.
+- RENAME `InfraConfigFragment` → it's an `ObjectClassDefinition`, NOT an OSGi fragment (the vocab
+  collision). Real config keys for the Metatype schema are listed lower in this file (INCUS/IMAGE/…).
+- Stays entirely on the resolution plane → oracle-backed, no OSGi runtime needed (see corrected fact 3).
+- Real config keys (from InfraDomain): INCUS requires configDir (opt project/defaultRemote/remoteAddress);
+  IMAGE requires sharedFolder (opt alias/builderHost/distrobuilderConfig); NETWORK opt
+  lanBridgeParent/vmnetNetworkName/nfsAutomount; WORKTREE requires dir; SYSTEMD opt dbusHost/dbusPort;
+  HOST opt rotationRetentionCount.
+
+- **Slice 3 (LATER) = the doctor split**, cartography-first (see corrected fact 2). Bigger/riskier; do the
   class→module mapping before expressing borders to the oracle.
 - Stages 3–4 (delivery/activation) gated on the runtime-lift decision (fact 3) — sequence deliberately.
 - Also invert the `Rke2labConfig → ConfigLoader` seam behind the existing `SectionReader` SPI (stage 3).
