@@ -39,6 +39,7 @@ import io.nxmatic.rke2lab.manifests.node.NodeEnvContributor;
 import io.nxmatic.rke2lab.manifests.node.NodeEnvContributorRegistry;
 import io.nxmatic.rke2lab.manifests.profiles.ComponentVersions;
 import io.nxmatic.rke2lab.manifests.profiles.FloxDebugPolicy;
+import io.nxmatic.rke2lab.manifests.units.runtime.flox.FloxRuntimeAssets;
 import io.nxmatic.rke2lab.netplan.ClusterNetworkBlueprint;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -2299,8 +2300,7 @@ public final class IncusResourceBootstrap {
       }
 
       // Add discovered flox environments
-      final io.nxmatic.rke2lab.manifests.units.runtime.flox.FloxRuntimeAssets floxAssets =
-          systemdTarget.getFloxRuntimeAssets();
+      final FloxRuntimeAssets floxAssets = systemdTarget.getFloxRuntimeAssets();
       if (floxAssets != null) {
         for (var env : floxAssets.getDiscoveredEnvironments()) {
           manifestBuilder.addFloxEnvironment(env.category(), env.name(), true);

@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.incus;
 
+import java.nio.file.Path;
 import java.time.Instant;
 
 /**
@@ -18,9 +19,11 @@ public record DeploymentMetadata(GitMetadata git, Instant timestamp) {
   public record GitMetadata(String branch, String commitSha) {
 
     static GitMetadata capture() {
-      return new GitMetadata(
-          io.nxmatic.rke2lab.controlplane.incus.GitMetadata.currentBranch(),
-          io.nxmatic.rke2lab.controlplane.incus.GitMetadata.currentCommitSha());
+      final Path repoRoot = Path.of(System.getProperty("user.dir"));
+      final HostSlotManifest.GitInfo info = GitMetadataExtractor.extract(repoRoot, false);
+      return info == null
+          ? new GitMetadata("unknown", "unknown")
+          : new GitMetadata(info.branch(), info.commitFull());
     }
   }
 }
