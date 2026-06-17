@@ -351,15 +351,25 @@ attach-mechanism opening (stage 5) that turns the closed `InfraDomain` enum into
 
 == 12. The first shippable slice
 
-Recommended scope = *Stage 1 (static decomposition) + the `BootstrapConfig` relocate*, the
-lowest-risk, oracle-backed cut. Rationale:
+Decided scope = *the full Stage 1 static decomposition* — the `BootstrapConfig` relocate *and* the
+doctor-core / ledger-read / ledger-write split, the lowest-risk, oracle-backed cut. (This is Stage 1 of
+section 8 in full; the two are one slice, not the relocate alone.) Rationale:
 
 * It rests entirely on the resolution plane, which the shipped Step-1 oracle already validates — no new
-  runtime mechanism (Config Admin, DS, the registry) is introduced.
+  runtime mechanism (Config Admin, DS, the registry) is introduced. Every candidate border is expressed
+  as Provide/Require and proven by the resolver: a refusal means the border is wrong.
 * The `BootstrapConfig` relocate is a pure move with a single dependency (`Rke2labConfig`); it corrects
-  a proven graph defect and flips eight `bdd → incus` edges to `bdd → config` with no logic change.
+  a proven graph defect and flips the `bdd → incus` edges to `bdd → config` with no logic change. The
+  doctor split separates the pure record model (doctor-core) from the host ledger write-side and the
+  near-pure ledger read-side — the same purity line, applied to the diagnostic subsystem.
 * It defers every concern that carries runtime risk (delivery values, activation policy, the living
-  registry) and the orthogonal attach-mechanism opening, keeping the first slice atomic and reviewable.
+  registry) and the orthogonal attach-mechanism opening, keeping the first slice on one plane and
+  reviewable as a single static cut.
+
+NOTE: the exact module borders (which classes land in doctor-core vs ledger-read vs ledger-write, and
+the precise `bdd → incus` edge count) are RE-DERIVED from a fresh jdeps run on current bytecode before
+implementation — the `/tmp` analysis the design rested on is ephemeral, and a static cut of this size
+deserves current data, not stale numbers.
 
 The config-extender contract (stage 2) is PROVEN by the spike but need not ship in slice 1 — it can be
 the second slice, once the static cut has landed and the module borders exist for the extender
