@@ -38,6 +38,7 @@ The cross-cutting hub, auto-loaded as the session root. One line per entry (<~18
 - [[review-scope-backlog]] — subagent quality reviewers use strict-diff scope; pre-existing code = non-blocking backlog at END, never refactored inline.
 - [[diagram-preview-file]] — present mermaid via in-workspace .claude/claude-preview.adoc (NOT /tmp); kroki bioskop-nixos.local:8000 + .asciidoctorconfig; safe dialect = solid arrows, nude edge labels, flowchart not classDiagram.
 - [[brainstorm-vocabulary-view-first]] — lead a new design with a code-faithful domain-vocabulary diagram (Diagram 0) so naming collisions surface at design time.
+- [[check-osgi-standard-before-modeling]] — before modeling any OSGi-ish mechanism (config/lifecycle/services/extenders/fragments), verify the standard on the REAL jars (~/.m2/org/osgi) FIRST; don't reinvent Config Admin/Metatype/DS. Four planes: resolution / delivery / activation / registry.
 - [[decision-options-in-preview]] — for non-trivial design choices, render the competing options as comparative diagrams in the preview BEFORE asking; user chooses against a visual, not prose.
 - [[workspace-driven-by-need]] — VSCode workspaces composed by the NEED (active chantier), not a fixed domain taxonomy; a workspace = repos a task touches + claude-hub root; lean `.code-workspace`, strip unrelated folders.
 
