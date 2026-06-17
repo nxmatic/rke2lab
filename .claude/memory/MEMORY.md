@@ -50,3 +50,4 @@ Project-specific memory for rke2lab. Cross-cutting facts (profile, conventions, 
 - [Validate at the boundary](validate-at-the-boundary.md) — validation discipline (referenced by intervention-provenance).
 - [Pulumi stack per worktree](pulumi-stack-per-worktree-backlog.md) — BACKLOG: flox PULUMI_BACKEND_URL project-relative → each worktree EMPTY state; real dev only in main. Bundles [[sops-worktree-smudge-noise]]. (cross-cutting gotcha; promote to hub later.)
 - [Sops worktree re-smudge](sops-worktree-smudge-noise.md) — `git worktree add` leaves sops files ENCRYPTED; FIX: `rm <sops files> && git checkout -- <them>`. (cross-cutting gotcha; promote to hub later.)
+- [Worktree Claude session symlink](worktree-claude-session-symlink.md) — make a chat started from main appear in a worktree's VSCode window: symlink the `.jsonl` under the worktree's project slug + a `.code-workspace` named after the branch in the parent `rke2lab.d/`. PROVEN 2026-06-17.

@@ -6,7 +6,9 @@
     "redhat.java",
     "vscjava.vscode-maven",
     "vscjava.vscode-java-debug",
-    "jnoortheen.nix-ide"
+    "vscjava.vscode-java-test",
+    "jnoortheen.nix-ide",
+    "lgdd.vscode-osgi"
   ],
   "unwantedRecommendations": [
     "sonarsource.sonarlint-vscode",

@@ -4,6 +4,16 @@
         "**/sdks/incus/**": true
     },
     "java.configuration.updateBuildConfiguration": "interactive",
+    "java.configuration.runtimes": [
+        {
+            "name": "JavaSE-25",
+            "path": "${workspaceFolder}/.flox/run/aarch64-darwin.rke2lab.dev",
+            "default": true
+        }
+    ],
+    "java.test.config": {
+        "vmArgs": []
+    },
     "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx4G -Xms100m -Xlog:disable",
     "terminal.integrated.focusAfterRun": "editor",
     "task.defaultPresentation": {

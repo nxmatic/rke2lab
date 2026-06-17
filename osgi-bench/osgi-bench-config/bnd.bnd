@@ -1,0 +1,6 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.osgibench.config
+Export-Package: io.nxmatic.rke2lab.osgibench.config
+Require-Capability: \
+  osgi.extender;filter:="(&(osgi.extender=osgi.metatype)(version>=1.4))", \
+  osgi.extender;filter:="(&(osgi.extender=osgi.component)(version>=1.5))"
+-noimportjava: true

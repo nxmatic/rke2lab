@@ -22,6 +22,7 @@
     <module>unitrepo-handler-api</module>
     <module>unitrepo-core</module>
     <module>seed-master</module>
+    <module>osgi-bench</module>
   </modules>
 
   <properties>
@@ -38,6 +39,7 @@
     <maven.enforcer.plugin.version>3.6.3</maven.enforcer.plugin.version>
     <maven.dependency.plugin.version>3.11.0</maven.dependency.plugin.version>
     <maven.surefire.plugin.version>3.5.6</maven.surefire.plugin.version>
+    <bnd.version>7.3.0</bnd.version>
     <!-- Default test run excludes the slow/throwaway tests (JUnit5 tag expression).
          Orthogonal tags, mapped to the integration-atlas two spaces + cost/nature:
            host  = exercises host space (the Pulumi/gRPC engine);
@@ -47,7 +49,7 @@
          Override with -Plive / -Pspike / -Phost / -Posgi / -Pall-tests. -->
     <surefire.groups/>
     <surefire.excludedGroups>live | spike</surefire.excludedGroups>
-    <spotless.version>3.6.0</spotless.version>
+    <spotless.version>3.7.0</spotless.version>
     <shellcheck.maven.plugin.version>0.5.1</shellcheck.maven.plugin.version>
     <google-java-format.version>1.35.0</google-java-format.version>
     <!-- Tracks the flake's nixpkgs shfmt (the toolchain source of truth);
@@ -271,6 +273,11 @@
           <groupId>dev.dimlight</groupId>
           <artifactId>shellcheck-maven-plugin</artifactId>
           <version>${shellcheck.maven.plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>biz.aQute.bnd</groupId>
+          <artifactId>bnd-maven-plugin</artifactId>
+          <version>${bnd.version}</version>
         </plugin>
       </plugins>
     </pluginManagement>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>osgi-bench</artifactId>
+  <packaging>pom</packaging>
+  <name>osgi-bench</name>
+
+  <modules>
+    <module>osgi-bench-config</module>
+    <module>osgi-bench-host</module>
+    <module>osgi-bench-schema</module>
+    <module>osgi-bench-testkit</module>
+    <module>osgi-bench-tests</module>
+  </modules>
+</project>
