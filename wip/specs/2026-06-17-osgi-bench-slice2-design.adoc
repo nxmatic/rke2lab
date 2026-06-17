@@ -1,0 +1,214 @@
+= Step 2 / Slice 2 — an OSGi bench: build real bundles, resolve them on a real Felix engine
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* DESIGN, grounded on the OSGi tooling read off the real jars on disk and on the production
+wiring read off the bytecode (not memory). This spec defines the scope of Step 2's second vertical
+slice. It lives in `wip/` and graduates into the durable docs (`docs/architecture/`, notably
+`integration-atlas.adoc`) at merge.
+
+This slice DELIBERATELY widens the scope that an earlier memory froze ("config-extender, cheap,
+resolution-plane only, no OSGi runtime needed"). The widening is a considered, owner-made choice this
+session: *Step 2 is the decomposition into OSGi bundles*, so producing real bundles and standing up the
+real engine — in tests — is the founding gesture of the chantier, not a distant stage. The companion
+goal is explicit: *build a working command of the OSGi build toolchain (bnd)*. The memory is corrected
+to match this spec at session exit.
+====
+
+== 1. Overview, scope, and what the atlas requires
+
+=== What this slice is
+
+A throwaway *OSGi bench* — a dedicated reactor sub-module of disposable classes — that proves two
+design principles against the *real Felix engine*, with bundles built by the *bnd-maven-plugin*,
+BEFORE any production config code is touched:
+
+* *P1 — the extender contract.* A real bundle declares `Require osgi.extender`; a host bundle
+  `Provide`s it; the real Felix framework resolves them (and fails loudly when the host is absent).
+  This is the real-engine successor to the hand-rolled `ConfigExtenderResolutionSpikeTest`, which
+  exercised only the resolution *algorithm* over fabricated `UnitResource` objects.
+* *P2 — an introspectable Metatype schema.* An unknown client retrieves a domain's
+  `ObjectClassDefinition` (keys, type, required/optional, default) via `MetaTypeService` by PID,
+  without knowing the provider. This realises the owner's requirement that a schema be *introspectable
+  and structured* so any client can find what it needs.
+
+=== Why the scope widened (honest record)
+
+The grounding facts, verified this session:
+
+* The resolver runs in production in exactly ONE place — `ManifestsDomainRegistry` (line ~111) over
+  `ManifestsUniverse`. Config (`InfraDomain` → `InfraConfigRegistry`) is a plain enum loop that NEVER
+  touches the resolver. So "promote the extender contract into the real config wiring" had no
+  production resolution path to land in — the contract needed a real engine to be exercised against.
+* There is no OSGi build today: no bnd, no `maven-bundle-plugin`, no `pax-exam`, no aQute tester; no
+  module produces a bundle (zero `Bundle-SymbolicName`, zero `<packaging>bundle`). Modules are ordinary
+  Maven jars. The owner's position: Step 2 *is* where bundles get defined, so they must be built — and
+  building them on the real bnd toolchain, exercised by the real Felix engine, gives the incremental
+  engine feedback that a hand-rolled algorithm cannot.
+
+This is a structuring choice taken with eyes open, after verification on the real jars and bytecode.
+
+=== Construction principle — incremental, zero duplication of real code
+
+* The bench uses *disposable* classes only — never a copy of `InfraDomain` or any real config type.
+* Real config code, when it becomes a bundle, *moves* (git mv) into its bundle form in a LATER
+  increment — it is never duplicated; two copies of a real class never coexist.
+* The bench is *scaffolding*: it is removed once production has absorbed the proven principle. It is
+  not a draft of production to be rebuilt in hard form — production absorbs the principle by moving,
+  and the scaffold comes down emptied of its purpose.
+
+=== What the atlas imposes on this slice
+
+Re-scanning `docs/architecture/integration-atlas.adoc` (the ritual reopens it at every design
+activity) surfaced three obligations:
+
+. *The crossing contract has TWO halves.* The atlas defines the sole legitimate OSGi↔host edge as
+  `Require osgi.extender` PLUS `SectionReader` for values. Metatype is the *schema* (the shape);
+  `SectionReader` is the *value channel*. This slice proves the *schema/resolution* half only; the
+  *value/`SectionReader`* half (inverting `Rke2labConfig → ConfigLoader`) stays stage 3.
+. *Metatype is a NEW box on the atlas.* The atlas knows only `osgi.extender` + `SectionReader`; it
+  mentions Metatype nowhere. Adding the introspectable Metatype schema must itself be proven *monotone*
+  in a before/after figure.
+. *This config view IS the second subsystem the atlas awaits.* The atlas is doctor-only and explicitly
+  awaits a second subsystem adopting the ritual (it says "the Step-2 config view, when it lands, is the
+  first to draw the crossing contract explicitly"). So this slice MUST add a per-subsystem config view
+  to the index plus an additivity proof.
+
+== 2. Bench architecture — the disposable sub-module
+
+A NEW reactor sub-module, `osgi-bench`, isolated from `unitrepo-core` and `seed-master` so the
+toolchain risk is confined and the module can be deleted wholesale at slice end. ("bench", not "spike",
+in the module name — more descriptive; the `@Tag("spike")` marker stays on the tests, so the
+tag-driven default exclusion `live | spike` still hides them.)
+
+Contents:
+
+* *Disposable classes* — tiny stand-ins for a "config" component and a "host" component. NOT a copy of
+  any real config type.
+* *`bnd-maven-plugin`* produces two real bundles in `target/`:
+** `config` — `Require-Capability: osgi.extender` for `osgi.metatype` + `osgi.component`.
+** `host` — `Provide-Capability: osgi.extender` for both.
+* For P2, a bundle that declares an `ObjectClassDefinition` (the Metatype descriptor under
+  `OSGI-INF/metatype/`, or via DS — the exact form the Felix Metatype runtime expects is verified on
+  its jar when that increment is built).
+
+The bench is built incrementally: P1 (extender contract) first — the smallest loop that proves
+bnd-build → real bundle → Felix resolves — then P2 (Metatype introspection) on top.
+
+== 3. The test harness — satisfying the VSCode requirement
+
+The owner requires tests runnable from VSCode (Test Explorer), not only from the Maven CLI. This rules
+out bnd's native test runner (`biz.aQute.tester.junit-platform`), which launches tests INSIDE a
+framework bnd resolves and which VSCode cannot drive natively. It does NOT rule out the bnd *builder* —
+build tooling and test runner are orthogonal axes.
+
+Decision:
+
+* *Builder axis* — `bnd-maven-plugin` writes the bundle manifests (by bytecode analysis). This is where
+  the bnd command-of-the-toolchain experience is built.
+* *Runner axis* — a plain *JUnit5* test plus a Jupiter *extension* `FelixFrameworkExtension`
+  (host-space, sibling of the existing `GrpcChannelNoiseCapture` JUL extension):
+** `@BeforeAll` — `FrameworkFactory.newFramework(config).start()`, expose the `BundleContext`.
+** `@AfterAll` — `framework.stop()`.
+** The extension installs the bundles bnd produced in `target/` (`ctx.installBundle("file:…")`).
+
+The tests are ordinary JUnit5, `@Tag("osgi")`, so VSCode Test Explorer launches them on a click and
+surefire runs them too:
+
+* *P1 test* — install `config` + `host`, `FrameworkWiring.resolveBundles(...)` → assert the real wiring
+  (both extender wires present). With the host absent, the bundle stays unresolved / a `BundleException`
+  is observable — loud failure, not a silent empty closure.
+* *P2 test* — install the Metatype runtime + the OCD bundle;
+  `MetaTypeService.getMetaTypeInformation(bundle).getObjectClassDefinition(pid, null)` →
+  read keys / type / required / default WITHOUT knowing the provider.
+
+== 4. Toolchain, dependencies, atlas ritual
+
+=== Dependencies
+
+Verified on disk:
+
+* *Present* — `org.apache.felix.framework` 7.0.5 (the real framework: `BundleContext`, bundle install,
+  real resolution, service registry), `org.apache.felix.resolver` 2.0.4 (algorithm, used today),
+  `org.apache.felix.scr` 2.2.12 (DS runtime), and all OSGi spec jars (`osgi.core` 8.0.0,
+  `org.osgi.namespace.extender` 1.0.1, `org.osgi.service.metatype` 1.4.1, `.cm` 1.6.1, `.component`
+  1.5.1).
+* *To fetch* — `bnd-maven-plugin`; `org.apache.felix.metatype` (Metatype runtime, for P2); and
+  `org.apache.felix.configadmin` only if P2's Metatype path requires it. All version-anchored in the
+  *BOM* (`bom/pom.xml`), beside the existing `felix.resolver` / `osgi.core` management.
+
+Verified API facts the design rests on (read with `javap` off the jars):
+
+* `ExtenderNamespace.EXTENDER_NAMESPACE = "osgi.extender"`, `CAPABILITY_VERSION_ATTRIBUTE = "version"`.
+* `ObjectClassDefinition` — `getID()`, `getName()`, `getAttributeDefinitions(int)`, constants
+  `REQUIRED` / `OPTIONAL` / `ALL`.
+* `AttributeDefinition` — `getType()` (`STRING=1` … `BOOLEAN=11`), `getCardinality()`,
+  `getDefaultValue()`, `validate(String)`.
+
+=== Atlas ritual (obligatory)
+
+At merge, enrich `docs/architecture/integration-atlas.adoc`:
+
+* Add a *config* per-subsystem view to the index — this is the second subsystem to adopt the ritual.
+* Draw a *monotone before/after* additivity figure: the extender contract + the Metatype schema box
+  are added; no existing box erased or rewired. Metatype is a new box whose additivity is proven here.
+* State explicitly that the slice proves the *schema/resolution* half of the crossing contract; the
+  *value/`SectionReader`* half stays stage 3.
+
+=== Build verification
+
+Per `build-verification-gotchas`: a green build can lie (`.mvn` forces `-DskipTests`; the build cache
+replays; ECJ can poison `.class`). Reliable check for this slice:
+
+[source]
+----
+flox activate -- ./mvnw clean package -pl :osgi-bench -am \
+  -Dmaven.build.cache.skipCache=true -DskipTests=false
+----
+
+Count the surefire reports to confirm the `@Tag("osgi")` tests actually executed (the default
+`surefire.excludedGroups` is `live | spike`, so the osgi tests run unless excluded — confirm the run,
+don't trust `BUILD SUCCESS`).
+
+== 5. Scope boundaries
+
+*In scope (this slice):*
+
+* The `osgi-bench` sub-module: disposable classes, bnd-built `config` + `host` bundles.
+* `FelixFrameworkExtension` (Jupiter) + the P1 and P2 JUnit5 tests, VSCode-runnable.
+* BOM entries for the fetched bnd / Felix-metatype dependencies.
+* The atlas config view + monotone additivity proof.
+
+*Explicitly deferred (NOT this slice):*
+
+* *Renaming `InfraConfigFragment`* — a pure production refactor (it is an `ObjectClassDefinition`, not
+  an OSGi fragment), independent of the bench; done separately on the production side. (Blast radius
+  verified self-contained: the 4 config-package files only.)
+* *Moving real config code into bundle form* (git mv) — a later increment, by MOVE never duplication.
+* *Inverting `Rke2labConfig → ConfigLoader`* behind `SectionReader` (the value half) — stage 3.
+* *Config Admin delivery by PID; DS `configuration-policy=require` activation* — stages 3–4, genuine
+  runtime lifts, gated.
+* *The service registry / live re-resolution* — stage 6, deferred v2.
+
+== 6. Verification checklist (the slice's own success criteria)
+
+* [ ] `osgi-bench` builds; `bnd-maven-plugin` emits real bundles (`Require/Provide-Capability` present
+  in the generated `MANIFEST.MF` — inspect with `unzip -p`).
+* [ ] P1: the real Felix framework resolves `config` → `host`; both extender wires asserted; host-absent
+  case fails loudly (observable `BundleException` / unresolved).
+* [ ] P2: `MetaTypeService` returns the OCD by PID; keys / type / required read without knowing the
+  provider.
+* [ ] Both tests launch from VSCode Test Explorer (click) AND under surefire (`@Tag("osgi")`,
+  surefire-counted).
+* [ ] Atlas: config view added; monotone before/after drawn; no built box erased or rewired.
+
+== 7. Related documentation
+
+* `docs/architecture/integration-atlas.adoc` — the living integration view this slice extends as the
+  second per-subsystem view.
+* `wip/specs/2026-06-17-config-bundle-host-contract-design.adoc` — the four-plane / two-axis frame and
+  the static→dynamic roadmap this slice sits on (slice 2 = stage 2, widened to real bundles + engine).
+* `docs/architecture/manifests/manifests-architecture.adoc` — the Step-1 type-state resolver in
+  production (the sole production resolver site today).

@@ -1,0 +1,43 @@
+package io.nxmatic.rke2lab.osgibench;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.osgi.framework.Bundle;
+
+/**
+ * P1 — the real Felix framework resolves the config bundle's {@code Require osgi.extender} against
+ * the host bundle's {@code Provide}, and fails to resolve when the host is absent (loud, not a
+ * silent empty closure). The real-engine successor to the hand-rolled {@code
+ * ConfigExtenderResolutionSpike}.
+ */
+@OsgiSpike
+class ExtenderContractSpikeTest {
+
+  @RegisterExtension static final FelixFrameworkExtension felix = new FelixFrameworkExtension();
+
+  @Test
+  void configResolvesWhenHostProvidesTheExtenders() throws Exception {
+    Bundle host = felix.install("host");
+    Bundle config = felix.install("config");
+
+    boolean resolved = felix.resolve(List.of(host, config));
+
+    assertTrue(resolved, "framework resolved the bundle set");
+    assertTrue(
+        config.getState() >= Bundle.RESOLVED && config.getState() != Bundle.INSTALLED,
+        "config bundle wired to the extender-providing host");
+  }
+
+  @Test
+  void configStaysUnresolvedWhenHostAbsent() throws Exception {
+    Bundle config = felix.install("config");
+
+    boolean resolved = felix.resolve(List.of(config));
+
+    assertFalse(resolved, "no provider for osgi.extender — resolution refuses, loudly");
+  }
+}

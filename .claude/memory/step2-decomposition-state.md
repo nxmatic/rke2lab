@@ -1,6 +1,6 @@
 ---
 name: step2-decomposition-state
-description: "Step 2 (decomposition + APIs, the docrepo->rke2lab migration track) — DESIGN SHIPPED (4 OSGi planes + 2 axes + static->dynamic 6-stage roadmap; Model B REJECTED). SLICE 1 SHIPPED to origin/main 689e2fff 2026-06-17 = the BootstrapConfig relocate ALONE (host incus -> pure config, ~33 call-sites, 265 green). Fresh jdeps corrected 3 spec facts (edge count=33 not 8; doctor split = boundary CREATION not relocate, re-scoped to its own slice; NO OSGi runtime in prod -> stages 3-4 = real lift). NEXT = slice 2 (config-extender, cheap, resolution-plane) or slice 3 (doctor split, cartography-first). Test-infra tagged by zone/cost, shipped."
+description: "Step 2 (decomposition + APIs, the docrepo->rke2lab migration track) — DESIGN SHIPPED (4 OSGi planes + 2 axes + static->dynamic 6-stage roadmap; Model B REJECTED). SLICE 1 SHIPPED 689e2fff (BootstrapConfig relocate). SLICE 2 = OSGi BENCH built+green on branch refactor/config-extender 2026-06-17, ready to squash-merge: real bnd bundles + real embedded Felix in tests proving P1 (Require osgi.extender resolves/refuses) + P2 (typed Metatype OCD by PID). Scope WIDENED (user choice): Step 2 IS the bundle decomposition, so real bnd build + real engine, not 'cheap resolution-only'. The dep bump (spring-boot 4, cdk8s 2.70) rode along and turned out REQUIRED for JDK25 (old byte-buddy can't read Java 25 bytecode) — NOT pure scope-creep. NEXT after merge = slice 3 (doctor split, cartography-first)."
 metadata: 
   node_type: memory
   type: project
@@ -265,6 +265,34 @@ project/defaultRemote/remoteAddress); IMAGE requires sharedFolder (opt alias/bui
 NETWORK opt lanBridgeParent/vmnetNetworkName/nfsAutomount; WORKTREE requires dir; SYSTEMD opt dbusHost/dbusPort;
 HOST opt rotationRetentionCount.
 
-See [[check-osgi-standard-before-modeling]] (the meta-lesson), [[docrepo-dag-state]],
-[[coherence-rules-coordinator]], [[hub:model-substrate-alignment]], [[hub:specialist-as-ledger-northstar]],
-[[build-verification-gotchas]], [[diagram-preview-file]].
+## SLICE 2 — OSGi BENCH (built + green 2026-06-17, branch refactor/config-extender, ready to squash-merge)
+
+Disposable reactor subtree `osgi-bench/` = aggregator + 4 leaf modules: `osgi-bench-config` +
+`osgi-bench-host` (bnd-maven-plugin bundles carrying Require/Provide `osgi.extender`),
+`osgi-bench-testkit` (reusable `FelixFrameworkExtension` Jupiter extension + `@OsgiSpike` composed
+tag), `osgi-bench-tests` (P1+P2). bnd 7.3.0, version in PARENT pluginManagement. Production config
+(`InfraDomain` etc.) NOT touched — bench = scaffolding; real config adopts the pattern later by MOVE.
+
+- **P1**: real embedded Felix resolves config's `Require osgi.extender` vs host's `Provide`, refuses
+  when host absent. **P2**: unknown client reads an `ObjectClassDefinition` by PID via the real
+  felix.metatype `MetaTypeService`, TYPED — enabled by `system.packages.extra`; see
+  [[osgi-test-in-vscode-three-ways]] (3 approaches spiked; only this one is typed AND VSCode-clickable).
+- **VSCode harness PROVEN**: plain JUnit5 + Jupiter extension, runs from Test Explorer on a click; the
+  chat-in-worktree setup = [[worktree-claude-session-symlink]].
+- **Dep bump REQUIRED, not creep**: spring-boot 3.3.12→4.1.0 is needed on JDK 25 (old byte-buddy can't
+  read Java 25 bytecode → seed-master won't compile without it); + cdk8s 2.70, bnd 7.3, spotless 3.7,
+  etc. Compile+unit green only — a `-Plive` pass (gated on [[pulumi-stack-per-worktree-backlog]]) is
+  PRIORITY backlog before trusting `pulumi up`. Verify via FULL `clean package -Posgi
+  -Dmaven.build.cache.skipCache=true` (partial `-pl :seed-master` runs gave FALSE failures from stale
+  target/ — [[build-verification-gotchas]]).
+- **Atlas**: config view added as 2nd ritual subsystem, monotone proof.
+- **Lessons (user feedback)**: (1) git-hygiene — branch carries atomicity commits (dead-code/review
+  fixes, successive refactors) that should've been squashed per-task; squash-merge fixes it, but be
+  cleaner next time. (2) MEMORY ISOLATION BUG — the home memory dir symlinks to `main/.claude/memory`,
+  so session memory edits LEAK into main's working tree instead of the branch. Fix this session: copy
+  the files into the branch worktree + commit ON THE BRANCH (memory = branch work, arrives in main via
+  merge). Durable fix (TODO): make the memory symlink follow the current worktree, not hard-point main.
+
+See [[osgi-test-in-vscode-three-ways]], [[check-osgi-standard-before-modeling]] (the meta-lesson),
+[[docrepo-dag-state]], [[coherence-rules-coordinator]], [[hub:model-substrate-alignment]],
+[[hub:specialist-as-ledger-northstar]], [[build-verification-gotchas]], [[diagram-preview-file]].
