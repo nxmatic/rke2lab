@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.osgi.resource.Resource;
 import org.osgi.resource.Wire;
@@ -20,6 +21,7 @@ import org.osgi.service.resolver.ResolutionException;
  * manifest domains + units) in one resolve, replacing the retired hand-rolled dependency-applier
  * walker over real data.
  */
+@Tag("osgi")
 class RealGraphResolutionTest {
 
   @Test

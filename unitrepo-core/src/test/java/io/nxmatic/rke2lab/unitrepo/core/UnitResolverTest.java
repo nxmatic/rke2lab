@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.osgi.resource.Resource;
 import org.osgi.resource.Wire;
@@ -18,6 +19,7 @@ import org.osgi.service.resolver.ResolutionException;
  * as capabilities and handed to the resolver — the foundational "it runs for real" of the OSGi
  * migration's resolution half.
  */
+@Tag("osgi")
 final class UnitResolverTest {
 
   private static final String NS_DOMAIN = "unitrepo.manifest.domain";

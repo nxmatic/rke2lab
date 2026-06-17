@@ -11,6 +11,7 @@ import io.nxmatic.rke2lab.unitrepo.core.UnitResolver;
 import io.nxmatic.rke2lab.unitrepo.core.UnitResource;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.osgi.resource.Resource;
 import org.osgi.resource.Wire;
@@ -22,6 +23,7 @@ import org.osgi.service.resolver.ResolutionException;
  * {@code dependsOn} units, units of a depended-on domain before those of the depending domain, and
  * a cycle reported as a diagnosable failure.
  */
+@Tag("osgi")
 final class ManifestsVisitOrderTest {
 
   private record StubUnit(String manifestUnitId, List<String> dependsOnManifestsUnitIds)
