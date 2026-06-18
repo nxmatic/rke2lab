@@ -1,3 +1,22 @@
+# Ephemeral / machine-local Claude runtime state that lands here when this dir is
+# the CLAUDE_CONFIG_DIR of the worktree (clean-split model: config-home = .claude,
+# not .claude/hub). Per-worktree, per-machine — never committed.
+.claude.json
+projects/
+sessions/
+session-env/
+shell-snapshots/
+history.jsonl
+file-history/
+cache/
+paste-cache/
+backups/
+ide/
+plugins/
+mcp-needs-auth-cache.json
+.last-cleanup
+plans/
+
 # Session checkpoints — private, auto-generated before compaction
 checkpoint-*.md
 
