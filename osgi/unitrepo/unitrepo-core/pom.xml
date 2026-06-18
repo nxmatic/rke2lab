@@ -7,20 +7,22 @@
     <groupId>io.nxmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <relativePath>../bundle-parent/pom.xml</relativePath>
+    <relativePath>../../bundle-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>unitrepo-handler-api</artifactId>
-  <name>osgi/unitrepo-handler-api</name>
-  <description>The handler SPI bundle: the UnitHandler contract a unit binds to via its constitutive
-    osgi.extender requirement; provides the unitrepo.handler extender capability.</description>
+  <artifactId>unitrepo-core</artifactId>
+  <name>osgi/unitrepo/unitrepo-core</name>
+  <description>The unit resolution oracle: a standalone Felix resolver over UnitResource
+    capability graphs, used as a library (no OSGi framework).</description>
 
   <dependencies>
-    <!-- bnd-consumed construction annotation: @Capability declares the Provide bnd generates -->
     <dependency>
       <groupId>org.osgi</groupId>
-      <artifactId>org.osgi.annotation.bundle</artifactId>
-      <scope>provided</scope>
+      <artifactId>osgi.core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.resolver</artifactId>
     </dependency>
   </dependencies>
 

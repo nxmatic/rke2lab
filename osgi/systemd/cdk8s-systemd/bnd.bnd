@@ -1,0 +1,3 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.cdk8s.systemd
+Export-Package: io.nxmatic.rke2lab.cdk8s.systemd
+-noimportjava: true

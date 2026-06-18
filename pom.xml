@@ -21,9 +21,6 @@
   <modules>
     <module>build-parent</module>
     <module>bom</module>
-    <module>netplan</module>
-    <module>systemd-contract</module>
-    <module>cdk8s-systemd</module>
     <module>seed-master</module>
     <module>osgi</module>
     <module>host</module>

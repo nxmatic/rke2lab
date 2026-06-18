@@ -1,0 +1,3 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.systemdcontract
+Export-Package: io.nxmatic.rke2lab.systemdcontract.api
+-noimportjava: true

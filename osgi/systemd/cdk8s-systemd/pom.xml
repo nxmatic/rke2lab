@@ -4,13 +4,13 @@
 
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
-    <artifactId>build-parent</artifactId>
+    <artifactId>bundle-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <relativePath>../build-parent/pom.xml</relativePath>
+    <relativePath>../../bundle-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>cdk8s-systemd</artifactId>
-  <name>cdk8s-systemd</name>
+  <name>osgi/systemd/cdk8s-systemd</name>
   <description>CDK8s extension for synthesizing systemd units</description>
 
   <dependencies>
@@ -21,11 +21,17 @@
     </dependency>
   </dependencies>
 
+  <!-- bnd execution + jar manifestFile inherited from osgi/bundle-parent; the bare
+       reference activates the managed bnd-process goal for this library bundle. -->
   <build>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
       </plugin>
     </plugins>
   </build>

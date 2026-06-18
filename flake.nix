@@ -108,13 +108,13 @@
           mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
             -f bom/pom.xml install
           mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
-            -f netplan/pom.xml \
+            -f osgi/netplan/pom.xml \
             -Dshfmt.version=${pkgs.shfmt.version} clean package -DskipTests
         '';
 
         installPhase = ''
           mkdir -p $out/share/java
-          cp netplan/target/netplan-*-exec.jar $out/share/java/rke2lab-netplan.jar
+          cp osgi/netplan/target/netplan-*-exec.jar $out/share/java/rke2lab-netplan.jar
         '';
       };
 
@@ -255,7 +255,7 @@
           installPhase = ''
             mkdir -p $out/share/java
             cp seed-master/target/seed-master-*-exec.jar $out/share/java/seed-master.jar
-            cp manifests/target/manifests-*-exec.jar $out/share/java/manifests.jar
+            cp osgi/manifests/manifests/target/manifests-*-exec.jar $out/share/java/manifests.jar
           '';
         };
 
