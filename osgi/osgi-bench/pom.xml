@@ -19,6 +19,9 @@
     <module>osgi-bench-config</module>
     <module>osgi-bench-host</module>
     <module>osgi-bench-schema</module>
+    <module>osgi-bench-scr-api</module>
+    <module>osgi-bench-scr-provider</module>
+    <module>osgi-bench-scr-consumer</module>
     <module>osgi-bench-testkit</module>
     <module>osgi-bench-tests</module>
   </modules>

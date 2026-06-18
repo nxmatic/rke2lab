@@ -17,7 +17,10 @@ import org.osgi.framework.Bundle;
 @OsgiSpike
 class ExtenderContractSpikeTest {
 
-  @RegisterExtension static final FelixFrameworkExtension felix = new FelixFrameworkExtension();
+  // Plain framework, no declared topology: each method installs its own bundle set and drives
+  // resolution by hand (resolve, not start) — the two cases need different bundles.
+  @RegisterExtension
+  static final FelixFrameworkExtension felix = FelixFrameworkExtension.builder().build();
 
   @Test
   void configResolvesWhenHostProvidesTheExtenders() throws Exception {

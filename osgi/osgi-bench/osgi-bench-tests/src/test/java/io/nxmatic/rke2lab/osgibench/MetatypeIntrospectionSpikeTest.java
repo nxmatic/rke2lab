@@ -8,7 +8,6 @@ import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.osgi.framework.Bundle;
-import org.osgi.framework.ServiceReference;
 import org.osgi.service.metatype.AttributeDefinition;
 import org.osgi.service.metatype.MetaTypeInformation;
 import org.osgi.service.metatype.MetaTypeService;
@@ -28,28 +27,22 @@ import org.osgi.service.metatype.ObjectClassDefinition;
 @OsgiSpike
 class MetatypeIntrospectionSpikeTest {
 
+  // felix.log provides org.osgi.service.log that felix.metatype requires, in that order.
   @RegisterExtension
   static final FelixFrameworkExtension felix =
-      new FelixFrameworkExtension(
-          "org.osgi.service.metatype;version=1.4,org.osgi.service.log;version=1.4");
+      FelixFrameworkExtension.builder()
+          .systemPackages(
+              "org.osgi.service.metatype;version=1.4", "org.osgi.service.log;version=1.4")
+          .installFromClasspath("org.apache.felix.log", "org.apache.felix.metatype")
+          .installBundles("schema")
+          .build();
 
   @Test
   void unknownClientReadsTheSchemaByPid() throws Exception {
-    // felix.log provides org.osgi.service.log that felix.metatype requires
-    felix.installFromClasspath("org.apache.felix.log").start();
-    felix.installFromClasspath("org.apache.felix.metatype").start();
-    Bundle schema = felix.install("schema");
-    schema.start();
+    Bundle schema = felix.bundle("schema");
 
-    ServiceReference<MetaTypeService> ref = null;
-    for (int i = 0; i < 50 && ref == null; i++) {
-      ref = felix.context().getServiceReference(MetaTypeService.class);
-      if (ref == null) {
-        Thread.sleep(10);
-      }
-    }
-    assertNotNull(ref, "MetaTypeService registered by the felix metatype runtime");
-    MetaTypeService mts = felix.context().getService(ref);
+    MetaTypeService mts = felix.awaitService(MetaTypeService.class, 5000);
+    assertNotNull(mts, "MetaTypeService registered by the felix metatype runtime");
 
     MetaTypeInformation info = mts.getMetaTypeInformation(schema);
     ObjectClassDefinition ocd =
