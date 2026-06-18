@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>build-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../build-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>host-parent</artifactId>
+  <packaging>pom</packaging>
+  <name>host/host-parent</name>
+  <description>Parent of the host-space modules — the counterpart of osgi/bundle-parent. It
+    will carry what is specific to actualisation-over-Pulumi adapters and NOT shared with the
+    OSGi space (shade for the exec jar, exec-maven-plugin, com.pulumi/incus dependency
+    management). Empty for now ON PURPOSE: no host module has migrated here yet (the roster
+    lands in later slices). It exists so the next slice that moves a host module inherits a
+    ready parent and is forced to refine it, rather than having to remember to create it.</description>
+</project>

@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- @codebase -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
@@ -10,15 +9,12 @@
     <relativePath>../build-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>systemd-contract</artifactId>
-  <name>systemd-contract</name>
+  <artifactId>host</artifactId>
+  <packaging>pom</packaging>
+  <name>host</name>
+  <description>host space — adapters, actualise over Pulumi</description>
 
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-      </plugin>
-    </plugins>
-  </build>
+  <modules>
+    <module>host-parent</module>
+  </modules>
 </project>

@@ -4,20 +4,18 @@
 
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
-    <artifactId>parent</artifactId>
+    <artifactId>build-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <relativePath>../pom.xml</relativePath>
+    <relativePath>../build-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>osgi-bench</artifactId>
+  <artifactId>osgi</artifactId>
   <packaging>pom</packaging>
-  <name>osgi-bench</name>
+  <name>osgi</name>
+  <description>OSGi space — pure core, declares ports in bundle manifests</description>
 
   <modules>
-    <module>osgi-bench-config</module>
-    <module>osgi-bench-host</module>
-    <module>osgi-bench-schema</module>
-    <module>osgi-bench-testkit</module>
-    <module>osgi-bench-tests</module>
+    <module>bundle-parent</module>
+    <module>osgi-bench</module>
   </modules>
 </project>

@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- @codebase -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
@@ -7,18 +6,18 @@
     <groupId>io.nxmatic.rke2lab</groupId>
     <artifactId>build-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <relativePath>../build-parent/pom.xml</relativePath>
+    <relativePath>../../build-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>systemd-contract</artifactId>
-  <name>systemd-contract</name>
+  <artifactId>osgi-bench</artifactId>
+  <packaging>pom</packaging>
+  <name>osgi/osgi-bench</name>
 
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-      </plugin>
-    </plugins>
-  </build>
+  <modules>
+    <module>osgi-bench-config</module>
+    <module>osgi-bench-host</module>
+    <module>osgi-bench-schema</module>
+    <module>osgi-bench-testkit</module>
+    <module>osgi-bench-tests</module>
+  </modules>
 </project>

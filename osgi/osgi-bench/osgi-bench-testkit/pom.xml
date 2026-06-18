@@ -4,13 +4,13 @@
 
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
-    <artifactId>parent</artifactId>
+    <artifactId>build-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <relativePath>../../pom.xml</relativePath>
+    <relativePath>../../../build-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>osgi-bench-testkit</artifactId>
-  <name>osgi-bench/osgi-bench-testkit</name>
+  <name>osgi/osgi-bench/osgi-bench-testkit</name>
 
   <!--
     Shared OSGi test fixtures, kept in src/main/java so consumers depend on them in test scope

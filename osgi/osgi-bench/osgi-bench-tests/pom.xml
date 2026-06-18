@@ -4,13 +4,13 @@
 
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
-    <artifactId>parent</artifactId>
+    <artifactId>build-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <relativePath>../../pom.xml</relativePath>
+    <relativePath>../../../build-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>osgi-bench-tests</artifactId>
-  <name>osgi-bench/osgi-bench-tests</name>
+  <name>osgi/osgi-bench/osgi-bench-tests</name>
 
   <dependencies>
     <dependency>
