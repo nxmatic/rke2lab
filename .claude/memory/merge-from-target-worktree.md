@@ -1,6 +1,6 @@
 ---
 name: merge-from-target-worktree
-description: "Integrate a finished sub-branch with a SQUASH merge (one commit on the target), run FROM the worktree that owns the target branch — never advance another branch's HEAD from your own worktree. Two near-misses caught by the user on 2026-06-18: almost merged from the wrong worktree, and assumed ff instead of squash."
+description: "Integrate a finished sub-branch with a SQUASH merge (one commit on the target), run FROM the worktree that owns the target branch — never advance another branch's HEAD from your own worktree. The integration-status memory line goes INSIDE the merge commit (amend before push), not a follow-up commit, and must not cite that commit's own hash. Three near-misses caught by the user on 2026-06-18: almost merged from the wrong worktree, assumed ff instead of squash, and recorded 'merged' status in a trailing commit instead of amending it into the merge."
 metadata:
   node_type: memory
   type: feedback
@@ -27,6 +27,17 @@ is fine; the `git merge --squash` + commit + worktree/branch teardown are the TA
 (`git log <target>..<sub>` shows the commits about to be squashed). Then STOP and hand off: state the
 commands the target workspace runs (`git merge --squash <sub>` ; `git commit` ; then remove worktree +
 delete branch, AFTER the merge). Do NOT run them from here.
+
+**3. The integration-status line belongs INSIDE the merge commit — amend, don't append.** A memory
+index line that flips a chantier from "awaiting merge" to "shipped/merged" is part of the integration,
+so it rides the SAME commit as the squash, added via `git commit --amend` while that commit is still
+unpushed — NOT a separate trailing "docs(memory): mark X merged" commit. Reason (the lesson from the
+bnd-annotations spike, now generalized): a commit cannot truthfully declare its own merge, and a
+follow-up commit just to set status is noise. **Corollary — never cite the merge commit's own hash in
+that line**, because the amend changes the hash → the reference goes stale instantly (same
+self-reference trap). Write the status hash-free (`SHIPPED to <target> (squash merge <date>)`); the
+git history already carries the hash. (User, 2026-06-18: "tu devrais modifier le statut avant de merge,
+ce serait encore plus propre.")
 
 **Corollary — commit everything BEFORE close/teardown.** The working tree is ephemeral; only what is
 committed onto the sub-branch survives to be squashed. Anything worth keeping (code AND session memory:
