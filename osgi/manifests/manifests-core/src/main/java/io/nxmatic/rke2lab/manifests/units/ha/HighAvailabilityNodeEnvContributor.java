@@ -6,8 +6,10 @@ import io.nxmatic.rke2lab.manifests.node.NodeEnvContributor;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import org.osgi.service.component.annotations.Component;
 
 /** HighAvailability domain node-env contributor. Contributes: network-vip */
+@Component(service = NodeEnvContributor.class)
 public class HighAvailabilityNodeEnvContributor implements NodeEnvContributor {
 
   private final ManifestDomainCatalog manifestDomainCatalog =

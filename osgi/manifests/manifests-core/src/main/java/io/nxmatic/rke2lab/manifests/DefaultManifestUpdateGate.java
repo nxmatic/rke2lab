@@ -6,8 +6,10 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.ServiceLoader;
+import org.osgi.service.component.annotations.Component;
 
 /** Default manifests-owned Stage-A update gate. */
+@Component(service = ManifestUpdateGate.class)
 public final class DefaultManifestUpdateGate implements ManifestUpdateGate {
 
   @Override

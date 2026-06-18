@@ -3,8 +3,10 @@ package io.nxmatic.rke2lab.manifests.node;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import org.osgi.service.component.annotations.Component;
 
 /** Node-identity domain node-env contributor. Contributes: node, paths */
+@Component(service = NodeEnvContributor.class)
 public class NodeEnvIdentityContributor implements NodeEnvContributor {
 
   @Override

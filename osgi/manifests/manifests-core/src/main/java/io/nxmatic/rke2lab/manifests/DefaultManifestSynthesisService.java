@@ -32,10 +32,12 @@ import java.util.stream.Collectors;
 import org.cdk8s.App;
 import org.cdk8s.AppProps;
 import org.cdk8s.Chart;
+import org.osgi.service.component.annotations.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Default SPI implementation for canonical manifest synthesis. */
+@Component(service = ManifestSynthesisService.class)
 public final class DefaultManifestSynthesisService implements ManifestSynthesisService {
 
   static final Logger LOG = LoggerFactory.getLogger(DefaultManifestSynthesisService.class);

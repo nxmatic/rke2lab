@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import org.osgi.service.component.annotations.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +33,7 @@ import org.slf4j.LoggerFactory;
  * for cluster apply, where order is {@code 00-} for CRDs, {@code 01-} for other cluster-scoped
  * resources (no namespace), {@code 02-} for namespace-scoped resources.
  */
+@Component(service = ManifestExplodeService.class)
 public final class DefaultManifestExplodeService implements ManifestExplodeService {
 
   private static final Logger LOG = LoggerFactory.getLogger(DefaultManifestExplodeService.class);

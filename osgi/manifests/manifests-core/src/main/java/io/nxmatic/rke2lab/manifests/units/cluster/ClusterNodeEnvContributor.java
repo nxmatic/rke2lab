@@ -5,8 +5,10 @@ import io.nxmatic.rke2lab.manifests.node.NodeEnvContributor;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import org.osgi.service.component.annotations.Component;
 
 /** Cluster domain node-env contributor. Contributes: cluster */
+@Component(service = NodeEnvContributor.class)
 public class ClusterNodeEnvContributor implements NodeEnvContributor {
 
   @Override

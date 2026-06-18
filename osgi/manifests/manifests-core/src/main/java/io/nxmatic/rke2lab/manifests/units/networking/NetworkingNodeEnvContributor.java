@@ -5,11 +5,13 @@ import io.nxmatic.rke2lab.manifests.node.NodeEnvContributor;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import org.osgi.service.component.annotations.Component;
 
 /**
  * Networking domain node-env contributor. Contributes: cilium, network-cluster, network-node,
  * network-lan-wan
  */
+@Component(service = NodeEnvContributor.class)
 public class NetworkingNodeEnvContributor implements NodeEnvContributor {
 
   @Override

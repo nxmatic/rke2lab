@@ -5,11 +5,13 @@ import io.nxmatic.rke2lab.manifests.node.NodeEnvContributor;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import org.osgi.service.component.annotations.Component;
 
 /**
  * Runtime domain node-env contributor. Contributes: rke2, config, containerd, cri, helm, kubectl,
  * user, daemonset-script-policy, systemd
  */
+@Component(service = NodeEnvContributor.class)
 public final class RuntimeNodeEnvContributor implements NodeEnvContributor {
 
   @Override
