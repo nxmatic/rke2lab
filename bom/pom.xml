@@ -44,6 +44,15 @@
     <felix.log.version>1.3.0</felix.log.version>
     <felix.configadmin.version>1.9.26</felix.configadmin.version>
     <osgi.metatype.version>1.4.1</osgi.metatype.version>
+    <!--
+      OSGi CONSTRUCTION annotations (compile-only, scope provided): bnd reads
+      them to GENERATE the manifest headers + Metatype XML — the Java is the
+      source of truth. Pinned individually because org.osgi:osgi.cmpn:8.1.0
+      (which would bundle all three) is absent from Maven Central.
+    -->
+    <osgi.ds.annotations.version>1.5.1</osgi.ds.annotations.version>
+    <osgi.metatype.annotations.version>1.4.1</osgi.metatype.annotations.version>
+    <osgi.bundle.annotations.version>2.0.0</osgi.bundle.annotations.version>
   </properties>
 
   <dependencyManagement>
@@ -193,6 +202,22 @@
         <groupId>org.osgi</groupId>
         <artifactId>org.osgi.service.metatype</artifactId>
         <version>${osgi.metatype.version}</version>
+      </dependency>
+      <!-- OSGi construction annotations — bnd-consumed, scope provided at use site -->
+      <dependency>
+        <groupId>org.osgi</groupId>
+        <artifactId>org.osgi.service.component.annotations</artifactId>
+        <version>${osgi.ds.annotations.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.osgi</groupId>
+        <artifactId>org.osgi.service.metatype.annotations</artifactId>
+        <version>${osgi.metatype.annotations.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.osgi</groupId>
+        <artifactId>org.osgi.annotation.bundle</artifactId>
+        <version>${osgi.bundle.annotations.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

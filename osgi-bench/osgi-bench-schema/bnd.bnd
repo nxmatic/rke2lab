@@ -1,5 +1,3 @@
 Bundle-SymbolicName: io.nxmatic.rke2lab.osgibench.schema
 Export-Package: io.nxmatic.rke2lab.osgibench.schema
-Require-Capability: osgi.extender;filter:="(&(osgi.extender=osgi.metatype)(version>=1.4))"
--includeresource: OSGI-INF/metatype/=src/main/resources/OSGI-INF/metatype/
 -noimportjava: true

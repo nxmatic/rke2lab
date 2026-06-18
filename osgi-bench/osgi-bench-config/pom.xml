@@ -17,6 +17,17 @@
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>
     </dependency>
+    <!-- bnd-consumed construction annotations: the Java declares what bnd generates -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.component.annotations</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.metatype.annotations</artifactId>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
 
   <build>

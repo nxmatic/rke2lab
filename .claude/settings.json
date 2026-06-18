@@ -8,8 +8,8 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/.claude/bin/session-start-reminder.sh\"",
-            "statusMessage": "Checking checkpoint draft status...",
-            "timeout": 5
+            "timeout": 5,
+            "statusMessage": "Checking checkpoint draft status..."
           }
         ]
       }
@@ -21,8 +21,8 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/.claude/bin/checkpoint-write.sh\"",
-            "statusMessage": "Creating checkpoint before compaction...",
-            "timeout": 10
+            "timeout": 10,
+            "statusMessage": "Creating checkpoint before compaction..."
           }
         ]
       }
@@ -34,11 +34,16 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/.claude/bin/checkpoint-gc.sh\"",
-            "statusMessage": "Pruning orphaned checkpoints...",
-            "timeout": 10
+            "timeout": 10,
+            "statusMessage": "Pruning orphaned checkpoints..."
           }
         ]
       }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(flox activate *)"
     ]
   }
 }

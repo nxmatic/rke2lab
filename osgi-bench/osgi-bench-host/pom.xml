@@ -17,6 +17,12 @@
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>
     </dependency>
+    <!-- bnd-consumed construction annotations: @Capability declares the Provide bnd generates -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.annotation.bundle</artifactId>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
 
   <build>
