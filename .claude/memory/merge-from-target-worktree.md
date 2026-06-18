@@ -1,6 +1,6 @@
 ---
 name: merge-from-target-worktree
-description: "Integrate a finished sub-branch with a SQUASH merge (one commit on the target), executed FROM the worktree that owns the TARGET branch (= where Claude already sits when it owns this work) — Claude DOES the merge + teardown itself, it does NOT ask permission. The only constraint is the LOCATION: never run the squash from the SUB-branch's own worktree (that's what advances another branch's HEAD). The integration-status memory line goes INSIDE the merge commit (amend before push), not a follow-up commit, and must not cite that commit's own hash. Near-misses caught by the user 2026-06-18: merged from the wrong worktree, assumed ff instead of squash, recorded 'merged' in a trailing commit instead of amending — and (the OVER-correction to delete) wrongly hardened this into 'the merge is the human's, hand off', which made Claude re-ask permission for a merge it created and may do itself."
+description: "Integrate a finished sub-branch with a SQUASH merge (one commit on the target). Claude DOES the merge + teardown itself (no permission hand-off), BUT only from the SESSION sitting in the TARGET worktree — NOT the sub-branch's own session, which cannot saw off the worktree/branch it is sitting on. The sub-branch session finishes + commits everything + verifies, then HANDS OFF to the target session for merge+teardown. Status line goes INSIDE the merge commit (amend, hash-free). Dérives caught by the user 2026-06-18: merged from the wrong worktree; assumed ff not squash; status in a trailing commit not amended; over-hardened into 'the merge is the human's' (wrong — Claude does it); and — the host-space dérive — the sub-branch session merged AND destroyed its own worktree/workspace/branch out from under itself."
 metadata:
   node_type: memory
   type: feedback
@@ -16,24 +16,35 @@ note = 2 → collapse to 1). So the integrating gesture is `git merge --squash <
 sub-branch; only the squashed summary lands on the target. Pairs with [[rke2lab-solo-no-pr-merge-direct]]
 (the *what* — direct merge, no PR) — this is the *how*.
 
-**2. Run it FROM the worktree that owns the TARGET branch — Claude does it, no hand-off.** This is a rule
-about LOCATION, not about WHO. When Claude owns the chantier (it created the sub-branch, worktree and
-workspace), it ALSO does the squash-merge and the teardown itself — it must NOT ask the user to click a
-permission for it. The single constraint: execute from the worktree that owns the TARGET branch (e.g.
-`design/…`, where Claude usually already sits), NOT from the sub-branch's own worktree. Why the location
-matters: under the external-worktree model every branch has its own checkout (`<repo>.d/<ns>/<branch>`),
-and advancing the target's HEAD from a *different* live worktree mutates a branch another workspace sits
-on — the cross-worktree collision the isolation rule forbids (see [[sops-worktree-smudge-noise]], hub
-`external-worktree-operating-model-state`). So: prep/commit/build-green on the sub-branch; then from the
-TARGET worktree run `git merge --squash <sub>` → `git commit` → teardown. (Do NOT over-correct this into
-"the merge is the human's" — that was a wrong hardening that re-introduced permission friction; the merge
-of Claude's own sub-branch is Claude's to perform. Genuine hand-off is only the runtime boundary in
-[[standing-autonomy-except-runtime-config]].)
+**2. The merge + teardown belong to the SESSION sitting in the TARGET worktree — NOT the sub-branch's
+own session. This is the rule about WHICH SESSION, and it is a physical constraint, not a preference.**
+Claude DOES the merge itself (no permission hand-off to the user — see the over-correction warning
+below); but the session that may do it is the one whose cwd/workspace is the TARGET worktree
+(`design/…`), NOT the session living in the sub-branch's worktree. **A session cannot saw off the
+branch it is sitting on:** the sub-branch session that runs `git merge --squash` + `git worktree remove`
++ `git branch -D` is deleting its own worktree, workspace and branch out from under itself — exactly
+what went wrong 2026-06-18 on `refactor/host-space` (it finished the work AND destroyed its own seat).
+`cd`-ing from the sub-branch session into the target worktree to run the merge there does NOT satisfy
+the rule — "from the target worktree" means the SESSION that owns it, not a directory you stepped into.
 
-**How to apply:** finish + commit + build-green + verify on the sub-branch (`git log <target>..<sub>`
-shows the commits about to be squashed; `git status` clean). Then, FROM the target worktree:
-`git merge --squash <sub>` ; `git commit` (amend the integration-status line in) ; remove the worktree +
-delete the branch. All of it Claude's gesture when Claude owns the work.
+Why: under the external-worktree model one workspace = one VSCode window = one session steering one
+branch (see [[sops-worktree-smudge-noise]], hub `external-worktree-operating-model-state`). The
+integration of a sub-branch is the target session's act because (a) advancing the target HEAD from the
+sub-branch session mutates a branch the target session sits on, and (b) the teardown removes the very
+worktree the sub-branch session is running in.
+
+**How to apply — split by session:**
+- *Sub-branch session* (the one that did the work): finish + commit EVERYTHING (code AND memory) +
+  build-green + verify (`git log <target>..<sub>` shows what will squash; `git status` clean). Then
+  STOP. Announce it is ready to integrate and HAND OFF to the target session — do NOT merge, do NOT
+  teardown, do NOT `cd` to the target worktree to do it.
+- *Target session* (the one sitting in `design/…`, e.g. this one): `git merge --squash <sub>` →
+  resolve any conflict → update the status line → `git commit` → `git worktree remove <sub>` →
+  `git branch -D <sub>` → delete the `.code-workspace`.
+
+(Do NOT over-correct this into "the merge is the human's" — that was a wrong hardening that
+re-introduced permission friction; the merge is Claude's to perform, just from the RIGHT session.
+Genuine permission hand-off is only the runtime boundary in [[standing-autonomy-except-runtime-config]].)
 
 **3. The integration-status line belongs INSIDE the merge commit — amend, don't append.** A memory
 index line that flips a chantier from "awaiting merge" to "shipped/merged" is part of the integration,
