@@ -1,6 +1,6 @@
 ---
 name: merge-from-target-worktree
-description: "Integrate a finished sub-branch with a SQUASH merge (one commit on the target), run FROM the worktree that owns the target branch — never advance another branch's HEAD from your own worktree. The integration-status memory line goes INSIDE the merge commit (amend before push), not a follow-up commit, and must not cite that commit's own hash. Three near-misses caught by the user on 2026-06-18: almost merged from the wrong worktree, assumed ff instead of squash, and recorded 'merged' status in a trailing commit instead of amending it into the merge."
+description: "Integrate a finished sub-branch with a SQUASH merge (one commit on the target), executed FROM the worktree that owns the TARGET branch (= where Claude already sits when it owns this work) — Claude DOES the merge + teardown itself, it does NOT ask permission. The only constraint is the LOCATION: never run the squash from the SUB-branch's own worktree (that's what advances another branch's HEAD). The integration-status memory line goes INSIDE the merge commit (amend before push), not a follow-up commit, and must not cite that commit's own hash. Near-misses caught by the user 2026-06-18: merged from the wrong worktree, assumed ff instead of squash, recorded 'merged' in a trailing commit instead of amending — and (the OVER-correction to delete) wrongly hardened this into 'the merge is the human's, hand off', which made Claude re-ask permission for a merge it created and may do itself."
 metadata:
   node_type: memory
   type: feedback
@@ -16,17 +16,24 @@ note = 2 → collapse to 1). So the integrating gesture is `git merge --squash <
 sub-branch; only the squashed summary lands on the target. Pairs with [[rke2lab-solo-no-pr-merge-direct]]
 (the *what* — direct merge, no PR) — this is the *how*.
 
-**2. Run it FROM the worktree that owns the TARGET branch.** Under the external-worktree operating model
-every branch has its own checkout (`<repo>.d/<ns>/<branch>`). Advancing the target branch's HEAD from a
-different worktree mutates a branch another live workspace is sitting on — exactly the cross-worktree
-collision the isolation rule forbids (see [[sops-worktree-smudge-noise]] and hub
-`external-worktree-operating-model-state`). Prep (commit, build-green, verify) in the sub-branch worktree
-is fine; the `git merge --squash` + commit + worktree/branch teardown are the TARGET workspace's gesture.
+**2. Run it FROM the worktree that owns the TARGET branch — Claude does it, no hand-off.** This is a rule
+about LOCATION, not about WHO. When Claude owns the chantier (it created the sub-branch, worktree and
+workspace), it ALSO does the squash-merge and the teardown itself — it must NOT ask the user to click a
+permission for it. The single constraint: execute from the worktree that owns the TARGET branch (e.g.
+`design/…`, where Claude usually already sits), NOT from the sub-branch's own worktree. Why the location
+matters: under the external-worktree model every branch has its own checkout (`<repo>.d/<ns>/<branch>`),
+and advancing the target's HEAD from a *different* live worktree mutates a branch another workspace sits
+on — the cross-worktree collision the isolation rule forbids (see [[sops-worktree-smudge-noise]], hub
+`external-worktree-operating-model-state`). So: prep/commit/build-green on the sub-branch; then from the
+TARGET worktree run `git merge --squash <sub>` → `git commit` → teardown. (Do NOT over-correct this into
+"the merge is the human's" — that was a wrong hardening that re-introduced permission friction; the merge
+of Claude's own sub-branch is Claude's to perform. Genuine hand-off is only the runtime boundary in
+[[standing-autonomy-except-runtime-config]].)
 
-**How to apply:** in the sub-branch worktree, finish + commit + build-green + verify
-(`git log <target>..<sub>` shows the commits about to be squashed). Then STOP and hand off: state the
-commands the target workspace runs (`git merge --squash <sub>` ; `git commit` ; then remove worktree +
-delete branch, AFTER the merge). Do NOT run them from here.
+**How to apply:** finish + commit + build-green + verify on the sub-branch (`git log <target>..<sub>`
+shows the commits about to be squashed; `git status` clean). Then, FROM the target worktree:
+`git merge --squash <sub>` ; `git commit` (amend the integration-status line in) ; remove the worktree +
+delete the branch. All of it Claude's gesture when Claude owns the work.
 
 **3. The integration-status line belongs INSIDE the merge commit — amend, don't append.** A memory
 index line that flips a chantier from "awaiting merge" to "shipped/merged" is part of the integration,
