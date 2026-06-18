@@ -13,44 +13,17 @@
   <artifactId>netplan</artifactId>
   <name>osgi/netplan</name>
   <description>Network configuration synthesis: typed netplan models rendered to the YAML the host
-    network layer consumes.</description>
+    network layer consumes. Pure core library bundle — exposes its api/ port for the netplan-cli
+    north-adapter (exec/netplan-cli) to drive; carries no exec/shade of its own.</description>
 
   <dependencies>
     <dependency>
       <groupId>com.github.seancfoley</groupId>
       <artifactId>ipaddress</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-databind</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.fasterxml.jackson.dataformat</groupId>
-      <artifactId>jackson-dataformat-yaml</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-classic</artifactId>
-    </dependency>
   </dependencies>
 
   <build>
-    <resources>
-      <resource>
-        <directory>${project.basedir}/src/main/resources</directory>
-        <excludes>
-          <exclude>logback.xml</exclude>
-        </excludes>
-      </resource>
-    </resources>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -66,62 +39,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
-        <configuration>
-          <excludes>
-            <exclude>logback.xml</exclude>
-          </excludes>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>exec-maven-plugin</artifactId>
-        <configuration>
-          <mainClass>io.nxmatic.rke2lab.netplan.NetplanCli</mainClass>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-            <phase>package</phase>
-            <configuration>
-              <createDependencyReducedPom>false</createDependencyReducedPom>
-              <shadedArtifactAttached>true</shadedArtifactAttached>
-              <shadedClassifierName>exec</shadedClassifierName>
-              <transformers>
-                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
-                  <resource>logback.xml</resource>
-                  <file>${project.basedir}/src/main/resources/logback.xml</file>
-                </transformer>
-                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                  <mainClass>io.nxmatic.rke2lab.netplan.NetplanCli</mainClass>
-                </transformer>
-              </transformers>
-              <filters>
-                <filter>
-                  <artifact>*:*</artifact>
-                  <excludes>
-                    <exclude>META-INF/MANIFEST.MF</exclude>
-                    <exclude>META-INF/*.SF</exclude>
-                    <exclude>META-INF/*.DSA</exclude>
-                    <exclude>META-INF/*.RSA</exclude>
-                    <exclude>META-INF/SIG-*</exclude>
-                    <exclude>META-INF/LICENSE*</exclude>
-                    <exclude>META-INF/NOTICE*</exclude>
-                    <exclude>logback.xml</exclude>
-                    <exclude>module-info.class</exclude>
-                    <exclude>META-INF/versions/*/module-info.class</exclude>
-                  </excludes>
-                </filter>
-              </filters>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>

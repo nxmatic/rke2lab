@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.netplan;
+package io.nxmatic.rke2lab.netplan.cli;
 
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisRequest;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisResult;

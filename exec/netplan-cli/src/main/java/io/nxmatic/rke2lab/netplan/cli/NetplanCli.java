@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.netplan;
+package io.nxmatic.rke2lab.netplan.cli;
 
 /**
  * Command-line interface for netplan operations.

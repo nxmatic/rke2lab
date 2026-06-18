@@ -34,7 +34,7 @@
     # build through this top-level entry point (and the aarch64-linux NRI plugin
     # cross-builds via the configured linux-builder). It shares nixpkgs/flake-utils
     # so there is a single resolved version set across the two flakes.
-    flox-runtime.url = "path:./manifests/src/main/resources/runtime/flox";
+    flox-runtime.url = "path:./osgi/manifests/manifests/src/main/resources/runtime/flox";
     flox-runtime.inputs.nixpkgs.follows = "nixpkgs";
     flox-runtime.inputs.flake-utils.follows = "flake-utils";
     flox-runtime.inputs.flake-commons.follows = "flake-commons";
@@ -102,19 +102,22 @@
         buildPhase = ''
           # Maven needs a writable HOME for .m2/repository
           mkdir -p $TMPDIR/.m2
-          # Install parent POM and BOM first, then build netplan module
+          # Install parent POM and BOM first, then build the netplan CLI module.
+          # netplan-cli depends on the pure netplan core (osgi/netplan), so it
+          # builds through the reactor (`-pl :netplan-cli -am`) rather than a
+          # standalone `-f` — `-am` pulls the core sibling from source.
           mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
             install:install-file -Dfile=pom.xml -DpomFile=pom.xml
           mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
             -f bom/pom.xml install
           mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
-            -f osgi/netplan/pom.xml \
+            -pl :netplan-cli -am \
             -Dshfmt.version=${pkgs.shfmt.version} clean package -DskipTests
         '';
 
         installPhase = ''
           mkdir -p $out/share/java
-          cp osgi/netplan/target/netplan-*-exec.jar $out/share/java/rke2lab-netplan.jar
+          cp exec/netplan-cli/target/netplan-cli-*-exec.jar $out/share/java/rke2lab-netplan.jar
         '';
       };
 
@@ -254,8 +257,8 @@
 
           installPhase = ''
             mkdir -p $out/share/java
-            cp seed-master/target/seed-master-*-exec.jar $out/share/java/seed-master.jar
-            cp osgi/manifests/manifests/target/manifests-*-exec.jar $out/share/java/manifests.jar
+            cp exec/seed-master/target/seed-master-*-exec.jar $out/share/java/seed-master.jar
+            cp exec/manifests-cli/target/manifests-cli-*-exec.jar $out/share/java/manifests.jar
           '';
         };
 

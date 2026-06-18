@@ -16,13 +16,14 @@
   <description>Pulumi-based provisioning management cluster bootstrap app — the reactor
     root. This pom only AGGREGATES; all shared configuration is inherited from
     build-parent (its own parent and first module). The two top-level spaces of the
-    target layout — osgi/ (pure core) and host/ (adapters) — are aggregated here.</description>
+    target layout — osgi/ (pure core), host/ (adapters), and exec/ (driving
+    entrypoints) — are aggregated here.</description>
 
   <modules>
     <module>build-parent</module>
     <module>bom</module>
-    <module>seed-master</module>
     <module>osgi</module>
     <module>host</module>
+    <module>exec</module>
   </modules>
 </project>

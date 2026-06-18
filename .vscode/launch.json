@@ -37,7 +37,7 @@
             "projectName": "rke2lab-seed-master",
             "mainClass": "io.nxmatic.rke2lab.controlplane.DbusTcpSpike",
             "args": "${input:dbusTcpSpikeArgs}",
-            "cwd": "${workspaceFolder:rke2lab}/seed-master",
+            "cwd": "${workspaceFolder:rke2lab}/exec/seed-master",
             "console": "internalConsole",
             "stopOnEntry": false,
             "vmArgs": "-Dorg.slf4j.simpleLogger.defaultLogLevel=info -Dorg.slf4j.simpleLogger.log.org.freedesktop.dbus=trace -Dorg.slf4j.simpleLogger.showDateTime=true -Dorg.slf4j.simpleLogger.dateTimeFormat=HH:mm:ss.SSS"
@@ -49,7 +49,7 @@
             "projectName": "rke2lab-seed-master",
             "mainClass": "io.nxmatic.rke2lab.controlplane.DbusTcpSpike",
             "args": "${input:dbusTcpSpikeArgs}",
-            "cwd": "${workspaceFolder:rke2lab}/seed-master",
+            "cwd": "${workspaceFolder:rke2lab}/exec/seed-master",
             "console": "internalConsole",
             "vmArgs": "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5006 -Dorg.slf4j.simpleLogger.defaultLogLevel=info -Dorg.slf4j.simpleLogger.log.org.freedesktop.dbus=trace"
         },

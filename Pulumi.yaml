@@ -7,7 +7,7 @@ runtime:
     # also builds this jar as a store output (`nix build .#seed-master`) for
     # release/deploy; that store path is consumed by the deploy path, not wired
     # here as a bare `result/` symlink (which any `nix build` would clobber).
-    binary: seed-master/target/seed-master-0.1.0-SNAPSHOT-exec.jar
+    binary: exec/seed-master/target/seed-master-0.1.0-SNAPSHOT-exec.jar
 description: Pulumi-based provisioning control plane for RK2Lab management cluster bootstrap
 packages:
   incus:

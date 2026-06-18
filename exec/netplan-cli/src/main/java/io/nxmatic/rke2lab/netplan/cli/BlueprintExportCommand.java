@@ -1,8 +1,9 @@
-package io.nxmatic.rke2lab.netplan;
+package io.nxmatic.rke2lab.netplan.cli;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
+import io.nxmatic.rke2lab.netplan.ClusterNetworkBlueprint;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
