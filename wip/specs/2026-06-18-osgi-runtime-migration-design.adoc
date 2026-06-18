@@ -1,0 +1,498 @@
+= OSGi runtime migration — from resolution-algorithm to a launched framework
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* DESIGN. This spec maps the surface of, and plans, the final OSGi push: rebuilding the
+pre-OSGi services as NATIVE OSGi services *up to the runtime*, until `master` can be provisioned under a
+real Felix framework. It is cartography + a sliced migration plan, NOT runtime code — no framework is
+launched in `main()` by this document.
+
+It lives in `wip/specs/` and graduates into the durable atlas
+(`docs/architecture/integration-atlas.adoc`) and the manifests/config architecture docs when the first
+runtime slice materialises.
+
+*The cap decision is settled (not re-litigated here):* we go all the way to the OSGi runtime. The
+objection "production mounts no framework today" — true, and recorded as corrected fact #3 of the Step-2
+design (Felix is used only as a resolution *algorithm*, `new ResolverImpl(...)`, never a launched
+framework) — describes the *transitional* state we are now deliberately leaving. The production *target*
+IS an OSGi system.
+====
+
+== 1. Overview — what "up to the runtime" means
+
+The Step-2 roadmap (`2026-06-17-config-bundle-host-contract-design.adoc`) froze four OSGi planes and a
+six-stage static→dynamic sequence. Three things have shipped on the *resolution* plane: the standalone
+`UnitResolver` drives production manifest synthesis (Step 1); the config-extender contract is
+spike-proven (stage 2); and the bnd-annotations spike proved *Java annotations are the source of truth*
+— bnd generates the manifest headers and `OSGI-INF` descriptors from `@Component` / `@Capability` /
+`@ObjectClassDefinition`, no hand-written headers. The Maven re-layout into `osgi/` / `host/` / `exec/`
+(steps 1–5) is done and merged.
+
+What remains is the part the roadmap flagged as "a genuine architectural lift, not small increments":
+stages 3–6, where config values are *delivered* at runtime, components *activate*, and services live in
+a *registry* — none of which has a container to host it today. This spec is that lift. It is organised
+around one distinction that governs everything:
+
+* *Geste A — DECLARATION* (build-time, no runtime). An annotation (`@Component`, `@Capability`,
+  `@ObjectClassDefinition`) that bnd reads to emit a manifest header or an `OSGI-INF/*.xml` descriptor.
+  Proven on the bench; needs no framework.
+* *Geste B — CONSUMPTION* (runtime). `@Reference` injection, a registry lookup, a component lifecycle.
+  Requires Declarative Services (SCR) running inside a *launched* framework. This is the new capability
+  this spec designs and sequences.
+
+The whole migration is the disciplined crossing from A to B: declare first (cheap, additive, reversible),
+then stand up the runtime that lets us consume the declarations, then move each consumption site across,
+then delete the static mechanism.
+
+.The governing distinction — geste A (declare, build-time) vs geste B (consume, runtime). The dashed line is the only thing this whole phase has to cross.
+[mermaid]
+....
+flowchart LR
+  subgraph A["GESTE A — DECLARATION (build-time, no framework) — PROVEN"]
+    src["Java source: @Component / @Capability / @ObjectClassDefinition"]:::geste
+    bnd["bnd reads the annotations"]:::tool
+    hdr["emits MANIFEST headers + OSGI-INF/*.xml descriptors"]:::artifact
+    src --> bnd --> hdr
+  end
+  subgraph B["GESTE B — CONSUMPTION (runtime, needs a launched framework) — THE LIFT"]
+    fw["launched Felix + felix.scr (SCR runtime)"]:::runtime
+    pub["components ACTIVATE → services published to the registry"]:::runtime
+    cons["@Reference auto-wires / registry lookup"]:::runtime
+    fw --> pub --> cons
+  end
+  hdr -.->|"the crossing this phase designs:<br/>add felix.scr + launch a framework"| fw
+
+  classDef geste fill:#eef,stroke:#88a,stroke-width:1px;
+  classDef tool fill:#ffd,stroke:#aa6,stroke-width:1px;
+  classDef artifact fill:#dfd,stroke:#5a5,stroke-width:1px;
+  classDef runtime fill:#fde,stroke:#a58,stroke-width:1px;
+....
+
+Everything left of the dashed line ships today (the bnd-annotations spike). Everything right of it needs
+two things that do not exist yet: `felix.scr` in the BOM, and a framework launched in `main()`. The
+slices in §5 are nothing more than walking each consumption site across that dashed line, one at a time.
+
+== 2. The migration surface (cartography, grounded on HEAD)
+
+The surface is small and clean. Two mechanisms shadow standard OSGi services today
+(`osgi-logging-and-cli-debt`), and only one of them is on the runtime path: `java.util.ServiceLoader` +
+`META-INF/services/` standing in for the *service registry* + *Declarative Services*. (The logback Log
+shadow is a separate exec/-relocation chore, not a runtime concern — out of scope here.)
+
+=== 2.1 The five SPIs (the declaration + consumption inventory)
+
+[cols="2,2,1,3",options="header"]
+|===
+| SPI (interface) | Declared in | Impls | Consumed at (`ServiceLoader.load`)
+
+| `ManifestSynthesisService`
+| `osgi/manifests/manifests` (`io.nxmatic.rke2lab.manifests`)
+| 1 (`DefaultManifestSynthesisService`)
+| `DefaultManifestUpdateGate:38` (osgi); `IncusResourceBootstrap:518` via `singleSpiProvider` (exec);
+  `manifests-cli/Main:158` (exec)
+
+| `ManifestUpdateGate`
+| `osgi/manifests/manifests`
+| 1 (`DefaultManifestUpdateGate`)
+| `EntryGatePolicyEnforcer:51` (exec/seed-master)
+
+| `ManifestExplodeService`
+| `osgi/manifests/manifests`
+| 1 (`DefaultManifestExplodeService`)
+| `IncusResourceBootstrap:524` via `singleSpiProvider` (exec)
+
+| `NodeEnvContributor`
+| `osgi/manifests/manifests` (`io.nxmatic.rke2lab.manifests.node`)
+| 6 (cluster, node-identity, networking, ha, storage, runtime)
+| `NodeEnvContributorRegistry:23` (osgi) — the only *multi-impl* aggregator
+
+| `NetplanSynthesisService`
+| `osgi/netplan` (`io.nxmatic.rke2lab.netplan.api`)
+| 1 (`DefaultNetplanSynthesisService`)
+| `netplan-cli/SynthesisCommand:35` (exec)
+|===
+
+The five `META-INF/services/` files mirror this table (one per SPI, in `osgi/manifests` and
+`osgi/netplan`). The historical `rk2lab` misspelling is *already fixed* at HEAD (step 5). The generic
+helper `IncusResourceBootstrap.singleSpiProvider(Class<T>)` (line 644) is the consumption *pivot*: it
+enforces exactly-one-provider and is the shape that `@Reference` (cardinality 1..1) replaces directly.
+
+=== 2.2 The two consumption shapes
+
+* *Singleton-service* (four of the five): exactly one provider, looked up and called. `@Reference`
+  with mandatory unary cardinality is the literal replacement; `singleSpiProvider`'s "throw if not
+  exactly one" becomes SCR's `UNSATISFIED_REFERENCE`.
+* *Aggregate-extender* (`NodeEnvContributor`): N providers discovered and ordered.
+  `@Reference(cardinality=MULTIPLE)` on a `List<NodeEnvContributor>` is the replacement; this is the
+  `osgi.extender` discovery shape named in the Step-2 attach axis, now realised at runtime. The hand
+  ordering in `NodeEnvContributorRegistry.orderedContributors()` becomes a component property
+  (`service.ranking`) or stays an explicit sort over the injected list — a slice decision.
+
+=== 2.3 Where consumption happens, by space
+
+[cols="1,3",options="header"]
+|===
+| Space | Consumption sites
+
+| `osgi/` | `DefaultManifestUpdateGate` (loads `ManifestSynthesisService`), `NodeEnvContributorRegistry`
+  (loads the 6 contributors) — both inside `osgi/manifests`, the cleanest cases to move first because
+  they never cross the bundle/host line.
+| `exec/seed-master` (host) | `IncusResourceBootstrap.singleSpiProvider` (synthesis + explode),
+  `EntryGatePolicyEnforcer` (update gate) — the *host* consuming *pure-model* services. This is the
+  bundle↔host seam; it is where Felix must already be running.
+| `exec/manifests-cli`, `exec/netplan-cli` (host, driving) | one `ServiceLoader.load` each — thin
+  north-adapter CLIs. Off the master-provisioning critical path; their migration is sequenced last and
+  carries an explicit "go-to-runtime or stay static" decision (§5, slice 6).
+|===
+
+== 3. What already exists toward the runtime (the short ladder)
+
+The single most consequential cartography finding: *the runtime is almost entirely already wired in the
+BOM.* The lift is far shorter than "stand up an OSGi runtime from scratch."
+
+[cols="2,1,2",options="header"]
+|===
+| Artifact (in `bom/pom.xml`) | Present? | Role on the runtime path
+
+| `org.apache.felix.framework` 7.0.5 | ✅ | the launchable framework itself
+| `org.apache.felix.configadmin` 1.9.26 | ✅ | DELIVERY plane (Config Admin, stage 3)
+| `org.apache.felix.metatype` 1.2.4 | ✅ | schema runtime (proven typed by P2 on the bench)
+| `org.apache.felix.log` 1.3.0 | ✅ | OSGi Log service (the idiomatic Log shadow's target)
+| `osgi.core` 8.0.0 + the three `*.annotations` | ✅ | API + the geste-A construction annotations
+| `org.apache.felix.resolver` 2.0.4 | ✅ | the resolution algorithm (already in production use)
+| *`org.apache.felix.scr`* | ❌ *MISSING* | *ACTIVATION plane (Declarative Services runtime) — the one gap*
+|===
+
+And the test harness already *launches a real framework*: `FelixFrameworkExtension`
+(`osgi/osgi-bench/osgi-bench-testkit`) does `factory.newFramework(config).init().start()`, installs
+bundles from the classpath, and resolves them — all as a plain JUnit5 extension that runs in surefire
+*and* VSCode Test Explorer (`osgi-test-in-vscode-three-ways`). `MetatypeIntrospectionSpikeTest` already
+does `felix.installFromClasspath("org.apache.felix.metatype").start()` then reads a typed service from
+the registry. *The same gesture installs `org.apache.felix.scr` the moment it is in the BOM* — so every
+runtime slice below is validated on a real Felix engine *without* `-Plive`. `-Plive` is reserved for the
+one slice that actualises a real `master` over Pulumi.
+
+This is the geste-A/geste-B boundary made concrete: geste A is proven (annotations → headers/descriptors,
+the bnd spike); geste B is blocked by exactly two things — `felix.scr` absent from the BOM, and no
+framework launched in `main()`. Slice 1 closes the first; slice 4 closes the second.
+
+== 4. The runtime target
+
+.C4 L1 — system context: who owns the lifecycle. The operator runs ONE OS process (`seed-master`); the Pulumi engine drives it; the OSGi framework is born INSIDE it, not around it.
+[mermaid]
+....
+flowchart TB
+  op(["operator / CI"]):::person
+  engine["Pulumi engine<br/>(external process)"]:::ext
+  infra["Incus / systemd / the master node<br/>(the infrastructure being provisioned)"]:::ext
+  subgraph proc["seed-master — one OS process (exec/seed-master)"]
+    host["HOST world (flat classloader): main(), Pulumi SDK + gRPC,<br/>composition root, the embedded Felix, the south-adapters"]:::host
+    osgi["OSGi world (bundle classloaders): the pure osgi/ bundles<br/>— manifests, netplan, the future doctor-core"]:::osgi
+    host -->|"embeds + starts; consumes services from"| osgi
+  end
+  op -->|"launches"| proc
+  engine <-->|"gRPC (binary: language-host protocol)"| host
+  host -->|"actualises resources over"| infra
+
+  classDef person fill:#eee,stroke:#333,stroke-width:1px;
+  classDef ext fill:#eee,stroke:#999,stroke-width:1px;
+  classDef host fill:#fde,stroke:#a58,stroke-width:1px;
+  classDef osgi fill:#eef,stroke:#88a,stroke-width:1px;
+....
+
+The one fact to take from L1: the framework is not a new process and not the outer shell — it lives
+*inside* the existing `seed-master` process, on the host side, with the gRPC link to the engine staying
+entirely in the flat host world. §4.1 zooms into that process.
+
+=== 4.1 Where Felix boots — Pulumi outer, Felix inner, gRPC flat
+
+The governing constraint is already proven, not assumed: *gRPC must stay on the flat host classloader*
+(`docrepo-dag-state` — issue #1565, gRPC transport discovery is a `ServiceLoader` keyed on the TCCL that
+bundle isolation breaks; the `spike/osgi-grpc-host` test PASSED by pinning the TCCL in a host-side
+mediation seam). `seed-master` IS the Pulumi program: `main()` → `ApplicationPipeline.run()` →
+`Pulumi.run(ctx → body)` when `PULUMI_MONITOR` is set, else standalone (`ApplicationPipeline:39`).
+`Pulumi.run` takes over the lifecycle; the SDK opens gRPC channels back to the engine.
+
+Therefore the framework is *not* the outermost shell.
+
+.C4 L2 — components inside the seed-master process at runtime. The nesting (Pulumi callback wraps the framework) and the seam (host reads the registry, gRPC never crosses into a bundle) are the two things to get right.
+[mermaid]
+....
+flowchart TB
+  subgraph FLAT["HOST world — one flat classloader (holds gRPC)"]
+    direction TB
+    main["main() → ApplicationPipeline.run()"]:::host
+    subgraph PCB["Pulumi.run(ctx) — owns the OUTER lifecycle"]
+      direction TB
+      cr["composition root (the ctx callback)"]:::host
+      fx["embedded Felix: framework.init().start()<br/>+ install the osgi/ bundles + felix.scr"]:::host
+      seam["the CONSUME SEAM:<br/>IncusResourceBootstrap / EntryGatePolicyEnforcer<br/>read services via getServiceReference"]:::seam
+      south["south-adapters: ComponentResource shells → gRPC → engine"]:::host
+      cr --> fx
+      fx --> seam
+      seam --> south
+    end
+    main --> PCB
+  end
+  subgraph BUNDLES["OSGi world — bundle classloaders (NO gRPC, ever)"]
+    direction TB
+    scr["felix.scr (SCR extender) activates the @Components"]:::osgi
+    svc["published services: ManifestSynthesisService,<br/>ManifestExplodeService, ManifestUpdateGate, …"]:::osgi
+    scr --> svc
+  end
+  fx -.->|"starts the SCR extender"| scr
+  svc -.->|"typed via system.packages.extra<br/>(shared API package)"| seam
+  engine["Pulumi engine"]:::ext
+  south <-->|gRPC| engine
+
+  classDef host fill:#fde,stroke:#a58,stroke-width:1px;
+  classDef osgi fill:#eef,stroke:#88a,stroke-width:1px;
+  classDef seam fill:#ffd,stroke:#aa6,stroke-width:2px;
+  classDef ext fill:#eee,stroke:#999,stroke-width:1px;
+....
+
+Felix is embedded as a *host-owned service*, started by the composition root *inside* the Pulumi
+callback. The pure `osgi/` bundles (manifests, netplan, the future doctor-core) run in the bundle world;
+the host, holding gRPC on its flat loader, consumes their *descriptions* from the registry across the
+yellow seam and actualises them — exactly the "OSGi models describe, the host actualises over the engine"
+line (`model-substrate-alignment`), now made runtime rather than build-time. No gRPC type ever crosses
+into a bundle, so #1565 cannot occur by construction. The seam reads the service *typed* (no reflection)
+because `system.packages.extra` exports the API package from the system bundle so host and bundle share
+one copy of the interface — the bench's proven trick (`osgi-test-in-vscode-three-ways`).
+
+=== 4.2 SCR vs the bare registry — recommend SCR
+
+Two ways to publish/consume services once a framework runs:
+
+* *Bare registry*: the host calls `BundleContext.registerService(...)` for each provider and
+  `getServiceReference(...)` to consume. No new artifact. But this is `ServiceLoader`-with-extra-steps —
+  the wiring stays imperative and hand-written, betraying the bnd-annotations decision that *the Java
+  `@Component` is the source of truth*.
+* *Declarative Services (SCR)*: `@Component` classes auto-publish at activation; `@Reference` auto-wires
+  and rebinds. Idiomatic, declarative, and the direct continuation of the proven annotation work. Costs
+  one BOM line (`org.apache.felix.scr`) and a framework that runs the SCR extender.
+
+*Recommendation: SCR.* The bnd-annotations spike already committed to annotations-as-source-of-truth and
+already emits the `Require osgi.extender=osgi.component` headers; choosing the bare registry now would
+make those headers decorative. "Fully integrated OSGi up to the runtime" means Declarative Services. The
+bare registry survives only as the mechanism the *host seam* uses to read a service it consumes from
+outside the bundle world (the host is not itself a DS component) — see §4.3.
+
+=== 4.3 The consume seam — bundles use `@Reference`, the host uses the registry API
+
+A subtlety the cartography forces: consumption splits by who is consuming.
+
+* *Inside the bundle world* (e.g. `NodeEnvContributorRegistry` consuming the 6 contributors, or
+  `DefaultManifestUpdateGate` consuming the synthesis service): the consumer is itself a bundle class →
+  it becomes a `@Component` with `@Reference`. Fully declarative.
+* *At the host seam* (`IncusResourceBootstrap`, `EntryGatePolicyEnforcer` in `exec/seed-master`): the
+  host is *not* a bundle and must not become one (it holds gRPC). It consumes the pure-model services
+  via the plain registry API (`getServiceReference` / `getService`) — the same typed-access pattern the
+  bench proved with `system.packages.extra` exporting the API package from the system bundle so the host
+  and the bundle share one copy of the interface (`osgi-test-in-vscode-three-ways`). This is the only
+  place the "bare registry" survives, and it is correct there: it is the hexagonal *adapter* reading a
+  *port*.
+
+=== 4.4 The declare→publish→consume→boot order
+
+.The four phases in time. `declare` happens at build (geste A); the other three happen once, in order, inside the Pulumi callback at process start (geste B).
+[mermaid]
+....
+sequenceDiagram
+  participant bnd as bnd at build-time
+  participant Main as main / Pulumi.run
+  participant FW as Felix + felix.scr
+  participant Reg as service registry
+  participant Host as host seam
+  Note over bnd: DECLARE - geste A, build
+  bnd->>bnd: annotations to OSGI-INF descriptors + Require osgi.extender
+  Note over Main,Host: PUBLISH then CONSUME then BOOT - geste B, runtime
+  Main->>FW: init and start framework, install osgi bundles
+  FW->>Reg: SCR activates the components, publishes services
+  Host->>Reg: getServiceReference, typed via shared API package
+  Reg-->>Host: ManifestSynthesisService and the others
+  Host->>Host: BOOT - actualise descriptions over Pulumi via gRPC
+....
+
+[cols="1,2,2",options="header"]
+|===
+| Phase | Mechanism | Plane / geste
+
+| *declare* | bnd reads `@Component` → emits `OSGI-INF/<c>.xml` + `Service-Component` + `Require
+  osgi.extender=osgi.component` | build-time, geste A (proven)
+| *publish* | `framework.start()` → felix.scr activates each component → services in the registry | ACTIVATION, geste B
+| *consume* | bundle `@Reference` (auto-wired by SCR) **or** host `getServiceReference` at the seam | REGISTRY, geste B
+| *boot* | the pipeline runs; the host actualises the consumed descriptions over Pulumi | application
+|===
+
+`configuration-policy=require` (stage 4) rides on *publish*: a component with required config sits in
+`UNSATISFIED_CONFIGURATION` until Config Admin delivers it — the "loud fail on missing config" at the
+right level. Config Admin (already in the BOM) is the DELIVERY half; it is sequenced as its own slice
+after the service migration proves SCR works.
+
+== 5. The slices (each independently validable)
+
+Ordered by the geste-A→geste-B crossing and by blast radius. Each slice is a green build; gestures A are
+additive and reversible; only the boot-seam and delete slices touch the master-provisioning path and are
+`-Plive` gated.
+
+[cols="1,3,1",options="header"]
+|===
+| Slice | What | Gate
+
+| *R1 — stand up SCR* | Add `org.apache.felix.scr` to the BOM (a `felix.scr.version` property; current
+  2.2.x). Add a runtime testkit gesture (reuse `FelixFrameworkExtension.installFromClasspath`) that
+  installs+starts SCR. Prove on embedded Felix that a trivial `@Component` *publishes* a service and a
+  `@Reference` *binds* it — the geste-B proof, the symmetric twin of the bench's P1/P2. Tagged
+  `@OsgiSpike`. | none (`-Posgi` surefire)
+
+| *R2 — declare the 5 SPIs as `@Component` (geste A only)* | Annotate the 6 + 4 impl classes
+  `@Component(service=…)`; bnd emits the descriptors. `ServiceLoader` + `META-INF/services` stay in
+  place as the *still-active* consumer — bundles now carry both, ZERO behaviour change. Validated by:
+  descriptor present in each jar (unzip), bundle resolves, all existing tests green. Pure additive.
+  | none
+
+| *R3 — consume the intra-bundle case via `@Reference`* | Inside `osgi/manifests` only:
+  `NodeEnvContributorRegistry` → `@Component` consuming `@Reference(MULTIPLE) List<NodeEnvContributor>`;
+  `DefaultManifestUpdateGate` → `@Reference` for the synthesis service. The 6 contributors keep their
+  `@Component`. Prove on embedded Felix that the registry resolves all 6 via SCR (the
+  `cardinality:=multiple` anti-cheat from the resolution proof, now at activation). `ServiceLoader`
+  removed *only* from these two intra-bundle sites; the host sites still use it. | none (`-Posgi` surefire)
+
+| *R4 — the boot seam in seed-master* | Embed + start Felix in the host composition root, inside the
+  `Pulumi.run` callback (§4.1), gRPC staying flat. Install the `osgi/` bundles; SCR publishes the
+  manifest services. `IncusResourceBootstrap` + `EntryGatePolicyEnforcer` consume
+  `ManifestSynthesisService` / `ManifestExplodeService` / `ManifestUpdateGate` from the *registry* (§4.3)
+  instead of `singleSpiProvider`. This is the architectural lift. Validated first on embedded Felix in a
+  host-scope test; the full master-provisioning path proven under `-Plive`. | *-Plive*
+
+| *R5 — retire the static mechanism* | Delete the 5 `META-INF/services/` files, `singleSpiProvider`, and
+  `NodeEnvContributorRegistry.loadContributors`. Uniformity: every consumption now goes through SCR or
+  the registry seam — no `ServiceLoader` survives on the runtime path (the CLIs in R6 are separate). The
+  `serviceloader-specialist-spi` static cousin is gone. | *-Plive* (re-proves the master path)
+
+| *R6 — the CLI consumers (explicit decision)* | `manifests-cli` and `netplan-cli` each `ServiceLoader`
+  one service. Decision to record (recommend (a)): *(a)* a shared `exec/` bootstrap that boots the same
+  embedded Felix + SCR and reads the service from the registry — ONE consumption mechanism across the
+  reactor (uniformity); *(b)* leave the CLIs on `ServiceLoader` as an accepted static cousin for a
+  one-shot process that needs no registry dynamism. Off the master-provisioning critical path, hence
+  last. | none
+
+| *R7 (deferred, stage 3–4) — DELIVERY + ACTIVATION config* | Wire `felix.configadmin`; move
+  `InfraDomain`/`InfraConfigFragment` to `@ObjectClassDefinition` + Config-Admin-delivered values;
+  `configuration-policy=require` for the loud-fail. The four-plane roadmap's delivery/activation halves,
+  now that a framework runs to host them. | mixed
+|===
+
+The REGISTRY-as-living-plane (stage 6: recruit/restructure specialists at runtime, hot-swap) stays a v2
+horizon — R1–R5 give it its substrate (a running registry with rebinding `@Reference`s) but build none
+of the live re-resolution.
+
+== 6. What is deliberately NOT in this phase
+
+* No runtime code — this is the cartography + plan; the first code is slice R1 on a fresh branch.
+* No Log-service migration — the logback shadow is an `exec/`-relocation chore
+  (`osgi-logging-and-cli-debt`), not on the runtime path; `felix.log` is in the BOM for when it is taken
+  up.
+* No doctor-core / ledger split — that is the Step-2 static-decomposition cartography slice
+  (`config-bundle-host-contract-design` §12), orthogonal to and sequenced independently of the runtime
+  lift.
+* No federation transport / distributed OSGi services — the v2 north-star
+  (`docrepo-dag-state`), gated far beyond this phase.
+
+== 7. Atlas before/after — the mandatory monotone proof
+
+The integration atlas ritual is run for this phase as it was for the doctor and config subsystems
+(`integration-atlas.adoc` §"The ritual"): a before/after pair, monotone (no built box erased *silently*),
+honest edits named in the verdict. This graduates into the atlas as a new "runtime" per-subsystem view at
+merge — the static `ServiceLoader` surface flipping to the live registry. Color convention matches the
+atlas: blue `built` (already shipped), green `neu` (this phase adds).
+
+This phase is the *one* ritual case where a built mechanism is deliberately *removed* (the static
+`ServiceLoader` path), so the before/after is drawn in two beats: the additive beat (R1–R4, the new path
+appears beside the old, monotone) and the retire beat (R5, the old path is consciously erased — which the
+ritual says must be stated, not hidden).
+
+=== Diagram G — BEFORE: the static ServiceLoader surface (today)
+
+[mermaid]
+....
+flowchart TB
+  sl["java.util.ServiceLoader + META-INF/services"]:::built
+  spi["the 5 SPIs: ManifestSynthesis/Explode/UpdateGate, NodeEnvContributor, NetplanSynthesis"]:::built
+  imp["the providers (1 each; 6 NodeEnvContributors)"]:::built
+  cons["consumers: DefaultManifestUpdateGate, NodeEnvContributorRegistry,<br/>IncusResourceBootstrap.singleSpiProvider, EntryGatePolicyEnforcer, the CLIs"]:::built
+  res["UnitResolver — Felix as a pure ALGORITHM (no framework)"]:::built
+  cons -->|"ServiceLoader.load"| sl
+  sl -->|discovers| imp
+  imp -.->|implement| spi
+  classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+  class sl,spi,imp,cons,res built;
+....
+
+=== Diagram H — AFTER the additive beat (R1–R4): the live registry appears beside the old path, monotone
+
+[mermaid]
+....
+flowchart TB
+  sl["java.util.ServiceLoader + META-INF/services — STILL PRESENT through R4"]:::built
+  spi["the 5 SPIs unchanged"]:::built
+  imp["the providers unchanged"]:::built
+  res["UnitResolver — Felix algorithm unchanged"]:::built
+  scr["felix.scr — launched SCR runtime"]:::neu
+  comp["the providers ALSO @Component (geste A, R2)"]:::neu
+  reg["service registry — published at activation (R3/R4)"]:::neu
+  ref["consumers ALSO via @Reference / registry seam (R3 bundle, R4 host)"]:::neu
+  imp -.->|implement| spi
+  comp -.->|annotate the same providers| imp
+  scr -->|activates| comp
+  comp -->|publish| reg
+  ref -->|"bind / lookup"| reg
+  classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+  classDef neu fill:#dfd,stroke:#2a2,stroke-width:3px;
+  class sl,spi,imp,res built;
+  class scr,comp,reg,ref neu;
+....
+
+=== Verdict — does it hold?
+
+. *The additive beat (R1–R4) is monotone: yes.* Diagram G→H erases no built box. The 5 SPIs, their
+  providers, and `UnitResolver` (Felix-as-algorithm) are unchanged. The `ServiceLoader` box survives
+  through R4 — both paths coexist while each consumption site is walked across. The green additions
+  (`felix.scr`, the `@Component` annotations on the *same* provider classes, the registry, the
+  `@Reference`/seam consumers) are NEW, beside the old path, not rewrites of it.
+
+. *One honest edit, named:* R3/R4 change the *consumers* — `DefaultManifestUpdateGate` and
+  `NodeEnvContributorRegistry` become `@Component`s, the host sites read the registry instead of
+  `singleSpiProvider`. These are changed collaborators (not pure additions), named here as the ritual
+  requires. The providers and SPIs themselves are pure additions (they gain an annotation, lose nothing).
+
+. *The retire beat (R5) DELIBERATELY erases the blue `ServiceLoader` box* — and this is the one place the
+  proof is *not* additive, stated explicitly per the ritual. It is justified, not a drift: keeping both
+  paths would violate the uniformity discipline (one mechanism, not "registry + a legacy cousin") and
+  would leave `serviceloader-specialist-spi`'s static cousin alive on the runtime path. R5 is gated
+  `-Plive` precisely because erasing a built mechanism must be re-proven against the real master, not
+  just asserted.
+
+. *The proof will be on the REAL engine, as the bench's was.* R1 and R3 validate on the embedded Felix of
+  `FelixFrameworkExtension` (the same harness that proved P1/P2), in surefire — `@Reference` binding and
+  the multi-cardinality aggregate resolving via SCR. Only R4/R5, which actualise a real `master` over
+  Pulumi, need `-Plive`.
+
+Conclusion: the runtime constellation holds. R1–R4 are monotone (the live registry grows beside the
+static path); R5's erasure of `ServiceLoader` is the single justified non-additive step, named and gated.
+At merge the green boxes flip blue and Diagram G's static surface is struck through.
+
+== 8. Related documentation
+
+* `wip/specs/2026-06-17-config-bundle-host-contract-design.adoc` — the four-plane / six-stage roadmap
+  this phase executes the runtime half of (stages 3–6).
+* `wip/specs/2026-06-17-target-module-layout.adoc` — the `osgi/` / `host/` / `exec/` spaces the
+  migration moves within (its §2 axis 3 documents the `exec/` = nature axis, updated this session).
+* `wip/specs/2026-06-17-osgi-bench-slice2-design.adoc` — the bench whose `FelixFrameworkExtension`
+  becomes the runtime-slice validation harness.
+* `docs/architecture/integration-atlas.adoc` — the living view this graduates into at merge (a new
+  "runtime" per-subsystem view: the static `ServiceLoader` surface flips to the live registry).
+</content>
