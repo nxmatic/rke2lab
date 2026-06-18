@@ -1,0 +1,334 @@
+= Claude memory — three-tier cascade (worktree → hub → home)
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* DESIGN (approved section-by-section, 2026-06-18; revised same day after the config-home
+finding). Freezes HOW Claude's file-memory is organised across three tiers, each backed by a
+distinct versioning mechanism. Supersedes the two-level model in `MEMORY-STRUCTURE-SPEC.md`
+(separate `claude-memory` meta-repo): the hub is now an embedded git subtree, not a standalone
+repo, and a third tier (home, nix-seeded) is added.
+
+Lives in `wip/specs/` (flat, per the `superpowers-assets-in-wip` convention — kept off `main` by
+the wip-guard). Implementation is a SEPARATE step gated on user review of this spec.
+====
+
+== 1. Why three tiers
+
+Claude's distilled file-memory was one mixed pile. The `MEMORY-STRUCTURE-SPEC` already split
+cross-cutting facts into a hub; this spec generalises that into a *cascade*, most-specific to
+most-general, where each tier owns a distinct **scope** AND a distinct **backing store**:
+
+[cols="1,2,1,2",options="header"]
+|===
+| Tier | Physical location | Scope | Backing / versioning
+
+| *worktree* | `<worktree>/.claude/memory/` | this branch | git commits on the branch (then merge → main)
+| *hub* | `<worktree>/.claude/hub/memory/` | the repo family | git subtree ↔ `claude-hub` remote
+| *home* | `~/.claude/memory/` | the machine | nix-darwin "seed if absent", then Claude-owned
+|===
+
+The value of the cascade is that *the location of a note IS its scope*, and the scope fixes who
+versions it. Collapsing the tiers into one folder (the rejected Option A) destroys that.
+
+== 2. The config-home — where Claude actually reads (clean-split, per-workspace)
+
+*Decision (2026-06-18, supersedes the wrapper model below):* the config-home is set
+**per-workspace** in the `.code-workspace`, pointing at `<worktree>/.claude` directly — no wrapper,
+no `.claude/hub` fusion. The `.code-workspace` is self-defined: it depends on nothing but the
+worktree folder, with the absolute path written in at generation time (host-specific, not shared):
+
+----
+"settings": {
+  "claudeCode.claudeProcessWrapper": "",        // empty = falsy = wrapper disabled for this window
+  "claudeCode.environmentVariables": [
+    { "name": "CLAUDE_CONFIG_DIR",
+      "value": "/abs/path/to/<worktree>/.claude" }
+  ]
+}
+----
+
+[IMPORTANT]
+====
+Because `CLAUDE_CONFIG_DIR = <worktree>/.claude`, Claude reads/writes EVERYTHING under
+`<worktree>/.claude/`, NOT `~/.claude/` and NOT `.claude/hub/`. In particular:
+
+* conversations: `<worktree>/.claude/projects/<slug>/*.jsonl`
+* auto-loaded memory: `<worktree>/.claude/projects/<slug>/memory/`
+
+`projects/` (+ `sessions/`, `plugins/`, …) is gitignored in `<worktree>/.claude/.gitignore`, so the
+per-worktree runtime never gets tracked by the branch. `.claude/hub` reverts to its SINGLE role:
+subtree content only (`memory/`, `skills/`, `instructions.md`, `bin/`) — no longer a config-home.
+====
+
+Why this beats the wrapper (verified against the extension bundle, v2.1.181):
+
+* `claudeCode.claudeProcessWrapper` has `scope=window` and is gated by `if(e)` — an empty string
+  disables it for this workspace, so the global wrapper does not run here.
+* `claudeCode.environmentVariables` is injected verbatim (`String(value)`, NO `${workspaceFolder}`
+  substitution — so the path MUST be absolute; that's fine, the `.code-workspace` is host-specific
+  and we know the path at generation time).
+* Result: no `git rev-parse` indirection, no runtime polluting the subtree, the hub stops being
+  dual-role. `.claude/hub` was only ever the config-home to get shared settings "for free"; the
+  per-workspace env var gives a clean config-home without that coupling.
+
+*Per-worktree isolation is preserved:* each `.code-workspace` names its own `<worktree>/.claude`, so
+a worktree still sees only its own conversations; removing the worktree still drops them.
+
+[NOTE]
+====
+*Superseded — the wrapper model.* Previously a fixed `claudeProcessWrapper`
+(`claude-hub.d/main/.claude/bin/claude-config-home-wrapper.sh`) resolved
+`CLAUDE_CONFIG_DIR="$(git rev-parse --show-toplevel)/.claude/hub"` at launch, because the extension
+can't substitute `${workspaceFolder}` in the wrapper path. That worked but fused config-home with
+the subtree (the dual-role hub, §2.2) and forced a memory symlink gymnastics. The clean-split
+retires it. `--git-dir` / `--git-common-dir` were considered for the wrapper and rejected
+(`--git-dir` = empty private dir; `--git-common-dir` = pools the whole repo). History kept so we
+don't re-derive it.
+====
+
+=== 2.1 toplevel vs git-dir vs slug — three things, do not confuse
+
+The slug is NOT derived from any `git rev-parse`. It is the *working-tree root path* (= the cwd =
+`--show-toplevel`) with `/` AND `.` replaced by `-`. The wrapper does NOT `cd`; it only reads
+`$PWD` to compute `root`. Three distinct values, only the first feeds the slug:
+
+[cols="1,2,2",options="header"]
+|===
+| Term | Resolver | Value here
+
+| *working-tree root* (feeds slug + config-home) | `git rev-parse --show-toplevel` | `…/chore/claude-memory-cascade`
+| git-dir (NEVER used for the slug) | `git rev-parse --git-dir` | `…/main/.git/worktrees/claude-memory-cascade`
+| slug | `encode(working-tree root)`, `/` and `.` → `-` | `-private-…-chore-claude-memory-cascade`
+|===
+
+=== 2.2 `.claude/hub` carries TWO orthogonal roles
+
+The single `.claude/hub` dir fuses two concerns, separated after the fact by its `.gitignore`:
+
+[cols="1,2,1",options="header"]
+|===
+| Role | Holds | Nature
+
+| config-home (`$CLAUDE_CONFIG_DIR`) | `settings.json`, `projects/`, `sessions/`, `plugins/`… | runtime, per-machine, gitignored
+| subtree content | `memory/`, `skills/`, `instructions.md`, `bin/` | shared, versioned (subtree)
+|===
+
+This fusion was the *deliberate trade* of the wrapper model: pointing the config-home at the subtree
+gave shared `settings.json`/`skills/`/`plugins/` for free, at the cost of runtime (`projects/`)
+landing inside the subtree. *The clean-split (§2) retires that trade* — config-home is now
+`<worktree>/.claude`, so the hub is subtree-content-only and this dual role no longer applies. Kept
+as history.
+
+=== 2.3 Memory load flow (current — clean-split)
+
+. VSCode opens the workspace; the `.code-workspace` sets `CLAUDE_CONFIG_DIR=<worktree>/.claude`
+  (absolute) and disables the wrapper (`claudeProcessWrapper: ""`).
+. Claude computes the *slug* from the cwd (`/` and `.` → `-`).
+. Claude reads the index at `$CLAUDE_CONFIG_DIR/projects/<slug>/memory/MEMORY.md`
+  (= `<worktree>/.claude/projects/<slug>/memory/MEMORY.md`).
+. That path is a *symlink* → `<worktree>/.claude/memory` (tier-1, tracked).
+. `MEMORY.md` loads; `[[hub:…]]` / `[[home:…]]` resolve on demand.
+
+The slug must agree in two places — Claude's computation and `link-memory.sh`'s symlink creation —
+or memory is "lost" (the §9 bug). Under the clean-split there is no `git rev-parse` indirection: the
+config-home is the literal path in the `.code-workspace`.
+
+== 3. Reading model — Option B (root index + scoped links)
+
+*Hard constraint of Claude Code:* a session auto-loads exactly ONE `MEMORY.md` — the one under
+`$CLAUDE_CONFIG_DIR/projects/<slug>/memory/` (under the clean-split,
+`<worktree>/.claude/projects/<slug>/memory/`), where `<slug>` is derived from the *cwd*. The other
+tiers are NOT auto-merged.
+
+Option B composes the tiers by reference:
+
+* `<worktree>/.claude/memory/MEMORY.md` is the *root index* (reached via the slug symlink, §7).
+* It reaches the other tiers by *scoped links*:
+** `[[name]]` — worktree-local (bare).
+** `[[hub:name]]` → `.claude/hub/memory/name.md` (already in-tree via subtree).
+** `[[home:name]]` → `~/.claude/memory/name.md` (out-of-repo, nix-seeded).
+
+Why B over a merged folder (Option A):
+
+* *Write-time identity (decisive):* the folder you write into IS the tier and fixes the backing.
+* *Reproducibility after reset/clone:* the hub is already in-tree; the home is nix-seeded; only ONE
+  thing must be recreated — the slug symlink.
+* *Read cost:* Option A wins marginally, but B needs only a documented convention in the index
+  header. This DAG of scoped links is already what the prior SPEC posed.
+
+== 4. FS invariant — never below the slug
+
+[IMPORTANT]
+====
+FS manipulation happens ONLY at the slug level — creating/repointing the symlink
+`<worktree>/.claude/projects/<slug>/memory` (or removing a whole `<slug>/` dir wholesale). We NEVER
+touch anything *inside* the slug directory (`*.jsonl` transcripts, `tool-results/`, per-session
+subdirs). Claude's internal slug layout is volatile and complex; treating it as opaque is what keeps
+the reset safe.
+====
+
+* Allowed: create/repoint `<slug>/memory`.
+* Forbidden: touch anything else under `<slug>/`.
+
+== 5. Lifecycle model — conversations are ephemeral, memory is the only durable carrier
+
+The target working cycle:
+
+. *In `main`:* open a conversation, brainstorm, decide to spin up a worktree.
+. *Outbound handoff:* commit to memory whatever the worktree will need (memory is the ONLY thing
+  that crosses the conversation/slug boundary), create the worktree (+ `.code-workspace`), and hand
+  back a prompt to open the new conversation inside it.
+. *Switch:* new VSCode window → load the `.code-workspace` → open the conversation in the worktree.
+. *In the worktree:* load the worktree's memory and work.
+. *Finish:* save/commit; say "it's done."
+. *Back in `main`:* return to the `main` workspace, say the work is finished → merge/squash into
+  `main`. The branch's tier-1 memory rides into `main` with the code.
+
+*Consequences, accepted by design:*
+
+* Conversations are NOT shared between worktrees. Each worktree owns its transcripts under its own
+  `<slug>/`.
+* To re-read a working conversation, reopen that worktree's workspace *while it is still parked*.
+  Once the merged branch's worktree is removed, its `<worktree>/.claude/projects/<slug>/`
+  vanishes with it — *the conversations are gone, intentionally.* They were already summarised into
+  memory + docs before the end; only noise is lost.
+
+*Bridging is human — one conversation ↔ one workspace ↔ one worktree.* Claude NEVER links or grafts
+a conversation across worktrees (we tried a one-file transcript symlink into another worktree's
+config-home and reverted it: it violated this invariant). Cross-conversation continuity flows
+through *committed memory* (the durable channel: a note written at the end, reloaded by the next
+conversation); the *human* carries the live thread between windows. This is simpler and more robust
+than any FS bridge: no dangling links to clean up, and the boundary stays sharp.
+
+== 6. Sidebar cache noise (`closed - …`) — the obligatory corollary of removal
+
+The VSCode "Claude sessions" sidebar caches its list OUTSIDE the worktree, in
+`~/Library/Application Support/Code - Insiders/User/workspaceStorage/<id>/state.vscdb`, key
+`agentSessions.model.cache` (a JSON array of `{resource:"claude-code:/<sessionId>", label, …}`).
+The user marks finished sessions by renaming them `closed - …`.
+
+Removing a worktree deletes its `.jsonl` transcripts (they live inside the worktree) but the
+sidebar entry SURVIVES (it lives outside) → an orphan label pointing at a transcript that no longer
+exists. *This* is the accumulating noise: dangling sidebar labels, not conversations.
+
+*Therefore:* purging the sidebar cache is not optional housekeeping — it is the obligatory
+corollary of worktree removal. "Finishing a branch" gains a step:
+`merge/squash → remove worktree → purge that worktree's orphan sidebar entries`.
+
+[NOTE]
+====
+*Capture now, validate in real life.* The exact purge mechanism (a reusable script over the
+`state.vscdb` files vs. a one-shot, and whether to also delete orphan `.jsonl`) is left to
+implementation; we will see how the lifecycle behaves in practice before hardening a tool.
+====
+
+== 7. Target wiring
+
+One symlink per worktree (never below the slug), under the config-home (clean-split:
+`$CLAUDE_CONFIG_DIR = <worktree>/.claude`), with the corrected slug encoding:
+
+----
+<worktree>/.claude/projects/<slug>/memory   →   <worktree>/.claude/memory
+----
+
+[cols="2,2",options="header"]
+|===
+| slug (`/` and `.` → `-`) | → target (the worktree's tracked memory)
+
+| `…-rke2lab-d-main` | `…/rke2lab.d/main/.claude/memory`
+| `…-rke2lab-d-design-target-module-layout` | `…/rke2lab.d/design/target-module-layout/.claude/memory`
+| `…-rke2lab-d-refactor-config-extender` | `…/rke2lab.d/refactor-config-extender/.claude/memory`
+|===
+
+Hygiene (at or above the slug level, never inside):
+
+. *Fix `link-memory.sh` on TWO axes:* (a) slug encoding `s:/:-:g` → `s:[/.]:-:g`; (b) anchor the
+  symlink under `${CLAUDE_CONFIG_DIR:-$HOME/.claude}` (under the clean-split, the workspace sets
+  `CLAUDE_CONFIG_DIR=<worktree>/.claude`), NOT a hardcoded `~/.claude`.
+. *Dedup the helper:* 3 copies today (`.claude/bin/`, `.claude/hub/bin/`,
+  `.claude/hub/skills/track-claude-memory-in-repo/`). Keep the canonical one in the HUB
+  (`.claude/hub/bin/`, travels by subtree); the others reference or are removed.
+
+== 8. Starting state (cold inventory, 2026-06-18)
+
+The content migration is essentially DONE; the remaining work is wiring + hygiene, not moving files.
+
+[cols="1,1,1,2",options="header"]
+|===
+| Store | Files | Tracked | Note
+
+| worktree `.claude/memory/` | 37 | yes (branch) | all project-specific (doctor, manifests, config, build, test, osgi…)
+| main `.claude/memory/` | 39 | yes (main) | identical superset; worktree inherited it at creation
+| hub `.claude/hub/memory/` | 34 | yes (subtree) | all cross-cutting / cross-repo — already migrated
+| home `~/.claude/memory/` | — | — | absent (greenfield)
+|===
+
+* *Doublons worktree ∩ hub: ZERO* (`comm -12` empty). No divergence to reconcile.
+* *Edge cases left in worktree* (deferred, not promoted now): `validate-at-the-boundary`,
+  `serviceloader-specialist-spi`, `coherence-rules-coordinator`, `worktree-claude-session-symlink`.
+
+== 9. The slug-encoding bug (root cause of past failures)
+
+Claude encodes the slug by replacing BOTH `/` AND `.` with `-`:
+
+----
+path : /private/var/lib/git/nxmatic/rke2lab.d/design/target-module-layout
+slug : -private-var-lib-git-nxmatic-rke2lab-d-design-target-module-layout
+                                          ^^^  .d → -d
+----
+
+`link-memory.sh` does `sed 's:/:-:g'` — it replaces ONLY `/`, so the `.` of `rke2lab.d` survives →
+the helper created the symlink under a slug Claude never reads → memory "lost" on reload. Because
+`rke2lab.d` is in the path of EVERY worktree in this family, the bug hit them all.
+
+[NOTE]
+====
+This spec's subject *is* the worktree-bootstrap testbed. The general bootstrap recipe — including
+the `.code-workspace` convention (sibling of the worktree in the namespace dir, bare-leaf name,
+relative folder `path`) — lives in the external-worktree operating model
+(`.claude/hub/instructions.md`, memory `external-worktree-operating-model-state`), not duplicated
+here. This spec only adds the memory-specific tier wiring on top of it.
+====
+
+== 10. Home tier — nix seed (machine-wide, minimal)
+
+Mirror the proven `settings.json` pattern in `nix-darwin-home/modules/home-manager/claude-code.nix`:
+nix never owns mutable content; it only *seeds if absent*.
+
+* New activation `home.activation.claudeCodeSeedMemory`: if `~/.claude/memory/` is absent, copy the
+  seed from the nix store, then STOP; if present, leave it untouched (Claude owns it). Same
+  "seed-if-absent, never overwrite" guard as `claudeCodeSeed`.
+* *Home is minimal — profile only.* The seed carries ONLY the irreducible-without-a-repo:
+  `user-profile-senior-dev` plus one or two universal work-style prefs. All other cross-cutting
+  stays in the hub. The home↔hub boundary is sharp.
+
+NOTE: the home tier (`~/.claude/memory`) is read via `[[home:name]]` links only. It is NOT the
+config-home — under the clean-split, the config-home is the per-worktree `<worktree>/.claude`. The
+two are distinct: `~/.claude/memory` is a link target, `<worktree>/.claude` is where sessions live.
+
+== 11. Scope
+
+In scope: the clean-split config-home (per-workspace `CLAUDE_CONFIG_DIR=<worktree>/.claude`, wrapper
+disabled), Option B reading model, the slug invariant, the lifecycle + ephemeral-conversation
+principle, the sidebar-purge-on-removal corollary (captured, mechanism TBD by real-life use), the
+`link-memory.sh` two-axis fix + dedup, the per-worktree wiring, the minimal nix home seed.
+
+Out of scope: promoting the 4 edge-case files to the hub; rewriting note content; auto-detecting
+working dirs; a link-validation checker; migrating other repos' memory; hardening the sidebar-purge
+tool before we have lived with the lifecycle.
+
+== 12. Success criteria
+
+* `link-memory.sh` computes the slug Claude actually reads (`/` and `.` both encoded) AND anchors it
+  under `$CLAUDE_CONFIG_DIR`; memory survives a window reload in any worktree of the family.
+* Each worktree's `<slug>/memory` symlink resolves to that worktree's `.claude/memory`; `main` keeps
+  its own; no cross-worktree leakage.
+* A worktree sees only its own conversations; removing a merged worktree drops its transcripts with
+  it, and the lifecycle includes purging the orphan sidebar entries.
+* `[[hub:name]]` / `[[home:name]]` resolve deterministically.
+* One canonical `link-memory.sh` (in the hub); the duplicates are gone.
+* A fresh machine: `darwin-rebuild` seeds `~/.claude/memory/` (profile) if absent and never
+  clobbers it thereafter.
+* No FS manipulation ever reaches inside a slug directory.

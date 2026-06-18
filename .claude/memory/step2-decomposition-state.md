@@ -277,8 +277,7 @@ tag), `osgi-bench-tests` (P1+P2). bnd 7.3.0, version in PARENT pluginManagement.
   when host absent. **P2**: unknown client reads an `ObjectClassDefinition` by PID via the real
   felix.metatype `MetaTypeService`, TYPED — enabled by `system.packages.extra`; see
   [[osgi-test-in-vscode-three-ways]] (3 approaches spiked; only this one is typed AND VSCode-clickable).
-- **VSCode harness PROVEN**: plain JUnit5 + Jupiter extension, runs from Test Explorer on a click; the
-  chat-in-worktree setup = [[worktree-claude-session-symlink]].
+- **VSCode harness PROVEN**: plain JUnit5 + Jupiter extension, runs from Test Explorer on a click.
 - **Dep bump REQUIRED, not creep**: spring-boot 3.3.12→4.1.0 is needed on JDK 25 (old byte-buddy can't
   read Java 25 bytecode → seed-master won't compile without it); + cdk8s 2.70, bnd 7.3, spotless 3.7,
   etc. Compile+unit green only — a `-Plive` pass (gated on [[pulumi-stack-per-worktree-backlog]]) is
