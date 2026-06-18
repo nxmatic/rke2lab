@@ -1,0 +1,153 @@
+= Target module layout — the host/OSGi decomposition
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* TARGET (the destination layout, not a slice). This spec freezes WHERE the host/OSGi
+decomposition is heading — the two top-level spaces, the two orthogonal axes, and the module roster
+every class lands in. Sub-decomposition (which exact class goes in which module) is OUT OF SCOPE here;
+that is per-slice cartography work. This document is the compass; slices are the steps.
+
+It lives in `wip/specs/` and graduates into the durable atlas (`docs/architecture/integration-atlas.adoc`,
+the "two spaces" section it extends) when the layout starts materialising.
+
+*Backup point.* `main` was tagged `backup/pre-decomposition-2026-06-17` (annotated, signed, pushed to
+origin) at commit `66bed704` — the pre-decomposition state (Step 2 slices 1–2 shipped: BootstrapConfig
+relocate + the OSGi bench). Return there to recover the monolithic layout.
+====
+
+== 1. Why this layout
+
+Step 2 proved, on the real Felix engine (the OSGi bench), that this application IS a ports-and-adapters
+system whose wiring is OSGi resolution: a bundle declares what it needs (`Require`) and offers
+(`Provide`) in its manifest, and the resolver wires need to provider. The target layout makes that
+structural. The integration atlas already names the deepest seam — the *two spaces*, OSGi (pure,
+describes) vs host (actualises over Pulumi); this layout turns that seam into the top-level directory
+split and adds the second axis (direction) the bench surfaced.
+
+== 2. The two orthogonal axes
+
+A module's place is two independent coordinates, not one.
+
+* *Axis 1 — purity (WHO):* a pure model in OSGi space *describes*; host code *actualises* the
+  description over the Pulumi engine. No `com.pulumi` / `io.grpc` in OSGi space. This is the top-level
+  split: `osgi/` vs `host/`.
+* *Axis 2 — direction (WHICH WAY):* every module has a northbound face (`Provide` — what it OFFERS, its
+  driving side) and a southbound face (`Require` — what it NEEDS, its driven side, toward the infra).
+  Direction is NOT a directory split at top level (orientation A, chosen for legibility); it is how a
+  module's two manifest faces read, and — inside `host/` — the grouping criterion for adapters.
+
+In hexagonal terms: a *port* is an interface the core declares (it lives in `osgi/`, as a
+`Require`/`Provide-Capability` in the bundle manifest); an *adapter* is an implementation (it lives in
+`host/`). The seam = one module's `Require` (south) wired by the resolver to another's `Provide`
+(north). There is no third "mediation/bridge" zone — the mediation IS the Provide/Require interplay.
+
+The 2×2 grid that places everything:
+
+[cols="1,2,2",options="header"]
+|===
+| | `osgi/` — core, declares (port) | `host/` — realises (adapter)
+
+| *north (driving)*
+| capability OFFERED (a `Provide` in the bundle manifest)
+| `north-adapters` — what drives the app: the bootstrap entry point, the scenario engine
+
+| *south (driven)*
+| capability REQUIRED (a `Require` in the bundle manifest) — the "south-ports", e.g. `SectionReader`,
+  "write a node"
+| `south-adapters` — what actualises toward infra: Pulumi, incus, systemd/dbus, bbox
+|===
+
+== 3. The layout (orientation A — OSGi left, host right, infra at the bottom)
+
+[mermaid]
+....
+flowchart TB
+  consumers["consumers / callers"]:::ext
+  subgraph OSGI["osgi/ — pure, describes (ports declared in bundle manifests)"]
+    o_prov["NORTH face = Provide: domain models offer their capabilities"]:::osgi
+    o_req["SOUTH face = Require: south-ports (SectionReader, write-a-node, the extender need)"]:::osgi
+    o_prov --- o_req
+  end
+  subgraph HOST["host/ — adapters, actualise"]
+    h_north["north-adapters (driving): bootstrap entry, scenario engine"]:::host
+    h_south["south-adapters (driven): pulumi, incus, systemd, bbox"]:::host
+  end
+  engine["Pulumi engine / infra"]:::ext
+  consumers --> h_north
+  h_north --> o_prov
+  o_req -->|wired by the resolver| h_south
+  h_south --> engine
+
+  classDef osgi fill:#eef,stroke:#88a,stroke-width:1px;
+  classDef host fill:#fde,stroke:#a58,stroke-width:1px;
+  classDef ext fill:#eee,stroke:#999,stroke-width:1px;
+....
+
+Reads top-to-bottom: callers / the operator drive from the north (through `north-adapters` into the
+pure core's offered capabilities), the core's required south-ports are wired by the resolver to
+`south-adapters`, which actualise down onto Pulumi at the bottom. "Offer up, depend down."
+
+== 4. Module roster — where every module lands
+
+Coarse-grained on purpose; finer cuts are per-slice cartography (out of scope). Two top-level spaces,
+every module in one of them. (`bom` is the lone exception: a version catalogue, not code — it stays a
+top-level sibling, in neither space.)
+
+=== `osgi/` — pure core, declares ports in manifests
+
+[cols="1,3",options="header"]
+|===
+| Module | Holds (source today)
+
+| `doctor-core` | the diagnostic record model + clinical vocabulary + the specialist seams (pure part of `controlplane/bdd`)
+| `ledger-read` | reconstructs / folds the medical record from history (pure part of `bdd`)
+| `config` | `Rke2labConfig`, `InfraDomain`, the Metatype-shaped schema (`controlplane/config`)
+| `policy` | `ControlplanePolicy`, `GrantPolicy`, link/debug/provisioning policies — its own module (transverse; `controlplane/policy`)
+| `specialist-plugins` | one Unit per specialist (extractable, no back-edge — proven Phase 1)
+| `manifests` | the manifests universe + its soldered resolver-adapter (already pure, existing module)
+| `unitrepo-core` / `unitrepo-handler-api` | the resolution oracle itself (pure, existing modules)
+|===
+
+=== `host/` — adapters, actualise over Pulumi
+
+[cols="1,3",options="header"]
+|===
+| Module | Holds (source today)
+
+| `north-adapters` | the driving side: the bootstrap entry point, the JGiven scenario engine that runs in prod to emit the runbook (driving part of `bdd`)
+| `south-adapters` | the driven side: actualisation over Pulumi — `IncusResourceBootstrap` + pipeline + resources + readiness + systemd + bbox (`controlplane/incus,pipeline,resources,readiness,systemd,bbox`), `ledger-write` (per-node serialization, imports `com.pulumi`), `ConfigLoader` (adapts `SectionReader`), and the existing `pulumi-automation-ext` / `sdks/incus`
+|===
+
+NOTE: the `bdd` package (68 classes) is not a module — it is the interleaving the cartography must
+dissolve: its record model + vocabulary + seams → `doctor-core`; its history fold → `ledger-read`; its
+per-node write → `ledger-write` (south-adapter); the scenario engine → `north-adapters`. Splitting it
+is the bulk of a later slice (cartography-first, on fresh bytecode).
+
+=== Technical leaves — placement to confirm per slice
+
+`netplan`, `systemd-contract`, `cdk8s-systemd`, `osgi-bench` are technical/leaf modules. They are pure
+(no Pulumi) so they belong in OSGi space by the purity axis, but they carry no Step-2 role; their
+physical placement under `osgi/` vs staying top-level is a per-slice detail, not a target decision.
+
+== 5. Scope and method
+
+* *In scope (this doc):* the two spaces, the two axes, the 2×2 grid, the module roster above.
+* *Out of scope:* which exact class lands in which module (per-slice cartography on fresh bytecode —
+  the `/tmp` jdeps data is ephemeral and was proven stale; re-derive load-bearing coupling claims), the
+  adapter sub-grouping inside `south-adapters` (by external system, if one grows too big), and the
+  composite-specialist hierarchy (captured, not built).
+* *Method:* migrate by MOVE (`git mv`), never duplicate — production code never coexists in two copies.
+  Each slice validated by the resolver oracle (a boundary expressed as Provide/Require that fails to
+  resolve is a wrong boundary). Build-verify with the FULL `clean package -Posgi
+  -Dmaven.build.cache.skipCache=true` (partial `-pl` runs gave false failures from stale `target/`).
+
+== 6. Related documentation
+
+* `docs/architecture/integration-atlas.adoc` — the "two spaces" seam this layout makes structural;
+  graduates here at merge.
+* `wip/specs/2026-06-17-osgi-bench-slice2-design.adoc` — the bench that proved the ports/adapters =
+  OSGi-resolution thesis on the real engine.
+* `wip/specs/2026-06-17-config-bundle-host-contract-design.adoc` — the four-plane / static→dynamic
+  roadmap this decomposition sits on.
