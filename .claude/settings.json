@@ -1,4 +1,9 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(flox activate *)"
+    ]
+  },
   "model": "us.anthropic.claude-opus-4-8[1m]",
   "hooks": {
     "SessionStart": [
@@ -39,11 +44,6 @@
           }
         ]
       }
-    ]
-  },
-  "permissions": {
-    "allow": [
-      "Bash(flox activate *)"
     ]
   }
 }
