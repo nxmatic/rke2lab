@@ -95,6 +95,25 @@ view at merge.
 shared exec/ Felix bootstrap, off critical path); R7 deferred = ConfigAdmin DELIVERY + DS ACTIVATION
 config (stages 3-4). Stage-6 living registry = v2 horizon (substrate built by R1-R5, no live re-resolution).
 
+## ★ The phase chain to main (the road, so we don't reconstruct it)
+
+`design/target-module-layout` is the LONG-LIVED integration branch. Sub-phases branch off it and
+re-merge into it; we touch `main` ONLY when master can be provisioned under Felix. Traced:
+
+```
+main
+ └─ design/target-module-layout  (integration, in standby)
+      ├─ [✓] layout — 5 steps (osgi/ host/ exec/), all SHIPPED
+      ├─ [✓] osgi-runtime-migration — DESIGN (this spec), SHIPPED
+      ├─ [ ] runtime impl slices R1–R6 (spec §5) — each its own worktree off the integration branch
+      ├─ [ ] unitrepo-pulumi — the ACL/mediation seam (actualisation OSGi↔Pulumi engine)
+      └─ [ ] live proof: provision master end-to-end (-Plive)  → ONLY THEN merge to main
+```
+
+Other deferred chantiers that fold in along the way (not blockers): doctor split bdd-core/bdd-ledger
+(oracle-validated), R7 ConfigAdmin/DS config (stages 3-4), stage-6 living registry (v2 horizon).
+The terminal gate to `main` = "capable of provisioning master", nothing less.
+
 ## Workspace / close discipline
 
 - Worktree `design/osgi-runtime-migration`, branch same, base `design/target-module-layout` @3190dc59
