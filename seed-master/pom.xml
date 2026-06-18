@@ -12,6 +12,8 @@
 
   <artifactId>seed-master</artifactId>
   <name>seed-master</name>
+  <description>Main bootstrap orchestration and Pulumi control plane: the shaded entry point
+    (controlplane.Main) that drives provisioning and hosts the level-0 node wiring.</description>
 
   <properties>
     <rke2lab.manifests.unpack.skip>false</rke2lab.manifests.unpack.skip>

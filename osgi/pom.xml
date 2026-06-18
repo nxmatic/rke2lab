@@ -17,5 +17,8 @@
   <modules>
     <module>bundle-parent</module>
     <module>osgi-bench</module>
+    <module>manifests</module>
+    <module>unitrepo-handler-api</module>
+    <module>unitrepo-core</module>
   </modules>
 </project>

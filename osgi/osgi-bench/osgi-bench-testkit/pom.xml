@@ -11,6 +11,8 @@
 
   <artifactId>osgi-bench-testkit</artifactId>
   <name>osgi/osgi-bench/osgi-bench-testkit</name>
+  <description>Reusable bench test fixtures: the FelixFrameworkExtension that boots a real embedded
+    Felix framework, and the @OsgiSpike composed tag. Not a bundle.</description>
 
   <!--
     Shared OSGi test fixtures, kept in src/main/java so consumers depend on them in test scope

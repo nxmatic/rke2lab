@@ -5,20 +5,17 @@
 
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
-    <artifactId>build-parent</artifactId>
+    <artifactId>bundle-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <relativePath>../build-parent/pom.xml</relativePath>
+    <relativePath>../bundle-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>unitrepo-core</artifactId>
-  <name>unitrepo-core</name>
+  <name>osgi/unitrepo-core</name>
+  <description>The unit resolution oracle: a standalone Felix resolver over UnitResource
+    capability graphs, used as a library (no OSGi framework).</description>
 
   <dependencies>
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>unitrepo-handler-api</artifactId>
-      <version>${project.version}</version>
-    </dependency>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>
@@ -29,11 +26,13 @@
     </dependency>
   </dependencies>
 
+  <!-- bnd execution + jar manifestFile inherited from osgi/bundle-parent; the bare
+       reference activates the managed bnd-process goal. -->
   <build>
     <plugins>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
       </plugin>
     </plugins>
   </build>

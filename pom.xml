@@ -27,9 +27,6 @@
     <module>sdks/incus</module>
     <module>pulumi-automation-ext</module>
     <module>pulumi-automation-ext-testkit</module>
-    <module>manifests</module>
-    <module>unitrepo-handler-api</module>
-    <module>unitrepo-core</module>
     <module>seed-master</module>
     <module>osgi</module>
     <module>host</module>

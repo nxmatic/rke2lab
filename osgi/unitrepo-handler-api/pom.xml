@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- @codebase -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
@@ -6,20 +7,16 @@
     <groupId>io.nxmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <relativePath>../../bundle-parent/pom.xml</relativePath>
+    <relativePath>../bundle-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>osgi-bench-host</artifactId>
-  <name>osgi/osgi-bench/osgi-bench-host</name>
-  <description>Bench bundle that PROVIDES the metatype and component extenders (@Capability generates
-    the Provide-Capability headers) — the host side of the extender contract.</description>
+  <artifactId>unitrepo-handler-api</artifactId>
+  <name>osgi/unitrepo-handler-api</name>
+  <description>The handler SPI bundle: the UnitHandler contract a unit binds to via its constitutive
+    osgi.extender requirement; provides the unitrepo.handler extender capability.</description>
 
   <dependencies>
-    <dependency>
-      <groupId>org.osgi</groupId>
-      <artifactId>osgi.core</artifactId>
-    </dependency>
-    <!-- bnd-consumed construction annotations: @Capability declares the Provide bnd generates -->
+    <!-- bnd-consumed construction annotation: @Capability declares the Provide bnd generates -->
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>org.osgi.annotation.bundle</artifactId>

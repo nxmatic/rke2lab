@@ -12,6 +12,8 @@
 
   <artifactId>pulumi-automation-ext-testkit</artifactId>
   <name>pulumi-automation-ext-testkit</name>
+  <description>Shared test fixtures for pulumi-automation-ext: reusable checkpoint/stack stubs,
+    kept in main scope so consumers depend on them without a test-jar.</description>
 
   <!--
     Shared test fixtures for the file-backend stack layout, kept in src/main/java so consumers

@@ -1,0 +1,3 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.unitrepo.core
+Export-Package: io.nxmatic.rke2lab.unitrepo.core
+-noimportjava: true

@@ -1,0 +1,8 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.manifests
+Export-Package: \
+    io.nxmatic.rke2lab.manifests,\
+    io.nxmatic.rke2lab.manifests.domain,\
+    io.nxmatic.rke2lab.manifests.node,\
+    io.nxmatic.rke2lab.manifests.profiles,\
+    io.nxmatic.rke2lab.manifests.units.runtime.flox
+-noimportjava: true

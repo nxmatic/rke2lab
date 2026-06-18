@@ -12,6 +12,8 @@
 
   <artifactId>systemd-contract</artifactId>
   <name>systemd-contract</name>
+  <description>Systemd unit abstractions and contracts: the typed vocabulary for declaring systemd
+    units and drop-ins, shared by the CDK8s-systemd integration and the synthesis layer.</description>
 
   <build>
     <plugins>

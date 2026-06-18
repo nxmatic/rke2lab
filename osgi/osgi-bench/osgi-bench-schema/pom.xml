@@ -11,6 +11,8 @@
 
   <artifactId>osgi-bench-schema</artifactId>
   <name>osgi/osgi-bench/osgi-bench-schema</name>
+  <description>Bench bundle shipping a Metatype OCD generated from @ObjectClassDefinition annotations
+    so a client can introspect its config schema by PID.</description>
 
   <dependencies>
     <dependency>

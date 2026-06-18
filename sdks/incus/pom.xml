@@ -13,6 +13,8 @@
   <groupId>io.nxmatic.rke2lab.sdks</groupId>
   <artifactId>incus</artifactId>
   <name>sdks/incus</name>
+  <description>Incus API client SDK: the generated gRPC Incus provider client — host-side by nature
+    (all gRPC), never an OSGi bundle.</description>
 
   <dependencies>
     <dependency>

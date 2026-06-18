@@ -11,6 +11,8 @@
 
   <artifactId>osgi-bench-tests</artifactId>
   <name>osgi/osgi-bench/osgi-bench-tests</name>
+  <description>Bench proof harness: P1 (extender resolve/refuse on the real Felix engine) and P2
+    (typed OCD introspection by PID). Not a bundle.</description>
 
   <dependencies>
     <dependency>

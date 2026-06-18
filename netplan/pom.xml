@@ -12,6 +12,8 @@
 
   <artifactId>netplan</artifactId>
   <name>netplan</name>
+  <description>Network configuration synthesis: typed netplan models rendered to the YAML the host
+    network layer consumes.</description>
 
   <dependencies>
     <dependency>

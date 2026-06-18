@@ -5,13 +5,15 @@
 
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
-    <artifactId>build-parent</artifactId>
+    <artifactId>bundle-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <relativePath>../build-parent/pom.xml</relativePath>
+    <relativePath>../bundle-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>manifests</artifactId>
-  <name>manifests</name>
+  <name>osgi/manifests</name>
+  <description>The manifests universe: the CDK8s-based Kubernetes manifest units, their domains,
+    and the soldered resolver-adapter — pure, declares its ports in the bundle manifest.</description>
 
   <properties>
     <!--
@@ -88,6 +90,13 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <!-- bnd-process (managed by osgi/bundle-parent) generates the OSGi MANIFEST from bnd.bnd +
+           the bytecode; the bare reference opts this library bundle in. The jar plugin below
+           picks up that manifest via the inherited manifestFile wiring. -->
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

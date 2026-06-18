@@ -16,6 +16,8 @@
   <version>1.0.0</version>
   <packaging>pom</packaging>
   <name>bom</name>
+  <description>Standalone third-party version catalogue: pins the external dependency versions the
+    modules build against. Own lifecycle, no parent (breaks the parent-imports-BOM cycle).</description>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

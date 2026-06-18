@@ -12,6 +12,8 @@
 
   <artifactId>pulumi-automation-ext</artifactId>
   <name>pulumi-automation-ext</name>
+  <description>Pulumi Automation API extensions: StackCheckpoint/StackSnapshot and the file-backend
+    state helpers that reshape checkpoints into the StackDeployment envelope.</description>
 
   <dependencies>
     <dependency>
