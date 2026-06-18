@@ -13,13 +13,13 @@
   <artifactId>manifests-cli</artifactId>
   <name>exec/manifests-cli</name>
   <description>Manifests CLI: the executable north-adapter that drives the manifests core
-    (osgi/manifests/manifests) through its ServiceLoader port for ad-hoc synthesis
+    (osgi/manifests/manifests-core) through its ServiceLoader port for ad-hoc synthesis
     (`java -jar … synthesize`). A plain main() — no OSGi framework — shaded into the -exec jar.</description>
 
   <dependencies>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>manifests</artifactId>
+      <artifactId>manifests-core</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

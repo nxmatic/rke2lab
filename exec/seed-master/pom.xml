@@ -58,7 +58,7 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>manifests</artifactId>
+      <artifactId>manifests-core</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -261,7 +261,7 @@
               <artifactItems>
                 <artifactItem>
                   <groupId>io.nxmatic.rke2lab</groupId>
-                  <artifactId>manifests</artifactId>
+                  <artifactId>manifests-core</artifactId>
                   <version>${rke2lab.version}</version>
                   <classifier>manifests-d</classifier>
                   <type>zip</type>

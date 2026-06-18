@@ -16,6 +16,6 @@
     the model/synthesis re-découpe is already known to be coming.</description>
 
   <modules>
-    <module>manifests</module>
+    <module>manifests-core</module>
   </modules>
 </project>

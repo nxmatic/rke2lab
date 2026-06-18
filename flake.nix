@@ -34,7 +34,7 @@
     # build through this top-level entry point (and the aarch64-linux NRI plugin
     # cross-builds via the configured linux-builder). It shares nixpkgs/flake-utils
     # so there is a single resolved version set across the two flakes.
-    flox-runtime.url = "path:./osgi/manifests/manifests/src/main/resources/runtime/flox";
+    flox-runtime.url = "path:./osgi/manifests/manifests-core/src/main/resources/runtime/flox";
     flox-runtime.inputs.nixpkgs.follows = "nixpkgs";
     flox-runtime.inputs.flake-utils.follows = "flake-utils";
     flox-runtime.inputs.flake-commons.follows = "flake-commons";
