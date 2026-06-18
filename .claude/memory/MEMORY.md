@@ -33,6 +33,7 @@ Project-specific memory for rke2lab. Cross-cutting facts (profile, conventions, 
 
 ## Infra / manifests / config
 
+- [OSGi-idiom debt: logging + shadowed services](osgi-logging-and-cli-debt.md) — **debt audit 2026-06-18:** standard OSGi services we shadow with non-OSGi mechanisms in the refactored bundles. (1) Log → `logback-classic`+`logback.xml` dragged into netplan/manifests (both core+CLI mixes → extract CLI+logback to `exec/`, core keeps slf4j-api only); (2) registry/DS → `ServiceLoader`+META-INF/services everywhere (NodeEnvContributor, 3 manifests svcs, NetplanSynthesisService) — gated on the runtime/framework-move; (3) cm/Metatype → some Properties/getResourceAsStream (triage needed). **★ real BUG:** netplan services file misnamed `rk2lab`→`rke2lab` → its ServiceLoader silently never registers. Fix in dedicated workspaces, NOT the exec-aggregator session in flight. See [[exec-aggregator-state]] [[docrepo-dag-state]] [[check-osgi-standard-before-modeling]].
 - [Coherence-rules coordinator](coherence-rules-coordinator.md) — walker-retirement Task 4: cross-domain rule = option B (explicit pure check that REPORTS, throws), NOT option A (silent Felix prune). resolve()=single coherence-rule coordinator; rule=pure fn of AssembledRegistry; CoherenceRule interface DEFERRED to rule-of-three.
 
 - [Config restructuring state](config-restructuring-state.md) — Inc1 (Rke2labConfig DTO + InfraDomain enum) MERGED; Inc2 (doctor remediation) waits on doctor work.
