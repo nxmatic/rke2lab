@@ -24,9 +24,6 @@
     <module>netplan</module>
     <module>systemd-contract</module>
     <module>cdk8s-systemd</module>
-    <module>sdks/incus</module>
-    <module>pulumi-automation-ext</module>
-    <module>pulumi-automation-ext-testkit</module>
     <module>seed-master</module>
     <module>osgi</module>
     <module>host</module>

@@ -16,5 +16,8 @@
 
   <modules>
     <module>host-parent</module>
+    <module>pulumi-generated-sdks/incus</module>
+    <module>pulumi-automation-ext</module>
+    <module>pulumi-automation-ext-testkit</module>
   </modules>
 </project>

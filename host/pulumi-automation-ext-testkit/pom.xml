@@ -5,13 +5,13 @@
 
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
-    <artifactId>build-parent</artifactId>
+    <artifactId>host-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <relativePath>../build-parent/pom.xml</relativePath>
+    <relativePath>../host-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>pulumi-automation-ext-testkit</artifactId>
-  <name>pulumi-automation-ext-testkit</name>
+  <name>host/pulumi-automation-ext-testkit</name>
   <description>Shared test fixtures for pulumi-automation-ext: reusable checkpoint/stack stubs,
     kept in main scope so consumers depend on them without a test-jar.</description>
 

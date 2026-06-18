@@ -94,21 +94,6 @@
         <artifactId>cdk8s-systemd</artifactId>
         <version>${project.version}</version>
       </dependency>
-      <dependency>
-        <groupId>io.nxmatic.rke2lab.sdks</groupId>
-        <artifactId>incus</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>pulumi-automation-ext</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>pulumi-automation-ext-testkit</artifactId>
-        <version>${project.version}</version>
-      </dependency>
     </dependencies>
   </dependencyManagement>
 

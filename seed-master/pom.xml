@@ -47,6 +47,7 @@
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>pulumi-automation-ext-testkit</artifactId>
+      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>

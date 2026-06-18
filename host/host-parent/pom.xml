@@ -12,10 +12,37 @@
   <artifactId>host-parent</artifactId>
   <packaging>pom</packaging>
   <name>host/host-parent</name>
-  <description>Parent of the host-space modules — the counterpart of osgi/bundle-parent. It
-    will carry what is specific to actualisation-over-Pulumi adapters and NOT shared with the
-    OSGi space (shade for the exec jar, exec-maven-plugin, com.pulumi/incus dependency
-    management). Empty for now ON PURPOSE: no host module has migrated here yet (the roster
-    lands in later slices). It exists so the next slice that moves a host module inherits a
-    ready parent and is forced to refine it, rather than having to remember to create it.</description>
+  <description>Parent of the host-space modules — the counterpart of osgi/bundle-parent. Carries the
+    dependency management for the host-only inter-module artifacts (the Pulumi-generated incus SDK and
+    the pulumi-automation-ext pair): they are consumed only within the host space, so their versions
+    live here rather than polluting the global build-parent. Plugin versions (shade, exec) stay in
+    build-parent: they are NOT host-specific — netplan and osgi/manifests shade exec jars too, so the
+    pluginManagement is genuinely global; only the per-module shade/exec &lt;configuration&gt; is local
+    to each consumer.</description>
+
+  <!--
+    Host-only inter-module versions, at ${project.version}. seed-master lives at the ROOT (its parent
+    is build-parent, not this) because it is the composition runtime spanning both spaces, so it cannot
+    inherit this management — it pins these three artifacts explicitly. This block exists for the host
+    modules themselves (e.g. pulumi-automation-ext-testkit -> pulumi-automation-ext).
+  -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab.sdks</groupId>
+        <artifactId>incus</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>pulumi-automation-ext</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>pulumi-automation-ext-testkit</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 </project>

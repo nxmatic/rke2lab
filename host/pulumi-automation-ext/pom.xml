@@ -5,13 +5,13 @@
 
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
-    <artifactId>build-parent</artifactId>
+    <artifactId>host-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <relativePath>../build-parent/pom.xml</relativePath>
+    <relativePath>../host-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>pulumi-automation-ext</artifactId>
-  <name>pulumi-automation-ext</name>
+  <name>host/pulumi-automation-ext</name>
   <description>Pulumi Automation API extensions: StackCheckpoint/StackSnapshot and the file-backend
     state helpers that reshape checkpoints into the StackDeployment envelope.</description>
 
