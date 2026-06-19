@@ -9,8 +9,8 @@
     <relativePath>../build-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>osgi-testkit</artifactId>
-  <name>osgi/osgi-testkit</name>
+  <artifactId>testkit</artifactId>
+  <name>osgi/testkit</name>
   <description>Reusable OSGi test fixtures shared across the osgi/ space: the FelixFrameworkExtension
     that boots a real embedded Felix framework, and the @OsgiSpike composed tag. Not a bundle.</description>
 

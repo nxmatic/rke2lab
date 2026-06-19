@@ -92,7 +92,7 @@
          stays dual-path (ServiceLoader) until R5. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>osgi-testkit</artifactId>
+      <artifactId>testkit</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

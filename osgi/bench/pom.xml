@@ -9,19 +9,19 @@
     <relativePath>../../build-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>osgi-bench</artifactId>
+  <artifactId>bench</artifactId>
   <packaging>pom</packaging>
-  <name>osgi/osgi-bench</name>
+  <name>osgi/bench</name>
   <description>Disposable OSGi bench: real bnd bundles + a real embedded Felix engine proving the
     annotations-as-source-of-truth and extender-resolution theses. Scaffolding, not production.</description>
 
   <modules>
-    <module>osgi-bench-config</module>
-    <module>osgi-bench-host</module>
-    <module>osgi-bench-schema</module>
-    <module>osgi-bench-scr-api</module>
-    <module>osgi-bench-scr-provider</module>
-    <module>osgi-bench-scr-consumer</module>
-    <module>osgi-bench-tests</module>
+    <module>bench-config</module>
+    <module>bench-host</module>
+    <module>bench-schema</module>
+    <module>bench-scr-api</module>
+    <module>bench-scr-provider</module>
+    <module>bench-scr-consumer</module>
+    <module>bench-tests</module>
   </modules>
 </project>

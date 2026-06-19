@@ -9,20 +9,20 @@
     <relativePath>../../bundle-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>osgi-bench-host</artifactId>
-  <name>osgi/osgi-bench/osgi-bench-host</name>
-  <description>Bench bundle that PROVIDES the metatype and component extenders (@Capability generates
-    the Provide-Capability headers) — the host side of the extender contract.</description>
+  <artifactId>bench-schema</artifactId>
+  <name>osgi/bench/bench-schema</name>
+  <description>Bench bundle shipping a Metatype OCD generated from @ObjectClassDefinition annotations
+    so a client can introspect its config schema by PID.</description>
 
   <dependencies>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>
     </dependency>
-    <!-- bnd-consumed construction annotations: @Capability declares the Provide bnd generates -->
+    <!-- bnd-consumed construction annotations: @ObjectClassDefinition generates the Metatype XML -->
     <dependency>
       <groupId>org.osgi</groupId>
-      <artifactId>org.osgi.annotation.bundle</artifactId>
+      <artifactId>org.osgi.service.metatype.annotations</artifactId>
       <scope>provided</scope>
     </dependency>
   </dependencies>

@@ -9,51 +9,51 @@
     <relativePath>../../../build-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>osgi-bench-tests</artifactId>
-  <name>osgi/osgi-bench/osgi-bench-tests</name>
+  <artifactId>bench-tests</artifactId>
+  <name>osgi/bench/bench-tests</name>
   <description>Bench proof harness: P1 (extender resolve/refuse on the real Felix engine) and P2
     (typed OCD introspection by PID). Not a bundle.</description>
 
   <dependencies>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>osgi-testkit</artifactId>
+      <artifactId>testkit</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>osgi-bench-config</artifactId>
+      <artifactId>bench-config</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>osgi-bench-host</artifactId>
+      <artifactId>bench-host</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>osgi-bench-schema</artifactId>
+      <artifactId>bench-schema</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>osgi-bench-scr-api</artifactId>
+      <artifactId>bench-scr-api</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>osgi-bench-scr-provider</artifactId>
+      <artifactId>bench-scr-provider</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>osgi-bench-scr-consumer</artifactId>
+      <artifactId>bench-scr-consumer</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

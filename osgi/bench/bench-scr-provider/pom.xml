@@ -9,26 +9,29 @@
     <relativePath>../../bundle-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>osgi-bench-schema</artifactId>
-  <name>osgi/osgi-bench/osgi-bench-schema</name>
-  <description>Bench bundle shipping a Metatype OCD generated from @ObjectClassDefinition annotations
-    so a client can introspect its config schema by PID.</description>
+  <artifactId>bench-scr-provider</artifactId>
+  <name>osgi/bench/bench-scr-provider</name>
+  <description>A @Component that publishes the Greeter service — the PUBLISH half of the SCR proof,
+    alone in its bundle so the anti-cheat can run without it.</description>
 
   <dependencies>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>
     </dependency>
-    <!-- bnd-consumed construction annotations: @ObjectClassDefinition generates the Metatype XML -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bench-scr-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- bnd-consumed: @Component generates OSGI-INF/*.xml + the Service-Component header -->
     <dependency>
       <groupId>org.osgi</groupId>
-      <artifactId>org.osgi.service.metatype.annotations</artifactId>
+      <artifactId>org.osgi.service.component.annotations</artifactId>
       <scope>provided</scope>
     </dependency>
   </dependencies>
 
-  <!-- bnd execution + jar manifestFile inherited from osgi/bundle-parent; the bare
-       reference activates the managed bnd-process goal. -->
   <build>
     <plugins>
       <plugin>

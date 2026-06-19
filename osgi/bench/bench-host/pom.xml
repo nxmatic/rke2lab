@@ -9,19 +9,26 @@
     <relativePath>../../bundle-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>osgi-bench-scr-api</artifactId>
-  <name>osgi/osgi-bench/osgi-bench-scr-api</name>
-  <description>The shared service API for the SCR proof (Greeter, GreetingClient). Its own bundle so
-    it can be exported via system.packages.extra and the consumer can resolve with the provider
-    absent — the precondition for the activation anti-cheat.</description>
+  <artifactId>bench-host</artifactId>
+  <name>osgi/bench/bench-host</name>
+  <description>Bench bundle that PROVIDES the metatype and component extenders (@Capability generates
+    the Provide-Capability headers) — the host side of the extender contract.</description>
 
   <dependencies>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>
     </dependency>
+    <!-- bnd-consumed construction annotations: @Capability declares the Provide bnd generates -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.annotation.bundle</artifactId>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
 
+  <!-- bnd execution + jar manifestFile inherited from osgi/bundle-parent; the bare
+       reference activates the managed bnd-process goal. -->
   <build>
     <plugins>
       <plugin>
