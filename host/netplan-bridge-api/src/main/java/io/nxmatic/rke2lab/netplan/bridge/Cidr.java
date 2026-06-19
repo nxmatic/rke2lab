@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.netplan;
+package io.nxmatic.rke2lab.netplan.bridge;
 
 import inet.ipaddr.IPAddressString;
 import inet.ipaddr.ipv4.IPv4Address;

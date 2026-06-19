@@ -3,10 +3,10 @@ package io.nxmatic.rke2lab.manifests.units.runtime.flox;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.Cdk8sApiObjectResolver;
-import io.nxmatic.rke2lab.manifests.ManifestAnnotations;
-import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestAnnotations;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.units.cluster.ClusterRefs;
 import io.nxmatic.rke2lab.manifests.units.cluster.ClusterRuntimeNamespaceManifestsUnit;
 import io.nxmatic.rke2lab.manifests.units.mesh.MeshRefs;
@@ -37,11 +37,6 @@ public final class FloxRuntimeManifestsUnit extends AbstractManifestsUnit {
 
   private final RuntimeDaemonsetScriptPolicyAssets runtimeDaemonsetScriptPolicyAssets =
       RuntimeDaemonsetScriptPolicyAssets.builder().build();
-
-  private final FloxRuntimeAssets floxRuntimeAssets =
-      FloxRuntimeAssets.builder()
-          .runtimeDaemonsetScriptPolicyAssets(runtimeDaemonsetScriptPolicyAssets)
-          .build();
 
   public FloxRuntimeManifestsUnit() {
     super(

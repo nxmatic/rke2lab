@@ -144,7 +144,7 @@ class MedicalRecordDumpTest {
     // It is real, parseable YAML with the documented top-level shape.
     final Map<String, Object> parsed = parseYaml(yaml);
     assertEquals(PATIENT.qualifiedName(), parsed.get("patient"));
-    final List<Map<String, Object>> visits = (List<Map<String, Object>>) parsed.get("visits");
+    final List<Map<String, Object>> visits = asListOfMaps(parsed.get("visits"));
     assertEquals(2, visits.size());
     assertEquals(1, visits.get(0).get("version"));
     assertEquals(2, visits.get(1).get("version"));
@@ -192,7 +192,7 @@ class MedicalRecordDumpTest {
     // The caller decided: a partial record is still emitted (the two readable visits).
     assertNotEquals(0, result.exitCode());
     final Map<String, Object> parsed = parseYaml(result.yaml());
-    final List<Map<String, Object>> visits = (List<Map<String, Object>>) parsed.get("visits");
+    final List<Map<String, Object>> visits = asListOfMaps(parsed.get("visits"));
     assertEquals(2, visits.size());
     assertEquals(List.of(1, 3), visits.stream().map(v -> v.get("version")).toList());
 
@@ -201,5 +201,13 @@ class MedicalRecordDumpTest {
     final String report = String.join("\n", result.failures());
     assertTrue(report.contains("2"), () -> report);
     assertTrue(report.contains(v2.file().toString()), () -> report);
+  }
+
+  /**
+   * Parsed YAML visits are a list of {@code Map<String, Object>} by the dump's documented shape.
+   */
+  @SuppressWarnings("unchecked")
+  private static List<Map<String, Object>> asListOfMaps(Object value) {
+    return (List<Map<String, Object>>) value;
   }
 }

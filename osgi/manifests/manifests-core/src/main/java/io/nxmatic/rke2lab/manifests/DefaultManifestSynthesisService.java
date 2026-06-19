@@ -5,6 +5,11 @@ import com.fasterxml.jackson.databind.MappingIterator;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdDropIn;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainPolicy;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestSynthesisRequest;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestSynthesisResult;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestSynthesisService;
 import io.nxmatic.rke2lab.manifests.domain.CicdDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.ClusterApiDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.ClusterDomainRegistrar;
@@ -66,7 +71,8 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             request.networkTopology(),
             request.componentVersions(),
             request.imageState());
-    try (var ignored = ManifestSynthesisContext.bind(context)) {
+    final var contextScope = ManifestSynthesisContext.bind(context);
+    try (contextScope) {
       return synthesizeInContext(request);
     }
   }
@@ -748,6 +754,8 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
   }
 
   static final class PipelineStageFailure extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
     final String topic;
 
     PipelineStageFailure(String topic, Throwable cause) {

@@ -3,8 +3,8 @@ package io.nxmatic.rke2lab.manifests.units.runtime.libexec;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.HostAssetDeliveryPolicy;
-import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainCatalog;
 import java.util.List;
 import software.constructs.Construct;
 

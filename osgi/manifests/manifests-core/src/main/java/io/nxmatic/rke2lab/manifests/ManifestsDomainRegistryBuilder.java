@@ -1,6 +1,7 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests;
 
+import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainPolicy;
 import java.util.ArrayList;
 import java.util.List;
 

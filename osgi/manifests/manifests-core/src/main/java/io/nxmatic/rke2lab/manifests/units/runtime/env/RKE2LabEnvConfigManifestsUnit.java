@@ -2,12 +2,12 @@
 package io.nxmatic.rke2lab.manifests.units.runtime.env;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
-import io.nxmatic.rke2lab.manifests.ManifestAnnotations;
-import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestAnnotations;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.bridge.node.NodeEnvContext;
+import io.nxmatic.rke2lab.manifests.bridge.node.NodeEnvContributor;
 import io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext;
-import io.nxmatic.rke2lab.manifests.node.NodeEnvContext;
-import io.nxmatic.rke2lab.manifests.node.NodeEnvContributor;
 import io.nxmatic.rke2lab.manifests.node.NodeEnvContributorRegistry;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.io.IOException;

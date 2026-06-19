@@ -1,9 +1,9 @@
 package io.nxmatic.rke2lab.manifests.units.clusterapi;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
-import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import io.nxmatic.rke2lab.manifests.upstream.UpstreamYamlInclusion;
 import java.util.List;

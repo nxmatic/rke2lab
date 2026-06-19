@@ -3,6 +3,10 @@ package io.nxmatic.rke2lab.manifests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.MappingIterator;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestAnnotations;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestExplodeRequest;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestExplodeResult;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestExplodeService;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

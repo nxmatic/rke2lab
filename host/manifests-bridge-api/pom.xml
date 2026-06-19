@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>host-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../host-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>manifests-bridge-api</artifactId>
+  <name>host/manifests-bridge-api</name>
+  <description>The manifests BRIDGE port — the host-owned contract the host consumes and the OSGi
+    manifests-core bundle implements. Pure POJO jar: the synthesis/explode/update SPIs, their
+    exchange records, NodeEnvContext/NodeEnvContributor, and the shared value/constant types
+    (domain policy + catalog, annotations, the profiles value records). Zero impl, zero pulumi,
+    zero osgi — that purity is what lets R4 re-export the package to the OSGi world via
+    system.packages.extra so both worlds share one copy of the contract.</description>
+</project>

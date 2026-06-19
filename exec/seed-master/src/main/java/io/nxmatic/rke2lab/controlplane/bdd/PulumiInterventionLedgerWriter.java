@@ -45,7 +45,11 @@ public final class PulumiInterventionLedgerWriter implements InterventionLedgerW
     this(backendDir, InterventionLedgerLayout.ledger());
   }
 
+  // WorkspaceStack.close() declares InterruptedException; the catch below already handles it, and
+  // there is no interruptible work after the body — so the [try] resource-suppression warning is
+  // moot.
   @Override
+  @SuppressWarnings("try")
   public void append(Intervention intervention) {
     final ProjectSettings projectSettings =
         ProjectSettings.builder(coordinate.project(), ProjectRuntimeName.JAVA)

@@ -1,5 +1,9 @@
 package io.nxmatic.rke2lab.manifests;
 
+import io.nxmatic.rke2lab.manifests.bridge.ManifestSynthesisRequest;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestSynthesisResult;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestSynthesisService;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestUpdateGate;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

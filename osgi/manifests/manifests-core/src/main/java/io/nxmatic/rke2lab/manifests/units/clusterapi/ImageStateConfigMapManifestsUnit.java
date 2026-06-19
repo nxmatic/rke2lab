@@ -1,11 +1,11 @@
 package io.nxmatic.rke2lab.manifests.units.clusterapi;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
-import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.ManifestSynthesisContext;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.nxmatic.rke2lab.manifests.profiles.BootstrapIdentity;
-import io.nxmatic.rke2lab.manifests.profiles.ImageState;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.bridge.profiles.BootstrapIdentity;
+import io.nxmatic.rke2lab.manifests.bridge.profiles.ImageState;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;

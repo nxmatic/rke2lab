@@ -29,15 +29,10 @@ import software.constructs.Construct;
  * resource by hand. The classpath YAML stays as a frozen artifact in the repo, version-pinned by
  * filename; upgrades are a drop-in replacement plus a Java string bump.
  *
- * <p>Subclass to specialize behavior — override {@link #accept} to filter documents (e.g. drop a
- * Namespace because the project ships its own), {@link #transform} to mutate documents (e.g. pin an
- * image tag), or {@link #upstreamIdentifierFor} to change how the {@code
- * internal.kpt.dev/upstream-identifier} annotation is derived.
- *
  * <p>Resources are constructed eagerly during instantiation. Use {@link #apiObjects()} to recover
  * the cdk8s constructs (e.g. to add cross-resource dependencies).
  */
-public class UpstreamYamlInclusion {
+public final class UpstreamYamlInclusion {
 
   private final List<ApiObject> apiObjects;
 
@@ -49,39 +44,25 @@ public class UpstreamYamlInclusion {
   }
 
   /** All resources emitted from the included YAML, in document order. */
-  public final List<ApiObject> apiObjects() {
+  public List<ApiObject> apiObjects() {
     return Collections.unmodifiableList(apiObjects);
   }
 
-  /**
-   * Filter hook. Default keeps every document. Override to skip resources the project ships
-   * separately (e.g. a namespace whose policy/labels diverge from upstream).
-   */
-  protected boolean accept(final Map<String, Object> document) {
+  private static boolean accept(final Map<String, Object> document) {
     return true;
   }
 
-  /**
-   * Transform hook. Default returns the document unchanged. Override to pin image tags, inject
-   * priority classes, override resource limits, etc.
-   */
-  protected Map<String, Object> transform(final Map<String, Object> document) {
+  private static Map<String, Object> transform(final Map<String, Object> document) {
     return document;
   }
 
-  /**
-   * Builds the {@code internal.kpt.dev/upstream-identifier} annotation value. Default format is
-   * {@code <apiGroup>|<kind>|<namespace>|<name>} — matches how project-authored layers stamp the
-   * annotation (see e.g. {@code TailscaleLayer}). Override only if a specific upstream wants a
-   * different shape.
-   */
-  protected String upstreamIdentifierFor(
+  private static String upstreamIdentifierFor(
       final String apiGroup, final String kind, final String namespace, final String name) {
     return apiGroup + "|" + kind + "|" + (namespace == null ? "" : namespace) + "|" + name;
   }
 
   @SuppressWarnings("unchecked")
-  private List<ApiObject> build(
+  private static List<ApiObject> build(
       final Construct scope,
       final String classpathResource,
       final PackageMetadataProfile packageProfile) {

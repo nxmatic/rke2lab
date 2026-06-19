@@ -1,7 +1,7 @@
-package io.nxmatic.rke2lab.manifests.node;
+package io.nxmatic.rke2lab.manifests.bridge.node;
 
-import io.nxmatic.rke2lab.manifests.profiles.BootstrapIdentity;
-import io.nxmatic.rke2lab.manifests.profiles.NetworkTopology;
+import io.nxmatic.rke2lab.manifests.bridge.profiles.BootstrapIdentity;
+import io.nxmatic.rke2lab.manifests.bridge.profiles.NetworkTopology;
 import java.nio.file.Path;
 
 /**

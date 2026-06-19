@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.manifests.node;
 
-import io.nxmatic.rke2lab.netplan.ClusterNetworkBlueprint;
+import io.nxmatic.rke2lab.manifests.bridge.node.NodeEnvContext;
+import io.nxmatic.rke2lab.netplan.bridge.ClusterNetworkBlueprint;
 import java.nio.file.Path;
 
 /**

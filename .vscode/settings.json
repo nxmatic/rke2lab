@@ -1,5 +1,6 @@
 {
-    "java.compile.nullAnalysis.mode": "automatic",
+    "_comment_nullAnalysis": "disabled on purpose: rke2lab's rule is that no input is ever nullable (non-null-by-default by discipline), but it isn't declared via @NonNullByDefault yet, so 'automatic' couldn't see the rule and only surfaced friction at third-party boundaries (Optional, Framework, JUnit callbacks) we can't fix. Machine-enforcing the rule is a backlog item (.claude/memory/java-cleanup-backlog.md + non-null-input-rule.md); flip back to 'automatic' the day @NonNullByDefault is declared.",
+    "java.compile.nullAnalysis.mode": "disabled",
     "problems.exclude": {
         "**/sdks/incus/**": true
     },
@@ -14,7 +15,7 @@
     "java.test.config": {
         "vmArgs": []
     },
-    "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx4G -Xms100m -Xlog:disable",
+    "java.jdt.ls.vmargs": "-XX:+UseParallelGC -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Dsun.zip.disableMemoryMapping=true -Xmx12G -Xms100m -Xlog:disable",
     "terminal.integrated.focusAfterRun": "editor",
     "task.defaultPresentation": {
         "reveal": "never",

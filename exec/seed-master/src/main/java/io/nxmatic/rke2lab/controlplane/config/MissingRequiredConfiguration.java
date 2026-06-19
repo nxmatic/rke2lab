@@ -10,7 +10,9 @@ import java.util.List;
  */
 public final class MissingRequiredConfiguration extends RuntimeException {
 
-  private final List<String> keys;
+  private static final long serialVersionUID = 1L;
+
+  private final transient List<String> keys;
 
   public MissingRequiredConfiguration(List<String> keys) {
     super(buildMessage(keys));

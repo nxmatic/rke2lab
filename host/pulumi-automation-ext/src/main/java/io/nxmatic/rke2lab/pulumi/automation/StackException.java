@@ -8,7 +8,9 @@ import java.nio.file.Path;
  */
 public abstract class StackException extends Exception {
 
-  private final Path path;
+  private static final long serialVersionUID = 1L;
+
+  private final transient Path path;
 
   protected StackException(Path path, String message, Throwable cause) {
     super(message, cause);

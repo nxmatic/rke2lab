@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.netplan;
+package io.nxmatic.rke2lab.netplan.bridge;
 
 import java.util.Locale;
 import java.util.regex.Pattern;

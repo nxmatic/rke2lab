@@ -2,6 +2,7 @@
 package io.nxmatic.rke2lab.manifests;
 
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainCatalog;
 
 /**
  * Context passed to systemd unit synthesis, containing references to common targets and the domain

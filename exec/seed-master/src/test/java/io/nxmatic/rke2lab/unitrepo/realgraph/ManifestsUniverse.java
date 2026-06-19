@@ -1,11 +1,11 @@
 package io.nxmatic.rke2lab.unitrepo.realgraph;
 
-import io.nxmatic.rke2lab.manifests.ManifestDomainCatalog;
-import io.nxmatic.rke2lab.manifests.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.ManifestsDomain;
 import io.nxmatic.rke2lab.manifests.ManifestsDomainRegistry;
 import io.nxmatic.rke2lab.manifests.ManifestsDomainRegistryBuilder;
 import io.nxmatic.rke2lab.manifests.ManifestsUnit;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.domain.CicdDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.ClusterApiDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.ClusterDomainRegistrar;

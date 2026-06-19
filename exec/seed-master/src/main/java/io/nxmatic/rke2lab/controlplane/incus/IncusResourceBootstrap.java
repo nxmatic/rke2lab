@@ -11,9 +11,7 @@ import com.pulumi.incus.Profile;
 import com.pulumi.incus.ProfileArgs;
 import com.pulumi.incus.Project;
 import com.pulumi.incus.ProjectArgs;
-import com.pulumi.incus.inputs.GetInstancePlainArgs;
 import com.pulumi.incus.inputs.GetNetworkPlainArgs;
-import com.pulumi.incus.inputs.GetProfilePlainArgs;
 import com.pulumi.incus.inputs.GetProjectPlainArgs;
 import com.pulumi.incus.inputs.InstanceDeviceArgs;
 import com.pulumi.incus.inputs.ProfileDeviceArgs;
@@ -26,21 +24,21 @@ import io.nxmatic.rke2lab.controlplane.incus.image.PulumiIncusImageProvider;
 import io.nxmatic.rke2lab.controlplane.pipeline.OnFailure;
 import io.nxmatic.rke2lab.controlplane.pipeline.TopicRunner;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
-import io.nxmatic.rke2lab.manifests.ManifestAnnotations;
-import io.nxmatic.rke2lab.manifests.ManifestExplodeRequest;
-import io.nxmatic.rke2lab.manifests.ManifestExplodeResult;
-import io.nxmatic.rke2lab.manifests.ManifestExplodeService;
-import io.nxmatic.rke2lab.manifests.ManifestSynthesisRequest;
-import io.nxmatic.rke2lab.manifests.ManifestSynthesisResult;
-import io.nxmatic.rke2lab.manifests.ManifestSynthesisService;
 import io.nxmatic.rke2lab.manifests.ManifestYaml;
-import io.nxmatic.rke2lab.manifests.node.NodeEnvContext;
-import io.nxmatic.rke2lab.manifests.node.NodeEnvContributor;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestAnnotations;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestExplodeRequest;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestExplodeResult;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestExplodeService;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestSynthesisRequest;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestSynthesisResult;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestSynthesisService;
+import io.nxmatic.rke2lab.manifests.bridge.node.NodeEnvContext;
+import io.nxmatic.rke2lab.manifests.bridge.node.NodeEnvContributor;
+import io.nxmatic.rke2lab.manifests.bridge.profiles.ComponentVersions;
+import io.nxmatic.rke2lab.manifests.bridge.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.node.NodeEnvContributorRegistry;
-import io.nxmatic.rke2lab.manifests.profiles.ComponentVersions;
-import io.nxmatic.rke2lab.manifests.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.units.runtime.flox.FloxRuntimeAssets;
-import io.nxmatic.rke2lab.netplan.ClusterNetworkBlueprint;
+import io.nxmatic.rke2lab.netplan.bridge.ClusterNetworkBlueprint;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
@@ -2873,50 +2871,6 @@ public final class IncusResourceBootstrap {
           .importId();
     }
 
-    private String existingInstanceId(
-        IncusProviderContext context, String instanceName, String incusProject) {
-      final long startedAt = System.nanoTime();
-      logInfo("incus lookup getInstance: start name=" + instanceName);
-      try {
-        final var instance =
-            IncusFunctions.getInstancePlain(
-                    GetInstancePlainArgs.builder().name(instanceName).project(incusProject).build(),
-                    context.invokeOptions())
-                .orTimeout(invokeTimeoutSeconds(), TimeUnit.SECONDS)
-                .join();
-        if (instance == null) {
-          logInfo(
-              "incus lookup getInstance: complete after "
-                  + elapsedSince(startedAt)
-                  + " (result=not-found)");
-          return "";
-        }
-
-        final String providerId = normalizeImportId(instance.id());
-        if (!providerId.isBlank()) {
-          logInfo(
-              "incus lookup getInstance: complete after "
-                  + elapsedSince(startedAt)
-                  + " (result=id)");
-          return providerId;
-        }
-
-        logInfo(
-            "incus lookup getInstance: complete after "
-                + elapsedSince(startedAt)
-                + " (result=name)");
-        return normalizeImportId(instance.name());
-      } catch (Exception ex) {
-        logInfo(
-            "incus lookup getInstance: failed after "
-                + elapsedSince(startedAt)
-                + " ("
-                + summarizeLookupFailure(ex)
-                + ")");
-        return "";
-      }
-    }
-
     private boolean isUnmanagedNetwork(
         IncusProviderContext context, String networkName, String incusProject) {
       final LookupResult projectScoped =
@@ -2950,12 +2904,6 @@ public final class IncusResourceBootstrap {
                 + ")");
       }
       return false;
-    }
-
-    private String existingProfileId(
-        IncusProviderContext context, String profileName, String incusProject) {
-      return resolveProfileImportId(
-          context, GetProfilePlainArgs.builder().name(profileName).project(incusProject).build());
     }
 
     private LookupResult resolveNetworkImportId(
@@ -3017,47 +2965,6 @@ public final class IncusResourceBootstrap {
       }
       final String lower = summary.toLowerCase(java.util.Locale.ROOT);
       return lower.contains("not found");
-    }
-
-    private String resolveProfileImportId(IncusProviderContext context, GetProfilePlainArgs args) {
-      final long startedAt = System.nanoTime();
-      logInfo("incus lookup getProfile: start name=" + args.name());
-      try {
-        final var profile =
-            IncusFunctions.getProfilePlain(args, context.invokeOptions())
-                .orTimeout(invokeTimeoutSeconds(), TimeUnit.SECONDS)
-                .join();
-        if (profile == null) {
-          logInfo(
-              "incus lookup getProfile: complete after "
-                  + elapsedSince(startedAt)
-                  + " (result=not-found)");
-          return "";
-        }
-
-        final String providerId = normalizeImportId(profile.id());
-        if (!providerId.isBlank()) {
-          logInfo(
-              "incus lookup getProfile: complete after "
-                  + elapsedSince(startedAt)
-                  + " (result=id)");
-          return providerId;
-        }
-
-        logInfo(
-            "incus lookup getProfile: complete after "
-                + elapsedSince(startedAt)
-                + " (result=name)");
-        return normalizeImportId(profile.name());
-      } catch (Exception ex) {
-        logInfo(
-            "incus lookup getProfile: failed after "
-                + elapsedSince(startedAt)
-                + " ("
-                + summarizeLookupFailure(ex)
-                + ")");
-        return "";
-      }
     }
 
     private String summarizeLookupFailure(Exception ex) {
@@ -3517,81 +3424,6 @@ public final class IncusResourceBootstrap {
       }
 
       return ProvisioningMetadata.Targets.of(staticTargets, dynamicTargets);
-    }
-
-    /**
-     * Legacy single-checksum method for backward compatibility during migration. Computes aggregate
-     * checksum over all targets.
-     */
-    @Deprecated
-    private static String checksum(BootstrapPaths paths) {
-      final List<Path> roots =
-          List.of(
-              paths.scriptsRoot(),
-              paths.systemdRoot(),
-              paths.manifestsRoot(),
-              paths.runtimeRke2ConfigRoot(),
-              paths.runtimeCloudConfigRoot(),
-              paths.runtimeEnvConfigRoot(),
-              paths.cloudSeedRoot(),
-              paths.daemonsetRoot());
-
-      try {
-        final MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        for (Path root : roots) {
-          updateDigestForPath(digest, root);
-        }
-        return HexFormat.of().formatHex(digest.digest());
-      } catch (NoSuchAlgorithmException ex) {
-        throw new IllegalStateException("SHA-256 is not available", ex);
-      }
-    }
-
-    private static String computeChecksum(List<Path> roots) {
-      try {
-        final MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        for (Path root : roots) {
-          updateDigestForPath(digest, root);
-        }
-        return HexFormat.of().formatHex(digest.digest());
-      } catch (NoSuchAlgorithmException ex) {
-        throw new IllegalStateException("SHA-256 is not available", ex);
-      }
-    }
-
-    private static void updateDigestForPath(MessageDigest digest, Path root) {
-      digest.update((byte) '\n');
-      digest.update(root.toString().getBytes(StandardCharsets.UTF_8));
-
-      if (!Files.exists(root)) {
-        digest.update("<missing>".getBytes(StandardCharsets.UTF_8));
-        return;
-      }
-
-      if (Files.isRegularFile(root)) {
-        digestFile(digest, root, root.getFileName());
-        return;
-      }
-
-      try (Stream<Path> walk = Files.walk(root)) {
-        walk.filter(Files::isRegularFile)
-            .sorted()
-            .forEach(file -> digestFile(digest, file, root.relativize(file)));
-      } catch (IOException ex) {
-        throw new IllegalStateException(
-            "Failed to fingerprint provisioning resources at: " + root, ex);
-      }
-    }
-
-    private static void digestFile(MessageDigest digest, Path file, Path relativePath) {
-      try {
-        digest.update((byte) '\n');
-        digest.update(relativePath.toString().getBytes(StandardCharsets.UTF_8));
-        digest.update((byte) 0);
-        digest.update(Files.readAllBytes(file));
-      } catch (IOException ex) {
-        throw new IllegalStateException("Failed to read provisioning resource: " + file, ex);
-      }
     }
   }
 

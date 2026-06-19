@@ -1,10 +1,10 @@
-package io.nxmatic.rke2lab.manifests;
+package io.nxmatic.rke2lab.manifests.bridge;
 
-import io.nxmatic.rke2lab.manifests.profiles.BootstrapIdentity;
-import io.nxmatic.rke2lab.manifests.profiles.ComponentVersions;
-import io.nxmatic.rke2lab.manifests.profiles.FloxDebugPolicy;
-import io.nxmatic.rke2lab.manifests.profiles.ImageState;
-import io.nxmatic.rke2lab.manifests.profiles.NetworkTopology;
+import io.nxmatic.rke2lab.manifests.bridge.profiles.BootstrapIdentity;
+import io.nxmatic.rke2lab.manifests.bridge.profiles.ComponentVersions;
+import io.nxmatic.rke2lab.manifests.bridge.profiles.FloxDebugPolicy;
+import io.nxmatic.rke2lab.manifests.bridge.profiles.ImageState;
+import io.nxmatic.rke2lab.manifests.bridge.profiles.NetworkTopology;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;

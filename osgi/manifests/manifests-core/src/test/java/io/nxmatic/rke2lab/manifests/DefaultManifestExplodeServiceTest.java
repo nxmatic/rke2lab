@@ -2,6 +2,9 @@ package io.nxmatic.rke2lab.manifests;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import io.nxmatic.rke2lab.manifests.bridge.ManifestAnnotations;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestExplodeRequest;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestExplodeResult;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;

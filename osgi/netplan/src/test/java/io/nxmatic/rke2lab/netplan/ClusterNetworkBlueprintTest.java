@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.netplan;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import io.nxmatic.rke2lab.netplan.bridge.ClusterNetworkBlueprint;
 import org.junit.jupiter.api.Test;
 
 class ClusterNetworkBlueprintTest {

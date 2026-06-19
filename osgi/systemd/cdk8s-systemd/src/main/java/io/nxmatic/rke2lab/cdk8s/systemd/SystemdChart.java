@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import software.constructs.Construct;
+import software.constructs.ConstructOrder;
 
 /**
  * A Chart for systemd units.
@@ -34,8 +35,6 @@ import software.constructs.Construct;
  */
 public class SystemdChart extends Construct {
 
-  private final List<SystemdUnit> units = new ArrayList<>();
-  private final List<SystemdDropIn> dropIns = new ArrayList<>();
   private final Map<String, List<String>> targetWantsRegistry = new LinkedHashMap<>();
 
   public SystemdChart(Construct scope, String id) {
@@ -43,21 +42,23 @@ public class SystemdChart extends Construct {
   }
 
   /**
-   * Called by child {@link SystemdUnit} constructs when they're created.
-   *
-   * <p>Package-private - only units in this package can register themselves.
+   * All {@link SystemdUnit} constructs anywhere under this chart, in construct-tree order.
+   * Discovered from the construct tree at call time rather than via constructor self-registration —
+   * so a unit is never observed before its (subclass) constructor has finished.
    */
-  void registerUnit(SystemdUnit unit) {
-    units.add(unit);
+  private List<SystemdUnit> units() {
+    return getNode().findAll(ConstructOrder.PREORDER).stream()
+        .filter(SystemdUnit.class::isInstance)
+        .map(SystemdUnit.class::cast)
+        .toList();
   }
 
-  /**
-   * Called by child {@link SystemdDropIn} constructs when they're created.
-   *
-   * <p>Package-private - only drop-ins in this package can register themselves.
-   */
-  void registerDropIn(SystemdDropIn dropIn) {
-    dropIns.add(dropIn);
+  /** All {@link SystemdDropIn} constructs anywhere under this chart, in construct-tree order. */
+  private List<SystemdDropIn> dropIns() {
+    return getNode().findAll(ConstructOrder.PREORDER).stream()
+        .filter(SystemdDropIn.class::isInstance)
+        .map(SystemdDropIn.class::cast)
+        .toList();
   }
 
   /**
@@ -72,7 +73,7 @@ public class SystemdChart extends Construct {
     Files.createDirectories(outdir);
 
     // Write unit files
-    for (SystemdUnit unit : units) {
+    for (SystemdUnit unit : units()) {
       final Path unitFile = outdir.resolve(unit.getUnitFileName());
       try (Writer writer = Files.newBufferedWriter(unitFile)) {
         unit.writeUnitFile(writer);
@@ -80,7 +81,7 @@ public class SystemdChart extends Construct {
     }
 
     // Write drop-in files
-    for (SystemdDropIn dropIn : dropIns) {
+    for (SystemdDropIn dropIn : dropIns()) {
       final Path dropInDir = outdir.resolve(dropIn.getDropInDirectory());
       Files.createDirectories(dropInDir);
       final Path dropInFile = dropInDir.resolve(dropIn.getDropInFileName());
@@ -96,7 +97,7 @@ public class SystemdChart extends Construct {
    * <p>Useful for testing or inspection.
    */
   public List<SystemdUnit> getUnits() {
-    return List.copyOf(units);
+    return units();
   }
 
   /**
@@ -108,7 +109,7 @@ public class SystemdChart extends Construct {
    * @return the unit, or null if not found
    */
   public SystemdUnit findUnit(String id) {
-    for (SystemdUnit unit : units) {
+    for (SystemdUnit unit : units()) {
       if (unit.getUnitId().equals(id)) {
         return unit;
       }
@@ -152,7 +153,7 @@ public class SystemdChart extends Construct {
 
       // Find target by unit filename
       SystemdUnit targetUnit = null;
-      for (SystemdUnit unit : units) {
+      for (SystemdUnit unit : units()) {
         if (unit.getUnitFileName().equals(targetName)) {
           targetUnit = unit;
           break;

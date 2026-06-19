@@ -1,10 +1,10 @@
 // @codebase
-package io.nxmatic.rke2lab.manifests.profiles;
+package io.nxmatic.rke2lab.manifests.bridge.profiles;
 
 /**
  * Synth-scoped debug policy aligned by manifest domain. Carried on {@link
- * io.nxmatic.rke2lab.manifests.ManifestSynthesisRequest} and reachable from any manifest unit via
- * {@link io.nxmatic.rke2lab.manifests.AbstractManifestsUnit#floxDebugPolicy()}.
+ * io.nxmatic.rke2lab.manifests.bridge.ManifestSynthesisRequest} and reachable from any manifest
+ * unit via {@link io.nxmatic.rke2lab.manifests.AbstractManifestsUnit#floxDebugPolicy()}.
  *
  * <p>Three independent toggles:
  *

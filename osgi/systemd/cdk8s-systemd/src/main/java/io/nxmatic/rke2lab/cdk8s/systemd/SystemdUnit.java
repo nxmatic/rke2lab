@@ -25,11 +25,8 @@ public abstract class SystemdUnit extends Construct {
   protected SystemdUnit(Construct scope, String id, String unitFileName) {
     super(scope, id);
     this.unitFileName = unitFileName;
-
-    // Register with parent SystemdChart
-    if (scope instanceof SystemdChart chart) {
-      chart.registerUnit(this);
-    }
+    // No self-registration: the SystemdChart discovers its units by walking the construct tree at
+    // synthesis time, so a unit is never observed before its subclass constructor has finished.
   }
 
   // === [Unit] Section ===

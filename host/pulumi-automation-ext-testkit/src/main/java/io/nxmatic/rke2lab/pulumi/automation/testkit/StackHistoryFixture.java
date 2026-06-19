@@ -25,14 +25,12 @@ import java.util.List;
 public final class StackHistoryFixture {
 
   private final Path backendDir;
-  private final String project;
   private final String stack;
   private final Path historyDir;
   private final List<String> stems = new ArrayList<>();
 
   private StackHistoryFixture(Path backendDir, String project, String stack) {
     this.backendDir = backendDir;
-    this.project = project;
     this.stack = stack;
     this.historyDir = PulumiBackendLayout.historyDir(backendDir, project, stack);
     try {

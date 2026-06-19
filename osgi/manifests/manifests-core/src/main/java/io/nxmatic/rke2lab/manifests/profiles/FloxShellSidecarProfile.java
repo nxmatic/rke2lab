@@ -1,6 +1,7 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests.profiles;
 
+import io.nxmatic.rke2lab.manifests.bridge.profiles.FloxDebugPolicy;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

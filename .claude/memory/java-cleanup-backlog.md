@@ -1,0 +1,65 @@
+---
+name: java-cleanup-backlog
+description: "The running backlog of Java/build cleanup items for rke2lab — code-hygiene debt, deferred decisions, and follow-ups that don't have their own chantier note. MAINTAINED AS A LIVE VIEW: add an item the moment something is pushed to the backlog (a deferred fix, a 'later pass', a TODO raised while doing other work), and tick/strike it the same increment it's done. Distinct from the design chantiers (extract-bridge-api, R4, …) which have their own state notes — this is the catch-all for the smaller stuff. Started 2026-06-19."
+metadata:
+  node_type: memory
+  type: project
+---
+
+## How to use this note
+
+This is the **live backlog view** the user asked to keep. Discipline:
+
+- When you push something to the backlog — a deferred fix, a "we'll do this later",
+  a TODO raised mid-work, a decision postponed — **add a line here in the same
+  increment**, don't trust memory.
+- When you finish a backlog item, **mark it DONE (with the commit) in the same
+  increment** — keep the view honest, never let it drift from reality.
+- Big multi-session efforts get their OWN state note (e.g. [[extract-bridge-api-state]],
+  [[osgi-runtime-r4-boot-seam-state]]); link them from here rather than duplicating.
+
+Status keys: `[ ]` open · `[~]` in progress · `[x]` done (keep a few recent done
+items for context, prune old ones).
+
+## Open
+
+- [ ] **Machine-enforce the existing non-null rule (decision owed).** rke2lab already
+  HAS the rule "no input is ever nullable" ([[non-null-input-rule]]) — the code is
+  non-null-by-default by DISCIPLINE, just not yet by annotation. So this isn't "adopt a
+  policy from scratch", it's "lock in the rule we already follow". `.vscode` had
+  `java.compile.nullAnalysis.mode: automatic`, but with no `@NonNullByDefault` declared
+  the IDE couldn't see the rule and instead surfaced friction at THIRD-PARTY boundaries
+  (`Optional`, `Framework`, JUnit callbacks) — unresolvable, not our debt. **Interim:**
+  mode set to `disabled` (2026-06-19). **Decision owed:** declare `@NonNullByDefault`
+  (jspecify or `org.eclipse.jdt.annotation`) at package scope so the rule becomes
+  machine-checked, leaving only the third-party edges to annotate locally; then flip
+  `.vscode` back to `automatic`. A slice of its own.
+- [ ] **`-Werror` once warnings stay at zero.** `-Xlint:all` is on by default in
+  build-parent (2026-06-19) and the reactor currently builds with ZERO javac warnings.
+  Lock it in with `-Werror` so any new warning fails the build — deferred until we're
+  confident it stays at zero (don't want a surprise red on the next unrelated change).
+- [ ] **R4 boot seam + the 3 wrong-direction inversions.** Not cleanup — a real
+  chantier; tracked in [[osgi-runtime-r4-boot-seam-state]]. The inversions
+  (`ManifestYaml`, `NodeEnvContributorRegistry`, `FloxRuntimeAssets` — host currently
+  reaches into these impl types) ride with R4, per [[api-extraction-tri-carto-state]].
+  Listed here only as a pointer so the backlog is complete.
+- [ ] **jdtls per-worktree slug + memory-symlink generator fix.** Non-main worktrees get
+  main's memory slug in the system prompt → announced `projects/<slug>/memory` path is
+  absent, and (the sibling defect) a window reload can lose the conversation list.
+  Fix lives in the `.code-workspace` generator (main workspace). Detail in
+  [[claude-memory-cascade-state]] and [[jdtls-heap-workspace-generation]].
+
+## Done (recent)
+
+- [x] **this-escape ×4 eliminated** (commit 1bdb9a40, 2026-06-19). Not suppressed:
+  SystemdChart now discovers units/drop-ins by walking the construct tree instead of
+  constructor self-registration; `UpstreamYamlInclusion` made `final` with private
+  static hooks (its overridable surface was never used — speculative).
+- [x] **Dead code removed** (commit 467753f7, 2026-06-19). IncusResourceBootstrap dead
+  Incus lookups + legacy checksum chain; `floxRuntimeAssets` and `StackHistoryFixture.project`
+  dead fields. 176 lines.
+- [x] **`-Xlint:all` on by default + 25 warnings cleared** (commit b08643bb, 2026-06-19).
+  serial / unchecked (BDD tests) / try. 29 → 0 javac warnings.
+
+See [[extract-bridge-api-state]] (the slice in flight), [[osgi-runtime-r4-boot-seam-state]]
+(R4), [[build-verification-gotchas]].

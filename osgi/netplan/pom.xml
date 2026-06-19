@@ -18,6 +18,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>netplan-bridge-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
       <groupId>com.github.seancfoley</groupId>
       <artifactId>ipaddress</artifactId>
     </dependency>

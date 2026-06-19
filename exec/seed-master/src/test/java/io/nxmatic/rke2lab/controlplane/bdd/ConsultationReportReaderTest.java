@@ -83,7 +83,7 @@ class ConsultationReportReaderTest {
   @Test
   void unparseable_plan_symptom_returns_empty() {
     final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
-    final Map<String, Object> plan = new LinkedHashMap<>((Map<String, Object>) raw.get("plan"));
+    final Map<String, Object> plan = new LinkedHashMap<>(asMap(raw.get("plan")));
     plan.put("symptom", "not-a-real-symptom");
     raw.put("plan", plan);
     assertTrue(ConsultationReportReader.fromOutputMap(raw).isEmpty());
@@ -137,7 +137,7 @@ class ConsultationReportReaderTest {
     final ConsultationReport report =
         new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(), plan);
     final Map<String, Object> raw = new LinkedHashMap<>(report.toOutputMap());
-    final Map<String, Object> planMap = new LinkedHashMap<>((Map<String, Object>) raw.get("plan"));
+    final Map<String, Object> planMap = new LinkedHashMap<>(asMap(raw.get("plan")));
     planMap.remove("replies");
     raw.put("plan", planMap);
 
@@ -149,11 +149,10 @@ class ConsultationReportReaderTest {
   @Test
   void prescription_without_payload_yields_empty_map() {
     final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
-    final Map<String, Object> planMap = new LinkedHashMap<>((Map<String, Object>) raw.get("plan"));
+    final Map<String, Object> planMap = new LinkedHashMap<>(asMap(raw.get("plan")));
     final List<?> replies = (List<?>) planMap.get("replies");
-    final Map<String, Object> reply = new LinkedHashMap<>((Map<String, Object>) replies.get(0));
-    final Map<String, Object> presc =
-        new LinkedHashMap<>((Map<String, Object>) reply.get("prescription"));
+    final Map<String, Object> reply = new LinkedHashMap<>(asMap(replies.get(0)));
+    final Map<String, Object> presc = new LinkedHashMap<>(asMap(reply.get("prescription")));
     presc.remove("payload");
     reply.put("prescription", presc);
     planMap.put("replies", List.of(reply));
@@ -171,9 +170,9 @@ class ConsultationReportReaderTest {
   @Test
   void unparseable_prescription_programRef_is_dropped_but_reply_keeps_its_assessment() {
     final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
-    final Map<String, Object> planMap = new LinkedHashMap<>((Map<String, Object>) raw.get("plan"));
+    final Map<String, Object> planMap = new LinkedHashMap<>(asMap(raw.get("plan")));
     final List<?> replies = (List<?>) planMap.get("replies");
-    final Map<String, Object> reply = new LinkedHashMap<>((Map<String, Object>) replies.get(0));
+    final Map<String, Object> reply = new LinkedHashMap<>(asMap(replies.get(0)));
     reply.put(
         "prescription",
         Map.of("programRef", "no-such-program", "payload", Map.of(), "humanHint", "ignored"));
@@ -191,9 +190,9 @@ class ConsultationReportReaderTest {
   @Test
   void reply_without_a_parseable_assessment_is_dropped() {
     final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
-    final Map<String, Object> planMap = new LinkedHashMap<>((Map<String, Object>) raw.get("plan"));
+    final Map<String, Object> planMap = new LinkedHashMap<>(asMap(raw.get("plan")));
     final List<?> replies = (List<?>) planMap.get("replies");
-    final Map<String, Object> reply = new LinkedHashMap<>((Map<String, Object>) replies.get(0));
+    final Map<String, Object> reply = new LinkedHashMap<>(asMap(replies.get(0)));
     reply.remove("assessment");
     planMap.put("replies", List.of(reply));
     raw.put("plan", planMap);
@@ -262,9 +261,9 @@ class ConsultationReportReaderTest {
   @Test
   void unknown_reply_key_survives_reconstruction() {
     final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
-    final Map<String, Object> planMap = new LinkedHashMap<>((Map<String, Object>) raw.get("plan"));
+    final Map<String, Object> planMap = new LinkedHashMap<>(asMap(raw.get("plan")));
     final List<?> replies = (List<?>) planMap.get("replies");
-    final Map<String, Object> reply = new LinkedHashMap<>((Map<String, Object>) replies.get(0));
+    final Map<String, Object> reply = new LinkedHashMap<>(asMap(replies.get(0)));
     reply.put("correspondence", Map.of("seenBy", "future"));
     planMap.put("replies", List.of(reply));
     raw.put("plan", planMap);
@@ -273,5 +272,11 @@ class ConsultationReportReaderTest {
     assertTrue(rebuilt.isPresent());
     assertEquals(1, rebuilt.get().plan().replies().size());
     assertEquals("dbus refused", rebuilt.get().observations().get(0).summary());
+  }
+
+  /** The output map is a {@code Map<String, Object>} by construction; the nested reads are too. */
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> asMap(Object value) {
+    return (Map<String, Object>) value;
   }
 }

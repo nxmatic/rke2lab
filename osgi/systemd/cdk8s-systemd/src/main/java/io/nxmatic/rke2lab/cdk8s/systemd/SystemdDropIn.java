@@ -45,11 +45,8 @@ public class SystemdDropIn extends Construct {
     super(scope, id);
     this.targetUnitName = targetUnitName;
     this.dropInFileName = id + ".conf";
-
-    // Register with parent SystemdChart
-    if (scope instanceof SystemdChart chart) {
-      chart.registerDropIn(this);
-    }
+    // No self-registration: the SystemdChart discovers its drop-ins by walking the construct
+    // tree at synthesis time, so a drop-in is never observed before this constructor finished.
   }
 
   // === [Unit] Section ===

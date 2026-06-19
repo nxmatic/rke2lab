@@ -1,5 +1,5 @@
 // @codebase
-package io.nxmatic.rke2lab.manifests;
+package io.nxmatic.rke2lab.manifests.bridge;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

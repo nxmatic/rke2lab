@@ -56,7 +56,6 @@ class ReferralReplyTest {
     assertTrue(map.containsKey("assessment"));
     assertTrue(map.containsKey("prescription"));
 
-    @SuppressWarnings("unchecked")
     final Map<?, ?> prescriptionMap = (Map<?, ?>) map.get("prescription");
     assertEquals("restart-systemd-unit", prescriptionMap.get("programRef"));
   }

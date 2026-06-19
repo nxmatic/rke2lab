@@ -13,6 +13,8 @@ import java.time.Instant;
  */
 public final class MedicalRecordReconstructionException extends Exception {
 
+  private static final long serialVersionUID = 1L;
+
   private final transient MedicalRecord partialRecord;
 
   public MedicalRecordReconstructionException(MedicalRecord partialRecord, int failureCount) {
@@ -39,6 +41,8 @@ public final class MedicalRecordReconstructionException extends Exception {
    * {@code getCause().path()}, the offending file — without reproducing the failure.
    */
   public static final class EntryFailure extends Exception {
+
+    private static final long serialVersionUID = 1L;
 
     private final int version;
     private final transient Instant when;

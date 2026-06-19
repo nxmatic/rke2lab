@@ -8,6 +8,8 @@ import java.nio.file.Path;
  */
 public final class StackContentException extends StackException {
 
+  private static final long serialVersionUID = 1L;
+
   public StackContentException(Path path, Throwable cause) {
     super(path, "stack content invalid at " + path, cause);
   }

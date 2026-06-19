@@ -18,8 +18,8 @@
  *       both output trees.
  *   <li>{@link io.nxmatic.rke2lab.manifests.ManifestSynthesisContext} — ThreadLocal runtime
  *       configuration injected into units for the duration of one synthesis.
- *   <li>{@link io.nxmatic.rke2lab.manifests.ManifestDomainCatalog} — single source of truth for
- *       domain ID strings (kebab-case).
+ *   <li>{@link io.nxmatic.rke2lab.manifests.bridge.ManifestDomainCatalog} — single source of truth
+ *       for domain ID strings (kebab-case).
  * </ul>
  *
  * <h2>Sub-packages</h2>

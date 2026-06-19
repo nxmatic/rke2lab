@@ -1,9 +1,14 @@
 package io.nxmatic.rke2lab.manifests.node;
 
+import io.nxmatic.rke2lab.manifests.ManifestYaml;
+import io.nxmatic.rke2lab.manifests.bridge.ManifestAnnotations;
+import io.nxmatic.rke2lab.manifests.bridge.node.NodeEnvContext;
+import io.nxmatic.rke2lab.manifests.bridge.node.NodeEnvContributor;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
@@ -84,7 +89,38 @@ public class NodeEnvContributorRegistry {
   /** Write all domain contributions as individual ConfigMap YAML files. */
   public void writeAllContributions(Path outputDir, NodeEnvContext context) throws IOException {
     for (var contributor : orderedContributors()) {
-      contributor.writeConfigMap(outputDir, context);
+      for (String section : contributor.contributedSections()) {
+        final Map<String, Object> document =
+            buildConfigMapDocument(
+                "env-section-" + section,
+                section,
+                contributor.contributeVariables(section, context));
+        ManifestYaml.writeDocument(
+            outputDir.resolve(contributor.domainId() + "-" + section + ".yml"), document);
+      }
     }
+  }
+
+  /**
+   * Build a Kubernetes ConfigMap document for a contributor section. The result is handed to {@link
+   * ManifestYaml} for rendering — no caller serializes YAML by hand.
+   */
+  private static Map<String, Object> buildConfigMapDocument(
+      String name, String section, Map<String, String> variables) {
+    final Map<String, Object> annotations = new LinkedHashMap<>();
+    annotations.put(ManifestAnnotations.LOCAL_CONFIG, "true");
+    annotations.put("env.rke2lab.nxmatic.io/section", section);
+    annotations.put("rke2lab.nxmatic.io/managed-by", "node-env-contributor");
+
+    final Map<String, Object> metadata = new LinkedHashMap<>();
+    metadata.put("annotations", annotations);
+    metadata.put("name", name);
+
+    final Map<String, Object> document = new LinkedHashMap<>();
+    document.put("apiVersion", "v1");
+    document.put("kind", "ConfigMap");
+    document.put("metadata", metadata);
+    document.put("data", variables);
+    return document;
   }
 }

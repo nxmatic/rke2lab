@@ -1,5 +1,5 @@
 // @codebase
-package io.nxmatic.rke2lab.manifests.profiles;
+package io.nxmatic.rke2lab.manifests.bridge.profiles;
 
 /**
  * Typed registry of bootstrap-layer component versions. Surfaced through {@link

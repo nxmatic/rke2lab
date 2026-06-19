@@ -1,5 +1,5 @@
 // @codebase
-package io.nxmatic.rke2lab.manifests.profiles;
+package io.nxmatic.rke2lab.manifests.bridge.profiles;
 
 /**
  * Stage A → Stage B image-identity slice published to synth-time layers via {@link

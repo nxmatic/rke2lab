@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.netplan;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisRequest;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisResult;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisService;
+import io.nxmatic.rke2lab.netplan.bridge.ClusterNetworkBlueprint;
 import org.osgi.service.component.annotations.Component;
 
 /** Default SPI implementation for canonical netplan synthesis. */
