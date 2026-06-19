@@ -88,6 +88,13 @@ Read the durable atlas (`docs/architecture/integration-atlas.adoc`, 539 lines, �
 E/F config exemplar) to stay faithful before drawing. Graduates as a new "runtime" per-subsystem atlas
 view at merge.
 
+★ ATLAS GRADUATED 2026-06-19: the durable atlas (`docs/architecture/integration-atlas.adoc`) now CARRIES
+the runtime view (`[[runtime-view]]`, Diagrams I/J) — the graduation of spec §7's G/H, PLUS the two
+post-spec decisions named in its verdict (the API-extraction `host/*-bridge-api` box; the proof reframe
+R4-by-`pulumi preview` not `-Plive`). R1–R3 listed SHIPPED, R4 + API-extraction GREEN, R5 amber. So the
+atlas is no longer stale (it had stopped at the bench/config view). Flip R4/extraction blue at their
+merge. Do NOT re-graduate G/H — it's done.
+
 **The 7 slices (spec §5):** R1 add felix.scr + prove publish/bind on embedded Felix; R2 declare 5 SPIs
 `@Component` (geste A, ServiceLoader STAYS, zero behaviour change); R3 consume intra-bundle via @Reference
 (NodeEnvContributorRegistry + DefaultManifestUpdateGate, osgi/manifests only); R4 boot seam in seed-master
