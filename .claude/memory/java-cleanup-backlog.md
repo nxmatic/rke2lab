@@ -48,6 +48,25 @@ items for context, prune old ones).
   absent, and (the sibling defect) a window reload can lose the conversation list.
   Fix lives in the `.code-workspace` generator (main workspace). Detail in
   [[claude-memory-cascade-state]] and [[jdtls-heap-workspace-generation]].
+- [ ] **Align the stale bench Bundle-SymbolicNames (osgibench → bench/testkit).** The
+  `osgi-bench`→`bench` + `osgi-testkit`→`testkit` rename (e58a44e3) moved the artifacts/dirs
+  but left the BSN **and** the Java packages at `io.nxmatic.rke2lab.osgibench.*` — so e.g.
+  module `bench-config` has BSN `…osgibench.config`, `bench-scr-api` has `…osgibench.scr.api`.
+  The BSN no longer reflects the module name. Disposable scaffolding → low stakes, but it is
+  the naming-drift the user spotted 2026-06-19. A slice of its own (touches the BSN, the
+  Export-Package, and the `osgibench` Java package across bench-* and the testkit). NOT in the bridge→contract
+  slice's scope (that one is manifests/netplan only). Sibling check: confirm no other module's
+  BSN drifted from its dir (audit all `bnd.bnd` at the time).
+- [ ] **★ REVIEW GATE for the bridge→contract merge (mine, at squash).** The rename slice
+  ([[rename-bridge-to-contract-state]]) MOVES `…manifests.bridge`→`.contract`, so it MUST make
+  the impl bundles' manifests consistent or the build goes red. At MY squash-merge review,
+  verify: (a) `manifests-core` `bnd.bnd` `Export-Package` no longer claims packages whose ports
+  left (it should export only what it still CONTAINS — impl/util packages — and must NOT export
+  the moved `.contract` ports, which now live in the host module); (b) same for `netplan`;
+  (c) the host `manifests-contract`/`netplan-contract` modules export their `.contract` package
+  cleanly (plain jar today; R4 will `system.packages.extra` it). This is the manifests/netplan
+  half of the BSN-drift the user flagged — it falls inside the in-flight slice, so it is a
+  REVIEW check, not a separate task. (The bench half is the open item above.)
 
 ## Done (recent)
 
