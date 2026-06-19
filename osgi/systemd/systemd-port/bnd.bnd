@@ -1,0 +1,3 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.systemd.port
+Export-Package: io.nxmatic.rke2lab.systemd.port
+-noimportjava: true

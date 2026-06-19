@@ -43,6 +43,14 @@ items for context, prune old ones).
   (`ManifestYaml`, `NodeEnvContributorRegistry`, `FloxRuntimeAssets` — host currently
   reaches into these impl types) ride with R4, per [[api-extraction-tri-carto-state]].
   Listed here only as a pointer so the backlog is complete.
+- [ ] **Delete the `realgraph` standalone-resolver fixture AT R4.** `exec/seed-master` test package
+  `io.nxmatic.rke2lab.unitrepo.realgraph` (7 files, all now `@Deprecated(forRemoval = true)`) hand-builds
+  a fake `UnitResource` universe to feed `UnitResolver` — a duplicated source of truth that already
+  drifted at the `-core`/`-port` split (`ReactorModuleCatalog` transcribes reactor module ids by hand;
+  `systemd-contract`/`manifests`/`netplan` ids left stale, NOT re-synced). Superseded once Felix boots
+  for real (R4) → delete the whole package then, don't repair. KEEP `UnitResolver` (wraps Felix
+  `ResolverImpl`, stays in production). Tombstoned in the osgi-cleanup slice; removal tracked in
+  [[osgi-runtime-r4-boot-seam-state]] + [[rename-contract-to-port-state]].
 - [ ] **jdtls per-worktree slug + memory-symlink generator fix.** Non-main worktrees get
   main's memory slug in the system prompt → announced `projects/<slug>/memory` path is
   absent, and (the sibling defect) a window reload can lose the conversation list.
@@ -57,6 +65,27 @@ items for context, prune old ones).
   Export-Package, and the `osgibench` Java package across bench-* and the testkit). NOT in the bridge→contract
   slice's scope (that one is manifests/netplan only). Sibling check: confirm no other module's
   BSN drifted from its dir (audit all `bnd.bnd` at the time).
+- [~] **Non-deductible Bundle-SymbolicNames hors-bench — IN SCOPE of osgi-cleanup (user widened,
+  2026-06-19).** The user's rule: a BSN must be MECHANICALLY DEDUCIBLE from the Maven artifactId
+  (`io.nxmatic.rke2lab.<artifactId, dashes→dots>` verbatim). The netplan promotion FORCES it
+  (`netplan`→`netplan-core` would turn a today-deducible BSN non-deducible), and uniformity pulls
+  the rest of the hors-bench lot in. Fixing in THIS slice (safe: grep confirms NO
+  `Require-Bundle`/`Fragment-Host` anywhere → no bundle references another by BSN):
+  - `manifests-core`: BSN `…manifests` → `…manifests.core`
+  - `netplan-core` (ex-`netplan`): BSN `…netplan` → `…netplan.core`
+  - `unitrepo-handler-api`: BSN `…unitrepo.handler` → `…unitrepo.handler.api` — **SUPERSEDED:
+    module renamed `unitrepo-handler-api`→`unitrepo-handler-spi`, package
+    `…unitrepo.handler`→`…unitrepo.handler.spi`, BSN+Export-Package = `…unitrepo.handler.spi`
+    (its nature is an extender SPI, [[rename-contract-to-port-state]]).**
+  - `systemd-contract`: BSN `…systemdcontract` → `…systemd.contract` — **SUPERSEDED by the
+    contract→port rename ([[rename-contract-to-port-state]]): the module is now `systemd-port`,
+    its package was renamed `systemdcontract.api`→`systemd.port` (killing the collapsed token AND
+    the parasitic `.api` on a port), so BSN = `…systemd.port` = Export-Package, both deducible.**
+  The **BSN changes; the Export-Package does NOT** (BSN = bundle identity, Export-Package = Java
+  package — independent). Already-deducible
+  (leave): `cdk8s-systemd`→`…cdk8s.systemd`, `unitrepo-core`→`…unitrepo.core`. New contracts are
+  deducible by construction. The **bench** family (`osgibench.*`) stays the SEPARATE backlog item
+  above (disposable + entangled with a Java-package rename).
 - [ ] **★ REVIEW GATE for the bridge→contract merge (mine, at squash).** The rename slice
   ([[rename-bridge-to-contract-state]]) MOVES `…manifests.bridge`→`.contract`, so it MUST make
   the impl bundles' manifests consistent or the build goes red. At MY squash-merge review,

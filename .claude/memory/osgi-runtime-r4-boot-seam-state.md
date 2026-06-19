@@ -111,6 +111,16 @@ the bundles are embedded INSIDE it, not staged beside it).
   jar; `Pulumi.yaml` stays unchanged (single `binary:`), so the runtime-adjacent surface is minimal and
   the self-containment principle keeps the environment to config-only.
 
+★ DELETE at R4 — `exec/seed-master` test package `io.nxmatic.rke2lab.unitrepo.realgraph` (7 files:
+`ReactorModuleCatalog`, `ManifestsUniverse`, `UniverseBuilder`, their 3 `*Test`s, `RealGraphResolutionTest`,
+plus `package-info`). All carry `@Deprecated(forRemoval = true)`. It is the STANDALONE-resolver proof: it
+hand-builds a fake `UnitResource` universe (modules + domains + units transcribed by hand) to feed
+`UnitResolver`. Once R4 boots Felix for real and resolves ACTUALLY-INSTALLED bundles, this hand-fed
+universe is redundant → delete the whole package (don't repair it; its transcribed module ids already
+drifted at the `-core`/`-port` split and are deliberately left stale). KEEP `UnitResolver` itself — it
+wraps Apache Felix `ResolverImpl` and stays in production (`ManifestsVisitOrder`, `ManifestsDomainRegistry`).
+Recorded in [[rename-contract-to-port-state]] + [[java-cleanup-backlog]].
+
 See [[osgi-runtime-migration-state]] (spec §4 is the runtime-target design this implements),
 [[osgi-runtime-r3-consume-references-state]] (dual-path + the deferred gate), [[osgi-runtime-r1-scr-state]]
 (embedded-Felix proof + typed-access trick), [[docrepo-dag-state]] (#1565 gRPC/TCCL),

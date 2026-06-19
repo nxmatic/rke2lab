@@ -16,8 +16,6 @@
 
   <modules>
     <module>host-parent</module>
-    <module>manifests-contract</module>
-    <module>netplan-contract</module>
     <module>pulumi-generated-sdks/incus</module>
     <module>pulumi-automation-ext</module>
     <module>pulumi-automation-ext-testkit</module>

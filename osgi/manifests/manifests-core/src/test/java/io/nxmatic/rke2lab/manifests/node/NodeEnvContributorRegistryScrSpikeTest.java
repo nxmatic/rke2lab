@@ -3,7 +3,7 @@ package io.nxmatic.rke2lab.manifests.node;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContributor;
+import io.nxmatic.rke2lab.manifests.port.node.NodeEnvContributor;
 import io.nxmatic.rke2lab.osgi.testkit.FelixFrameworkExtension;
 import io.nxmatic.rke2lab.osgi.testkit.OsgiSpike;
 import java.util.Arrays;

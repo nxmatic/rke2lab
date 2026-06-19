@@ -36,7 +36,7 @@ All Maven commands must run through flox: `flox activate -- ./mvnw ...`
 
 - `seed-master/` - Main bootstrap orchestration and Pulumi control plane
 - `manifests/` - Kubernetes manifest units (CDK8s-based, 27+ units)
-- `systemd-contract/` - Systemd unit abstractions and contracts
+- `systemd-port/` - Systemd unit abstractions and contracts (hexagonal port)
 - `cdk8s-systemd/` - CDK8s integration for systemd units
 - `netplan/` - Network configuration synthesis
 - `sdks/incus/` - Incus API client SDK

@@ -58,7 +58,7 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>manifests-contract</artifactId>
+      <artifactId>manifests-port</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -68,12 +68,12 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>netplan-contract</artifactId>
+      <artifactId>netplan-port</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>systemd-contract</artifactId>
+      <artifactId>systemd-port</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

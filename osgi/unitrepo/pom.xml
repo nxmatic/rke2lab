@@ -12,12 +12,12 @@
   <artifactId>unitrepo</artifactId>
   <packaging>pom</packaging>
   <name>osgi/unitrepo</name>
-  <description>The unit-repository domain: the handler SPI bundle (unitrepo-handler-api) and the
+  <description>The unit-repository domain: the handler SPI bundle (unitrepo-handler-spi) and the
     resolution oracle over UnitResource capability graphs (unitrepo-core). The Pulumi-facing ACL
     (unitrepo-pulumi) is the next module to land here.</description>
 
   <modules>
-    <module>unitrepo-handler-api</module>
+    <module>unitrepo-handler-spi</module>
     <module>unitrepo-core</module>
   </modules>
 </project>

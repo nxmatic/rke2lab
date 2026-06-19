@@ -12,7 +12,10 @@ import java.util.Map;
  * manifests} module gathers all manifest domains via {@code requireAll(module=manifests)}. The
  * combined {@code byId} map (assembled from the layer builders' own id-keyed maps, so no accessor
  * is needed on {@link UnitResource}) lets the resolution test map wiring results back to ids.
+ *
+ * @deprecated Part of the R4-superseded {@code realgraph} fixture — see {@code package-info}.
  */
+@Deprecated(forRemoval = true)
 final class UniverseBuilder {
 
   private final List<UnitResource> universe = new ArrayList<>();

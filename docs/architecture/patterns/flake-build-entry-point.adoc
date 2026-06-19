@@ -87,7 +87,7 @@ deployable artifacts.
 
 === seed-master / manifests: build the reactor, not the module
 
-`seed-master` depends on `manifests`, `netplan`, `systemd-contract`; `manifests`
+`seed-master` depends on `manifests`, `netplan`, `systemd-port`; `manifests`
 depends on others in turn. Rather than `netplanJar`'s piecewise
 `install-file` + per-module build, the seed-master/manifests outputs should run
 the *whole reactor* once from the parent pom:

@@ -103,8 +103,8 @@
           # Maven needs a writable HOME for .m2/repository
           mkdir -p $TMPDIR/.m2
           # Install parent POM and BOM first, then build the netplan CLI module.
-          # netplan-cli depends on the pure netplan core (osgi/netplan), so it
-          # builds through the reactor (`-pl :netplan-cli -am`) rather than a
+          # netplan-cli depends on the pure netplan core (osgi/netplan/netplan-core),
+          # so it builds through the reactor (`-pl :netplan-cli -am`) rather than a
           # standalone `-f` — `-am` pulls the core sibling from source.
           mvn -Dmaven.repo.local=$TMPDIR/.m2/repository \
             install:install-file -Dfile=pom.xml -DpomFile=pom.xml

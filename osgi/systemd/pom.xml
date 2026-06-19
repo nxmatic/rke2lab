@@ -12,11 +12,11 @@
   <artifactId>systemd</artifactId>
   <packaging>pom</packaging>
   <name>osgi/systemd</name>
-  <description>The systemd domain: the typed unit/contract vocabulary (systemd-contract) and the
+  <description>The systemd domain: the typed unit/contract vocabulary (systemd-port) and the
     CDK8s integration that synthesizes those units (cdk8s-systemd), grouped as library bundles.</description>
 
   <modules>
-    <module>systemd-contract</module>
+    <module>systemd-port</module>
     <module>cdk8s-systemd</module>
   </modules>
 </project>

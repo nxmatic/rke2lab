@@ -3,7 +3,7 @@ package io.nxmatic.rke2lab.controlplane.systemd;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.readiness.DbusSystemdProbe;
-import io.nxmatic.rke2lab.systemdcontract.api.SystemdStatusSnapshot;
+import io.nxmatic.rke2lab.systemd.port.SystemdStatusSnapshot;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;

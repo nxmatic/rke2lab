@@ -1,4 +1,4 @@
-Bundle-SymbolicName: io.nxmatic.rke2lab.manifests
+Bundle-SymbolicName: io.nxmatic.rke2lab.manifests.core
 Export-Package: \
     io.nxmatic.rke2lab.manifests,\
     io.nxmatic.rke2lab.manifests.domain,\

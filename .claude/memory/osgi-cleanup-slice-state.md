@@ -1,10 +1,28 @@
 ---
 name: osgi-cleanup-slice-state
-description: "REFACTOR slice (worktree refactor/osgi-cleanup, off origin/design/target-module-layout @4c2631f8, set up 2026-06-19): the OSGi-cleanup increment — re-place the contract modules host/→osgi/ beside their impl facet + bundle-ify them + per-package @Version across ALL osgi/ + turn on bnd baselining. Bundles ONE coherent OSGi-hygiene unit of work decided by the user ('on demarre un nouvel increment de travail pour le cleanup OSGi'). The contracts shipped as PLAIN JARS in host/ (rename 4c2631f8) — that re-confirmed the WRONG placement (purity-axis + hexagonal-DIP error: the PORT belongs to the DOMAIN osgi/, not the adapter host/). Two design cartos fully specify it: [[contract-placement-and-versioning-carto]] (placement + independent per-contract version) and [[osgi-package-versioning-carto]] (generalise @Version to every exported osgi/ package + baseline). NOT yet coded. Build-only, -Posgi green, NO -Plive."
+description: "REFACTOR slice (worktree refactor/osgi-cleanup, off origin/design/target-module-layout @4c2631f8, set up 2026-06-19): the OSGi-cleanup increment — re-place the contract modules host/→osgi/ beside their impl facet + bundle-ify them + per-package @Version across ALL osgi/ + turn on bnd baselining. Bundles ONE coherent OSGi-hygiene unit of work decided by the user ('on demarre un nouvel increment de travail pour le cleanup OSGi'). The contracts shipped as PLAIN JARS in host/ (rename 4c2631f8) — that re-confirmed the WRONG placement (purity-axis + hexagonal-DIP error: the PORT belongs to the DOMAIN osgi/, not the adapter host/). Two design cartos fully specify it: [[contract-placement-and-versioning-carto]] (placement + independent per-contract version) and [[osgi-package-versioning-carto]] (generalise @Version to every exported osgi/ package + baseline). ★ SHIPPED to design/target-module-layout (squash merge 2026-06-19); worktree torn down. The slice GREW beyond the brief: `contract`→`port` rename ([[rename-contract-to-port-state]]) + `unitrepo-handler-api`→`-spi` + the `realgraph` fixture tombstone (duplicated-source-of-truth drift, deleted at R4). Build-only, -Posgi green (35 modules / 18 tests / 12 reports / 0 skipped), the port import is now VERSIONED. NO -Plive."
 metadata:
   node_type: memory
   type: project
 ---
+
+## ★ SHIPPED 2026-06-19 (squash merge to design/target-module-layout; worktree torn down)
+
+Delivered all four moves below — with the contract→**port** rename layered on (the user's call mid-slice:
+`contract` is too generic, `port` names the hexagonal nature; see [[rename-contract-to-port-state]] for
+the taxonomy `-port`/`-spi`/`-api`). So the re-placement landed as `osgi/manifests/manifests-port`,
+`osgi/netplan/netplan-core`+`netplan-port` (netplan promoted FLAT→domain-dir), `osgi/systemd/systemd-port`
+(ex-`systemd-contract`, also killing the collapsed `systemdcontract` token + parasitic `.api`), and
+`unitrepo-handler-api`→`unitrepo-handler-spi`. `@Version("1.0.0")` graved on every exported osgi/ package;
+`bnd-baseline-maven-plugin` wired in `osgi/bundle-parent` with `failOnMissing=false` (no-op until a release
+is deliberately frozen — see [[osgi-baseline-install-discipline]] for the deliberate-install model + the
+two-orthogonal-coordinates insight that settled open decision #2). Re-verified on integration before merge:
+`manifests.port;version="[1.0,2)"` (the lone unversioned import from the carto origin is GONE), 12 surefire
+reports / 18 tests / 0 skipped. The two open decisions were both resolved with the user: netplan aggregator
+shape (domain-dir + `-core`/`-port`), and the baseline-vs-SNAPSHOT question (failOnMissing=false now,
+release-driven baseline repo a future slice). BSN-deducibility hors-bench also folded in
+([[java-cleanup-backlog]]). Atlas update (port now in osgi/, versioned) + flipping the two cartos to SHIPPED
+remain as design-session follow-ups.
 
 ## Mandate (read the two cartos FIRST — they are the spec)
 

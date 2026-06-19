@@ -19,7 +19,7 @@
   <dependencies>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>netplan</artifactId>
+      <artifactId>netplan-core</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

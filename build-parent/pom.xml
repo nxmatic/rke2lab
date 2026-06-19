@@ -81,12 +81,12 @@
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>netplan</artifactId>
+        <artifactId>netplan-core</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
-        <artifactId>systemd-contract</artifactId>
+        <artifactId>systemd-port</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

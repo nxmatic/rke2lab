@@ -1,0 +1,3 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.unitrepo.handler.spi
+Export-Package: io.nxmatic.rke2lab.unitrepo.handler.spi
+-noimportjava: true

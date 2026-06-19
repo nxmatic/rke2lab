@@ -1,19 +1,18 @@
 // @codebase
 /**
  * NodeEnv SPI: per-domain contributions to the node environment, assembled into a {@link
- * io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext}.
+ * io.nxmatic.rke2lab.manifests.port.node.NodeEnvContext}.
  *
  * <p>This is orthogonal to manifest synthesis. Where {@code ManifestsUnit}s emit K8s/systemd
- * artifacts, {@link io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContributor}s contribute
+ * artifacts, {@link io.nxmatic.rke2lab.manifests.port.node.NodeEnvContributor}s contribute
  * environment facts (identity, networking, storage, …) that the node needs at runtime.
  *
  * <h2>What lives here</h2>
  *
  * <ul>
- *   <li>{@link io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext} / {@link
+ *   <li>{@link io.nxmatic.rke2lab.manifests.port.node.NodeEnvContext} / {@link
  *       io.nxmatic.rke2lab.manifests.node.DefaultNodeEnvContext} — the assembled context.
- *   <li>{@link io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContributor} — the contribution
- *       SPI.
+ *   <li>{@link io.nxmatic.rke2lab.manifests.port.node.NodeEnvContributor} — the contribution SPI.
  *   <li>{@link io.nxmatic.rke2lab.manifests.node.NodeEnvContributorRegistry} — collects all
  *       contributors.
  *   <li>{@link io.nxmatic.rke2lab.manifests.node.NodeEnvIdentityContributor} — the identity slice.
@@ -31,4 +30,5 @@
  *       Architecture</a> — the module this SPI belongs to.
  * </ul>
  */
+@org.osgi.annotation.versioning.Version("1.0.0")
 package io.nxmatic.rke2lab.manifests.node;

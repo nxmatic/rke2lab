@@ -18,8 +18,8 @@
  *       both output trees.
  *   <li>{@link io.nxmatic.rke2lab.manifests.ManifestSynthesisContext} — ThreadLocal runtime
  *       configuration injected into units for the duration of one synthesis.
- *   <li>{@link io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog} — single source of
- *       truth for domain ID strings (kebab-case).
+ *   <li>{@link io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog} — single source of truth
+ *       for domain ID strings (kebab-case).
  * </ul>
  *
  * <h2>Sub-packages</h2>
@@ -49,4 +49,5 @@
  *       the runtime journey from synthesis to live resources.
  * </ul>
  */
+@org.osgi.annotation.versioning.Version("1.0.0")
 package io.nxmatic.rke2lab.manifests;

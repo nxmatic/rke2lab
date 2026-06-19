@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.manifests.units.cluster;
 
-import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
-import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContributor;
+import io.nxmatic.rke2lab.manifests.port.node.NodeEnvContext;
+import io.nxmatic.rke2lab.manifests.port.node.NodeEnvContributor;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;

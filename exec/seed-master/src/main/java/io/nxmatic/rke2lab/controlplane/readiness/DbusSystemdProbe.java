@@ -6,7 +6,7 @@ import de.thjom.java.systemd.Systemd;
 import de.thjom.java.systemd.Target;
 import de.thjom.java.systemd.types.UnitType;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.systemdcontract.api.SystemdStatusSnapshot;
+import io.nxmatic.rke2lab.systemd.port.SystemdStatusSnapshot;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;

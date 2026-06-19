@@ -1,0 +1,6 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.manifests.port
+Export-Package: \
+    io.nxmatic.rke2lab.manifests.port,\
+    io.nxmatic.rke2lab.manifests.port.node,\
+    io.nxmatic.rke2lab.manifests.port.profiles
+-noimportjava: true

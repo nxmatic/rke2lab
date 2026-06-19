@@ -4,8 +4,6 @@ import io.nxmatic.rke2lab.manifests.ManifestsDomain;
 import io.nxmatic.rke2lab.manifests.ManifestsDomainRegistry;
 import io.nxmatic.rke2lab.manifests.ManifestsDomainRegistryBuilder;
 import io.nxmatic.rke2lab.manifests.ManifestsUnit;
-import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
-import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.domain.CicdDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.ClusterApiDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.ClusterDomainRegistrar;
@@ -16,6 +14,8 @@ import io.nxmatic.rke2lab.manifests.domain.NetworkingDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.PlatformDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.RuntimeDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.StorageDomainRegistrar;
+import io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.port.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.unitrepo.core.UnitResource;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -25,7 +25,10 @@ import java.util.Map;
  * {@link ManifestsDomainRegistry} (all-enabled policy + the 10 public registrars) and re-expresses
  * its domains and units as {@link UnitResource}s in the resolver's vocabulary. Latent: it reads the
  * registry, never modifies a unit or domain class.
+ *
+ * @deprecated Part of the R4-superseded {@code realgraph} fixture — see {@code package-info}.
  */
+@Deprecated(forRemoval = true)
 final class ManifestsUniverse {
 
   static final String NS_DOMAIN = "unitrepo.manifest.domain";

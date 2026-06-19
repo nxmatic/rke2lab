@@ -56,6 +56,7 @@
     <osgi.ds.annotations.version>1.5.1</osgi.ds.annotations.version>
     <osgi.metatype.annotations.version>1.4.1</osgi.metatype.annotations.version>
     <osgi.bundle.annotations.version>2.0.0</osgi.bundle.annotations.version>
+    <osgi.versioning.annotations.version>1.1.2</osgi.versioning.annotations.version>
     <!--
       DS runtime API packages (org.osgi.service.component[.runtime], util.promise/function):
       felix.scr imports them as MANDATORY but osgi.core's system bundle does not carry them, so a
@@ -251,6 +252,11 @@
         <groupId>org.osgi</groupId>
         <artifactId>org.osgi.annotation.bundle</artifactId>
         <version>${osgi.bundle.annotations.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.osgi</groupId>
+        <artifactId>org.osgi.annotation.versioning</artifactId>
+        <version>${osgi.versioning.annotations.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

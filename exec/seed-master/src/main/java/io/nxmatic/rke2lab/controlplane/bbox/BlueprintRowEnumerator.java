@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.bbox;
 
 import io.nxmatic.bbox.reconcile.DesiredReservation;
-import io.nxmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
+import io.nxmatic.rke2lab.netplan.port.ClusterNetworkBlueprint;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;

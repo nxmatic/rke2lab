@@ -6,11 +6,18 @@ import java.util.Map;
 
 /**
  * The coarse (module) layer of the real-graph universe: one {@link UnitResource} per reactor module
- * that participates in seed-master's closure, with module-to-module edges transcribed faithfully
- * from the reactor poms (verified 2026-06-15). Same hardcoding discipline as {@code
- * ManifestDomainCatalog}. Test-scope only — the proof reads structure already in the build, it does
- * not introspect Maven at runtime.
+ * in seed-master's closure, with module-to-module edges, feeding {@link RealGraphResolutionTest}.
+ *
+ * @deprecated This fixture transcribes reactor module ids BY HAND, so it is a duplicated source of
+ *     truth that drifts silently from the real poms. The {@code -core}/{@code -port} split already
+ *     left ids here pointing at modules that no longer exist ({@code systemd-contract} → now {@code
+ *     systemd-port}; the un-split {@code manifests}/{@code netplan} → now {@code -core}/{@code
+ *     -port}), and nothing catches it because the proof only checks the fixture against itself. The
+ *     ids are deliberately NOT re-synced: this whole real-graph fixture proof is superseded once
+ *     Felix boots for real and resolves actually-installed bundles (R4 boot seam), at which point
+ *     this {@code realgraph} package is deleted, not repaired. See {@link RealGraphResolutionTest}.
  */
+@Deprecated(forRemoval = true)
 final class ReactorModuleCatalog {
 
   static final String NS_MODULE = "unitrepo.module";

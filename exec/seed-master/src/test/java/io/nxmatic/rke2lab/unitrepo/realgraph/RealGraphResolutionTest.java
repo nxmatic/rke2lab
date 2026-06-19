@@ -20,7 +20,11 @@ import org.osgi.service.resolver.ResolutionException;
  * The proof: the standalone Felix resolver computes rke2lab's real cross-layer closure (modules +
  * manifest domains + units) in one resolve, replacing the retired hand-rolled dependency-applier
  * walker over real data.
+ *
+ * @deprecated Superseded by the R4 Felix boot seam — see {@code package-info}. Deleted with the
+ *     rest of the {@code realgraph} fixture once Felix resolves actually-installed bundles.
  */
+@Deprecated(forRemoval = true)
 @Tag("osgi")
 class RealGraphResolutionTest {
 

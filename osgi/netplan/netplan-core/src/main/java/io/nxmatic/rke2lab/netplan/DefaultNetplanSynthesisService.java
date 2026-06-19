@@ -1,0 +1,28 @@
+package io.nxmatic.rke2lab.netplan;
+
+import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisRequest;
+import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisResult;
+import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisService;
+import io.nxmatic.rke2lab.netplan.port.ClusterNetworkBlueprint;
+import org.osgi.service.component.annotations.Component;
+
+/** Default SPI implementation for canonical netplan synthesis. */
+@Component(service = NetplanSynthesisService.class)
+public final class DefaultNetplanSynthesisService implements NetplanSynthesisService {
+
+  @Override
+  public String providerId() {
+    return "default-netplan-synthesizer";
+  }
+
+  @Override
+  public NetplanSynthesisResult synthesize(NetplanSynthesisRequest request) {
+    final ClusterNetworkBlueprint blueprint =
+        ClusterNetworkBlueprint.builder()
+            .cluster(request.clusterName())
+            .node(request.nodeName())
+            .deriveRecipeModel()
+            .build();
+    return new NetplanSynthesisResult(blueprint);
+  }
+}

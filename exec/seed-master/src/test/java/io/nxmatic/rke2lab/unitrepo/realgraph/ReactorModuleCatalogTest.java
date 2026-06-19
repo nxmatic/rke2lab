@@ -10,6 +10,10 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.osgi.resource.Capability;
 
+/**
+ * @deprecated Part of the R4-superseded {@code realgraph} fixture — see {@code package-info}.
+ */
+@Deprecated(forRemoval = true)
 @Tag("osgi")
 class ReactorModuleCatalogTest {
 

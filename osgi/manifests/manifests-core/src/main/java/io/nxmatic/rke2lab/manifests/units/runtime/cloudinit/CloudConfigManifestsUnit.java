@@ -3,10 +3,10 @@ package io.nxmatic.rke2lab.manifests.units.runtime.cloudinit;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.nxmatic.rke2lab.manifests.contract.ManifestAnnotations;
-import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.port.ManifestAnnotations;
+import io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
-import io.nxmatic.rke2lab.netplan.contract.ClusterNetworkBlueprint;
+import io.nxmatic.rke2lab.netplan.port.ClusterNetworkBlueprint;
 import java.util.List;
 import java.util.Map;
 import org.cdk8s.ApiObject;
