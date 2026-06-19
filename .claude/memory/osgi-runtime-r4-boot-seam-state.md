@@ -1,6 +1,6 @@
 ---
 name: osgi-runtime-r4-boot-seam-state
-description: "DESIGN/CARTO for IMPL slice R4 (the architectural lift): boot Felix inside seed-master's Pulumi callback + wire the host consume-seam onto the registry. Read-only carto done 2026-06-19 on integration @4d5521e4 — NOT yet coded, NO worktree yet. ★ KEY FINDING: the seed-master exec-jar SHADES manifests-core/netplan FLAT (classes merged, ServicesResourceTransformer fuses META-INF/services, ManifestResourceTransformer rewrites ONE manifest → the bundles' OSGI-INF/Service-Component are drowned). And Pulumi.yaml launches the program via `binary:` = ONE exec-jar (not a -cp with a bundles/ dir). So Felix CANNOT installBundle() separate bundle entities in the deployed process — the R1-R3 reactor-classpath install pattern does NOT carry to the shaded deployment. This is THE knot R4 must solve. Proof path is pulumi PREVIEW (a dry-run, in-scope per CLAUDE.md — NOT -Plive up), which really boots Felix in the Pulumi callback without mutating master. Cap decision still settled: go to the runtime."
+description: "DESIGN/CARTO for IMPL slice R4 (the architectural lift): boot Felix inside seed-master's Pulumi callback + wire the host consume-seam onto the registry. Read-only carto done 2026-06-19 on integration @4d5521e4 — NOT yet coded, NO worktree yet. ★ KEY FINDING: the seed-master exec-jar SHADES manifests-core/netplan FLAT (classes merged, ServicesResourceTransformer fuses META-INF/services, ManifestResourceTransformer rewrites ONE manifest → the bundles' OSGI-INF/Service-Component are drowned). And Pulumi.yaml launches the program via `binary:` = ONE exec-jar (not a -cp with a bundles/ dir). So Felix CANNOT installBundle() separate bundle entities in the deployed process — the R1-R3 reactor-classpath install pattern does NOT carry to the shaded deployment. This is THE knot R4 must solve. ★ DECISION TAKEN (user principle 2026-06-19): self-contained artifact — EMBED the osgi/ bundles INTACT inside the seed-master exec-jar (not shaded flat, not an external dir), Felix extracts+installs them at boot; the environment supplies only config. Proof path is pulumi PREVIEW (a dry-run, in-scope per CLAUDE.md — NOT -Plive up), which really boots Felix in the Pulumi callback without mutating master. Cap decision still settled: go to the runtime. NEXT = spin the R4 worktree with this note as its brief."
 metadata:
   node_type: memory
   type: project
@@ -43,29 +43,34 @@ Three grounded facts (integration @4d5521e4):
 So Felix-in-the-process cannot `installBundle(file:…)` a `manifests-core` bundle that no longer exists
 as a discrete entity. **R4 must choose a packaging that gives the running process installable bundles.**
 
-## The packaging options (to decide WITH the user before coding)
+## ★ DECISION (user principle, 2026-06-19): self-contained artifact — bundles EMBEDDED INTACT
 
-- **(A) Bundles as jars in a directory, NOT shaded.** Stop shading the osgi/ bundles into the exec-jar;
-  ship them as discrete bundle jars in e.g. `bundles/` beside the seed-master jar (or inside it as
-  resources, extracted at boot to a temp dir). The seed-master jar keeps only host + Felix + felix.scr;
-  at boot it `installBundle(file:bundles/*.jar)`. Closest to a real OSGi deployment, preserves each
-  bundle's manifest/OSGI-INF intact. COST: changes packaging — the shade stops pulling the bundles, the
-  flake `seedMasterJar` derivation must also stage the bundle jars, and `Pulumi.yaml`'s single-`binary:`
-  model must tolerate a sibling `bundles/` dir (the jar's launch dir is the repo root at preview, the
-  store path at deploy — the bundle dir must resolve in both).
-- **(B) Felix reads the flat classpath (no separate install).** Keep the flat shade; expose the app
-  classpath to Felix so the @Components resolve from it. Felix can run with bundles backed by the system
-  classloader, but the drowned `Service-Component`/`OSGI-INF` (fact 1) must be reconstructed — fragile,
-  fights the shade transformers, and erodes bundle isolation (the whole point). NOT recommended on
-  current read, but cheaper on packaging.
-- **(C) Hybrid: an OSGi-aware exec assembly.** A launcher jar whose classpath is a set of intact bundle
-  jars (e.g. bnd's `bnd run` / a felix launcher layout, or maven-bundle a runnable framework). Bigger
-  build change; most "correct OSGi" but furthest from the current shade/flake/Pulumi.yaml machinery.
+User principle: *the runtime should EMBED every component it needs; the environment supplies only
+CONFIGURATION. A self-contained artifact is a health sign and makes the system more deterministic.*
+This discriminates the options:
 
-The carto's lean: **(A)** — it preserves the bnd-emitted bundle metadata that R1-R3 worked to produce,
-and keeps gRPC on the flat host classloader (the bundles dir holds only pure model bundles, never gRPC).
-But it touches the flake + Pulumi.yaml launch surface, which is runtime-adjacent config → the user must
-weigh it. DO NOT code R4 until (A/B/C) is chosen.
+- **CHOSEN — embed the osgi/ bundles INTACT inside the seed-master exec-jar, install at boot.** Instead
+  of the shade FUSING `manifests-core.jar`/`netplan.jar` flat (which destroys them as bundle entities),
+  package them UNCHANGED as internal resources of the seed-master jar (e.g. under `bundles/` inside the
+  jar, each with its own MANIFEST + OSGI-INF preserved). At boot, Felix extracts them to a temp dir and
+  `installBundle(file:…)`. ONE artifact carries everything; the environment provides only config
+  (`PULUMI_*`, `.secrets`, the stack). `Pulumi.yaml`'s single `binary:` is UNCHANGED, and NO external
+  `bundles/` dir is provisioned — so this is MORE deterministic, not less. The host + Felix + felix.scr
+  stay flat (gRPC stays flat, invariant #1565); only the pure model bundles are embedded-intact.
+  This is a refinement of the old option (C), reframed by the self-containment principle.
+- *Rejected — (A) bundles in an EXTERNAL dir beside the jar:* violates the principle (the environment
+  would supply a bundle dir alongside the artifact; two things to provision + keep in sync; path
+  resolution differs between preview-at-repo-root and deploy-at-store-path). Less deterministic.
+- *Rejected — (B) Felix reads the flat classpath:* the drowned Service-Component/OSGI-INF must be
+  reconstructed, fights the shade transformers, erodes bundle isolation. Not self-describing.
+
+**The build change this implies (for the R4 worktree to work out):** the seed-master shade must STOP
+pulling `manifests-core`/`netplan`/(the pure bundles) into the flat classpath, and instead stage their
+INTACT jars as resources inside the exec-jar. Host-only deps (pulumi, grpc-netty, incus, cdk8s used by
+the host, jackson, felix.framework, felix.scr) stay flat. The bnd-emitted bundle metadata R1-R3
+produced is exactly what makes the embedded jars installable — it pays off here. Verify the flake
+`seedMasterJar` derivation still produces ONE jar (it copies `seed-master-*-exec.jar` — unchanged if
+the bundles are embedded INSIDE it, not staged beside it).
 
 ## What is already known + easy (the non-knot parts)
 
@@ -98,11 +103,13 @@ weigh it. DO NOT code R4 until (A/B/C) is chosen.
 
 ## Workspace / next step
 
-- NO worktree yet — this is the design/carto output, sitting on integration @4d5521e4. Next: take the
-  packaging decision (A/B/C) WITH the user, THEN spin the R4 worktree off design/target-module-layout
-  with this note as its startup brief, and code there (the design session does design, not impl).
-- The packaging choice touches the flake + Pulumi.yaml (runtime-adjacent) → user-owned decision, not
-  standing-autonomy ([[standing-autonomy-except-runtime-config]]).
+- NO worktree yet — this is the design/carto output, sitting on integration @4d5521e4. The packaging
+  decision is now TAKEN (embed bundles intact, self-contained jar — see the DECISION section). Next:
+  spin the R4 worktree off design/target-module-layout with this note as its startup brief, and code
+  there (the design session does design, not impl).
+- The packaging change touches the seed-master shade + verifies the flake derivation still emits ONE
+  jar; `Pulumi.yaml` stays unchanged (single `binary:`), so the runtime-adjacent surface is minimal and
+  the self-containment principle keeps the environment to config-only.
 
 See [[osgi-runtime-migration-state]] (spec §4 is the runtime-target design this implements),
 [[osgi-runtime-r3-consume-references-state]] (dual-path + the deferred gate), [[osgi-runtime-r1-scr-state]]
