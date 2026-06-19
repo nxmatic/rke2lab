@@ -56,6 +56,22 @@ a conversation across worktrees (a one-file transcript symlink was tried 2026-06
 broke the invariant). Cross-conversation continuity flows through COMMITTED MEMORY; the HUMAN carries
 the live thread between windows. A conversation is visible ONLY in its own workspace.
 
+**★ KNOWN DEFECT — handoff to the main workspace (fix before the next work worktree).** Observed
+2026-06-19 from worktree `feature/osgi-runtime-r3-consume-references`: the session's system prompt
+announced file-memory at `.claude/projects/-private-var-lib-git-nxmatic-rke2lab-d-MAIN/memory/` —
+i.e. the **main** worktree's slug, NOT this worktree's. The correct slug for this worktree (fact #3:
+`s:[/.]:-:g` over the working-tree root) is
+`-private-var-lib-git-nxmatic-rke2lab-d-feature-osgi-runtime-r3-consume-references`. So config-home /
+the runtime memory path resolved to MAIN's slug, and THIS worktree's
+`.claude/projects/<this-slug>/memory` symlink was absent → the announced path does not exist here.
+No data lost (committed `.claude/memory/` is the real source, read directly), but the auto-load
+bridge is broken for non-main worktrees. **Likely cause:** the per-worktree `.code-workspace` was
+generated with a `CLAUDE_CONFIG_DIR` / `link-memory.sh` slug that wasn't recomputed for this
+worktree (carried main's, or the symlink step was skipped). **Fix for the next work worktree:** when
+generating the worktree's `.code-workspace`, recompute the slug from THIS worktree's root and run
+`link-memory.sh` so `.claude/projects/<this-slug>/memory -> .claude/memory` exists and resolves;
+verify the announced path matches the worktree root, not `…-d-main`.
+
 **Residual / not done:** the nix `claudeCodeSeedMemory` activation (minimal home-tier seed-if-absent)
 was never wired — revisit only if a fresh machine needs the home tier bootstrapped.
 

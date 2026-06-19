@@ -56,7 +56,7 @@ public final class RKE2LabEnvConfigManifestsUnit extends AbstractManifestsUnit {
   protected void doSynthesize(final Construct scope, final ManifestsUnitContext context) {
     final NodeEnvContext nodeEnvContext = new DefaultNodeEnvContext();
     final NodeEnvContributorRegistry envContributorRegistry =
-        new NodeEnvContributorRegistry(nodeEnvContext);
+        NodeEnvContributorRegistry.forServiceLoader();
 
     for (String section : ENV_SECTIONS) {
       createSectionConfigMap(scope, section, nodeEnvContext, envContributorRegistry);

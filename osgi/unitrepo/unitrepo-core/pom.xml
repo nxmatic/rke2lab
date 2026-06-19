@@ -23,6 +23,15 @@
     <dependency>
       <groupId>org.apache.felix</groupId>
       <artifactId>org.apache.felix.resolver</artifactId>
+      <!-- felix.resolver drags org.osgi.core:5.0.0, a pre-R6 org.osgi.framework whose FrameworkUtil
+           lacks asDictionary(Map); on a classpath with Felix 7.x it shadows osgi.core:8.0.0 and
+           breaks framework.init() with NoSuchMethodError. We already declare osgi.core 8.0.0. -->
+      <exclusions>
+        <exclusion>
+          <groupId>org.osgi</groupId>
+          <artifactId>org.osgi.core</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
 

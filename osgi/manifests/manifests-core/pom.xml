@@ -79,6 +79,44 @@
       <artifactId>unitrepo-core</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- org.osgi.resource (capability graph types used by ManifestsDomainRegistry / VisitOrder).
+         Declared explicitly: it previously leaked in transitively via the obsolete org.osgi.core
+         that unitrepo-core now excludes. osgi.core 8.0.0 carries the package. -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>osgi.core</artifactId>
+    </dependency>
+
+    <!-- R3 SCR consumption proof: boot the real bundle on embedded Felix with felix.scr and assert
+         the @Reference(MULTIPLE) registry binds every contributor. Test scope only; the runtime
+         stays dual-path (ServiceLoader) until R5. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>osgi-testkit</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.scr</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- DS runtime API on the test classpath so the system bundle can export it to felix.scr -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.component</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.util.promise</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.util.function</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

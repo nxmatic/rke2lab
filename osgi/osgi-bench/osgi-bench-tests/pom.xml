@@ -17,7 +17,7 @@
   <dependencies>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>osgi-bench-testkit</artifactId>
+      <artifactId>osgi-testkit</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

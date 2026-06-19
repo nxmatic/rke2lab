@@ -2,30 +2,48 @@ package io.nxmatic.rke2lab.manifests.node;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.ServiceLoader;
+import java.util.TreeMap;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
 
 /**
- * Aggregates all {@link NodeEnvContributor} implementations discovered via {@link
- * java.util.ServiceLoader} and manages env var generation for runtime env-config synthesis.
+ * Aggregates all {@link NodeEnvContributor} implementations and manages env var generation for
+ * runtime env-config synthesis.
+ *
+ * <p>Dual-path discovery (R3, additive): under SCR the contributors arrive by {@link Reference}
+ * field injection (cardinality {@code MULTIPLE}); the framework-less callers use {@link
+ * #forServiceLoader()}, which discovers them via {@link ServiceLoader}. The static path is retired
+ * in R5 once every caller boots under Felix.
  */
+@Component(service = NodeEnvContributorRegistry.class)
 public class NodeEnvContributorRegistry {
 
-  private final List<NodeEnvContributor> contributors;
-  private final NodeEnvContext context;
+  @Reference(cardinality = ReferenceCardinality.MULTIPLE)
+  private List<NodeEnvContributor> contributors;
 
-  public NodeEnvContributorRegistry(NodeEnvContext context) {
-    this.context = context;
-    this.contributors = loadContributors();
+  /**
+   * DS activation path: SCR instantiates via this constructor and injects {@link #contributors}.
+   */
+  public NodeEnvContributorRegistry() {}
+
+  private NodeEnvContributorRegistry(List<NodeEnvContributor> contributors) {
+    this.contributors = contributors;
   }
 
-  /** Load all registered NodeEnvContributor implementations via ServiceLoader. */
-  private List<NodeEnvContributor> loadContributors() {
+  /** Framework-less path: discover contributors via {@link ServiceLoader}. */
+  public static NodeEnvContributorRegistry forServiceLoader() {
     var loader = ServiceLoader.load(NodeEnvContributor.class);
     var list = new ArrayList<NodeEnvContributor>();
     for (var contributor : loader) {
       list.add(contributor);
     }
-    return list;
+    return new NodeEnvContributorRegistry(List.copyOf(list));
   }
 
   /**
@@ -42,10 +60,9 @@ public class NodeEnvContributorRegistry {
             "high-availability", 5,
             "runtime", 6,
             "gitops", 7);
-    contributors.sort(
-        (a, b) ->
-            order.getOrDefault(a.domainId(), 99).compareTo(order.getOrDefault(b.domainId(), 99)));
-    return contributors;
+    return contributors.stream()
+        .sorted(Comparator.comparingInt(c -> order.getOrDefault(c.domainId(), 99)))
+        .toList();
   }
 
   /**
@@ -53,7 +70,7 @@ public class NodeEnvContributorRegistry {
    * domains override earlier ones (cluster < node < storage < networking < high-availability <
    * runtime < gitops).
    */
-  public Map<String, String> aggregateContributions() throws IOException {
+  public Map<String, String> aggregateContributions(NodeEnvContext context) throws IOException {
     var aggregated = new TreeMap<String, String>();
     for (var contributor : orderedContributors()) {
       for (String section : contributor.contributedSections()) {
@@ -65,7 +82,7 @@ public class NodeEnvContributorRegistry {
   }
 
   /** Write all domain contributions as individual ConfigMap YAML files. */
-  public void writeAllContributions(Path outputDir) throws IOException {
+  public void writeAllContributions(Path outputDir, NodeEnvContext context) throws IOException {
     for (var contributor : orderedContributors()) {
       contributor.writeConfigMap(outputDir, context);
     }

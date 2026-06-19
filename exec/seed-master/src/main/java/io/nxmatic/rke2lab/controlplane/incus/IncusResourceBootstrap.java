@@ -1286,9 +1286,9 @@ public final class IncusResourceBootstrap {
         Files.createDirectories(runtimeEnvConfigRoot);
 
         // Write layer contributions first
-        NodeEnvContributorRegistry registry = new NodeEnvContributorRegistry(layerContext);
+        NodeEnvContributorRegistry registry = NodeEnvContributorRegistry.forServiceLoader();
         final List<NodeEnvContributor> orderedContributors = registry.orderedContributors();
-        registry.writeAllContributions(runtimeEnvConfigRoot);
+        registry.writeAllContributions(runtimeEnvConfigRoot, layerContext);
 
         // Aggregate all layer contributions and create 99-configmap with merged vars
         Map<String, String> aggregatedVars = new LinkedHashMap<>();
@@ -1298,7 +1298,8 @@ public final class IncusResourceBootstrap {
         aggregatedVars.putAll(policy.toEnvMap());
 
         // Add layer contributions (later ones override earlier)
-        final Map<String, String> layerContributionVars = registry.aggregateContributions();
+        final Map<String, String> layerContributionVars =
+            registry.aggregateContributions(layerContext);
         aggregatedVars.putAll(layerContributionVars);
 
         final Map<String, Object> annotations = new LinkedHashMap<>();

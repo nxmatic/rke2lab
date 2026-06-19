@@ -3,6 +3,8 @@ package io.nxmatic.rke2lab.osgibench;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.osgi.testkit.FelixFrameworkExtension;
+import io.nxmatic.rke2lab.osgi.testkit.OsgiSpike;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;

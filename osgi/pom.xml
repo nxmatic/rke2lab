@@ -16,6 +16,7 @@
 
   <modules>
     <module>bundle-parent</module>
+    <module>osgi-testkit</module>
     <module>osgi-bench</module>
     <module>unitrepo</module>
     <module>systemd</module>

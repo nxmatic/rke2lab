@@ -2,6 +2,8 @@ package io.nxmatic.rke2lab.osgibench;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import io.nxmatic.rke2lab.osgi.testkit.FelixFrameworkExtension;
+import io.nxmatic.rke2lab.osgi.testkit.OsgiSpike;
 import io.nxmatic.rke2lab.osgibench.scr.Greeter;
 import io.nxmatic.rke2lab.osgibench.scr.GreetingClient;
 import org.junit.jupiter.api.Test;
