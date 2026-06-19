@@ -335,6 +335,25 @@
               </rules>
             </configuration>
           </execution>
+          <!-- Reactor jars resolve sibling-to-sibling from target/ via -am; a SNAPSHOT installed into
+               ~/.m2 would let a build silently resolve a stale frozen sibling and mask workspace
+               incoherence. The install phase is reached only by `mvn install`/`deploy`, never by
+               `package`, so this guard is silent on the normal build and fails loudly on a SNAPSHOT
+               install. A baseline jar is installed under a RELEASE version (passes), never a SNAPSHOT. -->
+          <execution>
+            <id>no-snapshot-install</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <phase>install</phase>
+            <configuration>
+              <rules>
+                <requireReleaseVersion>
+                  <message>Reactor SNAPSHOTs must not be installed to ~/.m2 — siblings resolve through the reactor via -am. Only a deliberate RELEASE-versioned baseline jar may be installed.</message>
+                </requireReleaseVersion>
+              </rules>
+            </configuration>
+          </execution>
         </executions>
       </plugin>
       <plugin>

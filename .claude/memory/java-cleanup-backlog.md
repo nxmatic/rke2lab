@@ -99,6 +99,17 @@ items for context, prune old ones).
 
 ## Done (recent)
 
+- [x] **Machine-enforce no-SNAPSHOT-install + purge ~/.m2 + fix a relativePath bomb** (2026-06-19).
+  Added the `no-snapshot-install` enforcer execution (`requireReleaseVersion` on the `install` phase) in
+  build-parent — `mvn install` of a SNAPSHOT now fails BEFORE writing to ~/.m2 (intra-phase order proven).
+  Then purged the 31 stale rke2lab SNAPSHOTs from ~/.m2 (many were ghost names from the renames:
+  `osgi-bench-*`, `systemd-contract`, `unitrepo-handler-api`, `manifests`, `netplan`, `parent`). The
+  purge IMMEDIATELY surfaced a latent bug it had been masking: `osgi/testkit/pom.xml` had
+  `<relativePath>../build-parent/pom.xml` (one `../` short → resolves to the non-existent
+  `osgi/build-parent`); Maven had been silently falling back to a FROZEN build-parent in ~/.m2, so the
+  build "passed" on a wrong pom. Fixed to `../../build-parent/pom.xml`; audited ALL modules' relativePaths
+  (testkit was the only break). This is exactly the masked-incoherence the no-install rule exists to
+  prevent — the discipline found it the first time it was applied. See [[osgi-baseline-install-discipline]].
 - [x] **this-escape ×4 eliminated** (commit 1bdb9a40, 2026-06-19). Not suppressed:
   SystemdChart now discovers units/drop-ins by walking the construct tree instead of
   constructor self-registration; `UpstreamYamlInclusion` made `final` with private

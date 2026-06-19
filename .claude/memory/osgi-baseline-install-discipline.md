@@ -70,6 +70,26 @@ can only come from the new changes → you know exactly when to bump.
   (≠ SNAPSHOT), consumed only by bnd-baseline as a comparison, a build-dependency of nothing. Do it
   only to freeze a stable reference, never automatically in a work/CI build.
 
+## ★ SHIPPED 2026-06-19 — the no-SNAPSHOT-install guard is now machine-enforced (commit on integration)
+
+The "never install the SNAPSHOT work-artifact" rule is no longer just discipline: a SECOND
+maven-enforcer execution `no-snapshot-install` (built-in rule `requireReleaseVersion`) is bound to the
+`install` PHASE in `build-parent/pom.xml`, beside `enforce-build-tooling`. Direct-to-branch (the user's
+call: tiny change, big safety payoff for dev + both of us).
+
+- **Why the `install` phase, not earlier.** `install` is reached only by `mvn install`/`deploy`, never
+  by `package`/`verify` — so the guard is SILENT on the normal build and fires only when an install is
+  attempted. Naming the intent matters: a guard hooked on `post-integration-test` (which also runs
+  before `install`) would block in time but read as nonsense to a future reader. There is no
+  `pre-install`/`post-install` phase — `install` is the idiomatic, legible hook. (Decided with the user.)
+- **Intra-phase ordering verified — the guard fires BEFORE the install-plugin writes.** Within one
+  phase, executions run in plugin declaration order; the enforcer (inherited early via build-parent)
+  precedes `maven-install-plugin`. PROVEN: clean-`~/.m2` re-test twice → `mvn install` of a SNAPSHOT
+  exits 1 AND writes NOTHING to `~/.m2`. (A first run left a stale pom that looked like a write — it was
+  pre-existing residue, not the guard; the clean re-test settled it.) So the SNAPSHOT never lands.
+- **The baseline install still works** — a RELEASE-versioned jar passes `requireReleaseVersion`, so the
+  deliberate freeze act above is unaffected. `mvn package -Posgi` stays green (guard silent).
+
 ## What ships in THIS slice (osgi-cleanup) vs later
 
 - **NOW:** grave `@Version` in `package-info` across osgi/ (source of truth) + wire
