@@ -1,9 +1,9 @@
 package io.nxmatic.rke2lab.manifests.node;
 
 import io.nxmatic.rke2lab.manifests.ManifestYaml;
-import io.nxmatic.rke2lab.manifests.bridge.ManifestAnnotations;
-import io.nxmatic.rke2lab.manifests.bridge.node.NodeEnvContext;
-import io.nxmatic.rke2lab.manifests.bridge.node.NodeEnvContributor;
+import io.nxmatic.rke2lab.manifests.contract.ManifestAnnotations;
+import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContext;
+import io.nxmatic.rke2lab.manifests.contract.node.NodeEnvContributor;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;

@@ -1,11 +1,11 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests;
 
-import io.nxmatic.rke2lab.manifests.bridge.profiles.BootstrapIdentity;
-import io.nxmatic.rke2lab.manifests.bridge.profiles.ComponentVersions;
-import io.nxmatic.rke2lab.manifests.bridge.profiles.FloxDebugPolicy;
-import io.nxmatic.rke2lab.manifests.bridge.profiles.ImageState;
-import io.nxmatic.rke2lab.manifests.bridge.profiles.NetworkTopology;
+import io.nxmatic.rke2lab.manifests.contract.profiles.BootstrapIdentity;
+import io.nxmatic.rke2lab.manifests.contract.profiles.ComponentVersions;
+import io.nxmatic.rke2lab.manifests.contract.profiles.FloxDebugPolicy;
+import io.nxmatic.rke2lab.manifests.contract.profiles.ImageState;
+import io.nxmatic.rke2lab.manifests.contract.profiles.NetworkTopology;
 import java.util.Objects;
 
 /**

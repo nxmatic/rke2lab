@@ -1,9 +1,9 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests.cli;
 
-import io.nxmatic.rke2lab.manifests.bridge.ManifestSynthesisRequest;
-import io.nxmatic.rke2lab.manifests.bridge.ManifestSynthesisResult;
-import io.nxmatic.rke2lab.manifests.bridge.ManifestSynthesisService;
+import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisRequest;
+import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisResult;
+import io.nxmatic.rke2lab.manifests.contract.ManifestSynthesisService;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;

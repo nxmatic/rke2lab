@@ -1,7 +1,7 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests;
 
-import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainPolicy;
+import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 
 /**
  * Registers a manifest domain with its manifest units. Implementations can conditionally include

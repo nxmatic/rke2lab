@@ -1,7 +1,7 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests;
 
-import io.nxmatic.rke2lab.manifests.bridge.ManifestAnnotations;
+import io.nxmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

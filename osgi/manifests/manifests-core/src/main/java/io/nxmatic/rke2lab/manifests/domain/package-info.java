@@ -16,9 +16,9 @@
  *     List.of(new FluxOperatorManifestsUnit()));
  * }</pre>
  *
- * <p>Domain IDs always come from {@link io.nxmatic.rke2lab.manifests.bridge.ManifestDomainCatalog},
- * never string literals — this prevents the kebab-case/camelCase mismatches documented in the
- * catalog pattern.
+ * <p>Domain IDs always come from {@link
+ * io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog}, never string literals — this
+ * prevents the kebab-case/camelCase mismatches documented in the catalog pattern.
  *
  * <h2>Status note</h2>
  *

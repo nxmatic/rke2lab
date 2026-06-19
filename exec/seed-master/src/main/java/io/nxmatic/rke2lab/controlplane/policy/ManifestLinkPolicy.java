@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.policy;
 
-import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainCatalog;
-import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainPolicy;
+import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.contract.ManifestDomainPolicy;
 import java.util.LinkedHashMap;
 import java.util.Map;
 

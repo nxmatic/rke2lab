@@ -1,7 +1,7 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests.profiles;
 
-import io.nxmatic.rke2lab.manifests.bridge.ManifestAnnotations;
+import io.nxmatic.rke2lab.manifests.contract.ManifestAnnotations;
 import java.util.Map;
 
 public final class PackageMetadataProfile {

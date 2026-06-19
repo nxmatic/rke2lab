@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.manifests;
 
-import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import java.util.Objects;
 
 /** Shared policy model describing how a workflow delivers and materializes host assets. */

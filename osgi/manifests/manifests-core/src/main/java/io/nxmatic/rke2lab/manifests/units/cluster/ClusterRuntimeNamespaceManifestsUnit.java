@@ -3,7 +3,7 @@ package io.nxmatic.rke2lab.manifests.units.cluster;
 
 import io.nxmatic.rke2lab.manifests.AbstractManifestsUnit;
 import io.nxmatic.rke2lab.manifests.ManifestsUnitContext;
-import io.nxmatic.rke2lab.manifests.bridge.ManifestDomainCatalog;
+import io.nxmatic.rke2lab.manifests.contract.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.util.List;
 import java.util.Map;
