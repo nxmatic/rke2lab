@@ -81,6 +81,27 @@ Each per-subsystem view below lives inside this frame: the doctor constellation 
 record model) wrapped by a host-space ledger write-side; the Step-2 config view (when it lands) is the
 first to draw the crossing contract explicitly.
 
+[NOTE]
+.Terminology — `system`, `space`, `world`, `universe`, and where `exec/` fits
+====
+These words are used precisely throughout the atlas and specs; this is the glossary.
+
+* *system* — THE WHOLE: the two spaces (OSGi + host) joined into one thing that runs. The spaces are
+  *parts of the system*; the system is not a third space.
+* *space* — a top-level LAYOUT directory, sorted by the purity + nature axes: `osgi/` (pure, describes),
+  `host/` (actualises over Pulumi), `exec/` (the *nature* axis — executables). "Two spaces" names the
+  PURITY seam (osgi↔host); `exec/` is the orthogonal nature axis, not a third purity space — so the
+  two-spaces frame above stays exactly right.
+* *world* — a RUNTIME classloader region: the OSGi world (bundle classloaders, no gRPC) vs the HOST
+  world (one flat classloader, holds gRPC). Same osgi/host line as the spaces, seen at runtime.
+* *`exec/` MATERIALISES the system* — an `exec/` module (`seed-master`) embeds both worlds into one
+  launchable artifact: the OSGi bundles (describe) + the host adapters (actualise), composed into a
+  self-contained jar that boots Felix inside `Pulumi.run` (the R4 view below). That is the role the
+  terminology was missing: osgi *describes*, host *actualises*, `exec/` *materialises*.
+* *universe* — RESERVED for the resolver sense (`UnitResolver`'s candidate set, `ManifestsUniverse`); it
+  is NOT a synonym for "system". Kept distinct on purpose.
+====
+
 == Per-subsystem index
 
 * <<doctor-view,Doctor subsystem>> — the diagnostic layer (remediation round-trip, medical record,
