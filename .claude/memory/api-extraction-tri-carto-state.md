@@ -1,6 +1,6 @@
 ---
 name: api-extraction-tri-carto-state
-description: "DESIGN/CARTO (read-only on integration @a100b75d, 2026-06-19): the API-extraction sort, the prerequisite to R4. The principle (user): the host must NOT see OSGi impl classes — fail-fast at BUILD, via dedicated *-api modules. But there are TWO kinds of API distinguished by WHO consumes (confirmed against integration-atlas.adoc §'two spaces'): (1) BRIDGE api — consumed by the HOST (and implemented by an OSGi bundle) → belongs to the HOST world (host owns the port, OSGi implements it; DIP, both arrows point at the host api); OSGi consumes host interface classes via system.packages.extra from the system bundle (R1's single-exporter, atlas P2). (2) INTRA-OSGi api — consumed ONLY by other bundles, never the host → stays an api bundle in the OSGi world. Sort criterion = does the host import this type? Carto found: unitrepo = pure intra-OSGi (host imports nothing); netplan = host imports only ClusterNetworkBlueprint (from the IMPL package …netplan, NOT …netplan.api — the existing split is mis-oriented vs who-consumes); manifests = 17 host-imported types SORTED (settled with user 2026-06-19): bridge-api = the 3 SPIs + 4 exchange records + NodeEnvContext + NodeEnvContributor (re-exported to OSGi) + ManifestDomainPolicy/Catalog/Annotations + 2 profiles records; STAY OSGi (invert at R4) = ManifestYaml, NodeEnvContributorRegistry, FloxRuntimeAssets. netplan bridge-api = ClusterNetworkBlueprint. Per-type sort DONE (api = ports + exchange records + shared value/constant types ONLY). NOT coded, NO worktree. Naming collision (api/impl/cli across 3 spaces) is the LAST decision before this becomes a codable prerequisite slice."
+description: "DESIGN/CARTO (read-only on integration @a100b75d, 2026-06-19): the API-extraction sort, the prerequisite to R4. The principle (user): the host must NOT see OSGi impl classes — fail-fast at BUILD, via dedicated *-api modules. But there are TWO kinds of API distinguished by WHO consumes (confirmed against integration-atlas.adoc §'two spaces'): (1) BRIDGE api — consumed by the HOST (and implemented by an OSGi bundle) → belongs to the HOST world (host owns the port, OSGi implements it; DIP, both arrows point at the host api); OSGi consumes host interface classes via system.packages.extra from the system bundle (R1's single-exporter, atlas P2). (2) INTRA-OSGi api — consumed ONLY by other bundles, never the host → stays an api bundle in the OSGi world. Sort criterion = does the host import this type? Carto found: unitrepo = pure intra-OSGi (host imports nothing); netplan = host imports only ClusterNetworkBlueprint (from the IMPL package …netplan, NOT …netplan.api — the existing split is mis-oriented vs who-consumes); manifests = 17 host-imported types SORTED (settled with user 2026-06-19): bridge-api = the 3 SPIs + 4 exchange records + NodeEnvContext + NodeEnvContributor (re-exported to OSGi) + ManifestDomainPolicy/Catalog/Annotations + 2 profiles records; STAY OSGi (invert at R4) = ManifestYaml, NodeEnvContributorRegistry, FloxRuntimeAssets. netplan bridge-api = ClusterNetworkBlueprint. Per-type sort DONE (api = ports + exchange records + shared value/constant types ONLY). ★ NAMING SETTLED: role-suffix, space=dir never in artifactId; BRIDGE port = `-bridge-api` in host/ (`host/manifests-bridge-api`, `host/netplan-bridge-api`), impl stays `-core`/its name in osgi/ (`manifests-core` UNCHANGED — NOT `-impl`, cf. unitrepo-core), intra-OSGi api = `-api`/`-handler-api`, cli = `-cli`. READY to become a codable prerequisite slice BEFORE R4 (own worktree). NOT coded yet."
 metadata:
   node_type: memory
   type: project
@@ -93,27 +93,65 @@ contract — the user's frontier rule: ports + exchange records + shared value/c
 `…netplan`). `NetplanSynthesisService` is CLI-facing (exec), NOT host-facing → it is netplan's own-world
 port, not a host bridge-api. The netplan→host blueprint feed is load-bearing (nix-darwin-home, flake).
 
-## Open: the naming collision (still to settle WITH the user)
+## ★ Naming convention (SETTLED with the user 2026-06-19)
 
-With `artifactId == leaf-dir-name` and "the SPACE never appears in the artifactId", one domain now wants
-to exist in up to 3 spaces: host (bridge api), osgi (impl + maybe intra-osgi api), exec (cli). Without a
-role suffix the three collide on `manifests`. Candidate convention (NOT yet chosen): role suffix —
-`host/manifests-api` (bridge port) / `osgi/manifests/manifests-impl` (provider bundle; the recent
-`manifests-core` rename then becomes `-impl`, since "core" is a misnomer once the api is out) /
-`exec/manifests-cli`; intra-OSGi api bundles keep their own suffix (`unitrepo-handler-api` already does).
-Decision deferred — the user was "pas encore complètement clair", and the netplan finding (api defined by
-interface-vs-class, not by consumer) means the split lines move, so naming should be fixed AFTER the
-per-type sort is agreed.
+The rule, confirmed against the existing reactor: **`artifactId == leaf-dir-name`; the SPACE
+(`osgi`/`host`/`exec`) NEVER appears in the artifactId; the ROLE is carried by a suffix.** User
+principle for this decision: *the NAME must show the role at first glance — the directory is only
+context, and you don't always have it under your eye.* So the role suffix is explicit even when the
+folder would imply it.
+
+[cols="2,1,1,2",options="header"]
+|===
+| Role | Suffix | Space (dir) | Example
+| BRIDGE port (crosses the host↔osgi seam, host-owned) | `-bridge-api` | `host/` | `host/manifests-bridge-api`
+| intra-OSGi api (bundles only) | `-api` / `-handler-api` | `osgi/` | `unitrepo-handler-api` (existing)
+| impl / core | `-core` | `osgi/` | `manifests-core`, `unitrepo-core`
+| CLI | `-cli` | `exec/` | `manifests-cli`, `netplan-cli`
+|===
+
+Two consequences:
+
+- **`manifests-core` STAYS `manifests-core`** (NOT `-impl`). Earlier in this session I floated
+  `manifests-impl`; that was WRONG — the established convention is `-core` for the implementation/kernel
+  (cf. `unitrepo-core`). The module renamed last session is stable; only the api is NEW.
+- The word **`bridge`** is not invented: it is the house term — the atlas calls it the "bundle/host
+  contract", this carto calls it BRIDGE api. `-bridge-api` makes a lone import (`io.nxmatic.rke2lab.
+  manifests.bridge.api.…` or artifact `manifests-bridge-api`) self-describing without the tree.
+
+**Target modules for the extraction slice:**
+
+- `host/manifests-bridge-api` — the manifests ports + exchange records + shared value/constant types
+  (the bridge-api column of the per-type table above). NodeEnvContributor lives here too, re-exported
+  to OSGi via `system.packages.extra`.
+- `host/netplan-bridge-api` — `ClusterNetworkBlueprint` (+ its transitive contract types). NOTE
+  `NetplanSynthesisService` is CLI-facing (consumed by `exec/netplan-cli`), does NOT cross the
+  host↔osgi seam → it is NOT a bridge-api; it stays an own-world port on the netplan impl side.
+- `osgi/manifests/manifests-core` — UNCHANGED name; loses the lifted port types, keeps the impls
+  (`Default*Service`, `ManifestYaml`, `NodeEnvContributorRegistry`, `FloxRuntimeAssets`) + depends on
+  `manifests-bridge-api` to implement the ports.
+- `osgi/netplan` — UNCHANGED name (the impl); depends on `netplan-bridge-api`.
+- `unitrepo` — untouched (pure intra-OSGi, already `-core` / `-handler-api`).
+
+Open sub-question for the slice (minor): the Java PACKAGE for the bridge-api — keep
+`io.nxmatic.rke2lab.manifests` (the types move module but not package, so no import churn beyond the new
+module dep) or introduce `io.nxmatic.rke2lab.manifests.bridge`? Lean: keep the package, move only the
+module — minimal churn, and bnd export is by package so the bundle still exports the same names. Decide
+when coding the slice.
 
 ## Next step
 
-- This is the design/carto output on integration @a100b75d. NEXT: agree the per-type sort for manifests
-  (ports → host bridge-api; defects `NodeEnvContributorRegistry`/`FloxRuntimeAssets` → invert) and the
-  netplan re-sort (`ClusterNetworkBlueprint` is the host bridge type), THEN settle the role-suffix
-  naming, THEN this becomes a prerequisite slice BEFORE R4 (a dedicated worktree). R4's boot seam then
-  lands on a clean api/impl frontier and the fail-fast is free.
-- Touches module layout + the host/osgi boundary; the naming + invert decisions are user-owned
-  ([[standing-autonomy-except-runtime-config]]). The design session does design, not impl.
+- This is the design/carto output on integration @a100b75d. The per-type sort AND the naming are now
+  SETTLED (sections above). This is READY to become a prerequisite slice BEFORE R4: a dedicated worktree
+  that creates `host/manifests-bridge-api` + `host/netplan-bridge-api`, moves the bridge-api types into
+  them, re-points `manifests-core`/`netplan` (impl) + the host consumers at the new modules, and proves
+  the build is green with the host compiling ONLY against `*-bridge-api` (the fail-fast: a host
+  `new DefaultX()` no longer compiles). R4's boot seam then lands on a clean api/impl frontier.
+- The 3 stay-OSGi types' wrong-direction host usages (`ManifestYaml`, `NodeEnvContributorRegistry`,
+  `FloxRuntimeAssets`) are INVERTED at R4, not in this slice — this slice only lifts the genuine ports.
+- Touches module layout + the host/osgi boundary; decisions were user-owned
+  ([[standing-autonomy-except-runtime-config]]). The design session does design, not impl — the slice
+  itself runs in its own worktree.
 
 See [[osgi-runtime-r4-boot-seam-state]] (R4, which this de-risks — the self-contained-jar packaging +
 the boot seam), [[osgi-runtime-r3-consume-references-state]] (the dual-path + NodeEnvContributorRegistry
