@@ -28,6 +28,24 @@ gap: there was no word for THE WHOLE. Carto of actual usage (atlas + specs + cod
   (`UnitResolver(List<UnitResource> universe)`), `ManifestsUniverse`, "the manifests universe". NOT a
   synonym for "system". Renaming the resolver field was considered and rejected (code churn for no gain);
   instead "system" fills the whole-system slot and "universe" stays the resolver's.
+- **port** — an *OSGi port*: the pure boundary model (interfaces + records, zero engine imports) that the
+  HOST calls and an OSGi bundle implements. By the purity axis its nature is osgi/, so it lives in
+  `osgi/<domain>/<domain>-port` — and the module/package name is reduced to bare **`port`** (not
+  `osgi-port`) BECAUSE the osgi/ belonging is already carried by the space; prefixing `osgi-` would
+  re-state what the location says. Hexagonally the port belongs to the DOMAIN, not the adapter: both the
+  host and the impl depend on it (DIP). Versioned bundle at BUILD, NOT installed into Felix — at runtime
+  it is **system-exported** (`system.packages.extra`, flat) and **host-loaded** (the resolution reads
+  osgi port ← system-exported ← host-loaded: the host loads the class, resolved via the system bundle's
+  export, back to the port defined in osgi/). DISTINCT from the *bundle/host contract* below.
+  Named-by-NATURE taxonomy (`-port`/`-spi`/`-api`): `-spi` = an interface resolved INSIDE the osgi world
+  the dependant *implements* (e.g. `unitrepo-handler-spi`); `-api` = a surface the dependant *calls*; a
+  port is BOTH at once across the frontier, so it is named by concern, never `.api`/`.spi`
+  ([[rename-contract-to-port-state]]).
+- **bundle/host contract** — DO NOT conflate with *port*. This is the capability-resolution seam:
+  `Require osgi.extender` + `SectionReader` (config view), a bundle declaring a need the host satisfies.
+  It is a contract (a declared/satisfied capability), not a typed model crossing the frontier. The atlas
+  keeps the word "contract" for THIS; what used to be loosely called "the contract" as a typed boundary
+  model is now the *port*.
 
 ## The role triad (the verbs)
 
@@ -49,5 +67,6 @@ The atlas (`docs/architecture/integration-atlas.adoc`) carries this as a NOTE in
 section. When writing specs/docs/memory, use these words with these meanings — precision of naming is a
 project principle ([[every-module-has-a-description]] sibling discipline). See
 [[osgi-runtime-r4-boot-seam-state]] (the self-contained jar that materialises the system),
-[[api-extraction-tri-carto-state]] (bridge-api lives in the host world), the atlas "two spaces" + runtime
-view.
+[[rename-contract-to-port-state]] (the `-port`/`-spi`/`-api` taxonomy; contract→port rename),
+[[api-extraction-tri-carto-state]] (the original sort, since superseded — the port lives in osgi/, not
+the host world as that early note framed it), the atlas "two spaces" + runtime view.

@@ -58,7 +58,17 @@ anti-idiom. The packaging is OSGi; the versioning discipline is not yet.
 3. **Keep the Maven GAV at `0.1.0-SNAPSHOT`** (reactor) — versioning is at the package layer, not the
    GAV. (Per-Bundle-Version decoupling deferred per above.)
 
-## Sequencing
+## ★ SHIPPED 2026-06-19 (squash merge dfdd1d23)
+
+Done in the osgi-cleanup slice ([[osgi-cleanup-slice-state]]) — NOT as a separate later slice, it was
+folded in with the port re-placement. `@Version("1.0.0")` graved on every exported osgi/ package (the
+audit's Export-Package sets), decoupled from the 0.1.0-SNAPSHOT GAV. `bnd-baseline-maven-plugin` wired
+in `osgi/bundle-parent` with `failOnMissing=false` — the "decisions owed" below were all resolved:
+the deliberate-install model answers "what released jar to compare against" ([[osgi-baseline-install-discipline]]:
+a release coordinate ≠ SNAPSHOT, frozen by a deliberate rare act, consumed by bnd-baseline ONLY, never
+from ~/.m2 as a build dep). Per-Bundle-Version decoupling stayed deferred as planned.
+
+## Sequencing (historical — pre-merge)
 
 - The CONTRACT slice ([[contract-placement-and-versioning-carto]]) is the FIRST application: when the
   contracts are bundle-ified in osgi/, they get `package-info @Version` from the start (each independent,

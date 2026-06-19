@@ -105,7 +105,19 @@ worktree or start fresh is a close call — the rename worktree's package/META-I
 the host→osgi git-mv + netplan promotion are new; lean: start a fresh slice off integration and cherry
 or redo (the rename worktree's value is mostly the package-rename sed, cheap to redo). Decide at setup.
 
-## Sequencing
+## ★ SHIPPED 2026-06-19 (squash merge dfdd1d23)
+
+Executed in the osgi-cleanup slice ([[osgi-cleanup-slice-state]]), with one refinement: the modules
+landed as `-port`, not `-contract` — `contract` was judged too generic mid-slice, `port` names the
+hexagonal nature ([[rename-contract-to-port-state]]). So: `osgi/manifests/manifests-port`,
+`osgi/netplan/{netplan-core,netplan-port}` (netplan promoted FLAT→domain-dir as designed here),
+`osgi/systemd/systemd-port`. Each carries its own `@Version("1.0.0")`; the host now imports versioned
+(`manifests.port;version="[1.0,2)"` — the lone unversioned import that triggered this carto is gone).
+Both open decisions resolved with the user (netplan aggregator shape; baseline-vs-SNAPSHOT →
+failOnMissing=false now, see [[osgi-baseline-install-discipline]]). The runtime model (versioned jar,
+NOT installed as a bundle, flat via system.packages.extra) is unchanged and feeds R4.
+
+## Sequencing (historical — pre-merge)
 
 This is a design/carto note on integration @4b13a39f. NEXT: take the two decisions above (location +
 version) WITH the user, then the rename worktree is re-scoped (or a fresh slice supersedes it) to

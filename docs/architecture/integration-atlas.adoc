@@ -110,9 +110,10 @@ These words are used precisely throughout the atlas and specs; this is the gloss
   introspectable Metatype schema, proven on the real Felix engine by the OSGi bench (Step 2 / slice 2)
   — SECOND subsystem adopting the ritual.
 * <<runtime-view,OSGi runtime view>> — the migration from `ServiceLoader` to a launched Felix +
-  Declarative Services (R1–R3 shipped; R4 boot-seam + the API-extraction prerequisite planned). Refines
-  the generic bundle/host contract into *bridge-api* (host-owned port) vs *intra-OSGi api*, and makes
-  the crossing a RUNTIME service registry rather than a build-time resolution — THIRD view.
+  Declarative Services (R1–R3 + the API-extraction/port re-placement shipped; R4 boot-seam planned).
+  Refines the generic bundle/host contract into a *port* (a pure domain model in `osgi/<domain>-port`,
+  depended on by both worlds — DIP) vs an *intra-OSGi spi*, and makes the crossing a RUNTIME service
+  registry rather than a build-time resolution — THIRD view.
 
 [[doctor-view]]
 == Doctor subsystem — per-subsystem view
@@ -566,7 +567,7 @@ its `Pulumi.run` callback and consumes the pure-model services from the registry
 `wip/specs/2026-06-18-osgi-runtime-migration-design.adoc` (slices R1–R7); this view is the GRADUATION of
 that spec's §7 atlas (Diagrams G/H) into the durable atlas, as the spec itself directed — plus the two
 decisions taken AFTER the spec was frozen (named below so the two documents do not silently diverge):
-the *API-extraction* prerequisite (bridge-api) and the *proof reframe* (R4 by `pulumi preview`, not
+the *API-extraction* prerequisite (the osgi/ ports) and the *proof reframe* (R4 by `pulumi preview`, not
 `-Plive`).
 
 === The model inventory
@@ -578,7 +579,7 @@ the *API-extraction* prerequisite (bridge-api) and the *proof reframe* (R4 by `p
 | R1 — felix.scr in the BOM + embedded-Felix proof | SHIPPED (blue) | `@Component` publishes, `@Reference` binds; anti-cheat = consumer unsatisfied when provider absent
 | R2 — the 5 SPIs declared `@Component` | SHIPPED (blue) | geste A only; bnd emits OSGI-INF; `ServiceLoader` stays active (coexist)
 | R3 — intra-bundle consume via `@Reference` | SHIPPED (blue) | `NodeEnvContributorRegistry` aggregates the 6 contributors via SCR; dual-path (`forServiceLoader()`) kept
-| API-extraction (prerequisite to R4) | PLANNED (green) | lift the BRIDGE ports into `host/*-bridge-api`; host compiles only against the port → fail-fast at build
+| API-extraction + port re-placement (prerequisite to R4) | SHIPPED (blue) | the boundary ports live in `osgi/<domain>/<domain>-port` (the port belongs to the DOMAIN, not the adapter); host compiles against the port → fail-fast at build; each port carries its own `@Version`, host imports it versioned
 | R4 — boot seam in seed-master | PLANNED (green) | embed Felix in the Pulumi callback; host seam reads services from the registry; self-contained jar (bundles embedded intact)
 | R5 — retire `ServiceLoader` | EXPLORATION (amber) | delete the static path once every caller boots under Felix
 |===
@@ -592,13 +593,23 @@ because the ritual requires every changed collaborator to be called out, not sil
 * The crossing is now a RUNTIME *service registry*, not only a build-time *resolution*. Once Felix is
   launched (R4), SCR publishes `@Component` services and consumers bind by `@Reference` (in-bundle) or
   `getServiceReference` (at the host seam).
-* The contract splits by WHO consumes (the API-extraction sort):
-  ** *bridge-api* — a port the HOST consumes and an OSGi bundle implements → lives in the HOST world
-     (`host/*-bridge-api`); the host owns the port, the bundle depends on it to implement (DIP). At
-     runtime the host exports the port package via `system.packages.extra` so the bundle shares one
-     copy of the interface — the same typed-access trick the config view's P2 proved for Metatype.
-  ** *intra-OSGi api* — a port consumed ONLY by other bundles (e.g. `unitrepo-handler-api`) → stays an
-     api bundle in the OSGi world.
+* The typed boundary splits by NATURE — the name follows the relation the module holds with whoever
+  depends on it (the `-port`/`-spi`/`-api` taxonomy). Note this is NOT the *bundle/host contract* of the
+  config view (`Require osgi.extender`, a capability seam) — that keeps the word "contract"; what used to
+  be loosely called "the contract" as a typed model crossing the frontier is now the *port*:
+  ** *port* — a boundary the HOST calls and an OSGi bundle implements. It is a PURE model (interfaces +
+     records, zero engine imports), so by the purity axis its nature is osgi/ and it lives in
+     `osgi/<domain>/<domain>-port` (e.g. `manifests-port`, `netplan-port`, `systemd-port`). The name is
+     reduced to bare `-port`, not `osgi-port`, because the osgi/ belonging is already carried by the
+     space. In hexagonal terms the port belongs to the DOMAIN, not the adapter — BOTH the host (adapter)
+     and the impl bundle depend on it (DIP), neither world depends on the other's impl. It is a versioned
+     bundle at BUILD time but is NOT installed into Felix: at runtime it is system-exported FLAT via
+     `system.packages.extra` and host-loaded (osgi port ← system-exported ← host-loaded), so host and
+     bundle share one copy of the interface — the same typed-access trick the config view's P2 proved for
+     Metatype. (A port is BOTH api and spi at once — the host calls it, the impl implements it — so it is
+     named by concern, never `.api`/`.spi`.)
+  ** *intra-OSGi spi* — a boundary resolved ONLY inside the OSGi world (e.g. `unitrepo-handler-spi`, an
+     extender SPI) → stays an spi bundle in the OSGi world, never crosses the host↔osgi frontier.
 
 This does not erase the old contract box — it types it. The `Require/Provide osgi.extender` resolution
 (config view) and the service registry (this view) are the two halves of the same seam.
@@ -633,12 +644,10 @@ flowchart TB
 ....
 flowchart TB
   subgraph OSGI["OSGi space — pure models"]
+    bapi["the ports: manifests-port / netplan-port / systemd-port (osgi/, versioned)"]:::neu
     spi["the 5 SPIs + impls"]:::osgi
     comp["impls ALSO @Component (R2)"]:::neu
     reg2["NodeEnvContributorRegistry @Component+@Reference (R3)"]:::neu
-  end
-  subgraph HOSTAPI["host world — bridge-api (ports, no impl)"]
-    bapi["manifests-bridge-api / netplan-bridge-api (R-prereq)"]:::neu
   end
   subgraph HOST["host space — actualises"]
     seam0["IncusResourceBootstrap / EntryGatePolicyEnforcer"]:::host
@@ -654,7 +663,7 @@ flowchart TB
   seam0 -->|"R4: getServiceReference, typed via system.packages.extra"| reg
   reg2 -->|"R3: @Reference"| reg
   spi -.->|implement| bapi
-  seam0 -.->|"compiles ONLY against"| bapi
+  seam0 -.->|"compiles + host-loads, system-exported (system.packages.extra)"| bapi
   classDef osgi fill:#eef,stroke:#88a,stroke-width:1px;
   classDef host fill:#fde,stroke:#a58,stroke-width:1px;
   classDef found fill:#eee,stroke:#999,stroke-width:1px;
@@ -662,13 +671,13 @@ flowchart TB
   class spi osgi;
   class seam0 host;
   class sl found;
-  class comp,reg2,reg,fx,bapi,bapi neu;
+  class comp,reg2,reg,fx,bapi neu;
 ....
 
 === Verdict — does it hold?
 
 . *Monotone through R4: yes.* No built box is erased BEFORE→AFTER. `ServiceLoader` + `META-INF/services`
-  and the SPI impls are unchanged; R1–R4 + the bridge-api are all GREEN additions beside them. The
+  and the SPI impls are unchanged; R1–R4 + the ports are all GREEN additions beside them. The
   `@Component` annotations decorate the SAME impl classes (R2) without rewriting them; the registry
   appears beside the static path, both live at once.
 
@@ -678,10 +687,11 @@ flowchart TB
   surface is strictly additive; R5 is the conscious, justified breaking change (uniformity: one
   consumption mechanism, not registry + static cousin).
 
-. *The bridge-api is a NEW host-world box, not a rewrite.* It lifts the ports OUT of the OSGi impl
-  modules into `host/*-bridge-api`; the impls then depend on it (DIP). The host's current direct
-  imports of impl classes (`NodeEnvContributorRegistry`, `ManifestYaml`, `FloxRuntimeAssets`) are
-  wrong-direction crossings the atlas already flags — inverted at R4, not lifted into the api.
+. *The ports are NEW osgi/ boxes, not a rewrite.* They lift the boundary models OUT of the OSGi impl
+  modules into `osgi/<domain>/<domain>-port`; the impls then depend on them (DIP), and the host compiles
+  + host-loads them (system-exported). The host's current direct imports of impl classes
+  (`NodeEnvContributorRegistry`, `ManifestYaml`, `FloxRuntimeAssets`) are wrong-direction crossings the
+  atlas already flags — inverted at R4, not lifted into the port.
 
 . *Honest scope.* R1–R3 are proven on embedded Felix (surefire, no `-Plive`). R4's proof is a real
   `pulumi preview` (a dry-run that boots Felix without mutating master) — the `-Plive up` is an optional
@@ -689,8 +699,8 @@ flowchart TB
   #1565); no gRPC type crosses into a bundle.
 
 . *Two evolutions of the spec's §7, named (not silent redraws).* The frozen spec §7 (Diagrams G/H) did
-  not yet carry (a) the API-extraction prerequisite — the bridge-api was decided 2026-06-19, so this
-  view ADDS the `host/*-bridge-api` box that G/H lacked; and (b) the proof reframe — §7 gated R4/R5 on
+  not yet carry (a) the API-extraction prerequisite — the ports were decided 2026-06-19, so this
+  view ADDS the `osgi/<domain>-port` boxes that G/H lacked; and (b) the proof reframe — §7 gated R4/R5 on
   `-Plive`, but `pulumi preview` (a dry-run) boots Felix for real without mutating master, so R4's proof
   is in-scope and the `-Plive up` is an optional final confirmation. Both are refinements the graduating
   view records on top of G/H, leaving G/H intact as the design-time origin.
