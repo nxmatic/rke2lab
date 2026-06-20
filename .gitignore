@@ -576,3 +576,6 @@ flycheck_*.el
 
 
 # End of https://www.toptal.com/developers/gitignore/api/emacs
+
+# kroki-generated diagram SVGs (regenerable from the .adoc mermaid blocks)
+docs/architecture/**/diag-*.svg

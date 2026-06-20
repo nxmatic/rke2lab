@@ -1,0 +1,178 @@
+= Unit repository — model overview
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* DESIGN, unified into rke2lab (2026-06-20). This is the entry point of the unit-repository
+design — the vision formerly developed in the standalone `docrepo-dag-wip` repo, now folded into
+rke2lab because the host project matured enough to host it (the OSGi framework boots in production,
+a Felix resolver runs in production, the hand-rolled dependency walker is retired). It is a sibling
+per-subsystem view of the rke2lab `doctor/`, read against the same `integration-atlas.adoc`.
+
+This doc carries the thesis, the shipped-vs-design state, and the settled decisions. The companion
+docs elaborate each concern; the atlas proves the whole is additive.
+====
+
+== The thesis
+
+A *unit repository* is the OSGi resolution model joined to a peer-to-peer provisioning and history
+layer that neither OBR nor p2 targeted. The resolution model is reused as a vocabulary of
+capabilities and requirements that a resolver assembles into a satisfying closure; the provisioning
+and history layer is git-faithful and content-addressed.
+
+A *unit* is a living entity: configuration plus logic — data plus behaviour. That is the reason for
+OSGi over plain git storage: behaviour must be resolved and bound, not merely stored. rke2lab's own
+`ManifestsUnit` and `SystemdUnit` are the first concrete units; the generic supertype is the OSGi
+generic `Resource` (Core ch.6), never `Bundle` (a handler is a bundle — the word keeps its precise
+OSGi meaning).
+
+== What is already true, and what is still design
+
+The vision was written before the rke2lab OSGi runtime shipped. Since then the world has caught up
+with half of it. The resolution core is no longer a proposal — it runs in production.
+
+[cols="2,1,3",options="header"]
+|===
+| Concern | Status | Note
+
+| Resolution oracle
+| SHIPPED
+| `UnitResolver` wraps the injected Felix `Resolver`; `ManifestsUniverse` re-expresses each
+  `ManifestsUnit` and domain as a `UnitResource` with Provide/Require; `CoherentManifestsDomainRegistry`
+  is the single coherence gate. The hand-rolled walker is deleted.
+
+| gRPC-free bundle world
+| SHIPPED
+| The `osgi/` bundles import zero `io.grpc` and zero `com.pulumi`. gRPC stays on the flat host
+  classloader — issue #1565 avoided by construction.
+
+| Handler SPI, providing half
+| SHIPPED
+| `unitrepo-handler-spi` declares the `UnitHandler` interface and provides the
+  `osgi.extender=unitrepo.handler` capability. No concrete handler implementor yet.
+
+| ContentStore on JGit
+| DESIGN
+| Units serialize as git trees, a Visit is a commit, the store is backed by JGit's `ObjectDatabase`
+  SPI, decorrelated. Not built — JGit is a seed-master dependency today, there is no ContentStore.
+
+| Ingest
+| DESIGN
+| Fold each Pulumi checkpoint into a content-addressed Visit-unit. Reuses the already-built
+  `StackCheckpoint` and `StackSnapshot`; a history-fold of a file backend, touching no gRPC.
+
+| Load from store
+| DESIGN
+| Load a handler bundle from the store into the embedded Felix at runtime, so a new unit type does
+  not rebuild the host.
+
+| Mediation seam
+| DESIGN
+| The `unitrepo-pulumi` anti-corruption layer: a neutral `ResourceDescription` in, the narrow engine
+  gRPC facade out. The downstream extension of the shipped port seam.
+
+| Federation
+| DESIGN
+| Peer nodes serve their own DAG, pull closures on need, no central registry. The P2P horizon.
+|===
+
+== The two settled decisions
+
+These two were decided during the unification and supersede the original V1 spec where they differ.
+
+=== Handlers load as bundles in the embedded Felix
+
+The original V1 plan loaded a handler's bytecode by hand, through a parent-first child classloader,
+with no running framework (it called this "mechanism C"). The rke2lab R4 work then shipped an
+embedded Felix that boots inside the `Pulumi.run` callback — and the design's own brainstorm had
+already noted that mechanism C was "the embryo of OSGi-embedded". So mechanism C is dropped: a
+handler loads as a bundle in the embedded Felix. Wherever the older docs say "standalone, no running
+framework", read it as "the resolution model is reused; in rke2lab it runs as an injected service
+inside the booted framework".
+
+=== The handler edge is two orthogonal axes, not one overloaded namespace
+
+A unit binds its behaviour through the extender pattern. The original doc wrote this as a per-type
+extender capability, `osgi.extender=unitrepo.type.X`. Checked against the real `felix.scr` jar, the
+standard DS extender carries ONE name — `osgi.extender=osgi.component` — and the component identity
+travels out of band. Overloading `osgi.extender` with the type conflates two independent axes. The
+unified model keeps them separate:
+
+* the *extender contract* — one name, `osgi.extender=unitrepo.handler`, version-ranged, matching the
+  standard and already shipped as the providing half;
+* the *type wiring* — a separate `unitrepo.type` namespace that carries the per-type edge INTO the
+  resolution graph, so "connected by construction" becomes a property the resolver proves, not a
+  runtime promise.
+
+`UnitResource.provide` and `require` already express both with no structural change; emitting the
+type edge on `ManifestsUniverse` units is implementation, not design.
+
+[mermaid]
+....
+flowchart TB
+  unit["unit of type visit"]
+  ext["osgi.extender unitrepo.handler<br/>the contract, one name"]
+  typ["unitrepo.type type=visit<br/>the resolved wiring"]
+  handler["handler bundle"]
+  unit -->|requires| ext
+  unit -->|requires| typ
+  handler -->|provides| ext
+  handler -->|provides| typ
+  classDef n fill:#eef,stroke:#88a,stroke-width:1px;
+  class unit,ext,typ,handler n;
+....
+
+== The capability map — what the model lets us say
+
+The point of the unification, beyond proving it additive, is the vocabulary of sentences it makes
+sayable about the system. Each capability is pinned to the box that enables it, colored by horizon:
+sayable now, unlocked next by the shipped framework, or the design horizon.
+
+[cols="2,1,3",options="header"]
+|===
+| Capability | Horizon | Enabled by
+
+| Any unit set resolves in one Felix resolve
+| now
+| `UnitResolver`
+
+| A checkpoint is a foldable Visit-unit DAG
+| next
+| ingest plus ContentStore
+
+| A handler loads from the store at runtime
+| next
+| load plus the embedded Felix
+
+| The model decides what, the host actualises how
+| next
+| `ResourceDescription` plus the ACL
+
+| Recruit a specialist by pulling its closure
+| horizon
+| resolve-and-pull
+
+| Share a severed, gated lens of a DAG
+| horizon
+| lens severance
+
+| Reproduce a deploy byte-exact
+| horizon
+| lockfile-DAG
+|===
+
+== The first increment to build
+
+The resolution core is shipped, the framework is shipped. The first buildable increment is the
+framework-unlocked bottom of the "next" band: the *handler edge plus load-from-store* — emit the
+`unitrepo.type` edge on real units, implement one concrete `UnitHandler`, and load it as a bundle
+from the store, proving "use a unit" and "run a module" are one operation. Ingest and the mediation
+seam follow; federation is the horizon.
+
+== Related documentation
+
+* link:../integration-atlas.adoc[Integration atlas] — the unit-repository view is a per-subsystem
+  view there; the additivity proof lives in the atlas, not here.
+* link:../doctor/glossary.adoc[Doctor glossary] — the clinical vocabulary the federation convergence
+  is verified against (a ledger-backed specialist's stack is a unit-DAG).

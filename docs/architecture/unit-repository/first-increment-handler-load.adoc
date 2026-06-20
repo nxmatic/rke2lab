@@ -1,0 +1,117 @@
+= Unit repository — first increment: handler edge + load-from-store
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* DESIGN (2026-06-20). The first buildable increment of the unit repository, the
+framework-unlocked bottom of the "next" band in link:model-overview.adoc[the model overview]. It rests
+on what already shipped — the `UnitResolver` oracle, the `ManifestsUniverse`, the embedded Felix that
+boots in production — and adds the smallest thing that proves a unit is a living entity: a handler,
+resolved by type and loaded from the store, that handles a unit. It touches no gRPC and no
+ContentStore write-side; it is latent (changes nothing in provisioning).
+====
+
+== Why this increment first
+
+The resolution core is shipped and the framework boots in production. The two design decisions are
+settled (mechanism C dropped; the handler edge is two axes). So the first thing to build is the seam
+those decisions describe: bind behavior to a unit by capability, and load that behavior as a bundle in
+the live framework. It is the proof that "use a unit" and "run a module" are one operation — the
+living-entity thesis made real on the smallest possible case. Everything heavier (ingest, the
+mediation seam, federation) builds on a proven handler seam.
+
+== What it rests on (shipped)
+
+* `UnitResolver` — wraps the injected Felix `Resolver`; resolves a Provide/Require closure over a
+  candidate set.
+* `UnitResource` — the generic OSGi `Resource`; its `provide` and `require` verbs already express any
+  namespace, so the handler edge needs no new structural type.
+* `ManifestsUniverse` — re-expresses each `ManifestsUnit` and domain as a `UnitResource`. Today it emits
+  `unitrepo.unit` and `unitrepo.manifest.domain` edges only — no handler edge yet.
+* `UnitHandler` SPI — provides `osgi.extender=unitrepo.handler`; the providing half of the contract. No
+  concrete implementor yet.
+* embedded Felix — boots inside seed-master's `Pulumi.run`; SCR publishes, the host reads via
+  `awaitService`.
+
+== The three gestures
+
+=== Gesture 1 — emit the type edge into the resolution graph
+
+A unit that needs handling must carry, beyond its existing edges, the two-axis handler edge: the
+extender contract requirement and the type-wiring requirement. The handler bundle provides the matching
+pair. The resolver then wires unit to handler — so connectivity is resolver-proven, not a runtime hope.
+
+[mermaid]
+....
+flowchart TB
+  unit["a unit needing handling"]
+  ext["Require osgi.extender unitrepo.handler<br/>the contract"]
+  typ["Require unitrepo.type type=X<br/>the wiring"]
+  handler["handler bundle for type X"]
+  unit -->|carries| ext
+  unit -->|carries| typ
+  handler -->|provides| ext
+  handler -->|provides| typ
+  classDef n fill:#eef,stroke:#88a,stroke-width:1px;
+  class unit,ext,typ,handler n;
+....
+
+The edge is added where units are built into `UnitResource`s. The first carrier can be a single trivial
+unit type, not the whole `ManifestsUniverse` — the increment proves the seam, it does not retrofit every
+existing unit.
+
+=== Gesture 2 — one concrete UnitHandler
+
+The SPI's requiring half lands: a concrete `UnitHandler` for one type, declaring `handledType()` and a
+trivial `handle` (a one-line summary of the unit's content is enough). It is a `@Component` so SCR
+publishes it, and it provides the `unitrepo.type` capability for its type alongside the shared
+`unitrepo.handler` extender contract.
+
+=== Gesture 3 — load the handler as a bundle from the store
+
+Mechanism C is dropped. The handler is loaded as a BUNDLE into the embedded Felix — not through a
+hand-rolled child classloader. In this first increment the "store" can be minimal (the handler bundle
+staged like the other embedded bundles); the point is that the load path is the framework's own
+`installBundle`, so the handler's `@Component` activates and the resolver wires it.
+
+[mermaid]
+....
+flowchart TB
+  store["the store, minimal for now"]
+  felix["embedded Felix"]
+  scr["SCR"]
+  handler["UnitHandler component for type X"]
+  resolver["UnitResolver"]
+  store -->|install bundle| felix
+  felix -->|activates| scr
+  scr -->|publishes| handler
+  resolver -->|wires unit to| handler
+  classDef n fill:#eef,stroke:#88a,stroke-width:1px;
+  class store,felix,scr,handler,resolver n;
+....
+
+== The proof
+
+A unit of type X, carrying the two-axis handler edge, resolves against a universe that includes the
+handler bundle; the resolver wires the unit to the handler; the handler — loaded as a bundle in the
+live framework — handles the unit's content and returns its summary. That single end-to-end path
+demonstrates connected-by-construction (the resolver refuses an unhandled unit) and use-a-unit ==
+run-a-module, with no gRPC crossed and no host rebuild for the new type.
+
+== Out of scope (later increments)
+
+* ContentStore on JGit write-side (option B) — link:jgit-transposition.adoc[the transposition doc]. The
+  store here is minimal; real content-addressed storage is its own increment.
+* ingest — folding Pulumi checkpoints into Visit-units.
+* the mediation seam — `ResourceDescription` plus the `unitrepo-pulumi` ACL.
+* federation, lenses, lockfile-DAG — the design horizon.
+* retrofitting the whole `ManifestsUniverse` with handler edges — the increment proves the seam on one
+  type.
+
+== Related documentation
+
+* link:model-overview.adoc[Model overview] — the thesis, the shipped-vs-design state, the two decisions.
+* link:unit-model.adoc[Unit model] — the living-entity thesis and the constitutive handler edge this
+  increment makes real.
+* link:../integration-atlas.adoc[Integration atlas] — the unit-repository view and the additivity proof.
