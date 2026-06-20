@@ -53,15 +53,50 @@ GOOD (makes the vision feasible, not utopian):
 
 CAVEATS (why it is a real inversion pass, not a move):
 - NOT all stages are pure coordinators: **4 of ~10 import Pulumi/gRPC directly** — `ClusterReadinessStage`,
-  `EnvironmentStage`, `OutputsStage`, `SystemdAdapterStage`. E.g. `EnvironmentStage` takes a
-  `com.pulumi.Context` just to log — actualisation leaking INTO a stage. These need real re-seaming
-  before the orchestrator can move.
+  `EnvironmentStage`, `OutputsStage`, `SystemdAdapterStage`. These need real re-seaming before the
+  orchestrator can move. CORRECTION (2026-06-20, read the code): `EnvironmentStage`'s `com.pulumi.Context`
+  is used for TWO things, not "just to log" as first claimed — (a) reading the engine config
+  (`Rke2labConfig.from(pulumiContext.config("rke2lab"))`, a genuine host concern), and (b) installing a
+  Pulumi log-sink (`SeedLog.installPulumiLogSink` → `pulumiContext.log()`). The config read is the real
+  host coupling; the log-sink is the redundant one — see the logger note below.
 - Most `new X()` in stages are DATA models (`ReportModel`, `ConsultationReport`, `CommandResult`) — NOT
   adapters, NOT inversion points. The genuine adapter-construction to invert is the Incus one (and
   whatever the 4 mixed stages do with their Context).
 - Open question: is bootstrap SEQUENCING itself domain logic, or is it actualisation (a sequential
   effect process)? The type-state grammar argues it is expressible as pure decision, but this must be
   settled per stage, not assumed.
+
+## The logger concern is NOT an inversion point — it's the ambient-context idiom we already own
+
+Investigating `EnvironmentStage`'s Pulumi log-sink (2026-06-20) surfaced this. Facts on integration
+@717943b5: `SeedLog` is on `java.util.logging` (JUL), there is NO `org.slf4j.MDC` anywhere in
+seed-master, NO jul→slf4j bridge, NO logback.xml — i.e. the host application logging is in DEBT
+([[seedlog-logback-migration-backlog]]), and R4 unified only the OSGi side (Pax + StaticLogbackContext →
+host logback, [[osgi-logs-flow-to-host]]). So "we log via the host and have the MDC host-side" is the
+TARGET, not today's state.
+
+The user's key reframe: **MDC == a ThreadLocal — the very mechanism we ALREADY use host-side.** That is
+exactly `ManifestSynthesisContext` ([[synth-context-channel-rule]]): an ambient context carried by a
+ThreadLocal, set by the coordinator under a symmetric `bind()` scope, read downstream with no explicit
+param. So the logging concern dissolves into a pattern we own:
+
+- The orchestrator sets an orchestration context (which stage/topic/target) in a ThreadLocal (MDC-like,
+  à la `ManifestSynthesisContext`); any log emitted downstream — host OR OSGi — picks it up and lands in
+  the one host logback context. The `pulumiContext.log()` bridge in `EnvironmentStage` then becomes
+  REDUNDANT (a second output channel) → delete it, don't invert it. It is not actualisation leaking into
+  a stage; it is a stale log channel.
+- This STRENGTHENS the orchestration-in-OSGi vision: the ThreadLocal ambient-context is precisely what
+  lets an OSGi-resident orchestrator run without threading context through every call — the same
+  ownership-invariant legitimacy as `synth-context-channel-rule` (set/removed symmetrically by the
+  coordinator, all readers in its scope). The OSGi orchestrator `bind()`s the context; host ports
+  actualise by reading it.
+- TO CONFIRM when this slice starts: whether to literally populate `org.slf4j.MDC` (for logback's `%X`)
+  FROM that orchestration ThreadLocal, vs. keep it a plain ambient context the SeedLog→logback path
+  reads. The user's framing is mechanism-by-analogy (ThreadLocal), not necessarily the `org.slf4j.MDC`
+  API — settle the literal binding then.
+
+So: the logger is a SIMPLIFICATION, not a fourth inversion — it folds into the SeedLog→logback debt plus
+the ambient-context idiom, both already understood.
 
 ## Sequencing — the user's call (2026-06-20)
 
