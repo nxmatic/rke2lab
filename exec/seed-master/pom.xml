@@ -50,16 +50,46 @@
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
+    <!-- Runtime-scope: the host compiles only against the -port types; unitrepo-core is needed at
+         run time (and on the test classpath the host-seam test locates it as a bundle). WI-C will
+         embed it intact as an OSGi bundle. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>unitrepo-core</artifactId>
       <version>${project.version}</version>
-      <scope>test</scope>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- felix.resolver is the org.osgi.service.resolver.Resolver PROVIDER: its bundle activator
+         registers the service that manifests-core's @Reference Resolver binds. unitrepo-core keeps
+         it test-scope (it consumes only the interface), so seed-master declares it directly —
+         runtime scope puts it on the host-seam test classpath today and makes it embeddable in WI-C.
+         Same osgi.core:5.0.0 exclusion (it would shadow osgi.core 8.0.0 and break framework.init()). -->
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.resolver</artifactId>
+      <scope>runtime</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.osgi</groupId>
+          <artifactId>org.osgi.core</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-port</artifactId>
       <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>runtime</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>testkit</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
@@ -112,6 +142,13 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <!-- The host's logback backend: gives slf4j a real LoggerContext, which pax-logging-logback
+         REUSES via StaticLogbackContext=true so OSGi (framework/SCR/bundle) logs land in the host
+         logs. The src/main/resources/logback.xml configures it. -->
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jgit</groupId>
@@ -228,6 +265,25 @@
             </goals>
             <phase>package</phase>
             <configuration>
+              <!-- The designed-for-OSGi jars are embedded INTACT (staged under META-INF/bundles by
+                   stage-embedded-bundles below) and installed into Felix as real bundles by
+                   OsgiRuntime. Excluding them from the flat uber-jar keeps each the SINGLE exporter
+                   of its packages: were a jar also flattened, the system bundle would re-export the
+                   same packages off the flat classpath and split the classes (the R1 scar). Their
+                   non-bundle transitive deps (jackson, snakeyaml, commons-compress) still flatten —
+                   the host needs those flat. unitrepo-core + cdk8s-systemd are NOT here: they are
+                   passive libraries (no @Component), served flat as the proven topology does.
+                   logback-classic stays flat too: it is the HOST LoggerContext pax reuses, not a
+                   bundle; felix.framework + osgi.core are the launcher itself. -->
+              <artifactSet>
+                <excludes>
+                  <exclude>io.nxmatic.rke2lab:manifests-core</exclude>
+                  <exclude>org.apache.felix:org.apache.felix.scr</exclude>
+                  <exclude>org.apache.felix:org.apache.felix.resolver</exclude>
+                  <exclude>org.ops4j.pax.logging:pax-logging-api</exclude>
+                  <exclude>org.ops4j.pax.logging:pax-logging-logback</exclude>
+                </excludes>
+              </artifactSet>
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
@@ -255,6 +311,55 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
         <executions>
+          <!-- Stage the designed-for-OSGi jars INTACT under META-INF/bundles (a <resource> root, so
+               they land in the uber-jar AND on the test classpath). OsgiRuntime.embedded* extracts
+               them at boot and installs them by file: URL. Fixed destFileNames give stable lookup
+               keys independent of the version; these are the same artifacts excluded from the flat
+               shade above. -->
+          <execution>
+            <id>stage-embedded-bundles</id>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <phase>generate-resources</phase>
+            <configuration>
+              <!-- Same m2e gate as unpack-manifests-bundle: the IDE incremental builder runs this
+                   mojo without a full reactor package, so the reactor jar isn't built yet (MDEP-187).
+                   The CLI reactor packages manifests-core before seed-master, so it stages fine. -->
+              <skip>${rke2lab.manifests.unpack.skip}</skip>
+              <outputDirectory>${project.build.directory}/generated-resources/META-INF/bundles</outputDirectory>
+              <overWriteReleases>true</overWriteReleases>
+              <overWriteSnapshots>true</overWriteSnapshots>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>io.nxmatic.rke2lab</groupId>
+                  <artifactId>manifests-core</artifactId>
+                  <version>${rke2lab.version}</version>
+                  <destFileName>manifests-core.jar</destFileName>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.apache.felix</groupId>
+                  <artifactId>org.apache.felix.scr</artifactId>
+                  <destFileName>org.apache.felix.scr.jar</destFileName>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.apache.felix</groupId>
+                  <artifactId>org.apache.felix.resolver</artifactId>
+                  <destFileName>org.apache.felix.resolver.jar</destFileName>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.ops4j.pax.logging</groupId>
+                  <artifactId>pax-logging-api</artifactId>
+                  <destFileName>pax-logging-api.jar</destFileName>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.ops4j.pax.logging</groupId>
+                  <artifactId>pax-logging-logback</artifactId>
+                  <destFileName>pax-logging-logback.jar</destFileName>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
           <execution>
             <id>unpack-manifests-bundle</id>
             <goals>

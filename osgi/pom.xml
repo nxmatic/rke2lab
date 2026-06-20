@@ -17,6 +17,7 @@
   <modules>
     <module>bundle-parent</module>
     <module>testkit</module>
+    <module>runtime</module>
     <module>bench</module>
     <module>unitrepo</module>
     <module>systemd</module>

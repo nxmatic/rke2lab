@@ -11,11 +11,14 @@ import io.nxmatic.rke2lab.unitrepo.core.UnitResolver;
 import io.nxmatic.rke2lab.unitrepo.core.UnitResource;
 import java.util.List;
 import java.util.Map;
+import org.apache.felix.resolver.Logger;
+import org.apache.felix.resolver.ResolverImpl;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.osgi.resource.Resource;
 import org.osgi.resource.Wire;
 import org.osgi.service.resolver.ResolutionException;
+import org.osgi.service.resolver.Resolver;
 
 /**
  * Drives {@link ManifestsVisitOrder} against a real {@link UnitResolver} wiring. The visit order it
@@ -36,6 +39,11 @@ final class ManifestsVisitOrderTest {
     return new UnitResource("synthesis-root")
         .requireAll(
             ManifestsUniverse.NS_DOMAIN, "(module=" + ManifestsUniverse.MANIFESTS_MODULE + ")");
+  }
+
+  /** The resolver the test injects — a direct ResolverImpl; production binds the OSGi service. */
+  private static Resolver resolver() {
+    return new ResolverImpl(new Logger(Logger.LOG_ERROR));
   }
 
   private static int indexOf(List<String> order, String id) {
@@ -60,7 +68,7 @@ final class ManifestsVisitOrderTest {
     ManifestsUniverse universe = new ManifestsUniverse(registry);
     UnitResource root = synthesisRoot();
     Map<Resource, List<Wire>> wiring =
-        new UnitResolver(append(universe.universe(), root)).resolve(root);
+        new UnitResolver(append(universe.universe(), root), resolver()).resolve(root);
 
     List<String> order = new ManifestsVisitOrder(wiring, universe.byId()).order();
 
@@ -89,7 +97,7 @@ final class ManifestsVisitOrderTest {
     ManifestsUniverse universe = new ManifestsUniverse(registry);
     UnitResource root = synthesisRoot();
     Map<Resource, List<Wire>> wiring =
-        new UnitResolver(append(universe.universe(), root)).resolve(root);
+        new UnitResolver(append(universe.universe(), root), resolver()).resolve(root);
 
     ManifestsVisitOrder visitOrder = new ManifestsVisitOrder(wiring, universe.byId());
     List<String> order = visitOrder.order();
@@ -121,7 +129,7 @@ final class ManifestsVisitOrderTest {
             .provide(ManifestsUniverse.NS_UNIT, Map.of("unit", "a/Y", "domain", "a"))
             .require(ManifestsUniverse.NS_UNIT, "(unit=a/X)");
 
-    UnitResolver resolver = new UnitResolver(List.of(x, y));
+    UnitResolver resolver = new UnitResolver(List.of(x, y), resolver());
     Map<Resource, List<Wire>> wiring = resolver.resolve(x);
 
     Map<String, UnitResource> byId = Map.of("a/X", x, "a/Y", y);

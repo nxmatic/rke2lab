@@ -9,11 +9,14 @@ import io.nxmatic.rke2lab.unitrepo.core.UnitResource;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.felix.resolver.Logger;
+import org.apache.felix.resolver.ResolverImpl;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.osgi.resource.Resource;
 import org.osgi.resource.Wire;
 import org.osgi.service.resolver.ResolutionException;
+import org.osgi.service.resolver.Resolver;
 
 /**
  * SPIKE (throwaway) for Step 2 — the config bundle/host contract at the RIGHT grain, after the OSGi
@@ -34,6 +37,11 @@ import org.osgi.service.resolver.ResolutionException;
  */
 @Tag("spike")
 class ConfigExtenderResolutionSpikeTest {
+
+  /** The resolver the spike injects — a direct ResolverImpl; production binds the OSGi service. */
+  private static Resolver resolver() {
+    return new ResolverImpl(new Logger(Logger.LOG_ERROR));
+  }
 
   // org.osgi.namespace.extender.ExtenderNamespace (verified on the 1.0.1 jar)
   static final String NS_EXTENDER = "osgi.extender";
@@ -67,7 +75,7 @@ class ConfigExtenderResolutionSpikeTest {
     UnitResource host = configHost();
     UnitResource incus = domainBundle("incus");
 
-    UnitResolver resolver = new UnitResolver(List.of(host, incus));
+    UnitResolver resolver = new UnitResolver(List.of(host, incus), resolver());
     Map<Resource, List<Wire>> wiring = resolver.resolve(incus);
     Set<Resource> closure = wiring.keySet();
 
@@ -89,7 +97,7 @@ class ConfigExtenderResolutionSpikeTest {
             .provide(NS_EXTENDER, Map.of(ATTR_EXTENDER, METATYPE, ATTR_VERSION, "1.4"));
     UnitResource incus = domainBundle("incus");
 
-    UnitResolver resolver = new UnitResolver(List.of(partialHost, incus));
+    UnitResolver resolver = new UnitResolver(List.of(partialHost, incus), resolver());
 
     assertThrows(
         ResolutionException.class,

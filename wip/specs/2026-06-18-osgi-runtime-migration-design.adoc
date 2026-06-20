@@ -262,6 +262,27 @@ into a bundle, so #1565 cannot occur by construction. The seam reads the service
 because `system.packages.extra` exports the API package from the system bundle so host and bundle share
 one copy of the interface — the bench's proven trick (`osgi-test-in-vscode-three-ways`).
 
+[IMPORTANT]
+.Invariant — a system export resolves classes, never carries OSGi behaviour
+====
+A package exported through `system.packages.extra` provides *type resolution only*: the bundle that
+imports it shares the host's flat-classpath copy of those classes. It does *not* carry any of the OSGi
+behaviour the package's origin module may own — no SCR activation (`@Component`), no
+`Provide-Capability`, no metatype, no bundle lifecycle. Those live in the bundle manifest, which a system
+export discards.
+
+The direct consequence, and the rule R4 packaging obeys: *a module may go to `system.packages.extra`
+only if it is passive* — pure types (interfaces, records, library classes). A module with active OSGi
+behaviour MUST be installed as an intact bundle, or its features become silently inert. Concretely in
+R4: `manifests-core` carries all the active behaviour (10 `OSGI-INF` descriptors, `Service-Component`,
+`Provide-Capability`) and is therefore embedded + installed *intact*; the `-port` contracts and the
+passive library bundles (`cdk8s-systemd`, `unitrepo-core`, jackson, cdk8s) are pure types and are served
+flat by the system bundle. A single package must have exactly *one* exporter — re-exporting a `-port`
+package from `manifests-core` while the system bundle also exports it is the split-package hazard R1
+documented (two class copies → the typed lookup silently misses), so the embedded bundle imports the
+`-port` packages and must not re-export them.
+====
+
 === 4.2 SCR vs the bare registry — recommend SCR
 
 Two ways to publish/consume services once a framework runs:
@@ -493,6 +514,9 @@ At merge the green boxes flip blue and Diagram G's static surface is struck thro
   migration moves within (its §2 axis 3 documents the `exec/` = nature axis, updated this session).
 * `wip/specs/2026-06-17-osgi-bench-slice2-design.adoc` — the bench whose `FelixFrameworkExtension`
   becomes the runtime-slice validation harness.
+* link:2026-06-20-osgi-runtime-r4-boot-seam-design.adoc[OSGi runtime R4 — the boot seam] — the design
+  record realising §5's R4 lift: path-2 embedding, the host boot, the three milestone-B inversions, and
+  the Pax logging chain.
 * `docs/architecture/integration-atlas.adoc` — the living view this graduates into at merge (a new
   "runtime" per-subsystem view: the static `ServiceLoader` surface flips to the live registry).
 </content>

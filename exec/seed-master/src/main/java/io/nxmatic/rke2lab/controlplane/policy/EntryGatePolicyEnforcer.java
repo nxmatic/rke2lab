@@ -1,13 +1,13 @@
 package io.nxmatic.rke2lab.controlplane.policy;
 
 import io.nxmatic.rke2lab.manifests.port.ManifestUpdateGate;
+import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.ServiceLoader;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.diff.DiffEntry;
@@ -21,19 +21,27 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 /** Enforces entry-gate policies for bootstrap execution. */
 public final class EntryGatePolicyEnforcer {
 
-  private static final List<EntryGatePolicy> ENTRY_GATE_POLICIES =
-      List.of(
-          new EntryGatePolicy(
-              "manifests-update-gate", EntryGatePolicyEnforcer::enforceManifestUpdateGate),
-          new EntryGatePolicy("clean-git-worktree", EntryGatePolicyEnforcer::enforceCleanWorktree),
-          new EntryGatePolicy(
-              "flake-lock-coherence", EntryGatePolicyEnforcer::enforceFlakeLockCoherence));
-
   private EntryGatePolicyEnforcer() {}
 
-  public static void enforceAll(Path worktreePath, boolean cleanWorktreeRequired) {
+  /**
+   * Run the entry-gate policies in order. {@code osgiRuntime} is threaded only into the
+   * manifests-update gate, which reads its {@link ManifestUpdateGate} from the framework registry.
+   * The policy table is built here (rather than as a static field) so the manifests-gate check can
+   * close over that runtime.
+   */
+  public static void enforceAll(
+      Path worktreePath, boolean cleanWorktreeRequired, OsgiRuntime osgiRuntime) {
+    final List<EntryGatePolicy> policies =
+        List.of(
+            new EntryGatePolicy(
+                "manifests-update-gate", path -> enforceManifestUpdateGate(path, osgiRuntime)),
+            new EntryGatePolicy(
+                "clean-git-worktree", EntryGatePolicyEnforcer::enforceCleanWorktree),
+            new EntryGatePolicy(
+                "flake-lock-coherence", EntryGatePolicyEnforcer::enforceFlakeLockCoherence));
+
     final Path normalizedWorktreePath = worktreePath.toAbsolutePath().normalize();
-    for (EntryGatePolicy policy : ENTRY_GATE_POLICIES) {
+    for (EntryGatePolicy policy : policies) {
       if ("clean-git-worktree".equals(policy.name()) && !cleanWorktreeRequired) {
         continue;
       }
@@ -46,23 +54,14 @@ public final class EntryGatePolicyEnforcer {
     }
   }
 
-  private static void enforceManifestUpdateGate(Path worktreePath) {
-    final List<ManifestUpdateGate> gates =
-        ServiceLoader.load(ManifestUpdateGate.class).stream()
-            .map(ServiceLoader.Provider::get)
-            .toList();
-    if (gates.isEmpty()) {
-      throw new IllegalStateException("No ManifestUpdateGate provider found via ServiceLoader.");
-    }
-    if (gates.size() > 1) {
+  /** Read the single {@link ManifestUpdateGate} from the booted framework's registry. */
+  private static void enforceManifestUpdateGate(Path worktreePath, OsgiRuntime osgiRuntime) {
+    final ManifestUpdateGate gate = osgiRuntime.awaitService(ManifestUpdateGate.class, 5000);
+    if (gate == null) {
       throw new IllegalStateException(
-          "Expected exactly one ManifestUpdateGate provider, found "
-              + gates.size()
-              + ": "
-              + gates.stream().map(ManifestUpdateGate::gateId).toList());
+          "No ManifestUpdateGate published in the OSGi registry within 5s.");
     }
-
-    gates.getFirst().enforce(worktreePath);
+    gate.enforce(worktreePath);
   }
 
   private static void enforceCleanWorktree(Path worktreePath) {

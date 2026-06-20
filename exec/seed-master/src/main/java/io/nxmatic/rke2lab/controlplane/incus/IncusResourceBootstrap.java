@@ -24,9 +24,8 @@ import io.nxmatic.rke2lab.controlplane.incus.image.PulumiIncusImageProvider;
 import io.nxmatic.rke2lab.controlplane.pipeline.OnFailure;
 import io.nxmatic.rke2lab.controlplane.pipeline.TopicRunner;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
-import io.nxmatic.rke2lab.manifests.ManifestYaml;
-import io.nxmatic.rke2lab.manifests.node.NodeEnvContributorRegistry;
-import io.nxmatic.rke2lab.manifests.port.ManifestAnnotations;
+import io.nxmatic.rke2lab.manifests.port.FloxRuntimeAssetService;
+import io.nxmatic.rke2lab.manifests.port.ManifestDocumentService;
 import io.nxmatic.rke2lab.manifests.port.ManifestExplodeRequest;
 import io.nxmatic.rke2lab.manifests.port.ManifestExplodeResult;
 import io.nxmatic.rke2lab.manifests.port.ManifestExplodeService;
@@ -34,11 +33,12 @@ import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisRequest;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisResult;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisService;
 import io.nxmatic.rke2lab.manifests.port.node.NodeEnvContext;
-import io.nxmatic.rke2lab.manifests.port.node.NodeEnvContributor;
+import io.nxmatic.rke2lab.manifests.port.node.NodeEnvOverlayService;
 import io.nxmatic.rke2lab.manifests.port.profiles.ComponentVersions;
 import io.nxmatic.rke2lab.manifests.port.profiles.FloxDebugPolicy;
-import io.nxmatic.rke2lab.manifests.units.runtime.flox.FloxRuntimeAssets;
+import io.nxmatic.rke2lab.manifests.port.profiles.IncusIdentityMaterial;
 import io.nxmatic.rke2lab.netplan.port.ClusterNetworkBlueprint;
+import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
@@ -55,7 +55,6 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -87,14 +86,21 @@ public final class IncusResourceBootstrap {
 
   private final BootstrapContext bootstrapContext;
 
-  public IncusResourceBootstrap(BootstrapConfig config) {
+  /** The embedded OSGi framework whose registry holds the manifests-world services. */
+  private final OsgiRuntime osgiRuntime;
+
+  public IncusResourceBootstrap(BootstrapConfig config, OsgiRuntime osgiRuntime) {
+    if (osgiRuntime == null) {
+      throw new IllegalArgumentException("osgiRuntime must not be null");
+    }
+    this.osgiRuntime = osgiRuntime;
     this.bootstrapContext =
         new BootstrapContext(
             config,
             new PulumiIncusImageProvider(config),
             HostMountSourceVerifier.INSTANCE,
-            new NodeConfigRegenerator(CloudConfigSecretRenderer.INSTANCE),
-            RuntimeEnvControlplaneOverlayWriter.INSTANCE,
+            new NodeConfigRegenerator(
+                new CloudConfigSecretRenderer(singleSpiProvider(ManifestDocumentService.class))),
             IncusImportLookup.INSTANCE,
             LaunchSecretsUpdater.INSTANCE);
   }
@@ -136,7 +142,6 @@ public final class IncusResourceBootstrap {
       PulumiIncusImageProvider imageProvider,
       HostMountSourceVerifier hostMountSourceVerifier,
       NodeConfigRegenerator nodeConfigRegenerator,
-      RuntimeEnvControlplaneOverlayWriter runtimeEnvControlplaneOverlayWriter,
       IncusImportLookup incusImportLookup,
       LaunchSecretsUpdater launchSecretsUpdater) {}
 
@@ -315,7 +320,8 @@ public final class IncusResourceBootstrap {
 
     private SystemdTarget registerSystemdTarget(
         ProvisioningTargetRegistry targetRegistry, BootstrapPaths stagingPaths) {
-      final SystemdTarget systemdTarget = new SystemdTarget();
+      final SystemdTarget systemdTarget =
+          new SystemdTarget(singleSpiProvider(FloxRuntimeAssetService.class));
       try {
         systemdTarget.materialize(stagingPaths);
       } catch (IOException ex) {
@@ -351,7 +357,7 @@ public final class IncusResourceBootstrap {
 
       final Rke2labEnvTarget rke2labEnvTarget =
           new Rke2labEnvTarget(
-              context.runtimeEnvControlplaneOverlayWriter(),
+              singleSpiProvider(NodeEnvOverlayService.class),
               layerContext,
               state.registry.require(ControlplanePolicy.class),
               stagingPaths.runtimeEnvConfigRoot());
@@ -505,13 +511,17 @@ public final class IncusResourceBootstrap {
       FloxDebugPolicy floxDebugPolicy)
       throws IOException {
     final ComponentVersions componentVersions = ComponentVersions.defaults();
+    final IncusIdentityMaterial incusIdentity =
+        new IncusIdentityMaterialAssembler(bootstrapContext.config()).assemble();
 
     final ManifestSynthesisRequest synthRequest =
-        new ManifestSynthesisRequest(synthScratch, consolidated)
-            .withFloxDebugPolicy(floxDebugPolicy)
-            .withBootstrapIdentity(layerContext.bootstrapIdentity())
-            .withNetworkTopology(layerContext.networkTopology())
-            .withComponentVersions(componentVersions);
+        ManifestSynthesisRequest.builder(synthScratch, consolidated)
+            .floxDebugPolicy(floxDebugPolicy)
+            .bootstrapIdentity(layerContext.bootstrapIdentity())
+            .networkTopology(layerContext.networkTopology())
+            .componentVersions(componentVersions)
+            .incusIdentity(incusIdentity)
+            .build();
 
     final ManifestSynthesisService synthesizer = singleSpiProvider(ManifestSynthesisService.class);
     return synthesizer.synthesize(synthRequest);
@@ -639,21 +649,14 @@ public final class IncusResourceBootstrap {
     }
   }
 
+  /** Read the single provider of {@code serviceType} from the booted framework's registry. */
   private <T> T singleSpiProvider(Class<T> serviceType) {
-    final List<T> providers =
-        ServiceLoader.load(serviceType).stream().map(ServiceLoader.Provider::get).toList();
-    if (providers.isEmpty()) {
+    final T service = osgiRuntime.awaitService(serviceType, 5000);
+    if (service == null) {
       throw new IllegalStateException(
-          "No " + serviceType.getSimpleName() + " provider found via ServiceLoader.");
+          "No " + serviceType.getSimpleName() + " published in the OSGi registry within 5s.");
     }
-    if (providers.size() > 1) {
-      throw new IllegalStateException(
-          "Expected exactly one "
-              + serviceType.getSimpleName()
-              + " provider, found "
-              + providers.size());
-    }
-    return providers.getFirst();
+    return service;
   }
 
   private final class ProviderStage {
@@ -1269,94 +1272,6 @@ public final class IncusResourceBootstrap {
             BootstrapPaths.HostPathCatalog.KUBECONFIG.path())
         .disk("nocloud.dir", hostPaths.cloudSeedRoot(), "/var/lib/cloud/seed/nocloud")
         .build();
-  }
-
-  private static final class RuntimeEnvControlplaneOverlayWriter {
-
-    private static final RuntimeEnvControlplaneOverlayWriter INSTANCE =
-        new RuntimeEnvControlplaneOverlayWriter();
-
-    private RuntimeEnvControlplaneOverlayWriter() {}
-
-    private Map<String, Object> write(
-        Path runtimeEnvConfigRoot, NodeEnvContext layerContext, ControlplanePolicy policy) {
-      try {
-        Files.createDirectories(runtimeEnvConfigRoot);
-
-        // Write layer contributions first
-        NodeEnvContributorRegistry registry = NodeEnvContributorRegistry.forServiceLoader();
-        final List<NodeEnvContributor> orderedContributors = registry.orderedContributors();
-        registry.writeAllContributions(runtimeEnvConfigRoot, layerContext);
-
-        // Aggregate all layer contributions and create 99-configmap with merged vars
-        Map<String, String> aggregatedVars = new LinkedHashMap<>();
-
-        // Add bootstrap-only constants first; contributor-owned sections override as needed
-        aggregatedVars.put("RKE2LAB_REPO_ROOT", BootstrapPaths.HostPathCatalog.WORKTREE.path());
-        aggregatedVars.putAll(policy.toEnvMap());
-
-        // Add layer contributions (later ones override earlier)
-        final Map<String, String> layerContributionVars =
-            registry.aggregateContributions(layerContext);
-        aggregatedVars.putAll(layerContributionVars);
-
-        final Map<String, Object> annotations = new LinkedHashMap<>();
-        annotations.put(ManifestAnnotations.LOCAL_CONFIG, "true");
-        annotations.put(
-            "description.kpt.dev", "Controlplane runtime environment with layer contributions");
-        annotations.put(
-            "env.rke2lab.nxmatic.io/section", "section-controlplane-layer-contributions");
-        annotations.put("rke2lab.nxmatic.io/managed-by", "controlplane");
-
-        final Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("annotations", annotations);
-        metadata.put("name", "env-section-controlplane-layer-contributions");
-
-        final Map<String, Object> document = new LinkedHashMap<>();
-        document.put("apiVersion", "v1");
-        document.put("kind", "ConfigMap");
-        document.put("metadata", metadata);
-        document.put("data", aggregatedVars);
-
-        final Path overlayPath =
-            runtimeEnvConfigRoot.resolve(
-                "99-configmap-env-section-controlplane-layer-contributions.yml");
-        ManifestYaml.writeDocument(overlayPath, document);
-        return buildRegistrySnapshot(orderedContributors, layerContributionVars);
-
-      } catch (IOException ex) {
-        throw new IllegalStateException(
-            "Failed to write controlplane runtime env override ConfigMap: " + runtimeEnvConfigRoot,
-            ex);
-      }
-    }
-
-    private static Map<String, Object> buildRegistrySnapshot(
-        List<NodeEnvContributor> orderedContributors, Map<String, String> layerContributionVars) {
-      final List<Map<String, Object>> contributors = new ArrayList<>();
-      final List<String> orderedDomains = new ArrayList<>();
-      final List<String> contributedSections = new ArrayList<>();
-
-      for (NodeEnvContributor contributor : orderedContributors) {
-        final List<String> sections = List.copyOf(contributor.contributedSections());
-        orderedDomains.add(contributor.domainId());
-        contributedSections.addAll(sections);
-        contributors.add(
-            Map.of(
-                "domainId", contributor.domainId(),
-                "contributorClass", contributor.getClass().getName(),
-                "sections", sections,
-                "sectionCount", sections.size()));
-      }
-
-      return Map.of(
-          "contributorCount", contributors.size(),
-          "contributors", contributors,
-          "orderedDomains", List.copyOf(orderedDomains),
-          "contributedSections", List.copyOf(contributedSections),
-          "contributedSectionCount", contributedSections.size(),
-          "aggregatedVariableCount", layerContributionVars.size());
-    }
   }
 
   private final class DefaultBootstrapNodeEnvContext implements NodeEnvContext {
@@ -2299,11 +2214,8 @@ public final class IncusResourceBootstrap {
       }
 
       // Add discovered flox environments
-      final FloxRuntimeAssets floxAssets = systemdTarget.getFloxRuntimeAssets();
-      if (floxAssets != null) {
-        for (var env : floxAssets.getDiscoveredEnvironments()) {
-          manifestBuilder.addFloxEnvironment(env.category(), env.name(), true);
-        }
+      for (var env : systemdTarget.floxAssetService().discoveredEnvironments()) {
+        manifestBuilder.addFloxEnvironment(env.category(), env.name(), true);
       }
 
       // Add staged manifests (post-cluster resources)
@@ -2717,18 +2629,18 @@ public final class IncusResourceBootstrap {
    * environment variables. DYNAMIC: re-sourced on the next service restart.
    */
   private static final class Rke2labEnvTarget implements ProvisioningTarget {
-    private final RuntimeEnvControlplaneOverlayWriter overlayWriter;
+    private final NodeEnvOverlayService overlayService;
     private final NodeEnvContext layerContext;
     private final ControlplanePolicy policy;
     private final Path envConfigRoot;
     private Map<String, Object> layerEnvSummary = Map.of();
 
     private Rke2labEnvTarget(
-        RuntimeEnvControlplaneOverlayWriter overlayWriter,
+        NodeEnvOverlayService overlayService,
         NodeEnvContext layerContext,
         ControlplanePolicy policy,
         Path envConfigRoot) {
-      this.overlayWriter = overlayWriter;
+      this.overlayService = overlayService;
       this.layerContext = layerContext;
       this.policy = policy;
       this.envConfigRoot = envConfigRoot;
@@ -2746,7 +2658,13 @@ public final class IncusResourceBootstrap {
 
     @Override
     public void materialize(BootstrapPaths paths) throws IOException {
-      layerEnvSummary = overlayWriter.write(envConfigRoot, layerContext, policy);
+      // Host-resolved seed variables the manifests world cannot know: bootstrap constants + the
+      // controlplane policy env. Contributor-owned sections override these inside the service.
+      final Map<String, String> seedVariables = new LinkedHashMap<>();
+      seedVariables.put("RKE2LAB_REPO_ROOT", BootstrapPaths.HostPathCatalog.WORKTREE.path());
+      seedVariables.putAll(policy.toEnvMap());
+      layerEnvSummary =
+          overlayService.writeControlplaneOverlay(envConfigRoot, layerContext, seedVariables);
     }
 
     @Override
@@ -2995,9 +2913,11 @@ public final class IncusResourceBootstrap {
 
   private static final class CloudConfigSecretRenderer {
 
-    private static final CloudConfigSecretRenderer INSTANCE = new CloudConfigSecretRenderer();
+    private final ManifestDocumentService documentService;
 
-    private CloudConfigSecretRenderer() {}
+    private CloudConfigSecretRenderer(ManifestDocumentService documentService) {
+      this.documentService = documentService;
+    }
 
     private CloudConfigPayload renderFromManifestSecrets(Path sourceRoot) {
       String userData = null;
@@ -3050,10 +2970,7 @@ public final class IncusResourceBootstrap {
 
     private Map<String, Object> parseYamlDocument(Path yamlSource) {
       try {
-        @SuppressWarnings("unchecked")
-        final Map<String, Object> parsed =
-            ManifestYaml.mapper().readValue(yamlSource.toFile(), Map.class);
-        return parsed;
+        return documentService.parseDocument(yamlSource);
       } catch (IOException ex) {
         throw new IllegalStateException("Failed to parse YAML manifest: " + yamlSource, ex);
       }

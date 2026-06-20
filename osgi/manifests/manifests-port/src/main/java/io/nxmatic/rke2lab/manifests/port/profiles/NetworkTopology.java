@@ -32,8 +32,7 @@ public record NetworkTopology(
     String vipGatewayInetAddr,
     String vipHostInetAddr) {
 
-  private static final NetworkTopology DEFAULT =
-      new NetworkTopology("", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "");
+  private static final NetworkTopology DEFAULT = builder().build();
 
   public NetworkTopology {
     clusterCidr = nullToBlank(clusterCidr);
@@ -59,7 +58,136 @@ public record NetworkTopology(
     return DEFAULT;
   }
 
+  public static Builder builder() {
+    return new Builder();
+  }
+
   private static String nullToBlank(String value) {
     return value == null ? "" : value;
+  }
+
+  /**
+   * The recommended construction path: names each address/CIDR/interface so the sixteen network
+   * strings can't be positionally swapped.
+   */
+  public static final class Builder {
+    private String clusterCidr = "";
+    private String clusterPodCidr = "";
+    private String clusterServiceCidr = "";
+    private String nodeHostInetAddr = "";
+    private String nodeNetworkCidr = "";
+    private String nodeNetworkGatewayAddr = "";
+    private String clusterLoadBalancerCidr = "";
+    private String clusterLoadBalancerGatewayAddr = "";
+    private String lanInterface = "";
+    private String lanHostInetAddr = "";
+    private String lanLoadBalancerCidr = "";
+    private String wanInterface = "";
+    private String vipInterface = "";
+    private String vipCidr = "";
+    private String vipGatewayInetAddr = "";
+    private String vipHostInetAddr = "";
+
+    private Builder() {}
+
+    public Builder clusterCidr(final String v) {
+      this.clusterCidr = v;
+      return this;
+    }
+
+    public Builder clusterPodCidr(final String v) {
+      this.clusterPodCidr = v;
+      return this;
+    }
+
+    public Builder clusterServiceCidr(final String v) {
+      this.clusterServiceCidr = v;
+      return this;
+    }
+
+    public Builder nodeHostInetAddr(final String v) {
+      this.nodeHostInetAddr = v;
+      return this;
+    }
+
+    public Builder nodeNetworkCidr(final String v) {
+      this.nodeNetworkCidr = v;
+      return this;
+    }
+
+    public Builder nodeNetworkGatewayAddr(final String v) {
+      this.nodeNetworkGatewayAddr = v;
+      return this;
+    }
+
+    public Builder clusterLoadBalancerCidr(final String v) {
+      this.clusterLoadBalancerCidr = v;
+      return this;
+    }
+
+    public Builder clusterLoadBalancerGatewayAddr(final String v) {
+      this.clusterLoadBalancerGatewayAddr = v;
+      return this;
+    }
+
+    public Builder lanInterface(final String v) {
+      this.lanInterface = v;
+      return this;
+    }
+
+    public Builder lanHostInetAddr(final String v) {
+      this.lanHostInetAddr = v;
+      return this;
+    }
+
+    public Builder lanLoadBalancerCidr(final String v) {
+      this.lanLoadBalancerCidr = v;
+      return this;
+    }
+
+    public Builder wanInterface(final String v) {
+      this.wanInterface = v;
+      return this;
+    }
+
+    public Builder vipInterface(final String v) {
+      this.vipInterface = v;
+      return this;
+    }
+
+    public Builder vipCidr(final String v) {
+      this.vipCidr = v;
+      return this;
+    }
+
+    public Builder vipGatewayInetAddr(final String v) {
+      this.vipGatewayInetAddr = v;
+      return this;
+    }
+
+    public Builder vipHostInetAddr(final String v) {
+      this.vipHostInetAddr = v;
+      return this;
+    }
+
+    public NetworkTopology build() {
+      return new NetworkTopology(
+          clusterCidr,
+          clusterPodCidr,
+          clusterServiceCidr,
+          nodeHostInetAddr,
+          nodeNetworkCidr,
+          nodeNetworkGatewayAddr,
+          clusterLoadBalancerCidr,
+          clusterLoadBalancerGatewayAddr,
+          lanInterface,
+          lanHostInetAddr,
+          lanLoadBalancerCidr,
+          wanInterface,
+          vipInterface,
+          vipCidr,
+          vipGatewayInetAddr,
+          vipHostInetAddr);
+    }
   }
 }

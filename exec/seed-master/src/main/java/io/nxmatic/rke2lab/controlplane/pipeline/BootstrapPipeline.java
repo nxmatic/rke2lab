@@ -27,6 +27,7 @@ import io.nxmatic.rke2lab.controlplane.pipeline.stages.SystemdAdapterStage;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
+import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -128,6 +129,16 @@ public final class BootstrapPipeline {
     }
 
     /**
+     * Optional: the embedded OSGi framework booted for this run. When set, the stages read the
+     * manifests-world services from its registry; when not (standalone/tests with no embedded
+     * bundles) they fall back to ServiceLoader.
+     */
+    public ComponentBoundPipeline withOsgiRuntime(OsgiRuntime osgiRuntime) {
+      state.osgiRuntime = osgiRuntime;
+      return this;
+    }
+
+    /**
      * Optional: record every checkpoint's scenario into one caller-owned runbook model, and every
      * doctor consultation into one caller-owned {@link ConsultationLog}. The caller renders the
      * runbook (in a {@code finally}, so a CRITICAL stop still produces one); the consultation log
@@ -216,7 +227,8 @@ public final class BootstrapPipeline {
               state.config.localWorktreePath(),
               state.config.imageBuilderHost(),
               state.options.cleanWorktreeRequired(),
-              state.readinessLogger);
+              state.readinessLogger,
+              state.osgiRuntime);
       TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
       return new PreflightDone(state);
     }
@@ -274,7 +286,11 @@ public final class BootstrapPipeline {
 
     public IncusDone during(String topic, Function<IncusStage, IncusStage> body) {
       final IncusStage stage =
-          new IncusStage(state.config, state.policy, result -> state.bootstrapResult = result);
+          new IncusStage(
+              state.config,
+              state.policy,
+              state.osgiRuntime,
+              result -> state.bootstrapResult = result);
       TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
       return new IncusDone(state);
     }

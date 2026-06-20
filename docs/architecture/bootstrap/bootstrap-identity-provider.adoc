@@ -28,14 +28,14 @@ graph TB
         InfraID[Infrastructure Identity<br/>Incus remote = cluster name]
     end
 
-    subgraph Operator["Operator Environment"]
+    subgraph Operator["Operator / host world (seed-master reads here)"]
         Secrets[.secrets<br/><i>incus.capn.clientKey</i>]
         IncusConfig[~/.config/incus/<br/><i>remotes, server certs</i>]
-        Resources[Resources<br/><i>capn-client.crt</i>]
+        Resources[seed-master resources<br/><i>capn-client.crt</i>]
     end
 
     Bootstrap -->|creates| Identity
-    Bootstrap -->|passes in request| Service
+    Bootstrap -->|assembles IncusIdentityMaterial,<br/>passes in request| Service
     Service -->|binds to ThreadLocal| Context
     Context -->|provides| ClusterID
     Context -->|provides| NodeID
@@ -43,9 +43,9 @@ graph TB
 
     Units -->|reads via helper| Context
 
-    Units -.->|reads from| Secrets
-    Units -.->|reads from| IncusConfig
-    Units -.->|reads from| Resources
+    Bootstrap -.->|reads from| Secrets
+    Bootstrap -.->|reads from| IncusConfig
+    Bootstrap -.->|reads from| Resources
 
     style Identity fill:#fff4e6,stroke:#ff9900
     style Context fill:#ccffcc,stroke:#00cc66
@@ -314,17 +314,24 @@ incus config trust add-certificate capn-client.crt \
     --remote nikopol
 ----
 
-=== Step 3: Store Certificate in Resources
+=== Step 3: Store Certificate in the host application resources
 
-Copy the public certificate to the manifests module resources:
+Copy the public certificate to seed-master's resources (the host world):
 
 [source,bash]
 ----
 cp capn-client.crt \
-    manifests/src/main/resources/incus/capn-client.crt
+    exec/seed-master/src/main/resources/incus/capn-client.crt
 ----
 
-This file is shipped with the application and read from classpath during synthesis.
+The `capn-provider` identity is host-owned: seed-master holds it and hands it off to Stage B (it is
+NOT the identity seed-master authenticates with — that is the operator cert in `~/.config/incus/`).
+The host-side `IncusIdentityMaterialAssembler` reads this cert (plus the client key from `.secrets`
+and the server cert + remote address from `~/.config/incus/`), bundles them into an
+`IncusIdentityMaterial`, and passes it across the host→OSGi frontier on the `ManifestSynthesisRequest`.
+The OSGi `IncusIdentitySecretManifestsUnit` only RENDERS the Secret from that material — it never reads
+a host file or classpath resource itself (it cannot: it runs inside an isolated bundle whose
+classloader sees neither the flat classpath nor `~`).
 
 === Step 4: Store Private Key in `.secrets`
 
@@ -531,9 +538,10 @@ No need to update `ManifestSynthesisContext` - it passes the entire `BootstrapId
 
 **Symptom**: `IllegalStateException: Client certificate resource not found: /incus/capn-client.crt`
 
-**Cause**: Certificate not in classpath resources.
+**Cause**: Certificate missing from seed-master's host-world resources, where the
+`IncusIdentityMaterialAssembler` reads it.
 
-**Fix**: Copy certificate to `manifests/src/main/resources/incus/capn-client.crt` and rebuild.
+**Fix**: Copy certificate to `exec/seed-master/src/main/resources/incus/capn-client.crt` and rebuild.
 
 === "incus.capn.clientKey not found in .secrets"
 

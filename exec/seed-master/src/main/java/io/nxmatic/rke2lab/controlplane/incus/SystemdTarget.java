@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.incus;
 
-import io.nxmatic.rke2lab.manifests.units.runtime.flox.FloxRuntimeAssets;
+import io.nxmatic.rke2lab.manifests.port.FloxRuntimeAssetService;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,7 +29,11 @@ public final class SystemdTarget implements ProvisioningTarget {
       CLASSPATH_ROOT + "/incus/manifests/systemd/systemd-scripts";
 
   private final List<Path> materializedPaths = new ArrayList<>();
-  private FloxRuntimeAssets floxRuntimeAssets;
+  private final FloxRuntimeAssetService floxAssetService;
+
+  SystemdTarget(FloxRuntimeAssetService floxAssetService) {
+    this.floxAssetService = floxAssetService;
+  }
 
   @Override
   public String name() {
@@ -62,20 +66,16 @@ public final class SystemdTarget implements ProvisioningTarget {
       deleteSubtree(floxRuntimeTarget);
     }
     Files.createDirectories(floxRuntimeTarget);
-    this.floxRuntimeAssets = FloxRuntimeAssets.builder().build();
-    this.floxRuntimeAssets.writeInstallerAssetTree(floxRuntimeTarget);
+    floxAssetService.writeInstallerAssetTree(floxRuntimeTarget);
     materializedPaths.add(floxRuntimeTarget);
   }
 
   /**
-   * Returns the FloxRuntimeAssets instance used during materialization.
-   *
-   * <p>Provides access to discovered flox environments for slot manifest generation.
-   *
-   * @return the flox runtime assets, or {@code null} if not yet materialized
+   * The flox runtime asset service, exposing the discovered flox environments for slot manifest
+   * generation.
    */
-  public FloxRuntimeAssets getFloxRuntimeAssets() {
-    return floxRuntimeAssets;
+  public FloxRuntimeAssetService floxAssetService() {
+    return floxAssetService;
   }
 
   @Override

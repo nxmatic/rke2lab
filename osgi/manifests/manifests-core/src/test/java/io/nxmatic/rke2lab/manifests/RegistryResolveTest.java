@@ -8,15 +8,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Set;
+import org.apache.felix.resolver.Logger;
+import org.apache.felix.resolver.ResolverImpl;
 import org.junit.jupiter.api.Test;
+import org.osgi.service.resolver.Resolver;
 
 /**
  * The integration keystone: {@link ManifestsDomainRegistry} is now a build-only ASSEMBLED state
- * that never validates at construction, and {@link ManifestsDomainRegistry#resolve()} is the single
- * coherence-rule coordinator that folds in the retired trio's guarantees — unknown refs, cycles,
- * and cross-domain violations all surface here, never silently.
+ * that never validates at construction, and {@link ManifestsDomainRegistry#resolve(Resolver)} is
+ * the single coherence-rule coordinator that folds in the retired trio's guarantees — unknown refs,
+ * cycles, and cross-domain violations all surface here, never silently.
  */
 final class RegistryResolveTest {
+
+  /** The resolver the test injects — a direct ResolverImpl; production binds the OSGi service. */
+  private static Resolver resolver() {
+    return new ResolverImpl(new Logger(Logger.LOG_ERROR));
+  }
 
   private record StubUnit(String manifestUnitId, List<String> dependsOnManifestsUnitIds)
       implements ManifestsUnit {
@@ -50,7 +58,7 @@ final class RegistryResolveTest {
 
     ManifestsDomainRegistry registry = new ManifestsDomainRegistry(List.of(a, b));
 
-    CoherentManifestsDomainRegistry coherent = registry.resolve();
+    CoherentManifestsDomainRegistry coherent = registry.resolve(resolver());
     assertNotNull(coherent);
 
     List<ManifestsUnit> order = coherent.visitOrder();
@@ -77,7 +85,8 @@ final class RegistryResolveTest {
     ManifestsDomainRegistry registry =
         assertDoesNotThrow(() -> new ManifestsDomainRegistry(List.of(a)));
 
-    IllegalStateException failure = assertThrows(IllegalStateException.class, registry::resolve);
+    IllegalStateException failure =
+        assertThrows(IllegalStateException.class, () -> registry.resolve(resolver()));
     assertTrue(
         failure.getMessage().contains("a/X") || failure.getMessage().contains("a/Y"),
         "cycle diagnosis names an offending unit: " + failure.getMessage());
@@ -97,7 +106,8 @@ final class RegistryResolveTest {
     ManifestsDomainRegistry registry =
         assertDoesNotThrow(() -> new ManifestsDomainRegistry(List.of(a, b)));
 
-    IllegalStateException failure = assertThrows(IllegalStateException.class, registry::resolve);
+    IllegalStateException failure =
+        assertThrows(IllegalStateException.class, () -> registry.resolve(resolver()));
     assertTrue(
         failure.getMessage().contains("a/A") && failure.getMessage().contains("b/B"),
         "cross-domain diagnosis names the offending units: " + failure.getMessage());
@@ -122,7 +132,7 @@ final class RegistryResolveTest {
 
     ManifestsDomainRegistry registry = new ManifestsDomainRegistry(List.of(x, y));
 
-    List<ManifestsUnit> order = registry.resolve().visitOrder();
+    List<ManifestsUnit> order = registry.resolve(resolver()).visitOrder();
 
     List<String> ids = order.stream().map(ManifestsUnit::manifestUnitId).toList();
 

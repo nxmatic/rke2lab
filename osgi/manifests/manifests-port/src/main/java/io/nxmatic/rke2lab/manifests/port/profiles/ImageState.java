@@ -28,8 +28,7 @@ public record ImageState(
   /** Sentinel used when seed-master hasn't supplied image state (tests, ephemeral runs). */
   public static final String UNKNOWN = "unknown";
 
-  private static final ImageState DEFAULT =
-      new ImageState(UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN, UNKNOWN);
+  private static final ImageState DEFAULT = builder().build();
 
   public ImageState {
     imageAlias = blankToUnknown(imageAlias);
@@ -48,6 +47,10 @@ public record ImageState(
     return DEFAULT;
   }
 
+  public static Builder builder() {
+    return new Builder();
+  }
+
   /** True when every field is still the sentinel — i.e. seed-master supplied no real identity. */
   public boolean isUnknown() {
     return UNKNOWN.equals(imageFingerprint) && UNKNOWN.equals(imageAlias);
@@ -55,5 +58,49 @@ public record ImageState(
 
   private static String blankToUnknown(String value) {
     return (value == null || value.isBlank()) ? UNKNOWN : value;
+  }
+
+  /**
+   * The recommended construction path: names each field so the image identity values can't be
+   * positionally swapped.
+   */
+  public static final class Builder {
+    private String imageAlias = UNKNOWN;
+    private String imageFingerprint = UNKNOWN;
+    private String imageBuildChecksum = UNKNOWN;
+    private String incusProject = UNKNOWN;
+    private String incusRemoteAddress = UNKNOWN;
+
+    private Builder() {}
+
+    public Builder imageAlias(final String v) {
+      this.imageAlias = v;
+      return this;
+    }
+
+    public Builder imageFingerprint(final String v) {
+      this.imageFingerprint = v;
+      return this;
+    }
+
+    public Builder imageBuildChecksum(final String v) {
+      this.imageBuildChecksum = v;
+      return this;
+    }
+
+    public Builder incusProject(final String v) {
+      this.incusProject = v;
+      return this;
+    }
+
+    public Builder incusRemoteAddress(final String v) {
+      this.incusRemoteAddress = v;
+      return this;
+    }
+
+    public ImageState build() {
+      return new ImageState(
+          imageAlias, imageFingerprint, imageBuildChecksum, incusProject, incusRemoteAddress);
+    }
   }
 }

@@ -35,6 +35,9 @@
     <cdk8s.version>2.70.76</cdk8s.version>
     <cdk8s.plus33.version>2.5.28</cdk8s.plus33.version>
     <slf4j.version>2.0.18</slf4j.version>
+    <!-- Aligned with the logback pax-logging-logback ${pax.logging.version} pulls (2.3.4 → 1.5.34):
+         StaticLogbackContext shares ONE LoggerContext between the host and pax, so both must be the
+         same logback. On a pax bump, re-check `mvn -pl :runtime dependency:tree -Dincludes=ch.qos.logback`. -->
     <logback.version>1.5.34</logback.version>
     <ipaddress.version>5.6.2</ipaddress.version>
     <commons.compress.version>1.28.0</commons.compress.version>
@@ -46,6 +49,14 @@
     <felix.log.version>1.3.0</felix.log.version>
     <felix.configadmin.version>1.9.26</felix.configadmin.version>
     <felix.scr.version>2.2.18</felix.scr.version>
+    <!--
+      Pax Logging: the OSGi logging backend the launched framework drains to. pax-logging-api
+      replaces org.slf4j for bundles; pax-logging-logback registers the OSGi LogService and, with
+      StaticLogbackContext=true, reuses the HOST's logback context so framework/SCR/bundle logs all
+      land in the host logs. 2.3.x targets OSGi R8 (matches felix.framework 7.0.5) and pulls
+      logback 1.5.x — keep logback.version aligned with what pax pulls (below).
+    -->
+    <pax.logging.version>2.3.4</pax.logging.version>
     <osgi.metatype.version>1.4.1</osgi.metatype.version>
     <!--
       OSGi CONSTRUCTION annotations (compile-only, scope provided): bnd reads
@@ -215,6 +226,18 @@
         <groupId>org.apache.felix</groupId>
         <artifactId>org.apache.felix.scr</artifactId>
         <version>${felix.scr.version}</version>
+      </dependency>
+      <!-- Pax Logging: api (replaces org.slf4j for bundles) + logback backend (LogService impl,
+           reuses the host logback context via StaticLogbackContext) -->
+      <dependency>
+        <groupId>org.ops4j.pax.logging</groupId>
+        <artifactId>pax-logging-api</artifactId>
+        <version>${pax.logging.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.ops4j.pax.logging</groupId>
+        <artifactId>pax-logging-logback</artifactId>
+        <version>${pax.logging.version}</version>
       </dependency>
       <dependency>
         <groupId>org.osgi</groupId>

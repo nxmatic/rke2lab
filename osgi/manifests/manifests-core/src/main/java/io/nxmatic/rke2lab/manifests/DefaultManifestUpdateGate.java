@@ -8,13 +8,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
-import java.util.List;
-import java.util.ServiceLoader;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 
 /** Default manifests-owned Stage-A update gate. */
 @Component(service = ManifestUpdateGate.class)
 public final class DefaultManifestUpdateGate implements ManifestUpdateGate {
+
+  @Reference private ManifestSynthesisService synthesisService;
 
   @Override
   public String gateId() {
@@ -23,7 +24,6 @@ public final class DefaultManifestUpdateGate implements ManifestUpdateGate {
 
   @Override
   public void enforce(Path worktreePath) {
-    final ManifestSynthesisService synthesisService = loadRequiredSingleProvider();
     final ManifestSynthesisRequest request = ManifestSynthesisRequest.ephemeral();
     try {
       final ManifestSynthesisResult result = synthesisService.synthesize(request);
@@ -37,26 +37,6 @@ public final class DefaultManifestUpdateGate implements ManifestUpdateGate {
     } finally {
       cleanupEphemeralRequest(request);
     }
-  }
-
-  private static ManifestSynthesisService loadRequiredSingleProvider() {
-    final List<ManifestSynthesisService> providers =
-        ServiceLoader.load(ManifestSynthesisService.class).stream()
-            .map(ServiceLoader.Provider::get)
-            .toList();
-
-    if (providers.isEmpty()) {
-      throw new IllegalStateException(
-          "No ManifestSynthesisService provider found via ServiceLoader.");
-    }
-    if (providers.size() > 1) {
-      throw new IllegalStateException(
-          "Expected exactly one ManifestSynthesisService provider, found "
-              + providers.size()
-              + ": "
-              + providers.stream().map(ManifestSynthesisService::providerId).toList());
-    }
-    return providers.getFirst();
   }
 
   private static void validateSynthesisResult(ManifestSynthesisResult result) throws IOException {

@@ -38,9 +38,7 @@ public record BootstrapIdentity(
   /** Sentinel used when seed-master hasn't supplied identity (tests, ephemeral runs). */
   public static final String UNKNOWN = "unknown";
 
-  private static final BootstrapIdentity DEFAULT =
-      new BootstrapIdentity(
-          UNKNOWN, 0, UNKNOWN, "cluster.local", UNKNOWN, UNKNOWN, 0, UNKNOWN, UNKNOWN);
+  private static final BootstrapIdentity DEFAULT = builder().build();
 
   public BootstrapIdentity {
     clusterName = blankToUnknown(clusterName);
@@ -62,7 +60,87 @@ public record BootstrapIdentity(
     return DEFAULT;
   }
 
+  public static Builder builder() {
+    return new Builder();
+  }
+
   private static String blankToUnknown(String value) {
     return (value == null || value.isBlank()) ? UNKNOWN : value;
+  }
+
+  /**
+   * The recommended construction path: names each field so the cluster/node identity values can't
+   * be positionally swapped (two ints + seven strings).
+   */
+  public static final class Builder {
+    private String clusterName = UNKNOWN;
+    private int clusterId = 0;
+    private String clusterToken = UNKNOWN;
+    private String clusterDomain = "cluster.local";
+    private String clusterEnv = UNKNOWN;
+    private String nodeName = UNKNOWN;
+    private int nodeId = 0;
+    private String nodeKind = UNKNOWN;
+    private String incusRemoteName = UNKNOWN;
+
+    private Builder() {}
+
+    public Builder clusterName(final String v) {
+      this.clusterName = v;
+      return this;
+    }
+
+    public Builder clusterId(final int v) {
+      this.clusterId = v;
+      return this;
+    }
+
+    public Builder clusterToken(final String v) {
+      this.clusterToken = v;
+      return this;
+    }
+
+    public Builder clusterDomain(final String v) {
+      this.clusterDomain = v;
+      return this;
+    }
+
+    public Builder clusterEnv(final String v) {
+      this.clusterEnv = v;
+      return this;
+    }
+
+    public Builder nodeName(final String v) {
+      this.nodeName = v;
+      return this;
+    }
+
+    public Builder nodeId(final int v) {
+      this.nodeId = v;
+      return this;
+    }
+
+    public Builder nodeKind(final String v) {
+      this.nodeKind = v;
+      return this;
+    }
+
+    public Builder incusRemoteName(final String v) {
+      this.incusRemoteName = v;
+      return this;
+    }
+
+    public BootstrapIdentity build() {
+      return new BootstrapIdentity(
+          clusterName,
+          clusterId,
+          clusterToken,
+          clusterDomain,
+          clusterEnv,
+          nodeName,
+          nodeId,
+          nodeKind,
+          incusRemoteName);
+    }
   }
 }

@@ -107,6 +107,21 @@
       <artifactId>org.apache.felix.scr</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- felix.resolver as the Resolver PROVIDER on the test classpath: the unit tests
+         (ManifestsVisitOrderTest, RegistryResolveTest) construct their own ResolverImpl to inject
+         into UnitResolver/resolve(Resolver). Production binds it as an OSGi service instead. Same
+         osgi.core:5.0.0 exclusion as unitrepo-core (it would shadow osgi.core 8.0.0). -->
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.resolver</artifactId>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.osgi</groupId>
+          <artifactId>org.osgi.core</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
     <!-- DS runtime API on the test classpath so the system bundle can export it to felix.scr -->
     <dependency>
       <groupId>org.osgi</groupId>

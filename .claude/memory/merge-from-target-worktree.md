@@ -63,3 +63,17 @@ state files, MEMORY.md index lines, feedback notes) must be committed to the sub
 NOT exempt because it lives under `.claude/memory/`, it rides the same branch into the squash. Check
 `git status` is clean as the last gesture before handing off. (User reminders 2026-06-18: "si on close,
 on doit toujours tout committer ce qu'on veut sur la branche" and "on veut un seul commit au merge".)
+
+**4. Garden the memory AT EACH MERGE — prune the *how*, keep the *what/why* (user, 2026-06-20).** Merge
+is the moment the target is reached, so it is also the moment to throw away the scaffolding — the SAME
+discipline as [[migration-branch-no-fallback]], applied to memory. Before (or as part of) the squash,
+the sub-branch session should collapse its process narrative: a resume-state becomes a one-line "shipped
+@ `<branch>`, see the durable notes" pointer (or is deleted), spent ★ history markers / "WI-X done" logs
+go, and the durable knowledge (invariants, rules, settled decisions + rationale) is kept, condensed.
+**Why this is a per-merge step, not a someday task:** the user's lesson (2026-06-20) is that R4 let 14+
+dense, cross-linked notes accumulate precisely because the pruning was deferred — "idéalement on aurait
+dû le faire à chaque merge". Deferring memory-gardening rots the same way deferring a `mvn install`
+cleanup does: the backlog compounds into a big dedicated pass ([[memory-synthesis-prune-the-how]]) that a
+per-merge habit would have prevented. So: distinguish durable-knowledge notes (keep) from
+process-narrative notes (prune) every time, and never let a shipped resume-state survive a merge
+un-collapsed. (git history already holds the blow-by-blow; memory should hold what the system IS.)

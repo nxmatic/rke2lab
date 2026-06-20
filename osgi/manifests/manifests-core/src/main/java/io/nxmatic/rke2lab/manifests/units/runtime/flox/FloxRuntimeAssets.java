@@ -5,24 +5,19 @@ import io.nxmatic.rke2lab.manifests.units.runtime.daemonset.RuntimeDaemonsetScri
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.net.JarURLConnection;
 import java.net.URL;
-import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
-import java.util.stream.Stream;
+import org.osgi.framework.Bundle;
+import org.osgi.framework.FrameworkUtil;
 
 public final class FloxRuntimeAssets {
 
@@ -129,63 +124,32 @@ public final class FloxRuntimeAssets {
   }
 
   /**
-   * Recursively copy every file under {@code classpathRoot} into {@code targetDir}, preserving
-   * relative paths. Works whether the resources sit on disk (during {@code mvn exec:java}) or
-   * inside a shaded JAR. The exec bit on shell scripts is set via {@link
-   * #applyExecutableBitIfNeeded(Path)}; everything else lands at the default {@code 0644}.
+   * Recursively copy every entry under {@code classpathRoot} out of the running bundle into {@code
+   * targetDir}, preserving relative paths, via {@link Bundle#findEntries} (recurse). Bundle entry
+   * paths are absolute ({@code /runtime/flox/...}); the relative path is taken against {@code
+   * classpathRoot}. The exec bit on shell scripts is set via {@link #applyExecutableBitIfNeeded};
+   * everything else lands at {@code 0644}. {@code manifests-core} only ever runs as an installed
+   * bundle (its {@code @Component} is activated by SCR), so there is no flat-classpath branch.
    */
   private void copyClasspathTreeTo(String classpathRoot, Path targetDir) throws IOException {
-    final URL rootUrl = resourceAnchor.getResource(classpathRoot);
-    if (rootUrl == null) {
-      throw new IllegalStateException("Classpath resource root not found: " + classpathRoot);
-    }
     Files.createDirectories(targetDir);
-
-    final URLConnection connection = rootUrl.openConnection();
-    if (connection instanceof JarURLConnection jarConnection) {
-      copyTreeFromJar(jarConnection, classpathRoot, targetDir);
-      return;
+    final Bundle bundle = FrameworkUtil.getBundle(FloxRuntimeAssets.class);
+    final String root = classpathRoot.endsWith("/") ? classpathRoot : classpathRoot + "/";
+    final Enumeration<URL> entries = bundle.findEntries(classpathRoot, "*", true);
+    if (entries == null) {
+      throw new IllegalStateException("Bundle resource root not found: " + classpathRoot);
     }
-    final Path sourceDir;
-    try {
-      sourceDir = Paths.get(rootUrl.toURI());
-    } catch (java.net.URISyntaxException ex) {
-      throw new IOException("Bad classpath resource URL: " + rootUrl, ex);
-    }
-    copyTreeFromFilesystem(sourceDir, targetDir);
-  }
-
-  private void copyTreeFromFilesystem(Path sourceDir, Path targetDir) throws IOException {
-    try (Stream<Path> walk = Files.walk(sourceDir)) {
-      for (Path src : walk.toList()) {
-        if (Files.isDirectory(src)) {
-          continue;
-        }
-        final Path rel = sourceDir.relativize(src);
-        final Path dst = targetDir.resolve(rel.toString());
-        Files.createDirectories(dst.getParent());
-        Files.copy(src, dst, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-        applyExecutableBitIfNeeded(dst);
-      }
-    }
-  }
-
-  private void copyTreeFromJar(JarURLConnection jarConnection, String classpathRoot, Path targetDir)
-      throws IOException {
-    final JarFile jarFile = jarConnection.getJarFile();
-    // JAR entries don't have a leading slash.
-    final String prefix = classpathRoot.substring(1) + "/";
-    final Enumeration<JarEntry> entries = jarFile.entries();
     while (entries.hasMoreElements()) {
-      final JarEntry entry = entries.nextElement();
-      final String name = entry.getName();
-      if (!name.startsWith(prefix) || entry.isDirectory()) {
-        continue;
+      final URL entry = entries.nextElement();
+      final String path = entry.getPath();
+      if (path.endsWith("/")) {
+        continue; // directory entry
       }
-      final String rel = name.substring(prefix.length());
+      final int rootIdx = path.indexOf(root);
+      final String rel = rootIdx >= 0 ? path.substring(rootIdx + root.length()) : path;
       final Path dst = targetDir.resolve(rel);
       Files.createDirectories(dst.getParent());
-      try (InputStream in = jarFile.getInputStream(entry)) {
+      try (InputStream in = entry.openStream()) {
         Files.copy(in, dst, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
       }
       applyExecutableBitIfNeeded(dst);
@@ -261,9 +225,12 @@ public final class FloxRuntimeAssets {
   }
 
   /**
-   * Walk the {@code /runtime/flox/environment.d/} resource tree and return every {@code
-   * category/name} directory that contains both {@code flake.nix} and {@code manifest.toml}. Works
-   * whether resources sit on disk (during {@code mvn exec:java}) or inside a shaded JAR.
+   * Discover {@code category/name} pairs from the running bundle: every {@code manifest.toml} at
+   * exactly {@code environment.d/<category>/<name>/manifest.toml}, via {@link Bundle#findEntries}.
+   * {@code manifests-core} only ever runs as an installed bundle (its {@code @Component} is
+   * activated by SCR; tests boot it under Felix too), so there is no flat-classpath branch. Bundle
+   * entry paths are absolute; the {@code category/name} is parsed against {@code
+   * ENV_RESOURCE_ROOT}.
    */
   private static Set<DiscoveredEnvironment> discoverEnvironments(Class<?> resourceAnchor) {
     final TreeSet<DiscoveredEnvironment> discovered =
@@ -273,94 +240,31 @@ public final class FloxRuntimeAssets {
               return cmp != 0 ? cmp : a.name().compareTo(b.name());
             });
 
-    final URL rootUrl = resourceAnchor.getResource(ENV_RESOURCE_ROOT);
-    if (rootUrl == null) {
-      throw new IllegalStateException(
-          "Flox environment.d resource root not found on classpath: " + ENV_RESOURCE_ROOT);
+    final Bundle bundle = FrameworkUtil.getBundle(resourceAnchor);
+    final String root = ENV_RESOURCE_ROOT.substring(1) + "/"; // "runtime/flox/environment.d/"
+    final Enumeration<URL> entries =
+        bundle.findEntries(ENV_RESOURCE_ROOT, MANIFEST_TOML_RESOURCE, true);
+    if (entries == null) {
+      return discovered;
     }
-
-    try {
-      final URLConnection connection = rootUrl.openConnection();
-      if (connection instanceof JarURLConnection jarConnection) {
-        addEnvsFromJar(jarConnection, discovered);
-      } else {
-        addEnvsFromFilesystem(rootUrl, discovered);
-      }
-    } catch (IOException ex) {
-      throw new UncheckedIOException(
-          "Failed scanning Flox environment.d resource root: " + ENV_RESOURCE_ROOT, ex);
-    }
-
-    return discovered;
-  }
-
-  private static void addEnvsFromFilesystem(URL rootUrl, Set<DiscoveredEnvironment> sink)
-      throws IOException {
-    final Path rootDir;
-    try {
-      rootDir = Paths.get(rootUrl.toURI());
-    } catch (java.net.URISyntaxException ex) {
-      throw new IOException("Bad environment.d URL: " + rootUrl, ex);
-    }
-
-    try (Stream<Path> categories = Files.list(rootDir)) {
-      categories
-          .filter(Files::isDirectory)
-          .forEach(
-              categoryDir -> {
-                try (Stream<Path> names = Files.list(categoryDir)) {
-                  names
-                      .filter(Files::isDirectory)
-                      .filter(name -> Files.isRegularFile(name.resolve(MANIFEST_TOML_RESOURCE)))
-                      .forEach(
-                          name ->
-                              sink.add(
-                                  new DiscoveredEnvironment(
-                                      categoryDir.getFileName().toString(),
-                                      name.getFileName().toString())));
-                } catch (IOException ex) {
-                  throw new UncheckedIOException(
-                      "Failed listing flox env category: " + categoryDir, ex);
-                }
-              });
-    }
-  }
-
-  private static void addEnvsFromJar(
-      JarURLConnection jarConnection, Set<DiscoveredEnvironment> sink) throws IOException {
-    final JarFile jarFile = jarConnection.getJarFile();
-    // JAR entries are stored without a leading slash.
-    final String prefix = ENV_RESOURCE_ROOT.substring(1) + "/"; // "runtime/flox/environment.d/"
-    final Set<String> manifestSeen = new LinkedHashSet<>();
-    final Enumeration<JarEntry> entries = jarFile.entries();
     while (entries.hasMoreElements()) {
-      final JarEntry entry = entries.nextElement();
-      final String name = entry.getName();
-      if (!name.startsWith(prefix) || entry.isDirectory()) {
+      final String path = entries.nextElement().getPath();
+      final int rootIdx = path.indexOf(root);
+      if (rootIdx < 0) {
         continue;
       }
-      final String tail = name.substring(prefix.length());
+      final String tail =
+          path.substring(rootIdx + root.length()); // <category>/<name>/manifest.toml
       final int firstSlash = tail.indexOf('/');
-      if (firstSlash < 0) {
-        continue;
-      }
-      final int secondSlash = tail.indexOf('/', firstSlash + 1);
+      final int secondSlash = firstSlash < 0 ? -1 : tail.indexOf('/', firstSlash + 1);
       if (secondSlash < 0) {
         continue;
       }
-      // Only consider files at exactly environment.d/<category>/<name>/<file>.
-      final String fileName = tail.substring(secondSlash + 1);
-      if (fileName.indexOf('/') >= 0) {
-        continue;
-      }
-      if (MANIFEST_TOML_RESOURCE.equals(fileName)) {
-        manifestSeen.add(tail.substring(0, secondSlash));
-      }
+      discovered.add(
+          new DiscoveredEnvironment(
+              tail.substring(0, firstSlash), tail.substring(firstSlash + 1, secondSlash)));
     }
-    for (String envKey : manifestSeen) {
-      final int slash = envKey.indexOf('/');
-      sink.add(new DiscoveredEnvironment(envKey.substring(0, slash), envKey.substring(slash + 1)));
-    }
+    return discovered;
   }
 
   public static final class Builder {

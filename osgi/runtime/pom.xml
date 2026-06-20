@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>build-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../build-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>runtime</artifactId>
+  <name>osgi/runtime</name>
+  <description>Production OSGi runtime host: boots an embedded Felix framework + felix.scr inside an
+    exec entrypoint, derives system.packages.extra from the embedded bundles' own manifests, installs
+    and starts them, and exposes the BundleContext so the host seam reads services from the registry.
+    The runtime-side counterpart of osgi/testkit. Not a bundle.</description>
+
+  <!--
+    Kept in src/main/java (not a bundle): this is host-world infrastructure consumed flat by the
+    exec entrypoints (seed-master today, the CLIs later), the same shape as osgi/testkit serving the
+    tests. It boots Felix, so felix.framework + osgi.core are compile deps; felix.scr is a compile
+    dep so the runtime can locate its jar to install it as the DS extender bundle.
+  -->
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.framework</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>osgi.core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <!--
+      The Felix DS extender + the DS-runtime API it imports are RUNTIME concerns of the boot, not
+      compile deps: OsgiRuntime only locates felix.scr's jar by name and the system bundle exports
+      the API packages flat (it does not compile against them). Declared here ONCE so every exec
+      entrypoint that depends on osgi/runtime inherits the whole boot stack transitively, instead of
+      re-listing the felix stack per entrypoint.
+    -->
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.scr</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.component</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.util.promise</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.util.function</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!--
+      Pax Logging: the boot installs pax-logging-api (provides org.slf4j to bundles) + pax-logging-
+      logback (OSGi LogService impl, reuses the host logback context). Runtime scope: OsgiRuntime
+      locates the jars by name and installs them as bundles; it does not compile against them.
+    -->
+    <dependency>
+      <groupId>org.ops4j.pax.logging</groupId>
+      <artifactId>pax-logging-api</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.ops4j.pax.logging</groupId>
+      <artifactId>pax-logging-logback</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
+</project>

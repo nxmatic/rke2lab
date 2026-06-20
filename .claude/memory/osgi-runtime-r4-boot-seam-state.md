@@ -64,6 +64,78 @@ This discriminates the options:
 - *Rejected — (B) Felix reads the flat classpath:* the drowned Service-Component/OSGI-INF must be
   reconstructed, fights the shade transformers, erodes bundle isolation. Not self-describing.
 
+## ★ DECISIONS REFINED on the worktree (2026-06-19, implementation carto)
+
+Three decisions taken WITH the user while cartographing the real code on the R4 worktree — they refine
+(do not contradict) the embed-intact decision above:
+
+1. **Path 2 — PROVIDE THE BUNDLES TO THE FRAMEWORK** (not path 1, everything via system-export). The
+   user chose to split seed-master's classpath into two worlds rather than serve the model flat: a minimal
+   flat HOST world (Felix + Pulumi + grpc-netty + seed-master code + the shared `-port` packages + the
+   not-designed-for-OSGi jars) and the OSGi world (intact bundles Felix installs + resolves against each
+   other). Embed mechanics are trivial (maven-dependency-plugin `copy` → `META-INF/bundles/*.jar` resources;
+   pom already does the analogous `unpack` for manifests-d). Detail in [[osgi-system-export-resolution-only]].
+2. **Criterion = DESIGNED-FOR-OSGi, not passive-vs-active.** What goes to `system.packages.extra` is "a jar
+   never conceived as a bundle" (`org.cdk8s`, `software.constructs` — jsii, unversioned imports → flat is
+   their natural place). Everything designed for OSGi — our `-core`/`-port` AND already-bundle libs
+   (jackson, snakeyaml, slf4j, commons-compress, versioned) — goes into the bundle world. A system export
+   carries CLASSES only, never the bundle's OSGi behaviour (SCR/capabilities/metatype/lifecycle) — the
+   invariant the user asked to document ([[osgi-system-export-resolution-only]], spec §4.1 IMPORTANT box).
+3. **ORDER FLIPS to B → A → C.** Path 2 wants `manifests-core` to retire ENTIRELY into the bundle world,
+   but the host still imports 3 impl types from it — `ManifestYaml`, `NodeEnvContributorRegistry`,
+   `FloxRuntimeAssets` — which are EXACTLY the 3 Milestone-B inversions. While those leaks exist
+   manifests-core would have to be flat (for the host) AND a bundle (for SCR) = the split-package hazard.
+   So B (cut the 3 leaks → host depends only on `-port`) must land BEFORE A (boot + retire manifests-core
+   into the bundle world). Confirmed by carto: seed-master's osgi-world imports are ALL `-port` except
+   those 3 impl types. The brief's A→B→C order held only under path 1; path 2 makes B a precondition of A.
+   The go/no-go behavioural proof (`pulumi preview`) stays at the END, on the bundle-clean seam.
+
+## ★ MILESTONE B reshaped — 3 COUTURES, not 3 isolated classes (carto + user, 2026-06-19)
+
+The user flagged the right symptom: `ManifestYaml` used on BOTH sides of the frontier is a bad smell —
+it means **the host is doing manifest DESCRIPTION work, which belongs to the manifests world** ("OSGi
+describes, host actualises", [[model-substrate-alignment]]). So the 3 wrong-direction leaks are NOT 3
+classes to relocate; they are 3 distinct seams to re-sew:
+
+- **Couture 1 (B1+B2 together):** `IncusResourceBootstrap.RuntimeEnvControlplaneOverlayWriter.write()`
+  (one caller, :2749) BUILDS + RENDERS a ConfigMap overlay and orders the contributors — host-side
+  manifest synthesis. It aggregates BOTH leaks: `ManifestYaml.writeDocument` (B1) AND
+  `NodeEnvContributorRegistry.forServiceLoader()` (B2) live in that one method. DECISION (user): repatriate
+  it into manifests-core as a `@Component` behind a port; the host calls it via the registry and only
+  handles objects/results. B1+B2 fall together. Returns a "registry snapshot" `Map` (ordered contributors
+  + aggregated vars) — shape to fold into the port's result type.
+- **Couture 2 (the 2nd `ManifestYaml` use — a READ):** `CloudConfigSecretRenderer.parseYamlDocument()`
+  (:3055) PARSES a produced manifest YAML into a `Map` to extract a secret payload — legitimate host
+  ACTUALISATION, but needs the deterministic parser (64 MiB limit, coercion). DECISION (user): the
+  deterministic YAML format IS a guarantee of the manifests world, NOT a generic lib — so even a READ goes
+  through the manifests service. The synthesis port (or a dedicated manifest-document port) ALSO exposes
+  deterministic parse/read ops; `ManifestYaml` stays 100% internal to manifests-core. Zero host→impl leak.
+  (Rejected: moving `ManifestYaml` into manifests-port — would pollute the pure contract with jackson+
+  snakeyaml deps AND keep a static call on the host, against the instance-passing discipline.)
+- **Couture 3 (B3 — `FloxRuntimeAssets`):** different motif — the host NEW-s an impl: `SystemdTarget:65`
+  `FloxRuntimeAssets.builder().build()`, read back at `IncusResourceBootstrap:2302` via
+  `getFloxRuntimeAssets()`. Inversion: the host RECEIVES the assets (via service/port), does not construct
+  the impl. (Not yet cartographed in depth — own commit.)
+
+## ★ SCOPE-DEMOTION belongs AFTER C — found via the user's "compile vs runtime?" question (2026-06-19)
+
+The user asked whether keeping `manifests-core` at `compile` scope in seed-master is dangerous (path 2
+wants it on the RUNTIME classpath, loaded by Felix, NOT compiled against). Correct instinct — demoting it
+to `runtime` scope would MACHINE-ENFORCE path 2 (the compiler then forbids importing an impl type). But the
+carto found the demotion can't happen yet:
+
+- seed-master MAIN is clean — compiles ONLY against `-port` (B holds for production code). ✓
+- BUT the test fixture `exec/seed-master/.../unitrepo/realgraph/ManifestsUniverse.java` still imports 14
+  manifests-core IMPL types (`ManifestsDomainRegistry`, `ManifestsDomain`, `ManifestsUnit`, the 10
+  `*DomainRegistrar`). That fixture is EXACTLY what Milestone C deletes (`@Deprecated(forRemoval=true)`).
+
+So the order is: **C (delete realgraph) THEN demote manifests-core compile→runtime** — the demotion is the
+final move that machine-enforces "host = ports only, manifests-core is a runtime bundle". The rest of A
+(OsgiRuntime boot, seam, host-scope test) does NOT depend on the scope — manifests-core stays on the
+classpath at `compile` meanwhile, so the host-scope test resolves it fine. `runtime`/`testkit`/`felix.scr`
+test-deps were added to seed-master's pom for the host-scope test; the manifests-core scope is left at
+`compile` until after C. (Side-find: the realgraph fixture is 8 files, not the brief's 7 — recount at C.)
+
 **The build change this implies (for the R4 worktree to work out):** the seed-master shade must STOP
 pulling `manifests-core`/`netplan`/(the pure bundles) into the flat classpath, and instead stage their
 INTACT jars as resources inside the exec-jar. Host-only deps (pulumi, grpc-netty, incus, cdk8s used by

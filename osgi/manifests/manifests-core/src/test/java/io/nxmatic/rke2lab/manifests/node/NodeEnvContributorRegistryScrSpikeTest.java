@@ -29,8 +29,7 @@ import org.osgi.service.component.runtime.dto.SatisfiedReferenceDTO;
  *
  * <p>The anti-cheat is the COUNT. A {@code 0..n} reference is satisfied even with zero bindings, so
  * "the registry activated" proves nothing on its own; "six contributors bound" proves SCR
- * discovered and injected the real domain set. The framework-less callers still use {@code
- * forServiceLoader()} (dual-path until R5); this is the only place the SCR path is exercised.
+ * discovered and injected the real domain set.
  *
  * <p>Because manifests-core is a heavy bundle, every package it imports must be exported from the
  * system bundle for it to RESOLVE — that long {@code systemPackages(...)} list is itself a finding:

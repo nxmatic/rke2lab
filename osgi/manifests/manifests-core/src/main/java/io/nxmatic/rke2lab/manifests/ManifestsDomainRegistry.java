@@ -14,6 +14,7 @@ import java.util.Map;
 import org.osgi.resource.Resource;
 import org.osgi.resource.Wire;
 import org.osgi.service.resolver.ResolutionException;
+import org.osgi.service.resolver.Resolver;
 
 /**
  * The ASSEMBLED state: an indexed view of policy-filtered domains and units that enforces only
@@ -85,10 +86,13 @@ public final class ManifestsDomainRegistry {
    * of the old acyclic check). CrossDomainRule runs first: it yields the most specific,
    * domain-aware diagnosis, so it wins when several problems coexist; the resolver and topo-sort
    * then catch the structural failures it does not model. The OSGi {@link ResolutionException} is
-   * wrapped into an {@link IllegalStateException} so callers and the synthesis pipeline never
-   * depend on OSGi types.
+   * wrapped into an {@link IllegalStateException} so callers never depend on that OSGi type.
+   *
+   * <p>The {@code resolver} is the injected {@code org.osgi.service.resolver.Resolver} — in
+   * production the felix.resolver service bound by SCR on {@code DefaultManifestSynthesisService};
+   * tests pass their own. It is the one OSGi type this gate's signature exposes, by necessity.
    */
-  public CoherentManifestsDomainRegistry resolve() {
+  public CoherentManifestsDomainRegistry resolve(Resolver resolver) {
     CrossDomainRule.check(this);
 
     final ManifestsUniverse universe = new ManifestsUniverse(this);
@@ -108,7 +112,7 @@ public final class ManifestsDomainRegistry {
 
     final Map<Resource, List<Wire>> wiring;
     try {
-      wiring = new UnitResolver(closure).resolve(root);
+      wiring = new UnitResolver(closure, resolver).resolve(root);
     } catch (ResolutionException cause) {
       throw new IllegalStateException(
           "manifest closure is incoherent: " + cause.getMessage(), cause);

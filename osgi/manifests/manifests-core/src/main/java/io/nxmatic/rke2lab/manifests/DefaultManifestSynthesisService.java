@@ -15,6 +15,7 @@ import io.nxmatic.rke2lab.manifests.domain.NetworkingDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.PlatformDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.RuntimeDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.StorageDomainRegistrar;
+import io.nxmatic.rke2lab.manifests.node.NodeEnvContributorRegistry;
 import io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.port.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisRequest;
@@ -38,6 +39,8 @@ import org.cdk8s.App;
 import org.cdk8s.AppProps;
 import org.cdk8s.Chart;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.resolver.Resolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +49,16 @@ import org.slf4j.LoggerFactory;
 public final class DefaultManifestSynthesisService implements ManifestSynthesisService {
 
   static final Logger LOG = LoggerFactory.getLogger(DefaultManifestSynthesisService.class);
+
+  /**
+   * The OSGi resolver SCR binds from the registry — felix.resolver's service, registered by its
+   * bundle activator. Threaded into {@link ManifestsDomainRegistry#resolve(Resolver)}, the single
+   * coherence gate, so this component never reaches into the resolver's impl package.
+   */
+  @Reference private Resolver resolver;
+
+  /** SCR-injected registry of node-env contributors, threaded into each unit's context. */
+  @Reference private NodeEnvContributorRegistry contributorRegistry;
 
   static final Set<String> SCRIPT_DATA_SUFFIXES =
       Set.of(".sh", ".bash", ".env", ".yaml", ".yml", ".conf", ".policy");
@@ -64,14 +77,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         providerId(),
         request.floxDebugPolicy());
 
-    final ManifestSynthesisContext context =
-        ManifestSynthesisContext.of(
-            request.floxDebugPolicy(),
-            request.bootstrapIdentity(),
-            request.networkTopology(),
-            request.componentVersions(),
-            request.imageState());
-    final var contextScope = ManifestSynthesisContext.bind(context);
+    final var contextScope = ManifestSynthesisContext.bind(ManifestSynthesisContext.of(request));
     try (contextScope) {
       return synthesizeInContext(request);
     }
@@ -211,7 +217,8 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                   .sorted()
                   .toList());
 
-          final CoherentManifestsDomainRegistry coherent = state.domainRegistry.resolve();
+          final CoherentManifestsDomainRegistry coherent =
+              state.domainRegistry.resolve(DefaultManifestSynthesisService.this.resolver);
 
           state.manifestUnitHitCount = 0;
           for (ManifestsUnit manifestUnit : coherent.visitOrder()) {
@@ -221,7 +228,12 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             final String domainId = coherent.requireDomainIdForManifestsUnit(manifestUnitId);
             manifestUnitVisitor.visit(
                 manifestUnit,
-                new ManifestsUnitContext(state.chart, domainId, manifestUnitId, resolver));
+                new ManifestsUnitContext(
+                    state.chart,
+                    domainId,
+                    manifestUnitId,
+                    resolver,
+                    DefaultManifestSynthesisService.this.contributorRegistry));
           }
 
           return this;

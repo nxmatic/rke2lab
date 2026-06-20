@@ -4,6 +4,7 @@ import io.nxmatic.rke2lab.manifests.port.profiles.BootstrapIdentity;
 import io.nxmatic.rke2lab.manifests.port.profiles.ComponentVersions;
 import io.nxmatic.rke2lab.manifests.port.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.port.profiles.ImageState;
+import io.nxmatic.rke2lab.manifests.port.profiles.IncusIdentityMaterial;
 import io.nxmatic.rke2lab.manifests.port.profiles.NetworkTopology;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -22,40 +23,14 @@ public record ManifestSynthesisRequest(
     BootstrapIdentity bootstrapIdentity,
     NetworkTopology networkTopology,
     ComponentVersions componentVersions,
-    ImageState imageState)
+    ImageState imageState,
+    IncusIdentityMaterial incusIdentity)
     implements ManifestDomainPolicyAware {
 
   private static final String ENABLED_DOMAINS_PROPERTY = "rke2lab.manifests.policy.enabledDomains";
 
   private static final ManifestDomainCatalog MANIFEST_DOMAIN_CATALOG =
       ManifestDomainCatalog.builder().addDefaultDomains().addDefaultStageALinkableDomains().build();
-
-  public ManifestSynthesisRequest(Path synthOutdir, Path synthManifestFile) {
-    this(synthOutdir, synthManifestFile, Optional.empty(), FloxDebugPolicy.disabled());
-  }
-
-  public ManifestSynthesisRequest(
-      Path synthOutdir,
-      Path synthManifestFile,
-      Optional<ManifestDomainPolicy> manifestDomainPolicy) {
-    this(synthOutdir, synthManifestFile, manifestDomainPolicy, FloxDebugPolicy.disabled());
-  }
-
-  public ManifestSynthesisRequest(
-      Path synthOutdir,
-      Path synthManifestFile,
-      Optional<ManifestDomainPolicy> manifestDomainPolicy,
-      FloxDebugPolicy floxDebugPolicy) {
-    this(
-        synthOutdir,
-        synthManifestFile,
-        manifestDomainPolicy,
-        floxDebugPolicy,
-        BootstrapIdentity.unknown(),
-        NetworkTopology.empty(),
-        ComponentVersions.empty(),
-        ImageState.unknown());
-  }
 
   public ManifestSynthesisRequest {
     synthOutdir = synthOutdir.toAbsolutePath().normalize();
@@ -69,6 +44,54 @@ public record ManifestSynthesisRequest(
     networkTopology = networkTopology == null ? NetworkTopology.empty() : networkTopology;
     componentVersions = componentVersions == null ? ComponentVersions.empty() : componentVersions;
     imageState = imageState == null ? ImageState.unknown() : imageState;
+    incusIdentity = incusIdentity == null ? IncusIdentityMaterial.unknown() : incusIdentity;
+  }
+
+  public static Builder builder(Path synthOutdir, Path synthManifestFile) {
+    return new Builder(synthOutdir, synthManifestFile);
+  }
+
+  /** A builder pre-loaded with this request's values, for immutable transformation. */
+  public Builder toBuilder() {
+    return new Builder(synthOutdir, synthManifestFile)
+        .manifestDomainPolicy(manifestDomainPolicy.orElse(null))
+        .floxDebugPolicy(floxDebugPolicy)
+        .bootstrapIdentity(bootstrapIdentity)
+        .networkTopology(networkTopology)
+        .componentVersions(componentVersions)
+        .imageState(imageState)
+        .incusIdentity(incusIdentity);
+  }
+
+  // Immutable transformations: each returns a new request with one slice replaced. They delegate to
+  // toBuilder() so the field list lives in exactly one place (the Builder) — adding a slice never
+  // touches these.
+  public ManifestSynthesisRequest withManifestDomainPolicy(ManifestDomainPolicy policy) {
+    return toBuilder().manifestDomainPolicy(policy).build();
+  }
+
+  public ManifestSynthesisRequest withFloxDebugPolicy(FloxDebugPolicy policy) {
+    return toBuilder().floxDebugPolicy(policy).build();
+  }
+
+  public ManifestSynthesisRequest withBootstrapIdentity(BootstrapIdentity identity) {
+    return toBuilder().bootstrapIdentity(identity).build();
+  }
+
+  public ManifestSynthesisRequest withNetworkTopology(NetworkTopology topology) {
+    return toBuilder().networkTopology(topology).build();
+  }
+
+  public ManifestSynthesisRequest withComponentVersions(ComponentVersions versions) {
+    return toBuilder().componentVersions(versions).build();
+  }
+
+  public ManifestSynthesisRequest withImageState(ImageState state) {
+    return toBuilder().imageState(state).build();
+  }
+
+  public ManifestSynthesisRequest withIncusIdentity(IncusIdentityMaterial material) {
+    return toBuilder().incusIdentity(material).build();
   }
 
   public static ManifestSynthesisRequest fromSystemProperties() {
@@ -81,25 +104,22 @@ public record ManifestSynthesisRequest(
       return ephemeral(manifestDomainPolicy, floxDebugPolicy);
     }
 
+    final Path outdir;
+    final Path manifestFile;
     if (outdirProperty != null && fileProperty != null) {
-      return new ManifestSynthesisRequest(
-          Paths.get(outdirProperty),
-          Paths.get(fileProperty),
-          manifestDomainPolicy,
-          floxDebugPolicy);
+      outdir = Paths.get(outdirProperty);
+      manifestFile = Paths.get(fileProperty);
+    } else if (outdirProperty != null) {
+      outdir = Paths.get(outdirProperty);
+      manifestFile = outdir.resolve("manifests.yaml");
+    } else {
+      manifestFile = Paths.get(fileProperty);
+      outdir = manifestFile.getParent() == null ? Paths.get(".") : manifestFile.getParent();
     }
-
-    if (outdirProperty != null) {
-      final Path outdir = Paths.get(outdirProperty);
-      return new ManifestSynthesisRequest(
-          outdir, outdir.resolve("manifests.yaml"), manifestDomainPolicy, floxDebugPolicy);
-    }
-
-    final Path manifestFile = Paths.get(fileProperty);
-    final Path outdir =
-        manifestFile.getParent() == null ? Paths.get(".") : manifestFile.getParent();
-    return new ManifestSynthesisRequest(
-        outdir, manifestFile, manifestDomainPolicy, floxDebugPolicy);
+    return builder(outdir, manifestFile)
+        .manifestDomainPolicy(manifestDomainPolicy.orElse(null))
+        .floxDebugPolicy(floxDebugPolicy)
+        .build();
   }
 
   public static ManifestSynthesisRequest ephemeral() {
@@ -116,84 +136,80 @@ public record ManifestSynthesisRequest(
       final Path outdir =
           Files.createTempDirectory("rke2lab-manifests-").toAbsolutePath().normalize();
       final Path manifestFile = outdir.resolve("manifests.yaml");
-      return new ManifestSynthesisRequest(
-              outdir, manifestFile, manifestDomainPolicy, floxDebugPolicy)
-          .withComponentVersions(ComponentVersions.defaults());
+      return builder(outdir, manifestFile)
+          .manifestDomainPolicy(manifestDomainPolicy.orElse(null))
+          .floxDebugPolicy(floxDebugPolicy)
+          .componentVersions(ComponentVersions.defaults())
+          .build();
     } catch (IOException ex) {
       throw new UncheckedIOException("Failed to create temporary synthesis directory", ex);
     }
   }
 
-  public ManifestSynthesisRequest withManifestDomainPolicy(ManifestDomainPolicy policy) {
-    return new ManifestSynthesisRequest(
-        synthOutdir,
-        synthManifestFile,
-        Optional.of(policy),
-        floxDebugPolicy,
-        bootstrapIdentity,
-        networkTopology,
-        componentVersions,
-        imageState);
-  }
+  /** The single construction path: the two output paths are required, every slice optional. */
+  public static final class Builder {
+    private final Path synthOutdir;
+    private final Path synthManifestFile;
+    private Optional<ManifestDomainPolicy> manifestDomainPolicy = Optional.empty();
+    private FloxDebugPolicy floxDebugPolicy = FloxDebugPolicy.disabled();
+    private BootstrapIdentity bootstrapIdentity = BootstrapIdentity.unknown();
+    private NetworkTopology networkTopology = NetworkTopology.empty();
+    private ComponentVersions componentVersions = ComponentVersions.empty();
+    private ImageState imageState = ImageState.unknown();
+    private IncusIdentityMaterial incusIdentity = IncusIdentityMaterial.unknown();
 
-  public ManifestSynthesisRequest withFloxDebugPolicy(FloxDebugPolicy policy) {
-    return new ManifestSynthesisRequest(
-        synthOutdir,
-        synthManifestFile,
-        manifestDomainPolicy,
-        policy,
-        bootstrapIdentity,
-        networkTopology,
-        componentVersions,
-        imageState);
-  }
+    private Builder(Path synthOutdir, Path synthManifestFile) {
+      this.synthOutdir = synthOutdir;
+      this.synthManifestFile = synthManifestFile;
+    }
 
-  public ManifestSynthesisRequest withBootstrapIdentity(BootstrapIdentity identity) {
-    return new ManifestSynthesisRequest(
-        synthOutdir,
-        synthManifestFile,
-        manifestDomainPolicy,
-        floxDebugPolicy,
-        identity,
-        networkTopology,
-        componentVersions,
-        imageState);
-  }
+    public Builder manifestDomainPolicy(final ManifestDomainPolicy v) {
+      this.manifestDomainPolicy = Optional.ofNullable(v);
+      return this;
+    }
 
-  public ManifestSynthesisRequest withNetworkTopology(NetworkTopology topology) {
-    return new ManifestSynthesisRequest(
-        synthOutdir,
-        synthManifestFile,
-        manifestDomainPolicy,
-        floxDebugPolicy,
-        bootstrapIdentity,
-        topology,
-        componentVersions,
-        imageState);
-  }
+    public Builder floxDebugPolicy(final FloxDebugPolicy v) {
+      this.floxDebugPolicy = v;
+      return this;
+    }
 
-  public ManifestSynthesisRequest withComponentVersions(ComponentVersions versions) {
-    return new ManifestSynthesisRequest(
-        synthOutdir,
-        synthManifestFile,
-        manifestDomainPolicy,
-        floxDebugPolicy,
-        bootstrapIdentity,
-        networkTopology,
-        versions,
-        imageState);
-  }
+    public Builder bootstrapIdentity(final BootstrapIdentity v) {
+      this.bootstrapIdentity = v;
+      return this;
+    }
 
-  public ManifestSynthesisRequest withImageState(ImageState state) {
-    return new ManifestSynthesisRequest(
-        synthOutdir,
-        synthManifestFile,
-        manifestDomainPolicy,
-        floxDebugPolicy,
-        bootstrapIdentity,
-        networkTopology,
-        componentVersions,
-        state);
+    public Builder networkTopology(final NetworkTopology v) {
+      this.networkTopology = v;
+      return this;
+    }
+
+    public Builder componentVersions(final ComponentVersions v) {
+      this.componentVersions = v;
+      return this;
+    }
+
+    public Builder imageState(final ImageState v) {
+      this.imageState = v;
+      return this;
+    }
+
+    public Builder incusIdentity(final IncusIdentityMaterial v) {
+      this.incusIdentity = v;
+      return this;
+    }
+
+    public ManifestSynthesisRequest build() {
+      return new ManifestSynthesisRequest(
+          synthOutdir,
+          synthManifestFile,
+          manifestDomainPolicy,
+          floxDebugPolicy,
+          bootstrapIdentity,
+          networkTopology,
+          componentVersions,
+          imageState,
+          incusIdentity);
+    }
   }
 
   private static FloxDebugPolicy floxDebugPolicyFromSystemProperties() {

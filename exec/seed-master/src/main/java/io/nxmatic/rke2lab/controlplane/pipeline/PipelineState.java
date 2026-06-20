@@ -8,6 +8,7 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
+import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -18,6 +19,13 @@ final class PipelineState {
   BootstrapOptions options;
   Consumer<String> readinessLogger;
   boolean pulumiMode;
+
+  /**
+   * The embedded OSGi framework booted once for this run (see {@code BootstrapStage}), or null when
+   * the process carries no embedded bundles (standalone/tests fall back to ServiceLoader). Threaded
+   * to the stages that read manifests-world services so they read them from the booted registry.
+   */
+  OsgiRuntime osgiRuntime;
 
   /**
    * The runbook model, owned by the caller and threaded through every checkpoint so each records

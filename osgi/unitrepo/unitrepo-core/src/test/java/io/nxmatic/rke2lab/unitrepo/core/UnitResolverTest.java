@@ -6,21 +6,32 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.felix.resolver.Logger;
+import org.apache.felix.resolver.ResolverImpl;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.osgi.resource.Resource;
 import org.osgi.resource.Wire;
 import org.osgi.service.resolver.ResolutionException;
+import org.osgi.service.resolver.Resolver;
 
 /**
- * Proves the resolution track on the real stack: the Apache Felix Resolver, running STANDALONE (no
- * OSGi framework), resolves a unit's Provide/Require closure. This is the rke2lab hand-rolled
- * dependency walker ({@code ManifestsUnit.dependsOn…} + the manifests traversal loops) re-expressed
- * as capabilities and handed to the resolver — the foundational "it runs for real" of the OSGi
- * migration's resolution half.
+ * Proves the resolution track on the real stack: the Apache Felix Resolver resolves a unit's
+ * Provide/Require closure. This is the rke2lab hand-rolled dependency walker ({@code
+ * ManifestsUnit.dependsOn…} + the manifests traversal loops) re-expressed as capabilities and
+ * handed to the resolver — the foundational "it runs for real" of the OSGi migration's resolution
+ * half. The test OWNS the {@link Resolver} it injects (a bare {@link ResolverImpl}); the end-to-end
+ * SCR injection of the felix.resolver service is proven by the host-seam test.
  */
 @Tag("osgi")
 final class UnitResolverTest {
+
+  /**
+   * The resolver the test injects — a direct ResolverImpl, no framework needed for the algorithm.
+   */
+  private static Resolver resolver() {
+    return new ResolverImpl(new Logger(Logger.LOG_ERROR));
+  }
 
   private static final String NS_DOMAIN = "unitrepo.manifest.domain";
   private static final String NS_EXTENDER = "osgi.extender";
@@ -45,7 +56,7 @@ final class UnitResolverTest {
             .require(NS_DOMAIN, "(unitrepo.manifest.domain=networking)")
             .require(NS_EXTENDER, "(osgi.extender=unitrepo.type.visit)");
 
-    UnitResolver resolver = new UnitResolver(List.of(handler, networking, root));
+    UnitResolver resolver = new UnitResolver(List.of(handler, networking, root), resolver());
     Map<Resource, List<Wire>> wiring = resolver.resolve(root);
 
     // the resolved closure must contain all three: root + networking (its domain dep) + handler
@@ -65,7 +76,7 @@ final class UnitResolverTest {
     UnitResource orphan =
         new UnitResource("orphan-unit").require(NS_DOMAIN, "(unitrepo.manifest.domain=absent)");
 
-    UnitResolver resolver = new UnitResolver(List.of(orphan));
+    UnitResolver resolver = new UnitResolver(List.of(orphan), resolver());
     assertThrows(
         ResolutionException.class,
         () -> resolver.resolve(orphan),
@@ -80,7 +91,8 @@ final class UnitResolverTest {
 
     UnitResource parent = new UnitResource("parent").requireAll(NS_DOMAIN, "(group=g1)");
 
-    UnitResolver resolver = new UnitResolver(List.of(memberA, memberB, memberC, parent));
+    UnitResolver resolver =
+        new UnitResolver(List.of(memberA, memberB, memberC, parent), resolver());
     Map<Resource, List<Wire>> wiring = resolver.resolve(parent);
 
     // parent must wire to ALL three members (cardinality:=multiple), not just one

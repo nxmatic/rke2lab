@@ -12,20 +12,24 @@
 
   <artifactId>unitrepo-core</artifactId>
   <name>osgi/unitrepo/unitrepo-core</name>
-  <description>The unit resolution oracle: a standalone Felix resolver over UnitResource
-    capability graphs, used as a library (no OSGi framework).</description>
+  <description>The unit resolution oracle: resolves UnitResource capability graphs through an
+    injected OSGi Resolver service over the org.osgi.service.resolver interface.</description>
 
   <dependencies>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>
     </dependency>
+    <!-- felix.resolver is the org.osgi.service.resolver.Resolver PROVIDER: at runtime its bundle
+         activator registers the service that UnitResolver consumes, so production imports only the
+         OSGi interface (carried by osgi.core 8.0.0) — felix.resolver is needed only on the TEST
+         classpath, where tests construct their own ResolverImpl to inject. It drags
+         org.osgi.core:5.0.0 (a pre-R6 org.osgi.framework whose FrameworkUtil lacks
+         asDictionary(Map)) which would shadow osgi.core:8.0.0 and break framework.init(); excluded. -->
     <dependency>
       <groupId>org.apache.felix</groupId>
       <artifactId>org.apache.felix.resolver</artifactId>
-      <!-- felix.resolver drags org.osgi.core:5.0.0, a pre-R6 org.osgi.framework whose FrameworkUtil
-           lacks asDictionary(Map); on a classpath with Felix 7.x it shadows osgi.core:8.0.0 and
-           breaks framework.init() with NoSuchMethodError. We already declare osgi.core 8.0.0. -->
+      <scope>test</scope>
       <exclusions>
         <exclusion>
           <groupId>org.osgi</groupId>

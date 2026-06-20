@@ -6,8 +6,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.felix.resolver.Logger;
-import org.apache.felix.resolver.ResolverImpl;
 import org.osgi.resource.Capability;
 import org.osgi.resource.Requirement;
 import org.osgi.resource.Resource;
@@ -19,10 +17,13 @@ import org.osgi.service.resolver.ResolveContext;
 import org.osgi.service.resolver.Resolver;
 
 /**
- * Resolves a unit's Provide/Require closure with the Apache Felix Resolver running STANDALONE — no
- * OSGi framework, no classloading, no ServiceLoader/TCCL. This is the resolution track de-risked in
- * the design: the resolver is a pure function of (units, their constraints) → wiring, replacing the
- * hand-rolled dependency walker in the manifests module.
+ * Resolves a unit's Provide/Require closure with an OSGi {@link Resolver}: a pure function of
+ * (units, their constraints) → wiring, replacing the hand-rolled dependency walker in the manifests
+ * module. The {@code Resolver} is INJECTED, not constructed — in production it is the {@code
+ * org.osgi.service.resolver.Resolver} service that the felix.resolver bundle's activator registers,
+ * so this module imports only the OSGi service interface (never felix.resolver's impl package) and
+ * resolves as a clean bundle. Callers without a framework (unit tests) supply their own {@code
+ * Resolver} (e.g. a {@code new ResolverImpl(...)}); the test owns that dependency.
  *
  * <p>The universe of candidate units is supplied via {@link ResolveContext#findProviders}, matched
  * by namespace + the requirement's {@code filter:} directive over each capability's attributes.
@@ -30,10 +31,11 @@ import org.osgi.service.resolver.Resolver;
 public final class UnitResolver {
 
   private final List<UnitResource> universe;
-  private final Resolver felix = new ResolverImpl(new Logger(Logger.LOG_ERROR));
+  private final Resolver felix;
 
-  public UnitResolver(List<UnitResource> universe) {
+  public UnitResolver(List<UnitResource> universe, Resolver resolver) {
     this.universe = List.copyOf(universe);
+    this.felix = resolver;
   }
 
   /** Resolve {@code root}'s closure against the universe; returns the wiring per resolved unit. */
