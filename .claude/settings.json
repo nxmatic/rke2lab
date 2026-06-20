@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(flox activate *)"
+      "Bash(flox activate *)",
+      "Bash(git worktree *)",
+      "Bash(git -C /private/var/lib/git/nxmatic/rke2lab.d/feature/cli-osgi-exec-alignment log --oneline -1)"
     ]
   },
   "model": "us.anthropic.claude-opus-4-8[1m]",
