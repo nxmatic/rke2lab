@@ -23,5 +23,6 @@
     <module>systemd</module>
     <module>manifests</module>
     <module>netplan</module>
+    <module>pipeline</module>
   </modules>
 </project>

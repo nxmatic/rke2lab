@@ -76,6 +76,14 @@
       <artifactId>netplan-port</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- The passive fluent-pipeline grammar engine (FluentTopicRunner/OnFailure/TopicFailure),
+         consumed in-bundle by BootstrapInfrastructureSynthesizer. Replaces the local Synthesis*
+         triplet. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>pipeline-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>cdk8s-systemd</artifactId>

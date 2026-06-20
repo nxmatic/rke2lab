@@ -12,10 +12,10 @@
  *       method-local staged-synthesis pipeline (see the fluent pipeline grammar).
  *   <li>{@link io.nxmatic.rke2lab.manifests.systemd.SystemdUnitSynthesizer} — the synthesis
  *       contract.
- *   <li>{@link io.nxmatic.rke2lab.manifests.systemd.SynthesisTopicRunner} / {@link
- *       io.nxmatic.rke2lab.manifests.systemd.SynthesisStageFailure} — the staged-synthesis harness
- *       (topic runner + failure type).
  * </ul>
+ *
+ * <p>The staged-synthesis harness (topic runner + failure type) is the shared {@code
+ * io.nxmatic.rke2lab.pipeline} grammar (pipeline-core), consumed in-bundle here.
  *
  * <p>The systemd target hierarchy itself (rke2lab, -network, -tools, -bootstrap, -manifests,
  * -secrets) and the rke2-server drop-in are created in {@link

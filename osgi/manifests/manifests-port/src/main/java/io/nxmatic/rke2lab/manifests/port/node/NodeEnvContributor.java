@@ -5,9 +5,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Contract for domains to contribute node environment variables. Implementations are registered via
- * Java Service Provider Interface metadata, discovered through {@link java.util.ServiceLoader}, and
- * aggregated by {@link NodeEnvContributorRegistry} for runtime env-config synthesis.
+ * Contract for domains to contribute node environment variables. Implementations are SCR
+ * {@code @Component}s, discovered through the OSGi service registry and aggregated by {@code
+ * NodeEnvContributorRegistry} (a {@code @Reference(MULTIPLE)}) for runtime env-config synthesis.
  */
 public interface NodeEnvContributor {
 

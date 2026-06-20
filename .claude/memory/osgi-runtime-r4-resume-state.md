@@ -26,13 +26,13 @@ is in git history, not here. The DURABLE knowledge it produced is split across f
 
 ## Backlog dominoes (live — homed in their own notes)
 
-1. The 2 CLIs still ServiceLoader + shade flat → broken for synthesis since WI-C0; migrating them is the
-   second-use-case generality test of the model → [[cli-osgi-migration-backlog]].
+1. ~~The 2 CLIs still ServiceLoader + shade flat~~ — SHIPPED 2026-06-20: both CLIs boot embedded Felix
+   and read the registry; the boot-seam model generalises → [[cli-osgi-migration-carto]].
 2. Host-world null-arg violations (pre-existing) → [[null-arg-is-a-rule-violation]] (the 4 named sites).
 3. ThreadLocal `current()` readers not migrated — fine where they are (all under bind), no action owed
    unless one moves out of synthesis scope → [[synth-context-channel-rule]].
-4. manifests-core not yet demoted compile→runtime in seed-master/pom.xml (rule holds in fact, not
-   machine-enforced) → [[osgi-runtime-r4-boot-seam-state]].
+4. ~~manifests-core not yet demoted compile→runtime~~ — DONE 2026-06-20: demoted in all three exec poms
+   (CLIs + seed-master), machine-enforcing path 2; the realgraph fixture that blocked it is gone.
 5. Worktree-provisioning automation (3 gaps hit running preview) → [[worktree-provisioning-handoff]].
 
 ## Validation discipline (unchanged, durable)

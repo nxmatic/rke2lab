@@ -102,11 +102,6 @@ public record ComponentVersions(
         .build();
   }
 
-  /** Empty versions — used by tests and ephemeral synth runs that don't go through seed-master. */
-  public static ComponentVersions empty() {
-    return builder().build();
-  }
-
   public static Builder builder() {
     return new Builder();
   }

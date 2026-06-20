@@ -10,6 +10,8 @@ import io.nxmatic.rke2lab.controlplane.pipeline.stages.EnvironmentStage;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.OutputsStage;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
+import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
+import io.nxmatic.rke2lab.pipeline.OnFailure;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -110,7 +112,7 @@ public final class ApplicationPipeline {
                   state.options = options;
                 }
               });
-      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
       return new EnvironmentDone(state);
     }
   }
@@ -147,7 +149,7 @@ public final class ApplicationPipeline {
               state.resourceManager,
               state.outputBuilder,
               outputs -> state.outputs = outputs);
-      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
       return new BootstrapDone(state);
     }
   }
@@ -173,7 +175,7 @@ public final class ApplicationPipeline {
 
     public OutputsDone during(String topic, Function<OutputsStage, OutputsStage> body) {
       final OutputsStage stage = new OutputsStage(state.pulumiContext, () -> state.outputs);
-      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
       return new OutputsDone(state);
     }
   }

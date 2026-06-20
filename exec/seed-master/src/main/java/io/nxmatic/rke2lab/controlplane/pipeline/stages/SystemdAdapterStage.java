@@ -17,9 +17,9 @@ import io.nxmatic.rke2lab.controlplane.bdd.Symptom;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterScenario;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.controlplane.pipeline.PipelineStageFailure;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
+import io.nxmatic.rke2lab.pipeline.TopicFailure;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -177,7 +177,7 @@ public final class SystemdAdapterStage {
     final Severity effective = policy.readiness().override(SCENARIO_ID).orElse(INTRINSIC_SEVERITY);
     if (effective == Severity.CRITICAL) {
       log("✗ " + SCENARIO_ID + " FAILED, severity=CRITICAL → stopping provisioning");
-      throw new PipelineStageFailure("systemd adapter", failure);
+      throw new TopicFailure("systemd adapter", failure);
     }
     log("⚠ " + SCENARIO_ID + " FAILED, severity=WARNING → continuing in DEGRADED mode");
     sink.accept(degradedObservation(failure).toOutputMap());

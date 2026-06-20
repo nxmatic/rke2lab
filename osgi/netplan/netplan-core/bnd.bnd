@@ -1,5 +1,3 @@
 Bundle-SymbolicName: io.nxmatic.rke2lab.netplan.core
-Export-Package: \
-    io.nxmatic.rke2lab.netplan,\
-    io.nxmatic.rke2lab.netplan.api
+Export-Package: io.nxmatic.rke2lab.netplan
 -noimportjava: true

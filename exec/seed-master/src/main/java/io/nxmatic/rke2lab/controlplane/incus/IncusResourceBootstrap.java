@@ -21,8 +21,6 @@ import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig.WorktreeHost;
 import io.nxmatic.rke2lab.controlplane.incus.image.PulumiIncusImageProvider;
-import io.nxmatic.rke2lab.controlplane.pipeline.OnFailure;
-import io.nxmatic.rke2lab.controlplane.pipeline.TopicRunner;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.manifests.port.FloxRuntimeAssetService;
 import io.nxmatic.rke2lab.manifests.port.ManifestDocumentService;
@@ -39,6 +37,8 @@ import io.nxmatic.rke2lab.manifests.port.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.port.profiles.IncusIdentityMaterial;
 import io.nxmatic.rke2lab.netplan.port.ClusterNetworkBlueprint;
 import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
+import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
+import io.nxmatic.rke2lab.pipeline.OnFailure;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
@@ -1031,7 +1031,7 @@ public final class IncusResourceBootstrap {
     }
 
     PathDone during(String topic, java.util.function.Function<PathStage, PathStage> body) {
-      TopicRunner.runDuring(
+      FluentTopicRunner.runDuring(
           "incus", topic, new PathStage(state.bootstrapContext, state), body, state.onFailure);
       return new PathDone(state);
     }
@@ -1057,7 +1057,7 @@ public final class IncusResourceBootstrap {
     }
 
     HostDone during(String topic, java.util.function.Function<HostStage, HostStage> body) {
-      TopicRunner.runDuring(
+      FluentTopicRunner.runDuring(
           "incus", topic, new HostStage(state.bootstrapContext, state), body, state.onFailure);
       return new HostDone(state);
     }
@@ -1084,7 +1084,7 @@ public final class IncusResourceBootstrap {
 
     ProviderDone during(
         String topic, java.util.function.Function<ProviderStage, ProviderStage> body) {
-      TopicRunner.runDuring(
+      FluentTopicRunner.runDuring(
           "incus", topic, new ProviderStage(state.bootstrapContext, state), body, state.onFailure);
       return new ProviderDone(state);
     }
@@ -1111,7 +1111,7 @@ public final class IncusResourceBootstrap {
 
     InstanceDone during(
         String topic, java.util.function.Function<InstanceStage, InstanceStage> body) {
-      TopicRunner.runDuring(
+      FluentTopicRunner.runDuring(
           "incus", topic, new InstanceStage(state.bootstrapContext, state), body, state.onFailure);
       return new InstanceDone(state);
     }

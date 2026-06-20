@@ -7,6 +7,8 @@ import io.nxmatic.rke2lab.manifests.systemd.stages.BootstrapStage;
 import io.nxmatic.rke2lab.manifests.systemd.stages.NetworkStage;
 import io.nxmatic.rke2lab.manifests.systemd.stages.StorageStage;
 import io.nxmatic.rke2lab.manifests.systemd.stages.ToolsStage;
+import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
+import io.nxmatic.rke2lab.pipeline.OnFailure;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,13 +50,13 @@ public final class BootstrapInfrastructureSynthesizer {
       final State state = new State();
 
       final class State {
-        SynthesisOnFailure onFailure;
+        OnFailure onFailure;
         // Stage references threaded for cross-stage dependencies.
         ToolsStage toolsStage;
         BootstrapStage bootstrapStage;
       }
 
-      AwaitingTools onFailure(SynthesisOnFailure handler) {
+      AwaitingTools onFailure(OnFailure handler) {
         state.onFailure = handler;
         return new AwaitingTools();
       }
@@ -62,7 +64,7 @@ public final class BootstrapInfrastructureSynthesizer {
       final class AwaitingTools {
         ToolsDone during(String topic, Function<ToolsStage, ToolsStage> body) {
           final ToolsStage stage = new ToolsStage(systemdChart, context);
-          SynthesisTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
+          FluentTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
           state.toolsStage = stage;
           return new ToolsDone();
         }
@@ -77,7 +79,7 @@ public final class BootstrapInfrastructureSynthesizer {
       final class AwaitingBootstrap {
         BootstrapDone during(String topic, Function<BootstrapStage, BootstrapStage> body) {
           final BootstrapStage stage = new BootstrapStage(systemdChart, context, state.toolsStage);
-          SynthesisTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
+          FluentTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
           state.bootstrapStage = stage;
           return new BootstrapDone();
         }
@@ -92,7 +94,7 @@ public final class BootstrapInfrastructureSynthesizer {
       final class AwaitingNetwork {
         NetworkDone during(String topic, Function<NetworkStage, NetworkStage> body) {
           final NetworkStage stage = new NetworkStage(systemdChart, context, state.bootstrapStage);
-          SynthesisTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
+          FluentTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
           return new NetworkDone();
         }
       }
@@ -107,7 +109,7 @@ public final class BootstrapInfrastructureSynthesizer {
         StorageDone during(String topic, Function<StorageStage, StorageStage> body) {
           final StorageStage stage =
               new StorageStage(systemdChart, context, state.toolsStage, state.bootstrapStage);
-          SynthesisTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
+          FluentTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
           return new StorageDone();
         }
       }

@@ -9,6 +9,7 @@ import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
+import io.nxmatic.rke2lab.pipeline.OnFailure;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -21,9 +22,8 @@ final class PipelineState {
   boolean pulumiMode;
 
   /**
-   * The embedded OSGi framework booted once for this run (see {@code BootstrapStage}), or null when
-   * the process carries no embedded bundles (standalone/tests fall back to ServiceLoader). Threaded
-   * to the stages that read manifests-world services so they read them from the booted registry.
+   * The embedded OSGi framework booted once for this run (see {@code BootstrapStage}). Threaded to
+   * the stages that read manifests-world services so they read them from the booted registry.
    */
   OsgiRuntime osgiRuntime;
 

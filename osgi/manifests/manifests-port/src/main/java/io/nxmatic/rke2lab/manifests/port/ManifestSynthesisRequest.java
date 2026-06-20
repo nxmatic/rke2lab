@@ -42,7 +42,14 @@ public record ManifestSynthesisRequest(
     floxDebugPolicy = floxDebugPolicy == null ? FloxDebugPolicy.disabled() : floxDebugPolicy;
     bootstrapIdentity = bootstrapIdentity == null ? BootstrapIdentity.unknown() : bootstrapIdentity;
     networkTopology = networkTopology == null ? NetworkTopology.empty() : networkTopology;
-    componentVersions = componentVersions == null ? ComponentVersions.empty() : componentVersions;
+    // No blank-version fallback: an absent ComponentVersions is incomplete state, not a valid empty
+    // default — a blank version renders an unresolvable upstream path (e.g. release-.yaml). The
+    // builder supplies ComponentVersions.defaults(); the engine (seed-master) overlays Pulumi
+    // config
+    // on top. Required by construction, so a version-less request cannot exist.
+    componentVersions =
+        java.util.Objects.requireNonNull(
+            componentVersions, "componentVersions is required (no blank-version default)");
     imageState = imageState == null ? ImageState.unknown() : imageState;
     incusIdentity = incusIdentity == null ? IncusIdentityMaterial.unknown() : incusIdentity;
   }
@@ -139,7 +146,6 @@ public record ManifestSynthesisRequest(
       return builder(outdir, manifestFile)
           .manifestDomainPolicy(manifestDomainPolicy.orElse(null))
           .floxDebugPolicy(floxDebugPolicy)
-          .componentVersions(ComponentVersions.defaults())
           .build();
     } catch (IOException ex) {
       throw new UncheckedIOException("Failed to create temporary synthesis directory", ex);
@@ -154,7 +160,7 @@ public record ManifestSynthesisRequest(
     private FloxDebugPolicy floxDebugPolicy = FloxDebugPolicy.disabled();
     private BootstrapIdentity bootstrapIdentity = BootstrapIdentity.unknown();
     private NetworkTopology networkTopology = NetworkTopology.empty();
-    private ComponentVersions componentVersions = ComponentVersions.empty();
+    private ComponentVersions componentVersions = ComponentVersions.defaults();
     private ImageState imageState = ImageState.unknown();
     private IncusIdentityMaterial incusIdentity = IncusIdentityMaterial.unknown();
 

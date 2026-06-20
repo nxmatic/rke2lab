@@ -85,16 +85,30 @@
       <artifactId>runtime</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- The passive fluent-pipeline grammar engine, consumed FLAT on the host classpath (JCL) —
+         the same class manifests-core consumes in-bundle. Replaces seed-master's local
+         TopicRunner/OnFailure/PipelineStageFailure triplet. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>pipeline-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>testkit</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
+    <!-- The model bundle: embedded INTACT under META-INF/bundles and installed by OsgiRuntime, NOT
+         flattened into the uber-jar (excluded from the shade). runtime scope MACHINE-ENFORCES path
+         2: seed-master's main + tests compile only against -port + OsgiRuntime, never against a
+         manifests-core impl type (the realgraph fixture that once forced compile scope is gone). The
+         stage-embedded-bundles + manifests-d unpack still resolve the reactor artifact at runtime. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-core</artifactId>
       <version>${project.version}</version>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>

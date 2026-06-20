@@ -32,15 +32,7 @@ class EmbeddedBundlesBootTest {
     assertTrue(
         OsgiRuntime.hasEmbeddedBundles(),
         "the stage-embedded-bundles execution must have placed the jars under META-INF/bundles");
-    runtime =
-        OsgiRuntime.builder()
-            .embeddedPaxLogging("pax-logging-api.jar", "pax-logging-logback.jar")
-            .withScr()
-            .embeddedRuntimeJar("org.apache.felix.scr.jar")
-            .embeddedRuntimeJar("org.apache.felix.resolver.jar")
-            .embeddedBundle("manifests-core.jar")
-            .build()
-            .boot();
+    runtime = OsgiRuntime.embeddedBootStack().embeddedBundle("manifests-core.jar").build().boot();
   }
 
   @AfterAll

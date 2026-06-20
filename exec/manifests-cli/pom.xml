@@ -13,22 +13,64 @@
   <artifactId>manifests-cli</artifactId>
   <name>exec/manifests-cli</name>
   <description>Manifests CLI: the executable north-adapter that drives the manifests core
-    (osgi/manifests/manifests-core) through its ServiceLoader port for ad-hoc synthesis
-    (`java -jar … synthesize`). A plain main() — no OSGi framework — shaded into the -exec jar.</description>
+    (osgi/manifests/manifests-core) for ad-hoc synthesis (`java -jar … synthesize`). Boots an
+    embedded Felix from the bundles staged in its -exec jar (the same boot seam as seed-master) and
+    reads ManifestSynthesisService from the registry — no flat ServiceLoader.</description>
+
+  <properties>
+    <rke2lab.manifests.unpack.skip>false</rke2lab.manifests.unpack.skip>
+  </properties>
 
   <dependencies>
+    <!-- The host-world boot infrastructure: OsgiRuntime + (transitively) the whole boot stack
+         (felix.framework + osgi.core compile, felix.scr + felix.resolver + pax-logging + the
+         DS-runtime API runtime). The CLI compiles against OsgiRuntime; the felix/pax jars it only
+         stages + installs, never compiles against. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>runtime</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The seam contract the CLI consumes, kept flat on the host classpath as the SINGLE exporter
+         (manifests-core imports but does not export it); OsgiRuntime mirrors it onto the system
+         bundle so the embedded manifests-core resolves against this one copy — typed access. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>manifests-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The model bundle: embedded INTACT under META-INF/bundles (stage-embedded-bundles below) and
+         installed by OsgiRuntime, NOT flattened into the uber-jar (excluded from the shade). runtime
+         scope MACHINE-ENFORCES path 2: the CLI compiles only against -port + OsgiRuntime, never
+         against a manifests-core impl type — the compiler now forbids the host→impl leak. The stage
+         execution + manifests-d unpack still resolve the reactor artifact at runtime scope. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>manifests-core</artifactId>
       <version>${project.version}</version>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
+    <!-- The host LoggerContext pax-logging-logback reuses (StaticLogbackContext=true), as in
+         seed-master: stays flat, it is not a bundle. -->
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
+    </dependency>
+    <!-- The embedded-Felix CLI-scope test boots the same topology as the deployed jar. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>testkit</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>osgi.core</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 
@@ -39,6 +81,9 @@
         <excludes>
           <exclude>logback.xml</exclude>
         </excludes>
+      </resource>
+      <resource>
+        <directory>${project.build.directory}/generated-resources</directory>
       </resource>
     </resources>
     <plugins>
@@ -63,7 +108,7 @@
         </configuration>
       </plugin>
       <!-- Flags + artifact filter inherited from build-parent's managed shade
-           execution; only the per-module transformers are declared here. -->
+           execution; only the per-module transformers + the embed-exclusions are declared here. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -74,6 +119,20 @@
             </goals>
             <phase>package</phase>
             <configuration>
+              <!-- The designed-for-OSGi jars are embedded INTACT (stage-embedded-bundles below) and
+                   installed into Felix as real bundles by OsgiRuntime. Excluding them from the flat
+                   uber-jar keeps each the SINGLE exporter of its packages (the R1 split scar). Their
+                   non-bundle transitive deps (jackson, snakeyaml, commons-compress) still flatten —
+                   the host needs those flat. Same exclusion set as seed-master's shade. -->
+              <artifactSet>
+                <excludes>
+                  <exclude>io.nxmatic.rke2lab:manifests-core</exclude>
+                  <exclude>org.apache.felix:org.apache.felix.scr</exclude>
+                  <exclude>org.apache.felix:org.apache.felix.resolver</exclude>
+                  <exclude>org.ops4j.pax.logging:pax-logging-api</exclude>
+                  <exclude>org.ops4j.pax.logging:pax-logging-logback</exclude>
+                </excludes>
+              </artifactSet>
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                   <resource>logback.xml</resource>
@@ -88,6 +147,72 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <!-- Stage the designed-for-OSGi jars INTACT under META-INF/bundles (a <resource> root, so
+               they land in the uber-jar AND on the test classpath). OsgiRuntime.embedded* streams
+               each into Felix at boot. Fixed destFileNames give stable lookup keys independent of
+               the version, mirrored from OsgiRuntime's *_JAR constants; these are the same artifacts
+               excluded from the flat shade above. Identical to seed-master's staging. -->
+          <execution>
+            <id>stage-embedded-bundles</id>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <phase>generate-resources</phase>
+            <configuration>
+              <skip>${rke2lab.manifests.unpack.skip}</skip>
+              <outputDirectory>${project.build.directory}/generated-resources/META-INF/bundles</outputDirectory>
+              <overWriteReleases>true</overWriteReleases>
+              <overWriteSnapshots>true</overWriteSnapshots>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>io.nxmatic.rke2lab</groupId>
+                  <artifactId>manifests-core</artifactId>
+                  <version>${rke2lab.version}</version>
+                  <destFileName>manifests-core.jar</destFileName>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.apache.felix</groupId>
+                  <artifactId>org.apache.felix.scr</artifactId>
+                  <destFileName>org.apache.felix.scr.jar</destFileName>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.apache.felix</groupId>
+                  <artifactId>org.apache.felix.resolver</artifactId>
+                  <destFileName>org.apache.felix.resolver.jar</destFileName>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.ops4j.pax.logging</groupId>
+                  <artifactId>pax-logging-api</artifactId>
+                  <destFileName>pax-logging-api.jar</destFileName>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.ops4j.pax.logging</groupId>
+                  <artifactId>pax-logging-logback</artifactId>
+                  <destFileName>pax-logging-logback.jar</destFileName>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>m2e</id>
+      <activation>
+        <property>
+          <name>m2e.version</name>
+        </property>
+      </activation>
+      <properties>
+        <rke2lab.manifests.unpack.skip>true</rke2lab.manifests.unpack.skip>
+      </properties>
+    </profile>
+  </profiles>
 </project>

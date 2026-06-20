@@ -620,8 +620,10 @@ chain each have their own C4 figure in the R4 spec —
 | R2 — the 5 SPIs declared `@Component` | SHIPPED (blue) | geste A only; bnd emits OSGI-INF; `ServiceLoader` stays active (coexist)
 | R3 — intra-bundle consume via `@Reference` | SHIPPED (blue) | `NodeEnvContributorRegistry` aggregates the 6 contributors via SCR; dual-path (`forServiceLoader()`) kept
 | API-extraction + port re-placement (prerequisite to R4) | SHIPPED (blue) | the boundary ports live in `osgi/<domain>/<domain>-port` (the port belongs to the DOMAIN, not the adapter); host compiles against the port → fail-fast at build; each port carries its own `@Version`, host imports it versioned
-| R4 — boot seam in seed-master | SHIPPED (blue) | embed Felix in the Pulumi callback; host seam reads services from the registry via `awaitService` (single path, fail-fast); self-contained exec-jar embeds 5 bundles intact (manifests-core + felix.scr/resolver + pax-logging ×2). Proven by `pulumi preview` (0 errored, full pipeline under Felix). Carries-over (backlog dominoes): the 2 CLIs still `ServiceLoader` (un-migrated), manifests-core not yet demoted to `runtime` scope
-| R5 — retire `ServiceLoader` | EXPLORATION (amber) | delete the static path once every entrypoint (incl. the CLIs) boots under Felix; then drop the 8 orphaned `META-INF/services` on the ports
+| R4 — boot seam in seed-master | SHIPPED (blue) | embed Felix in the Pulumi callback; host seam reads services from the registry via `awaitService` (single path, fail-fast); self-contained exec-jar embeds 5 bundles intact (manifests-core + felix.scr/resolver + pax-logging ×2). Proven by `pulumi preview` (0 errored, full pipeline under Felix). Both R4 dominoes now cleared: the 2 CLIs boot Felix, and all three exec demoted the model `-core` to `runtime` scope
+| CLI alignment — generalise the boot seam | SHIPPED (blue) | manifests-cli + netplan-cli boot embedded Felix and read their `-port` service from the registry (same seam as seed-master); fixes the WI-C0 synthesis breakage. `netplan.api` moved into `netplan-port` so the consumed contract is single-exported (the consumed-contract corollary). Proves the boot model generalises to standalone `main()` entrypoints
+| pipeline-core (L1) + SeedRuntime (L3) — dedup the grammar + one boot seam | SHIPPED (blue) | the fluent-pipeline engine, formerly duplicated as seed-master's `TopicRunner` + manifests-core's `SynthesisTopicRunner`, unified into the passive `pipeline-core` bundle (`FluentTopicRunner`/`OnFailure`/`TopicFailure`), dual-consumed (in-bundle by manifests-core, flat by seed-master). `SeedRuntime` collapses the three copied `bootEmbeddedOsgiRuntime()` into one host-only seam each seed parameterises with its bundle + tail. (L2 passive-stage extraction dropped: the candidate stages are host-coupled — awaits the orchestration-OSGi inversion)
+| R5 — retire `ServiceLoader` | PARTIALLY SHIPPED (CLI half blue) | the CLI half is DONE: every entrypoint now boots under Felix, and the 8 orphaned `META-INF/services` on the ports are deleted. Nothing of ours uses `ServiceLoader` for services any more (only `FrameworkFactory` discovery remains, permanent). The amber remainder is only any residual static-path cleanup the migration spec still tracks
 |===
 
 === The refinement this view makes to the two-spaces frame
@@ -759,6 +761,80 @@ static `ServiceLoader` surface and the live registry coexist until every caller 
 `design/target-module-layout`, each proven on embedded Felix (`@OsgiSpike`, `-Posgi`). R4 +
 API-extraction are cartographied in `.claude/memory/` (`osgi-runtime-r4-boot-seam-state`,
 `api-extraction-tri-carto-state`) and remain GREEN here until they ship. Flip them blue at merge.
+====
+
+=== Diagram K — AFTER (CLI alignment + pipeline-core/SeedRuntime): the static surface erased, the grammar deduped, monotone-with-one-named-erasure
+
+Builds on Diagram J. Two additive moves and the one pre-named R5 erasure (CLI half) realised. GREEN =
+added this increment; the `sl` box of J is DELETED (the named R5 erasure); the `cli` box is rewired, not
+erased.
+
+[mermaid]
+....
+flowchart TB
+  subgraph OSGI["OSGi space — pure models"]
+    bapi["the ports + netplan.api now in netplan-port"]:::osgi
+    spi["the 5 SPIs + impls"]:::osgi
+    comp["impls ALSO @Component"]:::osgi
+    reg2["NodeEnvContributorRegistry @Component+@Reference"]:::osgi
+    pc["pipeline-core — PASSIVE grammar<br/>FluentTopicRunner / OnFailure / TopicFailure"]:::osgi
+  end
+  subgraph HOST["host space — actualises"]
+    seam0["IncusResourceBootstrap / EntryGatePolicyEnforcer"]:::host
+    fx["embedded Felix + felix.scr (R4)"]:::osgi
+    sr["SeedRuntime — common boot prefix"]:::host
+  end
+  cli["manifests-cli / netplan-cli — NOW boot Felix"]:::host
+  reg["service registry (SCR publishes)"]:::osgi
+  comp -.->|annotate same impls| spi
+  fx -->|activates| comp
+  comp -->|publish| reg
+  seam0 -->|"awaitService, single path"| reg
+  reg2 -->|"@Reference"| reg
+  cli -->|"awaitService via SeedRuntime (R5 CLI-half DONE)"| reg
+  cli -->|boot via| sr
+  seam0 -->|boot via| sr
+  sr -->|"wraps the outer topic via"| pc
+  comp -.->|"in-bundle runner"| pc
+  spi -.->|implement| bapi
+  seam0 -.->|"system-exported"| bapi
+  classDef osgi fill:#eef,stroke:#88a,stroke-width:1px;
+  classDef host fill:#fde,stroke:#a58,stroke-width:1px;
+  classDef neu fill:#dfd,stroke:#2a2,stroke-width:3px;
+....
+
+==== Verdict — does it hold?
+
+. *The one named erasure is realised, not new.* Diagram J's `sl` box (`ServiceLoader + META-INF/services`)
+  and its edges are DELETED — exactly the R5 CLI-half the J verdict pre-authorised ("delete the static
+  path once every entrypoint boots under Felix; then drop the 8 orphaned `META-INF/services`"). The `cli`
+  box is NOT erased: it is rewired from `sl` to the registry via `SeedRuntime` — a changed collaborator,
+  named per the ritual.
+
+. *`pipeline-core` is a NEW box on an EXISTING seam.* It is passive (pure logic), so by the purity axis it
+  is OSGi-space, and it crosses to the host the SAME way the `-port` modules do (system-exported flat, one
+  copy) — no new seam invented. It unifies the two runner copies (`TopicRunner` + `SynthesisTopicRunner`)
+  the atlas never drew, so it rewires nothing on the map; both `comp` (in-bundle) and `sr` (host) point to
+  it, proving dual-consumption.
+
+. *`SeedRuntime` is a NEW host box beside `OsgiRuntime`.* It launches Felix, so it is host-only (#1565);
+  it wraps the three boot copies into one seam. No built box rewritten.
+
+. *L2 not drawn.* The passive-stage module was dropped (candidate stages are host-coupled); nothing added
+  for it — honest absence, not a silent omission.
+
+Conclusion: additive, with the single erasure being the atlas's own pre-named R5 CLI-half. The constellation
+holds.
+
+[NOTE]
+====
+*Confirmed in code (2026-06-20).* CLI alignment shipped on `feature/cli-osgi-exec-alignment`
+(`a925e877..92a56cea`): both CLIs boot embedded Felix, `netplan.api`→`netplan-port`, all three exec demoted
+`-core` to `runtime`, the 8 SPI files deleted, both CLIs run for real (EXIT 0). pipeline-core (L1) +
+SeedRuntime (L3) shipped on the same branch (`cc48c18a`, `319cc4f5`, `d065ce2f`, `06a60a48`, `95fcb82e`):
+one `FluentTopicRunner` dual-consumed, the three `bootEmbeddedOsgiRuntime()` collapsed to one seam, 4
+embedded-Felix tests green. SHIPPED to `design/target-module-layout` (squash merge 2026-06-20); the
+`pc`/`sr` boxes are now blue (their world colour), no green remaining in Diagram K.
 ====
 
 == Related documentation

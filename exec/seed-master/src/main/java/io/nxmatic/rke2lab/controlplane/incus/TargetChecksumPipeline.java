@@ -1,8 +1,8 @@
 package io.nxmatic.rke2lab.controlplane.incus;
 
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap.BootstrapPaths;
-import io.nxmatic.rke2lab.controlplane.pipeline.OnFailure;
-import io.nxmatic.rke2lab.controlplane.pipeline.TopicRunner;
+import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
+import io.nxmatic.rke2lab.pipeline.OnFailure;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -65,7 +65,7 @@ public final class TargetChecksumPipeline {
     public CloudInitDone during(
         String topic, Function<CloudInitTargetStage, CloudInitTargetStage> body) {
       final CloudInitTargetStage stage = new CloudInitTargetStage(state);
-      TopicRunner.runDuring("target-checksum", topic, stage, body, state.onFailure);
+      FluentTopicRunner.runDuring("target-checksum", topic, stage, body, state.onFailure);
       return new CloudInitDone(state);
     }
   }
@@ -80,7 +80,7 @@ public final class TargetChecksumPipeline {
     public CloudInitDone during(
         String topic, Function<CloudInitTargetStage, CloudInitTargetStage> body) {
       final CloudInitTargetStage stage = new CloudInitTargetStage(state);
-      TopicRunner.runDuring("target-checksum", topic, stage, body, state.onFailure);
+      FluentTopicRunner.runDuring("target-checksum", topic, stage, body, state.onFailure);
       return new CloudInitDone(state);
     }
   }
@@ -107,7 +107,7 @@ public final class TargetChecksumPipeline {
     public RegisteredComponentsDone during(
         String topic, Function<RegisteredComponentsStage, RegisteredComponentsStage> body) {
       final RegisteredComponentsStage stage = new RegisteredComponentsStage(state);
-      TopicRunner.runDuring("target-checksum", topic, stage, body, state.onFailure);
+      FluentTopicRunner.runDuring("target-checksum", topic, stage, body, state.onFailure);
       return new RegisteredComponentsDone(state);
     }
   }

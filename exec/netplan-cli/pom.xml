@@ -12,16 +12,48 @@
 
   <artifactId>netplan-cli</artifactId>
   <name>exec/netplan-cli</name>
-  <description>Netplan CLI: the executable north-adapter that drives the pure netplan core
-    (osgi/netplan) through its api/ port. A plain main() — no OSGi framework — shaded into the
-    -exec jar the Nix flake runs to synthesize netplan and export the network blueprint.</description>
+  <description>Netplan CLI: the executable north-adapter that drives the netplan core
+    (osgi/netplan/netplan-core). The synthesis command boots an embedded Felix from the bundles
+    staged in its -exec jar (the same boot seam as seed-master + manifests-cli) and reads
+    NetplanSynthesisService from the registry; the build-time blueprint export runs flat.</description>
+
+  <properties>
+    <rke2lab.manifests.unpack.skip>false</rke2lab.manifests.unpack.skip>
+  </properties>
 
   <dependencies>
+    <!-- The host-world boot infrastructure: OsgiRuntime + (transitively) the whole boot stack
+         (felix.framework + osgi.core compile, felix.scr + felix.resolver + pax-logging + the
+         DS-runtime API runtime). The CLI compiles against OsgiRuntime; the felix/pax jars it only
+         stages + installs, never compiles against. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>runtime</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The seam contract the CLI consumes (netplan.api) + the value types (netplan.port), kept
+         flat on the host classpath as the SINGLE exporter: netplan-port now owns BOTH packages
+         (netplan.api moved here from netplan-core so the consumed service contract lives in a module
+         the bundle imports-but-does-not-export — the single-exporter rule). OsgiRuntime mirrors them
+         onto the system bundle so the embedded netplan-core resolves against this one copy. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>netplan-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- The model bundle: embedded INTACT under META-INF/bundles (stage-embedded-bundles below) and
+         installed by OsgiRuntime, NOT flattened into the uber-jar (excluded from the shade) so it
+         stays the single exporter of its own io.nxmatic.rke2lab.netplan package. runtime scope
+         MACHINE-ENFORCES path 2: the CLI compiles only against -port + OsgiRuntime, never against a
+         netplan-core impl type — the compiler now forbids the host→impl leak. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>netplan-core</artifactId>
       <version>${project.version}</version>
+      <scope>runtime</scope>
     </dependency>
+    <!-- BlueprintExportCommand serializes the blueprint POJOs to YAML at build time, flat (no Felix):
+         jackson stays a flat host dep, the same as seed-master flattens its non-bundle libs. -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
@@ -34,9 +66,22 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
+    <!-- The host LoggerContext pax-logging-logback reuses (StaticLogbackContext=true): stays flat. -->
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
+    </dependency>
+    <!-- The embedded-Felix CLI-scope test boots the same topology as the deployed jar. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>testkit</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>osgi.core</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 
@@ -47,6 +92,9 @@
         <excludes>
           <exclude>logback.xml</exclude>
         </excludes>
+      </resource>
+      <resource>
+        <directory>${project.build.directory}/generated-resources</directory>
       </resource>
     </resources>
     <plugins>
@@ -71,7 +119,7 @@
         </configuration>
       </plugin>
       <!-- Flags + artifact filter inherited from build-parent's managed shade
-           execution; only the per-module transformers are declared here. -->
+           execution; only the per-module transformers + the embed-exclusions are declared here. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -82,6 +130,19 @@
             </goals>
             <phase>package</phase>
             <configuration>
+              <!-- The designed-for-OSGi jars are embedded INTACT (stage-embedded-bundles below) and
+                   installed into Felix as real bundles by OsgiRuntime. Excluding them from the flat
+                   uber-jar keeps each the SINGLE exporter of its packages (the R1 split scar). Same
+                   exclusion set as seed-master + manifests-cli, with netplan-core as the model bundle. -->
+              <artifactSet>
+                <excludes>
+                  <exclude>io.nxmatic.rke2lab:netplan-core</exclude>
+                  <exclude>org.apache.felix:org.apache.felix.scr</exclude>
+                  <exclude>org.apache.felix:org.apache.felix.resolver</exclude>
+                  <exclude>org.ops4j.pax.logging:pax-logging-api</exclude>
+                  <exclude>org.ops4j.pax.logging:pax-logging-logback</exclude>
+                </excludes>
+              </artifactSet>
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                   <resource>logback.xml</resource>
@@ -96,6 +157,71 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <!-- Stage the designed-for-OSGi jars INTACT under META-INF/bundles (a <resource> root, so
+               they land in the uber-jar AND on the test classpath). OsgiRuntime.embedded* streams
+               each into Felix at boot. Fixed destFileNames mirror OsgiRuntime's *_JAR constants; the
+               model bundle is netplan-core. These are the same artifacts excluded from the shade. -->
+          <execution>
+            <id>stage-embedded-bundles</id>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <phase>generate-resources</phase>
+            <configuration>
+              <skip>${rke2lab.manifests.unpack.skip}</skip>
+              <outputDirectory>${project.build.directory}/generated-resources/META-INF/bundles</outputDirectory>
+              <overWriteReleases>true</overWriteReleases>
+              <overWriteSnapshots>true</overWriteSnapshots>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>io.nxmatic.rke2lab</groupId>
+                  <artifactId>netplan-core</artifactId>
+                  <version>${rke2lab.version}</version>
+                  <destFileName>netplan-core.jar</destFileName>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.apache.felix</groupId>
+                  <artifactId>org.apache.felix.scr</artifactId>
+                  <destFileName>org.apache.felix.scr.jar</destFileName>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.apache.felix</groupId>
+                  <artifactId>org.apache.felix.resolver</artifactId>
+                  <destFileName>org.apache.felix.resolver.jar</destFileName>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.ops4j.pax.logging</groupId>
+                  <artifactId>pax-logging-api</artifactId>
+                  <destFileName>pax-logging-api.jar</destFileName>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.ops4j.pax.logging</groupId>
+                  <artifactId>pax-logging-logback</artifactId>
+                  <destFileName>pax-logging-logback.jar</destFileName>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>m2e</id>
+      <activation>
+        <property>
+          <name>m2e.version</name>
+        </property>
+      </activation>
+      <properties>
+        <rke2lab.manifests.unpack.skip>true</rke2lab.manifests.unpack.skip>
+      </properties>
+    </profile>
+  </profiles>
 </project>

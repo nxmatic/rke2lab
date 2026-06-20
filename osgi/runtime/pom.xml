@@ -35,6 +35,14 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
+    <!-- The passive fluent-pipeline grammar: SeedRuntime wraps its boot-run-close lifecycle as a
+         topic via FluentTopicRunner (label → logging + TopicFailure), the same engine the bundles
+         use. Consumed flat here (host world). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>pipeline-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!--
       The Felix DS extender + the DS-runtime API it imports are RUNTIME concerns of the boot, not
       compile deps: OsgiRuntime only locates felix.scr's jar by name and the system bundle exports

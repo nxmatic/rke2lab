@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- @codebase -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>build-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../build-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>pipeline-domain</artifactId>
+  <packaging>pom</packaging>
+  <name>osgi/pipeline</name>
+  <description>The pipeline domain: the passive fluent-pipeline grammar (pipeline-core — the topic
+    runner, failure handler, and stage failure) plus the passive bootstrap orchestration stages
+    (pipeline-bootstrap). Both are PASSIVE modules (pure logic, no @Component, no framework boot), so
+    each is dual-consumable: a real OSGi bundle at build time, yet equally usable flat on the host
+    classloader (system-exported for type resolution). They unify what used to be duplicated between
+    seed-master (host) and manifests-core (bundle).</description>
+
+  <modules>
+    <module>pipeline-core</module>
+  </modules>
+</project>

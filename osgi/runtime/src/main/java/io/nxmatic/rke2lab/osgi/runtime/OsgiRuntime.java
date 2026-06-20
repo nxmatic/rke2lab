@@ -83,6 +83,22 @@ public final class OsgiRuntime implements AutoCloseable {
    */
   public static final String EMBEDDED_BUNDLES_ROOT = "/META-INF/bundles/";
 
+  /**
+   * Staged file names of the boot-stack jars every exec entrypoint embeds under {@link
+   * #EMBEDDED_BUNDLES_ROOT}. The single source of truth for these names: {@link
+   * #embeddedBootStack()} and {@link #hasEmbeddedBundles()} read them here, and each exec module's
+   * {@code maven-dependency-plugin} {@code stage-embedded-bundles} execution names the same files
+   * via {@code destFileName} — the catalog that keeps the boot code and the staging in lock-step
+   * (poms cannot call Java, so this is the authoritative registry during review).
+   */
+  public static final String PAX_LOGGING_API_JAR = "pax-logging-api.jar";
+
+  public static final String PAX_LOGGING_LOGBACK_JAR = "pax-logging-logback.jar";
+
+  public static final String FELIX_SCR_JAR = "org.apache.felix.scr.jar";
+
+  public static final String FELIX_RESOLVER_JAR = "org.apache.felix.resolver.jar";
+
   private final List<Path> bundleJars;
   private final List<String> runtimeJars;
   private final boolean startScr;
@@ -110,12 +126,31 @@ public final class OsgiRuntime implements AutoCloseable {
   }
 
   /**
-   * Whether the running process carries embedded bundles under {@link #EMBEDDED_BUNDLES_ROOT} —
-   * true in the deployed exec-jar, false on a reactor/test classpath. The seam picks the embedded
+   * A builder pre-loaded with the boot stack every exec entrypoint shares — Pax Logging at the
+   * LogService layer, felix.scr as the DS extender, felix.resolver as the {@code
+   * org.osgi.service.resolver.Resolver} provider — all from the embedded {@link
+   * #EMBEDDED_BUNDLES_ROOT}. The per-entrypoint variation is only WHICH model bundle(s) to add:
+   * each caller chains its own {@code .embeddedBundle(...)} onto the returned builder before {@link
+   * Builder#build()}. Keeps the three entrypoints (seed-master + the two CLIs) booting an identical
+   * framework, so a boot change is made once here, not copy-pasted per main().
+   */
+  public static Builder embeddedBootStack() {
+    return builder()
+        .embeddedPaxLogging(PAX_LOGGING_API_JAR, PAX_LOGGING_LOGBACK_JAR)
+        .withScr()
+        .embeddedRuntimeJar(FELIX_SCR_JAR)
+        .embeddedRuntimeJar(FELIX_RESOLVER_JAR);
+  }
+
+  /**
+   * Whether the running process carries the embedded boot stack under {@link
+   * #EMBEDDED_BUNDLES_ROOT} — true in a deployed exec-jar, false on a reactor/test classpath.
+   * Probes felix.scr, the boot-stack jar common to every entrypoint (not a per-entrypoint model
+   * bundle), so the check is uniform across seed-master and the CLIs. The seam picks the embedded
    * boot topology over the classpath-located one with this.
    */
   public static boolean hasEmbeddedBundles() {
-    return OsgiRuntime.class.getResource(EMBEDDED_BUNDLES_ROOT + "manifests-core.jar") != null;
+    return OsgiRuntime.class.getResource(EMBEDDED_BUNDLES_ROOT + FELIX_SCR_JAR) != null;
   }
 
   /**

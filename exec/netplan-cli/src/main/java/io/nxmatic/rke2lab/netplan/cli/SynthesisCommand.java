@@ -3,8 +3,7 @@ package io.nxmatic.rke2lab.netplan.cli;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisRequest;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisResult;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisService;
-import java.util.List;
-import java.util.ServiceLoader;
+import io.nxmatic.rke2lab.osgi.runtime.SeedRuntime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +13,15 @@ public final class SynthesisCommand implements NetplanCli.Command {
 
   @Override
   public void execute(String[] args) {
-    final NetplanSynthesisService service = loadService();
+    // Boot the embedded Felix from the bundles staged in this exec-jar (the shared SeedRuntime
+    // seam),
+    // resolve the one netplan service from the registry, drive it, then close. No flat-classpath
+    // fallback: netplan-core's @Component activates only under a framework.
+    SeedRuntime.bootingEmbedded("netplan-core.jar")
+        .during("synthesis", NetplanSynthesisService.class, this::synthesize);
+  }
+
+  private void synthesize(NetplanSynthesisService service) {
     final NetplanSynthesisRequest request = NetplanSynthesisRequest.fromSystemProperties();
     final NetplanSynthesisResult result = service.synthesize(request);
 
@@ -28,27 +35,5 @@ public final class SynthesisCommand implements NetplanCli.Command {
                     "Net2Plan API endpoint configured at '{}' (network plan URL '{}')",
                     endpoint.baseUri(),
                     endpoint.networkPlanUri()));
-  }
-
-  private static NetplanSynthesisService loadService() {
-    final List<NetplanSynthesisService> providers =
-        ServiceLoader.load(NetplanSynthesisService.class).stream()
-            .map(ServiceLoader.Provider::get)
-            .toList();
-
-    if (providers.isEmpty()) {
-      throw new IllegalStateException(
-          "No NetplanSynthesisService provider found via ServiceLoader.");
-    }
-
-    if (providers.size() > 1) {
-      throw new IllegalStateException(
-          "Expected exactly one NetplanSynthesisService provider, found "
-              + providers.size()
-              + ": "
-              + providers.stream().map(NetplanSynthesisService::providerId).toList());
-    }
-
-    return providers.getFirst();
   }
 }

@@ -4,12 +4,12 @@ package io.nxmatic.rke2lab.manifests.cli;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisRequest;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisResult;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisService;
+import io.nxmatic.rke2lab.osgi.runtime.SeedRuntime;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
-import java.util.ServiceLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -143,33 +143,24 @@ public final class Main {
 
     @Override
     public void run() {
+      // Boot the embedded Felix from the bundles staged in this exec-jar (the shared SeedRuntime
+      // seam), resolve the one manifests-world service from the registry, drive it, then close.
+      // There is no flat-classpath fallback: since the Resolver became an @Reference,
+      // manifests-core's
+      // @Component activates only under a framework, so off-framework ServiceLoader yielded a null
+      // Resolver — the bug this migration fixes.
+      SeedRuntime.bootingEmbedded("manifests-core.jar")
+          .during("synthesize", ManifestSynthesisService.class, this::synthesize);
+    }
+
+    private void synthesize(ManifestSynthesisService synthesisService) {
       try {
-        final ManifestSynthesisService synthesisService = loadService();
         final ManifestSynthesisResult result = synthesisService.synthesize(request);
         logger.info("Manifest synthesis completed by provider '{}'", synthesisService.providerId());
         logger.info("Consolidated manifest output written to {}", result.manifestFile());
       } catch (IOException ex) {
         throw new UncheckedIOException(ex);
       }
-    }
-
-    ManifestSynthesisService loadService() {
-      final List<ManifestSynthesisService> providers =
-          ServiceLoader.load(ManifestSynthesisService.class).stream()
-              .map(ServiceLoader.Provider::get)
-              .toList();
-      if (providers.isEmpty()) {
-        throw new IllegalStateException(
-            "No ManifestSynthesisService provider found via ServiceLoader.");
-      }
-      if (providers.size() > 1) {
-        throw new IllegalStateException(
-            "Expected exactly one ManifestSynthesisService provider, found "
-                + providers.size()
-                + ": "
-                + providers.stream().map(ManifestSynthesisService::providerId).toList());
-      }
-      return providers.getFirst();
     }
 
     static final class Builder implements CommandBuilder<SynthesizeCommand> {

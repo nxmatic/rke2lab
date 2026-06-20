@@ -28,6 +28,8 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
 import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
+import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
+import io.nxmatic.rke2lab.pipeline.OnFailure;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -129,9 +131,8 @@ public final class BootstrapPipeline {
     }
 
     /**
-     * Optional: the embedded OSGi framework booted for this run. When set, the stages read the
-     * manifests-world services from its registry; when not (standalone/tests with no embedded
-     * bundles) they fall back to ServiceLoader.
+     * The embedded OSGi framework booted for this run; the stages read the manifests-world services
+     * from its registry.
      */
     public ComponentBoundPipeline withOsgiRuntime(OsgiRuntime osgiRuntime) {
       state.osgiRuntime = osgiRuntime;
@@ -229,7 +230,7 @@ public final class BootstrapPipeline {
               state.options.cleanWorktreeRequired(),
               state.readinessLogger,
               state.osgiRuntime);
-      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
       return new PreflightDone(state);
     }
   }
@@ -260,7 +261,7 @@ public final class BootstrapPipeline {
               state.config.localWorktreePath(),
               state.options.bboxFailOnError(),
               result -> state.bboxResult = result);
-      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
       return new BboxDone(state);
     }
   }
@@ -291,7 +292,7 @@ public final class BootstrapPipeline {
               state.policy,
               state.osgiRuntime,
               result -> state.bootstrapResult = result);
-      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
       return new IncusDone(state);
     }
   }
@@ -331,7 +332,7 @@ public final class BootstrapPipeline {
               generalist,
               liveProbe,
               summary -> state.systemdAdapterLaunchSummary = summary);
-      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
       return new SystemdAdapterDone(state);
     }
   }
@@ -371,7 +372,7 @@ public final class BootstrapPipeline {
               () -> state.bootstrapResult,
               () -> state.systemdAdapterLaunchSummary,
               result -> state.resourceResult = result);
-      TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
       return new ResourcesDone(state);
     }
   }
