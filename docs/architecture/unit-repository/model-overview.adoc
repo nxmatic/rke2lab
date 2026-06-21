@@ -14,6 +14,74 @@ This doc carries the thesis, the shipped-vs-design state, and the settled decisi
 docs elaborate each concern; the atlas proves the whole is additive.
 ====
 
+== The objective — why a unit repository at all
+
+Before the thesis, the goal that gives every piece its meaning. Today seed-master is a *transient
+orchestrator*: it runs on the physical host, boots the framework, provisions a cluster, then dies. It
+is a special node — it holds the amount, its code is baked flat in the exec-jar, the cluster it makes
+is an output, not a peer. The objective is to dissolve that asymmetry: a unit repository where the
+orchestrator becomes an ordinary peer in the cluster it bootstrapped, and everything — data and code —
+lives in the DAG.
+
+=== Before — level-0: seed-master is the transient orchestrator
+
+[mermaid]
+....
+flowchart TB
+  subgraph "physical host"
+    sm["seed-master — kernel level-0<br/>transient orchestrator<br/>code baked in the exec-jar<br/>NOT a unit"]
+  end
+  subgraph "the cluster — an output, not a peer"
+    rke["rke2lab cluster"]
+    wl["workloads — provisioned, passive"]
+  end
+  sm -->|boots Felix, provisions| rke
+  rke -->|runs| wl
+  classDef kern fill:#eee,stroke:#999,stroke-width:2px,stroke-dasharray:4 3;
+  classDef out fill:#fde,stroke:#a58,stroke-width:1px;
+  class sm kern;
+  class rke,wl out;
+....
+
+=== After — level-x: seed-master is an ordinary peer in the mesh
+
+[mermaid]
+....
+flowchart TB
+  boot["throwaway bootstrapper<br/>creates empty cluster, seeds first pull<br/>the irreducible level-0, then erases"]
+  subgraph "the cluster — a node serving its own DAG"
+    store["unit store — units incl. code, content-addressed"]
+    smp["seed-master — now an ordinary workload-peer"]
+    n1["unit-node A — scale-from-zero workload"]
+    n2["unit-node B — scale-from-zero workload"]
+  end
+  mesh["other clusters — peer super-nodes, each bootstrapped the same way"]
+  boot -.->|create cluster, seed, erase| store
+  store -->|resolved and loaded into| smp
+  store -->|resolved and loaded into| n1
+  store -->|resolved and loaded into| n2
+  smp <-->|pull-own, serve own DAG| mesh
+  classDef kern fill:#eee,stroke:#999,stroke-width:2px,stroke-dasharray:4 3;
+  classDef u fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class boot kern;
+  class store,smp,n1,n2,mesh u;
+....
+
+The move is monotone: nothing in BEFORE is erased. The cluster grows from an output into a node;
+seed-master is not deleted, it MOVES from transient orchestrator to workload-peer (a changed role,
+named, not a rewrite); the kernel level-0 shrinks from "holds everything" to a throwaway bootstrapper
+that creates the empty cluster, seeds the first pull, and erases — nobody depends on it
+(alive-iff-required). At steady state EVERYTHING is a workload-node: total homogeneity. seed-master
+migrates in by a *pull* — a `git clone` of its DAG — which is exactly a unit changing its manifestation
+from one substrate to another (the mechanism is the resolution + transport below).
+
+Every other piece of this design is a means to this end: resolution, recursive composition, and
+code-in-the-DAG all exist so the orchestrator can migrate in and the cluster can hold itself. The
+reflexive bootstrap — the app is a DAG of units AND its state is a DAG of units — only closes once the
+orchestrator is itself a unit in the cluster it made. SHIPPED today: the level-0 kernel (the host boot
+seam) and the cluster as an output. DESIGN: the store holding code, migration-by-pull, the homogeneous
+steady state, the mesh. This figure is the objective the increments climb toward.
+
 == The thesis
 
 A *unit repository* is the OSGi resolution model joined to a peer-to-peer provisioning and history

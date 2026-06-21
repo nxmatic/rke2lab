@@ -125,6 +125,57 @@ The hand-rolled `dependsOn…` walker that the resolver superseded is **retired*
 — it has been deleted. The resolution model is now the sole path; there is no
 walker feeding resolver input.
 
+== Resolving a coordinate — three stages across two name-spaces
+
+Resolving "which unit, which bytes" is NOT one lookup. It crosses the two
+orthogonal name-spaces (see link:jgit-transposition.adoc[the JGit transposition]):
+a requirement is a NAME, the bytes are reached by a HASH. The resolver bridges
+them, and an optional ref layer sits between for human version control.
+
+[mermaid]
+....
+flowchart LR
+  need["a need — Require type=doctor version>=2.0<br/>schema-name, logical, a RANGE"]
+  resolver["UnitResolver<br/>which unit provides it"]
+  ref["optional ref — tag, branch<br/>name maps to a root hash, git-native"]
+  hash["a root hash<br/>content-hash, exact, immutable"]
+  subtree["subtree reachability<br/>walk the closure, serve the bytes"]
+  bytes["the unit closure — data plus code"]
+  need -->|stage 1 logical| resolver
+  resolver -->|stage 2 pin| ref
+  ref -->|stage 3 reach| hash
+  hash --> subtree
+  subtree --> bytes
+  classDef ship fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef des fill:#ffd,stroke:#aa2,stroke-width:1px,stroke-dasharray:4 3;
+  class need,resolver ship;
+  class ref,hash,subtree,bytes des;
+....
+
+The three stages, each in its name-space:
+
+* *Stage 1 — logical, schema-name (SHIPPED).* The coordinate is a NAME plus a
+  version RANGE, e.g. `Require unitrepo.type=doctor; version>=2.0`. The
+  `UnitResolver` decides which unit satisfies it. This half — the hard half git
+  has no equivalent for — is what is already in production. The range expresses
+  *policy* (what is acceptable), not a fixed pick.
+* *Stage 2 — ref, content-hash, OPTIONAL (DESIGN).* Among the versions stage 1
+  accepts, a git-native ref (tag, branch) pins WHICH one: a mutable name that
+  maps to a root hash. This is the human version-control layer — the registry
+  between the loose range and the frozen hash. It refines the resolution, it
+  never replaces it: resolve the range first, then a ref constrains the choice.
+  Discipline: the `ContentStore` exposes refs as name-maps-to-hash, never a raw
+  JGit `Ref` or `ObjectId` (it speaks hash, bytes, unit).
+* *Stage 3 — hash, content-hash (DESIGN).* The result is a root hash — an exact,
+  immutable coordinate covering the whole closure by Merkle. From there subtree
+  reachability serves the bytes; git does this natively. A lockfile-DAG is
+  exactly a frozen set of stage-3 hashes — reproducible byte-exact.
+
+So a coordinate resolves logically first (name plus range), is optionally pinned
+by a ref, and lands on a hash whose subtree yields the closure — data and the
+code bundles required to consult it. Stage 1 is shipped; stages 2 and 3 ride with
+the `ContentStore`.
+
 == Live re-resolution loop — the heartbeat
 
 DESIGN. This is the strictly larger reactive horizon. rke2lab's *shipped*
