@@ -9,16 +9,16 @@ import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterScenario;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
-import io.nxmatic.rke2lab.doctor.Checkpoint;
-import io.nxmatic.rke2lab.doctor.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.ConsultationNarration;
-import io.nxmatic.rke2lab.doctor.ConsultationReport;
-import io.nxmatic.rke2lab.doctor.Generalist;
-import io.nxmatic.rke2lab.doctor.MedicalRecord;
-import io.nxmatic.rke2lab.doctor.Observation;
-import io.nxmatic.rke2lab.doctor.RemediationPlan;
-import io.nxmatic.rke2lab.doctor.Severity;
-import io.nxmatic.rke2lab.doctor.Symptom;
+import io.nxmatic.rke2lab.doctor.port.Checkpoint;
+import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
+import io.nxmatic.rke2lab.doctor.port.ConsultationNarration;
+import io.nxmatic.rke2lab.doctor.port.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.port.Observation;
+import io.nxmatic.rke2lab.doctor.port.RemediationPlan;
+import io.nxmatic.rke2lab.doctor.port.Severity;
+import io.nxmatic.rke2lab.doctor.port.Symptom;
 import io.nxmatic.rke2lab.pipeline.TopicFailure;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +52,7 @@ public final class SystemdAdapterStage {
   private final Consumer<String> readinessLogger;
   private final ReportModel runbook;
   private final ConsultationLog consultations;
-  private final Generalist generalist;
+  private final DoctorConsultingService doctor;
   private final SystemdAdapterProbe liveProbe;
   private final Consumer<Map<String, Object>> sink;
 
@@ -63,7 +63,7 @@ public final class SystemdAdapterStage {
       Consumer<String> readinessLogger,
       ReportModel runbook,
       ConsultationLog consultations,
-      Generalist generalist,
+      DoctorConsultingService doctor,
       SystemdAdapterProbe liveProbe,
       Consumer<Map<String, Object>> sink) {
     this.config = config;
@@ -72,7 +72,7 @@ public final class SystemdAdapterStage {
     this.readinessLogger = readinessLogger;
     this.runbook = runbook;
     this.consultations = consultations;
-    this.generalist = generalist;
+    this.doctor = doctor;
     this.liveProbe = liveProbe;
     this.sink = sink;
   }
@@ -195,10 +195,10 @@ public final class SystemdAdapterStage {
       return;
     }
     final Symptom symptom = observation.symptom().get();
-    final MedicalRecord record = generalist.recordForCurrentPatient();
+    final MedicalRecord record = doctor.recordForCurrentPatient();
     log("⚕ " + ConsultationNarration.consultedLine(record, symptom));
-    log("⚕ " + generalist.cohortFinding(symptom));
-    final RemediationPlan plan = generalist.consult(symptom, observation);
+    log("⚕ " + doctor.cohortFinding(symptom));
+    final RemediationPlan plan = doctor.consult(symptom, observation);
     if (consultations != null) {
       consultations.record(new ConsultationReport(SCENARIO_ID, List.of(observation), plan));
     }

@@ -3,9 +3,9 @@ package io.nxmatic.rke2lab.netplan.cli;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.junit.testkit.Osgi;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisService;
 import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
-import io.nxmatic.rke2lab.osgi.testkit.Osgi;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;

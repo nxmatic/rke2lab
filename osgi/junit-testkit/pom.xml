@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>junit-testkit</artifactId>
+  <name>osgi/junit-testkit</name>
+  <description>The JUnit-in-OSGi testkit: the shared fixtures for running JUnit IN AND AROUND a real
+    embedded framework. Two halves, by world. JVM-side (loaded by surefire, BEFORE the framework):
+    FelixFrameworkExtension boots a real Felix and the @Osgi/@OsgiSpike tags. In-container (loaded by
+    a host bundle): InContainerJUnitRunner drives a JUnit Platform Launcher INSIDE the framework
+    against a host package, so a host -test fragment runs its tests white-box. A bundle, not a plain
+    jar — being a bundle is a superset (it degrades to a plain jar on the flat classpath), and the
+    in-container half must be importable by fragments as a real bundle export.</description>
+
+  <dependencies>
+    <!-- JVM-side half: the Jupiter extension implements the callbacks (compile dep, not test), and
+         boots a real Felix via its launch API. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.framework</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>osgi.core</artifactId>
+    </dependency>
+
+    <!-- In-container half: the runner compiles against the JUnit Platform launcher + engine;
+         provided keeps them out of this bundle — each resolves as its own bundle at runtime. -->
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-engine</artifactId>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

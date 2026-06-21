@@ -95,7 +95,7 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>testkit</artifactId>
+      <artifactId>junit-testkit</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
@@ -123,11 +123,30 @@
     <!-- The doctor diagnostic model: pure operator-runbook types lifted to OSGi. COMPILE scope (not
          runtime like manifests-core): seed-master's staying code — the live registry, the reader,
          the scenarios and pipeline stages — references the model types directly, so it is a shared
-         library, not an embedded bundle. doctor-port arrives transitively. -->
+         library, not an embedded bundle. Both edges declared explicitly because both are imported in
+         code: doctor-port for the value vocabulary + contracts (the membrane), doctor-core for the
+         hidden actors still referenced directly (Generalist, HealthSystem, the readers) until Move B
+         hides them behind DoctorConsultingService. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-core</artifactId>
       <version>${project.version}</version>
+    </dependency>
+    <!-- test-only: the host tests that build replies/specialists (LiveMedicalRecordRegistry,
+         MedicalRecordDump, RealGraphInjection, …) use the shared fixtures ReferralReplies /
+         FakeSpecialist. These now live in package io.nxmatic.rke2lab.doctor.testkit inside the
+         doctor-port-test fragment (the old doctor-testkit module dissolved into it); on seed-master's
+         flat classpath that fragment jar is just the carrier of those fixture classes. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-port-test</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic</groupId>

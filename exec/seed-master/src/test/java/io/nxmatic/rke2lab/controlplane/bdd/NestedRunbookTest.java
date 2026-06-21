@@ -17,24 +17,23 @@ import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.ClusterReadinessStage;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
-import io.nxmatic.rke2lab.doctor.Assessment;
-import io.nxmatic.rke2lab.doctor.ClinicalAccess;
-import io.nxmatic.rke2lab.doctor.ClusterReadinessPhase;
-import io.nxmatic.rke2lab.doctor.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.ConsultationReport;
-import io.nxmatic.rke2lab.doctor.Generalist;
-import io.nxmatic.rke2lab.doctor.GrantPolicy;
-import io.nxmatic.rke2lab.doctor.MedicalRecord;
-import io.nxmatic.rke2lab.doctor.MedicalRecordRegistry;
-import io.nxmatic.rke2lab.doctor.Patient;
-import io.nxmatic.rke2lab.doctor.Prescription;
-import io.nxmatic.rke2lab.doctor.Referral;
-import io.nxmatic.rke2lab.doctor.ReferralReply;
-import io.nxmatic.rke2lab.doctor.RemediationProgramRef;
-import io.nxmatic.rke2lab.doctor.SchemaRef;
-import io.nxmatic.rke2lab.doctor.Specialist;
-import io.nxmatic.rke2lab.doctor.Specialty;
-import io.nxmatic.rke2lab.doctor.Symptom;
+import io.nxmatic.rke2lab.doctor.ExactRosterDoctor;
+import io.nxmatic.rke2lab.doctor.port.Assessment;
+import io.nxmatic.rke2lab.doctor.port.ClusterReadinessPhase;
+import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
+import io.nxmatic.rke2lab.doctor.port.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
+import io.nxmatic.rke2lab.doctor.port.Patient;
+import io.nxmatic.rke2lab.doctor.port.Prescription;
+import io.nxmatic.rke2lab.doctor.port.Referral;
+import io.nxmatic.rke2lab.doctor.port.ReferralReply;
+import io.nxmatic.rke2lab.doctor.port.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.port.SchemaRef;
+import io.nxmatic.rke2lab.doctor.port.Specialist;
+import io.nxmatic.rke2lab.doctor.port.Specialty;
+import io.nxmatic.rke2lab.doctor.port.Symptom;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -227,17 +226,20 @@ class NestedRunbookTest {
 
   /** Play the real stage with no log capture. */
   private static VerificationResult play(
-      ReportModel runbook, ClusterReadinessProbe probe, boolean pulumiMode, Generalist generalist) {
-    return play(runbook, probe, pulumiMode, generalist, message -> {});
+      ReportModel runbook,
+      ClusterReadinessProbe probe,
+      boolean pulumiMode,
+      DoctorConsultingService doctor) {
+    return play(runbook, probe, pulumiMode, doctor, message -> {});
   }
 
   private static VerificationResult play(
       ReportModel runbook,
       ClusterReadinessProbe probe,
       boolean pulumiMode,
-      Generalist generalist,
+      DoctorConsultingService doctor,
       java.util.function.Consumer<String> logger) {
-    return play(runbook, new ConsultationLog(), probe, pulumiMode, generalist, logger);
+    return play(runbook, new ConsultationLog(), probe, pulumiMode, doctor, logger);
   }
 
   private static VerificationResult play(
@@ -245,8 +247,8 @@ class NestedRunbookTest {
       ConsultationLog consultations,
       ClusterReadinessProbe probe,
       boolean pulumiMode,
-      Generalist generalist) {
-    return play(runbook, consultations, probe, pulumiMode, generalist, message -> {});
+      DoctorConsultingService doctor) {
+    return play(runbook, consultations, probe, pulumiMode, doctor, message -> {});
   }
 
   /**
@@ -260,7 +262,7 @@ class NestedRunbookTest {
       ConsultationLog consultations,
       ClusterReadinessProbe probe,
       boolean pulumiMode,
-      Generalist generalist,
+      DoctorConsultingService doctor,
       java.util.function.Consumer<String> logger) {
     final VerificationResult[] holder = new VerificationResult[1];
     new ClusterReadinessStage(
@@ -271,7 +273,7 @@ class NestedRunbookTest {
             logger,
             runbook,
             consultations,
-            generalist,
+            doctor,
             probe,
             REACHABLE_SYSTEMD_ADAPTER,
             result -> holder[0] = result)
@@ -279,13 +281,11 @@ class NestedRunbookTest {
     return holder[0];
   }
 
-  private static Generalist generalistWith(List<Specialist> specialists) {
-    final GrantPolicy policy =
-        GrantPolicy.empty().withSelfGrant(Generalist.GENERALIST_ID, TEST_PATIENT);
-    final ClinicalAccess access =
-        new ClinicalAccess(
-            Generalist.GENERALIST_ID, TEST_PATIENT, policy, EMPTY_RECORDS, msg -> {});
-    return Generalist.builder().specialists(specialists).access(access).build();
+  private static DoctorConsultingService doctorWith(List<Specialist> specialists) {
+    // ExactRosterDoctor takes the roster verbatim (no standard Network/Cluster prepended), so the
+    // routing/prescription assertions see exactly the specialists this test wires.
+    return ExactRosterDoctor.over(
+        TEST_PATIENT, EMPTY_RECORDS, intervention -> {}, specialists, msg -> {});
   }
 
   /** Map each top-level When step's rendered name to its step status. */
@@ -301,12 +301,12 @@ class NestedRunbookTest {
     return statuses;
   }
 
-  private static Generalist readyGeneralist() {
-    return generalistWith(List.of(new DbusTcpSpecialist(config())));
+  private static DoctorConsultingService readyGeneralist() {
+    return doctorWith(List.of(new DbusTcpSpecialist(config())));
   }
 
-  private static Generalist networkGeneralist() {
-    return generalistWith(List.of(new DbusTcpSpecialist(config()), new FakeNetworkSpecialist()));
+  private static DoctorConsultingService networkGeneralist() {
+    return doctorWith(List.of(new DbusTcpSpecialist(config()), new FakeNetworkSpecialist()));
   }
 
   /** A stand-in network specialist so a TIMEOUT (routed to NETWORK) yields a prescription. */

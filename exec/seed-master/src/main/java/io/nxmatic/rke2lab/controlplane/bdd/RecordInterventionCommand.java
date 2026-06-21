@@ -1,10 +1,10 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import io.nxmatic.rke2lab.doctor.Intervention;
-import io.nxmatic.rke2lab.doctor.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.doctor.ProblemRef;
-import io.nxmatic.rke2lab.doctor.Provenance;
-import io.nxmatic.rke2lab.doctor.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.port.Intervention;
+import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
+import io.nxmatic.rke2lab.doctor.port.ProblemRef;
+import io.nxmatic.rke2lab.doctor.port.Provenance;
+import io.nxmatic.rke2lab.doctor.port.RemediationProgramRef;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;

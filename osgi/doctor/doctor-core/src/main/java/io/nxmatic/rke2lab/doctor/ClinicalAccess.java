@@ -1,5 +1,9 @@
 package io.nxmatic.rke2lab.doctor;
 
+import io.nxmatic.rke2lab.doctor.port.ClinicianId;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
+import io.nxmatic.rke2lab.doctor.port.Patient;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -14,7 +18,7 @@ import java.util.function.Consumer;
  * gate is trivial for the admitted patient's own record (admission self-grants it) and genuinely
  * bites the cohort: {@link #cohort()} returns only the siblings this id holds grants on.
  */
-public final class ClinicalAccess {
+final class ClinicalAccess {
 
   private final ClinicianId boundId;
   private final Patient admittedPatient;

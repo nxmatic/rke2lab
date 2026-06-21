@@ -8,14 +8,20 @@
 #
 # and inherits everything below.
 #
-# bnd computes Import-Package from the scenario BYTECODE only. Exactly ONE package the in-container
-# run needs is invisible to that static analysis and must be forced: com.tngtech.jgiven.impl.intercept
-# — the RUNTIME-GENERATED stage proxy implements StageInterceptorInternal from it, but the scenario
-# bytecode never names it, so bnd's com.tngtech.jgiven.* wildcard (which only emits imports for
-# REFERENCED packages) drops it. byte-buddy's own packages bnd DOES compute (the Stage base + the
-# proxy machinery are statically reachable), so they need no forcing. That single forced import is
-# the entire build-time virality measure — bounded, named, contributed by the fragment to the host.
+# bnd computes Import-Package from the scenario BYTECODE only. TWO jGiven packages the in-container
+# run needs are invisible to that static analysis and must be forced, both because byte-buddy
+# GENERATES classes into them at runtime (names absent from any bytecode, so bnd's
+# com.tngtech.jgiven.* wildcard — which only emits imports for REFERENCED packages — drops them):
+#   - com.tngtech.jgiven.impl.intercept — the stage proxy implements StageInterceptorInternal from it
+#   - com.tngtech.jgiven.impl — byte-buddy defines ByteBuddyStageClassCreator$StepInterceptorGetter
+#     Setter into this package when proxying a state-carrying Stage (@ProvidedScenarioState etc.); a
+#     trivial Stage never triggers it, a real one does. The host must import the package so byte-buddy
+#     can DEFINE the class into the host loader there.
+# byte-buddy's own net.bytebuddy.* packages bnd DOES compute (statically reachable), so they need no
+# forcing. These two forced imports are the entire build-time virality measure — bounded, named,
+# contributed by the fragment to the host, single point of change for every jGiven host.
 Import-Package: \
+    com.tngtech.jgiven.impl, \
     com.tngtech.jgiven.impl.intercept, \
     com.tngtech.jgiven.*, \
     *

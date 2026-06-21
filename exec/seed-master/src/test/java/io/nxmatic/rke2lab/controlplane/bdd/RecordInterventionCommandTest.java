@@ -1,16 +1,16 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import static io.nxmatic.rke2lab.doctor.Checkpoint.SYSTEMD_ADAPTER;
-import static io.nxmatic.rke2lab.doctor.Symptom.CONNECTION_REFUSED;
+import static io.nxmatic.rke2lab.doctor.port.Checkpoint.SYSTEMD_ADAPTER;
+import static io.nxmatic.rke2lab.doctor.port.Symptom.CONNECTION_REFUSED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.doctor.Intervention;
-import io.nxmatic.rke2lab.doctor.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.doctor.ProblemRef;
-import io.nxmatic.rke2lab.doctor.Provenance;
-import io.nxmatic.rke2lab.doctor.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.port.Intervention;
+import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
+import io.nxmatic.rke2lab.doctor.port.ProblemRef;
+import io.nxmatic.rke2lab.doctor.port.Provenance;
+import io.nxmatic.rke2lab.doctor.port.RemediationProgramRef;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;

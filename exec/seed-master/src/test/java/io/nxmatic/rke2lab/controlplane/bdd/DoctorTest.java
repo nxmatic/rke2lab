@@ -5,12 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
-import io.nxmatic.rke2lab.doctor.MedicalRecord;
-import io.nxmatic.rke2lab.doctor.Observation;
-import io.nxmatic.rke2lab.doctor.Patient;
-import io.nxmatic.rke2lab.doctor.Referral;
-import io.nxmatic.rke2lab.doctor.ReferralReply;
-import io.nxmatic.rke2lab.doctor.Symptom;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.port.Observation;
+import io.nxmatic.rke2lab.doctor.port.Patient;
+import io.nxmatic.rke2lab.doctor.port.Referral;
+import io.nxmatic.rke2lab.doctor.port.ReferralReply;
+import io.nxmatic.rke2lab.doctor.port.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.port.Symptom;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -60,7 +61,14 @@ class DoctorTest {
     assertTrue(reply.hasPrescription(), "connection-refused is the dbus specialist's treatment");
     assertEquals("dbus-tcp/connection-refused/v1", reply.assessment().schemaRef().id());
 
-    final String humanHint = reply.prescription().orElseThrow().humanHint();
+    // The prescription's real, host-specific target — the coverage that used to live in the
+    // DoctorScenarioTest "targets unit" step before that scenario moved to the generic
+    // FakeSpecialist.
+    final var prescription = reply.prescription().orElseThrow();
+    assertEquals(RemediationProgramRef.RESTART_UNIT, prescription.programRef());
+    assertEquals(DbusTcpSpecialist.ADAPTER_UNIT, prescription.payload().get("unit"));
+
+    final String humanHint = prescription.humanHint();
     assertTrue(humanHint.contains("systemctl restart"), () -> humanHint);
     assertFalse(
         humanHint.contains("refused"),

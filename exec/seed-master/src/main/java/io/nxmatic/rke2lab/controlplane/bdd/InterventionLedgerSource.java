@@ -1,9 +1,9 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import io.nxmatic.rke2lab.doctor.Intervention;
-import io.nxmatic.rke2lab.doctor.InterventionLedger;
-import io.nxmatic.rke2lab.doctor.InterventionReader;
-import io.nxmatic.rke2lab.doctor.StackCoordinate;
+import io.nxmatic.rke2lab.doctor.port.Intervention;
+import io.nxmatic.rke2lab.doctor.port.InterventionLedger;
+import io.nxmatic.rke2lab.doctor.port.InterventionReader;
+import io.nxmatic.rke2lab.doctor.port.StackCoordinate;
 import io.nxmatic.rke2lab.pulumi.automation.StackException;
 import io.nxmatic.rke2lab.pulumi.automation.StackHandle;
 import io.nxmatic.rke2lab.pulumi.automation.StackHistory;

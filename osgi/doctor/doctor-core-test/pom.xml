@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>doctor-core-test</artifactId>
+  <name>osgi/doctor/doctor-core-test</name>
+  <description>The -test fragment of doctor-core: a Fragment-Host attached to the doctor-core bundle,
+    sharing its classloader so its actor tests run IN-CONTAINER and reach doctor-core's sealed,
+    package-private final-class actors (Generalist, HealthSystem, ClinicalAccess, GrantPolicy,
+    DriftSpecialist, the core Specialists) WHITE-BOX — the access the flat classpath gave only by
+    accident and a black-box bundle could never have. It carries, in src/main so they land in the
+    fragment: the 8 plain @Test actor tests + the 2 jGiven scenarios (DoctorScenario(Test)). The
+    shared fixtures (ReferralReplies, FakeSpecialist) it imports through the doctor-core host, which
+    in turn imports io.nxmatic.rke2lab.doctor.testkit exported by the doctor-port-test fragment —
+    one copy, no separate module. jGiven runs in-container via the shared jgiven-fragment.bnd
+    include; the JUnit lifecycle via the generic in-container runner (junit-testkit).</description>
+
+  <dependencies>
+    <!-- the JUnit-in-OSGi testkit: JVM-side FelixFrameworkExtension (harness) + in-container runner
+         (DoctorCoreTests); provided covers both src/test and src/main compilation. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>junit-testkit</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- compile the actor tests white-box against the host (provided: the fragment is pure test
+         bytecode that resolves against the doctor-core host at runtime). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-core</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- the shared fixtures live in the doctor-port-test fragment (package doctor.testkit, exported);
+         provided so the actor tests compile against ReferralReplies/FakeSpecialist. At runtime they
+         resolve through the doctor-core host, which imports doctor.testkit. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-port-test</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- the value vocabulary the tests speak (Symptom, RemediationPlan, …) -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-port</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- the actor tests + scenarios compile against Jupiter + jGiven (src/main → fragment). -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <!-- DoctorCoreTests names JupiterTestEngine.class (so bnd imports the engine package). -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-junit5</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- the src/test harness boots Felix via JGivenTestkit.felix() and installs the JUnit + jGiven
+         bundle worlds by classpath substring, so they must be on the TEST classpath. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>jgiven-testkit</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>jgiven-wrap</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>net.bytebuddy</groupId>
+      <artifactId>byte-buddy</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

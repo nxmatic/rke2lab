@@ -14,8 +14,8 @@
   <description>The doctor diagnostic model: the pure operator-runbook types (symptom, observation,
     assessment, prescription, remediation plan, medical record, health system, the specialists and
     the clinical-access model) lifted from exec/seed-master into the OSGi world. Consumes the
-    doctor-port observation seam; the host implements it (DIP). Zero pulumi, zero jgiven — the
-    rendering engine and the live-observation adapters stay host.</description>
+    doctor-port observation seam; the host implements it (DIP). Zero pulumi — the rendering engine and
+    the live-observation adapters stay host.</description>
 
   <dependencies>
     <dependency>

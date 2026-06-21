@@ -6,9 +6,9 @@ import com.pulumi.automation.ProjectBackend;
 import com.pulumi.automation.ProjectRuntimeName;
 import com.pulumi.automation.ProjectSettings;
 import com.pulumi.automation.WorkspaceStack;
-import io.nxmatic.rke2lab.doctor.Intervention;
-import io.nxmatic.rke2lab.doctor.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.doctor.StackCoordinate;
+import io.nxmatic.rke2lab.doctor.port.Intervention;
+import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
+import io.nxmatic.rke2lab.doctor.port.StackCoordinate;
 import java.nio.file.Path;
 import java.util.Map;
 

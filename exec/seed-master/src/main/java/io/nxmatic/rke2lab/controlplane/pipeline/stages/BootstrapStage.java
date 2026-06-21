@@ -9,7 +9,7 @@ import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapPipeline;
 import io.nxmatic.rke2lab.controlplane.pipeline.OutputBuilder;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
-import io.nxmatic.rke2lab.doctor.ConsultationLog;
+import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
 import io.nxmatic.rke2lab.osgi.runtime.SeedRuntime;
 import io.nxmatic.rke2lab.pipeline.OnFailure;

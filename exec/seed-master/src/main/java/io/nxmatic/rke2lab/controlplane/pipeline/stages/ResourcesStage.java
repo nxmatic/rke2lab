@@ -6,8 +6,8 @@ import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager.ResourceCreationResult;
-import io.nxmatic.rke2lab.doctor.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.Generalist;
+import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
+import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -22,7 +22,7 @@ public final class ResourcesStage {
   private final Consumer<String> readinessLogger;
   private final ReportModel runbook;
   private final ConsultationLog consultations;
-  private final Generalist generalist;
+  private final DoctorConsultingService doctor;
   private final Supplier<IncusResourceBootstrap.BootstrapResult> bootstrapResultSupplier;
   private final Supplier<Map<String, Object>> systemdAdapterLaunchSupplier;
   private final Consumer<ResourceCreationResult> sink;
@@ -36,7 +36,7 @@ public final class ResourcesStage {
       Consumer<String> readinessLogger,
       ReportModel runbook,
       ConsultationLog consultations,
-      Generalist generalist,
+      DoctorConsultingService doctor,
       Supplier<IncusResourceBootstrap.BootstrapResult> bootstrapResultSupplier,
       Supplier<Map<String, Object>> systemdAdapterLaunchSupplier,
       Consumer<ResourceCreationResult> sink) {
@@ -48,7 +48,7 @@ public final class ResourcesStage {
     this.readinessLogger = readinessLogger;
     this.runbook = runbook;
     this.consultations = consultations;
-    this.generalist = generalist;
+    this.doctor = doctor;
     this.bootstrapResultSupplier = bootstrapResultSupplier;
     this.systemdAdapterLaunchSupplier = systemdAdapterLaunchSupplier;
     this.sink = sink;
@@ -63,7 +63,7 @@ public final class ResourcesStage {
             readinessLogger,
             runbook,
             consultations,
-            generalist,
+            doctor,
             bootstrapResultSupplier.get(),
             systemdAdapterLaunchSupplier.get(),
             pulumiMode));

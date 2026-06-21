@@ -36,11 +36,13 @@
       <version>${project.version}</version>
     </dependency>
     <!-- test-only: StackHandleSnapshotSourceTest, relocated here with the adapter's host home, reads
-         the consultationReport output key from the doctor model. doctor-core is built before the host
-         in the reactor (osgi→host) and never depends back, so this is no cycle. -->
+         the consultationReport output key from the doctor model. Only the port (SnapshotSource + the
+         value vocabulary, incl. ConsultationReport since Move A) is imported — never a hidden actor —
+         so doctor-port alone. doctor-port is built before the host in the reactor (osgi→host) and
+         never depends back, so this is no cycle. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>doctor-core</artifactId>
+      <artifactId>doctor-port</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

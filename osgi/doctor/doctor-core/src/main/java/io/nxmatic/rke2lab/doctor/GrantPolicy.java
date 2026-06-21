@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.doctor;
 
+import io.nxmatic.rke2lab.doctor.port.ClinicianId;
+import io.nxmatic.rke2lab.doctor.port.Patient;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -14,7 +16,7 @@ import java.util.Set;
  *
  * <p>Immutable: each {@code with*} returns a new policy carrying the added grants.
  */
-public final class GrantPolicy {
+final class GrantPolicy {
 
   private final Set<Grant> grants;
 

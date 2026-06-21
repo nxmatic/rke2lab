@@ -2,12 +2,12 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import io.nxmatic.rke2lab.doctor.ConsultationReport;
-import io.nxmatic.rke2lab.doctor.MedicalRecord;
-import io.nxmatic.rke2lab.doctor.MedicalRecordReader;
-import io.nxmatic.rke2lab.doctor.MedicalRecordReconstructionException;
-import io.nxmatic.rke2lab.doctor.MedicalRecordReconstructionException.EntryFailure;
-import io.nxmatic.rke2lab.doctor.Patient;
+import io.nxmatic.rke2lab.doctor.port.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecordReader;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecordReconstructionException;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecordReconstructionException.EntryFailure;
+import io.nxmatic.rke2lab.doctor.port.Patient;
 import io.nxmatic.rke2lab.doctor.port.SnapshotException;
 import io.nxmatic.rke2lab.doctor.port.SnapshotSource;
 import io.nxmatic.rke2lab.pulumi.automation.StackHandle;

@@ -1,0 +1,17 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.junit.testkit
+
+# Two halves by world (see the pom). Only the in-container half is meant to be imported by a host
+# -test fragment, so only its package is exported.
+Export-Package: io.nxmatic.rke2lab.junit.testkit.container
+
+# The JVM-side half (FelixFrameworkExtension) pulls the framework-launch API + felix, which do NOT
+# exist inside the framework. They are needed only when this jar runs on surefire's flat classpath
+# (where they are present); marking them optional lets the bundle still RESOLVE when installed
+# in-container to provide the runner package. A bundle is a superset of a plain jar — this is what
+# keeps both uses true from one artifact.
+Import-Package: \
+    org.osgi.framework.launch;resolution:=optional, \
+    org.apache.felix.framework.util;resolution:=optional, \
+    *
+
+-noimportjava: true

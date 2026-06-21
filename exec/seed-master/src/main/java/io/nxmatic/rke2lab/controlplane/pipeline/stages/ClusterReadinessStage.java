@@ -10,16 +10,16 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
-import io.nxmatic.rke2lab.doctor.Checkpoint;
-import io.nxmatic.rke2lab.doctor.ClusterReadinessPhase;
-import io.nxmatic.rke2lab.doctor.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.ConsultationNarration;
-import io.nxmatic.rke2lab.doctor.ConsultationReport;
-import io.nxmatic.rke2lab.doctor.Generalist;
-import io.nxmatic.rke2lab.doctor.MedicalRecord;
-import io.nxmatic.rke2lab.doctor.Observation;
-import io.nxmatic.rke2lab.doctor.RemediationPlan;
-import io.nxmatic.rke2lab.doctor.Symptom;
+import io.nxmatic.rke2lab.doctor.port.Checkpoint;
+import io.nxmatic.rke2lab.doctor.port.ClusterReadinessPhase;
+import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
+import io.nxmatic.rke2lab.doctor.port.ConsultationNarration;
+import io.nxmatic.rke2lab.doctor.port.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.port.Observation;
+import io.nxmatic.rke2lab.doctor.port.RemediationPlan;
+import io.nxmatic.rke2lab.doctor.port.Symptom;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +47,7 @@ public final class ClusterReadinessStage {
   private final Consumer<String> readinessLogger;
   private final ReportModel runbook;
   private final ConsultationLog consultations;
-  private final Generalist generalist;
+  private final DoctorConsultingService doctor;
   private final ClusterReadinessProbe phaseProbe;
   private final Map<String, Object> systemdAdapterLaunchSummary;
   private final Consumer<VerificationResult> sink;
@@ -60,7 +60,7 @@ public final class ClusterReadinessStage {
       Consumer<String> readinessLogger,
       ReportModel runbook,
       ConsultationLog consultations,
-      Generalist generalist,
+      DoctorConsultingService doctor,
       ClusterReadinessProbe phaseProbe,
       Map<String, Object> systemdAdapterLaunchSummary,
       Consumer<VerificationResult> sink) {
@@ -71,7 +71,7 @@ public final class ClusterReadinessStage {
     this.readinessLogger = readinessLogger;
     this.runbook = runbook;
     this.consultations = consultations;
-    this.generalist = generalist;
+    this.doctor = doctor;
     this.phaseProbe = phaseProbe;
     this.systemdAdapterLaunchSummary =
         systemdAdapterLaunchSummary == null ? Map.of() : systemdAdapterLaunchSummary;
@@ -224,9 +224,9 @@ public final class ClusterReadinessStage {
         .ifPresent(
             observation -> {
               final Symptom symptom = observation.symptom().get();
-              final MedicalRecord record = generalist.recordForCurrentPatient();
+              final MedicalRecord record = doctor.recordForCurrentPatient();
               log("⚕ " + ConsultationNarration.consultedLine(record, symptom));
-              final RemediationPlan plan = generalist.consult(symptom, observation);
+              final RemediationPlan plan = doctor.consult(symptom, observation);
               if (consultations != null) {
                 consultations.record(
                     new ConsultationReport(

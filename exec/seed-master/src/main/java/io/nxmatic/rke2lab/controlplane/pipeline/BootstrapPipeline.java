@@ -1,13 +1,8 @@
 package io.nxmatic.rke2lab.controlplane.pipeline;
 
-import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
-import io.nxmatic.rke2lab.controlplane.bdd.DbusTcpSpecialist;
-import io.nxmatic.rke2lab.controlplane.bdd.InterventionLedgerLayout;
-import io.nxmatic.rke2lab.controlplane.bdd.InterventionLedgerSource;
-import io.nxmatic.rke2lab.controlplane.bdd.LiveMedicalRecordRegistry;
-import io.nxmatic.rke2lab.controlplane.bdd.PulumiInterventionLedgerWriter;
+import io.nxmatic.rke2lab.controlplane.bdd.DoctorAssembly;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.BboxStage;
@@ -18,20 +13,10 @@ import io.nxmatic.rke2lab.controlplane.pipeline.stages.SystemdAdapterStage;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
-import io.nxmatic.rke2lab.doctor.ClusterSpecialist;
-import io.nxmatic.rke2lab.doctor.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.DriftSpecialist;
-import io.nxmatic.rke2lab.doctor.Generalist;
-import io.nxmatic.rke2lab.doctor.HealthSystem;
-import io.nxmatic.rke2lab.doctor.InterventionLedger;
-import io.nxmatic.rke2lab.doctor.MedicalRecord;
-import io.nxmatic.rke2lab.doctor.NetworkSpecialist;
-import io.nxmatic.rke2lab.doctor.Patient;
+import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
-import java.nio.file.Path;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -67,23 +52,6 @@ public final class BootstrapPipeline {
 
   public static ConfiguringPipeline forCluster(BootstrapConfig config, ControlplanePolicy policy) {
     return new ConfiguringPipeline(new PipelineState(config, policy));
-  }
-
-  /**
-   * The symptom-independent follow-up: after the record is reconstructed for the run's patient,
-   * load the intervention ledger and let the generalist review every resolved problem. The drift
-   * specialist persists any inferred external change through its own writer. A no-op when no
-   * file:// backend is configured (nothing to load or persist).
-   */
-  static void reviewDriftAtReconstruction(HealthSystem healthSystem, Path backendDir) {
-    if (backendDir == null) {
-      return;
-    }
-    final Generalist generalist = healthSystem.generalist();
-    final MedicalRecord record = generalist.recordForCurrentPatient();
-    final InterventionLedger ledger =
-        new InterventionLedgerSource(backendDir, InterventionLedgerLayout.ledger()).load();
-    generalist.reviewOpenProblems(record, ledger);
   }
 
   public static final class ConfiguringPipeline {
@@ -156,62 +124,27 @@ public final class BootstrapPipeline {
     public AwaitingPreflight runningStandalone(Consumer<String> readinessLogger) {
       state.readinessLogger = readinessLogger;
       state.pulumiMode = false;
-      bindMedicalRecord(state);
+      assembleDoctor(state);
       return new AwaitingPreflight(state);
     }
 
     public AwaitingPreflight runningInPulumi(Consumer<String> readinessLogger) {
       state.readinessLogger = readinessLogger;
       state.pulumiMode = true;
-      bindMedicalRecord(state);
+      assembleDoctor(state);
       return new AwaitingPreflight(state);
     }
 
     /**
-     * Built once at the readiness transition (logger + mode settled): the patient under care is
-     * this Pulumi stack's org/project/stack when running under the engine, a placeholder otherwise
-     * (the registry degrades to an empty record either way when no file:// backend is configured).
-     * Admits the patient into the HealthSystem keystone the stages consult.
+     * Built once at the readiness transition (logger + mode settled): the host assembles the
+     * doctor's internal-edge contract (registry + ledger writer + config-bound specialists) and
+     * runs the drift-at-reconstruction review. The stages consult the contract, never the hidden
+     * actors.
      */
-    private static void bindMedicalRecord(PipelineState state) {
+    private static void assembleDoctor(PipelineState state) {
       final Consumer<String> logger =
           state.readinessLogger != null ? state.readinessLogger : msg -> {};
-      final LiveMedicalRecordRegistry registry = LiveMedicalRecordRegistry.fromEnvironment(logger);
-      final Patient patient = currentPatient(state.pulumiMode);
-      final Path backendDir = registry.backendDir();
-      // No file:// backend → nothing to persist against; the drift specialist runs with a no-op
-      // writer (inference computed, never stored), mirroring the registry's no-backend degrade.
-      final DriftSpecialist driftSpecialist =
-          backendDir != null
-              ? new DriftSpecialist(new PulumiInterventionLedgerWriter(backendDir))
-              : new DriftSpecialist(intervention -> {});
-      state.healthSystem =
-          HealthSystem.admit(
-              patient,
-              registry,
-              List.of(
-                  new DbusTcpSpecialist(state.config),
-                  new NetworkSpecialist(),
-                  new ClusterSpecialist()),
-              driftSpecialist,
-              logger);
-      reviewDriftAtReconstruction(state.healthSystem, backendDir);
-    }
-
-    private static Patient currentPatient(boolean pulumiMode) {
-      final Patient placeholder = new Patient("organization", "rke2lab", "standalone");
-      if (!pulumiMode) {
-        return placeholder;
-      }
-      try {
-        final Deployment deployment = Deployment.getInstance();
-        return new Patient(
-            deployment.getOrganizationName(),
-            deployment.getProjectName(),
-            deployment.getStackName());
-      } catch (RuntimeException noEngine) {
-        return placeholder;
-      }
+      state.doctor = DoctorAssembly.assemble(state.config, state.pulumiMode, logger);
     }
   }
 
@@ -318,7 +251,6 @@ public final class BootstrapPipeline {
 
     public SystemdAdapterDone during(
         String topic, Function<SystemdAdapterStage, SystemdAdapterStage> body) {
-      final Generalist generalist = state.healthSystem.generalist();
       final SeedSystemdAdapterEndpointGate gate = SeedSystemdAdapterEndpointGate.production();
       final SystemdAdapterProbe liveProbe = cfg -> gate.ensureReachable(cfg, state.readinessLogger);
       final SystemdAdapterStage stage =
@@ -329,7 +261,7 @@ public final class BootstrapPipeline {
               state.readinessLogger,
               state.runbook,
               state.consultations,
-              generalist,
+              state.doctor,
               liveProbe,
               summary -> state.systemdAdapterLaunchSummary = summary);
       FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
@@ -357,7 +289,6 @@ public final class BootstrapPipeline {
     }
 
     public ResourcesDone during(String topic, Function<ResourcesStage, ResourcesStage> body) {
-      final Generalist generalist = state.healthSystem.generalist();
       final ResourcesStage stage =
           new ResourcesStage(
               state.resourceManager,
@@ -368,7 +299,7 @@ public final class BootstrapPipeline {
               state.readinessLogger,
               state.runbook,
               state.consultations,
-              generalist,
+              state.doctor,
               () -> state.bootstrapResult,
               () -> state.systemdAdapterLaunchSummary,
               result -> state.resourceResult = result);

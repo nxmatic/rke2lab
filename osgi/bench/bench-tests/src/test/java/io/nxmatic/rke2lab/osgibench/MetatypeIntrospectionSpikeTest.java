@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.osgi.testkit.FelixFrameworkExtension;
-import io.nxmatic.rke2lab.osgi.testkit.OsgiSpike;
+import io.nxmatic.rke2lab.junit.testkit.FelixFrameworkExtension;
+import io.nxmatic.rke2lab.junit.testkit.OsgiSpike;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;

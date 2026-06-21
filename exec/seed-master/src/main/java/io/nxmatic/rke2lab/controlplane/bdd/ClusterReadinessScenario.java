@@ -8,8 +8,8 @@ import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.Quoted;
 import com.tngtech.jgiven.annotation.ScenarioStage;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.doctor.ClusterReadinessPhase;
-import io.nxmatic.rke2lab.doctor.Observation;
+import io.nxmatic.rke2lab.doctor.port.ClusterReadinessPhase;
+import io.nxmatic.rke2lab.doctor.port.Observation;
 import java.util.LinkedHashMap;
 import java.util.Map;
 

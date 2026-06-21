@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.jgiven.testkit;
 
-import io.nxmatic.rke2lab.osgi.testkit.FelixFrameworkExtension;
+import io.nxmatic.rke2lab.junit.testkit.FelixFrameworkExtension;
 
 /**
  * The jGiven boot closure for the OSGi testkit, in one call. Returns a {@link

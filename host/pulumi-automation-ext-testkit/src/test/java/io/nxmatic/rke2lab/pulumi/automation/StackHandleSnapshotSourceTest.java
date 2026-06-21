@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.doctor.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.port.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.port.SnapshotAccessException;
 import io.nxmatic.rke2lab.doctor.port.SnapshotEntry;
 import io.nxmatic.rke2lab.doctor.port.SnapshotView;

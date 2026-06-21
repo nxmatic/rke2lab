@@ -1,0 +1,19 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.doctor.port.test
+
+# THE fragment header: attach to the doctor-port bundle by its BSN, sharing its classloader and
+# packages. The test classes (authored in the host's package io.nxmatic.rke2lab.doctor.port) thus
+# run IN-CONTAINER through the host loader; the in-container JUnit Launcher + the fixtures need the
+# jGiven-free junit world, whose imports bnd computes from the bytecode below and which merge into
+# the host at resolution (OSGi Core §3.14).
+Fragment-Host: io.nxmatic.rke2lab.doctor.port
+
+# The shared model fixtures live here and are EXPORTED so the sibling doctor-core-test fragment
+# imports them through this host (no separate doctor-testkit module, no reverse module edge → the
+# old doctor-port <-> doctor-testkit Maven cycle is gone). The value-type tests + the in-container
+# runner stay in io.nxmatic.rke2lab.doctor.port, unexported (they are tests, not API).
+Export-Package: io.nxmatic.rke2lab.doctor.testkit
+
+# DoctorPortTests names JupiterTestEngine.class, so bnd computes Import-Package:
+# org.junit.jupiter.engine from the bytecode — that wires the engine bundle into the host, no manual
+# import needed. The value-type tests' jupiter.api etc. are computed the same way.
+-noimportjava: true

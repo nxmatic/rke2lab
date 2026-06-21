@@ -1,8 +1,8 @@
 package io.nxmatic.rke2lab.controlplane.systemd;
 
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.doctor.Observation;
-import io.nxmatic.rke2lab.doctor.Symptom;
+import io.nxmatic.rke2lab.doctor.port.Observation;
+import io.nxmatic.rke2lab.doctor.port.Symptom;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;

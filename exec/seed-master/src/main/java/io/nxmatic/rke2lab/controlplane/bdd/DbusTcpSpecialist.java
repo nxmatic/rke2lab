@@ -1,15 +1,15 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.doctor.Assessment;
-import io.nxmatic.rke2lab.doctor.Prescription;
-import io.nxmatic.rke2lab.doctor.Referral;
-import io.nxmatic.rke2lab.doctor.ReferralReply;
-import io.nxmatic.rke2lab.doctor.RemediationProgramRef;
-import io.nxmatic.rke2lab.doctor.SchemaRef;
-import io.nxmatic.rke2lab.doctor.Specialist;
-import io.nxmatic.rke2lab.doctor.Specialty;
-import io.nxmatic.rke2lab.doctor.Symptom;
+import io.nxmatic.rke2lab.doctor.port.Assessment;
+import io.nxmatic.rke2lab.doctor.port.Prescription;
+import io.nxmatic.rke2lab.doctor.port.Referral;
+import io.nxmatic.rke2lab.doctor.port.ReferralReply;
+import io.nxmatic.rke2lab.doctor.port.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.port.SchemaRef;
+import io.nxmatic.rke2lab.doctor.port.Specialist;
+import io.nxmatic.rke2lab.doctor.port.Specialty;
+import io.nxmatic.rke2lab.doctor.port.Symptom;
 import java.util.Map;
 
 /**

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>doctor-port-test</artifactId>
+  <name>osgi/doctor/doctor-port-test</name>
+  <description>The -test fragment of doctor-port, on the jgiven-probe-test model: a Fragment-Host
+    attached to the doctor-port bundle, sharing its classloader so its test classes run IN-CONTAINER
+    against the port's own world (not the bare-JVM flat classpath that produced the ReferralReplies
+    Maven cycle). It carries, in src/main so they land in the fragment: (1) the value-type tests
+    (MedicalRecord, ConsultationReport serialization/expectations, DoctorRecords, efficacy) that the
+    flat classpath forced to be parked in seed-master HOST; (2) the shared model fixtures
+    (ReferralReplies, FakeSpecialist) in package io.nxmatic.rke2lab.doctor.testkit, EXPORTED so the
+    sibling doctor-core-test fragment imports them through the doctor-port host (OSGi Core §3.14) —
+    dissolving the old doctor-testkit module. The src/test harness is plain JVM (VSCode-clickable):
+    it boots Felix, attaches this fragment, and proxies each @Test into the container via a JUnit
+    Platform Launcher running in-framework, mapping results to one DynamicTest per test.</description>
+
+  <dependencies>
+    <!-- The JUnit-in-OSGi testkit, both halves: the JVM-side FelixFrameworkExtension (used by the
+         src/test harness) AND the in-container InContainerJUnitRunner (used by DoctorPortTests in
+         src/main). provided covers both compilations; at runtime its container package resolves as a
+         bundle wired into the host, and the testkit locates it on the classpath by substring. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>junit-testkit</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- compile the fragment's test classes + in-container runner against the host (provided: the
+         fragment is pure test bytecode that resolves against the doctor-port host at runtime). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-port</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- The fragment's value-type tests (src/main, so they land in the fragment and run white-box)
+         compile against Jupiter (@Test, assertions); provided keeps it out of the fragment jar — it
+         resolves as its own OSGi bundle at runtime. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <!-- DoctorPortTests names JupiterTestEngine.class (so bnd imports the engine package); compile
+         against the engine, provided to keep it out of the fragment. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- The src/test harness installs the JUnit bundle world into Felix by classpath substring, so
+         the launcher must be on the TEST classpath (jupiter above is provided, also visible to
+         tests). The launcher pulls platform-engine/commons + opentest4j/apiguardian transitively. -->
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

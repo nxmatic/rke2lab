@@ -63,7 +63,7 @@
     <!-- The embedded-Felix CLI-scope test boots the same topology as the deployed jar. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>testkit</artifactId>
+      <artifactId>junit-testkit</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

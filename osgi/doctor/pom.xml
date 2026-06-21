@@ -19,6 +19,8 @@
 
   <modules>
     <module>doctor-port</module>
+    <module>doctor-port-test</module>
     <module>doctor-core</module>
+    <module>doctor-core-test</module>
   </modules>
 </project>

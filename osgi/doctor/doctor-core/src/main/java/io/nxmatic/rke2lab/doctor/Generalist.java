@@ -1,5 +1,20 @@
 package io.nxmatic.rke2lab.doctor;
 
+import io.nxmatic.rke2lab.doctor.port.Clinician;
+import io.nxmatic.rke2lab.doctor.port.ClinicianId;
+import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.Expectation;
+import io.nxmatic.rke2lab.doctor.port.InterventionLedger;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.port.Observation;
+import io.nxmatic.rke2lab.doctor.port.ProblemReview;
+import io.nxmatic.rke2lab.doctor.port.Referral;
+import io.nxmatic.rke2lab.doctor.port.ReferralReply;
+import io.nxmatic.rke2lab.doctor.port.RemediationPlan;
+import io.nxmatic.rke2lab.doctor.port.Specialist;
+import io.nxmatic.rke2lab.doctor.port.Specialty;
+import io.nxmatic.rke2lab.doctor.port.Symptom;
+import io.nxmatic.rke2lab.doctor.port.Visit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,7 +33,7 @@ import java.util.List;
  * The Generalist reads records only through its {@link ClinicalAccess} (bound to its id by the
  * {@link HealthSystem} at employment); it holds no registry or patient directly.
  */
-public final class Generalist implements Clinician {
+final class Generalist implements Clinician, DoctorConsultingService {
 
   /** The Generalist's stable id — the grant policy's join key for the general practitioner. */
   public static final ClinicianId GENERALIST_ID = new ClinicianId("generalist");
@@ -78,6 +93,7 @@ public final class Generalist implements Clinician {
   }
 
   /** The admitted patient's record, read through the held access. */
+  @Override
   public MedicalRecord recordForCurrentPatient() {
     return access.record();
   }
@@ -86,6 +102,7 @@ public final class Generalist implements Clinician {
    * A one-line cross-patient finding for the symptom, folded across the granted cohort. Empty
    * cohort (or no backend) yields a finding over just the current patient.
    */
+  @Override
   public String cohortFinding(Symptom symptom) {
     final List<MedicalRecord> cohort = access.cohort();
     final long withSymptom = cohort.stream().filter(r -> r.historyOf(symptom).count() > 0).count();
@@ -109,6 +126,7 @@ public final class Generalist implements Clinician {
    * specialist's {@link ReferralReply} (always an assessment, optionally a prescription), return a
    * remediation plan carrying the replies.
    */
+  @Override
   public RemediationPlan consult(Symptom symptom, Observation observation) {
     final MedicalRecord record = access.record();
     firstLook(record, symptom, observation);
@@ -150,6 +168,7 @@ public final class Generalist implements Clinician {
    * <p>"Resolved-but-unadministered" today is simply "resolved": no engine administers fixes yet,
    * so every resolved expectation is reviewed.
    */
+  @Override
   public List<ReferralReply> reviewOpenProblems(MedicalRecord record, InterventionLedger ledger) {
     final List<ReferralReply> letters = new ArrayList<>();
     final List<Visit> visits = record.visits();

@@ -6,8 +6,8 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
-import io.nxmatic.rke2lab.doctor.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.HealthSystem;
+import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
+import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
 import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import java.util.Map;
@@ -43,11 +43,11 @@ final class PipelineState {
   ConsultationLog consultations;
 
   /**
-   * The doctor's keystone for this run: holds the records registry + grant policy, employs the
-   * clinicians, admits the patient under care (this stack). Built once at the readiness transition;
-   * the stages consult the generalist it employs.
+   * The doctor's internal-edge contract for this run, assembled host-side ({@code DoctorAssembly})
+   * from the records registry + ledger writer + config-bound specialists. Built once at the
+   * readiness transition; the stages consult it without naming the hidden actors behind it.
    */
-  HealthSystem healthSystem;
+  DoctorConsultingService doctor;
 
   BboxReconciliationOrchestrator bboxOrchestrator;
   ResourceManager resourceManager;

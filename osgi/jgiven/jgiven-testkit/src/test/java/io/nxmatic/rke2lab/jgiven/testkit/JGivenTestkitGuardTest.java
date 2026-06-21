@@ -3,8 +3,8 @@ package io.nxmatic.rke2lab.jgiven.testkit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.osgi.testkit.FelixFrameworkExtension;
-import io.nxmatic.rke2lab.osgi.testkit.Osgi;
+import io.nxmatic.rke2lab.junit.testkit.FelixFrameworkExtension;
+import io.nxmatic.rke2lab.junit.testkit.Osgi;
 import java.lang.reflect.Method;
 import java.util.List;
 import org.junit.jupiter.api.MethodOrderer;

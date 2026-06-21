@@ -1,0 +1,86 @@
+package io.nxmatic.rke2lab.doctor.port;
+
+import static org.junit.jupiter.api.Assertions.fail;
+
+import io.nxmatic.rke2lab.junit.testkit.FelixFrameworkExtension;
+import io.nxmatic.rke2lab.junit.testkit.Osgi;
+import java.lang.reflect.Method;
+import java.util.List;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.osgi.framework.Bundle;
+
+/**
+ * The bare-JVM proxy (VSCode-clickable) that runs the doctor-port value-type tests IN-CONTAINER. It
+ * boots a real Felix, installs the doctor-port host bundle, this {@code -test} fragment, and the
+ * whole JUnit bundle world, resolves the host (attaching the fragment, OSGi Core §3.14), then
+ * drives a JUnit Platform Launcher FROM INSIDE the framework via {@code DoctorPortTests} (the
+ * fragment's host-package entry point onto the generic runner) — reached reflectively through the
+ * host classloader so no in-framework jUnit type crosses into this world.
+ *
+ * <p>Each in-container test comes back as an encoded {@link String}; this factory maps it to one
+ * {@link DynamicTest}, so VSCode shows a node per test and a single failing test fails alone. The
+ * value-type tests run white-box against doctor-port's own world — the coherence the flat classpath
+ * could not give (it is what produced the {@code ReferralReplies} Maven cycle).
+ */
+@Osgi
+class DoctorPortInContainerTest {
+
+  private static final String HOST_ARTIFACT = "doctor-port/target";
+  private static final String FRAGMENT_ARTIFACT = "doctor-port-test/target";
+  private static final String RUNNER_FQN = "io.nxmatic.rke2lab.doctor.port.DoctorPortTests";
+
+  @RegisterExtension
+  static final FelixFrameworkExtension felix =
+      FelixFrameworkExtension.builder()
+          // The JUnit world + the in-container runner bundle, each an OSGi bundle, installed so the
+          // launcher + jupiter engine + the runner resolve as bundles (located by classpath
+          // substring).
+          .installFromClasspath(
+              "opentest4j",
+              "apiguardian-api",
+              "junit-platform-commons",
+              "junit-platform-engine",
+              "junit-platform-launcher",
+              "junit-jupiter-api",
+              "junit-jupiter-params",
+              "junit-jupiter-engine",
+              "junit-testkit/target")
+          .build();
+
+  @TestFactory
+  Stream<DynamicTest> valueTypeTests() throws Exception {
+    final Bundle host = felix.install(HOST_ARTIFACT);
+    felix.install(FRAGMENT_ARTIFACT); // fragment — never started
+    if (!felix.resolve(List.of(host))) {
+      fail("doctor-port host (with its -test fragment) must resolve");
+    }
+    host.start();
+
+    final Class<?> runner = host.loadClass(RUNNER_FQN);
+    final Method run = runner.getMethod("run");
+    @SuppressWarnings("unchecked")
+    final List<String> results = (List<String>) run.invoke(null);
+
+    if (results.isEmpty()) {
+      fail("no in-container test was discovered — the jupiter engine did not attach");
+    }
+
+    return results.stream().map(DoctorPortInContainerTest::toDynamicTest);
+  }
+
+  private static DynamicTest toDynamicTest(String encoded) {
+    final String[] parts = encoded.split("\u001F", 3);
+    final String status = parts[0];
+    final String displayName = parts.length > 1 ? parts[1] : "(unnamed)";
+    return DynamicTest.dynamicTest(
+        displayName,
+        () -> {
+          if ("FAIL".equals(status)) {
+            fail(parts.length > 2 ? parts[2] : "in-container test failed");
+          }
+        });
+  }
+}

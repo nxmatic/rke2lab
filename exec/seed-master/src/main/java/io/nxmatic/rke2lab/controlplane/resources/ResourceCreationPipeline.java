@@ -11,10 +11,10 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifi
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterReadinessResource;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.controlplane.systemd.SystemdAdapterResource;
-import io.nxmatic.rke2lab.doctor.Checkpoint;
-import io.nxmatic.rke2lab.doctor.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.ConsultationReport;
-import io.nxmatic.rke2lab.doctor.Generalist;
+import io.nxmatic.rke2lab.doctor.port.Checkpoint;
+import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
+import io.nxmatic.rke2lab.doctor.port.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -33,7 +33,7 @@ final class ResourceCreationPipeline {
   private final Consumer<String> readinessLogger;
   private final ReportModel runbook;
   private final ConsultationLog consultations;
-  private final Generalist generalist;
+  private final DoctorConsultingService doctor;
   private final IncusResourceBootstrap.BootstrapResult bootstrapResult;
   private final Map<String, Object> systemdAdapterLaunchSummary;
 
@@ -44,7 +44,7 @@ final class ResourceCreationPipeline {
       Consumer<String> readinessLogger,
       ReportModel runbook,
       ConsultationLog consultations,
-      Generalist generalist,
+      DoctorConsultingService doctor,
       IncusResourceBootstrap.BootstrapResult bootstrapResult,
       Map<String, Object> systemdAdapterLaunchSummary) {
     this.config = config;
@@ -53,7 +53,7 @@ final class ResourceCreationPipeline {
     this.readinessLogger = readinessLogger;
     this.runbook = runbook;
     this.consultations = consultations;
-    this.generalist = generalist;
+    this.doctor = doctor;
     this.bootstrapResult = bootstrapResult;
     this.systemdAdapterLaunchSummary = systemdAdapterLaunchSummary;
   }
@@ -75,7 +75,7 @@ final class ResourceCreationPipeline {
             readinessLogger,
             runbook,
             consultations,
-            generalist,
+            doctor,
             new ProductionClusterReadinessProbe(policy, readinessLogger),
             systemdAdapterLaunchSummary,
             result -> holder[0] = result)

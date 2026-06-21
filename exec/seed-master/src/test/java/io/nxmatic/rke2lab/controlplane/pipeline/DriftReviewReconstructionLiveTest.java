@@ -2,24 +2,23 @@ package io.nxmatic.rke2lab.controlplane.pipeline;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import io.nxmatic.rke2lab.controlplane.bdd.DoctorAssembly;
 import io.nxmatic.rke2lab.controlplane.bdd.GrpcChannelNoiseCapture;
 import io.nxmatic.rke2lab.controlplane.bdd.InterventionLedgerSource;
 import io.nxmatic.rke2lab.controlplane.bdd.PulumiInterventionLedgerWriter;
-import io.nxmatic.rke2lab.doctor.Checkpoint;
-import io.nxmatic.rke2lab.doctor.DriftSpecialist;
-import io.nxmatic.rke2lab.doctor.Expectation;
-import io.nxmatic.rke2lab.doctor.HealthSystem;
-import io.nxmatic.rke2lab.doctor.Intervention;
-import io.nxmatic.rke2lab.doctor.InterventionLedger;
-import io.nxmatic.rke2lab.doctor.MedicalRecord;
-import io.nxmatic.rke2lab.doctor.MedicalRecordRegistry;
-import io.nxmatic.rke2lab.doctor.Patient;
-import io.nxmatic.rke2lab.doctor.ProblemRef;
-import io.nxmatic.rke2lab.doctor.Provenance;
-import io.nxmatic.rke2lab.doctor.RemediationProgramRef;
-import io.nxmatic.rke2lab.doctor.ResolutionPredicate;
-import io.nxmatic.rke2lab.doctor.Symptom;
-import io.nxmatic.rke2lab.doctor.Visit;
+import io.nxmatic.rke2lab.doctor.port.Checkpoint;
+import io.nxmatic.rke2lab.doctor.port.Expectation;
+import io.nxmatic.rke2lab.doctor.port.Intervention;
+import io.nxmatic.rke2lab.doctor.port.InterventionLedger;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
+import io.nxmatic.rke2lab.doctor.port.Patient;
+import io.nxmatic.rke2lab.doctor.port.ProblemRef;
+import io.nxmatic.rke2lab.doctor.port.Provenance;
+import io.nxmatic.rke2lab.doctor.port.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.port.ResolutionPredicate;
+import io.nxmatic.rke2lab.doctor.port.Symptom;
+import io.nxmatic.rke2lab.doctor.port.Visit;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
@@ -64,12 +63,15 @@ final class DriftReviewReconstructionLiveTest {
     // A stub registry returns the seeded record for the patient (the reconstruction stand-in).
     final MedicalRecordRegistry registry = patient -> seeded;
 
-    // The real ledger writer points at the @TempDir backend; the source reads it back.
-    final DriftSpecialist drift =
-        new DriftSpecialist(new PulumiInterventionLedgerWriter(backendDir));
-    final HealthSystem hs = HealthSystem.admit(PATIENT, registry, List.of(), drift, msg -> {});
-
-    BootstrapPipeline.reviewDriftAtReconstruction(hs, backendDir);
+    // The real ledger writer points at the @TempDir backend; the source reads it back. The assembly
+    // wires the drift specialist over it and runs the drift-at-reconstruction review.
+    DoctorAssembly.assembleWith(
+        PATIENT,
+        registry,
+        new PulumiInterventionLedgerWriter(backendDir),
+        List.of(),
+        backendDir,
+        msg -> {});
 
     final InterventionLedger ledger = new InterventionLedgerSource(backendDir).load();
     assertEquals(1, ledger.interventions().size(), "one inferred external change persisted");
