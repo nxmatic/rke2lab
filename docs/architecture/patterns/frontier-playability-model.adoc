@@ -57,10 +57,10 @@ flowchart TB
   Felix bundle? Pure JDK (`java.nio` files, `ProcessBuilder` commands) and Jackson ARE playable —
   touching the disk or spawning a process is never the disqualifier. `com.pulumi.*` and jgiven
   `com.tngtech.*` are NOT. This decides WHERE an impl can live (osgi-world vs host-world).
-* *Axis 2 — edge.* Does the operation touch an external system the org sits on (Pulumi state backend,
-  k8s cluster, systemd/dbus endpoint)? If yes, it is an *edge*, and an edge is what makes a *port*
-  necessary. Edges are mutualised BY TARGET (`pulumi-edge`, `cluster-edge`, `systemd-edge`), one per
-  external system, shared across domains.
+* *Axis 2 — edge.* Does the operation cross a boundary? An edge is what makes a *port* necessary, and
+  it comes in two species (see <<two-species>>): an *external edge* crosses the SYSTEM boundary toward
+  an outside system (Pulumi, k8s, systemd) — mutualised by target as `<target>-edge`; an *internal
+  edge* is a domain's face toward the rest of OUR system. Either way the port is the membrane.
 * *Axis 3 — direction.* Across the membrane, an operation is *ingress* (read from the world) or *egress*
   (write to the world). Used in prose and method names, never in module names (the k8s `Ingress`
   collision).
@@ -152,20 +152,36 @@ host actualises against an external system downstream). A port that traces to NO
 it is a mis-named internal interface. The inventory found ZERO orphan ports, so the rule holds with no
 counter-example.
 
-[NOTE]
-.A hunch to explore — does "edge" generalise to internal/external? (NOT settled)
-====
-This doc currently defines an edge as contact with an *external* system. A sharper idea surfaced
-(2026-06-21) and is recorded as a HUNCH, deliberately NOT graved into the glossary: maybe an edge is
-any *boundary crossing*, and there are two species — *external edge* (crosses the SYSTEM boundary:
-pulumi, systemd, cluster) vs *internal edge* (crosses a DOMAIN boundary: the doctor reached through its
-port by the rest of the system). Under that reading the "transitive" ports above (`manifests-port`,
-`netplan-port`) would trace to an *internal edge* (their own domain), and "every port traces to an edge"
-would hold with no "transitive orphan" category at all. It is powerful enough to want — and unproven
-enough to wait: to be tested on doctor / manifests / netplan in a dedicated design increment BEFORE the
-glossary adopts internal/external. Until then, "edge" in this doc means the external kind, and the
-inventory below is of external edges only.
-====
+[[two-species]]
+== Two species of edge — internal and external (validated 2026-06-21)
+
+An edge is any *boundary crossing*; there are two species, by WHICH boundary it crosses:
+
+* *external edge* — crosses the SYSTEM boundary, toward a system OUTSIDE ours (pulumi, systemd,
+  cluster, incus, ssh-to-age). Mutualised by target as `<target>-edge`. Often non-playable.
+* *internal edge* — the face of a DOMAIN turned toward the rest of OUR system; crossed by other
+  domains/orchestration through a pure port. This dissolves the earlier "transitive port" category:
+  `manifests-port`/`netplan-port` do not "trace to no edge" — their consumer-facing side IS an internal
+  edge. So *every port traces to an edge* holds with no orphan, no "transitive" exception.
+
+A single domain can carry BOTH faces. Doctor is the proof: `doctor-port`'s `SnapshotSource` is its
+external edge (→ pulumi), and its consumer-facing side is an internal edge (→ the orchestration).
+
+*Internal edge is PRESCRIPTIVE, not just descriptive.* It is not satisfied by "the domain has a port
+package"; its value is the LEAKAGE its absence allows. The tell is not the port's presence but whether
+neighbors import the core's IMPL types instead of calling a contract. Measured on the reactor:
+
+* *manifests / netplan — CLEAN internal edge.* Consumers (`IncusResourceBootstrap`, the CLIs) import
+  ONLY `-port` service types; zero `-core` impl leakage. The reference shape.
+* *doctor — internal edge MISSING (the smoking gun).* `doctor-port` carries only the external face
+  (`SnapshotSource`); the internal face is absent, so 40+ files in `controlplane` import `doctor-core`
+  impl types directly (`Generalist`, `ConsultationLog`, `MedicalRecord`, `Symptom`, `Checkpoint`),
+  passing them as constructor params. Changing `MedicalRecord`'s shape ripples through 20-40 files.
+
+The prescribed fix (first internal-edge increment): add a `DoctorConsultingService` internal edge to
+`doctor-port` (`consult(symptom, observation) → RemediationPlan`, record/history queries), hide the
+impl types behind it, rewire the consumers — making doctor symmetric with manifests/netplan. The doctor
+extraction merged so far closed the EXTERNAL face only; this closes the internal one.
 
 == Edge inventory (2026-06-21, reverse-engineered from the reactor)
 

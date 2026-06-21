@@ -46,14 +46,23 @@ gap: there was no word for THE WHOLE. Carto of actual usage (atlas + specs + cod
   It is a contract (a declared/satisfied capability), not a typed model crossing the frontier. The atlas
   keeps the word "contract" for THIS; what used to be loosely called "the contract" as a typed boundary
   model is now the *port*.
-- **edge** — a point of contact with an EXTERNAL system the org sits on: the Pulumi state backend, the
-  k8s cluster, the systemd/dbus control endpoint. An edge is what makes a *port* necessary: the port is
-  the membrane, the edge is the world on the far side of it. Edges are MUTUALISED BY TARGET, not per
-  domain — one `pulumi-edge` shared across every domain that touches Pulumi, not a private adapter each.
-  Named `<target>-edge` (`pulumi-edge`, `cluster-edge`, `systemd-edge`). "edge" was chosen over
-  ingress/egress for the MODULE name precisely to avoid the k8s collision (Ingress is a k8s resource;
-  NetworkPolicy has ingress/egress) — and because an edge is bidirectional (it reads AND writes the
-  world), so a single directional word would mislabel it.
+- **edge** — a boundary crossing; what makes a *port* necessary (the port is the membrane, the edge is
+  what lies on the far side). TWO SPECIES, by which boundary is crossed (validated on the reactor
+  2026-06-21):
+  - **external edge** — crosses the SYSTEM boundary toward a system OUTSIDE ours: the Pulumi state
+    backend, the k8s cluster, the systemd/dbus endpoint, incus, ssh-to-age. MUTUALISED BY TARGET, not
+    per domain — one `pulumi-edge` shared across every domain touching Pulumi, named `<target>-edge`.
+    Often non-playable. "edge" beats ingress/egress for the module name (avoids the k8s Ingress
+    collision; an external edge is bidirectional so a directional word would mislabel it).
+  - **internal edge** — a domain's face turned toward the rest of OUR system; crossed by other
+    domains/orchestration through a pure port. It DISSOLVES the old "transitive port" category:
+    `manifests-port`/`netplan-port` are internal edges, not orphan transitive ports — so *every port
+    traces to an edge* with no exception. A single domain can carry BOTH faces (doctor: `SnapshotSource`
+    external, its consumer side internal). PRESCRIPTIVE, not just descriptive — not satisfied by "has a
+    port package"; its value is the LEAKAGE its absence allows. Tell: do neighbors import the core's
+    IMPL types or call a contract? manifests/netplan = CLEAN (port types only); doctor = MISSING (40+
+    controlplane files import `doctor-core` impl types directly — the smoking gun). See
+    [[doctor-internal-edge-debt]].
 - **ingress / egress** — the DIRECTION of an operation across the membrane, used in prose and method
   names, NEVER as a module name: *ingress* = read FROM the world (`SnapshotSource.timeline()`), *egress*
   = write TO the world (`LedgerWriter.up()`). The same edge does both. Kept off module names so the k8s
