@@ -5,6 +5,7 @@ import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.port.ProblemRef;
 import io.nxmatic.rke2lab.doctor.port.Provenance;
 import io.nxmatic.rke2lab.doctor.port.RemediationProgramRef;
+import io.nxmatic.rke2lab.pulumi.edge.PulumiInterventionLedgerWriter;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;

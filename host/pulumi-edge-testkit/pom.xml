@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- @codebase -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>host-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../host-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>pulumi-edge-testkit</artifactId>
+  <name>host/pulumi-edge-testkit</name>
+  <description>Shared test fixtures for pulumi-edge: reusable checkpoint/stack stubs,
+    kept in main scope so consumers depend on them without a test-jar.</description>
+
+  <!--
+    Shared test fixtures for the file-backend stack layout, kept in src/main/java so consumers
+    depend on them in test scope across modules WITHOUT a test-jar — m2e does not resolve test-jar
+    classpaths, so the one-module-two-artifacts route would leave the IDE red. A plain main artifact
+    of a workspace project resolves cleanly. The fixture writes the on-disk history/checkpoint pair
+    once, reused by the edge's own tests (StackHandleTest, StackHandleSnapshotSourceTest) and by the
+    doctor-reconstruction tests in seed-master that read live Pulumi state.
+
+    It depends on pulumi-edge ONLY for PulumiBackendLayout (the single source of truth for
+    the .pulumi/history/<project>/<stack> on-disk convention), so the fixture writes into the exact
+    layout the reader reads — never a second copy of the path string. It does NOT reference the
+    classes under test (StackHandle/StackHistory/...): each consumer builds its own
+    StackHandle.forBackend(...) from the returned backendDir.
+  -->
+  <dependencies>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>pulumi-edge</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- compile scope, not test: GrpcChannelNoiseCapture is a JUnit extension shared as a main-scope
+         fixture (same rationale as StackHistoryFixture), so the consumers register it without a
+         test-jar. The extension API must therefore be on this module's own compile classpath. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+    </dependency>
+    <!-- test-only: StackHandleSnapshotSourceTest, relocated here with the adapter's host home, reads
+         the consultationReport output key from the doctor model. Only the port (SnapshotSource + the
+         value vocabulary, incl. ConsultationReport since Move A) is imported — never a hidden actor —
+         so doctor-port alone. doctor-port is built before the host in the reactor (osgi→host) and
+         never depends back, so this is no cycle. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-port</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- test-only: LiveMedicalRecordRegistryTest seeds reconstruction inputs with the doctor
+         testkit's ReferralReplies (main-scope fixtures in doctor-port-test). Test scope keeps the
+         fixture off the edge's runtime classpath. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-port-test</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

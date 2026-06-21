@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- @codebase -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>host-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../host-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>pulumi-edge</artifactId>
+  <name>host/pulumi-edge</name>
+  <description>The Pulumi external edge: the single host-side home for every contact with the Pulumi
+    state backend and Automation API, mutualised across all domains. Holds the low-level
+    StackHandle/StackHistory/StackSnapshot/StackCheckpoint over the file backend, and the
+    implementations of the doctor ports both faces cross — StackHandleSnapshotSource (ingress, reads
+    the timeline) and PulumiInterventionLedgerWriter (egress, writes the ledger). Non-playable
+    (com.pulumi.* is native + ServiceLoader), so it stays in the host world; callers cross through
+    the ports and never depend on this module directly.</description>
+
+  <dependencies>
+    <!-- DIP: the host implements the doctor observation port. Reactor order is osgi→host→exec, so
+         doctor-port is already built when this module compiles. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.pulumi</groupId>
+      <artifactId>pulumi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+  </dependencies>
+</project>

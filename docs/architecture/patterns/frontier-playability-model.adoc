@@ -250,6 +250,8 @@ Readings:
 
 == Related documentation
 
+* link:../osgi/pulumi-edge-handoff.adoc[pulumi-edge handoff] — the FIRST realised external edge and the
+  `<target>-edge` extraction template the other six edges replicate.
 * link:../integration-atlas.adoc[Integration atlas] — the two-spaces frame this refines.
 * The `system/space/world/universe` glossary (memory) — the reserved words `edge`, `ingress`/`egress`,
   and playability are defined there as opposable terms.

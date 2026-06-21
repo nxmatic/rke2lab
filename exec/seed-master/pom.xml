@@ -41,12 +41,12 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>pulumi-automation-ext</artifactId>
+      <artifactId>pulumi-edge</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>pulumi-automation-ext-testkit</artifactId>
+      <artifactId>pulumi-edge-testkit</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

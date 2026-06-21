@@ -10,8 +10,8 @@ import io.nxmatic.rke2lab.doctor.port.MedicalRecordReconstructionException.Entry
 import io.nxmatic.rke2lab.doctor.port.Patient;
 import io.nxmatic.rke2lab.doctor.port.SnapshotException;
 import io.nxmatic.rke2lab.doctor.port.SnapshotSource;
-import io.nxmatic.rke2lab.pulumi.automation.StackHandle;
-import io.nxmatic.rke2lab.pulumi.automation.StackHandleSnapshotSource;
+import io.nxmatic.rke2lab.pulumi.edge.StackHandle;
+import io.nxmatic.rke2lab.pulumi.edge.StackHandleSnapshotSource;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
