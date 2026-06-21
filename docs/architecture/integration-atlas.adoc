@@ -119,6 +119,12 @@ These words are used precisely throughout the atlas and specs; this is the gloss
   production. Its resolution core already SHIPPED (the `UnitResolver` oracle, the manifests universe);
   the rest — ingest, load-from-store, the mediation seam, federation — is additive design — FOURTH
   view. See link:unit-repository/model-overview.adoc[the unit-repository model overview].
+* <<manifests-view,Manifests subsystem>> — the CDK8s manifest-synthesis layer: typed `ManifestsUnit`
+  units resolved into a coherent visit-order by the same Felix `UnitResolver` the unitrepo view owns,
+  exploded per-domain and applied by RKE2 auto-deploy. Almost entirely SHIPPED — FIFTH view, the first
+  brought in by the design-state coverage pass (the bulk of the system's design lives outside the four
+  OSGi-centric views; manifests is the exemplar for folding the rest in). See
+  link:manifests/manifests-architecture.adoc[the manifests architecture].
 
 [[doctor-view]]
 == Doctor subsystem — per-subsystem view
@@ -456,6 +462,67 @@ mute on `Optional.empty()`). The runbook renders the `Assessment` distinctly. Th
 kept as the design-time proof; the inventory will carry the ✅ status when this chunk lands.
 ====
 
+=== Design scenarios — the doctor capabilities as DSL sentences
+
+The doctor view predates the capability-anchoring device, so its design lived only in the inventory
+prose and the two additivity verdicts. The third movement (see <<the-scenario-map>>) lifts those
+facts into scenarios. GIVEN the shipped substrate, WHEN a model lands, THEN the capability AND its
+additivity.
+
+. *The doctor reconstructs a patient's medical record on demand* — `[playable]` blue +
+.. GIVEN per-node diagnosis serialized into Pulumi (layer3 write-side)
+.. WHEN the medical-record query API reconstructs the record on demand from Pulumi
+.. THEN the doctor reads a patient's full history without an accumulator — AND the read substrate is
+   additive over the write-side, nothing rewired.
+
+. *Each node serializes its diagnosis; the runbook renders it back* — `[playable]` blue +
+.. GIVEN the clinical vocabulary and the live record wired in (vocabulary-and-live-record, step 1)
+.. WHEN layer3 write-side serializes per node and the read-side enriches the runbook
+.. THEN every node's diagnosis round-trips into the operator's runbook — AND the render is additive
+   over the existing runbook.
+
+. *A per-run HealthSystem admits a patient through a credentialed gate* — `[playable]` blue +
+.. GIVEN the `MedicalRecordRegistry` read core shipped
+.. WHEN the HealthSystem keystone wraps it with a `GrantPolicy` + `ClinicalAccess` and employs the
+   `Generalist`
+.. THEN the doctor admits a patient only through a credentialed access gate — AND the read core is
+   wrapped, never edited (the one honest collaborator swap: `Generalist` holds `ClinicalAccess`).
+
+. *The doctor reads a cohort across patients* — `[playable]` blue +
+.. GIVEN `LiveMedicalRecordRegistry.cohortFor` proven by live `pulumi preview` (cohort-correlation)
+.. WHEN the keystone promotes `cohortFor` off `@Spike`
+.. THEN the doctor correlates findings across a cohort — AND the promotion is a marker strip, not a
+   logic change.
+
+. *A diagnosis always carries its reasoning, prescription or not* — `[playable]` blue +
+.. GIVEN the old `diagnose(Symptom, Observation) → Optional<Prescription>` seam (the why dropped on
+   `Optional.empty()`)
+.. WHEN the referral round-trip flips it to `diagnose(Referral) → ReferralReply`
+.. THEN a declined diagnosis still carries its `Assessment` — the why always survives — AND the flip
+   is additive at the persisted shape (`replies` key added, none removed); the one named collaborator
+   shrink is `Prescription.humanHint` → action-only.
+
+. *The doctor replays a what-if on observed plus hypothesis* — `[narrated]` amber +
+.. GIVEN the HealthSystem as a concrete patient-record provider
+.. WHEN the preview/what-if planner lands
+.. THEN the doctor replays a diagnosis against observed-⊕-hypothesis state — AND it attaches to the
+   keystone's grant seam, adding nothing to the read core.
+
+. *Diagnosis-layer redundancy dissolves into a rules engine* — `[narrated]` amber +
+.. GIVEN the diagnosis layer's checkpoint topology
+.. WHEN the rules-engine exploration lands
+.. THEN the redundant per-node diagnosis collapses behind a rules engine — AND the grant seam awaits
+   its referral-derived grants (the single not-yet-proven edge).
+
+. *A Drools specialist sits behind the Specialist seam* — `[narrated]` amber +
+.. GIVEN the `Specialist` SPI seam
+.. WHEN a Drools-backed network specialist is plugged in
+.. THEN a rules-driven specialist co-consults behind the same seam — AND the seam is unchanged, the
+   specialist is a new box.
+
+*Coverage of this view:* 8 capabilities, 8 scenarios — complete per <<scenario-completeness>>. Five
+playable-and-blue today (all shipped), three narrated-amber (the explorations not built).
+
 === The ritual — how this atlas stays alive
 
 Reopen this atlas at the START of every design activity (doctor or another subsystem), before
@@ -467,11 +534,107 @@ writing a new model's spec:
   breaking change is justified.
 . *List honest edits:* any changed collaborator (not just additions) is named in the verdict, as
   the two edits above are.
+. *Write the scenarios:* for every capability the model adds (every row of the view's capability
+  map), write the design scenario it stands for — GIVEN the constellation before, WHEN the model or
+  term lands, THEN the capability holds AND additivity holds (nothing erased). See <<the-scenario-map>>.
 . *Flip green→blue* when a model ships, and update its inventory status.
 . *Update the inventory table* with the new model and its links.
 
 This keeps "a well-integrated spec is the proof we are on the right path" a standing practice, not a
 one-time exercise.
+
+[[the-scenario-map]]
+=== The third movement — the scenario map (the design DSL)
+
+Additivity proves nothing is *broken*; the capability map proves each box *earns its place* by
+licensing a sentence; the *scenario map* writes that sentence in full as a design scenario, in our
+own Given/When/Then DSL. A capability-map row is only the THEN clause; the scenario adds the GIVEN
+(the constellation as shipped) and the WHEN (the model or term that lands), and pairs the THEN with
+its AND (additivity). The three clauses map one-to-one onto the ritual above:
+
+* *GIVEN* — the constellation BEFORE (the inventory rows already blue).
+* *WHEN* — the model or term this activity lands (the green box).
+* *THEN* — the capability we can now say (the capability-map row), *AND* additivity holds (the verdict).
+
+*playable / narrated is NOT a nature of the scenario — it is the state of its GATES.* A scenario's
+path runs GIVEN → WHEN → THEN, and each clause is licensed by a box. A box is GATED by its horizon
+colour: blue (shipped) = gate OPEN, green (the current design increment) / amber (horizon) = gate
+SHUT. The tag is then DERIVED, never hand-maintained:
+
+* *playable* — every box on the scenario's path is blue (all gates open). The THEN is a fact
+  re-derivable from the reactor today (a module exists, a capability is exported, the walker is gone,
+  the unit count). Marked `[playable]`.
+* *narrated* — at least one box on the path is still green or amber (a gate is shut). The scenario is
+  ALREADY fully written — all three clauses are graved — it is only waiting for its gating boxes to
+  ship. Marked `[narrated]`.
+
+Every scenario is DESTINED to become playable; narrated is transitory, not a category. The ritual's
+*flip green→blue* step (when a model ships) IS the act of opening a gate — it flips the scenario
+narrated→playable automatically, by derivation. No scenario floats: a narrated scenario is moored to
+the named green/amber boxes it waits on, so one can always point to exactly what must ship to make it
+playable (see the worked example in <<unitrepo-view>>, scenario 3, where two named green boxes — a
+concrete `UnitHandler` and load-from-store — are the shut gates).
+
+This derivation is also the future guard's drift criterion, mechanical and judgement-free: a box is
+blue but its scenario is still narrated → a gate was left shut (we forgot to flip); a scenario claims
+playable but a box on its path is not blue → a gate opened falsely (a lie). Drift is no longer the
+fuzzy "do we cover everything?" but the crisp "is each tag synchronized with the colour of its path's
+boxes?".
+
+Each per-subsystem view therefore carries a *Design scenarios* section: one scenario per
+capability-map row, tagged playable/narrated (derived from its gates) and colored by horizon. The
+link:designer-runbook.adoc[designer's runbook] renders the playable ones live from the code; the
+narrated ones it renders as prose until their gates open. The scenarios ARE part of the spec — not a
+test artifact that lives only in Java.
+
+[[scenario-completeness]]
+==== The completeness clause (a standing rule)
+
+The ritual is not done when the model is proven additive. *Every capability a view declares MUST
+have a scenario, and every scenario MUST trace to a capability* — the two-way coverage test the
+capability map already states ("a sentence with no enabling box is a design gap; a box licensing no
+sentence is dead weight") is now extended to scenarios: a capability with no scenario is an
+*uncovered* design fact; a scenario with no capability is a *stray*. The whole design is covered by
+the DSL when every view's scenario map is complete. This is itself a re-entrance instance: the atlas
+submits its OWN design state to the same "render it, do not let it drift" rule it imposes on the
+operator's runtime state. The designer's runbook is the machine that will eventually *enforce* this
+clause by replay; until then it is enforced by reading.
+
+==== The answerability cascade — design → spec → plan → codebase
+
+The completeness clause above is one link of a longer chain. Our delivery has four layers, and *each
+layer must answer to the one above it* — be traceable up, and not invent down. This is the
+superpowers shape (brainstorm/design → spec → plan → implementation), made explicit here so the
+coverage test is the same at every seam:
+
+[cols="1,2,2",options="header"]
+|===
+| Layer | Answers to the layer above by | Coverage test
+
+| *design* (this atlas)
+| —  (the root: the constellation + additivity + capability map)
+| every box licenses a capability; every capability a box
+
+| *spec* (the scenario maps, the per-subsystem docs)
+| every capability has a scenario; every scenario traces to a capability
+| <<scenario-completeness>> — the clause above
+
+| *plan* (the increments, the WI breakdown)
+| every planned increment realises one or more scenarios; no increment without a scenario
+| a plan step with no scenario is scope creep; a scenario no plan touches is unscheduled design
+
+| *codebase* (the reactor)
+| every shipped slice flips a scenario playable-green; the designer's runbook replays it from code
+| the designer-runbook's playable half — a green that no longer holds is drift, caught at render
+|===
+
+Read top-down it is generation (design licenses spec licenses plan licenses code); read bottom-up it
+is answerability (code answers a scenario, a scenario answers a capability, a capability answers a
+box). A break at any seam is the same failure the completeness clause names — an orphan one way, a
+stray the other. The designer's runbook closes the bottom seam (code ⇄ spec) by replay; this atlas
+closes the top seam (design ⇄ spec) by the scenario map; the plan seam (spec ⇄ plan) is closed by
+each increment naming the scenario it lands. The whole chain is one re-entrance discipline applied at
+four heights.
 
 [[config-view]]
 == Config subsystem — per-subsystem view
@@ -561,6 +724,41 @@ config island (`InfraDomain` / `InfraConfigRegistry` / `Rke2labConfig`) was neve
 monotone proof held. The above figures are kept as the design-time proof; the spec will graduate
 into `docs/architecture/` at merge.
 ====
+
+=== Design scenarios — the config capabilities as DSL sentences
+
+The third movement (see <<the-scenario-map>>) for the config seam. GIVEN the enum island shipped,
+WHEN the extender contract / schema lands, THEN the capability AND its additivity. The two proven
+halves are playable on the OSGi bench; the value channel is narrated.
+
+. *The framework refuses to resolve a config bundle without its host* — `[playable]` green +
+.. GIVEN `InfraDomain` / `InfraConfigRegistry` / `Rke2labConfig` shipped as a pure record island
+.. WHEN the config bundle declares `Require osgi.extender` and no host provides it
+.. THEN the real Felix framework refuses to resolve (a `BundleException`, P1) — AND the production
+   island is untouched, the contract is a new box.
+
+. *Config keys are introspectable by PID, typed, no reflection* — `[playable]` green +
+.. GIVEN the registry's fragments and their key shapes
+.. WHEN a Metatype `ObjectClassDefinition` describes them, retrieved by PID (P2)
+.. THEN config keys (name, type, required) are introspectable by PID without reflection — AND the OCD
+   describes the existing registry without rewriting it.
+
+. *A pure config record reads its values through a SectionReader, not ConfigLoader* — `[narrated]`
+  amber +
+.. GIVEN the wrong-direction crossing `Rke2labConfig → ConfigLoader` the two-spaces frame flags
+.. WHEN the `SectionReader` value channel inverts it (stage 3)
+.. THEN a pure config record reads its values across the bundle/host contract, not by reaching into
+   host code — AND the crossing is inverted, not duplicated (real config adopts by MOVE).
+
+. *Config is delivered and activated by the running framework* — `[narrated]` amber +
+.. GIVEN the resolved extender contract and the introspectable schema
+.. WHEN Config Admin delivery + DS activation land (stages 3–4)
+.. THEN config values are delivered to components and activate them through the framework — AND this
+   composes onto the shipped registry, additive.
+
+*Coverage of this view:* 4 capabilities, 4 scenarios — complete per <<scenario-completeness>>. Two
+playable-green (proven on the bench, not yet in production), two narrated-amber (the value/activation
+half, gated).
 
 [[runtime-view]]
 == OSGi runtime view — per-subsystem view
@@ -842,6 +1040,77 @@ embedded-Felix tests green. SHIPPED to `design/target-module-layout` (squash mer
 `pc`/`sr` boxes are now blue (their world colour), no green remaining in Diagram K.
 ====
 
+=== Design scenarios — the runtime capabilities as DSL sentences
+
+The third movement (see <<the-scenario-map>>) for the runtime migration. Every row of this view's
+inventory is shipped, so every scenario is playable-and-blue — the richest playable surface for the
+designer's runbook. GIVEN the static `ServiceLoader` surface, WHEN a slice lands, THEN the capability
+AND its additivity.
+
+. *A component publishes a service the framework binds* — `[playable]` blue +
+.. GIVEN the 5 SPIs discovered by `java.util.ServiceLoader`
+.. WHEN R1 adds felix.scr to the BOM and proves `@Component`/`@Reference` on embedded Felix
+.. THEN a component publishes a service and a consumer binds it — AND the anti-cheat holds (the
+   consumer is unsatisfied when the provider is absent), `ServiceLoader` still coexists.
+
+. *The five SPIs are declared components* — `[playable]` blue +
+.. GIVEN the SPI impl classes
+.. WHEN R2 annotates them `@Component` (bnd emits OSGI-INF)
+.. THEN the five SPIs are declared services — AND the same impl classes are decorated, not rewritten;
+   `ServiceLoader` stays active.
+
+. *A registry aggregates its contributors by reference, not by ServiceLoader* — `[playable]` blue +
+.. GIVEN `NodeEnvContributorRegistry` loading 6 contributors via `ServiceLoader`
+.. WHEN R3 makes it `@Component` + `@Reference`
+.. THEN the registry aggregates its contributors through the service registry — AND the dual
+   `forServiceLoader()` path is kept beside it (additive).
+
+. *The host calls a domain across a versioned port, fail-fast at build* — `[playable]` blue +
+.. GIVEN the host importing impl classes directly (wrong-direction crossings)
+.. WHEN the boundary models are lifted into `osgi/<domain>/<domain>-port` (DIP)
+.. THEN the host compiles against a versioned port and the impl implements it — AND the ports are new
+   osgi/ boxes, system-exported flat so host and bundle share one copy.
+
+. *seed-master boots Felix inside Pulumi.run and reads services from the registry* — `[playable]`
+  blue +
+.. GIVEN the host seam reading via `ServiceLoader`
+.. WHEN R4 embeds Felix in the `Pulumi.run` callback and the seam reads via `awaitService`
+.. THEN seed-master boots the framework and consumes pure-model services from the registry — proven
+   by `pulumi preview` — AND the host's `ServiceLoader` path is CUT to a single registry path (the
+   one named, deliberate erasure, no-fallback discipline).
+
+. *Every entrypoint boots under Felix, the CLIs included* — `[playable]` blue +
+.. GIVEN the two CLIs still flat on `ServiceLoader`
+.. WHEN the CLI alignment generalises the boot seam (manifests-cli + netplan-cli)
+.. THEN every `main()` entrypoint boots embedded Felix and reads its `-port` from the registry — AND
+   `netplan.api` moves into `netplan-port` so the consumed contract is single-exported.
+
+. *One fluent pipeline grammar, dual-consumed in-bundle and flat* — `[playable]` blue +
+.. GIVEN the grammar duplicated as `TopicRunner` + `SynthesisTopicRunner`
+.. WHEN pipeline-core (L1) extracts `FluentTopicRunner` and SeedRuntime (L3) collapses the three boot
+   copies
+.. THEN one pipeline grammar is consumed both in-bundle and flat, behind one boot seam — AND it
+   crosses to the host the same way the ports do, no new seam (L2 dropped: host-coupled).
+
+. *Nothing of ours discovers services by ServiceLoader any more* — `[playable]` blue +
+.. GIVEN `ServiceLoader` + the 8 orphaned `META-INF/services` files
+.. WHEN R5's CLI-half deletes them once every entrypoint boots under Felix
+.. THEN no code of ours discovers services by `ServiceLoader` (only `FrameworkFactory` discovery
+   remains, permanent) — AND this is the single pre-named erasure of the whole migration, realised.
+
+. *The orchestration runs as an OSGi service* — `[narrated]` green +
+.. GIVEN the orchestration logic host-side (the pipeline stages drive Pulumi inside `Pulumi.run`)
+.. WHEN the orchestrator is inverted into an OSGi service, the actualisation steps (Incus/Pulumi/gRPC)
+   staying host as ports it calls (DIP)
+.. THEN the orchestration runs as an OSGi service while the engine stays host — AND nothing host-only
+   is forced pure (host orchestration may be the final architecture); the gain is maximising what lives
+   in the OSGi world, where the code is best-structured. The shut gate is the
+   orchestration-OSGi inversion; this is a leverage box (it also gates the unitrepo
+   "scenario resolves as a unit" and the designer-runbook "pure bundle" scenarios).
+
+*Coverage of this view:* 9 capabilities, 9 scenarios — complete per <<scenario-completeness>>. Eight
+playable-and-blue today; one narrated-green (the orchestration-OSGi inversion, a shared leverage gate).
+
 [[unitrepo-view]]
 == Unit repository — per-subsystem view
 
@@ -1024,12 +1293,120 @@ earns its place by licensing a sentence we could not say before. Colored by hori
 | reproduce a deploy byte-exact
 | horizon (amber)
 | lockfile-DAG
+
+| a design scenario resolves as a unit (gates become resolution edges)
+| next (green)
+| pure scenario engine plus `UnitResolver`
 |===
 
 The colored bands read as the project's state in one glance: a broad blue base, a green band the shipped
 R4 framework unlocks next, an amber P2P horizon. The same capability-anchoring device generalizes across
 all four views — a standing atlas tool, and a two-way coverage test: a sentence with no enabling box is a
 design gap, a box licensing no sentence is dead weight.
+
+=== Design scenarios — the seven capabilities as DSL sentences
+
+The third movement (see <<the-scenario-map>>): each capability-map row above, written in full as a
+design scenario. The GIVEN is the shipped rke2lab constellation; the WHEN is the box that licenses
+the sentence; the THEN is the capability AND its additivity. Tagged playable (re-derivable from the
+reactor today) or narrated (reasoning, no executable substrate yet), colored by horizon.
+
+. *Any unit set resolves in one Felix resolve* — `[playable]` blue +
+.. GIVEN the reactor as shipped (the Felix `Resolver` injected, the manifests universe built)
+.. WHEN the `UnitResolver` oracle wraps the resolver
+.. THEN any unit set resolves in one Felix resolve — the universe holds 46 units on bioskop — AND
+   the hand-rolled walker (`ManifestsUnitDependencyApplier`) is erased (the one named deletion, already
+   absorbed).
+
+. *A checkpoint is a foldable Visit-unit DAG* — `[playable, partial]` green +
+.. GIVEN `StackCheckpoint` / `StackSnapshot` shipped and the `MedicalRecord` fold proven
+.. WHEN ingest plus the ContentStore land
+.. THEN a checkpoint folds into a content-addressed Visit-unit DAG — AND no gRPC is touched, the fold
+   is additive over the file backend. (Partial today: the fold is shipped, ingest is not.)
+
+. *A handler loads from the store at runtime* — `[narrated]` green +
+.. GIVEN the embedded Felix booting inside `Pulumi.run` (R4 shipped)
+.. WHEN load-from-store lands and one concrete `UnitHandler` implements the providing half
+.. THEN a handler bundle loads from the store into the running framework with no host rebuild — AND
+   the `osgi.extender=unitrepo.handler` contract (already exported) is its resolution edge, nothing
+   rewired.
+
+. *The model decides what, the host actualises how* — `[narrated]` green +
+.. GIVEN the shipped `-port` + `awaitService` seam (the host READS a model the bundle computed)
+.. WHEN the neutral `ResourceDescription` and the `unitrepo-pulumi` ACL land
+.. THEN the model decides WHAT and the host actualises HOW over the engine — AND `ComponentResource`
+   is driven by a description instead of inline data (the one named changed collaborator), its gRPC
+   edge unchanged.
+
+. *Recruit a specialist by pulling its closure* — `[narrated]` amber +
+.. GIVEN the resolution oracle and the (designed) ContentStore
+.. WHEN resolve-and-pull lands
+.. THEN a node recruits a specialist by pulling its closure — AND this is the specialist-as-ledger
+   north-star reached from the unitrepo side, additive over the doctor's shipped record substrate.
+
+. *Share a severed, gated lens of a DAG* — `[narrated]` amber +
+.. GIVEN content-addressed units in the store
+.. WHEN lens severance lands
+.. THEN a peer shares a severed, gated lens of its DAG — AND the federation horizon opens with no
+   central registry, additive.
+
+. *Reproduce a deploy byte-exact* — `[narrated]` amber +
+.. GIVEN the content-addressed store and the resolution closure
+.. WHEN the lockfile-DAG lands
+.. THEN a deploy reproduces byte-exact from its lockfile-DAG — AND reproducibility is a property of
+   the DAG, nothing in the shipped base rewritten.
+
+. *A design scenario resolves as a unit* — `[narrated]` green +
+.. GIVEN scenarios written as prose Given/When/Then in the atlas, their gates counted by hand
+.. WHEN the scenario engine is made pure and a scenario is expressed as a `UnitResource`
+   (Provide/Require: "this scenario requires these boxes")
+.. THEN a design scenario resolves as a unit — its GATES become resolution EDGES, so the compass's
+   "how many increments" is RESOLVED by the Felix resolver, not hand-counted — AND this reuses the
+   shipped `UnitResolver`, additive. Shut gate: the orchestration-OSGi inversion (the shared leverage
+   box, see the runtime view).
+
+*Coverage of this view:* 8 capabilities, 8 scenarios — complete per <<scenario-completeness>>. One
+playable-and-green today (resolve), one playable-partial (the fold half of ingest); the rest narrated,
+awaiting their boxes.
+
+==== Worked example — the gates of scenario 3 (how narrated becomes playable)
+
+A narrated scenario does not float; it is moored to named boxes whose gates are shut. Decomposing
+scenario 3 ("a handler loads from the store at runtime") clause by clause shows exactly what must ship
+to flip it playable — narrated describes the GATES, not the scenario (which is already fully written).
+
+[cols="3,2,1,1",options="header"]
+|===
+| Clause | Gating box | Colour | Gate
+
+| GIVEN — embedded Felix boots inside `Pulumi.run`
+| R4 boot seam
+| 🔵 blue
+| OPEN
+
+| WHEN(a) — a concrete `UnitHandler` implements the providing half
+| the handler's requiring half (one concrete handler)
+| 🟢 green
+| shut
+
+| WHEN(b) — load-from-store lands
+| load-from-store
+| 🟢 green
+| shut
+
+| THEN — the bundle loads into the running framework, no host rebuild
+| (depends on WHEN a+b)
+| 🟢 green
+| shut
+|===
+
+Three shut gates, two distinct green boxes. To flip the scenario playable: ship one concrete
+`UnitHandler` (flip green→blue, gate WHEN(a) opens), ship load-from-store (flip green→blue, gate
+WHEN(b) opens) — then every box on the path is blue and the scenario flips narrated→playable by
+derivation, no re-tagging. Once playable, the probe writes itself, because blue boxes are probe-able by
+construction: WHEN(a) → "a class implements `UnitHandler` and provides `unitrepo.type=X`" (scan the
+reactor); WHEN(b)+THEN → "loading that bundle from the store into an embedded Felix resolves it" (an
+`@OsgiSpike`, green/red). This is the worked instance the ritual's gate definition points to.
 
 === Glossary remediation (the reserved words — see the "two spaces" note)
 
@@ -1052,6 +1429,246 @@ Folding the unitrepo docs in reconciles their vocabulary with the atlas's reserv
 The figures above are the design-time proof; the inventory carries the live status. The first buildable
 increment is the handler edge plus load-from-store. Flip green→blue as each ships.
 ====
+
+[[manifests-view]]
+== Manifests subsystem — per-subsystem view
+
+The fifth subsystem to adopt the ritual, and the FIRST brought in by the design-state coverage pass
+(2026-06-21). The four views above are the OSGi-centric heart of the system; this pass folds in the
+rest of the design, subsystem by subsystem, manifests first as the exemplar. Unlike unitrepo, manifests
+is almost entirely SHIPPED — it is the CDK8s synthesis layer that has run in production for months. Its
+design state is therefore a broad blue base with a thin green target (the unit-lifecycle cleanup). The
+full design is link:manifests/manifests-architecture.adoc[the manifests architecture]; this view holds
+the inventory, the additivity proof, the capability map, and the scenario map.
+
+The load-bearing seam this view makes explicit: manifests does NOT own a resolver — it is the first and
+shipped CONSUMER of the same Felix `UnitResolver` the unitrepo view owns. The `ManifestsUniverse` /
+`CoherentManifestsDomainRegistry` boxes appear in both views; here they are read as "manifests resolves
+its units", there as "the resolution oracle generalises to any unit". One box, two readings — the
+convergence unitrepo's verdict already named (a `ManifestsUnit` is the first concrete unit).
+
+=== The model inventory
+
+[cols="2,1,3",options="header"]
+|===
+| Model | Status | Note
+
+| typed synthesis — `ManifestsUnit` + CDK8s `Chart`
+| ✅ Shipped (blue)
+| Each unit synthesises Kubernetes resources type-safely; `AbstractManifestsUnit` is the base.
+
+| dual emission — manifests + systemd from one source
+| ✅ Shipped (blue)
+| The same `ManifestsUnit` emits K8s manifests and, via `synthesizeSystemdUnits`, the systemd installer
+  units — no duplicated source of truth. The seam to the systemd view.
+
+| coherent visit-order — the `UnitResolver` consumer
+| ✅ Shipped (blue)
+| `ManifestsUniverse` + `CoherentManifestsDomainRegistry` resolve units into a topological visit-order:
+  producer-before-consumer, cycles rejected, missing deps reported, cross-domain rules enforced — ONE
+  coherence gate (`resolve()`). The shipped box shared with the unitrepo view.
+
+| domain catalog — single source of IDs
+| ✅ Shipped (blue)
+| `ManifestDomainCatalog` accessors are the only source of domain IDs; no magic strings (the kebab/camel
+  mismatch class of bug is closed by construction).
+
+| conditional inclusion — policy-driven units
+| ✅ Shipped (blue)
+| Optional units/layers are included per `ControlplanePolicy` flag at synthesis time; ephemeral runs skip
+  synthesis via the `BootstrapIdentity.UNKNOWN` guard.
+
+| explode + apply — per-domain output, RKE2 auto-deploy
+| ✅ Shipped (blue)
+| `ManifestExploder` splits consolidated YAML into per-domain dirs by annotation; RKE2 auto-deploy applies
+  them with no kubectl; `local-config` excludes non-deployed resources.
+
+| staged synthesis — deferred to the Pulumi provider
+| ✅ Shipped (blue)
+| Synthesis can defer to the provider stage to read runtime Outputs (image fingerprints); the seam to the
+  cluster-api staged-post-cluster pattern.
+
+| context-threaded identity — ThreadLocal, no ctor params
+| ✅ Shipped (blue)
+| `ManifestSynthesisContext` threads cluster/node identity, network topology, component versions through
+  synthesis via ThreadLocal — the box shared with the (future) bootstrap view's identity provider.
+
+| unit-lifecycle cleanup — plain objects, deferred scope
+| 🟢 Design
+| The target model: units as plain objects with `synthesize(scope)` deferring scope binding, eliminating
+  the `lazy()` factory and emitting group-markers uniformly from the base hook.
+|===
+
+=== Diagram M — additivity: BEFORE (the four-view base) vs AFTER + manifests boxes (monotone)
+
+The ritual's test. BEFORE is the constellation as the four OSGi-centric views leave it; AFTER adds the
+manifests boxes. The key additive claim: manifests REUSES the shipped `UnitResolver` /
+`ManifestsUniverse` boxes (drawn as existing blue, not new) — it does not add a resolver, it is read as
+their first consumer. Only the manifests-specific boxes are green.
+
+[mermaid]
+....
+flowchart TB
+  subgraph "OSGi space — describes"
+    RES["UnitResolver oracle<br/>shipped, shared with unitrepo"]
+    UNIV["ManifestsUniverse<br/>shipped"]
+    COH["CoherentManifestsDomainRegistry<br/>shipped"]
+    UNIT["ManifestsUnit plus AbstractManifestsUnit<br/>typed CDK8s synthesis"]
+    CAT["ManifestDomainCatalog<br/>single source of IDs"]
+    POL["conditional inclusion<br/>policy-driven"]
+    LIFE["unit-lifecycle cleanup<br/>plain objects, deferred scope<br/>DESIGN"]
+  end
+  subgraph "host space — actualises"
+    CTX["ManifestSynthesisContext<br/>ThreadLocal identity"]
+    EXPL["ManifestExploder<br/>per-domain split"]
+    STAGE["staged synthesis<br/>deferred to provider"]
+  end
+  RKE["RKE2 auto-deploy"]
+  UNIT -->|expressed as UnitResource in| UNIV
+  UNIV -->|feeds| RES
+  RES -->|resolves to visit-order| COH
+  UNIT -->|reads IDs from| CAT
+  UNIT -->|gated by| POL
+  CTX -->|threads identity into| UNIT
+  COH -->|exploded by| EXPL
+  STAGE -->|reads Outputs for| UNIT
+  EXPL -->|applied by| RKE
+  LIFE -.->|cleans up| UNIT
+  classDef shipped fill:#eef,stroke:#88a,stroke-width:1px;
+  classDef neu fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class RES,UNIV,COH shipped;
+  class UNIT,CAT,POL,CTX,EXPL,STAGE shipped;
+  class LIFE neu;
+....
+
+=== Verdict — does it hold?
+
+. *Monotone: yes.* No box from the four prior views is erased or rewired. The shared `UnitResolver` /
+  `ManifestsUniverse` / `CoherentManifestsDomainRegistry` boxes are read here as "manifests resolves its
+  units" without changing them — the same boxes the unitrepo view reads as the general oracle. The
+  manifests-specific boxes are additions.
+
+. *Almost no green.* Unlike the other views, manifests is shipped-in-bulk: eight of nine boxes are blue.
+  The single green box is the unit-lifecycle cleanup (plain objects + deferred scope), the one design
+  target. There is no amber — manifests has no exploration horizon, it is a settled subsystem.
+
+. *Two shared boxes are named, not redrawn.* `ManifestSynthesisContext` (identity threading) is the same
+  box the bootstrap view's identity provider will read; the `UnitResolver` trio is the unitrepo view's.
+  Naming them shared — rather than drawing manifests-local copies — is what keeps the merge monotone.
+
+. *The convergence is earned.* unitrepo's verdict already claimed "a `ManifestsUnit` is the first concrete
+  unit"; this view is the other end of that claim, reached from the manifests side. The resolver was built
+  FOR manifests and generalised INTO unitrepo — the shared boxes are the proof, not an assertion.
+
+Conclusion: the constellation holds; manifests is additive, and mostly already blue.
+
+=== The capability map — what the manifests model lets us say
+
+The nine consolidated capabilities (reverse-engineered from the manifests docs during the coverage pass).
+Colored by horizon; all but one are blue.
+
+[cols="3,1,2",options="header"]
+|===
+| Capability — "we can now say" | Horizon | Enabled by
+
+| manifests synthesise from typed units, not hand-written YAML
+| now (blue)
+| `ManifestsUnit` plus CDK8s `Chart`
+
+| one unit source emits both K8s manifests and systemd units
+| now (blue)
+| `AbstractManifestsUnit.synthesizeSystemdUnits`
+
+| units resolve into a coherent visit-order in one gate
+| now (blue)
+| `UnitResolver` plus `CoherentManifestsDomainRegistry`
+
+| domain IDs come from one catalog, no magic strings
+| now (blue)
+| `ManifestDomainCatalog`
+
+| optional units are included by policy at synthesis
+| now (blue)
+| `ControlplanePolicy` plus the inclusion hook
+
+| output explodes per-domain and applies with no kubectl
+| now (blue)
+| `ManifestExploder` plus RKE2 auto-deploy
+
+| synthesis defers to the provider to read runtime Outputs
+| now (blue)
+| staged synthesis plus `Output.applyValue`
+
+| synthesis reads identity by context, not constructor params
+| now (blue)
+| `ManifestSynthesisContext` (ThreadLocal)
+
+| a unit binds its scope at synthesis, no `lazy()` factory
+| next (green)
+| unit-lifecycle cleanup
+
+|===
+
+=== Design scenarios — the nine capabilities as DSL sentences
+
+The third movement (see <<the-scenario-map>>). Eight playable-and-blue (the shipped synthesis layer —
+the richest playable surface after the runtime view), one green design target.
+
+. *Manifests synthesise from typed units, not hand-written YAML* — `[playable]` blue +
+.. GIVEN raw Kubernetes YAML hand-authored per resource
+.. WHEN `ManifestsUnit` + CDK8s `Chart` express each resource as typed Java
+.. THEN manifests synthesise from typed units — AND the YAML is generated, never hand-edited.
+
+. *One unit source emits both K8s manifests and systemd units* — `[playable]` blue +
+.. GIVEN a `ManifestsUnit` synthesising Kubernetes resources
+.. WHEN `AbstractManifestsUnit.synthesizeSystemdUnits` derives the installer units from the same source
+.. THEN one unit source emits both the K8s manifests and the systemd units — AND there is no second
+   source of truth to drift (the seam to the systemd view).
+
+. *Units resolve into a coherent visit-order in one gate* — `[playable]` blue +
+.. GIVEN units with inter-unit and cross-domain dependencies
+.. WHEN `ManifestsUniverse` expresses them as `UnitResource`s and the `UnitResolver` resolves them
+.. THEN units resolve into a topological visit-order — producer-before-consumer, cycles rejected, missing
+   deps reported, cross-domain rules enforced — in ONE coherence gate (`resolve()`) — AND this is the same
+   resolver box the unitrepo view owns, shared not duplicated.
+
+. *Domain IDs come from one catalog, no magic strings* — `[playable]` blue +
+.. GIVEN domain IDs hardcoded as string literals (the kebab/camel mismatch bug class)
+.. WHEN `ManifestDomainCatalog` accessors become the only source
+.. THEN domain IDs come from one catalog — AND a typo is a compile error, not a silent policy miss.
+
+. *Optional units are included by policy at synthesis* — `[playable]` blue +
+.. GIVEN a fixed set of units always synthesised
+.. WHEN `ControlplanePolicy` flags gate optional units/layers at synthesis time
+.. THEN optional units are included by policy — AND ephemeral runs skip synthesis via the
+   `BootstrapIdentity.UNKNOWN` guard, nothing else rewired.
+
+. *Output explodes per-domain and applies with no kubectl* — `[playable]` blue +
+.. GIVEN one consolidated YAML stream
+.. WHEN `ManifestExploder` splits it per-domain by annotation and RKE2 auto-deploy applies it
+.. THEN output explodes per-domain and applies with no kubectl — AND `local-config` excludes the
+   non-deployed resources.
+
+. *Synthesis defers to the provider to read runtime Outputs* — `[playable]` blue +
+.. GIVEN synthesis running before Pulumi Outputs resolve
+.. WHEN it defers to the provider stage via `Output.applyValue`
+.. THEN synthesis reads runtime Outputs (image fingerprints) — AND this is the seam the cluster-api
+   staged-post-cluster pattern extends, additive.
+
+. *Synthesis reads identity by context, not constructor params* — `[playable]` blue +
+.. GIVEN units that would need cluster/node identity passed through every constructor
+.. WHEN `ManifestSynthesisContext` threads it via ThreadLocal
+.. THEN synthesis reads identity by context — AND the same context box the bootstrap identity provider
+   owns is read here, shared not copied.
+
+. *A unit binds its scope at synthesis, no `lazy()` factory* — `[narrated]` green +
+.. GIVEN units wrapped in a `lazy()` factory to defer CDK8s scope binding
+.. WHEN the unit-lifecycle cleanup makes units plain objects with `synthesize(scope)`
+.. THEN a unit binds its scope at synthesis with no `lazy()` workaround, group-markers emitted uniformly
+   from the base hook — AND the change is internal to the unit model, the synthesis seam unchanged.
+
+*Coverage of this view:* 9 capabilities, 9 scenarios — complete per <<scenario-completeness>>. Eight
+playable-and-blue (the shipped synthesis layer), one narrated-green (the lifecycle cleanup target).
 
 == Related documentation
 
