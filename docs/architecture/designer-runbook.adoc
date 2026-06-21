@@ -104,6 +104,53 @@ The designer runbook follows the same mapping, with the codebase as the system u
   `unit-repository/unitrepo-design-unification-state` in memory and the atlas capability maps): the
   playable assertions flip a capability blue/green; the narrated ones stay amber.
 
+== The v0 — feasible today, the infrastructure already exists
+
+A first implementation needs NO new engine. JGiven is already wired (`jgiven-core` + `jgiven-junit5`
+in the BOM and in `exec/seed-master`), the report directory is already configured
+(`jgiven.report.dir`), and seed-master already holds ~18 scenario classes under `controlplane/bdd/`
+in the established style (`Given/When/Then extends Stage`, fluent steps, `@As` prose). The doctor
+scenarios prove the shape: the production vocabulary IS the scenario DSL.
+
+=== A capability sentence IS a scenario — the mapping
+
+The capability sentences are not a metaphor for scenarios; they are scenarios not yet written in
+JGiven. The three clauses map one-to-one:
+
+* GIVEN — the constellation before (the reactor as shipped).
+* WHEN — the term or model that lands.
+* THEN — the capability we can now say, AND additivity (nothing erased).
+
+Worked example, the sentence "a unit is a star the resolver sees; the universe holds 46 units on
+bioskop" becomes a scenario reading:
+
+* `given().the_reactor_as_shipped()`
+* `when().the_unitrepo_resolution_is_in_production()`
+* `then().any_unit_set_resolves_in_one_felix_resolve().and().the_universe_holds_units(46)`
+
+=== The playable steps probe the code — the half that cannot lie
+
+The v0's value is the PLAYABLE half: steps whose assertions are re-derived from the reactor, the same
+checks done by hand at the start of every session. They live in a design-probe `Stage`:
+
+* `the_module_exists("osgi/unitrepo/unitrepo-core")` — assert the module directory and its pom.
+* `the_walker_is_retired()` — assert `ManifestsUnitDependencyApplier` is absent from the tree.
+* `the_capability_is_exported("unitrepo.handler")` — read the generated bundle manifest.
+* `the_universe_holds_units(46)` — count via the resolver universe, the bioskop figure.
+
+A green probe flips its capability blue/green in the rendered report; a probe that no longer holds
+turns the line red — that is the drift a hand-written atlas hides, caught at render. The narrated
+clauses (additivity of a not-yet-built model) are attached as plain narration steps, rendered not
+asserted.
+
+=== The deliverable is the generated report
+
+Nothing more is built: a new `DesignStateScenarioTest` under `controlplane/bdd/`, a `DesignProbe`
+stage holding the code-probing steps, and the already-configured JGiven report renders them. That
+report IS the designer runbook v0 — read one document, have the live design state. Scope of the first
+cut: a handful of playable scenarios over the shipped unitrepo + doctor state; the narrated half and
+the atlas regeneration come after.
+
 == What it is not (scope honesty)
 
 It is not a replacement for the atlas — it is the atlas's missing live half. The atlas stays the map of
