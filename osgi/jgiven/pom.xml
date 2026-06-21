@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>build-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../build-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>jgiven</artifactId>
+  <packaging>pom</packaging>
+  <name>osgi/jgiven</name>
+  <description>BDD-in-OSGi test tooling. jGiven runs its scenarios in-container THROUGH the host
+    bundle's classloader, so it is a BDD concern, not a JUnit-scoped one — it depends on the junit
+    testkit (osgi/testkit) but is not owned by it. Holds the durable result of the jgiven-osgi-bundle
+    spike: jgiven-wrap (jgiven wrapped as a first-class bundle, test-scope), jgiven-testkit (the
+    reusable shared bnd include for the one forced fragment import + the JGivenTestkit boot helper),
+    and a probe host bundle with its sibling -test fragment + harness that double as the palier-2/3
+    non-regression guard — the guard models the real convention (a -test fragment alongside its host
+    bundle) and runs IN-CONTAINER thanks to jgiven-testkit + jgiven-wrap, so it IS the template a
+    host like doctor copies. See docs/architecture/osgi/jgiven-osgi-testkit-handoff.adoc.</description>
+
+  <modules>
+    <module>jgiven-wrap</module>
+    <module>jgiven-probe</module>
+    <module>jgiven-probe-test</module>
+    <module>jgiven-testkit</module>
+  </modules>
+</project>

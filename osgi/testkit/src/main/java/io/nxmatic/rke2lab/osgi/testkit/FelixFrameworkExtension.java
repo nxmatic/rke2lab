@@ -58,6 +58,7 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
           + "org.osgi.util.function;version=1.2";
 
   private final String systemPackagesExtra;
+  private final String bootDelegation;
   private final boolean startScr;
   private final List<String> classpathBundles;
   private final List<String> reactorBundles;
@@ -71,6 +72,8 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
       exports.addAll(mirrorImportsAsExports(artifact));
     }
     this.systemPackagesExtra = exports.isEmpty() ? null : String.join(",", exports);
+    this.bootDelegation =
+        builder.bootDelegation.isEmpty() ? null : String.join(",", builder.bootDelegation);
     this.startScr = builder.startScr;
     this.classpathBundles = List.copyOf(builder.classpathBundles);
     this.reactorBundles = List.copyOf(builder.reactorBundles);
@@ -83,6 +86,7 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
   /** Declares the framework topology installed+started in {@code beforeAll}. */
   public static final class Builder {
     private final List<String> systemPackages = new ArrayList<>();
+    private final List<String> bootDelegation = new ArrayList<>();
     private boolean startScr;
     private final List<String> classpathBundles = new ArrayList<>();
     private final List<String> reactorBundles = new ArrayList<>();
@@ -91,6 +95,18 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
     /** Export these packages from the system bundle (value of {@code system.packages.extra}). */
     public Builder systemPackages(String... packages) {
       this.systemPackages.addAll(Arrays.asList(packages));
+      return this;
+    }
+
+    /**
+     * Boot-delegate these packages ({@code org.osgi.framework.bootdelegation}): every bundle loads
+     * them from the parent (app) classloader, bypassing import/export wiring. The mechanism for
+     * JDK-internal packages a library reaches reflectively without importing them — notably {@code
+     * sun.misc} for byte-buddy's {@code ClassInjector.UsingReflection} (Unsafe). A system-bundle
+     * EXPORT cannot serve these: the consumer never declares the import to wire to.
+     */
+    public Builder bootDelegation(String... packages) {
+      this.bootDelegation.addAll(Arrays.asList(packages));
       return this;
     }
 
@@ -150,6 +166,9 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
     config.put(Constants.FRAMEWORK_STORAGE_CLEAN, Constants.FRAMEWORK_STORAGE_CLEAN_ONFIRSTINIT);
     if (systemPackagesExtra != null) {
       config.put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, systemPackagesExtra);
+    }
+    if (bootDelegation != null) {
+      config.put(Constants.FRAMEWORK_BOOTDELEGATION, bootDelegation);
     }
     framework = factory.newFramework(config);
     framework.init();

@@ -1,0 +1,214 @@
+= jGiven-as-OSGi-bundle — wrap spike report
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* SPIKE COMPLETE (2026-06-21). Branch `spike/jgiven-osgi-bundle`, off `origin/main`. The
+code is throwaway (lives in `osgi-spike/`, gated behind `-Pspike`, invisible to the default
+reactor); THIS report is the durable artefact. All three paliers run GREEN on a real embedded Felix
+7.0.5 — `Tests run: 2, Failures: 0`.
+====
+
+== The question the spike answered
+
+Not "does it build", but: *what OSGi concepts does jGiven (jgiven-core + jgiven-junit5, 2.0.3)
+need, and is that cost LOCAL (a clean wrap) or VIRAL (`DynamicImport-Package: *` everywhere = a
+monolith in disguise)?*
+
+The standing presumption it tested was the invariant `osgi-system-export-resolution-only`: "jGiven
+is not designed for OSGi → serve it flat as a system-package, never as a bundle." The spike was
+built to turn that presumption into a measured fact — and it *overturned* it. **jGiven wraps clean.
+The cost is LOCAL.** The alternative path the brief hoped for — jGiven as a first-class bundle,
+test scenarios as fragments playing in-container — is open, and was demonstrated end to end.
+
+== Verdict in one line
+
+[cols="1,4",options="header"]
+|===
+| |
+| *Verdict* | WRAP-PROPRE (local). jGiven becomes a first-class bundle; no virality.
+| *Build (palier 1)* | bnd wraps the two header-less jgiven jars; every dependency is already a bundle.
+| *Resolve (palier 2)* | the wrap bundle reaches ACTIVE with its whole import closure satisfied by stock bundles.
+| *Execute (palier 3)* | a Given/When/Then runs IN-CONTAINER via a test fragment, white-box-reading a package-private field.
+| *Total OSGi cost* | 1 framework boot-delegation (`sun.misc`) + exactly 1 forced fragment import (`com.tngtech.jgiven.impl.intercept`). byte-buddy needs NOTHING forced.
+|===
+
+== The decisive measurement: the dependency tail is already OSGi
+
+The spike's first instinct was the classic "wrap-bundle = embed the not-designed-for-OSGi tail,
+shaded/relocated, so we don't bnd-wrap each dependency." That instinct was *wrong here*, and
+measuring why is the core finding. Inspecting every jar in jGiven's graph for a
+`Bundle-SymbolicName`:
+
+[cols="2,1,3",options="header"]
+|===
+| Jar | Already a bundle? | Bundle-SymbolicName
+
+| jgiven-core         | *NO*  | (only `Automatic-Module-Name: com.tngtech.jgiven.core`)
+| jgiven-junit5       | *NO*  | (only `Automatic-Module-Name: com.tngtech.jgiven.junit5`)
+| guava               | yes   | `com.google.guava`
+| guava failureaccess | yes   | `com.google.guava.failureaccess`
+| gson                | yes   | `com.google.gson`
+| paranamer           | yes   | `com.thoughtworks.paranamer`
+| jansi               | yes   | `org.fusesource.jansi`
+| jakarta.annotation  | yes   | `jakarta.annotation-api`
+| byte-buddy          | yes   | `net.bytebuddy.byte-buddy`
+| slf4j               | (n/a) | owned by pax-logging inside our framework (the R1 scar)
+|===
+
+*There is no not-designed-for-OSGi tail.* Only the two jGiven jars themselves lack OSGi headers.
+Embedding guava/gson/etc. private would have been actively harmful — it would split their classes
+from the real bundles and hide legitimate dependencies inside ours. So the wrap is maximally LOCAL:
+
+* stamp OSGi headers onto the only two header-less jars,
+* `Export-Package: com.tngtech.jgiven.*`,
+* `Import-Package: *` everything else — each dependency installs as its own pre-existing bundle.
+
+No shade plugin, no `maven-dependency-plugin` staging, no relocation. The bnd recipe is in
+`osgi-spike/jgiven-wrap/bnd.bnd`.
+
+== The three paliers, with the symptom at each cran
+
+=== Palier 1 — build (GREEN)
+
+`bnd-maven-plugin` (the same plugin every reactor bundle already uses) wrapped the jgiven pair:
+316 jgiven classes exported, *0* dependency classes embedded, a clean versioned `Import-Package`
+with proper ranges (`com.google.common.*;version="[33.4,34)"`, `net.bytebuddy.*`, etc.). The only
+manual touches are making genuinely-optional environment packages optional (`appengine`,
+`errorprone`, `jspecify`, `sun.misc`) so resolution never blocks on annotation noise jGiven never
+executes.
+
+=== Palier 2 — resolution (GREEN)
+
+Installed into the testkit's real Felix alongside jGiven's dependency bundles, `jgiven-wrap` reaches
+`ACTIVE`. One genuine missing-requirement surfaced and is itself a finding: guava splits
+`com.google.common.util.concurrent.internal` into its *failureaccess* companion bundle, so that ships
+too. Once present, the whole closure resolves. *Nothing of jGiven is system-exported* — the LOCAL
+claim made literal.
+
+=== Palier 3 — execution in-container (GREEN), via host + fragment
+
+This is where the brief expected the breakage that would diagnose the missing concept. The harness
+follows the idea-#2 model precisely:
+
+* *host bundle* (`jgiven-wrap-fixture-core`) — a pure POJO `Vault` with a *package-private* `balance`
+  and ZERO test dependencies. It does not know jGiven exists.
+* *test fragment* (`jgiven-wrap-fixture-test`) — `Fragment-Host: …fixture.core`, authored in the
+  host's package, carrying the jGiven `Stage` + a runner. Sharing the host's classloader, it reads
+  `Vault.balance` *white-box*, and it CONTRIBUTES the jGiven/byte-buddy imports the pure host never
+  declared. Per OSGi Core §3.14 those merge into the host and resolve as one when the host resolves.
+
+Running `given a vault / when 100 is deposited / then the balance is 100` THROUGH the host
+classloader produced three successive symptoms, each diagnosing exactly one concept — and none of
+them viral:
+
+[cols="1,3,3",options="header"]
+|===
+| # | Symptom | Concept it diagnosed / fix
+
+| 3a
+| `ClassNotFoundException: ScaffoldingStrategy` … then `sun.misc.Unsafe not found by
+  net.bytebuddy` — byte-buddy's `ClassInjector.UsingReflection` needs `Unsafe`.
+| *Boot delegation*, NOT a system export: byte-buddy reaches `sun.misc` reflectively without
+  importing it, so there is no import to wire. Fix = `org.osgi.framework.bootdelegation=sun.misc`,
+  one JDK-internal package. (Added as a reusable `bootDelegation(...)` verb on the testkit.)
+
+| 3b
+| `NoClassDefFoundError: com/tngtech/jgiven/impl/intercept/StageInterceptorInternal` — the
+  RUNTIME-generated proxy implements a jGiven internal the scenario bytecode never names.
+| *bnd computes `Import-Package` from bytecode only.* A package touched solely by the generated
+  proxy is invisible to it, so the wildcard `com.tngtech.jgiven.*` drops it. Fix = the fragment
+  FORCES `com.tngtech.jgiven.impl.intercept` explicitly. ONE package — counted, not wildcarded.
+  (byte-buddy's own packages are statically reachable from the wrap bundle's bytecode, so bnd
+  computes them with no forcing — the fragment ends up importing ZERO byte-buddy packages.)
+
+| 3c
+| `NullPointerException: reportModel is null` in `scenarioFinished`.
+| *Not an OSGi symptom at all* — a plain jGiven standalone-embedding requirement: supply
+  `scenario.setModel(new ReportModel())`, which the JUnit integration would otherwise inject.
+|===
+
+After 3a + 3b (the two real OSGi fixes) and 3c (a jGiven API call), the scenario runs to `OK`. The
+byte-buddy stage proxy is defined into the host's classloader via the INJECTION strategy — reachable
+only because the fragment contributed `net.bytebuddy.*` to that host.
+
+== Why LOCAL, not VIRAL — the byte-buddy classloading evidence
+
+Decompiling `com.tngtech.jgiven.impl.ByteBuddyStageClassCreator` settled the virality question on
+the bytecode, before any test ran:
+
+[source,java]
+----
+// getClassLoadingStrategy(stageClass):
+if (stageClass.getClassLoader() == null) return ClassLoadingStrategy.Default.WRAPPER;
+else                                     return ClassLoadingStrategy.Default.INJECTION;
+load(stageClass.getClassLoader(), strategy);
+----
+
+jGiven defines the stage proxy *into the stage class's OWN classloader*, and it never looks stages up
+by name. That is the whole reason the cost is local:
+
+* *No `DynamicImport-Package` is needed* — jGiven does not discover arbitrary types by reflection
+  across bundles; it subclasses the concrete `Stage` it was handed.
+* The only requirements are that *the bundle carrying the stages* (here the host, via its fragment)
+  forces the single static-invisible internal `com.tngtech.jgiven.impl.intercept`, and that
+  `sun.misc` is boot-delegated framework-wide. Everything else — including all byte-buddy packages —
+  bnd computes from bytecode. Bounded, enumerable, contributed by the test fragment — exactly the
+  "fragment adds the dependencies the host needs" model.
+
+A viral outcome would have looked like `DynamicImport-Package: *` on the wrap bundle or the host to
+let byte-buddy resolve unknowable runtime types. That never appeared.
+
+== The alternative path this opens
+
+The invariant `osgi-system-export-resolution-only` said: serve jGiven flat, never as a bundle. The
+spike refutes its premise (jGiven's deps are all OSGi-ready) and proves the alternative:
+
+* *jGiven IS a first-class bundle* (`jgiven-wrap`), resolvable and ACTIVE.
+* *Test modules CAN be fragments* attached to the bundle-under-test, sharing its classloader to play
+  jGiven scenarios IN-CONTAINER against the real wiring, with white-box access to `internal`/
+  package-private types — the exact capability the idea-#2 note ("OSGi-fy jgiven + test modules as
+  fragments") was reaching for.
+
+This does NOT mandate adopting it. It removes the "not-designed-for-OSGi → impossible" objection and
+replaces it with a measured cost (one bootdelegation line, one forced fragment import per host that
+runs scenarios). Whether to pivot the test model is a separate decision; the spike's job was to make
+that decision available on evidence rather than presumption.
+
+=== Cost of adoption, if pursued
+
+. *Testkit:* keep the `bootDelegation(sun.misc)` verb (already added) — and the production
+  `OsgiRuntime` would need the same framework property if scenarios ever run there (they should not;
+  this is test-time only).
+. *Per host that hosts scenarios:* the fragment must force the single static-invisible import
+  `com.tngtech.jgiven.impl.intercept` (the proxy's interceptor package). This is one line, identical
+  across hosts — a candidate for a shared bnd include if the model is adopted widely.
+. *No change to any production bundle* — jGiven stays test-scope; only test fragments import it.
+
+== What was built (throwaway)
+
+All under `osgi-spike/` (top-level sibling of `osgi/`, aggregated only by the root `-Pspike`
+profile — a default `./mvnw install` of the worlds never builds or sees it):
+
+* `jgiven-wrap` — the wrap bundle (bnd: export jgiven, import everything).
+* `jgiven-wrap-fixture-core` — the pure host POJO bundle (`Vault`, package-private `balance`).
+* `jgiven-wrap-fixture-test` — the `Fragment-Host` test fragment (Stage + runner, forced imports).
+* `jgiven-wrap-tests` — the JUnit5 harness driving all three paliers on the testkit's Felix.
+
+Run: `flox activate -- ./mvnw -pl :jgiven-wrap-tests -am test -Pspike -DskipTests=false`.
+
+The one non-throwaway code change is `FelixFrameworkExtension.bootDelegation(...)` in `osgi/testkit`
+— a reusable, generally-correct testkit capability worth keeping regardless of the spike's fate.
+
+== Related documentation
+
+* link:jgiven-osgi-testkit-handoff.adoc[jGiven-in-OSGi testkit — host handoff] — the durable
+  promotion of this spike: the `osgi/jgiven/` modules and how a host consumes the fragment-test
+  model. Start there to USE the result; this report is the evidence behind it.
+* link:../patterns/frontier-playability-model.adoc[Frontier playability model] — playability axis
+  classifies jGiven `com.tngtech.*` as "not playable" for production code; this spike narrows that:
+  not-playable as a *production dependency*, but cleanly *wrappable* as a test-time bundle.
+* The `osgi-testkit-framework-injection-idea` memory (idea #2) — the sibling idea this spike realises.
+* The invariant `osgi-system-export-resolution-only` — the presumption this spike measured and
+  refuted for jGiven specifically.

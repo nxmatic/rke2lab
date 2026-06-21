@@ -24,5 +24,6 @@
     <module>manifests</module>
     <module>netplan</module>
     <module>pipeline</module>
+    <module>jgiven</module>
   </modules>
 </project>

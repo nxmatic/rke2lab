@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>jgiven-wrap</artifactId>
+  <name>osgi/jgiven/jgiven-wrap</name>
+  <description>jgiven-core + jgiven-junit5 (2.0.3) wrapped as a first-class OSGi bundle. EVERY jgiven
+    dependency already carries a Bundle-SymbolicName (guava, gson, paranamer, jansi,
+    jakarta.annotation, byte-buddy) and slf4j is owned by pax-logging — so there is no
+    not-designed-for-OSGi tail to embed. The wrap is maximally LOCAL: stamp OSGi headers onto the
+    only two header-less jars (the jgiven pair), export com.tngtech.jgiven.*, and Import-Package
+    everything else so each dependency installs as its own pre-existing bundle. Test-scope only — no
+    production bundle imports jGiven.</description>
+
+  <dependencies>
+    <!--
+      jgiven on the bnd classpath so Export-Package can see its packages. Its transitive tail
+      (guava, gson, paranamer, jansi, jakarta.annotation, slf4j, byte-buddy) rides in too; the
+      bnd.bnd decides per-dependency embed-vs-import (here: import everything, embed nothing).
+    -->
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-junit5</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

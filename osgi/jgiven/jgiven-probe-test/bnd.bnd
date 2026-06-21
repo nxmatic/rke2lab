@@ -1,0 +1,9 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.jgiven.probe.test
+
+# THE fragment header: attach to the host POJO bundle by its BSN, sharing its classloader and
+# packages. This and the -include below are the ONLY two lines a real host's -test fragment writes;
+# everything else (the forced com.tngtech.jgiven.impl.intercept import, the wildcard tail) comes
+# from the shared jgiven-fragment.bnd in jgiven-testkit. This module IS the template doctor copies.
+Fragment-Host: io.nxmatic.rke2lab.jgiven.probe
+
+-include: ${.}/../jgiven-testkit/src/main/resources/jgiven-fragment.bnd

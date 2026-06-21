@@ -62,6 +62,11 @@ implemented; the medical-model extensions are Design Only. All docs live in `arc
 * link:architecture/patterns/dsl-unification-exploration.adoc[JGiven as Shared Engine (DSL unification)] (⚠️ Design Only, parked) - One engine (JGiven), two layers; `during/then` stays the authoring surface, JGiven the runtime substrate; lands after runbook-doctor
 * link:architecture/cluster-api/staged-post-cluster-resources.adoc[Staged Post-Cluster Resources] - Pattern for resources that need Pulumi Outputs but must exist before Stage B
 
+=== OSGi runtime & test substrate
+
+* link:architecture/osgi/jgiven-osgi-testkit-handoff.adoc[jGiven-in-OSGi testkit — host handoff] (✅ Shipped) - **START HERE** to run BDD scenarios in-container. The `osgi/jgiven/` kit: `jgiven-wrap` (jGiven as a first-class bundle), `JGivenTestkit.felix()` boot helper + the shared `jgiven-fragment.bnd` include, and the probe host/`-test` fragment that is the template a host like doctor copies. The fragment-test model = white-box in OSGi.
+* link:architecture/osgi/jgiven-osgi-wrap-spike-report.adoc[jGiven wrap spike report] (✅ Proof) - The measured verdict the kit promotes: jGiven wraps clean as a bundle, cost LOCAL not viral (one `bootdelegation=sun.misc`, one forced fragment import, no `DynamicImport-Package: *`); the three paliers on real Felix 7.0.5.
+
 == GitOps & Cluster API
 
 **NEW**: Multiple planning documents? See link:guides/planning-documents-guide.adoc[Planning Documents Navigation Guide] for help understanding which plans are active, superseded, and how they relate.
