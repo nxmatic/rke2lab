@@ -76,6 +76,21 @@ bundles; the rest are passive types served flat. The minimal embedded set is a f
 fewer moving bundles, same proven seam. (netplan-core would join the embedded set only when netplan-cli
 is migrated to boot Felix — the per-entrypoint embed-set point, [[osgi-runtime-r4-resume-state]] dominoes.)
 
+## A THIRD lever — local wrap (measured 2026-06-21, jGiven spike)
+
+The criterion above gives a binary: designed-for-OSGi → bundle world; not → flat system-export. The
+jGiven spike ([[jgiven-osgi-wrap-spike-verdict]]) measured a THIRD option for a header-less jar, and it
+does NOT weaken the invariant — it adds a lever the invariant didn't name. When a not-designed-for-OSGi
+jar has a dependency tail that is *already entirely bundles* (jGiven's is: guava/gson/byte-buddy/… all
+carry a Bundle-SymbolicName; only the two jgiven jars lack headers), you can **wrap it locally** into the
+bundle world (bnd stamps headers + `Export-Package`, imports the rest as stock bundles) instead of
+flattening it. You CHOOSE the wrap over the flat export when the jar must *participate* in OSGi —
+resolve, host fragments, be reached through the registry — not merely lend its types. For jGiven that
+participation is the fragment-test model (white-box in-container). Cost stayed LOCAL: one
+`bootdelegation=sun.misc`, one forced fragment import, no `DynamicImport-Package: *`. The flat
+system-export remains correct for a jar that only needs to lend types (cdk8s/jsii); the wrap is for one
+that needs to act. Test-scope only — no production bundle imports jGiven.
+
 ## Single-exporter corollary (R1 hazard) — CHECKED on the real manifest 2026-06-19
 
 Exactly **one** exporter per package, else the R1 split: two Class copies → the host's typed

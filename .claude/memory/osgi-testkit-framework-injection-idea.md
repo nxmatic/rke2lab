@@ -56,13 +56,18 @@ TWO independent motivations now justify it (not one):
   bare-JVM flat classpath yet cover code that lives in classloader-isolated bundles. As a fragment, the
   fixture is its host → no module, no cycle. Cost today: 5 value-type tests parked in HOST.
 
-The jGiven mechanism (system-package vs wrap-bundle) is being SPIKED now (branch
-`spike/jgiven-osgi-bundle`): my presumption is system-package (jGiven is "not designed for OSGi" per
-[[osgi-system-export-resolution-only]]), but the spike tests it on facts — a clean wrap would open an
-alternative; a viral one (`DynamicImport-Package: *`, TCCL hacks) confirms the presumption on proof.
+The jGiven mechanism was SPIKED and the model ADOPTED (2026-06-21,
+[[jgiven-osgi-wrap-spike-verdict]]): jGiven wraps clean as a first-class bundle, cost LOCAL (one
+`bootdelegation=sun.misc`, one forced fragment import, no `DynamicImport-Package: *`); palier 3
+demonstrated a fragment reading a host's package-private field white-box and running a full
+Given/When/Then in-container. The user decided to PIVOT the test model to full-OSGi. The reusable
+templates are the `jgiven-wrap` bnd recipe + the `Fragment-Host` shape + the testkit `bootDelegation`
+verb (already on `FelixFrameworkExtension`).
 
 **Doctor Placement 2 (parked) integrates only WHEN this lands** — it rehomes the 5 HOST tests and
-finishes the work. The fragment-test model is a project-wide test-model pivot; deserves its own handoff.
+finishes the work. THIS is now the active chantier: a project-wide test-model pivot (bare-JVM JCL →
+OSGi fragments), deserves its own handoff/worktree. The doctor relocated tests are the first real
+fragment-test client.
 
 See [[r4-resolver-service-ification]] [[osgi-runtime-r4-resume-state]] [[doctor-internal-edge-debt]]
 [[osgi-system-export-resolution-only]] [[pipeline-orchestration-osgi-vision]].
