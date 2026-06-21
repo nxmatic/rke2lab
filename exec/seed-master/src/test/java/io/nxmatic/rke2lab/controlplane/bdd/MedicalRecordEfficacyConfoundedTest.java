@@ -1,11 +1,23 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import static io.nxmatic.rke2lab.controlplane.bdd.Checkpoint.SYSTEMD_ADAPTER;
-import static io.nxmatic.rke2lab.controlplane.bdd.Symptom.CONNECTION_REFUSED;
+import static io.nxmatic.rke2lab.doctor.Checkpoint.SYSTEMD_ADAPTER;
+import static io.nxmatic.rke2lab.doctor.Symptom.CONNECTION_REFUSED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.Intervention;
+import io.nxmatic.rke2lab.doctor.InterventionLedger;
+import io.nxmatic.rke2lab.doctor.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.Patient;
+import io.nxmatic.rke2lab.doctor.Prescription;
+import io.nxmatic.rke2lab.doctor.ProblemRef;
+import io.nxmatic.rke2lab.doctor.Provenance;
+import io.nxmatic.rke2lab.doctor.RemediationPlan;
+import io.nxmatic.rke2lab.doctor.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.TreatmentEfficacy;
+import io.nxmatic.rke2lab.doctor.Visit;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

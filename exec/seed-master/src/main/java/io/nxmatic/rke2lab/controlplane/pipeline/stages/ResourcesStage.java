@@ -1,13 +1,13 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
 import com.tngtech.jgiven.report.model.ReportModel;
-import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
-import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager.ResourceCreationResult;
+import io.nxmatic.rke2lab.doctor.ConsultationLog;
+import io.nxmatic.rke2lab.doctor.Generalist;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;

@@ -5,6 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.Checkpoint;
+import io.nxmatic.rke2lab.doctor.Expectation;
+import io.nxmatic.rke2lab.doctor.ExpectationReader;
+import io.nxmatic.rke2lab.doctor.ProblemRef;
+import io.nxmatic.rke2lab.doctor.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.ResolutionPredicate;
+import io.nxmatic.rke2lab.doctor.Symptom;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;

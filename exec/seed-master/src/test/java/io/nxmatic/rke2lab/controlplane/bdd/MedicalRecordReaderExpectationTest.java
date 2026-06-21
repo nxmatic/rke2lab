@@ -3,12 +3,20 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.pulumi.automation.StackDeployment;
-import io.nxmatic.rke2lab.pulumi.automation.StackAccessException;
-import io.nxmatic.rke2lab.pulumi.automation.StackContentException;
-import io.nxmatic.rke2lab.pulumi.automation.StackHistory;
-import io.nxmatic.rke2lab.pulumi.automation.StackSnapshot;
-import java.nio.file.Path;
+import io.nxmatic.rke2lab.doctor.Checkpoint;
+import io.nxmatic.rke2lab.doctor.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.Expectation;
+import io.nxmatic.rke2lab.doctor.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.MedicalRecordReader;
+import io.nxmatic.rke2lab.doctor.Patient;
+import io.nxmatic.rke2lab.doctor.ProblemRef;
+import io.nxmatic.rke2lab.doctor.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.ResolutionPredicate;
+import io.nxmatic.rke2lab.doctor.Symptom;
+import io.nxmatic.rke2lab.doctor.Visit;
+import io.nxmatic.rke2lab.doctor.port.SnapshotEntry;
+import io.nxmatic.rke2lab.doctor.port.SnapshotSource;
+import io.nxmatic.rke2lab.doctor.port.SnapshotView;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -31,28 +39,27 @@ class MedicalRecordReaderExpectationTest {
 
   private static final class FakeSnapshotSource implements SnapshotSource {
 
-    private final List<StackHistory.Entry> timeline = new ArrayList<>();
-    private final Map<StackHistory.Entry, StackSnapshot> snapshots = new LinkedHashMap<>();
+    private final List<SnapshotEntry> timeline = new ArrayList<>();
+    private final Map<SnapshotEntry, SnapshotView> snapshots = new LinkedHashMap<>();
 
-    FakeSnapshotSource readable(StackHistory.Entry entry, StackSnapshot snapshot) {
+    FakeSnapshotSource readable(SnapshotEntry entry, SnapshotView snapshot) {
       timeline.add(entry);
       snapshots.put(entry, snapshot);
       return this;
     }
 
     @Override
-    public List<StackHistory.Entry> timeline() {
+    public List<SnapshotEntry> timeline() {
       return List.copyOf(timeline);
     }
 
     @Override
-    public StackSnapshot at(StackHistory.Entry entry)
-        throws StackAccessException, StackContentException {
+    public SnapshotView at(SnapshotEntry entry) {
       return snapshots.get(entry);
     }
 
     @Override
-    public Optional<StackSnapshot> latest() {
+    public Optional<SnapshotView> latest() {
       if (timeline.isEmpty()) {
         return Optional.empty();
       }
@@ -60,27 +67,29 @@ class MedicalRecordReaderExpectationTest {
     }
   }
 
-  private static StackHistory.Entry entry(int version) {
-    return new StackHistory.Entry(
-        version, Instant.ofEpochSecond(version), "succeeded", Path.of("v" + version + ".json"));
+  private static SnapshotEntry entry(int version) {
+    return new SnapshotEntry(version, Instant.ofEpochSecond(version));
   }
 
   /**
    * A snapshot whose single resource carries BOTH a {@code consultationReport} Map output AND an
-   * {@code expectations} LIST output holding one expectation — exactly the shape B3 registers.
+   * {@code expectations} LIST output holding one expectation — exactly the shape B3 registers. In
+   * SnapshotView terms: consultationReport is a singleton per-resource list of the report map;
+   * expectations is a singleton per-resource list whose one element is the inner list of maps.
    */
-  private static StackSnapshot snapshotWithExpectation(Symptom symptom, Expectation expectation) {
-    final Map<String, Object> outputs = new LinkedHashMap<>();
-    outputs.put(ConsultationReport.OUTPUT_KEY, consultationReportMap(symptom));
-    outputs.put(Expectation.OUTPUT_KEY, List.of(expectation.toOutputMap()));
-    return snapshotOf(outputs);
+  private static SnapshotView snapshotWithExpectation(Symptom symptom, Expectation expectation) {
+    return new SnapshotView(
+        Map.of(
+            ConsultationReport.OUTPUT_KEY,
+            List.of(consultationReportMap(symptom)),
+            Expectation.OUTPUT_KEY,
+            List.of(List.of(expectation.toOutputMap()))));
   }
 
-  /** A healthy run: a readable resource carrying neither output. */
-  private static StackSnapshot snapshotWithoutExpectation(Symptom symptom) {
-    final Map<String, Object> outputs = new LinkedHashMap<>();
-    outputs.put(ConsultationReport.OUTPUT_KEY, consultationReportMap(symptom));
-    return snapshotOf(outputs);
+  /** A healthy run: a readable resource carrying only the consultationReport. */
+  private static SnapshotView snapshotWithoutExpectation(Symptom symptom) {
+    return new SnapshotView(
+        Map.of(ConsultationReport.OUTPUT_KEY, List.of(consultationReportMap(symptom))));
   }
 
   /**
@@ -88,11 +97,13 @@ class MedicalRecordReaderExpectationTest {
    * {@code expectations} key whose inner list is EMPTY — what B3 registers when a consultation
    * prescribed nothing ({@code Output.of(List.of())}).
    */
-  private static StackSnapshot snapshotWithEmptyExpectations(Symptom symptom) {
-    final Map<String, Object> outputs = new LinkedHashMap<>();
-    outputs.put(ConsultationReport.OUTPUT_KEY, consultationReportMap(symptom));
-    outputs.put(Expectation.OUTPUT_KEY, List.of());
-    return snapshotOf(outputs);
+  private static SnapshotView snapshotWithEmptyExpectations(Symptom symptom) {
+    return new SnapshotView(
+        Map.of(
+            ConsultationReport.OUTPUT_KEY,
+            List.of(consultationReportMap(symptom)),
+            Expectation.OUTPUT_KEY,
+            List.of(List.of())));
   }
 
   private static Map<String, Object> consultationReportMap(Symptom symptom) {
@@ -107,21 +118,6 @@ class MedicalRecordReaderExpectationTest {
     return report;
   }
 
-  private static StackSnapshot snapshotOf(Map<String, Object> outputs) {
-    final Map<String, Object> resource = new LinkedHashMap<>();
-    resource.put("outputs", outputs);
-    final Map<String, Object> deployment = new LinkedHashMap<>();
-    deployment.put("resources", List.of(resource));
-    final Map<String, Object> envelope = new LinkedHashMap<>();
-    envelope.put("version", 3);
-    envelope.put("deployment", deployment);
-    try {
-      return StackSnapshot.of(StackDeployment.fromJson(toJson(envelope)));
-    } catch (Exception e) {
-      throw new IllegalStateException("test envelope did not parse", e);
-    }
-  }
-
   private static Expectation expectation(Symptom symptom, RemediationProgramRef program) {
     return new Expectation(
         ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, symptom),
@@ -134,7 +130,7 @@ class MedicalRecordReaderExpectationTest {
   void read_entryWithExpectationsOutput_reconstructsThemIntoTheVisit() throws Exception {
     final RemediationProgramRef program = RemediationProgramRef.RESTART_UNIT;
     final Expectation expectation = expectation(Symptom.CONNECTION_REFUSED, program);
-    final StackHistory.Entry v1 = entry(1);
+    final SnapshotEntry v1 = entry(1);
     final SnapshotSource source =
         new FakeSnapshotSource()
             .readable(v1, snapshotWithExpectation(Symptom.CONNECTION_REFUSED, expectation));
@@ -155,7 +151,7 @@ class MedicalRecordReaderExpectationTest {
   @Test
   void read_entryWithEmptyExpectationsList_yieldsEmptyExpectationsButKeepsReports()
       throws Exception {
-    final StackHistory.Entry v1 = entry(1);
+    final SnapshotEntry v1 = entry(1);
     final SnapshotSource source =
         new FakeSnapshotSource().readable(v1, snapshotWithEmptyExpectations(Symptom.TIMEOUT));
 
@@ -172,7 +168,7 @@ class MedicalRecordReaderExpectationTest {
   @Test
   void read_entryWithoutExpectationsOutput_yieldsEmptyExpectationsButKeepsReports()
       throws Exception {
-    final StackHistory.Entry v1 = entry(1);
+    final SnapshotEntry v1 = entry(1);
     final SnapshotSource source =
         new FakeSnapshotSource().readable(v1, snapshotWithoutExpectation(Symptom.TIMEOUT));
 
@@ -182,36 +178,5 @@ class MedicalRecordReaderExpectationTest {
     assertTrue(visit.expectations().isEmpty());
     assertEquals(1, visit.reports().size());
     assertEquals(Symptom.TIMEOUT, visit.reports().get(0).symptom());
-  }
-
-  private static String toJson(Object value) {
-    if (value instanceof Map<?, ?> map) {
-      final StringBuilder sb = new StringBuilder("{");
-      boolean first = true;
-      for (Map.Entry<?, ?> e : map.entrySet()) {
-        if (!first) {
-          sb.append(',');
-        }
-        first = false;
-        sb.append('"').append(e.getKey()).append("\":").append(toJson(e.getValue()));
-      }
-      return sb.append('}').toString();
-    }
-    if (value instanceof List<?> list) {
-      final StringBuilder sb = new StringBuilder("[");
-      boolean first = true;
-      for (Object e : list) {
-        if (!first) {
-          sb.append(',');
-        }
-        first = false;
-        sb.append(toJson(e));
-      }
-      return sb.append(']').toString();
-    }
-    if (value instanceof String s) {
-      return '"' + s + '"';
-    }
-    return String.valueOf(value);
   }
 }

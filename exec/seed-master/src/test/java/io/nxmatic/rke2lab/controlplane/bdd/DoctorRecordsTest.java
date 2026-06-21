@@ -4,6 +4,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.ChiefComplaint;
+import io.nxmatic.rke2lab.doctor.Comorbidity;
+import io.nxmatic.rke2lab.doctor.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.Observation;
+import io.nxmatic.rke2lab.doctor.Prescription;
+import io.nxmatic.rke2lab.doctor.ReferralReply;
+import io.nxmatic.rke2lab.doctor.RemediationPlan;
+import io.nxmatic.rke2lab.doctor.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.Symptom;
+import io.nxmatic.rke2lab.doctor.SymptomHistory;
+import io.nxmatic.rke2lab.doctor.TreatmentEfficacy;
+import io.nxmatic.rke2lab.doctor.Visit;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

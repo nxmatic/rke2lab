@@ -3,6 +3,9 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
+import io.nxmatic.rke2lab.doctor.ClinicianId;
+import io.nxmatic.rke2lab.doctor.Generalist;
+import io.nxmatic.rke2lab.doctor.Specialist;
 import org.junit.jupiter.api.Test;
 
 class ClinicianIdentityTest {

@@ -2,6 +2,14 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import io.nxmatic.rke2lab.doctor.ConsultationNarration;
+import io.nxmatic.rke2lab.doctor.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.Observation;
+import io.nxmatic.rke2lab.doctor.Patient;
+import io.nxmatic.rke2lab.doctor.RemediationPlan;
+import io.nxmatic.rke2lab.doctor.Symptom;
+import io.nxmatic.rke2lab.doctor.Visit;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

@@ -1,7 +1,13 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import io.nxmatic.rke2lab.doctor.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.MedicalRecordReader;
+import io.nxmatic.rke2lab.doctor.MedicalRecordReconstructionException;
+import io.nxmatic.rke2lab.doctor.MedicalRecordRegistry;
+import io.nxmatic.rke2lab.doctor.Patient;
 import io.nxmatic.rke2lab.pulumi.automation.PulumiBackendLayout;
 import io.nxmatic.rke2lab.pulumi.automation.StackHandle;
+import io.nxmatic.rke2lab.pulumi.automation.StackHandleSnapshotSource;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;

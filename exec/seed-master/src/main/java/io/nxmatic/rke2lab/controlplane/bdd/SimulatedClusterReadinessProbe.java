@@ -1,5 +1,8 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import io.nxmatic.rke2lab.doctor.ClusterReadinessPhase;
+import io.nxmatic.rke2lab.doctor.Observation;
+import io.nxmatic.rke2lab.doctor.Symptom;
 import java.util.Map;
 
 /**

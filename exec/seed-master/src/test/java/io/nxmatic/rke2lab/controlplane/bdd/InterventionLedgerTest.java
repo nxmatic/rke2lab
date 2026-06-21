@@ -3,6 +3,12 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.Checkpoint;
+import io.nxmatic.rke2lab.doctor.Intervention;
+import io.nxmatic.rke2lab.doctor.InterventionLedger;
+import io.nxmatic.rke2lab.doctor.ProblemRef;
+import io.nxmatic.rke2lab.doctor.Provenance;
+import io.nxmatic.rke2lab.doctor.Symptom;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;

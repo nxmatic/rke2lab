@@ -1,5 +1,9 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import io.nxmatic.rke2lab.doctor.Assessment;
+import io.nxmatic.rke2lab.doctor.Prescription;
+import io.nxmatic.rke2lab.doctor.ReferralReply;
+import io.nxmatic.rke2lab.doctor.SchemaRef;
 import java.util.Map;
 import java.util.Optional;
 

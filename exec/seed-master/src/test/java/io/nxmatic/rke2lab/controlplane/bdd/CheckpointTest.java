@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import io.nxmatic.rke2lab.doctor.Checkpoint;
 import org.junit.jupiter.api.Test;
 
 /**

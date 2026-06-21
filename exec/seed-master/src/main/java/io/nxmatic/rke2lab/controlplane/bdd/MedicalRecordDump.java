@@ -2,9 +2,16 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import io.nxmatic.rke2lab.controlplane.bdd.MedicalRecordReconstructionException.EntryFailure;
-import io.nxmatic.rke2lab.pulumi.automation.StackException;
+import io.nxmatic.rke2lab.doctor.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.MedicalRecordReader;
+import io.nxmatic.rke2lab.doctor.MedicalRecordReconstructionException;
+import io.nxmatic.rke2lab.doctor.MedicalRecordReconstructionException.EntryFailure;
+import io.nxmatic.rke2lab.doctor.Patient;
+import io.nxmatic.rke2lab.doctor.port.SnapshotException;
+import io.nxmatic.rke2lab.doctor.port.SnapshotSource;
 import io.nxmatic.rke2lab.pulumi.automation.StackHandle;
+import io.nxmatic.rke2lab.pulumi.automation.StackHandleSnapshotSource;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -99,8 +106,8 @@ public final class MedicalRecordDump {
 
   private static String causePath(Throwable failure) {
     final Throwable cause = failure.getCause();
-    if (cause instanceof StackException stack) {
-      return stack.path() + ": " + stack.getMessage();
+    if (cause instanceof SnapshotException snapshot) {
+      return snapshot.location() + ": " + snapshot.getMessage();
     }
     return failure.getMessage();
   }

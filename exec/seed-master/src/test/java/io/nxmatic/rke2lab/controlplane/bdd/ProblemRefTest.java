@@ -1,14 +1,15 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import static io.nxmatic.rke2lab.controlplane.bdd.Checkpoint.CLUSTER_READINESS;
-import static io.nxmatic.rke2lab.controlplane.bdd.Checkpoint.SYSTEMD_ADAPTER;
-import static io.nxmatic.rke2lab.controlplane.bdd.Symptom.CONNECTION_REFUSED;
-import static io.nxmatic.rke2lab.controlplane.bdd.Symptom.TIMEOUT;
+import static io.nxmatic.rke2lab.doctor.Checkpoint.CLUSTER_READINESS;
+import static io.nxmatic.rke2lab.doctor.Checkpoint.SYSTEMD_ADAPTER;
+import static io.nxmatic.rke2lab.doctor.Symptom.CONNECTION_REFUSED;
+import static io.nxmatic.rke2lab.doctor.Symptom.TIMEOUT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.ProblemRef;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 

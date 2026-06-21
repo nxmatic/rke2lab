@@ -5,6 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.Checkpoint;
+import io.nxmatic.rke2lab.doctor.Intervention;
+import io.nxmatic.rke2lab.doctor.InterventionLedgerWriter;
+import io.nxmatic.rke2lab.doctor.InterventionReader;
+import io.nxmatic.rke2lab.doctor.ProblemRef;
+import io.nxmatic.rke2lab.doctor.Provenance;
+import io.nxmatic.rke2lab.doctor.Symptom;
 import io.nxmatic.rke2lab.pulumi.automation.StackHandle;
 import io.nxmatic.rke2lab.pulumi.automation.StackHistory;
 import io.nxmatic.rke2lab.pulumi.automation.StackSnapshot;

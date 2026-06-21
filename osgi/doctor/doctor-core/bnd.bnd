@@ -1,0 +1,4 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.doctor.core
+Export-Package: \
+    io.nxmatic.rke2lab.doctor
+-noimportjava: true

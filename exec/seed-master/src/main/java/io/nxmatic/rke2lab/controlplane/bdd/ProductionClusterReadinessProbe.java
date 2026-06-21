@@ -4,6 +4,9 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.PhaseOutcome;
+import io.nxmatic.rke2lab.doctor.ClusterReadinessPhase;
+import io.nxmatic.rke2lab.doctor.Observation;
+import io.nxmatic.rke2lab.doctor.Symptom;
 import java.util.Map;
 import java.util.function.Consumer;
 

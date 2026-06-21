@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.InterventionLedger;
 import io.nxmatic.rke2lab.pulumi.automation.PulumiBackendLayout;
 import java.nio.file.Files;
 import java.nio.file.Path;

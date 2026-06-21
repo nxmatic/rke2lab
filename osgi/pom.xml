@@ -25,5 +25,6 @@
     <module>netplan</module>
     <module>pipeline</module>
     <module>jgiven</module>
+    <module>doctor</module>
   </modules>
 </project>

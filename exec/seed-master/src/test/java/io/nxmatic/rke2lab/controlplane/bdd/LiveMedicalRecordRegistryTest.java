@@ -7,6 +7,16 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.nxmatic.rke2lab.doctor.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.Observation;
+import io.nxmatic.rke2lab.doctor.Patient;
+import io.nxmatic.rke2lab.doctor.Prescription;
+import io.nxmatic.rke2lab.doctor.ReferralReply;
+import io.nxmatic.rke2lab.doctor.RemediationPlan;
+import io.nxmatic.rke2lab.doctor.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.Symptom;
+import io.nxmatic.rke2lab.doctor.SymptomHistory;
 import io.nxmatic.rke2lab.pulumi.automation.testkit.StackHistoryFixture;
 import java.nio.file.Path;
 import java.util.ArrayList;

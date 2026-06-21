@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import io.nxmatic.rke2lab.doctor.StackCoordinate;
 import io.nxmatic.rke2lab.pulumi.automation.PulumiBackendLayout;
 import java.nio.file.Path;
 

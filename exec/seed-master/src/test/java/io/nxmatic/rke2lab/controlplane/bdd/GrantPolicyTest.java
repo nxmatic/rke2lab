@@ -3,6 +3,9 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.ClinicianId;
+import io.nxmatic.rke2lab.doctor.GrantPolicy;
+import io.nxmatic.rke2lab.doctor.Patient;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

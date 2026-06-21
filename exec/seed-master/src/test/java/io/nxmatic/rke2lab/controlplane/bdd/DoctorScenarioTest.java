@@ -1,6 +1,8 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import com.tngtech.jgiven.junit5.ScenarioTest;
+import io.nxmatic.rke2lab.doctor.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.Symptom;
 import org.junit.jupiter.api.Test;
 
 /**

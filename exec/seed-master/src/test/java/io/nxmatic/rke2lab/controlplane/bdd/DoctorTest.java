@@ -5,6 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
+import io.nxmatic.rke2lab.doctor.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.Observation;
+import io.nxmatic.rke2lab.doctor.Patient;
+import io.nxmatic.rke2lab.doctor.Referral;
+import io.nxmatic.rke2lab.doctor.ReferralReply;
+import io.nxmatic.rke2lab.doctor.Symptom;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

@@ -16,6 +16,13 @@
     state helpers that reshape checkpoints into the StackDeployment envelope.</description>
 
   <dependencies>
+    <!-- DIP: the host implements the doctor observation port. Reactor order is osgi→host→exec, so
+         doctor-port is already built when this module compiles. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.pulumi</groupId>
       <artifactId>pulumi</artifactId>

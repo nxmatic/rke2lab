@@ -2,10 +2,6 @@ package io.nxmatic.rke2lab.controlplane.resources;
 
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.report.model.ReportModel;
-import io.nxmatic.rke2lab.controlplane.bdd.Checkpoint;
-import io.nxmatic.rke2lab.controlplane.bdd.ConsultationLog;
-import io.nxmatic.rke2lab.controlplane.bdd.ConsultationReport;
-import io.nxmatic.rke2lab.controlplane.bdd.Generalist;
 import io.nxmatic.rke2lab.controlplane.bdd.ProductionClusterReadinessProbe;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
@@ -15,6 +11,10 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifi
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterReadinessResource;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.controlplane.systemd.SystemdAdapterResource;
+import io.nxmatic.rke2lab.doctor.Checkpoint;
+import io.nxmatic.rke2lab.doctor.ConsultationLog;
+import io.nxmatic.rke2lab.doctor.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.Generalist;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;

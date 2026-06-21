@@ -1,10 +1,10 @@
 package io.nxmatic.rke2lab.controlplane.pipeline;
 
-import io.nxmatic.rke2lab.controlplane.bdd.DriftSpecialist;
-import io.nxmatic.rke2lab.controlplane.bdd.HealthSystem;
-import io.nxmatic.rke2lab.controlplane.bdd.MedicalRecord;
-import io.nxmatic.rke2lab.controlplane.bdd.MedicalRecordRegistry;
-import io.nxmatic.rke2lab.controlplane.bdd.Patient;
+import io.nxmatic.rke2lab.doctor.DriftSpecialist;
+import io.nxmatic.rke2lab.doctor.HealthSystem;
+import io.nxmatic.rke2lab.doctor.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.MedicalRecordRegistry;
+import io.nxmatic.rke2lab.doctor.Patient;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

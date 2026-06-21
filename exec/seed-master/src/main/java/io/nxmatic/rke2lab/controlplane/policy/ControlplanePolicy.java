@@ -1,9 +1,9 @@
 package io.nxmatic.rke2lab.controlplane.policy;
 
 import io.nxmatic.rke2lab.controlplane.SeedLog;
-import io.nxmatic.rke2lab.controlplane.bdd.Severity;
-import io.nxmatic.rke2lab.controlplane.bdd.Symptom;
 import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
+import io.nxmatic.rke2lab.doctor.Severity;
+import io.nxmatic.rke2lab.doctor.Symptom;
 import io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.port.ManifestDomainPolicy;
 import java.util.LinkedHashMap;

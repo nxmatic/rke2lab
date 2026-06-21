@@ -5,6 +5,16 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
+import io.nxmatic.rke2lab.doctor.DriftSpecialist;
+import io.nxmatic.rke2lab.doctor.Generalist;
+import io.nxmatic.rke2lab.doctor.HealthSystem;
+import io.nxmatic.rke2lab.doctor.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.MedicalRecordRegistry;
+import io.nxmatic.rke2lab.doctor.Observation;
+import io.nxmatic.rke2lab.doctor.Patient;
+import io.nxmatic.rke2lab.doctor.RemediationPlan;
+import io.nxmatic.rke2lab.doctor.Specialist;
+import io.nxmatic.rke2lab.doctor.Symptom;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
