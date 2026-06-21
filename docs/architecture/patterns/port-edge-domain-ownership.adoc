@@ -1,0 +1,336 @@
+= Who owns the port — domain, port, and edge, told apart
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* DESIGN (2026-06-22). A companion to
+link:frontier-playability-model.adoc[the frontier-playability model]. That doc names the three axes
+(playability / edge / direction) and the two edge species. This one answers the question that keeps
+recurring when extracting a `<target>-edge`: *what tells an edge apart from a domain, and who owns the
+port between them?* It exists because we twice mis-modelled it — proposing a `ssh-to-age-port` and a
+`ssh-to-age-core` for a thing that has neither.
+====
+
+== The three roles in one sentence
+
+The *domain* is what is enclosed; the *edge* is its face toward an outside; the *port* is the membrane
+between them — *and the port is owned by the consumer that calls it, never by the edge.*
+
+Each role has exactly one verb. Keeping the verbs straight is the whole model:
+
+[cols="1,1,3",options="header"]
+|===
+| Role | Verb | What it is / owns
+
+| *domain* (`-core`)
+| *CALLS*
+| Pure logic that reasons over the model and never leaves the system (remove every external system, it
+  still compiles and computes). Owns its model types; *declares + calls* the ports it needs (`@Reference`).
+
+| *port* (`-port`)
+| *DECLARES*
+| The shared interface of call + the pure exchange records. A *passive type*, exported so both sides
+  share the same class. It is NOT resolved and carries NO capability — no `@Component`. It is the
+  *address*, not the door. Owned by the consumer (lives in its `-port` module), never named after the edge.
+
+| *edge* (`<target>-edge`)
+| *PROVIDES*
+| The adapter whose reason to exist is *contact* with one external target (remove the target, nothing is
+  left). *Implements* a port and *provides the capability* that makes that port reachable — it is the
+  door SCR resolves. Owns its low-level contact types; exposes NO port of its own.
+|===
+
+== Who is resolved — the port is the address, the edge is the door
+
+This is the pivot the whole model turns on, and the one we kept fumbling:
+
+[quote]
+____
+The *port is not resolved* — it only provides the interface of call (the shared type). What is resolved
+is the wiring between a *consumer that requires* and an *edge that provides*, expressed *through* that
+type. The port is the address; the edge is the door.
+____
+
+So a port that is merely exported (`Export-Package`) gives *type resolution only* — the contract's class,
+nothing about who implements it (the `system-export = resolution-only` invariant). Type-sharing alone
+finds no door: a consumer holding just the package would have to `new EdgeImpl()`, re-coupling to the
+edge (anti-DIP). The door is found because the *edge publishes a capability* keyed on the port type, and
+the consumer requires it.
+
+[mermaid]
+....
+flowchart TB
+  core["domain-core — the CONSUMER<br/>requires the type (@Reference)"]
+  port["domain-port — interface of call<br/>passive type, exported, NOT resolved"]
+  edge["target-edge — the PROVIDER<br/>implements + provides the capability (@Component)"]
+  world["external target"]
+  core -->|"① DECLARES + CALLS"| port
+  edge -->|"② IMPLEMENTS"| port
+  core -.->|"③ SCR resolves the wiring, keyed on the port type"| edge
+  edge -->|"④ CONTACTS"| world
+  classDef d fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef p fill:#fde,stroke:#a58,stroke-width:2px;
+  classDef e fill:#eef,stroke:#88a,stroke-width:2px;
+  classDef w fill:#eee,stroke:#999,stroke-width:1px;
+  class core d;
+  class port p;
+  class edge e;
+  class world w;
+....
+
+Read it as: the consumer (`①`) and the edge (`②`) both point AT the port — the port points at nothing,
+which is why it is pure and passive. The actual resolution (`③`) runs consumer↔edge, *keyed on the port
+type* but not flowing through the port as an actor. The edge carries the behaviour (the capability); the
+port carries only the type. *That* is what tells port from edge — not "one is pure and the other does
+I/O", but "the port is the type, the edge is the capability that makes the type reachable".
+
+=== Two worlds, two resolution regimes
+
+Whether the edge must publish a capability *depends on the consumer's world*:
+
+[cols="1,3",options="header"]
+|===
+| Consumer world | How the door is found
+
+| *OSGi world* (e.g. ssh-to-age's consumer)
+| The edge MUST publish a capability, else no bundle finds it without a coupling `new`. Two strengths:
+  *(a) service* — `@Component` provides `osgi.service` keyed on the port type, `@Reference` binds it;
+  *runtime, soft* (no edge → component just stays unsatisfied). *(b) resolution capability* —
+  `Provide-/Require-Capability` on a namespace; *resolve-time, hard* (no door → the framework refuses to
+  wire). For a *system boundary*, (b) is the better fail-mode: "no door ⟹ resolution fails" beats
+  "silently inactive". Precedent: the unitrepo handler edge (`osgi.extender=unitrepo.handler` + a
+  `unitrepo.type` namespace).
+
+| *host world* (e.g. pulumi-edge, dbus-edge)
+| NO capability needed *today*. The host is the flat assembler — it does
+  `new PulumiInterventionLedgerWriter(...)` explicitly in `DoctorAssembly`. There is no registry to
+  resolve against, so the edge provides nothing; it is simply instantiated by the wiring. This is why
+  `pulumi-edge` never had to declare a capability.
+|===
+
+=== The world is DERIVED from the consumer, not a property of the edge
+
+A correction worth stating loudly: an edge's world *follows the world of whoever calls it*. ssh-to-age
+is the first external edge in the OSGi world for one reason — its consumer
+(`DefaultManifestSynthesisService`) is a `@Component`. pulumi/dbus are host because their callers
+(`DoctorAssembly`, the readiness gates) are host (non-playability is only the *secondary* reason their
+impl could not move even if a caller did). So "which world?" is never answered by looking at the edge
+alone; look at who requires it.
+
+=== The registry is the single source of resolution (target) — vs the mixed present
+
+The *target* state: a consumer always obtains an edge through the OSGi registry — never through a hand
+written `if (host) new … else @Reference`. How the impl *enters* the registry follows playability
+(`@Component` SCR when playable; a host-published `registerService` when not), but the *resolution* the
+consumer sees is uniform: it requires the port type, the registry supplies the door.
+
+[mermaid]
+....
+flowchart TB
+  consumer["any consumer<br/>requires the port type"]
+  registry["OSGi service registry<br/>the single source of resolution"]
+  scr["playable edge<br/>@Component (SCR)"]
+  hostpub["non-playable edge<br/>host-published registerService"]
+  consumer -->|"requires (uniform)"| registry
+  scr -->|"registers via SCR"| registry
+  hostpub -->|"registers via host publish"| registry
+  classDef c fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef r fill:#fde,stroke:#a58,stroke-width:2px;
+  classDef e fill:#eef,stroke:#88a,stroke-width:1px;
+  class consumer c;
+  class registry r;
+  class scr,hostpub e;
+....
+
+Honest present (2026-06-22): this is *not yet* uniform. Today `DoctorAssembly` still does
+`new PulumiInterventionLedgerWriter(backendDir)` — a host `new`, not a registry lookup. So three regimes
+coexist: OSGi consumer → `@Reference`; host consumer of an OSGi service → the R4 `awaitService` seam;
+host consumer of a host edge → `new`. The single-registry picture above is the destination this chantier
+moves toward, not a claim about the code as it stands. (Recording it as target, not fact, keeps us honest
+per `model-substrate-alignment` — do not describe a substrate that does not exist yet.)
+
+[NOTE]
+====
+*The boot trap (a prerequisite increment, flagged here).* The `META-INF/bundles` embed topology is
+hand-listed at ~8 sites with no single source — `OsgiRuntime` admits it ("poms cannot call Java, this is
+the authoritative registry during review"). The fix is a single source by *scanning* `META-INF/bundles`,
+its own increment. It is the same gesture as the registry above: *read the real artifact* (services
+published / jars present), never a parallel hand-maintained list — `model-substrate-alignment` applied to
+the registry and to the build. To port into integration when that increment lands.
+====
+
+== The decisive test — domain vs edge
+
+[quote]
+____
+Does this type *cross a boundary of the system*, or stay inside it reasoning over the model?
+____
+
+* Crosses → *edge*.
+* Stays inside, computes → *domain* (or *port*, if it is the contract the domain calls).
+
+The trap the playability axis dispels: the discriminator is *not* "does I/O / spawns a process". A
+domain may read a file; `ProcessBuilder` and `java.nio` are playable. The discriminator is *reaching an
+external target* — the skin of the system, not the act of I/O.
+
+== The ownership rule (the load-bearing claim)
+
+*A port belongs to the consumer that calls outward — the domain or the orchestration. The edge
+IMPLEMENTS that port and PROVIDES the capability behind it; it never owns the port.* This is
+hexagonal/DIP stated for our layout: the adapter depends on the contract, the contract never depends on
+the adapter.
+
+Consequences, both observed on the real reactor:
+
+* There is *no `pulumi-port`*. The ports `pulumi-edge` implements — `SnapshotSource`,
+  `InterventionLedgerWriter` — live in `doctor-port`, because *doctor* is the consumer that needs to read
+  state and write a ledger. Nobody ever created a port named after the edge.
+* A pure point of contact with *no domain* (ssh-to-age: it reasons over nothing, it just converts by
+  shelling a tool) gets *no `-core` and no port of its own* — only an `-edge`, plus a port owned by
+  whoever calls it.
+
+[mermaid]
+....
+flowchart LR
+  dom["domain-core<br/>(reasons, pure)"]
+  port["domain-port<br/>the contract it CALLS<br/>(owned here)"]
+  edge["target-edge<br/>implements the contract<br/>(owns no port)"]
+  world["external target"]
+  dom -->|"calls"| port
+  edge -.->|"implements"| port
+  edge -->|"contacts"| world
+  classDef d fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef p fill:#fde,stroke:#a58,stroke-width:2px;
+  classDef e fill:#eef,stroke:#88a,stroke-width:2px;
+  classDef w fill:#eee,stroke:#999,stroke-width:1px;
+  class dom d;
+  class port p;
+  class edge e;
+  class world w;
+....
+
+The arrow that matters: `edge ┄implements┄▶ port ◀──calls── domain`. Both point AT the port; the port
+points at nothing. That is why it is pure, and why it is the one door reached identically from either
+world.
+
+== Direction is a method, not a module, not two ports
+
+A second recurring confusion: expecting an edge to split into an "in" port and an "out" port.
+
+* *One edge = one target = one door.* It is not directional. The same `pulumi-edge` both reads (ingress)
+  and writes (egress) — splitting it by direction would lie about it being one tool, and `ingress`
+  collides with the k8s sense anyway.
+* *Two ports does not mean in/out.* `pulumi-edge` implements two ports because the *domain* (doctor) has
+  two distinct needs — read a snapshot, write a ledger — so they are named *by concern*
+  (`SnapshotSource`, `InterventionLedgerWriter`), never `…In`/`…Out`.
+* *Direction lives in the method name / prose.* `SnapshotSource.timeline()` is ingress;
+  `LedgerWriter.up()` is egress. If a single contract one day both reads and writes, the edge stays one
+  module with methods of both directions.
+
+== Worked example A — pulumi-edge (a domain WITH an edge)
+
+doctor is a real domain: there is diagnostic reasoning to do. So it has all three.
+
+[mermaid]
+....
+flowchart LR
+  core["doctor-core<br/>diagnostic model (pure)"]
+  dport["doctor-port<br/>SnapshotSource (ingress)<br/>InterventionLedgerWriter (egress)"]
+  pedge["pulumi-edge<br/>StackHandleSnapshotSource<br/>PulumiInterventionLedgerWriter"]
+  pulumi["Pulumi state backend"]
+  core -->|"calls"| dport
+  pedge -.->|"implements"| dport
+  pedge -->|"reads / writes"| pulumi
+  classDef d fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef p fill:#fde,stroke:#a58,stroke-width:2px;
+  classDef e fill:#eef,stroke:#88a,stroke-width:2px;
+  classDef w fill:#eee,stroke:#999,stroke-width:1px;
+  class core d;
+  class dport p;
+  class pedge e;
+  class pulumi w;
+....
+
+Three modules: `doctor-core` (reasons), `doctor-port` (owns the two contracts, by concern), `pulumi-edge`
+(implements them, touches the backend). No `pulumi-port`. One edge, two ports, both owned by doctor.
+
+== Worked example B — ssh-to-age-edge (a point of contact, NO domain)
+
+ssh-to-age reasons over nothing: it converts a key by shelling an external tool. There is no residual
+computation if you remove the tool — so *no `-core`, and no port named after it*. The contract belongs to
+the *consumer* that needs the age key.
+
+Per the prerequisite design, the synthesis unit must not *fetch* the key mid-synthesis; an upstream step
+prepares it and injects it. So the consumer is that upstream step (the orchestration/assembly feeding the
+`ManifestsUnitContext`):
+
+[mermaid]
+....
+flowchart TB
+  upstream["upstream prep step<br/>(needs the age key — the CONSUMER)"]
+  cport["consumer-port<br/>SshToAgeConverter (ssh-key → age-key)<br/>(owned by the consumer)"]
+  sedge["ssh-to-age-edge<br/>ProcessBuilder('ssh-to-age')<br/>(implements, owns no port)"]
+  tool["ssh-to-age CLI"]
+  ctx["ManifestsUnitContext<br/>(carries the age key as a prerequisite)"]
+  unit["SopsAgeSecretManifestsUnit<br/>doSynthesize — pure, reads the key, builds the Secret"]
+  upstream -->|"calls"| cport
+  sedge -.->|"implements"| cport
+  sedge -->|"contacts"| tool
+  upstream -->|"injects age key"| ctx
+  ctx -->|"prerequisite input"| unit
+  classDef d fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef p fill:#fde,stroke:#a58,stroke-width:2px;
+  classDef e fill:#eef,stroke:#88a,stroke-width:2px;
+  classDef w fill:#eee,stroke:#999,stroke-width:1px;
+  classDef x fill:#ffd,stroke:#aa2,stroke-width:1px;
+  class upstream d;
+  class cport p;
+  class sedge e;
+  class tool w;
+  class ctx,unit x;
+....
+
+Two modules for the contact (`ssh-to-age-edge` + the consumer's port), *zero* `-core`, *zero*
+`ssh-to-age-port`. And the unit goes pure: synthesis *takes* the key as a prerequisite, it does not go
+*fetch* it. (This edge is also the first one materialised in the OSGi world — ssh-to-age is playable, so
+the edge need not be pushed to host; materialising it is about making the system boundary explicit, not
+about playability.)
+
+== The two principles this settles
+
+. *Synthesis takes prerequisites; it does not fetch them.* A describe-step is a pure function of its
+  inputs. Reaching out for an input mid-describe is the defect — independent of which world does the
+  reaching.
+. *The edge materialises the boundary even when the domain could do the contact inline.* An edge is not
+  a playability concession; it is the system's skin made explicit. Playability decides only *which world*
+  the edge lives in, never *whether* it is one.
+
+== Quick decision guide
+
+[cols="2,3",options="header"]
+|===
+| You have… | Then…
+
+| Logic that reasons over the model, no external contact
+| `-core` (domain). Owns the ports it calls.
+
+| The contract a consumer calls outward
+| `-port`, owned by that consumer. Pure. Named by concern, never `…In/…Out`.
+
+| An adapter that contacts one external target
+| `<target>-edge`. Implements a consumer's port. Owns NO port, has NO `-core` unless it also carries real
+  domain logic (it usually doesn't).
+
+| A pure point of contact with no reasoning (ssh-to-age)
+| Just the `<target>-edge` + a port owned by its consumer. No `-core`, no port of its own.
+|===
+
+== Related documentation
+
+* link:frontier-playability-model.adoc[Frontier-playability model] — the axes, the two edge species, the
+  7-edge inventory.
+* link:../osgi/pulumi-edge-handoff.adoc[pulumi-edge handoff] — the realised `<target>-edge` template
+  (example A above, shipped).
+* The `system/space/world/universe` glossary (memory) — the reserved words `edge`, `ingress`/`egress`,
+  `playability`, and the port-is-the-membrane clarification.
