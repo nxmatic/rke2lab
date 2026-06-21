@@ -46,6 +46,35 @@ gap: there was no word for THE WHOLE. Carto of actual usage (atlas + specs + cod
   It is a contract (a declared/satisfied capability), not a typed model crossing the frontier. The atlas
   keeps the word "contract" for THIS; what used to be loosely called "the contract" as a typed boundary
   model is now the *port*.
+- **edge** — a point of contact with an EXTERNAL system the org sits on: the Pulumi state backend, the
+  k8s cluster, the systemd/dbus control endpoint. An edge is what makes a *port* necessary: the port is
+  the membrane, the edge is the world on the far side of it. Edges are MUTUALISED BY TARGET, not per
+  domain — one `pulumi-edge` shared across every domain that touches Pulumi, not a private adapter each.
+  Named `<target>-edge` (`pulumi-edge`, `cluster-edge`, `systemd-edge`). "edge" was chosen over
+  ingress/egress for the MODULE name precisely to avoid the k8s collision (Ingress is a k8s resource;
+  NetworkPolicy has ingress/egress) — and because an edge is bidirectional (it reads AND writes the
+  world), so a single directional word would mislabel it.
+- **ingress / egress** — the DIRECTION of an operation across the membrane, used in prose and method
+  names, NEVER as a module name: *ingress* = read FROM the world (`SnapshotSource.timeline()`), *egress*
+  = write TO the world (`LedgerWriter.up()`). The same edge does both. Kept off module names so the k8s
+  meaning never collides.
+- **the port is the membrane of BOTH worlds, not just OSGi's** — load-bearing clarification (2026-06-21):
+  the port is reached IDENTICALLY whether the caller is in the OSGi world (core) or the host world. The
+  host has no privileged direct path to the world — it too passes through the port. There is never a
+  second route ("direct host access" + "port for OSGi"); there is ONE door. Consequence: if an edge's
+  impl migrates host↔osgi (because its lib becomes playable, below), callers are unaffected — they were
+  already going through the port. The port decouples from the edge's own world-of-residence.
+- **playability (the frontier criterion)** — the test that decides whether a type's impl can live in
+  the OSGi world: *can the third-party libraries it needs resolve and run inside a Felix bundle?* Pure
+  JDK (`java.nio` filesystem, `ProcessBuilder` commands) and Jackson ARE playable — touching the disk or
+  spawning a process is NEVER the disqualifier. Non-playable: `com.pulumi.*` (native deps, ServiceLoader,
+  classloader assumptions), jgiven `com.tngtech.*`. CRITICAL: playability is ORTHOGONAL to edge —
+  rendering an operation playable does NOT eliminate its port (reading the Pulumi state in pure JDK still
+  REACHES the state backend; it is still an edge). Playability decides only WHERE the edge's impl lives
+  (host vs osgi), never WHETHER a port is needed. The detonator: `BootstrapConfig` is a pure record, so a
+  type "host because it takes BootstrapConfig" is actually playable → it is `core` or a `port`, not an
+  edge. Writing a port thus becomes a DERIVATION, not a judgement: "is this type's lib playable?" (a
+  closed, code-probable question) replaces "does this describe or actualise?" (a fuzzy one).
 
 ## The role triad (the verbs)
 

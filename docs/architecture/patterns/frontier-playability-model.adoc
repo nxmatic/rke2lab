@@ -1,0 +1,239 @@
+= The host/OSGi frontier — playability, edges, and the membrane
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* DESIGN (2026-06-21). A transverse model that sharpens the host/OSGi frontier. It emerged
+mid-refactor during the doctor-model extraction and is recorded here at design level so every domain
+reads against it, not just the doctor. The reserved vocabulary (`edge`, `ingress`/`egress`,
+playability) is graved in the `system/space/world/universe` glossary; this doc carries the reasoning
+and the vocabulary view.
+====
+
+== Why this model exists
+
+The first cut of the frontier used a *describe-vs-actualise* lens ("pure model describes → osgi;
+observation/rendering actualises → host"). Executing the doctor extraction, that lens mislabeled real
+files: it flagged a type as "host" merely because it NAMED a host-shaped type, even when the type was a
+pure record. A sharper, code-probable criterion surfaced — *playability* — and with it two reserved
+words (`edge`, `ingress`/`egress`) that let us say what the old lens could not.
+
+== The three orthogonal axes
+
+The frontier is not one line but three independent axes. Confusing them is what made the old lens
+mislabel files. The vocabulary view (Diagram 0) draws them so collisions surface at design time.
+
+[mermaid]
+....
+flowchart TB
+  subgraph PURITY["axis 1 — PURITY / playability (where the impl can run)"]
+    ow["osgi-world<br/>bundle classloader"]
+    hw["host-world<br/>flat classloader"]
+  end
+  subgraph EDGE["axis 2 — EDGE (does it touch an external system?)"]
+    inn["in-domain<br/>own logic, never leaves"]
+    edg["edge<br/>pulumi / cluster / systemd"]
+  end
+  subgraph DIR["axis 3 — DIRECTION (which way across the membrane)"]
+    ing["ingress<br/>read FROM the world"]
+    egr["egress<br/>write TO the world"]
+  end
+  note["the PORT is the membrane —<br/>reached identically from both worlds"]
+  edg --> note
+  note --> ing
+  note --> egr
+  classDef a fill:#eef,stroke:#88a,stroke-width:1px;
+  classDef b fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef c fill:#ffd,stroke:#aa2,stroke-width:1px;
+  classDef m fill:#fde,stroke:#a58,stroke-width:2px;
+  class ow,hw a;
+  class inn,edg b;
+  class ing,egr c;
+  class note m;
+....
+
+* *Axis 1 — purity / playability.* Can the third-party libraries a type needs resolve and run inside a
+  Felix bundle? Pure JDK (`java.nio` files, `ProcessBuilder` commands) and Jackson ARE playable —
+  touching the disk or spawning a process is never the disqualifier. `com.pulumi.*` and jgiven
+  `com.tngtech.*` are NOT. This decides WHERE an impl can live (osgi-world vs host-world).
+* *Axis 2 — edge.* Does the operation touch an external system the org sits on (Pulumi state backend,
+  k8s cluster, systemd/dbus endpoint)? If yes, it is an *edge*, and an edge is what makes a *port*
+  necessary. Edges are mutualised BY TARGET (`pulumi-edge`, `cluster-edge`, `systemd-edge`), one per
+  external system, shared across domains.
+* *Axis 3 — direction.* Across the membrane, an operation is *ingress* (read from the world) or *egress*
+  (write to the world). Used in prose and method names, never in module names (the k8s `Ingress`
+  collision).
+
+== The load-bearing claim: the port is the membrane of BOTH worlds
+
+The port is reached *identically* whether the caller is in the OSGi world (a `core` bundle) or the host
+world. The host has no privileged direct route to the external system — it too passes through the port.
+There is never a second path ("direct host access" plus "a port for OSGi"); there is ONE door.
+
+[mermaid]
+....
+flowchart LR
+  core["doctor-core<br/>(osgi-world)"]
+  hostcode["host-world code"]
+  port["doctor-port<br/>the membrane (pure records)"]
+  edge["pulumi-edge<br/>the impl (today host;<br/>osgi the day its lib is playable)"]
+  world["Pulumi state backend"]
+  core -->|through| port
+  hostcode -->|through| port
+  port -->|fulfilled by| edge
+  edge -->|ingress/egress| world
+  classDef o fill:#eef,stroke:#88a,stroke-width:1px;
+  classDef h fill:#fde,stroke:#a58,stroke-width:1px;
+  classDef m fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class core o;
+  class hostcode,edge h;
+  class port m;
+....
+
+Consequence: if an edge's impl migrates host↔osgi (because its library becomes playable), callers are
+unaffected — they were already going through the port. *The port decouples the domain not only from the
+external system but from the edge's own world-of-residence.*
+
+== Playability is orthogonal to edge — it does NOT eliminate ports
+
+A tempting error: "we can read the Pulumi state in pure JDK, so it's playable, so put it in `core` and
+drop the port." Wrong, and the orthogonality is the proof. Reading the state in pure JDK still REACHES
+the state backend — it is still an edge; the port still protects the domain from the backend's file
+format, location, and CLI flags. Dropping it would re-couple `core` to the world.
+
+What playability *does* buy is migration: when an edge's lib is playable, the edge's IMPL can move from
+a host module to an OSGi bundle — serving the standing goal of maximising what lives in the better
+structured OSGi world — while the port and all callers stay put. So:
+
+* ❌ "more playable logic in OSGi → fewer ports" — no, that re-couples.
+* ✅ "more playable logic in OSGi → edges migrate host→osgi, ports stay" — yes, and that is the gain.
+
+== What this simplifies (measured honestly)
+
+The benefit is not that each port is easier to *type* — the seam that touches the world (pure-record
+translation) is exactly as much work. The benefit is that *writing a port becomes a derivation, not a
+judgement*:
+
+* it removes ports we would have created in error (the `BootstrapConfig`-pure probes are `core`/ports,
+  not edges with host impls — ports that no longer exist);
+* it mutualises egress ports by target (one `pulumi-edge`, not one per domain);
+* it replaces a fuzzy per-type judgement ("describe or actualise?") with a closed, code-probable
+  question ("is this type's lib playable?", "does it reach an external system?").
+
+A richer vocabulary that is *easier* to wield, because each new word CLOSES a question instead of
+opening one: `world` closes "which classloader", `edge` closes "external contact?", `ingress`/`egress`
+close "which direction". Three closed questions = three judgements removed.
+
+== Worked example — the doctor domain
+
+* `doctor-core` (osgi-world) — the ~48 pure diagnostic types; in-domain, never leaves.
+* `doctor-port` — the membrane: `SnapshotSource` plus the pure exchange records `SnapshotEntry` /
+  `SnapshotView` that replace the host `StackSnapshot` / `StackHistory` at the boundary.
+* `pulumi-edge` (host today) — the realised egress/ingress: `StackHandleSnapshotSource` (ingress, reads
+  the timeline) and `PulumiInterventionLedgerWriter` (egress, writes the ledger). Mutualised: any other
+  domain's Pulumi contact lives here too, not in a private doctor adapter.
+
+The `BootstrapConfig`-pure probes (`ClusterReadinessProbe`, `SystemdAdapterProbe`) are *ports* (pure
+functional interfaces), not edges — only their PRODUCTION impls that fetch the live world are
+non-playable and belong to a `cluster-edge` / `systemd-edge`.
+
+The doctor extraction (branch `refactor/doctor-model-to-osgi`) is the FIRST realisation of this whole
+model end-to-end: it splits `doctor-core` (in-domain) / `doctor-port` (membrane) / `pulumi-edge` (the
+realised contact). Crucially, the edge it builds is `pulumi-edge` MUTUALISED BY TARGET — not a
+`doctor-pulumi` private adapter. The two Pulumi contacts (state read + ledger write) are two faces of
+ONE shared edge that every Pulumi-touching domain uses.
+
+== Every port traces to an edge (no orphans)
+
+A discipline the inventory confirmed on the facts: *every port traces to an edge* — directly (the port
+exchanges the external system's own state types) or transitively (the port describes a pure model the
+host actualises against an external system downstream). A port that traces to NO edge is not a port —
+it is a mis-named internal interface. The inventory found ZERO orphan ports, so the rule holds with no
+counter-example.
+
+[NOTE]
+.A hunch to explore — does "edge" generalise to internal/external? (NOT settled)
+====
+This doc currently defines an edge as contact with an *external* system. A sharper idea surfaced
+(2026-06-21) and is recorded as a HUNCH, deliberately NOT graved into the glossary: maybe an edge is
+any *boundary crossing*, and there are two species — *external edge* (crosses the SYSTEM boundary:
+pulumi, systemd, cluster) vs *internal edge* (crosses a DOMAIN boundary: the doctor reached through its
+port by the rest of the system). Under that reading the "transitive" ports above (`manifests-port`,
+`netplan-port`) would trace to an *internal edge* (their own domain), and "every port traces to an edge"
+would hold with no "transitive orphan" category at all. It is powerful enough to want — and unproven
+enough to wait: to be tested on doctor / manifests / netplan in a dedicated design increment BEFORE the
+glossary adopts internal/external. Until then, "edge" in this doc means the external kind, and the
+inventory below is of external edges only.
+====
+
+== Edge inventory (2026-06-21, reverse-engineered from the reactor)
+
+Seven distinct edges, six targets. Almost all live in `exec/seed-master` (host world today), not yet
+extracted into `<target>-edge` modules — that extraction is the "realise the edges" work, one increment
+per target.
+
+[cols="2,2,1,1,1",options="header"]
+|===
+| Edge | Target | Direction | World today | Playable?
+
+| pulumi-edge (state read)
+| Pulumi state backend (`com.pulumi.automation`)
+| both
+| host
+| no
+
+| pulumi-edge (ledger write)
+| Pulumi Automation API (`LocalWorkspace.up()`)
+| egress
+| host
+| no
+
+| dbus-systemd-edge
+| systemd dbus endpoint (`de.thjom.java.systemd`, `org.freedesktop.dbus`)
+| both
+| host
+| no
+
+| incus-edge
+| Incus API (`ProcessBuilder` incus exec / ssh)
+| both
+| host
+| **yes**
+
+| cluster-edge
+| RKE2 / k8s API (`ProcessBuilder` kubectl)
+| both
+| host
+| **yes**
+
+| host-filesystem-edge
+| host filesystem (kubeconfig, state dirs — `java.nio`)
+| both
+| host
+| **yes**
+
+| ssh-to-age-edge
+| ssh-to-age CLI (`ProcessBuilder`)
+| egress
+| **osgi** (during synthesis)
+| yes
+|===
+
+Readings:
+
+* *Two edges are irreducibly host* (Pulumi ×2, dbus) — their libraries are non-playable (native deps,
+  ServiceLoader). Their `<target>-edge` modules stay host.
+* *Four edges are host today but PLAYABLE* (incus, cluster/kubectl, host-filesystem, ssh-to-age) —
+  pure JDK `ProcessBuilder` / `java.nio`. These are the migration candidates: their edge impls CAN move
+  host→osgi, serving the goal of maximising the OSGi world, with no change to callers (they cross the
+  port either way).
+* *One purity violation* — `SopsAgeSecretManifestsUnit` in `manifests-core` (OSGi world) shells out to
+  `ssh-to-age` DURING synthesis: an osgi module touching an edge directly, no port between. To fix by
+  deferring the conversion to host-time or routing it through a port to a `ssh-to-age-edge`.
+
+== Related documentation
+
+* link:../integration-atlas.adoc[Integration atlas] — the two-spaces frame this refines.
+* The `system/space/world/universe` glossary (memory) — the reserved words `edge`, `ingress`/`egress`,
+  and playability are defined there as opposable terms.
