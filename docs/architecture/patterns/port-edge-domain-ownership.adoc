@@ -261,30 +261,34 @@ ssh-to-age reasons over nothing: it converts a key by shelling an external tool.
 computation if you remove the tool — so *no `-core`, and no port named after it*. The contract belongs to
 the *consumer* that needs the age key.
 
-Per the prerequisite design, the synthesis unit must not *fetch* the key mid-synthesis; an upstream step
-prepares it and injects it. So the consumer is that upstream step (the orchestration/assembly feeding the
-`ManifestsUnitContext`):
+Per the prerequisite design, the synthesis unit must not *fetch* the key mid-synthesis. The consumer is
+`DefaultManifestSynthesisService` — the `@Component` (OSGi world, our lock): it runs a *pre-synthesis
+pass* that calls the converter and *binds the age key into the profile-bearing context*, the same channel
+that already carries `IncusIdentityMaterial` / `BootstrapIdentity`. That channel is
+`ManifestSynthesisContext` (the request/ThreadLocal-scoped profile holder) — NOT `ManifestsUnitContext`,
+which is the per-unit record (`chart`, `domainId`, `resolver`) and carries no profile. `doSynthesize`
+then only reads the key from the context and builds the Secret:
 
 [mermaid]
 ....
 flowchart TB
-  upstream["upstream prep step<br/>(needs the age key — the CONSUMER)"]
+  svc["DefaultManifestSynthesisService<br/>@Component (OSGi) — the CONSUMER<br/>pre-synthesis pass"]
   cport["consumer-port<br/>SshToAgeConverter (ssh-key → age-key)<br/>(owned by the consumer)"]
   sedge["ssh-to-age-edge<br/>ProcessBuilder('ssh-to-age')<br/>(implements, owns no port)"]
   tool["ssh-to-age CLI"]
-  ctx["ManifestsUnitContext<br/>(carries the age key as a prerequisite)"]
+  ctx["ManifestSynthesisContext<br/>profile holder (request/ThreadLocal)<br/>carries age key, like IncusIdentityMaterial"]
   unit["SopsAgeSecretManifestsUnit<br/>doSynthesize — pure, reads the key, builds the Secret"]
-  upstream -->|"calls"| cport
+  svc -->|"calls"| cport
   sedge -.->|"implements"| cport
   sedge -->|"contacts"| tool
-  upstream -->|"injects age key"| ctx
+  svc -->|"binds age key (pre-synthesis)"| ctx
   ctx -->|"prerequisite input"| unit
   classDef d fill:#dfd,stroke:#2a2,stroke-width:2px;
   classDef p fill:#fde,stroke:#a58,stroke-width:2px;
   classDef e fill:#eef,stroke:#88a,stroke-width:2px;
   classDef w fill:#eee,stroke:#999,stroke-width:1px;
   classDef x fill:#ffd,stroke:#aa2,stroke-width:1px;
-  class upstream d;
+  class svc d;
   class cport p;
   class sedge e;
   class tool w;
