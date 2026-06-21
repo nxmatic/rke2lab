@@ -37,4 +37,32 @@ tests adds ZERO coverage (the ResolverImpl obtained via the framework is bit-ide
 is over pure org.osgi.resource data). The real robustness win was hardening the SEAM test to drive
 the SCR-injected Resolver end-to-end — already done in R4. Pick this up as a separate increment.
 
-See [[r4-resolver-service-ification]] [[osgi-runtime-r4-resume-state]].
+## The test-fragment model (the bigger sibling) + its TWO motivations
+
+Surfaced during doctor Placement 2 (2026-06-21). Two coupled moves: (1) jGiven & co resolve IN the
+framework as bundles (so scenarios can play in-container); (2) test modules contributed as OSGi
+**fragments** with a `Fragment-Host`, attached to the bundle under test, sharing its classloader → they
+see `internal`/package-private types white-box INSIDE the framework, and play jgiven scenarios against
+the real wiring. The fragment is the **in-framework twin of package-private**: package-private =
+white-box in the bare JVM; fragment = white-box in OSGi. Implication graved: this is the *execution
+substrate of the designer-runbook's "live" column* for OSGi-resident capabilities — gated on the
+orchestration→OSGi migration ([[pipeline-orchestration-osgi-vision]], [[orchestration-purity-benefit]]).
+
+TWO independent motivations now justify it (not one):
+- *Play scenarios in-container against the real OSGi wiring* (the original idea).
+- *Dissolve a real Maven cycle* — proven by [[doctor-internal-edge-debt]] commit 2: a shared test
+  fixture (`ReferralReplies`) building a port type cannot live in a module the port's own tests depend
+  on (`doctor-port ↔ doctor-testkit`, Maven module-level, scope-blind). Root cause: our tests run in the
+  bare-JVM flat classpath yet cover code that lives in classloader-isolated bundles. As a fragment, the
+  fixture is its host → no module, no cycle. Cost today: 5 value-type tests parked in HOST.
+
+The jGiven mechanism (system-package vs wrap-bundle) is being SPIKED now (branch
+`spike/jgiven-osgi-bundle`): my presumption is system-package (jGiven is "not designed for OSGi" per
+[[osgi-system-export-resolution-only]]), but the spike tests it on facts — a clean wrap would open an
+alternative; a viral one (`DynamicImport-Package: *`, TCCL hacks) confirms the presumption on proof.
+
+**Doctor Placement 2 (parked) integrates only WHEN this lands** — it rehomes the 5 HOST tests and
+finishes the work. The fragment-test model is a project-wide test-model pivot; deserves its own handoff.
+
+See [[r4-resolver-service-ification]] [[osgi-runtime-r4-resume-state]] [[doctor-internal-edge-debt]]
+[[osgi-system-export-resolution-only]] [[pipeline-orchestration-osgi-vision]].
