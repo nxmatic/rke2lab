@@ -101,6 +101,45 @@ flowchart TB
     class LENS lens;
 ....
 
+== Recursive homogeneous composition — a unit can contain units
+
+The hash-edges to child units are not a special "container type". A unit that contains units is a
+unit, exactly as a folder that contains documents is a document. The containment is *recursive* and
+*homogeneous*: the container is the same kind as the contained, at every depth. There is no
+second-class aggregate, no separate "bundle vs unit" layer — there are only units, some leaf, some
+containing.
+
+This is the node homogeneity axiom (no special node types) applied one level down, INSIDE a node: no
+special unit types. A leaf is a unit; a folder is a unit; a clinic that aggregates specialists is a
+unit; a `HealthSystem` that holds the registry, the access policy, and the employed clinicians is a
+unit; the node that serves them is itself described by units. What used to read as "a bundle is an
+aggregator of units" is just this: a bundle is a unit whose payload is bytecode AND which may contain
+others — the aggregator is not a different species, only a unit at a containing depth.
+
+[mermaid]
+....
+flowchart TB
+  hs["HealthSystem — a containing unit"]
+  clinic["clinic — a containing unit, payload bytecode"]
+  spec["specialist — a unit"]
+  rec["MedicalRecord — a unit"]
+  ref["Referral — a leaf unit"]
+  hs -->|hash-edge| clinic
+  clinic -->|hash-edge| spec
+  clinic -->|hash-edge| rec
+  spec -->|hash-edge| ref
+  classDef u fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
+  class hs,clinic,spec,rec,ref u;
+....
+
+The payoff is the property the prior OBR-fronted document repository had by construction: because
+EVERYTHING reduces to units, and a unit contains units, *resolution is total*. Loading a containing
+unit pulls its closure — recursively all sub-units, including the code bundles they require to be
+consulted. There is no point where "it leaves the DAG", except the kernel level-0 (the boot amount
+that cannot load itself from a store it has not opened yet — see
+link:node-and-resolution.adoc[node and resolution]). This is the self-hosting keystone: the app is a
+DAG of units and its state is a DAG of units, so the model closes on itself.
+
 == The handler edge is constitutive — the graph's orientation
 
 A unit cannot exist in the oriented unit-graph **without** the edge to the capabilities required to
