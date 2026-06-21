@@ -1055,6 +1055,9 @@ increment is the handler edge plus load-from-store. Flip green→blue as each sh
 
 == Related documentation
 
+* link:designer-runbook.adoc[The designer's runbook] — the live render of THIS atlas's design state;
+  it pays the re-entrance debt that this atlas, being hand-written, currently carries (its playable
+  half is replayed from the code so it cannot drift).
 * link:unit-repository/model-overview.adoc[Unit repository model overview] — the fourth per-subsystem
   view's full design (thesis, shipped-vs-design, the two settled decisions).
 * link:doctor/glossary.adoc[Doctor glossary] — the vocabulary every model on this atlas speaks.

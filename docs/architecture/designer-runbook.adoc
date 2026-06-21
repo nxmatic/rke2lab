@@ -1,0 +1,122 @@
+= The designer's runbook — a live render of the design state
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* DESIGN (2026-06-21). A re-entrance materialization (hub `reentrance-northstar`): the runbook
+is a LIVE render of the doctor DSL for the OPERATOR; the designer's runbook is the same service one
+layer up — a live render of the design state for US. It answers "where are we / what is next" without
+re-reading memory and grepping the code by hand each session. This doc states what it is, why it is
+owed, and how it is built.
+====
+
+== Why it is owed — the re-entrance debt
+
+The operator runbook obeys a rule: render the state LIVE from the real substrate (Pulumi), never
+hand-written, never stale. We impose that rule on the operator's view but exempt our OWN view: the
+`integration-atlas.adoc` and the capability map are HAND-WRITTEN, free to drift. They did drift — the
+unitrepo spec carried a stale "mechanism C" until it was caught by hand this session. That exemption is
+a re-entrance debt: a system that rules its domain but does not submit itself to the same rule has a
+blind spot on itself. The designer runbook pays the debt — the design view rendered by the same
+live-from-real-state rule we give the operator.
+
+== The symmetry — same machinery, one layer up
+
+[mermaid]
+....
+flowchart TB
+  subgraph "runtime layer — the operator"
+    ddsl["doctor DSL — diagnose refer prescribe"]
+    dstate["materializes the RUNTIME state, from Pulumi"]
+    runbook["RUNBOOK — live render"]
+    ddsl --> dstate --> runbook
+  end
+  subgraph "design layer — us"
+    gdsl["design DSL — vocabulary-view capability-sentence additivity"]
+    gstate["materializes the DESIGN state, from code plus memory"]
+    drb["DESIGNER RUNBOOK — live render"]
+    gdsl --> gstate --> drb
+  end
+  runbook -.->|same service, other subject| drb
+  classDef r fill:#eef,stroke:#88a,stroke-width:1px;
+  classDef d fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class ddsl,dstate,runbook r;
+  class gdsl,gstate,drb d;
+....
+
+Our design DSL already has the Given/When/Then shape: GIVEN the constellation before (what shipped),
+WHEN a term or model lands, THEN we can say a new capability, AND additivity holds (nothing erased).
+The capability map and the additivity proof are not two devices — they are the THEN and the AND of one
+design scenario. We already play these; the runbook is what renders them.
+
+== What it is built from — the hybrid substrate
+
+The operator runbook has one hard substrate (Pulumi state) so it is fully replayed. The design state is
+mixed, so the designer runbook is HYBRID: a playable half and a narrated half.
+
+[mermaid]
+....
+flowchart TB
+  subgraph "playable — replayed from the code, cannot lie"
+    p1["is a green-to-blue TRUE — grep the code"]
+    p2["does this -port or capability EXIST — read the module"]
+    p3["did the walker retire — it is deleted"]
+    p4["how many units in the universe — count, 46 on bioskop"]
+  end
+  subgraph "narrated — reasoning, rendered not executed"
+    n1["is a not-yet-built model additive"]
+    n2["the level-x objective, the design horizon"]
+    n3["an amber-horizon capability, a claim"]
+  end
+  drb["DESIGNER RUNBOOK — playable replayed plus narrated rendered"]
+  p1 --> drb
+  n1 --> drb
+  classDef p fill:#eef,stroke:#88a,stroke-width:1px;
+  classDef n fill:#ffd,stroke:#aa2,stroke-width:1px,stroke-dasharray:4 3;
+  classDef v fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class p1,p2,p3,p4 p;
+  class n1,n2,n3 n;
+  class drb v;
+....
+
+* *The playable half* is replayed from the CODE — the hard substrate (grep/jdeps over the reactor,
+  surefire counts, the shipped `-port` modules and capabilities). It is where the value is: it CANNOT
+  lie, because it is re-derived from what actually compiles and ships. It catches the drift a
+  hand-written atlas hides.
+* *The narrated half* renders the reasoning that has no executable substrate yet — additivity of a
+  not-yet-built model, the design horizon. It is rendered, not executed; it must live where it does not
+  rot (regenerated alongside the atlas, not free-typed).
+
+== How it is constructed
+
+The engine question is already settled by the parked DSL-unification decision: ONE engine (JGiven),
+two layers — the fluent grammar is the authoring surface, JGiven is the narration + report substrate.
+The designer runbook follows the same mapping, with the codebase as the system under scenario:
+
+* *design scenarios are JGiven scenarios over the reactor.* A scenario reads GIVEN the design baseline,
+  WHEN a model/term, THEN the capability — and its steps PROBE the code for the playable assertions
+  (the module exists, the capability is exported, the walker is gone, the unit count). The same
+  living-documentation principle as the BDD suite: the generated report IS the deliverable.
+* *the generated report IS the designer runbook* — JGiven's HTML/AsciiDoc output, the way the operator
+  runbook is the rendered doctor narrative. Read one document, have the live design state.
+* *it renders against the capability-anchoring device* (see rke2lab
+  `unit-repository/unitrepo-design-unification-state` in memory and the atlas capability maps): the
+  playable assertions flip a capability blue/green; the narrated ones stay amber.
+
+== What it is not (scope honesty)
+
+It is not a replacement for the atlas — it is the atlas's missing live half. The atlas stays the map of
+models and their additivity (the reasoning, the figures); the designer runbook is the part of that map
+that is re-derived from the code so it cannot drift. Nor is it built yet — this is the design; the
+first concrete step is to express a handful of playable design scenarios as JGiven scenarios that probe
+the reactor, and render their report.
+
+== Related documentation
+
+* link:integration-atlas.adoc[Integration atlas] — the map of models and the additivity ritual; today
+  hand-written, which is the re-entrance debt this runbook pays.
+* link:patterns/dsl-unification-exploration.adoc[DSL unification] — the one-engine-two-layers decision
+  (JGiven as substrate, the fluent grammar as authoring surface) this runbook builds on.
+* link:unit-repository/model-overview.adoc[Unit repository model overview] — the design whose state the
+  runbook renders, including the capability map it flips blue/green/amber.
