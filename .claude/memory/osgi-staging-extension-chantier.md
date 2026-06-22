@@ -1,17 +1,20 @@
 ---
 name: osgi-staging-extension-chantier
-description: "DONE + PROVEN (2026-06-22, this worktree feature/osgi-staging-extension): the build-time Maven extension single-sources the shade-exclude <-> META-INF/bundles staging from what bundles DECLARE; the DS-API gate is closed (SCR_API_PACKAGES deleted, trio installed+wired) and the real `pulumi preview` boots green. Below: what shipped, the design, and the 3 handoff follow-ups (.internal package pattern, two-executor unification, exec/->embed-exec rename)."
+description: "INTEGRATED (squash 50150e56) into design/pre-integration — the build-time Maven extension single-sources the shade-exclude <-> META-INF/bundles staging from what bundles DECLARE; the DS-API gate is closed (SCR_API_PACKAGES deleted, trio installed+wired) and the real `pulumi preview` boots green. Two-phase build (install RELEASE tooling maven-embed-staging-ext to ~/.m2, then reactor) re-verified green on the integrated tip. Below: what shipped, the design, and the 3 handoff follow-ups still OPEN (.internal package pattern, two-executor unification, exec/->embed-exec rename)."
 metadata:
   node_type: memory
   type: project
 ---
 
-## STATUS: DONE + PROVEN (2026-06-22) — not yet integrated to design/pre-integration
+## STATUS: INTEGRATED (squash 50150e56) into design/pre-integration
 
-The chantier delivered, end to end, on branch `feature/osgi-staging-extension`. The full
-reactor is green WITH tests, and the user's real `pulumi preview --stack dev-preview-staging`
-boots seed-master on the wired trio (the deployed uber-jar, not just reactor tests). The
-"hand-list in disguise" the osgi-boot-alignment chantier left behind is closed.
+The chantier delivered, end to end, on branch `feature/osgi-staging-extension`, and was
+squash-merged into design/pre-integration (50150e56) — two-phase build (install the RELEASE
+tooling, then reactor clean package skipCache skipTests=false) re-verified green on the
+integrated tip. The full reactor is green WITH tests, and the user's real `pulumi preview
+--stack dev-preview-staging` boots seed-master on the wired trio (the deployed uber-jar, not
+just reactor tests). The "hand-list in disguise" the osgi-boot-alignment chantier left behind
+is closed. The 3 handoff follow-ups below remain OPEN.
 
 ### What shipped (commits on this branch)
 - `d3686f0d` — **BootStackJar moved into bnd-read.** It is the closure's seed BY NATURE
