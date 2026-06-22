@@ -81,6 +81,12 @@ SHIPPED + integrated into design/pre-integration:
 
 ## Working rules (learned this session)
 
+- *Commit per step, squash at integration.* Each volet/step that builds GREEN gets its OWN commit
+  with a detailed body (the detail feeds the eventual squash message). These per-step commits are
+  bisection + rollback points DURING the work; they are NOT the integration history — every chantier
+  squash-merges into design/pre-integration (see the "squash of …" commits in the log). So commit
+  freely after each verified-green step; don't hoard changes into one big commit, and don't fret about
+  intermediate-history tidiness — the squash handles that. NEXT SESSIONS: do the same.
 - *Check the workspace before integrating* — the jGiven "merge on main" episode was because the active
   workspace was main, not pre-integration. 1 workspace = 1 worktree = 1 conversation.
 - Integrate into `design/pre-integration`, NEVER `main` (main = final destination, only when the whole is

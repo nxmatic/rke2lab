@@ -34,6 +34,27 @@
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>
     </dependency>
+    <!-- slf4j-api for the resolution-failure diagnostic (resolve() logs the unsatisfied
+         requirements rather than returning a blind false). API façade only — the backend is the
+         consuming test module's. -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <!-- The shared boot MODEL — NOT the executor osgi/runtime. FelixFrameworkExtension reuses the
+         ClasspathBundleIndex (locate / embeddableBundles / exportsForImportsOf) so test and prod agree
+         on boot discovery from one source. Depending on boot-discovery (which pulls only the JDK
+         jar/manifest API) rather than runtime keeps the boot EXECUTOR's closure — notably pax-logging-api,
+         a second org.slf4j provider — off the consuming test modules' classpath, where it broke jGiven
+         in-container resolution. Compile scope (not provided): the extension is loaded JVM-side by
+         surefire BEFORE any framework boots, and so are the downstream test modules that use it — they
+         need boot-discovery on their flat test classpath, which only a transitive dependency gives. The
+         package is only touched JVM-side, never wired in-container, so its bnd Import-Package is harmless. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>boot-discovery</artifactId>
+      <version>${project.version}</version>
+    </dependency>
 
     <!-- In-container half: the runner compiles against the JUnit Platform launcher + engine;
          provided keeps them out of this bundle — each resolves as its own bundle at runtime. -->

@@ -9,6 +9,9 @@ import io.nxmatic.rke2lab.manifests.port.ManifestExplodeService;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisService;
 import io.nxmatic.rke2lab.manifests.port.ManifestUpdateGate;
 import io.nxmatic.rke2lab.manifests.port.node.NodeEnvOverlayService;
+import io.nxmatic.rke2lab.osgi.boot.discovery.BootStackJar;
+import io.nxmatic.rke2lab.osgi.boot.discovery.BundleIndex;
+import io.nxmatic.rke2lab.osgi.boot.discovery.EmbedCapability;
 import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -36,18 +39,20 @@ class HostSeamEmbeddedFelixTest {
 
   @BeforeAll
   static void bootFelix() throws Exception {
+    final BundleIndex classpath = BundleIndex.ofClasspath();
     final OsgiRuntime.Builder builder =
         OsgiRuntime.builder()
             .withPaxLogging(
-                OsgiRuntime.locateOnClasspath("pax-logging-api"),
-                OsgiRuntime.locateOnClasspath("pax-logging-logback"))
+                classpath.locateBySymbolicName(BootStackJar.PAX_LOGGING_API.symbolicName()),
+                classpath.locateBySymbolicName(BootStackJar.PAX_LOGGING_LOGBACK.symbolicName()))
             .withScr()
-            .runtimeJar(OsgiRuntime.locateOnClasspath("org.apache.felix.scr"))
+            .runtimeBundle(classpath.locateBySymbolicName(BootStackJar.FELIX_SCR.symbolicName()))
             // felix.resolver's activator registers the org.osgi.service.resolver.Resolver service
             // that DefaultManifestSynthesisService binds via @Reference. With it absent SCR cannot
             // activate that component, so the seam services below never publish — its presence here
             // is what proves the SCR Resolver injection end to end.
-            .runtimeJar(OsgiRuntime.locateOnClasspath("org.apache.felix.resolver"));
+            .runtimeBundle(
+                classpath.locateBySymbolicName(BootStackJar.FELIX_RESOLVER.symbolicName()));
 
     // Install EVERY embeddable bundle the classpath carries (manifests-core, ssh-to-age-edge, …),
     // discovered by the embed capability — the same source-of-truth as the deployed exec-jar's
@@ -56,8 +61,9 @@ class HostSeamEmbeddedFelixTest {
     // silently
     // un-publish the seam services asserted below. The third-party boot stack above carries no
     // embed
-    // capability, so it stays located by name — the irreducible remainder for jars we don't own.
-    OsgiRuntime.embeddableBundlesOnClasspath().forEach(builder::bundle);
+    // capability, so it stays located by the BootStackJar registry — the irreducible remainder for
+    // jars we don't own.
+    classpath.matching(EmbedCapability.INSTALL_FILTER).forEach(builder::bundle);
 
     runtime = builder.build().boot();
   }

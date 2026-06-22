@@ -1,10 +1,11 @@
 package io.nxmatic.rke2lab.junit.testkit;
 
-import java.io.IOException;
-import java.io.InputStream;
+import io.nxmatic.rke2lab.osgi.boot.discovery.BundleIndex;
+import io.nxmatic.rke2lab.osgi.boot.discovery.BundleLocation;
+import io.nxmatic.rke2lab.osgi.boot.discovery.BundleManifest;
+import io.nxmatic.rke2lab.osgi.boot.discovery.EmbedCapability;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -13,8 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
-import java.util.jar.JarFile;
-import java.util.jar.Manifest;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -24,6 +23,8 @@ import org.osgi.framework.Constants;
 import org.osgi.framework.launch.Framework;
 import org.osgi.framework.launch.FrameworkFactory;
 import org.osgi.util.tracker.ServiceTracker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Boots a real embedded Felix framework once per test class so OSGi proofs observe the actual OSGi
@@ -45,6 +46,8 @@ import org.osgi.util.tracker.ServiceTracker;
  */
 public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAllCallback {
 
+  private static final Logger LOG = LoggerFactory.getLogger(FelixFrameworkExtension.class);
+
   /**
    * The DS-runtime API packages felix.scr imports as MANDATORY but the {@code osgi.core} system
    * bundle does not carry. {@link Builder#withScr()} exports them automatically; the matching jars
@@ -62,14 +65,21 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
   private final boolean startScr;
   private final List<String> classpathBundles;
   private final List<String> reactorBundles;
+  private final List<String> matchFilters;
 
   private final Map<String, Bundle> installedBundles = new LinkedHashMap<>();
   private Framework framework;
 
+  /**
+   * The shared boot-discovery index over the test classpath — the source-of-truth the prod executor
+   * reads too.
+   */
+  private final BundleIndex classpath = BundleIndex.ofClasspath();
+
   private FelixFrameworkExtension(Builder builder) {
     Set<String> exports = new LinkedHashSet<>(builder.systemPackages);
-    for (String artifact : builder.exportImportsOf) {
-      exports.addAll(mirrorImportsAsExports(artifact));
+    for (String symbolicName : builder.exportImportsOf) {
+      exports.addAll(classpath.exportsForImportsOf(symbolicName));
     }
     this.systemPackagesExtra = exports.isEmpty() ? null : String.join(",", exports);
     this.bootDelegation =
@@ -77,6 +87,7 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
     this.startScr = builder.startScr;
     this.classpathBundles = List.copyOf(builder.classpathBundles);
     this.reactorBundles = List.copyOf(builder.reactorBundles);
+    this.matchFilters = List.copyOf(builder.matchFilters);
   }
 
   public static Builder builder() {
@@ -91,6 +102,7 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
     private final List<String> classpathBundles = new ArrayList<>();
     private final List<String> reactorBundles = new ArrayList<>();
     private final List<String> exportImportsOf = new ArrayList<>();
+    private final List<String> matchFilters = new ArrayList<>();
 
     /** Export these packages from the system bundle (value of {@code system.packages.extra}). */
     public Builder systemPackages(String... packages) {
@@ -133,18 +145,39 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
       return this;
     }
 
-    /** Runtime jars (e.g. {@code org.apache.felix.metatype}) installed+started, in order. */
-    public Builder installFromClasspath(String... artifactIds) {
-      this.classpathBundles.addAll(Arrays.asList(artifactIds));
+    /**
+     * Third-party jars installed+started, in order, each located by its {@code Bundle-SymbolicName}
+     * — the identity it declares, NOT its Maven file name (so {@code
+     * org.ops4j.pax.logging.pax-logging-api}, not {@code pax-logging-api}). For the boot stack and
+     * library bundles we do not own and cannot mark with an embed capability.
+     */
+    public Builder installFromClasspath(String... symbolicNames) {
+      this.classpathBundles.addAll(Arrays.asList(symbolicNames));
       return this;
     }
 
     /**
-     * Reactor bundles installed+started, in order, each located on the classpath by artifact
-     * substring; fetch via {@link #bundle}.
+     * Bundles installed+started, in order, each located by its {@code Bundle-SymbolicName}; fetch
+     * via {@link #bundle}. For a proof that NAMES the specific host bundle(s) it installs (e.g. a
+     * doctor-core host). To select OUR embeddable fixtures by what they declare, use {@link
+     * #installMatching(String)}; for a third-party jar by identity, {@link
+     * #installFromClasspath(String...)}.
      */
-    public Builder installBundles(String... artifacts) {
-      this.reactorBundles.addAll(Arrays.asList(artifacts));
+    public Builder installBundles(String... symbolicNames) {
+      this.reactorBundles.addAll(Arrays.asList(symbolicNames));
+      return this;
+    }
+
+    /**
+     * Install+start every embeddable bundle whose {@link EmbedCapability embed capability} matches
+     * {@code ldapFilter} — selection by what each bundle DECLARES, never a name a test keeps in
+     * sync. {@code (type=model)} boots the deployed exec-jar's model set; {@code
+     * (&(type=fixture)(suite=scr)(role=consumer))} installs ONE fixture and, by omitting {@code
+     * role=provider}, is how the anti-cheat proves a consumer stays unsatisfied. Each installed
+     * bundle is fetchable via {@link #bundle} under its {@code Bundle-SymbolicName}.
+     */
+    public Builder installMatching(String ldapFilter) {
+      this.matchFilters.add(ldapFilter);
       return this;
     }
 
@@ -164,6 +197,13 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
     Map<String, String> config = new java.util.HashMap<>();
     config.put(Constants.FRAMEWORK_STORAGE, storage.toString());
     config.put(Constants.FRAMEWORK_STORAGE_CLEAN, Constants.FRAMEWORK_STORAGE_CLEAN_ONFIRSTINIT);
+    // The test class may opt into louder framework diagnostics via @FrameworkLog — the only place a
+    // failed resolve()/activation explains WHICH requirement could not be wired. Default ERROR.
+    context
+        .getElement()
+        .map(element -> element.getAnnotation(FrameworkLog.class))
+        .ifPresent(
+            log -> config.put("felix.log.level", Integer.toString(log.value().felixLevel())));
     if (systemPackagesExtra != null) {
       config.put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, systemPackagesExtra);
     }
@@ -177,13 +217,23 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
     if (startScr) {
       startScr();
     }
-    for (String artifactId : classpathBundles) {
-      installFromClasspath(artifactId).start();
+    for (String symbolicName : classpathBundles) {
+      installFromClasspath(symbolicName).start();
     }
-    for (String artifact : reactorBundles) {
-      Bundle bundle = install(artifact);
+    for (String symbolicName : reactorBundles) {
+      Bundle bundle = install(symbolicName);
       bundle.start();
-      installedBundles.put(artifact, bundle);
+      installedBundles.put(symbolicName, bundle);
+    }
+    // Bundles selected by what they DECLARE (the embed capability) rather than named. Keyed in the
+    // installed map by the bundle's OWN Bundle-SymbolicName — they were discovered by capability,
+    // never named by the caller, so OSGi's native identity is the only honest key.
+    for (String ldapFilter : matchFilters) {
+      for (BundleLocation location : classpath.matching(ldapFilter)) {
+        Bundle bundle = installAt(location);
+        bundle.start();
+        installedBundles.put(bundle.getSymbolicName(), bundle);
+      }
     }
   }
 
@@ -199,124 +249,152 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
     return framework.getBundleContext();
   }
 
-  /** The reactor bundle the builder installed under {@code artifact}, for tests that need it. */
-  public Bundle bundle(String artifact) {
-    Bundle bundle = installedBundles.get(artifact);
+  /**
+   * The bundle the builder installed under {@code symbolicName}, for tests that need it. Bundles
+   * installed by {@link Builder#installMatching(String) capability filter} are keyed by their own
+   * {@code Bundle-SymbolicName} too.
+   */
+  public Bundle bundle(String symbolicName) {
+    Bundle bundle = installedBundles.get(symbolicName);
     if (bundle == null) {
-      throw new IllegalArgumentException("no bundle installed for artifact " + artifact);
+      throw new IllegalArgumentException("no bundle installed for " + symbolicName);
     }
     return bundle;
   }
 
   /**
-   * Install the reactor bundle whose classpath entry contains {@code artifact}. Locates it on the
-   * test classpath (java.class.path), not from a target/ directory, because the test module depends
-   * on the bundle modules as maven dependencies. During reactor builds with {@code -am}, those
-   * resolve to {@code target/classes} directories (not jars), which OSGi loads as directory-based
-   * bundles when they carry a META-INF/MANIFEST.MF.
+   * Install the bundle declaring {@code symbolicName} as its {@code Bundle-SymbolicName}, located
+   * on the test classpath via {@link BundleIndex#locateBySymbolicName(String)} — by the identity
+   * the bundle publishes, not a guess from its Maven file name. The test module depends on the
+   * bundle modules as maven dependencies; during reactor {@code -am} builds those resolve to {@code
+   * target/classes} directories, which OSGi loads as directory-based bundles when they carry a
+   * META-INF/MANIFEST.MF.
    */
-  public Bundle install(String artifact) throws Exception {
-    Path bundleLocation = locateBundle(artifact);
-    String bundleUrl =
-        Files.isDirectory(bundleLocation)
-            ? "reference:" + bundleLocation.toUri().toString()
-            : bundleLocation.toUri().toString();
-    return context().installBundle(bundleUrl);
+  public Bundle install(String symbolicName) throws Exception {
+    return installAt(classpath.locateBySymbolicName(symbolicName));
   }
 
   /**
-   * Locate, on the test classpath ({@code java.class.path}), the jar or {@code target/classes}
-   * directory whose path contains {@code artifact} and carries a manifest. Pure classpath
-   * inspection — no framework needed — so it is usable BEFORE {@code framework.init()}.
+   * Install — WITHOUT starting — every bundle whose {@link EmbedCapability embed capability}
+   * matches {@code ldapFilter}, and return the handles in install order. Selection is by what each
+   * bundle DECLARES ({@code (&(type=fixture)(suite=extender))}), never a {@code
+   * Bundle-SymbolicName} a test keeps in sync — the imperative, install-only counterpart of {@link
+   * Builder#installMatching} (the declared topology, which also starts). For a proof that drives
+   * resolution or activation BY HAND over the returned handles: the extender resolve/refuse proof,
+   * or a host the test starts itself. Each handle is also fetchable later via {@link #bundle} under
+   * its own symbolic name.
    */
-  private static Path locateBundle(String artifact) {
-    return Arrays.stream(
-            System.getProperty("java.class.path").split(System.getProperty("path.separator")))
-        .map(Paths::get)
-        .filter(
-            p ->
-                p.toString().contains(artifact)
-                    && (Files.isRegularFile(p) && p.getFileName().toString().endsWith(".jar")
-                        || Files.isDirectory(p) && Files.exists(p.resolve("META-INF/MANIFEST.MF"))))
-        .findFirst()
-        .orElseThrow(
-            () ->
-                new IllegalStateException(
-                    "no " + artifact + " bundle (jar or classes dir) on classpath"));
+  public List<Bundle> installMatching(String ldapFilter) throws Exception {
+    final List<Bundle> installed = new ArrayList<>();
+    for (BundleLocation location : classpath.matching(ldapFilter)) {
+      Bundle bundle = installAt(location);
+      installedBundles.put(bundle.getSymbolicName(), bundle);
+      installed.add(bundle);
+    }
+    return installed;
   }
 
   /**
-   * Read the {@code Import-Package} header from {@code artifact}'s manifest and turn each clause
-   * into a system-bundle export clause: the package name kept, an explicit version range narrowed
-   * to its lower bound (so the importer's range is satisfied), every other directive/attribute
-   * dropped (resolution, uses, etc. are meaningless on a system-bundle export). The bundle's OWN
-   * exports are not mirrored — only what it imports needs wiring for it to resolve.
+   * A host bundle and the {@code -test} fragment attached to it, both installed, neither started.
    */
-  private static Set<String> mirrorImportsAsExports(String artifact) {
-    String importPackage = readManifestHeader(locateBundle(artifact), Constants.IMPORT_PACKAGE);
-    if (importPackage == null || importPackage.isBlank()) {
-      return Set.of();
+  public record FixtureWithHost(Bundle host, Bundle fragment) {}
+
+  /**
+   * Install a fixture {@code -test} FRAGMENT selected by {@code ldapFilter} together with the host
+   * it attaches to — neither started — and return both handles. The fragment is OURS (it declares
+   * the embed capability {@code ldapFilter} matches); its host is the prod bundle it names in
+   * {@code Fragment-Host}, located by THAT declared symbolic name. So the test names neither: it
+   * selects the fragment by what it declares, and the fragment declares its own host. The caller
+   * then resolves the host (attaching the fragment, OSGi Core §3.14) and starts it.
+   *
+   * <p>A fragment has no lifecycle of its own — it is installed but never started; resolving the
+   * host merges it in. {@code ldapFilter} must match exactly one fragment.
+   */
+  public FixtureWithHost installFixtureWithHost(String ldapFilter) throws Exception {
+    final List<BundleLocation> matched = classpath.matching(ldapFilter);
+    if (matched.size() != 1) {
+      throw new IllegalArgumentException(
+          "expected exactly one fixture fragment matching "
+              + ldapFilter
+              + ", found "
+              + matched.size());
     }
-    Set<String> exports = new LinkedHashSet<>();
-    for (String clause : splitClauses(importPackage)) {
-      exports.add(importClauseToExport(clause));
+    final BundleLocation fragmentLocation = matched.get(0);
+    final String hostBsn =
+        BundleManifest.fragmentHost(fragmentLocation.readHeader(BundleManifest.FRAGMENT_HOST));
+    if (hostBsn == null) {
+      throw new IllegalArgumentException(
+          "fixture matching " + ldapFilter + " declares no Fragment-Host — not a -test fragment");
     }
-    return exports;
+    final Bundle host = install(hostBsn);
+    final Bundle fragment = installAt(fragmentLocation);
+    installedBundles.put(host.getSymbolicName(), host);
+    installedBundles.put(fragment.getSymbolicName(), fragment);
+    return new FixtureWithHost(host, fragment);
   }
 
-  /** Lower-bound an import clause's version range and strip all other parameters. */
-  private static String importClauseToExport(String clause) {
-    String pkg = clause.split(";", 2)[0].trim();
-    for (String part : clause.split(";")) {
-      String p = part.trim();
-      if (p.startsWith("version=")) {
-        String raw = p.substring("version=".length()).replace("\"", "");
-        String lower =
-            raw.startsWith("[") || raw.startsWith("(") ? raw.substring(1).split(",")[0] : raw;
-        return pkg + ";version=" + lower.trim();
-      }
-    }
-    return pkg;
-  }
-
-  /** Split an OSGi header value on commas that are NOT inside a quoted version range. */
-  private static List<String> splitClauses(String header) {
-    List<String> clauses = new ArrayList<>();
-    int depth = 0;
-    int start = 0;
-    for (int i = 0; i < header.length(); i++) {
-      char c = header.charAt(i);
-      if (c == '"') {
-        depth ^= 1;
-      } else if (c == ',' && depth == 0) {
-        clauses.add(header.substring(start, i));
-        start = i + 1;
-      }
-    }
-    clauses.add(header.substring(start));
-    return clauses;
-  }
-
-  /** Read a single manifest header from a jar file or an exploded {@code target/classes} dir. */
-  private static String readManifestHeader(Path bundleLocation, String header) {
-    try {
-      if (Files.isDirectory(bundleLocation)) {
-        try (InputStream in =
-            Files.newInputStream(bundleLocation.resolve("META-INF/MANIFEST.MF"))) {
-          return new Manifest(in).getMainAttributes().getValue(header);
+  /**
+   * Install the bundle at a {@link BundleLocation} — a classpath jar/dir by its URL, a staged jar
+   * by streaming its bytes into the framework's cache. One install path for both sources.
+   */
+  private Bundle installAt(BundleLocation location) throws Exception {
+    return switch (location) {
+      case BundleLocation.Staged staged -> {
+        try (var in = staged.open()) {
+          yield context().installBundle(staged.locationId(), in);
         }
       }
-      try (JarFile jar = new JarFile(bundleLocation.toFile())) {
-        Manifest manifest = jar.getManifest();
-        return manifest == null ? null : manifest.getMainAttributes().getValue(header);
-      }
-    } catch (IOException e) {
-      throw new IllegalStateException("cannot read manifest of " + bundleLocation, e);
-    }
+      case BundleLocation.OnClasspath onClasspath ->
+          context().installBundle(onClasspath.locationId());
+    };
   }
 
+  /**
+   * Resolve {@code bundles} against the framework wiring. Returns whether ALL resolved — but a bare
+   * {@code false} is the blindness this testkit exists to avoid, so on failure it first LOGS, per
+   * still-unresolved bundle, the requirements OSGi could not wire (the same "which constraint
+   * failed" a raw {@code resolveBundles} swallows). A caller that fails the test on {@code false}
+   * then has the reason in the test log, not just a boolean. (Felix's own {@code felix.log.level} —
+   * raised via {@link FrameworkLog} — covers the resolver's internal trace; this covers the
+   * post-mortem.)
+   */
   public boolean resolve(List<Bundle> bundles) {
-    return framework.adapt(org.osgi.framework.wiring.FrameworkWiring.class).resolveBundles(bundles);
+    final boolean resolved =
+        framework.adapt(org.osgi.framework.wiring.FrameworkWiring.class).resolveBundles(bundles);
+    if (!resolved) {
+      for (Bundle bundle : bundles) {
+        if ((bundle.getState() & Bundle.RESOLVED) == 0) {
+          LOG.error(
+              "bundle {} [{}] did not resolve; unsatisfied requirements: {}",
+              bundle.getSymbolicName(),
+              bundle.getBundleId(),
+              unsatisfiedRequirements(bundle));
+        }
+      }
+    }
+    return resolved;
+  }
+
+  /**
+   * The requirements of {@code bundle} that no installed bundle's capability satisfies — the
+   * actionable part of a resolution failure (a missing {@code Import-Package}, an unattachable
+   * fragment host, an {@code osgi.ee} mismatch). Computed by diffing the bundle's declared
+   * requirements against the framework's resolved capabilities, so it names exactly what to
+   * install.
+   */
+  private List<String> unsatisfiedRequirements(Bundle bundle) {
+    final var wiring = framework.adapt(org.osgi.framework.wiring.FrameworkWiring.class);
+    final List<String> unsatisfied = new ArrayList<>();
+    for (var requirement :
+        bundle
+            .adapt(org.osgi.framework.wiring.BundleRevision.class)
+            .getDeclaredRequirements(null)) {
+      final var candidates = wiring.findProviders(requirement);
+      if (candidates.isEmpty()) {
+        unsatisfied.add(requirement.toString());
+      }
+    }
+    return unsatisfied;
   }
 
   /**
@@ -349,16 +427,12 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
   }
 
   /**
-   * Locate a runtime jar (e.g. {@code org.apache.felix.scr}) on the test classpath by substring.
+   * Locate a third-party jar (e.g. {@code org.apache.felix.scr}) on the test classpath by its
+   * {@code Bundle-SymbolicName}, via {@link BundleIndex#locateBySymbolicName(String)} — by the
+   * identity the bundle declares, never a guess from its Maven file name.
    */
-  private Bundle installFromClasspath(String artifactId) throws Exception {
-    String jar =
-        Arrays.stream(
-                System.getProperty("java.class.path").split(System.getProperty("path.separator")))
-            .filter(p -> p.contains(artifactId))
-            .findFirst()
-            .orElseThrow(() -> new IllegalStateException(artifactId + " not on test classpath"));
-    return context().installBundle("file:" + jar);
+  private Bundle installFromClasspath(String symbolicName) throws Exception {
+    return installAt(classpath.locateBySymbolicName(symbolicName));
   }
 
   /** Install+start felix.scr and block until its {@code ServiceComponentRuntime} appears. */

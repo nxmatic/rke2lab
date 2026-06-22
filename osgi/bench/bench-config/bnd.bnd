@@ -1,3 +1,8 @@
 Bundle-SymbolicName: io.nxmatic.rke2lab.osgibench.config
 Export-Package: io.nxmatic.rke2lab.osgibench.config
+# Test fixture, selected by FelixFrameworkExtension.installMatching via an LDAP filter over these
+# attributes — never by a Bundle-SymbolicName literal a test keeps in sync. The extender suite's
+# consumer: it requires the osgi.extender the host fixture provides, so the resolve-vs-refuse proof
+# installs them together (resolves) or the config alone (refuses, loudly).
+Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=extender; role=config
 -noimportjava: true

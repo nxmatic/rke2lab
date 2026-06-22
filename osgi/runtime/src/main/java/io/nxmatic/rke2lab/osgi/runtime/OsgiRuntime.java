@@ -1,10 +1,11 @@
 package io.nxmatic.rke2lab.osgi.runtime;
 
+import io.nxmatic.rke2lab.osgi.boot.discovery.BootStackJar;
+import io.nxmatic.rke2lab.osgi.boot.discovery.BundleIndex;
+import io.nxmatic.rke2lab.osgi.boot.discovery.BundleLocation;
+import io.nxmatic.rke2lab.osgi.boot.discovery.BundleManifest;
+import io.nxmatic.rke2lab.osgi.boot.discovery.EmbedCapability;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.JarURLConnection;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -15,10 +16,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
-import java.util.jar.JarInputStream;
-import java.util.jar.Manifest;
+import java.util.stream.Stream;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleException;
@@ -33,33 +31,32 @@ import org.slf4j.LoggerFactory;
 /**
  * Boots an embedded Apache Felix framework + felix.scr inside an exec entrypoint and installs a set
  * of intact bundles, so the host can read their {@code @Component} services from the registry. The
- * runtime-side counterpart of the test-only {@code FelixFrameworkExtension}.
+ * host-world EXECUTOR of the boot MODEL declared in {@code osgi/boot/boot-discovery}; the test-only
+ * {@code FelixFrameworkExtension} is the other executor of the same model.
  *
- * <p>Built through {@link #builder()}, which DECLARES the topology: which felix runtime jars to
- * install (felix.scr is implied by {@link Builder#withScr()}), and which bundle jars to install.
- * The {@code system.packages.extra} the bundles need is DERIVED, not hand-listed: the runtime reads
- * each bundle's bnd-computed {@code Import-Package} header and re-exports those packages from the
- * system bundle, so the bundle resolves against the host's flat classpath (jackson, cdk8s, the
- * {@code -port} contracts) while sharing ONE copy of each class — typed access across the seam, no
- * reflection. This keeps the export set in lock-step with what bnd actually computed and makes each
- * exec entrypoint declare only ITS bundles; the derivation is uniform across entrypoints.
+ * <p>The {@code system.packages.extra} the bundles need is DERIVED, not hand-listed: the runtime
+ * reads each bundle's bnd-computed {@code Import-Package} header (via {@link BundleManifest}) and
+ * re-exports those packages from the system bundle, so the bundle resolves against the host's flat
+ * classpath (jackson, cdk8s, the {@code -port} contracts) while sharing ONE copy of each class —
+ * typed access across the seam, no reflection. This keeps the export set in lock-step with what bnd
+ * actually computed.
  *
- * <p>A package designed for OSGi may instead be installed as its own bundle; a package NOT designed
- * for OSGi (e.g. the jsii {@code org.cdk8s}/{@code software.constructs} jars) is served flat via
- * the derived system export. A system export carries CLASSES only — never the origin's
- * SCR/capability/ metatype behaviour — so only passive, non-OSGi packages belong there.
+ * <p>Every bundle — boot stack, model, edge — is a {@link BundleLocation}, found by the identity it
+ * DECLARES through a {@link BundleIndex}, never by a file name. Two topologies share this one
+ * install path: the classpath topology (reactor tests pass located bundles) and the embedded
+ * topology ({@link #embeddedBootStack()} discovers everything from the jars staged under {@code
+ * META-INF/bundles/}).
  */
 public final class OsgiRuntime implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(OsgiRuntime.class);
 
   /**
-   * OSGi start levels drive activation order natively — we install everything, pin each bundle to
-   * its layer, then let the framework raise its level and start bundles level-by-level. Logging is
+   * OSGi start levels drive activation order natively — install everything, pin each bundle to its
+   * layer, then let the framework raise its level and start bundles level-by-level. Logging is
    * lowest so the LogService is live before anything else activates; the felix runtime (scr,
-   * resolver) next; the model bundles last (their {@code @Component}s log + bind through the live
-   * LogService and resolved runtime). The framework's own beginning level is set to the highest so
-   * a single {@code framework.start()} walks all three.
+   * resolver) next; the model bundles last. The executor's mapping of the model's {@link
+   * BootStackJar.Layer} roles onto concrete levels.
    */
   private static final int START_LEVEL_LOGGING = 1;
 
@@ -79,60 +76,41 @@ public final class OsgiRuntime implements AutoCloseable {
           + "org.osgi.util.function;version=1.2";
 
   /**
-   * Classpath resource prefix under which the deployed exec-jar stages the designed-for-OSGi jars
-   * INTACT (seed-master's {@code maven-dependency-plugin} {@code copy} execution). The {@code
-   * embedded*} builder verbs name a jar under here; {@link #boot()} streams its bytes straight into
-   * Felix's bundle cache via {@code installBundle(location, stream)} and reads its manifest from
-   * the same stream for the Import-Package mirror — no temp file, Felix owns the persisted copy.
+   * The bundles staged under {@code META-INF/bundles/} in this exec-jar (empty off the exec-jar) —
+   * the source for {@link #hasEmbeddedBundles()}, the pre-construction "is this an exec-jar" probe
+   * a caller reads to choose {@link #embeddedBootStack()} over a classpath builder.
    */
-  public static final String EMBEDDED_BUNDLES_ROOT = "/META-INF/bundles/";
+  private static final BundleIndex STAGED =
+      BundleIndex.ofStagedBundles(OsgiRuntime.class.getClassLoader());
 
-  /**
-   * The {@code Provide-Capability} namespace a jar self-declares (in its {@code bnd.bnd}) to mark
-   * itself a MODEL bundle to embed + install — the single source of truth for "which staged jars
-   * are model bundles". {@link #boot()} scans {@link #EMBEDDED_BUNDLES_ROOT} and installs exactly
-   * the carriers of this capability; the boot-stack jars do not carry it, so they are excluded
-   * objectively, with no parallel hand-list of names. Our own namespace with no matching {@code
-   * Require-Capability}, so the OSGi resolver ignores it — it never affects package wiring.
-   */
-  public static final String EMBED_CAPABILITY_NAMESPACE = "io.nxmatic.rke2lab.embed";
+  /** Pax Logging, at the LogService layer (api then backend), in declaration order. */
+  private final List<BundleLocation> paxLoggingBundles;
 
-  /**
-   * Staged file names of the BOOT-STACK jars every exec entrypoint embeds under {@link
-   * #EMBEDDED_BUNDLES_ROOT}. These four are named-by-constant on purpose: the boot stack is fixed
-   * and identical across entrypoints, so {@link #embeddedBootStack()} installs them by name and
-   * {@link #hasEmbeddedBundles()} probes one of them. The MODEL bundles are NOT listed here — they
-   * are discovered by scanning for {@link #EMBED_CAPABILITY_NAMESPACE} ({@link
-   * #scanEmbeddedModelBundles()}), so adding a model bundle needs no Java edit. For the boot stack
-   * the pom {@code stage-embedded-bundles} {@code destFileName} must still match these constants;
-   * poms cannot call Java, so this stays the authoritative boot-stack registry during review.
-   */
-  public static final String PAX_LOGGING_API_JAR = "pax-logging-api.jar";
-
-  public static final String PAX_LOGGING_LOGBACK_JAR = "pax-logging-logback.jar";
-
-  public static final String FELIX_SCR_JAR = "org.apache.felix.scr.jar";
-
-  public static final String FELIX_RESOLVER_JAR = "org.apache.felix.resolver.jar";
-
-  private final List<Path> bundleJars;
-  private final List<String> runtimeJars;
+  private final List<BundleLocation> runtimeBundles;
+  private final List<BundleLocation> modelBundles;
   private final boolean startScr;
-  private final List<Path> paxLoggingJars;
-  private final List<String> embeddedRuntimeNames;
-  private final List<String> embeddedPaxLoggingNames;
+  private final boolean embedsBootStack;
   private final Set<String> explicitSystemPackages;
+
+  /**
+   * Where this runtime DISCOVERS bundles — a collaborator, so reading the composition shows the
+   * runtime does discovery rather than hiding it in a method body. The embedded boot reads the
+   * staged index (boot-stack jars by symbolic name, model/edge bundles by the embed capability); a
+   * classpath/test boot reads the classpath index (where the builder's located bundles live, and
+   * which the seam guard queries to attribute a package to its owning domain bundle).
+   */
+  private final BundleIndex discovery;
 
   private Framework framework;
 
   private OsgiRuntime(Builder builder) {
-    this.bundleJars = List.copyOf(builder.bundleJars);
-    this.runtimeJars = List.copyOf(builder.runtimeJars);
+    this.paxLoggingBundles = List.copyOf(builder.paxLoggingBundles);
+    this.runtimeBundles = List.copyOf(builder.runtimeBundles);
+    this.modelBundles = List.copyOf(builder.modelBundles);
     this.startScr = builder.startScr;
-    this.paxLoggingJars = List.copyOf(builder.paxLoggingJars);
-    this.embeddedRuntimeNames = List.copyOf(builder.embeddedRuntimeNames);
-    this.embeddedPaxLoggingNames = List.copyOf(builder.embeddedPaxLoggingNames);
+    this.embedsBootStack = builder.embedsBootStack;
     this.explicitSystemPackages = new LinkedHashSet<>(builder.systemPackages);
+    this.discovery = builder.embedsBootStack ? STAGED : BundleIndex.ofClasspath();
   }
 
   public static Builder builder() {
@@ -140,126 +118,32 @@ public final class OsgiRuntime implements AutoCloseable {
   }
 
   /**
-   * A builder pre-loaded with the boot stack every exec entrypoint shares — Pax Logging at the
-   * LogService layer, felix.scr as the DS extender, felix.resolver as the {@code
-   * org.osgi.service.resolver.Resolver} provider — all from the embedded {@link
-   * #EMBEDDED_BUNDLES_ROOT}. There is NO per-entrypoint variation to add: {@link #boot()} discovers
-   * the model bundle(s) by scanning {@link #EMBEDDED_BUNDLES_ROOT} for {@link
-   * #EMBED_CAPABILITY_NAMESPACE}, so every entrypoint just calls {@code
-   * embeddedBootStack().build()}. Keeps the three entrypoints (seed-master + the two CLIs) booting
-   * an identical framework, so a boot change is made once here, not copy-pasted per main().
+   * A builder pre-loaded to boot the whole embedded stack from the jars staged under {@code
+   * META-INF/bundles/}: {@link #boot()} locates the {@link BootStackJar} entries by their symbolic
+   * name and discovers the model + edge bundles by the embed capability — no per-entrypoint
+   * variation to add. Every exec entrypoint (seed-master + the two CLIs) just calls {@code
+   * embeddedBootStack().build()}, so a boot change is made once here.
    */
   public static Builder embeddedBootStack() {
-    return builder()
-        .embeddedPaxLogging(PAX_LOGGING_API_JAR, PAX_LOGGING_LOGBACK_JAR)
-        .withScr()
-        .embeddedRuntimeJar(FELIX_SCR_JAR)
-        .embeddedRuntimeJar(FELIX_RESOLVER_JAR);
+    return builder().withScr().embedBootStack();
   }
 
   /**
-   * Whether the running process carries the embedded boot stack under {@link
-   * #EMBEDDED_BUNDLES_ROOT} — true in a deployed exec-jar, false on a reactor/test classpath.
-   * Probes felix.scr, the boot-stack jar common to every entrypoint (not a per-entrypoint model
-   * bundle), so the check is uniform across seed-master and the CLIs. The seam picks the embedded
-   * boot topology over the classpath-located one with this.
+   * Whether the running process carries the embedded boot stack — true in a deployed exec-jar,
+   * false on a reactor/test classpath. Probes felix.scr (by its symbolic name), the boot-stack
+   * bundle common to every entrypoint, so the check is uniform across seed-master and the CLIs.
    */
   public static boolean hasEmbeddedBundles() {
-    return OsgiRuntime.class.getResource(EMBEDDED_BUNDLES_ROOT + FELIX_SCR_JAR) != null;
-  }
-
-  /**
-   * Locate, on {@code java.class.path}, the jar or exploded {@code target/classes} directory FOR
-   * {@code artifact} (its Maven artifactId) that carries a bundle manifest. Used to resolve the
-   * felix runtime jars and — during reactor builds, before the exec-jar embeds them — the bundle
-   * locations.
-   *
-   * <p>The artifact is matched on the jar's LEAF ({@code <artifact>-<version>.jar} / {@code
-   * <artifact>.jar}) or, for an exploded {@code <artifact>/target/classes} dir, on the module
-   * directory name — never on a path substring. A substring match breaks the moment the artifact
-   * name appears higher in the path (e.g. a worktree dir named after the artifact poisons EVERY
-   * classpath entry), returning the wrong jar.
-   */
-  public static Path locateOnClasspath(String artifact) {
-    return java.util.Arrays.stream(
-            System.getProperty("java.class.path").split(System.getProperty("path.separator")))
-        .map(Path::of)
-        .filter(p -> matchesArtifact(p, artifact))
-        .findFirst()
-        .orElseThrow(() -> new IllegalStateException("no " + artifact + " bundle on classpath"));
-  }
-
-  /**
-   * Discover, on {@code java.class.path}, every embeddable bundle — a jar or exploded {@code
-   * target/classes} dir whose manifest self-declares {@link #EMBED_CAPABILITY_NAMESPACE}. The
-   * classpath counterpart of {@link #scanEmbeddedModelBundles()}: both keep on the SAME capability,
-   * differing only in source (the staged {@code META-INF/bundles/} root vs the reactor classpath),
-   * so a model/edge bundle is found by what it DECLARES, never by a name a caller must keep in
-   * sync.
-   *
-   * <p>Used by the classpath boot topology (reactor tests) to install the model + edge bundles
-   * without naming them. The third-party boot stack (pax-logging / felix.scr / felix.resolver)
-   * carries no such capability — nothing for us to key on — so it stays located by {@link
-   * #locateOnClasspath(String)}; that named path is the irreducible remainder for jars we don't
-   * own. Sorted for a reproducible boot log.
-   */
-  public static List<Path> embeddableBundlesOnClasspath() {
-    return java.util.Arrays.stream(
-            System.getProperty("java.class.path").split(System.getProperty("path.separator")))
-        .map(Path::of)
-        .filter(OsgiRuntime::declaresEmbedCapability)
-        .sorted()
-        .toList();
-  }
-
-  /** Whether the classpath entry's bundle manifest self-declares the embed capability. */
-  private static boolean declaresEmbedCapability(Path path) {
-    try {
-      final String cap =
-          Files.isDirectory(path)
-              ? (Files.exists(path.resolve("META-INF/MANIFEST.MF"))
-                  ? readManifestHeader(path, "Provide-Capability")
-                  : null)
-              : (Files.isRegularFile(path) && path.getFileName().toString().endsWith(".jar")
-                  ? readManifestHeader(path, "Provide-Capability")
-                  : null);
-      return cap != null && cap.contains(EMBED_CAPABILITY_NAMESPACE);
-    } catch (IOException ex) {
-      return false;
-    }
-  }
-
-  /**
-   * Whether {@code path} is the classpath entry for the Maven {@code artifact}: a {@code
-   * <artifact>.jar} / {@code <artifact>-<version>.jar} file, or an exploded {@code
-   * <artifact>/target/classes} (or {@code test-classes}) directory carrying a bundle manifest.
-   */
-  private static boolean matchesArtifact(Path path, String artifact) {
-    if (Files.isRegularFile(path)) {
-      final String leaf = path.getFileName().toString();
-      if (!leaf.endsWith(".jar")) {
-        return false;
-      }
-      final String stem = leaf.substring(0, leaf.length() - ".jar".length());
-      return stem.equals(artifact) || stem.startsWith(artifact + "-");
-    }
-    if (Files.isDirectory(path) && Files.exists(path.resolve("META-INF/MANIFEST.MF"))) {
-      // …/<artifact>/target/classes → the module dir is two parents up from classes.
-      final Path target = path.getParent();
-      final Path moduleDir = target == null ? null : target.getParent();
-      return moduleDir != null && moduleDir.getFileName().toString().equals(artifact);
-    }
-    return false;
+    return STAGED.contains(BootStackJar.FELIX_SCR.symbolicName());
   }
 
   /** Declares the framework topology booted by {@link #boot()}. */
   public static final class Builder {
-    private final List<Path> bundleJars = new ArrayList<>();
-    private final List<String> runtimeJars = new ArrayList<>();
+    private final List<BundleLocation> paxLoggingBundles = new ArrayList<>();
+    private final List<BundleLocation> runtimeBundles = new ArrayList<>();
+    private final List<BundleLocation> modelBundles = new ArrayList<>();
     private final List<String> systemPackages = new ArrayList<>();
-    private final List<Path> paxLoggingJars = new ArrayList<>();
-    private final List<String> embeddedRuntimeNames = new ArrayList<>();
-    private final List<String> embeddedPaxLoggingNames = new ArrayList<>();
+    private boolean embedsBootStack;
     private boolean startScr;
 
     /** Install + start felix.scr before the bundles and export the DS-runtime API it needs. */
@@ -276,40 +160,36 @@ public final class OsgiRuntime implements AutoCloseable {
      * that — with {@code StaticLogbackContext=true} — reuses the HOST's logback context. Order
      * matters: api first, then the backend.
      */
-    public Builder withPaxLogging(Path paxLoggingApi, Path paxLoggingLogback) {
-      this.paxLoggingJars.add(paxLoggingApi);
-      this.paxLoggingJars.add(paxLoggingLogback);
+    public Builder withPaxLogging(BundleLocation paxLoggingApi, BundleLocation paxLoggingLogback) {
+      this.paxLoggingBundles.add(paxLoggingApi);
+      this.paxLoggingBundles.add(paxLoggingLogback);
       return this;
     }
 
-    /** A felix runtime jar (e.g. {@code org.apache.felix.scr}) to install + start, by file path. */
-    public Builder runtimeJar(Path jar) {
-      this.runtimeJars.add(jar.toString());
-      return this;
-    }
-
-    /**
-     * A bundle jar to install + start; its {@code Import-Package} is mirrored as a system export.
-     */
-    public Builder bundle(Path jar) {
-      this.bundleJars.add(jar);
+    /** A felix runtime bundle (e.g. {@code org.apache.felix.scr}) to install + start. */
+    public Builder runtimeBundle(BundleLocation bundle) {
+      this.runtimeBundles.add(bundle);
       return this;
     }
 
     /**
-     * Like {@link #runtimeJar(Path)} but resolved from the embedded {@link #EMBEDDED_BUNDLES_ROOT}.
+     * A model/edge bundle to install + start; its {@code Import-Package} is mirrored as a system
+     * export.
      */
-    public Builder embeddedRuntimeJar(String name) {
-      this.embeddedRuntimeNames.add(name);
+    public Builder bundle(BundleLocation bundle) {
+      this.modelBundles.add(bundle);
       return this;
     }
 
     /**
-     * Like {@link #withPaxLogging(Path, Path)} but both jars are embedded; api first, then backend.
+     * Boot the whole stack from the staged bundles: {@link #boot()} locates the {@link
+     * BootStackJar} entries by symbolic name and discovers the model + edge bundles by the embed
+     * capability. The embedded-deployment counterpart of {@link #withPaxLogging}/{@link
+     * #runtimeBundle}/{@link #bundle}; the boot stack is fixed and identical across entrypoints, so
+     * nothing per-jar to pass.
      */
-    public Builder embeddedPaxLogging(String paxLoggingApiName, String paxLoggingLogbackName) {
-      this.embeddedPaxLoggingNames.add(paxLoggingApiName);
-      this.embeddedPaxLoggingNames.add(paxLoggingLogbackName);
+    public Builder embedBootStack() {
+      this.embedsBootStack = true;
       return this;
     }
 
@@ -326,64 +206,44 @@ public final class OsgiRuntime implements AutoCloseable {
     }
   }
 
-  /** Boot the framework, install+start pax-logging + felix.scr (if requested) and the bundles. */
+  private static int startLevelFor(BootStackJar.Layer layer) {
+    return switch (layer) {
+      case LOGGING -> START_LEVEL_LOGGING;
+      case FRAMEWORK_RUNTIME -> START_LEVEL_FRAMEWORK_RUNTIME;
+    };
+  }
+
+  /** An installable bundle: where its bytes live, and the start level its layer maps to. */
+  private record Installable(BundleLocation location, int startLevel) {}
+
+  /** Boot the framework, install+start the boot stack (if requested) and the model bundles. */
   public OsgiRuntime boot() throws IOException {
-    // The model bundles to install are DISCOVERED, not hand-listed: scan the staged jars under
-    // EMBEDDED_BUNDLES_ROOT and keep those whose manifest self-declares the embed capability. The
-    // boot-stack jars (pax/scr/resolver) are staged in the same root but do not carry the marker,
-    // so they are excluded objectively — the install-by-name path above handles them. The scan runs
-    // ONLY in the embedded boot topology (embeddedBootStack(), which fills embeddedRuntimeNames):
-    // the classpath topology installs its model bundle by reactor path via bundle(Path), and the
-    // staged META-INF/bundles/ is then also on the test classpath — scanning it too would install
-    // the same bundle twice and fail with a duplicate BSN.
-    final List<String> embeddedBundleNames =
-        embeddedRuntimeNames.isEmpty() ? List.of() : scanEmbeddedModelBundles();
-    final Set<String> exports = new LinkedHashSet<>(explicitSystemPackages);
-    // A package exported by an installed bundle has that bundle as its sole provider inside the
-    // framework, so it must NEVER be system-exported: bnd emits substitutable exports (an exported
-    // package also appears in Import-Package), and re-exporting it from the system bundle would
-    // split the class — a NoClassDefFoundError at SCR injection time.
-    final Set<String> bundleExportedPackages = new LinkedHashSet<>();
-    for (Path bundleJar : bundleJars) {
-      bundleExportedPackages.addAll(
-          packageNames(readManifestHeader(bundleJar, Constants.EXPORT_PACKAGE)));
+    // Resolve the topology into one ordered list of (location, start level). The embedded topology
+    // DISCOVERS — boot-stack jars by symbolic name, model/edge bundles by the embed capability —
+    // from the staged index; the classpath topology took its bundles explicitly through the
+    // builder.
+    // Either way every bundle is a BundleLocation, so the install loop below is source-agnostic.
+    final List<Installable> stack = new ArrayList<>();
+    final List<BundleLocation> models = new ArrayList<>(modelBundles);
+    for (BundleLocation pax : paxLoggingBundles) {
+      stack.add(new Installable(pax, START_LEVEL_LOGGING));
     }
-    for (String name : embeddedBundleNames) {
-      try (InputStream in = openEmbedded(name)) {
-        bundleExportedPackages.addAll(
-            packageNames(readManifestHeader(in, Constants.EXPORT_PACKAGE)));
+    for (BundleLocation runtime : runtimeBundles) {
+      stack.add(new Installable(runtime, START_LEVEL_FRAMEWORK_RUNTIME));
+    }
+    if (embedsBootStack) {
+      for (BootStackJar jar : BootStackJar.values()) {
+        stack.add(
+            new Installable(
+                discovery.locateBySymbolicName(jar.symbolicName()), startLevelFor(jar.layer())));
       }
+      models.addAll(discovery.matching(EmbedCapability.INSTALL_FILTER));
     }
-    for (Path bundleJar : bundleJars) {
-      exports.addAll(
-          mirrorImportsAsExports(readManifestHeader(bundleJar, Constants.IMPORT_PACKAGE)));
+    for (BundleLocation model : models) {
+      stack.add(new Installable(model, START_LEVEL_BUNDLES));
     }
-    // Embedded bundles live as classpath resources, not files: read each one's manifest straight
-    // from its jar stream for the same Import-Package mirror — no extraction to a temp file.
-    for (String name : embeddedBundleNames) {
-      try (InputStream in = openEmbedded(name)) {
-        exports.addAll(mirrorImportsAsExports(readManifestHeader(in, Constants.IMPORT_PACKAGE)));
-      }
-    }
-    // A mirrored import wires to the system bundle, which exports off the HOST's flat classpath. So
-    // keep an export only when it is genuinely host-provided: drop any package an installed bundle
-    // exports (it owns it internally), and fail fast on any remaining package the host classloader
-    // cannot resolve — a real missing dependency, surfaced here rather than as an opaque
-    // NoClassDefFoundError once SCR tries to inject it.
-    exports.removeIf(e -> bundleExportedPackages.contains(packageName(e)));
-    final List<String> unresolved =
-        exports.stream().map(OsgiRuntime::packageName).filter(p -> !hostResolves(p)).toList();
-    if (!unresolved.isEmpty()) {
-      throw new IllegalStateException(
-          "system.packages.extra would export packages absent from the host classpath: "
-              + unresolved);
-    }
-    if (!paxLoggingJars.isEmpty()) {
-      // pax-logging-api provides org.slf4j to bundles; a second provider (the system bundle
-      // re-exporting it off the flat classpath) would split the slf4j binder — the R1 scar. Drop
-      // org.slf4j from the derived exports so pax is the sole provider inside the framework.
-      exports.removeIf(e -> e.equals("org.slf4j") || e.startsWith("org.slf4j;"));
-    }
+
+    final Set<String> exports = deriveSystemExports(models, discovery);
 
     final FrameworkFactory factory =
         ServiceLoader.load(FrameworkFactory.class)
@@ -405,10 +265,14 @@ public final class OsgiRuntime implements AutoCloseable {
     if (!exports.isEmpty()) {
       config.put(Constants.FRAMEWORK_SYSTEMPACKAGES_EXTRA, String.join(",", exports));
     }
-    if (!paxLoggingJars.isEmpty()) {
+    // Pax Logging present either explicitly (withPaxLogging) or via the embedded boot stack — both
+    // need the same two pax effects below; keying only on the explicit list silently skipped them
+    // for the embedded boot.
+    final boolean paxLoggingPresent = !paxLoggingBundles.isEmpty() || embedsBootStack;
+    if (paxLoggingPresent) {
       // pax-logging-logback reuses the host's logback LoggerContext (one context, host-owned)
-      // rather than a private one; and drains framework/bundle/service events at WARN into the
-      // LogService.
+      // rather
+      // than a private one; and drains framework/bundle/service events at WARN into the LogService.
       config.put("org.ops4j.pax.logging.StaticLogbackContext", "true");
       config.put("org.ops4j.pax.logging.service.frameworkEventsLogLevel", "WARN");
     }
@@ -417,32 +281,13 @@ public final class OsgiRuntime implements AutoCloseable {
     try {
       framework.init();
 
-      // Install everything at level 0, each bundle pinned to its layer and marked
-      // persistently-started; the framework's native start-level machinery — not a hand-ordered
-      // loop — then drives activation in level order when we raise its level below.
-      // Classpath-located
-      // jars install by location URL; embedded ones stream straight into Felix's own bundle cache
-      // (installBundle copies the bytes), so neither needs a temp file.
-      for (Path paxJar : paxLoggingJars) {
-        installAtLevel(paxJar.toUri().toString(), START_LEVEL_LOGGING);
-      }
-      for (String name : embeddedPaxLoggingNames) {
-        installEmbeddedAtLevel(name, START_LEVEL_LOGGING);
-      }
-      for (String runtimeJar : runtimeJars) {
-        installAtLevel("file:" + runtimeJar, START_LEVEL_FRAMEWORK_RUNTIME);
-      }
-      for (String name : embeddedRuntimeNames) {
-        installEmbeddedAtLevel(name, START_LEVEL_FRAMEWORK_RUNTIME);
-      }
-      int bundleCount = 0;
-      for (Path bundleJar : bundleJars) {
-        installAtLevel(bundleLocationUrl(bundleJar), START_LEVEL_BUNDLES);
-        bundleCount++;
-      }
-      for (String name : embeddedBundleNames) {
-        installEmbeddedAtLevel(name, START_LEVEL_BUNDLES);
-        bundleCount++;
+      // Install everything pinned to its layer and marked persistently-started; the framework's
+      // native start-level machinery — not a hand-ordered loop — drives activation in level order
+      // when we raise its level. Declaration order within a level is preserved (pax-api before its
+      // backend). Each bundle installs from its BundleLocation: a packaged jar by URL, an exploded
+      // dir by reference:, a staged jar by streaming its bytes into Felix's cache — one path.
+      for (Installable installable : stack) {
+        installAtLevel(installable.location(), installable.startLevel());
       }
 
       // Raise the framework to its beginning level; STARTED fires once that level is reached and
@@ -467,7 +312,7 @@ public final class OsgiRuntime implements AutoCloseable {
         throw new IllegalStateException(
             "felix.scr reached its start level but ServiceComponentRuntime never appeared");
       }
-      LOG.info("OSGi runtime booted: {} bundle(s) installed and started", bundleCount);
+      LOG.info("OSGi runtime booted: {} bundle(s) installed and started", stack.size());
     } catch (BundleException ex) {
       throw new IOException("failed to boot OSGi runtime", ex);
     } catch (InterruptedException ex) {
@@ -478,103 +323,89 @@ public final class OsgiRuntime implements AutoCloseable {
   }
 
   /**
-   * Install a bundle, pin it to {@code startLevel}, and mark it persistently-started. While the
-   * framework's current level is below {@code startLevel} the bundle stays {@code INSTALLED}; the
-   * framework activates it when it climbs to that level — no manual {@code .start()} ordering.
+   * The {@code system.packages.extra} set: each model bundle's {@code Import-Package} mirrored as a
+   * system export, minus packages an installed bundle exports itself (it is the sole provider
+   * inside the framework — re-exporting from the system bundle would split the class). Fails fast
+   * on a remaining package the host classloader cannot resolve — a real missing dependency,
+   * surfaced here rather than as an opaque NoClassDefFoundError once SCR injects.
    */
-  private void installAtLevel(String location, int startLevel) throws BundleException {
-    final Bundle bundle = context().installBundle(location);
+  private Set<String> deriveSystemExports(List<BundleLocation> models, BundleIndex discovery)
+      throws IOException {
+    final Set<String> exports = new LinkedHashSet<>(explicitSystemPackages);
+    final Set<String> bundleExportedPackages = new LinkedHashSet<>();
+    for (BundleLocation model : models) {
+      bundleExportedPackages.addAll(
+          BundleManifest.packageNames(model.readHeader(Constants.EXPORT_PACKAGE)));
+    }
+    for (BundleLocation model : models) {
+      exports.addAll(
+          BundleManifest.mirrorImportsAsExports(model.readHeader(Constants.IMPORT_PACKAGE)));
+    }
+    exports.removeIf(e -> bundleExportedPackages.contains(BundleManifest.packageName(e)));
+    // The seam guard. A package owned by a domain bundle (type=model/edge) loads on the BUNDLE side
+    // of the seam: its bundle is the sole exporter, never the system bundle. If such a package
+    // still
+    // sits in `exports` here, its exporter is NOT in the install set, so it would leak into
+    // system.packages.extra and split the class against the bundle's own copy. The packages removed
+    // just above (exported by an installed bundle) are the wired-bundle-to-bundle case and are
+    // gone;
+    // what remains and resolves to a domain exporter is the leak. Seam packages (type=seam, the
+    // -port membrane) resolve to null here and stay — that is exactly what belongs in the seam.
+    final List<String> leaked =
+        exports.stream()
+            .map(BundleManifest::packageName)
+            .flatMap(
+                p -> {
+                  final String exporter = discovery.domainExporterOf(p);
+                  return exporter == null
+                      ? Stream.empty()
+                      : Stream.of(p + " (owned by domain bundle " + exporter + ")");
+                })
+            .toList();
+    if (!leaked.isEmpty()) {
+      throw new IllegalStateException(
+          "system.packages.extra would leak domain packages whose owning bundle is not installed — "
+              + "install the owning bundle (wire it bundle-to-bundle) instead of system-exporting it: "
+              + leaked);
+    }
+    final List<String> unresolved =
+        exports.stream().map(BundleManifest::packageName).filter(p -> !hostResolves(p)).toList();
+    if (!unresolved.isEmpty()) {
+      throw new IllegalStateException(
+          "system.packages.extra would export packages absent from the host classpath: "
+              + unresolved);
+    }
+    // pax-logging-api provides org.slf4j to bundles; a second provider (the system bundle
+    // re-exporting it off the flat classpath) would split the slf4j binder — the R1 scar. Drop
+    // org.slf4j so pax is the sole provider inside the framework.
+    if (!paxLoggingBundles.isEmpty() || embedsBootStack) {
+      exports.removeIf(e -> e.equals("org.slf4j") || e.startsWith("org.slf4j;"));
+    }
+    return exports;
+  }
+
+  /**
+   * Install a bundle from its {@link BundleLocation}, pin it to {@code startLevel}, and mark it
+   * persistently-started. While the framework's current level is below {@code startLevel} the
+   * bundle stays {@code INSTALLED}; the framework activates it when it climbs to that level — no
+   * manual {@code .start()} ordering. A staged bundle streams its bytes into Felix's cache
+   * (installBundle copies them); a classpath jar/dir installs by its location URL — no temp file
+   * either way.
+   */
+  private void installAtLevel(BundleLocation location, int startLevel)
+      throws BundleException, IOException {
+    final Bundle bundle =
+        switch (location) {
+          case BundleLocation.Staged staged -> {
+            try (var in = staged.open()) {
+              yield context().installBundle(staged.locationId(), in);
+            }
+          }
+          case BundleLocation.OnClasspath onClasspath ->
+              context().installBundle(onClasspath.locationId());
+        };
     bundle.adapt(BundleStartLevel.class).setStartLevel(startLevel);
     bundle.start();
-  }
-
-  /**
-   * Install an embedded jar ({@code /META-INF/bundles/<name>}) by streaming its bytes straight into
-   * Felix's bundle cache — {@code installBundle(location, stream)} copies them — then pin it to its
-   * layer. No temp file: Felix owns the persisted copy. The location string is informational (the
-   * resource path), used only as the bundle's identity in the cache and logs.
-   */
-  private void installEmbeddedAtLevel(String name, int startLevel)
-      throws BundleException, IOException {
-    try (InputStream in = openEmbedded(name)) {
-      final Bundle bundle = context().installBundle(EMBEDDED_BUNDLES_ROOT + name, in);
-      bundle.adapt(BundleStartLevel.class).setStartLevel(startLevel);
-      bundle.start();
-    }
-  }
-
-  /** Open {@code /META-INF/bundles/<name>} from the running jar, or fail loudly if it is absent. */
-  private InputStream openEmbedded(String name) throws IOException {
-    final String resource = EMBEDDED_BUNDLES_ROOT + name;
-    final InputStream in = OsgiRuntime.class.getResourceAsStream(resource);
-    if (in == null) {
-      throw new IOException("embedded bundle not found on classpath: " + resource);
-    }
-    return in;
-  }
-
-  /**
-   * The staged file names under {@link #EMBEDDED_BUNDLES_ROOT} whose manifest self-declares {@link
-   * #EMBED_CAPABILITY_NAMESPACE} — the model bundles to install, discovered rather than
-   * hand-listed. Sorted by file name for a deterministic install order (model bundles share {@code
-   * START_LEVEL_BUNDLES}, so the framework wires them by capability not by order, but a stable
-   * order keeps the boot log reproducible). On a reactor/test classpath with no staged bundles the
-   * root is absent and this returns an empty list — no exception, the off-exec-jar degraded case.
-   */
-  private List<String> scanEmbeddedModelBundles() throws IOException {
-    final List<String> models = new ArrayList<>();
-    for (String name : listEmbeddedJarNames()) {
-      try (InputStream in = openEmbedded(name)) {
-        if (readManifestHeader(in, "Provide-Capability") instanceof String cap
-            && cap.contains(EMBED_CAPABILITY_NAMESPACE)) {
-          models.add(name);
-        }
-      }
-    }
-    models.sort(String::compareTo);
-    return models;
-  }
-
-  /**
-   * Enumerate the {@code *.jar} file names directly under {@link #EMBEDDED_BUNDLES_ROOT}, covering
-   * both deployment shapes: a {@code jar:} URL when the root lives inside the running exec-jar, and
-   * a {@code file:} directory when {@code generated-resources/META-INF/bundles} is an exploded
-   * resource root (the reactor test classpath). A missing root yields an empty list.
-   */
-  private static List<String> listEmbeddedJarNames() throws IOException {
-    final URL root = OsgiRuntime.class.getResource(EMBEDDED_BUNDLES_ROOT);
-    if (root == null) {
-      return List.of();
-    }
-    final List<String> names = new ArrayList<>();
-    if ("jar".equals(root.getProtocol())) {
-      final JarURLConnection connection = (JarURLConnection) root.openConnection();
-      final String prefix = EMBEDDED_BUNDLES_ROOT.substring(1); // drop the leading '/'
-      try (JarFile jar = connection.getJarFile()) {
-        for (JarEntry entry : java.util.Collections.list(jar.entries())) {
-          final String entryName = entry.getName();
-          if (!entry.isDirectory()
-              && entryName.startsWith(prefix)
-              && entryName.endsWith(".jar")
-              && entryName.indexOf('/', prefix.length()) < 0) {
-            names.add(entryName.substring(prefix.length()));
-          }
-        }
-      }
-    } else {
-      final Path dir;
-      try {
-        dir = Path.of(root.toURI());
-      } catch (URISyntaxException ex) {
-        throw new IOException("malformed embedded-bundles root URL: " + root, ex);
-      }
-      try (var stream = Files.newDirectoryStream(dir, "*.jar")) {
-        for (Path jar : stream) {
-          names.add(jar.getFileName().toString());
-        }
-      }
-    }
-    return names;
   }
 
   /**
@@ -633,42 +464,6 @@ public final class OsgiRuntime implements AutoCloseable {
   }
 
   /**
-   * A directory-based bundle (an exploded {@code target/classes} during reactor builds) installs
-   * via the {@code reference:} scheme; a packaged jar (the embedded-intact bundle in a deployed
-   * exec-jar) installs by its plain file URI. Serving both lets one runtime cover the reactor test
-   * and the deployed process unchanged.
-   */
-  private static String bundleLocationUrl(Path bundleJar) {
-    return Files.isDirectory(bundleJar)
-        ? "reference:" + bundleJar.toUri()
-        : bundleJar.toUri().toString();
-  }
-
-  /**
-   * Turn a bundle's {@code Import-Package} header into system-bundle export clauses: package name
-   * kept, an explicit version range narrowed to its lower bound (so the importer's range is
-   * satisfied), every other directive/attribute dropped. The bundle's OWN exports are not mirrored
-   * — only what it imports needs wiring for it to resolve against the host's flat classpath.
-   */
-  private static Set<String> mirrorImportsAsExports(String importPackage) {
-    if (importPackage == null || importPackage.isBlank()) {
-      return Set.of();
-    }
-    final Set<String> exports = new LinkedHashSet<>();
-    for (String clause : splitClauses(importPackage)) {
-      exports.add(importClauseToExport(clause));
-    }
-    return exports;
-  }
-
-  /**
-   * Bare package name of an export/import clause ({@code foo.bar;version=1.0} → {@code foo.bar}).
-   */
-  private static String packageName(String clause) {
-    return clause.split(";", 2)[0].trim();
-  }
-
-  /**
    * Whether the host (flat) classpath actually carries {@code packageName}. OsgiRuntime runs in the
    * host world, so its own classloader is the flat classpath the system bundle exports from; a
    * package with no directory resource there cannot be wired into the framework.
@@ -679,70 +474,6 @@ public final class OsgiRuntime implements AutoCloseable {
       return OsgiRuntime.class.getClassLoader().getResources(path).hasMoreElements();
     } catch (IOException ex) {
       return false;
-    }
-  }
-
-  /** All package names in a {@code Export-Package}/{@code Import-Package} header. */
-  private static Set<String> packageNames(String header) {
-    if (header == null || header.isBlank()) {
-      return Set.of();
-    }
-    final Set<String> names = new LinkedHashSet<>();
-    for (String clause : splitClauses(header)) {
-      names.add(packageName(clause));
-    }
-    return names;
-  }
-
-  private static String importClauseToExport(String clause) {
-    final String pkg = clause.split(";", 2)[0].trim();
-    for (String part : clause.split(";")) {
-      final String p = part.trim();
-      if (p.startsWith("version=")) {
-        final String raw = p.substring("version=".length()).replace("\"", "");
-        final String lower =
-            raw.startsWith("[") || raw.startsWith("(") ? raw.substring(1).split(",")[0] : raw;
-        return pkg + ";version=" + lower.trim();
-      }
-    }
-    return pkg;
-  }
-
-  private static List<String> splitClauses(String header) {
-    final List<String> clauses = new ArrayList<>();
-    int depth = 0;
-    int start = 0;
-    for (int i = 0; i < header.length(); i++) {
-      final char c = header.charAt(i);
-      if (c == '"') {
-        depth ^= 1;
-      } else if (c == ',' && depth == 0) {
-        clauses.add(header.substring(start, i));
-        start = i + 1;
-      }
-    }
-    clauses.add(header.substring(start));
-    return clauses;
-  }
-
-  private static String readManifestHeader(Path bundleJar, String header) throws IOException {
-    if (Files.isDirectory(bundleJar)) {
-      try (InputStream in = Files.newInputStream(bundleJar.resolve("META-INF/MANIFEST.MF"))) {
-        return new Manifest(in).getMainAttributes().getValue(header);
-      }
-    }
-    try (JarFile jar = new JarFile(bundleJar.toFile())) {
-      final Manifest manifest = jar.getManifest();
-      return manifest == null ? null : manifest.getMainAttributes().getValue(header);
-    }
-  }
-
-  /** Read {@code header} from a jar STREAM's manifest (an embedded bundle resource). */
-  private static String readManifestHeader(InputStream jarStream, String header)
-      throws IOException {
-    try (JarInputStream jar = new JarInputStream(jarStream)) {
-      final Manifest manifest = jar.getManifest();
-      return manifest == null ? null : manifest.getMainAttributes().getValue(header);
     }
   }
 }

@@ -35,6 +35,14 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
+    <!-- The shared boot MODEL: the embed capability, the BootStackJar registry, and the
+         ClasspathBundleIndex this executor consumes to locate bundles + mirror their imports before
+         the framework exists. Same model the test FelixFrameworkExtension reads. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>boot-discovery</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- The passive fluent-pipeline grammar: SeedRuntime wraps its boot-run-close lifecycle as a
          topic via FluentTopicRunner (label → logging + TopicFailure), the same engine the bundles
          use. Consumed flat here (host world). -->

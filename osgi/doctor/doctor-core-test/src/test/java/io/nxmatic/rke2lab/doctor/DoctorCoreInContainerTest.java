@@ -28,38 +28,38 @@ import org.osgi.framework.Bundle;
 @Osgi
 class DoctorCoreInContainerTest {
 
-  private static final String HOST_ARTIFACT = "doctor-core/target";
-  private static final String FRAGMENT_ARTIFACT = "doctor-core-test/target";
-  // doctor-port-test contributes the shared fixtures package (doctor.testkit) — installed so the
-  // host can wire io.nxmatic.rke2lab.doctor.testkit that doctor-core-test imports.
-  private static final String FIXTURES_FRAGMENT_ARTIFACT = "doctor-port-test/target";
-  private static final String DOCTOR_PORT_ARTIFACT = "doctor-port/target";
+  // The doctor suite's two fixtures, selected by what they declare. role=core is the host under
+  // test (its actors); role=port contributes the shared doctor.testkit fixtures package its sibling
+  // imports. Each fragment names its own host (doctor-core / doctor-port) via Fragment-Host, so no
+  // host is named by a literal here.
+  private static final String CORE_FIXTURE = "(&(type=fixture)(suite=doctor)(role=core))";
+  private static final String PORT_FIXTURE = "(&(type=fixture)(suite=doctor)(role=port))";
   private static final String RUNNER_FQN = "io.nxmatic.rke2lab.doctor.DoctorCoreTests";
 
   @RegisterExtension
   static final FelixFrameworkExtension felix =
       JGivenTestkit.felix() // jGiven boot closure (byte-buddy, jgiven-wrap, slf4j/junit packages)
           .installFromClasspath(
-              "opentest4j",
-              "apiguardian-api",
+              "org.opentest4j",
+              "org.apiguardian.api",
               "junit-platform-commons",
               "junit-platform-engine",
               "junit-platform-launcher",
               "junit-jupiter-api",
               "junit-jupiter-params",
               "junit-jupiter-engine",
-              "junit-testkit/target")
+              "io.nxmatic.rke2lab.junit.testkit")
           .build();
 
   @TestFactory
   Stream<DynamicTest> actorTests() throws Exception {
     // doctor-port carries the value vocabulary + the exported doctor.testkit fixtures (via its own
-    // -test fragment); doctor-core depends on it. Install the chain, attach both fragments,
-    // resolve.
-    Bundle port = felix.install(DOCTOR_PORT_ARTIFACT);
-    felix.install(FIXTURES_FRAGMENT_ARTIFACT); // doctor-port-test fragment — exports doctor.testkit
-    Bundle host = felix.install(HOST_ARTIFACT);
-    felix.install(FRAGMENT_ARTIFACT); // doctor-core-test fragment — never started
+    // -test fragment); doctor-core depends on it. Each fixture installs its host + fragment,
+    // located
+    // through the fragment's declared Fragment-Host — no host named by a literal. Attach both
+    // fragments, resolve both hosts together.
+    Bundle port = felix.installFixtureWithHost(PORT_FIXTURE).host();
+    Bundle host = felix.installFixtureWithHost(CORE_FIXTURE).host();
     if (!felix.resolve(List.of(port, host))) {
       fail("doctor-port + doctor-core (with their -test fragments) must resolve");
     }

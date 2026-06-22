@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.junit.testkit.FelixFrameworkExtension;
-import io.nxmatic.rke2lab.junit.testkit.OsgiSpike;
+import io.nxmatic.rke2lab.junit.testkit.Osgi;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -16,8 +16,8 @@ import org.osgi.framework.Bundle;
  * silent empty closure). The real-engine successor to the hand-rolled {@code
  * ConfigExtenderResolutionSpike}.
  */
-@OsgiSpike
-class ExtenderContractSpikeTest {
+@Osgi
+class ExtenderContractTest {
 
   // Plain framework, no declared topology: each method installs its own bundle set and drives
   // resolution by hand (resolve, not start) — the two cases need different bundles.
@@ -26,8 +26,10 @@ class ExtenderContractSpikeTest {
 
   @Test
   void configResolvesWhenHostProvidesTheExtenders() throws Exception {
-    Bundle host = felix.install("host");
-    Bundle config = felix.install("config");
+    // Host + config selected by what they DECLARE (their role), never by a Bundle-SymbolicName a
+    // test keeps in sync. Each role installed once; the config handle drives the per-bundle assert.
+    Bundle host = felix.installMatching("(&(type=fixture)(suite=extender)(role=host))").get(0);
+    Bundle config = felix.installMatching("(&(type=fixture)(suite=extender)(role=config))").get(0);
 
     boolean resolved = felix.resolve(List.of(host, config));
 
@@ -39,9 +41,11 @@ class ExtenderContractSpikeTest {
 
   @Test
   void configStaysUnresolvedWhenHostAbsent() throws Exception {
-    Bundle config = felix.install("config");
+    // The consumer ALONE — omitting role=host is how the anti-cheat proves it stays unresolved.
+    // Selection by declaration, so "no provider" is expressed IN the filter, not by not-naming it.
+    List<Bundle> config = felix.installMatching("(&(type=fixture)(suite=extender)(role=config))");
 
-    boolean resolved = felix.resolve(List.of(config));
+    boolean resolved = felix.resolve(config);
 
     assertFalse(resolved, "no provider for osgi.extender — resolution refuses, loudly");
   }

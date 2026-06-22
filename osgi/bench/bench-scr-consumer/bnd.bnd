@@ -1,2 +1,4 @@
 Bundle-SymbolicName: io.nxmatic.rke2lab.osgibench.scr.consumer
+# Test fixture, selected by installMatching via LDAP filter over these attributes (not by file name).
+Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=scr; role=consumer
 -noimportjava: true

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>boot-discovery</artifactId>
+  <name>osgi/boot/boot-discovery</name>
+  <description>The embedded-OSGi boot MODEL, shared by the prod executor (osgi/runtime) and the
+    test-world FelixFrameworkExtension so both agree on the boot topology instead of re-implementing
+    it. Declares the embed capability namespace bundles self-mark with, the BootStackJar registry of
+    the third-party boot stack (pax-logging, felix.scr/resolver — not ours, so named not scanned),
+    and ClasspathBundleIndex: an instance that scans java.class.path ONCE and answers locate /
+    embeddable-bundles / mirror-imports queries. Depends only on the JDK jar/manifest API — NO felix,
+    NO pax — so a consumer that only needs to FIND bundles never drags the boot runtime's closure
+    (notably pax-logging-api, a second org.slf4j provider) onto its classpath.</description>
+
+  <dependencies>
+    <!-- The OSGi API SPEC jar (not felix): for org.osgi.framework.Filter + FrameworkUtil, used to
+         select embeddable bundles by an LDAP filter over their embed-capability attributes. A spec
+         jar carries no implementation, so this does NOT reintroduce the felix/pax closure the module
+         deliberately avoids — it is the same API the bundles themselves are written against. -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>osgi.core</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

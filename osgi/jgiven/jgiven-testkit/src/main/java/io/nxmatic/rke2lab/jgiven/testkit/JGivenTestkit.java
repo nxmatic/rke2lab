@@ -5,12 +5,15 @@ import io.nxmatic.rke2lab.junit.testkit.FelixFrameworkExtension;
 /**
  * The jGiven boot closure for the OSGi testkit, in one call. Returns a {@link
  * FelixFrameworkExtension.Builder} already carrying everything a host needs to run jGiven scenarios
- * in-container; the host adds only its OWN bundle(s) and {@code build()}s:
+ * in-container; the host then {@code build()}s and, in the test body, installs its own {@code
+ * -test} fixture fragment by what it DECLARES — never by a {@code Bundle-SymbolicName} literal:
  *
  * <pre>{@code
  * @RegisterExtension
- * static final FelixFrameworkExtension felix =
- *     JGivenTestkit.felix().installBundles("doctor-core").build();
+ * static final FelixFrameworkExtension felix = JGivenTestkit.felix().build();
+ *
+ * // in the test: select the fixture by capability; its host comes from the fragment's Fragment-Host
+ * var fixture = felix.installFixtureWithHost("(&(type=fixture)(suite=doctor)(role=core))");
  * }</pre>
  *
  * <p>This is where jGiven-specific OSGi knowledge lives, deliberately OUT of the generic {@link
@@ -35,10 +38,9 @@ import io.nxmatic.rke2lab.junit.testkit.FelixFrameworkExtension;
  */
 public final class JGivenTestkit {
 
-  // The testkit locates bundles by classpath SUBSTRING; "jgiven-wrap" is a prefix of nothing else
-  // under osgi/jgiven now, but anchoring on "<module>/target" keeps it unambiguous against any
-  // future jgiven-wrap-* sibling (reactor -am resolves the wrap to its target/classes dir).
-  public static final String WRAP_ARTIFACT = "jgiven-wrap/target";
+  // Located on the classpath by its Bundle-SymbolicName — the identity it declares, not a file
+  // name.
+  public static final String WRAP_BSN = "io.nxmatic.rke2lab.jgiven.wrap";
 
   private JGivenTestkit() {}
 
@@ -64,13 +66,13 @@ public final class JGivenTestkit {
         // splits its util.concurrent.internal package into the failureaccess companion bundle, so
         // that ships too (itself a proper OSGi bundle: com.google.guava.failureaccess).
         .installFromClasspath(
-            "failureaccess",
-            "guava",
-            "gson",
-            "paranamer",
-            "jansi",
-            "jakarta.annotation",
-            "byte-buddy")
-        .installBundles(WRAP_ARTIFACT);
+            "com.google.guava.failureaccess",
+            "com.google.guava",
+            "com.google.gson",
+            "com.thoughtworks.paranamer",
+            "org.fusesource.jansi",
+            "jakarta.annotation-api",
+            "net.bytebuddy.byte-buddy")
+        .installBundles(WRAP_BSN);
   }
 }

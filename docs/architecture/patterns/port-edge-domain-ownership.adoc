@@ -31,8 +31,11 @@ Each role has exactly one verb. Keeping the verbs straight is the whole model:
 | *port* (`-port`)
 | *DECLARES*
 | The shared interface of call + the pure exchange records. A *passive type*, exported so both sides
-  share the same class. It is NOT resolved and carries NO capability — no `@Component`. It is the
-  *address*, not the door. Owned by the consumer (lives in its `-port` module), never named after the edge.
+  share the same class. It is NOT resolved and carries no _resolution/service_ capability — no
+  `@Component`. (It does carry one passive *discovery marker*, `type=seam` — see
+  <<the-boot-face,the boot face>> — which the resolver ignores, being a namespace with no `Require`
+  side.) It is the *address*, not the door. Owned by the consumer (lives in its `-port` module), never
+  named after the edge.
 
 | *edge* (`<target>-edge`)
 | *PROVIDES*
@@ -168,6 +171,87 @@ same gesture as the registry above: *read the real artifact* (the capability the
 never a parallel hand-maintained list — `model-substrate-alignment` applied to the build. See
 link:../osgi/osgi-boot-single-source-handoff.adoc[the OSGi boot single-source handoff].
 ====
+
+[[the-boot-face]]
+== The boot face — how each role loads (the seam, and why we keep losing it)
+
+Ownership tells the roles apart at *design* time. But they also differ at *boot* time — in which
+classloader each role's classes live — and that difference is the one we keep forgetting and then
+rediscovering the hard way (a split class, a silent `ClassCastException` across the host seam). This
+section pins it down so it stays pinned.
+
+The host (`seed-master` and the two CLIs) runs *flat, outside OSGi* on the JVM application classloader
+(JCL). It boots an embedded Felix and reads services back out of it — e.g.
+`osgiRuntime.awaitService(ManifestUpdateGate.class)`, a `-port` type. For that typed handoff to work
+(no reflection, no `ClassCastException`), the flat host *and* the installed bundle must share *one copy*
+of the `-port` class. There is exactly one mechanism for one shared copy: the *system bundle* exports
+the package (`FRAMEWORK_SYSTEMPACKAGES_EXTRA`), so every bundle imports the host's class rather than
+loading its own. That shared-export boundary is the *seam*.
+
+[IMPORTANT]
+====
+*The seam law (the load-bearing invariant).* A class of a `-port` is loaded by the *host JCL* and shared
+into the framework via a system export. A class of a *domain* (`-core`) or an *edge* is loaded by its
+*bundle classloader* and never escapes to the JCL. Equivalently, stated as the guard:
+
+* `type=model` / `type=edge` package ⟹ exported by *its bundle only*, **never** in
+  `system.packages.extra`. Leaking it there gives two copies (flat + bundle) and splits the class.
+* `type=seam` package (and genuinely non-OSGi third-party jars with no `Bundle-SymbolicName`) ⟹
+  exported by the *system bundle*, shared with the flat host. This is deliberate, and the *only* thing
+  that legitimately belongs there.
+
+A `-port` carries a `Bundle-SymbolicName` (it is a real jar), so "has a BSN ⟹ install it as a bundle"
+is *too strong* — it would install the `-port` as its own bundle, give the host a second copy, and break
+the very typed handoff the seam exists for. The discriminator is not "is it a bundle" but "which side of
+the seam does it load on", and that is *declared*, not inferred.
+====
+
+So the embed namespace `io.nxmatic.rke2lab.embed` carries a fourth `type`, the seam, alongside the three
+ownership roles' boot faces:
+
+[cols="1,2,2",options="header"]
+|===
+| `type=` | Role | Boot face
+
+| `model`
+| domain (`-core`) with `@Component`
+| Installed as a bundle (BundleCL). Its exported packages stay its own — never system-exported.
+
+| `edge`
+| `<target>-edge` with `@Component`
+| Installed as a bundle (BundleCL). Same: its packages never leak to the system bundle.
+
+| `seam`
+| `-port` (the membrane)
+| NOT installed as a bundle. System-exported so the flat host shares one typed copy. The JCL side of
+  the boundary.
+
+| `fixture`
+| test-only carrier (+ `suite`/`role`)
+| Installed only by the test harness (`FelixFrameworkExtension`), never on a runtime classpath.
+|===
+
+The one question the `type=seam` value answers — the key phrase to keep:
+
+[quote]
+____
+*Which side of the seam frontier does the port load on?* — the system bundle (JCL), shared with the flat
+host, or its own bundle (BundleCL), kept inside the framework.
+____
+
+That is the whole meaning of the value, and it is *factual, not metaphorical*: in OSGi exactly one
+classloader may *define* a given package; everyone else *imports* that one copy (one package = one
+exporter = one class). So "which side does it load on" is just "which classloader defines this package —
+the system bundle, or a specific bundle?". `type=seam` declares the answer is *the system bundle* (so the
+flat host and the bundles share one typed copy); `type=model`/`type=edge` declares the answer is *that
+bundle alone* (and the system bundle must never also define it, or the two copies split the class).
+
+Why a *declared* `type=seam` and not an inferred "no `@Component` ⟹ seam": inference is negative and
+fragile — the day a `-port` grows a component it would silently flip from seam to domain and the seam
+would break with no warning. Declaring the seam positively, in the same namespace as the rest, is the
+single-source-of-truth gesture applied here: the bundle *says* which side of the frontier it loads on,
+the boot reads it, nothing guesses. The guard then fail-fasts (naming the package) if a
+`type=model`/`type=edge` package would ever reach `system.packages.extra`.
 
 == The decisive test — domain vs edge
 

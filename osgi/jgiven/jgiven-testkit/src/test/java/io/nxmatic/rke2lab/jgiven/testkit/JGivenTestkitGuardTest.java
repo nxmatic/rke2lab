@@ -36,8 +36,7 @@ import org.osgi.framework.Bundle;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class JGivenTestkitGuardTest {
 
-  private static final String FRAGMENT_ARTIFACT = "jgiven-probe-test";
-  private static final String HOST_ARTIFACT = "jgiven-probe";
+  private static final String FIXTURE_FILTER = "(&(type=fixture)(suite=jgiven)(role=probe))";
   private static final String RUNNER_FQN = "io.nxmatic.rke2lab.jgiven.probe.VaultScenarioRunner";
 
   @RegisterExtension static final FelixFrameworkExtension felix = JGivenTestkit.felix().build();
@@ -46,7 +45,7 @@ class JGivenTestkitGuardTest {
   @Test
   @Order(2)
   void palier2_wrapBundleReachesActive() {
-    Bundle wrap = felix.bundle(JGivenTestkit.WRAP_ARTIFACT);
+    Bundle wrap = felix.bundle(JGivenTestkit.WRAP_BSN);
     assertEquals(
         Bundle.ACTIVE,
         wrap.getState(),
@@ -65,10 +64,14 @@ class JGivenTestkitGuardTest {
   @Test
   @Order(3)
   void palier3_scenarioRunsInContainerViaFragment() throws Exception {
-    // Install both WITHOUT starting: a fragment cannot be started, and the host must be resolved
-    // only AFTER the fragment is present so the framework attaches it (OSGi Core §3.14).
-    Bundle host = felix.install(HOST_ARTIFACT);
-    Bundle fragment = felix.install(FRAGMENT_ARTIFACT);
+    // Select the probe fixture by what it DECLARES; its host (jgiven-probe) is found through the
+    // fragment's Fragment-Host, so neither is named by a Bundle-SymbolicName literal. Both
+    // installed
+    // WITHOUT starting: a fragment cannot be started, and the host is resolved only AFTER the
+    // fragment is present so the framework attaches it (OSGi Core §3.14).
+    FelixFrameworkExtension.FixtureWithHost fixture = felix.installFixtureWithHost(FIXTURE_FILTER);
+    Bundle host = fixture.host();
+    Bundle fragment = fixture.fragment();
 
     // Resolve the host: the framework folds the fragment's Import-Package into the host's and
     // resolves the merged set as one, attaching the fragment.

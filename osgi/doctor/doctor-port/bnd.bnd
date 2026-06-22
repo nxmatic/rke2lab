@@ -1,4 +1,10 @@
 Bundle-SymbolicName: io.nxmatic.rke2lab.doctor.port
 Export-Package: \
     io.nxmatic.rke2lab.doctor.port
+# The seam: the flat host reads these -port services back out of the embedded framework TYPED, so the
+# system bundle must be the SOLE exporter of these packages (one exporter = one class, no split).
+# type=seam declares that boot face — the boot system-exports it instead of installing it as a bundle,
+# and the leak guard never flags it. A discovery marker, not a resolution capability (no Require side).
+# See docs/architecture/patterns/port-edge-domain-ownership.adoc § "The boot face".
+Provide-Capability: io.nxmatic.rke2lab.embed; type=seam
 -noimportjava: true

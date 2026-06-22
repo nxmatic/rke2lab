@@ -18,9 +18,7 @@
   <modules>
     <module>bench-config</module>
     <module>bench-host</module>
-    <module>bench-schema</module>
     <module>bench-scr-api</module>
-    <module>bench-scr-provider</module>
     <module>bench-scr-consumer</module>
     <module>bench-tests</module>
   </modules>

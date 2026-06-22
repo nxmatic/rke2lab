@@ -28,32 +28,32 @@ import org.osgi.framework.Bundle;
 @Osgi
 class DoctorPortInContainerTest {
 
-  private static final String HOST_ARTIFACT = "doctor-port/target";
-  private static final String FRAGMENT_ARTIFACT = "doctor-port-test/target";
+  private static final String FIXTURE_FILTER = "(&(type=fixture)(suite=doctor)(role=port))";
   private static final String RUNNER_FQN = "io.nxmatic.rke2lab.doctor.port.DoctorPortTests";
 
   @RegisterExtension
   static final FelixFrameworkExtension felix =
       FelixFrameworkExtension.builder()
           // The JUnit world + the in-container runner bundle, each an OSGi bundle, installed so the
-          // launcher + jupiter engine + the runner resolve as bundles (located by classpath
-          // substring).
+          // launcher + jupiter engine + the runner resolve as bundles (located by
+          // Bundle-SymbolicName).
           .installFromClasspath(
-              "opentest4j",
-              "apiguardian-api",
+              "org.opentest4j",
+              "org.apiguardian.api",
               "junit-platform-commons",
               "junit-platform-engine",
               "junit-platform-launcher",
               "junit-jupiter-api",
               "junit-jupiter-params",
               "junit-jupiter-engine",
-              "junit-testkit/target")
+              "io.nxmatic.rke2lab.junit.testkit")
           .build();
 
   @TestFactory
   Stream<DynamicTest> valueTypeTests() throws Exception {
-    final Bundle host = felix.install(HOST_ARTIFACT);
-    felix.install(FRAGMENT_ARTIFACT); // fragment — never started
+    // Select the doctor-port fixture by what it DECLARES; its host (doctor-port) is found through
+    // the fragment's Fragment-Host — neither named by a literal. Both installed, neither started.
+    final Bundle host = felix.installFixtureWithHost(FIXTURE_FILTER).host();
     if (!felix.resolve(List.of(host))) {
       fail("doctor-port host (with its -test fragment) must resolve");
     }

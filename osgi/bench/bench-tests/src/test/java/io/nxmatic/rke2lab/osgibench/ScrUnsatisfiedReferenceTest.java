@@ -3,7 +3,7 @@ package io.nxmatic.rke2lab.osgibench;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import io.nxmatic.rke2lab.junit.testkit.FelixFrameworkExtension;
-import io.nxmatic.rke2lab.junit.testkit.OsgiSpike;
+import io.nxmatic.rke2lab.junit.testkit.Osgi;
 import io.nxmatic.rke2lab.osgibench.scr.Greeter;
 import io.nxmatic.rke2lab.osgibench.scr.GreetingClient;
 import org.junit.jupiter.api.Test;
@@ -17,8 +17,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * no published consumer. Its own framework (separate class) so the provider bundle is genuinely
  * never installed.
  */
-@OsgiSpike
-class ScrUnsatisfiedReferenceSpikeTest {
+@Osgi
+class ScrUnsatisfiedReferenceTest {
 
   // The consumer is installed but NOT the provider — the anti-cheat is right here in the topology.
   // api from the system bundle: the consumer RESOLVES (the api is present) but SCR leaves it
@@ -28,7 +28,9 @@ class ScrUnsatisfiedReferenceSpikeTest {
       FelixFrameworkExtension.builder()
           .withScr()
           .systemPackages("io.nxmatic.rke2lab.osgibench.scr;version=0.1.0")
-          .installBundles("scr-consumer")
+          // The consumer ONLY — omitting role=provider is how the anti-cheat proves it stays
+          // unsatisfied. Selection by declaration, so "no provider" is expressed in the filter.
+          .installMatching("(&(type=fixture)(suite=scr)(role=consumer))")
           .build();
 
   @Test
