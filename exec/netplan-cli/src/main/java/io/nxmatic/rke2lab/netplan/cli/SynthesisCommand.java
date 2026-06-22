@@ -17,7 +17,7 @@ public final class SynthesisCommand implements NetplanCli.Command {
     // seam),
     // resolve the one netplan service from the registry, drive it, then close. No flat-classpath
     // fallback: netplan-core's @Component activates only under a framework.
-    SeedRuntime.bootingEmbedded("netplan-core.jar")
+    SeedRuntime.bootingEmbedded()
         .during("synthesis", NetplanSynthesisService.class, this::synthesize);
   }
 

@@ -33,21 +33,19 @@ public final class SeedRuntime {
   private SeedRuntime() {}
 
   /**
-   * Begin a seed boot over {@link OsgiRuntime#embeddedBootStack()} plus the given model bundle(s) —
-   * their staged file names under {@link OsgiRuntime#EMBEDDED_BUNDLES_ROOT}, e.g. {@code
-   * "manifests-core.jar"}. Choose the tail shape with {@code during(...)}.
+   * Begin a seed boot over {@link OsgiRuntime#embeddedBootStack()}. The model bundle(s) to install
+   * are not named here: {@link OsgiRuntime#boot()} DISCOVERS them by scanning {@link
+   * OsgiRuntime#EMBEDDED_BUNDLES_ROOT} for the embed capability, so an entrypoint declares only its
+   * staged jars (the pom) — never a name in Java. Choose the tail shape with {@code during(...)}.
    */
-  public static Booting bootingEmbedded(String... modelBundleJars) {
-    return new Booting(modelBundleJars.clone());
+  public static Booting bootingEmbedded() {
+    return new Booting();
   }
 
-  /** The model bundle set is fixed; the tail shape is chosen via {@code during(...)}. */
+  /** The tail shape is chosen via {@code during(...)}; the model bundles are scanned at boot. */
   public static final class Booting {
-    private final String[] modelBundleJars;
 
-    private Booting(String[] modelBundleJars) {
-      this.modelBundleJars = modelBundleJars;
-    }
+    private Booting() {}
 
     /**
      * Boot the framework, run {@code tail} with the booted {@link OsgiRuntime}, then close it. For
@@ -94,11 +92,7 @@ public final class SeedRuntime {
     }
 
     private OsgiRuntime boot() throws IOException {
-      final OsgiRuntime.Builder builder = OsgiRuntime.embeddedBootStack();
-      for (String modelBundleJar : modelBundleJars) {
-        builder.embeddedBundle(modelBundleJar);
-      }
-      return builder.build().boot();
+      return OsgiRuntime.embeddedBootStack().build().boot();
     }
   }
 }

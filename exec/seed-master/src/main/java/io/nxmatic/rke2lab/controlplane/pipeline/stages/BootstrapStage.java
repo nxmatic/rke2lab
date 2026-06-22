@@ -64,7 +64,7 @@ public final class BootstrapStage {
     // stages read the manifests-world services from its registry. SeedRuntime closes the framework
     // after the tail returns or throws — and the runbook render in the tail's own finally runs
     // BEFORE that close, so a CRITICAL stop still produces a runbook.
-    SeedRuntime.bootingEmbedded("manifests-core.jar")
+    SeedRuntime.bootingEmbedded()
         .during("bootstrap", osgiRuntime -> runUnderRuntime(osgiRuntime, runbook, consultations));
     return this;
   }

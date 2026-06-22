@@ -152,12 +152,21 @@ per `model-substrate-alignment` — do not describe a substrate that does not ex
 
 [NOTE]
 ====
-*The boot trap (a prerequisite increment, flagged here).* The `META-INF/bundles` embed topology is
-hand-listed at ~8 sites with no single source — `OsgiRuntime` admits it ("poms cannot call Java, this is
-the authoritative registry during review"). The fix is a single source by *scanning* `META-INF/bundles`,
-its own increment. It is the same gesture as the registry above: *read the real artifact* (services
-published / jars present), never a parallel hand-maintained list — `model-substrate-alignment` applied to
-the registry and to the build. To port into integration when that increment lands.
+*The boot trap (resolved — `refactor/osgi-boot-single-source`).* The `META-INF/bundles` embed topology
+WAS hand-listed at ~8 sites with no single source — `OsgiRuntime` admitted it ("poms cannot call Java,
+this is the authoritative registry during review"). It is now single-sourced by a *capability scan*: each
+model bundle self-declares `Provide-Capability: io.nxmatic.rke2lab.embed; type=model` in its `bnd.bnd`,
+and `OsgiRuntime.boot()` scans `META-INF/bundles`, reads each jar's manifest, and installs exactly the
+carriers of that capability. The boot-stack jars (pax/scr/resolver) do not carry the marker, so they are
+excluded *objectively* — not by a name filter, which would be a hand-list in disguise that slips at the
+first rename. All the Java bundle-name literals (`bootingEmbedded("…jar")`, the builder's
+`embeddedBundle(…)` verb, the tests' `embeddedBundle(…)`) are gone; adding an embedded bundle is now one
+pom `artifactItem` + one capability line in its bnd, zero Java. The staging `artifactItem` and the
+shade `<exclude>` remain the two pom faces of one declaration (the shade runs before the boot, so it
+cannot be scanned), but that is the irreducible pom side — the Java hand-list is eliminated. This is the
+same gesture as the registry above: *read the real artifact* (the capability the jar actually declares),
+never a parallel hand-maintained list — `model-substrate-alignment` applied to the build. See
+link:../osgi/osgi-boot-single-source-handoff.adoc[the OSGi boot single-source handoff].
 ====
 
 == The decisive test — domain vs edge

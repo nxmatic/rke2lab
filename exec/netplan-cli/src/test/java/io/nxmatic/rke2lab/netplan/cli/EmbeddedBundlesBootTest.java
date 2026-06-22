@@ -29,7 +29,7 @@ class EmbeddedBundlesBootTest {
     assertTrue(
         OsgiRuntime.hasEmbeddedBundles(),
         "the stage-embedded-bundles execution must have placed the jars under META-INF/bundles");
-    runtime = OsgiRuntime.embeddedBootStack().embeddedBundle("netplan-core.jar").build().boot();
+    runtime = OsgiRuntime.embeddedBootStack().build().boot();
   }
 
   @AfterAll

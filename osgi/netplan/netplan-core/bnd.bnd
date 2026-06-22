@@ -1,3 +1,8 @@
 Bundle-SymbolicName: io.nxmatic.rke2lab.netplan.core
 Export-Package: io.nxmatic.rke2lab.netplan
+# Self-declares this jar as a model bundle to embed + install under META-INF/bundles/. OsgiRuntime
+# scans the staged jars for this capability and installs the carriers as model bundles; the
+# boot-stack jars (pax/scr/resolver) do not carry it, so they are excluded objectively — no
+# hand-list of names. Our own namespace, no matching Require-Capability, so the resolver ignores it.
+Provide-Capability: io.nxmatic.rke2lab.embed; type=model
 -noimportjava: true

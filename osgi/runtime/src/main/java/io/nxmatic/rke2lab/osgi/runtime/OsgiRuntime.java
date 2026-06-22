@@ -2,6 +2,9 @@ package io.nxmatic.rke2lab.osgi.runtime;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.JarURLConnection;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -12,6 +15,7 @@ import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarInputStream;
 import java.util.jar.Manifest;
@@ -84,12 +88,24 @@ public final class OsgiRuntime implements AutoCloseable {
   public static final String EMBEDDED_BUNDLES_ROOT = "/META-INF/bundles/";
 
   /**
-   * Staged file names of the boot-stack jars every exec entrypoint embeds under {@link
-   * #EMBEDDED_BUNDLES_ROOT}. The single source of truth for these names: {@link
-   * #embeddedBootStack()} and {@link #hasEmbeddedBundles()} read them here, and each exec module's
-   * {@code maven-dependency-plugin} {@code stage-embedded-bundles} execution names the same files
-   * via {@code destFileName} — the catalog that keeps the boot code and the staging in lock-step
-   * (poms cannot call Java, so this is the authoritative registry during review).
+   * The {@code Provide-Capability} namespace a jar self-declares (in its {@code bnd.bnd}) to mark
+   * itself a MODEL bundle to embed + install — the single source of truth for "which staged jars
+   * are model bundles". {@link #boot()} scans {@link #EMBEDDED_BUNDLES_ROOT} and installs exactly
+   * the carriers of this capability; the boot-stack jars do not carry it, so they are excluded
+   * objectively, with no parallel hand-list of names. Our own namespace with no matching {@code
+   * Require-Capability}, so the OSGi resolver ignores it — it never affects package wiring.
+   */
+  public static final String EMBED_CAPABILITY_NAMESPACE = "io.nxmatic.rke2lab.embed";
+
+  /**
+   * Staged file names of the BOOT-STACK jars every exec entrypoint embeds under {@link
+   * #EMBEDDED_BUNDLES_ROOT}. These four are named-by-constant on purpose: the boot stack is fixed
+   * and identical across entrypoints, so {@link #embeddedBootStack()} installs them by name and
+   * {@link #hasEmbeddedBundles()} probes one of them. The MODEL bundles are NOT listed here — they
+   * are discovered by scanning for {@link #EMBED_CAPABILITY_NAMESPACE} ({@link
+   * #scanEmbeddedModelBundles()}), so adding a model bundle needs no Java edit. For the boot stack
+   * the pom {@code stage-embedded-bundles} {@code destFileName} must still match these constants;
+   * poms cannot call Java, so this stays the authoritative boot-stack registry during review.
    */
   public static final String PAX_LOGGING_API_JAR = "pax-logging-api.jar";
 
@@ -103,7 +119,6 @@ public final class OsgiRuntime implements AutoCloseable {
   private final List<String> runtimeJars;
   private final boolean startScr;
   private final List<Path> paxLoggingJars;
-  private final List<String> embeddedBundleNames;
   private final List<String> embeddedRuntimeNames;
   private final List<String> embeddedPaxLoggingNames;
   private final Set<String> explicitSystemPackages;
@@ -115,7 +130,6 @@ public final class OsgiRuntime implements AutoCloseable {
     this.runtimeJars = List.copyOf(builder.runtimeJars);
     this.startScr = builder.startScr;
     this.paxLoggingJars = List.copyOf(builder.paxLoggingJars);
-    this.embeddedBundleNames = List.copyOf(builder.embeddedBundleNames);
     this.embeddedRuntimeNames = List.copyOf(builder.embeddedRuntimeNames);
     this.embeddedPaxLoggingNames = List.copyOf(builder.embeddedPaxLoggingNames);
     this.explicitSystemPackages = new LinkedHashSet<>(builder.systemPackages);
@@ -129,10 +143,11 @@ public final class OsgiRuntime implements AutoCloseable {
    * A builder pre-loaded with the boot stack every exec entrypoint shares — Pax Logging at the
    * LogService layer, felix.scr as the DS extender, felix.resolver as the {@code
    * org.osgi.service.resolver.Resolver} provider — all from the embedded {@link
-   * #EMBEDDED_BUNDLES_ROOT}. The per-entrypoint variation is only WHICH model bundle(s) to add:
-   * each caller chains its own {@code .embeddedBundle(...)} onto the returned builder before {@link
-   * Builder#build()}. Keeps the three entrypoints (seed-master + the two CLIs) booting an identical
-   * framework, so a boot change is made once here, not copy-pasted per main().
+   * #EMBEDDED_BUNDLES_ROOT}. There is NO per-entrypoint variation to add: {@link #boot()} discovers
+   * the model bundle(s) by scanning {@link #EMBEDDED_BUNDLES_ROOT} for {@link
+   * #EMBED_CAPABILITY_NAMESPACE}, so every entrypoint just calls {@code
+   * embeddedBootStack().build()}. Keeps the three entrypoints (seed-master + the two CLIs) booting
+   * an identical framework, so a boot change is made once here, not copy-pasted per main().
    */
   public static Builder embeddedBootStack() {
     return builder()
@@ -177,7 +192,6 @@ public final class OsgiRuntime implements AutoCloseable {
     private final List<String> runtimeJars = new ArrayList<>();
     private final List<String> systemPackages = new ArrayList<>();
     private final List<Path> paxLoggingJars = new ArrayList<>();
-    private final List<String> embeddedBundleNames = new ArrayList<>();
     private final List<String> embeddedRuntimeNames = new ArrayList<>();
     private final List<String> embeddedPaxLoggingNames = new ArrayList<>();
     private boolean startScr;
@@ -217,16 +231,6 @@ public final class OsgiRuntime implements AutoCloseable {
     }
 
     /**
-     * Like {@link #bundle(Path)} but the jar is embedded in the running exec-jar under {@link
-     * #EMBEDDED_BUNDLES_ROOT}; {@code name} is its staged file name (e.g. {@code
-     * "manifests-core.jar"}). {@link #boot()} extracts it, then installs it identically.
-     */
-    public Builder embeddedBundle(String name) {
-      this.embeddedBundleNames.add(name);
-      return this;
-    }
-
-    /**
      * Like {@link #runtimeJar(Path)} but resolved from the embedded {@link #EMBEDDED_BUNDLES_ROOT}.
      */
     public Builder embeddedRuntimeJar(String name) {
@@ -258,6 +262,16 @@ public final class OsgiRuntime implements AutoCloseable {
 
   /** Boot the framework, install+start pax-logging + felix.scr (if requested) and the bundles. */
   public OsgiRuntime boot() throws IOException {
+    // The model bundles to install are DISCOVERED, not hand-listed: scan the staged jars under
+    // EMBEDDED_BUNDLES_ROOT and keep those whose manifest self-declares the embed capability. The
+    // boot-stack jars (pax/scr/resolver) are staged in the same root but do not carry the marker,
+    // so they are excluded objectively — the install-by-name path above handles them. The scan runs
+    // ONLY in the embedded boot topology (embeddedBootStack(), which fills embeddedRuntimeNames):
+    // the classpath topology installs its model bundle by reactor path via bundle(Path), and the
+    // staged META-INF/bundles/ is then also on the test classpath — scanning it too would install
+    // the same bundle twice and fail with a duplicate BSN.
+    final List<String> embeddedBundleNames =
+        embeddedRuntimeNames.isEmpty() ? List.of() : scanEmbeddedModelBundles();
     final Set<String> exports = new LinkedHashSet<>(explicitSystemPackages);
     // A package exported by an installed bundle has that bundle as its sole provider inside the
     // framework, so it must NEVER be system-exported: bnd emits substitutable exports (an exported
@@ -431,6 +445,70 @@ public final class OsgiRuntime implements AutoCloseable {
       throw new IOException("embedded bundle not found on classpath: " + resource);
     }
     return in;
+  }
+
+  /**
+   * The staged file names under {@link #EMBEDDED_BUNDLES_ROOT} whose manifest self-declares {@link
+   * #EMBED_CAPABILITY_NAMESPACE} — the model bundles to install, discovered rather than
+   * hand-listed. Sorted by file name for a deterministic install order (model bundles share {@code
+   * START_LEVEL_BUNDLES}, so the framework wires them by capability not by order, but a stable
+   * order keeps the boot log reproducible). On a reactor/test classpath with no staged bundles the
+   * root is absent and this returns an empty list — no exception, the off-exec-jar degraded case.
+   */
+  private List<String> scanEmbeddedModelBundles() throws IOException {
+    final List<String> models = new ArrayList<>();
+    for (String name : listEmbeddedJarNames()) {
+      try (InputStream in = openEmbedded(name)) {
+        if (readManifestHeader(in, "Provide-Capability") instanceof String cap
+            && cap.contains(EMBED_CAPABILITY_NAMESPACE)) {
+          models.add(name);
+        }
+      }
+    }
+    models.sort(String::compareTo);
+    return models;
+  }
+
+  /**
+   * Enumerate the {@code *.jar} file names directly under {@link #EMBEDDED_BUNDLES_ROOT}, covering
+   * both deployment shapes: a {@code jar:} URL when the root lives inside the running exec-jar, and
+   * a {@code file:} directory when {@code generated-resources/META-INF/bundles} is an exploded
+   * resource root (the reactor test classpath). A missing root yields an empty list.
+   */
+  private static List<String> listEmbeddedJarNames() throws IOException {
+    final URL root = OsgiRuntime.class.getResource(EMBEDDED_BUNDLES_ROOT);
+    if (root == null) {
+      return List.of();
+    }
+    final List<String> names = new ArrayList<>();
+    if ("jar".equals(root.getProtocol())) {
+      final JarURLConnection connection = (JarURLConnection) root.openConnection();
+      final String prefix = EMBEDDED_BUNDLES_ROOT.substring(1); // drop the leading '/'
+      try (JarFile jar = connection.getJarFile()) {
+        for (JarEntry entry : java.util.Collections.list(jar.entries())) {
+          final String entryName = entry.getName();
+          if (!entry.isDirectory()
+              && entryName.startsWith(prefix)
+              && entryName.endsWith(".jar")
+              && entryName.indexOf('/', prefix.length()) < 0) {
+            names.add(entryName.substring(prefix.length()));
+          }
+        }
+      }
+    } else {
+      final Path dir;
+      try {
+        dir = Path.of(root.toURI());
+      } catch (URISyntaxException ex) {
+        throw new IOException("malformed embedded-bundles root URL: " + root, ex);
+      }
+      try (var stream = Files.newDirectoryStream(dir, "*.jar")) {
+        for (Path jar : stream) {
+          names.add(jar.getFileName().toString());
+        }
+      }
+    }
+    return names;
   }
 
   /**

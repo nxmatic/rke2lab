@@ -149,7 +149,7 @@ public final class Main {
       // manifests-core's
       // @Component activates only under a framework, so off-framework ServiceLoader yielded a null
       // Resolver — the bug this migration fixes.
-      SeedRuntime.bootingEmbedded("manifests-core.jar")
+      SeedRuntime.bootingEmbedded()
           .during("synthesize", ManifestSynthesisService.class, this::synthesize);
     }
 
