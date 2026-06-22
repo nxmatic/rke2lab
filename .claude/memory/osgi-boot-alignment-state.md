@@ -1,6 +1,6 @@
 ---
 name: osgi-boot-alignment-state
-description: "RESUME POINT for the osgi-boot-alignment chantier (worktree refactor/osgi-boot-alignment, branched off design/pre-integration @ 4d99f599). Single-sources the embedded-OSGi boot: ONE model module osgi/boot/boot-discovery shared by both executors (prod OsgiRuntime + test FelixFrameworkExtension); bundles located by what they DECLARE (Bundle-SymbolicName for third-party, embed-capability LDAP filter for ours) — the filename-matching heuristic is GONE. 4 commits done, build GREEN. REMAINING: string-literal dedup, SCR_API_PACKAGES versions, jul->slf4j visibility, #4 shade/staging mojo."
+description: "PARKED, still OPEN — the osgi-boot-alignment chantier (worktree refactor/osgi-boot-alignment KEPT, not killed). A GREEN increment was squash-merged into design/pre-integration (squash 60e81998) ONLY to give the staging extension a common base — the chantier is NOT finished. Done so far: single-sourced the embedded-OSGi boot (ONE model module osgi/boot/boot-discovery shared by prod OsgiRuntime + test FelixFrameworkExtension; bundles located by what they DECLARE — BSN for third-party, embed-capability LDAP for ours; filename heuristic GONE), type=seam guard, full BSN→capability migration. STILL IN SCOPE (resumes on this branch): jul→slf4j visibility; and the post-extension return to the exec-jars — let the extension place the bundles, validate the DS-API gate, DELETE SCR_API_PACKAGES."
 metadata:
   node_type: memory
   type: project
