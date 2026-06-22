@@ -34,16 +34,22 @@ SHIPPED + integrated into design/pre-integration:
 
 ## OPEN — order matters
 
-1. **feature/ssh-to-age-edge (NEXT — its prerequisite is now integrated).** Worktree at ac61c50c, clean;
-   rebase it on the new design tip first (boot-single-source landed). The first external edge in the OSGi
-   WORLD (its consumer `DefaultManifestSynthesisService` is a `@Component`; world is derived from the
-   consumer). Fixes the sops defect: `SopsAgeSecretManifestsUnit.doSynthesize` currently FETCHES the SSH
-   key + shells `ssh-to-age` mid-synthesis (line ~160). Fix = the `@Component` runs a PRE-SYNTHESIS pass
-   calling the converter, binds the age key into `ManifestSynthesisContext` (the profile holder, same
-   channel as IncusIdentityMaterial — NOT ManifestsUnitContext), and doSynthesize only reads it. The
-   contact materialises as `ssh-to-age-edge` (OSGi world, playable ProcessBuilder) + a `SshToAgeConverter`
-   port owned by the consumer; NO `-core`, NO ssh-to-age-port. Adding this bundle now = 1 staging
-   artifactItem + the embed capability in its bnd, ZERO Java (thanks to boot-single-source).
+1. **feature/ssh-to-age-edge — SHIPPED (2026-06-22), build GREEN, awaiting integration into
+   design/pre-integration.** The first external edge in the OSGi WORLD. `osgi/ssh-to-age-edge`
+   (`ProcessBuilderSshToAgeConverter @Component`) provides the consumer-owned `SshToAgeConverter` seam +
+   `SopsAgeMaterial` profile in `manifests-port`; NO `-core`, NO ssh-to-age-port. `DefaultManifestSynthesisService`
+   runs a PRE-SYNTHESIS pass (`SopsAgeMaterialResolver`: typed Jackson read of keys.yaml — regex GONE —
+   then the converter), binds `SopsAgeMaterial` on `ManifestSynthesisContext` (profile holder, NOT
+   ManifestsUnitContext); `SopsAgeSecretManifestsUnit` only renders (old fetch methods deleted). `@Reference`
+   MANDATORY → fail-fast. Packaging: 1 staging artifactItem + `Provide-Capability: …embed; type=edge;
+   edge=ssh-to-age` per its bnd (cores retrofitted to `type=model; model=<id>`), in seed-master + manifests-cli.
+   Surefire: seed-master 68, manifests-core 24, CLIs 1+1, 0 fail/skip. Handoff
+   `docs/architecture/osgi/ssh-to-age-edge-handoff.adoc`. Two traps closed: `locateOnClasspath` matched a
+   path substring (worktree NAMED ssh-to-age-edge poisoned every entry → wrong jar) → match the leaf/module
+   dir; the host-seam test named its bundles → now `OsgiRuntime.embeddableBundlesOnClasspath()` discovers
+   them by the SAME embed capability as the boot scan (3rd-party boot stack carries none — stays named).
+   See [[prefer-osgi-edge-three-reasons]]. Deferred to boot-single-source v2: unify the embedded↔classpath
+   capability readers + a typed enum boot-stack registry.
 
 2. **THEN the remaining edges:** dbus-systemd-edge (host, non-playable), then the playables
    incus-edge / cluster-edge / host-filesystem-edge.

@@ -50,6 +50,16 @@
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
+    <!-- The ssh-to-age edge: embedded INTACT under META-INF/bundles (staged below) + installed by
+         OsgiRuntime, NOT flattened (excluded from the shade). runtime scope — the CLI never compiles
+         against the edge impl; manifests-core's @Reference SshToAgeConverter binds it from the
+         registry. Mandatory reference, so the edge MUST be embedded or the service never publishes. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>ssh-to-age-edge</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
+    </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
@@ -127,6 +137,7 @@
               <artifactSet>
                 <excludes>
                   <exclude>io.nxmatic.rke2lab:manifests-core</exclude>
+                  <exclude>io.nxmatic.rke2lab:ssh-to-age-edge</exclude>
                   <exclude>org.apache.felix:org.apache.felix.scr</exclude>
                   <exclude>org.apache.felix:org.apache.felix.resolver</exclude>
                   <exclude>org.ops4j.pax.logging:pax-logging-api</exclude>
@@ -173,6 +184,15 @@
                   <artifactId>manifests-core</artifactId>
                   <version>${rke2lab.version}</version>
                   <destFileName>manifests-core.jar</destFileName>
+                </artifactItem>
+                <!-- The ssh-to-age edge: discovered as a model bundle by OsgiRuntime's capability
+                     scan (it self-declares io.nxmatic.rke2lab.embed in its manifest), not named in
+                     Java. destFileName is free — the scan reads the capability, not the name. -->
+                <artifactItem>
+                  <groupId>io.nxmatic.rke2lab</groupId>
+                  <artifactId>ssh-to-age-edge</artifactId>
+                  <version>${rke2lab.version}</version>
+                  <destFileName>ssh-to-age-edge.jar</destFileName>
                 </artifactItem>
                 <artifactItem>
                   <groupId>org.apache.felix</groupId>

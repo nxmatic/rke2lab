@@ -5,9 +5,11 @@ Export-Package: \
     io.nxmatic.rke2lab.manifests.node,\
     io.nxmatic.rke2lab.manifests.profiles,\
     io.nxmatic.rke2lab.manifests.units.runtime.flox
-# Self-declares this jar as a model bundle to embed + install under META-INF/bundles/. OsgiRuntime
-# scans the staged jars for this capability and installs the carriers as model bundles; the
+# Self-declares this jar as an embeddable bundle to install under META-INF/bundles/. OsgiRuntime
+# scans the staged jars for the NAMESPACE (io.nxmatic.rke2lab.embed) and installs every carrier; the
 # boot-stack jars (pax/scr/resolver) do not carry it, so they are excluded objectively — no
-# hand-list of names. Our own namespace, no matching Require-Capability, so the resolver ignores it.
-Provide-Capability: io.nxmatic.rke2lab.embed; type=model
+# hand-list of names. The type attribute qualifies the carrier's NATURE (model | edge) and
+# <type>=<id> names which one — read by humans, not by the scan or the resolver (no matching
+# Require-Capability). This jar is a model: in-domain manifest logic.
+Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=manifests
 -noimportjava: true

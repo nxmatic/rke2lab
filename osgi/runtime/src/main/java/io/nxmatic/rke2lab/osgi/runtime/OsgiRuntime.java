@@ -169,21 +169,87 @@ public final class OsgiRuntime implements AutoCloseable {
   }
 
   /**
-   * Locate, on {@code java.class.path}, the jar or exploded {@code target/classes} directory whose
-   * path contains {@code artifact} and carries a bundle manifest. Used to resolve the felix runtime
-   * jars and — during reactor builds, before the exec-jar embeds them — the bundle locations.
+   * Locate, on {@code java.class.path}, the jar or exploded {@code target/classes} directory FOR
+   * {@code artifact} (its Maven artifactId) that carries a bundle manifest. Used to resolve the
+   * felix runtime jars and — during reactor builds, before the exec-jar embeds them — the bundle
+   * locations.
+   *
+   * <p>The artifact is matched on the jar's LEAF ({@code <artifact>-<version>.jar} / {@code
+   * <artifact>.jar}) or, for an exploded {@code <artifact>/target/classes} dir, on the module
+   * directory name — never on a path substring. A substring match breaks the moment the artifact
+   * name appears higher in the path (e.g. a worktree dir named after the artifact poisons EVERY
+   * classpath entry), returning the wrong jar.
    */
   public static Path locateOnClasspath(String artifact) {
     return java.util.Arrays.stream(
             System.getProperty("java.class.path").split(System.getProperty("path.separator")))
         .map(Path::of)
-        .filter(
-            p ->
-                p.toString().contains(artifact)
-                    && (Files.isRegularFile(p) && p.getFileName().toString().endsWith(".jar")
-                        || Files.isDirectory(p) && Files.exists(p.resolve("META-INF/MANIFEST.MF"))))
+        .filter(p -> matchesArtifact(p, artifact))
         .findFirst()
         .orElseThrow(() -> new IllegalStateException("no " + artifact + " bundle on classpath"));
+  }
+
+  /**
+   * Discover, on {@code java.class.path}, every embeddable bundle — a jar or exploded {@code
+   * target/classes} dir whose manifest self-declares {@link #EMBED_CAPABILITY_NAMESPACE}. The
+   * classpath counterpart of {@link #scanEmbeddedModelBundles()}: both keep on the SAME capability,
+   * differing only in source (the staged {@code META-INF/bundles/} root vs the reactor classpath),
+   * so a model/edge bundle is found by what it DECLARES, never by a name a caller must keep in
+   * sync.
+   *
+   * <p>Used by the classpath boot topology (reactor tests) to install the model + edge bundles
+   * without naming them. The third-party boot stack (pax-logging / felix.scr / felix.resolver)
+   * carries no such capability — nothing for us to key on — so it stays located by {@link
+   * #locateOnClasspath(String)}; that named path is the irreducible remainder for jars we don't
+   * own. Sorted for a reproducible boot log.
+   */
+  public static List<Path> embeddableBundlesOnClasspath() {
+    return java.util.Arrays.stream(
+            System.getProperty("java.class.path").split(System.getProperty("path.separator")))
+        .map(Path::of)
+        .filter(OsgiRuntime::declaresEmbedCapability)
+        .sorted()
+        .toList();
+  }
+
+  /** Whether the classpath entry's bundle manifest self-declares the embed capability. */
+  private static boolean declaresEmbedCapability(Path path) {
+    try {
+      final String cap =
+          Files.isDirectory(path)
+              ? (Files.exists(path.resolve("META-INF/MANIFEST.MF"))
+                  ? readManifestHeader(path, "Provide-Capability")
+                  : null)
+              : (Files.isRegularFile(path) && path.getFileName().toString().endsWith(".jar")
+                  ? readManifestHeader(path, "Provide-Capability")
+                  : null);
+      return cap != null && cap.contains(EMBED_CAPABILITY_NAMESPACE);
+    } catch (IOException ex) {
+      return false;
+    }
+  }
+
+  /**
+   * Whether {@code path} is the classpath entry for the Maven {@code artifact}: a {@code
+   * <artifact>.jar} / {@code <artifact>-<version>.jar} file, or an exploded {@code
+   * <artifact>/target/classes} (or {@code test-classes}) directory carrying a bundle manifest.
+   */
+  private static boolean matchesArtifact(Path path, String artifact) {
+    if (Files.isRegularFile(path)) {
+      final String leaf = path.getFileName().toString();
+      if (!leaf.endsWith(".jar")) {
+        return false;
+      }
+      final String stem = leaf.substring(0, leaf.length() - ".jar".length());
+      return stem.equals(artifact) || stem.startsWith(artifact + "-");
+    }
+    if (Files.isDirectory(path) && Files.exists(path.resolve("META-INF/MANIFEST.MF"))) {
+      // …/<artifact>/target/classes → the module dir is two parents up from classes.
+      final Path target = path.getParent();
+      final Path moduleDir = target == null ? null : target.getParent();
+      return moduleDir != null && moduleDir.getFileName().toString().equals(artifact);
+    }
+    return false;
   }
 
   /** Declares the framework topology booted by {@link #boot()}. */

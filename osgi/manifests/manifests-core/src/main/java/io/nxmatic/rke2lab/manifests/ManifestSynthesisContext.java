@@ -8,6 +8,7 @@ import io.nxmatic.rke2lab.manifests.port.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.port.profiles.ImageState;
 import io.nxmatic.rke2lab.manifests.port.profiles.IncusIdentityMaterial;
 import io.nxmatic.rke2lab.manifests.port.profiles.NetworkTopology;
+import io.nxmatic.rke2lab.manifests.port.profiles.SopsAgeMaterial;
 import java.nio.file.Path;
 import java.util.Objects;
 
@@ -45,12 +46,32 @@ public final class ManifestSynthesisContext {
 
   private final ManifestSynthesisRequest request;
 
+  /**
+   * The age key, resolved by the synthesis service's pre-synthesis step (read the SSH key, convert
+   * it via the {@code SshToAgeConverter} edge) and bound here. Unlike the request-borne profiles,
+   * this is NOT supplied by the host across the frontier — it is derived inside the OSGi world, so
+   * it is a context field of its own, defaulting to {@link SopsAgeMaterial#unknown()}.
+   */
+  private final SopsAgeMaterial sopsAgeMaterial;
+
   private ManifestSynthesisContext(ManifestSynthesisRequest request) {
+    this(request, SopsAgeMaterial.unknown());
+  }
+
+  private ManifestSynthesisContext(
+      ManifestSynthesisRequest request, SopsAgeMaterial sopsAgeMaterial) {
     this.request = Objects.requireNonNull(request, "request");
+    this.sopsAgeMaterial = Objects.requireNonNull(sopsAgeMaterial, "sopsAgeMaterial");
   }
 
   public static ManifestSynthesisContext of(ManifestSynthesisRequest request) {
     return new ManifestSynthesisContext(request);
+  }
+
+  /** Context carrying the pre-synthesis-resolved age key alongside the request. */
+  public static ManifestSynthesisContext of(
+      ManifestSynthesisRequest request, SopsAgeMaterial sopsAgeMaterial) {
+    return new ManifestSynthesisContext(request, sopsAgeMaterial);
   }
 
   public static ManifestSynthesisContext current() {
@@ -91,6 +112,10 @@ public final class ManifestSynthesisContext {
 
   public IncusIdentityMaterial incusIdentity() {
     return request.incusIdentity();
+  }
+
+  public SopsAgeMaterial sopsAgeMaterial() {
+    return sopsAgeMaterial;
   }
 
   /** Restores the previous binding when closed. */

@@ -36,7 +36,7 @@ class HostSeamEmbeddedFelixTest {
 
   @BeforeAll
   static void bootFelix() throws Exception {
-    runtime =
+    final OsgiRuntime.Builder builder =
         OsgiRuntime.builder()
             .withPaxLogging(
                 OsgiRuntime.locateOnClasspath("pax-logging-api"),
@@ -47,10 +47,19 @@ class HostSeamEmbeddedFelixTest {
             // that DefaultManifestSynthesisService binds via @Reference. With it absent SCR cannot
             // activate that component, so the seam services below never publish — its presence here
             // is what proves the SCR Resolver injection end to end.
-            .runtimeJar(OsgiRuntime.locateOnClasspath("org.apache.felix.resolver"))
-            .bundle(OsgiRuntime.locateOnClasspath("manifests-core"))
-            .build()
-            .boot();
+            .runtimeJar(OsgiRuntime.locateOnClasspath("org.apache.felix.resolver"));
+
+    // Install EVERY embeddable bundle the classpath carries (manifests-core, ssh-to-age-edge, …),
+    // discovered by the embed capability — the same source-of-truth as the deployed exec-jar's
+    // META-INF/bundles scan, just sourced from the reactor classpath. Naming them here would drift:
+    // manifests-core's @Reference SshToAgeConverter is mandatory, so a forgotten edge would
+    // silently
+    // un-publish the seam services asserted below. The third-party boot stack above carries no
+    // embed
+    // capability, so it stays located by name — the irreducible remainder for jars we don't own.
+    OsgiRuntime.embeddableBundlesOnClasspath().forEach(builder::bundle);
+
+    runtime = builder.build().boot();
   }
 
   @AfterAll

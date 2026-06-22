@@ -21,6 +21,8 @@ import io.nxmatic.rke2lab.manifests.port.ManifestDomainPolicy;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisRequest;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisResult;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisService;
+import io.nxmatic.rke2lab.manifests.port.SshToAgeConverter;
+import io.nxmatic.rke2lab.manifests.port.profiles.SopsAgeMaterial;
 import io.nxmatic.rke2lab.manifests.systemd.BootstrapInfrastructureSynthesizer;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -60,6 +62,13 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
   /** SCR-injected registry of node-env contributors, threaded into each unit's context. */
   @Reference private NodeEnvContributorRegistry contributorRegistry;
 
+  /**
+   * The ssh-to-age edge, bound from the registry. Mandatory: without the edge the component never
+   * activates, so {@code ManifestSynthesisService} never publishes — a missing edge fails the boot
+   * fast rather than silently half-rendering the sops-age Secret. The pre-synthesis step calls it.
+   */
+  @Reference private SshToAgeConverter sshToAgeConverter;
+
   static final Set<String> SCRIPT_DATA_SUFFIXES =
       Set.of(".sh", ".bash", ".env", ".yaml", ".yml", ".conf", ".policy");
 
@@ -77,7 +86,14 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         providerId(),
         request.floxDebugPolicy());
 
-    final var contextScope = ManifestSynthesisContext.bind(ManifestSynthesisContext.of(request));
+    // Pre-synthesis step: resolve the age key (read the SSH key from the key-store, convert it via
+    // the ssh-to-age edge) BEFORE binding the context, so units only render — synthesis takes its
+    // prerequisites, it does not fetch them.
+    final SopsAgeMaterial sopsAgeMaterial =
+        new SopsAgeMaterialResolver(sshToAgeConverter).resolve();
+
+    final var contextScope =
+        ManifestSynthesisContext.bind(ManifestSynthesisContext.of(request, sopsAgeMaterial));
     try (contextScope) {
       return synthesizeInContext(request);
     }
