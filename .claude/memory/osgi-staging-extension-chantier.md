@@ -98,6 +98,17 @@ point-for-point and means NOTHING is missing in our boot:
 - Factory via `ServiceLoader.load(FrameworkFactory).newFramework(config).init/start` is the canonical
   embedding pattern — both our executors already do exactly this. Verdict: nothing to add to the boot.
 
+## Alternatives evaluated and REJECTED — do NOT re-open (decision final)
+- **Tycho** — NO. Eclipse/p2 ecosystem only (`eclipse-plugin`/`eclipse-feature`/`eclipse-repository`,
+  target-platform, p2 repos); produces no flat uber-jar and is blind to our `ServiceLoader<FrameworkFactory>`
+  embedded-Felix launch. Adopting it = rebuilding the whole build around p2. User has explicit bad
+  history with p2 — sterile path, NOT to be raised again.
+- **bnd resolver alone** (`bnd-resolver-maven-plugin` / `.bndrun` `-runrequires`→`-runbundles`) — NO. Its
+  closure logic is EXACTLY what we want (declarative, no reflection, DS-API pulled in transitively), but
+  the DECISION (already taken) is to code that logic in JAVA in our own extension reusing `BundleIndex`,
+  not to depend on an external bnd launcher that doesn't fit our hybrid host-flat + embedded-Felix + seam
+  topology. The bnd resolver is the conceptual proof the approach is sound, not the implementation.
+
 ## Shape constraints (the hard part, why it's a separate chantier)
 - A Maven core extension (`AbstractMavenLifecycleParticipant`) loads BEFORE the reactor it governs,
   so it cannot be a reactor module — same no-parent / SEPARATE-ROOT shape as the BOM. Lives beside
