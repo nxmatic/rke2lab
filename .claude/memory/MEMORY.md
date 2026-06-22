@@ -52,16 +52,9 @@ Project memory for rke2lab. Cross-cutting facts (profile, conventions, principle
 
 ## Doctor / health system (the big subsystem)
 
-- [Runbook+doctor state](runbook-doctor-state.md) — SHIPPED. Layer-3 write-side (per-node registerOutputs) + read-side runtime enrichment; Pulumi fork resolved (doctor=app logic).
-- [HealthSystem keystone](healthsystem-keystone-state.md) — SHIPPED. Per-run HealthSystem holds registry + GrantPolicy, employs Generalist via ClinicalAccess. Deferred = referral-derived grants. Absorbs the design brainstorm [[healthsystem-access-control-model]] + the [[cohort-correlation-spike]] (cross-patient correlation, promoted here).
-- [Referral round-trip](referral-roundtrip-state.md) — SHIPPED. diagnose(Referral)→ReferralReply always carries an Assessment; 4 types + 2 fake specialists.
-- [Medical-record impl complete](medical-record-impl-complete.md) — SHIPPED. On-demand query API reconstructed from Pulumi; per-symptom efficacy. (Supersedes the [[medical-record-query-api-state]] design — accumulator abandoned.)
-- [Doctor live-record roadmap](doctor-live-record-roadmap.md) — 3-step chain; step1 + access-control SHIPPED; remaining = step2 remediation/Referral. See [[doctor-remediation-model]] (Remediator tier = the "hands", recruit-a-specialist gradient).
-- [Preview what-if topic](preview-whatif-topic.md) — PARKED: preview replays BDD on observed⊕hypothesis; patient record via self-StackReference.
-- [Efficacy first-prescription provisional](efficacy-first-prescription-provisional.md) — per-symptom gate settled; "first prescription" pick provisional.
-- [ServiceLoader Specialist SPI](serviceloader-specialist-spi.md) — PARKED: doctor roster = extension point; target = integrate with the federated OSGi system.
-- [Seeded history + readonly-preview techniques](seeded-history-automation-api.md) — seed a TEST stack (exportStack→mutate→importStack, visits tagged 'seeded'); and export dev state→throwaway stack→preview (fixed the version=0 bug, [[task14-readonly-preview-integration]]).
+- [HealthSystem keystone + runbook/record (SHIPPED core)](healthsystem-keystone-state.md) — SHIPPED. Per-run HealthSystem holds registry + GrantPolicy, employs Generalist via ClinicalAccess. Absorbs the access-control brainstorm [[healthsystem-access-control-model]] + [[cohort-correlation-spike]]. Companions SHIPPED: [[runbook-doctor-state]] (Layer-3 write+read enrichment, doctor=app-logic), [[referral-roundtrip-state]] (diagnose→ReferralReply+Assessment), [[medical-record-impl-complete]] (on-demand query API from Pulumi; supersedes [[medical-record-query-api-state]]).
 - [Intervention-provenance state](intervention-provenance-state.md) — SHIPPED to main (260 tests). DriftSpecialist + InterventionLedger + StackCoordinate. ONLY OPEN = e2e LIVE proof. See [[hub:specialist-as-ledger-northstar]] [[hub:model-substrate-alignment]].
+- [Doctor live-record roadmap + open design](doctor-live-record-roadmap.md) — step1 + access-control SHIPPED; remaining = step2 remediation/Referral ([[doctor-remediation-model]], Remediator = the "hands"). PARKED design: [[preview-whatif-topic]] (preview replays BDD on observed⊕hypothesis), [[serviceloader-specialist-spi]] (roster = extension point → federated OSGi), [[efficacy-first-prescription-provisional]] (per-symptom gate settled, pick provisional), [[seeded-history-automation-api]] (seed/readonly-preview test techniques).
 
 ## Infra / manifests / config
 
@@ -91,6 +84,7 @@ Project memory for rke2lab. Cross-cutting facts (profile, conventions, principle
 - [Standing autonomy except runtime config](standing-autonomy-except-runtime-config.md) — **feedback:** act without asking except runtime config (pulumi/kubectl/incus/nix; settings.json) + the integration merge. Don't over-use AskUserQuestion; don't strip accrued grants.
 - [rke2lab solo — no PR, merge direct](rke2lab-solo-no-pr-merge-direct.md) — **feedback:** solo repo, no PRs; integrate by direct rebase+ff to origin/main, then remove worktree + delete branch.
 - [squash-merge from the target's worktree](merge-from-target-worktree.md) — **feedback:** squash merge (one commit); Claude does it from the TARGET worktree, never the sub-branch's own session (can't saw off the branch it sits on). See [[standing-autonomy-except-runtime-config]].
+- [Verify state before labeling](verify-state-before-labeling.md) — **feedback:** never label a chantier DONE/IN-PROGRESS/blocked from a surface signal (a grep, a file's presence) — read what the code does + run the objective gate (build green). Caught calling osgi-boot-single-source 'IN PROGRESS' from a grep; it was done. Comms-twin of [[single-source-of-truth-before-logic]] / [[model-substrate-alignment]]. See [[build-verification-gotchas]].
 - [BDD/JGiven test strategy](bdd-jgiven-test-strategy.md) — tests = living docs; JGiven BDD on real use-cases; DSL-first prototype.
 - [Test tag taxonomy by zone](test-tag-taxonomy-by-zone.md) — SHIPPED. 4 orthogonal JUnit5 tags (host/osgi/live/spike); default excludes `live | spike`; suffix `*LiveTest`/`*SpikeTest`.
 - [DSL unification topic](dsl-unification-topic.md) — PARKED: one engine (JGiven), two layers. NEXT = prototype PreflightScenario.
