@@ -1,13 +1,11 @@
-package io.nxmatic.rke2lab.osgi.boot.discovery;
+package io.nxmatic.rke2lab.osgi.bnd;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
 import org.osgi.framework.Filter;
 
 /**
- * The {@link BundleManifest#EMBED_CAPABILITY_NAMESPACE embed capability} a bundle self-declares,
- * parsed into its attributes — the single place the embed {@code Provide-Capability} clause is
- * read. A bundle marks both that it is embeddable AND its nature, in one declaration:
+ * A typed view of the embed {@link Clause} a bundle self-declares in its {@code Provide-Capability}
+ * — the single place that clause is read, shared by the build-time extension and the runtime boot
+ * model. A bundle marks both that it is embeddable AND its nature in one declaration:
  *
  * <pre>{@code
  * Provide-Capability: io.nxmatic.rke2lab.embed; type=model;   model=manifests
@@ -15,13 +13,22 @@ import org.osgi.framework.Filter;
  * Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=scr; role=provider
  * }</pre>
  *
- * <p>The attributes are no longer decorative: a consumer SELECTS bundles by an LDAP {@link Filter}
- * over them ({@code (&(type=fixture)(suite=scr)(role=provider))}), so a test installs exactly the
- * fixtures its proof needs by what they DECLARE — never by a file name it keeps in sync. This is
- * the capability counterpart of identifying third-party jars by their {@code Bundle-SymbolicName}:
- * both read the artifact's own manifest, neither guesses from the Maven file name.
+ * <p>A consumer SELECTS bundles by an LDAP {@link Filter} over the clause attributes, so it
+ * installs exactly what it needs by what the bundle DECLARES, never by a file name it keeps in
+ * sync. The {@code type} discriminator carries the seam law ({@link #isDomain()} vs {@link
+ * #isSeam()}): both the runtime export guard and the build-time staging classification turn on it,
+ * so it lives once.
  */
-public record EmbedCapability(Map<String, String> attributes) {
+public record EmbedCapability(Clause clause) {
+
+  /**
+   * The {@code Provide-Capability} namespace a bundle self-declares (in its {@code bnd.bnd}) to
+   * mark itself embeddable — the single source of truth for "which jars are ours to embed".
+   * Boot-stack jars (pax / felix.scr / felix.resolver) do not carry it, so they are excluded
+   * objectively with no parallel hand-list. A namespace with no matching {@code
+   * Require-Capability}, so the OSGi resolver ignores it — it never affects package wiring.
+   */
+  public static final String EMBED_CAPABILITY_NAMESPACE = "io.nxmatic.rke2lab.embed";
 
   /** The {@code type} attribute key — the carrier's boot face (its role at install time). */
   public static final String TYPE = "type";
@@ -48,14 +55,23 @@ public record EmbedCapability(Map<String, String> attributes) {
   /**
    * The bundles a runtime INSTALLS into the framework: domain {@code model} + {@code edge}, both
    * loading on the bundle side. Excludes {@code seam} (system-exported, not installed) and {@code
-   * fixture} (test-only). The single source for the prod discovery filter — replaces the former
-   * {@code (type=*)}, which now also matches the seam.
+   * fixture} (test-only). The single source for the prod discovery filter.
    */
   public static final String INSTALL_FILTER = "(|(type=model)(type=edge))";
 
+  /**
+   * The embed capability declared in {@code provideCapability}, or {@code null} if the header does
+   * not name {@link #EMBED_CAPABILITY_NAMESPACE}. Reads only the embed clause; other capability
+   * namespaces in the same header are ignored.
+   */
+  public static EmbedCapability of(OsgiHeader provideCapability) {
+    final Clause clause = provideCapability.named(EMBED_CAPABILITY_NAMESPACE);
+    return clause == null ? null : new EmbedCapability(clause);
+  }
+
   /** The carrier's {@code type} ({@link #TYPE_MODEL} / {@link #TYPE_EDGE} / …), or {@code null}. */
   public String type() {
-    return attributes.get(TYPE);
+    return clause.attributes().get(TYPE);
   }
 
   /**
@@ -73,38 +89,8 @@ public record EmbedCapability(Map<String, String> attributes) {
     return TYPE_SEAM.equals(type());
   }
 
-  /**
-   * Parse the embed clause out of a {@code Provide-Capability} header, or {@code null} if the
-   * header does not declare {@link BundleManifest#EMBED_CAPABILITY_NAMESPACE}. Reads only the embed
-   * clause; other capability namespaces in the same header are ignored.
-   */
-  public static EmbedCapability parse(String provideCapabilityHeader) {
-    if (provideCapabilityHeader == null) {
-      return null;
-    }
-    for (String clause : BundleManifest.splitClauses(provideCapabilityHeader)) {
-      final String[] parts = clause.split(";");
-      if (parts.length == 0 || !parts[0].trim().equals(BundleManifest.EMBED_CAPABILITY_NAMESPACE)) {
-        continue;
-      }
-      final Map<String, String> attrs = new LinkedHashMap<>();
-      for (int i = 1; i < parts.length; i++) {
-        final String p = parts[i].trim();
-        final int eq = p.indexOf('=');
-        if (eq > 0) {
-          // Strip a directive ':' (key:=value) and any quotes — only plain attributes select.
-          final String key = p.substring(0, eq).replace(":", "").trim();
-          final String value = p.substring(eq + 1).replace("\"", "").trim();
-          attrs.put(key, value);
-        }
-      }
-      return new EmbedCapability(Map.copyOf(attrs));
-    }
-    return null;
-  }
-
   /** Whether {@code filter} (an LDAP filter over the embed attributes) selects this capability. */
   public boolean matches(Filter filter) {
-    return filter.matches(attributes);
+    return filter.matches(clause.attributes());
   }
 }

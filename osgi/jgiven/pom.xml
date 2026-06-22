@@ -5,11 +5,12 @@
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
     <artifactId>build-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
-    <relativePath>../build-parent/pom.xml</relativePath>
+    <version>0.0.0</version>
+    <relativePath>../../build-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>jgiven</artifactId>
+  <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>osgi/jgiven</name>
   <description>BDD-in-OSGi test tooling. jGiven runs its scenarios in-container THROUGH the host

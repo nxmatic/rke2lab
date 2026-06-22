@@ -5,11 +5,12 @@
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
     <artifactId>build-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.0.0</version>
     <relativePath>../../build-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>runtime</artifactId>
+  <version>0.0.0-SNAPSHOT</version>
   <name>osgi/runtime</name>
   <description>Production OSGi runtime host: boots an embedded Felix framework + felix.scr inside an
     exec entrypoint, derives system.packages.extra from the embedded bundles' own manifests, installs

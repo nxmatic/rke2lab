@@ -5,11 +5,12 @@
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
     <artifactId>build-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.0.0</version>
     <relativePath>../../build-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>manifests-domain</artifactId>
+  <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>osgi/manifests</name>
   <description>The manifests domain: today the single manifests bundle, enveloped as a domain because

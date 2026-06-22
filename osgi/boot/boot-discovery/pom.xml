@@ -5,7 +5,7 @@
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../bundle-parent/pom.xml</relativePath>
   </parent>
 
@@ -21,13 +21,15 @@
     (notably pax-logging-api, a second org.slf4j provider) onto its classpath.</description>
 
   <dependencies>
-    <!-- The OSGi API SPEC jar (not felix): for org.osgi.framework.Filter + FrameworkUtil, used to
-         select embeddable bundles by an LDAP filter over their embed-capability attributes. A spec
-         jar carries no implementation, so this does NOT reintroduce the felix/pax closure the module
-         deliberately avoids — it is the same API the bundles themselves are written against. -->
+    <!-- The shared bnd-header reading (OsgiHeader / Clause / EmbedCapability), extracted into the
+         maven-embed-staging-ext lifecycle so the build-time extension and this runtime model parse
+         identically. A RELEASE coordinate (1.0.0, not a reactor SNAPSHOT), so it is a stable
+         foundation like the BOM — resolved from the local repo, no masking, the no-snapshot-install
+         guard untouched. Pulls osgi.core transitively (EmbedCapability needs org.osgi.framework
+         .Filter). "bnd" stays an implementation detail: boot-discovery exports none of it. -->
     <dependency>
-      <groupId>org.osgi</groupId>
-      <artifactId>osgi.core</artifactId>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bnd-read</artifactId>
     </dependency>
   </dependencies>
 

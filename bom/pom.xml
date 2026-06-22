@@ -229,15 +229,35 @@
       </dependency>
       <!-- Pax Logging: api (replaces org.slf4j for bundles) + logback backend (LogService impl,
            reuses the host logback context via StaticLogbackContext) -->
+      <!--
+        Both pax-logging jars drag osgi.cmpn (the OSGi compendium aggregate: a real bundle exporting
+        137 packages, incl. org.osgi.service.component / util.promise / util.function). Nothing here
+        compiles against the compendium, and those DS-API packages are owned by their dedicated spec
+        jars (staged as bundles). Left in, osgi.cmpn flattens into the exec uber-jar and the system
+        bundle re-exports its 137 packages, splitting the staged trio's packages. Excluded HERE in the
+        BOM so the cut applies on every transitive path, once — the enforcer bans it globally too.
+      -->
       <dependency>
         <groupId>org.ops4j.pax.logging</groupId>
         <artifactId>pax-logging-api</artifactId>
         <version>${pax.logging.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.osgi</groupId>
+            <artifactId>osgi.cmpn</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.ops4j.pax.logging</groupId>
         <artifactId>pax-logging-logback</artifactId>
         <version>${pax.logging.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.osgi</groupId>
+            <artifactId>osgi.cmpn</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.osgi</groupId>

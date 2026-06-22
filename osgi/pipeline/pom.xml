@@ -6,11 +6,12 @@
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
     <artifactId>build-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.0.0</version>
     <relativePath>../../build-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>pipeline-domain</artifactId>
+  <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>osgi/pipeline</name>
   <description>The pipeline domain: the passive fluent-pipeline grammar (pipeline-core — the topic

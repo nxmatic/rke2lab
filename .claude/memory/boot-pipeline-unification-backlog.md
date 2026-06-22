@@ -52,9 +52,23 @@ boot-pipeline beside it. The user crystallised it: *runtime is a bundle that def
 the runtime itself* — the boot concern wants its own family, model and execution side by side under
 `osgi/boot/`.
 
+## The duplication is now CONCRETE (staging-extension chantier, 2026-06-22)
+
+The DS-API gate forced a new shared step that landed in BOTH executors by copy, exactly the drift
+this backlog warns about — the user even called it at the time ("le maintainer en fait évoluer une
+et pas l'autre"). The runtime closure that installs the DS-API trio as passive bundles now exists
+twice: `OsgiRuntime.closeOverImports(stack, systemExported)` (prod) and the felix.scr import-fixpoint
+inside `FelixFrameworkExtension.startScr()` (test) — same algorithm (close over MANDATORY imports a
+stacked bundle needs, that no stacked bundle exports and the system bundle does not either, pulling
+the index exporter in as a passive bundle), written twice. The SELECTION half is already shared
+(`DiscoveryPolicy` in boot-discovery, consumed by both); the CLOSURE half is the remaining
+duplication to fold. So the unification now has a concrete first target, not just the boot()/beforeAll
+spine. See [[osgi-staging-extension-chantier]].
+
 ## Resume hint
 
-Start from the two `boot()` / `beforeAll()` bodies once boot-discovery has shipped; find the common
-spine (init framework → install at level → raise → await SCR) and the per-world variation (export
-derivation, fragments, start-level pinning). See [[external-edges-chantier-handoff]] for the chantier
-that spawned this, and the `osgi/boot/` aggregator it introduced.
+Start from the two `boot()` / `beforeAll()` bodies; the closure (above) is the freshest duplication
+to extract. Find the common spine (init framework → install at level → raise → await SCR → close over
+imports) and the per-world variation (export derivation, fragments, start-level pinning). See
+[[external-edges-chantier-handoff]] for the chantier that spawned this, and the `osgi/boot/`
+aggregator it introduced.

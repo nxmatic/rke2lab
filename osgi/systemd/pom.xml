@@ -5,11 +5,12 @@
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
     <artifactId>build-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.0.0</version>
     <relativePath>../../build-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>systemd</artifactId>
+  <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>osgi/systemd</name>
   <description>The systemd domain: the typed unit/contract vocabulary (systemd-port) and the

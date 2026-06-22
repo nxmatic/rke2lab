@@ -1,9 +1,9 @@
 package io.nxmatic.rke2lab.junit.testkit;
 
+import io.nxmatic.rke2lab.osgi.bnd.EmbedCapability;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleIndex;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleLocation;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleManifest;
-import io.nxmatic.rke2lab.osgi.boot.discovery.EmbedCapability;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -47,18 +47,6 @@ import org.slf4j.LoggerFactory;
 public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAllCallback {
 
   private static final Logger LOG = LoggerFactory.getLogger(FelixFrameworkExtension.class);
-
-  /**
-   * The DS-runtime API packages felix.scr imports as MANDATORY but the {@code osgi.core} system
-   * bundle does not carry. {@link Builder#withScr()} exports them automatically; the matching jars
-   * must be on the test classpath (the system bundle loads them).
-   */
-  public static final String SCR_API_PACKAGES =
-      "org.osgi.service.component;version=1.5,"
-          + "org.osgi.service.component.runtime;version=1.5,"
-          + "org.osgi.service.component.runtime.dto;version=1.5,"
-          + "org.osgi.util.promise;version=1.3,"
-          + "org.osgi.util.function;version=1.2";
 
   private final String systemPackagesExtra;
   private final String bootDelegation;
@@ -137,11 +125,12 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
     }
 
     /**
-     * Install+start felix.scr before the reactor bundles and export the DS-runtime API it needs.
+     * Install+start felix.scr before the reactor bundles. The DS-runtime API it imports
+     * (org.osgi.service.component / util.promise / util.function) is no longer system-exported: the
+     * staged spec-jar bundles provide it, so felix.scr wires to them bundle-to-bundle.
      */
     public Builder withScr() {
       this.startScr = true;
-      this.systemPackages.add(SCR_API_PACKAGES);
       return this;
     }
 
@@ -197,6 +186,12 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
     Map<String, String> config = new java.util.HashMap<>();
     config.put(Constants.FRAMEWORK_STORAGE, storage.toString());
     config.put(Constants.FRAMEWORK_STORAGE_CLEAN, Constants.FRAMEWORK_STORAGE_CLEAN_ONFIRSTINIT);
+    // Off (Felix defaults it true): no stack-inspection guesswork falling a non-wired class through
+    // to the parent (app) classloader. Every load must be satisfied by a bundle's imports /
+    // Bundle-ClassPath / the system bundle, or fail loudly — deterministic, and a seam package can
+    // never be served by the flat parent instead of its single declared exporter. Mirrors
+    // OsgiRuntime.
+    config.put("felix.bootdelegation.implicit", "false");
     // The test class may opt into louder framework diagnostics via @FrameworkLog — the only place a
     // failed resolve()/activation explains WHICH requirement could not be wired. Default ERROR.
     context
@@ -320,8 +315,7 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
               + matched.size());
     }
     final BundleLocation fragmentLocation = matched.get(0);
-    final String hostBsn =
-        BundleManifest.fragmentHost(fragmentLocation.readHeader(BundleManifest.FRAGMENT_HOST));
+    final String hostBsn = BundleManifest.from(fragmentLocation).fragmentHost();
     if (hostBsn == null) {
       throw new IllegalArgumentException(
           "fixture matching " + ldapFilter + " declares no Fragment-Host — not a -test fragment");
@@ -435,12 +429,39 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
     return installAt(classpath.locateBySymbolicName(symbolicName));
   }
 
-  /** Install+start felix.scr and block until its {@code ServiceComponentRuntime} appears. */
+  /**
+   * Install+start felix.scr, first pulling in the passive jars it imports but the system bundle
+   * does not export — the DS-API trio ({@code org.osgi.service.component} / {@code util.promise} /
+   * {@code util.function}). Those packages are felix.scr-internal: wired bundle-to-bundle, never
+   * system-exported (no {@code SCR_API_PACKAGES} shim), so felix.scr would stay INSTALLED without
+   * them. The runtime mirror of {@code OsgiRuntime.closeOverImports}, scoped to felix.scr's imports
+   * — see the boot-pipeline-unification backlog for folding the two executors onto one closure.
+   */
   private void startScr() throws Exception {
-    installFromClasspath("org.apache.felix.scr").start();
-    if (awaitService("org.osgi.service.component.runtime.ServiceComponentRuntime", 5000) == null) {
-      throw new IllegalStateException(
-          "felix.scr started but ServiceComponentRuntime never appeared");
+    final Bundle scr = installFromClasspath("org.apache.felix.scr");
+    // Close TRANSITIVELY over the passive jars felix.scr needs: it imports the DS-API trio, and
+    // util.promise in turn imports util.function — a single pass would miss the second hop, so this
+    // is a fixpoint (frontier), like OsgiRuntime.closeOverImports. A host-flat package has no index
+    // exporter; exporterOf skips seams; an already-installed jar is not re-added.
+    final java.util.Deque<BundleManifest> frontier = new java.util.ArrayDeque<>();
+    final Set<String> pulled = new LinkedHashSet<>();
+    frontier.add(BundleManifest.from(classpath.locateBySymbolicName("org.apache.felix.scr")));
+    while (!frontier.isEmpty()) {
+      for (var imported : frontier.removeFirst().imports().clauses()) {
+        if ("optional".equals(imported.attributes().get("resolution"))) {
+          continue;
+        }
+        final BundleLocation exporter = classpath.exporterOf(imported.name());
+        if (exporter == null || !pulled.add(exporter.locationId())) {
+          continue;
+        }
+        installAt(exporter); // a passive spec jar — installed so the importer wires to it.
+        frontier.add(BundleManifest.from(exporter));
+      }
+    }
+    scr.start();
+    if (scr.getState() != Bundle.ACTIVE) {
+      throw new IllegalStateException("felix.scr did not reach ACTIVE — DS is not running");
     }
   }
 }

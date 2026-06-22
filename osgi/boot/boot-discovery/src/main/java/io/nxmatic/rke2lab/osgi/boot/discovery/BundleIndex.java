@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.osgi.boot.discovery;
 
+import io.nxmatic.rke2lab.osgi.bnd.EmbedCapability;
 import java.io.IOException;
 import java.net.JarURLConnection;
 import java.net.URISyntaxException;
@@ -7,6 +8,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import org.osgi.framework.Filter;
@@ -14,7 +16,7 @@ import org.osgi.framework.FrameworkUtil;
 import org.osgi.framework.InvalidSyntaxException;
 
 /**
- * The bundles a boot can see, each read ONCE for the identity it declares and queried as an
+ * The bundles a boot can see, each read ONCE into a {@link BundleManifest} and queried as an
  * instance — the single source of truth for "where is bundle X" before the framework exists. ONE
  * index over two SOURCES (the only thing that differs is how a source enumerates its bundles and
  * how each is read — captured by {@link BundleLocation}):
@@ -26,30 +28,15 @@ import org.osgi.framework.InvalidSyntaxException;
  *       a deployed exec-jar, reached through the classloader that carries them.
  * </ul>
  *
- * <p>A bundle is found by what its MANIFEST declares, never guessed from a file name (a Maven leaf,
- * or the staged name WE choose — both drift or mislead). Two honest keys:
- *
- * <ul>
- *   <li>{@link #locateBySymbolicName} — by {@code Bundle-SymbolicName}, the OSGi identity every
- *       bundle declares. For jars we do not own and cannot mark (felix, pax, junit).
- *   <li>{@link #matching(String)} — by an LDAP filter over the {@link EmbedCapability embed
- *       capability} attributes ({@code type}/{@code suite}/{@code role}/…). For OUR bundles, which
- *       self-declare what they are, so a consumer selects what it needs by declaration.
- * </ul>
+ * <p>A bundle is found by what its MANIFEST declares, never guessed from a file name. Two honest
+ * keys: {@link #locateBySymbolicName} by {@code Bundle-SymbolicName} (jars we cannot mark — felix,
+ * pax, junit), and {@link #matching(String)} by an LDAP filter over the {@link EmbedCapability
+ * embed capability} attributes (OUR bundles, which self-declare what they are).
  */
 public final class BundleIndex {
 
-  /**
-   * A scanned bundle: where it lives, the identity it declares, and the packages it exports — all
-   * read ONCE at scan time (two-or-three manifest headers, no bytecode), so later queries never
-   * touch the filesystem again. {@code exportedPackages} backs the leak guard's package→exporter
-   * resolution.
-   */
-  private record Entry(
-      BundleLocation location,
-      String symbolicName,
-      EmbedCapability embed,
-      Set<String> exportedPackages) {}
+  /** A scanned bundle: where it lives plus the headers it declares, both read ONCE at scan time. */
+  private record Entry(BundleLocation location, BundleManifest manifest) {}
 
   private static final class ClasspathHolder {
     private static final BundleIndex INSTANCE = scan(classpathLocations());
@@ -83,14 +70,14 @@ public final class BundleIndex {
     final List<Entry> found = new ArrayList<>();
     for (BundleLocation location : locations) {
       try {
-        final String bsn = symbolicName(location.readHeader("Bundle-SymbolicName"));
-        final EmbedCapability embed =
-            EmbedCapability.parse(location.readHeader("Provide-Capability"));
-        if (bsn != null || embed != null) {
-          final Set<String> exports =
-              BundleManifest.packageNames(location.readHeader("Export-Package"));
-          found.add(new Entry(location, bsn, embed, exports));
+        final BundleManifest manifest = BundleManifest.from(location);
+        if (manifest.symbolicName() == null && manifest.embed() == null) {
+          continue; // not a bundle we can install.
         }
+        if (location.isFrameworkLauncher()) {
+          continue; // the launcher becomes system bundle 0, never an installed bundle.
+        }
+        found.add(new Entry(location, manifest));
       } catch (IOException ex) {
         // An unreadable entry is not a bundle we can install — skip it.
       }
@@ -105,7 +92,7 @@ public final class BundleIndex {
    */
   public BundleLocation locateBySymbolicName(String symbolicName) {
     return entries.stream()
-        .filter(e -> symbolicName.equals(e.symbolicName()))
+        .filter(e -> symbolicName.equals(e.manifest().symbolicName()))
         .map(Entry::location)
         .findFirst()
         .orElseThrow(
@@ -123,9 +110,8 @@ public final class BundleIndex {
   public List<BundleLocation> matching(String ldapFilter) {
     final Filter filter = filter(ldapFilter);
     return entries.stream()
-        .filter(e -> e.embed() != null && e.embed().matches(filter))
-        .sorted(
-            java.util.Comparator.comparing(e -> e.symbolicName() == null ? "" : e.symbolicName()))
+        .filter(e -> e.manifest().embed() != null && e.manifest().embed().matches(filter))
+        .sorted(Comparator.comparing(e -> nullToEmpty(e.manifest().symbolicName())))
         .map(Entry::location)
         .toList();
   }
@@ -135,20 +121,62 @@ public final class BundleIndex {
    * probe.
    */
   public boolean contains(String symbolicName) {
-    return entries.stream().anyMatch(e -> symbolicName.equals(e.symbolicName()));
+    return entries.stream().anyMatch(e -> symbolicName.equals(e.manifest().symbolicName()));
   }
 
   /**
-   * Locate the bundle {@code symbolicName} and turn its bnd-computed {@code Import-Package} into
-   * the system-bundle export clauses needed for it to resolve against a flat classpath.
+   * Every installable bundle in the index, in scan order — the launcher already excluded (it is the
+   * system bundle), so this is exactly the set a {@link DiscoveryPolicy#all()} boot installs.
+   */
+  public List<BundleLocation> all() {
+    return entries.stream().map(Entry::location).toList();
+  }
+
+  /** The symbolic name a location declares, for a policy filtering the index by name. */
+  String symbolicNameOf(BundleLocation location) {
+    return entries.stream()
+        .filter(e -> e.location().equals(location))
+        .map(e -> e.manifest().symbolicName())
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * A bundle in the index that exports {@code packageName} but is neither a seam (system-exported,
+   * host-flat) — or {@code null}. The runtime closure's query: felix.scr imports {@code
+   * org.osgi.service.component}, no installed bundle provides it, so this pulls in the dedicated
+   * spec jar that exports it. The launcher is already absent from the index. First match wins; a
+   * genuine multi-exporter conflict is the developer's classpath to keep clean, as at build time.
+   */
+  public BundleLocation exporterOf(String packageName) {
+    return entries.stream()
+        .filter(e -> e.manifest().embed() == null || !e.manifest().embed().isSeam())
+        .filter(e -> e.manifest().exports().names().contains(packageName))
+        .map(Entry::location)
+        .findFirst()
+        .orElse(null);
+  }
+
+  /** The parsed manifest of a location in this index — for an executor pinning its start level. */
+  public BundleManifest manifestOf(BundleLocation location) {
+    return entries.stream()
+        .filter(e -> e.location().equals(location))
+        .map(Entry::manifest)
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("location not in index: " + location));
+  }
+
+  /**
+   * The {@code Import-Package} of bundle {@code symbolicName} mirrored into the system-bundle
+   * export clauses it needs to resolve against a flat classpath.
    */
   public Set<String> exportsForImportsOf(String symbolicName) {
-    try {
-      return BundleManifest.mirrorImportsAsExports(
-          locateBySymbolicName(symbolicName).readHeader("Import-Package"));
-    } catch (IOException ex) {
-      throw new IllegalStateException("cannot read Import-Package of " + symbolicName, ex);
-    }
+    return entries.stream()
+        .filter(e -> symbolicName.equals(e.manifest().symbolicName()))
+        .map(e -> e.manifest().imports().asSystemExports())
+        .findFirst()
+        .orElseThrow(
+            () -> new IllegalStateException("no bundle " + symbolicName + " in " + describe()));
   }
 
   /**
@@ -163,15 +191,19 @@ public final class BundleIndex {
    */
   public String domainExporterOf(String packageName) {
     return entries.stream()
-        .filter(e -> e.embed() != null && e.embed().isDomain())
-        .filter(e -> e.exportedPackages().contains(packageName))
-        .map(Entry::symbolicName)
+        .filter(e -> e.manifest().embed() != null && e.manifest().embed().isDomain())
+        .filter(e -> e.manifest().exports().names().contains(packageName))
+        .map(e -> e.manifest().symbolicName())
         .findFirst()
         .orElse(null);
   }
 
   private String describe() {
     return entries.size() + " indexed bundle(s)";
+  }
+
+  private static String nullToEmpty(String s) {
+    return s == null ? "" : s;
   }
 
   private static List<BundleLocation> classpathLocations() {
@@ -226,10 +258,6 @@ public final class BundleIndex {
       }
     }
     return locations;
-  }
-
-  private static String symbolicName(String header) {
-    return header == null ? null : header.split(";", 2)[0].trim();
   }
 
   private static Filter filter(String ldapFilter) {

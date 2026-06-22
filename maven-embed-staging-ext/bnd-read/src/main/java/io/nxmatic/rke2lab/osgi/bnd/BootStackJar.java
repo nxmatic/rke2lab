@@ -1,16 +1,19 @@
-package io.nxmatic.rke2lab.osgi.boot.discovery;
+package io.nxmatic.rke2lab.osgi.bnd;
 
 /**
  * The third-party boot-stack jars every embedded-OSGi deployment installs — Pax Logging at the
  * logging layer, felix.scr + felix.resolver at the framework-runtime layer. A typed registry, NOT a
  * capability scan: these jars are third-party and carry no {@link
- * BundleManifest#EMBED_CAPABILITY_NAMESPACE embed capability} ({@code pax-logging-api} declares no
+ * EmbedCapability#EMBED_CAPABILITY_NAMESPACE embed capability} ({@code pax-logging-api} declares no
  * {@code Provide-Capability} at all), so they are not ours to mark — the honest frontier is "ours →
- * discovered by capability, third-party → this enum". Part of the boot MODEL: it names the jars by
- * their OSGi identity and their layer; the executor ({@code OsgiRuntime}) maps {@link Layer} to its
- * own start-level numbers and locates each jar by its {@link #symbolicName()} (on the classpath, or
- * among the staged bundles) — never by a file name. Declaration order is install order; within a
- * layer the framework keeps it, so pax-api precedes its backend.
+ * discovered by capability, third-party → this enum". They are the closure's seed by NATURE, not by
+ * wiring: nothing of ours imports felix.scr (DS wires components by reflection, not
+ * Import-Package), so no Import-Package closure ever reaches it — it must be named. Read once on
+ * both sides: the runtime ({@code OsgiRuntime}) maps {@link Layer} to its own start-level numbers
+ * and locates each jar by its {@link #symbolicName()} (on the classpath, or among the staged
+ * bundles); the build-time staging extension seeds the stage-vs-flat closure from the same registry
+ * — never a file name. Declaration order is install order; within a layer the framework keeps it,
+ * so pax-api precedes its backend.
  */
 public enum BootStackJar {
   PAX_LOGGING_API("pax-logging-api", "org.ops4j.pax.logging.pax-logging-api", Layer.LOGGING),
@@ -41,9 +44,10 @@ public enum BootStackJar {
 
   /**
    * The Maven artifactId — the pom-side identity the {@code stage-embedded-bundles} {@code
-   * artifactItem} copies from. Not used to FIND the jar at boot (that is {@link #symbolicName()});
-   * kept as the single source that ties this registry to the staging pom (see the shade/staging
-   * single-source mojo).
+   * artifactItem} copies from. Also how the build-time staging extension names the jar in the
+   * derived shade-exclude / staging lists, so this registry is the single source tying the runtime
+   * boot model to the staging pom. Not used to FIND the jar at boot (that is {@link
+   * #symbolicName()}).
    */
   public String artifactId() {
     return artifactId;

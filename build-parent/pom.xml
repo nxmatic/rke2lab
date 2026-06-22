@@ -5,7 +5,10 @@
 
   <groupId>io.nxmatic.rke2lab</groupId>
   <artifactId>build-parent</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <!-- 0.0.0: a deliberate "release that does not exist" sentinel — a fixed RELEASE coordinate (not a
+       SNAPSHOT) so a release child like maven-embed-staging-ext can parent it past the
+       no-snapshot-install guard, while the number signals it is never a real published release. -->
+  <version>0.0.0</version>
   <packaging>pom</packaging>
   <name>build-parent</name>
   <description>The build parent: global configuration (properties, dependency/plugin
@@ -15,7 +18,7 @@
     not here.</description>
 
   <properties>
-    <rke2lab.version>0.1.0-SNAPSHOT</rke2lab.version>
+    <rke2lab.version>0.0.0-SNAPSHOT</rke2lab.version>
     <maven.compiler.release>25</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
@@ -62,37 +65,46 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <!-- bnd-read: the shared bnd-header reading. Like the BOM, it has its OWN lifecycle (the
+           maven-embed-staging-ext aggregator, built and installed as a RELEASE before the reactor),
+           so its version is fixed here, NOT ${rke2lab.version}. boot-discovery depends on it; the
+           single source for that version is this line. -->
+      <dependency>
+        <groupId>io.nxmatic.rke2lab</groupId>
+        <artifactId>bnd-read</artifactId>
+        <version>1.0.0</version>
+      </dependency>
       <!-- rke2lab inter-module versions (project lifecycle) -->
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>seed-master</artifactId>
-        <version>${project.version}</version>
+        <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>seed-master</artifactId>
-        <version>${project.version}</version>
+        <version>${rke2lab.version}</version>
         <classifier>exec</classifier>
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>manifests-core</artifactId>
-        <version>${project.version}</version>
+        <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>netplan-core</artifactId>
-        <version>${project.version}</version>
+        <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>systemd-port</artifactId>
-        <version>${project.version}</version>
+        <version>${rke2lab.version}</version>
       </dependency>
       <dependency>
         <groupId>io.nxmatic.rke2lab</groupId>
         <artifactId>cdk8s-systemd</artifactId>
-        <version>${project.version}</version>
+        <version>${rke2lab.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -351,6 +363,28 @@
                 <requireReleaseVersion>
                   <message>Reactor SNAPSHOTs must not be installed to ~/.m2 — siblings resolve through the reactor via -am. Only a deliberate RELEASE-versioned baseline jar may be installed.</message>
                 </requireReleaseVersion>
+              </rules>
+            </configuration>
+          </execution>
+          <!-- The permanent guard mirroring the BOM's <exclusion>s: what the BOM cuts on every
+               transitive path, this bans globally, so a future dependency bump cannot silently
+               reintroduce it by another route. Keep this list in sync with the BOM exclusions.
+               - org.osgi:osgi.cmpn — the compendium aggregate (one bundle, 137 exported packages);
+                 nothing compiles against it and its DS-API packages are owned by the dedicated spec
+                 jars (staged), so flattening it would split those packages off the system bundle. -->
+          <execution>
+            <id>enforce-banned-dependencies</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <bannedDependencies>
+                  <excludes>
+                    <exclude>org.osgi:osgi.cmpn</exclude>
+                  </excludes>
+                  <message>org.osgi:osgi.cmpn (the OSGi compendium aggregate) must not reach the dependency graph — it splits the staged DS-API packages. It is excluded from pax-logging in the BOM; if it reappeared, a new transitive path introduced it. Add the matching &lt;exclusion&gt; in bom/pom.xml.</message>
+                </bannedDependencies>
               </rules>
             </configuration>
           </execution>

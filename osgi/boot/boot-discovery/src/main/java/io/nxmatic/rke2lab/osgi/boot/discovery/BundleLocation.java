@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.jar.JarFile;
+import java.util.jar.JarInputStream;
+import java.util.jar.Manifest;
 
 /**
  * Where a discovered bundle physically lives, and how to read it — the one thing that genuinely
@@ -21,8 +24,11 @@ import java.nio.file.Path;
  */
 public sealed interface BundleLocation {
 
-  /** Read a manifest {@code header} from this bundle, or {@code null} if absent. */
-  String readHeader(String header) throws IOException;
+  /** The service file a launchable OSGi framework declares — how the launcher identifies itself. */
+  String FRAMEWORK_FACTORY_SERVICE = "META-INF/services/org.osgi.framework.launch.FrameworkFactory";
+
+  /** Read this bundle's manifest, or {@code null} if it has none. The only read of the bytes. */
+  Manifest readManifest() throws IOException;
 
   /** Open this bundle's bytes — the caller closes the stream. */
   InputStream open() throws IOException;
@@ -31,12 +37,31 @@ public sealed interface BundleLocation {
   String locationId();
 
   /**
+   * Whether this jar IS the OSGi framework launcher (it carries the {@link
+   * #FRAMEWORK_FACTORY_SERVICE}). The launcher becomes the system bundle 0 — it is never installed
+   * as an ordinary bundle, so the index excludes it. Identified by the service it declares, the
+   * same honest signal {@code ServiceLoader.load(FrameworkFactory.class)} uses, never by a name.
+   */
+  boolean isFrameworkLauncher() throws IOException;
+
+  /**
    * A {@code java.class.path} entry — a jar file or an exploded {@code target/classes} directory.
    */
   record OnClasspath(Path path) implements BundleLocation {
     @Override
-    public String readHeader(String header) throws IOException {
-      return BundleManifest.readHeader(path, header);
+    public Manifest readManifest() throws IOException {
+      if (Files.isDirectory(path)) {
+        final Path mf = path.resolve("META-INF/MANIFEST.MF");
+        if (!Files.exists(mf)) {
+          return null;
+        }
+        try (InputStream in = Files.newInputStream(mf)) {
+          return new Manifest(in);
+        }
+      }
+      try (JarFile jar = new JarFile(path.toFile())) {
+        return jar.getManifest();
+      }
     }
 
     @Override
@@ -49,14 +74,24 @@ public sealed interface BundleLocation {
       // A directory bundle (exploded classes) installs via reference:; a packaged jar by its URI.
       return Files.isDirectory(path) ? "reference:" + path.toUri() : path.toUri().toString();
     }
+
+    @Override
+    public boolean isFrameworkLauncher() throws IOException {
+      if (Files.isDirectory(path)) {
+        return Files.exists(path.resolve(FRAMEWORK_FACTORY_SERVICE));
+      }
+      try (JarFile jar = new JarFile(path.toFile())) {
+        return jar.getEntry(FRAMEWORK_FACTORY_SERVICE) != null;
+      }
+    }
   }
 
   /** A jar staged under {@code META-INF/bundles/<name>}, reached through {@code loader}. */
   record Staged(ClassLoader loader, String resourceName) implements BundleLocation {
     @Override
-    public String readHeader(String header) throws IOException {
-      try (InputStream in = open()) {
-        return BundleManifest.readHeader(in, header);
+    public Manifest readManifest() throws IOException {
+      try (JarInputStream jar = new JarInputStream(open())) {
+        return jar.getManifest();
       }
     }
 
@@ -72,6 +107,20 @@ public sealed interface BundleLocation {
     @Override
     public String locationId() {
       return resourceName;
+    }
+
+    @Override
+    public boolean isFrameworkLauncher() throws IOException {
+      // Staged jars live under META-INF/bundles/; the launcher is flat in the uber-jar, never
+      // staged, so a staged jar is by construction not the launcher. Checked honestly all the same.
+      try (JarInputStream jar = new JarInputStream(open())) {
+        for (var entry = jar.getNextJarEntry(); entry != null; entry = jar.getNextJarEntry()) {
+          if (FRAMEWORK_FACTORY_SERVICE.equals(entry.getName())) {
+            return true;
+          }
+        }
+      }
+      return false;
     }
   }
 }

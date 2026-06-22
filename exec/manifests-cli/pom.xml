@@ -6,11 +6,12 @@
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
     <artifactId>build-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.0.0</version>
     <relativePath>../../build-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>manifests-cli</artifactId>
+  <version>0.0.0-SNAPSHOT</version>
   <name>exec/manifests-cli</name>
   <description>Manifests CLI: the executable north-adapter that drives the manifests core
     (osgi/manifests/manifests-core) for ad-hoc synthesis (`java -jar … synthesize`). Boots an
@@ -129,20 +130,10 @@
             </goals>
             <phase>package</phase>
             <configuration>
-              <!-- The designed-for-OSGi jars are embedded INTACT (stage-embedded-bundles below) and
-                   installed into Felix as real bundles by OsgiRuntime. Excluding them from the flat
-                   uber-jar keeps each the SINGLE exporter of its packages (the R1 split scar). Their
-                   non-bundle transitive deps (jackson, snakeyaml, commons-compress) still flatten —
-                   the host needs those flat. Same exclusion set as seed-master's shade. -->
+              <!-- Shade excludes DERIVED + injected by the osgi-staging-extension from what the
+                   bundles declare — no hand-list. The empty artifactSet is the seam it fills. -->
               <artifactSet>
-                <excludes>
-                  <exclude>io.nxmatic.rke2lab:manifests-core</exclude>
-                  <exclude>io.nxmatic.rke2lab:ssh-to-age-edge</exclude>
-                  <exclude>org.apache.felix:org.apache.felix.scr</exclude>
-                  <exclude>org.apache.felix:org.apache.felix.resolver</exclude>
-                  <exclude>org.ops4j.pax.logging:pax-logging-api</exclude>
-                  <exclude>org.ops4j.pax.logging:pax-logging-logback</exclude>
-                </excludes>
+                <excludes/>
               </artifactSet>
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
@@ -164,9 +155,8 @@
         <executions>
           <!-- Stage the designed-for-OSGi jars INTACT under META-INF/bundles (a <resource> root, so
                they land in the uber-jar AND on the test classpath). OsgiRuntime.embedded* streams
-               each into Felix at boot. Fixed destFileNames give stable lookup keys independent of
-               the version, mirrored from OsgiRuntime's *_JAR constants; these are the same artifacts
-               excluded from the flat shade above. Identical to seed-master's staging. -->
+               each into Felix at boot. The artifactItems are DERIVED + injected by the
+               osgi-staging-extension (same closure as the shade excludes), single-sourced. -->
           <execution>
             <id>stage-embedded-bundles</id>
             <goals>
@@ -178,43 +168,7 @@
               <outputDirectory>${project.build.directory}/generated-resources/META-INF/bundles</outputDirectory>
               <overWriteReleases>true</overWriteReleases>
               <overWriteSnapshots>true</overWriteSnapshots>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>io.nxmatic.rke2lab</groupId>
-                  <artifactId>manifests-core</artifactId>
-                  <version>${rke2lab.version}</version>
-                  <destFileName>manifests-core.jar</destFileName>
-                </artifactItem>
-                <!-- The ssh-to-age edge: discovered as a model bundle by OsgiRuntime's capability
-                     scan (it self-declares io.nxmatic.rke2lab.embed in its manifest), not named in
-                     Java. destFileName is free — the scan reads the capability, not the name. -->
-                <artifactItem>
-                  <groupId>io.nxmatic.rke2lab</groupId>
-                  <artifactId>ssh-to-age-edge</artifactId>
-                  <version>${rke2lab.version}</version>
-                  <destFileName>ssh-to-age-edge.jar</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.felix</groupId>
-                  <artifactId>org.apache.felix.scr</artifactId>
-                  <destFileName>org.apache.felix.scr.jar</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.felix</groupId>
-                  <artifactId>org.apache.felix.resolver</artifactId>
-                  <destFileName>org.apache.felix.resolver.jar</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.ops4j.pax.logging</groupId>
-                  <artifactId>pax-logging-api</artifactId>
-                  <destFileName>pax-logging-api.jar</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.ops4j.pax.logging</groupId>
-                  <artifactId>pax-logging-logback</artifactId>
-                  <destFileName>pax-logging-logback.jar</destFileName>
-                </artifactItem>
-              </artifactItems>
+              <artifactItems/>
             </configuration>
           </execution>
         </executions>

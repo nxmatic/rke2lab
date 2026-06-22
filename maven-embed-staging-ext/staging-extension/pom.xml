@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>maven-embed-staging-ext</artifactId>
+    <version>1.0.0</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>staging-extension</artifactId>
+  <name>maven-embed-staging-ext/staging-extension</name>
+  <description>A Maven core extension that single-sources the OSGi bundle staging. Loaded via
+    .mvn/extensions.xml, it registers a MojoExecutionListener that fires just before the shade and
+    maven-dependency-plugin executions of each exec JAR — in the package phase, where the dependency
+    set is fully resolved (third-party jars AND the already-built reactor bundles, incl. felix.scr
+    reached transitively through osgi/runtime). It derives the closure (seed = our embed bundles +
+    the boot-stack; close over Import-Package), classifies each jar, and mutates the EXECUTION's
+    configuration in place — the Xpp3Dom shade actually reads — replacing the two hand-maintained pom
+    lists. Reuses bnd-read for the header parsing.
+
+    Why beforeMojoExecution and not the Model: Maven freezes each plugin's configuration into its
+    MojoExecution when it calculates the build plan, before any earlier-phase mojo runs — so mutating
+    project.getModel() at prepare-package is NOT honoured (proven). The listener mutates the live
+    MojoExecution, the same hook the nxmatic build-cache patch uses.</description>
+
+  <properties>
+    <maven.api.version>3.9.6</maven.api.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bnd-read</artifactId>
+      <version>1.0.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.maven</groupId>
+      <artifactId>maven-core</artifactId>
+      <version>${maven.api.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>javax.inject</groupId>
+      <artifactId>javax.inject</artifactId>
+      <version>1</version>
+      <scope>provided</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Generate META-INF/sisu/javax.inject.Named so the running Maven's container discovers the
+           MojoExecutionListener — the registration the reference core extensions (build-cache) use. -->
+      <plugin>
+        <groupId>org.eclipse.sisu</groupId>
+        <artifactId>sisu-maven-plugin</artifactId>
+        <version>1.0.0</version>
+        <executions>
+          <execution>
+            <id>index-project</id>
+            <goals>
+              <goal>main-index</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

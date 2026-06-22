@@ -14,6 +14,7 @@ Import-Package: \
     org.osgi.framework.launch;resolution:=optional, \
     org.apache.felix.framework.util;resolution:=optional, \
     io.nxmatic.rke2lab.osgi.boot.discovery;resolution:=optional, \
+    io.nxmatic.rke2lab.osgi.bnd;resolution:=optional, \
     org.slf4j;resolution:=optional, \
     *
 

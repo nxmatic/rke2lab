@@ -5,11 +5,12 @@
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
     <artifactId>build-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.0.0</version>
     <relativePath>../../../build-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>bench-tests</artifactId>
+  <version>0.0.0-SNAPSHOT</version>
   <name>osgi/bench/bench-tests</name>
   <description>Bench proof harness: P1 (extender resolve/refuse on the real Felix engine) and P2
     (typed OCD introspection by PID). Not a bundle.</description>

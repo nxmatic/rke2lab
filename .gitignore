@@ -579,3 +579,4 @@ flycheck_*.el
 
 # kroki-generated diagram SVGs (regenerable from the .adoc mermaid blocks)
 docs/architecture/**/diag-*.svg
+*.swp

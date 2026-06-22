@@ -1,14 +1,17 @@
 package io.nxmatic.rke2lab.osgi.runtime;
 
-import io.nxmatic.rke2lab.osgi.boot.discovery.BootStackJar;
+import io.nxmatic.rke2lab.osgi.bnd.BootStackJar;
+import io.nxmatic.rke2lab.osgi.bnd.Clause;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleIndex;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleLocation;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BundleManifest;
-import io.nxmatic.rke2lab.osgi.boot.discovery.EmbedCapability;
+import io.nxmatic.rke2lab.osgi.boot.discovery.DiscoveryPolicy;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -58,22 +61,17 @@ public final class OsgiRuntime implements AutoCloseable {
    * resolver) next; the model bundles last. The executor's mapping of the model's {@link
    * BootStackJar.Layer} roles onto concrete levels.
    */
-  private static final int START_LEVEL_LOGGING = 1;
-
-  private static final int START_LEVEL_FRAMEWORK_RUNTIME = 2;
-
-  private static final int START_LEVEL_BUNDLES = 3;
-
   /**
-   * DS-runtime API packages felix.scr imports as MANDATORY that the {@code osgi.core} system bundle
-   * does not carry; {@link Builder#withScr()} exports them from the system bundle.
+   * A passive spec/library jar (e.g. the DS-API trio): no activator, it only needs to be resolvable
+   * before anything that imports it. Lowest level so it precedes the boot stack that wires to it.
    */
-  private static final String SCR_API_PACKAGES =
-      "org.osgi.service.component;version=1.5,"
-          + "org.osgi.service.component.runtime;version=1.5,"
-          + "org.osgi.service.component.runtime.dto;version=1.5,"
-          + "org.osgi.util.promise;version=1.3,"
-          + "org.osgi.util.function;version=1.2";
+  private static final int START_LEVEL_PASSIVE = 1;
+
+  private static final int START_LEVEL_LOGGING = 2;
+
+  private static final int START_LEVEL_FRAMEWORK_RUNTIME = 3;
+
+  private static final int START_LEVEL_BUNDLES = 4;
 
   /**
    * The bundles staged under {@code META-INF/bundles/} in this exec-jar (empty off the exec-jar) —
@@ -90,6 +88,7 @@ public final class OsgiRuntime implements AutoCloseable {
   private final List<BundleLocation> modelBundles;
   private final boolean startScr;
   private final boolean embedsBootStack;
+  private final DiscoveryPolicy discoveryPolicy;
   private final Set<String> explicitSystemPackages;
 
   /**
@@ -109,6 +108,7 @@ public final class OsgiRuntime implements AutoCloseable {
     this.modelBundles = List.copyOf(builder.modelBundles);
     this.startScr = builder.startScr;
     this.embedsBootStack = builder.embedsBootStack;
+    this.discoveryPolicy = builder.discoveryPolicy;
     this.explicitSystemPackages = new LinkedHashSet<>(builder.systemPackages);
     this.discovery = builder.embedsBootStack ? STAGED : BundleIndex.ofClasspath();
   }
@@ -145,11 +145,16 @@ public final class OsgiRuntime implements AutoCloseable {
     private final List<String> systemPackages = new ArrayList<>();
     private boolean embedsBootStack;
     private boolean startScr;
+    private DiscoveryPolicy discoveryPolicy = DiscoveryPolicy.all();
 
-    /** Install + start felix.scr before the bundles and export the DS-runtime API it needs. */
+    /**
+     * Install + start felix.scr before the bundles. The DS-runtime API it imports
+     * (org.osgi.service.component / util.promise / util.function) is no longer system-exported: the
+     * staging extension stages those spec jars as bundles, so felix.scr wires to them bundle-to-
+     * bundle — system-exporting them would re-export off the flat classpath and split the class.
+     */
     public Builder withScr() {
       this.startScr = true;
-      this.systemPackages.add(SCR_API_PACKAGES);
       return this;
     }
 
@@ -193,6 +198,18 @@ public final class OsgiRuntime implements AutoCloseable {
       return this;
     }
 
+    /**
+     * How the embedded boot selects which discovered bundles to install — defaults to {@link
+     * DiscoveryPolicy#all()} (feed Felix every bundle the index carries, let its resolver wire
+     * them). Override to pin a deterministic subset: {@code discover(DiscoveryPolicy.allExcept(…))}
+     * or {@code discover(DiscoveryPolicy.only(…))}. The SAME knob the test harness exposes, so prod
+     * and test choose their topology through one API. Only meaningful with {@link #embedBootStack}.
+     */
+    public Builder discover(DiscoveryPolicy policy) {
+      this.discoveryPolicy = policy;
+      return this;
+    }
+
     /** Extra packages to export from the system bundle, beyond those derived from the bundles. */
     public Builder systemPackages(String... packages) {
       for (String pkg : packages) {
@@ -206,6 +223,18 @@ public final class OsgiRuntime implements AutoCloseable {
     }
   }
 
+  private static String stateName(int state) {
+    return switch (state) {
+      case Bundle.UNINSTALLED -> "UNINSTALLED";
+      case Bundle.INSTALLED -> "INSTALLED ";
+      case Bundle.RESOLVED -> "RESOLVED  ";
+      case Bundle.STARTING -> "STARTING  ";
+      case Bundle.STOPPING -> "STOPPING  ";
+      case Bundle.ACTIVE -> "ACTIVE    ";
+      default -> "?(" + state + ")";
+    };
+  }
+
   private static int startLevelFor(BootStackJar.Layer layer) {
     return switch (layer) {
       case LOGGING -> START_LEVEL_LOGGING;
@@ -213,17 +242,100 @@ public final class OsgiRuntime implements AutoCloseable {
     };
   }
 
+  /**
+   * The start level a discovered bundle installs at, by its ROLE:
+   *
+   * <ul>
+   *   <li>a boot-stack jar (felix.scr / resolver / pax, matched by symbolic name) takes its {@link
+   *       BootStackJar.Layer};
+   *   <li>a model/edge bundle (embed capability) takes the bundle level — it activates last;
+   *   <li>anything else is a PASSIVE spec/library jar (e.g. the DS-API trio, which felix.scr
+   *       imports): it has no activator, only needs to RESOLVE, and must do so BEFORE the bundle
+   *       that imports it activates. felix.scr sits at FRAMEWORK_RUNTIME, so the trio cannot wait
+   *       at the bundle level (above scr) or scr activates first and never sees
+   *       ServiceComponentRuntime. Pin it at the lowest level so it is resolvable before anything
+   *       that wires to it.
+   * </ul>
+   */
+  private static int startLevelOf(BundleManifest manifest) {
+    final String bsn = manifest.symbolicName();
+    for (BootStackJar jar : BootStackJar.values()) {
+      if (jar.symbolicName().equals(bsn)) {
+        return startLevelFor(jar.layer());
+      }
+    }
+    if (manifest.embed() != null && manifest.embed().isDomain()) {
+      return START_LEVEL_BUNDLES;
+    }
+    return START_LEVEL_PASSIVE; // a passive spec/library jar — resolvable before all importers.
+  }
+
   /** An installable bundle: where its bytes live, and the start level its layer maps to. */
   private record Installable(BundleLocation location, int startLevel) {}
 
+  /**
+   * Pull every passive jar the stack's MANDATORY imports need into the stack — the runtime mirror
+   * of the build-time {@code StagingClosure}. For each stacked bundle's import that (a) is
+   * mandatory, (b) no stacked bundle already exports, and (c) the host classpath does NOT carry (so
+   * it cannot resolve against the system bundle — the DS-API trio, removed from
+   * system.packages.extra; jackson stays out, it IS host-flat), find the index jar that exports it
+   * and add it passively. A fixpoint: a pulled-in jar's own imports are closed over in turn.
+   * Idempotent on the embedded topology (the policy already staged the trio); it is the classpath
+   * topology this makes resolve the same set.
+   */
+  private void closeOverImports(List<Installable> stack, Set<String> systemExported)
+      throws IOException {
+    final Set<String> stackGas = new LinkedHashSet<>();
+    final Set<String> exportedByStack = new LinkedHashSet<>();
+    for (Installable i : stack) {
+      final BundleManifest m = BundleManifest.from(i.location());
+      stackGas.add(i.location().locationId());
+      exportedByStack.addAll(m.exports().names());
+    }
+    final Deque<BundleLocation> frontier = new ArrayDeque<>();
+    stack.forEach(i -> frontier.add(i.location()));
+    while (!frontier.isEmpty()) {
+      final BundleManifest manifest = BundleManifest.from(frontier.removeFirst());
+      for (Clause imported : manifest.imports().clauses()) {
+        final String pkg = imported.name();
+        if ("optional".equals(imported.attributes().get("resolution"))
+            || exportedByStack.contains(pkg)
+            || systemExported.contains(pkg)) {
+          // optional, already provided by a stacked bundle, or served by the system bundle
+          // (mirrored from a model/edge import — host-flat, e.g. jackson). NOT host-flat-but-
+          // unmirrored: the DS-API trio is host-flat in a reactor test yet only felix.scr imports
+          // it, so it is NOT system-exported and MUST be wired bundle-to-bundle — pull it in.
+          continue;
+        }
+        final BundleLocation exporter = discovery.exporterOf(pkg);
+        if (exporter == null || stackGas.contains(exporter.locationId())) {
+          continue;
+        }
+        final BundleManifest exporterManifest = BundleManifest.from(exporter);
+        stack.add(new Installable(exporter, startLevelOf(exporterManifest)));
+        stackGas.add(exporter.locationId());
+        exportedByStack.addAll(exporterManifest.exports().names());
+        frontier.add(exporter);
+      }
+    }
+  }
+
   /** Boot the framework, install+start the boot stack (if requested) and the model bundles. */
   public OsgiRuntime boot() throws IOException {
-    // Resolve the topology into one ordered list of (location, start level). The embedded topology
-    // DISCOVERS — boot-stack jars by symbolic name, model/edge bundles by the embed capability —
-    // from the staged index; the classpath topology took its bundles explicitly through the
-    // builder.
-    // Either way every bundle is a BundleLocation, so the install loop below is source-agnostic.
+    // Resolve the topology into one ordered list of (location, start level). The classpath topology
+    // took its bundles explicitly through the builder; the embedded topology DISCOVERS them from
+    // the
+    // index via the DiscoveryPolicy (default: install everything the index carries, the launcher
+    // already excluded). Either way every bundle is a BundleLocation, so the install loop below is
+    // source-agnostic. The start level is the bundle's ROLE: pax at logging, felix.scr/resolver at
+    // framework-runtime (by their BootStackJar symbolic name), everything else at the bundle level
+    // —
+    // a spec jar like the DS-API trio installs there too, passively (no activator, it only resolves
+    // so felix.scr wires to it).
     final List<Installable> stack = new ArrayList<>();
+    // The domain (model/edge) bundles whose Import-Package feeds deriveSystemExports —
+    // builder-given
+    // ones plus those discovered in the embedded topology.
     final List<BundleLocation> models = new ArrayList<>(modelBundles);
     for (BundleLocation pax : paxLoggingBundles) {
       stack.add(new Installable(pax, START_LEVEL_LOGGING));
@@ -231,19 +343,38 @@ public final class OsgiRuntime implements AutoCloseable {
     for (BundleLocation runtime : runtimeBundles) {
       stack.add(new Installable(runtime, START_LEVEL_FRAMEWORK_RUNTIME));
     }
-    if (embedsBootStack) {
-      for (BootStackJar jar : BootStackJar.values()) {
-        stack.add(
-            new Installable(
-                discovery.locateBySymbolicName(jar.symbolicName()), startLevelFor(jar.layer())));
-      }
-      models.addAll(discovery.matching(EmbedCapability.INSTALL_FILTER));
-    }
-    for (BundleLocation model : models) {
+    // Classpath topology: the builder named its model/edge bundles explicitly.
+    for (BundleLocation model : modelBundles) {
       stack.add(new Installable(model, START_LEVEL_BUNDLES));
+    }
+    // Embedded topology: discover from the index via the policy. Each bundle installs at the start
+    // level its role maps to; domain bundles also feed the system-export derivation.
+    if (embedsBootStack) {
+      for (BundleLocation location : discoveryPolicy.select(discovery)) {
+        final BundleManifest manifest = discovery.manifestOf(location);
+        stack.add(new Installable(location, startLevelOf(manifest)));
+        if (manifest.embed() != null && manifest.embed().isDomain()) {
+          models.add(location);
+        }
+      }
     }
 
     final Set<String> exports = deriveSystemExports(models, discovery);
+
+    // Close over the stack's MANDATORY imports: a package a stacked bundle imports that no stacked
+    // bundle exports and the system bundle does not export either (so it cannot resolve host-flat),
+    // but a jar in the index does, pulls that jar in as a passive bundle — the DS-API trio
+    // felix.scr
+    // imports. The runtime mirror of the build-time StagingClosure, so a classpath boot resolves
+    // the
+    // same set the embedded boot stages, without naming the trio. Passing the system-export set
+    // keeps a host-flat package (jackson, mirrored from a model import) from being pulled as
+    // bundle.
+    closeOverImports(
+        stack,
+        exports.stream()
+            .map(e -> Clause.parse(e).name())
+            .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new)));
 
     final FrameworkFactory factory =
         ServiceLoader.load(FrameworkFactory.class)
@@ -260,6 +391,17 @@ public final class OsgiRuntime implements AutoCloseable {
     final Map<String, String> config = new java.util.HashMap<>();
     config.put(Constants.FRAMEWORK_STORAGE, storage.toString());
     config.put(Constants.FRAMEWORK_STORAGE_CLEAN, Constants.FRAMEWORK_STORAGE_CLEAN_ONFIRSTINIT);
+    // Felix defaults felix.bootdelegation.implicit=true: it GUESSES, by stack inspection, when a
+    // class-load instigated from OUTSIDE a bundle should fall through to the parent (app)
+    // classloader.
+    // That is exactly the silent escape hatch that lets a non-wired package resolve by accident —
+    // and
+    // would let a seam package be served by the flat parent instead of the single declared
+    // exporter,
+    // making a typed-seam proof pass for the wrong reason. Off: every load not satisfied by a
+    // bundle's
+    // imports / Bundle-ClassPath / the system bundle fails loudly. Deterministic by construction.
+    config.put("felix.bootdelegation.implicit", "false");
     // The framework climbs to this level when started, activating each layer in turn (§4.3).
     config.put(Constants.FRAMEWORK_BEGINNING_STARTLEVEL, Integer.toString(START_LEVEL_BUNDLES));
     if (!exports.isEmpty()) {
@@ -306,11 +448,8 @@ public final class OsgiRuntime implements AutoCloseable {
         throw new IOException("OSGi framework did not reach start level " + START_LEVEL_BUNDLES);
       }
 
-      if (startScr
-          && awaitServiceByName("org.osgi.service.component.runtime.ServiceComponentRuntime", 5000)
-              == null) {
-        throw new IllegalStateException(
-            "felix.scr reached its start level but ServiceComponentRuntime never appeared");
+      if (startScr) {
+        assertScrActive();
       }
       LOG.info("OSGi runtime booted: {} bundle(s) installed and started", stack.size());
     } catch (BundleException ex) {
@@ -332,16 +471,18 @@ public final class OsgiRuntime implements AutoCloseable {
   private Set<String> deriveSystemExports(List<BundleLocation> models, BundleIndex discovery)
       throws IOException {
     final Set<String> exports = new LinkedHashSet<>(explicitSystemPackages);
+    final List<BundleManifest> manifests = new ArrayList<>();
+    for (BundleLocation model : models) {
+      manifests.add(BundleManifest.from(model));
+    }
     final Set<String> bundleExportedPackages = new LinkedHashSet<>();
-    for (BundleLocation model : models) {
-      bundleExportedPackages.addAll(
-          BundleManifest.packageNames(model.readHeader(Constants.EXPORT_PACKAGE)));
+    for (BundleManifest manifest : manifests) {
+      bundleExportedPackages.addAll(manifest.exports().names());
     }
-    for (BundleLocation model : models) {
-      exports.addAll(
-          BundleManifest.mirrorImportsAsExports(model.readHeader(Constants.IMPORT_PACKAGE)));
+    for (BundleManifest manifest : manifests) {
+      exports.addAll(manifest.imports().asSystemExports());
     }
-    exports.removeIf(e -> bundleExportedPackages.contains(BundleManifest.packageName(e)));
+    exports.removeIf(e -> bundleExportedPackages.contains(Clause.parse(e).name()));
     // The seam guard. A package owned by a domain bundle (type=model/edge) loads on the BUNDLE side
     // of the seam: its bundle is the sole exporter, never the system bundle. If such a package
     // still
@@ -353,7 +494,7 @@ public final class OsgiRuntime implements AutoCloseable {
     // -port membrane) resolve to null here and stay — that is exactly what belongs in the seam.
     final List<String> leaked =
         exports.stream()
-            .map(BundleManifest::packageName)
+            .map(e -> Clause.parse(e).name())
             .flatMap(
                 p -> {
                   final String exporter = discovery.domainExporterOf(p);
@@ -369,7 +510,7 @@ public final class OsgiRuntime implements AutoCloseable {
               + leaked);
     }
     final List<String> unresolved =
-        exports.stream().map(BundleManifest::packageName).filter(p -> !hostResolves(p)).toList();
+        exports.stream().map(e -> Clause.parse(e).name()).filter(p -> !hostResolves(p)).toList();
     if (!unresolved.isEmpty()) {
       throw new IllegalStateException(
           "system.packages.extra would export packages absent from the host classpath: "
@@ -450,17 +591,34 @@ public final class OsgiRuntime implements AutoCloseable {
     }
   }
 
-  private Object awaitServiceByName(String className, long timeoutMillis) {
-    final ServiceTracker<Object, Object> tracker = new ServiceTracker<>(context(), className, null);
-    tracker.open();
-    try {
-      return tracker.waitForService(timeoutMillis);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      return null;
-    } finally {
-      tracker.close();
+  /**
+   * Assert felix.scr actually activated — the proof that DS is running. We check the felix.scr
+   * BUNDLE reached {@code ACTIVE}, NOT that the host can see {@code ServiceComponentRuntime}: that
+   * service's package ({@code org.osgi.service.component.runtime}) is felix.scr-internal, wired
+   * bundle-to-bundle and deliberately NOT system-exported to the flat host, so the host cannot (and
+   * must not) resolve it. A stalled felix.scr (an unsatisfied mandatory import) stays INSTALLED;
+   * the dump names every bundle's state so the unresolved one is obvious.
+   */
+  private void assertScrActive() {
+    final Bundle scr = bundleBySymbolicName(BootStackJar.FELIX_SCR.symbolicName());
+    if (scr != null && scr.getState() == Bundle.ACTIVE) {
+      return;
     }
+    final StringBuilder dump = new StringBuilder();
+    for (Bundle b : framework.getBundleContext().getBundles()) {
+      dump.append("\n  ").append(stateName(b.getState())).append("  ").append(b.getSymbolicName());
+    }
+    throw new IllegalStateException(
+        "felix.scr did not reach ACTIVE — DS is not running; bundle states:" + dump);
+  }
+
+  private Bundle bundleBySymbolicName(String symbolicName) {
+    for (Bundle b : framework.getBundleContext().getBundles()) {
+      if (symbolicName.equals(b.getSymbolicName())) {
+        return b;
+      }
+    }
+    return null;
   }
 
   /**
