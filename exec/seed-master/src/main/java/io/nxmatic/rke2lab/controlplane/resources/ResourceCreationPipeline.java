@@ -34,6 +34,7 @@ final class ResourceCreationPipeline {
   private final ReportModel runbook;
   private final ConsultationLog consultations;
   private final DoctorConsultingService doctor;
+  private final SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
   private final IncusResourceBootstrap.BootstrapResult bootstrapResult;
   private final Map<String, Object> systemdAdapterLaunchSummary;
 
@@ -45,6 +46,7 @@ final class ResourceCreationPipeline {
       ReportModel runbook,
       ConsultationLog consultations,
       DoctorConsultingService doctor,
+      SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
       IncusResourceBootstrap.BootstrapResult bootstrapResult,
       Map<String, Object> systemdAdapterLaunchSummary) {
     this.config = config;
@@ -54,6 +56,7 @@ final class ResourceCreationPipeline {
     this.runbook = runbook;
     this.consultations = consultations;
     this.doctor = doctor;
+    this.systemdRuntimeStatus = systemdRuntimeStatus;
     this.bootstrapResult = bootstrapResult;
     this.systemdAdapterLaunchSummary = systemdAdapterLaunchSummary;
   }
@@ -76,7 +79,7 @@ final class ResourceCreationPipeline {
             runbook,
             consultations,
             doctor,
-            new ProductionClusterReadinessProbe(policy, readinessLogger),
+            new ProductionClusterReadinessProbe(policy, systemdRuntimeStatus, readinessLogger),
             systemdAdapterLaunchSummary,
             result -> holder[0] = result)
         .launch();
@@ -191,7 +194,8 @@ final class ResourceCreationPipeline {
       this.systemdRuntimeStatus =
           Deployment.getInstance().isDryRun()
               ? SeedSystemdAdapterRuntimeStatusSnapshot.deferredPreview(config)
-              : SeedSystemdAdapterRuntimeStatusSnapshot.snapshot(config, readinessLogger);
+              : ResourceCreationPipeline.this.systemdRuntimeStatus.snapshot(
+                  config, readinessLogger);
       return this;
     }
 
@@ -265,7 +269,7 @@ final class ResourceCreationPipeline {
 
     StandaloneResourceBuilder withSystemdRuntimeStatus() {
       this.systemdRuntimeStatus =
-          SeedSystemdAdapterRuntimeStatusSnapshot.snapshotStandalone(config);
+          ResourceCreationPipeline.this.systemdRuntimeStatus.snapshotStandalone(config);
       return this;
     }
 

@@ -17,6 +17,7 @@
 
   <modules>
     <module>bundle-parent</module>
+    <module>bundle-test-parent</module>
     <module>boot</module>
     <module>junit-testkit</module>
     <module>runtime</module>

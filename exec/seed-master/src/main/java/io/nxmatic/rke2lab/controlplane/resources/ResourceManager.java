@@ -4,6 +4,7 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
+import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
 import java.util.Map;
@@ -20,6 +21,7 @@ public final class ResourceManager {
       ReportModel runbook,
       ConsultationLog consultations,
       DoctorConsultingService doctor,
+      SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
       IncusResourceBootstrap.BootstrapResult bootstrapResult,
       Map<String, Object> systemdAdapterLaunchSummary,
       boolean pulumiMode) {
@@ -33,6 +35,7 @@ public final class ResourceManager {
             runbook,
             consultations,
             doctor,
+            systemdRuntimeStatus,
             bootstrapResult,
             systemdAdapterLaunchSummary);
 

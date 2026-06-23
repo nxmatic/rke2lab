@@ -5,7 +5,7 @@ import org.slf4j.bridge.SLF4JBridgeHandler;
 /**
  * Routes host {@code java.util.logging} onto slf4j/logback — the HOST-side (JCL) half of the boot's
  * logging convergence, shared by both boot executors (the prod {@code FrameworkLauncher} and the
- * test {@code FelixFrameworkExtension}) so they wire logs identically.
+ * test {@code OutOfContainerFrameworkExtension}) so they wire logs identically.
  *
  * <pre>
  *   Felix internal Logger ─► (FelixJulLogger) JUL ─┐

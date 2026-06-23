@@ -1,24 +1,26 @@
 package io.nxmatic.rke2lab.jgiven.testkit;
 
-import io.nxmatic.rke2lab.junit.testkit.FelixFrameworkExtension;
+import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
 
 /**
  * The jGiven boot closure for the OSGi testkit, in one call. Returns a {@link
- * FelixFrameworkExtension.Builder} already carrying everything a host needs to run jGiven scenarios
- * in-container; the host then {@code build()}s and, in the test body, installs its own {@code
- * -test} fixture fragment by what it DECLARES — never by a {@code Bundle-SymbolicName} literal:
+ * OutOfContainerFrameworkExtension.Builder} already carrying everything a host needs to run jGiven
+ * scenarios in-container; the host then {@code build()}s and, in the test body, installs its own
+ * {@code -test} fixture fragment by what it DECLARES — never by a {@code Bundle-SymbolicName}
+ * literal:
  *
  * <pre>{@code
  * @RegisterExtension
- * static final FelixFrameworkExtension felix = JGivenTestkit.felix().build();
+ * static final OutOfContainerFrameworkExtension felix = JGivenTestkit.felix().build();
  *
  * // in the test: select the fixture by capability; its host comes from the fragment's Fragment-Host
  * var fixture = felix.installFixtureWithHost("(&(type=fixture)(suite=doctor)(role=core))");
  * }</pre>
  *
  * <p>This is where jGiven-specific OSGi knowledge lives, deliberately OUT of the generic {@link
- * FelixFrameworkExtension} (which stays jGiven-agnostic). The closure has three measured parts,
- * each from the wrap spike (see {@code docs/architecture/osgi/jgiven-osgi-wrap-spike-report.adoc}):
+ * OutOfContainerFrameworkExtension} (which stays jGiven-agnostic). The closure has three measured
+ * parts, each from the wrap spike (see {@code
+ * docs/architecture/osgi/jgiven-osgi-wrap-spike-report.adoc}):
  *
  * <ul>
  *   <li>{@code bootDelegation(sun.misc)} — byte-buddy's {@code ClassInjector.UsingReflection}
@@ -45,14 +47,14 @@ public final class JGivenTestkit {
   private JGivenTestkit() {}
 
   /**
-   * A {@link FelixFrameworkExtension.Builder} pre-loaded with the jGiven boot closure (boot
-   * delegation, the jGiven dependency bundles, {@code jgiven-wrap}, and the host slf4j/junit
+   * A {@link OutOfContainerFrameworkExtension.Builder} pre-loaded with the jGiven boot closure
+   * (boot delegation, the jGiven dependency bundles, {@code jgiven-wrap}, and the host slf4j/junit
    * packages). The caller adds its own host bundle(s) via {@code installBundles(...)} and {@code
    * build()}s. The {@code jgiven-wrap} bundle and its dependency jars must be on the calling test
    * module's classpath (test-scope dependencies) so the testkit can locate them.
    */
-  public static FelixFrameworkExtension.Builder felix() {
-    return FelixFrameworkExtension.builder()
+  public static OutOfContainerFrameworkExtension.Builder felix() {
+    return OutOfContainerFrameworkExtension.builder()
         .bootDelegation("sun.misc")
         .systemPackages(
             "org.slf4j;version=2.0.17",

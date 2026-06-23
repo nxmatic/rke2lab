@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager.ResourceCreationResult;
+import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
 import java.util.Map;
@@ -23,6 +24,7 @@ public final class ResourcesStage {
   private final ReportModel runbook;
   private final ConsultationLog consultations;
   private final DoctorConsultingService doctor;
+  private final SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
   private final Supplier<IncusResourceBootstrap.BootstrapResult> bootstrapResultSupplier;
   private final Supplier<Map<String, Object>> systemdAdapterLaunchSupplier;
   private final Consumer<ResourceCreationResult> sink;
@@ -37,6 +39,7 @@ public final class ResourcesStage {
       ReportModel runbook,
       ConsultationLog consultations,
       DoctorConsultingService doctor,
+      SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
       Supplier<IncusResourceBootstrap.BootstrapResult> bootstrapResultSupplier,
       Supplier<Map<String, Object>> systemdAdapterLaunchSupplier,
       Consumer<ResourceCreationResult> sink) {
@@ -49,6 +52,7 @@ public final class ResourcesStage {
     this.runbook = runbook;
     this.consultations = consultations;
     this.doctor = doctor;
+    this.systemdRuntimeStatus = systemdRuntimeStatus;
     this.bootstrapResultSupplier = bootstrapResultSupplier;
     this.systemdAdapterLaunchSupplier = systemdAdapterLaunchSupplier;
     this.sink = sink;
@@ -64,6 +68,7 @@ public final class ResourcesStage {
             runbook,
             consultations,
             doctor,
+            systemdRuntimeStatus,
             bootstrapResultSupplier.get(),
             systemdAdapterLaunchSupplier.get(),
             pulumiMode));

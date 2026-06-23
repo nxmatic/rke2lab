@@ -13,10 +13,12 @@ import io.nxmatic.rke2lab.controlplane.pipeline.stages.SystemdAdapterStage;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
+import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
+import io.nxmatic.rke2lab.systemd.port.SystemdRuntimeProbe;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -125,6 +127,7 @@ public final class BootstrapPipeline {
       state.readinessLogger = readinessLogger;
       state.pulumiMode = false;
       assembleDoctor(state);
+      resolveSystemdRuntimeStatus(state);
       return new AwaitingPreflight(state);
     }
 
@@ -132,6 +135,7 @@ public final class BootstrapPipeline {
       state.readinessLogger = readinessLogger;
       state.pulumiMode = true;
       assembleDoctor(state);
+      resolveSystemdRuntimeStatus(state);
       return new AwaitingPreflight(state);
     }
 
@@ -144,7 +148,24 @@ public final class BootstrapPipeline {
     private static void assembleDoctor(PipelineState state) {
       final Consumer<String> logger =
           state.readinessLogger != null ? state.readinessLogger : msg -> {};
-      state.doctor = DoctorAssembly.assemble(state.config, state.pulumiMode, logger);
+      state.doctor = DoctorAssembly.assemble(state.pulumiMode, logger);
+    }
+
+    /**
+     * Resolve the systemd runtime-status probe once from the booted registry — the
+     * dbus-systemd-edge {@code @Component} that implements {@code SystemdRuntimeProbe}. Wrapped as
+     * the snapshot instance and threaded to the readiness sites, so none of them reaches the edge
+     * statically.
+     */
+    private static void resolveSystemdRuntimeStatus(PipelineState state) {
+      final SystemdRuntimeProbe probe =
+          state.bootedFramework.awaitService(SystemdRuntimeProbe.class, 5000);
+      if (probe == null) {
+        throw new IllegalStateException(
+            "No SystemdRuntimeProbe published in the OSGi registry within 5s "
+                + "(dbus-systemd-edge @Component absent).");
+      }
+      state.systemdRuntimeStatus = new SeedSystemdAdapterRuntimeStatusSnapshot(probe);
     }
   }
 
@@ -251,7 +272,8 @@ public final class BootstrapPipeline {
 
     public SystemdAdapterDone during(
         String topic, Function<SystemdAdapterStage, SystemdAdapterStage> body) {
-      final SeedSystemdAdapterEndpointGate gate = SeedSystemdAdapterEndpointGate.production();
+      final SeedSystemdAdapterEndpointGate gate =
+          SeedSystemdAdapterEndpointGate.production(state.systemdRuntimeStatus);
       final SystemdAdapterProbe liveProbe = cfg -> gate.ensureReachable(cfg, state.readinessLogger);
       final SystemdAdapterStage stage =
           new SystemdAdapterStage(
@@ -300,6 +322,7 @@ public final class BootstrapPipeline {
               state.runbook,
               state.consultations,
               state.doctor,
+              state.systemdRuntimeStatus,
               () -> state.bootstrapResult,
               () -> state.systemdAdapterLaunchSummary,
               result -> state.resourceResult = result);

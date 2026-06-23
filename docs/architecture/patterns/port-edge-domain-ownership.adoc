@@ -228,7 +228,7 @@ ownership roles' boot faces:
 
 | `fixture`
 | test-only carrier (+ `suite`/`role`)
-| Installed only by the test harness (`FelixFrameworkExtension`), never on a runtime classpath.
+| Installed only by the test harness (`OutOfContainerFrameworkExtension`), never on a runtime classpath.
 |===
 
 The one question the `type=seam` value answers — the key phrase to keep:
@@ -312,6 +312,44 @@ flowchart LR
 The arrow that matters: `edge ┄implements┄▶ port ◀──calls── domain`. Both point AT the port; the port
 points at nothing. That is why it is pure, and why it is the one door reached identically from either
 world.
+
+== The keystone — the mediator knows all facets, but mediates only by ports
+
+A consequence of the ownership rule, stated at the level of the whole system. *Knowledge runs strictly
+downward.* Each domain is pure in its *upward ignorance*: it does not know which application embeds it
+(Pulumi does not know it provisions RKE2; the doctor does not know it lives in a provisioning system;
+systemd does not know a doctor auscultates it). The dependency graph enforces this — the control-node
+(`seed-master`) depends on *every* domain (`doctor-*`, `systemd-port`, `manifests-*`, `pulumi-edge`, …);
+*no domain depends on the control-node*.
+
+So the *one place that knows two facets at once* is the control-node — and that is precisely why it,
+and only it, can *mediate between them*. But it mediates *through their ports* (it knows them all),
+*never through their internals* (it reasons in none). The host assembly wires impls onto ports; it
+diagnoses nothing and speaks no protocol. *Mediation between facets is a property of the executable
+that materialises the system, never a responsibility of a domain* — the dual of the upward-ignorance
+rule above.
+
+The keystone image is exact in the way that matters and misleading in the way that doesn't: like the
+stone at the crown of an arch, the control-node holds the structure *only because it touches both
+sides* — and it holds *nothing of its own*. It carries no domain logic; remove every port-wiring line
+and there is no residue of reasoning left in it. Its centrality is one of *knowledge and wiring*, not
+of richness. A domain that learned about the control-node, or a control-node that started to reason in
+a domain's terms, would both break the arch.
+
+This is the same shape as the edge/consumer split one level down — *the edge measures, the consumer
+reads the fact* — lifted to the whole system:
+
+. The control-node asks one domain (through its port) to *produce* a fact — e.g. `systemd-port`'s
+  `SystemdRuntimeProbe` yields a `SystemdStatusSnapshot`.
+. It *translates* that fact into the vocabulary of another domain's port — the snapshot becomes an
+  `Observation` the doctor can read.
+. It *consults* the second domain (again through its port) — the doctor reasons over the observation.
+
+At no step does the control-node interpret the systemd protocol or perform a diagnosis itself; each
+act of meaning happens inside a domain, behind a port. The control-node only carries facts across the
+seam between them. (The two edge species this produces — *sondes* that observe→snapshot→fact→consult,
+versus *portes* that convert or act with no persisted fact — are catalogued in
+link:frontier-playability-model.adoc[the frontier-playability model].)
 
 == Direction is a method, not a module, not two ports
 

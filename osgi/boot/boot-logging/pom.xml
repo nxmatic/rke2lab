@@ -12,7 +12,7 @@
   <artifactId>boot-logging</artifactId>
   <name>osgi/boot/boot-logging</name>
   <description>The embedded-OSGi boot's HOST-side logging convergence, shared by both boot executors
-    (the prod FrameworkLauncher in osgi/runtime AND the test-world FelixFrameworkExtension in
+    (the prod FrameworkLauncher in osgi/runtime AND the test-world OutOfContainerFrameworkExtension in
     osgi/junit-testkit) so they converge logs the SAME way instead of each re-implementing it. Two
     host-world (JCL) pieces, both pax-free by design — pax-logging is the OSGi-side (BCL) LogService
     and lives in osgi/runtime only, never here, so depending on boot-logging never drags a second
@@ -35,11 +35,7 @@
       <groupId>org.apache.felix</groupId>
       <artifactId>org.apache.felix.framework</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter</artifactId>
-      <scope>test</scope>
-    </dependency>
+    <!-- junit-jupiter (test) is inherited from build-parent. -->
     <!-- The log-flow test emits through an org.slf4j Logger (LoggerFactory) to prove host JUL reaches
          the slf4j/logback side; the main bridge touches only SLF4JBridgeHandler (jul-to-slf4j). So
          slf4j-api is a TEST-scope direct dependency here, not compile — declared, not leaned on. -->

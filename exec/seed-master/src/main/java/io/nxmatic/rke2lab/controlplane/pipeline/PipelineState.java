@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
+import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
 import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
@@ -48,6 +49,14 @@ final class PipelineState {
    * readiness transition; the stages consult it without naming the hidden actors behind it.
    */
   DoctorConsultingService doctor;
+
+  /**
+   * The systemd runtime-status probe for this run, resolved once from the booted OSGi registry (the
+   * dbus-systemd-edge {@code @Component} implementing {@code SystemdRuntimeProbe}) and wrapped as
+   * this instance. Threaded to the readiness sites that take a status snapshot, so none of them
+   * reaches the edge statically.
+   */
+  SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
 
   BboxReconciliationOrchestrator bboxOrchestrator;
   ResourceManager resourceManager;

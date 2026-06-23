@@ -3,8 +3,8 @@ package io.nxmatic.rke2lab.doctor;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import io.nxmatic.rke2lab.jgiven.testkit.JGivenTestkit;
-import io.nxmatic.rke2lab.junit.testkit.FelixFrameworkExtension;
 import io.nxmatic.rke2lab.junit.testkit.Osgi;
+import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.stream.Stream;
@@ -37,8 +37,11 @@ class DoctorCoreInContainerTest {
   private static final String RUNNER_FQN = "io.nxmatic.rke2lab.doctor.DoctorCoreTests";
 
   @RegisterExtension
-  static final FelixFrameworkExtension felix =
+  static final OutOfContainerFrameworkExtension felix =
       JGivenTestkit.felix() // jGiven boot closure (byte-buddy, jgiven-wrap, slf4j/junit packages)
+          // doctor-core's dbus-tcp specialist names the unit via the typed SystemdUnitId, so the
+          // host imports the systemd domain's port; system-export it (a seam) so the host resolves.
+          .systemPackages("io.nxmatic.rke2lab.systemd.port;version=1.0.0")
           .installFromClasspath(
               "org.opentest4j",
               "org.apiguardian.api",

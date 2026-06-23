@@ -53,11 +53,12 @@ public final class SeedSystemdAdapterEndpointGate {
   }
 
   /** The live gate, wired to the real wall clock, sleep, dbus runtime probe, and incus exec. */
-  public static SeedSystemdAdapterEndpointGate production() {
+  public static SeedSystemdAdapterEndpointGate production(
+      SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus) {
     return new SeedSystemdAdapterEndpointGate(
         System::nanoTime,
         SeedSystemdAdapterEndpointGate::sleep,
-        config -> SeedSystemdAdapterRuntimeStatusSnapshot.snapshot(config, null),
+        runtimeStatus::snapshot,
         SeedSystemdAdapterEndpointGate::probeInstanceReachable);
   }
 
@@ -148,7 +149,10 @@ public final class SeedSystemdAdapterEndpointGate {
     // A refused/unanswered dbus deadline is a CONNECTION_REFUSED symptom, not a bare throw: the
     // snapshot stamps status=ok the instant dbus answers, so reaching this deadline means the
     // connection itself never succeeded. The last summary carries the dbus "why" — preserved in
-    // details so the doctor consults and the runbook stays loquacious.
+    // details so the doctor consults and the runbook stays loquacious. The endpoint + node are
+    // promoted to FLAT details keys (the gate holds them host-side, from config) so the pure
+    // dbus-tcp specialist reads them off the observation without reaching back to BootstrapConfig
+    // and without spelunking the nested adapterStatus map.
     return Observation.failed(
         Symptom.CONNECTION_REFUSED,
         summary,
@@ -158,6 +162,12 @@ public final class SeedSystemdAdapterEndpointGate {
                 "systemd-adapter-endpoint-gate",
                 "probeMode",
                 "systemd-adapter-runtime",
+                "adapterHost",
+                config.systemdAdapterDbusHost(),
+                "adapterPort",
+                Integer.toString(config.systemdAdapterDbusPort()),
+                "nodeName",
+                config.nodeName(),
                 "adapterStatus",
                 Map.copyOf(lastSnapshot))));
   }

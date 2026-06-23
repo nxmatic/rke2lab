@@ -44,9 +44,9 @@ import org.slf4j.LoggerFactory;
  * for, and from ONE place only: a second (unversioned) exporter wires importers to a different
  * class copy and the typed lookup silently misses.
  */
-public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAllCallback {
+public final class OutOfContainerFrameworkExtension implements BeforeAllCallback, AfterAllCallback {
 
-  private static final Logger LOG = LoggerFactory.getLogger(FelixFrameworkExtension.class);
+  private static final Logger LOG = LoggerFactory.getLogger(OutOfContainerFrameworkExtension.class);
 
   private final String systemPackagesExtra;
   private final String bootDelegation;
@@ -64,7 +64,7 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
    */
   private final BundleIndex classpath = BundleIndex.ofClasspath();
 
-  private FelixFrameworkExtension(Builder builder) {
+  private OutOfContainerFrameworkExtension(Builder builder) {
     Set<String> exports = new LinkedHashSet<>(builder.systemPackages);
     for (String symbolicName : builder.exportImportsOf) {
       exports.addAll(classpath.exportsForImportsOf(symbolicName));
@@ -170,8 +170,8 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
       return this;
     }
 
-    public FelixFrameworkExtension build() {
-      return new FelixFrameworkExtension(this);
+    public OutOfContainerFrameworkExtension build() {
+      return new OutOfContainerFrameworkExtension(this);
     }
   }
 

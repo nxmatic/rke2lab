@@ -43,7 +43,7 @@ so it sees the host white-box with no reverse module edge — no cycle, no parki
 | *Renamed from `osgi/testkit`* (package `…osgi.testkit` → `…junit.testkit`): the name now states
   its nature — JUnit-in-OSGi fixtures. A *bundle* (a bundle is a superset of a plain jar — it
   degrades to a jar on the flat classpath). Two halves by world: *JVM-side*
-  `FelixFrameworkExtension` + `@Osgi`/`@OsgiSpike` (loaded by surefire, boots Felix); *in-container*
+  `OutOfContainerFrameworkExtension` + `@Osgi`/`@OsgiSpike` (loaded by surefire, boots Felix); *in-container*
   `InContainerJUnitRunner` in the exported `…junit.testkit.container` package (loaded by a host
   bundle, drives a JUnit Platform Launcher inside the framework).
 
@@ -164,7 +164,7 @@ public static List<String> run() throws InterruptedException {
       .run();
 }
 ----
-. *the harness* (`src/test`, `@Osgi @TestFactory`): boot via `FelixFrameworkExtension.builder()` (or
+. *the harness* (`src/test`, `@Osgi @TestFactory`): boot via `OutOfContainerFrameworkExtension.builder()` (or
   `JGivenTestkit.felix()` for jGiven), `installFromClasspath` the JUnit bundles + `junit-testkit`,
   install host + fragment, `resolve`, invoke `run()` through the host loader, map each line to a
   `DynamicTest`.

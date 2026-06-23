@@ -4,6 +4,7 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.PhaseOutcome;
+import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.doctor.port.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.doctor.port.Observation;
 import io.nxmatic.rke2lab.doctor.port.Symptom;
@@ -22,10 +23,15 @@ import java.util.function.Consumer;
 public final class ProductionClusterReadinessProbe implements ClusterReadinessProbe {
 
   private final ControlplanePolicy policy;
+  private final SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus;
   private final Consumer<String> logger;
 
-  public ProductionClusterReadinessProbe(ControlplanePolicy policy, Consumer<String> logger) {
+  public ProductionClusterReadinessProbe(
+      ControlplanePolicy policy,
+      SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus,
+      Consumer<String> logger) {
     this.policy = policy;
+    this.runtimeStatus = runtimeStatus;
     this.logger = logger;
   }
 
@@ -35,7 +41,8 @@ public final class ProductionClusterReadinessProbe implements ClusterReadinessPr
       case KUBECONFIG_PUBLISHED ->
           toObservation(
               phase,
-              ClusterBootstrapReadinessVerifier.checkKubeconfigPublished(config, logger),
+              ClusterBootstrapReadinessVerifier.checkKubeconfigPublished(
+                  config, runtimeStatus, logger),
               Symptom.KUBECONFIG_MISSING);
       case API_READY ->
           toObservation(

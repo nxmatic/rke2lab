@@ -8,7 +8,7 @@ Bundle-SymbolicName: io.nxmatic.rke2lab.doctor.core.test
 # is crossed, by sharing the package).
 Fragment-Host: io.nxmatic.rke2lab.doctor.core
 
-# Test fixture, selected by FelixFrameworkExtension via an LDAP filter over these attributes — never
+# Test fixture, selected by OutOfContainerFrameworkExtension via an LDAP filter over these attributes — never
 # by a Bundle-SymbolicName literal. Its host (doctor-core) is found through the Fragment-Host above.
 # type=fixture, suite=doctor, role=core (the white-box actor tests + the 2 in-container jGiven
 # scenarios). Same suite as the port fragment, distinguished by role.

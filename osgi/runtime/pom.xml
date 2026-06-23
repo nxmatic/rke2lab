@@ -47,7 +47,7 @@
     </dependency>
     <!-- The shared boot MODEL: the embed capability, the BootStackJar registry, and the
          ClasspathBundleIndex this executor consumes to locate bundles + mirror their imports before
-         the framework exists. Same model the test FelixFrameworkExtension reads. -->
+         the framework exists. Same model the test OutOfContainerFrameworkExtension reads. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>boot-discovery</artifactId>

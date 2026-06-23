@@ -13,7 +13,7 @@
   <name>osgi/junit-testkit</name>
   <description>The JUnit-in-OSGi testkit: the shared fixtures for running JUnit IN AND AROUND a real
     embedded framework. Two halves, by world. JVM-side (loaded by surefire, BEFORE the framework):
-    FelixFrameworkExtension boots a real Felix and the @Osgi/@OsgiSpike tags. In-container (loaded by
+    OutOfContainerFrameworkExtension boots a real Felix and the @Osgi/@OsgiSpike tags. In-container (loaded by
     a host bundle): InContainerJUnitRunner drives a JUnit Platform Launcher INSIDE the framework
     against a host package, so a host -test fragment runs its tests white-box. A bundle, not a plain
     jar — being a bundle is a superset (it degrades to a plain jar on the flat classpath), and the
@@ -41,7 +41,7 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
-    <!-- The shared boot MODEL — NOT the executor osgi/runtime. FelixFrameworkExtension reuses the
+    <!-- The shared boot MODEL — NOT the executor osgi/runtime. OutOfContainerFrameworkExtension reuses the
          ClasspathBundleIndex (locate / embeddableBundles / exportsForImportsOf) so test and prod agree
          on boot discovery from one source. Depending on boot-discovery (which pulls only the JDK
          jar/manifest API) rather than runtime keeps the boot EXECUTOR's closure — notably pax-logging-api,

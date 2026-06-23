@@ -76,8 +76,20 @@ SHIPPED + integrated into design/pre-integration:
      declaration; shade runs pre-boot so it can't derive from a runtime scan). Mojo, or document as
      irreducible — state it once, authoritatively.
 
-2. **THEN the remaining edges:** dbus-systemd-edge (host, non-playable), then the playables
-   incus-edge / cluster-edge / host-filesystem-edge.
+2. **The remaining edges.** SHIPPED so far: pulumi (template), ssh-to-age (first OSGi), **dbus-systemd**
+   (edge #3, SHIPPED 2026-06-23 — first BOTH extracted AND migrated to OSGi; see
+   [[dbus-systemd-edge-spec-state]]). LEFT: **incus / cluster / host-fs**. Use the sonde-vs-porte lens
+   ([[dbus-systemd-edge-spec-state]] holds it):
+   - **cluster-edge = a SONDE** (not a porte): `ClusterReadinessProbe`→`Observation` + `ClusterSpecialist`
+     ALREADY exist in doctor; just extract the kubectl contact (`ClusterBootstrapReadinessVerifier`) out
+     of seed-master. NO `cluster-core`. Name STAYS `cluster` (one k8s cluster — unambiguous; k8s-cluster
+     rename rejected).
+   - **incus-edge** — SDK already under `sdks/incus/`; playable. Brainstorm first.
+   - **host-fs** — likely NOT a sonde (no fs specialist/observation in doctor); the seed-master fs touch
+     is DIFFUSE. Brainstorm whether there's a single extractable contact at all, or host-internal plumbing
+     that should NOT become an edge.
+   Each still needs a short brainstorm (contact? port-by-concern? sonde/porte? snapshot→fact?) — the
+   pattern is now established + documented (the keystone section of port-edge-domain-ownership.adoc).
 
 ## Working rules (learned this session)
 

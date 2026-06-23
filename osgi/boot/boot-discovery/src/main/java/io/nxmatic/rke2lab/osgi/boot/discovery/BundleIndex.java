@@ -174,9 +174,9 @@ public final class BundleIndex {
    *
    * <p>The single source of the felix.scr → DS-API-trio derivation. The two executors differ ONLY
    * in what they contribute per jar: {@code BootPlanner} adds a passive-level {@code Installable}
-   * to its plan; the test {@code FelixFrameworkExtension} installs the jar into the framework. The
-   * seam law lives in {@code exporterOf} (a seam is host-flat, never pulled), so the walk stays
-   * pure.
+   * to its plan; the test {@code OutOfContainerFrameworkExtension} installs the jar into the
+   * framework. The seam law lives in {@code exporterOf} (a seam is host-flat, never pulled), so the
+   * walk stays pure.
    */
   public void closeOverImports(
       List<BundleLocation> seeds, Set<String> alreadyProvided, Consumer<BundleLocation> onPulled) {

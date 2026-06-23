@@ -302,11 +302,12 @@ class NestedRunbookTest {
   }
 
   private static DoctorConsultingService readyGeneralist() {
-    return doctorWith(List.of(new DbusTcpSpecialist(config())));
+    // The dbus-tcp specialist is in the core's standard roster now; no host injection needed.
+    return doctorWith(List.of());
   }
 
   private static DoctorConsultingService networkGeneralist() {
-    return doctorWith(List.of(new DbusTcpSpecialist(config()), new FakeNetworkSpecialist()));
+    return doctorWith(List.of(new FakeNetworkSpecialist()));
   }
 
   /** A stand-in network specialist so a TIMEOUT (routed to NETWORK) yields a prescription. */

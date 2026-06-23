@@ -1,11 +1,12 @@
-package io.nxmatic.rke2lab.controlplane.readiness;
+package io.nxmatic.rke2lab.dbus.systemd.edge;
 
 import de.thjom.java.systemd.Manager;
 import de.thjom.java.systemd.Service;
 import de.thjom.java.systemd.Systemd;
 import de.thjom.java.systemd.Target;
 import de.thjom.java.systemd.types.UnitType;
-import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
+import io.nxmatic.rke2lab.systemd.port.SystemdProbeRequest;
+import io.nxmatic.rke2lab.systemd.port.SystemdRuntimeProbe;
 import io.nxmatic.rke2lab.systemd.port.SystemdStatusSnapshot;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -20,11 +21,23 @@ import org.freedesktop.dbus.connections.transports.TransportBuilder.SaslAuthMode
 import org.freedesktop.dbus.exceptions.DBusException;
 import org.freedesktop.dbus.interfaces.DBusInterface;
 import org.freedesktop.dbus.types.UInt32;
+import org.osgi.service.component.annotations.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Probes systemd-adapter over DBus-on-TCP and returns a {@link SystemdStatusSnapshot}. */
-public final class DbusSystemdProbe {
+/**
+ * The realised {@code dbus-systemd} edge: the single door toward systemd over its dbus-on-TCP
+ * endpoint. It implements the systemd domain's {@link SystemdRuntimeProbe} seam by opening an
+ * anonymous-SASL DBus connection to {@code tcp:host=…,port=…}, reading the live state through
+ * {@code de.thjom.java.systemd}, and translating it into the pure {@link SystemdStatusSnapshot}.
+ *
+ * <p>TCP is playable in OSGi, so this edge lives in the OSGi world; SCR publishes it and the host
+ * resolves it from the registry. The dbus-java stack is embedded as nested jars on this bundle's
+ * {@code Bundle-ClassPath}, so the transport {@code ServiceLoader} discovers {@code
+ * TcpTransportProvider} inside this one classloader.
+ */
+@Component(service = SystemdRuntimeProbe.class)
+public final class DbusSystemdProbe implements SystemdRuntimeProbe {
 
   private static final Logger LOG = LoggerFactory.getLogger(DbusSystemdProbe.class);
 
@@ -41,11 +54,10 @@ public final class DbusSystemdProbe {
     List<Object[]> ListJobs();
   }
 
-  private DbusSystemdProbe() {}
-
-  public static SystemdStatusSnapshot probe(BootstrapConfig config) {
-    final String host = config.systemdAdapterDbusHost();
-    final int port = config.systemdAdapterDbusPort();
+  @Override
+  public SystemdStatusSnapshot probe(SystemdProbeRequest request) {
+    final String host = request.dbusHost();
+    final int port = request.dbusPort();
     final String busAddress = "tcp:host=" + host + ",port=" + port;
 
     LOG.info("connecting to {}", busAddress);
@@ -103,8 +115,8 @@ public final class DbusSystemdProbe {
           Map.of(
               "adapterHost", host,
               "adapterPort", Integer.toString(port),
-              "incusInstance", nullSafe(config.nodeName()),
-              "nixosHost", nullSafe(config.imageBuilderHost()),
+              "incusInstance", nullSafe(request.nodeName()),
+              "nixosHost", nullSafe(request.imageBuilderHost()),
               "systemBusAddress", busAddress);
 
       return SystemdStatusSnapshot.builder()
@@ -127,7 +139,7 @@ public final class DbusSystemdProbe {
     }
   }
 
-  private static Map<String, String> collectPendingJobs(DBusConnection connection) {
+  private Map<String, String> collectPendingJobs(DBusConnection connection) {
     final LinkedHashMap<String, String> jobs = new LinkedHashMap<>();
     try {
       final JobLister lister =
@@ -155,7 +167,7 @@ public final class DbusSystemdProbe {
     return Map.copyOf(jobs);
   }
 
-  private static Map<String, String> collectFailedUnitDetails(Manager manager) {
+  private Map<String, String> collectFailedUnitDetails(Manager manager) {
     final LinkedHashMap<String, String> details = new LinkedHashMap<>();
     try {
       for (UnitType unit : manager.listUnits()) {
@@ -177,7 +189,7 @@ public final class DbusSystemdProbe {
     return Map.copyOf(details);
   }
 
-  private static Map<String, String> collectPendingDependencies(Manager manager, Target target) {
+  private Map<String, String> collectPendingDependencies(Manager manager, Target target) {
     final Set<String> dependencies = new LinkedHashSet<>();
     addAll(dependencies, target.getRequires());
     addAll(dependencies, target.getWants());
@@ -197,7 +209,7 @@ public final class DbusSystemdProbe {
     return Map.copyOf(pending);
   }
 
-  private static void addAll(Set<String> sink, List<String> values) {
+  private void addAll(Set<String> sink, List<String> values) {
     if (values == null) {
       return;
     }
@@ -208,18 +220,18 @@ public final class DbusSystemdProbe {
     }
   }
 
-  private static int clampNonNegative(long value) {
+  private int clampNonNegative(long value) {
     if (value <= 0L) {
       return 0;
     }
     return (int) Math.min(value, Integer.MAX_VALUE);
   }
 
-  private static String nullSafeState(String value) {
+  private String nullSafeState(String value) {
     return value == null || value.isBlank() ? "unknown" : value;
   }
 
-  private static String nullSafe(String value) {
+  private String nullSafe(String value) {
     return value == null || value.isBlank() ? "unknown" : value;
   }
 }

@@ -198,7 +198,7 @@ profile — a default `./mvnw install` of the worlds never builds or sees it):
 
 Run: `flox activate -- ./mvnw -pl :jgiven-wrap-tests -am test -Pspike -DskipTests=false`.
 
-The one non-throwaway code change is `FelixFrameworkExtension.bootDelegation(...)` in `osgi/testkit`
+The one non-throwaway code change is `OutOfContainerFrameworkExtension.bootDelegation(...)` in `osgi/testkit`
 — a reusable, generally-correct testkit capability worth keeping regardless of the spike's fate.
 
 == Related documentation

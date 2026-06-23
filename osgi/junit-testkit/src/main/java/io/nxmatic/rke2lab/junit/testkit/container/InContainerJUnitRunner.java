@@ -21,12 +21,12 @@ import org.osgi.framework.wiring.BundleWiring;
 
 /**
  * The in-framework half of the OSGi test-fragment model — the in-container twin of {@code
- * FelixFrameworkExtension} (its JVM-side counterpart). A host {@code -test} fragment, which shares
- * its host bundle's classloader, constructs one of these (reflectively, THROUGH that loader) and
- * calls {@link #run()} so a real JUnit Platform Launcher runs INSIDE the framework, discovering and
- * executing the fragment's {@code @Test} classes white-box (exactly as the host's own code sees
- * them). {@link #run()} returns plain {@link String}s so no JUnit type ever crosses into the
- * calling JVM world.
+ * OutOfContainerFrameworkExtension} (its JVM-side counterpart). A host {@code -test} fragment,
+ * which shares its host bundle's classloader, constructs one of these (reflectively, THROUGH that
+ * loader) and calls {@link #run()} so a real JUnit Platform Launcher runs INSIDE the framework,
+ * discovering and executing the fragment's {@code @Test} classes white-box (exactly as the host's
+ * own code sees them). {@link #run()} returns plain {@link String}s so no JUnit type ever crosses
+ * into the calling JVM world.
  *
  * <p>An instance, not a static helper: the host classloader, the engine class, and the package to
  * scan are the collaborators it runs against — passed in, held as fields, explicit in the call

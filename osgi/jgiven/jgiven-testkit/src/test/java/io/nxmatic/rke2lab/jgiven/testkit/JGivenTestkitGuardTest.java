@@ -3,8 +3,8 @@ package io.nxmatic.rke2lab.jgiven.testkit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.junit.testkit.FelixFrameworkExtension;
 import io.nxmatic.rke2lab.junit.testkit.Osgi;
+import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
 import java.lang.reflect.Method;
 import java.util.List;
 import org.junit.jupiter.api.MethodOrderer;
@@ -39,7 +39,8 @@ class JGivenTestkitGuardTest {
   private static final String FIXTURE_FILTER = "(&(type=fixture)(suite=jgiven)(role=probe))";
   private static final String RUNNER_FQN = "io.nxmatic.rke2lab.jgiven.probe.VaultScenarioRunner";
 
-  @RegisterExtension static final FelixFrameworkExtension felix = JGivenTestkit.felix().build();
+  @RegisterExtension
+  static final OutOfContainerFrameworkExtension felix = JGivenTestkit.felix().build();
 
   /** Palier 2 — the wrap bundle's import closure resolves and it reaches ACTIVE. */
   @Test
@@ -69,7 +70,8 @@ class JGivenTestkitGuardTest {
     // installed
     // WITHOUT starting: a fragment cannot be started, and the host is resolved only AFTER the
     // fragment is present so the framework attaches it (OSGi Core §3.14).
-    FelixFrameworkExtension.FixtureWithHost fixture = felix.installFixtureWithHost(FIXTURE_FILTER);
+    OutOfContainerFrameworkExtension.FixtureWithHost fixture =
+        felix.installFixtureWithHost(FIXTURE_FILTER);
     Bundle host = fixture.host();
     Bundle fragment = fixture.fragment();
 

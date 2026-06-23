@@ -30,7 +30,10 @@ public final class SeedNodeBootstrapWatcher {
       Duration timeout, Duration retryInterval, Duration progressLogInterval) {}
 
   public static boolean waitForBootstrapPreconditions(
-      BootstrapConfig config, WaitConfig waitConfig, Consumer<String> logger) {
+      BootstrapConfig config,
+      SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus,
+      WaitConfig waitConfig,
+      Consumer<String> logger) {
     final Duration timeout = waitConfig.timeout();
     final Duration retryInterval = waitConfig.retryInterval();
     final Duration progressLogInterval = waitConfig.progressLogInterval();
@@ -45,8 +48,7 @@ public final class SeedNodeBootstrapWatcher {
 
     String lastSummary = "not yet checked";
     while (System.nanoTime() < deadlineNanos) {
-      final Map<String, Object> statusSnapshot =
-          SeedSystemdAdapterRuntimeStatusSnapshot.snapshot(config, null);
+      final Map<String, Object> statusSnapshot = runtimeStatus.snapshot(config);
       final String probeStatus = stringValue(statusSnapshot.getOrDefault("status", "unknown"));
       final boolean runtimeReady = toBoolean(statusSnapshot.get("runtimePrecheckReady"));
       final int pendingJobCount = toInt(statusSnapshot.get("pendingJobs"), -1);

@@ -4,9 +4,9 @@
 
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
-    <artifactId>bundle-parent</artifactId>
+    <artifactId>bundle-test-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
-    <relativePath>../../bundle-parent/pom.xml</relativePath>
+    <relativePath>../../bundle-test-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>doctor-core-test</artifactId>
@@ -23,14 +23,8 @@
     include; the JUnit lifecycle via the generic in-container runner (junit-testkit).</description>
 
   <dependencies>
-    <!-- the JUnit-in-OSGi testkit: JVM-side FelixFrameworkExtension (harness) + in-container runner
-         (DoctorCoreTests); provided covers both src/test and src/main compilation. -->
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>junit-testkit</artifactId>
-      <version>${project.version}</version>
-      <scope>provided</scope>
-    </dependency>
+    <!-- The JUnit-in-OSGi testkit, Jupiter, the engine, jGiven (jgiven-junit5), and the platform
+         launcher all come from bundle-test-parent. Only module-specific deps are named below. -->
 
     <!-- compile the actor tests white-box against the host (provided: the fragment is pure test
          bytecode that resolves against the doctor-core host at runtime). -->
@@ -59,23 +53,8 @@
       <scope>provided</scope>
     </dependency>
 
-    <!-- the actor tests + scenarios compile against Jupiter + jGiven (src/main → fragment). -->
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <!-- DoctorCoreTests names JupiterTestEngine.class (so bnd imports the engine package). -->
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-engine</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.tngtech.jgiven</groupId>
-      <artifactId>jgiven-junit5</artifactId>
-      <scope>provided</scope>
-    </dependency>
+    <!-- Jupiter, the engine, jgiven-junit5 (all provided) and junit-platform-launcher (test) are
+         inherited from bundle-test-parent. -->
 
     <!-- the src/test harness boots Felix via JGivenTestkit.felix() and installs the JUnit + jGiven
          bundle worlds by classpath substring, so they must be on the TEST classpath. -->
@@ -83,11 +62,6 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>jgiven-testkit</artifactId>
       <version>${project.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.junit.platform</groupId>
-      <artifactId>junit-platform-launcher</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

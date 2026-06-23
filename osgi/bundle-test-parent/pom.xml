@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+    <relativePath>../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>bundle-test-parent</artifactId>
+  <version>0.0.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>osgi/bundle-test-parent</name>
+  <description>Parent of the OSGi -test FRAGMENTS (doctor-core-test, doctor-port-test,
+    jgiven-probe-test, …). A fragment carries its tests in src/main so they land in the fragment
+    and run white-box through the host classloader; that bytecode therefore needs the JUnit + jGiven
+    recipe at PROVIDED scope (build-parent gives it only at test scope, which a fragment's src/main
+    cannot see). Declared once here so every fragment is uniform and BDD-capable by default — the
+    in-container InContainerJUnitRunner + jGiven are reachable whether or not a given fragment uses
+    them yet. The out-of-container harness (src/test) gets junit-platform-launcher too; it pulls
+    platform-engine/commons + opentest4j/apiguardian transitively.</description>
+
+  <dependencies>
+    <!-- The JUnit-in-OSGi testkit: OutOfContainerFrameworkExtension (src/test harness) +
+         InContainerJUnitRunner (src/main, runs the @Tests in-framework). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>junit-testkit</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- The fragment's src/main @Test classes compile against Jupiter; provided keeps them out of
+         the fragment jar — they resolve as their own OSGi bundle at runtime. -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <!-- The in-container runner names JupiterTestEngine.class (so bnd imports the engine package). -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <!-- BDD by default: jGiven scenarios compile in any fragment's src/main without redeclaration. -->
+    <dependency>
+      <groupId>com.tngtech.jgiven</groupId>
+      <artifactId>jgiven-junit5</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <!-- The src/test harness boots Felix and drives a JUnit Platform Launcher; on the test classpath. -->
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

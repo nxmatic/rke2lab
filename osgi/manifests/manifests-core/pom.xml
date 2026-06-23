@@ -88,6 +88,13 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>cdk8s-systemd</artifactId>
     </dependency>
+    <!-- The systemd domain's unit vocabulary: StorageStage synthesises the dbus-tcp unit from the
+         typed SystemdUnitId, not a literal — the import draws the producer edge in the graph. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>systemd-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>unitrepo-core</artifactId>

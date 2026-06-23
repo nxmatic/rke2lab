@@ -16,7 +16,7 @@
     factored out so a host writes one bnd line + one builder call. Two deliverables: (1) the shared
     bnd include jgiven-fragment.bnd — the single forced Import-Package (com.tngtech.jgiven.impl.intercept,
     invisible to bnd's bytecode analysis) plus the Fragment-Host comment shape — so a -test fragment
-    inherits it instead of re-declaring it; (2) JGivenTestkit.felix(), a FelixFrameworkExtension
+    inherits it instead of re-declaring it; (2) JGivenTestkit.felix(), a OutOfContainerFrameworkExtension
     builder pre-loaded with the jGiven boot closure (bootDelegation(sun.misc) + jgiven-wrap + its
     already-OSGi dependency bundles + the slf4j/junit host packages the wrap imports). Not a bundle —
     a plain jar; the .bnd is a build-time resource on the consumer's bnd path, the helper is test-time
@@ -65,10 +65,6 @@
       <artifactId>osgi.core</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter</artifactId>
-      <scope>test</scope>
-    </dependency>
+    <!-- junit-jupiter (test) is inherited from build-parent. -->
   </dependencies>
 </project>

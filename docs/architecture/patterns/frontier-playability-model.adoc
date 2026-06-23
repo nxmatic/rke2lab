@@ -208,8 +208,8 @@ per target.
 | dbus-systemd-edge
 | systemd dbus endpoint (`de.thjom.java.systemd`, `org.freedesktop.dbus`)
 | both
-| host
-| no
+| osgi (migrating)
+| **yes** (over TCP)
 
 | incus-edge
 | Incus API (`ProcessBuilder` incus exec / ssh)
@@ -238,9 +238,15 @@ per target.
 
 Readings:
 
-* *Two edges are irreducibly host* (Pulumi ×2, dbus) — their libraries are non-playable (native deps,
-  ServiceLoader). Their `<target>-edge` modules stay host.
-* *Four edges are host today but PLAYABLE* (incus, cluster/kubectl, host-filesystem, ssh-to-age) —
+* *Only Pulumi is irreducibly host* (×2) — `com.pulumi.*` carries native deps, `ServiceLoader`, and
+  classloader assumptions that cannot resolve in a Felix bundle. Its `<target>-edge` modules stay host.
+* *dbus-systemd was mis-classified as irreducibly host — corrected.* The native-deps disqualifier
+  applies only to the *unix-socket* transport (junixsocket); we use *TCP only* (`dbus-java-transport-tcp`,
+  plain sockets), which is playable. The one real obstacle, `ServiceLoader` transport discovery, is
+  solved by *embedding* the dbus-java jars in the edge bundle so the lookup and the `TcpTransportProvider`
+  share one bundle classloader. So dbus-systemd-edge *migrates into OSGi* — the first edge both extracted
+  and migrated in one move. See link:../osgi/dbus-systemd-edge-spec.adoc[the dbus-systemd-edge spec].
+* *Four more edges are host today but PLAYABLE* (incus, cluster/kubectl, host-filesystem, ssh-to-age) —
   pure JDK `ProcessBuilder` / `java.nio`. These are the migration candidates: their edge impls CAN move
   host→osgi, serving the goal of maximising the OSGi world, with no change to callers (they cross the
   port either way).

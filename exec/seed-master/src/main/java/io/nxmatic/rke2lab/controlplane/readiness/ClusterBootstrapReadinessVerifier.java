@@ -4,6 +4,7 @@ import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.SeedNodeBootstrapWatcher;
+import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -49,7 +50,9 @@ public final class ClusterBootstrapReadinessVerifier {
    * free of any {@code bdd} types (no package cycle). {@code logger} is applied for the call.
    */
   public static PhaseOutcome checkKubeconfigPublished(
-      BootstrapConfig config, Consumer<String> logger) {
+      BootstrapConfig config,
+      SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus,
+      Consumer<String> logger) {
     return runPhase(
         logger,
         () -> {
@@ -59,6 +62,7 @@ public final class ClusterBootstrapReadinessVerifier {
           final Duration timeout = config.readinessTimeout();
           if (!SeedNodeBootstrapWatcher.waitForBootstrapPreconditions(
               config,
+              runtimeStatus,
               new SeedNodeBootstrapWatcher.WaitConfig(
                   timeout, RETRY_INTERVAL, LOG_PROGRESS_INTERVAL),
               ClusterBootstrapReadinessVerifier::logInfo)) {

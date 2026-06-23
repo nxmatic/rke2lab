@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,17 +24,19 @@ class ReferralReplyTest {
   private final Referral referral =
       Referral.of(patient, Symptom.CONNECTION_REFUSED, observation, record);
 
+  private static final String DBUS_UNIT = SystemdUnitId.DBUS_TCP_SYSTEM_BUS.serviceUnitName();
+
   private final Assessment assessment =
       Assessment.of(
           SchemaRef.of("dbus-tcp/connection-refused/v1"),
-          Map.of("unit", "rke2lab-dbus-tcp-system-bus.service"),
+          Map.of("unit", DBUS_UNIT),
           "dbus-TCP endpoint refused the connection");
 
   private final Prescription prescription =
       Prescription.of(
           RemediationProgramRef.RESTART_UNIT,
-          Map.of("unit", "rke2lab-dbus-tcp-system-bus.service"),
-          "incus exec master -- systemctl restart rke2lab-dbus-tcp-system-bus.service");
+          Map.of("unit", DBUS_UNIT),
+          "incus exec master -- systemctl restart " + DBUS_UNIT);
 
   @Test
   void assessing_reply_has_no_prescription() {

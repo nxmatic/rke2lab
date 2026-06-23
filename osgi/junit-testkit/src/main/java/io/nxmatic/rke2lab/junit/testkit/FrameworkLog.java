@@ -7,13 +7,13 @@ import java.lang.annotation.Target;
 
 /**
  * Raises the embedded Felix framework's own internal log verbosity ({@code felix.log.level}) for
- * the annotated test class. {@link FelixFrameworkExtension} reads it in {@code beforeAll} and feeds
- * the level into the framework config.
+ * the annotated test class. {@link OutOfContainerFrameworkExtension} reads it in {@code beforeAll}
+ * and feeds the level into the framework config.
  *
  * <p>This is the LAUNCHER's own log (resolver + bundle diagnostics, written to {@code System.out})
  * — distinct from the OSGi {@code LogService} and from application slf4j. It is the only place a
- * failed {@link FelixFrameworkExtension#resolve(java.util.List) resolve()} (which returns a bare
- * {@code false}) explains WHICH requirement could not be wired, so annotate the test you are
+ * failed {@link OutOfContainerFrameworkExtension#resolve(java.util.List) resolve()} (which returns
+ * a bare {@code false}) explains WHICH requirement could not be wired, so annotate the test you are
  * debugging:
  *
  * <pre>{@code

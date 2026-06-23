@@ -35,7 +35,7 @@ unchanged; builds on the model of link:osgi-boot-single-source-handoff.adoc[the 
 . *Boot Felix and make it so.* — the **effectful act**: framework factory, the config map, `init`/`start`,
   the `STARTED` latch, the install loop, `assertScrActive`, `close`.
 
-`FelixFrameworkExtension` (the test executor) answers the *same two questions a second time*, slightly
+`OutOfContainerFrameworkExtension` (the test executor) answers the *same two questions a second time*, slightly
 differently — its `startScr()` carries the comment *"the runtime mirror of `OsgiRuntime.closeOverImports`"*.
 Two copies of one resolution thesis, free to drift.
 
@@ -48,7 +48,7 @@ crypticness; that is the symptom this spec removes.
 
 [cols="2,2,2",options="header"]
 |===
-| Provisioning step | `OsgiRuntime` (prod) | `FelixFrameworkExtension` (test)
+| Provisioning step | `OsgiRuntime` (prod) | `OutOfContainerFrameworkExtension` (test)
 
 | factory + temp storage + `bootdelegation.implicit=false` | ✓ | ✓ (identical)
 | `system.packages.extra` | ✓ | ✓ (identical)
@@ -92,7 +92,7 @@ flowchart TB
 
   subgraph "consumers"
     Exec["exec apps"]
-    Ffe["FelixFrameworkExtension shrinks"]
+    Ffe["OutOfContainerFrameworkExtension shrinks"]
     Proof["proof apparatus test-only"]
     Exec --> Preset
     Ffe --> Pipe
@@ -181,7 +181,7 @@ BootPipeline.embedded()                       // preset: staged source + no-embe
 // prod — a CLI: boot, resolve ONE port service, drive it
 BootPipeline.embedded().resolve(ManifestSynthesisService.class, svc -> svc.synthesize(request));
 
-// test — FelixFrameworkExtension / JGivenTestkit.felix(): classpath source, test knobs, hands framework out
+// test — OutOfContainerFrameworkExtension / JGivenTestkit.felix(): classpath source, test knobs, hands framework out
 BootPipeline.booting()
     .during("discovery", d -> d.classpath().selecting(DiscoveryPolicy.onlyMatching("(type=model)")))
     .then().during("plan", p -> p.systemPackages(extras))
@@ -288,7 +288,7 @@ change to `BootPlanner`.
 
 == Aligning the testkit — provisioning shared, proof kept apart
 
-`FelixFrameworkExtension.beforeAll` builds a plan from the classpath index and launches it through the same
+`OutOfContainerFrameworkExtension.beforeAll` builds a plan from the classpath index and launches it through the same
 `FrameworkLauncher` — gaining prod's start-level activation model by construction. Its *proof affordances*
 stay test-only, operating on the launched `BootedFramework`, and are explicitly **not** a second way to
 provision:
@@ -338,7 +338,7 @@ the topology; the launcher derives effects from it.
   *plan, launch, expose seam*. GREEN.
 . **Introduce `BootPipeline`** (the three-topic grammar) + the `embedded()` preset; route exec apps through
   it; delete `SeedRuntime`. GREEN, `pulumi preview`.
-. **Route `FelixFrameworkExtension` through the shared planner+launcher**; delete the `startScr` mirror;
+. **Route `OutOfContainerFrameworkExtension` through the shared planner+launcher**; delete the `startScr` mirror;
   keep the proof affordances. Delete `OsgiRuntime`. Full reactor GREEN with tests.
 +
 *Watch here:* today the testkit installs some bundles *outside* any policy — `installFromClasspath(bsn)`

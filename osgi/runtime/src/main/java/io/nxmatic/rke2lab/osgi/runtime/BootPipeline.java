@@ -24,7 +24,7 @@ import java.util.function.Consumer;
  * <p>The state boundary is the plan/launch seam: you cannot launch without a plan, and the pure
  * plan can be inspected at {@code PlanDone} without booting Felix. This is the executor counterpart
  * of the boot MODEL in {@code osgi/boot/boot-discovery}; the test harness ({@code
- * FelixFrameworkExtension}) is the other one, sharing {@link BootPlanner} + {@link
+ * OutOfContainerFrameworkExtension}) is the other one, sharing {@link BootPlanner} + {@link
  * FrameworkLauncher}.
  *
  * <p>Exec entrypoints do not spell the three topics out — they call {@link #embedded()}, a preset

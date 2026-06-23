@@ -121,6 +121,16 @@
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
+    <!-- The dbus-systemd edge: embedded INTACT under META-INF/bundles and installed by OsgiRuntime,
+         NOT flattened into the uber-jar. runtime scope — seed-master never compiles against the edge
+         impl; the readiness pipeline resolves SystemdRuntimeProbe from the registry (awaitService).
+         The edge MUST be embedded or the runtime-status probe never publishes. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>dbus-systemd-edge</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
+    </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>netplan-port</artifactId>
@@ -206,18 +216,6 @@
     <dependency>
       <groupId>org.eclipse.jgit</groupId>
       <artifactId>org.eclipse.jgit</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.github.thjomnx</groupId>
-      <artifactId>java-systemd</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.github.hypfvieh</groupId>
-      <artifactId>dbus-java-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.github.hypfvieh</groupId>
-      <artifactId>dbus-java-transport-tcp</artifactId>
     </dependency>
     <dependency>
       <groupId>com.tngtech.jgiven</groupId>

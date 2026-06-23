@@ -4,7 +4,7 @@ Bundle-SymbolicName: io.nxmatic.rke2lab.junit.testkit
 # -test fragment, so only its package is exported.
 Export-Package: io.nxmatic.rke2lab.junit.testkit.container
 
-# The JVM-side half (FelixFrameworkExtension) pulls the framework-launch API + felix + the shared
+# The JVM-side half (OutOfContainerFrameworkExtension) pulls the framework-launch API + felix + the shared
 # boot-discovery model + slf4j (the resolution-failure diagnostic logger), none of which exist inside
 # the framework. They are needed only when this jar runs on surefire's flat classpath (where they are
 # present); marking them optional lets the bundle still RESOLVE when installed in-container to provide

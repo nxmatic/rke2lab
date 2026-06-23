@@ -2,8 +2,8 @@ package io.nxmatic.rke2lab.osgibench;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import io.nxmatic.rke2lab.junit.testkit.FelixFrameworkExtension;
 import io.nxmatic.rke2lab.junit.testkit.Osgi;
+import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
 import io.nxmatic.rke2lab.osgibench.scr.Greeter;
 import io.nxmatic.rke2lab.osgibench.scr.GreetingClient;
 import org.junit.jupiter.api.Test;
@@ -24,8 +24,8 @@ class ScrUnsatisfiedReferenceTest {
   // api from the system bundle: the consumer RESOLVES (the api is present) but SCR leaves it
   // unsatisfied because no Greeter is published — resolution succeeds, activation does not.
   @RegisterExtension
-  static final FelixFrameworkExtension felix =
-      FelixFrameworkExtension.builder()
+  static final OutOfContainerFrameworkExtension felix =
+      OutOfContainerFrameworkExtension.builder()
           .withScr()
           .systemPackages("io.nxmatic.rke2lab.osgibench.scr;version=0.1.0")
           // The consumer ONLY — omitting role=provider is how the anti-cheat proves it stays

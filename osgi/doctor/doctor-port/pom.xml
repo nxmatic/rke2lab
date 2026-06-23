@@ -17,6 +17,18 @@
     plus the port's failure-mode exceptions. Zero pulumi, zero osgi runtime — host-loaded and
     system-exported at runtime so both worlds share one copy. Per-package @Version (starts 1.0.0).</description>
 
+  <dependencies>
+    <!-- test only: the serialization fixtures name the dbus-tcp unit via the typed SystemdUnitId so
+         no literal drifts from the systemd domain's single source. Not a runtime/compile coupling —
+         the port itself stays a pure leaf. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>systemd-port</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
   <build>
     <plugins>
       <plugin>

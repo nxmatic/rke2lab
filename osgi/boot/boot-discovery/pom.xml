@@ -12,7 +12,7 @@
   <artifactId>boot-discovery</artifactId>
   <name>osgi/boot/boot-discovery</name>
   <description>The embedded-OSGi boot MODEL, shared by the prod executor (osgi/runtime) and the
-    test-world FelixFrameworkExtension so both agree on the boot topology instead of re-implementing
+    test-world OutOfContainerFrameworkExtension so both agree on the boot topology instead of re-implementing
     it. Declares the embed capability namespace bundles self-mark with, the BootStackJar registry of
     the third-party boot stack (pax-logging, felix.scr/resolver — not ours, so named not scanned),
     and ClasspathBundleIndex: an instance that scans java.class.path ONCE and answers locate /
@@ -37,11 +37,7 @@
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter</artifactId>
-      <scope>test</scope>
-    </dependency>
+    <!-- junit-jupiter (test) is inherited from build-parent. -->
   </dependencies>
 
   <build>

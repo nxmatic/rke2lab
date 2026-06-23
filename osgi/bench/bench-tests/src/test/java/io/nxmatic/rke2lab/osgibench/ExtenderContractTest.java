@@ -3,8 +3,8 @@ package io.nxmatic.rke2lab.osgibench;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.junit.testkit.FelixFrameworkExtension;
 import io.nxmatic.rke2lab.junit.testkit.Osgi;
+import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -22,7 +22,8 @@ class ExtenderContractTest {
   // Plain framework, no declared topology: each method installs its own bundle set and drives
   // resolution by hand (resolve, not start) — the two cases need different bundles.
   @RegisterExtension
-  static final FelixFrameworkExtension felix = FelixFrameworkExtension.builder().build();
+  static final OutOfContainerFrameworkExtension felix =
+      OutOfContainerFrameworkExtension.builder().build();
 
   @Test
   void configResolvesWhenHostProvidesTheExtenders() throws Exception {

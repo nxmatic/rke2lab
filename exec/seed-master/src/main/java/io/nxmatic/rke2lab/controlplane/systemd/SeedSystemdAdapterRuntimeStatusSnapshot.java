@@ -2,20 +2,35 @@ package io.nxmatic.rke2lab.controlplane.systemd;
 
 import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.controlplane.readiness.DbusSystemdProbe;
+import io.nxmatic.rke2lab.systemd.port.SystemdProbeRequest;
+import io.nxmatic.rke2lab.systemd.port.SystemdRuntimeProbe;
 import io.nxmatic.rke2lab.systemd.port.SystemdStatusSnapshot;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** Canonical runtime status snapshot probe backed by systemd-adapter DBus-on-TCP. */
+/**
+ * Canonical runtime status snapshot probe backed by the systemd-adapter dbus-on-TCP edge. An
+ * instance, not a static helper: it holds the {@link SystemdRuntimeProbe} resolved once from the
+ * booted OSGi registry (the dbus-systemd-edge {@code @Component}), so every readiness site that
+ * needs a status snapshot is passed this instance rather than reaching the edge statically.
+ */
 public final class SeedSystemdAdapterRuntimeStatusSnapshot {
 
   private static final String API_VERSION = "rke2lab.nxmatic.io/v1alpha1";
   private static final String KIND = "SystemdAdapterRuntimeStatus";
 
-  private SeedSystemdAdapterRuntimeStatusSnapshot() {
-    // Utility class
+  private static final Consumer<String> NOOP_LOGGER = message -> {};
+
+  private final SystemdRuntimeProbe probe;
+
+  public SeedSystemdAdapterRuntimeStatusSnapshot(SystemdRuntimeProbe probe) {
+    this.probe = probe;
+  }
+
+  /** Snapshot with no progress logging (the gate's polling path, where the line would be noise). */
+  public Map<String, Object> snapshot(BootstrapConfig config) {
+    return snapshot(config, NOOP_LOGGER);
   }
 
   public static Map<String, Object> deferredPreview(BootstrapConfig config) {
@@ -25,9 +40,9 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
         Map.of("source", "systemd-adapter-runtime-probe", "probeMode", "systemd-adapter-runtime"));
   }
 
-  public static Map<String, Object> snapshot(BootstrapConfig config, Consumer<String> logger) {
+  public Map<String, Object> snapshot(BootstrapConfig config, Consumer<String> logger) {
     try {
-      final SystemdStatusSnapshot statusSnapshot = DbusSystemdProbe.probe(config);
+      final SystemdStatusSnapshot statusSnapshot = probe.probe(requestFrom(config));
       final LinkedHashMap<String, Object> parsed =
           new LinkedHashMap<>(statusSnapshot.toPayloadMap());
       parsed.put("apiVersion", API_VERSION);
@@ -49,8 +64,16 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
     }
   }
 
-  public static Map<String, Object> snapshotStandalone(BootstrapConfig config) {
+  public Map<String, Object> snapshotStandalone(BootstrapConfig config) {
     return snapshot(config, message -> SeedLog.info("readiness", message));
+  }
+
+  private static SystemdProbeRequest requestFrom(BootstrapConfig config) {
+    return new SystemdProbeRequest(
+        config.systemdAdapterDbusHost(),
+        config.systemdAdapterDbusPort(),
+        config.nodeName(),
+        config.imageBuilderHost());
   }
 
   private static String sanitize(String raw) {

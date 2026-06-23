@@ -1,7 +1,7 @@
-package io.nxmatic.rke2lab.controlplane.bdd;
+package io.nxmatic.rke2lab.doctor;
 
-import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.doctor.port.Assessment;
+import io.nxmatic.rke2lab.doctor.port.Observation;
 import io.nxmatic.rke2lab.doctor.port.Prescription;
 import io.nxmatic.rke2lab.doctor.port.Referral;
 import io.nxmatic.rke2lab.doctor.port.ReferralReply;
@@ -10,6 +10,7 @@ import io.nxmatic.rke2lab.doctor.port.SchemaRef;
 import io.nxmatic.rke2lab.doctor.port.Specialist;
 import io.nxmatic.rke2lab.doctor.port.Specialty;
 import io.nxmatic.rke2lab.doctor.port.Symptom;
+import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
 import java.util.Map;
 
 /**
@@ -19,17 +20,18 @@ import java.util.Map;
  * endpoint. The unit name is this specialist's own domain knowledge (it owns the systemd unit it
  * remediates), not a string reached across modules. For any other symptom it declines with a
  * reasoned {@link Assessment} (the "why") and no prescription.
+ *
+ * <p>Pure: the endpoint and node it names come from the OBSERVATION the producer stamped (flat
+ * {@code adapterHost}/{@code adapterPort}/{@code nodeName} details keys), never from {@code
+ * BootstrapConfig} — a doctor reads facts off the snapshot, it does not open the door itself. So it
+ * lives in {@code doctor-core} beside the other specialists and joins the standard roster.
  */
-public final class DbusTcpSpecialist implements Specialist {
+final class DbusTcpSpecialist implements Specialist {
 
-  /** The adapter unit this specialist remediates (cf. manifests' rke2lab-dbus-tcp-system-bus). */
-  static final String ADAPTER_UNIT = "rke2lab-dbus-tcp-system-bus.service";
-
-  private final BootstrapConfig config;
-
-  public DbusTcpSpecialist(BootstrapConfig config) {
-    this.config = config;
-  }
+  /**
+   * The adapter unit this specialist remediates — the typed id the manifests producer also names.
+   */
+  static final String ADAPTER_UNIT = SystemdUnitId.DBUS_TCP_SYSTEM_BUS.serviceUnitName();
 
   @Override
   public Specialty domain() {
@@ -47,7 +49,11 @@ public final class DbusTcpSpecialist implements Specialist {
               "not a dbus-TCP symptom — the systemd adapter has no treatment for " + symptom.id());
       return ReferralReply.assessing(referral, assessment);
     }
-    final String endpoint = config.systemdAdapterDbusHost() + ":" + config.systemdAdapterDbusPort();
+    final Observation observation = referral.observation();
+    final String host = detail(observation, "adapterHost", "unknown");
+    final String port = detail(observation, "adapterPort", "unknown");
+    final String nodeName = detail(observation, "nodeName", "unknown");
+    final String endpoint = host + ":" + port;
     final Assessment assessment =
         Assessment.of(
             SchemaRef.of("dbus-tcp/connection-refused/v1"),
@@ -59,8 +65,23 @@ public final class DbusTcpSpecialist implements Specialist {
     final Prescription prescription =
         Prescription.of(
             RemediationProgramRef.RESTART_UNIT,
-            Map.of("unit", ADAPTER_UNIT, "host", config.systemdAdapterDbusHost()),
-            "incus exec " + config.nodeName() + " -- systemctl restart " + ADAPTER_UNIT);
+            Map.of("unit", ADAPTER_UNIT, "host", host),
+            restartUnitCommand(nodeName, ADAPTER_UNIT));
     return ReferralReply.prescribing(referral, assessment, prescription);
+  }
+
+  /**
+   * The human-hint command that restarts a unit on a node via the incus egress route — for
+   * CONNECTION_REFUSED the dbus door is down, so the restart cannot go back through dbus; incus
+   * exec is the route that survives. One home for the format so it is not reassembled by hand at
+   * the call site (or asserted by re-spelling it).
+   */
+  static String restartUnitCommand(String nodeName, String unit) {
+    return "incus exec " + nodeName + " -- systemctl restart " + unit;
+  }
+
+  private static String detail(Observation observation, String key, String fallback) {
+    final Object value = observation.details().get(key);
+    return value == null ? fallback : value.toString();
   }
 }

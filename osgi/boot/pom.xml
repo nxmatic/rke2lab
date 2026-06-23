@@ -15,7 +15,7 @@
   <description>The embedded-OSGi boot family. Splits the boot concern into the MODEL — what to boot
     and how to find it — and its consumers. boot-discovery declares the model (the embed capability,
     the BootStackJar registry, the classpath bundle index); the host-world executor osgi/runtime and
-    the test-world FelixFrameworkExtension both consume it, so prod and test agree on the boot
+    the test-world OutOfContainerFrameworkExtension both consume it, so prod and test agree on the boot
     topology by sharing one model rather than re-implementing it.</description>
 
   <modules>

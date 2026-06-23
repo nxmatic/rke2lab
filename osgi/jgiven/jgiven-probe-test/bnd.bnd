@@ -6,7 +6,7 @@ Bundle-SymbolicName: io.nxmatic.rke2lab.jgiven.probe.test
 # from the shared jgiven-fragment.bnd in jgiven-testkit. This module IS the template doctor copies.
 Fragment-Host: io.nxmatic.rke2lab.jgiven.probe
 
-# Test fixture, selected by FelixFrameworkExtension.installFixtureWithHost via an LDAP filter over
+# Test fixture, selected by OutOfContainerFrameworkExtension.installFixtureWithHost via an LDAP filter over
 # these attributes — never by a Bundle-SymbolicName literal. The host it attaches to (jgiven-probe)
 # is found through the Fragment-Host above, so the test names neither. type=fixture, suite=jgiven
 # (the in-container jGiven proof), role=probe (the template host's fragment doctor copies).

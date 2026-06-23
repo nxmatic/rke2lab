@@ -4,9 +4,9 @@
 
   <parent>
     <groupId>io.nxmatic.rke2lab</groupId>
-    <artifactId>bundle-parent</artifactId>
+    <artifactId>bundle-test-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
-    <relativePath>../../bundle-parent/pom.xml</relativePath>
+    <relativePath>../../bundle-test-parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>jgiven-probe-test</artifactId>

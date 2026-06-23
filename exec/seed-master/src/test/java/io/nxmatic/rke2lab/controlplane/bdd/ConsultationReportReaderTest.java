@@ -16,6 +16,7 @@ import io.nxmatic.rke2lab.doctor.port.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.port.SchemaRef;
 import io.nxmatic.rke2lab.doctor.port.Symptom;
 import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
+import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -242,16 +243,17 @@ class ConsultationReportReaderTest {
 
   @Test
   void round_trips_a_prescribing_reply_preserving_its_assessment() {
+    final String dbusUnit = SystemdUnitId.DBUS_TCP_SYSTEM_BUS.serviceUnitName();
     final Assessment assessment =
         Assessment.of(
             SchemaRef.of("dbus-tcp/connection-refused/v1"),
-            Map.of("unit", "rke2lab-dbus-tcp-system-bus.service"),
+            Map.of("unit", dbusUnit),
             "dbus-TCP endpoint refused the connection");
     final Prescription prescription =
         Prescription.of(
             RemediationProgramRef.RESTART_UNIT,
-            Map.of("unit", "rke2lab-dbus-tcp-system-bus.service"),
-            "incus exec master -- systemctl restart rke2lab-dbus-tcp-system-bus.service");
+            Map.of("unit", dbusUnit),
+            "incus exec master -- systemctl restart " + dbusUnit);
     final ReferralReply reply = ReferralReply.reconstructed(assessment, Optional.of(prescription));
     final RemediationPlan plan =
         new RemediationPlan(Symptom.CONNECTION_REFUSED, List.of(reply), "adapter unreachable");

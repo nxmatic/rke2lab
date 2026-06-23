@@ -701,7 +701,7 @@ An honest reading:
   3–4, deferred.
 
 . *The proof is on the REAL engine, not asserted.* Both tests run on the real embedded Felix
-  framework (via `FelixFrameworkExtension`, a JUnit5 extension), installing real bundles built by
+  framework (via `OutOfContainerFrameworkExtension`, a JUnit5 extension), installing real bundles built by
   `bnd-maven-plugin`. P1 proved the framework refuses to resolve when the host is absent
   (`BundleException`). P2 proved typed access (no reflection) by having the framework export
   `org.osgi.service.metatype` from the system bundle (`system.packages.extra`) so the test and

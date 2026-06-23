@@ -2,8 +2,8 @@ package io.nxmatic.rke2lab.doctor.port;
 
 import static org.junit.jupiter.api.Assertions.fail;
 
-import io.nxmatic.rke2lab.junit.testkit.FelixFrameworkExtension;
 import io.nxmatic.rke2lab.junit.testkit.Osgi;
+import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.stream.Stream;
@@ -32,8 +32,12 @@ class DoctorPortInContainerTest {
   private static final String RUNNER_FQN = "io.nxmatic.rke2lab.doctor.port.DoctorPortTests";
 
   @RegisterExtension
-  static final FelixFrameworkExtension felix =
-      FelixFrameworkExtension.builder()
+  static final OutOfContainerFrameworkExtension felix =
+      OutOfContainerFrameworkExtension.builder()
+          // The fragment names the dbus-tcp unit via the typed SystemdUnitId, so it imports the
+          // systemd domain's port; system-export it (it is a seam, system-exported in prod too) so
+          // the host resolves the merged-in fragment import.
+          .systemPackages("io.nxmatic.rke2lab.systemd.port;version=1.0.0")
           // The JUnit world + the in-container runner bundle, each an OSGi bundle, installed so the
           // launcher + jupiter engine + the runner resolve as bundles (located by
           // Bundle-SymbolicName).

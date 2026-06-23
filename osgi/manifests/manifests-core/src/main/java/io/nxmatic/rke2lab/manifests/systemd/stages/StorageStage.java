@@ -5,6 +5,7 @@ import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.ServiceType;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.StandardStream;
 import io.nxmatic.rke2lab.manifests.SystemdSynthesisContext;
+import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
 
 /**
  * Storage and system stage: filesystem configuration, ZFS, DBus, and kubeconfig generation.
@@ -67,11 +68,12 @@ public final class StorageStage {
   }
 
   public StorageStage dbusTcpSystemBus() {
-    new SystemdService(systemdChart, "rke2lab-dbus-tcp-system-bus")
+    new SystemdService(systemdChart, SystemdUnitId.DBUS_TCP_SYSTEM_BUS.bareName())
         .description("Expose DBus system bus over TCP for RKE2Lab")
         .after("dbus.service")
         .type(ServiceType.ONESHOT)
-        .execStart("/srv/host/systemd-scripts.d/rke2lab-dbus-tcp-system-bus.sh")
+        .execStart(
+            "/srv/host/systemd-scripts.d/" + SystemdUnitId.DBUS_TCP_SYSTEM_BUS.bareName() + ".sh")
         .remainAfterExit(true)
         .standardOutput(StandardStream.JOURNAL)
         .standardError(StandardStream.JOURNAL)

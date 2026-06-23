@@ -7,7 +7,7 @@ Bundle-SymbolicName: io.nxmatic.rke2lab.doctor.port.test
 # the host at resolution (OSGi Core §3.14).
 Fragment-Host: io.nxmatic.rke2lab.doctor.port
 
-# Test fixture, selected by FelixFrameworkExtension via an LDAP filter over these attributes — never
+# Test fixture, selected by OutOfContainerFrameworkExtension via an LDAP filter over these attributes — never
 # by a Bundle-SymbolicName literal. Its host (doctor-port) is found through the Fragment-Host above.
 # type=fixture, suite=doctor, role=port (the value-type tests + the exported doctor.testkit fixtures
 # the sibling core fragment imports through this host).

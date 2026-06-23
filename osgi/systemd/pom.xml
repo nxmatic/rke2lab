@@ -13,11 +13,13 @@
   <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>osgi/systemd</name>
-  <description>The systemd domain: the typed unit/contract vocabulary (systemd-port) and the
-    CDK8s integration that synthesizes those units (cdk8s-systemd), grouped as library bundles.</description>
+  <description>The systemd domain: the typed unit/contract vocabulary plus the runtime-status
+    readiness seam (systemd-port), the CDK8s integration that synthesizes those units
+    (cdk8s-systemd), and the dbus-on-TCP edge that reads the live systemd (dbus-systemd-edge).</description>
 
   <modules>
     <module>systemd-port</module>
     <module>cdk8s-systemd</module>
+    <module>dbus-systemd-edge</module>
   </modules>
 </project>

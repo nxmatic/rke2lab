@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
+import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -54,16 +55,17 @@ class ConsultationReportSerializationTest {
     final Observation observation =
         Observation.failed(
             Symptom.CONNECTION_REFUSED, "dbus refused", Map.of("source", "endpoint-gate"));
+    final String dbusUnit = SystemdUnitId.DBUS_TCP_SYSTEM_BUS.serviceUnitName();
     final Assessment assessment =
         Assessment.of(
             SchemaRef.of("dbus-tcp/connection-refused/v1"),
-            Map.of("unit", "rke2lab-dbus-tcp-system-bus.service"),
+            Map.of("unit", dbusUnit),
             "dbus-TCP endpoint refused the connection");
     final Prescription prescription =
         Prescription.of(
             RemediationProgramRef.RESTART_UNIT,
-            Map.of("unit", "rke2lab-dbus-tcp-system-bus.service"),
-            "incus exec master -- systemctl restart rke2lab-dbus-tcp-system-bus.service");
+            Map.of("unit", dbusUnit),
+            "incus exec master -- systemctl restart " + dbusUnit);
     final ReferralReply reply =
         ReferralReply.reconstructed(assessment, java.util.Optional.of(prescription));
     final RemediationPlan plan =

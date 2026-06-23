@@ -42,7 +42,7 @@ no reverse module edge — no cycle.
 | `osgi/jgiven/jgiven-testkit`
 | The reusable assets. **(1)** `src/main/resources/jgiven-fragment.bnd` — the shared bnd include
   carrying the one forced `Import-Package` bnd cannot compute. **(2)** `JGivenTestkit.felix()` — a
-  `FelixFrameworkExtension.Builder` pre-loaded with the jGiven boot closure. Its own `src/test`
+  `OutOfContainerFrameworkExtension.Builder` pre-loaded with the jGiven boot closure. Its own `src/test`
   carries the palier-2/3 guard. A plain jar, not a bundle.
 
 | `osgi/jgiven/jgiven-probe`
@@ -61,7 +61,7 @@ no reverse module edge — no cycle.
 ----
 flowchart TB
   subgraph testkit["osgi/testkit (generic, jGiven-agnostic)"]
-    felix["FelixFrameworkExtension<br/>boots real Felix 7.0.5<br/>has bootDelegation() verb"]
+    felix["OutOfContainerFrameworkExtension<br/>boots real Felix 7.0.5<br/>has bootDelegation() verb"]
   end
 
   subgraph jgiven["osgi/jgiven (BDD-in-OSGi)"]
@@ -138,7 +138,7 @@ bnd computes them from the `Stage` bytecode, and they resolve against the `jgive
 [source,java]
 ----
 @RegisterExtension
-static final FelixFrameworkExtension felix =
+static final OutOfContainerFrameworkExtension felix =
     JGivenTestkit.felix()                 // jGiven boot closure baked in
         .installBundles("doctor-core")    // + the host bundle under test
         .build();
@@ -186,7 +186,7 @@ assertEquals("OK", result);
 
 == Anti-patterns
 
-❌ *Put jGiven-specific boot knowledge in `FelixFrameworkExtension`.* The generic testkit stays
+❌ *Put jGiven-specific boot knowledge in `OutOfContainerFrameworkExtension`.* The generic testkit stays
 jGiven-agnostic; the boot closure lives in `JGivenTestkit.felix()`. A second BDD lib would get its
 own helper, not a second branch in the generic extension.
 
