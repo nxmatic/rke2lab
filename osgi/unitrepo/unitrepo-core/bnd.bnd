@@ -1,3 +1,7 @@
 Bundle-SymbolicName: io.nxmatic.rke2lab.unitrepo.core
 Export-Package: io.nxmatic.rke2lab.unitrepo.core
+# Embeddable model bundle (the unit-resolution oracle) — what the seed-master pom's WI-C note
+# planned ("embed it intact as an OSGi bundle"). Staged under META-INF/bundles by the capability
+# scan like the other domains.
+Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=unitrepo
 -noimportjava: true
