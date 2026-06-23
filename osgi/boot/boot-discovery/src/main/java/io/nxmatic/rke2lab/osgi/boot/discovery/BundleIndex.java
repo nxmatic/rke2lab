@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.osgi.boot.discovery;
 
+import io.nxmatic.rke2lab.osgi.bnd.Clause;
 import io.nxmatic.rke2lab.osgi.bnd.EmbedCapability;
 import java.io.IOException;
 import java.net.JarURLConnection;
@@ -7,10 +8,14 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 import org.osgi.framework.Filter;
 import org.osgi.framework.FrameworkUtil;
 import org.osgi.framework.InvalidSyntaxException;
@@ -155,6 +160,51 @@ public final class BundleIndex {
         .map(Entry::location)
         .findFirst()
         .orElse(null);
+  }
+
+  /**
+   * Close over the passive jars the {@code seeds} transitively need but neither already provide nor
+   * resolve host-flat — the import-closure FRAME both boot executors share, with the per-jar action
+   * CONTRIBUTED as {@code onPulled}. Starting from each seed's manifest, for every MANDATORY import
+   * not in {@code alreadyProvided} (a package already served: exported by a seed, by a
+   * previously-pulled jar, or by the system bundle), pull in the index jar that exports it ({@link
+   * #exporterOf}, which skips seams and the launcher), hand it to {@code onPulled}, and close over
+   * ITS imports in turn — a fixpoint, so a second hop (util.promise → util.function) is not missed.
+   * Each pulled jar is handed to {@code onPulled} exactly once, in discovery order; no seed is.
+   *
+   * <p>The single source of the felix.scr → DS-API-trio derivation. The two executors differ ONLY
+   * in what they contribute per jar: {@code BootPlanner} adds a passive-level {@code Installable}
+   * to its plan; the test {@code FelixFrameworkExtension} installs the jar into the framework. The
+   * seam law lives in {@code exporterOf} (a seam is host-flat, never pulled), so the walk stays
+   * pure.
+   */
+  public void closeOverImports(
+      List<BundleLocation> seeds, Set<String> alreadyProvided, Consumer<BundleLocation> onPulled) {
+    final Set<String> provided = new LinkedHashSet<>(alreadyProvided);
+    final Set<String> pulledIds = new LinkedHashSet<>();
+    final Deque<BundleManifest> frontier = new ArrayDeque<>();
+    for (BundleLocation seed : seeds) {
+      final BundleManifest manifest = manifestOf(seed);
+      pulledIds.add(seed.locationId());
+      provided.addAll(manifest.exports().names());
+      frontier.add(manifest);
+    }
+    while (!frontier.isEmpty()) {
+      for (Clause imported : frontier.removeFirst().imports().clauses()) {
+        final String pkg = imported.name();
+        if ("optional".equals(imported.attributes().get("resolution")) || provided.contains(pkg)) {
+          continue;
+        }
+        final BundleLocation exporter = exporterOf(pkg);
+        if (exporter == null || !pulledIds.add(exporter.locationId())) {
+          continue;
+        }
+        final BundleManifest exporterManifest = manifestOf(exporter);
+        provided.addAll(exporterManifest.exports().names());
+        onPulled.accept(exporter);
+        frontier.add(exporterManifest);
+      }
+    }
   }
 
   /** The parsed manifest of a location in this index — for an executor pinning its start level. */

@@ -5,7 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.junit.testkit.Osgi;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisService;
-import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
+import io.nxmatic.rke2lab.osgi.runtime.BootPipeline;
+import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -13,8 +14,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Generality proof for the 3rd entrypoint and a NEW embed-set: netplan-cli boots Felix from {@code
  * netplan-core.jar} staged under {@code META-INF/bundles/} — a model bundle seed-master never
- * embedded — and reads {@code NetplanSynthesisService} from the registry. This exercises {@link
- * OsgiRuntime}'s per-entrypoint {@code system.packages.extra} derivation on a fresh bundle set:
+ * embedded — and reads {@code NetplanSynthesisService} from the registry. This exercises {@code
+ * BootPlanner}'s per-entrypoint {@code system.packages.extra} derivation on a fresh bundle set:
  * netplan-core's bnd imports (incl. {@code netplan.api}, now single-exported by netplan-port) must
  * resolve against the CLI's flat classpath, and the typed resolve below would fail loudly on any
  * split.
@@ -22,27 +23,27 @@ import org.junit.jupiter.api.Test;
 @Osgi
 class EmbeddedBundlesBootTest {
 
-  private static OsgiRuntime runtime;
+  private static BootedFramework framework;
 
   @BeforeAll
-  static void bootFromEmbeddedBundles() throws Exception {
+  static void bootFromEmbeddedBundles() {
     assertTrue(
-        OsgiRuntime.hasEmbeddedBundles(),
+        BootPipeline.hasEmbeddedBundles(),
         "the stage-embedded-bundles execution must have placed the jars under META-INF/bundles");
-    runtime = OsgiRuntime.embeddedBootStack().build().boot();
+    framework = BootPipeline.embedded().launch();
   }
 
   @AfterAll
   static void stopFelix() {
-    if (runtime != null) {
-      runtime.close();
+    if (framework != null) {
+      framework.close();
     }
   }
 
   @Test
   void embeddedNetplanCorePublishesSynthesisServiceTyped() {
     assertNotNull(
-        runtime.awaitService(NetplanSynthesisService.class, 5000),
+        framework.awaitService(NetplanSynthesisService.class, 5000),
         "the embedded netplan-core bundle booted and SCR published NetplanSynthesisService,"
             + " resolved typed across the seam (netplan.api single-exported by netplan-port)");
   }

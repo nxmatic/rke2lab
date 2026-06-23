@@ -36,6 +36,15 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
+    <!-- The boot's host-side logging convergence (HostLoggingBridge + FelixJulLogger), SHARED with
+         the test executor so prod and test wire host logs identically. Pax-free — it carries no
+         second slf4j binding — so it does not disturb the pax LogService configured below for the
+         OSGi side. The launcher calls HostLoggingBridge.install() + passes a FelixJulLogger. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>boot-logging</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- The shared boot MODEL: the embed capability, the BootStackJar registry, and the
          ClasspathBundleIndex this executor consumes to locate bundles + mirror their imports before
          the framework exists. Same model the test FelixFrameworkExtension reads. -->
@@ -43,6 +52,13 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>boot-discovery</artifactId>
       <version>${project.version}</version>
+    </dependency>
+    <!-- FrameworkLauncher + BootPipeline name the boot-stack jars via the BootStackJar registry (the
+         start-level layering). It would arrive transitively through boot-discovery, but we compile
+         against the type, so it is a direct dependency. A RELEASE coordinate like in boot-discovery. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bnd-read</artifactId>
     </dependency>
     <!-- The passive fluent-pipeline grammar: SeedRuntime wraps its boot-run-close lifecycle as a
          topic via FluentTopicRunner (label → logging + TopicFailure), the same engine the bundles
@@ -54,45 +70,58 @@
     </dependency>
     <!--
       The Felix DS extender + the DS-runtime API it imports are RUNTIME concerns of the boot, not
-      compile deps: OsgiRuntime only locates felix.scr's jar by name and the system bundle exports
-      the API packages flat (it does not compile against them). Declared here ONCE so every exec
-      entrypoint that depends on osgi/runtime inherits the whole boot stack transitively, instead of
-      re-listing the felix stack per entrypoint.
+      compile deps: the launcher only locates felix.scr's jar by name and the system bundle exports
+      the API packages flat (it does not compile against them).
+
+      optional=true: these are BUNDLES — they belong on a Bundle ClassLoader inside Felix, never on
+      the flat host JCL. optional keeps them off every exec module's transitive classpath (Maven does
+      not propagate optional deps), which is the seam law made declarative: a staged bundle is absent
+      from the JCL by NATURE. The build-time staging extension re-resolves them by coordinate (the
+      BootStackJar registry) and copies them under META-INF/bundles, so the boot still finds them —
+      they are staged, not flat. See the bundle-on-jcl-is-wrong-classpath invariant.
     -->
     <dependency>
       <groupId>org.apache.felix</groupId>
       <artifactId>org.apache.felix.scr</artifactId>
       <scope>runtime</scope>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>org.osgi.service.component</artifactId>
       <scope>runtime</scope>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>org.osgi.util.promise</artifactId>
       <scope>runtime</scope>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>org.osgi.util.function</artifactId>
       <scope>runtime</scope>
+      <optional>true</optional>
     </dependency>
     <!--
       Pax Logging: the boot installs pax-logging-api (provides org.slf4j to bundles) + pax-logging-
-      logback (OSGi LogService impl, reuses the host logback context). Runtime scope: OsgiRuntime
-      locates the jars by name and installs them as bundles; it does not compile against them.
+      logback (OSGi LogService impl, reuses the host logback context). Same optional rationale: a
+      second org.slf4j provider must NEVER reach the host JCL (it broke jGiven in-container slf4j
+      binding) — pax is staged into the framework, never flat. The launcher locates the jars by name
+      and installs them as bundles; it does not compile against them.
     -->
     <dependency>
       <groupId>org.ops4j.pax.logging</groupId>
       <artifactId>pax-logging-api</artifactId>
       <scope>runtime</scope>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.ops4j.pax.logging</groupId>
       <artifactId>pax-logging-logback</artifactId>
       <scope>runtime</scope>
+      <optional>true</optional>
     </dependency>
   </dependencies>
 </project>

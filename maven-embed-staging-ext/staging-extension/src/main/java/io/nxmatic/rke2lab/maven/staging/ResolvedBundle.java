@@ -79,7 +79,7 @@ public record ResolvedBundle(
     return groupId + ":" + artifactId;
   }
 
-  /** The stable staged file name OsgiRuntime looks the jar up under — version-independent. */
+  /** The stable staged file name BootPlanner looks the jar up under — version-independent. */
   public String stagedFileName() {
     return artifactId + ".jar";
   }

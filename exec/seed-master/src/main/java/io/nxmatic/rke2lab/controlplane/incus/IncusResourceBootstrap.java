@@ -36,7 +36,7 @@ import io.nxmatic.rke2lab.manifests.port.profiles.ComponentVersions;
 import io.nxmatic.rke2lab.manifests.port.profiles.FloxDebugPolicy;
 import io.nxmatic.rke2lab.manifests.port.profiles.IncusIdentityMaterial;
 import io.nxmatic.rke2lab.netplan.port.ClusterNetworkBlueprint;
-import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
+import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import java.io.IOException;
@@ -87,13 +87,13 @@ public final class IncusResourceBootstrap {
   private final BootstrapContext bootstrapContext;
 
   /** The embedded OSGi framework whose registry holds the manifests-world services. */
-  private final OsgiRuntime osgiRuntime;
+  private final BootedFramework bootedFramework;
 
-  public IncusResourceBootstrap(BootstrapConfig config, OsgiRuntime osgiRuntime) {
-    if (osgiRuntime == null) {
-      throw new IllegalArgumentException("osgiRuntime must not be null");
+  public IncusResourceBootstrap(BootstrapConfig config, BootedFramework bootedFramework) {
+    if (bootedFramework == null) {
+      throw new IllegalArgumentException("bootedFramework must not be null");
     }
-    this.osgiRuntime = osgiRuntime;
+    this.bootedFramework = bootedFramework;
     this.bootstrapContext =
         new BootstrapContext(
             config,
@@ -651,7 +651,7 @@ public final class IncusResourceBootstrap {
 
   /** Read the single provider of {@code serviceType} from the booted framework's registry. */
   private <T> T singleSpiProvider(Class<T> serviceType) {
-    final T service = osgiRuntime.awaitService(serviceType, 5000);
+    final T service = bootedFramework.awaitService(serviceType, 5000);
     if (service == null) {
       throw new IllegalStateException(
           "No " + serviceType.getSimpleName() + " published in the OSGi registry within 5s.");

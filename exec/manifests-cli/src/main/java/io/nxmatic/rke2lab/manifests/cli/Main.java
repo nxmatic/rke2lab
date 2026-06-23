@@ -4,7 +4,7 @@ package io.nxmatic.rke2lab.manifests.cli;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisRequest;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisResult;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisService;
-import io.nxmatic.rke2lab.osgi.runtime.SeedRuntime;
+import io.nxmatic.rke2lab.osgi.runtime.BootPipeline;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
@@ -143,13 +143,13 @@ public final class Main {
 
     @Override
     public void run() {
-      // Boot the embedded Felix from the bundles staged in this exec-jar (the shared SeedRuntime
-      // seam), resolve the one manifests-world service from the registry, drive it, then close.
-      // There is no flat-classpath fallback: since the Resolver became an @Reference,
-      // manifests-core's
+      // Boot the embedded Felix from the bundles staged in this exec-jar (the shared boot seam),
+      // resolve the one manifests-world service from the registry, drive it, then close. There is
+      // no
+      // flat-classpath fallback: since the Resolver became an @Reference, manifests-core's
       // @Component activates only under a framework, so off-framework ServiceLoader yielded a null
       // Resolver — the bug this migration fixes.
-      SeedRuntime.bootingEmbedded()
+      BootPipeline.embedded()
           .during("synthesize", ManifestSynthesisService.class, this::synthesize);
     }
 

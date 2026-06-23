@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.maven.staging;
 
+import io.nxmatic.rke2lab.osgi.bnd.BootStackJar;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -20,9 +21,16 @@ import org.apache.maven.project.DependencyResolutionResult;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectDependenciesResolver;
 import org.codehaus.plexus.util.xml.Xpp3Dom;
+import org.eclipse.aether.RepositorySystem;
+import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.graph.Dependency;
+import org.eclipse.aether.resolution.ArtifactRequest;
+import org.eclipse.aether.resolution.ArtifactResolutionException;
+import org.eclipse.aether.resolution.ArtifactResult;
 import org.eclipse.aether.util.artifact.JavaScopes;
 import org.eclipse.aether.util.filter.ScopeDependencyFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Single-sources the OSGi bundle staging by reconfiguring, in place, the shade and
@@ -51,15 +59,20 @@ import org.eclipse.aether.util.filter.ScopeDependencyFilter;
 @Priority(20)
 public class StagingExecutionStrategy implements MojosExecutionStrategy {
 
+  private static final Logger log = LoggerFactory.getLogger(StagingExecutionStrategy.class);
+
   private final Map<String, MojosExecutionStrategy> strategies;
   private final ProjectDependenciesResolver dependenciesResolver;
+  private final RepositorySystem repositorySystem;
 
   @Inject
   public StagingExecutionStrategy(
       Map<String, MojosExecutionStrategy> strategies,
-      ProjectDependenciesResolver dependenciesResolver) {
+      ProjectDependenciesResolver dependenciesResolver,
+      RepositorySystem repositorySystem) {
     this.strategies = strategies;
     this.dependenciesResolver = dependenciesResolver;
+    this.repositorySystem = repositorySystem;
   }
 
   @Override
@@ -89,19 +102,25 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
         stageAdded = injectStagingArtifactItems(execution, closure);
       }
     }
-    System.out.println(
-        "[osgi-staging] "
-            + module
-            + ": derived "
-            + closure.staged().size()
-            + " bundles; +"
-            + shadeAdded
-            + " shade excludes, +"
-            + stageAdded
-            + " staging items");
+    log.info(
+        "[osgi-staging] {}: derived {} bundles; +{} shade excludes, +{} staging items",
+        module,
+        closure.staged().size(),
+        shadeAdded,
+        stageAdded);
   }
 
-  /** Resolve the project's full compile+runtime dependency set, with each jar's file on disk. */
+  /**
+   * Resolve the project's full compile+runtime dependency set, with each jar's file on disk, PLUS
+   * the boot stack re-resolved by coordinate.
+   *
+   * <p>The boot stack is {@code optional} in {@code osgi/runtime} so it stays off the host JCL
+   * (bundle-on-jcl-is-wrong-classpath invariant) — which means it is ABSENT from this resolved
+   * graph. But the closure must still see it to stage it. So we re-resolve each {@link
+   * BootStackJar} directly by its coordinate (version from the project's managed-version map, i.e.
+   * the BOM) and fold it into the set the closure seeds from. The graph gives us OUR embed bundles
+   * + their flat tail; the registry gives us the third-party boot stack the optional scope hid.
+   */
   private List<ResolvedBundle> resolveBundles(MavenSession session)
       throws LifecycleExecutionException {
     final MavenProject project = session.getCurrentProject();
@@ -122,7 +141,54 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
       bundles.add(
           ResolvedBundle.read(a.getGroupId(), a.getArtifactId(), a.getVersion(), a.getFile()));
     }
+    bundles.addAll(resolveBootStack(session, project));
     return bundles;
+  }
+
+  /**
+   * Re-resolve the {@link BootStackJar} registry by coordinate. The version is the one the project
+   * manages (the BOM line); resolution pulls the jar's file from the local/remote repo regardless
+   * of the optional scope that kept it out of the graph above.
+   */
+  private List<ResolvedBundle> resolveBootStack(MavenSession session, MavenProject project)
+      throws LifecycleExecutionException {
+    final Map<String, org.apache.maven.artifact.Artifact> managed = project.getManagedVersionMap();
+    final List<ResolvedBundle> stack = new ArrayList<>();
+    for (BootStackJar jar : BootStackJar.values()) {
+      final String key = jar.groupId() + ":" + jar.artifactId();
+      final org.apache.maven.artifact.Artifact managedArtifact = managed.get(key + ":jar");
+      if (managedArtifact == null) {
+        throw new LifecycleExecutionException(
+            "osgi-staging: boot-stack jar "
+                + key
+                + " has no managed version (expected a BOM line)");
+      }
+      stack.add(resolveByCoordinate(session, jar, managedArtifact.getVersion()));
+    }
+    return stack;
+  }
+
+  private ResolvedBundle resolveByCoordinate(MavenSession session, BootStackJar jar, String version)
+      throws LifecycleExecutionException {
+    final ArtifactRequest request =
+        new ArtifactRequest()
+            .setArtifact(new DefaultArtifact(jar.groupId(), jar.artifactId(), "jar", version))
+            .setRepositories(session.getCurrentProject().getRemoteProjectRepositories());
+    try {
+      final ArtifactResult resolved =
+          repositorySystem.resolveArtifact(session.getRepositorySession(), request);
+      final org.eclipse.aether.artifact.Artifact a = resolved.getArtifact();
+      return ResolvedBundle.read(a.getGroupId(), a.getArtifactId(), a.getVersion(), a.getFile());
+    } catch (ArtifactResolutionException ex) {
+      throw new LifecycleExecutionException(
+          "osgi-staging could not resolve boot-stack jar "
+              + jar.groupId()
+              + ":"
+              + jar.artifactId()
+              + ":"
+              + version,
+          ex);
+    }
   }
 
   /** Add a shade {@code <exclude>ga</exclude>} per staged bundle, skipping ones already listed. */

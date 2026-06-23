@@ -10,8 +10,8 @@ import io.nxmatic.rke2lab.controlplane.pipeline.OutputBuilder;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
-import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
-import io.nxmatic.rke2lab.osgi.runtime.SeedRuntime;
+import io.nxmatic.rke2lab.osgi.runtime.BootPipeline;
+import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import java.nio.file.Path;
 import java.util.Map;
@@ -60,23 +60,24 @@ public final class BootstrapStage {
     // exactly the failure the runbook exists to document.
     final ReportModel runbook = new ReportModel();
     final ConsultationLog consultations = new ConsultationLog();
-    // Boot the embedded OSGi framework once for the whole run via the shared SeedRuntime seam; the
-    // stages read the manifests-world services from its registry. SeedRuntime closes the framework
-    // after the tail returns or throws — and the runbook render in the tail's own finally runs
-    // BEFORE that close, so a CRITICAL stop still produces a runbook.
-    SeedRuntime.bootingEmbedded()
-        .during("bootstrap", osgiRuntime -> runUnderRuntime(osgiRuntime, runbook, consultations));
+    // Boot the embedded OSGi framework once for the whole run via the shared boot seam; the stages
+    // read the manifests-world services from its registry. BootPipeline closes the framework after
+    // the tail returns or throws — and the runbook render in the tail's own finally runs BEFORE
+    // that
+    // close, so a CRITICAL stop still produces a runbook.
+    BootPipeline.embedded()
+        .during("bootstrap", framework -> runUnderRuntime(framework, runbook, consultations));
     return this;
   }
 
   private void runUnderRuntime(
-      OsgiRuntime osgiRuntime, ReportModel runbook, ConsultationLog consultations) {
+      BootedFramework framework, ReportModel runbook, ConsultationLog consultations) {
     try {
       BootstrapPipeline.ComponentBoundPipeline ready =
           BootstrapPipeline.forCluster(configSupplier.get(), policySupplier.get())
               .withOptions(optionsSupplier.get())
               .using(bboxOrchestrator, resourceManager, outputBuilder)
-              .withOsgiRuntime(osgiRuntime)
+              .withBootedFramework(framework)
               .recordingInto(runbook, consultations);
       final OnFailure handler = onFailureSupplier.get();
       if (handler != null) {

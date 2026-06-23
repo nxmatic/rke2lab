@@ -20,5 +20,6 @@
 
   <modules>
     <module>boot-discovery</module>
+    <module>boot-logging</module>
   </modules>
 </project>

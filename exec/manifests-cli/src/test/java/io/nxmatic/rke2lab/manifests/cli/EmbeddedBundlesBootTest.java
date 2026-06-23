@@ -5,7 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.junit.testkit.Osgi;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisService;
-import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
+import io.nxmatic.rke2lab.osgi.runtime.BootPipeline;
+import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -15,33 +16,33 @@ import org.junit.jupiter.api.Test;
  * {@code META-INF/bundles/} — the exact topology {@code Main} uses at runtime — and reads {@code
  * ManifestSynthesisService} from the registry. This is the standalone-{@code main()} counterpart of
  * seed-master's {@code EmbeddedBundlesBootTest}; it proves the shared {@link
- * OsgiRuntime#embeddedBootStack()} seam carries to a CLI, fixing the off-framework ServiceLoader
- * bug (a null {@code Resolver} since the Resolver became an {@code @Reference}).
+ * BootPipeline#embedded()} seam carries to a CLI, fixing the off-framework ServiceLoader bug (a
+ * null {@code Resolver} since the Resolver became an {@code @Reference}).
  */
 @Osgi
 class EmbeddedBundlesBootTest {
 
-  private static OsgiRuntime runtime;
+  private static BootedFramework framework;
 
   @BeforeAll
-  static void bootFromEmbeddedBundles() throws Exception {
+  static void bootFromEmbeddedBundles() {
     assertTrue(
-        OsgiRuntime.hasEmbeddedBundles(),
+        BootPipeline.hasEmbeddedBundles(),
         "the stage-embedded-bundles execution must have placed the jars under META-INF/bundles");
-    runtime = OsgiRuntime.embeddedBootStack().build().boot();
+    framework = BootPipeline.embedded().launch();
   }
 
   @AfterAll
   static void stopFelix() {
-    if (runtime != null) {
-      runtime.close();
+    if (framework != null) {
+      framework.close();
     }
   }
 
   @Test
   void embeddedManifestsCorePublishesSynthesisServiceTyped() {
     assertNotNull(
-        runtime.awaitService(ManifestSynthesisService.class, 5000),
+        framework.awaitService(ManifestSynthesisService.class, 5000),
         "the embedded manifests-core bundle booted and SCR published ManifestSynthesisService"
             + " (its @Reference Resolver bound from the embedded felix.resolver)");
   }

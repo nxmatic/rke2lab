@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
  * The set of dependency jars an exec-module must STAGE as OSGi bundles (copied intact under {@code
  * META-INF/bundles/} and excluded from the flat uber-jar), derived as a CLOSURE over what the
  * bundles declare — replacing the two hand-maintained pom lists. Mirrors the runtime install logic
- * ({@code OsgiRuntime.boot}) at build time, so the jars on disk match the bundles the runtime will
+ * ({@code BootPlanner.plan}) at build time, so the jars on disk match the bundles the runtime will
  * install.
  *
  * <p>The seed is the same two sources the runtime installs from:
@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
  * </ul>
  *
  * <p>From that seed we CLOSE over {@code Import-Package}, BOUNDED by what the host already provides
- * flat — the mirror of {@code OsgiRuntime.deriveSystemExports}. A package a staged bundle imports
+ * flat — the mirror of {@code BootPlanner.deriveSystemExports}. A package a staged bundle imports
  * pulls in its exporter(s) only when ALL of:
  *
  * <ul>

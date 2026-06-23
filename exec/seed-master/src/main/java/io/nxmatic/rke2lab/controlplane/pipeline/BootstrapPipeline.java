@@ -14,7 +14,7 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
-import io.nxmatic.rke2lab.osgi.runtime.OsgiRuntime;
+import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import java.util.Map;
@@ -102,8 +102,8 @@ public final class BootstrapPipeline {
      * The embedded OSGi framework booted for this run; the stages read the manifests-world services
      * from its registry.
      */
-    public ComponentBoundPipeline withOsgiRuntime(OsgiRuntime osgiRuntime) {
-      state.osgiRuntime = osgiRuntime;
+    public ComponentBoundPipeline withBootedFramework(BootedFramework bootedFramework) {
+      state.bootedFramework = bootedFramework;
       return this;
     }
 
@@ -162,7 +162,7 @@ public final class BootstrapPipeline {
               state.config.imageBuilderHost(),
               state.options.cleanWorktreeRequired(),
               state.readinessLogger,
-              state.osgiRuntime);
+              state.bootedFramework);
       FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
       return new PreflightDone(state);
     }
@@ -223,7 +223,7 @@ public final class BootstrapPipeline {
           new IncusStage(
               state.config,
               state.policy,
-              state.osgiRuntime,
+              state.bootedFramework,
               result -> state.bootstrapResult = result);
       FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
       return new IncusDone(state);

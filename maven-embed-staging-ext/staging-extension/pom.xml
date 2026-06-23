@@ -47,6 +47,13 @@
       <version>1</version>
       <scope>provided</scope>
     </dependency>
+    <!-- The strategy logs its staging summary through slf4j; the running Maven core provides the
+         binding, so this is provided (the API only, no binding shipped in the extension). -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
 
   <build>

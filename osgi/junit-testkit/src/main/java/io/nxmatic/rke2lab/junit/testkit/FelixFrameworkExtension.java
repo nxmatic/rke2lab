@@ -189,8 +189,8 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
     // Off (Felix defaults it true): no stack-inspection guesswork falling a non-wired class through
     // to the parent (app) classloader. Every load must be satisfied by a bundle's imports /
     // Bundle-ClassPath / the system bundle, or fail loudly — deterministic, and a seam package can
-    // never be served by the flat parent instead of its single declared exporter. Mirrors
-    // OsgiRuntime.
+    // never be served by the flat parent instead of its single declared exporter. Mirrors the prod
+    // FrameworkLauncher.
     config.put("felix.bootdelegation.implicit", "false");
     // The test class may opt into louder framework diagnostics via @FrameworkLog — the only place a
     // failed resolve()/activation explains WHICH requirement could not be wired. Default ERROR.
@@ -434,34 +434,48 @@ public final class FelixFrameworkExtension implements BeforeAllCallback, AfterAl
    * does not export — the DS-API trio ({@code org.osgi.service.component} / {@code util.promise} /
    * {@code util.function}). Those packages are felix.scr-internal: wired bundle-to-bundle, never
    * system-exported (no {@code SCR_API_PACKAGES} shim), so felix.scr would stay INSTALLED without
-   * them. The runtime mirror of {@code OsgiRuntime.closeOverImports}, scoped to felix.scr's imports
-   * — see the boot-pipeline-unification backlog for folding the two executors onto one closure.
+   * them. The walk is the SHARED {@link BundleIndex#closeOverImports} the prod {@code BootPlanner}
+   * also drives — one frame, seeded here with felix.scr and nothing pre-provided (this testkit does
+   * not system-export the trio); the two executors differ ONLY in the per-jar action they
+   * CONTRIBUTE. Here it INSTALLS each pulled jar into the framework (the planner adds an
+   * Installable instead).
    */
   private void startScr() throws Exception {
-    final Bundle scr = installFromClasspath("org.apache.felix.scr");
-    // Close TRANSITIVELY over the passive jars felix.scr needs: it imports the DS-API trio, and
-    // util.promise in turn imports util.function — a single pass would miss the second hop, so this
-    // is a fixpoint (frontier), like OsgiRuntime.closeOverImports. A host-flat package has no index
-    // exporter; exporterOf skips seams; an already-installed jar is not re-added.
-    final java.util.Deque<BundleManifest> frontier = new java.util.ArrayDeque<>();
-    final Set<String> pulled = new LinkedHashSet<>();
-    frontier.add(BundleManifest.from(classpath.locateBySymbolicName("org.apache.felix.scr")));
-    while (!frontier.isEmpty()) {
-      for (var imported : frontier.removeFirst().imports().clauses()) {
-        if ("optional".equals(imported.attributes().get("resolution"))) {
-          continue;
-        }
-        final BundleLocation exporter = classpath.exporterOf(imported.name());
-        if (exporter == null || !pulled.add(exporter.locationId())) {
-          continue;
-        }
-        installAt(exporter); // a passive spec jar — installed so the importer wires to it.
-        frontier.add(BundleManifest.from(exporter));
-      }
-    }
+    final BundleLocation scrLocation = classpath.locateBySymbolicName("org.apache.felix.scr");
+    // The shared closure takes a plain Consumer (its boot-discovery API stays pure, no checked
+    // throws); installAt throws checked BundleException/IOException, so the contributed handler
+    // sneaky-rethrows it — the exception surfaces intact from startScr (which declares throws), no
+    // wrapping, no exception type leaking into the pure API.
+    classpath.closeOverImports(
+        List.of(scrLocation),
+        Set.of(),
+        passive -> installPassiveSneaky(passive)); // installed so the importer wires to it
+    final Bundle scr = installAt(scrLocation);
     scr.start();
     if (scr.getState() != Bundle.ACTIVE) {
       throw new IllegalStateException("felix.scr did not reach ACTIVE — DS is not running");
     }
+  }
+
+  /**
+   * {@link #installAt} as a plain {@link java.util.function.Consumer} body — see {@link #sneaky}.
+   */
+  private void installPassiveSneaky(BundleLocation location) {
+    try {
+      installAt(location);
+    } catch (Exception ex) {
+      sneaky(ex);
+    }
+  }
+
+  /**
+   * Sneaky-throw: rethrow a checked exception without declaring it, so a checked-throwing body can
+   * be passed where a non-throwing {@code Consumer} is expected. The cast is erased at runtime, so
+   * the original exception propagates unchanged to the nearest {@code throws} (here {@code
+   * startScr}).
+   */
+  @SuppressWarnings("unchecked")
+  private static <E extends Throwable> void sneaky(Throwable ex) throws E {
+    throw (E) ex;
   }
 }

@@ -1,6 +1,6 @@
 ---
 name: osgi-runtime-decomposition-debt
-description: "Refactor debt flagged by the user (2026-06-20, R4 WI-C): OsgiRuntime is getting touffu — boot() now orchestrates pax-logging + felix.scr + model bundles + embedded-vs-classpath install + Import-Package mirror + start-levels + manifest parsing. Once R4 proves the seam, consider delegating to components (e.g. an export-deriver, a bundle-source abstraction file-vs-embedded, a start-level installer). NOT done in R4 — proving the seam comes first; decomposing now would bloat the increment."
+description: "RESOLVED (2026-06-23, boot-decomposition increment of osgi-boot-alignment) — the debt the user flagged 2026-06-20 (R4 WI-C): OsgiRuntime touffu, boot() fusing pax-logging + felix.scr + model bundles + embedded-vs-classpath install + Import-Package mirror + start-levels + manifest parsing. RESOLUTION: OsgiRuntime DELETED, decomposed into pure BootPlanner→BootPlan (decision: exports, closure, seam-guard, start-levels) + effectful FrameworkLauncher→BootedFramework (act) + BootPipeline grammar; the file-vs-embedded branch became the BundleLocation sealed type + BundleIndex factory (nature is data, not control flow). Exactly the export-deriver / bundle-source-abstraction / start-level-installer split the user hinted at. See [[boot-decomposition-state]]."
 metadata:
   node_type: memory
   type: project
@@ -19,12 +19,14 @@ runtime commence vraiment a etre touffu."
 - Import-Package → system.packages.extra mirror (manifest read from a file OR a jar stream)
 - OSGi start-levels (logging=1, felix runtime=2, model bundles=3) + STARTED latch
 
-**Debt / future direction (NOT R4):** delegate to focused components — candidates the user hinted at:
-- a bundle-source abstraction (file vs embedded) so boot() stops branching on the two
-- an export-deriver (the mirror logic: splitClauses / importClauseToExport / readManifestHeader)
-- a start-level installer
-Do it AFTER R4 proves the seam (pulumi preview). Decomposing mid-WI-C would bloat the increment and
-risk the proven-green topology. Tie to [[migration-branch-no-fallback]] discipline: only refactor
-what the migration needs, when it needs it.
+**RESOLVED (2026-06-23)** — the boot-decomposition increment delivered exactly the split hinted at:
+- bundle-source abstraction (file vs embedded) → `BundleLocation` sealed type (`OnClasspath`/`Staged`)
+  + `BundleIndex.ofClasspath()`/`ofStagedBundles()` factories; boot() no longer branches on the two —
+  the only switch left is the install mechanism (two arms of one sealed switch in `FrameworkLauncher`).
+- export-deriver (the mirror logic) → `BootPlanner.deriveSystemExports` + the seam guard, pure, in
+  `boot-discovery`, returning an inspectable `BootPlan`.
+- start-level installer → folded into `FrameworkLauncher` (the effectful act), driven by the plan.
+`OsgiRuntime` + `SeedRuntime` are DELETED (guard grep green). Spec:
+`docs/architecture/osgi/osgi-boot-decomposition-spec.adoc`.
 
-See [[osgi-runtime-r4-resume-state]] [[r4-resolver-service-ification]].
+See [[boot-decomposition-state]] [[osgi-runtime-r4-resume-state]] [[r4-resolver-service-ification]].

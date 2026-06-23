@@ -253,6 +253,12 @@ single-source-of-truth gesture applied here: the bundle *says* which side of the
 the boot reads it, nothing guesses. The guard then fail-fasts (naming the package) if a
 `type=model`/`type=edge` package would ever reach `system.packages.extra`.
 
+The boot machinery that reads this seam law — the pure `BootPlanner` that derives `system.packages.extra`
+and runs the guard, told apart from the `FrameworkLauncher` that enacts it — is decomposed in
+link:../osgi/osgi-boot-decomposition-spec.adoc[the OSGi boot decomposition]. Its pax/JCL volet sharpens
+the same frontier from the build side: a bundle (BundleCL) that leaks onto the flat host classpath (JCL)
+is a *wrong classpath*, so the boot stack is `optional` and staged by coordinate rather than left flat.
+
 == The decisive test — domain vs edge
 
 [quote]

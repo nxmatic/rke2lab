@@ -25,11 +25,22 @@
          maven-embed-staging-ext lifecycle so the build-time extension and this runtime model parse
          identically. A RELEASE coordinate (1.0.0, not a reactor SNAPSHOT), so it is a stable
          foundation like the BOM — resolved from the local repo, no masking, the no-snapshot-install
-         guard untouched. Pulls osgi.core transitively (EmbedCapability needs org.osgi.framework
-         .Filter). "bnd" stays an implementation detail: boot-discovery exports none of it. -->
+         guard untouched. "bnd" stays an implementation detail: boot-discovery exports none of it. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>bnd-read</artifactId>
+    </dependency>
+    <!-- DiscoveryPolicy / BundleIndex / BundleLocation compile against org.osgi.framework (Filter,
+         FrameworkUtil, the manifest-header semantics). Declared directly: it would arrive via
+         bnd-read, but a type we compile against is a direct dependency, never a transitive lean. -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>osgi.core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 
