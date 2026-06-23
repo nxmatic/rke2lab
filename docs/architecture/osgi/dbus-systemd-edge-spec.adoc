@@ -51,6 +51,18 @@ flowchart LR
 
 == The keystone — the mediator is the control-node, not a domain
 
+[NOTE]
+====
+*Superseded (2026-06-23) on the central claim.* This section's conclusion — "the control-node is the
+mediator; mediation between facets is a property of the executable, never a domain" — was *reversed* by
+the cluster work. Mediation is *distributed, peer-to-peer*: a domain that intrinsically spans peers
+relates them itself, in a *contribution* it owns, and the registry resolves the wiring. The executable
+keeps only control of *time* (boot, retry, preview), not of *meaning*. See
+link:../patterns/port-edge-domain-ownership.adoc#the-contribution-role[the contribution role and the
+peer-to-peer mediation section]. The *upward-ignorance* premise below still holds; only the "therefore
+the executable mediates" step is withdrawn.
+====
+
 One frame holds all the problems below together. *Knowledge runs strictly downward, never up.* Each
 domain is pure in its *upward ignorance*: Pulumi does not know it provisions RKE2; the doctor does not
 know it lives in a provisioning system; systemd does not know a doctor auscultates it. None of them

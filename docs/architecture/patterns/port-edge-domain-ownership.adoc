@@ -313,43 +313,206 @@ The arrow that matters: `edge ┄implements┄▶ port ◀──calls── doma
 points at nothing. That is why it is pure, and why it is the one door reached identically from either
 world.
 
-== The keystone — the mediator knows all facets, but mediates only by ports
+== Peer-to-peer mediation — the keystone is dissolved, not enthroned
 
-A consequence of the ownership rule, stated at the level of the whole system. *Knowledge runs strictly
-downward.* Each domain is pure in its *upward ignorance*: it does not know which application embeds it
-(Pulumi does not know it provisions RKE2; the doctor does not know it lives in a provisioning system;
-systemd does not know a doctor auscultates it). The dependency graph enforces this — the control-node
-(`seed-master`) depends on *every* domain (`doctor-*`, `systemd-port`, `manifests-*`, `pulumi-edge`, …);
-*no domain depends on the control-node*.
+[NOTE]
+====
+*Revision (2026-06-23) — this section reverses an earlier claim.* It used to read "the *keystone*: the
+control-node is the one place that knows two facets at once, therefore the one place that can mediate;
+mediation between facets is a property of the executable, never a domain." That thesis is *withdrawn*.
+The mechanism below (a domain *contributes* its bridge as a fragment, the registry resolves it) shows
+mediation is *distributed*, not central. The dbus spec's keystone section is superseded the same way.
+====
 
-So the *one place that knows two facets at once* is the control-node — and that is precisely why it,
-and only it, can *mediate between them*. But it mediates *through their ports* (it knows them all),
-*never through their internals* (it reasons in none). The host assembly wires impls onto ports; it
-diagnoses nothing and speaks no protocol. *Mediation between facets is a property of the executable
-that materialises the system, never a responsibility of a domain* — the dual of the upward-ignorance
-rule above.
+Start from the same true premise — *knowledge runs strictly downward.* Each domain is pure in its
+*upward ignorance*: it does not know which application embeds it (Pulumi does not know it provisions
+RKE2; the doctor does not know it lives in a provisioning system; systemd does not know a doctor
+auscultates it). The dependency graph enforces this — `seed-master` depends on *every* domain; *no
+domain depends on `seed-master`*.
 
-The keystone image is exact in the way that matters and misleading in the way that doesn't: like the
-stone at the crown of an arch, the control-node holds the structure *only because it touches both
-sides* — and it holds *nothing of its own*. It carries no domain logic; remove every port-wiring line
-and there is no residue of reasoning left in it. Its centrality is one of *knowledge and wiring*, not
-of richness. A domain that learned about the control-node, or a control-node that started to reason in
-a domain's terms, would both break the arch.
+The old conclusion was that the control-node, being the only thing that sees two facets, *must* be the
+mediator. But that confused two different controls under one word:
 
-This is the same shape as the edge/consumer split one level down — *the edge measures, the consumer
-reads the fact* — lifted to the whole system:
+[cols="1,3",options="header"]
+|===
+| Control of… | Who holds it
 
-. The control-node asks one domain (through its port) to *produce* a fact — e.g. `systemd-port`'s
-  `SystemdRuntimeProbe` yields a `SystemdStatusSnapshot`.
-. It *translates* that fact into the vocabulary of another domain's port — the snapshot becomes an
-  `Observation` the doctor can read.
-. It *consults* the second domain (again through its port) — the doctor reasons over the observation.
+| *meaning* — _which facets relate, and how_
+| *Distributed, peer-to-peer.* A domain that intrinsically spans peers relates them *itself*, in a
+  *contribution* it owns, reaching the peers *through their ports*. cluster-readiness presupposes the
+  node's systemd convergence — so the *cluster* relates cluster↔systemd↔doctor, not the executable.
+  The registry resolves the wiring; no center decides it.
 
-At no step does the control-node interpret the systemd protocol or perform a diagnosis itself; each
-act of meaning happens inside a domain, behind a port. The control-node only carries facts across the
-seam between them. (The two edge species this produces — *sondes* that observe→snapshot→fact→consult,
-versus *portes* that convert or act with no persisted fact — are catalogued in
+| *time* — _when, how often, retry, preview, boot the framework_
+| *The executable, and only it.* This is nobody's domain: something must start Felix and hold the
+  readiness poll. The control-node keeps this — but it is *demoted from keystone to a bootstrapper +
+  time-driver*. It carries no domain meaning; remove every line and no reasoning is left in it.
+|===
+
+So the arch has *no crown stone*. The least-knowledge rule is the whole point: *each component relates
+exactly the facets it already knows, and the less it knows the better it does its one job.* A domain
+spanning peers is not a leak as long as (a) it reaches them only through *ports* (never impls), (b) the
+graph stays acyclic (the peer never learns about it back), and (c) the span is *essential* — a
+real-world presupposition, not a convenience. Where no domain intrinsically spans two facets, that
+mediation has no owner and *falls back* to the executable — subsidiarity, not centrality.
+
+What used to be a *sequence the control-node decided* (produce a systemd fact → translate → consult the
+doctor) becomes a *data dependency inside the contribution*: the cluster's mediator reads the systemd
+node-fact itself and produces the `Observation`. Sequencing dissolves into wiring; only the temporal
+poll remains in the executable. (The edge species this still produces — *sondes* that
+observe→snapshot→fact→consult, versus *portes* that convert with no persisted fact — are catalogued in
 link:frontier-playability-model.adoc[the frontier-playability model].)
+
+[[the-contribution-role]]
+== The fourth role — a contribution (a fragment that brings a bridge to a host)
+
+The three ownership roles (domain / port / edge) describe *one* domain's parts. Peer-to-peer mediation
+needs a fourth, *across* domains: a **contribution**. It is how a domain that spans peers presents its
+bridge to a *host* that fans contributions out — without the host ever learning the domain.
+
+[cols="1,1,3",options="header"]
+|===
+| Role | Verb | What it is / owns
+
+| *contribution* (a *fragment* of a host)
+| *CONTRIBUTES*
+| A domain's bridge made present inside a host. It attaches to *one* host (`Fragment-Host`), carries a
+  live SCR `@Component` *mediator* (produces a fact by composing other domains' ports/edges) and/or a
+  *reasoner* the host fans out to (e.g. a `Specialist`), and brings its *own* `Import-Package` for the
+  peers it spans. Owns no port. The coupling to its peers lives *here*, by definition — so the host's
+  manifest names no domain and stays blind.
+|===
+
+Three facts make this work, and each is load-bearing:
+
+* *A fragment carries live components.* SCR processes the `Service-Component` header of a bundle *and of
+  its attached fragments* (DS spec 112.4.1); a fragment's `@Component` activates in the *host's* bundle
+  context. So a mediator that `@References` other domains' ports lives in the contribution, not the host.
+* *Resolve precedes activation, so the host adapts.* A fragment is attached at *resolve* time; by
+  *activation* the host already knows its fragments. The host therefore stops hard-wiring its roster
+  (`roster.add(new XSpecialist())`) and reads *whatever was contributed* (a dynamic `@Reference
+  List<…>`, or the woven components). The host adapts to how it was contributed — it does not enumerate
+  its contributors by name.
+* *The fragment brings its own imports.* Sharing the host classloader, the contribution can reach the
+  host's package-private internals (this is the *fragment-test model* — `*-core-test` fragments already
+  do it — promoted to production), and it adds *its* `Import-Package` (the peer ports) to the host. The
+  host stays decoupled; the bridge's coupling is quarantined in the fragment.
+
+Two decoupled times live in one contribution without contradiction: the *mediator* face *measures*
+(time 1, opens the door, produces the fact) and the *reasoner* face *reads* (time 2, never probes) —
+the same "doctors do not open doors" split as link:../osgi/dbus-systemd-edge-spec.adoc[the dbus spec],
+now *inside* a single contributed fragment rather than across the executable.
+
+[mermaid]
+....
+flowchart TB
+  host["host --- fans out contributions, manifest names NO domain"]
+  contrib["contribution --- fragment of the host"]
+  mediator["mediator component --- produces a fact, time 1"]
+  reasoner["reasoner --- reads the fact, time 2"]
+  peerport["a peer domain port"]
+  edge["this domain edge"]
+  contrib -->|Fragment-Host| host
+  contrib -->|carries| mediator
+  contrib -->|carries| reasoner
+  mediator -->|references| peerport
+  mediator -->|composes| edge
+  host -->|dynamic roster, adapts| reasoner
+  classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef c fill:#ffd,stroke:#aa2,stroke-width:2px;
+  classDef p fill:#fde,stroke:#a58,stroke-width:2px;
+  classDef e fill:#eef,stroke:#88a,stroke-width:2px;
+  class host h;
+  class contrib,mediator,reasoner c;
+  class peerport p;
+  class edge e;
+....
+
+[NOTE]
+====
+*Deferred — the generic contribution-host.* If a *second* host of contributions ever appears, the
+doctor and that host may prove to be one *species* — a fan-out host — worth an extracted abstraction.
+It is deferred on purpose: one does not extract an abstraction from a single instance (only the doctor
+exists today). When a real second host arrives, the common shape extracts itself; forcing it now would
+be speculative abstraction.
+====
+
+[[mediation-proof-obligation]]
+[IMPORTANT]
+====
+*Proven (2026-06-23) — the mechanism holds, with conditions.* A `@Component` that lives in a FRAGMENT
+is activated by Felix SCR (2.2.x / framework 7.0.5) in the HOST's context — reaching state `ACTIVE`,
+references satisfied, no failure, read from SCR's own `ComponentConfigurationDTO`. The proof is
+`FragmentContributedComponentTest` in `osgi/bench` (host `bench-fragment-host` + fragment
+`bench-fragment-contribution`). Three non-obvious conditions the host must meet — they are *not*
+automatic, so a contribution host (e.g. `doctor-core`) must declare them:
+
+. The fragment carries the `@Component`; bnd emits its `OSGI-INF/*.xml` + `Service-Component` into the
+  fragment jar.
+. *The host* declares `Service-Component: OSGI-INF/*.xml` (wildcard) in its own bnd. SCR reads the
+  header off the host bundle (`getHeaders()` does not merge fragment headers), but the wildcard
+  resolves against the host's entries via `findEntries`, which spans attached fragments.
+. *The host* declares `Require-Capability: osgi.extender;filter:="(osgi.extender=osgi.component)"` by
+  hand — a host owning no `@Component` makes bnd emit no extender requirement, so SCR would not track
+  it.
+
+Observation caveat: the published service's *type* must have a single classloader. If the host exports
+the service package and it is also system-exported, the two copies split the class and an
+`awaitService(Class)` never matches. For the doctor this does not arise — the observable type lives in
+a `-port` (`type=seam`, system bundle the sole exporter); the host must not also export it.
+====
+
+[[vocabulary-sentences]]
+== The roles as sentences — the vocabulary read aloud
+
+Each role is one *sentence* built from the shared vocabulary: a subject, its one verb, and what it
+sees. The *coupling signature* — how many ports the subject sees — is right there in the object of the
+sentence, and it is what tells the roles apart. Capability is universal (every port is a seam, visible
+from any bundle), but *use is minimal*: a role sees only the ports its sentence names.
+
+[cols="2,5",options="header"]
+|===
+| Sentence | Ports it sees
+
+| *A domain-core CALLS the ports it needs and reasons over its own model.*
+| The ports it *calls* (several allowed — they are its declared needs). Sees no edge, no other core.
+
+| *A port DECLARES a type and points at nothing.*
+| None. It is passive — the address, not the door. Both sides point at it; it points nowhere.
+
+| *An edge IMPLEMENTS one port and CONTACTS one external target.*
+| Exactly *one* — the port it implements. An edge that sees two ports is a mediator in disguise.
+  (Verified: `pulumi-edge` imports exactly one, `doctor-port`.)
+
+| *A mediator RELATES several ports and contacts no external target.*
+| *Several* — the ports of the facets it bridges. A mediator that sees one relates nothing.
+
+| *A contribution CONTRIBUTES a mediator and-or a reasoner to one host.*
+| The peer ports its mediator bridges, brought as its *own* `Import-Package`. Attaches to one host
+  (`Fragment-Host`); the host's manifest names no domain.
+|===
+
+[mermaid]
+....
+flowchart LR
+  domaincore["domain-core --- CALLS --- the ports it needs"]
+  port["port --- DECLARES --- nothing"]
+  edge["edge --- IMPLEMENTS one port --- CONTACTS one target"]
+  mediator["mediator --- RELATES several ports --- no target"]
+  contribution["contribution --- CONTRIBUTES to one host"]
+  classDef d fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef p fill:#fde,stroke:#a58,stroke-width:2px;
+  classDef e fill:#eef,stroke:#88a,stroke-width:2px;
+  classDef m fill:#ffd,stroke:#aa2,stroke-width:2px;
+  class domaincore d;
+  class port p;
+  class edge e;
+  class mediator,contribution m;
+....
+
+The reading that settles edge-vs-mediator: it is *not* "edge does I/O, mediator does not" — both reach
+through ports. It is the *count*: one port (a contact) versus several (a bridge). The verb and the
+port-count together are the whole identity.
 
 == Direction is a method, not a module, not two ports
 
@@ -438,6 +601,75 @@ Two modules for the contact (`ssh-to-age-edge` + the consumer's port), *zero* `-
 the edge need not be pushed to host; materialising it is about making the system boundary explicit, not
 about playability.)
 
+== Worked example C — cluster (a domain that CONTRIBUTES a bridge to a host)
+
+[NOTE]
+====
+*Status: DESIGN (2026-06-23), not yet built — the first use of
+<<the-contribution-role,the contribution role>>.* It must clear
+<<mediation-proof-obligation,the proof obligation>> before it is built.
+====
+
+cluster is the case the first two examples do not cover: a *sonde* whose readiness *presupposes another
+domain's fact*. "The cluster is ready" means *kubeconfig published ∧ API ready ∧ controllers effective*
+— and the first of those presupposes the node's *systemd convergence*. That presupposition is a
+real-world coupling; the question is only where it lives. Peer-to-peer says: in the cluster's own
+contribution, never in the executable.
+
+It carries a vocabulary *about the cluster* the consumer reads but does not own (the readiness phases),
+so unlike ssh-to-age it *does* get a port — symmetric with systemd, not with pulumi:
+
+* *cluster-port* — `ClusterReadinessProbe` (the contact seam the edge implements), purified to a pure
+  `ClusterProbeRequest` record (no host `BootstrapConfig`); `ClusterReadinessPhase` (today it *squats*
+  in `doctor-port` — a latent debt, re-homed here); the phase↔`SchemaRef` enum (today loose literals in
+  `ClusterSpecialist`). Owned by the cluster domain, read cross-domain by the doctor.
+* *cluster-edge* — `@Component implements ClusterReadinessProbe`, kubectl over `ProcessBuilder` for the
+  api-ready and controllers-effective phases. Pure `ProcessBuilder` + `java.nio`, so *no embedded jar*
+  (simpler than dbus, which embedded three for a transport `ServiceLoader`).
+* *cluster contribution* — a *fragment of `doctor-core`* carrying both faces: the *mediator*
+  `@Component` (composes the cluster-edge contact with the systemd node-fact read through `systemd-port`,
+  and produces the `Observation` — time 1) and `ClusterSpecialist` (reasons over it — time 2, moved out
+  of `doctor-core` into the fragment). No `cluster-core`: the contribution *is* the cluster's logic.
+
+[mermaid]
+....
+flowchart TB
+  world["EXTERNAL --- kubectl against the cluster"]
+  edge["cluster-edge --- @Component, kubectl"]
+  cport["cluster-port --- ClusterReadinessProbe, phases, SchemaRef enum"]
+  sport["systemd-port --- the node convergence fact"]
+  contrib["cluster contribution --- fragment of doctor-core"]
+  host["doctor-core --- the host, fans out, names no domain"]
+  edge -->|implements| cport
+  edge -->|contacts| world
+  contrib -->|Fragment-Host| host
+  contrib -->|mediator composes| edge
+  contrib -->|mediator @References| sport
+  contrib -->|reasoner fanned out by| host
+  classDef e fill:#eef,stroke:#88a,stroke-width:2px;
+  classDef p fill:#fde,stroke:#a58,stroke-width:2px;
+  classDef c fill:#ffd,stroke:#aa2,stroke-width:2px;
+  classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef w fill:#eee,stroke:#999,stroke-width:1px;
+  class edge e;
+  class cport,sport p;
+  class contrib c;
+  class host h;
+  class world w;
+....
+
+What does *not* move makes the cut legible. The executable (`seed-master`) keeps only *time* — the
+`SeedNodeBootstrapWatcher` retry/timeout poll, preview/dry-run, the Pulumi-resource wrapping, the
+runbook renderer. The kubeconfig file-poll (`java.nio`, a local file) and the systemd phase-0 gate stay
+host too: they orchestrate, they do not *contact* the cluster. Only the kubectl contact is the edge.
+And the coupling cluster↔systemd lives in the fragment's `Import-Package`, so `doctor-core`'s manifest
+still names no domain.
+
+*Scope — cluster-first.* cluster is the *first* contributed specialist; `DbusTcpSpecialist` and
+`NetworkSpecialist` stay hard-wired in `doctor-core` for now, migrated in a later increment — the same
+"prove the pattern on one instance first" as pulumi-edge being the first edge. The roster is
+transitionally mixed; that is accepted, not a half-migration left to rot.
+
 == The two principles this settles
 
 . *Synthesis takes prerequisites; it does not fetch them.* A describe-step is a pure function of its
@@ -465,6 +697,11 @@ about playability.)
 
 | A pure point of contact with no reasoning (ssh-to-age)
 | Just the `<target>-edge` + a port owned by its consumer. No `-core`, no port of its own.
+
+| A domain whose meaning *presupposes another domain's fact* (cluster readiness presupposes systemd)
+| A *contribution* — a fragment of the host that fans the reasoning out (the doctor). It carries the
+  mediator (produces the fact, reaching peers through their ports) and the reasoner. No `-core`; the
+  coupling lives in the fragment, the host stays blind. See <<the-contribution-role>>.
 |===
 
 == Related documentation

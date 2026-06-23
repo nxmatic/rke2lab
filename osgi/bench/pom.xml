@@ -21,6 +21,8 @@
     <module>bench-host</module>
     <module>bench-scr-api</module>
     <module>bench-scr-consumer</module>
+    <module>bench-fragment-host</module>
+    <module>bench-fragment-contribution</module>
     <module>bench-tests</module>
   </modules>
 </project>

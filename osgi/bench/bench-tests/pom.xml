@@ -46,6 +46,21 @@
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
+    <!-- the fragment-contribution proof: the host exports ContributedService, the fragment carries
+         the @Component that provides it. Both located on the test classpath by their embed
+         capability (installFixtureWithHost), not named in the test. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bench-fragment-host</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>bench-fragment-contribution</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>
