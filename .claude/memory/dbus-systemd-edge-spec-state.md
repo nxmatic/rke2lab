@@ -33,13 +33,24 @@ Two edge species, told apart by whether they produce a persisted FACT a domain l
 
 Applied to what's left (verified in the reactor 2026-06-23):
 
-- **cluster-edge = a SONDE, NOT a porte.** `ClusterReadinessProbe.probe(...)` already returns an
-  `Observation` (doctor-port), `ClusterReadinessPhase`/`SnapshotSource` exist, and `ClusterSpecialist`
-  already lives in doctor-core. So: extract the kubectl contact out of seed-master
-  (`ClusterBootstrapReadinessVerifier`) into a `cluster-edge`; the port + reasoning are ALREADY in
-  doctor — NO `cluster-core` to create. **Name stays `cluster`** (the system provisions exactly one
-  k8s cluster — `cluster` is unambiguous here; "k8s-cluster" rename rejected by the user, and it would
-  churn ClusterSpecialist/ClusterReadiness* for nothing).
+- **cluster-edge = a SONDE, and it GETS its own `cluster-port`** (correction: cluster is like systemd,
+  NOT like pulumi). The discriminant is NOT "one consumer vs two" — it is "does the subject carry a
+  domain vocabulary, facts ABOUT it that the consumer reads but does not own?". cluster does: the
+  readiness phases (kubeconfig / api / controllers) are facts about the CLUSTER, not doctor vocabulary.
+  So a `cluster-port` is warranted (symmetric with systemd-port), even if small. It is NOT speculative —
+  it RE-HOMES vocabulary currently scattered/squatting:
+  · `ClusterReadinessProbe` (the seam the edge implements) — promote from seed-master `controlplane/bdd/`.
+  · `ClusterReadinessPhase` — MOVE from doctor-port (it squats the doctor's membrane today; that was a
+    latent debt, not a precedent).
+  · a single-sourcing enum binding each phase ↔ its `SchemaRef` ("cluster/kubeconfig/v1", "cluster/api/v1",
+    "cluster/controller/v1") — today loose literals in `ClusterSpecialist` (doctor-core); this is the
+    SystemdUnitId move (the producer=edge ↔ consumer=specialist relation made a type).
+  The kubectl CONTACT (`ClusterBootstrapReadinessVerifier` + `ProductionClusterReadinessProbe`) → the
+  `cluster-edge`. `ClusterSpecialist` STAYS in doctor-core (consumer of the port). NO `cluster-core`.
+  manifests `units/cluster` (`ClusterRefs`, namespace synthesis) is a DIFFERENT cluster concern
+  (resources, not readiness) — do NOT touch it; the shared `"cluster/"` string prefix is a naming
+  collision, not shared vocabulary. **Name stays `cluster`** (one k8s cluster — unambiguous; k8s-cluster
+  rename rejected). [Earlier note here wrongly said "no cluster-port, like pulumi" — superseded.]
 - **host-fs = UNDETERMINED, likely NOT a sonde.** No filesystem specialist or observation exists in
   doctor (grep clean). The seed-master filesystem touch is DIFFUSE (config load, git metadata,
   checksums) — not one neat class like DbusSystemdProbe. Before building it: brainstorm whether there
