@@ -91,7 +91,7 @@
          TopicRunner/OnFailure/PipelineStageFailure triplet. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>pipeline-core</artifactId>
+      <artifactId>pipeline</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

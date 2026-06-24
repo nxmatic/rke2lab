@@ -25,7 +25,6 @@
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>systemd-port</artifactId>
       <version>${project.version}</version>
-      <scope>test</scope>
     </dependency>
   </dependencies>
 
