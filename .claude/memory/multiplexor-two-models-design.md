@@ -363,20 +363,40 @@ at the multiplexor. Invariant `grep -ri pulumi osgi/ == 0` preserved (publish li
 - 5 javadoc refs to the gone façade cleaned (DoctorConsultingService, ExactRosterDoctor, DefaultHealthSystem,
   HealthSystemTest, PipelineState).
 
-### NEXT — commit B (separate, pure rename): `DoctorConsultingService` → `ConsultingService`
+### COMMIT B DONE — `DoctorConsultingService` → `ConsultingService` (8db2af6f)
 
-User wants the redundant `Doctor-` prefix off the PORT type (package is already `doctor.port`; "Doctor"
-in a class name reads as the Generalist, confusing). Scope = the PORT ONLY (18 files reference it).
-Do NOT touch `DoctorGraph` (different debate) nor the test/scenario names (DoctorScenario, *Test — there
-"Doctor" names the subsystem under test, legitimate). Separate commit so the atomic slice's diff stays
-clean (user chose B).
+Pure rename, the PORT type only (package is already `doctor.port`; "Doctor" in a class name reads as
+the Generalist). `DoctorGraph` and the test/scenario names KEPT "Doctor" (subsystem-under-test naming,
+legitimate). Build green.
+
+## STEP 4 DONE — prescriptor split: `Specialist.diagnose` → `assess` + `prescribe` (750589db)
+
+The fused `diagnose(Referral) → ReferralReply` became two surfaced verbs:
+`assess(Referral) → Assessment` (always — the "why") + `prescribe(Referral, Assessment) →
+Optional<Prescription>` (conditional — the treatment; empty = reasoned decline). `ReferralReply`
+UNCHANGED — it already carried the duality (Assessment + `Optional<Prescription>`); only the method fused.
+
+- Fork couplage RESOLVED = **A** (`prescribe(Referral, Assessment)`): prescribe reads facts BACK from
+  the assessment (its single source), not re-derived. DbusTcp reads `unit` off the assessment payload;
+  only raw host/node facts come off the observation (input facts, not a re-derivation). B (re-derive)
+  duplicates; C (a `Diagnosis` type) was over-design — neither taken.
+- The **Generalist owns the reply shape** now: private `refer()` runs assess→prescribe→assembles the
+  ReferralReply (L170). THIS is the documented seam where the efficacy-first gate will interpose.
+- Recut: SPI + 3 prod specialists (DbusTcp prescribes; Network/Cluster are pure-assess, prescribe →
+  Optional.empty) + 4 test doubles (FakeSpecialist, FakeDiagnostician prescribe; DecliningSpecialist,
+  FakeNetworkSpecialist) + the 3 domain unit tests now assert each verb DIRECTLY (no reply reconstruction).
+- This closed the `clinician-genus-entity-value-detector` "fused" fork. NOTE: `assess`/`prescribe` are
+  the diagnostician tier (Specialist) only — the Generalist coordinates, it does not carry the two verbs.
+
+### NEXT — efficacy-first gate (its own slice, design fork OPEN)
+
+The gate consults the efficacy history BETWEEN assess and prescribe, in the Generalist's `refer()`.
+It was DEFERRED deliberately: the split is its prerequisite (now done), but the gate has an un-settled
+design fork ("provisional", per [[efficacy-first-prescription-provisional]]) — so it needs its own
+brainstorm before code. Do NOT bolt it on; reopen that note's fork first.
 
 THEN (separate slices, ordered backlog):
 
-- **Slice prescriptor** — surface `Specialist.diagnose` as TWO verbs (`assess` always + `prescribe`
-  conditional), where the efficacy-first gate naturally sits (Generalist orchestrates assess→gate→prescribe).
-  Touches all Specialist impls; the user explicitly deferred it here ("on verra au slice prescriptor").
-  This is the `clinician-genus-entity-value-detector` open fork (assess+prescribe fused today).
 - static-helper/factory-as-instance audit; DriftSpecialist-as-Clinician decision; Generalist-visibility
   slice ([[clinician-genus-entity-value-detector]] backlog); systemd module rename
   ([[osgi-bench-testkit-naming-state]] backlog). See [[object-graph-navigability-principle]],
