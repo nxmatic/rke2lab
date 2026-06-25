@@ -56,6 +56,16 @@
       <version>${project.version}</version>
     </dependency>
 
+    <!-- The SCR runtime API (ServiceComponentRuntime + the *.dto types): the ScrDiagnostics helper
+         reads component states / unsatisfied references to explain why a @Component is or isn't
+         published. provided — felix.scr provides these packages at runtime; the helper only needs
+         them to compile (and the bnd import below is optional, JVM-side only). -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.component</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
     <!-- In-container half: the runner compiles against the JUnit Platform launcher + engine;
          provided keeps them out of this bundle — each resolves as its own bundle at runtime. -->
     <dependency>

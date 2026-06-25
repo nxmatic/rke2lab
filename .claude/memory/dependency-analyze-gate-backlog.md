@@ -28,6 +28,12 @@ on without a calibrated ignore set would fail the build on legitimate declaratio
    (SOURCE retention) → invisible to analyze. Inherited from bundle-parent.
 2. **`runtime`-scope deps** (slf4j-api, pax-logging-api/logback, felix.scr, jansi, DS-trio runtime,
    paranamer, jakarta.annotation-api…) — never referenced in bytecode by definition; needed at runtime.
+   *Since 2026-06-25:* the DS TEST stack (`org.apache.felix.scr` + `org.osgi.service.component` +
+   `org.osgi.util.promise` + `org.osgi.util.function`, all scope=test) moved INTO `bundle-test-parent`
+   (a `withScr()` in-container test installs them bundle-to-bundle; SCR loads them at run time, so
+   bytecode never references them → "unused declared" on EVERY `-test` fragment). Ignore them ONCE on
+   bundle-test-parent's own analyze, not per-fragment. `org.osgi.service.component` ALSO carries the
+   runtime DTOs `ScrDiagnostics` reads — there it IS used in bytecode (used-undeclared would be wrong).
 3. **Bundles installed into Felix by classpath substring** (bench-host, bench-config, bench-scr-consumer,
    jgiven-probe, jgiven-probe-test, jgiven-wrap, junit-testkit provided) — resolved at RUN time by the
    testkit, never in bytecode → "unused declared" but indispensable.

@@ -56,5 +56,32 @@
       <artifactId>junit-platform-launcher</artifactId>
       <scope>test</scope>
     </dependency>
+
+    <!-- Declarative Services on the test classpath: felix.scr + the DS-runtime API trio it wires to.
+         A -test harness that boots SCR (OutOfContainerFrameworkExtension.withScr()) installs these
+         bundle-to-bundle so a fragment-contributed @Component activates. The domains are becoming
+         @Components, so booting SCR is the norm for in-container tests — declared once here, every
+         fragment inherits it (a non-SCR test only carries a slightly wider TEST classpath, never an
+         embedded jar). org.osgi.service.component also carries the runtime DTOs ScrDiagnostics reads. -->
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.scr</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.component</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.util.promise</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.util.function</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

@@ -61,31 +61,11 @@
       <scope>provided</scope>
     </dependency>
 
-    <!-- Jupiter, the engine, jgiven-junit5 (all provided) and junit-platform-launcher (test) are
-         inherited from bundle-test-parent. -->
+    <!-- Jupiter, the engine, jgiven-junit5, junit-platform-launcher AND the DS test stack (felix.scr
+         + the org.osgi.service.component / util.promise / util.function trio for withScr()) are all
+         inherited from bundle-test-parent — booting SCR is the norm for in-container tests now. -->
 
-    <!-- HealthSystemDsBootTest.withScr(): felix.scr + the DS-API trio it wires to, on the test
-         classpath, so SCR activates the fragment-contributed @Components (mirrors dbus-systemd-edge). -->
-    <dependency>
-      <groupId>org.apache.felix</groupId>
-      <artifactId>org.apache.felix.scr</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.osgi</groupId>
-      <artifactId>org.osgi.service.component</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.osgi</groupId>
-      <artifactId>org.osgi.util.promise</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.osgi</groupId>
-      <artifactId>org.osgi.util.function</artifactId>
-      <scope>test</scope>
-    </dependency>
+    <!-- osgi.core (test): the harness names framework types (Bundle, BundleContext) directly. -->
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>
