@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.doctor;
+package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.ClinicianId;
@@ -17,7 +17,7 @@ import java.util.Set;
  *
  * <p>Immutable: each {@code with*} returns a new policy carrying the added grants.
  */
-final class GrantPolicy {
+public final class GrantPolicy {
 
   private final Set<Grant> grants;
 

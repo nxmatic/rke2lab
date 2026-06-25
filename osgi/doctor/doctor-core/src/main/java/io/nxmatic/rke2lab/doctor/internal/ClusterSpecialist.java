@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.doctor;
+package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
@@ -17,7 +17,7 @@ import java.util.Map;
  * in the consult fan-out (the recruit seam) until a real specialist that can treat cluster symptoms
  * is added.
  */
-final class ClusterSpecialist implements Specialist {
+public final class ClusterSpecialist implements Specialist {
 
   @Override
   public Specialty domain() {

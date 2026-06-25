@@ -71,6 +71,18 @@ earlier decision, DS annotations were stripped from `-core` ("re-add at the peer
 Step 1b only creates the receptacle (`doctor-spi`); `Doctor.java` keeps its transitional static
 `new ClusterSpecialist()` roster until the cluster increment re-adds DS.
 
+★ SPECIALIST DISTRIBUTION PLAN (user: "chacun sa responsabilité — le domaine cluster définit le
+ClusterSpecialist, donc c'est lui qui le contribue au doctor"). Correct in principle; reality forces
+the sequencing (decided: finish package-isolation 1b-ii/1c FIRST, distribute as the NEXT increment):
+- `DbusTcpSpecialist` → systemd domain (exists; already deps `systemd.port.SystemdUnitId`).
+- `NetworkSpecialist` → netplan domain (exists; currently a stub).
+- `ClusterSpecialist` → cluster domain — **does NOT exist yet**; distributing it = creating the
+  cluster domain = the cluster-edge chantier. This is why it cannot move in step 1.
+- `DriftSpecialist` → likely STAYS in doctor (self-drift auto-diagnosis; deps InterventionLedgerWriter).
+Distribution requires real DS wiring (@Component on each + @Reference List<Specialist> in doctor) —
+that is roadmap step 4 territory. The transitional `new XxxSpecialist()` in Doctor.java is explicitly
+temporary, to be replaced when each specialist moves home with its @Component.
+
 ## ★ KEYSTONE DECISION: path-addressing — records NEVER cross to the host (2026-06-25)
 
 The knot we had missed: `DoctorConsultingService` is a LIVE in-process call (`consult(Symptom,
@@ -239,3 +251,14 @@ Whiteboard: we REWRITE the stack content; no prior Pulumi outputs preserved.
 
 See [[fragment-contribution-mediation-model]] [[doctor-internal-edge-debt]]
 [[pipeline-orchestration-osgi-vision]] [[external-edges-chantier-handoff]].
+
+## BACKLOG — factory-as-instance refinement (user, 2026-06-25)
+
+A static factory (DoctorGraph.assemble, HealthSystem.admit) is a LEGITIMATE static (CLAUDE.md
+exception). But it can still be inverted: materialize the factory as an INSTANCE that delegates
+creation. The gain is NOT the creation itself — it is that the factory becomes a NODE in the object
+graph: if the created instance holds a reference back to its factory, then walking UP the tree from
+any instance reaches the factory (and what it knows) — navigable from anywhere. A static factory is
+invisible in the graph; a factory-instance is navigable. Aligns with keep-the-graph-navigable
+([[prefer-non-static-inner-keep-the-graph]]). Deferred refinement, not blocking; revisit with the
+static-helper audit.

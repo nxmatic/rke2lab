@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.doctor;
+package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
@@ -27,7 +27,7 @@ import java.util.Map;
  * BootstrapConfig} — a doctor reads facts off the snapshot, it does not open the door itself. So it
  * lives in {@code doctor-core} beside the other specialists and joins the standard roster.
  */
-final class DbusTcpSpecialist implements Specialist {
+public final class DbusTcpSpecialist implements Specialist {
 
   /**
    * The adapter unit this specialist remediates — the typed id the manifests producer also names.

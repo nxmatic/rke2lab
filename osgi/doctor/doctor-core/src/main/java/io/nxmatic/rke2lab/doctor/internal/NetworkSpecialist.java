@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.doctor;
+package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
@@ -16,7 +16,7 @@ import java.util.Map;
  * exists yet. This specialist gives the NETWORK domain a voice in the consult fan-out (the recruit
  * seam) until a real specialist that can treat network symptoms is added.
  */
-final class NetworkSpecialist implements Specialist {
+public final class NetworkSpecialist implements Specialist {
 
   @Override
   public Specialty domain() {

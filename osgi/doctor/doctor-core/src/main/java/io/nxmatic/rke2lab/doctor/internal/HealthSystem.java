@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.doctor;
+package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.*;
@@ -20,7 +20,7 @@ import java.util.function.Consumer;
  * specialist carries a {@link ClinicianId} (its identity) but gains an access in step 2, when a
  * referred record is actually read.
  */
-final class HealthSystem {
+public final class HealthSystem {
 
   private final Generalist generalist;
 

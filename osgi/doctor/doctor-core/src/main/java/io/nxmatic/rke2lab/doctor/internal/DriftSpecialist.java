@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.doctor;
+package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.records.*;
@@ -29,7 +29,7 @@ import java.util.Optional;
  * <p>The inference is idempotent across reruns: a prior inferred external change already in the
  * window suppresses re-recording, so one real change is never recorded N times over N runs.
  */
-final class DriftSpecialist {
+public final class DriftSpecialist {
 
   private final InterventionLedgerWriter writer;
 

@@ -1,9 +1,11 @@
 Bundle-SymbolicName: io.nxmatic.rke2lab.doctor.core
+# Export ONLY the public facade package. io.nxmatic.rke2lab.doctor.internal (Generalist, HealthSystem,
+# ClinicalAccess, the specialists, ...) is NOT listed → bnd does not export it → the impl is SEALED:
+# no other bundle can import it. The .internal name makes "framework-internal, never exported"
+# structural, not inferred. Only Doctor + ExactRosterDoctor (the facade) cross the bundle boundary.
 Export-Package: \
     io.nxmatic.rke2lab.doctor
-# Self-declares doctor-core as an embeddable model bundle (installed under META-INF/bundles/ by the
-# capability scan, like manifests-core / netplan-core). The step that puts the doctor INTO the OSGi
-# world — prerequisite to it becoming the SCR contribution host (the @Reference List<Specialist>
-# roster the cluster fragment binds into).
+# Embeddable model bundle (installed under META-INF/bundles/ by the capability scan, like
+# manifests-core / netplan-core).
 Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=doctor
 -noimportjava: true

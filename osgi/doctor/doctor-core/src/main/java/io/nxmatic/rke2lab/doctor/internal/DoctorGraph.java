@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.doctor;
+package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
@@ -15,12 +15,12 @@ import java.util.function.Consumer;
  * verbatim). Package-private: only the two public factories in this package reach it, so the actors
  * it news up stay hidden behind the {@link DoctorConsultingService} it returns.
  */
-final class DoctorGraph {
+public final class DoctorGraph {
 
   private DoctorGraph() {}
 
   /** Wire the registry + writer + the EXACT roster into the actors; return the contract. */
-  static DoctorConsultingService assemble(
+  public static DoctorConsultingService assemble(
       Patient patient,
       MedicalRecordRegistry registry,
       InterventionLedgerWriter ledgerWriter,
