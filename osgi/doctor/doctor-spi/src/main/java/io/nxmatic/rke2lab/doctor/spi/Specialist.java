@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.doctor.port;
+package io.nxmatic.rke2lab.doctor.spi;
 
 import io.nxmatic.rke2lab.doctor.records.*;
 

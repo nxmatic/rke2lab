@@ -20,6 +20,7 @@
 
   <modules>
     <module>doctor-records</module>
+    <module>doctor-spi</module>
     <module>doctor-port</module>
     <module>doctor-port-test</module>
     <module>doctor-core</module>

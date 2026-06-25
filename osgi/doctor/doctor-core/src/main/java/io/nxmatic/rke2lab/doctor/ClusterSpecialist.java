@@ -1,6 +1,5 @@
 package io.nxmatic.rke2lab.doctor;
 
-import io.nxmatic.rke2lab.doctor.port.Specialist;
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.Referral;
@@ -8,6 +7,7 @@ import io.nxmatic.rke2lab.doctor.records.ReferralReply;
 import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Specialty;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import java.util.Map;
 
 /**

@@ -32,6 +32,13 @@
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
+    <!-- the inter-domain SPI: FakeSpecialist implements Specialist (moved here from doctor-port). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-spi</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
     <!-- the serialization fixtures name the dbus-tcp unit via the typed SystemdUnitId (provided: the
          fragment's src/main tests compile against it, it resolves through the host at runtime). -->
     <dependency>

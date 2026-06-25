@@ -1,8 +1,6 @@
 package io.nxmatic.rke2lab.doctor;
 
-import io.nxmatic.rke2lab.doctor.port.Clinician;
 import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
-import io.nxmatic.rke2lab.doctor.port.Specialist;
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.ClinicianId;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
@@ -16,6 +14,8 @@ import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
 import io.nxmatic.rke2lab.doctor.records.Specialty;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.records.Visit;
+import io.nxmatic.rke2lab.doctor.spi.Clinician;
+import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import java.util.ArrayList;
 import java.util.List;
 

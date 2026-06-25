@@ -48,6 +48,29 @@ understand it. ⇒ the **envelope rides in the output KEY** (`doctor/consultatio
 wrapper in the operator's face; NO opaque multi-doc YAML blob (kills Pulumi diff — rejected).
 Optional per-domain `domain/summary` shallow human line alongside the deep DAG.
 
+## ★ GENERALIZED: DS-contribution is THE inter-domain relation pattern (2026-06-25)
+
+The DomainDagMultiplexor mechanism is not special — it is one instance of the general inter-domain
+relation pattern, and the user generalized it explicitly: **a contributing domain implements an SPI
+interface, annotates the impl `@Component`, and the contributed domain receives it via
+`@Reference(cardinality=MULTIPLE) List<T>`.** Two SPI families already share the exact mechanism:
+
+| SPI interface | contributor | consumer | received via |
+|---|---|---|---|
+| `Specialist` (reasoning) | a domain (cluster) | doctor | `@Reference List<Specialist>` |
+| `DomainDagMapper` (serialization) | each domain | the DomainDagMultiplexor | `@Reference List<DomainDagMapper>` |
+
+Same shape: shared SPI package + `@Component` on the provider + `@Reference List` on the consumer;
+neither imports the other's impl — they meet on the SPI. Proven by `FragmentContributedComponentTest`
+(a `@Reference List` receives a contributed component). So the **4th package role `.spi`** (a
+dedicated `doctor-spi` module, taxonomy sibling of `-port`) is where ALL inter-domain contracts live;
+DS is the single contribution mechanism for inter-domain relations, whether reasoning or data.
+
+NOTE on sequencing: the `@Component`/`@Reference List` WIRING is the target, NOT step 1b. Per the
+earlier decision, DS annotations were stripped from `-core` ("re-add at the peer-to-peer moment").
+Step 1b only creates the receptacle (`doctor-spi`); `Doctor.java` keeps its transitional static
+`new ClusterSpecialist()` roster until the cluster increment re-adds DS.
+
 ## ★ KEYSTONE DECISION: path-addressing — records NEVER cross to the host (2026-06-25)
 
 The knot we had missed: `DoctorConsultingService` is a LIVE in-process call (`consult(Symptom,
