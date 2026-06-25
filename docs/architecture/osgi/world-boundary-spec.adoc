@@ -17,7 +17,7 @@ spec records *that there is only one door*, which one, and how a live reference 
 == The claim
 
 The host world (flat JCL, the Pulumi-aware orchestrator) and the OSGi world (bundle classloaders,
-pure models) exchange exactly one kind of live reference across one boundary. After the Multiplexor
+pure models) exchange exactly one kind of live reference across one boundary. After the DomainDagMultiplexor
 design (link:multiplexor-spec.adoc[multiplexor-spec]) collapsed the data exchange to a single
 `Document` stream, the *behavioral* surface between the worlds reduces to a single service handed
 from OSGi to the host. This document specifies that handoff.
@@ -116,17 +116,23 @@ flowchart TB
 
 == Why exactly one door
 
-Before the Multiplexor, the host read several model services out of the registry —
+Before the DomainDagMultiplexor, the host read several model services out of the registry —
 `SystemdRuntimeProbe`, and the design called for `SnapshotSource`, `MedicalRecordRegistry`,
 `InterventionLedgerWriter`, `Patient` to be host-published too: one seam type per crossing fact. The
-Multiplexor collapses all diagnostic data into one `Document` stream behind one service. The host
+DomainDagMultiplexor collapses all diagnostic data into one `Document` stream behind one service. The host
 stops reading N model services and reads one stream source.
+
+That single service is the door's two faces, named for each side: the host reads the seam interface
+`DomainDagSource` (`awaitService(DomainDagSource.class)` — "give me the source of the domains' DAGs");
+its sealed implementation is the `DomainDagMultiplexor` (collect the per-domain `DomainDagMapper`s,
+stamp the envelope, mux/demux the stream). The host never names "multiplexor" — that is the internal
+mechanism; it speaks only of the `DomainDagSource` it consumes.
 
 `SystemdRuntimeProbe` remains a live probe (a *measurement* the host triggers, not persisted data),
 so it is a legitimate second door of a different kind — a *probe* door, not a *data* door. The rule
-is therefore precise: *data crosses through exactly one door* (the Multiplexor stream); a probe is a
+is therefore precise: *data crosses through exactly one door* (the DomainDagMultiplexor stream); a probe is a
 distinct, narrow measurement door. Any third proposed door is a design smell — the question to ask
-is "is this data (→ the Multiplexor) or a live measurement (→ a probe door)?".
+is "is this data (→ the DomainDagMultiplexor) or a live measurement (→ a probe door)?".
 
 == The invariant
 
@@ -172,17 +178,17 @@ A baseline so the increment's progress is visible, not asserted:
 * *Translation domain↔Pulumi (`toOutputMap`/`OUTPUT_KEY`/`Reader`) — transpired across ~30 files,
   in the wrong places:*
 ** *14 files in `doctor/port/`* — the records serialize THEMSELVES into Pulumi output shape. This is
-   translation logic living *inside the model*. These collapse into per-domain `DocumentMapper`s.
+   translation logic living *inside the model*. These collapse into per-domain `DomainDagMapper`s.
 ** *~11 host files* (`policy/`, `bdd/`, `readiness/`, `systemd/`, `OutputBuilder`) — ACL logic
    dispersed across stages/resources instead of concentrated in the ACL. These converge into the
-   `PipelineAdapter` + the Multiplexor.
+   `DomainDagAdapter` + the DomainDagMultiplexor.
 
 === The verdict this gives
 
 Today the ACL role is *not* concentrated — it has transpired, most damagingly into the doctor model
 (14 records). The increment is "done" on this axis precisely when both guards read 0 and the ~30
 translation sites have converged: the diagnostic records become pure (`type=record`), each domain's
-serialization lives in one `DocumentMapper`, and the host-side translation lives in the one ACL. The
+serialization lives in one `DomainDagMapper`, and the host-side translation lives in the one ACL. The
 guards are cheap enough to run on every commit of the increment — a regression that re-scatters
 translation shows up immediately.
 
@@ -190,7 +196,7 @@ translation shows up immediately.
 
 * link:../patterns/port-edge-domain-ownership.adoc#the-boot-face[The seam law] — the generic
   "which side of the seam does a class load on" rule this door is one instance of.
-* link:multiplexor-spec.adoc[Multiplexor spec] — the design that collapsed the data exchange to one
+* link:multiplexor-spec.adoc[DomainDagMultiplexor spec] — the design that collapsed the data exchange to one
   stream, making "one door" true.
 * link:osgi-boot-decomposition-spec.adoc[Boot decomposition] — how `BootedFramework` is produced
   (the boot ACT vs the framework-free boot DECISION).

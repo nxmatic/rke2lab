@@ -1,6 +1,6 @@
 ---
 name: multiplexor-two-models-design
-description: "DESIGN settled 2026-06-24 (brainstorm, NOT yet built) — the host↔OSGi data exchange is reframed as TWO distinct world-models (OSGi diagnostic model vs host stack model) meeting ONLY at a Document contract, never sharing a type. A Multiplexor (OSGi) mux/demuxes an envelope stream; a host PipelineAdapter mirrors it to Pulumi. Mechanism = DS (chosen over fragment), so records stay private. Invariant: Pulumi is host-only vocabulary."
+description: "DESIGN settled 2026-06-24 (brainstorm, NOT yet built) — the host↔OSGi data exchange is reframed as TWO distinct world-models (OSGi diagnostic model vs host stack model) meeting ONLY at a Document contract, never sharing a type. A DomainDagMultiplexor (OSGi) mux/demuxes an envelope stream; a host DomainDagAdapter mirrors it to Pulumi. Mechanism = DS (chosen over fragment), so records stay private. Invariant: Pulumi is host-only vocabulary."
 metadata:
   node_type: memory
   type: project
@@ -32,13 +32,13 @@ output key". That conceptual leak is the bug. Target guardrail: **`grep -ri pulu
 | role | world | owns | knows Pulumi? |
 |---|---|---|---|
 | domain (doctor) | OSGi | its DAG records + reasoning | no |
-| **Multiplexor** NEW | OSGi | envelope `(domain, coordinate)`; mux/demux a transport-neutral DocumentStream | no — a stream codec |
-| **PipelineAdapter** NEW | host | maps DocumentStream ↔ Pulumi outputs; live stack I/O | yes — the ONLY one |
+| **DomainDagMultiplexor** NEW | OSGi | envelope `(domain, coordinate)`; mux/demux a transport-neutral DocumentStream | no — a stream codec |
+| **DomainDagAdapter** NEW | host | maps DocumentStream ↔ Pulumi outputs; live stack I/O | yes — the ONLY one |
 
-Egress/ingress are MIRRORS meeting at the stream: domain DAG → Multiplexor (stamp+mux) →
-DocumentStream → PipelineAdapter (export per `domain/coordinate`) → Pulumi; and the reverse.
+Egress/ingress are MIRRORS meeting at the stream: domain DAG → DomainDagMultiplexor (stamp+mux) →
+DocumentStream → DomainDagAdapter (export per `domain/coordinate`) → Pulumi; and the reverse.
 Pulumi becomes ONE possible sink behind the adapter — the same stream could later land in a git
-repo (the "clone the stack onto git, immutable" idea), Multiplexor unchanged.
+repo (the "clone the stack onto git, immutable" idea), DomainDagMultiplexor unchanged.
 
 ## Operator-legibility constraint (decides the wire shape)
 
@@ -52,12 +52,12 @@ Optional per-domain `domain/summary` shallow human line alongside the deep DAG.
 
 The contribution mechanism for a domain's mapper. Two options weighed in the preview:
 - **A — fragment carries the YAML mapper.** A fragment shares the host classloader, so its
-  `Import-Package` (on the domain's record package) MERGES into the Multiplexor host ⇒ the
-  Multiplexor's import set grows by one record package PER domain. Coupled, grows.
-- **B — DS (CHOSEN).** The contract bundle defines a **mapper interface** (`DocumentMapper`,
+  `Import-Package` (on the domain's record package) MERGES into the DomainDagMultiplexor host ⇒ the
+  DomainDagMultiplexor's import set grows by one record package PER domain. Coupled, grows.
+- **B — DS (CHOSEN).** The contract bundle defines a **mapper interface** (`DomainDagMapper`,
   record↔`Document`). The DOMAIN imports only that interface and implements its side as a
-  `@Component`, next to its records, in its own bundle. The Multiplexor `@Reference`s
-  `List<DocumentMapper>` and imports ONLY the interface package — forever, never grows. Records
+  `@Component`, next to its records, in its own bundle. The DomainDagMultiplexor `@Reference`s
+  `List<DomainDagMapper>` and imports ONLY the interface package — forever, never grows. Records
   **never leave the domain bundle**; the payload crosses already-serialized as a `JsonNode`.
 
 User's rationale: "keeping the records private makes the system robuster" — blindness is
@@ -72,7 +72,7 @@ contribute **data** (a mapper). Both keep the same principle — a domain contri
 capability, meaning is distributed — but: **fragment = mechanism for contributing CODE; DS =
 mechanism for contributing DATA** (the payload should cross serialized, not as shared classes).
 The fragment proof ([[fragment-contribution-mediation-model]] § PROOF DONE) still stands for the
-Specialist/Mediator contribution; the Multiplexor is the data-serialization counterpart.
+Specialist/Mediator contribution; the DomainDagMultiplexor is the data-serialization counterpart.
 
 ## Second-order win — FEWER live components (user, 2026-06-24)
 
@@ -82,8 +82,8 @@ participating actor: doctor-core as SCR host, a Mediator per domain, the dynamic
 fact (`SnapshotSource`, `MedicalRecordRegistry`, `InterventionLedgerWriter`, `Patient`). Every
 fact-that-crosses needed its own registry-typed service identity.
 
-The Multiplexor collapses that to **one service type (`DocumentMapper`) + one
-`@Reference List<DocumentMapper>`**. A domain publishes ONE `@Component` (its mapper), not a fan
+The DomainDagMultiplexor collapses that to **one service type (`DomainDagMapper`) + one
+`@Reference List<DomainDagMapper>`**. A domain publishes ONE `@Component` (its mapper), not a fan
 of per-fact components/registrations; data crosses as serialized `Document`s through a single
 channel, so it is no longer registry-typed per fact. Live wiring shrinks on two axes — fewer
 components, fewer registry types — so **less to wire = less to fail at boot.** This is the runtime
@@ -92,13 +92,13 @@ face of the same robustness gain as record-privacy, and it serves the session's 
 
 ## Bundle shape (target)
 
-- **contract bundle** — `DocumentMapper` interface + `Document(domain, coordinate, JsonNode)`. The
+- **contract bundle** — `DomainDagMapper` interface + `Document(domain, coordinate, JsonNode)`. The
   ONE shared package both worlds import.
 - **doctor-core** — pure records + reasoning, NO OSGi annotations (placeable anywhere).
-- **doctor-contribution** — `@Component DocumentMapper` impl + Jackson; imports the interface;
+- **doctor-contribution** — `@Component DomainDagMapper` impl + Jackson; imports the interface;
   maps its LOCAL records. (DS returns here — the "peer-to-peer moment" deferred earlier this
   session; only in `*-contribution`, never in `*-core`.)
-- **Multiplexor bundle** — `@Reference List<DocumentMapper>`, mux/demux; imports only the interface.
+- **DomainDagMultiplexor bundle** — `@Reference List<DomainDagMapper>`, mux/demux; imports only the interface.
 
 ## Vocabulary moves (the leak cleanup)
 
@@ -137,7 +137,7 @@ reuse as reference like 4e3e1427 was):
 Design DOCS now (3 coherent specs + atlas):
 - `osgi/multiplexor-spec.adoc` — two-models, Document, DS-over-fragment, redistribution.
 - `osgi/world-boundary-spec.adoc` — THE single door between worlds (NOT a pattern, an arch spec):
-  type-seam + `awaitService` + DS-publish + sealed impl; "one DATA door (Multiplexor) + a distinct
+  type-seam + `awaitService` + DS-publish + sealed impl; "one DATA door (DomainDagMultiplexor) + a distinct
   PROBE door (SystemdRuntimeProbe)". Holds the CONCENTRATION CHECK (below). + pending commit.
 - `integration-atlas.adoc` — two-vocabulary table + Doctor 3rd additivity proof.
 
@@ -148,7 +148,7 @@ the atlas already names). Two greps are the acceptance criteria:
 2. `grep -rl "toOutputMap\|OUTPUT_KEY" osgi/` == 0 → **14 today** (doctor records self-serialize —
    the leak the increment closes). Baseline map: door OSGi→host (awaitService) ALREADY concentrated
    in controlplane/pipeline/ (7 files); translation TRANSPIRED over ~30 files (14 in doctor/port/,
-   ~11 host) that must converge into per-domain DocumentMappers + the one ACL. Run on every commit.
+   ~11 host) that must converge into per-domain DomainDagMappers + the one ACL. Run on every commit.
 
 ★ type=record DECISION (user chose C): introduce a NEW embed `type=record` (first-class category,
 not just a package/bundle) for pure-data bundles, alongside model/seam/edge/fixture. The user wants
@@ -160,17 +160,17 @@ the system to break on violation ("benefice pur"). Resolver enforces PLACEMENT a
 **5 call sites** in the pipeline (SystemdAdapterStage, ClusterReadinessStage, ResourcesStage,
 ResourceManager, ResourceCreationPipeline; assembled in DoctorAssembly, held in PipelineState). So
 its `-port` SURVIVES as a probe/consultation door UNLESS we move consultation to across-runs (then
-it becomes data → joins the Multiplexor). The data `-port`s (SnapshotSource, MedicalRecordRegistry,
-InterventionLedgerWriter) DO dissolve into the Multiplexor. Decision in-process-vs-across-runs still
+it becomes data → joins the DomainDagMultiplexor). The data `-port`s (SnapshotSource, MedicalRecordRegistry,
+InterventionLedgerWriter) DO dissolve into the DomainDagMultiplexor. Decision in-process-vs-across-runs still
 deferred — it touches 5 pipeline sites, not trivial.
 
 NEXT (incremental roadmap — each step green + commit, never hold the whole in head):
 1. `doctor-records` bundle + `type=record` + the staging-ext purity guard → green, commit.
-2. contract bundle (`DocumentMapper` + `Document(domain, coordinate, JsonNode)`) → green, commit.
-3. `doctor-contribution` (one DocumentMapper, Jackson; `.internal` package for the impl) → commit.
-4. Multiplexor sealed bundle + `@Reference List<DocumentMapper>` + the SCR bind boot test (sibling
+2. contract bundle (`DomainDagMapper` + `Document(domain, coordinate, JsonNode)`) → green, commit.
+3. `doctor-contribution` (one DomainDagMapper, Jackson; `.internal` package for the impl) → commit.
+4. DomainDagMultiplexor sealed bundle + `@Reference List<DomainDagMapper>` + the SCR bind boot test (sibling
    proof = `FragmentContributedComponentTest`) → green, commit.
-5. host `PipelineAdapter` (the ACL) + `awaitService(DocumentStreamSource.class)` → preview green, commit.
+5. host `DomainDagAdapter` (the ACL) + `awaitService(DomainDagSource.class)` → preview green, commit.
 6. SEPARATE later decision: DoctorConsultingService in-process vs across-runs (the 5 sites).
 Pattern-doc forward-pointer in `port-edge-domain-ownership.adoc` still NOT done (low priority).
 Whiteboard: we REWRITE the stack content; no prior Pulumi outputs preserved.

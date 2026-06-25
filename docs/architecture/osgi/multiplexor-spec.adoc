@@ -1,4 +1,4 @@
-= Multiplexor — two world-models, one Document contract
+= DomainDagMultiplexor — two world-models, one Document contract
 :toc: left
 :toclevels: 3
 
@@ -23,17 +23,17 @@ records flow *out* to Pulumi outputs (egress), and on a later run they are read 
 Here is what the whole flow is meant to be — the reference the rest of the document repairs toward.
 
 Two worlds, two models, never sharing a type; they meet only at a serialized `Document`. The
-*Multiplexor* (OSGi) stamps an envelope and multiplexes a document stream; the *PipelineAdapter*
+*DomainDagMultiplexor* (OSGi) stamps an envelope and multiplexes a document stream; the *DomainDagAdapter*
 (host) is its mirror, mapping that stream to Pulumi. Pulumi is named in the host world only.
 
 [mermaid]
 ....
 flowchart LR
   domain["OSGi — diagnostic model<br/>MedicalRecord, ConsultationReport"]
-  mapper["OSGi — DocumentMapper<br/>per-domain, a Component"]
-  mux["OSGi — Multiplexor<br/>stamp envelope, mux/demux"]
+  mapper["OSGi — DomainDagMapper<br/>per-domain, a Component"]
+  mux["OSGi — DomainDagMultiplexor<br/>stamp envelope, mux/demux"]
   doc["the CONTRACT<br/>Document: domain, coordinate, payload"]
-  adapter["host — PipelineAdapter<br/>stream to Pulumi"]
+  adapter["host — DomainDagAdapter<br/>stream to Pulumi"]
   stack["host — stack model<br/>StackSnapshot, StackHandle"]
   domain -->|maps its records| mapper
   mapper -->|emits Document| mux
@@ -96,11 +96,11 @@ deleted; Jackson serializes each model to/from a `Document` on its own side.
 flowchart LR
   subgraph "OSGi — diagnostic model"
     dr["MedicalRecord, ConsultationReport"]
-    mux["Multiplexor"]
+    mux["DomainDagMultiplexor"]
   end
   doc["Document<br/>domain, coordinate, payload"]
   subgraph "host — stack model"
-    adapter["PipelineAdapter"]
+    adapter["DomainDagAdapter"]
     snap["StackSnapshot, StackHandle"]
   end
   dr -->|bare DAG| mux
@@ -124,7 +124,7 @@ flowchart LR
 === Resolution — each world keeps its own word; the adapter maps between them
 
 The doctor side names it `Patient`; the host side names it `Stack` / `StackCoordinate`. They are the
-same real-world thing seen through two models. The `PipelineAdapter` is exactly the place that maps
+same real-world thing seen through two models. The `DomainDagAdapter` is exactly the place that maps
 `Patient` to `StackCoordinate`. `Patient` keeps its name — only its "is a Pulumi stack" *definition*
 is cut. `StackCoordinate` moves to the host.
 
@@ -132,7 +132,7 @@ is cut. `StackCoordinate` moves to the host.
 ....
 flowchart LR
   patient["OSGi — Patient<br/>abstract diagnosed identity"]
-  adapter["host — PipelineAdapter<br/>maps Patient to Stack"]
+  adapter["host — DomainDagAdapter<br/>maps Patient to Stack"]
   coord["host — StackCoordinate<br/>project, stack"]
   stack["Pulumi stack"]
   patient -.adapter maps.-> adapter
@@ -146,17 +146,17 @@ flowchart LR
 
 == Problem 3 — how a domain contributes its mapper without coupling the gateway
 
-A domain must hand the Multiplexor a way to serialize its DAG. The naive route — a *fragment*
+A domain must hand the DomainDagMultiplexor a way to serialize its DAG. The naive route — a *fragment*
 carrying the mapper — shares the host classloader, so the mapper's `Import-Package` on the domain's
-record package merges into the Multiplexor host. The Multiplexor's import set would grow by one
+record package merges into the DomainDagMultiplexor host. The DomainDagMultiplexor's import set would grow by one
 record package per domain. Coupled, and growing.
 
 === Resolution — DS, so records stay private and the gateway imports one interface
 
-The contract bundle defines a `DocumentMapper` interface (record ↔ `Document`). The *domain* imports
+The contract bundle defines a `DomainDagMapper` interface (record ↔ `Document`). The *domain* imports
 only that interface and implements its side as a `@Component`, in its own bundle, next to its
-records. DS bridges the two bundles: the Multiplexor holds
-`@Reference(cardinality=MULTIPLE) List<DocumentMapper>` and imports *only* the interface package —
+records. DS bridges the two bundles: the DomainDagMultiplexor holds
+`@Reference(cardinality=MULTIPLE) List<DomainDagMapper>` and imports *only* the interface package —
 forever, never growing. The records never leave the domain bundle; the payload crosses already
 serialized as a `JsonNode`.
 
@@ -168,14 +168,14 @@ is what makes the system robust.
 ....
 flowchart TB
   subgraph "contract bundle — one shared package"
-    iface["DocumentMapper interface"]
+    iface["DomainDagMapper interface"]
   end
   subgraph "doctor bundles"
     dcore["doctor-core<br/>pure records, NO OSGi"]
-    dcontrib["doctor-contribution<br/>Component DocumentMapper, Jackson"]
+    dcontrib["doctor-contribution<br/>Component DomainDagMapper, Jackson"]
   end
-  subgraph "Multiplexor bundle — type-blind"
-    mux["Multiplexor<br/>References List of DocumentMapper"]
+  subgraph "DomainDagMultiplexor bundle — type-blind"
+    mux["DomainDagMultiplexor<br/>References List of DomainDagMapper"]
   end
   dcore -->|owns records| dcontrib
   dcontrib -->|Import-Package| iface
@@ -202,7 +202,7 @@ changed", destroying the per-key diff.
 
 === Resolution — the envelope rides in the output KEY, the value is the bare DAG
 
-The Multiplexor's envelope `(domain, coordinate)` becomes the *output key*; the *value* is the bare
+The DomainDagMultiplexor's envelope `(domain, coordinate)` becomes the *output key*; the *value* is the bare
 DAG, a Pulumi-native structured object. The operator reads `doctor/consultationReport` and sees a
 clean tree with no `schema:` / `payload:` wrapper in their face. Pulumi's per-key diff stays
 meaningful. An optional shallow `doctor/summary` line can sit alongside the deep DAG for at-a-glance
@@ -219,7 +219,7 @@ incus/seedInstance          {urn: ..., status: running, fingerprint: ...}
 == The components already exist — this is a redistribution
 
 The host pipeline already has the egress machinery; it is just placed in one world and typed to
-Pulumi. The design does not invent a `PipelineAdapter` from nothing — it redistributes components
+Pulumi. The design does not invent a `DomainDagAdapter` from nothing — it redistributes components
 that exist today.
 
 [cols="1,2,2",options="header"]
@@ -228,15 +228,15 @@ that exist today.
 
 | `OutputBuilder`
 | hand-concatenates every domain's outputs into one flat 23-key `Map`
-| the *Multiplexor* mux — moves OSGi-side, fed by the `DocumentMapper`s instead of by hand
+| the *DomainDagMultiplexor* mux — moves OSGi-side, fed by the `DomainDagMapper`s instead of by hand
 
 | `ReadinessOutputMapper`
 | a per-domain `Map<key, Function<VerificationResult, Object>>`; host-side and imports `com.pulumi.core.Output`
-| a `DocumentMapper` `@Component` in the domain's `-contribution` bundle, Pulumi-blind
+| a `DomainDagMapper` `@Component` in the domain's `-contribution` bundle, Pulumi-blind
 
 | `OutputsStage`
 | imports `com.pulumi.Context`, calls `pulumiContext::export`
-| the *PipelineAdapter* egress tail — *stays host* (it is genuinely Pulumi-aware), now consumes a `DocumentStream`
+| the *DomainDagAdapter* egress tail — *stays host* (it is genuinely Pulumi-aware), now consumes a `DocumentStream`
 |===
 
 `OutputsStage` *correctly* stays host: it is the one place `com.pulumi.Context` legitimately
@@ -252,30 +252,30 @@ Pulumi-typed* that belongs OSGi-side and Pulumi-blind.
 
 | domain (doctor)
 | OSGi
-| its DAG records + reasoning; a `DocumentMapper` `@Component` in its `-contribution` bundle
+| its DAG records + reasoning; a `DomainDagMapper` `@Component` in its `-contribution` bundle
 | no
 
-| Multiplexor
+| DomainDagMultiplexor
 | OSGi
-| the envelope `(domain, coordinate)`; mux/demux a transport-neutral `DocumentStream`; imports only `DocumentMapper`
+| the envelope `(domain, coordinate)`; mux/demux a transport-neutral `DocumentStream`; imports only `DomainDagMapper`
 | no — a stream codec
 
-| PipelineAdapter
+| DomainDagAdapter
 | host
 | maps `DocumentStream` to/from Pulumi outputs; maps `Patient` to `StackCoordinate`; live stack I/O
 | yes — the only role that does
 |===
 
-The Multiplexor and the PipelineAdapter are mirror translators meeting at the `Document`. Each maps
+The DomainDagMultiplexor and the DomainDagAdapter are mirror translators meeting at the `Document`. Each maps
 *its* world-model to and from the shared contract; neither sees the other world's types.
 
 [mermaid]
 ....
 flowchart TB
   a["OSGi model — MedicalRecord"]
-  b["Multiplexor — OSGi side"]
+  b["DomainDagMultiplexor — OSGi side"]
   c["Document contract"]
-  d["PipelineAdapter — host side"]
+  d["DomainDagAdapter — host side"]
   e["host model — StackSnapshot"]
   f["Pulumi outputs"]
   a -->|egress| b
@@ -293,19 +293,19 @@ flowchart TB
 == What this buys
 
 * *Fewer exported types* — the seam stops being 61 doctor-port types and becomes one
-  `DocumentMapper` interface + the `Document` record. The model's relationship graph travels as a
+  `DomainDagMapper` interface + the `Document` record. The model's relationship graph travels as a
   document, not as Java types.
 * *Fewer live components* — the prior live plan needed a `@Component` per crossing fact
   (host-published `SnapshotSource`, `MedicalRecordRegistry`, `InterventionLedgerWriter`, `Patient`)
-  plus a Mediator per domain. The Multiplexor collapses that to one service type and one
-  `@Reference List<DocumentMapper>`: a domain publishes one mapper, not a fan of per-fact
+  plus a Mediator per domain. The DomainDagMultiplexor collapses that to one service type and one
+  `@Reference List<DomainDagMapper>`: a domain publishes one mapper, not a fan of per-fact
   components. Less to wire is less to fail at boot.
 * *A pure, placeable doctor* — `doctor-core` sheds its Pulumi vocabulary and its serialization, and
   depends only on `doctor-port`. It can live outside seed-master, in another process, or be cloned
   by a peer. DS returns only in the `-contribution` bundle, never in `-core`.
 * *Pulumi as one sink among possible others* — the same `DocumentStream` could later land in a git
   repository (an immutable, consultable record), with only a different host adapter and no change to
-  the Multiplexor or any domain.
+  the DomainDagMultiplexor or any domain.
 
 == The invariant
 
@@ -321,7 +321,7 @@ Problem 2 is what brings it to zero.
 * *Whiteboard* — we rewrite the stack content; previous Pulumi outputs are not preserved, so there is
   no migration shape to honor.
 * *First and only DAG client today* — `manifests` / `netplan` / `systemd` emit flat summaries, not
-  DAGs; doctor is the sole `DocumentMapper` contributor at first. The Multiplexor is built so a
+  DAGs; doctor is the sole `DomainDagMapper` contributor at first. The DomainDagMultiplexor is built so a
   second domain plugs in additively (one more `@Component`, no gateway change). The generalization
   into link:../patterns/port-edge-domain-ownership.adoc[the ownership pattern doc] is deferred until
   a second real client forces its shape — not enshrined from one instance.
