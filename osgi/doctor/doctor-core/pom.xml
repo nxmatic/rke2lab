@@ -40,6 +40,13 @@
       <artifactId>systemd-port</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- bnd-consumed construction annotations: DefaultHealthSystem (@Component) collects the
+         tier-scoped @Reference List<Specialist> and is published as the HealthSystem port service. -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.component.annotations</artifactId>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
 
   <build>

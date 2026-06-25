@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.doctor.internal.*;
+import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
@@ -17,6 +19,12 @@ import io.nxmatic.rke2lab.doctor.testkit.FakeSpecialist;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Admission over the single construction path ({@link DoctorGraph}): the patient is admitted, the
+ * generalist employed with a credentialed access, and the roster consulted. Exercises the same
+ * assembly the OSGi {@code DefaultHealthSystem} and the flat {@code Doctor} façade both route
+ * through.
+ */
 class HealthSystemTest {
 
   private static final Patient DEV = new Patient("organization", "rke2lab", "dev");
@@ -29,40 +37,40 @@ class HealthSystemTest {
     return List.of(new FakeSpecialist());
   }
 
-  private static DriftSpecialist noopDrift() {
-    return new DriftSpecialist(intervention -> {});
+  private static InterventionLedgerWriter noopLedger() {
+    return intervention -> {};
+  }
+
+  private static DoctorConsultingService admit(Patient patient, MedicalRecordRegistry registry) {
+    return DoctorGraph.assemble(patient, registry, noopLedger(), roster(), msg -> {});
   }
 
   @Test
-  void admit_employs_a_generalist_that_can_read_its_own_patient() {
-    final HealthSystem hs =
-        HealthSystem.admit(DEV, singlePatientRegistry(), roster(), noopDrift(), msg -> {});
-    final Generalist generalist = hs.generalist();
-    assertNotNull(generalist);
-    assertEquals(DEV, generalist.recordForCurrentPatient().patient());
+  void admit_employs_a_doctor_that_can_read_its_own_patient() {
+    final DoctorConsultingService doctor = admit(DEV, singlePatientRegistry());
+    assertNotNull(doctor);
+    assertEquals(DEV, doctor.recordForCurrentPatient().patient());
   }
 
   @Test
-  void the_employed_generalist_still_consults_normally() {
-    final HealthSystem hs =
-        HealthSystem.admit(DEV, singlePatientRegistry(), roster(), noopDrift(), msg -> {});
+  void the_employed_doctor_still_consults_normally() {
+    final DoctorConsultingService doctor = admit(DEV, singlePatientRegistry());
     final Observation observation =
         Observation.failed(Symptom.CONNECTION_REFUSED, "dbus refused", java.util.Map.of());
-    final RemediationPlan plan = hs.generalist().consult(Symptom.CONNECTION_REFUSED, observation);
+    final RemediationPlan plan = doctor.consult(Symptom.CONNECTION_REFUSED, observation);
     assertEquals(Symptom.CONNECTION_REFUSED, plan.symptom());
     assertTrue(plan.hasPrescriptions(), "the dbus specialist treats connection-refused");
   }
 
   @Test
-  void the_admitted_generalist_reads_its_own_patient_but_a_stranger_is_outside_the_cohort() {
+  void the_admitted_doctor_reads_its_own_patient_but_a_stranger_is_outside_the_cohort() {
     // cohortFor surfaces only DEV at admission, so only DEV is granted.
-    final MedicalRecordRegistry registry = patient -> new MedicalRecord(patient, List.of());
-    final HealthSystem hs = HealthSystem.admit(DEV, registry, roster(), noopDrift(), msg -> {});
+    final DoctorConsultingService doctor = admit(DEV, singlePatientRegistry());
     // Self-read works (admitted + self-granted).
-    assertEquals(DEV, hs.generalist().recordForCurrentPatient().patient());
+    assertEquals(DEV, doctor.recordForCurrentPatient().patient());
     // The cohort is exactly the admitted patient — no ungranted stranger leaks in.
     assertTrue(
-        hs.generalist().cohortFinding(Symptom.CONNECTION_REFUSED).contains("of 1 patient(s)"),
+        doctor.cohortFinding(Symptom.CONNECTION_REFUSED).contains("of 1 patient(s)"),
         "the cohort is the single admitted, self-granted patient");
   }
 }
