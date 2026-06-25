@@ -287,7 +287,59 @@ The guard (1c), as built:
   the type; removed → green. The guard only fires on an EXEC module's staging (seed-master), never on
   the bundle's own build.
 
-NEXT INCREMENT — distribute specialists (DbusTcp→systemd, Network→netplan, Cluster→new cluster
-domain = the cluster-edge chantier) with DS @Component/@Reference List, replacing the transitional
-`new XxxSpecialist()` in Doctor.java. THEN the static-helper/factory-as-instance audit. See
-[[object-graph-navigability-principle]].
+## STEP 2 DONE — HealthSystem is a live OSGi entity + DS contribution proven (2026-06-25)
+
+Committed, all green (see [[clinician-genus-entity-value-detector]] for the vocabulary):
+- ebaadc03 SPI re-rooted at the Clinician genus: `Specialist` (diagnostician) + `Remediator` (NEW,
+  administers) + `ClinicianProperties` (the DS service-property catalog: clinician.role / clinician.tier).
+- 905842c8 `HealthSystem` port seam (`admit(Patient) → DoctorConsultingService`) + `DefaultHealthSystem`
+  @Component (.internal) holding `@Reference(target=TARGET_DOMAIN_DIAGNOSTICIANS) List<Specialist>` +
+  EHR/ledger ports; `DoctorGraph.assemble` is the SINGLE admission path (flat Doctor + OSGi both route
+  through it); internal HealthSystem class deleted.
+- fccb2ac9 in-container proof (`HealthSystemContributionTest`, src/main of doctor-core-test): SCR
+  collects a fragment-contributed `FakeDiagnostician` into the tier-scoped roster, admit→consult routes
+  to it. KEY LEARNINGS: (1) a contribution-host MUST declare `Service-Component: OSGI-INF/*.xml`
+  (wildcard) — SCR reads the header off the HOST manifest (getHeaders does not merge fragment headers);
+  the wildcard resolves via findEntries which spans fragments. (2) records-private invariant: the proof
+  runs IN-CONTAINER, never crossing a record to the bare JVM. (3) in-container tests that boot SCR must
+  INSTALL doctor-records + doctor-spi as bundles (not system-export — they are not seams). (4) charging
+  a class ≠ activating a bundle; `@FrameworkLog(DEBUG)` prints why a resolve fails.
+- e88d31d6 `ScrDiagnostics` (junit-testkit, package `diagnostic`, subject `scr`) + DS test stack
+  (felix.scr + DS-API trio) single-sourced into bundle-test-parent.
+- 8e570154 memory: Generalist visibility is a SEPARATE slice (it does NOT distribute — per-run,
+  no domain, not a DS singleton).
+
+## STEP 3 IN PROGRESS — atomic: distribute the 3 specialists + host switch (2026-06-25)
+
+User chose option (3): distribute all three diagnosticians to their domains AND do the host switch in
+ONE atomic slice (not one-by-one, because the flat `Doctor.consultingService` path is LIVE in prod —
+BootstrapPipeline L151 — so emptying the hard-coded roster before the OSGi path replaces it would
+degrade prod). A specialist auto-registers as a `Specialist` service on activation (FrameworkLauncher
+install+start()s every model bundle, verified), so `new XxxSpecialist()` is replaced by activation +
+DS collection.
+
+DONE so far: NetworkSpecialist → `osgi/netplan/netplan-core` package `.netplan.internal` (NON-exported
+→ sealed; crosses as the Specialist service), @Component tagged PROP_DIAGNOSTICIAN+PROP_TIER_DOMAIN;
+netplan-core gained doctor-spi + doctor-records deps; compiles, OSGI-INF descriptor emitted. The OLD
+`.internal.NetworkSpecialist` in doctor-core is NOT yet deleted.
+
+REMAINING (atomic slice):
+1. systemd-core — NEW module `osgi/systemd/systemd-core` (type=model, like netplan-core); move
+   DbusTcpSpecialist there as @Component diagnostician/domain (it already deps systemd-port for
+   SystemdUnitId). Add to osgi/systemd/pom.xml modules.
+2. cluster-core — NEW module `osgi/cluster/cluster-core` (type=model) + `osgi/cluster/pom.xml`
+   aggregator + add `cluster` to osgi/pom.xml modules; move ClusterSpecialist there as @Component.
+3. doctor-core: delete the 3 `.internal` specialists; empty Doctor.java's hard-coded roster. Decide
+   Doctor/ExactRosterDoctor flat factories (likely delete with the host switch).
+4. tests: FakeSpecialistsTest (doctor-core-test, white-box `new NetworkSpecialist()/ClusterSpecialist()`)
+   breaks → rewrite with local fakes (it tests the Generalist fan-out, not the real specialists) or move
+   each specialist's unit test to its domain (plain JVM test — they are pure diagnose, no OSGi needed).
+   NestedRunbookTest already has its own FakeNetworkSpecialist (no change).
+5. host switch: BootstrapPipeline L151 `state.doctor = DoctorAssembly.assemble(...)` →
+   `state.bootedFramework.awaitService(HealthSystem.class, 5000).admit(patient)` (the SystemdRuntimeProbe
+   awaitService right below at L162 is the pattern). Adapt DoctorAssembly; remove Doctor.consultingService.
+6. build green seed-master no-cache + a prod-topology boot test that the 3 specialists are DS-collected;
+   ONE atomic commit.
+
+THEN: static-helper/factory-as-instance audit; DriftSpecialist-as-Clinician decision; Generalist-visibility
+slice. See [[object-graph-navigability-principle]] [[clinician-genus-entity-value-detector]].
