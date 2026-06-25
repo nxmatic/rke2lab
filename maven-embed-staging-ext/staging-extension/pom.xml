@@ -35,6 +35,14 @@
       <artifactId>bnd-read</artifactId>
       <version>1.0.0</version>
     </dependency>
+    <!-- The record-purity guard reads each type=record bundle's exported .class through ASM (bytecode
+         only, no linking — the records reference jackson/systemd types this realm does not carry).
+         9.8 reads JDK 25 class files; Maven core bundles an older ASM, so we carry our own. -->
+    <dependency>
+      <groupId>org.ow2.asm</groupId>
+      <artifactId>asm</artifactId>
+      <version>9.8</version>
+    </dependency>
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-core</artifactId>

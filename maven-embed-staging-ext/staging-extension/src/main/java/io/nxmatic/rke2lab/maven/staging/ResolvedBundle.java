@@ -89,6 +89,14 @@ public record ResolvedBundle(
     return symbolicName != null;
   }
 
+  /**
+   * The purity check OF this bundle — only meaningful when it is a {@code type=record} carrier. The
+   * check is an instance reached from its subject (object-graph-navigability), not a static helper.
+   */
+  public RecordPurity recordPurity() {
+    return new RecordPurity(this);
+  }
+
   /** Strip the {@code ;singleton:=true} and other attributes a BSN header may carry. */
   private static String bareSymbolicName(String header) {
     return header == null ? null : Clause.parse(header).name();

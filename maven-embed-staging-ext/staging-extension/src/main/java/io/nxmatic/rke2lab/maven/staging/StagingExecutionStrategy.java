@@ -91,7 +91,9 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
   private void reconfigureStaging(MavenSession session, List<MojoExecution> mojoExecutions)
       throws LifecycleExecutionException {
     final String module = session.getCurrentProject().getArtifactId();
-    final StagingClosure closure = StagingClosure.compute(resolveBundles(session));
+    final List<ResolvedBundle> resolved = resolveBundles(session);
+    enforceRecordPurity(resolved);
+    final StagingClosure closure = StagingClosure.compute(resolved);
 
     int shadeAdded = 0;
     int stageAdded = 0;
@@ -108,6 +110,29 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
         closure.staged().size(),
         shadeAdded,
         stageAdded);
+  }
+
+  /**
+   * Fail the build if any {@code type=record} bundle exports a top-level type that is not a record,
+   * enum, or sealed ADT root — the law that gives the record category its meaning (a pure-data
+   * bundle, never behavior). The check is delegated to a {@link RecordPurity} instance OF each
+   * record bundle, so it is navigable back to its subject.
+   */
+  private void enforceRecordPurity(List<ResolvedBundle> resolved)
+      throws LifecycleExecutionException {
+    for (ResolvedBundle bundle : resolved) {
+      if (bundle.embed() == null || !bundle.embed().isRecord()) {
+        continue;
+      }
+      final List<String> violations = bundle.recordPurity().violations();
+      if (!violations.isEmpty()) {
+        throw new LifecycleExecutionException(
+            "osgi-staging: type=record bundle "
+                + bundle.ga()
+                + " exports non-data types (only records / enums / sealed ADT roots are allowed): "
+                + violations);
+      }
+    }
   }
 
   /**

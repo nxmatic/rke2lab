@@ -84,9 +84,9 @@ public record EmbedCapability(Clause clause) {
   }
 
   /**
-   * Whether this carrier loads on the BUNDLE side of the seam — a {@code model}, an {@code edge}, or
-   * a {@code record}. Its exported packages are owned by its own bundle classloader and must NEVER
-   * reach {@code system.packages.extra} (a second exporter there would split the class). The
+   * Whether this carrier loads on the BUNDLE side of the seam — a {@code model}, an {@code edge},
+   * or a {@code record}. Its exported packages are owned by its own bundle classloader and must
+   * NEVER reach {@code system.packages.extra} (a second exporter there would split the class). The
    * discriminator the leak guard turns on.
    */
   public boolean isDomain() {
