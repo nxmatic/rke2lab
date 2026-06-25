@@ -40,7 +40,11 @@ class DoctorPortInContainerTest {
           .systemPackages("io.nxmatic.rke2lab.systemd.port;version=1.0.0")
           // The JUnit world + the in-container runner bundle, each an OSGi bundle, installed so the
           // launcher + jupiter engine + the runner resolve as bundles (located by
-          // Bundle-SymbolicName).
+          // Bundle-SymbolicName). doctor-port imports io.nxmatic.rke2lab.doctor.records (the value
+          // vocabulary lifted into the doctor-records leaf) + the fragment's FakeSpecialist imports
+          // doctor.spi; both are INSTALLED as bundles (records is type=record, spi is type=model) —
+          // never system-exported, which would lie about their non-seam nature — so the host
+          // resolves.
           .installFromClasspath(
               "org.opentest4j",
               "org.apiguardian.api",
@@ -50,6 +54,8 @@ class DoctorPortInContainerTest {
               "junit-jupiter-api",
               "junit-jupiter-params",
               "junit-jupiter-engine",
+              "io.nxmatic.rke2lab.doctor.records",
+              "io.nxmatic.rke2lab.doctor.spi",
               "io.nxmatic.rke2lab.junit.testkit")
           .build();
 

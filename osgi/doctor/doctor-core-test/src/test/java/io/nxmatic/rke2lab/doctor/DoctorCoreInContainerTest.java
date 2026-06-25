@@ -26,6 +26,11 @@ import org.osgi.framework.Bundle;
  * DynamicTest}, so VSCode shows a node per test and a single failure fails alone.
  */
 @Osgi
+// To debug a failed in-container resolve/activation, annotate this class with @FrameworkLog(DEBUG)
+// (io.nxmatic.rke2lab.junit.testkit.FrameworkLog) — it raises Felix's own felix.log.level so the
+// resolver prints WHICH requirement could not be wired to System.out (resolve() otherwise returns a
+// bare false). Left as a comment: it is the lever to reach for, not a permanent dependency.
+//   @FrameworkLog(FrameworkLog.Level.DEBUG)
 class DoctorCoreInContainerTest {
 
   // The doctor suite's two fixtures, selected by what they declare. role=core is the host under
@@ -39,6 +44,10 @@ class DoctorCoreInContainerTest {
   @RegisterExtension
   static final OutOfContainerFrameworkExtension felix =
       JGivenTestkit.felix() // jGiven boot closure (byte-buddy, jgiven-wrap, slf4j/junit packages)
+          // doctor-core now carries the DefaultHealthSystem @Component, so its bundle Requires the
+          // DS
+          // extender (osgi.extender=osgi.component); felix.scr must run for doctor-core to resolve.
+          .withScr()
           // doctor-core's dbus-tcp specialist names the unit via the typed SystemdUnitId, so the
           // host imports the systemd domain's port; system-export it (a seam) so the host resolves.
           .systemPackages("io.nxmatic.rke2lab.systemd.port;version=1.0.0")
@@ -51,6 +60,12 @@ class DoctorCoreInContainerTest {
               "junit-jupiter-api",
               "junit-jupiter-params",
               "junit-jupiter-engine",
+              // doctor-port imports doctor.records; doctor-core imports doctor.spi (the Specialist
+              // SPI). Installed as bundles (type=record / type=model), never system-exported —
+              // their
+              // non-seam nature — so doctor-port + doctor-core resolve their imports in-container.
+              "io.nxmatic.rke2lab.doctor.records",
+              "io.nxmatic.rke2lab.doctor.spi",
               "io.nxmatic.rke2lab.junit.testkit")
           .build();
 

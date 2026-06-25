@@ -8,4 +8,14 @@ Export-Package: \
 # Embeddable model bundle (installed under META-INF/bundles/ by the capability scan, like
 # manifests-core / netplan-core).
 Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=doctor
+
+# doctor-core is a HOST OF CONTRIBUTIONS: DefaultHealthSystem collects domain-contributed Specialist
+# @Components by @Reference. Felix SCR reads Service-Component off the HOST bundle's own manifest
+# (bundle.getHeaders() does NOT merge fragment headers), so the literal value bnd would generate
+# (only DefaultHealthSystem.xml) makes a fragment-contributed @Component invisible. The wildcard
+# resolves against the bundle's ENTRIES, and findEntries spans attached fragments — so OSGI-INF/*.xml
+# picks up BOTH doctor-core's own descriptor AND any fragment-contributed ones. Same rationale as
+# bench-fragment-host. (The osgi.component extender Require-Capability is still emitted by bnd from
+# the @Component, so it is not hand-declared here.)
+Service-Component: OSGI-INF/*.xml
 -noimportjava: true

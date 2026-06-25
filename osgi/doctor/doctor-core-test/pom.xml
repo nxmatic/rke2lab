@@ -53,8 +53,44 @@
       <scope>provided</scope>
     </dependency>
 
+    <!-- bnd-consumed DS annotations: the dsproof @Component fakes (FakeDiagnostician + the EHR/ledger
+         ports) so SCR activates DefaultHealthSystem and binds its tier-scoped roster in the boot test. -->
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.component.annotations</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
     <!-- Jupiter, the engine, jgiven-junit5 (all provided) and junit-platform-launcher (test) are
          inherited from bundle-test-parent. -->
+
+    <!-- HealthSystemDsBootTest.withScr(): felix.scr + the DS-API trio it wires to, on the test
+         classpath, so SCR activates the fragment-contributed @Components (mirrors dbus-systemd-edge). -->
+    <dependency>
+      <groupId>org.apache.felix</groupId>
+      <artifactId>org.apache.felix.scr</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.service.component</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.util.promise</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>org.osgi.util.function</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.osgi</groupId>
+      <artifactId>osgi.core</artifactId>
+      <scope>test</scope>
+    </dependency>
 
     <!-- the src/test harness boots Felix via JGivenTestkit.felix() and installs the JUnit + jGiven
          bundle worlds by classpath substring, so they must be on the TEST classpath. -->
