@@ -1,6 +1,6 @@
 ---
 name: multiplexor-two-models-design
-description: "DESIGN settled 2026-06-24 (brainstorm, NOT yet built) — the host↔OSGi data exchange is reframed as TWO distinct world-models (OSGi diagnostic model vs host stack model) meeting ONLY at a Document contract, never sharing a type. A DomainDagMultiplexor (OSGi) mux/demuxes an envelope stream; a host DomainDagAdapter mirrors it to Pulumi. Mechanism = DS (chosen over fragment), so records stay private. Invariant: Pulumi is host-only vocabulary."
+description: "DESIGN settled 2026-06-24; steps 1-4 BUILT (2026-06-25): doctor quartet + record-purity guard, HealthSystem as live OSGi entity, 3 specialists distributed to their domains + host switch to awaitService(HealthSystem).admit, ConsultingService rename, Specialist.diagnose split into assess+prescribe. Steps 5-6 (DomainDagMultiplexor/Adapter, the Document-contract data seam) NOT yet built. The host↔OSGi data exchange is reframed as TWO distinct world-models meeting ONLY at a Document contract, never sharing a type; mechanism = DS (over fragment), records stay private. Invariant: Pulumi is host-only vocabulary."
 metadata:
   node_type: memory
   type: project
@@ -85,7 +85,7 @@ temporary, to be replaced when each specialist moves home with its @Component.
 
 ## ★ KEYSTONE DECISION: path-addressing — records NEVER cross to the host (2026-06-25)
 
-The knot we had missed: `DoctorConsultingService` is a LIVE in-process call (`consult(Symptom,
+The knot we had missed: `ConsultingService` (then `DoctorConsultingService`) is a LIVE in-process call (`consult(Symptom,
 Observation)` → `RemediationPlan`, on 5 pipeline sites), so today **typed records DO cross to the
 host** — violating the user's invariant "records are the OSGi vocabulary's implementation; they do
 NOT cross to the host". The sealed-ADT compile break (`ResolutionPredicate` record implements the
@@ -225,7 +225,7 @@ the system to break on violation ("benefice pur"). Resolver enforces PLACEMENT a
 (only records/enums exported, zero behavior) needs a GUARD = build-time, in the staging extension
 (StagingClosure reads the bnd; bytecode check Class.isRecord()/isEnum()). Both in the same increment.
 
-★ DoctorConsultingService is the OPEN knot: it is NOT data — it's a live synchronous `consult()` on
+★ ConsultingService is the OPEN knot: it is NOT data — it's a live synchronous `consult()` on
 **5 call sites** in the pipeline (SystemdAdapterStage, ClusterReadinessStage, ResourcesStage,
 ResourceManager, ResourceCreationPipeline; assembled in DoctorAssembly, held in PipelineState). So
 its `-port` SURVIVES as a probe/consultation door UNLESS we move consultation to across-runs (then
@@ -245,7 +245,7 @@ NEXT (incremental roadmap — each step green + commit, never hold the whole in 
    read at ResourceCreationPipeline + RunbookRenderer) into an IMMUTABLE record with `withReport()`
    — DECIDED (user, the immutability rule), DEFERRED to here because it forces re-threading the
    return value through the stages, which is pipeline-refactor scope, NOT a step-1 pure move.
-6. SEPARATE later decision: DoctorConsultingService in-process vs across-runs (the 5 sites).
+6. SEPARATE later decision: ConsultingService in-process vs across-runs (the 5 sites).
 Pattern-doc forward-pointer in `port-edge-domain-ownership.adoc` still NOT done (low priority).
 Whiteboard: we REWRITE the stack content; no prior Pulumi outputs preserved.
 
@@ -292,7 +292,7 @@ The guard (1c), as built:
 Committed, all green (see [[clinician-genus-entity-value-detector]] for the vocabulary):
 - ebaadc03 SPI re-rooted at the Clinician genus: `Specialist` (diagnostician) + `Remediator` (NEW,
   administers) + `ClinicianProperties` (the DS service-property catalog: clinician.role / clinician.tier).
-- 905842c8 `HealthSystem` port seam (`admit(Patient) → DoctorConsultingService`) + `DefaultHealthSystem`
+- 905842c8 `HealthSystem` port seam (`admit(Patient) → ConsultingService`, then named DoctorConsultingService) + `DefaultHealthSystem`
   @Component (.internal) holding `@Reference(target=TARGET_DOMAIN_DIAGNOSTICIANS) List<Specialist>` +
   EHR/ledger ports; `DoctorGraph.assemble` is the SINGLE admission path (flat Doctor + OSGi both route
   through it); internal HealthSystem class deleted.
