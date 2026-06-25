@@ -102,6 +102,55 @@ These words are used precisely throughout the atlas and specs; this is the gloss
   is NOT a synonym for "system". Kept distinct on purpose.
 ====
 
+=== The two vocabularies — one thing, named in each world (DESIGN 2026-06-24)
+
+The two-spaces seam is also a *vocabulary* seam. The same real-world thing is named differently in
+each world, on purpose: the OSGi world speaks the *diagnostic* model, the host world speaks the
+*stack* model, and they never share a type. They meet only at a serialized `Document(domain,
+coordinate, payload)`. The stage column names where the host pipeline handles each pairing *today*
+(read from the code) — a maintenance map for the link:osgi/multiplexor-spec.adoc[Multiplexor design].
+It is deliberately the *current* stage, not a future one: the refactored stage decomposition is not
+yet designed (see Diagram O's verdict), so naming "after" stages here would be invention.
+
+*The frame (general):* an OSGi-world word names a pure model; its host-world counterpart names the
+actualised, Pulumi-typed thing; a `PipelineAdapter`/`Multiplexor` pair translates between them via
+the `Document`. *Reserved to the host world only:* `Pulumi`, `Stack`, `output` — enforced by
+`grep -ri pulumi osgi/` == 0. Doctor↔stack is the first (and today only) concrete pairing; further
+domains slot in as rows when they acquire a DAG.
+
+[cols="1,1,1",options="header"]
+|===
+| OSGi world (diagnostic) | host world (stack) | stage that handles it TODAY
+
+| `Patient` — abstract diagnosed identity
+| `StackCoordinate` — project, stack
+| `BootstrapStage` (resolves the current stack)
+
+| `ConsultationReport`, `Observation`, `RemediationPlan`
+| `StackSnapshot` entries (egress), the flat output map today
+| `ClusterReadinessStage`, `SystemdAdapterStage` (raise + consult)
+
+| `MedicalRecord` — the reconstructed record DAG
+| `StackHistory`, `LiveMedicalRecordRegistry` (rebuilt host-side today — a leak)
+| `ResourcesStage` (reads the snapshot back)
+
+| `Intervention`, `InterventionLedger`
+| `InterventionLedgerSource`, `StackCheckpoint`
+| `ResourcesStage` (ledger write-side)
+
+| `DocumentMapper` (per-domain `@Component`, NEW)
+| (none — Pulumi-blind by construction)
+| n/a today — replaces `ReadinessOutputMapper`; future stage not yet designed
+
+| `Multiplexor` / `PipelineAdapter` (NEW)
+| `PipelineAdapter` — stream ↔ Pulumi outputs
+| descends from `OutputBuilder` + `OutputsStage`; future stage not yet designed
+|===
+
+The right column is *also* a design tool: a stage that touches two unrelated pairings is a
+candidate to split; a pairing handled in no stage is dead. The before/after of the pipeline refactor
+this design implies will be drawn in the Doctor subsystem view below.
+
 == Per-subsystem index
 
 * <<doctor-view,Doctor subsystem>> — the diagnostic layer (remediation round-trip, medical record,
@@ -460,6 +509,143 @@ persisted-shape level — the new `replies` key appears; no old key vanishes). T
 (`DbusTcpSpecialist`) returns a `ReferralReply` with an `Assessment` even when declining (no longer
 mute on `Optional.empty()`). The runbook renders the `Assessment` distinctly. The above figure is
 kept as the design-time proof; the inventory will carry the ✅ status when this chunk lands.
+====
+
+=== Additivity proof: Multiplexor — two models, one Document (DESIGN 2026-06-24)
+
+Unlike the two proofs above, this one is *monotone-with-named-erasure* (the mode of Diagram K in
+the runtime view): the diagnostic model sheds its Pulumi-shaped serialization, and that erasure is
+deliberate and named. The claim to prove is twofold — the *model* loses its self-serialization
+cleanly, and the *pipeline* (the orchestrator that runs `pulumi preview`) refactors to match in the
+*same increment*. Both must land together: a pure model with a pipeline still hand-building the flat
+map would not preview green, so it would not be deliverable. See
+link:osgi/multiplexor-spec.adoc[the Multiplexor spec].
+
+==== Diagram N — the model: BEFORE vs AFTER (named erasure)
+
+Blue = shipped, untouched. Green = added. Red-dashed = deliberately erased. The doctor records stop
+knowing Pulumi; `Patient` keeps its name but loses its "is a stack" definition; `StackCoordinate`
+relocates to the host world.
+
+[mermaid]
+....
+flowchart LR
+    subgraph B[before, shipped]
+        b_rec["ConsultationReport<br/>holds OUTPUT_KEY, toOutputMap"]
+        b_rdr["ConsultationReportReader plus 3 more"]
+        b_pat["Patient, defined as a Pulumi stack"]
+        b_coord["StackCoordinate, in doctor-port"]
+        b_rec -->|parsed back by| b_rdr
+        b_pat -->|is| b_coord
+    end
+
+    subgraph A[after, two models]
+        a_rec["ConsultationReport<br/>pure record, no output methods"]
+        a_map["DocumentMapper impl<br/>contribution bundle, Jackson"]
+        a_doc["Document, domain coordinate payload"]
+        a_pat["Patient, abstract diagnosed identity"]
+        a_coord["StackCoordinate, moved to host"]
+        a_rec -->|mapped by| a_map
+        a_map -->|emits| a_doc
+        a_pat -.adapter maps to.-> a_coord
+    end
+
+    classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+    classDef new fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
+    classDef gone fill:#fdd,stroke:#c33,stroke-width:2px,stroke-dasharray:4 3;
+    class b_rec,b_pat,a_rec,a_pat built;
+    class a_map,a_doc new;
+    class b_rdr,b_coord gone;
+    class a_coord new;
+....
+
+==== Diagram O — the pipeline: BEFORE vs AFTER (the orchestrator refactor)
+
+The same increment refactors the boot pipeline. *What is decided* (firm): `OutputBuilder`
+(hand-concatenation) becomes the Multiplexor mux OSGi-side; `ReadinessOutputMapper` (host,
+Pulumi-typed) becomes per-domain `DocumentMapper` `@Component`s OSGi-side; `OutputsStage` stays
+host — it is the one legitimate `com.pulumi.Context` — but consumes a `DocumentStream`. *What is
+open* (rated below): the *stage decomposition* of the "after" — how many stages, their names, their
+boundaries — is NOT yet designed. The diagram shows components-in-their-worlds, not a settled stage
+list; the stage names below are illustrative placeholders, not commitments.
+
+[mermaid]
+....
+flowchart LR
+    subgraph PB[before, host-side egress]
+        p_map["ReadinessOutputMapper<br/>host, imports com.pulumi"]
+        p_build["OutputBuilder<br/>flat 23-key map by hand"]
+        p_out["OutputsStage<br/>pulumiContext export"]
+        p_map -->|feeds| p_build
+        p_build -->|flat map| p_out
+    end
+
+    subgraph PA[after, redistributed]
+        a_dm["DocumentMapper Components<br/>OSGi, Pulumi-blind"]
+        a_mux["Multiplexor<br/>OSGi, mux demux"]
+        a_adapter["PipelineAdapter<br/>host, stream to Pulumi"]
+        a_outs["OutputsStage<br/>host, consumes DocumentStream"]
+        a_dm -->|emit Document| a_mux
+        a_mux -->|stream| a_adapter
+        a_adapter -->|per domain coordinate| a_outs
+    end
+
+    classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+    classDef new fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
+    classDef moved fill:#fff3cd,stroke:#f57f17,stroke-width:2px;
+    class p_out,a_outs built;
+    class a_dm,a_mux,a_adapter new;
+    class p_map,p_build moved;
+....
+
+==== Verdict — does it hold?
+
+An honest reading:
+
+. *Monotone-with-named-erasure, declared not hidden.* Three things are deliberately erased: the four
+  `*Reader` classes, the `toOutputMap`/`OUTPUT_KEY` methods, and `StackCoordinate`'s residence in
+  `doctor-port`. These are not silent rewrites — they are the named cost of the two-models split, and
+  the whiteboard constraint (we rewrite the stack content; no prior outputs preserved) makes the
+  erasure safe: no persisted data is migrated.
+
+. *Two honest relocations (not deletions):* `StackCoordinate` moves doctor-port → host (it was always
+  a stack concept squatting in the diagnostic model); `ReadinessOutputMapper`'s mapping logic moves
+  host → a per-domain `DocumentMapper` `@Component`. The behavior survives; only the world it lives
+  in changes — which is the whole point.
+
+. *The seam shrinks, provably:* doctor-port's exported surface drops from 61 types toward
+  `DocumentMapper` + `Document`; the Multiplexor imports one interface package, not N record packages
+  (the DS mechanism, chosen over a fragment precisely so records stay private). Fewer exported types
+  AND fewer live components (one `@Reference List<DocumentMapper>` replaces a fan of per-fact
+  host-published services).
+
+. *The atomicity is the integration invariant:* the model half and the pipeline half are one
+  increment because the boot pipeline IS the orchestrator that runs `pulumi preview` — the
+  integration gate. Half-landed would not preview green, so it is not separately deliverable. The
+  "after" of both diagrams is therefore a committed target, not a direction.
+
+. *The open items, rated (this is a refactor — doubt is normal; the atlas's job is to say whether
+  the residual risk is acceptable):*
+.. *Stage decomposition of the "after" pipeline — OPEN, risk LOW/ACCEPTABLE.* We cannot honestly name
+   the refactored stages yet; that design is deferred. But it is a *mechanical re-slicing within the
+   existing fluent pipeline grammar*, which already supports adding/reordering `during(...)` blocks
+   type-safely — we are not inventing orchestration, only re-slicing a flow whose *components* are
+   now fixed. Deferring the names does not endanger the increment.
+.. *SCR binds `@Reference List<DocumentMapper>` in the Multiplexor boot topology — OPEN, risk
+   LOW/ACCEPTABLE.* A sibling proof already exists (`FragmentContributedComponentTest` binds a
+   `@Reference List` across the contribution boundary). Nonzero but small; the increment must carry
+   the boot test before the move is trusted.
+
+Conclusion: *on the right path, residual risks acceptable.* The model is additive-with-named-erasure;
+the pipeline refactor is a redistribution of existing components into their correct worlds; the two
+are atomic at the integration boundary. The two open items are bounded and both rated LOW — neither
+is a reason to withhold the increment, provided the boot test lands with it. The atlas says: go.
+
+[NOTE]
+====
+*Status: DESIGN (2026-06-24), not yet built.* The figures are the design-time proof; the inventory
+will carry the ✅ status when this increment lands. The load-bearing open proof is the SCR
+`@Reference List<DocumentMapper>` bind in the Multiplexor boot topology.
 ====
 
 === Design scenarios — the doctor capabilities as DSL sentences

@@ -1,0 +1,337 @@
+= Multiplexor — two world-models, one Document contract
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* DESIGN (2026-06-24). NOT yet built. A reframe of how the OSGi world and the host world
+exchange data across the seam, born from a brainstorm that started as "lower the number of classes
+the Pulumi pipeline requires" and became a model revision.
+
+This is a *before / after* document. Each section states one problem, shows it as a figure, and
+shows the resolution as a figure. The model is read from the code, not imposed on it.
+
+Companion to link:../patterns/port-edge-domain-ownership.adoc[the port/edge/domain ownership doc]
+and link:../patterns/frontier-playability-model.adoc[the frontier-playability model]; it is the
+*data-serialization* counterpart to the *component-contribution* mechanism settled there.
+====
+
+== The system in one picture
+
+The seam between the host and the OSGi worlds carries data both ways: the doctor's diagnostic
+records flow *out* to Pulumi outputs (egress), and on a later run they are read *back* (ingress).
+Here is what the whole flow is meant to be — the reference the rest of the document repairs toward.
+
+Two worlds, two models, never sharing a type; they meet only at a serialized `Document`. The
+*Multiplexor* (OSGi) stamps an envelope and multiplexes a document stream; the *PipelineAdapter*
+(host) is its mirror, mapping that stream to Pulumi. Pulumi is named in the host world only.
+
+[mermaid]
+....
+flowchart LR
+  domain["OSGi — diagnostic model<br/>MedicalRecord, ConsultationReport"]
+  mapper["OSGi — DocumentMapper<br/>per-domain, a Component"]
+  mux["OSGi — Multiplexor<br/>stamp envelope, mux/demux"]
+  doc["the CONTRACT<br/>Document: domain, coordinate, payload"]
+  adapter["host — PipelineAdapter<br/>stream to Pulumi"]
+  stack["host — stack model<br/>StackSnapshot, StackHandle"]
+  domain -->|maps its records| mapper
+  mapper -->|emits Document| mux
+  mux -->|envelope stream| doc
+  doc -->|cross seam| adapter
+  adapter -->|to host model| stack
+  classDef o fill:#eef,stroke:#88a,stroke-width:2px;
+  classDef c fill:#fde,stroke:#a58,stroke-width:2px;
+  classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class domain,mapper,mux o;
+  class doc c;
+  class adapter,stack h;
+....
+
+== Problem 1 — one model thinking in Pulumi
+
+The doctor records serialize *themselves* to Pulumi outputs. `ConsultationReport` carries
+`OUTPUT_KEY = "consultationReport"` and a `toOutputMap()`; four `*Reader` classes
+(`ConsultationReportReader`, `MedicalRecordReader`, `ExpectationReader`, `InterventionReader`)
+parse the flat map back into the *same* record types. About 2000 lines of hand-marshalling are
+smeared across ~24 doctor-port files. The seam is 61 exported types because the *relationship
+graph* of the model crosses as Java types.
+
+The deeper leak is in the vocabulary, not the code: there are zero `com.pulumi.*` type references
+in `osgi/`, but the *word* "Pulumi" appears across ~24 doctor-port files. `Patient` is defined as
+"the identity of a Pulumi stack being diagnosed"; `StackCoordinate` as "a Pulumi stack id";
+`OUTPUT_KEY` as "the Pulumi output key". The OSGi world does not import Pulumi — it *thinks* in
+Pulumi.
+
+[mermaid]
+....
+flowchart LR
+  rec["doctor record<br/>knows OUTPUT_KEY, toOutputMap"]
+  out["OutputBuilder<br/>host, flat 23-key map"]
+  stack["Pulumi stack"]
+  reader["Reader<br/>parses output map into the SAME record"]
+  rec -->|toOutputMap| out
+  out -->|one flat map| stack
+  stack -->|read back| reader
+  reader -->|rebuilds same type| rec
+  classDef warn fill:#fec,stroke:#c82,stroke-width:2px;
+  class rec,out,stack,reader warn;
+....
+
+=== Resolution — two models meeting at a Document
+
+Stop treating it as one model crossing a boundary. There are two distinct world-models that never
+share a type:
+
+* *OSGi world = the diagnostic model* — `MedicalRecord`, `ConsultationReport`, `Intervention`,
+  `Observation`, `Specialist`, `Generalist`, `HealthSystem`. Speaks medical; never Pulumi.
+* *host world = the stack model* — `StackHandle`, `StackSnapshot`, `StackHistory`,
+  `StackCheckpoint`, `StackCoordinate`, `LiveMedicalRecordRegistry`. The only Pulumi-aware world.
+
+They meet only at the `Document` contract. `toOutputMap` / `OUTPUT_KEY` / the four `*Reader`s are
+deleted; Jackson serializes each model to/from a `Document` on its own side.
+
+[mermaid]
+....
+flowchart LR
+  subgraph "OSGi — diagnostic model"
+    dr["MedicalRecord, ConsultationReport"]
+    mux["Multiplexor"]
+  end
+  doc["Document<br/>domain, coordinate, payload"]
+  subgraph "host — stack model"
+    adapter["PipelineAdapter"]
+    snap["StackSnapshot, StackHandle"]
+  end
+  dr -->|bare DAG| mux
+  mux -->|stamp envelope| doc
+  doc -->|cross seam| adapter
+  adapter -->|to host model| snap
+  classDef o fill:#eef,stroke:#88a,stroke-width:2px;
+  classDef c fill:#fde,stroke:#a58,stroke-width:2px;
+  classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class dr,mux o;
+  class doc c;
+  class adapter,snap h;
+....
+
+== Problem 2 — the same thing, named in the wrong world
+
+`Patient(org, project, stack)` lives in `doctor-port` and is defined as a Pulumi stack. But a
+*stack* is a host-world concept. The diagnostic model should know only that it diagnoses a
+*Patient*; that a Patient maps to a Pulumi *Stack* is the host's knowledge.
+
+=== Resolution — each world keeps its own word; the adapter maps between them
+
+The doctor side names it `Patient`; the host side names it `Stack` / `StackCoordinate`. They are the
+same real-world thing seen through two models. The `PipelineAdapter` is exactly the place that maps
+`Patient` to `StackCoordinate`. `Patient` keeps its name — only its "is a Pulumi stack" *definition*
+is cut. `StackCoordinate` moves to the host.
+
+[mermaid]
+....
+flowchart LR
+  patient["OSGi — Patient<br/>abstract diagnosed identity"]
+  adapter["host — PipelineAdapter<br/>maps Patient to Stack"]
+  coord["host — StackCoordinate<br/>project, stack"]
+  stack["Pulumi stack"]
+  patient -.adapter maps.-> adapter
+  adapter -->|resolves to| coord
+  coord -->|addresses| stack
+  classDef o fill:#eef,stroke:#88a,stroke-width:2px;
+  classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
+  class patient o;
+  class adapter,coord,stack h;
+....
+
+== Problem 3 — how a domain contributes its mapper without coupling the gateway
+
+A domain must hand the Multiplexor a way to serialize its DAG. The naive route — a *fragment*
+carrying the mapper — shares the host classloader, so the mapper's `Import-Package` on the domain's
+record package merges into the Multiplexor host. The Multiplexor's import set would grow by one
+record package per domain. Coupled, and growing.
+
+=== Resolution — DS, so records stay private and the gateway imports one interface
+
+The contract bundle defines a `DocumentMapper` interface (record ↔ `Document`). The *domain* imports
+only that interface and implements its side as a `@Component`, in its own bundle, next to its
+records. DS bridges the two bundles: the Multiplexor holds
+`@Reference(cardinality=MULTIPLE) List<DocumentMapper>` and imports *only* the interface package —
+forever, never growing. The records never leave the domain bundle; the payload crosses already
+serialized as a `JsonNode`.
+
+The blindness is *structural*, not policed: there is only ever one import (the interface), so the
+"check the gateway imports only the DAG packages" guard is unnecessary. Keeping the records private
+is what makes the system robust.
+
+[mermaid]
+....
+flowchart TB
+  subgraph "contract bundle — one shared package"
+    iface["DocumentMapper interface"]
+  end
+  subgraph "doctor bundles"
+    dcore["doctor-core<br/>pure records, NO OSGi"]
+    dcontrib["doctor-contribution<br/>Component DocumentMapper, Jackson"]
+  end
+  subgraph "Multiplexor bundle — type-blind"
+    mux["Multiplexor<br/>References List of DocumentMapper"]
+  end
+  dcore -->|owns records| dcontrib
+  dcontrib -->|Import-Package| iface
+  dcontrib -.DS bridge.-> mux
+  mux -->|Import-Package| iface
+  classDef ok fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef pure fill:#ddf,stroke:#22a,stroke-width:2px;
+  class mux,iface,dcontrib ok;
+  class dcore pure;
+....
+
+This is the *data* counterpart of the *component* contribution proven in
+link:../patterns/port-edge-domain-ownership.adoc#the-contribution-role[the contribution role]: a
+fragment is the mechanism for contributing code (a Mediator/Specialist `@Component`); DS is the
+mechanism for contributing data (a mapper), because the payload should cross serialized, not as
+shared classes.
+
+== Problem 4 — the operator must read the stack without our tooling
+
+A constraint the design must honor: an operator runs plain `pulumi stack output` with no rke2lab
+tooling and must *understand* what they see. A single opaque multi-document YAML blob in one output
+key fails this — Pulumi renders it as one escaped string, and any change shows as "the whole blob
+changed", destroying the per-key diff.
+
+=== Resolution — the envelope rides in the output KEY, the value is the bare DAG
+
+The Multiplexor's envelope `(domain, coordinate)` becomes the *output key*; the *value* is the bare
+DAG, a Pulumi-native structured object. The operator reads `doctor/consultationReport` and sees a
+clean tree with no `schema:` / `payload:` wrapper in their face. Pulumi's per-key diff stays
+meaningful. An optional shallow `doctor/summary` line can sit alongside the deep DAG for at-a-glance
+reading. YAML is the human rendering of the value, not a wrapper around it.
+
+[source]
+----
+$ pulumi stack output
+doctor/consultationReport   {checkpointId: cluster-readiness, observations: [...], plan: {...}}
+doctor/summary              "cluster-readiness: 2 symptoms, 1 remediation pending"
+incus/seedInstance          {urn: ..., status: running, fingerprint: ...}
+----
+
+== The components already exist — this is a redistribution
+
+The host pipeline already has the egress machinery; it is just placed in one world and typed to
+Pulumi. The design does not invent a `PipelineAdapter` from nothing — it redistributes components
+that exist today.
+
+[cols="1,2,2",options="header"]
+|===
+| today (all host-side) | what it does now | becomes
+
+| `OutputBuilder`
+| hand-concatenates every domain's outputs into one flat 23-key `Map`
+| the *Multiplexor* mux — moves OSGi-side, fed by the `DocumentMapper`s instead of by hand
+
+| `ReadinessOutputMapper`
+| a per-domain `Map<key, Function<VerificationResult, Object>>`; host-side and imports `com.pulumi.core.Output`
+| a `DocumentMapper` `@Component` in the domain's `-contribution` bundle, Pulumi-blind
+
+| `OutputsStage`
+| imports `com.pulumi.Context`, calls `pulumiContext::export`
+| the *PipelineAdapter* egress tail — *stays host* (it is genuinely Pulumi-aware), now consumes a `DocumentStream`
+|===
+
+`OutputsStage` *correctly* stays host: it is the one place `com.pulumi.Context` legitimately
+appears, the straddle point where the booted OSGi world meets the Pulumi engine. `OutputBuilder`
+and `ReadinessOutputMapper` are the leak made visible — they do mapper/mux work *host-side and
+Pulumi-typed* that belongs OSGi-side and Pulumi-blind.
+
+== The roles, told apart
+
+[cols="1,1,2,1",options="header"]
+|===
+| role | world | owns | knows Pulumi?
+
+| domain (doctor)
+| OSGi
+| its DAG records + reasoning; a `DocumentMapper` `@Component` in its `-contribution` bundle
+| no
+
+| Multiplexor
+| OSGi
+| the envelope `(domain, coordinate)`; mux/demux a transport-neutral `DocumentStream`; imports only `DocumentMapper`
+| no — a stream codec
+
+| PipelineAdapter
+| host
+| maps `DocumentStream` to/from Pulumi outputs; maps `Patient` to `StackCoordinate`; live stack I/O
+| yes — the only role that does
+|===
+
+The Multiplexor and the PipelineAdapter are mirror translators meeting at the `Document`. Each maps
+*its* world-model to and from the shared contract; neither sees the other world's types.
+
+[mermaid]
+....
+flowchart TB
+  a["OSGi model — MedicalRecord"]
+  b["Multiplexor — OSGi side"]
+  c["Document contract"]
+  d["PipelineAdapter — host side"]
+  e["host model — StackSnapshot"]
+  f["Pulumi outputs"]
+  a -->|egress| b
+  b --> c
+  c --> d
+  d --> e
+  e --> f
+  f -->|ingress| e
+  e --> d
+  d --> c
+  c --> b
+  b --> a
+....
+
+== What this buys
+
+* *Fewer exported types* — the seam stops being 61 doctor-port types and becomes one
+  `DocumentMapper` interface + the `Document` record. The model's relationship graph travels as a
+  document, not as Java types.
+* *Fewer live components* — the prior live plan needed a `@Component` per crossing fact
+  (host-published `SnapshotSource`, `MedicalRecordRegistry`, `InterventionLedgerWriter`, `Patient`)
+  plus a Mediator per domain. The Multiplexor collapses that to one service type and one
+  `@Reference List<DocumentMapper>`: a domain publishes one mapper, not a fan of per-fact
+  components. Less to wire is less to fail at boot.
+* *A pure, placeable doctor* — `doctor-core` sheds its Pulumi vocabulary and its serialization, and
+  depends only on `doctor-port`. It can live outside seed-master, in another process, or be cloned
+  by a peer. DS returns only in the `-contribution` bundle, never in `-core`.
+* *Pulumi as one sink among possible others* — the same `DocumentStream` could later land in a git
+  repository (an immutable, consultable record), with only a different host adapter and no change to
+  the Multiplexor or any domain.
+
+== The invariant
+
+[IMPORTANT]
+====
+*Pulumi is a host-only word.* Enforceable mechanically: `grep -ri pulumi osgi/` must return zero
+(same spirit as the no-snapshot-install guardrail). Today it does not — the cleanup in Problem 1 and
+Problem 2 is what brings it to zero.
+====
+
+== Scope and sequencing
+
+* *Whiteboard* — we rewrite the stack content; previous Pulumi outputs are not preserved, so there is
+  no migration shape to honor.
+* *First and only DAG client today* — `manifests` / `netplan` / `systemd` emit flat summaries, not
+  DAGs; doctor is the sole `DocumentMapper` contributor at first. The Multiplexor is built so a
+  second domain plugs in additively (one more `@Component`, no gateway change). The generalization
+  into link:../patterns/port-edge-domain-ownership.adoc[the ownership pattern doc] is deferred until
+  a second real client forces its shape — not enshrined from one instance.
+
+== Related documentation
+
+* link:../patterns/port-edge-domain-ownership.adoc[Who owns the port] — the component-contribution
+  mechanism this spec mirrors for data.
+* link:../patterns/frontier-playability-model.adoc[The frontier-playability model] — the host/OSGi
+  frontier this exchange crosses.
+* link:dbus-systemd-edge-spec.adoc[dbus-systemd-edge spec] — a sibling before/after edge document.
+* link:../integration-atlas.adoc[Integration atlas] — the Doctor subsystem view carries the
+  before/after additivity proof for this design.
