@@ -1,0 +1,198 @@
+= The world boundary — the single door between the host and OSGi worlds
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* ARCHITECTURE SPEC (2026-06-25). Describes the *one* frontier between the two worlds and
+the exact mechanism by which a reference crosses it.
+
+This is *not a pattern* — a pattern generalizes, and this crossing is implemented essentially
+*once*, on purpose. The drastic reduction of the inter-world surface to a single typed door IS the
+architectural result this document records. The generic "which side of the seam does a class load
+on" rule lives in link:../patterns/port-edge-domain-ownership.adoc#the-boot-face[the seam law]; this
+spec records *that there is only one door*, which one, and how a live reference passes through it.
+====
+
+== The claim
+
+The host world (flat JCL, the Pulumi-aware orchestrator) and the OSGi world (bundle classloaders,
+pure models) exchange exactly one kind of live reference across one boundary. After the Multiplexor
+design (link:multiplexor-spec.adoc[multiplexor-spec]) collapsed the data exchange to a single
+`Document` stream, the *behavioral* surface between the worlds reduces to a single service handed
+from OSGi to the host. This document specifies that handoff.
+
+== The system in one picture
+
+The host boots the framework, then reads ONE service out of the registry by its seam type. That
+service's implementation stays sealed inside its bundle; only its interface — a `type=seam` package —
+is shared across the boundary so the typed handoff resolves to one class, not two.
+
+[mermaid]
+....
+flowchart LR
+  host["host world — flat JCL<br/>the orchestrator, Pulumi-aware"]
+  booted["BootedFramework<br/>the seam handle"]
+  iface["the door interface<br/>type=seam, one shared class"]
+  impl["the @Component impl<br/>sealed in its bundle"]
+  reg["OSGi service registry"]
+  host -->|awaitService door.class| booted
+  booted -->|reads| reg
+  impl -.DS publishes under the interface.-> reg
+  reg -->|returns the impl, typed as the interface| host
+  iface -.shared both sides.-> host
+  iface -.shared both sides.-> impl
+  classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef o fill:#eef,stroke:#88a,stroke-width:2px;
+  classDef s fill:#fde,stroke:#a58,stroke-width:2px;
+  classDef sealed fill:#fdd,stroke:#c33,stroke-width:3px;
+  class host h;
+  class booted,reg o;
+  class iface s;
+  class impl sealed;
+....
+
+== The mechanism, in four moving parts
+
+=== 1. The handle — `BootedFramework`
+
+The boot ACT (`FrameworkLauncher`) produces a `BootedFramework`: a live embedded Felix the host
+holds a plain Java reference to. It exposes the registry to the host:
+
+[source,java]
+----
+public <T> T awaitService(Class<T> type, long timeoutMillis)   // by type — the normal door
+public Object awaitService(String className, long timeoutMillis) // by name — when the type is bundle-internal
+public BundleContext context()                                  // the raw context, rarely needed
+----
+
+`awaitService` opens a `ServiceTracker` and `waitForService(timeout)` — it blocks until SCR has
+published the service, which happens only *after* the component's mandatory `@Reference`s bind. So
+the host's read is correctly ordered against the OSGi world's wiring: a `null` return means the
+component never satisfied (loud failure at the call site), never a race.
+
+=== 2. The door interface — a `type=seam` package
+
+For `awaitService(Door.class)` to match a service in the registry, the host and the publishing
+bundle must share *the same* `Door` class. That is the seam law: the interface lives in a
+`type=seam` package, loaded by the system bundle (JCL) and shared into the bundle world, so there is
+exactly one `Door` class, not a host copy and a bundle copy that would split and silently miss.
+
+This is already in production: the host reads `awaitService(SystemdRuntimeProbe.class, 5000)`, and
+`SystemdRuntimeProbe` is a `systemd-port` seam type; the `@Component` implementing it lives in
+`dbus-systemd-edge` and is never seen by the host.
+
+=== 3. The implementation — sealed, published by DS
+
+The implementation is a `@Component` inside its bundle (`type=model`). Its package is *not*
+exported. DS publishes the instance into the registry *under the door interface*. The host therefore
+receives a working object typed as the interface, while the impl class stays invisible — nobody can
+import it to bypass the door. Sealing the impl + publishing a service are the two halves that let the
+boundary be both crossable and closed.
+
+When even the interface must stay bundle-internal, the `awaitService(String)` by-name variant reads
+the service without the host ever naming a class — the door narrows further, at the cost of an
+untyped handle the host must use reflectively.
+
+=== 4. The crossing, ordered
+
+[mermaid]
+....
+flowchart TB
+  boot["host boots Felix → BootedFramework"]
+  wire["OSGi: @Component's @References bind"]
+  pub["SCR publishes the impl under the door interface"]
+  await["host: awaitService(Door.class, timeout)"]
+  use["host holds a Door, calls it — impl stays sealed"]
+  boot --> wire
+  wire --> pub
+  await -->|blocks until| pub
+  pub --> use
+  classDef h fill:#dfd,stroke:#2a2,stroke-width:2px;
+  classDef o fill:#eef,stroke:#88a,stroke-width:2px;
+  class boot,await,use h;
+  class wire,pub o;
+....
+
+== Why exactly one door
+
+Before the Multiplexor, the host read several model services out of the registry —
+`SystemdRuntimeProbe`, and the design called for `SnapshotSource`, `MedicalRecordRegistry`,
+`InterventionLedgerWriter`, `Patient` to be host-published too: one seam type per crossing fact. The
+Multiplexor collapses all diagnostic data into one `Document` stream behind one service. The host
+stops reading N model services and reads one stream source.
+
+`SystemdRuntimeProbe` remains a live probe (a *measurement* the host triggers, not persisted data),
+so it is a legitimate second door of a different kind — a *probe* door, not a *data* door. The rule
+is therefore precise: *data crosses through exactly one door* (the Multiplexor stream); a probe is a
+distinct, narrow measurement door. Any third proposed door is a design smell — the question to ask
+is "is this data (→ the Multiplexor) or a live measurement (→ a probe door)?".
+
+== The invariant
+
+[IMPORTANT]
+====
+The boundary is typed and one-directional in ownership: *OSGi publishes, the host reads.* The host
+never registers a model service into the OSGi world (that would invert the dependency — the OSGi
+world must not depend on the host). The one exception already documented — a non-playable host edge
+host-publishing onto a `-port` type-seam (e.g. `pulumi-edge`'s `SnapshotSource`) — is the host
+*lending an instance behind a shared type*, not the OSGi world depending on host code; see
+link:../patterns/port-edge-domain-ownership.adoc[the ownership doc].
+====
+
+== Concentration check — is the ACL where it belongs, and only there?
+
+The pipeline is the host-side Anti-Corruption Layer (same nature as the `unitrepo-pulumi` ACL the
+atlas already names): it knows both worlds and translates between them so neither depends on the
+other. "Is that role concentrated, or has it leaked elsewhere?" is not a matter of opinion — it is
+measurable. Two greps are the falsifiable acceptance criteria for this increment.
+
+=== The two measurable guards
+
+[cols="1,3,2",options="header"]
+|===
+| guard | command | target
+
+| no Pulumi vocabulary in the OSGi world
+| `grep -rl "import com.pulumi" osgi/`
+| *0* — already true today (the type-level invariant holds)
+
+| no self-serialization in the diagnostic model
+| `grep -rl "toOutputMap\|OUTPUT_KEY\|fromOutputMap" osgi/`
+| *0* — *14 today* (every doctor record serializes itself; the leak this increment closes)
+|===
+
+=== The transpiration map (measured 2026-06-25, before the increment)
+
+A baseline so the increment's progress is visible, not asserted:
+
+* *Door OSGi→host (`awaitService`/`BootedFramework`) — already concentrated.* 7 files, all under
+  `controlplane/pipeline/` (+ incus/policy neighbours). The read half of the ACL is essentially in
+  place; little to move.
+* *Translation domain↔Pulumi (`toOutputMap`/`OUTPUT_KEY`/`Reader`) — transpired across ~30 files,
+  in the wrong places:*
+** *14 files in `doctor/port/`* — the records serialize THEMSELVES into Pulumi output shape. This is
+   translation logic living *inside the model*. These collapse into per-domain `DocumentMapper`s.
+** *~11 host files* (`policy/`, `bdd/`, `readiness/`, `systemd/`, `OutputBuilder`) — ACL logic
+   dispersed across stages/resources instead of concentrated in the ACL. These converge into the
+   `PipelineAdapter` + the Multiplexor.
+
+=== The verdict this gives
+
+Today the ACL role is *not* concentrated — it has transpired, most damagingly into the doctor model
+(14 records). The increment is "done" on this axis precisely when both guards read 0 and the ~30
+translation sites have converged: the diagnostic records become pure (`type=record`), each domain's
+serialization lives in one `DocumentMapper`, and the host-side translation lives in the one ACL. The
+guards are cheap enough to run on every commit of the increment — a regression that re-scatters
+translation shows up immediately.
+
+== Related documentation
+
+* link:../patterns/port-edge-domain-ownership.adoc#the-boot-face[The seam law] — the generic
+  "which side of the seam does a class load on" rule this door is one instance of.
+* link:multiplexor-spec.adoc[Multiplexor spec] — the design that collapsed the data exchange to one
+  stream, making "one door" true.
+* link:osgi-boot-decomposition-spec.adoc[Boot decomposition] — how `BootedFramework` is produced
+  (the boot ACT vs the framework-free boot DECISION).
+* link:../integration-atlas.adoc[Integration atlas] — the two-spaces frame and the two-vocabulary
+  table this boundary separates.

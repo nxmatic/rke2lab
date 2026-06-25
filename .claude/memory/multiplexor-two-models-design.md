@@ -123,34 +123,57 @@ face of the same robustness gain as record-privacy, and it serves the session's 
 Whiteboard constraint: we REWRITE the stack content; previous Pulumi outputs are not preserved
 (no migration shape to honor).
 
-## RESUME TOMORROW (2026-06-24 EOD — hotspot died)
+## STATE (2026-06-25) — design closed + stable anchors committed
 
-DONE today, on disk, NOT committed (working tree still mid-flight from the lost session
-77d9e53b — see `git status`; the stray default-package `Grant.java` + the doctor-port/core churn
-are pre-existing, untouched by today's design work):
-- `docs/architecture/osgi/multiplexor-spec.adoc` (337 lines) — the spec, 4 graduated diagrams.
-- `docs/architecture/integration-atlas.adoc` — two additions: (1) "two vocabularies" table in the
-  "two spaces" section (stage column = TODAY only, future stages honestly deferred); (2) Doctor view
-  3rd additivity proof "Multiplexor — two models" (Diagrams N+O + verdict rated GO, risks LOW).
-- `.claude/claude-preview.adoc` — last render (fragment-vs-DS option compare); safe to overwrite.
+Two stable commit-anchors on feature/cluster-edge (the user wants every stable state committed, to
+reuse as reference like 4e3e1427 was):
+- `9c6ad5e8` fix(doctor): restored core/port placement — doctor-core full (13 actors), doctor-port
+  thin membrane (50 files, all in doctor.port). Undid bf2e1fde's inversion (it had emptied core +
+  dumped actors into port with a package/dir mismatch → wouldn't compile). Pipeline flatten of
+  bf2e1fde KEPT (good housekeeping + the type=seam foundation). Verified: full `clean package` green
+  without cache.
+- `929b3aad` docs(multiplexor): multiplexor-spec + atlas additivity proof (Diagrams N+O) + memory.
 
-Settled this session (all in this file above): two-models reframe; `Document(domain, coordinate,
-JsonNode)` contract; **DS mechanism chosen over fragment (user voted B — records private)**; naming
-= `Patient` (doctor side) ↔ `Stack`/`StackCoordinate` (host side), same thing per world; operator
-reads bare DAG via envelope-in-the-output-KEY; component redistribution
-`OutputBuilder`→Multiplexor, `ReadinessOutputMapper`→`DocumentMapper`, `OutputsStage` stays host;
-**model + pipeline refactor are ONE atomic increment** (the boot pipeline IS the `pulumi preview`
-orchestrator — half-landed won't preview green).
+Design DOCS now (3 coherent specs + atlas):
+- `osgi/multiplexor-spec.adoc` — two-models, Document, DS-over-fragment, redistribution.
+- `osgi/world-boundary-spec.adoc` — THE single door between worlds (NOT a pattern, an arch spec):
+  type-seam + `awaitService` + DS-publish + sealed impl; "one DATA door (Multiplexor) + a distinct
+  PROBE door (SystemdRuntimeProbe)". Holds the CONCENTRATION CHECK (below). + pending commit.
+- `integration-atlas.adoc` — two-vocabulary table + Doctor 3rd additivity proof.
 
-NEXT (where to pick up):
-1. Pattern-doc forward-pointer in `port-edge-domain-ownership.adoc` (generalization DEFERRED — still
-   one-client; just a pointer to the spec). NOT yet done.
-2. THEN start the increment build: contract bundle (`DocumentMapper` + `Document`) → doctor records
-   pure (delete `toOutputMap`/`OUTPUT_KEY`/4 `*Reader`s) → `doctor-contribution` `@Component` +
-   Jackson → Multiplexor + `@Reference List<DocumentMapper>` → host `PipelineAdapter` → pipeline
-   re-slice. CARRY the boot test: SCR binds `@Reference List<DocumentMapper>` (sibling proof =
-   `FragmentContributedComponentTest`).
-3. Open/LOW-risk: refactored stage names (defer — mechanical re-slice in the fluent grammar).
+★ CONCENTRATION CHECK — the falsifiable quality indicator for the increment (in world-boundary-spec):
+the pipeline is the host-side ACL (Anti-Corruption Layer — same nature as the `unitrepo-pulumi` ACL
+the atlas already names). Two greps are the acceptance criteria:
+1. `grep -rl "import com.pulumi" osgi/` == 0  → TRUE today (type-level invariant holds).
+2. `grep -rl "toOutputMap\|OUTPUT_KEY" osgi/` == 0 → **14 today** (doctor records self-serialize —
+   the leak the increment closes). Baseline map: door OSGi→host (awaitService) ALREADY concentrated
+   in controlplane/pipeline/ (7 files); translation TRANSPIRED over ~30 files (14 in doctor/port/,
+   ~11 host) that must converge into per-domain DocumentMappers + the one ACL. Run on every commit.
+
+★ type=record DECISION (user chose C): introduce a NEW embed `type=record` (first-class category,
+not just a package/bundle) for pure-data bundles, alongside model/seam/edge/fixture. The user wants
+the system to break on violation ("benefice pur"). Resolver enforces PLACEMENT already; PURITY
+(only records/enums exported, zero behavior) needs a GUARD = build-time, in the staging extension
+(StagingClosure reads the bnd; bytecode check Class.isRecord()/isEnum()). Both in the same increment.
+
+★ DoctorConsultingService is the OPEN knot: it is NOT data — it's a live synchronous `consult()` on
+**5 call sites** in the pipeline (SystemdAdapterStage, ClusterReadinessStage, ResourcesStage,
+ResourceManager, ResourceCreationPipeline; assembled in DoctorAssembly, held in PipelineState). So
+its `-port` SURVIVES as a probe/consultation door UNLESS we move consultation to across-runs (then
+it becomes data → joins the Multiplexor). The data `-port`s (SnapshotSource, MedicalRecordRegistry,
+InterventionLedgerWriter) DO dissolve into the Multiplexor. Decision in-process-vs-across-runs still
+deferred — it touches 5 pipeline sites, not trivial.
+
+NEXT (incremental roadmap — each step green + commit, never hold the whole in head):
+1. `doctor-records` bundle + `type=record` + the staging-ext purity guard → green, commit.
+2. contract bundle (`DocumentMapper` + `Document(domain, coordinate, JsonNode)`) → green, commit.
+3. `doctor-contribution` (one DocumentMapper, Jackson; `.internal` package for the impl) → commit.
+4. Multiplexor sealed bundle + `@Reference List<DocumentMapper>` + the SCR bind boot test (sibling
+   proof = `FragmentContributedComponentTest`) → green, commit.
+5. host `PipelineAdapter` (the ACL) + `awaitService(DocumentStreamSource.class)` → preview green, commit.
+6. SEPARATE later decision: DoctorConsultingService in-process vs across-runs (the 5 sites).
+Pattern-doc forward-pointer in `port-edge-domain-ownership.adoc` still NOT done (low priority).
+Whiteboard: we REWRITE the stack content; no prior Pulumi outputs preserved.
 
 See [[fragment-contribution-mediation-model]] [[doctor-internal-edge-debt]]
 [[pipeline-orchestration-osgi-vision]] [[external-edges-chantier-handoff]].
