@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.port.HealthSystem;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
@@ -16,7 +16,7 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
 /**
  * The institution — the {@link HealthSystem} the host crosses to obtain a doctor, published OSGi
  * service-side so the diagnostic model and its specialists never reach the host (only this seam and
- * the returned {@link DoctorConsultingService} do). It HOLDS its infrastructure (the EHR, the
+ * the returned {@link ConsultingService} do). It HOLDS its infrastructure (the EHR, the
  * intervention ledger) and EMPLOYS its clinicians, and {@link #admit admits} a patient: mints the
  * run's grants, binds a credentialed {@link ClinicalAccess}, and employs the {@link Generalist}.
  *
@@ -52,7 +52,7 @@ public final class DefaultHealthSystem implements HealthSystem {
   }
 
   @Override
-  public DoctorConsultingService admit(Patient patient) {
+  public ConsultingService admit(Patient patient) {
     return DoctorGraph.assemble(patient, registry, ledgerWriter, specialists, msg -> {});
   }
 }

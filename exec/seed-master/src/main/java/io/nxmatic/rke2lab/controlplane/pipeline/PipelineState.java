@@ -8,7 +8,7 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import java.util.Map;
@@ -49,7 +49,7 @@ final class PipelineState {
    * awaitService(HealthSystem).admit}). Built once at the readiness transition; the stages consult
    * it without naming the hidden actors behind it.
    */
-  DoctorConsultingService doctor;
+  ConsultingService doctor;
 
   /**
    * The systemd runtime-status probe for this run, resolved once from the booted OSGi registry (the

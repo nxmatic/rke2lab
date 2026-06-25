@@ -19,7 +19,7 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
 import io.nxmatic.rke2lab.doctor.ExactRosterDoctor;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.ClusterReadinessPhase;
@@ -229,7 +229,7 @@ class NestedRunbookTest {
       ReportModel runbook,
       ClusterReadinessProbe probe,
       boolean pulumiMode,
-      DoctorConsultingService doctor) {
+      ConsultingService doctor) {
     return play(runbook, probe, pulumiMode, doctor, message -> {});
   }
 
@@ -237,7 +237,7 @@ class NestedRunbookTest {
       ReportModel runbook,
       ClusterReadinessProbe probe,
       boolean pulumiMode,
-      DoctorConsultingService doctor,
+      ConsultingService doctor,
       java.util.function.Consumer<String> logger) {
     return play(runbook, new ConsultationLog(), probe, pulumiMode, doctor, logger);
   }
@@ -247,7 +247,7 @@ class NestedRunbookTest {
       ConsultationLog consultations,
       ClusterReadinessProbe probe,
       boolean pulumiMode,
-      DoctorConsultingService doctor) {
+      ConsultingService doctor) {
     return play(runbook, consultations, probe, pulumiMode, doctor, message -> {});
   }
 
@@ -262,7 +262,7 @@ class NestedRunbookTest {
       ConsultationLog consultations,
       ClusterReadinessProbe probe,
       boolean pulumiMode,
-      DoctorConsultingService doctor,
+      ConsultingService doctor,
       java.util.function.Consumer<String> logger) {
     final VerificationResult[] holder = new VerificationResult[1];
     new ClusterReadinessStage(
@@ -281,7 +281,7 @@ class NestedRunbookTest {
     return holder[0];
   }
 
-  private static DoctorConsultingService doctorWith(List<Specialist> specialists) {
+  private static ConsultingService doctorWith(List<Specialist> specialists) {
     // ExactRosterDoctor takes the roster verbatim (no standard Network/Cluster prepended), so the
     // routing/prescription assertions see exactly the specialists this test wires.
     return ExactRosterDoctor.over(
@@ -301,12 +301,12 @@ class NestedRunbookTest {
     return statuses;
   }
 
-  private static DoctorConsultingService readyGeneralist() {
+  private static ConsultingService readyGeneralist() {
     // The dbus-tcp specialist is in the core's standard roster now; no host injection needed.
     return doctorWith(List.of());
   }
 
-  private static DoctorConsultingService networkGeneralist() {
+  private static ConsultingService networkGeneralist() {
     return doctorWith(List.of(new FakeNetworkSpecialist()));
   }
 

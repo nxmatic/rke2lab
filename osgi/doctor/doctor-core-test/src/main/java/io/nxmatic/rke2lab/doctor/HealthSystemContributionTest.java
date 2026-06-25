@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.doctor.dsproof.FakeDiagnostician;
-import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.port.HealthSystem;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Patient;
@@ -55,7 +55,7 @@ class HealthSystemContributionTest {
     // Admit a patient and consult the symptom FakeDiagnostician routes on. A prescription proves
     // the
     // DS-contributed specialist was bound into the tier-scoped roster AND routed to by the doctor.
-    final DoctorConsultingService doctor = healthSystem.admit(DEV);
+    final ConsultingService doctor = healthSystem.admit(DEV);
     final Observation observation =
         Observation.failed(Symptom.CONNECTION_REFUSED, "dbus refused", Map.of());
     final RemediationPlan plan = doctor.consult(Symptom.CONNECTION_REFUSED, observation);

@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.pulumi.edge.InterventionLedgerLayout;
@@ -26,7 +26,7 @@ public final class DriftReview {
    * Symptom-independent: after the record is reconstructed for the run's patient, fold the ledger
    * over every open problem. A no-op when no {@code file://} backend is configured.
    */
-  public void reviewAtReconstruction(DoctorConsultingService doctor) {
+  public void reviewAtReconstruction(ConsultingService doctor) {
     if (backendDir == null) {
       return;
     }

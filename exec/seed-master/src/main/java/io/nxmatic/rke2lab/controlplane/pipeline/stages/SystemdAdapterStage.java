@@ -11,7 +11,7 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultationNarration;
-import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
@@ -52,7 +52,7 @@ public final class SystemdAdapterStage {
   private final Consumer<String> readinessLogger;
   private final ReportModel runbook;
   private final ConsultationLog consultations;
-  private final DoctorConsultingService doctor;
+  private final ConsultingService doctor;
   private final SystemdAdapterProbe liveProbe;
   private final Consumer<Map<String, Object>> sink;
 
@@ -63,7 +63,7 @@ public final class SystemdAdapterStage {
       Consumer<String> readinessLogger,
       ReportModel runbook,
       ConsultationLog consultations,
-      DoctorConsultingService doctor,
+      ConsultingService doctor,
       SystemdAdapterProbe liveProbe,
       Consumer<Map<String, Object>> sink) {
     this.config = config;

@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.*;
@@ -18,14 +18,14 @@ import java.util.function.Consumer;
  * io.nxmatic.rke2lab.doctor.internal.DefaultHealthSystem} (the institution, specialists by DS) and
  * the flat {@link io.nxmatic.rke2lab.doctor.Doctor} / {@link
  * io.nxmatic.rke2lab.doctor.ExactRosterDoctor} factories — so admission lives in exactly one place.
- * Package-private actors stay hidden behind the {@link DoctorConsultingService} it returns.
+ * Package-private actors stay hidden behind the {@link ConsultingService} it returns.
  */
 public final class DoctorGraph {
 
   private DoctorGraph() {}
 
   /** Admit the patient over the EXACT roster + ledger writer and return the consulting contract. */
-  public static DoctorConsultingService assemble(
+  public static ConsultingService assemble(
       Patient patient,
       MedicalRecordRegistry registry,
       InterventionLedgerWriter ledgerWriter,

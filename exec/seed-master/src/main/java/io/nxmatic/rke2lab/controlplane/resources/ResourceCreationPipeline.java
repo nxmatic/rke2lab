@@ -12,7 +12,7 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterReadinessResource;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.controlplane.systemd.SystemdAdapterResource;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import java.util.Map;
@@ -33,7 +33,7 @@ final class ResourceCreationPipeline {
   private final Consumer<String> readinessLogger;
   private final ReportModel runbook;
   private final ConsultationLog consultations;
-  private final DoctorConsultingService doctor;
+  private final ConsultingService doctor;
   private final SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
   private final IncusResourceBootstrap.BootstrapResult bootstrapResult;
   private final Map<String, Object> systemdAdapterLaunchSummary;
@@ -45,7 +45,7 @@ final class ResourceCreationPipeline {
       Consumer<String> readinessLogger,
       ReportModel runbook,
       ConsultationLog consultations,
-      DoctorConsultingService doctor,
+      ConsultingService doctor,
       SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
       IncusResourceBootstrap.BootstrapResult bootstrapResult,
       Map<String, Object> systemdAdapterLaunchSummary) {

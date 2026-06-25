@@ -11,7 +11,7 @@ import io.nxmatic.rke2lab.doctor.records.Patient;
  * <p>Resolved from the embedded framework ({@code awaitService(HealthSystem.class)}): the doctor is
  * built OSGi-side, where its specialists arrive by Declarative Services, so the diagnostic model
  * and its specialists never cross to the host — only this seam and the returned {@link
- * DoctorConsultingService} (both port types) do.
+ * ConsultingService} (both port types) do.
  */
 public interface HealthSystem {
 
@@ -20,5 +20,5 @@ public interface HealthSystem {
    * grants are minted here (self + cohort), and the employed clinicians are wired to the admitted
    * patient.
    */
-  DoctorConsultingService admit(Patient patient);
+  ConsultingService admit(Patient patient);
 }

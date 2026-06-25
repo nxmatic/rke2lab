@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.doctor.internal.*;
-import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.*;
@@ -40,20 +40,20 @@ class HealthSystemTest {
     return intervention -> {};
   }
 
-  private static DoctorConsultingService admit(Patient patient, MedicalRecordRegistry registry) {
+  private static ConsultingService admit(Patient patient, MedicalRecordRegistry registry) {
     return DoctorGraph.assemble(patient, registry, noopLedger(), roster(), msg -> {});
   }
 
   @Test
   void admit_employs_a_doctor_that_can_read_its_own_patient() {
-    final DoctorConsultingService doctor = admit(DEV, singlePatientRegistry());
+    final ConsultingService doctor = admit(DEV, singlePatientRegistry());
     assertNotNull(doctor);
     assertEquals(DEV, doctor.recordForCurrentPatient().patient());
   }
 
   @Test
   void the_employed_doctor_still_consults_normally() {
-    final DoctorConsultingService doctor = admit(DEV, singlePatientRegistry());
+    final ConsultingService doctor = admit(DEV, singlePatientRegistry());
     final Observation observation =
         Observation.failed(Symptom.CONNECTION_REFUSED, "dbus refused", java.util.Map.of());
     final RemediationPlan plan = doctor.consult(Symptom.CONNECTION_REFUSED, observation);
@@ -64,7 +64,7 @@ class HealthSystemTest {
   @Test
   void the_admitted_doctor_reads_its_own_patient_but_a_stranger_is_outside_the_cohort() {
     // cohortFor surfaces only DEV at admission, so only DEV is granted.
-    final DoctorConsultingService doctor = admit(DEV, singlePatientRegistry());
+    final ConsultingService doctor = admit(DEV, singlePatientRegistry());
     // Self-read works (admitted + self-granted).
     assertEquals(DEV, doctor.recordForCurrentPatient().patient());
     // The cohort is exactly the admitted patient — no ungranted stranger leaks in.

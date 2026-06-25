@@ -6,7 +6,7 @@ import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -20,7 +20,7 @@ public final class ResourceManager {
       Consumer<String> readinessLogger,
       ReportModel runbook,
       ConsultationLog consultations,
-      DoctorConsultingService doctor,
+      ConsultingService doctor,
       SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
       IncusResourceBootstrap.BootstrapResult bootstrapResult,
       Map<String, Object> systemdAdapterLaunchSummary,

@@ -12,7 +12,7 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifi
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultationNarration;
-import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
@@ -47,7 +47,7 @@ public final class ClusterReadinessStage {
   private final Consumer<String> readinessLogger;
   private final ReportModel runbook;
   private final ConsultationLog consultations;
-  private final DoctorConsultingService doctor;
+  private final ConsultingService doctor;
   private final ClusterReadinessProbe phaseProbe;
   private final Map<String, Object> systemdAdapterLaunchSummary;
   private final Consumer<VerificationResult> sink;
@@ -60,7 +60,7 @@ public final class ClusterReadinessStage {
       Consumer<String> readinessLogger,
       ReportModel runbook,
       ConsultationLog consultations,
-      DoctorConsultingService doctor,
+      ConsultingService doctor,
       ClusterReadinessProbe phaseProbe,
       Map<String, Object> systemdAdapterLaunchSummary,
       Consumer<VerificationResult> sink) {

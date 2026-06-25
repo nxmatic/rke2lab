@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import io.nxmatic.rke2lab.controlplane.bdd.DriftReview;
 import io.nxmatic.rke2lab.doctor.ExactRosterDoctor;
-import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
@@ -69,7 +69,7 @@ final class DriftReviewReconstructionLiveTest {
     // is built over the exact (empty) roster — the run's drift specialist comes from the graph —
     // and
     // the host-driven review folds the ledger over the reconstructed record.
-    final DoctorConsultingService doctor =
+    final ConsultingService doctor =
         ExactRosterDoctor.over(
             PATIENT,
             registry,

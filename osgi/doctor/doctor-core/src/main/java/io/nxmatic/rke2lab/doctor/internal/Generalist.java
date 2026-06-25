@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.ClinicianId;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
@@ -34,7 +34,7 @@ import java.util.List;
  * The Generalist reads records only through its {@link ClinicalAccess} (bound to its id by the
  * {@link HealthSystem} at employment); it holds no registry or patient directly.
  */
-public final class Generalist implements Clinician, DoctorConsultingService {
+public final class Generalist implements Clinician, ConsultingService {
 
   /** The Generalist's stable id — the grant policy's join key for the general practitioner. */
   public static final ClinicianId GENERALIST_ID = new ClinicianId("generalist");

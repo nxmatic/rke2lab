@@ -8,7 +8,7 @@ import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager.ResourceCreationResult;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -23,7 +23,7 @@ public final class ResourcesStage {
   private final Consumer<String> readinessLogger;
   private final ReportModel runbook;
   private final ConsultationLog consultations;
-  private final DoctorConsultingService doctor;
+  private final ConsultingService doctor;
   private final SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
   private final Supplier<IncusResourceBootstrap.BootstrapResult> bootstrapResultSupplier;
   private final Supplier<Map<String, Object>> systemdAdapterLaunchSupplier;
@@ -38,7 +38,7 @@ public final class ResourcesStage {
       Consumer<String> readinessLogger,
       ReportModel runbook,
       ConsultationLog consultations,
-      DoctorConsultingService doctor,
+      ConsultingService doctor,
       SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
       Supplier<IncusResourceBootstrap.BootstrapResult> bootstrapResultSupplier,
       Supplier<Map<String, Object>> systemdAdapterLaunchSupplier,

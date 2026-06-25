@@ -12,7 +12,7 @@ import java.util.List;
  * <p>The graph behind it is assembled OSGi-side when the {@code HealthSystem} admits a patient, and
  * handed back as this contract; the consumer holds only the interface.
  */
-public interface DoctorConsultingService {
+public interface ConsultingService {
 
   /**
    * The patient consults: route the symptom + the captured {@link Observation} to the relevant
