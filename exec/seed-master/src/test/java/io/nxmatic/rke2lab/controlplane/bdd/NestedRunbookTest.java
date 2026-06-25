@@ -28,7 +28,6 @@ import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Patient;
 import io.nxmatic.rke2lab.doctor.records.Prescription;
 import io.nxmatic.rke2lab.doctor.records.Referral;
-import io.nxmatic.rke2lab.doctor.records.ReferralReply;
 import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Specialty;
@@ -40,6 +39,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -318,18 +318,20 @@ class NestedRunbookTest {
     }
 
     @Override
-    public ReferralReply diagnose(Referral referral) {
-      final Assessment assessment =
-          Assessment.of(
-              SchemaRef.of("network/check-connectivity/v1"),
-              Map.of("symptom", referral.symptom().id()),
-              "the API endpoint may be unreachable — verify network connectivity first");
-      final Prescription prescription =
+    public Assessment assess(Referral referral) {
+      return Assessment.of(
+          SchemaRef.of("network/check-connectivity/v1"),
+          Map.of("symptom", referral.symptom().id()),
+          "the API endpoint may be unreachable — verify network connectivity first");
+    }
+
+    @Override
+    public Optional<Prescription> prescribe(Referral referral, Assessment assessment) {
+      return Optional.of(
           Prescription.of(
               RemediationProgramRef.CHECK_CONNECTIVITY,
               Map.of("symptom", referral.symptom().id()),
-              "check connectivity to the API endpoint");
-      return ReferralReply.prescribing(referral, assessment, prescription);
+              "check connectivity to the API endpoint"));
     }
   }
 

@@ -1,14 +1,15 @@
 package io.nxmatic.rke2lab.netplan.internal;
 
 import io.nxmatic.rke2lab.doctor.records.Assessment;
+import io.nxmatic.rke2lab.doctor.records.Prescription;
 import io.nxmatic.rke2lab.doctor.records.Referral;
-import io.nxmatic.rke2lab.doctor.records.ReferralReply;
 import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Specialty;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.spi.ClinicianProperties;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import java.util.Map;
+import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -35,26 +36,30 @@ public final class NetworkSpecialist implements Specialist {
   }
 
   @Override
-  public ReferralReply diagnose(Referral referral) {
+  public Assessment assess(Referral referral) {
     final Symptom symptom = referral.symptom();
-    final Assessment assessment =
-        switch (symptom) {
-          case CONNECTION_REFUSED, TIMEOUT ->
-              Assessment.of(
-                  SchemaRef.of("network/reachability/v1"),
-                  Map.of("symptom", symptom.id()),
-                  "endpoint unreachable at the TCP layer; no network-level remediation — the listener is down, not the path");
-          case API_NOT_READY ->
-              Assessment.of(
-                  SchemaRef.of("network/api-path/v1"),
-                  Map.of("symptom", symptom.id()),
-                  "API endpoint not reachable yet; network path is the suspect, but no automated fix — investigate routing");
-          default ->
-              Assessment.of(
-                  SchemaRef.of("network/other/v1"),
-                  Map.of("symptom", symptom.id()),
-                  "not a network symptom — no network assessment for " + symptom.id());
-        };
-    return ReferralReply.assessing(referral, assessment);
+    return switch (symptom) {
+      case CONNECTION_REFUSED, TIMEOUT ->
+          Assessment.of(
+              SchemaRef.of("network/reachability/v1"),
+              Map.of("symptom", symptom.id()),
+              "endpoint unreachable at the TCP layer; no network-level remediation — the listener is down, not the path");
+      case API_NOT_READY ->
+          Assessment.of(
+              SchemaRef.of("network/api-path/v1"),
+              Map.of("symptom", symptom.id()),
+              "API endpoint not reachable yet; network path is the suspect, but no automated fix — investigate routing");
+      default ->
+          Assessment.of(
+              SchemaRef.of("network/other/v1"),
+              Map.of("symptom", symptom.id()),
+              "not a network symptom — no network assessment for " + symptom.id());
+    };
+  }
+
+  /** Never prescribes — no automated network remediation exists yet (assessment-only). */
+  @Override
+  public Optional<Prescription> prescribe(Referral referral, Assessment assessment) {
+    return Optional.empty();
   }
 }

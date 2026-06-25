@@ -8,6 +8,7 @@ import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Patient;
+import io.nxmatic.rke2lab.doctor.records.Prescription;
 import io.nxmatic.rke2lab.doctor.records.Referral;
 import io.nxmatic.rke2lab.doctor.records.ReferralReply;
 import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
@@ -18,6 +19,7 @@ import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.doctor.testkit.FakeSpecialist;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -34,13 +36,16 @@ class GeneralistFanOutTest {
   /** A specialist that always declines on its domain — assesses, never prescribes. */
   private record DecliningSpecialist(Specialty domain) implements Specialist {
     @Override
-    public ReferralReply diagnose(Referral referral) {
-      final Assessment assessment =
-          Assessment.of(
-              SchemaRef.of("test/declining/v1"),
-              Map.of("symptom", referral.symptom().id()),
-              "declined: no automated treatment");
-      return ReferralReply.assessing(referral, assessment);
+    public Assessment assess(Referral referral) {
+      return Assessment.of(
+          SchemaRef.of("test/declining/v1"),
+          Map.of("symptom", referral.symptom().id()),
+          "declined: no automated treatment");
+    }
+
+    @Override
+    public Optional<Prescription> prescribe(Referral referral, Assessment assessment) {
+      return Optional.empty();
     }
   }
 

@@ -4,40 +4,45 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.doctor.records.ReferralReply;
+import io.nxmatic.rke2lab.doctor.records.Prescription;
+import io.nxmatic.rke2lab.doctor.records.Referral;
 import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.testkit.TestReferrals;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
  * The systemd diagnostician's contract, as a plain JVM unit test colocated with the specialist
  * (same package, so it reads the package-private ADAPTER_UNIT / restartUnitCommand to pin the
- * contract without re-spelling them). The diagnose is pure — it reads facts off the OBSERVATION the
- * producer stamped, never host config — so no OSGi boot is needed here; the DS contribution itself
- * is proven generically by the doctor's HealthSystemContributionTest. The {@code Referral} fixture
- * comes from the shared {@link TestReferrals} testkit factory.
+ * contract without re-spelling them). The two acts are pure — they read facts off the OBSERVATION
+ * the producer stamped, never host config — so no OSGi boot is needed here; the DS contribution
+ * itself is proven generically by the doctor's HealthSystemContributionTest. The {@code Referral}
+ * fixture comes from the shared {@link TestReferrals} testkit factory.
  */
 class DbusTcpSpecialistTest {
 
   @Test
-  void declined_symptom_yields_assessment_not_silence() {
+  void declined_symptom_assesses_but_does_not_prescribe() {
     final DbusTcpSpecialist specialist = new DbusTcpSpecialist();
     final Observation observation = Observation.failed(Symptom.TIMEOUT, "timed out", Map.of());
+    final Referral referral = TestReferrals.of(Symptom.TIMEOUT, observation);
 
-    final ReferralReply reply = specialist.diagnose(TestReferrals.of(Symptom.TIMEOUT, observation));
-
-    assertFalse(reply.hasPrescription(), "the dbus specialist only treats connection-refused");
-    assertEquals("dbus-tcp/declined/v1", reply.assessment().schemaRef().id());
+    final Assessment assessment = specialist.assess(referral);
+    assertEquals("dbus-tcp/declined/v1", assessment.schemaRef().id());
     assertTrue(
-        reply.assessment().summary().contains("no treatment"),
-        () -> "a decline must explain itself: " + reply.assessment().summary());
+        assessment.summary().contains("no treatment"),
+        () -> "a decline must explain itself: " + assessment.summary());
+    assertFalse(
+        specialist.prescribe(referral, assessment).isPresent(),
+        "the dbus specialist only treats connection-refused");
   }
 
   @Test
-  void connection_refused_yields_assessment_and_prescription_from_the_observation() {
+  void connection_refused_assesses_and_prescribes_from_the_observation() {
     final DbusTcpSpecialist specialist = new DbusTcpSpecialist();
     // The producer (the endpoint gate) stamps the endpoint + node as flat details keys; the
     // specialist reads them off the observation rather than reaching back to host config.
@@ -46,17 +51,17 @@ class DbusTcpSpecialistTest {
             Symptom.CONNECTION_REFUSED,
             "dbus refused",
             Map.of("adapterHost", "10.0.0.7", "adapterPort", "55555", "nodeName", "seed-master"));
+    final Referral referral = TestReferrals.of(Symptom.CONNECTION_REFUSED, observation);
 
-    final ReferralReply reply =
-        specialist.diagnose(TestReferrals.of(Symptom.CONNECTION_REFUSED, observation));
-
-    assertTrue(reply.hasPrescription(), "connection-refused is the dbus specialist's treatment");
-    assertEquals("dbus-tcp/connection-refused/v1", reply.assessment().schemaRef().id());
+    final Assessment assessment = specialist.assess(referral);
+    assertEquals("dbus-tcp/connection-refused/v1", assessment.schemaRef().id());
     assertTrue(
-        reply.assessment().summary().contains("10.0.0.7:55555"),
-        () -> "the endpoint read off the observation must appear: " + reply.assessment().summary());
+        assessment.summary().contains("10.0.0.7:55555"),
+        () -> "the endpoint read off the observation must appear: " + assessment.summary());
 
-    final var prescription = reply.prescription().orElseThrow();
+    final Optional<Prescription> prescribed = specialist.prescribe(referral, assessment);
+    assertTrue(prescribed.isPresent(), "connection-refused is the dbus specialist's treatment");
+    final Prescription prescription = prescribed.orElseThrow();
     assertEquals(RemediationProgramRef.RESTART_UNIT, prescription.programRef());
     assertEquals(DbusTcpSpecialist.ADAPTER_UNIT, prescription.payload().get("unit"));
 

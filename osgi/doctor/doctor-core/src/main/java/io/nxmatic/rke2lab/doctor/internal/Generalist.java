@@ -141,7 +141,7 @@ public final class Generalist implements Clinician, ConsultingService {
     final List<ReferralReply> replies = new ArrayList<>();
     for (Specialist specialist : specialists) {
       if (route.contains(specialist.domain())) {
-        replies.add(specialist.diagnose(referral));
+        replies.add(refer(specialist, referral));
       }
     }
 
@@ -158,6 +158,21 @@ public final class Generalist implements Clinician, ConsultingService {
                 + prescribed
                 + " prescription(s)";
     return new RemediationPlan(symptom, replies, summary);
+  }
+
+  /**
+   * Run a specialist's two acts and assemble the reply: it ALWAYS assesses, and prescribes only
+   * when it has a treatment. The decision sits HERE, in the coordinator — the seam where the
+   * efficacy-first gate will later interpose between the assessment and the prescription (consult
+   * the history before authorizing a treatment). The specialist provides the two pieces; the
+   * Generalist owns the reply shape.
+   */
+  private static ReferralReply refer(Specialist specialist, Referral referral) {
+    final Assessment assessment = specialist.assess(referral);
+    return specialist
+        .prescribe(referral, assessment)
+        .map(prescription -> ReferralReply.prescribing(referral, assessment, prescription))
+        .orElseGet(() -> ReferralReply.assessing(referral, assessment));
   }
 
   /**

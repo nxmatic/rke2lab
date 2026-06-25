@@ -4,12 +4,12 @@ import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.Prescription;
 import io.nxmatic.rke2lab.doctor.records.Referral;
-import io.nxmatic.rke2lab.doctor.records.ReferralReply;
 import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Specialty;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * A schema-self-describing, prescribing {@link Specialist} double for the model tests. It stands in
@@ -49,17 +49,19 @@ public final class FakeSpecialist implements Specialist {
   }
 
   @Override
-  public ReferralReply diagnose(Referral referral) {
-    final Assessment assessment =
-        Assessment.of(
-            SCHEMA_REF,
-            Map.of("symptom", referral.symptom().id()),
-            "fake specialist reasoning for " + referral.symptom().id());
-    final Prescription prescription =
+  public Assessment assess(Referral referral) {
+    return Assessment.of(
+        SCHEMA_REF,
+        Map.of("symptom", referral.symptom().id()),
+        "fake specialist reasoning for " + referral.symptom().id());
+  }
+
+  @Override
+  public Optional<Prescription> prescribe(Referral referral, Assessment assessment) {
+    return Optional.of(
         Prescription.of(
             PROGRAM_REF,
             Map.of("symptom", referral.symptom().id(), "unit", UNIT),
-            "systemctl restart " + UNIT);
-    return ReferralReply.prescribing(referral, assessment, prescription);
+            "systemctl restart " + UNIT));
   }
 }

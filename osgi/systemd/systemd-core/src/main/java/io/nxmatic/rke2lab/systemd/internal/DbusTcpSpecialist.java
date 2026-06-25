@@ -4,7 +4,6 @@ import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Prescription;
 import io.nxmatic.rke2lab.doctor.records.Referral;
-import io.nxmatic.rke2lab.doctor.records.ReferralReply;
 import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Specialty;
@@ -13,6 +12,7 @@ import io.nxmatic.rke2lab.doctor.spi.ClinicianProperties;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
 import java.util.Map;
+import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -50,35 +50,48 @@ public final class DbusTcpSpecialist implements Specialist {
   }
 
   @Override
-  public ReferralReply diagnose(Referral referral) {
+  public Assessment assess(Referral referral) {
     final Symptom symptom = referral.symptom();
     if (symptom != Symptom.CONNECTION_REFUSED) {
-      final Assessment assessment =
-          Assessment.of(
-              SchemaRef.of("dbus-tcp/declined/v1"),
-              Map.of("declinedSymptom", symptom.id()),
-              "not a dbus-TCP symptom — the systemd adapter has no treatment for " + symptom.id());
-      return ReferralReply.assessing(referral, assessment);
+      return Assessment.of(
+          SchemaRef.of("dbus-tcp/declined/v1"),
+          Map.of("declinedSymptom", symptom.id()),
+          "not a dbus-TCP symptom — the systemd adapter has no treatment for " + symptom.id());
+    }
+    final Observation observation = referral.observation();
+    final String endpoint =
+        detail(observation, "adapterHost", "unknown")
+            + ":"
+            + detail(observation, "adapterPort", "unknown");
+    return Assessment.of(
+        SchemaRef.of("dbus-tcp/connection-refused/v1"),
+        Map.of("endpoint", endpoint, "unit", ADAPTER_UNIT),
+        "dbus-TCP endpoint "
+            + endpoint
+            + " refused the connection — the adapter unit is the deterministic first treatment "
+            + "for an unreachable dbus-TCP endpoint.");
+  }
+
+  /**
+   * Prescribe the adapter-unit restart only for the connection-refused assessment this specialist
+   * raises; decline otherwise. The {@code unit} is read back from the assessment (its single source);
+   * {@code host}/{@code nodeName} are raw observation facts the assessment does not carry, so they
+   * are read off the referral's observation — input facts, not a re-derivation of the assessment.
+   */
+  @Override
+  public Optional<Prescription> prescribe(Referral referral, Assessment assessment) {
+    if (referral.symptom() != Symptom.CONNECTION_REFUSED) {
+      return Optional.empty();
     }
     final Observation observation = referral.observation();
     final String host = detail(observation, "adapterHost", "unknown");
-    final String port = detail(observation, "adapterPort", "unknown");
     final String nodeName = detail(observation, "nodeName", "unknown");
-    final String endpoint = host + ":" + port;
-    final Assessment assessment =
-        Assessment.of(
-            SchemaRef.of("dbus-tcp/connection-refused/v1"),
-            Map.of("endpoint", endpoint, "unit", ADAPTER_UNIT),
-            "dbus-TCP endpoint "
-                + endpoint
-                + " refused the connection — the adapter unit is the deterministic first treatment "
-                + "for an unreachable dbus-TCP endpoint.");
-    final Prescription prescription =
+    final String unit = assessment.payload().getOrDefault("unit", ADAPTER_UNIT).toString();
+    return Optional.of(
         Prescription.of(
             RemediationProgramRef.RESTART_UNIT,
-            Map.of("unit", ADAPTER_UNIT, "host", host),
-            restartUnitCommand(nodeName, ADAPTER_UNIT));
-    return ReferralReply.prescribing(referral, assessment, prescription);
+            Map.of("unit", unit, "host", host),
+            restartUnitCommand(nodeName, unit)));
   }
 
   /**

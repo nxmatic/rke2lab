@@ -9,12 +9,12 @@ import io.nxmatic.rke2lab.doctor.records.*;
  * is NOT a doctor: it does not read observations and does not reason — it executes what a doctor
  * prescribed (clinically a nurse / pharmacist / physiotherapist).
  *
- * <p><b>The doctor stays pure.</b> Diagnosis ({@link Specialist#diagnose}) never touches the live
- * system; ALL live-system risk is confined to this tier. A remediator is therefore an EXPLICITLY
- * invoked actor — it is never called from the diagnostic {@code consult} path. The loop closes
- * between visits on the operator's terms: the doctor PROPOSES (the prescription persists in the
- * record), the operator DISPOSES (authorizes it), and only then is a remediator asked to
- * administer.
+ * <p><b>The doctor stays pure.</b> Diagnosis ({@link Specialist#assess} + {@link
+ * Specialist#prescribe}) never touches the live system; ALL live-system risk is confined to this
+ * tier. A remediator is therefore an EXPLICITLY invoked actor — it is never called from the
+ * diagnostic {@code consult} path. The loop closes between visits on the operator's terms: the
+ * doctor PROPOSES (the prescription persists in the record), the operator DISPOSES (authorizes it),
+ * and only then is a remediator asked to administer.
  *
  * <p>The {@link Prescription#programRef()} is the routing key: a remediator {@link #administers}
  * exactly the program(s) it is the hands for, mirroring how the Generalist routes a symptom to a
