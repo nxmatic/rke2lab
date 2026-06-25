@@ -61,4 +61,13 @@ predicted):**
 2. `Specialist.diagnose(Referral) → ReferralReply` FUSES assess+prescribe into one method; the
    operation model is real but implicit. Open: leave fused or surface as two verbs.
 
+**Backlog — Generalist visibility (a SEPARATE slice, not the specialist distribution).** The
+Generalist IS a Clinician (carries `GENERALIST_ID`), but it does NOT distribute like a specialist:
+it has no domain (it is the transversal coordinator, home = doctor-core) and is PER-RUN + stateful
+(built by `DoctorGraph` with a patient-bound `ClinicalAccess` at each `admit(patient)`), so it cannot
+be a DS singleton `@Component`. Its coherence as a "visible practitioner" rides on its IDENTITY, not
+on OSGi distribution. If a practitioner directory/registry is ever wanted (who is employed in this
+health system?), the Generalist must appear there beside the specialists — but that is its own slice,
+decided then, not folded into the specialist DS distribution.
+
 See [[multiplexor-two-models-design]] [[doctor-live-record-roadmap]] [[object-graph-navigability-principle]].
