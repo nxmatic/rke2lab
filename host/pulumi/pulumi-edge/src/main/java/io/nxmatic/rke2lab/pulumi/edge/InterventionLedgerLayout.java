@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.pulumi.edge;
 
-import io.nxmatic.rke2lab.doctor.port.StackCoordinate;
+import io.nxmatic.rke2lab.doctor.records.StackCoordinate;
 import java.nio.file.Path;
 
 /**

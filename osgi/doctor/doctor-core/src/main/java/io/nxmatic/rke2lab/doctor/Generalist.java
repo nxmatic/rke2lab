@@ -1,20 +1,21 @@
 package io.nxmatic.rke2lab.doctor;
 
 import io.nxmatic.rke2lab.doctor.port.Clinician;
-import io.nxmatic.rke2lab.doctor.port.ClinicianId;
 import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
-import io.nxmatic.rke2lab.doctor.port.Expectation;
-import io.nxmatic.rke2lab.doctor.port.InterventionLedger;
-import io.nxmatic.rke2lab.doctor.port.MedicalRecord;
-import io.nxmatic.rke2lab.doctor.port.Observation;
-import io.nxmatic.rke2lab.doctor.port.ProblemReview;
-import io.nxmatic.rke2lab.doctor.port.Referral;
-import io.nxmatic.rke2lab.doctor.port.ReferralReply;
-import io.nxmatic.rke2lab.doctor.port.RemediationPlan;
 import io.nxmatic.rke2lab.doctor.port.Specialist;
-import io.nxmatic.rke2lab.doctor.port.Specialty;
-import io.nxmatic.rke2lab.doctor.port.Symptom;
-import io.nxmatic.rke2lab.doctor.port.Visit;
+import io.nxmatic.rke2lab.doctor.records.*;
+import io.nxmatic.rke2lab.doctor.records.ClinicianId;
+import io.nxmatic.rke2lab.doctor.records.Expectation;
+import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
+import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.records.Observation;
+import io.nxmatic.rke2lab.doctor.records.ProblemReview;
+import io.nxmatic.rke2lab.doctor.records.Referral;
+import io.nxmatic.rke2lab.doctor.records.ReferralReply;
+import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
+import io.nxmatic.rke2lab.doctor.records.Specialty;
+import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.doctor.records.Visit;
 import java.util.ArrayList;
 import java.util.List;
 

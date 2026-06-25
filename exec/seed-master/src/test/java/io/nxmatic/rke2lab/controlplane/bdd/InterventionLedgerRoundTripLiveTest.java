@@ -2,13 +2,13 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.nxmatic.rke2lab.doctor.port.Checkpoint;
-import io.nxmatic.rke2lab.doctor.port.Intervention;
-import io.nxmatic.rke2lab.doctor.port.InterventionLedger;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.doctor.port.ProblemRef;
-import io.nxmatic.rke2lab.doctor.port.Provenance;
-import io.nxmatic.rke2lab.doctor.port.Symptom;
+import io.nxmatic.rke2lab.doctor.records.Checkpoint;
+import io.nxmatic.rke2lab.doctor.records.Intervention;
+import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
+import io.nxmatic.rke2lab.doctor.records.ProblemRef;
+import io.nxmatic.rke2lab.doctor.records.Provenance;
+import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.pulumi.edge.InterventionLedgerSource;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiInterventionLedgerWriter;
 import io.nxmatic.rke2lab.pulumi.edge.testkit.GrpcChannelNoiseCapture;

@@ -20,6 +20,11 @@
   <dependencies>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-records</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-port</artifactId>
       <version>${project.version}</version>
     </dependency>

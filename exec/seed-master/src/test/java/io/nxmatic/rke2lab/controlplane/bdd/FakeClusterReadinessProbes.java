@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import io.nxmatic.rke2lab.doctor.port.Observation;
+import io.nxmatic.rke2lab.doctor.records.Observation;
 import java.util.Map;
 
 /** Canned cluster-readiness phase outcomes for the DSL-first nested scenario. */

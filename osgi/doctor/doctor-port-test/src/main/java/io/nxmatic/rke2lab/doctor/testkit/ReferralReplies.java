@@ -1,9 +1,10 @@
 package io.nxmatic.rke2lab.doctor.testkit;
 
-import io.nxmatic.rke2lab.doctor.port.Assessment;
-import io.nxmatic.rke2lab.doctor.port.Prescription;
-import io.nxmatic.rke2lab.doctor.port.ReferralReply;
-import io.nxmatic.rke2lab.doctor.port.SchemaRef;
+import io.nxmatic.rke2lab.doctor.records.*;
+import io.nxmatic.rke2lab.doctor.records.Assessment;
+import io.nxmatic.rke2lab.doctor.records.Prescription;
+import io.nxmatic.rke2lab.doctor.records.ReferralReply;
+import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import java.util.Map;
 import java.util.Optional;
 

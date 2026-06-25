@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.doctor.port;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import io.nxmatic.rke2lab.doctor.records.*;
 import org.junit.jupiter.api.Test;
 
 class PatientTest {

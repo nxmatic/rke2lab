@@ -2,7 +2,7 @@ package io.nxmatic.rke2lab.pulumi.edge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.nxmatic.rke2lab.doctor.port.StackCoordinate;
+import io.nxmatic.rke2lab.doctor.records.StackCoordinate;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 

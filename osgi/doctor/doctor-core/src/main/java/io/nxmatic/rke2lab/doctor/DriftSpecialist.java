@@ -1,12 +1,13 @@
 package io.nxmatic.rke2lab.doctor;
 
-import io.nxmatic.rke2lab.doctor.port.Assessment;
-import io.nxmatic.rke2lab.doctor.port.Intervention;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.doctor.port.ProblemReview;
-import io.nxmatic.rke2lab.doctor.port.Provenance;
-import io.nxmatic.rke2lab.doctor.port.ReferralReply;
-import io.nxmatic.rke2lab.doctor.port.SchemaRef;
+import io.nxmatic.rke2lab.doctor.records.*;
+import io.nxmatic.rke2lab.doctor.records.Assessment;
+import io.nxmatic.rke2lab.doctor.records.Intervention;
+import io.nxmatic.rke2lab.doctor.records.ProblemReview;
+import io.nxmatic.rke2lab.doctor.records.Provenance;
+import io.nxmatic.rke2lab.doctor.records.ReferralReply;
+import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;

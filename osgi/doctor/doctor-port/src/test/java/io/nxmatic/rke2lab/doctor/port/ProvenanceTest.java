@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.doctor.port;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.records.*;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 

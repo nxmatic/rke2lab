@@ -1,10 +1,10 @@
 package io.nxmatic.rke2lab.pulumi.edge;
 
-import io.nxmatic.rke2lab.doctor.port.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordReader;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordReconstructionException;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
-import io.nxmatic.rke2lab.doctor.port.Patient;
+import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.records.Patient;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;

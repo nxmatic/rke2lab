@@ -3,8 +3,9 @@ package io.nxmatic.rke2lab.doctor;
 import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
-import io.nxmatic.rke2lab.doctor.port.Patient;
 import io.nxmatic.rke2lab.doctor.port.Specialist;
+import io.nxmatic.rke2lab.doctor.records.*;
+import io.nxmatic.rke2lab.doctor.records.Patient;
 import java.util.List;
 import java.util.function.Consumer;
 

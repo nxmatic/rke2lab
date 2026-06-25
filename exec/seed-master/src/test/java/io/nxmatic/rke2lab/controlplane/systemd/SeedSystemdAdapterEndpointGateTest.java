@@ -5,8 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
-import io.nxmatic.rke2lab.doctor.port.Observation;
-import io.nxmatic.rke2lab.doctor.port.Symptom;
+import io.nxmatic.rke2lab.doctor.records.Observation;
+import io.nxmatic.rke2lab.doctor.records.Symptom;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;

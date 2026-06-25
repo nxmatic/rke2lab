@@ -1,8 +1,9 @@
 package io.nxmatic.rke2lab.doctor;
 
 import com.tngtech.jgiven.junit5.ScenarioTest;
-import io.nxmatic.rke2lab.doctor.port.RemediationProgramRef;
-import io.nxmatic.rke2lab.doctor.port.Symptom;
+import io.nxmatic.rke2lab.doctor.records.*;
+import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.testkit.FakeSpecialist;
 import org.junit.jupiter.api.Test;
 

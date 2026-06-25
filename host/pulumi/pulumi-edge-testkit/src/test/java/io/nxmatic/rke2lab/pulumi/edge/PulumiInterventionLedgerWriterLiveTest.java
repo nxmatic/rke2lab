@@ -5,13 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.doctor.port.Checkpoint;
-import io.nxmatic.rke2lab.doctor.port.Intervention;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.port.InterventionReader;
-import io.nxmatic.rke2lab.doctor.port.ProblemRef;
-import io.nxmatic.rke2lab.doctor.port.Provenance;
-import io.nxmatic.rke2lab.doctor.port.Symptom;
+import io.nxmatic.rke2lab.doctor.records.Checkpoint;
+import io.nxmatic.rke2lab.doctor.records.Intervention;
+import io.nxmatic.rke2lab.doctor.records.ProblemRef;
+import io.nxmatic.rke2lab.doctor.records.Provenance;
+import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.pulumi.edge.testkit.GrpcChannelNoiseCapture;
 import java.nio.file.Path;
 import java.time.Instant;

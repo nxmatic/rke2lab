@@ -2,9 +2,9 @@ package io.nxmatic.rke2lab.pulumi.edge;
 
 import io.nxmatic.rke2lab.doctor.port.SnapshotAccessException;
 import io.nxmatic.rke2lab.doctor.port.SnapshotContentException;
-import io.nxmatic.rke2lab.doctor.port.SnapshotEntry;
 import io.nxmatic.rke2lab.doctor.port.SnapshotSource;
-import io.nxmatic.rke2lab.doctor.port.SnapshotView;
+import io.nxmatic.rke2lab.doctor.records.SnapshotEntry;
+import io.nxmatic.rke2lab.doctor.records.SnapshotView;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;

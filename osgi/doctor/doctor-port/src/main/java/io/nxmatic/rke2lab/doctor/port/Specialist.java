@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.doctor.port;
 
+import io.nxmatic.rke2lab.doctor.records.*;
+
 /**
  * A domain expert the Generalist routes to. Given a {@link Referral} (the typed request carrying
  * the symptom, the captured {@link Observation}, and the patient's record), it reads the

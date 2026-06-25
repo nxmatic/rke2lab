@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.records.*;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
 import java.time.Instant;
 import java.util.List;

@@ -4,10 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.doctor.port.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.port.SnapshotAccessException;
-import io.nxmatic.rke2lab.doctor.port.SnapshotEntry;
-import io.nxmatic.rke2lab.doctor.port.SnapshotView;
+import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.records.SnapshotEntry;
+import io.nxmatic.rke2lab.doctor.records.SnapshotView;
 import io.nxmatic.rke2lab.pulumi.edge.testkit.StackHistoryFixture;
 import java.nio.file.Files;
 import java.nio.file.Path;

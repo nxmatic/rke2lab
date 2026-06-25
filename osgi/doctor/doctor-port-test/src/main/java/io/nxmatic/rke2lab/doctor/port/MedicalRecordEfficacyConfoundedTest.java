@@ -1,11 +1,12 @@
 package io.nxmatic.rke2lab.doctor.port;
 
-import static io.nxmatic.rke2lab.doctor.port.Checkpoint.SYSTEMD_ADAPTER;
-import static io.nxmatic.rke2lab.doctor.port.Symptom.CONNECTION_REFUSED;
+import static io.nxmatic.rke2lab.doctor.records.Checkpoint.SYSTEMD_ADAPTER;
+import static io.nxmatic.rke2lab.doctor.records.Symptom.CONNECTION_REFUSED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
 import java.time.Instant;
 import java.util.List;

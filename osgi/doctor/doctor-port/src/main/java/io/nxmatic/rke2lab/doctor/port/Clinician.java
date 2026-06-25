@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.doctor.port;
 
+import io.nxmatic.rke2lab.doctor.records.*;
+
 /**
  * An employed actor in the HealthSystem: a {@link Generalist} or a {@link Specialist}, each
  * carrying a stable {@link ClinicianId} (its identity — who it is, independent of whether it holds

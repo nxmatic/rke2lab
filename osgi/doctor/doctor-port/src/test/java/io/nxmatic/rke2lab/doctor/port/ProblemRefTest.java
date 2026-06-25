@@ -1,14 +1,15 @@
 package io.nxmatic.rke2lab.doctor.port;
 
-import static io.nxmatic.rke2lab.doctor.port.Checkpoint.CLUSTER_READINESS;
-import static io.nxmatic.rke2lab.doctor.port.Checkpoint.SYSTEMD_ADAPTER;
-import static io.nxmatic.rke2lab.doctor.port.Symptom.CONNECTION_REFUSED;
-import static io.nxmatic.rke2lab.doctor.port.Symptom.TIMEOUT;
+import static io.nxmatic.rke2lab.doctor.records.Checkpoint.CLUSTER_READINESS;
+import static io.nxmatic.rke2lab.doctor.records.Checkpoint.SYSTEMD_ADAPTER;
+import static io.nxmatic.rke2lab.doctor.records.Symptom.CONNECTION_REFUSED;
+import static io.nxmatic.rke2lab.doctor.records.Symptom.TIMEOUT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.records.*;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 

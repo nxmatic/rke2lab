@@ -11,10 +11,10 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifi
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterReadinessResource;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.controlplane.systemd.SystemdAdapterResource;
-import io.nxmatic.rke2lab.doctor.port.Checkpoint;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.port.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
+import io.nxmatic.rke2lab.doctor.records.Checkpoint;
+import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;

@@ -3,10 +3,11 @@ package io.nxmatic.rke2lab.doctor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.doctor.port.ClinicianId;
-import io.nxmatic.rke2lab.doctor.port.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
-import io.nxmatic.rke2lab.doctor.port.Patient;
+import io.nxmatic.rke2lab.doctor.records.*;
+import io.nxmatic.rke2lab.doctor.records.ClinicianId;
+import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.records.Patient;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

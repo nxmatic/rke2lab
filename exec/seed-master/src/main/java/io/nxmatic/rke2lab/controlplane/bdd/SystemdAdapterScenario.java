@@ -6,7 +6,7 @@ import com.tngtech.jgiven.annotation.Hidden;
 import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.Quoted;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.doctor.port.Observation;
+import io.nxmatic.rke2lab.doctor.records.Observation;
 
 /**
  * The systemd-adapter readiness scenario, grouped: its {@link Given}/{@link When}/{@link Then}

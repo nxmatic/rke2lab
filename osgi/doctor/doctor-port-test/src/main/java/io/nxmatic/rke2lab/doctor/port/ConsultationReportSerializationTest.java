@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
 import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
 import java.util.List;

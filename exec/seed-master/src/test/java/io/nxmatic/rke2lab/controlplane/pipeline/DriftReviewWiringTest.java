@@ -1,9 +1,9 @@
 package io.nxmatic.rke2lab.controlplane.pipeline;
 
 import io.nxmatic.rke2lab.controlplane.bdd.DoctorAssembly;
-import io.nxmatic.rke2lab.doctor.port.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
-import io.nxmatic.rke2lab.doctor.port.Patient;
+import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.records.Patient;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

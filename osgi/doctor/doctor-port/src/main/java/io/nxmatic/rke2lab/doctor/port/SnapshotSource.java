@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.doctor.port;
 
+import io.nxmatic.rke2lab.doctor.records.*;
 import java.util.List;
 import java.util.Optional;
 

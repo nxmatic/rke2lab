@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.doctor.port;
 
+import io.nxmatic.rke2lab.doctor.records.*;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Map;

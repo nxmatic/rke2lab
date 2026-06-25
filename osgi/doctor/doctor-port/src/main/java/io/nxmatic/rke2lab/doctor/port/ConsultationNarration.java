@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.doctor.port;
 
+import io.nxmatic.rke2lab.doctor.records.*;
+
 /**
  * Renders the doctor's one-line consultation narration ("consulted with N prior visit(s); SYMPTOM
  * seen K× before") from a {@link MedicalRecord}. Extracted so the two checkpoint stages that

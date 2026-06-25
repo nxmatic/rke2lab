@@ -1,15 +1,16 @@
 package io.nxmatic.rke2lab.doctor;
 
-import io.nxmatic.rke2lab.doctor.port.Assessment;
-import io.nxmatic.rke2lab.doctor.port.Observation;
-import io.nxmatic.rke2lab.doctor.port.Prescription;
-import io.nxmatic.rke2lab.doctor.port.Referral;
-import io.nxmatic.rke2lab.doctor.port.ReferralReply;
-import io.nxmatic.rke2lab.doctor.port.RemediationProgramRef;
-import io.nxmatic.rke2lab.doctor.port.SchemaRef;
 import io.nxmatic.rke2lab.doctor.port.Specialist;
-import io.nxmatic.rke2lab.doctor.port.Specialty;
-import io.nxmatic.rke2lab.doctor.port.Symptom;
+import io.nxmatic.rke2lab.doctor.records.*;
+import io.nxmatic.rke2lab.doctor.records.Assessment;
+import io.nxmatic.rke2lab.doctor.records.Observation;
+import io.nxmatic.rke2lab.doctor.records.Prescription;
+import io.nxmatic.rke2lab.doctor.records.Referral;
+import io.nxmatic.rke2lab.doctor.records.ReferralReply;
+import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.records.SchemaRef;
+import io.nxmatic.rke2lab.doctor.records.Specialty;
+import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
 import java.util.Map;
 

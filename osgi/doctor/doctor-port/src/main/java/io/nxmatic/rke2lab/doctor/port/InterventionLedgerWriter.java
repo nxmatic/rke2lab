@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.doctor.port;
 
+import io.nxmatic.rke2lab.doctor.records.*;
+
 /**
  * The write seam for the intervention ledger — the twin of the read seam {@link
  * io.nxmatic.rke2lab.pulumi.edge.StackHandle}. Implementations persist an {@link Intervention} to a

@@ -3,7 +3,7 @@ package io.nxmatic.rke2lab.pulumi.edge;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.doctor.port.InterventionLedger;
+import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
