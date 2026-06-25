@@ -48,6 +48,40 @@ understand it. ⇒ the **envelope rides in the output KEY** (`doctor/consultatio
 wrapper in the operator's face; NO opaque multi-doc YAML blob (kills Pulumi diff — rejected).
 Optional per-domain `domain/summary` shallow human line alongside the deep DAG.
 
+## ★ KEYSTONE DECISION: path-addressing — records NEVER cross to the host (2026-06-25)
+
+The knot we had missed: `DoctorConsultingService` is a LIVE in-process call (`consult(Symptom,
+Observation)` → `RemediationPlan`, on 5 pipeline sites), so today **typed records DO cross to the
+host** — violating the user's invariant "records are the OSGi vocabulary's implementation; they do
+NOT cross to the host". The sealed-ADT compile break (`ResolutionPredicate` record implements the
+`ExpectationPredicate` sealed interface) was only the SYMPTOM that surfaced this.
+
+Resolution (user's idea): the pipeline receives the DAGs as **documents (structure)**, and
+references a DAG entity by its **path within the document** — a **YAML Path** (`observations[0]`,
+`plan.prescriptions[1]`, à la `yq`), NOT a JSON Pointer. YAML is the reference format (operator reads
+`pulumi stack output` in YAML; JSON/YAML are the same tree, interconvertible — the in-memory tree
+stays a Jackson `JsonNode` via `jackson-dataformat-yaml`, but the EXPOSED address speaks YAML). The
+service interface takes **(document ref, path[s])**, never a typed record. OSGi resolves path →
+instance in the DAG → runs the logic → returns a result path.
+
+Verified in code: on all 5 sites the host NEVER reads a record's content — `consult()` → it
+accumulates the plan (`ConsultationReport`); `recordForCurrentPatient()` → only feeds
+`ConsultationNarration` (a log line); `cohortFinding()` → already a `String`. So the host only needs
+to ADDRESS nodes, never hold instances. Path-addressing makes position B (records never cross)
+practicable WITHOUT killing live consultation.
+
+Consequences:
+- `doctor-records` is a PURE OSGi bundle, NEVER system-exported — **NOT a seam** (revises the earlier
+  "type=record is seam-like" note). The host never sees it.
+- The sealed ADT (`ExpectationPredicate` + `ResolutionPredicate`) lives in `doctor-records` with no
+  seam question — it does not cross.
+- The seam carries ONLY: the `Document` (structure, already host-side via the mapper) + the
+  `DomainDagSource` interface whose methods speak in **paths** (String) + a doc ref.
+- The purity guard for `type=record` must accept sealed ADT roots (sealed interface whose permits are
+  all records/enums), not only record/enum.
+- OPEN (consultation increment): how the host PRODUCES an Observation to inject — build it as
+  structure and get a path back, or have OSGi mint it from raw host data (the systemd measurement).
+
 ## ★ Mechanism DECISION: DS, not fragment (settled 2026-06-24, user voted B)
 
 The contribution mechanism for a domain's mapper. Two options weighed in the preview:
@@ -171,6 +205,11 @@ NEXT (incremental roadmap — each step green + commit, never hold the whole in 
 4. DomainDagMultiplexor sealed bundle + `@Reference List<DomainDagMapper>` + the SCR bind boot test (sibling
    proof = `FragmentContributedComponentTest`) → green, commit.
 5. host `DomainDagAdapter` (the ACL) + `awaitService(DomainDagSource.class)` → preview green, commit.
+   ALSO at step 5: convert `ConsultationLog` (today a mutable shared accumulator threaded by ref
+   through ~6 pipeline stages, `.record()` mutated at SystemdAdapterStage + ClusterReadinessStage,
+   read at ResourceCreationPipeline + RunbookRenderer) into an IMMUTABLE record with `withReport()`
+   — DECIDED (user, the immutability rule), DEFERRED to here because it forces re-threading the
+   return value through the stages, which is pipeline-refactor scope, NOT a step-1 pure move.
 6. SEPARATE later decision: DoctorConsultingService in-process vs across-runs (the 5 sites).
 Pattern-doc forward-pointer in `port-edge-domain-ownership.adoc` still NOT done (low priority).
 Whiteboard: we REWRITE the stack content; no prior Pulumi outputs preserved.
