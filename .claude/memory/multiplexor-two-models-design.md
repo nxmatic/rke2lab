@@ -262,3 +262,30 @@ any instance reaches the factory (and what it knows) — navigable from anywhere
 invisible in the graph; a factory-instance is navigable. Aligns with keep-the-graph-navigable
 ([[prefer-non-static-inner-keep-the-graph]]). Deferred refinement, not blocking; revisit with the
 static-helper audit.
+
+## RESUME — step 1c in progress (2026-06-25, pre-compact)
+
+Quartet doctor-{records,spi,port,core} DONE + committed, full build green:
+- 8a8ef701 doctor-records leaf (type=record), 2691ff38 doctor-spi (Specialist+Clinician),
+  bfaddf52 .internal sealed impl, c508d13e navigability principle memory.
+
+STEP 1c IN PROGRESS — type=record purity guard, build-time, in the staging extension.
+WORKING TREE (uncommitted): EmbedCapability.java edited — added TYPE_RECORD constant, isRecord(),
+isDomain() now includes record, INSTALL_FILTER = "(|(type=model)(type=edge)(type=record))". COMPILES
+conceptually, not yet built.
+
+NEXT (resume here):
+1. Add ASM dependency (user: "il suffit de mettre la dépendance" — pom of maven-embed-staging-ext/
+   staging-extension; bnd-read stays pure or also gets it). NOT yet added.
+2. Write the purity guard: for each ResolvedBundle where embed().isRecord(), open the jar, read each
+   exported .class via ASM ClassReader, assert it is a record (super java/lang/Record) OR enum (super
+   java/lang/Enum) OR a sealed interface whose permits are all records/enums (ADT root). Else throw
+   LifecycleExecutionException → build fails. Prefer an INSTANCE class (RecordPurity) navigable from
+   ResolvedBundle, NOT a static helper (object-graph-navigability-principle).
+3. Call the guard in StagingExecutionStrategy.reconfigureStaging after StagingClosure.compute, over
+   the type=record bundles. Build green = doctor-records passes (it is pure today).
+4. Commit 1c.
+
+THEN: roadmap — distribute specialists (DbusTcp→systemd, Network→netplan, Cluster→new cluster domain)
+with DS @Component/@Reference List (replaces transitional `new XxxSpecialist()` in Doctor.java);
+and the static-helper/factory-as-instance audit. See [[object-graph-navigability-principle]].

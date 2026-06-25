@@ -42,6 +42,15 @@ public record EmbedCapability(Clause clause) {
   public static final String TYPE_EDGE = "edge";
 
   /**
+   * A pure data bundle: only records, enums, and sealed ADT roots — zero behavior. The diagnostic
+   * DAG vocabulary a domain reasons over. Installed bundle-side like a model (its exports are its
+   * own, never system-exported) — records are the OSGi vocabulary's implementation and never cross
+   * to the host (the path-addressing keystone). The staging extension's purity guard fails the
+   * build if a {@code type=record} bundle exports a type that is not a record / enum / sealed-ADT.
+   */
+  public static final String TYPE_RECORD = "record";
+
+  /**
    * The seam (a {@code -port}): the membrane the flat host shares with the framework. NOT installed
    * as a bundle — system-exported so the host's JCL copy and the bundles' copy are ONE class. The
    * one {@code type} that legitimately appears in {@code system.packages.extra}. See {@code
@@ -53,11 +62,11 @@ public record EmbedCapability(Clause clause) {
   public static final String TYPE_FIXTURE = "fixture";
 
   /**
-   * The bundles a runtime INSTALLS into the framework: domain {@code model} + {@code edge}, both
-   * loading on the bundle side. Excludes {@code seam} (system-exported, not installed) and {@code
-   * fixture} (test-only). The single source for the prod discovery filter.
+   * The bundles a runtime INSTALLS into the framework: domain {@code model} + {@code edge} + {@code
+   * record}, all loading on the bundle side. Excludes {@code seam} (system-exported, not installed)
+   * and {@code fixture} (test-only). The single source for the prod discovery filter.
    */
-  public static final String INSTALL_FILTER = "(|(type=model)(type=edge))";
+  public static final String INSTALL_FILTER = "(|(type=model)(type=edge)(type=record))";
 
   /**
    * The embed capability declared in {@code provideCapability}, or {@code null} if the header does
@@ -75,13 +84,18 @@ public record EmbedCapability(Clause clause) {
   }
 
   /**
-   * Whether this carrier loads on the BUNDLE side of the seam — a {@code model} or an {@code edge}.
-   * Its exported packages are owned by its own bundle classloader and must NEVER reach {@code
-   * system.packages.extra} (a second exporter there would split the class). The discriminator the
-   * leak guard turns on.
+   * Whether this carrier loads on the BUNDLE side of the seam — a {@code model}, an {@code edge}, or
+   * a {@code record}. Its exported packages are owned by its own bundle classloader and must NEVER
+   * reach {@code system.packages.extra} (a second exporter there would split the class). The
+   * discriminator the leak guard turns on.
    */
   public boolean isDomain() {
-    return TYPE_MODEL.equals(type()) || TYPE_EDGE.equals(type());
+    return TYPE_MODEL.equals(type()) || TYPE_EDGE.equals(type()) || TYPE_RECORD.equals(type());
+  }
+
+  /** Whether this carrier is a pure-data bundle — subject to the build-time record-purity guard. */
+  public boolean isRecord() {
+    return TYPE_RECORD.equals(type());
   }
 
   /** Whether this carrier is the seam — system-exported for the flat host, never installed. */
