@@ -263,29 +263,31 @@ invisible in the graph; a factory-instance is navigable. Aligns with keep-the-gr
 ([[prefer-non-static-inner-keep-the-graph]]). Deferred refinement, not blocking; revisit with the
 static-helper audit.
 
-## RESUME — step 1c in progress (2026-06-25, pre-compact)
+## STEP 1 DONE — quartet + purity guard committed (2026-06-25)
 
-Quartet doctor-{records,spi,port,core} DONE + committed, full build green:
+Quartet doctor-{records,spi,port,core} + the type=record purity guard, all committed, build green:
 - 8a8ef701 doctor-records leaf (type=record), 2691ff38 doctor-spi (Specialist+Clinician),
   bfaddf52 .internal sealed impl, c508d13e navigability principle memory.
+- 8ba759ef record-purity guard in the staging extension.
 
-STEP 1c IN PROGRESS — type=record purity guard, build-time, in the staging extension.
-WORKING TREE (uncommitted): EmbedCapability.java edited — added TYPE_RECORD constant, isRecord(),
-isDomain() now includes record, INSTALL_FILTER = "(|(type=model)(type=edge)(type=record))". COMPILES
-conceptually, not yet built.
+The guard (1c), as built:
 
-NEXT (resume here):
-1. Add ASM dependency (user: "il suffit de mettre la dépendance" — pom of maven-embed-staging-ext/
-   staging-extension; bnd-read stays pure or also gets it). NOT yet added.
-2. Write the purity guard: for each ResolvedBundle where embed().isRecord(), open the jar, read each
-   exported .class via ASM ClassReader, assert it is a record (super java/lang/Record) OR enum (super
-   java/lang/Enum) OR a sealed interface whose permits are all records/enums (ADT root). Else throw
-   LifecycleExecutionException → build fails. Prefer an INSTANCE class (RecordPurity) navigable from
-   ResolvedBundle, NOT a static helper (object-graph-navigability-principle).
-3. Call the guard in StagingExecutionStrategy.reconfigureStaging after StagingClosure.compute, over
-   the type=record bundles. Build green = doctor-records passes (it is pure today).
-4. Commit 1c.
+- `RecordPurity(ResolvedBundle)` — an INSTANCE reached by `ResolvedBundle.recordPurity()` (NOT a
+  static helper; object-graph-navigability). Reads each exported TOP-LEVEL `.class` via ASM 9.8
+  `ClassReader` (bytecode only, no linking — records reference jackson/systemd this realm can't
+  carry). Pure-data = record (ACC_RECORD / super java/lang/Record) OR enum (ACC_ENUM) OR sealed
+  interface (has a PermittedSubclasses attr = ADT root). Nested `$` types (a record's Builder) and
+  non-EXPORTED packages are skipped — only the seam is policed.
+- `StagingExecutionStrategy.enforceRecordPurity(resolved)` runs before `StagingClosure.compute`, over
+  every `embed().isRecord()` bundle; non-empty `violations()` → `LifecycleExecutionException`.
+- ASM 9.8 added to `staging-extension/pom.xml` (own jar — Maven core's bundled ASM is too old for
+  JDK 25 class files; ASM over ByteBuddy: read-only metadata, tiny realm, no transitive tail).
+- `RecordPurityTest` (5 cases, ASM-synthesised class fixtures) is the permanent regression for the
+  guard logic. Proven end-to-end against seed-master too: planted plain class → BUILD FAILURE naming
+  the type; removed → green. The guard only fires on an EXEC module's staging (seed-master), never on
+  the bundle's own build.
 
-THEN: roadmap — distribute specialists (DbusTcp→systemd, Network→netplan, Cluster→new cluster domain)
-with DS @Component/@Reference List (replaces transitional `new XxxSpecialist()` in Doctor.java);
-and the static-helper/factory-as-instance audit. See [[object-graph-navigability-principle]].
+NEXT INCREMENT — distribute specialists (DbusTcp→systemd, Network→netplan, Cluster→new cluster
+domain = the cluster-edge chantier) with DS @Component/@Reference List, replacing the transitional
+`new XxxSpecialist()` in Doctor.java. THEN the static-helper/factory-as-instance audit. See
+[[object-graph-navigability-principle]].
