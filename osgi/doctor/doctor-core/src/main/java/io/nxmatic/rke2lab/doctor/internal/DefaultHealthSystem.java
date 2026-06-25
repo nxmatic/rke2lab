@@ -28,8 +28,8 @@ import org.osgi.service.component.annotations.ReferenceCardinality;
  *
  * <p>The EHR ({@link MedicalRecordRegistry}) and ledger ({@link InterventionLedgerWriter}) are
  * institutional infrastructure, referenced as ports — not handed over at the bedside. Until the
- * host publishes them as services they stay unsatisfied and this component does not activate; the
- * flat assembly path ({@link io.nxmatic.rke2lab.doctor.Doctor}) still serves in the meantime.
+ * host publishes them as services they stay unsatisfied and this component does not activate; once
+ * published, SCR activates the institution and the host admits the patient across the seam.
  */
 @Component(service = HealthSystem.class)
 public final class DefaultHealthSystem implements HealthSystem {

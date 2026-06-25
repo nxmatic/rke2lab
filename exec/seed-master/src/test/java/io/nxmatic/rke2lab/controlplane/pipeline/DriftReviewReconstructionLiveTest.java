@@ -2,7 +2,9 @@ package io.nxmatic.rke2lab.controlplane.pipeline;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.nxmatic.rke2lab.controlplane.bdd.DoctorAssembly;
+import io.nxmatic.rke2lab.controlplane.bdd.DriftReview;
+import io.nxmatic.rke2lab.doctor.ExactRosterDoctor;
+import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
@@ -63,15 +65,18 @@ final class DriftReviewReconstructionLiveTest {
     // A stub registry returns the seeded record for the patient (the reconstruction stand-in).
     final MedicalRecordRegistry registry = patient -> seeded;
 
-    // The real ledger writer points at the @TempDir backend; the source reads it back. The assembly
-    // wires the drift specialist over it and runs the drift-at-reconstruction review.
-    DoctorAssembly.assembleWith(
-        PATIENT,
-        registry,
-        new PulumiInterventionLedgerWriter(backendDir),
-        List.of(),
-        backendDir,
-        msg -> {});
+    // The real ledger writer points at the @TempDir backend; the source reads it back. The doctor
+    // is built over the exact (empty) roster — the run's drift specialist comes from the graph —
+    // and
+    // the host-driven review folds the ledger over the reconstructed record.
+    final DoctorConsultingService doctor =
+        ExactRosterDoctor.over(
+            PATIENT,
+            registry,
+            new PulumiInterventionLedgerWriter(backendDir),
+            List.of(),
+            msg -> {});
+    new DriftReview(backendDir).reviewAtReconstruction(doctor);
 
     final InterventionLedger ledger = new InterventionLedgerSource(backendDir).load();
     assertEquals(1, ledger.interventions().size(), "one inferred external change persisted");

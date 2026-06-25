@@ -44,9 +44,10 @@ final class PipelineState {
   ConsultationLog consultations;
 
   /**
-   * The doctor's internal-edge contract for this run, assembled host-side ({@code DoctorAssembly})
-   * from the records registry + ledger writer + config-bound specialists. Built once at the
-   * readiness transition; the stages consult it without naming the hidden actors behind it.
+   * The doctor's consulting contract for this run, obtained host-side by admitting the patient into
+   * the OSGi {@code HealthSystem} (the host publishes the EHR + ledger, then {@code
+   * awaitService(HealthSystem).admit}). Built once at the readiness transition; the stages consult
+   * it without naming the hidden actors behind it.
    */
   DoctorConsultingService doctor;
 

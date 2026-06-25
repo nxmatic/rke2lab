@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- @codebase -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
@@ -10,26 +9,17 @@
     <relativePath>../../bundle-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>netplan-core</artifactId>
-  <name>osgi/netplan/netplan-core</name>
-  <description>Network configuration synthesis: typed netplan models rendered to the YAML the host
-    network layer consumes. The impl facet of the netplan domain — implements the netplan-port
-    port and exposes its api/ for the netplan-cli north-adapter (exec/netplan-cli) to drive; carries
-    no exec/shade of its own.</description>
+  <artifactId>systemd-core</artifactId>
+  <name>osgi/systemd/systemd-core</name>
+  <description>The systemd domain's in-world model facet: it contributes the systemd diagnostician
+    (DbusTcpSpecialist) to the doctor as a Declarative Services @Component over the doctor's
+    Specialist SPI. The specialist owns the systemd unit it remediates (the typed SystemdUnitId from
+    systemd-port), so it lives here, in its domain — not in doctor-core. A type=model embeddable
+    bundle; its impl package is non-exported (the specialist crosses as the Specialist service).</description>
 
   <dependencies>
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>netplan-port</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.github.seancfoley</groupId>
-      <artifactId>ipaddress</artifactId>
-    </dependency>
-    <!-- The netplan domain contributes its own diagnostician (NetworkSpecialist) to the doctor: it
-         implements the Specialist SPI over the doctor's record vocabulary, published as a @Component
-         the health system's tier-scoped @Reference collects. The domain owns its specialist. -->
+    <!-- The doctor's inter-domain SPI (Specialist + ClinicianProperties) and its record vocabulary:
+         the systemd domain implements the SPI to plug its diagnostician into the doctor. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-spi</artifactId>
@@ -40,15 +30,23 @@
       <artifactId>doctor-records</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- bnd-consumed construction annotations: @Component declares the DS descriptor bnd generates
-         (geste A only — the runtime stays on ServiceLoader until a later slice). -->
+    <!-- The systemd domain's own unit vocabulary: the specialist names the unit it remediates via
+         the typed SystemdUnitId, not a literal. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>systemd-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <!-- bnd-consumed DS annotations: @Component declares the SCR descriptor bnd generates. -->
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>org.osgi.service.component.annotations</artifactId>
       <scope>provided</scope>
     </dependency>
-    <!-- The shared doctor test fixtures (TestReferrals) for the NetworkSpecialist unit test — the
-         Referral comes from the one testkit factory, not re-spelled boilerplate. -->
+    <!-- The shared doctor test fixtures (TestReferrals) — the specialist unit test builds its
+         Referral from the one testkit factory, not re-spelled boilerplate. doctor-port-test carries
+         the io.nxmatic.rke2lab.doctor.testkit package (the old doctor-testkit module dissolved into
+         it); consumed here as a plain test jar (this is a JVM unit test, no OSGi boot). -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>doctor-port-test</artifactId>
@@ -63,9 +61,6 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
       </plugin>
-      <!-- bnd-process (managed by osgi/bundle-parent) generates the OSGi MANIFEST from bnd.bnd +
-           the bytecode; the bare reference opts this library bundle in. The jar plugin below picks
-           up that manifest via the inherited manifestFile wiring. -->
       <plugin>
         <groupId>biz.aQute.bnd</groupId>
         <artifactId>bnd-maven-plugin</artifactId>

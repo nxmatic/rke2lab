@@ -1,42 +1,33 @@
-package io.nxmatic.rke2lab.doctor.internal;
+package io.nxmatic.rke2lab.systemd.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.doctor.records.*;
-import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.doctor.records.Patient;
-import io.nxmatic.rke2lab.doctor.records.Referral;
 import io.nxmatic.rke2lab.doctor.records.ReferralReply;
 import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
-import java.util.List;
+import io.nxmatic.rke2lab.doctor.testkit.TestReferrals;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * The dbus-tcp specialist, white-box in-container: it is package-private in {@code doctor-core}, so
- * this fragment reaches it through the host loader. Proves the actor that used to live config-bound
- * on the host now reads its endpoint + node off the OBSERVATION the producer stamped — a decline
- * still speaks the "why", a connection-refused prescribes the unit restart with the host/node taken
- * from the snapshot, not from {@code BootstrapConfig}.
+ * The systemd diagnostician's contract, as a plain JVM unit test colocated with the specialist
+ * (same package, so it reads the package-private ADAPTER_UNIT / restartUnitCommand to pin the
+ * contract without re-spelling them). The diagnose is pure — it reads facts off the OBSERVATION the
+ * producer stamped, never host config — so no OSGi boot is needed here; the DS contribution itself
+ * is proven generically by the doctor's HealthSystemContributionTest. The {@code Referral} fixture
+ * comes from the shared {@link TestReferrals} testkit factory.
  */
 class DbusTcpSpecialistTest {
-
-  private static final Patient PATIENT = new Patient("organization", "rke2lab", "dev");
-
-  private static Referral referral(Symptom symptom, Observation observation) {
-    return Referral.of(PATIENT, symptom, observation, new MedicalRecord(PATIENT, List.of()));
-  }
 
   @Test
   void declined_symptom_yields_assessment_not_silence() {
     final DbusTcpSpecialist specialist = new DbusTcpSpecialist();
     final Observation observation = Observation.failed(Symptom.TIMEOUT, "timed out", Map.of());
 
-    final ReferralReply reply = specialist.diagnose(referral(Symptom.TIMEOUT, observation));
+    final ReferralReply reply = specialist.diagnose(TestReferrals.of(Symptom.TIMEOUT, observation));
 
     assertFalse(reply.hasPrescription(), "the dbus specialist only treats connection-refused");
     assertEquals("dbus-tcp/declined/v1", reply.assessment().schemaRef().id());
@@ -57,7 +48,7 @@ class DbusTcpSpecialistTest {
             Map.of("adapterHost", "10.0.0.7", "adapterPort", "55555", "nodeName", "seed-master"));
 
     final ReferralReply reply =
-        specialist.diagnose(referral(Symptom.CONNECTION_REFUSED, observation));
+        specialist.diagnose(TestReferrals.of(Symptom.CONNECTION_REFUSED, observation));
 
     assertTrue(reply.hasPrescription(), "connection-refused is the dbus specialist's treatment");
     assertEquals("dbus-tcp/connection-refused/v1", reply.assessment().schemaRef().id());

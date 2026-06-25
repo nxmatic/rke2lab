@@ -9,8 +9,8 @@ import java.util.List;
  * the {@code Generalist}, the {@code HealthSystem}, the specialists — so the model's impl evolves
  * freely behind it. Symmetric with manifests-port / netplan-port.
  *
- * <p>The graph behind it is assembled host-side and handed back as this contract (see {@code
- * Doctor.consultingService} in the core); the consumer holds only the interface.
+ * <p>The graph behind it is assembled OSGi-side when the {@code HealthSystem} admits a patient, and
+ * handed back as this contract; the consumer holds only the interface.
  */
 public interface DoctorConsultingService {
 

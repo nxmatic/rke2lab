@@ -1,6 +1,8 @@
 package io.nxmatic.rke2lab.controlplane.pipeline;
 
-import io.nxmatic.rke2lab.controlplane.bdd.DoctorAssembly;
+import io.nxmatic.rke2lab.controlplane.bdd.DriftReview;
+import io.nxmatic.rke2lab.doctor.ExactRosterDoctor;
+import io.nxmatic.rke2lab.doctor.port.DoctorConsultingService;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Patient;
@@ -18,10 +20,12 @@ class DriftReviewWiringTest {
 
   @Test
   void nullBackendIsANoOp() {
-    // No backend → the assembly's drift-at-reconstruction review returns without touching anything;
-    // must not throw.
+    // No backend → the drift-at-reconstruction review returns without touching anything; must not
+    // throw.
     final MedicalRecordRegistry registry = patient -> new MedicalRecord(patient, List.of());
-    DoctorAssembly.assembleWith(PATIENT, registry, intervention -> {}, List.of(), null, msg -> {});
+    final DoctorConsultingService doctor =
+        ExactRosterDoctor.over(PATIENT, registry, intervention -> {}, List.of(), msg -> {});
+    new DriftReview(null).reviewAtReconstruction(doctor);
     // No assertion beyond "did not throw"; the guard is the behaviour under test.
   }
 }

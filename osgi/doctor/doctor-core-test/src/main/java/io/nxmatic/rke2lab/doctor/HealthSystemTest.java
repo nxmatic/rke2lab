@@ -22,8 +22,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Admission over the single construction path ({@link DoctorGraph}): the patient is admitted, the
  * generalist employed with a credentialed access, and the roster consulted. Exercises the same
- * assembly the OSGi {@code DefaultHealthSystem} and the flat {@code Doctor} façade both route
- * through.
+ * single construction path the OSGi {@code DefaultHealthSystem} routes through on admission.
  */
 class HealthSystemTest {
 

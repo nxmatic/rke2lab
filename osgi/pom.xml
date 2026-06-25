@@ -26,6 +26,7 @@
     <module>systemd</module>
     <module>manifests</module>
     <module>netplan</module>
+    <module>cluster</module>
     <module>pipeline</module>
     <module>jgiven</module>
     <module>doctor</module>

@@ -81,6 +81,19 @@ exercised the substring install). Residual untracked target/ dirs at the old pat
   design/target-module-layout session for the squash-merge — **this session does NOT saw its own
   worktree** ([[merge-from-target-worktree]]).
 
+## BACKLOG — systemd modules mix two naming conventions (user, 2026-06-25)
+
+Same naming debt, still open under `osgi/systemd/`: the modules MIX domain-prefix with techno-in-head.
+- `systemd-port`, `systemd-core` (NEW 2026-06-25) — correct: domain prefix.
+- `cdk8s-systemd`, `dbus-systemd-edge` — wrong order: should be `systemd-cdk8s`, `systemd-dbus-edge`
+  to match the artifactId == domain-prefixed-leaf rule (manifests-core, netplan-core, …).
+A pure mechanical rename like the bench/testkit one above (git mv + artifactId + `<name>` + `<module>`
+lines + GAV dependents + the capability-filter / classpath-substring call-sites in the edge boot tests
++ the memory `dbus-systemd-edge-spec-state`). NOT done in the specialist-distribution slice (out of
+scope, and renaming pre-existing modules mid-atomic-slice would blur the diff). Own chantier when picked
+up. Note the BSN changes too (`io.nxmatic.rke2lab.dbus.systemd.edge` → `…systemd.dbus.edge`?), so re-check
+every Fragment-Host / Require-Bundle and the embed-capability filters that select these bundles.
+
 See [[osgi-runtime-r3-consume-references-state]] (promoted osgi-testkit; built the substring lookup),
 [[osgi-leaves-state]] (the domain-DIR rule), [[build-verification-gotchas]], [[merge-from-target-worktree]],
-[[standing-autonomy-except-runtime-config]].
+[[standing-autonomy-except-runtime-config]], [[dbus-systemd-edge-spec-state]].

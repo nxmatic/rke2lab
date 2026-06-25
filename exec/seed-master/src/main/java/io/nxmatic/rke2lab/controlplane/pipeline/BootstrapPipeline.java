@@ -1,8 +1,9 @@
 package io.nxmatic.rke2lab.controlplane.pipeline;
 
+import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
-import io.nxmatic.rke2lab.controlplane.bdd.DoctorAssembly;
+import io.nxmatic.rke2lab.controlplane.bdd.DriftReview;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.BboxStage;
@@ -15,10 +16,17 @@ import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
+import io.nxmatic.rke2lab.doctor.port.HealthSystem;
+import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
+import io.nxmatic.rke2lab.doctor.records.Patient;
 import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
+import io.nxmatic.rke2lab.pulumi.edge.LiveMedicalRecordRegistry;
+import io.nxmatic.rke2lab.pulumi.edge.PulumiInterventionLedgerWriter;
 import io.nxmatic.rke2lab.systemd.port.SystemdRuntimeProbe;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -126,7 +134,7 @@ public final class BootstrapPipeline {
     public AwaitingPreflight runningStandalone(Consumer<String> readinessLogger) {
       state.readinessLogger = readinessLogger;
       state.pulumiMode = false;
-      assembleDoctor(state);
+      admitPatient(state);
       resolveSystemdRuntimeStatus(state);
       return new AwaitingPreflight(state);
     }
@@ -134,21 +142,62 @@ public final class BootstrapPipeline {
     public AwaitingPreflight runningInPulumi(Consumer<String> readinessLogger) {
       state.readinessLogger = readinessLogger;
       state.pulumiMode = true;
-      assembleDoctor(state);
+      admitPatient(state);
       resolveSystemdRuntimeStatus(state);
       return new AwaitingPreflight(state);
     }
 
     /**
-     * Built once at the readiness transition (logger + mode settled): the host assembles the
-     * doctor's internal-edge contract (registry + ledger writer + config-bound specialists) and
-     * runs the drift-at-reconstruction review. The stages consult the contract, never the hidden
-     * actors.
+     * Built once at the readiness transition (logger + mode settled). The host owns the
+     * institution's infrastructure (the live EHR, the Pulumi ledger writer — built from env/Pulumi
+     * knowledge), so it publishes both into the embedded framework; that satisfies the OSGi {@code
+     * HealthSystem}'s references and SCR activates it (its diagnosing roster arrives by Declarative
+     * Services, never crossing to the host). The host then crosses the seam and gets itself
+     * admitted — {@code awaitService(HealthSystem).admit(patient)} — receiving the doctor's
+     * consulting contract, then runs the host-driven drift-at-reconstruction review. The stages
+     * consult the contract, never the hidden actors.
      */
-    private static void assembleDoctor(PipelineState state) {
+    private static void admitPatient(PipelineState state) {
       final Consumer<String> logger =
           state.readinessLogger != null ? state.readinessLogger : msg -> {};
-      state.doctor = DoctorAssembly.assemble(state.pulumiMode, logger);
+      final BootedFramework framework = state.bootedFramework;
+
+      final LiveMedicalRecordRegistry registry = LiveMedicalRecordRegistry.fromEnvironment(logger);
+      final Path backendDir = registry.backendDir();
+      final InterventionLedgerWriter ledgerWriter =
+          backendDir != null ? new PulumiInterventionLedgerWriter(backendDir) : intervention -> {};
+      framework.context().registerService(MedicalRecordRegistry.class, registry, null);
+      framework.context().registerService(InterventionLedgerWriter.class, ledgerWriter, null);
+
+      final HealthSystem healthSystem = framework.awaitService(HealthSystem.class, 5000);
+      if (healthSystem == null) {
+        throw new IllegalStateException(
+            "No HealthSystem published in the OSGi registry within 5s — DefaultHealthSystem did not"
+                + " activate (a domain diagnostician @Component, the EHR, or the ledger reference is"
+                + " unbound).");
+      }
+      state.doctor = healthSystem.admit(currentPatient(state.pulumiMode));
+      new DriftReview(backendDir).reviewAtReconstruction(state.doctor);
+    }
+
+    /**
+     * This run's patient: the Pulumi stack's org/project/stack under the engine, a placeholder
+     * otherwise (standalone, or no engine bound).
+     */
+    private static Patient currentPatient(boolean pulumiMode) {
+      final Patient placeholder = new Patient("organization", "rke2lab", "standalone");
+      if (!pulumiMode) {
+        return placeholder;
+      }
+      try {
+        final Deployment deployment = Deployment.getInstance();
+        return new Patient(
+            deployment.getOrganizationName(),
+            deployment.getProjectName(),
+            deployment.getStackName());
+      } catch (RuntimeException noEngine) {
+        return placeholder;
+      }
     }
 
     /**

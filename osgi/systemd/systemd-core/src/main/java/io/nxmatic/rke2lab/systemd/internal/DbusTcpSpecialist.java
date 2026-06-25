@@ -1,6 +1,5 @@
-package io.nxmatic.rke2lab.doctor.internal;
+package io.nxmatic.rke2lab.systemd.internal;
 
-import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Prescription;
@@ -10,27 +9,38 @@ import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Specialty;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.doctor.spi.ClinicianProperties;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
 import java.util.Map;
+import org.osgi.service.component.annotations.Component;
 
 /**
- * Systemd-domain specialist for the dbus-over-TCP adapter. Reads the observation first (the
- * captured snapshot _is_ the Status/Conditions) and, for a connection-refused symptom, prescribes
- * restarting the adapter unit — the deterministic first treatment for an unreachable dbus-TCP
- * endpoint. The unit name is this specialist's own domain knowledge (it owns the systemd unit it
- * remediates), not a string reached across modules. For any other symptom it declines with a
- * reasoned {@link Assessment} (the "why") and no prescription.
+ * The systemd domain's diagnostician for the dbus-over-TCP adapter. Reads the observation first
+ * (the captured snapshot _is_ the Status/Conditions) and, for a connection-refused symptom,
+ * prescribes restarting the adapter unit — the deterministic first treatment for an unreachable
+ * dbus-TCP endpoint. The unit name is this specialist's own domain knowledge (it owns the systemd
+ * unit it remediates), not a string reached across modules. For any other symptom it declines with
+ * a reasoned {@link Assessment} and no prescription.
+ *
+ * <p>Contributed to the doctor by Declarative Services: a {@link Specialist} {@code @Component}
+ * self-declaring the domain-level diagnostician properties ({@link
+ * ClinicianProperties#PROP_DIAGNOSTICIAN} + {@link ClinicianProperties#PROP_TIER_DOMAIN}), which
+ * the health system's tier-scoped {@code @Reference} collects. It lives in the systemd domain (its
+ * owner — it names the systemd unit and reads systemd-port's typed id), not in doctor-core.
  *
  * <p>Pure: the endpoint and node it names come from the OBSERVATION the producer stamped (flat
- * {@code adapterHost}/{@code adapterPort}/{@code nodeName} details keys), never from {@code
- * BootstrapConfig} — a doctor reads facts off the snapshot, it does not open the door itself. So it
- * lives in {@code doctor-core} beside the other specialists and joins the standard roster.
+ * {@code adapterHost}/{@code adapterPort}/{@code nodeName} details keys), never from config — a
+ * doctor reads facts off the snapshot, it does not open the door itself.
  */
+@Component(
+    service = Specialist.class,
+    property = {ClinicianProperties.PROP_DIAGNOSTICIAN, ClinicianProperties.PROP_TIER_DOMAIN})
 public final class DbusTcpSpecialist implements Specialist {
 
   /**
    * The adapter unit this specialist remediates — the typed id the manifests producer also names.
+   * Package-private so the colocated unit test pins the contract without re-spelling the unit name.
    */
   static final String ADAPTER_UNIT = SystemdUnitId.DBUS_TCP_SYSTEM_BUS.serviceUnitName();
 
@@ -74,8 +84,7 @@ public final class DbusTcpSpecialist implements Specialist {
   /**
    * The human-hint command that restarts a unit on a node via the incus egress route — for
    * CONNECTION_REFUSED the dbus door is down, so the restart cannot go back through dbus; incus
-   * exec is the route that survives. One home for the format so it is not reassembled by hand at
-   * the call site (or asserted by re-spelling it).
+   * exec is the route that survives. One home for the format so it is not reassembled by hand.
    */
   static String restartUnitCommand(String nodeName, String unit) {
     return "incus exec " + nodeName + " -- systemctl restart " + unit;

@@ -309,37 +309,75 @@ Committed, all green (see [[clinician-genus-entity-value-detector]] for the voca
 - 8e570154 memory: Generalist visibility is a SEPARATE slice (it does NOT distribute — per-run,
   no domain, not a DS singleton).
 
-## STEP 3 IN PROGRESS — atomic: distribute the 3 specialists + host switch (2026-06-25)
+## STEP 3 DONE — atomic: 3 specialists distributed + host switch to the OSGi HealthSystem (2026-06-25)
 
-User chose option (3): distribute all three diagnosticians to their domains AND do the host switch in
-ONE atomic slice (not one-by-one, because the flat `Doctor.consultingService` path is LIVE in prod —
-BootstrapPipeline L151 — so emptying the hard-coded roster before the OSGi path replaces it would
-degrade prod). A specialist auto-registers as a `Specialist` service on activation (FrameworkLauncher
-install+start()s every model bundle, verified), so `new XxxSpecialist()` is replaced by activation +
-DS collection.
+Shipped as ONE atomic slice (option 3): distribute all three diagnosticians to their domains AND
+switch prod admission to the OSGi `HealthSystem`, because the flat `Doctor.consultingService` path
+was LIVE in prod — keeping both worlds alive is the two-worlds juggling that sank the earlier doctor
+attempt. Build GREEN (clean/package -Posgi no-cache, tests on). The 3 domains (netplan-core,
+systemd-core NEW, cluster-core NEW + `osgi/cluster/` aggregator) each hold their specialist as a
+`@Component` diagnostician/domain in `.internal`, collected by DS — see
+[[clinician-genus-entity-value-detector]] for the vocabulary that grounded the brainstorm.
 
-DONE so far: NetworkSpecialist → `osgi/netplan/netplan-core` package `.netplan.internal` (NON-exported
-→ sealed; crosses as the Specialist service), @Component tagged PROP_DIAGNOSTICIAN+PROP_TIER_DOMAIN;
-netplan-core gained doctor-spi + doctor-records deps; compiles, OSGI-INF descriptor emitted. The OLD
-`.internal.NetworkSpecialist` in doctor-core is NOT yet deleted.
+### The host switch — the INVERSE seam (the brainstorm's payoff, via `.claude/claude-preview.adoc`)
 
-REMAINING (atomic slice):
-1. systemd-core — NEW module `osgi/systemd/systemd-core` (type=model, like netplan-core); move
-   DbusTcpSpecialist there as @Component diagnostician/domain (it already deps systemd-port for
-   SystemdUnitId). Add to osgi/systemd/pom.xml modules.
-2. cluster-core — NEW module `osgi/cluster/cluster-core` (type=model) + `osgi/cluster/pom.xml`
-   aggregator + add `cluster` to osgi/pom.xml modules; move ClusterSpecialist there as @Component.
-3. doctor-core: delete the 3 `.internal` specialists; empty Doctor.java's hard-coded roster. Decide
-   Doctor/ExactRosterDoctor flat factories (likely delete with the host switch).
-4. tests: FakeSpecialistsTest (doctor-core-test, white-box `new NetworkSpecialist()/ClusterSpecialist()`)
-   breaks → rewrite with local fakes (it tests the Generalist fan-out, not the real specialists) or move
-   each specialist's unit test to its domain (plain JVM test — they are pure diagnose, no OSGi needed).
-   NestedRunbookTest already has its own FakeNetworkSpecialist (no change).
-5. host switch: BootstrapPipeline L151 `state.doctor = DoctorAssembly.assemble(...)` →
-   `state.bootedFramework.awaitService(HealthSystem.class, 5000).admit(patient)` (the SystemdRuntimeProbe
-   awaitService right below at L162 is the pattern). Adapt DoctorAssembly; remove Doctor.consultingService.
-6. build green seed-master no-cache + a prod-topology boot test that the 3 specialists are DS-collected;
-   ONE atomic commit.
+The seam host↔OSGi has TWO directions; only `awaitService` (OSGi→host) was wired (SystemdRuntimeProbe,
+prod). The HealthSystem needs the MIRROR: the host PUBLISHES its infra into the framework so
+`DefaultHealthSystem`'s `@Reference`s (EHR + ledger) satisfy and SCR activates it. `registerService` is
+already reachable via `BootedFramework.context()` — NO need to extend BootedFramework. Forward-compat
+PROVEN (user's condition "on retombe sur nos pattes au multiplexor"): the publish-then-await STRUCTURE
+is invariant; the multiplexor (steps 5-6) only substitutes the published TYPE
+(MedicalRecordRegistry+InterventionLedgerWriter → DomainDagSource) at the SAME point, a net replacement.
+The `MedicalRecord` traversal it implies ALREADY existed via the flat path (LiveMedicalRecordRegistry
+builds it host-side) — not added, just moved param→service-registry; the keystone closes it both sides
+at the multiplexor. Invariant `grep -ri pulumi osgi/ == 0` preserved (publish lives in exec/seed-master).
 
-THEN: static-helper/factory-as-instance audit; DriftSpecialist-as-Clinician decision; Generalist-visibility
-slice. See [[object-graph-navigability-principle]] [[clinician-genus-entity-value-detector]].
+### What landed (the diff)
+
+- **Doctor.java DELETED** — the flat façade only ever added `new {DbusTcp,Network,Cluster}Specialist()`;
+  those classes are gone (distributed), and the run's DriftSpecialist comes from `DoctorGraph.assemble`
+  (shared), so the façade had zero residual value. "Doctor" is ABSTRACT (the user settled it): no class
+  should bear it as an entity — the concrete doctors are `Generalist` + the `Specialist`s; the common
+  interface IS `Clinician` (not `Doctor`); `Remediator` is "a clinician but not a doctor". Deleting the
+  façade returned the word to its abstraction (Wirth test: a concept whose removal breaks nothing wasn't
+  needed). `DoctorGraph` is the assembly ACT, not the Doctor.
+- **`Admission` was created then DISSOLVED** mid-session: a host class named `Admission.admit(...)`
+  USURPED admission — admitting is the HealthSystem's job, not the host's. The user's model: enrollment
+  (system-health level, identity / "numéro de sécu") vs admission (establishment level); we have no
+  Hospital/Clinic yet so `HealthSystem.admit` FUSES both — fork for the day establishments appear (do
+  NOT rename `admit` now). So the host does NOT admit; the pipeline's `admitPatient(state)` inlines:
+  build EHR+ledger (host) → `context().registerService(both)` → `awaitService(HealthSystem)` →
+  `.admit(currentPatient)` → DriftReview. Mirrors `resolveSystemdRuntimeStatus`.
+- **`DriftReview`** (exec/seed-master/.../bdd) — the drift-at-reconstruction follow-up extracted as an
+  INSTANCE bound to its `backendDir` (factory-as-instance / object-graph-navigability), reused by the 2
+  drift tests; replaces the old static `DoctorAssembly.reviewDriftAtReconstruction`.
+- **2 drift tests** (`DriftReviewWiringTest`, `DriftReviewReconstructionLiveTest`) rewired off the gone
+  façade to `ExactRosterDoctor.over(...)` + `new DriftReview(backendDir)` — they only ever passed
+  `List.of()`, so nothing lost; their subject is the drift review, now aimed directly.
+- **`FakeSpecialistsTest` → `GeneralistFanOutTest`**: cases 1&2 (`new Network/ClusterSpecialist`) DROPPED
+  (those decline cases now live in netplan/cluster-core); the fan-out case kept (option A) with a LOCAL
+  `DecliningSpecialist(NETWORK)` record + the prescribing `FakeSpecialist`. `FakeSpecialist` (POJO) stays
+  — it serves the in-JVM model tests (routing/fan-out/retrieval) via `ExactRosterDoctor`; the DS-contributed
+  `@Component` fake is the SEPARATE `FakeDiagnostician` (in-container, HealthSystemContributionTest). Two
+  fakes, two layers, both legitimate.
+- 5 javadoc refs to the gone façade cleaned (DoctorConsultingService, ExactRosterDoctor, DefaultHealthSystem,
+  HealthSystemTest, PipelineState).
+
+### NEXT — commit B (separate, pure rename): `DoctorConsultingService` → `ConsultingService`
+
+User wants the redundant `Doctor-` prefix off the PORT type (package is already `doctor.port`; "Doctor"
+in a class name reads as the Generalist, confusing). Scope = the PORT ONLY (18 files reference it).
+Do NOT touch `DoctorGraph` (different debate) nor the test/scenario names (DoctorScenario, *Test — there
+"Doctor" names the subsystem under test, legitimate). Separate commit so the atomic slice's diff stays
+clean (user chose B).
+
+THEN (separate slices, ordered backlog):
+
+- **Slice prescriptor** — surface `Specialist.diagnose` as TWO verbs (`assess` always + `prescribe`
+  conditional), where the efficacy-first gate naturally sits (Generalist orchestrates assess→gate→prescribe).
+  Touches all Specialist impls; the user explicitly deferred it here ("on verra au slice prescriptor").
+  This is the `clinician-genus-entity-value-detector` open fork (assess+prescribe fused today).
+- static-helper/factory-as-instance audit; DriftSpecialist-as-Clinician decision; Generalist-visibility
+  slice ([[clinician-genus-entity-value-detector]] backlog); systemd module rename
+  ([[osgi-bench-testkit-naming-state]] backlog). See [[object-graph-navigability-principle]],
+  [[pipeline-orchestration-osgi-vision]].

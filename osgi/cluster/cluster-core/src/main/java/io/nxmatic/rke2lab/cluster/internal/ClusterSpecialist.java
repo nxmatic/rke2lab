@@ -1,22 +1,33 @@
-package io.nxmatic.rke2lab.doctor.internal;
+package io.nxmatic.rke2lab.cluster.internal;
 
-import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.Referral;
 import io.nxmatic.rke2lab.doctor.records.ReferralReply;
 import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Specialty;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.doctor.spi.ClinicianProperties;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import java.util.Map;
+import org.osgi.service.component.annotations.Component;
 
 /**
- * Cluster-domain exemplar specialist. Reads the observation and returns a reasoned {@link
- * Assessment} of cluster-layer concerns (kubeconfig, control-plane readiness), but never prescribes
- * — no automated cluster remediation exists yet. This specialist gives the CLUSTER domain a voice
- * in the consult fan-out (the recruit seam) until a real specialist that can treat cluster symptoms
- * is added.
+ * The cluster domain's diagnostician: it reads a cluster-layer observation (kubeconfig,
+ * control-plane readiness) and returns a reasoned {@link Assessment}, but never prescribes — no
+ * automated cluster remediation exists yet. It gives the CLUSTER domain a voice in the consult
+ * fan-out until a treating specialist is added.
+ *
+ * <p>Contributed to the doctor by Declarative Services: a {@link Specialist} {@code @Component}
+ * self-declaring the domain-level diagnostician properties ({@link
+ * ClinicianProperties#PROP_DIAGNOSTICIAN} + {@link ClinicianProperties#PROP_TIER_DOMAIN}), which
+ * the health system's tier-scoped {@code @Reference} collects. It lives in the cluster domain (its
+ * owner), not in doctor-core — the domain defines its own specialist. The class is in a
+ * non-exported package: it crosses to the doctor as the {@code Specialist} service, never as a
+ * shared type.
  */
+@Component(
+    service = Specialist.class,
+    property = {ClinicianProperties.PROP_DIAGNOSTICIAN, ClinicianProperties.PROP_TIER_DOMAIN})
 public final class ClusterSpecialist implements Specialist {
 
   @Override

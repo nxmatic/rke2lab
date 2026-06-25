@@ -9,18 +9,15 @@
     <relativePath>../../build-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>systemd</artifactId>
+  <artifactId>cluster</artifactId>
   <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
-  <name>osgi/systemd</name>
-  <description>The systemd domain: the typed unit/contract vocabulary plus the runtime-status
-    readiness seam (systemd-port), the CDK8s integration that synthesizes those units
-    (cdk8s-systemd), and the dbus-on-TCP edge that reads the live systemd (dbus-systemd-edge).</description>
+  <name>osgi/cluster</name>
+  <description>The cluster domain: the in-world model facet that reasons about cluster-layer concerns
+    (kubeconfig, control-plane readiness). Its first content is the cluster diagnostician contributed
+    to the doctor (cluster-core); the domain grows here as the cluster-edge chantier proceeds.</description>
 
   <modules>
-    <module>systemd-port</module>
-    <module>systemd-core</module>
-    <module>cdk8s-systemd</module>
-    <module>dbus-systemd-edge</module>
+    <module>cluster-core</module>
   </modules>
 </project>
