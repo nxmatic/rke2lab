@@ -29,6 +29,13 @@ public interface ConsultingService {
   String cohortFinding(Symptom symptom);
 
   /**
+   * The one-line consultation narration for the symptom — "consulted with N prior visit(s); SYMPTOM
+   * seen K× before" — folded over the admitted patient's own record. Twin of {@link
+   * #cohortFinding(Symptom)}: both render a narration line the consulting stages log.
+   */
+  String consultedLine(Symptom symptom);
+
+  /**
    * The follow-up coordination at reconstruction: for every resolved expectation on the record,
    * review the problem against the loaded {@link InterventionLedger} and collect the drift letters.
    */

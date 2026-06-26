@@ -108,6 +108,22 @@ public final class Generalist implements Clinician, ConsultingService {
   }
 
   /**
+   * The one-line consultation narration for the symptom, folded over the held patient's own record.
+   * Twin of {@link #cohortFinding(Symptom)} — both render a line the consulting stages log.
+   */
+  @Override
+  public String consultedLine(Symptom symptom) {
+    final MedicalRecord record = access.record();
+    return "consulted with "
+        + record.visits().size()
+        + " prior visit(s); "
+        + symptom.id()
+        + " seen "
+        + record.historyOf(symptom).count()
+        + "× before";
+  }
+
+  /**
    * A one-line cross-patient finding for the symptom, folded across the granted cohort. Empty
    * cohort (or no backend) yields a finding over just the current patient.
    */

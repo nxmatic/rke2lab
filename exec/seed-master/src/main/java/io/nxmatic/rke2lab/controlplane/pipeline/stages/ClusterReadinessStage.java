@@ -11,12 +11,10 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.port.ConsultationNarration;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
-import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
@@ -224,8 +222,7 @@ public final class ClusterReadinessStage {
         .ifPresent(
             observation -> {
               final Symptom symptom = observation.symptom().get();
-              final MedicalRecord record = doctor.recordForCurrentPatient();
-              log("⚕ " + ConsultationNarration.consultedLine(record, symptom));
+              log("⚕ " + doctor.consultedLine(symptom));
               final RemediationPlan plan = doctor.consult(symptom, observation);
               if (consultations != null) {
                 consultations.record(

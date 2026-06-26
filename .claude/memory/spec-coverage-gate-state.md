@@ -72,8 +72,8 @@ Per-gate summary: record-purity 0/0, spec-coverage 0e/39w, instance-discipline 0
 
 ## Remaining
 
-- Committed as ONE batch (the rule + its verrou), including `maven-embed-staging-ext/.mvn` — the
-  user's symlink so `../mvnw` installs the extension from inside the module (user asked to commit it).
+- DONE: committed as ONE batch `0299913a` (56 files, incl `maven-embed-staging-ext/.mvn` — the user's
+  symlink so `../mvnw` installs the extension from inside the module).
 - Deferred (separate slices, user-confirmed): the lines+imports severity indicator for static helpers
   (a refinement, noted not built); paying down the WARN backlog domain by domain then raising to ERROR.
 

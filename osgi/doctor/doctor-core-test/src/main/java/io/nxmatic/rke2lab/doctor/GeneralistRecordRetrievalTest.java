@@ -15,6 +15,7 @@ import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.doctor.testkit.FakeSpecialist;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -97,5 +98,43 @@ class GeneralistRecordRetrievalTest {
 
     assertSame(known, generalist.recordForCurrentPatient());
     assertEquals(PATIENT, spy.lastRequested);
+  }
+
+  @Test
+  void consulted_line_renders_from_an_empty_record() {
+    final Generalist generalist =
+        generalistOver(List.of(), new SpyRegistry(new MedicalRecord(PATIENT, List.of())));
+
+    assertEquals(
+        "consulted with 0 prior visit(s); connection-refused seen 0× before",
+        generalist.consultedLine(Symptom.CONNECTION_REFUSED));
+  }
+
+  @Test
+  void consulted_line_counts_only_visits_raising_the_symptom() {
+    // Two visits: one raises CONNECTION_REFUSED, the other TIMEOUT — the fold counts the symptom's
+    // visits, not all visits.
+    final Visit refused =
+        new Visit(
+            1,
+            Instant.ofEpochSecond(1_780_000_001L),
+            List.of(report(Symptom.CONNECTION_REFUSED)),
+            List.of());
+    final Visit timeout =
+        new Visit(
+            2, Instant.ofEpochSecond(1_780_000_002L), List.of(report(Symptom.TIMEOUT)), List.of());
+    final Generalist generalist =
+        generalistOver(
+            List.of(), new SpyRegistry(new MedicalRecord(PATIENT, List.of(refused, timeout))));
+
+    assertEquals(
+        "consulted with 2 prior visit(s); connection-refused seen 1× before",
+        generalist.consultedLine(Symptom.CONNECTION_REFUSED));
+  }
+
+  private static ConsultationReport report(Symptom symptom) {
+    final Observation observation = Observation.failed(symptom, "test " + symptom.id(), Map.of());
+    final RemediationPlan plan = new RemediationPlan(symptom, List.of(), "test summary");
+    return new ConsultationReport("test-checkpoint", List.of(observation), plan);
   }
 }
