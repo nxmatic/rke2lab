@@ -23,6 +23,14 @@
       <artifactId>domain-annotations</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- The cluster domain's own port: ClusterSchemaRef single-sources the "cluster/*/v1" schema refs
+         the specialist carries on its assessments. The natural direction — the domain depends on its
+         own seam. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>cluster-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- The doctor's inter-domain SPI (Specialist + ClinicianProperties) and its record vocabulary:
          the cluster domain implements the SPI to plug its diagnostician into the doctor. -->
     <dependency>
