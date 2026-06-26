@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
@@ -13,9 +14,15 @@ import java.util.function.Consumer;
 
 /**
  * The live cluster-readiness probe: each {@link ClusterReadinessPhase} delegates to the matching
- * per-phase check on {@link ClusterBootstrapReadinessVerifier} (the 520-line verifier is reused,
- * not rewritten) and maps the outcome to an {@link Observation} carrying a typed {@link Symptom} on
- * failure. The dependency direction is {@code bdd → readiness} only, so no package cycle.
+ * per-phase check on {@link ClusterBootstrapReadinessVerifier} (which owns the host orchestration —
+ * the systemd gate, the kubeconfig NIO poll, the policy→controller projection, the retry loops) and
+ * maps the outcome to an {@link Observation} carrying a typed {@link Symptom} on failure. The
+ * dependency direction is {@code bdd → readiness} only, so no package cycle.
+ *
+ * <p>The two kubectl-backed phases (API readiness, controller effectiveness) are satisfied by the
+ * injected {@link ClusterReadinessContact} edge, resolved once from the OSGi registry (the
+ * cluster-edge {@code @Component}). This probe never reaches the edge statically — it is passed the
+ * contact, then threads it to the verifier's per-phase checks.
  *
  * <p>Symptoms are typed and named in the runbook from Increment D; no specialist treats them yet,
  * so the doctor produces an empty plan (symptom seen, no treatment offered).
@@ -24,14 +31,17 @@ public final class ProductionClusterReadinessProbe implements ClusterReadinessPr
 
   private final ControlplanePolicy policy;
   private final SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus;
+  private final ClusterReadinessContact contact;
   private final Consumer<String> logger;
 
   public ProductionClusterReadinessProbe(
       ControlplanePolicy policy,
       SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus,
+      ClusterReadinessContact contact,
       Consumer<String> logger) {
     this.policy = policy;
     this.runtimeStatus = runtimeStatus;
+    this.contact = contact;
     this.logger = logger;
   }
 
@@ -47,12 +57,13 @@ public final class ProductionClusterReadinessProbe implements ClusterReadinessPr
       case API_READY ->
           toObservation(
               phase,
-              ClusterBootstrapReadinessVerifier.checkApiReady(config, logger),
+              ClusterBootstrapReadinessVerifier.checkApiReady(config, contact, logger),
               Symptom.API_NOT_READY);
       case CONTROLLERS_EFFECTIVE ->
           toObservation(
               phase,
-              ClusterBootstrapReadinessVerifier.checkControllersEffective(config, policy, logger),
+              ClusterBootstrapReadinessVerifier.checkControllersEffective(
+                  config, contact, policy, logger),
               Symptom.CONTROLLER_NOT_READY);
     };
   }

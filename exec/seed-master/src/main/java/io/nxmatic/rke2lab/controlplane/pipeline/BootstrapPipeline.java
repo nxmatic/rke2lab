@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane.pipeline;
 
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.bdd.DriftReview;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
@@ -135,6 +136,7 @@ public final class BootstrapPipeline {
       state.pulumiMode = false;
       admitPatient(state);
       resolveSystemdRuntimeStatus(state);
+      resolveClusterReadinessContact(state);
       return new AwaitingPreflight(state);
     }
 
@@ -143,6 +145,7 @@ public final class BootstrapPipeline {
       state.pulumiMode = true;
       admitPatient(state);
       resolveSystemdRuntimeStatus(state);
+      resolveClusterReadinessContact(state);
       return new AwaitingPreflight(state);
     }
 
@@ -214,6 +217,23 @@ public final class BootstrapPipeline {
                 + "(dbus-systemd-edge @Component absent).");
       }
       state.systemdRuntimeStatus = new SeedSystemdAdapterRuntimeStatusSnapshot(probe);
+    }
+
+    /**
+     * Resolve the cluster-readiness contact once from the booted registry — the cluster-edge
+     * {@code @Component} that implements {@code ClusterReadinessContact} by shelling kubectl.
+     * Threaded to the readiness probe, so the host wraps it in its retry loops without reaching the
+     * edge statically.
+     */
+    private static void resolveClusterReadinessContact(PipelineState state) {
+      final ClusterReadinessContact contact =
+          state.bootedFramework.awaitService(ClusterReadinessContact.class, 5000);
+      if (contact == null) {
+        throw new IllegalStateException(
+            "No ClusterReadinessContact published in the OSGi registry within 5s "
+                + "(cluster-edge @Component absent).");
+      }
+      state.clusterReadinessContact = contact;
     }
   }
 
@@ -371,6 +391,7 @@ public final class BootstrapPipeline {
               state.consultations,
               state.doctor,
               state.systemdRuntimeStatus,
+              state.clusterReadinessContact,
               () -> state.bootstrapResult,
               () -> state.systemdAdapterLaunchSummary,
               result -> state.resourceResult = result);

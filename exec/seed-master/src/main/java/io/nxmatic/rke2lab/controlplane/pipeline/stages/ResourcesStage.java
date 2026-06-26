@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
@@ -25,6 +26,7 @@ public final class ResourcesStage {
   private final ConsultationLog consultations;
   private final ConsultingService doctor;
   private final SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
+  private final ClusterReadinessContact clusterReadinessContact;
   private final Supplier<IncusResourceBootstrap.BootstrapResult> bootstrapResultSupplier;
   private final Supplier<Map<String, Object>> systemdAdapterLaunchSupplier;
   private final Consumer<ResourceCreationResult> sink;
@@ -40,6 +42,7 @@ public final class ResourcesStage {
       ConsultationLog consultations,
       ConsultingService doctor,
       SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
+      ClusterReadinessContact clusterReadinessContact,
       Supplier<IncusResourceBootstrap.BootstrapResult> bootstrapResultSupplier,
       Supplier<Map<String, Object>> systemdAdapterLaunchSupplier,
       Consumer<ResourceCreationResult> sink) {
@@ -53,6 +56,7 @@ public final class ResourcesStage {
     this.consultations = consultations;
     this.doctor = doctor;
     this.systemdRuntimeStatus = systemdRuntimeStatus;
+    this.clusterReadinessContact = clusterReadinessContact;
     this.bootstrapResultSupplier = bootstrapResultSupplier;
     this.systemdAdapterLaunchSupplier = systemdAdapterLaunchSupplier;
     this.sink = sink;
@@ -69,6 +73,7 @@ public final class ResourcesStage {
             consultations,
             doctor,
             systemdRuntimeStatus,
+            clusterReadinessContact,
             bootstrapResultSupplier.get(),
             systemdAdapterLaunchSupplier.get(),
             pulumiMode));

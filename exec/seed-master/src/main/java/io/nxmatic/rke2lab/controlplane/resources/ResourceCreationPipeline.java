@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane.resources;
 
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.controlplane.bdd.ProductionClusterReadinessProbe;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
@@ -35,6 +36,7 @@ final class ResourceCreationPipeline {
   private final ConsultationLog consultations;
   private final ConsultingService doctor;
   private final SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
+  private final ClusterReadinessContact clusterReadinessContact;
   private final IncusResourceBootstrap.BootstrapResult bootstrapResult;
   private final Map<String, Object> systemdAdapterLaunchSummary;
 
@@ -47,6 +49,7 @@ final class ResourceCreationPipeline {
       ConsultationLog consultations,
       ConsultingService doctor,
       SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
+      ClusterReadinessContact clusterReadinessContact,
       IncusResourceBootstrap.BootstrapResult bootstrapResult,
       Map<String, Object> systemdAdapterLaunchSummary) {
     this.config = config;
@@ -57,6 +60,7 @@ final class ResourceCreationPipeline {
     this.consultations = consultations;
     this.doctor = doctor;
     this.systemdRuntimeStatus = systemdRuntimeStatus;
+    this.clusterReadinessContact = clusterReadinessContact;
     this.bootstrapResult = bootstrapResult;
     this.systemdAdapterLaunchSummary = systemdAdapterLaunchSummary;
   }
@@ -79,7 +83,8 @@ final class ResourceCreationPipeline {
             runbook,
             consultations,
             doctor,
-            new ProductionClusterReadinessProbe(policy, systemdRuntimeStatus, readinessLogger),
+            new ProductionClusterReadinessProbe(
+                policy, systemdRuntimeStatus, clusterReadinessContact, readinessLogger),
             systemdAdapterLaunchSummary,
             result -> holder[0] = result)
         .launch();

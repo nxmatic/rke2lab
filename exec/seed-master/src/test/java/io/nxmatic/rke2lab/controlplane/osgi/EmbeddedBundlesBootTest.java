@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.controlplane.osgi;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.junit.testkit.Osgi;
 import io.nxmatic.rke2lab.manifests.port.FloxRuntimeAssetService;
 import io.nxmatic.rke2lab.manifests.port.ManifestDocumentService;
@@ -78,5 +79,14 @@ class EmbeddedBundlesBootTest {
     assertNotNull(
         framework.awaitService(FloxRuntimeAssetService.class, 5000),
         "SCR published FloxRuntimeAssetService (couture 3)");
+  }
+
+  @Test
+  void embeddedClusterEdgePublishesTheReadinessContactTyped() {
+    assertNotNull(
+        framework.awaitService(ClusterReadinessContact.class, 5000),
+        "the embedded cluster-edge bundle booted and SCR published ClusterReadinessContact — the"
+            + " host resolves the kubectl contact from the registry (cluster-port seam"
+            + " single-exporter, typed, no ClassCastException)");
   }
 }

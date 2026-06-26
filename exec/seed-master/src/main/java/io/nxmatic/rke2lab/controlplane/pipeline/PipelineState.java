@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.pipeline;
 
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
@@ -59,6 +60,14 @@ final class PipelineState {
    * reaches the edge statically.
    */
   SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
+
+  /**
+   * The cluster-readiness contact for this run, resolved once from the booted OSGi registry (the
+   * cluster-edge {@code @Component} implementing {@code ClusterReadinessContact}). Threaded to the
+   * readiness probe, which the host orchestration wraps in its retry loops — so the host never
+   * reaches the edge statically.
+   */
+  ClusterReadinessContact clusterReadinessContact;
 
   BboxReconciliationOrchestrator bboxOrchestrator;
   ResourceManager resourceManager;

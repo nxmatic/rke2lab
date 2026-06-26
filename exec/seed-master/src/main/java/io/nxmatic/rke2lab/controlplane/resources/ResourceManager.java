@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.resources;
 
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
@@ -22,6 +23,7 @@ public final class ResourceManager {
       ConsultationLog consultations,
       ConsultingService doctor,
       SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
+      ClusterReadinessContact clusterReadinessContact,
       IncusResourceBootstrap.BootstrapResult bootstrapResult,
       Map<String, Object> systemdAdapterLaunchSummary,
       boolean pulumiMode) {
@@ -36,6 +38,7 @@ public final class ResourceManager {
             consultations,
             doctor,
             systemdRuntimeStatus,
+            clusterReadinessContact,
             bootstrapResult,
             systemdAdapterLaunchSummary);
 

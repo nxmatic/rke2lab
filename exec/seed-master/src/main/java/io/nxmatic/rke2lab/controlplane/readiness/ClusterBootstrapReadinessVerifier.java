@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.readiness;
 
+import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
+import io.nxmatic.rke2lab.cluster.port.ControllerRef;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
@@ -84,12 +86,13 @@ public final class ClusterBootstrapReadinessVerifier {
         });
   }
 
-  public static PhaseOutcome checkApiReady(BootstrapConfig config, Consumer<String> logger) {
+  public static PhaseOutcome checkApiReady(
+      BootstrapConfig config, ClusterReadinessContact contact, Consumer<String> logger) {
     return runPhase(
         logger,
         () -> {
           final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
-          final boolean ok = waitForApiReady(kubeconfigPath, config.readinessTimeout());
+          final boolean ok = waitForApiReady(contact, kubeconfigPath, config.readinessTimeout());
           return new PhaseOutcome(
               ok,
               ok ? "kubernetes API reports readyz=ok" : "kubernetes API did not report readyz=ok");
@@ -97,13 +100,16 @@ public final class ClusterBootstrapReadinessVerifier {
   }
 
   public static PhaseOutcome checkControllersEffective(
-      BootstrapConfig config, ControlplanePolicy policy, Consumer<String> logger) {
+      BootstrapConfig config,
+      ClusterReadinessContact contact,
+      ControlplanePolicy policy,
+      Consumer<String> logger) {
     return runPhase(
         logger,
         () -> {
           final Path kubeconfigPath = config.kubeconfigRef().toAbsolutePath().normalize();
           final ControllerVerification controllers =
-              verifyRequiredControllers(kubeconfigPath, policy, config.readinessTimeout());
+              verifyRequiredControllers(contact, kubeconfigPath, policy, config.readinessTimeout());
           return new PhaseOutcome(controllers.ready(), controllers.detail());
         });
   }
@@ -117,11 +123,6 @@ public final class ClusterBootstrapReadinessVerifier {
     } finally {
       ACTIVE_LOGGER.set(previous);
     }
-  }
-
-  /** The required-controller refs for a policy — exposed for the BDD output projection. */
-  public static List<String> controllerRefs(ControlplanePolicy policy) {
-    return requiredControllerRefs(policy);
   }
 
   /** Outcome of a single readiness phase: passed, plus a human detail line. */
@@ -225,120 +226,77 @@ public final class ClusterBootstrapReadinessVerifier {
     return false;
   }
 
-  private static boolean waitForApiReady(Path kubeconfigPath, Duration timeout) {
+  /**
+   * The host owns the retry loop and the timeout policy; the {@link ClusterReadinessContact} edge
+   * answers ONE point-in-time question per poll. Each {@code isApiReady} call is stateless — the
+   * waiting lives here, not in the edge.
+   */
+  private static boolean waitForApiReady(
+      ClusterReadinessContact contact, Path kubeconfigPath, Duration timeout) {
     logInfo("waiting for kubernetes API readiness (/readyz)...");
     final long startedAt = System.nanoTime();
     long nextProgressLogAt = startedAt + LOG_PROGRESS_INTERVAL.toNanos();
-    String lastSummary = "not yet checked";
     final long deadlineNanos = System.nanoTime() + timeout.toNanos();
     while (System.nanoTime() < deadlineNanos) {
-      final CommandResult readyzResult =
-          runCommand(
-              List.of(
-                  "kubectl",
-                  "--kubeconfig",
-                  kubeconfigPath.toString(),
-                  "--insecure-skip-tls-verify=true",
-                  "--request-timeout=5s",
-                  "get",
-                  "--raw=/readyz"),
-              Duration.ofSeconds(8));
-      if (readyzResult.exitCode() == 0 && readyzResult.stdout().trim().contains("ok")) {
+      if (contact.isApiReady(kubeconfigPath)) {
         logInfo("kubernetes API ready after " + elapsedSince(startedAt));
         return true;
       }
 
-      lastSummary = readyzResult.summary();
       final long now = System.nanoTime();
       if (now >= nextProgressLogAt) {
-        logInfo(
-            "still waiting for API readyz after "
-                + elapsedSince(startedAt)
-                + " (last result: "
-                + lastSummary
-                + ")");
+        logInfo("still waiting for API readyz after " + elapsedSince(startedAt));
         nextProgressLogAt = now + LOG_PROGRESS_INTERVAL.toNanos();
       }
 
       sleep(RETRY_INTERVAL);
     }
 
-    logInfo(
-        "API readiness wait timed out after " + timeout + " (last result: " + lastSummary + ")");
+    logInfo("API readiness wait timed out after " + timeout);
     return false;
   }
 
+  /**
+   * The host projects the policy into the required {@link ControllerRef}s and owns the retry loop;
+   * the edge answers the single point-in-time "are these effective now?" question per poll. The
+   * edge never sees the policy — only the projected refs.
+   */
   private static ControllerVerification verifyRequiredControllers(
-      Path kubeconfigPath, ControlplanePolicy policy, Duration timeout) {
+      ClusterReadinessContact contact,
+      Path kubeconfigPath,
+      ControlplanePolicy policy,
+      Duration timeout) {
     final List<ControllerRef> requiredControllers = requiredControllers(policy);
     if (requiredControllers.isEmpty()) {
       logInfo("no required controllers configured for readiness gate");
       return new ControllerVerification(true, "no required controllers", List.of());
     }
 
-    for (ControllerRef controllerRef : requiredControllers) {
-      final String resourceRef = controllerRef.kind() + "/" + controllerRef.name();
-
-      logInfo("waiting for controller create: " + controllerRef.ref());
-      final CommandResult createdResult =
-          runCommand(
-              List.of(
-                  "kubectl",
-                  "--kubeconfig",
-                  kubeconfigPath.toString(),
-                  "--insecure-skip-tls-verify=true",
-                  "-n",
-                  controllerRef.namespace(),
-                  "wait",
-                  "--for=create",
-                  resourceRef,
-                  "--timeout=" + timeout.toSeconds() + "s"),
-              timeout.plusSeconds(5));
-      if (createdResult.exitCode() != 0) {
-        logInfo("controller create wait failed: " + controllerRef.ref());
+    logInfo("waiting for required controllers to become effective...");
+    final long startedAt = System.nanoTime();
+    long nextProgressLogAt = startedAt + LOG_PROGRESS_INTERVAL.toNanos();
+    final long deadlineNanos = System.nanoTime() + timeout.toNanos();
+    while (System.nanoTime() < deadlineNanos) {
+      if (contact.areControllersEffective(kubeconfigPath, requiredControllers)) {
+        logInfo("all required controllers are effective after " + elapsedSince(startedAt));
         return new ControllerVerification(
-            false,
-            "failed waiting for resource create "
-                + controllerRef.ref()
-                + " ("
-                + createdResult.summary()
-                + ")",
-            requiredControllerRefs(policy));
+            true, "all required controllers rolled out", requiredControllerRefs(policy));
       }
 
-      logInfo("waiting for controller rollout: " + controllerRef.ref());
-      final CommandResult rolloutResult =
-          runCommand(
-              List.of(
-                  "kubectl",
-                  "--kubeconfig",
-                  kubeconfigPath.toString(),
-                  "--insecure-skip-tls-verify=true",
-                  "-n",
-                  controllerRef.namespace(),
-                  "rollout",
-                  "status",
-                  resourceRef,
-                  "--timeout=" + timeout.toSeconds() + "s"),
-              timeout.plusSeconds(5));
-      if (rolloutResult.exitCode() != 0) {
-        logInfo("controller rollout wait failed: " + controllerRef.ref());
-        return new ControllerVerification(
-            false,
-            "failed rollout status for "
-                + controllerRef.ref()
-                + " ("
-                + rolloutResult.summary()
-                + ")",
-            requiredControllerRefs(policy));
+      final long now = System.nanoTime();
+      if (now >= nextProgressLogAt) {
+        logInfo("still waiting for required controllers after " + elapsedSince(startedAt));
+        nextProgressLogAt = now + LOG_PROGRESS_INTERVAL.toNanos();
       }
 
-      logInfo("controller ready: " + controllerRef.ref());
+      sleep(RETRY_INTERVAL);
     }
 
-    logInfo("all required controllers are effective");
+    logInfo("required-controller wait timed out after " + timeout);
     return new ControllerVerification(
-        true, "all required controllers rolled out", requiredControllerRefs(policy));
+        false,
+        "required controllers not effective within " + timeout,
+        requiredControllerRefs(policy));
   }
 
   private static String describeKubeconfigState(Path kubeconfigPath) {
@@ -405,33 +363,6 @@ public final class ClusterBootstrapReadinessVerifier {
 
   private static List<String> requiredControllerRefs(ControlplanePolicy policy) {
     return requiredControllers(policy).stream().map(ControllerRef::ref).toList();
-  }
-
-  private static CommandResult runCommand(List<String> command, Duration timeout) {
-    final ProcessBuilder processBuilder = new ProcessBuilder(command);
-    processBuilder.environment().putIfAbsent("LANG", "C");
-
-    try {
-      final Process process = processBuilder.start();
-      final boolean exited =
-          process.waitFor(timeout.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
-      if (!exited) {
-        process.destroyForcibly();
-        return new CommandResult(-1, "", "timed out after " + timeout);
-      }
-
-      final int exitCode = process.exitValue();
-      final String stdout =
-          new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-      final String stderr =
-          new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-      return new CommandResult(exitCode, stdout, stderr);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      return new CommandResult(-1, "", "command interrupted");
-    } catch (IOException ex) {
-      return new CommandResult(-1, "", "failed to execute command: " + ex.getMessage());
-    }
   }
 
   private static void sleep(Duration duration) {
@@ -518,39 +449,6 @@ public final class ClusterBootstrapReadinessVerifier {
     }
   }
 
-  private record ControllerRef(String kind, String name, String namespace) {
-    private String ref() {
-      return kind + "/" + name + "@" + namespace;
-    }
-  }
-
   private record ControllerVerification(
       boolean ready, String detail, List<String> requiredControllerRefs) {}
-
-  private record CommandResult(int exitCode, String stdout, String stderr) {
-    private String summary() {
-      if (exitCode == 0) {
-        return "ok";
-      }
-
-      final String firstStderr = firstNonBlankLine(stderr);
-      if (!firstStderr.isBlank()) {
-        return firstStderr;
-      }
-
-      final String firstStdout = firstNonBlankLine(stdout);
-      if (!firstStdout.isBlank()) {
-        return firstStdout;
-      }
-
-      return "exit=" + exitCode;
-    }
-
-    private static String firstNonBlankLine(String value) {
-      if (value == null || value.isBlank()) {
-        return "";
-      }
-      return value.lines().map(String::trim).filter(line -> !line.isBlank()).findFirst().orElse("");
-    }
-  }
 }
