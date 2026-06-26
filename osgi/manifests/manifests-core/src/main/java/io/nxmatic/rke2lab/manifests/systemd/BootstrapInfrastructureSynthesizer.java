@@ -1,7 +1,6 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests.systemd;
 
-import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import io.nxmatic.rke2lab.manifests.SystemdSynthesisContext;
 import io.nxmatic.rke2lab.manifests.systemd.stages.BootstrapStage;
 import io.nxmatic.rke2lab.manifests.systemd.stages.NetworkStage;
@@ -9,6 +8,7 @@ import io.nxmatic.rke2lab.manifests.systemd.stages.StorageStage;
 import io.nxmatic.rke2lab.manifests.systemd.stages.ToolsStage;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
+import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
 import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

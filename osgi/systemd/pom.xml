@@ -14,13 +14,15 @@
   <packaging>pom</packaging>
   <name>osgi/systemd</name>
   <description>The systemd domain: the typed unit/contract vocabulary plus the runtime-status
-    readiness seam (systemd-port), the CDK8s integration that synthesizes those units
-    (cdk8s-systemd), and the dbus-on-TCP edge that reads the live systemd (dbus-systemd-edge).</description>
+    readiness seam (systemd-port), the systemd diagnostician (systemd-core), the cdk8s rendering of
+    systemd units that systemd owns and contributes to the manifests domain as a carrier fragment
+    (systemd-cdk8s-manifests), and the dbus-on-TCP edge that reads the live systemd
+    (dbus-systemd-edge).</description>
 
   <modules>
     <module>systemd-port</module>
     <module>systemd-core</module>
-    <module>cdk8s-systemd</module>
+    <module>systemd-cdk8s-manifests</module>
     <module>dbus-systemd-edge</module>
   </modules>
 </project>

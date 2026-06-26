@@ -1,2 +1,2 @@
 @org.osgi.annotation.versioning.Version("1.0.0")
-package io.nxmatic.rke2lab.cdk8s.systemd;
+package io.nxmatic.rke2lab.systemd.cdk8s;

@@ -1,10 +1,10 @@
 package io.nxmatic.rke2lab.manifests.systemd.stages;
 
-import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
-import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService;
-import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.ServiceType;
-import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService.StandardStream;
 import io.nxmatic.rke2lab.manifests.SystemdSynthesisContext;
+import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
+import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService;
+import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.ServiceType;
+import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.StandardStream;
 
 /**
  * Tools installation stage: Nix and Flox package managers.

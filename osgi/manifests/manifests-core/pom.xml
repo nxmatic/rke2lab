@@ -32,13 +32,15 @@
       <artifactId>domain-annotations</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- The cdk8s vocabulary (org.cdk8s + software.constructs) comes from the manifests-cdk8s carrier
+         bundle, which embeds the flat cdk8s closure and exports those packages. provided: this is a
+         build-time compile need only (so bnd computes the Import-Package); at runtime manifests-core
+         resolves the packages bundle-to-bundle against the carrier, never host-flat. -->
     <dependency>
-      <groupId>org.cdk8s</groupId>
-      <artifactId>cdk8s</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>software.constructs</groupId>
-      <artifactId>constructs</artifactId>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>manifests-cdk8s</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
@@ -89,9 +91,13 @@
       <artifactId>pipeline</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- systemd's cdk8s rendering of its units (io.nxmatic.rke2lab.systemd.cdk8s), contributed as a
+         fragment of the manifests-cdk8s carrier. manifests-core imports that package to drive the
+         systemd-unit synthesis. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>cdk8s-systemd</artifactId>
+      <artifactId>systemd-cdk8s-manifests</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <!-- The systemd domain's unit vocabulary: StorageStage synthesises the dbus-tcp unit from the
          typed SystemdUnitId, not a literal — the import draws the producer edge in the graph. -->

@@ -1,0 +1,29 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.manifests.cdk8s
+
+# Export the cdk8s vocabulary to the OSGi world. cdk8s is a manifests-domain concern, so it loads on
+# the BUNDLE side of the two-world boundary: this carrier is the sole exporter, wired bundle-to-bundle
+# to manifests-core and the manifests-cdk8s-systemd fragment — never leaked host-flat through the
+# system bundle. The internal closure (software.amazon.jsii.*, org.jetbrains.annotations) stays
+# private to this bundle's classpath; only the two packages consumers actually import are exported.
+Export-Package: \
+    org.cdk8s, \
+    software.constructs
+
+# Embed the flat (non-OSGi) cdk8s closure as WHOLE nested jars (no @ — the jars stay intact); the
+# lib:=true directive nests each jar AND adds it to this bundle's Bundle-ClassPath. These four carry
+# no Bundle-SymbolicName, so they could never resolve as bundles; nesting them here gives the
+# exported packages a real classloader. jackson-datatype-jsr310 and javax.annotation-api are NOT
+# nested — they are genuine OSGi bundles, so jsii-runtime's imports of them are computed by bnd and
+# wired bundle-to-bundle at runtime.
+-includeresource: \
+  cdk8s-*.jar;lib:=true, \
+  constructs-*.jar;lib:=true, \
+  jsii-runtime-*.jar;lib:=true, \
+  annotations-*.jar;lib:=true
+
+# Self-declares this jar as an embeddable model carrier (scanned + installed under META-INF/bundles
+# by the io.nxmatic.rke2lab.embed capability, like the other domain carriers). model=manifests-cdk8s:
+# the cdk8s runtime the manifests domain owns.
+Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=manifests-cdk8s
+
+-noimportjava: true

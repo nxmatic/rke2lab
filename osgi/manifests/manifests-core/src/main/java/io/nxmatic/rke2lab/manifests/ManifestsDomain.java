@@ -1,8 +1,8 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests;
 
-import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import io.nxmatic.rke2lab.manifests.systemd.SystemdUnitSynthesizer;
+import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

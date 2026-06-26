@@ -1,11 +1,11 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests.systemd;
 
-import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
-import io.nxmatic.rke2lab.cdk8s.systemd.SystemdService;
-import io.nxmatic.rke2lab.cdk8s.systemd.SystemdUnit;
 import io.nxmatic.rke2lab.manifests.InstallPhase;
 import io.nxmatic.rke2lab.manifests.SystemdSynthesisContext;
+import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
+import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService;
+import io.nxmatic.rke2lab.systemd.cdk8s.SystemdUnit;
 import java.util.List;
 
 /**

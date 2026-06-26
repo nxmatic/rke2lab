@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+    <relativePath>../../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>manifests-cdk8s</artifactId>
+  <name>osgi/manifests/manifests-cdk8s</name>
+  <description>The cdk8s carrier bundle for the manifests domain: it embeds the flat (non-OSGi) cdk8s
+    closure — cdk8s, software.constructs, jsii-runtime and the jetbrains annotations — INTACT into
+    its Bundle-ClassPath (-includeresource …;lib:=true), then exports org.cdk8s and
+    software.constructs to the OSGi world. cdk8s is a manifests concern, not a host seam: this keeps
+    it on the BUNDLE side of the two-world boundary (a real Export-Package wired bundle-to-bundle),
+    so manifests-core and the contributed cdk8s-rendering fragments (e.g. systemd-cdk8s-manifests)
+    resolve cdk8s without the host-flat system-packages leak. One bundle owns the embedding; everyone
+    else attaches or imports.</description>
+
+  <dependencies>
+    <!-- The flat cdk8s closure, embedded INTACT into the Bundle-ClassPath (see bnd.bnd
+         -includeresource): these jars carry no Bundle-SymbolicName, so they cannot resolve in the
+         OSGi world on their own — this carrier nests them and re-exports their packages. cdk8s pulls
+         jsii-runtime; constructs pulls the jetbrains annotations transitively. -->
+    <dependency>
+      <groupId>org.cdk8s</groupId>
+      <artifactId>cdk8s</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>software.constructs</groupId>
+      <artifactId>constructs</artifactId>
+    </dependency>
+  </dependencies>
+
+  <!-- bnd execution + jar manifestFile inherited from osgi/bundle-parent; the bare reference
+       activates the managed bnd-process goal. No src/main/java: this bundle is a pure carrier whose
+       content is the embedded flat jars. -->
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

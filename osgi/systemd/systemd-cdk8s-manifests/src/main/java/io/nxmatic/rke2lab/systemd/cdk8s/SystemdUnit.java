@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.cdk8s.systemd;
+package io.nxmatic.rke2lab.systemd.cdk8s;
 
 import java.io.IOException;
 import java.io.Writer;
