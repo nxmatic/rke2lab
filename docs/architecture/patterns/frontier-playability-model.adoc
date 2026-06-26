@@ -178,7 +178,7 @@ neighbors import the core's IMPL types instead of calling a contract. Measured o
   impl types directly (`Generalist`, `ConsultationLog`, `MedicalRecord`, `Symptom`, `Checkpoint`),
   passing them as constructor params. Changing `MedicalRecord`'s shape ripples through 20-40 files.
 
-The prescribed fix (first internal-edge increment): add a `DoctorConsultingService` internal edge to
+The prescribed fix (first internal-edge increment): add a `ConsultingService` internal edge to
 `doctor-port` (`consult(symptom, observation) → RemediationPlan`, record/history queries), hide the
 impl types behind it, rewire the consumers — making doctor symmetric with manifests/netplan. The doctor
 extraction merged so far closed the EXTERNAL face only; this closes the internal one.

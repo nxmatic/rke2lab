@@ -43,7 +43,7 @@ Consumers call exactly four methods on `Generalist`, confirmed by reading every 
 
 [source,java]
 ----
-interface DoctorConsultingService {           // NEW, in doctor-port
+interface ConsultingService {           // NEW, in doctor-port
   RemediationPlan consult(Symptom s, Observation o);
   MedicalRecord   recordForCurrentPatient();
   String          cohortFinding(Symptom s);
@@ -52,12 +52,12 @@ interface DoctorConsultingService {           // NEW, in doctor-port
 ----
 
 `Generalist` already exposes these four with identical signatures → it `implements
-DoctorConsultingService` directly, **no adapter**. Graph construction (today `bindMedicalRecord` +
+ConsultingService` directly, **no adapter**. Graph construction (today `bindMedicalRecord` +
 `currentPatient` + `reviewDriftAtReconstruction` in `BootstrapPipeline`, touching
 `HealthSystem.admit`, `DriftSpecialist`, `NetworkSpecialist`, `ClusterSpecialist`,
 `LiveMedicalRecordRegistry`, `PulumiInterventionLedgerWriter`) moves into a `DoctorAssembly` in
 `controlplane.bdd` — the package that *already* hosts the host realisation. The assembly reads
-config/env/Pulumi and returns a `DoctorConsultingService`; the pipeline's `PipelineState` holds the
+config/env/Pulumi and returns a `ConsultingService`; the pipeline's `PipelineState` holds the
 service, not a `HealthSystem`. After this, the pipeline imports **zero** doctor-core types — the
 internal edge is closed for production, symmetric with manifests/netplan.
 
@@ -127,7 +127,7 @@ promotion). The other three fixtures are single-consumer / host-only and stay pu
 | Option | What ships | Cost / risk
 
 | *B-prod only* (my recommendation to sequence first)
-| `DoctorConsultingService` + `DoctorAssembly`; pipeline sees only the contract; the 2 pipeline
+| `ConsultingService` + `DoctorAssembly`; pipeline sees only the contract; the 2 pipeline
   *wiring* tests (`DriftReviewWiringTest`, `DriftReviewReconstructionLiveTest`) rewire onto the
   assembly. Tests stay where they are for now.
 | Low. Closes the production edge. Leaves the test-relocation + Export-Package narrowing as a named
@@ -167,9 +167,9 @@ already exists, so option 2 is not blocked — it is just larger and deserves it
 Option 2 + full hiding. We finish Move A properly in THIS increment, as three sequenced commits on
 this branch (sequencing ≠ deferring — all three land here before integration):
 
-* *commit 1 — B-prod*: `DoctorConsultingService` (the 4 ops) in doctor-port; `Generalist implements`
+* *commit 1 — B-prod*: `ConsultingService` (the 4 ops) in doctor-port; `Generalist implements`
   it directly (no adapter); a `DoctorAssembly` in `controlplane.bdd` builds the graph and returns a
-  `DoctorConsultingService`; `PipelineState` holds the service, not a `HealthSystem`. Target: the
+  `ConsultingService`; `PipelineState` holds the service, not a `HealthSystem`. Target: the
   pipeline imports zero doctor-core types.
 * *commit 2 — test-relocation + doctor-testkit*: ~29 value-type tests → `doctor-port/src/test`, ~17
   model-actor tests → `doctor-core/src/test`, ~6 host tests stay; `ReferralReplies` → a new
@@ -187,7 +187,7 @@ re-litigation; the implementation fork the plan left open is now closed.
 
 * *`Doctor` façade* (public, exported, in `io.nxmatic.rke2lab.doctor`):
   `Doctor.consultingService(Patient, MedicalRecordRegistry, InterventionLedgerWriter,
-  List<Specialist> hostSpecialists, Consumer<String>) → DoctorConsultingService`. Port-only
+  List<Specialist> hostSpecialists, Consumer<String>) → ConsultingService`. Port-only
   signature. It news up GrantPolicy/ClinicalAccess/DriftSpecialist/Network+ClusterSpecialist/
   Generalist/HealthSystem internally and returns the `Generalist` (which implements the contract).
 * *Roster*: the core adds Network+Cluster internally; the host passes only the config-bound
@@ -265,21 +265,21 @@ commit 3 — but the `Doctor` façade above is the prerequisite under any mechan
 
 Validated by reading every call site; ready to implement once the fork above is decided.
 
-*doctor-port*: `DoctorConsultingService` interface (4 ops).
+*doctor-port*: `ConsultingService` interface (4 ops).
 
-*doctor-core*: `Generalist implements DoctorConsultingService` (signatures already identical, the 4
+*doctor-core*: `Generalist implements ConsultingService` (signatures already identical, the 4
 methods already public); + `Doctor` assembly façade (if the façade option is chosen).
 
 *seed-master production* (target: zero doctor-core actor import):
 
 * `controlplane/bdd/DoctorAssembly.java` (NEW) — absorbs `bindMedicalRecord` + `currentPatient` +
   `reviewDriftAtReconstruction` from `BootstrapPipeline`; supplies host impls; returns a
-  `DoctorConsultingService`; instance-passing seam (registry+writer) for the drift tests.
-* `pipeline/PipelineState.java` — `HealthSystem healthSystem` → `DoctorConsultingService doctor`.
+  `ConsultingService`; instance-passing seam (registry+writer) for the drift tests.
+* `pipeline/PipelineState.java` — `HealthSystem healthSystem` → `ConsultingService doctor`.
 * `pipeline/BootstrapPipeline.java` — drop the 3 methods + 5 actor imports; `runningStandalone` /
   `runningInPulumi` call `DoctorAssembly`; stages receive `state.doctor`.
 * `pipeline/stages/{SystemdAdapterStage,ClusterReadinessStage,ResourcesStage}.java` — field+ctor
-  `Generalist generalist` → `DoctorConsultingService doctor` (call-sites unchanged semantically).
+  `Generalist generalist` → `ConsultingService doctor` (call-sites unchanged semantically).
 * `resources/{ResourceManager,ResourceCreationPipeline}.java` — `Generalist` param → contract
   (pass-through).
 
@@ -289,7 +289,7 @@ methods already public); + `Doctor` assembly façade (if the façade option is c
   `BootstrapPipeline.reviewDriftAtReconstruction` onto `DoctorAssembly`'s injection seam; lose their
   `HealthSystem`/`DriftSpecialist` imports.
 * `NestedRunbookTest` — builds a `Generalist` passed to `ClusterReadinessStage`; since `Generalist
-  implements DoctorConsultingService` it stays assignable and compiles unchanged in commit 1 (it
+  implements ConsultingService` it stays assignable and compiles unchanged in commit 1 (it
   relocates in commit 2). Left as-is.
 
 *commit 1 verification*: `flox activate -- ./mvnw -pl :doctor-core,:doctor-port,:seed-master -am clean
