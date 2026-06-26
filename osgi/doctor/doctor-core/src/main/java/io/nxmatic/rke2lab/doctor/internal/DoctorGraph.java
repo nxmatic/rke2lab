@@ -14,11 +14,12 @@ import java.util.function.Consumer;
 /**
  * The single construction path for the doctor graph: admit the patient (mint this run's self +
  * cohort grants), bind a credentialed {@link ClinicalAccess}, and employ the {@link Generalist}
- * over the roster + the run's {@link DriftSpecialist}. Shared by the OSGi {@link
- * io.nxmatic.rke2lab.doctor.internal.DefaultHealthSystem} (the institution, specialists by DS) and
- * the flat {@link io.nxmatic.rke2lab.doctor.Doctor} / {@link
- * io.nxmatic.rke2lab.doctor.ExactRosterDoctor} factories — so admission lives in exactly one place.
- * Package-private actors stay hidden behind the {@link ConsultingService} it returns.
+ * over the roster + the run's {@link DriftSpecialist}. Used by the OSGi {@code DefaultHealthSystem}
+ * (the institution, specialists by DS) for production admission, and by the {@code
+ * ExactRosterDoctor} fixture in the doctor-core-test fragment (which shares this loader, so it
+ * reaches this sealed package white-box) for tests that drive the graph over an exact roster — so
+ * admission lives in exactly one place. Package-private actors stay hidden behind the {@link
+ * ConsultingService} it returns.
  */
 public final class DoctorGraph {
 

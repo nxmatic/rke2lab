@@ -169,6 +169,17 @@
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
+    <!-- test-only: ExactRosterDoctor (the host tests' exact-roster fixture) lives in the
+         doctor-core-test fragment now — it reaches doctor-core's sealed internal graph white-box
+         (same package, shared host loader), the access a host module cannot have. On seed-master's
+         flat classpath the fragment jar is just the carrier of that fixture class; the Fragment-Host
+         header is inert out of container. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-core-test</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>io.nxmatic</groupId>
       <artifactId>java-bbox-api-client</artifactId>
