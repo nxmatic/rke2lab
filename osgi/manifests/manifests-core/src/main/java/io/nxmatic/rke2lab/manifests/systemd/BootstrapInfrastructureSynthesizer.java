@@ -49,6 +49,8 @@ public final class BootstrapInfrastructureSynthesizer {
     final class SynthesisPipeline {
       final State state = new State();
 
+      final FluentTopicRunner runner = new FluentTopicRunner("synthesis");
+
       final class State {
         OnFailure onFailure;
         // Stage references threaded for cross-stage dependencies.
@@ -64,7 +66,7 @@ public final class BootstrapInfrastructureSynthesizer {
       final class AwaitingTools {
         ToolsDone during(String topic, Function<ToolsStage, ToolsStage> body) {
           final ToolsStage stage = new ToolsStage(systemdChart, context);
-          FluentTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
+          runner.runDuring(topic, stage, body, state.onFailure);
           state.toolsStage = stage;
           return new ToolsDone();
         }
@@ -79,7 +81,7 @@ public final class BootstrapInfrastructureSynthesizer {
       final class AwaitingBootstrap {
         BootstrapDone during(String topic, Function<BootstrapStage, BootstrapStage> body) {
           final BootstrapStage stage = new BootstrapStage(systemdChart, context, state.toolsStage);
-          FluentTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
+          runner.runDuring(topic, stage, body, state.onFailure);
           state.bootstrapStage = stage;
           return new BootstrapDone();
         }
@@ -94,7 +96,7 @@ public final class BootstrapInfrastructureSynthesizer {
       final class AwaitingNetwork {
         NetworkDone during(String topic, Function<NetworkStage, NetworkStage> body) {
           final NetworkStage stage = new NetworkStage(systemdChart, context, state.bootstrapStage);
-          FluentTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
+          runner.runDuring(topic, stage, body, state.onFailure);
           return new NetworkDone();
         }
       }
@@ -109,7 +111,7 @@ public final class BootstrapInfrastructureSynthesizer {
         StorageDone during(String topic, Function<StorageStage, StorageStage> body) {
           final StorageStage stage =
               new StorageStage(systemdChart, context, state.toolsStage, state.bootstrapStage);
-          FluentTopicRunner.runDuring("synthesis", topic, stage, body, state.onFailure);
+          runner.runDuring(topic, stage, body, state.onFailure);
           return new StorageDone();
         }
       }

@@ -64,6 +64,7 @@ public final class ApplicationPipeline {
     BootstrapOptions options;
     Map<String, Object> outputs;
     OnFailure onFailure;
+    final FluentTopicRunner runner = new FluentTopicRunner("pipeline");
 
     State(Context pulumiContext) {
       this.pulumiContext = pulumiContext;
@@ -112,7 +113,7 @@ public final class ApplicationPipeline {
                   state.options = options;
                 }
               });
-      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      state.runner.runDuring(topic, stage, body, state.onFailure);
       return new EnvironmentDone(state);
     }
   }
@@ -149,7 +150,7 @@ public final class ApplicationPipeline {
               state.resourceManager,
               state.outputBuilder,
               outputs -> state.outputs = outputs);
-      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      state.runner.runDuring(topic, stage, body, state.onFailure);
       return new BootstrapDone(state);
     }
   }
@@ -175,7 +176,7 @@ public final class ApplicationPipeline {
 
     public OutputsDone during(String topic, Function<OutputsStage, OutputsStage> body) {
       final OutputsStage stage = new OutputsStage(state.pulumiContext, () -> state.outputs);
-      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      state.runner.runDuring(topic, stage, body, state.onFailure);
       return new OutputsDone(state);
     }
   }

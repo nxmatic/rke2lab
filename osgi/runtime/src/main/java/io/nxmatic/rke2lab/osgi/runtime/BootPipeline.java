@@ -73,17 +73,17 @@ public final class BootPipeline {
      * pipeline). The boot-run-close shape: the lifecycle is owned here.
      */
     public void during(String topic, Consumer<BootedFramework> tail) {
-      FluentTopicRunner.runDuring(
-          "boot",
-          topic,
-          this,
-          self -> {
-            try (BootedFramework framework = launch()) {
-              tail.accept(framework);
-            }
-            return self;
-          },
-          onFailure);
+      new FluentTopicRunner("boot")
+          .runDuring(
+              topic,
+              this,
+              self -> {
+                try (BootedFramework framework = launch()) {
+                  tail.accept(framework);
+                }
+                return self;
+              },
+              onFailure);
     }
 
     /**

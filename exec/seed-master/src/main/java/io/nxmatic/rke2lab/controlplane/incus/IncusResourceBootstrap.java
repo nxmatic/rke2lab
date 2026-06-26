@@ -183,6 +183,7 @@ public final class IncusResourceBootstrap {
 
     // Pipeline coordination
     OnFailure onFailure;
+    final FluentTopicRunner runner = new FluentTopicRunner("incus");
 
     // Path state (kept as direct fields: dual instance, frequent access)
     BootstrapPaths localPaths;
@@ -1031,8 +1032,8 @@ public final class IncusResourceBootstrap {
     }
 
     PathDone during(String topic, java.util.function.Function<PathStage, PathStage> body) {
-      FluentTopicRunner.runDuring(
-          "incus", topic, new PathStage(state.bootstrapContext, state), body, state.onFailure);
+      state.runner.runDuring(
+          topic, new PathStage(state.bootstrapContext, state), body, state.onFailure);
       return new PathDone(state);
     }
   }
@@ -1057,8 +1058,8 @@ public final class IncusResourceBootstrap {
     }
 
     HostDone during(String topic, java.util.function.Function<HostStage, HostStage> body) {
-      FluentTopicRunner.runDuring(
-          "incus", topic, new HostStage(state.bootstrapContext, state), body, state.onFailure);
+      state.runner.runDuring(
+          topic, new HostStage(state.bootstrapContext, state), body, state.onFailure);
       return new HostDone(state);
     }
   }
@@ -1084,8 +1085,8 @@ public final class IncusResourceBootstrap {
 
     ProviderDone during(
         String topic, java.util.function.Function<ProviderStage, ProviderStage> body) {
-      FluentTopicRunner.runDuring(
-          "incus", topic, new ProviderStage(state.bootstrapContext, state), body, state.onFailure);
+      state.runner.runDuring(
+          topic, new ProviderStage(state.bootstrapContext, state), body, state.onFailure);
       return new ProviderDone(state);
     }
   }
@@ -1111,8 +1112,8 @@ public final class IncusResourceBootstrap {
 
     InstanceDone during(
         String topic, java.util.function.Function<InstanceStage, InstanceStage> body) {
-      FluentTopicRunner.runDuring(
-          "incus", topic, new InstanceStage(state.bootstrapContext, state), body, state.onFailure);
+      state.runner.runDuring(
+          topic, new InstanceStage(state.bootstrapContext, state), body, state.onFailure);
       return new InstanceDone(state);
     }
   }

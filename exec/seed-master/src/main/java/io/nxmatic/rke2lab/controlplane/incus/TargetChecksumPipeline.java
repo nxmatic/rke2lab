@@ -43,6 +43,7 @@ public final class TargetChecksumPipeline {
     final ProvisioningTargetRegistry registry;
     final LinkedHashMap<String, String> targetChecksums = new LinkedHashMap<>();
     OnFailure onFailure = (topic, cause) -> {}; // no-op default
+    final FluentTopicRunner runner = new FluentTopicRunner("target-checksum");
 
     State(BootstrapPaths paths, ProvisioningTargetRegistry registry) {
       this.paths = paths;
@@ -65,7 +66,7 @@ public final class TargetChecksumPipeline {
     public CloudInitDone during(
         String topic, Function<CloudInitTargetStage, CloudInitTargetStage> body) {
       final CloudInitTargetStage stage = new CloudInitTargetStage(state);
-      FluentTopicRunner.runDuring("target-checksum", topic, stage, body, state.onFailure);
+      state.runner.runDuring(topic, stage, body, state.onFailure);
       return new CloudInitDone(state);
     }
   }
@@ -80,7 +81,7 @@ public final class TargetChecksumPipeline {
     public CloudInitDone during(
         String topic, Function<CloudInitTargetStage, CloudInitTargetStage> body) {
       final CloudInitTargetStage stage = new CloudInitTargetStage(state);
-      FluentTopicRunner.runDuring("target-checksum", topic, stage, body, state.onFailure);
+      state.runner.runDuring(topic, stage, body, state.onFailure);
       return new CloudInitDone(state);
     }
   }
@@ -107,7 +108,7 @@ public final class TargetChecksumPipeline {
     public RegisteredComponentsDone during(
         String topic, Function<RegisteredComponentsStage, RegisteredComponentsStage> body) {
       final RegisteredComponentsStage stage = new RegisteredComponentsStage(state);
-      FluentTopicRunner.runDuring("target-checksum", topic, stage, body, state.onFailure);
+      state.runner.runDuring(topic, stage, body, state.onFailure);
       return new RegisteredComponentsDone(state);
     }
   }

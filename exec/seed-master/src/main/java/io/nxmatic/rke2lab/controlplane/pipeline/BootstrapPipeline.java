@@ -21,7 +21,6 @@ import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.Patient;
 import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
-import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import io.nxmatic.rke2lab.pulumi.edge.LiveMedicalRecordRegistry;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiInterventionLedgerWriter;
@@ -233,7 +232,7 @@ public final class BootstrapPipeline {
               state.options.cleanWorktreeRequired(),
               state.readinessLogger,
               state.bootedFramework);
-      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      state.runner.runDuring(topic, stage, body, state.onFailure);
       return new PreflightDone(state);
     }
   }
@@ -264,7 +263,7 @@ public final class BootstrapPipeline {
               state.config.localWorktreePath(),
               state.options.bboxFailOnError(),
               result -> state.bboxResult = result);
-      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      state.runner.runDuring(topic, stage, body, state.onFailure);
       return new BboxDone(state);
     }
   }
@@ -295,7 +294,7 @@ public final class BootstrapPipeline {
               state.policy,
               state.bootedFramework,
               result -> state.bootstrapResult = result);
-      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      state.runner.runDuring(topic, stage, body, state.onFailure);
       return new IncusDone(state);
     }
   }
@@ -335,7 +334,7 @@ public final class BootstrapPipeline {
               state.doctor,
               liveProbe,
               summary -> state.systemdAdapterLaunchSummary = summary);
-      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      state.runner.runDuring(topic, stage, body, state.onFailure);
       return new SystemdAdapterDone(state);
     }
   }
@@ -375,7 +374,7 @@ public final class BootstrapPipeline {
               () -> state.bootstrapResult,
               () -> state.systemdAdapterLaunchSummary,
               result -> state.resourceResult = result);
-      FluentTopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+      state.runner.runDuring(topic, stage, body, state.onFailure);
       return new ResourcesDone(state);
     }
   }

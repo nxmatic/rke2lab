@@ -10,6 +10,7 @@ import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSn
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
+import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -69,6 +70,7 @@ final class PipelineState {
   ResourceManager.ResourceCreationResult resourceResult;
 
   OnFailure onFailure;
+  final FluentTopicRunner runner = new FluentTopicRunner("pipeline");
 
   PipelineState(BootstrapConfig config, ControlplanePolicy policy) {
     this.config = config;

@@ -20,6 +20,8 @@ import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisService;
 import io.nxmatic.rke2lab.manifests.port.SshToAgeConverter;
 import io.nxmatic.rke2lab.manifests.port.profiles.SopsAgeMaterial;
 import io.nxmatic.rke2lab.manifests.systemd.BootstrapInfrastructureSynthesizer;
+import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
+import io.nxmatic.rke2lab.pipeline.OnFailure;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdDropIn;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdTarget;
@@ -107,6 +109,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     // Structure: setup → registry → targets → units → finalization → synthesis
     final class SynthesisPipeline {
       final ManifestSynthesisRequest request;
+      final FluentTopicRunner runner = new FluentTopicRunner("manifest-synthesis");
 
       SynthesisPipeline(ManifestSynthesisRequest request) {
         this.request = request;
@@ -158,7 +161,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         Cdk8sSetupDone during(
             String topic, java.util.function.Function<Cdk8sSetupStage, Cdk8sSetupStage> body) {
           final Cdk8sSetupStage stage = new Cdk8sSetupStage(state);
-          runDuring("manifest-synthesis", topic, stage, body, state.onFailure);
+          runner.runDuring(topic, stage, body, state.onFailure);
           return new Cdk8sSetupDone(state);
         }
       }
@@ -206,7 +209,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             String topic,
             java.util.function.Function<DomainRegistryStage, DomainRegistryStage> body) {
           final DomainRegistryStage stage = new DomainRegistryStage(state);
-          runDuring("manifest-synthesis", topic, stage, body, state.onFailure);
+          runner.runDuring(topic, stage, body, state.onFailure);
           return new DomainRegistryDone(state);
         }
       }
@@ -282,7 +285,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             String topic,
             java.util.function.Function<SystemdTargetsStage, SystemdTargetsStage> body) {
           final SystemdTargetsStage stage = new SystemdTargetsStage(state);
-          runDuring("manifest-synthesis", topic, stage, body, state.onFailure);
+          runner.runDuring(topic, stage, body, state.onFailure);
           return new SystemdTargetsDone(state);
         }
       }
@@ -408,7 +411,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         SystemdUnitsDone during(
             String topic, java.util.function.Function<SystemdUnitsStage, SystemdUnitsStage> body) {
           final SystemdUnitsStage stage = new SystemdUnitsStage(state);
-          runDuring("manifest-synthesis", topic, stage, body, state.onFailure);
+          runner.runDuring(topic, stage, body, state.onFailure);
           return new SystemdUnitsDone(state);
         }
       }
@@ -457,7 +460,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
             String topic,
             java.util.function.Function<TargetFinalizationStage, TargetFinalizationStage> body) {
           final TargetFinalizationStage stage = new TargetFinalizationStage(state);
-          runDuring("manifest-synthesis", topic, stage, body, state.onFailure);
+          runner.runDuring(topic, stage, body, state.onFailure);
           return new TargetFinalizationDone(state);
         }
       }
@@ -523,7 +526,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         SynthesisDone during(
             String topic, java.util.function.Function<SynthesisStage, SynthesisStage> body) {
           final SynthesisStage stage = new SynthesisStage(state);
-          runDuring("manifest-synthesis", topic, stage, body, state.onFailure);
+          runner.runDuring(topic, stage, body, state.onFailure);
           return new SynthesisDone(state);
         }
       }
@@ -595,25 +598,6 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
               state.systemdOutdir,
               state.manifestUnitHitCount,
               state.domainRegistry.domains().size());
-        }
-      }
-
-      static <S> void runDuring(
-          String scope,
-          String topic,
-          S stage,
-          java.util.function.Function<S, S> body,
-          OnFailure onFailure) {
-        LOG.debug("→ entering {}", topic);
-        final long start = System.nanoTime();
-        try {
-          body.apply(stage);
-        } catch (Throwable cause) {
-          onFailure.accept(topic, cause);
-          throw new PipelineStageFailure(topic, cause);
-        } finally {
-          final long elapsed = System.nanoTime() - start;
-          LOG.debug("← leaving {} (elapsed: {} ms)", topic, elapsed / 1_000_000);
         }
       }
     }
@@ -768,25 +752,5 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
       normalized = normalized + "\n";
     }
     return normalized;
-  }
-
-  @FunctionalInterface
-  interface OnFailure {
-    void accept(String topic, Throwable cause);
-  }
-
-  static final class PipelineStageFailure extends RuntimeException {
-    private static final long serialVersionUID = 1L;
-
-    final String topic;
-
-    PipelineStageFailure(String topic, Throwable cause) {
-      super("Pipeline stage '" + topic + "' failed: " + cause.getMessage(), cause);
-      this.topic = topic;
-    }
-
-    String topic() {
-      return topic;
-    }
   }
 }
