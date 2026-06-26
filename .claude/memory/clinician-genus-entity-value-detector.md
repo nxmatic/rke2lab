@@ -53,13 +53,16 @@ crosses the seam is decided per role by who needs to call it:
   the operator's terms (loop-closure between visits, [[doctor-remediation-model]]).
 
 **Two findings the detector surfaced (the "we may discover some missing / mis-folded" the user
-predicted):**
-1. `DriftSpecialist` has an operation model (`review`, and it WRITES to the ledger via
-   InterventionLedgerWriter — a real effect) but is NOT a `Clinician` today → a MISSING entity, held
-   beside the roster. Candidate to enroll as a clinician (a third species — an efficacy reviewer —
-   neither diagnostician nor remediator).
-2. `Specialist.diagnose(Referral) → ReferralReply` FUSES assess+prescribe into one method; the
-   operation model is real but implicit. Open: leave fused or surface as two verbs.
+predicted) — BOTH now resolved:**
+1. `DriftSpecialist` has an operation model (`review`, and it WRITES to the ledger) but is NOT a
+   `Clinician` today → a MISSING entity. RESOLVED in design (2026-06-26): reframed as the
+   **médecin-conseil**, a PURE-READER efficacy analyst (drops the write → no longer a third
+   write-bearing species; a system-employed reviewer tier). See
+   [[medecin-conseil-efficacy-analyst-design]]. NOT yet built.
+2. `Specialist.diagnose(Referral) → ReferralReply` FUSED assess+prescribe → RESOLVED + BUILT
+   (2026-06-26, commit 750589db): split into `assess(Referral) → Assessment` (always) +
+   `prescribe(Referral, Assessment) → Optional<Prescription>` (conditional); the Generalist assembles
+   the reply. See [[multiplexor-two-models-design]] STEP 4.
 
 **Backlog — Generalist visibility (a SEPARATE slice, not the specialist distribution).** The
 Generalist IS a Clinician (carries `GENERALIST_ID`), but it does NOT distribute like a specialist:
