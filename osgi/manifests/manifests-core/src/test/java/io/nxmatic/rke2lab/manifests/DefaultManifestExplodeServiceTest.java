@@ -106,12 +106,13 @@ class DefaultManifestExplodeServiceTest {
 
   private static String explodeOne(final Path tmp, final Map<String, Object> document)
       throws IOException {
+    final YamlMapper yaml = new YamlMapper();
     final Path consolidated = tmp.resolve("synth.yaml");
     final Path target = tmp.resolve("exploded");
-    ManifestYaml.writeDocuments(consolidated, List.of(document));
+    yaml.write(consolidated).documents(List.of(document));
 
     final ManifestExplodeResult result =
-        new DefaultManifestExplodeService()
+        new DefaultManifestExplodeService(yaml)
             .explode(new ManifestExplodeRequest(consolidated, target));
 
     assertEquals(1, result.writtenFileCount());

@@ -80,13 +80,14 @@ public final class ManifestSynthesisContext {
   }
 
   /**
-   * Publishes {@code context} for the calling thread. Returns an {@link AutoCloseable} that
-   * restores the previous binding (which may be the default) when closed — wrap in
-   * try-with-resources to keep the scope tight and exception-safe.
+   * Publishes THIS context for the calling thread. Returns an {@link AutoCloseable} that restores
+   * the previous binding (which may be the default) when closed — wrap in try-with-resources to
+   * keep the scope tight and exception-safe. The context publishes itself; the {@link #CURRENT}
+   * ThreadLocal stays a private detail of the type that owns it.
    */
-  public static Scope bind(ManifestSynthesisContext context) {
+  public Scope bind() {
     final ManifestSynthesisContext previous = CURRENT.get();
-    CURRENT.set(Objects.requireNonNull(context, "context"));
+    CURRENT.set(this);
     return new Scope(previous);
   }
 

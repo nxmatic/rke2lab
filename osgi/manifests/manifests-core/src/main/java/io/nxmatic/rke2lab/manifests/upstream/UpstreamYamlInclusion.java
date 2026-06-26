@@ -2,8 +2,7 @@
 package io.nxmatic.rke2lab.manifests.upstream;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.MappingIterator;
-import io.nxmatic.rke2lab.manifests.ManifestYaml;
+import io.nxmatic.rke2lab.manifests.YamlMapper;
 import io.nxmatic.rke2lab.manifests.profiles.PackageMetadataProfile;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,8 +38,9 @@ public final class UpstreamYamlInclusion {
   public UpstreamYamlInclusion(
       final Construct scope,
       final String classpathResource,
-      final PackageMetadataProfile packageProfile) {
-    this.apiObjects = build(scope, classpathResource, packageProfile);
+      final PackageMetadataProfile packageProfile,
+      final YamlMapper yaml) {
+    this.apiObjects = build(scope, classpathResource, packageProfile, yaml);
   }
 
   /** All resources emitted from the included YAML, in document order. */
@@ -65,8 +65,9 @@ public final class UpstreamYamlInclusion {
   private static List<ApiObject> build(
       final Construct scope,
       final String classpathResource,
-      final PackageMetadataProfile packageProfile) {
-    final List<Map<String, Object>> documents = readDocuments(classpathResource);
+      final PackageMetadataProfile packageProfile,
+      final YamlMapper yaml) {
+    final List<Map<String, Object>> documents = readDocuments(classpathResource, yaml);
     final List<ApiObject> emitted = new ArrayList<>();
 
     int index = 0;
@@ -172,7 +173,8 @@ public final class UpstreamYamlInclusion {
     return Map.copyOf(merged);
   }
 
-  private static List<Map<String, Object>> readDocuments(final String classpathResource) {
+  private static List<Map<String, Object>> readDocuments(
+      final String classpathResource, final YamlMapper yaml) {
     final String resourcePath =
         classpathResource.startsWith("/") ? classpathResource.substring(1) : classpathResource;
     try (InputStream in =
@@ -180,16 +182,7 @@ public final class UpstreamYamlInclusion {
       if (in == null) {
         throw new IllegalArgumentException("Classpath resource not found: " + classpathResource);
       }
-      try (MappingIterator<Map<String, Object>> iterator = ManifestYaml.readValues(in, MAP_TYPE)) {
-        final List<Map<String, Object>> documents = new ArrayList<>();
-        while (iterator.hasNext()) {
-          final Map<String, Object> document = iterator.next();
-          if (document != null) {
-            documents.add(document);
-          }
-        }
-        return documents;
-      }
+      return yaml.read(in).as(MAP_TYPE).toList();
     } catch (IOException ex) {
       throw new UncheckedIOException("Failed to read classpath resource: " + classpathResource, ex);
     }

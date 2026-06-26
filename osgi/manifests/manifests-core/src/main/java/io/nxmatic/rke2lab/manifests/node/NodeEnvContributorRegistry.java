@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.manifests.node;
 
-import io.nxmatic.rke2lab.manifests.ManifestYaml;
+import io.nxmatic.rke2lab.manifests.YamlMapper;
 import io.nxmatic.rke2lab.manifests.port.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.port.node.NodeEnvContext;
 import io.nxmatic.rke2lab.manifests.port.node.NodeEnvContributor;
@@ -26,8 +26,11 @@ public class NodeEnvContributorRegistry {
   @Reference(cardinality = ReferenceCardinality.MULTIPLE)
   private List<NodeEnvContributor> contributors;
 
+  @Reference private YamlMapper yaml;
+
   /**
-   * DS activation path: SCR instantiates via this constructor and injects {@link #contributors}.
+   * DS activation path: SCR instantiates via this constructor and injects {@link #contributors} and
+   * {@link #yaml}.
    */
   public NodeEnvContributorRegistry() {}
 
@@ -75,15 +78,15 @@ public class NodeEnvContributorRegistry {
                 "env-section-" + section,
                 section,
                 contributor.contributeVariables(section, context));
-        ManifestYaml.writeDocument(
-            outputDir.resolve(contributor.domainId() + "-" + section + ".yml"), document);
+        yaml.write(outputDir.resolve(contributor.domainId() + "-" + section + ".yml"))
+            .document(document);
       }
     }
   }
 
   /**
    * Build a Kubernetes ConfigMap document for a contributor section. The result is handed to {@link
-   * ManifestYaml} for rendering — no caller serializes YAML by hand.
+   * YamlMapper} for rendering — no caller serializes YAML by hand.
    */
   private static Map<String, Object> buildConfigMapDocument(
       String name, String section, Map<String, String> variables) {

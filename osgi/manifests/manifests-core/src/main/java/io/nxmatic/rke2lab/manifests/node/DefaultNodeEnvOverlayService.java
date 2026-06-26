@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.manifests.node;
 
-import io.nxmatic.rke2lab.manifests.ManifestYaml;
+import io.nxmatic.rke2lab.manifests.YamlMapper;
 import io.nxmatic.rke2lab.manifests.port.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.port.node.NodeEnvContext;
 import io.nxmatic.rke2lab.manifests.port.node.NodeEnvContributor;
@@ -16,8 +16,8 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 
 /**
- * Default {@link NodeEnvOverlayService}. The contributor registry arrives by {@link Reference}
- * field injection under SCR.
+ * Default {@link NodeEnvOverlayService}. The contributor registry and the YAML service arrive by
+ * {@link Reference} field injection under SCR.
  */
 @Component(service = NodeEnvOverlayService.class)
 public final class DefaultNodeEnvOverlayService implements NodeEnvOverlayService {
@@ -27,7 +27,9 @@ public final class DefaultNodeEnvOverlayService implements NodeEnvOverlayService
 
   @Reference private NodeEnvContributorRegistry registry;
 
-  /** DS activation path: SCR injects {@link #registry}. */
+  @Reference private YamlMapper yaml;
+
+  /** DS activation path: SCR injects {@link #registry} and {@link #yaml}. */
   public DefaultNodeEnvOverlayService() {}
 
   @Override
@@ -61,7 +63,7 @@ public final class DefaultNodeEnvOverlayService implements NodeEnvOverlayService
     document.put("metadata", metadata);
     document.put("data", aggregatedVars);
 
-    ManifestYaml.writeDocument(runtimeEnvConfigRoot.resolve(OVERLAY_FILE_NAME), document);
+    yaml.write(runtimeEnvConfigRoot.resolve(OVERLAY_FILE_NAME)).document(document);
 
     return buildRegistrySnapshot(orderedContributors, layerContributionVars);
   }

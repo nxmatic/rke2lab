@@ -50,11 +50,13 @@
  * </ul>
  */
 @org.osgi.annotation.versioning.Version("1.0.0")
-// Both gates at WARN — visible backlog, drop a pose to return to the ERROR default once cleared.
-// SPEC_COVERAGE: a manifests-architecture doc exists but coverage is not yet enforced type-by-type.
-// INSTANCE_DISCIPLINE: ManifestYaml (9 static helpers) + ManifestSynthesisContext#bind.
+// SPEC_COVERAGE at WARN — visible backlog: a manifests-architecture doc exists but coverage is not
+// yet enforced type-by-type. Drop once the exported types are specified. INSTANCE_DISCIPLINE is
+// back
+// at the ERROR-locked default: the static ManifestYaml + ManifestSynthesisContext#bind are gone
+// (the
+// YamlMapper @Component, and bind() now an instance method).
 @GovernedBy(value = Gate.SPEC_COVERAGE, level = EnforcementLevel.WARN)
-@GovernedBy(value = Gate.INSTANCE_DISCIPLINE, level = EnforcementLevel.WARN)
 package io.nxmatic.rke2lab.manifests;
 
 import io.nxmatic.rke2lab.domain.annotations.EnforcementLevel;

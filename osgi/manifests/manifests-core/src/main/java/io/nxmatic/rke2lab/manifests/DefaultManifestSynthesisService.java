@@ -1,7 +1,6 @@
 package io.nxmatic.rke2lab.manifests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.MappingIterator;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdChart;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdDropIn;
 import io.nxmatic.rke2lab.cdk8s.systemd.SystemdTarget;
@@ -29,7 +28,6 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -63,6 +61,11 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
   @Reference private NodeEnvContributorRegistry contributorRegistry;
 
   /**
+   * The deterministic YAML service, threaded into each unit's context (units are not components).
+   */
+  @Reference private YamlMapper yaml;
+
+  /**
    * The ssh-to-age edge, bound from the registry. Mandatory: without the edge the component never
    * activates, so {@code ManifestSynthesisService} never publishes — a missing edge fails the boot
    * fast rather than silently half-rendering the sops-age Secret. The pre-synthesis step calls it.
@@ -92,8 +95,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     final SopsAgeMaterial sopsAgeMaterial =
         new SopsAgeMaterialResolver(sshToAgeConverter).resolve();
 
-    final var contextScope =
-        ManifestSynthesisContext.bind(ManifestSynthesisContext.of(request, sopsAgeMaterial));
+    final var contextScope = ManifestSynthesisContext.of(request, sopsAgeMaterial).bind();
     try (contextScope) {
       return synthesizeInContext(request);
     }
@@ -249,7 +251,8 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                     domainId,
                     manifestUnitId,
                     resolver,
-                    DefaultManifestSynthesisService.this.contributorRegistry));
+                    DefaultManifestSynthesisService.this.contributorRegistry,
+                    DefaultManifestSynthesisService.this.yaml));
           }
 
           return this;
@@ -720,19 +723,10 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
     }
   }
 
-  void enforceLiteralBlockStyleForConfigMapScripts(Path synthesizedFile) throws IOException {
-    final List<Map<String, Object>> documents = new ArrayList<>();
-    try (MappingIterator<Map<String, Object>> iterator =
-        ManifestYaml.readValues(synthesizedFile, DOCUMENT_TYPE)) {
-      while (iterator.hasNext()) {
-        final Map<String, Object> document = iterator.next();
-        if (document != null) {
-          documents.add(normalizeConfigMapScripts(document));
-        }
-      }
-    }
-
-    ManifestYaml.writeDocuments(synthesizedFile, documents);
+  void enforceLiteralBlockStyleForConfigMapScripts(Path synthesizedFile) {
+    final List<Map<String, Object>> documents =
+        yaml.read(synthesizedFile).as(DOCUMENT_TYPE).map(this::normalizeConfigMapScripts).toList();
+    yaml.write(synthesizedFile).documents(documents);
   }
 
   Map<String, Object> normalizeConfigMapScripts(Map<String, Object> document) {

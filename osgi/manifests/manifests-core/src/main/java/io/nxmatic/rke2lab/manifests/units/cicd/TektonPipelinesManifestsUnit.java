@@ -38,7 +38,7 @@ public final class TektonPipelinesManifestsUnit extends AbstractManifestsUnit {
     // — the build will fail fast if it doesn't.
     final String operatorReleaseResource =
         "/upstream/cicd/tekton-operator/release-" + operatorVersion + ".yaml";
-    new UpstreamYamlInclusion(scope, operatorReleaseResource, packageProfile);
+    new UpstreamYamlInclusion(scope, operatorReleaseResource, packageProfile, context.yaml());
 
     createReplicatedSecret(
         scope,

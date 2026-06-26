@@ -10,7 +10,8 @@ public record ManifestsUnitContext(
     String domainId,
     String manifestUnitId,
     Cdk8sApiObjectResolver resolver,
-    NodeEnvContributorRegistry contributorRegistry) {
+    NodeEnvContributorRegistry contributorRegistry,
+    YamlMapper yaml) {
 
   public ManifestsUnitContext {
     if (chart == null) {
@@ -27,6 +28,9 @@ public record ManifestsUnitContext(
     }
     if (contributorRegistry == null) {
       throw new IllegalArgumentException("contributorRegistry must not be null");
+    }
+    if (yaml == null) {
+      throw new IllegalArgumentException("yaml must not be null");
     }
   }
 }

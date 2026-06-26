@@ -28,6 +28,18 @@ is [[object-graph-navigability-principle]] applied to a DAG: a static is an orph
 means a dependency that does not travel through references. (Pure string→value factories like
 `Cidr.parse` stay static — they are construction, the entry edge of the graph, not an internal hop.)
 
+**Finding the owner: there are usually SEVERAL candidates in scope, and the context may be
+thread-local-carried.** The owner is rarely one obvious node. Two recurring shapes:
+
+- *Several nodes at hand* — `derive()` held `clusterCidr`/`nodeCidr`/`vipCidr`/`lanCidr` all in scope;
+  picking the right owner PER value (the network each address belongs to) is part of the refactor, not
+  an afterthought.
+- *Context carried by a ThreadLocal* — the natural owner is sometimes a context object delivered by a
+  thread-local rather than passed in the signature (e.g. `ManifestSynthesisContext`, the thread-local
+  runtime config injected into units). That context IS a legitimate instance to host the behaviour on;
+  prefer it over wiring a brand-new instance through every call site. So a static YAML/util helper in
+  `manifests-core` likely belongs on the already-thread-local-carried context, not on a fresh object.
+
 **How to apply:**
 
 - Touching a class with a static behaviour method ⇒ move it onto the natural instance (often one

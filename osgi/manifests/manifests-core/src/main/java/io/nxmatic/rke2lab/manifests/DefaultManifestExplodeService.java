@@ -2,7 +2,6 @@
 package io.nxmatic.rke2lab.manifests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.MappingIterator;
 import io.nxmatic.rke2lab.manifests.port.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.port.ManifestExplodeRequest;
 import io.nxmatic.rke2lab.manifests.port.ManifestExplodeResult;
@@ -14,7 +13,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +45,13 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
 
   private static final String CRD_KIND = "CustomResourceDefinition";
 
+  private final YamlMapper yaml;
+
+  @Activate
+  public DefaultManifestExplodeService(@Reference YamlMapper yaml) {
+    this.yaml = yaml;
+  }
+
   @Override
   public String providerId() {
     return "default-jackson-exploder";
@@ -66,29 +74,26 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
 
     final List<Path> written = new ArrayList<>();
 
-    try (MappingIterator<JsonNode> documents = ManifestYaml.readNodes(source)) {
-      while (documents.hasNext()) {
-        final JsonNode document = documents.next();
-        if (document == null || !document.isObject()) {
-          continue;
-        }
+    yaml.read(source)
+        .nodes()
+        .filter(JsonNode::isObject)
+        .forEach(
+            document -> {
+              final String kind = textOrNull(document.get("kind"));
+              if (kind == null) {
+                return;
+              }
+              final String domain = annotation(document, ManifestAnnotations.DOMAIN, "default");
+              final String pkg = annotation(document, ManifestAnnotations.PACKAGE, "unknown");
+              final String namespace = textOrNull(document.path("metadata").get("namespace"));
+              final String name =
+                  sanitizeFileSegment(textOrNull(document.path("metadata").get("name")));
 
-        final String domain = annotation(document, ManifestAnnotations.DOMAIN, "default");
-        final String pkg = annotation(document, ManifestAnnotations.PACKAGE, "unknown");
-        final String kind = textOrNull(document.get("kind"));
-        if (kind == null) {
-          continue;
-        }
-        final String namespace = textOrNull(document.path("metadata").get("namespace"));
-        final String name = sanitizeFileSegment(textOrNull(document.path("metadata").get("name")));
-
-        final String fileName = fileNameFor(document, kind, namespace, name);
-
-        final Path outFile = target.resolve(domain).resolve(pkg).resolve(fileName);
-        ManifestYaml.writeDocument(outFile, document);
-        written.add(outFile);
-      }
-    }
+              final String fileName = fileNameFor(document, kind, namespace, name);
+              final Path outFile = target.resolve(domain).resolve(pkg).resolve(fileName);
+              yaml.write(outFile).document(document);
+              written.add(outFile);
+            });
 
     written.sort(Comparator.naturalOrder());
 

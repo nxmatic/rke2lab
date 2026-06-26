@@ -1,16 +1,24 @@
 package io.nxmatic.rke2lab.manifests;
 
 import io.nxmatic.rke2lab.manifests.port.ManifestDocumentService;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 
 /**
- * Default {@link ManifestDocumentService} backed by the deterministic {@link ManifestYaml} mapper.
+ * Default {@link ManifestDocumentService} backed by the deterministic {@link YamlMapper} service.
  */
 @Component(service = ManifestDocumentService.class)
 public final class DefaultManifestDocumentService implements ManifestDocumentService {
+
+  private final YamlMapper yaml;
+
+  @Activate
+  public DefaultManifestDocumentService(@Reference YamlMapper yaml) {
+    this.yaml = yaml;
+  }
 
   @Override
   public String providerId() {
@@ -18,10 +26,8 @@ public final class DefaultManifestDocumentService implements ManifestDocumentSer
   }
 
   @Override
-  public Map<String, Object> parseDocument(Path yamlSource) throws IOException {
-    @SuppressWarnings("unchecked")
-    final Map<String, Object> parsed =
-        ManifestYaml.mapper().readValue(yamlSource.toFile(), Map.class);
-    return parsed;
+  @SuppressWarnings("unchecked")
+  public Map<String, Object> parseDocument(Path yamlSource) {
+    return yaml.read(yamlSource, Map.class);
   }
 }

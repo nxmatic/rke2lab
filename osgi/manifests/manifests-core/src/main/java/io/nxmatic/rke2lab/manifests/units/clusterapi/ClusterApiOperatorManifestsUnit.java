@@ -45,7 +45,7 @@ public final class ClusterApiOperatorManifestsUnit extends AbstractManifestsUnit
 
     final String operatorReleaseResource =
         "/upstream/clusterapi/operator/release-" + operatorVersion + ".yaml";
-    new UpstreamYamlInclusion(scope, operatorReleaseResource, packageProfile);
+    new UpstreamYamlInclusion(scope, operatorReleaseResource, packageProfile, context.yaml());
 
     createProviderNamespaces(scope);
     createCoreProvider(scope, coreVersion);
