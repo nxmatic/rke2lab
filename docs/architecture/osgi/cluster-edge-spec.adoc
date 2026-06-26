@@ -4,11 +4,19 @@
 
 [NOTE]
 ====
-*Status:* DESIGN (2026-06-26). The fourth external edge of the
+*Status:* IMPLEMENTED (2026-06-26). The fourth external edge of the
 link:../patterns/frontier-playability-model.adoc[frontier-playability model], after
 link:pulumi-edge-handoff.adoc[pulumi-edge], link:ssh-to-age-edge-handoff.adoc[ssh-to-age-edge] and
 link:dbus-systemd-edge-spec.adoc[dbus-systemd-edge]. It mirrors the dbus-systemd-edge shape: a single
 class shells the external tool; everything else consumes a port.
+
+Built in four green steps (Option B): `cluster-port` seam (`ClusterReadinessPhase` rapatriated from
+doctor-records, `ClusterSchemaRef`, `ControllerRef`, the `ClusterReadinessContact` seam); `cluster-core`
+swaps loose literals for `ClusterSchemaRef`; `cluster-edge` = `KubectlClusterContact` `@Component`
+(pure ProcessBuilder, zero embedded jars); `seed-master` injects the contact from the registry and
+thins `ClusterBootstrapReadinessVerifier` to its host orchestration (gate, kubeconfig poll,
+policy→`ControllerRef` projection, retry loops, `VerificationResult`). `EmbeddedBundlesBootTest` proves
+the edge resolves typed from seed-master's deployed embed topology.
 
 The cluster domain already has its *core* — `ClusterSpecialist`, a `Specialist` `@Component` in
 `osgi/cluster/cluster-core`, contributed to the doctor's DS-collected roster (the specialist
