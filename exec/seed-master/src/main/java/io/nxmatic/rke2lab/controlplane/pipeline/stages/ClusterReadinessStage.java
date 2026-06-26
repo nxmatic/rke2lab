@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.cluster.port.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessScenario;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
@@ -13,7 +14,6 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifi
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
-import io.nxmatic.rke2lab.doctor.records.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.RemediationPlan;

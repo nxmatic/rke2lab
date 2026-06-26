@@ -18,6 +18,7 @@
     to the doctor (cluster-core); the domain grows here as the cluster-edge chantier proceeds.</description>
 
   <modules>
+    <module>cluster-port</module>
     <module>cluster-core</module>
   </modules>
 </project>

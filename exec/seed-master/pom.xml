@@ -141,6 +141,16 @@
       <artifactId>systemd-port</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- The cluster domain's seam: the readiness phase vocabulary the bdd scenario + pipeline stage
+         name directly, the typed schema refs, and the ClusterReadinessContact the host composes for
+         the kubectl-backed phases. COMPILE scope like the other -port membranes — seed-master's
+         staying code references these types directly; the boot system-exports the package (type=seam)
+         so the host reads them back TYPED across the embedded-framework boundary. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>cluster-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- The doctor diagnostic model: pure operator-runbook types lifted to OSGi. COMPILE scope (not
          runtime like manifests-core): seed-master's staying code — the live registry, the reader,
          the scenarios and pipeline stages — references the model types directly, so it is a shared

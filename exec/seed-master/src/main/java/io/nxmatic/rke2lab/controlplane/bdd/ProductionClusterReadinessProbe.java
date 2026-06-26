@@ -1,11 +1,11 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import io.nxmatic.rke2lab.cluster.port.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.PhaseOutcome;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
-import io.nxmatic.rke2lab.doctor.records.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import java.util.Map;
