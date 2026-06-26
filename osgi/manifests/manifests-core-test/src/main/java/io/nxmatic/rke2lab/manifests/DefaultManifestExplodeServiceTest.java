@@ -1,10 +1,13 @@
 package io.nxmatic.rke2lab.manifests;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import io.nxmatic.rke2lab.junit.testkit.diagnostic.ScrDiagnostics;
 import io.nxmatic.rke2lab.manifests.port.ManifestAnnotations;
 import io.nxmatic.rke2lab.manifests.port.ManifestExplodeRequest;
 import io.nxmatic.rke2lab.manifests.port.ManifestExplodeResult;
+import io.nxmatic.rke2lab.manifests.port.ManifestExplodeService;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -12,14 +15,48 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.FrameworkUtil;
 
 /**
- * Locks the annotation-driven file naming in {@link DefaultManifestExplodeService}: the
- * per-resource file name is decided by annotations, never by the resource name. Regression guard
- * for the empty {@code config.yaml.d} bug, where RKE2 config fragments were dotfiled into {@code
- * .configmap-<name>.yaml.yml} and missed the installer's {@code *.yaml}/{@code *.yml} glob.
+ * Locks the annotation-driven file naming in the {@link ManifestExplodeService} @Component, run
+ * IN-CONTAINER: the per-resource file name is decided by annotations, never by the resource name.
+ * Regression guard for the empty {@code config.yaml.d} bug, where RKE2 config fragments were
+ * dotfiled into {@code .configmap-<name>.yaml.yml} and missed the installer's {@code *.yaml}/{@code
+ * *.yml} glob.
+ *
+ * <p>The service is acquired from the registry through the bundle's own {@link BundleContext} — SCR
+ * activated {@code DefaultManifestExplodeService} with its {@code @Reference} to the {@code
+ * YamlMapper} @Component satisfied — never {@code new DefaultManifestExplodeService(new
+ * YamlMapper())}. That hand-wiring was the pre-OSGI debt this migration pays down: the fixture is
+ * now what DS injects, proving the @Component graph activates in-container (the cdk8s carrier + its
+ * systemd fragment included).
  */
 class DefaultManifestExplodeServiceTest {
+
+  private static ManifestExplodeService explodeService() {
+    final BundleContext context =
+        FrameworkUtil.getBundle(DefaultManifestExplodeServiceTest.class).getBundleContext();
+    final var reference = context.getServiceReference(ManifestExplodeService.class);
+    assertNotNull(
+        reference,
+        "SCR must publish ManifestExplodeService — DefaultManifestExplodeService activated with its"
+            + " @Reference to the YamlMapper @Component satisfied."
+            + ScrDiagnostics.of(context).report());
+    final ManifestExplodeService service = context.getService(reference);
+    assertNotNull(service, "the ManifestExplodeService reference must resolve to an instance");
+    return service;
+  }
+
+  private static YamlMapper yamlMapper() {
+    final BundleContext context =
+        FrameworkUtil.getBundle(DefaultManifestExplodeServiceTest.class).getBundleContext();
+    final var reference = context.getServiceReference(YamlMapper.class);
+    assertNotNull(
+        reference,
+        "SCR must publish the YamlMapper @Component." + ScrDiagnostics.of(context).report());
+    return context.getService(reference);
+  }
 
   @Test
   void rke2ConfigFragmentKeepsVerbatimName(@TempDir Path tmp) throws IOException {
@@ -106,14 +143,12 @@ class DefaultManifestExplodeServiceTest {
 
   private static String explodeOne(final Path tmp, final Map<String, Object> document)
       throws IOException {
-    final YamlMapper yaml = new YamlMapper();
     final Path consolidated = tmp.resolve("synth.yaml");
     final Path target = tmp.resolve("exploded");
-    yaml.write(consolidated).documents(List.of(document));
+    yamlMapper().write(consolidated).documents(List.of(document));
 
     final ManifestExplodeResult result =
-        new DefaultManifestExplodeService(yaml)
-            .explode(new ManifestExplodeRequest(consolidated, target));
+        explodeService().explode(new ManifestExplodeRequest(consolidated, target));
 
     assertEquals(1, result.writtenFileCount());
     return target.relativize(result.writtenFiles().get(0)).toString();

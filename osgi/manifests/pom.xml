@@ -23,5 +23,6 @@
     <module>manifests-port</module>
     <module>manifests-cdk8s</module>
     <module>manifests-core</module>
+    <module>manifests-core-test</module>
   </modules>
 </project>
