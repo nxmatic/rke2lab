@@ -1,11 +1,10 @@
 @org.osgi.annotation.versioning.Version("1.0.0")
-// WARN level: drift is listed at each build (green), a visible backlog — drop the annotation to
-// return to the ERROR default once the netplan port is specified type-by-type. One marker covers
-// the whole bundle's exported surface (.port AND .api).
-// INSTANCE_DISCIPLINE at WARN: Cidr#parseAddress + ClusterNetworkBlueprint#topology are a visible
-// backlog — drop this pose to return to the ERROR default once they are instances or @Exempt.
+// SPEC_COVERAGE at WARN: drift listed at each build (green) — drop once the netplan port is
+// specified type-by-type. One marker covers the whole bundle's exported surface (.port AND .api).
+// INSTANCE_DISCIPLINE is back at the ERROR-locked default: the port's two static helpers are gone
+// (Cidr#parseAddress made package-private, ClusterNetworkBlueprint#topology folded into the
+// constant).
 @GovernedBy(value = Gate.SPEC_COVERAGE, level = EnforcementLevel.WARN)
-@GovernedBy(value = Gate.INSTANCE_DISCIPLINE, level = EnforcementLevel.WARN)
 package io.nxmatic.rke2lab.netplan.port;
 
 import io.nxmatic.rke2lab.domain.annotations.EnforcementLevel;

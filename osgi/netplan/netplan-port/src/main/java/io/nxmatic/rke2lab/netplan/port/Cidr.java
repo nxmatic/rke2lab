@@ -35,11 +35,35 @@ public record Cidr(InetAddress networkAddress, int prefixLength) {
       throw new IllegalArgumentException("CIDR prefix out of range (0..32): " + value);
     }
 
-    return new Cidr(parseAddress(ipv4Address.toInetAddress().getHostAddress()), prefix);
+    return new Cidr(ipv4Address.toInetAddress(), prefix);
   }
 
-  /** Parse IPv4/IPv6 address into {@link InetAddress} with consistent exception semantics. */
-  public static InetAddress parseAddress(String value) {
+  /**
+   * The host at {@code offset} from this network's base address — derived from the CIDR we already
+   * hold, so callers ask the network for its hosts instead of rebuilding and re-parsing an address
+   * string. Full integer addition, so an offset that crosses an octet boundary is handled
+   * correctly.
+   */
+  public InetAddress host(int offset) {
+    return new IPAddressString(networkAddress.getHostAddress())
+        .getAddress()
+        .toIPv4()
+        .increment(offset)
+        .toInetAddress();
+  }
+
+  /** The conventional gateway of this network: the first host (offset 1). */
+  public InetAddress gateway() {
+    return host(1);
+  }
+
+  /**
+   * Resolve a foreign address into an {@link InetAddress} with this type's consistent exception
+   * semantics — manipulating inet addresses is part of a network value-type's role. Used for an
+   * address that does not derive from this network's own range (e.g. a fixed LAN gateway outside
+   * the allocated slice), asked of the {@code Cidr} in whose address space it lives.
+   */
+  public InetAddress address(String value) {
     try {
       return InetAddress.getByName(value);
     } catch (UnknownHostException exception) {

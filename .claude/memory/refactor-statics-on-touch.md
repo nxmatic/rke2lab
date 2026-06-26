@@ -17,6 +17,17 @@ LOADED: you can see who calls it, with what data, what ROLE it plays in the syst
 right instance to move it onto. Defer it and that context is lost; the refactor becomes expensive
 again and the WARN count stays flat behind a comment. Touching = the one moment the move is cheap.
 
+**A static inside a DAG is usually a DESIGN defect, not a style nit.** In a derivation/pipeline graph
+(e.g. `ClusterNetworkBlueprint.derive()`), every node should derive from its parent node by following
+object references. A static short-circuits a missing edge — it rebuilt+re-parsed an address string
+(`inet("10.80."+octet+".1")`) instead of asking the `Cidr` it already held (`clusterCidr.gateway()`).
+The static HID the absent edge; removing it surfaces the real graph and the right instance method to
+add (`cidr.host(n)`/`gateway()`/`address(foreign)`). So "go all the way": don't relocate the static to
+a better-placed static — move the behaviour onto the node that owns the data, restoring the edge. This
+is [[object-graph-navigability-principle]] applied to a DAG: a static is an orphan node; in a DAG that
+means a dependency that does not travel through references. (Pure string→value factories like
+`Cidr.parse` stay static — they are construction, the entry edge of the graph, not an internal hop.)
+
 **How to apply:**
 
 - Touching a class with a static behaviour method ⇒ move it onto the natural instance (often one

@@ -24,11 +24,6 @@ public record ClusterNetworkBlueprint(
     return new Builder();
   }
 
-  /** Return the canonical cluster topology: 1 master + 3 control nodes + 2 worker nodes. */
-  public static ClusterTopology topology() {
-    return ClusterTopology.CANONICAL;
-  }
-
   private static ClusterNetworkBlueprint derive(String clusterName, String nodeName) {
     validateNodeName(nodeName);
 
@@ -54,17 +49,21 @@ public record ClusterNetworkBlueprint(
     final Cidr lanNodeCidr = Cidr.parse("192.168.1." + lanSliceBase + "/27");
     final Cidr lanLbCidr = Cidr.parse("192.168.1." + lanLbSliceBase + "/27");
 
-    final InetAddress clusterGatewayInetaddr = inet("10.80." + hostThirdOctet + ".1");
+    // Each host derives from the CIDR we already hold — ask the network for its host, instead of
+    // rebuilding and re-parsing an address string that re-encodes the same octets.
+    final InetAddress clusterGatewayInetaddr = clusterCidr.gateway();
     final InetAddress nodeGatewayInetaddr = clusterGatewayInetaddr;
-    final InetAddress nodeHostInetaddr = inet("10.80." + hostThirdOctet + "." + (10 + nodeId));
+    final InetAddress nodeHostInetaddr = nodeCidr.host(10 + nodeId);
 
-    final InetAddress vipGatewayInetaddr = inet("10.80." + vipThirdOctet + ".1");
-    final InetAddress vipHostInetaddr = inet("10.80." + vipThirdOctet + ".10");
+    final InetAddress vipGatewayInetaddr = vipCidr.gateway();
+    final InetAddress vipHostInetaddr = vipCidr.host(10);
 
-    final InetAddress lanHostInetaddr = inet("192.168.1." + (lanSliceBase + 3 + nodeId));
-    final InetAddress lanGatewayInetaddr = inet("192.168.1.254");
-    final InetAddress lanHeadscaleInetaddr = inet("192.168.1." + (lanLbSliceBase + 1));
-    final InetAddress lanTailscaleInetaddr = inet("192.168.1." + (lanLbSliceBase + 2));
+    final InetAddress lanHostInetaddr = lanNodeCidr.host(3 + nodeId);
+    // The fixed LAN gateway lies outside the allocated /27 slice — a foreign address, resolved by a
+    // Cidr in whose 192.168.1.0 space it lives (address manipulation is part of the type's role).
+    final InetAddress lanGatewayInetaddr = lanNodeCidr.address("192.168.1.254");
+    final InetAddress lanHeadscaleInetaddr = lanLbCidr.host(1);
+    final InetAddress lanTailscaleInetaddr = lanLbCidr.host(2);
 
     final String wanDhcpRange =
         "10.80."
@@ -174,10 +173,6 @@ public record ClusterNetworkBlueprint(
               + "' does not conform to canonical topology "
               + "(master, peer1-3, worker1-2)");
     }
-  }
-
-  private static InetAddress inet(String value) {
-    return Cidr.parseAddress(value);
   }
 
   private static int lanSliceIndex(String clusterName) {

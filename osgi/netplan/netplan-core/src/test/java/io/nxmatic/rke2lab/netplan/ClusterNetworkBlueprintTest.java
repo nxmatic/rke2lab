@@ -9,7 +9,8 @@ class ClusterNetworkBlueprintTest {
 
   @Test
   void topology_isCanonical_withOnemaster_threeControlNodes_twoWorkers() {
-    ClusterNetworkBlueprint.ClusterTopology topology = ClusterNetworkBlueprint.topology();
+    ClusterNetworkBlueprint.ClusterTopology topology =
+        ClusterNetworkBlueprint.ClusterTopology.CANONICAL;
 
     assertEquals(1, topology.masterCount());
     assertEquals(3, topology.controlNodeCount());
