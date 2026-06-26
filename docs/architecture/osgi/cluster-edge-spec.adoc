@@ -153,10 +153,23 @@ honours 2 of the 3 phases, an asymmetry a reader must learn.
 
 === Option B — edge is a low-level kubectl contact (fine, purer)
 
-`cluster-edge` exposes a fine contact — e.g. `boolean isApiReady(kubeconfig)` /
-`boolean areControllersEffective(kubeconfig, refs)` — that knows kubectl and nothing about phases or
-`Observation`. The host's `ProductionClusterReadinessProbe` orchestrates all three phases, calling the
-edge for the two kubectl ones and projecting the results into `Observation` itself.
+`cluster-edge` exposes a fine contact — `boolean isApiReady(kubeconfig)` /
+`boolean areControllersEffective(kubeconfig, List<ControllerRef>)` — that knows kubectl and nothing
+about phases or `Observation`. The host's `ProductionClusterReadinessProbe` orchestrates all three
+phases, calling the edge for the two kubectl ones and projecting the results into `Observation` itself.
+
+[IMPORTANT]
+====
+*Seam shape decided (2026-06-26): the edge receives already-projected `ControllerRef`s — it never
+sees `ControlplanePolicy`.* The current `verifyRequiredControllers(kubeconfig, ControlplanePolicy,
+timeout)` mixes two concerns: deriving the required controllers from the host policy
+(`requiredControllers(policy)` reads HA/networking/storage/… enabled flags) AND shelling
+`kubectl wait`/`rollout`. Only the second is the contact. So the *host* keeps the policy→refs
+projection and passes the resulting `List<ControllerRef>` to the edge; the edge does pure kubectl over
+refs it is given. `ControllerRef` (kind/name/namespace) becomes a neutral record of `cluster-port` —
+the contact vocabulary, free of any policy type. `isApiReady` needs only the kubeconfig path. This is
+the clean single-door edge: it imports one port, contacts one target, and carries no host type.
+====
 
 [mermaid]
 ....
