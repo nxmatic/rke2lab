@@ -74,9 +74,10 @@ public final class DbusTcpSpecialist implements Specialist {
 
   /**
    * Prescribe the adapter-unit restart only for the connection-refused assessment this specialist
-   * raises; decline otherwise. The {@code unit} is read back from the assessment (its single source);
-   * {@code host}/{@code nodeName} are raw observation facts the assessment does not carry, so they
-   * are read off the referral's observation — input facts, not a re-derivation of the assessment.
+   * raises; decline otherwise. The {@code unit} is read back from the assessment (its single
+   * source); {@code host}/{@code nodeName} are raw observation facts the assessment does not carry,
+   * so they are read off the referral's observation — input facts, not a re-derivation of the
+   * assessment.
    */
   @Override
   public Optional<Prescription> prescribe(Referral referral, Assessment assessment) {
