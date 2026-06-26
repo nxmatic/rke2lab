@@ -97,6 +97,34 @@ public record ResolvedBundle(
     return new RecordPurity(this);
   }
 
+  /**
+   * The spec-coverage check OF this bundle against {@code docsDir} — every exported type must be
+   * named in a spec or {@code @Transitional}. Reports the violations only; how they are reported is
+   * decided by {@link #governance()}. An instance reached from its subject, like {@link
+   * #recordPurity()}.
+   */
+  public SpecCoverage specCoverage(java.nio.file.Path docsDir) {
+    return new SpecCoverage(this, docsDir);
+  }
+
+  /**
+   * The instance-discipline check OF this bundle — exported types should not publish {@code public
+   * static} behaviour helpers (factories and constants exempt). Reports the violations only; the
+   * level is {@link #governance()}'s call. An instance reached from its subject, like the twins.
+   */
+  public InstanceDiscipline instanceDiscipline() {
+    return new InstanceDiscipline(this);
+  }
+
+  /**
+   * The governance OF this bundle — the {@link EnforcementLevel} each {@link Gate} reports it at,
+   * read from {@code @GovernedBy} on its package-infos (default {@link EnforcementLevel#ERROR}). An
+   * instance reached from its subject, like {@link #recordPurity()} / {@link #specCoverage}.
+   */
+  public GovernanceReader governance() {
+    return new GovernanceReader(this);
+  }
+
   /** Strip the {@code ;singleton:=true} and other attributes a BSN header may carry. */
   private static String bareSymbolicName(String header) {
     return header == null ? null : Clause.parse(header).name();

@@ -8,6 +8,7 @@ import io.nxmatic.rke2lab.doctor.records.ProblemReview;
 import io.nxmatic.rke2lab.doctor.records.Provenance;
 import io.nxmatic.rke2lab.doctor.records.ReferralReply;
 import io.nxmatic.rke2lab.doctor.records.SchemaRef;
+import io.nxmatic.rke2lab.domain.annotations.Transitional;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -28,7 +29,13 @@ import java.util.Optional;
  *
  * <p>The inference is idempotent across reruns: a prior inferred external change already in the
  * window suppresses re-recording, so one real change is never recorded N times over N runs.
+ *
+ * <p>The settled design reframes this as the médecin-conseil — a pure-reader efficacy analyst that
+ * produces an EfficacyReport and INFERS/WRITES nothing (the external-change inference is dropped).
  */
+@Transitional(
+    to = "médecin-conseil (efficacy analyst)",
+    spec = "efficacy-and-medecin-conseil-design.adoc")
 public final class DriftSpecialist {
 
   private final InterventionLedgerWriter writer;

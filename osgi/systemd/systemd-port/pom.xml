@@ -15,6 +15,14 @@
   <description>Systemd unit abstractions and contracts: the typed vocabulary for declaring systemd
     units and drop-ins, shared by the CDK8s-systemd integration and the synthesis layer.</description>
 
+  <dependencies>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>domain-annotations</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+
   <!-- bnd execution + jar manifestFile inherited from osgi/bundle-parent; the bare
        reference activates the managed bnd-process goal for this library bundle. -->
   <build>

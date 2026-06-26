@@ -500,6 +500,13 @@ gesture's nature; how it is carried, and how the path is selected, is not decide
 <<loop-closure>> for _when_ the gesture is administered, and <<ai-seam>> for the action
 surface (MCP) a future imperative remediator might use.
 
+What a remediator *reports* is the administering counterpart of a specialist's `Assessment`: an
+`AdministrationOutcome` carrying a closed-set `AdministrationStatus` (never a free string), a
+structured payload (what it did / observed), and a human summary. Like an assessment, it is present
+whatever the status — a `SKIPPED` administration keeps its reason, so an administration is never
+silent. (Records shipped in `doctor-records`; the remediator role that produces them is the design
+above, not yet wired.)
+
 [#loop-closure]
 === Loop closure: the next visit, on the operator's terms
 
@@ -573,6 +580,16 @@ update in the same change. Increment A stays on `Map` (no doctor yet); the typed
 exactly when the doctor needs it. `Observation` is a plain record — serializability (for a
 future MCP boundary) follows whenever Phase 2 picks a mechanism, and is not a Phase 1
 concern.
+
+*When the snapshot cannot be read — a typed failure hierarchy, not a leaked backend error.* The
+observation port raises `SnapshotException` when a snapshot that should have been readable was not,
+and preserves the host's retry distinction WITHOUT leaking the backend's file types: the offending
+source is named by an opaque `location` descriptor the adapter fills in. Two subclasses carry the
+distinction — `SnapshotAccessException` (absent / unreadable / denied — retrying may succeed; the
+pure counterpart of the host `StackAccessException`) and `SnapshotContentException` (reachable but
+malformed — retrying will not help; the pure counterpart of `StackContentException`). The split is
+the doctor world's pure mirror of the host's access-vs-content error contract, so the diagnostic
+side never imports a host or filesystem type to reason about a read failure.
 
 [#ai-seam]
 == The AI-augmentation seam (Phase 2, not built here)

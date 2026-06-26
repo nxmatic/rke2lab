@@ -18,6 +18,7 @@
   <modules>
     <module>bundle-parent</module>
     <module>bundle-test-parent</module>
+    <module>domain-annotations</module>
     <module>boot</module>
     <module>junit-testkit</module>
     <module>runtime</module>

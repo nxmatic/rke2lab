@@ -1,0 +1,190 @@
+= Staging gates & their governance model
+:toc: left
+:icons: font
+
+== Overview
+
+The OSGi bundle staging is driven by a Maven extension (`maven-embed-staging-ext/staging-extension`)
+that, beyond wiring the shade/dependency-plugin lists, enforces a set of *staging laws* — build-time
+invariants read from bundle bytecode. A law that finds violations can fail the build. This is the
+project's answer to a recurring problem: a discipline asked for at review time silently rots between
+reviews. A *gate* is seen at every build (impossible to forget) and, once a bundle's debt is cleared,
+its default level locks the rule so the anti-pattern can never silently reappear.
+
+This document specifies the three gates and the single annotation that governs how each reports.
+
+=== The three gates
+
+[cols="1,3",options="header"]
+|===
+| Gate | Law
+
+| `RECORD_PURITY`
+| A `type=record` bundle may export only records, enums, and sealed ADT roots — a pure-data bundle,
+  never behaviour. (Read by `RecordPurity`.)
+
+| `SPEC_COVERAGE`
+| Every type a bundle exports must be named in a `docs/` architecture spec, or carry
+  `@Transitional` (a traced migration whose spec describes the successor). A type in neither is
+  code-out-of-spec. (Read by `SpecCoverage`.)
+
+| `INSTANCE_DISCIPLINE`
+| A bundle's exported types must not publish `public static` behaviour helpers (the instance-passing
+  discipline — pass instances through the call graph, no `XxxHelper.staticMethod()`). The *target is
+  zero*. Factory methods (`of`, `from*`, `parse`, `valueOf`, `builder`, `create`, `defaults`, `new*`,
+  or a method returning its own declaring type) are part of the rule, not exceptions — they are
+  construction, not behaviour. Constants (fields) are not inspected. Anything else that must stay
+  static is an EXPLICIT exception, annotated `@Exempt` (see below) — never widened into the
+  heuristic. (Read by `InstanceDiscipline`.)
+|===
+
+== Governance — `@GovernedBy(Gate, EnforcementLevel)`
+
+Each gate reports at an `EnforcementLevel`, declared per-package on a `package-info`:
+
+[cols="1,3",options="header"]
+|===
+| Level | Effect
+
+| `ERROR` (default)
+| A violation breaks the build. The *locked* state: once a bundle is clean, the default keeps it
+  clean forever.
+
+| `WARN`
+| Violations are listed as a warning, build stays green. A visible, shrinking backlog — a bundle on
+  its way to `ERROR`.
+
+| `IGNORE`
+| Violations are silent. Build infrastructure only (a module that powers a gate cannot be governed
+  by it), never a way to hide a real domain's debt.
+|===
+
+`@GovernedBy` is `@Repeatable` and `@Target(PACKAGE)`: one pose per gate, each with its own level. A
+gate with NO `@GovernedBy` for a package treats it at the default `ERROR` — so *governed by default*
+is the standing guarantee; a package opts a single gate down to `WARN`/`IGNORE` explicitly.
+
+[source,java]
+----
+@GovernedBy(Gate.SPEC_COVERAGE, EnforcementLevel.WARN)         // listed, build green
+@GovernedBy(Gate.INSTANCE_DISCIPLINE, EnforcementLevel.ERROR)  // breaks the build
+package io.nxmatic.rke2lab.netplan.port;
+----
+
+The annotations live in `osgi/domain-annotations` — a dependency-free bundle common to ALL domains,
+so even a `type=record` leaf under the purity guard can be annotated without taking on a dependency,
+and no domain depends on another's annotation module.
+
+== Exemptions — `@Exempt(Gate, reason)`
+
+`@GovernedBy` lowers the report level for a whole *package*; `@Exempt` removes a *single element* from
+one gate, with a written reason. It is the precise opposite of widening the detection heuristic: the
+gate stays strict (the `INSTANCE_DISCIPLINE` target is zero static helpers), and a member that must
+legitimately stay static carries an explicit, reviewable exemption rather than being silently absorbed
+by a broader name rule.
+
+[source,java]
+----
+public final class ClusterNetworkBlueprint {
+  @Exempt(value = Gate.INSTANCE_DISCIPLINE, reason = "pure topology projection, no collaborators")
+  public static Topology topology(...) { ... }
+}
+----
+
+`@Exempt` is `@Repeatable`, `@Target({TYPE, METHOD, FIELD})`, retention `CLASS` (the extension reads it
+via ASM, like every other marker). The gate skips an element carrying `@Exempt(thatGate, …)`. Rules:
+
+* the `reason` is mandatory and non-blank — an exemption with no justification is itself a smell;
+* an exemption is per-gate, so exempting `INSTANCE_DISCIPLINE` does not touch `SPEC_COVERAGE`;
+* it does NOT replace factory recognition: real factories (the verbs above) are part of the rule and
+  need no annotation. `@Exempt` is for the residue the rule cannot recognise but review accepts.
+
+Discovering an exemption that recurs across many elements is the signal to reconsider the rule (or the
+design), not to keep stamping `@Exempt` — the annotation count is itself a backlog metric.
+
+=== C4 — component & data flow
+
+[mermaid]
+....
+flowchart TB
+  subgraph anns["osgi/domain-annotations (dependency-free)"]
+    gb["@GovernedBy(Gate, EnforcementLevel) @Repeatable"]
+    en["EnforcementLevel {IGNORE,WARN,ERROR}"]
+    ga["Gate {SPEC_COVERAGE,RECORD_PURITY,INSTANCE_DISCIPLINE}"]
+    ex["@Exempt(Gate, reason) @Repeatable<br/>TYPE / METHOD / FIELD"]
+    tr["@Transitional(to, spec)"]
+  end
+  subgraph dom["each domain bundle"]
+    pi["package-info.class<br/>carries @GovernedBy per gate"]
+    tps["exported types<br/>(an element may carry @Exempt)"]
+  end
+  subgraph ext["staging-extension (installed BEFORE the reactor)"]
+    gr["GovernanceReader (ASM)<br/>→ Map&lt;Gate, EnforcementLevel&gt;"]
+    rp["RecordPurity"]
+    sc["SpecCoverage"]
+    id["InstanceDiscipline<br/>(skips @Exempt elements)"]
+    se["StagingExecutionStrategy.enforceGates<br/>fail-AT-end: collect all, fail once"]
+  end
+  gb -.read as bytecode.-> gr
+  ex -.read as bytecode.-> id
+  pi --> gr
+  tps --> rp & sc & id
+  gr --> se
+  rp --> se
+  sc --> se
+  id --> se
+  classDef infra fill:#eef,stroke:#225;
+  class ext infra;
+....
+
+== Reader side — bytecode, not linkage
+
+The extension is installed BEFORE the reactor that builds `domain-annotations`, so it CANNOT link
+those types. It reads them from bytecode through ASM and maps them onto its OWN mirror enums
+(`EnforcementLevel`, `Gate`) — exactly as it reads bnd header strings into its own `EmbedCapability`
+view. The mirror constant NAMES must stay in step with the annotation module's enums.
+
+A `@Repeatable` annotation posed once is stored as `@GovernedBy`; posed twice or more, Java wraps the
+poses in the container `@GovernedByAll`. The reader handles BOTH shapes and yields a
+`Map<Gate, EnforcementLevel>` for the bundle; each gate looks up its own level, defaulting to `ERROR`.
+
+== Fail-at-end
+
+`enforceGates` runs every law over the whole resolved bundle set, *collecting* all violations, then
+fails ONCE with the complete list. A per-bundle throw would surface only the first offender and force
+a fix-rebuild-repeat loop; accumulating shows the whole debt in a single run so it can be cleared in
+one pass. `WARN`-level violations are logged (build green); `ERROR`-level violations are what make the
+single aggregated failure.
+
+== Anti-patterns
+
+[cols="1,1",options="header"]
+|===
+| ❌ Don't | ✅ Do
+
+| Add a boolean opt-out flag per gate
+| One `@GovernedBy(Gate, level)` per gate — graduated, not on/off
+
+| Name the level after "drift" (collides with the doctor domain's drift detection)
+| `EnforcementLevel` — neutral, gate-agnostic
+
+| Make the extension depend on `domain-annotations`
+| Read annotations via ASM into the extension's mirror enums (build-order safe)
+
+| Leave a cleaned bundle at `WARN`
+| Drop the `@GovernedBy` for that gate so it returns to the `ERROR` default (locked)
+
+| Widen a gate's heuristic to silence a false positive (e.g. add a name prefix so one static stops
+  being flagged)
+| Keep the rule strict; annotate the single element `@Exempt(gate, reason)` — explicit, reviewable,
+  countable
+
+| Stamp `@Exempt` on a pattern that recurs across many elements
+| Treat the recurring exemption as a signal to fix the rule or the design — the `@Exempt` count is a
+  backlog metric
+|===
+
+== Related documentation
+
+* link:world-boundary-spec.adoc[World boundary] — the host↔OSGi seam these bundles stage into.
+* link:osgi-boot-single-source-handoff.adoc[OSGi boot single-source] — the staging closure the same
+  extension derives.

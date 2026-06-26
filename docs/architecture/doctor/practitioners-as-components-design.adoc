@@ -11,6 +11,10 @@ blocks it (per-run state inside the Generalist) and the correction (separate the
 practitioner from the per-run consultation). Instantiation mechanism CHOSEN (2026-06-26): option C,
 the employment registry — the practitioner is employed once as a `@Component`, the consultation is a
 per-run value. Remaining maille (the operational-mode contract, the `engage` shape) deferred to build.
+
+*Supersedes (two-way links):* this design replaces `Generalist` (marked
+`@Transitional(to = "GeneralPractitioner + Consultation")` in code) — the per-run object split into an
+employed practitioner + a consultation value. Code points here; this spec names what it replaces.
 ====
 
 == Overview — the goal and the obstacle
@@ -108,6 +112,20 @@ clinician declares its *operational mode* — the verbs it answers with, already
 |===
 
 Identity says *who*; operational mode says *what it does*. Both belong on the genus.
+
+The `consult` mode emits a one-line narration of the visit — "consulted with N prior visit(s); SYMPTOM
+seen K× before" — rendered by `ConsultationNarration` from the patient's `MedicalRecord`. It is
+extracted (a single static renderer) so the two checkpoint stages that consult produce the identical
+line rather than each re-assembling the string; the consult verb and the analyst's `review` both read
+the record, so they share this rendering.
+
+The DS side of this genus is `ClinicianProperties` — the single source of truth for the service
+properties a clinician `@Component` publishes and a consumer's `@Reference` target selects on, so the
+provider and filter sides can never drift (the identifier-catalog discipline). Two axes, both rooted at
+the genus `clinician.*` (never a species): `ROLE` (diagnostician vs remediator — a remediator is a
+clinician but not a doctor, so the discriminator is `clinician.*`, not `doctor.*`) and `TIER`
+(domain-level vs sub-level, the filter that stops a composite clinician from collapsing the roster).
+This is what makes the employment-by-`@Reference` half of the directory work.
 
 == Instantiation mechanism — CHOSEN: C (employment registry)
 

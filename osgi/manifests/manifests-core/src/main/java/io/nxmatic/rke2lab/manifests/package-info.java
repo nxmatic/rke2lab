@@ -50,4 +50,13 @@
  * </ul>
  */
 @org.osgi.annotation.versioning.Version("1.0.0")
+// Both gates at WARN — visible backlog, drop a pose to return to the ERROR default once cleared.
+// SPEC_COVERAGE: a manifests-architecture doc exists but coverage is not yet enforced type-by-type.
+// INSTANCE_DISCIPLINE: ManifestYaml (9 static helpers) + ManifestSynthesisContext#bind.
+@GovernedBy(value = Gate.SPEC_COVERAGE, level = EnforcementLevel.WARN)
+@GovernedBy(value = Gate.INSTANCE_DISCIPLINE, level = EnforcementLevel.WARN)
 package io.nxmatic.rke2lab.manifests;
+
+import io.nxmatic.rke2lab.domain.annotations.EnforcementLevel;
+import io.nxmatic.rke2lab.domain.annotations.Gate;
+import io.nxmatic.rke2lab.domain.annotations.GovernedBy;

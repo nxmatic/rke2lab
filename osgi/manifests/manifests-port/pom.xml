@@ -22,6 +22,14 @@
     share ONE copy of the contract. Versioned independently of the reactor GAV via per-package
     @Version (starts 1.0.0).</description>
 
+  <dependencies>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>domain-annotations</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+
   <build>
     <plugins>
       <plugin>

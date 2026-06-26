@@ -92,7 +92,7 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
       throws LifecycleExecutionException {
     final String module = session.getCurrentProject().getArtifactId();
     final List<ResolvedBundle> resolved = resolveBundles(session);
-    enforceRecordPurity(resolved);
+    enforceGates(resolved, locateDocsDir(session));
     final StagingClosure closure = StagingClosure.compute(resolved);
 
     int shadeAdded = 0;
@@ -113,26 +113,159 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
   }
 
   /**
-   * Fail the build if any {@code type=record} bundle exports a top-level type that is not a record,
-   * enum, or sealed ADT root — the law that gives the record category its meaning (a pure-data
-   * bundle, never behavior). The check is delegated to a {@link RecordPurity} instance OF each
-   * record bundle, so it is navigable back to its subject.
+   * Run every staging law over the whole bundle set in fail-AT-end mode: collect every violation
+   * from every bundle, report each at the {@link EnforcementLevel} its bundle declares for that
+   * {@link Gate} ({@code @GovernedBy}, default ERROR), then fail ONCE with the complete ERROR list.
+   * A per-bundle throw would surface only the first offender, forcing a fix-rebuild-repeat loop to
+   * discharge the debt one bundle at a time; accumulating shows the whole debt in a single run so
+   * it can be cleared in one pass. WARN violations are logged (a visible, shrinking backlog);
+   * IGNORE is silent.
+   *
+   * <p>The laws (each governable per bundle, default ERROR):
+   *
+   * <ul>
+   *   <li>{@link Gate#RECORD_PURITY} — a {@code type=record} bundle may export only records / enums
+   *       / sealed ADT roots. Delegated to a {@link RecordPurity} instance OF each record bundle.
+   *   <li>{@link Gate#SPEC_COVERAGE} — a bundle may export only types named in a {@code docs/} spec
+   *       or marked {@code @Transitional}. Delegated to a {@link SpecCoverage} instance OF each
+   *       bundle. A {@code null} docs dir (not found) skips this law rather than failing
+   *       spuriously.
+   * </ul>
    */
-  private void enforceRecordPurity(List<ResolvedBundle> resolved)
+  private void enforceGates(List<ResolvedBundle> resolved, java.nio.file.Path docsDir)
       throws LifecycleExecutionException {
+    if (docsDir == null) {
+      log.warn(
+          "[osgi-staging] docs/ not found from the reactor root — spec-coverage check skipped");
+    }
+    final GateReport report = new GateReport();
     for (ResolvedBundle bundle : resolved) {
-      if (bundle.embed() == null || !bundle.embed().isRecord()) {
-        continue;
+      final Map<Gate, EnforcementLevel> governance = bundle.governance().levels();
+      if (bundle.embed() != null && bundle.embed().isRecord()) {
+        report.record(
+            Gate.RECORD_PURITY,
+            governance,
+            bundle,
+            bundle.recordPurity().violations(),
+            "exports non-data types (only records / enums / sealed ADT roots allowed)");
       }
-      final List<String> violations = bundle.recordPurity().violations();
-      if (!violations.isEmpty()) {
-        throw new LifecycleExecutionException(
-            "osgi-staging: type=record bundle "
-                + bundle.ga()
-                + " exports non-data types (only records / enums / sealed ADT roots are allowed): "
-                + violations);
+      if (docsDir != null && bundle.isBundle() && bundle.embed() != null) {
+        report.record(
+            Gate.SPEC_COVERAGE,
+            governance,
+            bundle,
+            bundle.specCoverage(docsDir).violations(),
+            "exports types absent from docs/ specs and not @Transitional");
+      }
+      if (bundle.isBundle() && bundle.embed() != null) {
+        report.record(
+            Gate.INSTANCE_DISCIPLINE,
+            governance,
+            bundle,
+            bundle.instanceDiscipline().violations(),
+            "exports public static behaviour helpers (pass instances; factories exempt)");
       }
     }
+    report.flush();
+  }
+
+  /**
+   * Accumulates each gate's violations by the {@link EnforcementLevel} their bundle declares: ERROR
+   * lines become the single aggregated build failure, WARN lines a visible backlog logged at the
+   * end, IGNORE is dropped. The {@code @GovernedBy(gate, level)} default is ERROR, so an
+   * unspecified domain is locked by default.
+   */
+  private final class GateReport {
+
+    private final List<String> errors = new ArrayList<>();
+    private final List<String> warnings = new ArrayList<>();
+    private final Map<Gate, int[]> tally =
+        new java.util.EnumMap<>(Gate.class); // [errors, warnings]
+
+    void record(
+        Gate gate,
+        Map<Gate, EnforcementLevel> governance,
+        ResolvedBundle bundle,
+        List<String> violations,
+        String what) {
+      if (violations.isEmpty()) {
+        return;
+      }
+      final EnforcementLevel level = governance.getOrDefault(gate, EnforcementLevel.ERROR);
+      if (level == EnforcementLevel.IGNORE) {
+        return;
+      }
+      final String line =
+          "  [" + gateLabel(gate) + "] " + bundle.ga() + " " + what + ": " + violations;
+      final int[] counts = tally.computeIfAbsent(gate, g -> new int[2]);
+      if (level == EnforcementLevel.ERROR) {
+        errors.add(line);
+        counts[0] += violations.size();
+      } else {
+        warnings.add(line);
+        counts[1] += violations.size();
+      }
+    }
+
+    void flush() throws LifecycleExecutionException {
+      logSummary();
+      if (!warnings.isEmpty()) {
+        log.warn(
+            "[osgi-staging] {} staging-law violation(s) at WARN (@GovernedBy(...,WARN)) — visible"
+                + " backlog, raise to the ERROR default once cleared:\n{}",
+            warnings.size(),
+            String.join("\n", warnings));
+      }
+      if (!errors.isEmpty()) {
+        throw new LifecycleExecutionException(
+            "osgi-staging: "
+                + errors.size()
+                + " staging-law violation(s) at ERROR — fix each, mark it @Transitional(to,spec), or"
+                + " lower the gate to @GovernedBy(gate, WARN) on the package-info while the debt is"
+                + " paid down:\n"
+                + String.join("\n", errors));
+      }
+    }
+
+    /**
+     * One line per gate: how many violations it found, split ERROR vs WARN — the état des lieux.
+     */
+    private void logSummary() {
+      final StringBuilder summary = new StringBuilder();
+      for (Gate gate : Gate.values()) {
+        final int[] counts = tally.getOrDefault(gate, new int[2]);
+        summary
+            .append("\n  ")
+            .append(gateLabel(gate))
+            .append(": ")
+            .append(counts[0])
+            .append(" error, ")
+            .append(counts[1])
+            .append(" warn");
+      }
+      log.info("[osgi-staging] gate summary (violations by gate):{}", summary);
+    }
+
+    private String gateLabel(Gate gate) {
+      return gate.name().toLowerCase().replace('_', '-');
+    }
+  }
+
+  /**
+   * The repo's {@code docs/} directory, found by walking up from the current module's basedir — the
+   * one tree a Mojo can reach (via the session) that a bundle classloader cannot. {@code null} if
+   * no ancestor holds a {@code docs/} directory.
+   */
+  private static java.nio.file.Path locateDocsDir(MavenSession session) {
+    java.nio.file.Path dir = session.getCurrentProject().getBasedir().toPath();
+    while (dir != null) {
+      final java.nio.file.Path docs = dir.resolve("docs");
+      if (java.nio.file.Files.isDirectory(docs)) {
+        return docs;
+      }
+      dir = dir.getParent();
+    }
+    return null;
   }
 
   /**

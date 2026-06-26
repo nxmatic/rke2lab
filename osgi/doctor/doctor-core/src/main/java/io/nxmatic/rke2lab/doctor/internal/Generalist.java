@@ -16,6 +16,7 @@ import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.records.Visit;
 import io.nxmatic.rke2lab.doctor.spi.Clinician;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
+import io.nxmatic.rke2lab.domain.annotations.Transitional;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,7 +34,14 @@ import java.util.List;
  *
  * The Generalist reads records only through its {@link ClinicalAccess} (bound to its id by the
  * {@link HealthSystem} at employment); it holds no registry or patient directly.
+ *
+ * <p>The settled design splits this per-run object into an EMPLOYED practitioner (a stable
+ * {@code @Component}) and a per-run Consultation value carrying the access — so every actor can be
+ * a component of the system.
  */
+@Transitional(
+    to = "GeneralPractitioner + Consultation",
+    spec = "practitioners-as-components-design.adoc")
 public final class Generalist implements Clinician, ConsultingService {
 
   /** The Generalist's stable id — the grant policy's join key for the general practitioner. */

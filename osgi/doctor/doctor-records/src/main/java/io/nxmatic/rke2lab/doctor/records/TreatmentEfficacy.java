@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.doctor.records;
 
+import io.nxmatic.rke2lab.domain.annotations.Transitional;
 import java.util.List;
 
 /**
@@ -8,7 +9,11 @@ import java.util.List;
  * visit. A treatment "ever worked" if at least one attempt was followed by no recurrence — and was
  * not {@code confounded}: a confounded attempt is one where the symptom resolved but a non-engine
  * intervention in the window explains it, so the resolution cannot be credited to the treatment.
+ *
+ * <p>The thin "ever worked" measurement; the settled design supersedes it with a bounded, dated
+ * {@code EfficacyReport} that keeps its references and the "why".
  */
+@Transitional(to = "EfficacyReport", spec = "efficacy-and-medecin-conseil-design.adoc")
 public record TreatmentEfficacy(Symptom symptom, List<Attempt> attempts) {
 
   public record Attempt(int version, String programRef, boolean recurred, boolean confounded) {}

@@ -11,6 +11,10 @@ reference targets) is deliberately deferred until real recruitment use-cases app
 is the target it will be refactored toward. It documents the existing efficacy types
 (`TreatmentEfficacy`, `ProblemReview`) that had drifted out of the specs, and the redesign that
 supersedes the inference.
+
+*Supersedes (two-way links):* this design replaces `DriftSpecialist` (marked
+`@Transitional(to = "médecin-conseil")` in code) and `TreatmentEfficacy`
+(`@Transitional(to = "EfficacyReport")`). Code points here; this spec names what it replaces.
 ====
 
 == Overview — what problem this solves
@@ -170,9 +174,11 @@ produced and then dropped.
 |===
 | type | role in this model
 
-| `TreatmentEfficacy` (record)
-| the as-built thin measurement (`symptom` + `List<Attempt>`, `everWorked()`); superseded in spirit
-  by the bounded `EfficacyReport`. `Attempt(version, programRef, recurred, confounded)`.
+| `TreatmentEfficacy` (record) — *SUPERSEDED by `EfficacyReport`*
+| the as-built thin measurement (`symptom` + `List<Attempt>`, `everWorked()`); the bounded
+  `EfficacyReport` replaces it. `Attempt(version, programRef, recurred, confounded)`. The type is
+  marked `@Transitional(to = "EfficacyReport")` in code — the two-way link: code points here, this
+  spec names what it replaces.
 
 | `ProblemReview` (record)
 | the transient request handed to the analyst: `problem`, `expectation`, `priorVisit`, `nextVisit`,
@@ -185,6 +191,19 @@ produced and then dropped.
 
 | `SymptomHistory`
 | the longitudinal view of one symptom across visits the analyst folds over.
+
+| `ProblemRef` (record)
+| the problem-oriented join key shared by three actors: the generalist OPENS a problem when a symptom
+  appears at a checkpoint, the operator DECLARES interventions against it, the analyst EXPLAINS its
+  resolutions. `(Checkpoint, Optional<Symptom>)` — a checkpoint-only ref explains every symptom there;
+  a symptom-specific ref explains only its own.
+
+| `ExpectationPredicate` (sealed) / `ResolutionPredicate` (record)
+| the EXTENSION SEAM for "what a prescription expects at the next visit". A sealed ADT: today the only
+  permit is `ResolutionPredicate` (the symptom is gone); a future analyst will want a richer one (e.g.
+  a `FingerprintPredicate` diffing observed state) — it slots in without touching callers. This is the
+  observed-vs-expected detection axis the brainstorm flagged as the reliable, declaration-independent
+  drift signal.
 |===
 
 == Anti-patterns (what this design forbids)

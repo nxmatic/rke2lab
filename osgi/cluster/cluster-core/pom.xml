@@ -18,6 +18,11 @@
     its impl package is non-exported (the specialist crosses as the Specialist service).</description>
 
   <dependencies>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>domain-annotations</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- The doctor's inter-domain SPI (Specialist + ClinicianProperties) and its record vocabulary:
          the cluster domain implements the SPI to plug its diagnostician into the doctor. -->
     <dependency>

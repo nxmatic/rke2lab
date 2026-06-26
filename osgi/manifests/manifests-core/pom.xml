@@ -28,6 +28,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>domain-annotations</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
       <groupId>org.cdk8s</groupId>
       <artifactId>cdk8s</artifactId>
     </dependency>

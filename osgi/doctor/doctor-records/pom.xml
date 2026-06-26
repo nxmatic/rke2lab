@@ -17,6 +17,15 @@
     speak about and the actors in doctor-core reason over. A pure leaf both depend on, so a
     DomainDagMapper imports only the data, never the contracts. Carries type=record.</description>
 
+  <dependencies>
+    <!-- Dependency-free annotations only (does NOT compromise the leaf): @Transitional markers. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>domain-annotations</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+
   <build>
     <plugins>
       <plugin>
