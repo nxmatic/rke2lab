@@ -81,18 +81,30 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
       MavenSession session,
       MojoExecutionRunner mojoExecutionRunner)
       throws LifecycleExecutionException {
-    if (mojoExecutions.stream().anyMatch(StagingExecutionStrategy::isShade)) {
-      reconfigureStaging(session, mojoExecutions);
+    final boolean staging = mojoExecutions.stream().anyMatch(StagingExecutionStrategy::isShade);
+    final List<ResolvedBundle> resolved = staging ? resolveBundles(session) : null;
+    if (staging) {
+      // Inject the shade/staging config BEFORE delegating: the mojos read it as they are
+      // configured.
+      reconfigureStaging(session, mojoExecutions, resolved);
     }
     delegate().execute(mojoExecutions, session, mojoExecutionRunner);
+    if (staging) {
+      // Run the staging-law gate AFTER delegating: compile has now populated target/classes, so the
+      // gate can read the exec's REALM_BOUNDARY governance AND self-scan its host classes. Gating
+      // before compile saw an empty (cold) tree — no governance anchor, host classes unseen, and
+      // the
+      // build failed before compile could ever fill it (a self-deadlock). Running here also matches
+      // the gate's declared fail-AT-end intent: collect every violation, fail once, at the true
+      // end.
+      enforceGates(session, resolved, locateDocsDir(session));
+    }
   }
 
   /** Derive the staging closure from the resolved deps and inject both faces of the staging. */
-  private void reconfigureStaging(MavenSession session, List<MojoExecution> mojoExecutions)
-      throws LifecycleExecutionException {
+  private void reconfigureStaging(
+      MavenSession session, List<MojoExecution> mojoExecutions, List<ResolvedBundle> resolved) {
     final String module = session.getCurrentProject().getArtifactId();
-    final List<ResolvedBundle> resolved = resolveBundles(session);
-    enforceGates(session, resolved, locateDocsDir(session));
     final StagingClosure closure = StagingClosure.compute(resolved);
 
     int shadeAdded = 0;
