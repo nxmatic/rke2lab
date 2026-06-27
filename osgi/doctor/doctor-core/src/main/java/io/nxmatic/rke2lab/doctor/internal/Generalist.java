@@ -152,17 +152,15 @@ public final class Generalist implements Clinician, ConsultingService {
    * diagnosis, returned as a {@code consultation} Document. The twin of the readiness authority's
    * assess — same checkpoint, the consulting concern rather than the provisioning verdict.
    *
-   * <p><b>Not yet implemented:</b> Task 2 (zone-0b) maps the checkpoint's flat {@code symptomKind}
-   * string to the doctor's internal {@link Symptom} enum, extracts the observation's structured
-   * fields, calls {@link #consult(Symptom, Observation)}, and assembles the consultation Document.
-   * Until then, this stub fails-fast so a premature call surfaces immediately.
+   * <p>Not yet implemented: the Document path will map the checkpoint's flat {@code symptomKind}
+   * string to the internal {@link Symptom} enum, extract the observation's structured fields, call
+   * {@link #consult(Symptom, Observation)}, and assemble the consultation Document. Until then this
+   * stub fails fast so a premature call surfaces immediately rather than returning a wrong result.
    */
   @Override
   public io.nxmatic.rke2lab.exchange.port.Document consult(
       io.nxmatic.rke2lab.exchange.port.Document checkpoint) {
-    throw new UnsupportedOperationException(
-        "consult(Document) not yet implemented — Task 2 (zone-0b) maps checkpoint→Symptom/Observation, "
-            + "routes to specialists, assembles consultation Document");
+    throw new UnsupportedOperationException("consult(Document) not yet implemented");
   }
 
   /**
