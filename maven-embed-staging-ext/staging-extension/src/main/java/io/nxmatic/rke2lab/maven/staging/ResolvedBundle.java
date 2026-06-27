@@ -155,6 +155,60 @@ public record ResolvedBundle(
     return new GovernanceReader(this);
   }
 
+  /** One compiled class read from this carrier — its binary name and bytes. */
+  public record ClassEntry(String binaryName, byte[] bytes) {}
+
+  /** Every {@code .class} in this carrier's jar (top-level and nested), for body-level scans. */
+  public java.util.List<ClassEntry> classEntries() {
+    if (file() == null || !file().isFile()) {
+      return java.util.List.of();
+    }
+    final java.util.List<ClassEntry> entries = new java.util.ArrayList<>();
+    try (JarFile jar = new JarFile(file())) {
+      final java.util.Enumeration<java.util.jar.JarEntry> e = jar.entries();
+      while (e.hasMoreElements()) {
+        final java.util.jar.JarEntry entry = e.nextElement();
+        final String name = entry.getName();
+        if (!name.endsWith(".class") || name.endsWith("module-info.class")) {
+          continue;
+        }
+        try (var in = jar.getInputStream(entry)) {
+          entries.add(new ClassEntry(name.substring(0, name.length() - 6), in.readAllBytes()));
+        }
+      }
+    } catch (IOException ex) {
+      throw new UncheckedIOException("cannot read classes of " + ga(), ex);
+    }
+    return entries;
+  }
+
+  /** Every {@code .class} under an exploded classes directory (the exec's own target/classes). */
+  public static java.util.List<ClassEntry> classEntriesOf(java.nio.file.Path classesDir) {
+    if (classesDir == null || !java.nio.file.Files.isDirectory(classesDir)) {
+      return java.util.List.of();
+    }
+    try (var tree = java.nio.file.Files.walk(classesDir)) {
+      final java.util.List<ClassEntry> entries = new java.util.ArrayList<>();
+      tree.filter(p -> p.toString().endsWith(".class"))
+          .filter(p -> !p.getFileName().toString().equals("module-info.class"))
+          .forEach(
+              p -> {
+                try {
+                  final String binary = classesDir.relativize(p).toString().replace('\\', '/');
+                  entries.add(
+                      new ClassEntry(
+                          binary.substring(0, binary.length() - 6),
+                          java.nio.file.Files.readAllBytes(p)));
+                } catch (IOException ex) {
+                  throw new UncheckedIOException("cannot read class " + p, ex);
+                }
+              });
+      return entries;
+    } catch (IOException ex) {
+      throw new UncheckedIOException("cannot walk classes dir " + classesDir, ex);
+    }
+  }
+
   /** Strip the {@code ;singleton:=true} and other attributes a BSN header may carry. */
   private static String bareSymbolicName(String header) {
     return header == null ? null : Clause.parse(header).name();

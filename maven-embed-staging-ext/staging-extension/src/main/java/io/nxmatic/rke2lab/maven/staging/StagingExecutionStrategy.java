@@ -92,7 +92,7 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
       throws LifecycleExecutionException {
     final String module = session.getCurrentProject().getArtifactId();
     final List<ResolvedBundle> resolved = resolveBundles(session);
-    enforceGates(resolved, locateDocsDir(session));
+    enforceGates(session, resolved, locateDocsDir(session));
     final StagingClosure closure = StagingClosure.compute(resolved);
 
     int shadeAdded = 0;
@@ -133,7 +133,8 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
    *       spuriously.
    * </ul>
    */
-  private void enforceGates(List<ResolvedBundle> resolved, java.nio.file.Path docsDir)
+  private void enforceGates(
+      MavenSession session, List<ResolvedBundle> resolved, java.nio.file.Path docsDir)
       throws LifecycleExecutionException {
     if (docsDir == null) {
       log.warn(
@@ -165,6 +166,67 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
             bundle,
             bundle.instanceDiscipline().violations(),
             "exports public static behaviour helpers (pass instances; factories exempt)");
+      }
+    }
+
+    // ---- REALM_BOUNDARY: no class references a type unreachable in its realm ----
+    final Set<String> forbidden = new java.util.LinkedHashSet<>();
+    for (ResolvedBundle b : resolved) {
+      if (b.embed() != null && b.embed().isDomain()) {
+        forbidden.addAll(b.ourExportedPackages());
+      }
+    }
+    if (!forbidden.isEmpty()) {
+      // Flat realm: the exec's own classes + the flat tail + the seams. Its visible set is every
+      // package that loads flat (our flat packages + the seam exports); a forbidden (bundle-only)
+      // package referenced from here cannot be loaded by the flat host classloader at runtime.
+      final Set<String> flatVisible = new java.util.LinkedHashSet<>();
+      final List<ResolvedBundle.ClassEntry> flatClasses = new ArrayList<>();
+      final java.nio.file.Path ownClasses =
+          java.nio.file.Path.of(session.getCurrentProject().getBuild().getOutputDirectory());
+      flatClasses.addAll(ResolvedBundle.classEntriesOf(ownClasses));
+      for (ResolvedBundle b : resolved) {
+        final boolean domain = b.embed() != null && b.embed().isDomain();
+        if (b.launcher() || domain) {
+          continue; // the framework, and bundle-side domains, are not in the flat realm.
+        }
+        flatVisible.addAll(b.ourExportedPackages());
+        flatClasses.addAll(b.classEntries()); // includes the seams (type=seam) — they are flat too.
+      }
+      final RealmBoundary flat = new RealmBoundary("flat", forbidden, flatVisible);
+      final List<String> flatViolations = new ArrayList<>();
+      for (ResolvedBundle.ClassEntry c : flatClasses) {
+        flatViolations.addAll(flat.violations(c.binaryName(), c.bytes()));
+      }
+      // Attribute every flat-realm violation at the governance of the exec project (its
+      // package-info).
+      report.record(
+          StagingGate.REALM_BOUNDARY,
+          execGovernance(session),
+          execPseudoBundle(session),
+          flatViolations,
+          "flat-realm classes reference bundle-only packages (host/seam leak)");
+
+      // Bundle realms: each isDomain carrier may reference only its own + imported + system
+      // packages.
+      for (ResolvedBundle b : resolved) {
+        if (b.embed() == null || !b.embed().isDomain()) {
+          continue;
+        }
+        final Set<String> visible = new java.util.LinkedHashSet<>(b.ourExportedPackages());
+        visible.addAll(b.imports().names());
+        final RealmBoundary realm =
+            new RealmBoundary("bundle:" + b.symbolicName(), forbidden, visible);
+        final List<String> v = new ArrayList<>();
+        for (ResolvedBundle.ClassEntry c : b.classEntries()) {
+          v.addAll(realm.violations(c.binaryName(), c.bytes()));
+        }
+        report.record(
+            StagingGate.REALM_BOUNDARY,
+            b.governance().levels(),
+            b,
+            v,
+            "bundle-realm classes reference packages they do not import (OSGi-internal leak)");
       }
     }
     report.flush();
@@ -250,6 +312,25 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
     private String gateLabel(StagingGate gate) {
       return gate.name().toLowerCase().replace('_', '-');
     }
+  }
+
+  /** The current exec project's governance, read from its own compiled package-info classes. */
+  private Map<StagingGate, EnforcementLevel> execGovernance(MavenSession session) {
+    final java.nio.file.Path classes =
+        java.nio.file.Path.of(session.getCurrentProject().getBuild().getOutputDirectory());
+    final Map<StagingGate, EnforcementLevel> levels = new java.util.EnumMap<>(StagingGate.class);
+    for (ResolvedBundle.ClassEntry c : ResolvedBundle.classEntriesOf(classes)) {
+      if (c.binaryName().endsWith("package-info")) {
+        GovernanceReader.readInto(c.bytes(), levels);
+      }
+    }
+    return levels;
+  }
+
+  /** A ResolvedBundle view of the exec module itself, for the report's ga() label. */
+  private ResolvedBundle execPseudoBundle(MavenSession session) {
+    final MavenProject p = session.getCurrentProject();
+    return ResolvedBundle.read(p.getGroupId(), p.getArtifactId(), p.getVersion(), null);
   }
 
   /**

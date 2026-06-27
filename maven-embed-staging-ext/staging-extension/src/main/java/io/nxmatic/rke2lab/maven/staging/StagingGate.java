@@ -10,7 +10,8 @@ package io.nxmatic.rke2lab.maven.staging;
 enum StagingGate {
   RECORD_PURITY,
   SPEC_COVERAGE,
-  INSTANCE_DISCIPLINE;
+  INSTANCE_DISCIPLINE,
+  REALM_BOUNDARY;
 
   /** Map an ASM enum-constant name to a gate, or {@code null} for an unknown name (ignored). */
   static StagingGate fromName(String name) {

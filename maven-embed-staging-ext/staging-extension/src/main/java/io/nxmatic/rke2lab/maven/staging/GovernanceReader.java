@@ -37,6 +37,14 @@ final class GovernanceReader {
     this.bundle = bundle;
   }
 
+  /** Parse one package-info's bytes, merging its @GovernedBy poses into {@code levels}. */
+  static void readInto(byte[] packageInfo, Map<StagingGate, EnforcementLevel> levels) {
+    new ClassReader(packageInfo)
+        .accept(
+            new GovernanceVisitor(levels),
+            ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+  }
+
   /** The level each gate reports this bundle at; a gate absent from the map defaults to ERROR. */
   Map<StagingGate, EnforcementLevel> levels() {
     final Map<StagingGate, EnforcementLevel> levels = new EnumMap<>(StagingGate.class);

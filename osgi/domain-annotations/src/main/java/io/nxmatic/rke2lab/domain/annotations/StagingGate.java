@@ -12,10 +12,13 @@ package io.nxmatic.rke2lab.domain.annotations;
  *       {@link Transitional}; a type in neither is code-out-of-spec.
  *   <li>{@link #INSTANCE_DISCIPLINE} — exported types should not publish {@code public static}
  *       behaviour helpers (pass instances through the call graph; factories and constants exempt).
+ *   <li>{@link #REALM_BOUNDARY} — no class references a type unreachable in its classloader realm
+ *       (flat vs bundle realms; host/seam leak and OSGi-internal leak).
  * </ul>
  */
 public enum StagingGate {
   RECORD_PURITY,
   SPEC_COVERAGE,
-  INSTANCE_DISCIPLINE
+  INSTANCE_DISCIPLINE,
+  REALM_BOUNDARY
 }
