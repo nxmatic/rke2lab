@@ -21,6 +21,7 @@ import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.exchange.port.Action;
 import io.nxmatic.rke2lab.exchange.port.Coordinate;
 import io.nxmatic.rke2lab.exchange.port.Document;
+import io.nxmatic.rke2lab.exchange.port.Domain;
 import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.pipeline.TopicFailure;
@@ -264,8 +265,7 @@ public final class SystemdAdapterStage {
         .readiness()
         .rawOverride(scenarioId)
         .ifPresent(value -> payload.put(ExchangeCatalog.FIELD_OVERRIDE, value));
-    return new Document(
-        ExchangeCatalog.DOMAIN_DOCTOR, Coordinate.READINESS_CHECKPOINT.slug(), payload);
+    return new Document(Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), payload);
   }
 
   private void log(String message) {

@@ -15,9 +15,9 @@ class DocumentTest {
     final ObjectNode payload = MAPPER.createObjectNode();
     payload.put(ExchangeCatalog.FIELD_ACTION, Action.STOP.slug());
     final Document doc =
-        new Document(ExchangeCatalog.DOMAIN_DOCTOR, Coordinate.READINESS_VERDICT.slug(), payload);
+        new Document(Domain.DOCTOR.slug(), Coordinate.READINESS_VERDICT.slug(), payload);
 
-    assertEquals(ExchangeCatalog.DOMAIN_DOCTOR, doc.domain());
+    assertEquals(Domain.DOCTOR.slug(), doc.domain());
     assertEquals(Coordinate.READINESS_VERDICT.slug(), doc.coordinate());
     assertEquals(Action.STOP.slug(), doc.payload().get(ExchangeCatalog.FIELD_ACTION).asText());
   }
@@ -25,10 +25,8 @@ class DocumentTest {
   @Test
   void catalogConstantsAreTheCanonicalStrings() {
     // The single source of truth for field keys (the schema) — call sites must reference these,
-    // never literals. Closed value domains (coordinates, actions, symptom kinds) are now typed
-    // enums
-    // and tested in ExchangeVocabularyTest.
-    assertEquals("doctor", ExchangeCatalog.DOMAIN_DOCTOR);
+    // never literals. Closed value domains (domain, coordinate, action, symptom kind) are now
+    // typed enums and tested in ExchangeVocabularyTest.
     assertEquals("scenarioId", ExchangeCatalog.FIELD_SCENARIO_ID);
     assertEquals("failed", ExchangeCatalog.FIELD_FAILED);
     assertEquals("override", ExchangeCatalog.FIELD_OVERRIDE);

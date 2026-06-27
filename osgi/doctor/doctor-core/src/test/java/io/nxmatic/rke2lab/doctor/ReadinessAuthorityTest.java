@@ -8,6 +8,7 @@ import io.nxmatic.rke2lab.doctor.internal.DefaultReadinessAuthority;
 import io.nxmatic.rke2lab.exchange.port.Action;
 import io.nxmatic.rke2lab.exchange.port.Coordinate;
 import io.nxmatic.rke2lab.exchange.port.Document;
+import io.nxmatic.rke2lab.exchange.port.Domain;
 import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
 import org.junit.jupiter.api.Test;
@@ -24,8 +25,7 @@ class ReadinessAuthorityTest {
     if (override != null) {
       payload.put(ExchangeCatalog.FIELD_OVERRIDE, override);
     }
-    return new Document(
-        ExchangeCatalog.DOMAIN_DOCTOR, Coordinate.READINESS_CHECKPOINT.slug(), payload);
+    return new Document(Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), payload);
   }
 
   private static String action(Document verdict) {

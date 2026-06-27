@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.doctor.records.Severity;
 import io.nxmatic.rke2lab.exchange.port.Action;
 import io.nxmatic.rke2lab.exchange.port.Coordinate;
 import io.nxmatic.rke2lab.exchange.port.Document;
+import io.nxmatic.rke2lab.exchange.port.Domain;
 import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
 import java.util.Map;
@@ -53,8 +54,7 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
         ExchangeCatalog.FIELD_ACTION, stop ? Action.STOP.slug() : Action.CONTINUE_DEGRADED.slug());
     verdict.put(
         ExchangeCatalog.FIELD_REASON, scenarioId + " severity=" + effective.name().toLowerCase());
-    return new Document(
-        ExchangeCatalog.DOMAIN_DOCTOR, Coordinate.READINESS_VERDICT.slug(), verdict);
+    return new Document(Domain.DOCTOR.slug(), Coordinate.READINESS_VERDICT.slug(), verdict);
   }
 
   private Severity intrinsicFor(String scenarioId) {

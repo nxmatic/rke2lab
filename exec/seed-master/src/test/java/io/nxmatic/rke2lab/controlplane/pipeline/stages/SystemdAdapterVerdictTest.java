@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.exchange.port.Action;
 import io.nxmatic.rke2lab.exchange.port.Coordinate;
 import io.nxmatic.rke2lab.exchange.port.Document;
+import io.nxmatic.rke2lab.exchange.port.Domain;
 import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.pipeline.TopicFailure;
@@ -22,8 +23,7 @@ class SystemdAdapterVerdictTest {
       final ObjectNode verdict = MAPPER.createObjectNode();
       verdict.put(ExchangeCatalog.FIELD_ACTION, action);
       verdict.put(ExchangeCatalog.FIELD_REASON, "test");
-      return new Document(
-          ExchangeCatalog.DOMAIN_DOCTOR, Coordinate.READINESS_VERDICT.slug(), verdict);
+      return new Document(Domain.DOCTOR.slug(), Coordinate.READINESS_VERDICT.slug(), verdict);
     };
   }
 

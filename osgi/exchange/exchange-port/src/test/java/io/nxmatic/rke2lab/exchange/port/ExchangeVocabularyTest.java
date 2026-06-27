@@ -50,4 +50,11 @@ class ExchangeVocabularyTest {
     assertEquals(Optional.empty(), SymptomKind.parse(""));
     assertEquals(Optional.empty(), SymptomKind.parse("   "));
   }
+
+  @Test
+  void domainSlugsArePinnedAndRoundTrip() {
+    assertEquals("doctor", Domain.DOCTOR.slug());
+    assertEquals(Optional.of(Domain.DOCTOR), Domain.parse("doctor"));
+    assertEquals(Optional.empty(), Domain.parse("nope"));
+  }
 }

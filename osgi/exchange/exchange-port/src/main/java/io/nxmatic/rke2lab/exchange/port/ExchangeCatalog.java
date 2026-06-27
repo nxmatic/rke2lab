@@ -2,14 +2,12 @@ package io.nxmatic.rke2lab.exchange.port;
 
 /**
  * The single source of truth for the exchange's payload field keys — the schema. Closed value
- * domains (coordinates, actions, symptom kinds) are now typed enums in this package. Call sites
- * reference these constants, never literals, so a mismatch cannot drift silently (the {@code
+ * domains (domain, coordinate, action, symptom-kind) are now typed enums in this package: {@link
+ * Domain}, {@link Coordinate}, {@link Action}, {@link SymptomKind}. Call sites reference these
+ * enums and their constants, never literals, so a mismatch cannot drift silently (the {@code
  * clusterApi}-bug discipline). Build-time schemas (a later increment) key on the field names here.
  */
 public final class ExchangeCatalog {
-
-  /** The doctor domain owns the readiness vocabulary. */
-  public static final String DOMAIN_DOCTOR = "doctor";
 
   /** Checkpoint payload: the scenario id (e.g. the systemd-adapter checkpoint slug). */
   public static final String FIELD_SCENARIO_ID = "scenarioId";
