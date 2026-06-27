@@ -1,9 +1,31 @@
 ---
 name: manifests-tests-pre-osgi-debt
-description: manifests-core tests are pre-OSGI POJO/flat-classpath tests (new Default…()), not the in-container fragment-test model doctor uses. A debt to migrate now that manifests uses DS correctly — exercise the @Component services in-container (injected) instead of constructing them by hand.
+description: DONE 2026-06-26 — manifests-core-test in-container fragment built, DefaultManifestExplodeServiceTest migrated to DS injection (6/6 green in Felix); old POJO test deleted. The 5 pure-API tests legitimately stay flat-classpath POJO.
 metadata:
   type: project
 ---
+
+**DONE (2026-06-26).** Built `osgi/manifests/manifests-core-test` mirroring doctor-core-test: a
+`Fragment-Host: io.nxmatic.rke2lab.manifests.core` fragment (`type=fixture; suite=manifests;
+role=core`), the `ManifestsCoreTests` runner + actor `DefaultManifestExplodeServiceTest` in
+`src/main`, the `ManifestsCoreInContainerTest` Felix probe in `src/test`. The migrated test acquires
+`ManifestExplodeService` + `YamlMapper` from the registry (`getServiceReference`), no more `new
+DefaultManifestExplodeService(new YamlMapper())`. 6/6 green in-container; the old POJO test in
+manifests-core deleted. The 5 remaining manifests-core tests (Cdk8sApiObjectResolver, RegistryResolve,
+ManifestsVisitOrder, CrossDomainRule, ManifestsUniverse) exercise NO @Component (the `ResolverImpl`
+they `new` is a Felix test-classpath resolver) — they legitimately stay flat-classpath POJO in
+`src/test`.
+
+**Doubled as the runtime proof of [[cdk8s-carrier-flat-jar-pattern]]:** resolving manifests-core
+in-container wired the cdk8s carrier ⇄ jackson and attached the systemd-cdk8s-manifests fragment
+(`FRAGMENT WIRE → manifests.cdk8s`) — the bundle-to-bundle cdk8s wiring holds in Felix. The probe's
+GRAPH bundle list is hand-written (→ [[derive-incontainer-graph-from-imports-backlog]]); the one real
+obstacle was netplan-port needing `inet.ipaddr` (the `com.github.seancfoley.ipaddress` bundle), added
+to the graph. Two start-vs-resolve lessons: the JUnit stack `installFromClasspath().start()`s, but the
+manifests graph (cross-imports + a fragment with no lifecycle) must be install-without-start +
+resolve-as-one-set.
+
+--- original blueprint (kept for reference) ---
 
 `manifests-core` was written BEFORE the OSGi migration, so its tests live in `src/test/java` as
 flat-classpath POJO tests that `new DefaultManifestExplodeService(...)` etc. doctor, written

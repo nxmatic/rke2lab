@@ -10,7 +10,7 @@ metadata:
 
 `osgi/junit-testkit/.../FelixFrameworkExtension` → `OutOfContainerFrameworkExtension`.
 Pure mechanical rename (git mv + token replace across call sites, bnd fixture comments, pom
-comments, live `docs/architecture/*.adoc`). No behaviour change. Reactor green under `-Pall-tests`.
+comments, live `docs/architecture/*.adoc`). No behaviour change. Reactor green under `-Pall-worlds`.
 
 **Why:** the two halves of the OSGi test-fragment model were named on different axes — one after
 the TECHNO (Felix), one after the PLACE (`InContainerJUnitRunner`). The user's call: name BOTH by

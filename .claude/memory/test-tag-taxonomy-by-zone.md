@@ -15,7 +15,7 @@ metadata:
 
 **Default run** (root pom property `surefire.excludedGroups`): `live | spike` excluded. The slow
 deployments and the throwaway spikes stay out of the default loop; the fast host-readers and all the
-osgi-resolver regressions stay IN. Profiles in the root pom: `-Pall-tests` (nothing excluded), `-Plive`
+osgi-resolver regressions stay IN. Profiles in the root pom: `-Pall-worlds` (nothing excluded), `-Plive`
 (adds live back), `-Pspike` / `-Phost` / `-Posgi` (run ONLY that group). Ad hoc:
 `-Dgroups='host & live'`, `-DexcludedGroups=…`.
 

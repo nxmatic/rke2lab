@@ -249,6 +249,22 @@ NEXT (incremental roadmap — each step green + commit, never hold the whole in 
 Pattern-doc forward-pointer in `port-edge-domain-ownership.adoc` still NOT done (low priority).
 Whiteboard: we REWRITE the stack content; no prior Pulumi outputs preserved.
 
+## STATE (2026-06-27) — steps 1-4 done, step 5 is what `pulumi preview` now trips on
+
+LIVE CONFIRMATION that step 5 is the next real work: once the cdk8s carrier moved bundle-side
+(commit 376e7d95 — the staging/boot/gate chain), `pulumi preview` crashes at boot with
+`NoClassDefFoundError: io.nxmatic.rke2lab.doctor.records.Severity`. That is NOT a regression — it
+is exactly the record-crossing the keystone (above) closes. `type=record` (step 1) made
+doctor-records bundle-only + shade-excluded from the flat uber-jar; the flat jar had been MASKING
+the leak. The host (exec/seed-master) still holds doctor.records.* — `ControlplanePolicy` parses
+`Severity`/`Symptom`; `SystemdAdapterStage` branches on `Severity.CRITICAL`;
+`ProductionClusterReadinessProbe` mints `Observation`/`Symptom`. The CONCENTRATION CHECK baseline
+(`toOutputMap`/`OUTPUT_KEY` in osgi/ = 14, target 0) is still un-cleared. Until the DomainDagMultiplexor
++ host DomainDagAdapter ACL + path-addressing (steps 5/6) land, the host imports doctor.records and
+the preview cannot boot. The build itself (`package -Pall-worlds -DskipTests=false`) is GREEN — only
+the preview exercises the deployed exec-jar deeply enough to hit it. So: preview-red is EXPECTED in
+this stable state; do NOT "fix" it by re-adding doctor-records flat — build step 5.
+
 See [[fragment-contribution-mediation-model]] [[doctor-internal-edge-debt]]
 [[pipeline-orchestration-osgi-vision]] [[external-edges-chantier-handoff]].
 

@@ -54,8 +54,8 @@ un-worktree-par-edge ; déférer à [[external-edges-chantier-handoff]] / la ses
 ## Règles apprises (RESPECTER)
 - JAMAIS passer `null` en paramètre → overload/no-op ([[null-arg-is-a-rule-violation]]).
 - Pas de helper statique ; instance-passing ([[prefer-non-static-inner-keep-the-graph]]).
-- Build de vérif : `flox activate -- ./mvnw -Pall-tests clean package -Dmaven.build.cache.skipCache=true
-  -DskipTests=false` (tests SEULEMENT avec `-Pall-tests`).
+- Build de vérif : `flox activate -- ./mvnw -Pall-worlds clean package -Dmaven.build.cache.skipCache=true
+  -DskipTests=false` (tests SEULEMENT avec `-Pall-worlds`).
 - Commits orthogonaux (a20d2c7c renommage, 327c8c4c build-parent) : garder séparés au squash.
 - Merge = squash dans design/pre-integration depuis la session pre-integration ([[merge-from-target-worktree]]).
 

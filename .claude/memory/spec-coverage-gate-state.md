@@ -62,13 +62,39 @@ Per-gate summary: record-purity 0/0, spec-coverage 0e/39w, instance-discipline 0
 - Spec: `docs/architecture/osgi/staging-gates-governance-spec.adoc` (+ README entry). The whiteboard
   `.claude/claude-preview.adoc` holds the frozen C4.
 
-## The backlog the gates now expose (état des lieux, all WARN)
+## Gate jurisdiction: PROD scope only — test is out of bounds BY DESIGN (settled 2026-06-26)
 
-- INSTANCE_DISCIPLINE (14): pipeline:FluentTopicRunner#runDuring; manifests-core:ManifestYaml#{dump,
-  writeDocument,writeDocuments,readNodes,readValues×3,mapper}+ManifestSynthesisContext#bind;
-  netplan-port:Cidr#parseAddress+ClusterNetworkBlueprint#topology; doctor-port:ConsultationNarration#
-  consultedLine; doctor-core:ExactRosterDoctor#over.
-- SPEC_COVERAGE (39): the unspecified exported types of unitrepo/manifests/netplan/systemd/cluster.
+The gate runs on the module that shades+stages the exec-jar (seed-master) and scans that artifact's
+**compile/runtime** dependency closure (`resolveBundles` filters `COMPILE, RUNTIME`). So the criterion
+is SCOPE, not "fragment or not":
+
+- a **prod fragment** like `systemd-cdk8s-manifests` (a `Fragment-Host` of manifests-cdk8s, pulled
+  compile by manifests-core → runtime by seed-master) IS in the closure → **scanned**. Fragments are
+  not exempt per se.
+- **test bundles/fragments** (`doctor-core-test`, `manifests-core-test`, scope `test`) are nobody's
+  runtime dependency → never in the closure → **not scanned**.
+
+This is the INTENDED behaviour, not a bug (user: "les bundles et fragments de test n'ont pas à être
+scannés, c'est la fixture qui dirige"). In test scope the fixture's needs prevail over prod discipline,
+so a fixture's static factory is legitimate there. Corollary: **a fixture wrongly sitting in a PROD
+bundle** (e.g. `ExactRosterDoctor` in doctor-core) is flagged — and the fix is to MOVE it to the `-test`
+fragment where fixtures belong (its real place), NOT to `@Exempt` it. Moving it out is correct because
+the class changes scope, not because it hides in a blind spot.
+
+## The backlog the gates now expose (état des lieux)
+
+- **INSTANCE_DISCIPLINE: 0/0 — FULLY CLEARED (2026-06-26), now ERROR-locked.** The 14-strong static
+  backlog is paid down end to end: ManifestYaml→YamlMapper @Component (323be163);
+  ConsultationNarration→Generalist#consultedLine (7c4ae03b); Cidr#parseAddress→instance host/gateway/
+  address + topology()→CANONICAL (5592a488); FluentTopicRunner static→instance + the duplicated local
+  copy folded (bee5da2f); ExactRosterDoctor#over → moved to the doctor-core-test fragment, the fixture
+  out of the prod bundle (11dd059c). No exported public static behaviour helper remains; the default
+  ERROR now blocks any reappearing one. **No `@GovernedBy(INSTANCE_DISCIPLINE, …)` pose exists in any
+  package-info** (verified by grep 2026-06-26) → the law sits at its ERROR default everywhere, the lock
+  is CLOSED, not merely "debt happens to be 0". Proven behaviour lives in `InstanceDisciplineTest` (the
+  extension's 6 tests); no manual re-proof needed. Nothing to "switch to error" — it already is.
+- SPEC_COVERAGE (40, WARN): the unspecified exported types of unitrepo/manifests/netplan/systemd/cluster.
+  The remaining backlog — pay down domain by domain, then raise to ERROR.
 
 ## Remaining
 

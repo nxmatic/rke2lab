@@ -14,7 +14,7 @@
 - Inter-module deps resolve through the reactor; build with `-am`. NEVER `mvn install` project artifacts to `~/.m2`. (`dependency:get` of third-party jars into the cache is allowed — it is not a project install.)
 - Tests are skipped by default (`.mvn` forces `-DskipTests`); execute with `-DskipTests=false`. A green build with no `Tests run:` line means tests were skipped. (verbatim from CLAUDE.md / `build-verification-gotchas`)
 - Build cache can replay stale results and leave `target/classes` empty; for any load-bearing verification pass `-Dmaven.build.cache.skipCache=true`. (`build-verification-gotchas`)
-- Tag taxonomy (root pom): `host` / `osgi` / `live` / `spike`; default `surefire.excludedGroups = live | spike`. Bench tests carry `@Tag("osgi")` AND `@Tag("spike")` (throwaway proof) — run them explicitly with `-Posgi` or `-Pall-tests`, or by not excluding spike. Suffix convention: `*SpikeTest`.
+- Tag taxonomy (root pom): `host` / `osgi` / `live` / `spike`; default `surefire.excludedGroups = live | spike`. Bench tests carry `@Tag("osgi")` AND `@Tag("spike")` (throwaway proof) — run them explicitly with `-Posgi` or `-Pall-worlds`, or by not excluding spike. Suffix convention: `*SpikeTest`.
 - Artifact id = directory name; group id `io.nxmatic.rke2lab`; `<name>` = relative dir path. Parent is `io.nxmatic.rke2lab:parent:0.1.0-SNAPSHOT`.
 - No "superpowers" string in any artifact; specs/plans live under `wip/`.
 - Comments document the *why* only; this is a single-developer repo — no compatibility shims.
