@@ -17,6 +17,9 @@ public final class ExchangeCatalog {
   /** Coordinate: the authority's provisioning verdict handed back. */
   public static final String READINESS_VERDICT = "readiness-verdict";
 
+  /** Coordinate: the consultation output, the specialists' narration and rendered diagnosis. */
+  public static final String CONSULTATION = "consultation";
+
   /** Checkpoint payload: the scenario id (e.g. the systemd-adapter checkpoint slug). */
   public static final String FIELD_SCENARIO_ID = "scenarioId";
 
@@ -25,6 +28,21 @@ public final class ExchangeCatalog {
 
   /** Checkpoint payload: the operator's raw severity override for this scenario, or absent. */
   public static final String FIELD_OVERRIDE = "override";
+
+  /** Checkpoint payload: the symptom's plain-text narration. */
+  public static final String FIELD_NARRATION = "narration";
+
+  /** Consultation payload: the specialists' rendered AsciiDoc diagnosis. */
+  public static final String FIELD_DIAGNOSIS_ADOC = "diagnosisAdoc";
+
+  /** Checkpoint payload: the symptom kind discriminator. */
+  public static final String FIELD_SYMPTOM_KIND = "symptomKind";
+
+  /** Checkpoint payload: the symptom's summary text. */
+  public static final String FIELD_SUMMARY = "summary";
+
+  /** Checkpoint payload: the symptom's detail text. */
+  public static final String FIELD_DETAILS = "details";
 
   /**
    * Verdict payload: the provisioning action — {@link #ACTION_STOP} or {@link

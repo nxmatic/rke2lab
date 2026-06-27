@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.doctor.port;
 
 import io.nxmatic.rke2lab.doctor.records.*;
+import io.nxmatic.rke2lab.exchange.port.Document;
 import java.util.List;
 
 /**
@@ -13,6 +14,14 @@ import java.util.List;
  * handed back as this contract; the consumer holds only the interface.
  */
 public interface ConsultingService {
+
+  /**
+   * Consult on a checkpoint: route its symptom + observation to the specialists and synthesize the
+   * narration and the rendered AsciiDoc diagnosis, returned as a {@code consultation} Document. The
+   * twin of {@link io.nxmatic.rke2lab.exchange.port.ReadinessAuthority#assess} — same checkpoint,
+   * the consulting concern rather than the provisioning verdict.
+   */
+  Document consult(Document checkpoint);
 
   /**
    * The patient consults: route the symptom + the captured {@link Observation} to the relevant

@@ -40,4 +40,14 @@ class DocumentTest {
     assertEquals("stop", ExchangeCatalog.ACTION_STOP);
     assertEquals("continue-degraded", ExchangeCatalog.ACTION_CONTINUE_DEGRADED);
   }
+
+  @Test
+  void consultationCoordinateAndFieldsArePinned() {
+    assertEquals("consultation", ExchangeCatalog.CONSULTATION);
+    assertEquals("narration", ExchangeCatalog.FIELD_NARRATION);
+    assertEquals("diagnosisAdoc", ExchangeCatalog.FIELD_DIAGNOSIS_ADOC);
+    assertEquals("symptomKind", ExchangeCatalog.FIELD_SYMPTOM_KIND);
+    assertEquals("summary", ExchangeCatalog.FIELD_SUMMARY);
+    assertEquals("details", ExchangeCatalog.FIELD_DETAILS);
+  }
 }
