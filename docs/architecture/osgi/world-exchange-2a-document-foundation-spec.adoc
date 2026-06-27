@@ -1,0 +1,206 @@
+= World exchange 2A — the Document foundation + the readiness verdict crossing
+:toc: left
+:toclevels: 3
+
+[NOTE]
+====
+*Status:* DESIGN (converged 2026-06-27, NOT yet built). This is the first implementation increment of
+link:world-exchange-spec.adoc[the world exchange] — the design-of-record this specializes. It builds
+the neutral `Document` contract and crosses the *readiness verdict* through it, removing the
+`doctor.records` types from `ControlplanePolicy` / `EnvironmentStage` (the boot-crash trigger). The
+remaining host surface (the probe / observation / consult machinery, the egress DAG, the readside
+reconstruction) is later increments (2B/2C/2D), tracked by the `REALM_BOUNDARY` gate's WARN worklist.
+
+Every claim below was checked against the real code on 2026-06-27.
+====
+
+== Why 2A exists
+
+`pulumi preview` crashes at boot with `NoClassDefFoundError doctor.records.Severity`:
+`ControlplanePolicy.from()` calls `Severity.parse(...)` and `Symptom.parse(...)` while building the
+policy — at boot, before Felix exists, on the flat host classloader that no longer carries
+`doctor-records` (it is `type=record`, shade-excluded). 2A removes every `doctor.records` parse and
+field from `ControlplanePolicy`, so `from()` becomes doctor-free, and crosses the one decision the
+host genuinely needs back — *stop provisioning vs continue degraded* — as a structured `Document`.
+
+== The end state (what every increment converges to)
+
+The load-bearing invariant, true at the end of the whole migration and respected by 2A:
+
+[mermaid]
+....
+flowchart LR
+  subgraph "SOURCE edge strings are legitimate"
+    cfg["pulumi config key values are strings by nature"]
+  end
+  subgraph "HOST transports structured"
+    ing["host builds a STRUCTURED ingress Document"]
+    rd["host reads ONE control field of a STRUCTURED verdict Document"]
+  end
+  subgraph "SEAM every crossing structured schema validated"
+    d1["ingress Document"]
+    d2["verdict Document"]
+  end
+  subgraph "OSGi authority owns the vocabulary"
+    interp["interprets Document into Severity decides"]
+  end
+  cfg -->|read once at the edge| ing
+  ing --> d1 --> interp
+  interp --> d2 --> rd
+  rd -->|stop or continue degraded| prov["provisioning"]
+....
+
+* The ONLY place raw strings exist is the Pulumi config at the source edge — that is what config *is*.
+* The instant anything crosses host↔OSGi it is a *structured* `Document`, schema-validated.
+* The host reads an *enumerated field* of a structured verdict `Document` (`action`) — the REST
+  equivalent of reading a body's `status` field, never "a string as the interface". A raw string may
+  be carried *briefly inside the host* before it is structured, but no seam interface is a bare string.
+
+== Decision 1 — the `Document` type
+
+A neutral, immutable envelope, owned by a new seam module so the flat host and the bundles share one
+class:
+
+[source,java]
+----
+// osgi/exchange/exchange-port  (Provide-Capability: io.nxmatic.rke2lab.embed; type=seam)
+package io.nxmatic.rke2lab.exchange.port;
+
+public record Document(String domain, String coordinate, com.fasterxml.jackson.databind.JsonNode payload) { }
+----
+
+* `domain` = the owning domain (e.g. `"doctor"`); `coordinate` = the document type = the schema key
+  (e.g. `"readiness-verdict"`); `payload` = a Jackson `JsonNode` tree (the structured body). This is
+  exactly the `Document(domain, coordinate, payload)` triplet the design-of-record names.
+* It lives in `exchange-port` (`type=seam`): system-exported, one class shared by host + bundles —
+  never `type=record`, so the `RECORD_PURITY` gate does not apply (a seam may carry a transport
+  record; it carries no behaviour).
+* `JsonNode` crosses the seam, so `com.fasterxml.jackson.databind` must be a host-flat
+  (system-exported) package. It already is by construction: `manifests-core` (a `type=model` bundle)
+  imports `com.fasterxml.jackson.databind` for its `YamlMapper`, and the boot mirrors every
+  model/edge bundle's `Import-Package` into `system.packages.extra`
+  (`BootPlanner.deriveSystemExports` / `StagingClosure.indexHostFlatPackages`). So jackson.databind is
+  already on the flat classpath; 2A relies on that, and adds nothing to the derivation.
+* Rejected: a `Map<String,Object>` payload (re-introduces the untyped nested maps `toOutputMap`
+  represents — the very shape this migration deletes); a sealed `Document` hierarchy with one impl per
+  coordinate (re-introduces N shared data types at the seam — leak #1).
+
+== Decision 2 — the readiness verdict crosses as a control field in a Document
+
+Today the host *reasons on* `Severity`: `SystemdAdapterStage:175` does
+`policy.readiness().override(SCENARIO_ID).orElse(INTRINSIC_SEVERITY)` then `== Severity.CRITICAL`.
+After 2A the authority lives OSGi-side; the host reads one field.
+
+[mermaid]
+....
+flowchart TB
+  subgraph "exchange-port type seam NEW"
+    doc["record Document"]
+    auth["ReadinessAuthority assess Document to Document"]
+  end
+  subgraph "HOST flat after 2A"
+    pol["ControlplanePolicy holds raw config no doctor type"]
+    stage["stage reads action field of the verdict Document"]
+  end
+  subgraph "OSGi authority"
+    impl["authority impl owns Severity applies override decides"]
+  end
+  pol -->|raw override plus observation as Document| auth
+  auth --> impl
+  impl -->|verdict Document action stop or continue degraded| auth
+  auth --> stage
+  stage -->|stop or continue degraded| prov["provisioning"]
+....
+
+* New seam verb on `exchange-port`:
++
+[source,java]
+----
+public interface ReadinessAuthority {
+  /** Assess a checkpoint outcome and return the provisioning verdict as a Document. */
+  Document assess(Document checkpoint);
+}
+----
+* The host builds a structured *checkpoint* `Document` (`domain="doctor"`,
+  `coordinate="readiness-checkpoint"`, payload = `{scenarioId, ok, rawOverride, ...}` — host-native
+  facts, no doctor type), calls `assess`, and reads ONE enumerated field of the returned verdict
+  `Document` (`coordinate="readiness-verdict"`, payload `{action: "stop" | "continue-degraded",
+  reason}`). `if "stop" -> throw TopicFailure; else continue degraded`. No `Severity` on the host.
+* The OSGi-side impl is the authority: it holds `Severity`, applies the operator override + the
+  scenario's intrinsic severity, and maps the decision to `action`. (Where it is published — a doctor
+  bundle `@Component` vs an exchange service — is an implementation choice for the plan; the seam
+  contract is `ReadinessAuthority`.)
+* Rejected: the host keeping the decision on raw config strings (`"critical" -> stop`) — that is
+  `== Severity.CRITICAL` in disguise; the host would still encode the severity *meaning*, which the
+  design-of-record forbids.
+
+== Scope boundary — where 2A stops (the cut is migration order, not final shape)
+
+`ControlplanePolicy.from()` parses TWO doctor types: `Severity` (readiness-override) and `Symptom`
+(preview-simulate). The `Severity` path is contained (one consume site, the `== CRITICAL`). The
+`Symptom` path is entangled with the probe / `Observation` / consult machinery (`LiveClusterReadinessProbe`,
+the simulated probes, `Observation.failed(Symptom)`) — that is increment 2B.
+
+2A takes the *parse-vs-consume* cut: **`from()` stops parsing every doctor type**. `ControlplanePolicy`
+holds the readiness-override AND the preview-simulate as RAW config (strings); the readiness override
+travels its full path (the verdict `Document`); the preview-simulate string is merely *carried* (its
+interpretation deferred to 2B, where the probe machinery lives). After 2A, `ControlplanePolicy` and
+`from()` load ZERO doctor types — the policy is fully migrated and never touched again.
+
+[IMPORTANT]
+====
+The raw preview-simulate string 2A carries is held *inside the host*, never exposed as a seam
+interface — consistent with the end-state rule (no seam crossing is a bare string). The stages still
+load `Symptom` via the `Observation` path; those are the remaining `REALM_BOUNDARY` WARN entries 2B
+clears.
+====
+
+== What "green" means per increment
+
+The flat uber-jar excludes `doctor-records`, so ANY host class that loads a doctor type at RUNTIME
+crashes. The crash has two reachable points: `ControlplanePolicy.from()` at boot (pre-Felix), then the
+stages (inside Felix). Closing one advances the crash to the next. Therefore:
+
+* 2A (and 2B/2C) are green at the *BUILD* level — they compile, the `REALM_BOUNDARY` WARN worklist
+  shrinks, and unit tests pass.
+* `pulumi preview` boots green only at the *LAST* increment, when the worklist reaches zero (no host
+  class loads a doctor type). 2A closes the boot-time parse; the green preview arrives at the end.
+
+This is consistent with "each step green" = build-green + a shrinking gate worklist.
+
+== The contract check (schema) — designed, scheduled late
+
+Per the design-of-record, each document type (`coordinate`) gets a JSON Schema, build-time enforced
+(mapper round-trip tests + a staging check). 2A introduces two coordinates
+(`readiness-checkpoint`, `readiness-verdict`); their schemas + the build check land in the schema
+increment (2D), not 2A. 2A's own tests round-trip the `Document`s its code produces/consumes. Runtime
+validation stays YAGNI until remote.
+
+== Units 2A introduces
+
+[cols="1,3",options="header"]
+|===
+| unit | responsibility
+
+| `osgi/exchange/exchange-port` (new, `type=seam`)
+| the `Document` record + the `ReadinessAuthority` verb. One class each, shared host + bundles.
+
+| the OSGi-side `ReadinessAuthority` impl
+| owns `Severity`, applies override + intrinsic severity, maps to the verdict `action`.
+
+| `ControlplanePolicy` (modified)
+| drops the `doctor.records` import, the `Map<String,Severity>` / `Map<String,Symptom>` fields, and
+  the `Severity.parse` / `Symptom.parse` in `from()`; holds the readiness-override + preview-simulate
+  as raw config.
+
+| `SystemdAdapterStage` (modified)
+| builds the checkpoint `Document`, calls `assess`, reads the verdict `action` instead of
+  `== Severity.CRITICAL`.
+|===
+
+== Related documentation
+
+* link:world-exchange-spec.adoc[World exchange] — the design-of-record this increment specializes
+  (ports are services, data crosses as Documents, OSGi holds the authority).
+* link:staging-gates-governance-spec.adoc[Staging-gates governance] — the `REALM_BOUNDARY` gate whose
+  WARN worklist tracks the remaining host↔OSGi drift this migration pays down.
