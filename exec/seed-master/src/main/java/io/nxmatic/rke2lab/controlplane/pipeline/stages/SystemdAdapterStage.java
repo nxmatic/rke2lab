@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
@@ -15,13 +17,16 @@ import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
-import io.nxmatic.rke2lab.doctor.records.Severity;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.exchange.port.Document;
+import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
+import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.pipeline.TopicFailure;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 
 /**
  * Readiness gate, played as the BDD scenario it documents. The same Given/When/Then that runs
@@ -38,32 +43,29 @@ public final class SystemdAdapterStage {
   /** Override key + report label for this gate. */
   private static final String SCENARIO_ID = Checkpoint.SYSTEMD_ADAPTER.slug();
 
-  /**
-   * Intrinsic severity: master can provision without the dbus adapter (degraded), so a failure is a
-   * WARNING unless the operator overrides it (e.g. strict debugging).
-   */
-  private static final Severity INTRINSIC_SEVERITY = Severity.WARNING;
-
   private final BootstrapConfig config;
   private final ControlplanePolicy policy;
   private final boolean pulumiMode;
   private final Consumer<String> readinessLogger;
-  private final ReportModel runbook;
-  private final ConsultationLog consultations;
-  private final ConsultingService doctor;
+  @Nullable private final ReportModel runbook;
+  @Nullable private final ConsultationLog consultations;
+  @Nullable private final ConsultingService doctor;
   private final SystemdAdapterProbe liveProbe;
   private final Consumer<Map<String, Object>> sink;
+  private final ReadinessAuthority readinessAuthority;
+  private final ObjectMapper mapper = new ObjectMapper();
 
   public SystemdAdapterStage(
       BootstrapConfig config,
       ControlplanePolicy policy,
       boolean pulumiMode,
       Consumer<String> readinessLogger,
-      ReportModel runbook,
-      ConsultationLog consultations,
-      ConsultingService doctor,
+      @Nullable ReportModel runbook,
+      @Nullable ConsultationLog consultations,
+      @Nullable ConsultingService doctor,
       SystemdAdapterProbe liveProbe,
-      Consumer<Map<String, Object>> sink) {
+      Consumer<Map<String, Object>> sink,
+      ReadinessAuthority readinessAuthority) {
     this.config = config;
     this.policy = policy;
     this.pulumiMode = pulumiMode;
@@ -73,6 +75,35 @@ public final class SystemdAdapterStage {
     this.doctor = doctor;
     this.liveProbe = liveProbe;
     this.sink = sink;
+    this.readinessAuthority = readinessAuthority;
+  }
+
+  /**
+   * The verdict-decision seam, without the optional reporting collaborators — package-private so it
+   * stays off the prod public API: the only caller is the same-package test fixture, which bridges
+   * it to a public factory. A proof that exercises only the failing-probe → authority-verdict path
+   * has no runbook, consultation log, or doctor to supply; routing through this overload keeps that
+   * absence here rather than as three nulls at the call site.
+   */
+  SystemdAdapterStage(
+      BootstrapConfig config,
+      ControlplanePolicy policy,
+      boolean pulumiMode,
+      Consumer<String> readinessLogger,
+      SystemdAdapterProbe liveProbe,
+      Consumer<Map<String, Object>> sink,
+      ReadinessAuthority readinessAuthority) {
+    this(
+        config,
+        policy,
+        pulumiMode,
+        readinessLogger,
+        null,
+        null,
+        null,
+        liveProbe,
+        sink,
+        readinessAuthority);
   }
 
   public SystemdAdapterStage launch() {
@@ -84,8 +115,8 @@ public final class SystemdAdapterStage {
     // severity, would abort an apply over a defect that does not exist). In preview, the simulated
     // scenario lifts dry-run and runs a canned failing probe (emitting the typed symptom) so the
     // incident renders without touching live infrastructure.
-    // Bridge: the policy now carries raw; the stage still parses Symptom for the probe path
-    // (removed in 2B). preview-simulate interpretation stays here until the probe path migrates.
+    // The policy now carries raw config; the probe path still parses Symptom here, so the
+    // preview-simulate interpretation stays on the host until the probe itself crosses the seam.
     final Optional<Symptom> simulated =
         preview
             ? policy.preview().rawSimulate(SCENARIO_ID).flatMap(Symptom::parse)
@@ -171,24 +202,19 @@ public final class SystemdAdapterStage {
       return this;
     }
 
-    // Failure: the patient consults. The doctor diagnoses the captured observation's symptom into a
-    // remediation plan, which is logged and (Increment C) flows into the runbook node.
+    // Failure: the patient consults the doctor, then the host asks the OSGi authority for the
+    // provisioning verdict — the authority owns the severity vocabulary, the host reads only the
+    // action field. No Severity type on the host.
     consultDoctor(captured);
 
-    // The operator override wins over the scenario's intrinsic severity.
-    // Bridge: raw override parsed locally; replaced by the ReadinessAuthority verdict in the next
-    // increment of this stage.
-    final Severity effective =
-        policy
-            .readiness()
-            .rawOverride(SCENARIO_ID)
-            .flatMap(Severity::parse)
-            .orElse(INTRINSIC_SEVERITY);
-    if (effective == Severity.CRITICAL) {
-      log("✗ " + SCENARIO_ID + " FAILED, severity=CRITICAL → stopping provisioning");
+    final Document checkpoint = checkpointDocument(SCENARIO_ID);
+    final Document verdict = readinessAuthority.assess(checkpoint);
+    final String action = verdict.payload().path(ExchangeCatalog.FIELD_ACTION).asText();
+    if (ExchangeCatalog.ACTION_STOP.equals(action)) {
+      log("✗ " + SCENARIO_ID + " FAILED, verdict=stop → stopping provisioning");
       throw new TopicFailure("systemd adapter", failure);
     }
-    log("⚠ " + SCENARIO_ID + " FAILED, severity=WARNING → continuing in DEGRADED mode");
+    log("⚠ " + SCENARIO_ID + " FAILED, verdict=continue-degraded → continuing in DEGRADED mode");
     sink.accept(degradedObservation(failure).toOutputMap());
     return this;
   }
@@ -197,10 +223,11 @@ public final class SystemdAdapterStage {
    * The patient consults the doctor on failure: route the captured observation's symptom to the
    * Generalist, log the prescriptions, and keep the plan on a {@link ConsultationReport} in the
    * shared log (no longer dropped). A symptomless or absent observation (e.g. failure before the
-   * probe ran) has nothing to route, so the consultation is skipped.
+   * probe ran) has nothing to route, so the consultation is skipped. A null doctor (test fixture)
+   * also skips the consultation, as the verdict decision is independent of the consult.
    */
   private void consultDoctor(Observation observation) {
-    if (observation == null || observation.symptom().isEmpty()) {
+    if (doctor == null || observation == null || observation.symptom().isEmpty()) {
       return;
     }
     final Symptom symptom = observation.symptom().get();
@@ -224,6 +251,19 @@ public final class SystemdAdapterStage {
             + failure.getMessage()
             + ")",
         Map.of("source", "systemd-adapter-endpoint-gate", "probeMode", "systemd-adapter-runtime"));
+  }
+
+  /** The checkpoint outcome as a structured Document for the readiness authority. */
+  private Document checkpointDocument(String scenarioId) {
+    final ObjectNode payload = mapper.createObjectNode();
+    payload.put(ExchangeCatalog.FIELD_SCENARIO_ID, scenarioId);
+    payload.put(ExchangeCatalog.FIELD_FAILED, true);
+    policy
+        .readiness()
+        .rawOverride(scenarioId)
+        .ifPresent(value -> payload.put(ExchangeCatalog.FIELD_OVERRIDE, value));
+    return new Document(
+        ExchangeCatalog.DOMAIN_DOCTOR, ExchangeCatalog.READINESS_CHECKPOINT, payload);
   }
 
   private void log(String message) {

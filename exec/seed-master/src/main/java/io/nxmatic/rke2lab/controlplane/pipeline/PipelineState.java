@@ -69,6 +69,14 @@ final class PipelineState {
    */
   ClusterReadinessContact clusterReadinessContact;
 
+  /**
+   * The readiness authority for this run, resolved once from the booted OSGi registry (the
+   * doctor-core {@code @Component} implementing {@code ReadinessAuthority}). Threaded to the stages
+   * that build checkpoint Documents and read verdict actions — so the host never reasons on
+   * Severity.
+   */
+  io.nxmatic.rke2lab.exchange.port.ReadinessAuthority readinessAuthority;
+
   BboxReconciliationOrchestrator bboxOrchestrator;
   ResourceManager resourceManager;
   OutputBuilder outputBuilder;

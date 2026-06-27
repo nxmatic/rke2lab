@@ -21,6 +21,7 @@ import io.nxmatic.rke2lab.doctor.port.HealthSystem;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.Patient;
+import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import io.nxmatic.rke2lab.pulumi.edge.LiveMedicalRecordRegistry;
@@ -137,6 +138,7 @@ public final class BootstrapPipeline {
       admitPatient(state);
       resolveSystemdRuntimeStatus(state);
       resolveClusterReadinessContact(state);
+      resolveReadinessAuthority(state);
       return new AwaitingPreflight(state);
     }
 
@@ -146,6 +148,7 @@ public final class BootstrapPipeline {
       admitPatient(state);
       resolveSystemdRuntimeStatus(state);
       resolveClusterReadinessContact(state);
+      resolveReadinessAuthority(state);
       return new AwaitingPreflight(state);
     }
 
@@ -234,6 +237,22 @@ public final class BootstrapPipeline {
                 + "(cluster-edge @Component absent).");
       }
       state.clusterReadinessContact = contact;
+    }
+
+    /**
+     * Resolve the readiness authority once from the booted registry — the doctor-core
+     * {@code @Component} that implements {@code ReadinessAuthority}. Threaded to the stages that
+     * build checkpoint Documents and read verdict actions — so the host never reasons on Severity.
+     */
+    private static void resolveReadinessAuthority(PipelineState state) {
+      final ReadinessAuthority authority =
+          state.bootedFramework.awaitService(ReadinessAuthority.class, 5000);
+      if (authority == null) {
+        throw new IllegalStateException(
+            "No ReadinessAuthority published in the OSGi registry within 5s "
+                + "(doctor-core DefaultReadinessAuthority @Component absent).");
+      }
+      state.readinessAuthority = authority;
     }
   }
 
@@ -353,7 +372,8 @@ public final class BootstrapPipeline {
               state.consultations,
               state.doctor,
               liveProbe,
-              summary -> state.systemdAdapterLaunchSummary = summary);
+              summary -> state.systemdAdapterLaunchSummary = summary,
+              state.readinessAuthority);
       state.runner.runDuring(topic, stage, body, state.onFailure);
       return new SystemdAdapterDone(state);
     }

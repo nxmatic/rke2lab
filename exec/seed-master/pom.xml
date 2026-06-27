@@ -182,6 +182,13 @@
       <artifactId>domain-annotations</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- The world-exchange seam: Document + ReadinessAuthority. The stage builds a checkpoint
+         Document and reads the verdict's action, instead of reasoning on Severity. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>exchange-port</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- The doctor diagnostic model: pure operator-runbook types lifted to OSGi. COMPILE scope (not
          runtime like manifests-core): seed-master's staying code — the live registry, the reader,
          the scenarios and pipeline stages — references the model types directly, so it is a shared
