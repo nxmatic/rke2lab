@@ -84,6 +84,25 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
 
   /** Declares the framework topology installed+started in {@code beforeAll}. */
   public static final class Builder {
+
+    /**
+     * The JUnit-Platform runner world an in-container proxy installs via {@link #withJUnitRunner()}
+     * — the single source of truth for it, so each proxy names {@code withJUnitRunner()} rather
+     * than copying these symbolic names. Order is install+start order: the opentest4j/apiguardian
+     * leaves the platform bundles import come first.
+     */
+    private static final List<String> JUNIT_RUNNER_BUNDLES =
+        List.of(
+            "org.opentest4j",
+            "org.apiguardian.api",
+            "junit-platform-commons",
+            "junit-platform-engine",
+            "junit-platform-launcher",
+            "junit-jupiter-api",
+            "junit-jupiter-params",
+            "junit-jupiter-engine",
+            "io.nxmatic.rke2lab.junit.testkit");
+
     private final List<String> systemPackages = new ArrayList<>();
     private final List<String> bootDelegation = new ArrayList<>();
     private boolean startScr;
@@ -142,6 +161,20 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
      */
     public Builder installFromClasspath(String... symbolicNames) {
       this.classpathBundles.addAll(Arrays.asList(symbolicNames));
+      return this;
+    }
+
+    /**
+     * Install+start the JUnit-Platform runner world every in-container PROXY test needs: the
+     * launcher + engine + jupiter API the {@code DoctorCoreTests}-style in-framework runner drives,
+     * the opentest4j/apiguardian leaves they import, and this {@code junit-testkit} bundle. These
+     * are the PROXY's own infrastructure — the bare-JVM test boots a Felix and runs a JUnit
+     * launcher INSIDE it — not a dependency of the host under test, so they are not derivable from
+     * the host's manifest and stay named here, in ONE place instead of copied per proxy. Located by
+     * {@code Bundle-SymbolicName}, like {@link #installFromClasspath}.
+     */
+    public Builder withJUnitRunner() {
+      this.classpathBundles.addAll(JUNIT_RUNNER_BUNDLES);
       return this;
     }
 
@@ -455,6 +488,66 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
     if (scr.getState() != Bundle.ACTIVE) {
       throw new IllegalStateException("felix.scr did not reach ACTIVE — DS is not running");
     }
+  }
+
+  /**
+   * Install — WITHOUT starting — the import closure of {@code hosts}: every classpath bundle the
+   * hosts transitively import that is neither already installed, system-exported (host-flat), nor a
+   * seam. Returns the pulled bundles in discovery order so the caller folds them into the set it
+   * resolves with the hosts.
+   *
+   * <p>This is the host-seeded counterpart of {@link #startScr()} (which seeds the SAME shared
+   * {@link BundleIndex#closeOverImports} walk with felix.scr): a test installs its host via {@link
+   * #installFixtureWithHost} and lets the framework's own dependency graph pull in what the host
+   * needs (its sibling domain bundles, the third-party libraries it imports — jackson, ipaddress),
+   * instead of hand-listing them. The walk's already-provided set is what the running SYSTEM BUNDLE
+   * exports — the framework's intrinsic packages ({@code org.osgi.framework}, {@code
+   * org.osgi.resource}, …) AND the seam packages declared via {@link Builder#systemPackages}, all
+   * host-flat — so it never pulls a bundle (e.g. the {@code osgi.core} API jar) for a package the
+   * system bundle already serves. {@code exporterOf} also skips seam-typed bundles, so a seam is
+   * never pulled. The closure is always in sync with what the host's manifest declares — no list to
+   * resynchronise.
+   */
+  public List<Bundle> installImportClosureOf(Bundle... hosts) throws Exception {
+    final List<BundleLocation> seeds = new ArrayList<>();
+    for (Bundle host : hosts) {
+      seeds.add(classpath.locateBySymbolicName(host.getSymbolicName()));
+    }
+    final List<Bundle> pulled = new ArrayList<>();
+    classpath.closeOverImports(
+        seeds,
+        systemBundleExports(),
+        location -> {
+          try {
+            final Bundle bundle = installAt(location);
+            installedBundles.put(bundle.getSymbolicName(), bundle);
+            pulled.add(bundle);
+          } catch (Exception ex) {
+            sneaky(ex);
+          }
+        });
+    return pulled;
+  }
+
+  /**
+   * The package names the running system bundle (id 0) exports — its intrinsic framework packages
+   * plus {@code system.packages.extra} (the seams). Read from the live framework's own wiring, so
+   * the closure walk's already-provided set is exactly what loads host-flat, never a hand-kept
+   * mirror.
+   */
+  private Set<String> systemBundleExports() {
+    final Set<String> names = new LinkedHashSet<>();
+    for (var capability :
+        framework
+            .adapt(org.osgi.framework.wiring.BundleWiring.class)
+            .getCapabilities(org.osgi.framework.namespace.PackageNamespace.PACKAGE_NAMESPACE)) {
+      names.add(
+          (String)
+              capability
+                  .getAttributes()
+                  .get(org.osgi.framework.namespace.PackageNamespace.PACKAGE_NAMESPACE));
+    }
+    return names;
   }
 
   /**

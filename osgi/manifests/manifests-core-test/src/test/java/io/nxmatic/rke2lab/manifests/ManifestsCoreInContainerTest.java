@@ -41,34 +41,6 @@ class ManifestsCoreInContainerTest {
   private static final String CORE_FIXTURE = "(&(type=fixture)(suite=manifests)(role=core))";
   private static final String RUNNER_FQN = "io.nxmatic.rke2lab.manifests.ManifestsCoreTests";
 
-  // manifests-core's runtime graph, installed-without-starting then resolved as ONE set with the
-  // host (order-independent: the resolver wires the whole graph in one pass, and the carrier's
-  // systemd fragment attaches to it during resolution — neither can be .start()ed, a fragment has
-  // no
-  // lifecycle and a bundle would resolve in isolation before its providers exist). The cdk8s
-  // carrier
-  // (its embedded flat closure imports the jackson bundles) + the systemd-cdk8s-manifests fragment
-  // riding it; the sibling ports; the pipeline engine + unitrepo-core; the third-party OSGi bundles
-  // (jackson stack, snakeyaml, commons-compress). All non-seam, so installed as bundles, never
-  // system-exported.
-  private static final List<String> GRAPH =
-      List.of(
-          "io.nxmatic.rke2lab.manifests.cdk8s",
-          "io.nxmatic.rke2lab.systemd.cdk8s.manifests",
-          "io.nxmatic.rke2lab.manifests.port",
-          "io.nxmatic.rke2lab.netplan.port",
-          "io.nxmatic.rke2lab.systemd.port",
-          "io.nxmatic.rke2lab.pipeline",
-          "io.nxmatic.rke2lab.unitrepo.core",
-          // netplan-port imports inet.ipaddr (the CIDR vocabulary); its sole exporter bundle.
-          "com.github.seancfoley.ipaddress",
-          "com.fasterxml.jackson.core.jackson-core",
-          "com.fasterxml.jackson.core.jackson-databind",
-          "com.fasterxml.jackson.core.jackson-annotations",
-          "com.fasterxml.jackson.dataformat.jackson-dataformat-yaml",
-          "org.yaml.snakeyaml",
-          "org.apache.commons.commons-compress");
-
   @RegisterExtension
   static final OutOfContainerFrameworkExtension felix =
       JGivenTestkit.felix() // jGiven boot closure (byte-buddy, jgiven-wrap, slf4j/junit packages)
@@ -76,32 +48,38 @@ class ManifestsCoreInContainerTest {
           // Requires the DS extender (osgi.extender=osgi.component); felix.scr must run for
           // manifests-core to resolve and activate.
           .withScr()
-          // The JUnit world the in-container runner needs — these DO start (they have a lifecycle
+          // The JUnit runner world — the proxy's own infrastructure, the single shared declaration.
+          .withJUnitRunner()
+          // The sibling domain PORTS manifests-core imports are seams (type=seam): host-flat,
+          // system-exported here exactly as in prod, never installed as bundles. The closure walk
+          // skips seam exporters, so these would never be pulled — they belong here, not in the
+          // derived set. Everything else manifests-core's runtime graph needs (the cdk8s carrier
           // and
-          // their providers precede them). The manifests graph is installed-without-starting in the
-          // test body instead, so the cross-bundle resolve happens in one pass.
-          .installFromClasspath(
-              "org.opentest4j",
-              "org.apiguardian.api",
-              "junit-platform-commons",
-              "junit-platform-engine",
-              "junit-platform-launcher",
-              "junit-jupiter-api",
-              "junit-jupiter-params",
-              "junit-jupiter-engine",
-              "io.nxmatic.rke2lab.junit.testkit")
+          // its systemd fragment, unitrepo-core, jackson, ipaddress, snakeyaml, commons-compress)
+          // is
+          // derived from the host's manifest in the test body via installImportClosureOf.
+          .systemPackages(
+              "io.nxmatic.rke2lab.manifests.port;version=1.0.0",
+              "io.nxmatic.rke2lab.manifests.port.node;version=1.0.0",
+              "io.nxmatic.rke2lab.manifests.port.profiles;version=1.0.0",
+              "io.nxmatic.rke2lab.netplan.port;version=1.0.0",
+              "io.nxmatic.rke2lab.systemd.port;version=1.0.0",
+              "io.nxmatic.rke2lab.pipeline;version=1.0.0")
           .build();
 
   @TestFactory
   Stream<DynamicTest> actorTests() throws Exception {
     // Install the manifests-core host + its -test fragment (both selected by what they declare, the
-    // fragment located through its Fragment-Host), plus the whole runtime graph — none started.
+    // fragment located through its Fragment-Host), then let OSGi pull the host's whole runtime
+    // graph
+    // from its manifest — the cdk8s carrier (and the systemd-cdk8s-manifests fragment that exports
+    // a
+    // package the host imports, so it is reached as an exporter), unitrepo-core, jackson,
+    // ipaddress,
+    // snakeyaml, commons-compress — instead of a hand-kept list. None started.
     Bundle host = felix.installFixtureWithHost(CORE_FIXTURE).host();
-    final List<Bundle> toResolve = new ArrayList<>();
-    toResolve.add(host);
-    for (String symbolicName : GRAPH) {
-      toResolve.add(felix.install(symbolicName));
-    }
+    final List<Bundle> toResolve = new ArrayList<>(List.of(host));
+    toResolve.addAll(felix.installImportClosureOf(host));
     // Resolve the entire set at once: the resolver wires host ⇄ carrier ⇄ jackson ⇄ ports in one
     // pass, and attaches the systemd fragment to the carrier (OSGi Core §3.14). Order-independent.
     if (!felix.resolve(toResolve)) {

@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.jgiven.testkit.JGivenTestkit;
 import io.nxmatic.rke2lab.junit.testkit.Osgi;
 import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DynamicTest;
@@ -50,23 +51,17 @@ class DoctorCoreInContainerTest {
           .withScr()
           // doctor-core's dbus-tcp specialist names the unit via the typed SystemdUnitId, so the
           // host imports the systemd domain's port; system-export it (a seam) so the host resolves.
-          .systemPackages("io.nxmatic.rke2lab.systemd.port;version=1.0.0")
-          .installFromClasspath(
-              "org.opentest4j",
-              "org.apiguardian.api",
-              "junit-platform-commons",
-              "junit-platform-engine",
-              "junit-platform-launcher",
-              "junit-jupiter-api",
-              "junit-jupiter-params",
-              "junit-jupiter-engine",
-              // doctor-port imports doctor.records; doctor-core imports doctor.spi (the Specialist
-              // SPI). Installed as bundles (type=record / type=model), never system-exported —
-              // their
-              // non-seam nature — so doctor-port + doctor-core resolve their imports in-container.
-              "io.nxmatic.rke2lab.doctor.records",
-              "io.nxmatic.rke2lab.doctor.spi",
-              "io.nxmatic.rke2lab.junit.testkit")
+          // doctor-core's DefaultReadinessAuthority @Component crosses the world-exchange boundary,
+          // so the host imports the exchange port (Document + ReadinessAuthority); it too is a
+          // seam.
+          .systemPackages(
+              "io.nxmatic.rke2lab.systemd.port;version=1.0.0",
+              "io.nxmatic.rke2lab.exchange.port;version=1.0.0")
+          // The JUnit runner world (launcher + engine + this testkit) — the proxy's own
+          // infrastructure, the single shared declaration. Everything the HOST declares it needs
+          // (doctor.records, doctor.spi, jackson) is derived from its manifest in the test body via
+          // installImportClosureOf — no hand-kept list.
+          .withJUnitRunner()
           .build();
 
   @TestFactory
@@ -75,10 +70,14 @@ class DoctorCoreInContainerTest {
     // -test fragment); doctor-core depends on it. Each fixture installs its host + fragment,
     // located
     // through the fragment's declared Fragment-Host — no host named by a literal. Attach both
-    // fragments, resolve both hosts together.
+    // fragments, then let OSGi pull the hosts' own import closure (their sibling domain bundles +
+    // the third-party libraries they import, jackson among them) instead of a hand-kept list.
+    // Resolve hosts + the derived closure together, in one pass.
     Bundle port = felix.installFixtureWithHost(PORT_FIXTURE).host();
     Bundle host = felix.installFixtureWithHost(CORE_FIXTURE).host();
-    if (!felix.resolve(List.of(port, host))) {
+    final List<Bundle> toResolve = new ArrayList<>(List.of(port, host));
+    toResolve.addAll(felix.installImportClosureOf(port, host));
+    if (!felix.resolve(toResolve)) {
       fail("doctor-port + doctor-core (with their -test fragments) must resolve");
     }
     host.start();

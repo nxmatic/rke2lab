@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import io.nxmatic.rke2lab.junit.testkit.Osgi;
 import io.nxmatic.rke2lab.junit.testkit.OutOfContainerFrameworkExtension;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DynamicTest;
@@ -38,33 +39,26 @@ class DoctorPortInContainerTest {
           // systemd domain's port; system-export it (it is a seam, system-exported in prod too) so
           // the host resolves the merged-in fragment import.
           .systemPackages("io.nxmatic.rke2lab.systemd.port;version=1.0.0")
-          // The JUnit world + the in-container runner bundle, each an OSGi bundle, installed so the
-          // launcher + jupiter engine + the runner resolve as bundles (located by
-          // Bundle-SymbolicName). doctor-port imports io.nxmatic.rke2lab.doctor.records (the value
-          // vocabulary lifted into the doctor-records leaf) + the fragment's FakeSpecialist imports
-          // doctor.spi; both are INSTALLED as bundles (records is type=record, spi is type=model) —
-          // never system-exported, which would lie about their non-seam nature — so the host
-          // resolves.
-          .installFromClasspath(
-              "org.opentest4j",
-              "org.apiguardian.api",
-              "junit-platform-commons",
-              "junit-platform-engine",
-              "junit-platform-launcher",
-              "junit-jupiter-api",
-              "junit-jupiter-params",
-              "junit-jupiter-engine",
-              "io.nxmatic.rke2lab.doctor.records",
-              "io.nxmatic.rke2lab.doctor.spi",
-              "io.nxmatic.rke2lab.junit.testkit")
+          // The JUnit runner world (launcher + engine + this testkit) — the proxy's own
+          // infrastructure, the single shared declaration. What the host+fragment declare they need
+          // (doctor.records, which doctor-port imports; doctor.spi, which the fragment's
+          // FakeSpecialist imports) is derived from their manifests in the test body via
+          // installImportClosureOf — no hand-kept list.
+          .withJUnitRunner()
           .build();
 
   @TestFactory
   Stream<DynamicTest> valueTypeTests() throws Exception {
     // Select the doctor-port fixture by what it DECLARES; its host (doctor-port) is found through
     // the fragment's Fragment-Host — neither named by a literal. Both installed, neither started.
-    final Bundle host = felix.installFixtureWithHost(FIXTURE_FILTER).host();
-    if (!felix.resolve(List.of(host))) {
+    // Seed the import closure with BOTH host and fragment: the fragment's FakeSpecialist imports
+    // doctor.spi, which the host's own manifest does not, so the fragment must be walked too.
+    final OutOfContainerFrameworkExtension.FixtureWithHost fixture =
+        felix.installFixtureWithHost(FIXTURE_FILTER);
+    final Bundle host = fixture.host();
+    final List<Bundle> toResolve = new ArrayList<>(List.of(host));
+    toResolve.addAll(felix.installImportClosureOf(host, fixture.fragment()));
+    if (!felix.resolve(toResolve)) {
       fail("doctor-port host (with its -test fragment) must resolve");
     }
     host.start();
