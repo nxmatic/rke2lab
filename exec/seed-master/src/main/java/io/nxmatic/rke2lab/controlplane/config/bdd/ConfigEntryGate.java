@@ -20,7 +20,7 @@ import java.util.List;
  * not only in tests.
  *
  * <p>The Given/When/Then stages are nested here so the gate's behaviour reads in one place. Then
- * steps throw plain {@link AssertionError} (not JUnit) so they remain runnable from production.
+ * steps throw plain {@link AssertionError} (not JUnit) so they remain runnable from live.
  */
 public final class ConfigEntryGate {
 

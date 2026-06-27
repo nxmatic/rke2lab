@@ -87,9 +87,9 @@ public final class ClusterReadinessStage {
 
     // Capture each phase's observation as the injected probe produces it, so the VerificationResult
     // projection and the doctor consultation read data the scenario already computed (never JGiven
-    // stage state read back through a getter — JGiven intercepts those as steps). Production
+    // stage state read back through a getter — JGiven intercepts those as steps). Live
     // injects
-    // a ProductionClusterReadinessProbe; tests inject a simulated/fake probe and play the same
+    // a LiveClusterReadinessProbe; tests inject a simulated/fake probe and play the same
     // launch(), so the scenario script lives in exactly one place.
     final Map<ClusterReadinessPhase, Observation> phaseObservations =
         new EnumMap<>(ClusterReadinessPhase.class);

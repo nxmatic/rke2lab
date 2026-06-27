@@ -12,7 +12,7 @@ package io.nxmatic.rke2lab.manifests.port.profiles;
  *
  * <p>Empty defaults are intentional: when nothing is bound, layers that look up topology data emit
  * a clearly-blank value, which is easier to spot in rendered manifests than a silent fallback to a
- * production address.
+ * live address.
  */
 public record NetworkTopology(
     String clusterCidr,

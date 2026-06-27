@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 /**
  * The configuration entry gate, told as behaviour. Asserts the gate OUTCOME only — ready vs which
  * mandatory inputs are missing. Resolved-value coverage lives in {@code Rke2labConfigTest} (the
- * gate does not re-assert it, to avoid duplicating coverage). Production plays this same gate at
+ * gate does not re-assert it, to avoid duplicating coverage). Live plays this same gate at
  * provisioning time against the real Pulumi config loader.
  */
 class ConfigEntryGateScenarioTest

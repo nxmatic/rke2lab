@@ -97,7 +97,7 @@ public final class SystemdAdapterStage {
     // symptom).
     final Observation[] observationHolder = new Observation[1];
     // The injected live probe is the default; a preview-only simulated incident overrides it (and
-    // only then). Production injects the real endpoint gate; tests inject a fake and play the same
+    // only then). Live injects the real endpoint gate; tests inject a fake and play the same
     // launch(), so the scenario script lives in one place.
     final SystemdAdapterProbe underlying =
         simulated.<SystemdAdapterProbe>map(SimulatedSystemdAdapterProbe::of).orElse(liveProbe);

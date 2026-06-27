@@ -49,7 +49,7 @@ public final class EnvironmentStage {
   private Rke2labConfig config;
 
   /**
-   * The root config DTO, read once. Production wraps the Pulumi config; offline (no context) uses
+   * The root config DTO, read once. Live wraps the Pulumi config; offline (no context) uses
    * defaults so the pipeline can run without operator YAML.
    */
   private Rke2labConfig config() {

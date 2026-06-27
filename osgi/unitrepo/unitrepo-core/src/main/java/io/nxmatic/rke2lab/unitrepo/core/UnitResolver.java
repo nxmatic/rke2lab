@@ -19,7 +19,7 @@ import org.osgi.service.resolver.Resolver;
 /**
  * Resolves a unit's Provide/Require closure with an OSGi {@link Resolver}: a pure function of
  * (units, their constraints) → wiring, replacing the hand-rolled dependency walker in the manifests
- * module. The {@code Resolver} is INJECTED, not constructed — in production it is the {@code
+ * module. The {@code Resolver} is INJECTED, not constructed — in live it is the {@code
  * org.osgi.service.resolver.Resolver} service that the felix.resolver bundle's activator registers,
  * so this module imports only the OSGi service interface (never felix.resolver's impl package) and
  * resolves as a clean bundle. Callers without a framework (unit tests) supply their own {@code

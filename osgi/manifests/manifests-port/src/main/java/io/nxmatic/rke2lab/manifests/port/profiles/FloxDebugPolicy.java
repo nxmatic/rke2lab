@@ -31,16 +31,15 @@ public record FloxDebugPolicy(
     boolean meshEnabled, boolean networkingEnabled, boolean floxNriPluginEnabled) {
 
   /**
-   * Single source of truth for the production carrier image. Workload binaries come from the flox
-   * env overlay; the carrier just needs a {@code /bin/sh} for {@code flox activate} to bootstrap
-   * from.
+   * Single source of truth for the live carrier image. Workload binaries come from the flox env
+   * overlay; the carrier just needs a {@code /bin/sh} for {@code flox activate} to bootstrap from.
    */
   private static final String PROD_IMAGE = "busybox:stable";
 
   private static final String DEBUG_IMAGE = "alpine:latest";
   private static final FloxDebugPolicy DISABLED = new FloxDebugPolicy(false, false, false);
 
-  /** Production-shape policy: every primitive falls through unchanged. */
+  /** Live-shape policy: every primitive falls through unchanged. */
   public static FloxDebugPolicy disabled() {
     return DISABLED;
   }
@@ -71,7 +70,7 @@ public record FloxDebugPolicy(
    * Selects the flox env mounted into the prod container for the given domain. When the matching
    * domain toggle is on, prod runs against the debug env (unstripped binary, delve in PATH) so the
    * shell sidecar can {@code dlv attach $(pgrep ...)} with source-level visibility. When off, prod
-   * stays on its production env.
+   * stays on its live env.
    */
   public String resolveMeshEnvironment(final String prodEnv, final String debugEnv) {
     return meshEnabled ? debugEnv : prodEnv;

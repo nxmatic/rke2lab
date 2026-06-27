@@ -88,9 +88,9 @@ public final class ManifestsDomainRegistry {
    * then catch the structural failures it does not model. The OSGi {@link ResolutionException} is
    * wrapped into an {@link IllegalStateException} so callers never depend on that OSGi type.
    *
-   * <p>The {@code resolver} is the injected {@code org.osgi.service.resolver.Resolver} — in
-   * production the felix.resolver service bound by SCR on {@code DefaultManifestSynthesisService};
-   * tests pass their own. It is the one OSGi type this gate's signature exposes, by necessity.
+   * <p>The {@code resolver} is the injected {@code org.osgi.service.resolver.Resolver} — in live
+   * the felix.resolver service bound by SCR on {@code DefaultManifestSynthesisService}; tests pass
+   * their own. It is the one OSGi type this gate's signature exposes, by necessity.
    */
   public CoherentManifestsDomainRegistry resolve(Resolver resolver) {
     CrossDomainRule.check(this);

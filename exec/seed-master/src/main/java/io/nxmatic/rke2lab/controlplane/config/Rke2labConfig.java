@@ -37,7 +37,7 @@ public record Rke2labConfig(
   }
 
   /**
-   * Build from any loader (production wraps Pulumi config; the entry gate and offline tests pass an
+   * Build from any loader (live wraps Pulumi config; the entry gate and offline tests pass an
    * in-memory loader). Validates mandatory keys — throws {@link MissingRequiredConfiguration}
    * naming every absent one.
    */

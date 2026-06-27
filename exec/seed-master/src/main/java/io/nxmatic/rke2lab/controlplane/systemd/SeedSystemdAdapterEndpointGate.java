@@ -34,7 +34,7 @@ public final class SeedSystemdAdapterEndpointGate {
   private static final Duration INSTANCE_READY_RETRY_INTERVAL = Duration.ofSeconds(2);
 
   // Injected collaborators: the gate's real-world I/O (wall clock, sleep, the dbus runtime probe,
-  // the incus-exec reachability check). production() wires the live ones; tests substitute fakes so
+  // the incus-exec reachability check). live() wires the live ones; tests substitute fakes so
   // the deadline paths are reachable without real infrastructure or wall-clock waits.
   private final LongSupplier nanoClock;
   private final Consumer<Duration> sleeper;
@@ -53,7 +53,7 @@ public final class SeedSystemdAdapterEndpointGate {
   }
 
   /** The live gate, wired to the real wall clock, sleep, dbus runtime probe, and incus exec. */
-  public static SeedSystemdAdapterEndpointGate production(
+  public static SeedSystemdAdapterEndpointGate live(
       SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus) {
     return new SeedSystemdAdapterEndpointGate(
         System::nanoTime,

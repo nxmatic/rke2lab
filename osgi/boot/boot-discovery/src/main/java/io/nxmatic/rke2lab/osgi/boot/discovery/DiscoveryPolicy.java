@@ -8,8 +8,8 @@ import org.osgi.framework.InvalidSyntaxException;
 
 /**
  * Which bundles of a {@link BundleIndex} a boot installs — the ONE selection rule shared by the
- * production executor and the test harness, so a maintainer evolves it in a single place and the
- * two never drift. A spectrum from least to most deterministic:
+ * live executor and the test harness, so a maintainer evolves it in a single place and the two
+ * never drift. A spectrum from least to most deterministic:
  *
  * <ul>
  *   <li>{@link #all()} — install every bundle the index carries (the launcher is already excluded,

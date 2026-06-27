@@ -25,8 +25,8 @@ public final class SystemdAdapterScenario {
     @ProvidedScenarioState SystemdAdapterProbe probe;
 
     /**
-     * Production passes its real config; tests pass one whose host/port drive the fake's narrative.
-     * Only the host shows in the report — the full config dump would drown the prose.
+     * Live passes its real config; tests pass one whose host/port drive the fake's narrative. Only
+     * the host shows in the report — the full config dump would drown the prose.
      */
     public Given the_seed_node(@Quoted String host, @Hidden BootstrapConfig config) {
       this.config = config;
@@ -57,8 +57,7 @@ public final class SystemdAdapterScenario {
 
   /**
    * Then: asserts on the recorded observation. Plain {@code AssertionError} (not JUnit) keeps this
-   * runnable from production when the gate plays the scenario — JGiven marks a throwing step
-   * failed.
+   * runnable from live when the gate plays the scenario — JGiven marks a throwing step failed.
    */
   public static class Then extends Stage<Then> {
 

@@ -341,7 +341,7 @@ public final class BootstrapPipeline {
     public SystemdAdapterDone during(
         String topic, Function<SystemdAdapterStage, SystemdAdapterStage> body) {
       final SeedSystemdAdapterEndpointGate gate =
-          SeedSystemdAdapterEndpointGate.production(state.systemdRuntimeStatus);
+          SeedSystemdAdapterEndpointGate.live(state.systemdRuntimeStatus);
       final SystemdAdapterProbe liveProbe = cfg -> gate.ensureReachable(cfg, state.readinessLogger);
       final SystemdAdapterStage stage =
           new SystemdAdapterStage(

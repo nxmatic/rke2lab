@@ -27,14 +27,14 @@ import java.util.function.Consumer;
  * <p>Symptoms are typed and named in the runbook from Increment D; no specialist treats them yet,
  * so the doctor produces an empty plan (symptom seen, no treatment offered).
  */
-public final class ProductionClusterReadinessProbe implements ClusterReadinessProbe {
+public final class LiveClusterReadinessProbe implements ClusterReadinessProbe {
 
   private final ControlplanePolicy policy;
   private final SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus;
   private final ClusterReadinessContact contact;
   private final Consumer<String> logger;
 
-  public ProductionClusterReadinessProbe(
+  public LiveClusterReadinessProbe(
       ControlplanePolicy policy,
       SeedSystemdAdapterRuntimeStatusSnapshot runtimeStatus,
       ClusterReadinessContact contact,

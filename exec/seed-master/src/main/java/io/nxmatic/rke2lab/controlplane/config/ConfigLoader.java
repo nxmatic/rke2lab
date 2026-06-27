@@ -34,9 +34,7 @@ public final class ConfigLoader {
     return new ConfigLoader(sectionReader);
   }
 
-  /**
-   * Production: read top-level sections via Pulumi getObject, walking dotted names into sub-maps.
-   */
+  /** Live: read top-level sections via Pulumi getObject, walking dotted names into sub-maps. */
   @SuppressWarnings({"unchecked", "null"})
   public static ConfigLoader of(Config config) {
     return new ConfigLoader(

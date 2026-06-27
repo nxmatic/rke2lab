@@ -37,8 +37,8 @@ public record IncusIdentityMaterial(
 
   /**
    * Default instance used by {@link
-   * io.nxmatic.rke2lab.manifests.ManifestSynthesisContext#current()} when nothing was bound —
-   * production callers always override via the synth request.
+   * io.nxmatic.rke2lab.manifests.ManifestSynthesisContext#current()} when nothing was bound — live
+   * callers always override via the synth request.
    */
   public static IncusIdentityMaterial unknown() {
     return DEFAULT;

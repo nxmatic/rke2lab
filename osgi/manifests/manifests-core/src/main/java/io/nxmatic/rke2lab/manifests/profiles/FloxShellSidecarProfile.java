@@ -131,7 +131,7 @@ public final class FloxShellSidecarProfile {
 
   /**
    * Mounts the prod container should add so its flox state lives in the same per-pod emptyDirs the
-   * sidecar sees. Empty list when disabled — production manifests stay byte-identical to today.
+   * sidecar sees. Empty list when disabled — live manifests stay byte-identical to today.
    */
   public List<Map<String, Object>> extraProdMounts() {
     if (!enabled()) {

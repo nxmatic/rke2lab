@@ -4,7 +4,7 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 
 /**
- * The readiness probe the scenario runs. Production plays the scenario with the real probe ({@code
+ * The readiness probe the scenario runs. Live plays the scenario with the real probe ({@code
  * SeedSystemdAdapterEndpointGate::ensureReachable}); tests inject a fake. It returns an {@link
  * Observation}: the captured snapshot, carrying a {@code status} ({@code "ok"} when reachable), a
  * human {@code summary}, and — on a non-ok result — the typed {@link Symptom} the doctor routes on.
