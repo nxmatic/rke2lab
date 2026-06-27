@@ -192,11 +192,11 @@ public Document consult(Document checkpoint) {
   final Symptom symptom = toSymptom(kind);          // exhaustive switch, OSGi owns Symptom
   final Observation observation = observationFrom(payload); // summary/details → Observation, OSGi-side
   final RemediationPlan plan = consult(symptom, observation);  // the existing record-typed internal path
-  final ObjectNode out = mapper.createObjectNode();
+  final ObjectNode out = Document.newPayload();  // the seam owns payload construction (no per-component ObjectMapper)
   out.put(ExchangeCatalog.FIELD_SCENARIO_ID, payload.path(ExchangeCatalog.FIELD_SCENARIO_ID).asText());
   out.put(ExchangeCatalog.FIELD_NARRATION, narrationLine(symptom)); // was consultedLine + cohortFinding, joined
   out.put(ExchangeCatalog.FIELD_DIAGNOSIS_ADOC, diagnosisBlock(plan)); // moved in from RunbookRenderer
-  return new Document(ExchangeCatalog.DOMAIN_DOCTOR, Coordinate.CONSULTATION.slug(), out);
+  return new Document(Domain.DOCTOR.slug(), Coordinate.CONSULTATION.slug(), out);
 }
 
 private static Symptom toSymptom(SymptomKind kind) {
@@ -210,11 +210,23 @@ private static Symptom toSymptom(SymptomKind kind) {
 }
 ```
 
-Add the private helpers: `observationFrom(JsonNode)` (rebuild the `Observation` OSGi-side from the checkpoint's summary/details), `narrationLine(Symptom)` (join `consultedLine` + `cohortFinding`), and `diagnosisBlock(RemediationPlan)` (copy verbatim from `RunbookRenderer.diagnosisBlock` — the `⚕/🔬/℞` AsciiDoc StringBuilder). The `toSymptom` switch has NO `default` — adding a `Symptom`/`SymptomKind` value later forces this site to update (the anti-drift filet). `Generalist` needs an `ObjectMapper`; reuse or add one. doctor-core's pom already deps `exchange-port` (2A added it for `DefaultReadinessAuthority`); confirm and add only if absent.
+Add the private helpers: `observationFrom(JsonNode)` (rebuild the `Observation` OSGi-side from the checkpoint's summary/details), `narrationLine(Symptom)` (join `consultedLine` + `cohortFinding`), and `diagnosisBlock(RemediationPlan)` (copy verbatim from `RunbookRenderer.diagnosisBlock` — the `⚕/🔬/℞` AsciiDoc StringBuilder). The `toSymptom` switch has NO `default` — adding a `Symptom`/`SymptomKind` value later forces this site to update (the anti-drift filet). doctor-core's pom already deps `exchange-port`.
 
 - [ ] **Step 4: Run the test, verify it passes** — same command as Step 2. Expected: PASS.
 
-- [ ] **Step 5: Commit** — `git commit -m "feat(doctor): Generalist.consult(Document) renders narration + diagnosis AsciiDoc OSGi-side"`.
+- [ ] **Step 5: Commit** — `git commit -m "feat(doctor): Generalist.consult(Document) renders narration + diagnosis AsciiDoc OSGi-side"` *(shipped: `fc0e441e`)*.
+
+### Step 6 (half-2): the seam owns payload construction — no per-component `ObjectMapper`
+
+User-flagged: three components (`DefaultReadinessAuthority`, `SystemdAdapterStage`, `Generalist`) each held `new ObjectMapper()` only to call `createObjectNode()` — a dispersed concern. The seam owns the `Document` envelope, so it owns the payload's construction. Decision: a STATIC factory `Document.newPayload()` (stateless → uniform with the seam's `Coordinate/Action/SymptomKind.parse()` statics; the repo rule allows static for factory methods). The instance twin (`@Component DocumentCodec`, the JSON twin of manifests' `YamlMapper`) is deferred to 2D when payloads carry schema + ordering config — see the `document-codec-instance-in-2d-backlog` memory.
+
+- [ ] **6a:** Add to `osgi/exchange/exchange-port/.../Document.java`: `public static ObjectNode newPayload()` → `JsonNodeFactory.instance.objectNode()` (no `ObjectMapper`; distinct name from the instance accessor `payload()`). *(Done.)*
+
+- [ ] **6b:** Migrate the THREE `new ObjectMapper()` → `createObjectNode()` sites to `Document.newPayload()` and delete each `private final ObjectMapper mapper` field + the `ObjectMapper` import: `Generalist` (`out`), `DefaultReadinessAuthority` (`verdict`), `SystemdAdapterStage` (`checkpointDocument`'s `payload`). Uniformity: ALL three, not one — no half-migration. Grep `new ObjectMapper()` across `osgi exec` main sources (excl `/target/`, excl manifests' `YamlMapper`/`createYamlScalarSerializer` which are YAML config, legitimately their own) → only the now-removed exchange sites disappear.
+
+- [ ] **6c: Verify green** — exchange-port `test`; doctor-core `ReadinessAuthorityTest` + doctor-core-test `GeneralistConsultDocumentTest`; seed-master `package -Pall-worlds -Dtest=SystemdAdapterVerdictTest`. All PASS.
+
+- [ ] **6d: Commit** — `git commit -m "refactor(exchange): the seam owns Document payload construction (Document.newPayload), drop per-component ObjectMapper"`, `Co-Authored-By` trailer.
 
 ---
 
