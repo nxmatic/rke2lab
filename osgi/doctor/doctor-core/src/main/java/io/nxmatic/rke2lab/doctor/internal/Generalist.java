@@ -1,5 +1,8 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.ClinicianId;
@@ -17,8 +20,13 @@ import io.nxmatic.rke2lab.doctor.records.Visit;
 import io.nxmatic.rke2lab.doctor.spi.Clinician;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.domain.annotations.Transitional;
+import io.nxmatic.rke2lab.exchange.port.Coordinate;
+import io.nxmatic.rke2lab.exchange.port.Domain;
+import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
+import io.nxmatic.rke2lab.exchange.port.SymptomKind;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The doctor's coordinator. When a checkpoint fails, the patient consults: the Generalist takes the
@@ -50,6 +58,7 @@ public final class Generalist implements Clinician, ConsultingService {
   private final List<Specialist> specialists;
   private final ClinicalAccess access;
   private final DriftSpecialist driftSpecialist;
+  private final ObjectMapper mapper = new ObjectMapper();
 
   private Generalist(
       List<Specialist> specialists, ClinicalAccess access, DriftSpecialist driftSpecialist) {
@@ -151,16 +160,72 @@ public final class Generalist implements Clinician, ConsultingService {
    * observation to the specialists and synthesize the narration and the rendered AsciiDoc
    * diagnosis, returned as a {@code consultation} Document. The twin of the readiness authority's
    * assess — same checkpoint, the consulting concern rather than the provisioning verdict.
-   *
-   * <p>Not yet implemented: the Document path will map the checkpoint's flat {@code symptomKind}
-   * string to the internal {@link Symptom} enum, extract the observation's structured fields, call
-   * {@link #consult(Symptom, Observation)}, and assemble the consultation Document. Until then this
-   * stub fails fast so a premature call surfaces immediately rather than returning a wrong result.
    */
   @Override
   public io.nxmatic.rke2lab.exchange.port.Document consult(
       io.nxmatic.rke2lab.exchange.port.Document checkpoint) {
-    throw new UnsupportedOperationException("consult(Document) not yet implemented");
+    final var payload = checkpoint.payload();
+    final SymptomKind kind =
+        SymptomKind.parse(payload.path(ExchangeCatalog.FIELD_SYMPTOM_KIND).asText()).orElseThrow();
+    final Symptom symptom = toSymptom(kind);
+    final Observation observation = observationFrom(payload, symptom);
+    final RemediationPlan plan = consult(symptom, observation);
+    final ObjectNode out = mapper.createObjectNode();
+    out.put(
+        ExchangeCatalog.FIELD_SCENARIO_ID,
+        payload.path(ExchangeCatalog.FIELD_SCENARIO_ID).asText());
+    out.put(ExchangeCatalog.FIELD_NARRATION, narrationLine(symptom));
+    out.put(ExchangeCatalog.FIELD_DIAGNOSIS_ADOC, diagnosisBlock(plan));
+    return new io.nxmatic.rke2lab.exchange.port.Document(
+        Domain.DOCTOR.slug(), Coordinate.CONSULTATION.slug(), out);
+  }
+
+  /** Maps the wire SymptomKind to the internal Symptom enum. No default — drift forces update. */
+  private static Symptom toSymptom(SymptomKind kind) {
+    return switch (kind) {
+      case CONNECTION_REFUSED -> Symptom.CONNECTION_REFUSED;
+      case TIMEOUT -> Symptom.TIMEOUT;
+      case KUBECONFIG_MISSING -> Symptom.KUBECONFIG_MISSING;
+      case API_NOT_READY -> Symptom.API_NOT_READY;
+      case CONTROLLER_NOT_READY -> Symptom.CONTROLLER_NOT_READY;
+    };
+  }
+
+  /** Rebuilds the Observation OSGi-side from the checkpoint payload. */
+  private static Observation observationFrom(JsonNode payload, Symptom symptom) {
+    final String summary = payload.path(ExchangeCatalog.FIELD_SUMMARY).asText();
+    final String details = payload.path(ExchangeCatalog.FIELD_DETAILS).asText();
+    return Observation.failed(symptom, summary, Map.of("details", details));
+  }
+
+  /** Joins the two narration lines: consulted + cohort finding. */
+  private String narrationLine(Symptom symptom) {
+    return consultedLine(symptom) + " — " + cohortFinding(symptom);
+  }
+
+  /**
+   * The Diagnosis (⚕ generalist summary) + Assessment (🔬 specialist reasoning) + Mitigation (℞
+   * prescriptions) block, as AsciiDoc text. Each reply's assessment is always rendered; its
+   * prescription (mitigation) is rendered only when present. Copied from RunbookRenderer.
+   */
+  private String diagnosisBlock(RemediationPlan plan) {
+    final StringBuilder block = new StringBuilder();
+    block.append("⚕ Diagnosis: ").append(plan.generalistSummary());
+    for (ReferralReply reply : plan.replies()) {
+      block
+          .append("\n\n🔬 Assessment (")
+          .append(reply.assessment().schemaRef().id())
+          .append("): ")
+          .append(reply.assessment().summary());
+      if (reply.hasPrescription()) {
+        block
+            .append("\n\n℞ Mitigation (")
+            .append(reply.prescription().get().programRef().id())
+            .append("): ")
+            .append(reply.prescription().get().humanHint());
+      }
+    }
+    return block.toString();
   }
 
   /**
