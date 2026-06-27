@@ -1,6 +1,5 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
@@ -56,7 +55,6 @@ public final class SystemdAdapterStage {
   private final SystemdAdapterProbe liveProbe;
   private final Consumer<Map<String, Object>> sink;
   private final ReadinessAuthority readinessAuthority;
-  private final ObjectMapper mapper = new ObjectMapper();
 
   public SystemdAdapterStage(
       BootstrapConfig config,
@@ -258,7 +256,7 @@ public final class SystemdAdapterStage {
 
   /** The checkpoint outcome as a structured Document for the readiness authority. */
   private Document checkpointDocument(String scenarioId) {
-    final ObjectNode payload = mapper.createObjectNode();
+    final ObjectNode payload = Document.newPayload();
     payload.put(ExchangeCatalog.FIELD_SCENARIO_ID, scenarioId);
     payload.put(ExchangeCatalog.FIELD_FAILED, true);
     policy

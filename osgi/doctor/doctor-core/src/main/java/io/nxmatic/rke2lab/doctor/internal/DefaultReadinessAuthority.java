@@ -1,6 +1,5 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.records.Severity;
 import io.nxmatic.rke2lab.exchange.port.Action;
@@ -32,8 +31,6 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
 
   private static final Severity DEFAULT_INTRINSIC = Severity.WARNING;
 
-  private final ObjectMapper mapper = new ObjectMapper();
-
   @Override
   public Document assess(Document checkpoint) {
     final String scenarioId =
@@ -49,7 +46,7 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
             : intrinsicFor(scenarioId);
 
     final boolean stop = effective == Severity.CRITICAL;
-    final ObjectNode verdict = mapper.createObjectNode();
+    final ObjectNode verdict = Document.newPayload();
     verdict.put(
         ExchangeCatalog.FIELD_ACTION, stop ? Action.STOP.slug() : Action.CONTINUE_DEGRADED.slug());
     verdict.put(

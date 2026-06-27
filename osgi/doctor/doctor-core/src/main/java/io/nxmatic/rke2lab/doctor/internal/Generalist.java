@@ -1,7 +1,6 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.records.*;
@@ -21,6 +20,7 @@ import io.nxmatic.rke2lab.doctor.spi.Clinician;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.domain.annotations.Transitional;
 import io.nxmatic.rke2lab.exchange.port.Coordinate;
+import io.nxmatic.rke2lab.exchange.port.Document;
 import io.nxmatic.rke2lab.exchange.port.Domain;
 import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import io.nxmatic.rke2lab.exchange.port.SymptomKind;
@@ -58,7 +58,6 @@ public final class Generalist implements Clinician, ConsultingService {
   private final List<Specialist> specialists;
   private final ClinicalAccess access;
   private final DriftSpecialist driftSpecialist;
-  private final ObjectMapper mapper = new ObjectMapper();
 
   private Generalist(
       List<Specialist> specialists, ClinicalAccess access, DriftSpecialist driftSpecialist) {
@@ -170,7 +169,7 @@ public final class Generalist implements Clinician, ConsultingService {
     final Symptom symptom = toSymptom(kind);
     final Observation observation = observationFrom(payload, symptom);
     final RemediationPlan plan = consult(symptom, observation);
-    final ObjectNode out = mapper.createObjectNode();
+    final ObjectNode out = Document.newPayload();
     out.put(
         ExchangeCatalog.FIELD_SCENARIO_ID,
         payload.path(ExchangeCatalog.FIELD_SCENARIO_ID).asText());
