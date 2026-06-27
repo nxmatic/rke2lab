@@ -232,16 +232,16 @@ User-flagged: three components (`DefaultReadinessAuthority`, `SystemdAdapterStag
 
 ## Task 3 (zone-0c): rename `DoctorGraph` → `ConsultationDag`
 
-**Files:**
-- Rename: `osgi/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/internal/DoctorGraph.java` → `ConsultationDag.java`
-- Modify: `osgi/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/internal/DefaultHealthSystem.java` (the `assemble` call site)
-- Modify: `osgi/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/bnd.bnd` (prose reference, line ~3)
-- Modify: `osgi/doctor/doctor-core-test/src/main/java/io/nxmatic/rke2lab/doctor/HealthSystemTest.java` (javadoc + `DoctorGraph.assemble` call)
-- Modify: `osgi/doctor/doctor-core-test/src/main/java/io/nxmatic/rke2lab/doctor/ExactRosterDoctor.java` (`DoctorGraph.assemble` call)
-- Modify: `exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/resources/ResourceCreationPipeline.java` (the 1 host reference)
+**Files** (the COMPLETE reference map, controller-verified — the plan's earlier "1 host reference in `ResourceCreationPipeline`" was STALE: that file does NOT reference `DoctorGraph`):
+- Rename: `osgi/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/internal/DoctorGraph.java` → `ConsultationDag.java` (class decl line 24 + private ctor line 26 + its own javadoc)
+- Modify: `osgi/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/internal/DefaultHealthSystem.java:56` (the `DoctorGraph.assemble(...)` call)
+- Modify: `osgi/doctor/doctor-core/bnd.bnd:3` (prose reference)
+- Modify: `osgi/doctor/doctor-core-test/src/main/java/io/nxmatic/rke2lab/doctor/HealthSystemTest.java` (javadoc `{@link DoctorGraph}` line 23 + the `DoctorGraph.assemble` call line 44)
+- Modify: `osgi/doctor/doctor-core-test/src/main/java/io/nxmatic/rke2lab/doctor/ExactRosterDoctor.java:36` (the `DoctorGraph.assemble` call)
+- Modify (docs, 1 ref each): `docs/architecture/doctor/practitioners-as-components-design.adoc`, `docs/architecture/doctor/placement2-handoff.adoc` — prose references to the type name.
 
 **Interfaces:**
-- Produces: `ConsultationDag.assemble(...)` (same signature as `DoctorGraph.assemble`), replacing every `DoctorGraph` reference.
+- Produces: `ConsultationDag.assemble(...)` (same signature as `DoctorGraph.assemble`), replacing every `DoctorGraph` reference. (NOTE: 2B Task 2 moved `diagnosisBlock` into `Generalist`, NOT into the DAG — the spec's earlier "ConsultationDag hosts the moved diagnosisBlock" did not happen that way; the rename here is PURE, no logic moves into it.)
 
 - [ ] **Step 1: Rename the class + file** — `DoctorGraph` → `ConsultationDag`, class name and filename. Update its own javadoc (it produces the consultation DAG).
 
