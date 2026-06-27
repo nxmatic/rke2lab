@@ -33,6 +33,6 @@ public final class ExactRosterDoctor {
       InterventionLedgerWriter ledgerWriter,
       List<Specialist> exactRoster,
       Consumer<String> logger) {
-    return DoctorGraph.assemble(patient, registry, ledgerWriter, exactRoster, logger);
+    return ConsultationDag.assemble(patient, registry, ledgerWriter, exactRoster, logger);
   }
 }

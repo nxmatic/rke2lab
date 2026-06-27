@@ -12,18 +12,18 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * The single construction path for the doctor graph: admit the patient (mint this run's self +
+ * The single construction path for the consultation DAG: admit the patient (mint this run's self +
  * cohort grants), bind a credentialed {@link ClinicalAccess}, and employ the {@link Generalist}
  * over the roster + the run's {@link DriftSpecialist}. Used by the OSGi {@code DefaultHealthSystem}
  * (the institution, specialists by DS) for live admission, and by the {@code ExactRosterDoctor}
  * fixture in the doctor-core-test fragment (which shares this loader, so it reaches this sealed
- * package white-box) for tests that drive the graph over an exact roster — so admission lives in
+ * package white-box) for tests that drive the DAG over an exact roster — so admission lives in
  * exactly one place. Package-private actors stay hidden behind the {@link ConsultingService} it
  * returns.
  */
-public final class DoctorGraph {
+public final class ConsultationDag {
 
-  private DoctorGraph() {}
+  private ConsultationDag() {}
 
   /** Admit the patient over the EXACT roster + ledger writer and return the consulting contract. */
   public static ConsultingService assemble(

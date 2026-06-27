@@ -21,7 +21,7 @@ employed practitioner + a consultation value. Code points here; this spec names 
 
 After specialist distribution, three actors are DS `@Component`s (the institution
 `DefaultHealthSystem` + the three domain `Specialist`s). Two are NOT: the `Generalist` and the
-`DriftSpecialist`. They are built per-run by `DoctorGraph.assemble` at each `admit(patient)`.
+`DriftSpecialist`. They are built per-run by `ConsultationDag.assemble` at each `admit(patient)`.
 
 The user wants *uniformity*: every actor a component of the system, each carrying its own
 *operational mode* (its verbs) the way it already carries a `ClinicianId` (its identity). The

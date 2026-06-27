@@ -33,7 +33,7 @@ manifests/netplan — consumers cross a pure port, the impl evolves freely behin
 Two public assembly seams in doctor-core return the contract without exposing the actors:
 `Doctor.consultingService(...)` (production, prepends the standard Network+Cluster roster) and
 `ExactRosterDoctor.over(...)` (test-support, exact roster), both delegating to the package-private
-`DoctorGraph`.
+`ConsultationDag`.
 
 Outstanding: the one accepted debt below (5+1 `ReferralReplies` tests parked in HOST), which the
 test-fragment chantier dissolves. Nothing else open.

@@ -53,6 +53,6 @@ public final class DefaultHealthSystem implements HealthSystem {
 
   @Override
   public ConsultingService admit(Patient patient) {
-    return DoctorGraph.assemble(patient, registry, ledgerWriter, specialists, msg -> {});
+    return ConsultationDag.assemble(patient, registry, ledgerWriter, specialists, msg -> {});
   }
 }

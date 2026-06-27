@@ -20,8 +20,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * Admission over the single construction path ({@link DoctorGraph}): the patient is admitted, the
- * generalist employed with a credentialed access, and the roster consulted. Exercises the same
+ * Admission over the single construction path ({@link ConsultationDag}): the patient is admitted,
+ * the generalist employed with a credentialed access, and the roster consulted. Exercises the same
  * single construction path the OSGi {@code DefaultHealthSystem} routes through on admission.
  */
 class HealthSystemTest {
@@ -41,7 +41,7 @@ class HealthSystemTest {
   }
 
   private static ConsultingService admit(Patient patient, MedicalRecordRegistry registry) {
-    return DoctorGraph.assemble(patient, registry, noopLedger(), roster(), msg -> {});
+    return ConsultationDag.assemble(patient, registry, noopLedger(), roster(), msg -> {});
   }
 
   @Test

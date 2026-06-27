@@ -1,8 +1,8 @@
 Bundle-SymbolicName: io.nxmatic.rke2lab.doctor.core
 # Export ONLY the facade package. io.nxmatic.rke2lab.doctor.internal (Generalist, HealthSystem,
-# ClinicalAccess, the specialists, DoctorGraph, ...) is NOT listed → bnd does not export it → the impl
+# ClinicalAccess, the specialists, ConsultationDag, ...) is NOT listed → bnd does not export it → the impl
 # is SEALED: no other bundle can import it. The .internal name makes "framework-internal, never
-# exported" structural, not inferred. The graph is reached only through the doctor-port contracts
+# exported" structural, not inferred. The DAG is reached only through the doctor-port contracts
 # (ConsultingService/HealthSystem) a @Component publishes; the exact-roster fixture that drives it
 # white-box lives in the doctor-core-test fragment (which shares this loader), not in this prod bundle.
 Export-Package: \
