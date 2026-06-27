@@ -56,5 +56,8 @@ class ExchangeVocabularyTest {
     assertEquals("doctor", Domain.DOCTOR.slug());
     assertEquals(Optional.of(Domain.DOCTOR), Domain.parse("doctor"));
     assertEquals(Optional.empty(), Domain.parse("nope"));
+    assertEquals(Optional.empty(), Domain.parse(null));
+    assertEquals(Optional.empty(), Domain.parse(""));
+    assertEquals(Optional.empty(), Domain.parse("   "));
   }
 }
