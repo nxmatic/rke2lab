@@ -2,8 +2,6 @@ package io.nxmatic.rke2lab.controlplane.policy;
 
 import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
-import io.nxmatic.rke2lab.doctor.records.Severity;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.port.ManifestDomainPolicy;
 import java.util.LinkedHashMap;
@@ -76,21 +74,9 @@ public record ControlplanePolicy(
         .network(networkPolicy)
         .provisioning(provisioningPolicy)
         .manifestLink(manifestLinkPolicy)
-        .readiness(new ReadinessPolicy(toSeverityOverrides(config.policy().readinessOverride())))
-        .preview(new PreviewPolicy(toSimulations(config.policy().previewSimulate())))
+        .readiness(new ReadinessPolicy(config.policy().readinessOverride()))
+        .preview(new PreviewPolicy(config.policy().previewSimulate()))
         .build();
-  }
-
-  private static Map<String, Severity> toSeverityOverrides(Map<String, String> raw) {
-    final Map<String, Severity> parsed = new LinkedHashMap<>();
-    raw.forEach((scenario, value) -> Severity.parse(value).ifPresent(s -> parsed.put(scenario, s)));
-    return parsed;
-  }
-
-  private static Map<String, Symptom> toSimulations(Map<String, String> raw) {
-    final Map<String, Symptom> parsed = new LinkedHashMap<>();
-    raw.forEach((scenario, value) -> Symptom.parse(value).ifPresent(s -> parsed.put(scenario, s)));
-    return parsed;
   }
 
   public Map<String, String> toEnvMap() {
@@ -164,62 +150,55 @@ public record ControlplanePolicy(
 
   /**
    * Operator override of readiness-scenario severity, keyed by scenario id (e.g. {@code
-   * "systemd-adapter"}). An entry forces that scenario's effective severity regardless of the
-   * severity the scenario declares for itself; absent entries defer to the scenario. Applies in
-   * both preview and apply — it changes how a <em>real</em> failure is treated.
+   * "systemd-adapter"}), carried as the RAW config string. The host does not interpret it — it
+   * hands the raw value to the OSGi-side ReadinessAuthority, which owns the severity vocabulary and
+   * decides.
    */
-  public record ReadinessPolicy(Map<String, Severity> severityOverrides) {
+  public record ReadinessPolicy(Map<String, String> rawOverrides) {
     public ReadinessPolicy {
-      severityOverrides = Map.copyOf(severityOverrides);
+      rawOverrides = Map.copyOf(rawOverrides);
     }
 
     public static ReadinessPolicy none() {
       return new ReadinessPolicy(Map.of());
     }
 
-    /** The operator-forced severity for a scenario, if any. */
-    public Optional<Severity> override(String scenarioId) {
-      return Optional.ofNullable(severityOverrides.get(scenarioId));
+    /** The operator's raw override string for a scenario, if any — interpreted OSGi-side. */
+    public Optional<String> rawOverride(String scenarioId) {
+      return Optional.ofNullable(rawOverrides.get(scenarioId));
     }
 
     public Map<String, Object> toOutputMap() {
       final Map<String, Object> outputs = new LinkedHashMap<>();
-      severityOverrides.forEach(
-          (scenario, severity) ->
-              outputs.put("readiness.override." + scenario, severity.name().toLowerCase()));
+      rawOverrides.forEach(
+          (scenario, value) -> outputs.put("readiness.override." + scenario, value));
       return outputs;
     }
   }
 
   /**
-   * Operator control of {@code pulumi preview} behavior. Everything here is <em>preview-only by
-   * construction</em>: the engine alone decides whether we are previewing ({@code isDryRun()});
-   * this policy only says what to do <em>when</em> we are. Nothing here can affect a real {@code
-   * pulumi up} — which is the safety contract for fault simulation.
-   *
-   * <p><b>simulations</b> orders a fake incident: during preview the named scenario lifts dry-run
-   * and runs a canned failing probe emitting the mapped {@link Symptom}, so a runbook for that
-   * incident renders without touching live infrastructure. A stale entry left in config is simply
-   * never consulted during apply.
+   * Operator control of {@code pulumi preview} fault simulation, keyed by scenario id, carried as
+   * the RAW config string. Preview-only by construction. The host does not interpret it; the
+   * simulated probe path (a later increment) maps it OSGi-side.
    */
-  public record PreviewPolicy(Map<String, Symptom> simulations) {
+  public record PreviewPolicy(Map<String, String> rawSimulations) {
     public PreviewPolicy {
-      simulations = Map.copyOf(simulations);
+      rawSimulations = Map.copyOf(rawSimulations);
     }
 
     public static PreviewPolicy none() {
       return new PreviewPolicy(Map.of());
     }
 
-    /** The fake-incident symptom ordered for a scenario, if any. */
-    public Optional<Symptom> simulate(String scenarioId) {
-      return Optional.ofNullable(simulations.get(scenarioId));
+    /** The fake-incident symptom string ordered for a scenario, if any — interpreted OSGi-side. */
+    public Optional<String> rawSimulate(String scenarioId) {
+      return Optional.ofNullable(rawSimulations.get(scenarioId));
     }
 
     public Map<String, Object> toOutputMap() {
       final Map<String, Object> outputs = new LinkedHashMap<>();
-      simulations.forEach(
-          (scenario, symptom) -> outputs.put("preview.simulate." + scenario, symptom.id()));
+      rawSimulations.forEach(
+          (scenario, value) -> outputs.put("preview.simulate." + scenario, value));
       return outputs;
     }
   }

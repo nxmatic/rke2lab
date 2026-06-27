@@ -84,8 +84,12 @@ public final class SystemdAdapterStage {
     // severity, would abort an apply over a defect that does not exist). In preview, the simulated
     // scenario lifts dry-run and runs a canned failing probe (emitting the typed symptom) so the
     // incident renders without touching live infrastructure.
+    // Bridge: the policy now carries raw; the stage still parses Symptom for the probe path
+    // (removed in 2B). preview-simulate interpretation stays here until the probe path migrates.
     final Optional<Symptom> simulated =
-        preview ? policy.preview().simulate(SCENARIO_ID) : Optional.empty();
+        preview
+            ? policy.preview().rawSimulate(SCENARIO_ID).flatMap(Symptom::parse)
+            : Optional.empty();
 
     // Normal preview skips step bodies (deferred-preview); a simulated preview runs them against
     // the fake probe so the failure is visible.
@@ -172,7 +176,14 @@ public final class SystemdAdapterStage {
     consultDoctor(captured);
 
     // The operator override wins over the scenario's intrinsic severity.
-    final Severity effective = policy.readiness().override(SCENARIO_ID).orElse(INTRINSIC_SEVERITY);
+    // Bridge: raw override parsed locally; replaced by the ReadinessAuthority verdict in the next
+    // increment of this stage.
+    final Severity effective =
+        policy
+            .readiness()
+            .rawOverride(SCENARIO_ID)
+            .flatMap(Severity::parse)
+            .orElse(INTRINSIC_SEVERITY);
     if (effective == Severity.CRITICAL) {
       log("✗ " + SCENARIO_ID + " FAILED, severity=CRITICAL → stopping provisioning");
       throw new TopicFailure("systemd adapter", failure);
