@@ -3,6 +3,6 @@ Export-Package: \
     io.nxmatic.rke2lab.doctor.spi
 # The inter-domain SPI: another OSGi domain (e.g. cluster) implements Specialist to plug into the
 # doctor. Exported OSGi-side, installed as a bundle (type=model) — NOT a host seam: the host never
-# calls these. See docs/architecture/osgi/world-boundary-spec.adoc (the 4 packages per domain).
+# calls these. See docs/architecture/osgi/world-exchange-spec.adoc.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=doctor
 -noimportjava: true

@@ -108,15 +108,16 @@ The two-spaces seam is also a *vocabulary* seam. The same real-world thing is na
 each world, on purpose: the OSGi world speaks the *diagnostic* model, the host world speaks the
 *stack* model, and they never share a type. They meet only at a serialized `Document(domain,
 coordinate, payload)`. The stage column names where the host pipeline handles each pairing *today*
-(read from the code) — a maintenance map for the link:osgi/multiplexor-spec.adoc[DomainDagMultiplexor design].
-It is deliberately the *current* stage, not a future one: the refactored stage decomposition is not
-yet designed (see Diagram O's verdict), so naming "after" stages here would be invention.
+(read from the code) — a maintenance map for the link:osgi/world-exchange-spec.adoc[world-exchange design].
 
 *The frame (general):* an OSGi-world word names a pure model; its host-world counterpart names the
-actualised, Pulumi-typed thing; a `DomainDagAdapter`/`DomainDagMultiplexor` pair translates between them via
-the `Document`. *Reserved to the host world only:* `Pulumi`, `Stack`, `output` — enforced by
-`grep -ri pulumi osgi/` == 0. Doctor↔stack is the first (and today only) concrete pairing; further
-domains slot in as rows when they acquire a DAG.
+actualised, Pulumi-typed thing. They never share a type — *the ports speak `Document`, not data*, and
+each world maps the `Document` to its own types (the OSGi `DomainDagMapper` to records, the host
+adapter to the stack model). *Reserved to the host world only:* `Pulumi`, `Stack`, `output` —
+enforced by `grep -ri pulumi osgi/` == 0. Doctor↔stack is the first (and today only) concrete
+pairing; further domains slot in as rows when they acquire a DAG. The refactored stage decomposition
+this implies — GROUND / EXCHANGE / APPLY — is now designed (world-exchange spec), drawn in Diagram O
+below.
 
 [cols="1,1,1",options="header"]
 |===
@@ -511,15 +512,23 @@ mute on `Optional.empty()`). The runbook renders the `Assessment` distinctly. Th
 kept as the design-time proof; the inventory will carry the ✅ status when this chunk lands.
 ====
 
-=== Additivity proof: DomainDagMultiplexor — two models, one Document (DESIGN 2026-06-24)
+=== Additivity proof: world exchange — ports are services, data crosses as Documents (DESIGN 2026-06-27)
 
-Unlike the two proofs above, this one is *monotone-with-named-erasure* (the mode of Diagram K in
-the runtime view): the diagnostic model sheds its Pulumi-shaped serialization, and that erasure is
-deliberate and named. The claim to prove is twofold — the *model* loses its self-serialization
-cleanly, and the *pipeline* (the orchestrator that runs `pulumi preview`) refactors to match in the
-*same increment*. Both must land together: a pure model with a pipeline still hand-building the flat
-map would not preview green, so it would not be deliverable. See
-link:osgi/multiplexor-spec.adoc[the DomainDagMultiplexor spec].
+This proof REVISES the earlier "DomainDagMultiplexor" proof (design 2026-06-24, never shipped) after a
+five-angle code review found that design closed only ONE of three boundary leaks. The full reasoning
+is link:osgi/world-exchange-spec.adoc[the world-exchange spec]; the three leaks it must close:
+
+. *the seam SPEAKS records* — `doctor-port` / `cluster-port` (`type=seam`) import `doctor.records`;
+. *the host REASONS on records* — `ControlplanePolicy.Severity.parse()` at boot (the `pulumi preview`
+  crash), `SystemdAdapterStage` branches `== Severity.CRITICAL`;
+. *egress self-serialization* — 14 `toOutputMap`/`OUTPUT_KEY`/`Reader` in `osgi/` (the only leak the
+  2026-06-24 design addressed).
+
+Like Diagram K, it is *monotone-with-named-erasure*: the diagnostic model sheds its Pulumi-shaped
+serialization AND the seam stops naming records (the ports speak `Document`), and those erasures are
+deliberate and named. The claim is threefold — the *model* loses self-serialization, the *seam* stops
+speaking records, and the *pipeline* re-decomposes (GROUND/EXCHANGE/APPLY) — all in the same
+increment, because a half-landed state would not `pulumi preview` green, so would not be deliverable.
 
 ==== Diagram N — the model: BEFORE vs AFTER (named erasure)
 
@@ -559,15 +568,52 @@ flowchart LR
     class a_coord new;
 ....
 
+==== Diagram N2 — the seam and the host: BEFORE vs AFTER (leaks #1 and #2 closed)
+
+The revision the 2026-06-24 design lacked. BEFORE: the seam imports `doctor.records` (leak #1) and the
+host parses/branches on records (leak #2). AFTER: the port verbs take/return `Document`; the host maps
+its facts to a `Document` and reads a control field — it no longer names a record. Red-dashed = the
+erased imports/branches; green = the verb signatures now speaking `Document`.
+
+[mermaid]
+....
+flowchart LR
+    subgraph B2[before, the seam speaks records, the host reasons]
+        b_port["doctor-port<br/>consult Symptom Observation<br/>Import-Package doctor.records"]
+        b_host["host<br/>Severity.parse, == CRITICAL"]
+        b_rec2["doctor.records"]
+        b_host -->|imports and branches| b_rec2
+        b_port -->|imports| b_rec2
+    end
+
+    subgraph A2[after, the seam speaks Document, the host transports]
+        a_port["doctor-port<br/>consult Document returns Document"]
+        a_host["host<br/>maps facts to Document, reads control field"]
+        a_doc2["Document"]
+        a_rec2["doctor.records, OSGi-private"]
+        a_host -->|Document in| a_port
+        a_port -->|reads OSGi-side| a_rec2
+        a_host -->|builds and reads| a_doc2
+    end
+
+    classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+    classDef new fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
+    classDef gone fill:#fdd,stroke:#c33,stroke-width:2px,stroke-dasharray:4 3;
+    class b_rec2,a_rec2 built;
+    class b_port,b_host gone;
+    class a_port,a_host,a_doc2 new;
+....
+
 ==== Diagram O — the pipeline: BEFORE vs AFTER (the orchestrator refactor)
 
 The same increment refactors the boot pipeline. *What is decided* (firm): `OutputBuilder`
 (hand-concatenation) becomes the DomainDagMultiplexor mux OSGi-side; `ReadinessOutputMapper` (host,
 Pulumi-typed) becomes per-domain `DomainDagMapper` `@Component`s OSGi-side; `OutputsStage` stays
-host — it is the one legitimate `com.pulumi.Context` — but consumes a `DocumentStream`. *What is
-open* (rated below): the *stage decomposition* of the "after" — how many stages, their names, their
-boundaries — is NOT yet designed. The diagram shows components-in-their-worlds, not a settled stage
-list; the stage names below are illustrative placeholders, not commitments.
+host — it is the one legitimate `com.pulumi.Context` — but consumes a `DocumentStream`. *The stage
+decomposition is now designed* (it was open in the 2026-06-24 version): the pipeline re-decomposes by
+capability into GROUND / EXCHANGE / APPLY, verified on the code — only 2 of the 5 existing stages
+cross the seam, and EXCHANGE is framed by the boot-run-close (Felix open for the exchange, closed on
+return). See the world-exchange spec.
 
 [mermaid]
 ....
@@ -580,21 +626,25 @@ flowchart LR
         p_build -->|flat map| p_out
     end
 
-    subgraph PA[after, redistributed]
+    subgraph PA[after, GROUND EXCHANGE APPLY]
+        a_ground["GROUND host only<br/>config, boot Felix, publish infra"]
+        a_exch["EXCHANGE framed by boot run close<br/>ingress, 2 seam stages, egress"]
         a_dm["DomainDagMapper Components<br/>OSGi, Pulumi-blind"]
         a_mux["DomainDagMultiplexor<br/>OSGi, mux demux"]
         a_adapter["DomainDagAdapter<br/>host, stream to Pulumi"]
-        a_outs["OutputsStage<br/>host, consumes DocumentStream"]
+        a_apply["APPLY host only<br/>OutputsStage pulumi export"]
+        a_ground -->|opens| a_exch
         a_dm -->|emit Document| a_mux
-        a_mux -->|stream| a_adapter
-        a_adapter -->|per domain coordinate| a_outs
+        a_mux -->|within EXCHANGE| a_exch
+        a_exch -->|DAG stream| a_adapter
+        a_adapter -->|per domain coordinate| a_apply
     end
 
     classDef built fill:#eef,stroke:#88a,stroke-width:1px;
     classDef new fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
     classDef moved fill:#fff3cd,stroke:#f57f17,stroke-width:2px;
-    class p_out,a_outs built;
-    class a_dm,a_mux,a_adapter new;
+    class p_out,a_apply built;
+    class a_dm,a_mux,a_adapter,a_ground,a_exch new;
     class p_map,p_build moved;
 ....
 
@@ -602,11 +652,13 @@ flowchart LR
 
 An honest reading:
 
-. *Monotone-with-named-erasure, declared not hidden.* Three things are deliberately erased: the four
-  `*Reader` classes, the `toOutputMap`/`OUTPUT_KEY` methods, and `StackCoordinate`'s residence in
-  `doctor-port`. These are not silent rewrites — they are the named cost of the two-models split, and
-  the whiteboard constraint (we rewrite the stack content; no prior outputs preserved) makes the
-  erasure safe: no persisted data is migrated.
+. *Monotone-with-named-erasure, declared not hidden.* Five things are deliberately erased: the four
+  `*Reader` classes, the `toOutputMap`/`OUTPUT_KEY` methods, `StackCoordinate`'s residence in
+  `doctor-port`, the `-port` bundles' `Import-Package doctor.records` (leak #1, Diagram N2), and the
+  host's `Severity.parse` / `== CRITICAL` record reasoning (leak #2, Diagram N2). These are not silent
+  rewrites — they are the named cost of the worlds-speak-Documents split, and the whiteboard
+  constraint (we rewrite the stack content; no prior outputs preserved) makes the erasure safe: no
+  persisted data is migrated.
 
 . *Two honest relocations (not deletions):* `StackCoordinate` moves doctor-port → host (it was always
   a stack concept squatting in the diagnostic model); `ReadinessOutputMapper`'s mapping logic moves
@@ -626,24 +678,29 @@ An honest reading:
 
 . *The open items, rated (this is a refactor — doubt is normal; the atlas's job is to say whether
   the residual risk is acceptable):*
-.. *Stage decomposition of the "after" pipeline — OPEN, risk LOW/ACCEPTABLE.* We cannot honestly name
-   the refactored stages yet; that design is deferred. But it is a *mechanical re-slicing within the
-   existing fluent pipeline grammar*, which already supports adding/reordering `during(...)` blocks
-   type-safely — we are not inventing orchestration, only re-slicing a flow whose *components* are
-   now fixed. Deferring the names does not endanger the increment.
+.. *Stage decomposition of the "after" pipeline — NOW RESOLVED (was open in the 2026-06-24 version).*
+   The decomposition is designed: GROUND / EXCHANGE / APPLY, read from the code (only 2 of 5 stages
+   cross the seam; EXCHANGE is framed by the boot-run-close). It is a *mechanical re-slicing within
+   the existing fluent pipeline grammar*, whose `during(...)` blocks already compose type-safely — the
+   names are now committed, not deferred.
 .. *SCR binds `@Reference List<DomainDagMapper>` in the DomainDagMultiplexor boot topology — OPEN, risk
    LOW/ACCEPTABLE.* A sibling proof already exists (`FragmentContributedComponentTest` binds a
    `@Reference List` across the contribution boundary). Nonzero but small; the increment must carry
    the boot test before the move is trusted.
+.. *Runtime Document validation — DEFERRED (YAGNI), not a risk.* The schema contract is enforced at
+   build (mapper unit tests + a fourth staging gate); runtime validation (OSGi fragment + host
+   remote-switch) is reserved for when host and OSGi become separately deployable. We build on one
+   codebase, so the build check suffices for the embedded increment.
 
 Conclusion: *on the right path, residual risks acceptable.* The model is additive-with-named-erasure;
-the pipeline refactor is a redistribution of existing components into their correct worlds; the two
-are atomic at the integration boundary. The two open items are bounded and both rated LOW — neither
-is a reason to withhold the increment, provided the boot test lands with it. The atlas says: go.
+the seam stops speaking records and the pipeline re-decomposes by capability; all three leaks close in
+one atomic increment at the integration boundary. The one remaining open item (the SCR `@Reference
+List` bind) is bounded and rated LOW — not a reason to withhold the increment, provided the boot test
+lands with it. The atlas says: go.
 
 [NOTE]
 ====
-*Status: DESIGN (2026-06-24), not yet built.* The figures are the design-time proof; the inventory
+*Status: DESIGN (2026-06-27), not yet built.* The figures are the design-time proof; the inventory
 will carry the ✅ status when this increment lands. The load-bearing open proof is the SCR
 `@Reference List<DomainDagMapper>` bind in the DomainDagMultiplexor boot topology.
 ====

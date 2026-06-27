@@ -3,8 +3,9 @@ Export-Package: \
     io.nxmatic.rke2lab.doctor.records
 # type=record — the first-class data category. A pure-data bundle: records, enums, and sealed ADT
 # roots only, never behavior. Unlike a seam it is NOT system-exported — records are the OSGi
-# vocabulary's implementation and never cross to the host (path-addressing: the host references DAG
-# nodes by YAML path, never holds a record). The staging extension's purity guard fails the build if
-# an exported type is not a record/enum/sealed-ADT. See docs/architecture/osgi/world-boundary-spec.adoc.
+# vocabulary's implementation and never cross to the host: every host↔OSGi exchange goes through a
+# Document (the ports speak Document, not data), so the host never holds a record. The staging
+# extension's purity guard fails the build if an exported type is not a record/enum/sealed-ADT. See
+# docs/architecture/osgi/world-exchange-spec.adoc.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=record
 -noimportjava: true
