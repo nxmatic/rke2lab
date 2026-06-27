@@ -1,6 +1,6 @@
 ---
 name: world-exchange-2a-execution-state
-description: World-exchange 2A (the Document foundation increment) is SHIPPED on feature/cluster-edge (2026-06-27). The readiness verdict crosses the host↔OSGi seam as a structured Document; ControlplanePolicy is doctor-free; a Plan-1 gate timing flaw (cold-tree deadlock) was fixed; and the in-container proxy tests were refactored to DERIVE their install closure from the host instead of hand-listing bundles. Next is 2B.
+description: World-exchange 2A SHIPPED on feature/cluster-edge (2026-06-27) — readiness verdict crosses as a Document, ControlplanePolicy doctor-free, a Plan-1 gate cold-tree deadlock fixed, and the in-container proxy tests refactored to DERIVE their install closure from the host. 2B is SPECCED + PLANNED + COMMITTED (4c91a852), ready to EXECUTE subagent-driven — the consult path crosses as a Document, by zone (shared seam first), see the 2B RESUME section at the bottom.
 metadata:
   type: project
 ---
@@ -64,9 +64,51 @@ doctor-port 34, manifests-core 6 — green. Diagnostic lever for a false resolve
 prints the Felix resolver WIRE/FRAGMENT-WIRE trace to stdout (no slf4j backend needed); the
 `resolve()` slf4j post-mortem needs a backend (JGivenTestkit supplies one, bare `builder()` does not).
 
-## NEXT
+## 2B — SPECCED + PLANNED, RESUME HERE (execute, 2026-06-27)
 
-2B (per [[world-exchange-document-design]]) — fold the doctor-graph→DAG rename in
-([[doctor-graph-vs-dag-vocabulary-backlog]]). The probe path still parses `Symptom` host-side
-(preview-simulate); that migration is 2B's. Branch kept, never merged ([[external-worktree-operating-model-state]]).
-See [[realm-boundary-gate]] [[maven-build-cache-and-staging-verify]] [[felixframeworkextension-renamed-outofcontainer]].
+Spec: `docs/architecture/osgi/world-exchange-2b-consult-path-spec.adoc`.
+Plan: `wip/plans/2026-06-27-world-exchange-2b-consult-path.md` (7 tasks, TDD, one commit each).
+Both committed `4c91a852`. Design brainstormed WITH the user (5 decisions, all in the spec) — do NOT
+re-litigate; execute.
+
+**Scope:** the consult/failure path crosses as a Document, decomposed BY ZONE (user's choice), the
+shared seam first because both consult stages share `ConsultingService`'s 3 verbs:
+- zone-0 (Tasks 1-3): add `consult(Document checkpoint)→Document consultation` to `ConsultingService`
+  (the Document twin of 2A's `assess`, a DISTINCT verb — NOT folded into assess); `Generalist`
+  implements it, rendering the narration string AND the `diagnosisAdoc` AsciiDoc block OSGi-side (it
+  owns the `RemediationPlan`); rename `DoctorGraph`→`ConsultationDag`.
+- zone-1 (Task 4): systemd-adapter — probe returns a checkpoint Document (symptom as a SLUG string,
+  no `Observation.failed(Symptom)`), stage calls `consult(checkpoint)`, logs narration.
+- zone-2 (Task 5): cluster — identical; THEN remove the 3 old record-typed verbs from the seam.
+- Task 6: `RunbookRenderer` reads `consultation.diagnosisAdoc()` (a string) into the jGiven shell,
+  drops its `doctor.records` imports; `diagnosisBlock` MOVED to `Generalist` in Task 2.
+- Task 7: close-out — worklist's consult-path slice gone, mark 2B shipped.
+
+**The 5 design decisions (settled, in the spec):** (1) consult DISTINCT from assess — keeps the
+authority(verdict) vs consulting(diagnosis) seam split. (2) narration + diagnosisAdoc are strings the
+host LOGS/INSERTS — DEFINITIVE, not transitory; produced OSGi-side. (3) the host does NOT render the
+runbook — OSGi produces the AsciiDoc TEXT (markup, not HTML), so NO asciidoctor/jruby/graphviz
+dependency. (4) DoctorGraph→ConsultationDag. (5) self-review caught: 2A's checkpoint
+(scenarioId/failed/override) is INSUFFICIENT to route a consult — EXTEND it with `symptomKind` (the
+Symptom slug, OSGi maps back to the enum it owns) + `summary` + `details`; one checkpoint instance
+feeds both assess and consult.
+
+**Two open verifications flagged for the executor** (in the plan's self-review): whether `Checkpoint`
+is a `doctor.records` type (then the runbook join uses the raw slug string instead) and whether
+`doctor-port` already deps `exchange-port` (add if absent — Task 1).
+
+**Boundaries:** 2B touches ONLY the consult/failure path. NOT the reconstruction path (`DriftReview`,
+`*Reader`, `recordForCurrentPatient`/`reviewOpenProblems` — those 2 seam verbs STAY) = 2C; NOT the
+Pulumi-resource egress (`*Resource`, `toOutputMap`) = egress increment; NOT the JSON schemas / the
+REALM_BOUNDARY→ERROR flip = 2D. `ConsultationReport` is NOT deleted (reconstruction + its OSGi tests
+still use it). Green-per-zone: zone-0 is build+OSGi-test green but the HOST worklist does NOT shrink
+until zone-1/2 (host still calls old verbs) — expected, not a regression.
+
+**Verify recipe:** seed-master via `package -Pall-worlds -DskipTests=false -Dmaven.build.cache.skipCache=true`
+(NEVER bare `test`); doctor-core-test via bare `test` on its module; full reactor to read the
+`realm-boundary` worklist shrink per zone.
+
+Branch kept, never merged ([[external-worktree-operating-model-state]]). Folds the
+[[doctor-graph-vs-dag-vocabulary-backlog]] rename. See [[world-exchange-document-design]]
+[[realm-boundary-gate]] [[maven-build-cache-and-staging-verify]]
+[[felixframeworkextension-renamed-outofcontainer]] [[options-always-as-c4-diagrams]].
