@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+    <relativePath>../../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>exchange-port</artifactId>
+  <name>osgi/exchange/exchange-port</name>
+  <description>The world-exchange seam: the neutral Document envelope (domain, coordinate, JsonNode
+    payload) every host↔OSGi crossing carries, the ExchangeCatalog of coordinate + field names, and
+    the ReadinessAuthority verb the host calls to turn a checkpoint outcome into a provisioning
+    verdict. type=seam: system-exported, one shared copy across the boundary, like every -port.</description>
+
+  <dependencies>
+    <!-- JsonNode is the Document payload. databind is host-flat at runtime (manifests-core imports
+         it; the boot mirrors model-bundle imports into system.packages.extra), so the bundle compiles
+         against it but does not embed it. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

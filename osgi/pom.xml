@@ -28,6 +28,7 @@
     <module>manifests</module>
     <module>netplan</module>
     <module>cluster</module>
+    <module>exchange</module>
     <module>pipeline</module>
     <module>jgiven</module>
     <module>doctor</module>

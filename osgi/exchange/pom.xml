@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>build-parent</artifactId>
+    <version>0.0.0</version>
+    <relativePath>../../build-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>exchange</artifactId>
+  <version>0.0.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>osgi/exchange</name>
+  <description>The host↔OSGi exchange seam: the neutral Document envelope every world-exchange crossing
+    carries, and the exchange verbs (ReadinessAuthority) the host calls. type=seam packages, system-
+    exported, one shared copy across the boundary. See docs/architecture/osgi/world-exchange-spec.adoc.</description>
+
+  <modules>
+    <module>exchange-port</module>
+  </modules>
+</project>
