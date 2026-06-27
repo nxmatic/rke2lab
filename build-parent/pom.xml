@@ -37,7 +37,7 @@
            osgi  = exercises OSGi space (the resolver / pure model);
            live  = drives a real Pulumi inline up() (seconds each, spawns gRPC);
            spike = throwaway proof, not a regression test.
-         Override with -Plive / -Pspike / -Phost / -Posgi / -Pall-tests. -->
+         Override with -Plive / -Pspike / -Phost / -Posgi / -Pall-worlds. -->
     <surefire.groups/>
     <surefire.excludedGroups>live | spike</surefire.excludedGroups>
     <spotless.version>3.7.0</spotless.version>
@@ -450,7 +450,7 @@
          boolean expressions (host, osgi, live, spike). -->
     <profile>
       <!-- Run everything, including the slow live deployments and the spikes. -->
-      <id>all-tests</id>
+      <id>all-worlds</id>
       <properties>
         <surefire.excludedGroups/>
       </properties>

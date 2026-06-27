@@ -51,6 +51,13 @@
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>manifests-cdk8s</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+
     <!-- The ssh-to-age edge: embedded INTACT under META-INF/bundles (staged below) + installed by
          OsgiRuntime, NOT flattened (excluded from the shade). runtime scope — the CLI never compiles
          against the edge impl; manifests-core's @Reference SshToAgeConverter binds it from the

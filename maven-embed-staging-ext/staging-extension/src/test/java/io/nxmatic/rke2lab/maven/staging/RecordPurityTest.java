@@ -25,7 +25,12 @@ import org.objectweb.asm.Opcodes;
  */
 class RecordPurityTest {
 
-  private static final String PKG = "ex";
+  // Under OUR root: the gates govern only io.nxmatic.rke2lab.* (a carrier's foreign exports are out
+  // of jurisdiction — see ResolvedBundle#ourExportedPackages). PKG is the dotted Export-Package
+  // value;
+  // PATH is its binary form for the synthesised .class entries.
+  private static final String PKG = "io.nxmatic.rke2lab.ex";
+  private static final String PATH = PKG.replace('.', '/');
 
   @Test
   void recordEnumAndSealedAdtRootAreAllData(@TempDir File dir) throws IOException {
@@ -33,16 +38,17 @@ class RecordPurityTest {
         jar(
             dir,
             classNode(
-                PKG + "/AReccord", Opcodes.ACC_FINAL | Opcodes.ACC_RECORD, "java/lang/Record"),
-            classNode(PKG + "/AnEnum", Opcodes.ACC_FINAL | Opcodes.ACC_ENUM, "java/lang/Enum"),
-            sealedInterface(PKG + "/AnAdtRoot", PKG + "/AReccord"));
+                PATH + "/AReccord", Opcodes.ACC_FINAL | Opcodes.ACC_RECORD, "java/lang/Record"),
+            classNode(PATH + "/AnEnum", Opcodes.ACC_FINAL | Opcodes.ACC_ENUM, "java/lang/Enum"),
+            sealedInterface(PATH + "/AnAdtRoot", PATH + "/AReccord"));
     assertTrue(
         purity(jar).violations().isEmpty(), "record, enum, sealed ADT root are all pure data");
   }
 
   @Test
   void aPlainClassIsAViolation(@TempDir File dir) throws IOException {
-    final File jar = jar(dir, classNode(PKG + "/Behavior", Opcodes.ACC_PUBLIC, "java/lang/Object"));
+    final File jar =
+        jar(dir, classNode(PATH + "/Behavior", Opcodes.ACC_PUBLIC, "java/lang/Object"));
     assertEquals(List.of(PKG + ".Behavior"), purity(jar).violations());
   }
 
@@ -53,7 +59,7 @@ class RecordPurityTest {
         jar(
             dir,
             classNode(
-                PKG + "/AContract",
+                PATH + "/AContract",
                 Opcodes.ACC_PUBLIC | Opcodes.ACC_INTERFACE | Opcodes.ACC_ABSTRACT,
                 "java/lang/Object"));
     assertEquals(List.of(PKG + ".AContract"), purity(jar).violations());
@@ -65,8 +71,8 @@ class RecordPurityTest {
     final File jar =
         jar(
             dir,
-            classNode(PKG + "/Coord", Opcodes.ACC_FINAL | Opcodes.ACC_RECORD, "java/lang/Record"),
-            classNode(PKG + "/Coord$Builder", Opcodes.ACC_PUBLIC, "java/lang/Object"));
+            classNode(PATH + "/Coord", Opcodes.ACC_FINAL | Opcodes.ACC_RECORD, "java/lang/Record"),
+            classNode(PATH + "/Coord$Builder", Opcodes.ACC_PUBLIC, "java/lang/Object"));
     assertTrue(
         purity(jar).violations().isEmpty(), "a nested $ type is part of its enclosing record");
   }
@@ -79,10 +85,25 @@ class RecordPurityTest {
             dir,
             PKG, // only PKG is exported
             classNode(
-                PKG + "/AReccord", Opcodes.ACC_FINAL | Opcodes.ACC_RECORD, "java/lang/Record"),
+                PATH + "/AReccord", Opcodes.ACC_FINAL | Opcodes.ACC_RECORD, "java/lang/Record"),
             classNode("hidden/Behavior", Opcodes.ACC_PUBLIC, "java/lang/Object"));
     assertTrue(
         purity(jar).violations().isEmpty(), "a class in a non-exported package is not on the seam");
+  }
+
+  @Test
+  void aForeignExportedPackageIsOutOfJurisdiction(@TempDir File dir) throws IOException {
+    // A carrier (e.g. manifests-cdk8s) re-exporting a third-party closure exports packages that are
+    // NOT ours: org.cdk8s here. The gates govern only io.nxmatic.rke2lab.* — a plain foreign class
+    // on the exported surface is not a purity violation, it is simply not our code.
+    final File jar =
+        jar(
+            dir,
+            "org.cdk8s",
+            classNode("org/cdk8s/ApiObject", Opcodes.ACC_PUBLIC, "java/lang/Object"));
+    assertTrue(
+        purity(jar).violations().isEmpty(),
+        "a re-exported third-party package is outside the gate's jurisdiction");
   }
 
   /** A {@link RecordPurity} of a {@code type=record} bundle read from the synthesised jar. */

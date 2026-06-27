@@ -30,27 +30,32 @@ import org.objectweb.asm.Opcodes;
  */
 class SpecCoverageTest {
 
-  private static final String PKG = "ex";
+  // Under OUR root: the gates govern only io.nxmatic.rke2lab.* (a carrier's foreign exports are out
+  // of jurisdiction — see ResolvedBundle#ourExportedPackages). PKG is the dotted Export-Package
+  // value;
+  // PATH is its binary form for the synthesised .class entries.
+  private static final String PKG = "io.nxmatic.rke2lab.ex";
+  private static final String PATH = PKG.replace('.', '/');
   private static final String TRANSITIONAL = "io/nxmatic/rke2lab/domain/annotations/Transitional";
 
   @Test
   void aTypeNamedInTheSpecsIsCovered(@TempDir File dir) throws IOException {
     final Path docs = docs(dir, "the Widget is the central type of this domain.");
-    final File jar = jar(dir, plainClass(PKG + "/Widget"));
+    final File jar = jar(dir, plainClass(PATH + "/Widget"));
     assertTrue(coverage(jar, docs).violations().isEmpty(), "Widget is named in a spec");
   }
 
   @Test
   void aTypeAbsentFromTheSpecsIsDrift(@TempDir File dir) throws IOException {
     final Path docs = docs(dir, "this domain documents nothing relevant.");
-    final File jar = jar(dir, plainClass(PKG + "/Undocumented"));
+    final File jar = jar(dir, plainClass(PATH + "/Undocumented"));
     assertEquals(List.of("Undocumented"), coverage(jar, docs).violations());
   }
 
   @Test
   void aTransitionalTypeIsNotDriftEvenWhenAbsent(@TempDir File dir) throws IOException {
     final Path docs = docs(dir, "the successor EfficacyReport is described here.");
-    final File jar = jar(dir, annotatedClass(PKG + "/OldType", TRANSITIONAL));
+    final File jar = jar(dir, annotatedClass(PATH + "/OldType", TRANSITIONAL));
     assertTrue(
         coverage(jar, docs).violations().isEmpty(),
         "an absent type marked @Transitional is in transition, not drift");
@@ -63,7 +68,7 @@ class SpecCoverageTest {
         jar(
             dir,
             PKG,
-            plainClass(PKG + "/Widget"),
+            plainClass(PATH + "/Widget"),
             plainClass("hidden/Undocumented")); // not on the exported surface
     assertTrue(
         coverage(jar, docs).violations().isEmpty(),

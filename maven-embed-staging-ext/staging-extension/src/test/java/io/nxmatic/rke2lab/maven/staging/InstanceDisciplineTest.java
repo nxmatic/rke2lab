@@ -26,7 +26,12 @@ import org.objectweb.asm.Opcodes;
  */
 class InstanceDisciplineTest {
 
-  private static final String PKG = "ex";
+  // Under OUR root: the gates govern only io.nxmatic.rke2lab.* (a carrier's foreign exports are out
+  // of jurisdiction — see ResolvedBundle#ourExportedPackages). PKG is the dotted Export-Package
+  // value;
+  // PATH is its binary form for the synthesised .class entries and type descriptors.
+  private static final String PKG = "io.nxmatic.rke2lab.ex";
+  private static final String PATH = PKG.replace('.', '/');
   private static final String EXEMPT = "io/nxmatic/rke2lab/domain/annotations/Exempt";
   private static final String GATE = "io/nxmatic/rke2lab/domain/annotations/Gate";
 
@@ -45,14 +50,21 @@ class InstanceDisciplineTest {
   @Test
   void aFactoryMethodIsExemptByTheRule(@TempDir File dir) throws IOException {
     // of(...) returning anything is a construction verb — part of the rule, no annotation needed.
-    final File jar = jar(dir, klass("Widget", m -> staticMethod(m, "of", "()Lex/Widget;", null)));
+    final File jar =
+        jar(
+            dir,
+            klass("Widget", m -> staticMethod(m, "of", "()Lio/nxmatic/rke2lab/ex/Widget;", null)));
     assertTrue(discipline(jar).violations().isEmpty(), "factories are construction, not behaviour");
   }
 
   @Test
   void aMethodReturningItsOwnTypeIsExemptByShape(@TempDir File dir) throws IOException {
     final File jar =
-        jar(dir, klass("Widget", m -> staticMethod(m, "derive", "()Lex/Widget;", null)));
+        jar(
+            dir,
+            klass(
+                "Widget",
+                m -> staticMethod(m, "derive", "()Lio/nxmatic/rke2lab/ex/Widget;", null)));
     assertTrue(discipline(jar).violations().isEmpty(), "returns self ⇒ fluent factory");
   }
 
@@ -83,10 +95,10 @@ class InstanceDisciplineTest {
 
   private static ClassNode klass(String simple, java.util.function.Consumer<ClassWriter> body) {
     final ClassWriter cw = new ClassWriter(0);
-    cw.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, PKG + "/" + simple, null, "java/lang/Object", null);
+    cw.visit(Opcodes.V17, Opcodes.ACC_PUBLIC, PATH + "/" + simple, null, "java/lang/Object", null);
     body.accept(cw);
     cw.visitEnd();
-    return new ClassNode(PKG + "/" + simple, cw.toByteArray());
+    return new ClassNode(PATH + "/" + simple, cw.toByteArray());
   }
 
   /**

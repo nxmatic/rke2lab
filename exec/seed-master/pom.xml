@@ -111,6 +111,19 @@
       <version>${project.version}</version>
       <scope>runtime</scope>
     </dependency>
+    <!-- The cdk8s carrier bundle: embedded INTACT under META-INF/bundles, the Fragment-Host the
+         systemd-cdk8s-manifests fragment attaches to (it exports io.nxmatic.rke2lab.systemd.cdk8s,
+         which manifests-core imports). manifests-core depends on it as provided (non-transitive), so
+         the staging closure never reaches it transitively — it must be declared here, exactly as the
+         manifests-cli exec module declares it. Without it the fragment stages host-less and
+         manifests-core fails to resolve. runtime scope: seed-master compiles against flat cdk8s for
+         its own host rendering, never against this OSGi carrier. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>manifests-cdk8s</artifactId>
+      <version>${project.version}</version>
+      <scope>runtime</scope>
+    </dependency>
     <!-- The ssh-to-age edge: embedded INTACT + installed by OsgiRuntime, NOT flattened (excluded
          from the shade). runtime scope — seed-master never compiles against the edge impl;
          manifests-core's @Reference SshToAgeConverter binds it from the registry. Mandatory

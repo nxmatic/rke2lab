@@ -52,7 +52,7 @@ final class SpecCoverage {
    * exports nothing.
    */
   List<String> violations() {
-    final Set<String> exportedPackages = bundle.exports().names();
+    final Set<String> exportedPackages = bundle.ourExportedPackages();
     if (exportedPackages.isEmpty()) {
       return List.of();
     }

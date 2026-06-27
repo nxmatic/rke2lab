@@ -176,7 +176,12 @@ public final class FrameworkLauncher {
               framework.getBundleContext().installBundle(onClasspath.locationId());
         };
     bundle.adapt(BundleStartLevel.class).setStartLevel(startLevel);
-    bundle.start();
+    // A fragment has no lifecycle of its own — calling start() on it throws. It is installed and
+    // left to be merged into its host when the host resolves (OSGi Core §3.14), exactly as the test
+    // harness installs a -test fragment. Detected by the Fragment-Host header it declares.
+    if (bundle.getHeaders().get(org.osgi.framework.Constants.FRAGMENT_HOST) == null) {
+      bundle.start();
+    }
   }
 
   /**

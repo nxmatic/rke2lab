@@ -41,7 +41,7 @@ final class RecordPurity {
    * The fully-qualified names of exported top-level types that are NOT a record/enum/sealed-ADT.
    */
   List<String> violations() {
-    final Set<String> exportedPackages = bundle.exports().names();
+    final Set<String> exportedPackages = bundle.ourExportedPackages();
     final List<String> violations = new ArrayList<>();
     try (JarFile jar = new JarFile(bundle.file())) {
       final Enumeration<JarEntry> entries = jar.entries();

@@ -11,4 +11,14 @@ Bundle-SymbolicName: io.nxmatic.rke2lab.systemd.cdk8s.manifests
 Fragment-Host: io.nxmatic.rke2lab.manifests.cdk8s
 Export-Package: io.nxmatic.rke2lab.systemd.cdk8s
 
+# Self-declares this fragment as embeddable so the staging closure stages it under META-INF/bundles
+# (seeded on the embed capability, like every domain carrier) and the shade excludes its classes from
+# the flat uber-jar — without this it resolved host-flat, the very leak the carrier model kills.
+# type=model: it loads on the BUNDLE side of the seam (isDomain), so its exported package
+# io.nxmatic.rke2lab.systemd.cdk8s is wired bundle-to-bundle (merged into the manifests-cdk8s host it
+# attaches to), never system-exported. A fragment has no lifecycle, so the boot installs it without
+# start()ing it (FrameworkLauncher skips start for a Fragment-Host bundle) and the host merges it on
+# resolve.
+Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=systemd-cdk8s-manifests
+
 -noimportjava: true

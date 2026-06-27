@@ -6,9 +6,11 @@ import io.nxmatic.rke2lab.osgi.bnd.OsgiHeader;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Set;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
+import java.util.stream.Collectors;
 
 /**
  * One resolved dependency jar of an exec-module, read through the OSGi lens at BUILD time — the
@@ -74,9 +76,36 @@ public record ResolvedBundle(
     }
   }
 
+  /**
+   * Our package root. The staging gates (record-purity, spec-coverage, instance-discipline) judge
+   * only OUR code: a type under {@code io.nxmatic.rke2lab.*}. A carrier whose job is to re-export a
+   * third-party closure ({@code manifests-cdk8s} exporting {@code org.cdk8s} / {@code
+   * software.constructs}) is exporting packages that are not ours to spec, purify, or discipline —
+   * the same reason {@code -noimportjava} does not govern the JDK. The gates filter exported
+   * packages through {@link #isOurs(String)} so foreign exports are out of their jurisdiction.
+   */
+  public static final String OUR_ROOT = "io.nxmatic.rke2lab";
+
   /** The {@code groupId:artifactId} key — the pom-side identity the shade/staging lists name. */
   public String ga() {
     return groupId + ":" + artifactId;
+  }
+
+  /**
+   * The exported packages UNDER our root — the published surface the gates govern. A carrier's
+   * re-exported third-party packages ({@code org.cdk8s}, …) are excluded: not ours to judge.
+   */
+  public Set<String> ourExportedPackages() {
+    return exports.names().stream()
+        .filter(ResolvedBundle::isOurs)
+        .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+  }
+
+  /**
+   * Whether {@code packageName} is under our package root — i.e. our code, the gates' jurisdiction.
+   */
+  public static boolean isOurs(String packageName) {
+    return packageName.equals(OUR_ROOT) || packageName.startsWith(OUR_ROOT + ".");
   }
 
   /** The stable staged file name BootPlanner looks the jar up under — version-independent. */
