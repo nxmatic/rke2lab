@@ -116,6 +116,32 @@ These two coordinates (`readiness-checkpoint` from 2A, `consultation` from 2B) g
 + the build-time concord check in the schema increment (2D), not here. 2B's own tests round-trip the
 Documents its code produces/consumes.
 
+== The typed vocabulary — closed domains are seam enums, not catalog strings
+
+`ExchangeCatalog` from 2A had begun to flatten three different natures into one list of `String`
+constants: *coordinates* (a closed set), *enumerated field values* (`stop`/`continue-degraded` — a
+closed set), and *payload field keys* (the schema). The first two are closed value domains; carrying
+them as loose strings reopens exactly the `clusterApi`-class drift the catalog discipline exists to
+prevent — and 2B would have added a third loose domain (the symptom kind the host needs once it drops
+`doctor.records.Symptom`).
+
+2B lifts the closed domains into typed seam enums in `osgi/exchange/exchange-port`, each with
+`String slug()` + `static Optional<E> parse(String)` (mirroring `Severity.parse`/`Symptom.parse`):
+
+* `Coordinate` — `READINESS_CHECKPOINT`, `READINESS_VERDICT`, `CONSULTATION`.
+* `Action` — `STOP`, `CONTINUE_DEGRADED`.
+* `SymptomKind` — the five slugs of `doctor.records.Symptom`, host-flat. The host writes
+  `SymptomKind.X.slug()` into the checkpoint; `Generalist` maps `SymptomKind`→`Symptom` via an
+  exhaustive `switch` (OSGi owns `Symptom`; the seam carries only the flat twin). The no-`default`
+  switch is the anti-drift filet — a new symptom forces both enums and the map to update together.
+
+`ExchangeCatalog` slims to its sound role: the single source for *payload field keys* (`DOMAIN_DOCTOR`
++ the `FIELD_*` schema keys). `Document` STAYS the neutral envelope `(String domain, String
+coordinate, JsonNode payload)` — the coordinate is NOT typed into it, so the transport never couples
+to the (today doctor-only) coordinate vocabulary; call sites write `Coordinate.X.slug()` into the
+`String coordinate` slot. This typing is done in zone-0 (Task 1) and migrates the 2A call sites
+(`DefaultReadinessAuthority`, `SystemdAdapterStage`) in the same change, for uniformity.
+
 == What moves where (the consult-path units)
 
 [cols="1,3",options="header"]

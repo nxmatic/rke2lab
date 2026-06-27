@@ -23,52 +23,109 @@
 
 ---
 
-## Task 1 (zone-0a): the `consult(Document)` seam verb + ExchangeCatalog constants
+## Task 1 (zone-0a): the typed exchange vocabulary (enums) + the `consult(Document)` seam verb
+
+> **Status note:** commit `864ec8d8` already landed the first half of this task — it added the
+> `consult(Document)` verb to `ConsultingService`, the `exchange-port`→`doctor-port` pom dependency,
+> and the consultation/checkpoint field constants to `ExchangeCatalog`. That commit STAYS. This task
+> as revised adds the second half (a user-requested refinement): lift the catalog's *closed value
+> domains* into typed enums, because `ExchangeCatalog` had become a flat fourre-tout mixing three
+> natures — coordinates (a closed set), enumerated field values (closed sets), and payload field
+> keys (the schema). Coordinates/actions/symptom-kinds are closed domains → enums; only the schema
+> keys stay catalog constants. This also supplies the **missing** symptom-kind vocabulary the host
+> needs in zone-1/2 once it drops `doctor.records.Symptom`.
 
 **Files:**
-- Modify: `osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/ExchangeCatalog.java`
-- Modify: `osgi/doctor/doctor-port/src/main/java/io/nxmatic/rke2lab/doctor/port/ConsultingService.java`
-- Test: `osgi/exchange/exchange-port/src/test/java/io/nxmatic/rke2lab/exchange/port/ExchangeCatalogTest.java` (extend the existing catalog test, or `DocumentTest`'s catalog assertions)
+- Create: `osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/Coordinate.java`
+- Create: `osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/Action.java`
+- Create: `osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/SymptomKind.java`
+- Modify: `osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/ExchangeCatalog.java` (slim to schema keys)
+- Modify: `osgi/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/internal/DefaultReadinessAuthority.java` (call sites)
+- Modify: `exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/SystemdAdapterStage.java` (call sites)
+- Test (create): `osgi/exchange/exchange-port/src/test/java/io/nxmatic/rke2lab/exchange/port/ExchangeVocabularyTest.java`
+- Test (modify): `osgi/exchange/exchange-port/src/test/java/io/nxmatic/rke2lab/exchange/port/DocumentTest.java`
+- Test (modify): `osgi/doctor/doctor-core/src/test/java/io/nxmatic/rke2lab/doctor/ReadinessAuthorityTest.java`
+- Test (modify): `exec/seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/SystemdAdapterVerdictTest.java`
 
 **Interfaces:**
-- Consumes: `Document` (from 2A, `osgi/exchange/exchange-port`).
-- Produces: `ConsultingService.consult(Document)→Document`; `ExchangeCatalog` constants `CONSULTATION` (coordinate `"consultation"`), `FIELD_NARRATION` (`"narration"`), `FIELD_DIAGNOSIS_ADOC` (`"diagnosisAdoc"`), `FIELD_SYMPTOM_KIND` (`"symptomKind"`), `FIELD_SUMMARY` (`"summary"`), `FIELD_DETAILS` (`"details"`). The checkpoint reuses 2A's `READINESS_CHECKPOINT` coordinate + `FIELD_SCENARIO_ID`/`FIELD_FAILED`/`FIELD_OVERRIDE`, plus the three new checkpoint fields above.
+- Consumes: `Document` (from 2A). `Document` STAYS the neutral envelope `(String domain, String coordinate, JsonNode payload)` — do NOT type the coordinate into it; the envelope must not couple to the doctor coordinate vocabulary.
+- Produces: three enums in `io.nxmatic.rke2lab.exchange.port`, each with `String slug()` + `static Optional<E> parse(String)` (slug-strict), mirroring the codebase enum idiom (`Severity.parse`, `Symptom.parse`, `Checkpoint.slug`):
+  - `Coordinate{ READINESS_CHECKPOINT("readiness-checkpoint"), READINESS_VERDICT("readiness-verdict"), CONSULTATION("consultation") }`
+  - `Action{ STOP("stop"), CONTINUE_DEGRADED("continue-degraded") }`
+  - `SymptomKind{ CONNECTION_REFUSED("connection-refused"), TIMEOUT("timeout"), KUBECONFIG_MISSING("kubeconfig-missing"), API_NOT_READY("api-not-ready"), CONTROLLER_NOT_READY("controller-not-ready") }` — the five slugs of `doctor.records.Symptom`, host-flat. (`Generalist` maps `SymptomKind`→`Symptom` in Task 2; the host produces `SymptomKind.X.slug()` in Tasks 4-5.)
+- `ExchangeCatalog` (slimmed) keeps ONLY: `DOMAIN_DOCTOR` + all `FIELD_*` (the payload schema keys). REMOVES `READINESS_CHECKPOINT`, `READINESS_VERDICT`, `CONSULTATION` (→ `Coordinate`), `ACTION_STOP`, `ACTION_CONTINUE_DEGRADED` (→ `Action`). `consult(Document)` already on `ConsultingService` from `864ec8d8`.
 
-- [ ] **Step 1: Write the failing test** — assert the new `ExchangeCatalog` constants pin their canonical strings (mirror the existing `catalogConstantsAreTheCanonicalStrings` test).
+- [ ] **Step 1: Write the failing test** — create `ExchangeVocabularyTest` pinning each enum's slug + a parse round-trip, mirroring `DocumentTest`'s canonical-strings discipline. Example for one enum (do all three):
 
 ```java
 @Test
-void consultationCoordinateAndFieldsArePinned() {
-  assertEquals("consultation", ExchangeCatalog.CONSULTATION);
-  assertEquals("narration", ExchangeCatalog.FIELD_NARRATION);
-  assertEquals("diagnosisAdoc", ExchangeCatalog.FIELD_DIAGNOSIS_ADOC);
-  assertEquals("symptomKind", ExchangeCatalog.FIELD_SYMPTOM_KIND);
-  assertEquals("summary", ExchangeCatalog.FIELD_SUMMARY);
-  assertEquals("details", ExchangeCatalog.FIELD_DETAILS);
+void coordinateSlugsArePinnedAndRoundTrip() {
+  assertEquals("readiness-checkpoint", Coordinate.READINESS_CHECKPOINT.slug());
+  assertEquals("readiness-verdict", Coordinate.READINESS_VERDICT.slug());
+  assertEquals("consultation", Coordinate.CONSULTATION.slug());
+  assertEquals(Optional.of(Coordinate.CONSULTATION), Coordinate.parse("consultation"));
+  assertEquals(Optional.empty(), Coordinate.parse("nope"));
 }
 ```
 
-- [ ] **Step 2: Run it, verify it fails** — `flox activate -- ./mvnw -pl :exchange-port -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=ExchangeCatalogTest`. Expected: FAIL (constants undefined).
+- [ ] **Step 2: Run it, verify it fails** — `flox activate -- ./mvnw -pl :exchange-port -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=ExchangeVocabularyTest`. Expected: FAIL (enums undefined / won't compile).
 
-- [ ] **Step 3: Add the constants** to `ExchangeCatalog` (private-ctor final class, mirror the existing constants' javadoc density).
-
-- [ ] **Step 4: Add the seam verb** to `ConsultingService`:
+- [ ] **Step 3: Create the three enums.** Each is a `public enum` in `io.nxmatic.rke2lab.exchange.port` with a private `final String slug`, a slug-arg constructor, `public String slug()`, and `public static Optional<E> parse(String slug)` that returns empty on null/blank/unknown and matches on `slug` only. Match the javadoc voice of `Document`/`ReadinessAuthority`. `Coordinate`:
 
 ```java
+package io.nxmatic.rke2lab.exchange.port;
+
+import java.util.Optional;
+
 /**
- * Consult on a checkpoint: route its symptom + observation to the specialists and synthesize the
- * narration and the rendered AsciiDoc diagnosis, returned as a {@code consultation} Document. The
- * twin of {@link io.nxmatic.rke2lab.exchange.port.ReadinessAuthority#assess} — same checkpoint, the
- * consulting concern rather than the provisioning verdict.
+ * The closed set of document coordinates — the document type and schema key a {@link Document}
+ * carries. Lifted from loose strings so a call site cannot name a coordinate that does not exist
+ * (the {@code clusterApi}-bug discipline). {@code slug()} is the wire value placed in {@link
+ * Document#coordinate()}; the envelope stays neutral and never holds this enum.
  */
-io.nxmatic.rke2lab.exchange.port.Document consult(io.nxmatic.rke2lab.exchange.port.Document checkpoint);
+public enum Coordinate {
+  READINESS_CHECKPOINT("readiness-checkpoint"),
+  READINESS_VERDICT("readiness-verdict"),
+  CONSULTATION("consultation");
+
+  private final String slug;
+
+  Coordinate(String slug) {
+    this.slug = slug;
+  }
+
+  public String slug() {
+    return slug;
+  }
+
+  /** Resolves a wire coordinate; null/blank/unknown yields empty. */
+  public static Optional<Coordinate> parse(String slug) {
+    if (slug == null || slug.isBlank()) {
+      return Optional.empty();
+    }
+    for (Coordinate coordinate : values()) {
+      if (coordinate.slug.equals(slug)) {
+        return Optional.of(coordinate);
+      }
+    }
+    return Optional.empty();
+  }
+}
 ```
 
-Leave the three old verbs (`consult(Symptom,Observation)`, `consultedLine`, `cohortFinding`) in place for now — they are removed in Task 5 once unused. Add the `exchange-port` dependency to `doctor-port`'s pom if not already present (check first; 2A may not have added it to doctor-port).
+`Action` and `SymptomKind` are byte-for-byte the same shape (constants + slug + parse) — UNIFORM, no variants. `SymptomKind`'s javadoc notes it is the host-flat twin of the doctor's internal symptom enum (OSGi owns and maps back).
 
-- [ ] **Step 5: Run the test, verify it passes** — same command as Step 2. Expected: PASS.
+- [ ] **Step 4: Slim `ExchangeCatalog`.** Remove the five lifted constants and their javadoc; keep `DOMAIN_DOCTOR` + every `FIELD_*`. Update the class javadoc: it is now the single source for *payload field keys* (the schema); closed value domains (coordinates, actions, symptom kinds) are the typed enums in this package.
 
-- [ ] **Step 6: Commit** — `git add` the three files; `git commit -m "feat(exchange): consult(Document) seam verb + consultation catalog constants"`.
+- [ ] **Step 5: Migrate the call sites.** `DefaultReadinessAuthority`: `verdict.put(FIELD_ACTION, stop ? Action.STOP.slug() : Action.CONTINUE_DEGRADED.slug())` and `new Document(DOMAIN_DOCTOR, Coordinate.READINESS_VERDICT.slug(), verdict)`; add the `Action`/`Coordinate` imports. `SystemdAdapterStage`: `if (Action.STOP.slug().equals(action))` and `new Document(DOMAIN_DOCTOR, Coordinate.READINESS_CHECKPOINT.slug(), payload)` in `checkpointDocument`; add imports. Then the three test files: `DocumentTest` (the `READINESS_VERDICT`/`ACTION_STOP` references → `Coordinate`/`Action`, and drop the removed-constant assertions, which now live in `ExchangeVocabularyTest`), `ReadinessAuthorityTest`, `SystemdAdapterVerdictTest`. Grep `ExchangeCatalog.ACTION_`, `ExchangeCatalog.READINESS_`, `ExchangeCatalog.CONSULTATION` across `osgi exec` (exclude `/target/`) — expected ZERO after.
+
+- [ ] **Step 6: Verify green.** exchange-port + doctor-core via bare `test`; seed-master MUST go through `package -Pall-worlds`:
+  - `flox activate -- ./mvnw -pl :exchange-port -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=ExchangeVocabularyTest,DocumentTest`
+  - `flox activate -- ./mvnw -pl :doctor-core -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=ReadinessAuthorityTest`
+  - `flox activate -- ./mvnw -pl :seed-master -am package -Pall-worlds -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=SystemdAdapterVerdictTest`
+  All PASS.
+
+- [ ] **Step 7: Commit** — `git commit -m "refactor(exchange): lift coordinate/action/symptom-kind closed domains into seam enums"` (the verb + dep already shipped in `864ec8d8`; this commit is the vocabulary typing). End with the `Co-Authored-By` trailer.
 
 ---
 
@@ -79,10 +136,10 @@ Leave the three old verbs (`consult(Symptom,Observation)`, `consultedLine`, `coh
 - Test: `osgi/doctor/doctor-core-test/src/main/java/io/nxmatic/rke2lab/doctor/` — a new `GeneralistConsultDocumentTest` (the doctor-core-test module runs in-container; follow the existing `GeneralistRecordRetrievalTest` shape).
 
 **Interfaces:**
-- Consumes: `ConsultingService.consult(Document)` (Task 1), the existing internal `consult(Symptom,Observation)→RemediationPlan` + `consultedLine`/`cohortFinding`, and the `diagnosisBlock` logic (moved in from `RunbookRenderer` — copy its body now, the host loses it in Task 7).
-- Produces: a `consult(Document)` impl that returns a `consultation` Document with `narration` + `diagnosisAdoc` + echoed `checkpointId`.
+- Consumes: `ConsultingService.consult(Document)` (Task 1), the `SymptomKind` seam enum (Task 1), the existing internal `consult(Symptom,Observation)→RemediationPlan` + `consultedLine`/`cohortFinding`, and the `diagnosisBlock` logic (moved in from `RunbookRenderer` — copy its body now, the host loses it in Task 6).
+- Produces: a `consult(Document)` impl that returns a `consultation` Document with `narration` + `diagnosisAdoc` + echoed `scenarioId`. Plus a private `SymptomKind`→`Symptom` mapping (an exhaustive `switch` — OSGi owns `Symptom`, the seam carries only the host-flat `SymptomKind`).
 
-- [ ] **Step 1: Write the failing test** — build a checkpoint Document (scenarioId + failed + symptomKind="connection-refused" + summary + details), call the assembled `Generalist`'s `consult(Document)`, assert the returned Document's `coordinate` is `consultation`, its `narration` is non-empty, and its `diagnosisAdoc` contains `"⚕ Diagnosis:"`.
+- [ ] **Step 1: Write the failing test** — build a checkpoint Document (scenarioId + failed + `symptomKind = SymptomKind.CONNECTION_REFUSED.slug()` + summary + details), call the assembled `Generalist`'s `consult(Document)`, assert the returned Document's `coordinate()` equals `Coordinate.CONSULTATION.slug()`, its `narration` field is non-empty, and its `diagnosisAdoc` field contains `"⚕ Diagnosis:"`.
 
 - [ ] **Step 2: Run it, verify it fails** — `flox activate -- ./mvnw -pl :doctor-core-test -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=GeneralistConsultDocumentTest`. Expected: FAIL (method not implemented / returns nothing).
 
@@ -92,18 +149,30 @@ Leave the three old verbs (`consult(Symptom,Observation)`, `consultedLine`, `coh
 @Override
 public Document consult(Document checkpoint) {
   final var payload = checkpoint.payload();
-  final Symptom symptom = Symptom.fromSlug(payload.path(ExchangeCatalog.FIELD_SYMPTOM_KIND).asText());
-  final Observation observation = observationFrom(payload); // status/summary/details → Observation, OSGi-side
+  final SymptomKind kind =
+      SymptomKind.parse(payload.path(ExchangeCatalog.FIELD_SYMPTOM_KIND).asText()).orElseThrow();
+  final Symptom symptom = toSymptom(kind);          // exhaustive switch, OSGi owns Symptom
+  final Observation observation = observationFrom(payload); // summary/details → Observation, OSGi-side
   final RemediationPlan plan = consult(symptom, observation);  // the existing record-typed internal path
   final ObjectNode out = mapper.createObjectNode();
   out.put(ExchangeCatalog.FIELD_SCENARIO_ID, payload.path(ExchangeCatalog.FIELD_SCENARIO_ID).asText());
   out.put(ExchangeCatalog.FIELD_NARRATION, narrationLine(symptom)); // was consultedLine + cohortFinding, joined
   out.put(ExchangeCatalog.FIELD_DIAGNOSIS_ADOC, diagnosisBlock(plan)); // moved in from RunbookRenderer
-  return new Document(ExchangeCatalog.DOMAIN_DOCTOR, ExchangeCatalog.CONSULTATION, out);
+  return new Document(ExchangeCatalog.DOMAIN_DOCTOR, Coordinate.CONSULTATION.slug(), out);
+}
+
+private static Symptom toSymptom(SymptomKind kind) {
+  return switch (kind) {
+    case CONNECTION_REFUSED -> Symptom.CONNECTION_REFUSED;
+    case TIMEOUT -> Symptom.TIMEOUT;
+    case KUBECONFIG_MISSING -> Symptom.KUBECONFIG_MISSING;
+    case API_NOT_READY -> Symptom.API_NOT_READY;
+    case CONTROLLER_NOT_READY -> Symptom.CONTROLLER_NOT_READY;
+  };
 }
 ```
 
-Add the private helpers: `observationFrom(JsonNode)` (rebuild the `Observation` OSGi-side from the checkpoint's summary/details), `narrationLine(Symptom)` (join `consultedLine` + `cohortFinding`), and `diagnosisBlock(RemediationPlan)` (copy verbatim from `RunbookRenderer.diagnosisBlock` — the `⚕/🔬/℞` AsciiDoc StringBuilder). Add `Symptom.fromSlug(String)` to `doctor-records` if it does not exist (mirror the `Checkpoint.fromSlug` pattern). `Generalist` needs an `ObjectMapper`; reuse or add one. doctor-core's pom needs the `exchange-port` dependency (check; 2A added it for `DefaultReadinessAuthority`, so likely present).
+Add the private helpers: `observationFrom(JsonNode)` (rebuild the `Observation` OSGi-side from the checkpoint's summary/details), `narrationLine(Symptom)` (join `consultedLine` + `cohortFinding`), and `diagnosisBlock(RemediationPlan)` (copy verbatim from `RunbookRenderer.diagnosisBlock` — the `⚕/🔬/℞` AsciiDoc StringBuilder). The `toSymptom` switch has NO `default` — adding a `Symptom`/`SymptomKind` value later forces this site to update (the anti-drift filet). `Generalist` needs an `ObjectMapper`; reuse or add one. doctor-core's pom already deps `exchange-port` (2A added it for `DefaultReadinessAuthority`); confirm and add only if absent.
 
 - [ ] **Step 4: Run the test, verify it passes** — same command as Step 2. Expected: PASS.
 
@@ -145,16 +214,16 @@ Add the private helpers: `observationFrom(JsonNode)` (rebuild the `Observation` 
 - Modify: `exec/seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/SystemdAdapterStageFixture.java` + `SystemdAdapterVerdictTest.java` (the probe now returns a checkpoint Document)
 
 **Interfaces:**
-- Consumes: `ConsultingService.consult(Document)` (Task 1), the extended checkpoint fields (Task 1 constants).
+- Consumes: `ConsultingService.consult(Document)` (Task 1), the `SymptomKind`/`Coordinate` seam enums + the extended checkpoint field keys (Task 1).
 - Produces: a systemd-adapter zone with zero `doctor.records` imports.
 
-- [ ] **Step 1: Write/adapt the failing test** — `SystemdAdapterVerdictTest` already drives the failing-probe → verdict path. Extend it (or add a sibling) asserting the stage, on failure, calls `consult` and logs a narration line — using a stub `ConsultingService` returning a known `consultation` Document. The fixture's probe now returns a checkpoint `Document` (failed + symptomKind), not an `Observation`.
+- [ ] **Step 1: Write/adapt the failing test** — `SystemdAdapterVerdictTest` already drives the failing-probe → verdict path. Extend it (or add a sibling) asserting the stage, on failure, calls `consult` and logs a narration line — using a stub `ConsultingService` returning a known `consultation` Document. The fixture's probe now returns a checkpoint `Document` (failed + `symptomKind = SymptomKind.CONNECTION_REFUSED.slug()`), not an `Observation`.
 
 - [ ] **Step 2: Run it, verify it fails** — `flox activate -- ./mvnw -pl :seed-master -am package -Pall-worlds -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=SystemdAdapterVerdictTest`. Expected: FAIL (probe/consult signatures changed).
 
-- [ ] **Step 3: Migrate the probe + gate** — `SystemdAdapterProbe.probe(config)` returns `Document` (a checkpoint: status, failed, symptomKind slug, summary, details). `SeedSystemdAdapterEndpointGate` and `SimulatedSystemdAdapterProbe` build that Document from host-native values — the failure kind becomes the symptom *slug* string (`"connection-refused"`, `"timeout"`), never `Symptom.X`. No `doctor.records` import remains in these files.
+- [ ] **Step 3: Migrate the probe + gate** — `SystemdAdapterProbe.probe(config)` returns `Document` (a checkpoint: status, failed, symptomKind slug, summary, details). `SeedSystemdAdapterEndpointGate` and `SimulatedSystemdAdapterProbe` build that Document from host-native values — the failure kind is written as `SymptomKind.CONNECTION_REFUSED.slug()` / `SymptomKind.TIMEOUT.slug()` (the seam enum, host-flat), never `Symptom.X` and never a literal. No `doctor.records` import remains in these files.
 
-- [ ] **Step 4: Migrate the stage** — `checkpointDocument` adds `symptomKind`/`summary`/`details` (it already adds scenarioId/failed/override). `consultDoctor(Document checkpoint)` calls `doctor.consult(checkpoint)`, logs `consultation.payload().path(FIELD_NARRATION).asText()`, and (for the runbook) stashes the `consultation` Document for the renderer (see Task 6 for how it reaches `RunbookRenderer`). Drop the `Observation`/`Symptom`/`RemediationPlan`/`ConsultationReport` imports. The `doctor` field type stays `ConsultingService` (now used via the Document verb).
+- [ ] **Step 4: Migrate the stage** — `checkpointDocument` adds `symptomKind`/`summary`/`details` (it already adds scenarioId/failed/override) and uses `Coordinate.READINESS_CHECKPOINT.slug()` for the coordinate. `consultDoctor(Document checkpoint)` calls `doctor.consult(checkpoint)`, logs `consultation.payload().path(FIELD_NARRATION).asText()`, and (for the runbook) stashes the `consultation` Document for the renderer (see Task 6 for how it reaches `RunbookRenderer`). Drop the `Observation`/`Symptom`/`RemediationPlan`/`ConsultationReport` imports. The `doctor` field type stays `ConsultingService` (now used via the Document verb).
 
 - [ ] **Step 5: Migrate the scenario + fixture** — `SystemdAdapterScenario` Then-steps assert on the checkpoint/consultation Document, not `Observation`. Fixture + `SystemdAdapterVerdictTest` build a checkpoint Document.
 
@@ -185,7 +254,7 @@ Add the private helpers: `observationFrom(JsonNode)` (rebuild the `Observation` 
 
 - [ ] **Step 2: Run it, verify it fails** — `flox activate -- ./mvnw -pl :seed-master -am package -Pall-worlds -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=ClusterReadiness*`. Expected: FAIL.
 
-- [ ] **Step 3: Migrate the cluster probe + stage + scenario** — same shape as Task 4: `ClusterReadinessProbe.probe(config, phase)` returns a checkpoint `Document`; the live/simulated impls write the symptom slug; `ClusterReadinessStage.consultDoctor` calls `consult(checkpoint)`; drop `doctor.records` imports.
+- [ ] **Step 3: Migrate the cluster probe + stage + scenario** — same shape as Task 4: `ClusterReadinessProbe.probe(config, phase)` returns a checkpoint `Document`; the live/simulated impls write the symptom slug via the seam enum (`SymptomKind.KUBECONFIG_MISSING.slug()` / `API_NOT_READY` / `CONTROLLER_NOT_READY`), never `Symptom.X`; the checkpoint coordinate is `Coordinate.READINESS_CHECKPOINT.slug()`; `ClusterReadinessStage.consultDoctor` calls `consult(checkpoint)`; drop `doctor.records` imports.
 
 - [ ] **Step 4: Remove the three old seam verbs** — now that NO host code calls `consult(Symptom,Observation)`, `consultedLine`, `cohortFinding`, delete them from `ConsultingService` and from `Generalist`'s public surface (keep the internal `consult(Symptom,Observation)` as a PRIVATE helper of `Generalist.consult(Document)` — it is still the routing core). Verify the seam's `Import-Package` no longer needs `Symptom`/`Observation`/`RemediationPlan` for the consult verbs (it still imports them for the two reconstruction verbs — expected).
 
@@ -239,7 +308,8 @@ Add the private helpers: `observationFrom(JsonNode)` (rebuild the `Observation` 
 
 ## Self-Review
 
-- *Spec coverage:* zone-0 (Tasks 1-3: seam verb + Generalist impl + rename), zone-1 (Task 4), zone-2 (Task 5), runbook tail (Task 6), close-out (Task 7). Every spec unit has a task.
-- *Order:* Task 1 (seam) precedes 4-5 (consumers) — the shared-seam-first constraint holds. Task 2 moves `diagnosisBlock` into `Generalist` BEFORE Task 6 deletes it from `RunbookRenderer` — no window where it is gone from both.
-- *Type consistency:* the consultation Document fields (`narration`, `diagnosisAdoc`, `symptomKind`, `summary`, `details`) are named once in Task 1 and reused verbatim in Tasks 2/4/5/6.
-- *Open verification for the executor:* Task 6 Step 3 flags `Checkpoint` — confirm whether it is `doctor.records` (then replace with the string slug) or host-resoluble. Task 1 flags the `exchange-port` dependency on `doctor-port` (add if absent).
+- *Spec coverage:* zone-0 (Tasks 1-3: typed vocabulary + seam verb, Generalist impl, rename), zone-1 (Task 4), zone-2 (Task 5), runbook tail (Task 6), close-out (Task 7). Every spec unit has a task.
+- *Order:* Task 1 (seam vocabulary + verb) precedes 4-5 (consumers) — the shared-seam-first constraint holds, and the `SymptomKind` enum the host needs is created before the host drops `Symptom`. Task 2 moves `diagnosisBlock` into `Generalist` BEFORE Task 6 deletes it from `RunbookRenderer` — no window where it is gone from both.
+- *Type consistency:* the consultation Document field KEYS (`narration`, `diagnosisAdoc`, `symptomKind`, `summary`, `details`) are `ExchangeCatalog.FIELD_*` constants named once in Task 1. The closed VALUE domains are the seam enums `Coordinate`/`Action`/`SymptomKind` (Task 1), referenced via `.slug()` everywhere: `Coordinate.READINESS_CHECKPOINT.slug()` (Task 4/5 checkpoint), `Coordinate.CONSULTATION.slug()` (Task 2), `Action.STOP.slug()` (DefaultReadinessAuthority + SystemdAdapterStage), `SymptomKind.X.slug()` (Task 4/5 probes); `Generalist.toSymptom(SymptomKind)` maps to the OSGi-owned `Symptom` via an exhaustive switch (Task 2). No literal symptom/action/coordinate string survives.
+- *Resolved before execution (controller):* `doctor-port` did NOT dep `exchange-port` — added in commit `864ec8d8`. `Checkpoint` IS a `doctor.records` enum → Task 6 uses the raw slug string, not the type. `Symptom` already has `parse(String)` but the host no longer touches `Symptom` at all — it uses the seam `SymptomKind`. No `ExchangeCatalogTest`; vocabulary assertions live in the new `ExchangeVocabularyTest` (enums) + `DocumentTest` (field keys).
+- *Open verification for the executor:* Task 6 Step 3 — confirm the host-side consultation carrier threading through `BootstrapPipeline`/`PipelineState` (string-only) before deleting `RunbookRenderer.diagnosisBlock`.
