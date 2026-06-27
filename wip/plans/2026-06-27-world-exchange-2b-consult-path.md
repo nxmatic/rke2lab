@@ -49,11 +49,22 @@
 
 **Interfaces:**
 - Consumes: `Document` (from 2A). `Document` STAYS the neutral envelope `(String domain, String coordinate, JsonNode payload)` — do NOT type the coordinate into it; the envelope must not couple to the doctor coordinate vocabulary.
-- Produces: three enums in `io.nxmatic.rke2lab.exchange.port`, each with `String slug()` + `static Optional<E> parse(String)` (slug-strict), mirroring the codebase enum idiom (`Severity.parse`, `Symptom.parse`, `Checkpoint.slug`):
+- Produces: FOUR enums in `io.nxmatic.rke2lab.exchange.port`, each with `String slug()` + `static Optional<E> parse(String)` (slug-strict), mirroring the codebase enum idiom (`Severity.parse`, `Symptom.parse`, `Checkpoint.slug`):
+  - `Domain{ DOCTOR("doctor") }` — the document owner. (One value today; forward-extensible if other ports exchange Documents. This is the slot `Document.domain()` carries, NOT the host's `InfraDomainCatalog` provisioning axis nor `ManifestDomainCatalog` — a different axis AND a different layer; the seam leaf cannot reference the host.)
   - `Coordinate{ READINESS_CHECKPOINT("readiness-checkpoint"), READINESS_VERDICT("readiness-verdict"), CONSULTATION("consultation") }`
   - `Action{ STOP("stop"), CONTINUE_DEGRADED("continue-degraded") }`
   - `SymptomKind{ CONNECTION_REFUSED("connection-refused"), TIMEOUT("timeout"), KUBECONFIG_MISSING("kubeconfig-missing"), API_NOT_READY("api-not-ready"), CONTROLLER_NOT_READY("controller-not-ready") }` — the five slugs of `doctor.records.Symptom`, host-flat. (`Generalist` maps `SymptomKind`→`Symptom` in Task 2; the host produces `SymptomKind.X.slug()` in Tasks 4-5.)
-- `ExchangeCatalog` (slimmed) keeps ONLY: `DOMAIN_DOCTOR` + all `FIELD_*` (the payload schema keys). REMOVES `READINESS_CHECKPOINT`, `READINESS_VERDICT`, `CONSULTATION` (→ `Coordinate`), `ACTION_STOP`, `ACTION_CONTINUE_DEGRADED` (→ `Action`). `consult(Document)` already on `ConsultingService` from `864ec8d8`.
+- `ExchangeCatalog` (slimmed) keeps ONLY the `FIELD_*` payload schema keys. REMOVES `DOMAIN_DOCTOR` (→ `Domain.DOCTOR`), `READINESS_CHECKPOINT`/`READINESS_VERDICT`/`CONSULTATION` (→ `Coordinate`), `ACTION_STOP`/`ACTION_CONTINUE_DEGRADED` (→ `Action`). The `FIELD_*` keys STAY constants — the real "which fields per coordinate" typing is the per-coordinate JSON Schema in 2D; a flat `Field` enum would re-merge checkpoint+verdict+consultation fields (the fourre-tout one level down) and pre-empt 2D. `consult(Document)` already on `ConsultingService` from `864ec8d8`.
+
+> **Half-3 (this revision):** commits `864ec8d8` (verb + dep + field constants) and `a892c8ee`
+> (Coordinate/Action/SymptomKind enums + 2A call-site migration) already landed. Half-3 adds the
+> `Domain` enum and removes the last non-field constant `DOMAIN_DOCTOR` from `ExchangeCatalog`, so
+> the catalog is purely the `FIELD_*` schema keys and EVERY closed value domain in the seam is a typed
+> enum. Six `DOMAIN_DOCTOR` call sites migrate to `Domain.DOCTOR.slug()`: `ExchangeCatalog` (decl),
+> `DocumentTest` (×3 incl. the canonical-string assertion → move to `ExchangeVocabularyTest`),
+> `ReadinessAuthorityTest`, `DefaultReadinessAuthority`, `SystemdAdapterVerdictTest`,
+> `SystemdAdapterStage`. `Document` STAYS the neutral `(String domain, String coordinate, JsonNode)`
+> — call sites write `Domain.DOCTOR.slug()` into the slot; the envelope is not coupled to the enum.
 
 - [ ] **Step 1: Write the failing test** — create `ExchangeVocabularyTest` pinning each enum's slug + a parse round-trip, mirroring `DocumentTest`'s canonical-strings discipline. Example for one enum (do all three):
 
@@ -115,7 +126,7 @@ public enum Coordinate {
 
 `Action` and `SymptomKind` are byte-for-byte the same shape (constants + slug + parse) — UNIFORM, no variants. `SymptomKind`'s javadoc notes it is the host-flat twin of the doctor's internal symptom enum (OSGi owns and maps back).
 
-- [ ] **Step 4: Slim `ExchangeCatalog`.** Remove the five lifted constants and their javadoc; keep `DOMAIN_DOCTOR` + every `FIELD_*`. Update the class javadoc: it is now the single source for *payload field keys* (the schema); closed value domains (coordinates, actions, symptom kinds) are the typed enums in this package.
+- [ ] **Step 4: Slim `ExchangeCatalog`.** Remove the lifted constants and their javadoc. (Half-2 removed the five coordinate/action constants but kept `DOMAIN_DOCTOR`; **half-3 (Step 7) removes `DOMAIN_DOCTOR` too** → `Domain.DOCTOR`, leaving ONLY the `FIELD_*` schema keys.) Update the class javadoc: it is now the single source for *payload field keys* (the schema); closed value domains (domain, coordinates, actions, symptom kinds) are the typed enums in this package.
 
 - [ ] **Step 5: Migrate the call sites.** `DefaultReadinessAuthority`: `verdict.put(FIELD_ACTION, stop ? Action.STOP.slug() : Action.CONTINUE_DEGRADED.slug())` and `new Document(DOMAIN_DOCTOR, Coordinate.READINESS_VERDICT.slug(), verdict)`; add the `Action`/`Coordinate` imports. `SystemdAdapterStage`: `if (Action.STOP.slug().equals(action))` and `new Document(DOMAIN_DOCTOR, Coordinate.READINESS_CHECKPOINT.slug(), payload)` in `checkpointDocument`; add imports. Then the three test files: `DocumentTest` (the `READINESS_VERDICT`/`ACTION_STOP` references → `Coordinate`/`Action`, and drop the removed-constant assertions, which now live in `ExchangeVocabularyTest`), `ReadinessAuthorityTest`, `SystemdAdapterVerdictTest`. Grep `ExchangeCatalog.ACTION_`, `ExchangeCatalog.READINESS_`, `ExchangeCatalog.CONSULTATION` across `osgi exec` (exclude `/target/`) — expected ZERO after.
 
@@ -125,7 +136,34 @@ public enum Coordinate {
   - `flox activate -- ./mvnw -pl :seed-master -am package -Pall-worlds -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=SystemdAdapterVerdictTest`
   All PASS.
 
-- [ ] **Step 7: Commit** — `git commit -m "refactor(exchange): lift coordinate/action/symptom-kind closed domains into seam enums"` (the verb + dep already shipped in `864ec8d8`; this commit is the vocabulary typing). End with the `Co-Authored-By` trailer.
+- [ ] **Step 7: Commit** — `git commit -m "refactor(exchange): lift coordinate/action/symptom-kind closed domains into seam enums"` (the verb + dep already shipped in `864ec8d8`; this commit is the vocabulary typing). End with the `Co-Authored-By` trailer. *(Shipped: `a892c8ee`.)*
+
+### Step 8 (half-3): the `Domain` enum — the last closed domain leaves the catalog
+
+Add `Domain` so EVERY closed value domain in the seam is a typed enum and `ExchangeCatalog` is purely the `FIELD_*` schema keys.
+
+- [ ] **8a: RED** — in `ExchangeVocabularyTest`, add `domainSlugsArePinnedAndRoundTrip()`:
+
+```java
+@Test
+void domainSlugsArePinnedAndRoundTrip() {
+  assertEquals("doctor", Domain.DOCTOR.slug());
+  assertEquals(Optional.of(Domain.DOCTOR), Domain.parse("doctor"));
+  assertEquals(Optional.empty(), Domain.parse("nope"));
+}
+```
+
+Run `flox activate -- ./mvnw -pl :exchange-port -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=ExchangeVocabularyTest` → FAIL (Domain undefined).
+
+- [ ] **8b: Create `Domain`** in `io.nxmatic.rke2lab.exchange.port`, byte-for-byte the same shape as `Coordinate`/`Action`/`SymptomKind` (single value `DOCTOR("doctor")`). Javadoc: the document owner — the value carried in `Document.domain()`; note it is the exchange's own owner axis, NOT the host's `InfraDomainCatalog` provisioning domains nor `ManifestDomainCatalog` (different axis and layer; the seam leaf must not depend on the host).
+
+- [ ] **8c: Remove `DOMAIN_DOCTOR`** from `ExchangeCatalog` (decl + javadoc). The catalog now holds ONLY `FIELD_*`. Update its class javadoc to say so: the single source for payload field keys; all closed value domains (domain, coordinate, action, symptom-kind) are typed enums in this package.
+
+- [ ] **8d: Migrate the 6 `DOMAIN_DOCTOR` call sites** to `Domain.DOCTOR.slug()`: `DefaultReadinessAuthority` (the `assess` verdict Document), `SystemdAdapterStage` (`checkpointDocument`), `DocumentTest` (the two `new Document(...)`/`doc.domain()` uses; the `assertEquals("doctor", ExchangeCatalog.DOMAIN_DOCTOR)` line is DELETED — `Domain`'s canonical-string assertion now lives in `ExchangeVocabularyTest`), `ReadinessAuthorityTest`, `SystemdAdapterVerdictTest`. Add the `Domain` import where needed. Grep `DOMAIN_DOCTOR` across `osgi exec` (exclude `/target/`) → ZERO after.
+
+- [ ] **8e: Verify green** — same three commands as Step 6 (exchange-port `ExchangeVocabularyTest,DocumentTest`; doctor-core `ReadinessAuthorityTest`; seed-master `package -Pall-worlds -Dtest=SystemdAdapterVerdictTest`). All PASS.
+
+- [ ] **8f: Commit** — `git commit -m "refactor(exchange): lift the document-owner domain into a seam enum; catalog is now only schema field keys"`, `Co-Authored-By` trailer.
 
 ---
 

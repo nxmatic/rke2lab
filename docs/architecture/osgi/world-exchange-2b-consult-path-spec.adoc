@@ -128,6 +128,10 @@ prevent — and 2B would have added a third loose domain (the symptom kind the h
 2B lifts the closed domains into typed seam enums in `osgi/exchange/exchange-port`, each with
 `String slug()` + `static Optional<E> parse(String)` (mirroring `Severity.parse`/`Symptom.parse`):
 
+* `Domain` — `DOCTOR`. The owner the document slot `Document.domain()` carries. One value today,
+  forward-extensible. This is NOT the host's `InfraDomainCatalog` (provisioning concerns: incus,
+  network, …) nor `ManifestDomainCatalog` (k8s deployment domains): a different axis AND a different
+  layer — the seam leaf cannot depend on the host where those live.
 * `Coordinate` — `READINESS_CHECKPOINT`, `READINESS_VERDICT`, `CONSULTATION`.
 * `Action` — `STOP`, `CONTINUE_DEGRADED`.
 * `SymptomKind` — the five slugs of `doctor.records.Symptom`, host-flat. The host writes
@@ -135,12 +139,16 @@ prevent — and 2B would have added a third loose domain (the symptom kind the h
   exhaustive `switch` (OSGi owns `Symptom`; the seam carries only the flat twin). The no-`default`
   switch is the anti-drift filet — a new symptom forces both enums and the map to update together.
 
-`ExchangeCatalog` slims to its sound role: the single source for *payload field keys* (`DOMAIN_DOCTOR`
-+ the `FIELD_*` schema keys). `Document` STAYS the neutral envelope `(String domain, String
-coordinate, JsonNode payload)` — the coordinate is NOT typed into it, so the transport never couples
-to the (today doctor-only) coordinate vocabulary; call sites write `Coordinate.X.slug()` into the
-`String coordinate` slot. This typing is done in zone-0 (Task 1) and migrates the 2A call sites
-(`DefaultReadinessAuthority`, `SystemdAdapterStage`) in the same change, for uniformity.
+`ExchangeCatalog` slims to its sound role: the single source for *payload field keys* (the `FIELD_*`
+schema keys) — and ONLY those, once `DOMAIN_DOCTOR` becomes `Domain.DOCTOR`. The `FIELD_*` keys stay
+constants deliberately: the real "which fields belong to which coordinate" typing is the per-coordinate
+JSON Schema in increment 2D. A flat `Field` enum would re-merge the checkpoint, verdict, and
+consultation field sets into one list — the fourre-tout one level down — and pre-empt 2D, so it is not
+done. `Document` STAYS the neutral envelope `(String domain, String coordinate, JsonNode payload)` —
+the domain/coordinate are NOT typed into it, so the transport never couples to the (today doctor-only)
+vocabulary; call sites write `Domain.DOCTOR.slug()` / `Coordinate.X.slug()` into the `String` slots.
+This typing is done in zone-0 (Task 1) and migrates the 2A call sites (`DefaultReadinessAuthority`,
+`SystemdAdapterStage`) in the same change, for uniformity.
 
 == What moves where (the consult-path units)
 
