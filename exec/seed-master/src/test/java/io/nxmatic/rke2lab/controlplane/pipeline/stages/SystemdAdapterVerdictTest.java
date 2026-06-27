@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.nxmatic.rke2lab.exchange.port.Action;
+import io.nxmatic.rke2lab.exchange.port.Coordinate;
 import io.nxmatic.rke2lab.exchange.port.Document;
 import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
@@ -21,22 +23,21 @@ class SystemdAdapterVerdictTest {
       verdict.put(ExchangeCatalog.FIELD_ACTION, action);
       verdict.put(ExchangeCatalog.FIELD_REASON, "test");
       return new Document(
-          ExchangeCatalog.DOMAIN_DOCTOR, ExchangeCatalog.READINESS_VERDICT, verdict);
+          ExchangeCatalog.DOMAIN_DOCTOR, Coordinate.READINESS_VERDICT.slug(), verdict);
     };
   }
 
   @Test
   void stopVerdictThrowsTopicFailure() {
     final SystemdAdapterStage stage =
-        SystemdAdapterStageFixture.failing(authorityReturning(ExchangeCatalog.ACTION_STOP));
+        SystemdAdapterStageFixture.failing(authorityReturning(Action.STOP.slug()));
     assertThrows(TopicFailure.class, stage::launch);
   }
 
   @Test
   void continueDegradedVerdictDoesNotThrow() {
     final SystemdAdapterStage stage =
-        SystemdAdapterStageFixture.failing(
-            authorityReturning(ExchangeCatalog.ACTION_CONTINUE_DEGRADED));
+        SystemdAdapterStageFixture.failing(authorityReturning(Action.CONTINUE_DEGRADED.slug()));
     assertDoesNotThrow(stage::launch);
   }
 }

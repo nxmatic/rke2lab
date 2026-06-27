@@ -3,6 +3,8 @@ package io.nxmatic.rke2lab.doctor.internal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.records.Severity;
+import io.nxmatic.rke2lab.exchange.port.Action;
+import io.nxmatic.rke2lab.exchange.port.Coordinate;
 import io.nxmatic.rke2lab.exchange.port.Document;
 import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
@@ -48,11 +50,11 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
     final boolean stop = effective == Severity.CRITICAL;
     final ObjectNode verdict = mapper.createObjectNode();
     verdict.put(
-        ExchangeCatalog.FIELD_ACTION,
-        stop ? ExchangeCatalog.ACTION_STOP : ExchangeCatalog.ACTION_CONTINUE_DEGRADED);
+        ExchangeCatalog.FIELD_ACTION, stop ? Action.STOP.slug() : Action.CONTINUE_DEGRADED.slug());
     verdict.put(
         ExchangeCatalog.FIELD_REASON, scenarioId + " severity=" + effective.name().toLowerCase());
-    return new Document(ExchangeCatalog.DOMAIN_DOCTOR, ExchangeCatalog.READINESS_VERDICT, verdict);
+    return new Document(
+        ExchangeCatalog.DOMAIN_DOCTOR, Coordinate.READINESS_VERDICT.slug(), verdict);
   }
 
   private Severity intrinsicFor(String scenarioId) {

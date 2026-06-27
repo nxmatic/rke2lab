@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.internal.DefaultReadinessAuthority;
+import io.nxmatic.rke2lab.exchange.port.Action;
+import io.nxmatic.rke2lab.exchange.port.Coordinate;
 import io.nxmatic.rke2lab.exchange.port.Document;
 import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
@@ -23,7 +25,7 @@ class ReadinessAuthorityTest {
       payload.put(ExchangeCatalog.FIELD_OVERRIDE, override);
     }
     return new Document(
-        ExchangeCatalog.DOMAIN_DOCTOR, ExchangeCatalog.READINESS_CHECKPOINT, payload);
+        ExchangeCatalog.DOMAIN_DOCTOR, Coordinate.READINESS_CHECKPOINT.slug(), payload);
   }
 
   private static String action(Document verdict) {
@@ -33,19 +35,19 @@ class ReadinessAuthorityTest {
   @Test
   void intrinsicWarningContinuesDegraded() {
     final Document verdict = authority.assess(checkpoint("systemd-adapter", true, null));
-    assertEquals(ExchangeCatalog.READINESS_VERDICT, verdict.coordinate());
-    assertEquals(ExchangeCatalog.ACTION_CONTINUE_DEGRADED, action(verdict));
+    assertEquals(Coordinate.READINESS_VERDICT.slug(), verdict.coordinate());
+    assertEquals(Action.CONTINUE_DEGRADED.slug(), action(verdict));
   }
 
   @Test
   void operatorCriticalOverrideStops() {
     final Document verdict = authority.assess(checkpoint("systemd-adapter", true, "critical"));
-    assertEquals(ExchangeCatalog.ACTION_STOP, action(verdict));
+    assertEquals(Action.STOP.slug(), action(verdict));
   }
 
   @Test
   void operatorWarningOverrideContinuesDegraded() {
     final Document verdict = authority.assess(checkpoint("systemd-adapter", true, "warning"));
-    assertEquals(ExchangeCatalog.ACTION_CONTINUE_DEGRADED, action(verdict));
+    assertEquals(Action.CONTINUE_DEGRADED.slug(), action(verdict));
   }
 }

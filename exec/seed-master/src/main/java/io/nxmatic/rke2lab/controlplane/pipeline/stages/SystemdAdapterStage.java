@@ -18,6 +18,8 @@ import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.exchange.port.Action;
+import io.nxmatic.rke2lab.exchange.port.Coordinate;
 import io.nxmatic.rke2lab.exchange.port.Document;
 import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
@@ -210,7 +212,7 @@ public final class SystemdAdapterStage {
     final Document checkpoint = checkpointDocument(SCENARIO_ID);
     final Document verdict = readinessAuthority.assess(checkpoint);
     final String action = verdict.payload().path(ExchangeCatalog.FIELD_ACTION).asText();
-    if (ExchangeCatalog.ACTION_STOP.equals(action)) {
+    if (Action.STOP.slug().equals(action)) {
       log("✗ " + SCENARIO_ID + " FAILED, verdict=stop → stopping provisioning");
       throw new TopicFailure("systemd adapter", failure);
     }
@@ -263,7 +265,7 @@ public final class SystemdAdapterStage {
         .rawOverride(scenarioId)
         .ifPresent(value -> payload.put(ExchangeCatalog.FIELD_OVERRIDE, value));
     return new Document(
-        ExchangeCatalog.DOMAIN_DOCTOR, ExchangeCatalog.READINESS_CHECKPOINT, payload);
+        ExchangeCatalog.DOMAIN_DOCTOR, Coordinate.READINESS_CHECKPOINT.slug(), payload);
   }
 
   private void log(String message) {
