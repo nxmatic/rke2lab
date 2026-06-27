@@ -8,12 +8,12 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Removes a SINGLE element (a type, method, or field) from ONE staging {@link Gate}, with a written
- * reason — the precise opposite of widening a gate's detection heuristic. The gate stays strict
- * (the {@link Gate#INSTANCE_DISCIPLINE} target is zero static helpers); a member that must
- * legitimately stay carries an explicit, reviewable exemption rather than being silently absorbed
- * by a broader name rule. {@link GovernedBy} lowers a whole package's report level; this exempts
- * one element.
+ * Removes a SINGLE element (a type, method, or field) from ONE staging {@link StagingGate}, with a
+ * written reason — the precise opposite of widening a gate's detection heuristic. The gate stays
+ * strict (the {@link StagingGate#INSTANCE_DISCIPLINE} target is zero static helpers); a member that
+ * must legitimately stay carries an explicit, reviewable exemption rather than being silently
+ * absorbed by a broader name rule. {@link GovernedBy} lowers a whole package's report level; this
+ * exempts one element.
  *
  * <p>The {@link #reason} is mandatory and must be non-blank — an exemption with no justification is
  * itself a smell. It does NOT replace factory recognition: real factories (the construction verbs
@@ -31,7 +31,7 @@ import java.lang.annotation.Target;
 public @interface Exempt {
 
   /** The gate this element is exempt from. */
-  Gate value();
+  StagingGate value();
 
   /** Why this element legitimately stays despite the gate — mandatory, non-blank, reviewable. */
   String reason();

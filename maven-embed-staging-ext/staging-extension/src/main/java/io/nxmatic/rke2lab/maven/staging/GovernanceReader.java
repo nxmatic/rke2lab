@@ -14,10 +14,10 @@ import org.objectweb.asm.Opcodes;
 
 /**
  * Reads a {@link ResolvedBundle}'s declared governance — the {@link EnforcementLevel} each {@link
- * Gate} reports this bundle's violations at, from {@code @GovernedBy} (or its repeated container
- * {@code @GovernedByAll}) on the jar's {@code package-info} classes. A gate with no declaration is
- * absent from the map and the caller treats it at the default {@link EnforcementLevel#ERROR} — so
- * <em>governed by default</em> is the standing guarantee.
+ * StagingGate} reports this bundle's violations at, from {@code @GovernedBy} (or its repeated
+ * container {@code @GovernedByAll}) on the jar's {@code package-info} classes. A gate with no
+ * declaration is absent from the map and the caller treats it at the default {@link
+ * EnforcementLevel#ERROR} — so <em>governed by default</em> is the standing guarantee.
  *
  * <p>The extension cannot link the annotation module (it is installed before the reactor builds
  * it), so this reads the annotation via ASM and maps the enum-constant names onto the extension's
@@ -38,8 +38,8 @@ final class GovernanceReader {
   }
 
   /** The level each gate reports this bundle at; a gate absent from the map defaults to ERROR. */
-  Map<Gate, EnforcementLevel> levels() {
-    final Map<Gate, EnforcementLevel> levels = new EnumMap<>(Gate.class);
+  Map<StagingGate, EnforcementLevel> levels() {
+    final Map<StagingGate, EnforcementLevel> levels = new EnumMap<>(StagingGate.class);
     try (JarFile jar = new JarFile(bundle.file())) {
       final Enumeration<JarEntry> entries = jar.entries();
       while (entries.hasMoreElements()) {
@@ -63,16 +63,16 @@ final class GovernanceReader {
   /**
    * The level {@code gate} reports this bundle at, or {@link EnforcementLevel#ERROR} by default.
    */
-  EnforcementLevel levelOf(Gate gate) {
+  EnforcementLevel levelOf(StagingGate gate) {
     return levels().getOrDefault(gate, EnforcementLevel.ERROR);
   }
 
   /** Collects {@code @GovernedBy} (single) and {@code @GovernedByAll} (container) into the map. */
   private static final class GovernanceVisitor extends ClassVisitor {
 
-    private final Map<Gate, EnforcementLevel> levels;
+    private final Map<StagingGate, EnforcementLevel> levels;
 
-    GovernanceVisitor(Map<Gate, EnforcementLevel> levels) {
+    GovernanceVisitor(Map<StagingGate, EnforcementLevel> levels) {
       super(Opcodes.ASM9);
       this.levels = levels;
     }
@@ -92,9 +92,9 @@ final class GovernanceReader {
   /** Reads the {@code value} array of {@code @GovernedByAll}, each element a nested @GovernedBy. */
   private static final class ContainerVisitor extends AnnotationVisitor {
 
-    private final Map<Gate, EnforcementLevel> levels;
+    private final Map<StagingGate, EnforcementLevel> levels;
 
-    ContainerVisitor(Map<Gate, EnforcementLevel> levels) {
+    ContainerVisitor(Map<StagingGate, EnforcementLevel> levels) {
       super(Opcodes.ASM9);
       this.levels = levels;
     }
@@ -111,17 +111,17 @@ final class GovernanceReader {
   }
 
   /**
-   * Reads one {@code @GovernedBy}: {@code value} (the {@link Gate} enum) and {@code level} (the
-   * {@link EnforcementLevel} enum, default ERROR when the member is absent). Records the pair when
-   * the gate name is known.
+   * Reads one {@code @GovernedBy}: {@code value} (the {@link StagingGate} enum) and {@code level}
+   * (the {@link EnforcementLevel} enum, default ERROR when the member is absent). Records the pair
+   * when the gate name is known.
    */
   private static final class GovernedByVisitor extends AnnotationVisitor {
 
-    private final Map<Gate, EnforcementLevel> levels;
-    private Gate gate;
+    private final Map<StagingGate, EnforcementLevel> levels;
+    private StagingGate gate;
     private EnforcementLevel level = EnforcementLevel.ERROR;
 
-    GovernedByVisitor(Map<Gate, EnforcementLevel> levels) {
+    GovernedByVisitor(Map<StagingGate, EnforcementLevel> levels) {
       super(Opcodes.ASM9);
       this.levels = levels;
     }
@@ -129,7 +129,7 @@ final class GovernanceReader {
     @Override
     public void visitEnum(String name, String desc, String value) {
       if ("value".equals(name)) {
-        gate = Gate.fromName(value);
+        gate = StagingGate.fromName(value);
       } else if ("level".equals(name)) {
         level = EnforcementLevel.fromName(value);
       }

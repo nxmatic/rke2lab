@@ -14,7 +14,7 @@ package io.nxmatic.rke2lab.domain.annotations;
  *       behaviour helpers (pass instances through the call graph; factories and constants exempt).
  * </ul>
  */
-public enum Gate {
+public enum StagingGate {
   RECORD_PURITY,
   SPEC_COVERAGE,
   INSTANCE_DISCIPLINE

@@ -139,8 +139,8 @@ final class InstanceDiscipline {
 
   /**
    * An {@link AnnotationVisitor} that fires {@code onExempt} when an {@code @Exempt} (or a nested
-   * one inside the {@code @ExemptAll} container) names {@link Gate#INSTANCE_DISCIPLINE} in its
-   * {@code value}; {@code null} for any other annotation. Shared by the type- and method-level
+   * one inside the {@code @ExemptAll} container) names {@link StagingGate#INSTANCE_DISCIPLINE} in
+   * its {@code value}; {@code null} for any other annotation. Shared by the type- and method-level
    * scans.
    */
   private static AnnotationVisitor exemptVisitor(String desc, Runnable onExempt) {

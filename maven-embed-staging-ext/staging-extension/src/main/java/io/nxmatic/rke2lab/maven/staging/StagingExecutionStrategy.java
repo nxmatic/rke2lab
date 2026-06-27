@@ -115,20 +115,21 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
   /**
    * Run every staging law over the whole bundle set in fail-AT-end mode: collect every violation
    * from every bundle, report each at the {@link EnforcementLevel} its bundle declares for that
-   * {@link Gate} ({@code @GovernedBy}, default ERROR), then fail ONCE with the complete ERROR list.
-   * A per-bundle throw would surface only the first offender, forcing a fix-rebuild-repeat loop to
-   * discharge the debt one bundle at a time; accumulating shows the whole debt in a single run so
-   * it can be cleared in one pass. WARN violations are logged (a visible, shrinking backlog);
-   * IGNORE is silent.
+   * {@link StagingGate} ({@code @GovernedBy}, default ERROR), then fail ONCE with the complete
+   * ERROR list. A per-bundle throw would surface only the first offender, forcing a
+   * fix-rebuild-repeat loop to discharge the debt one bundle at a time; accumulating shows the
+   * whole debt in a single run so it can be cleared in one pass. WARN violations are logged (a
+   * visible, shrinking backlog); IGNORE is silent.
    *
    * <p>The laws (each governable per bundle, default ERROR):
    *
    * <ul>
-   *   <li>{@link Gate#RECORD_PURITY} — a {@code type=record} bundle may export only records / enums
-   *       / sealed ADT roots. Delegated to a {@link RecordPurity} instance OF each record bundle.
-   *   <li>{@link Gate#SPEC_COVERAGE} — a bundle may export only types named in a {@code docs/} spec
-   *       or marked {@code @Transitional}. Delegated to a {@link SpecCoverage} instance OF each
-   *       bundle. A {@code null} docs dir (not found) skips this law rather than failing
+   *   <li>{@link StagingGate#RECORD_PURITY} — a {@code type=record} bundle may export only records
+   *       / enums / sealed ADT roots. Delegated to a {@link RecordPurity} instance OF each record
+   *       bundle.
+   *   <li>{@link StagingGate#SPEC_COVERAGE} — a bundle may export only types named in a {@code
+   *       docs/} spec or marked {@code @Transitional}. Delegated to a {@link SpecCoverage} instance
+   *       OF each bundle. A {@code null} docs dir (not found) skips this law rather than failing
    *       spuriously.
    * </ul>
    */
@@ -140,10 +141,10 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
     }
     final GateReport report = new GateReport();
     for (ResolvedBundle bundle : resolved) {
-      final Map<Gate, EnforcementLevel> governance = bundle.governance().levels();
+      final Map<StagingGate, EnforcementLevel> governance = bundle.governance().levels();
       if (bundle.embed() != null && bundle.embed().isRecord()) {
         report.record(
-            Gate.RECORD_PURITY,
+            StagingGate.RECORD_PURITY,
             governance,
             bundle,
             bundle.recordPurity().violations(),
@@ -151,7 +152,7 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
       }
       if (docsDir != null && bundle.isBundle() && bundle.embed() != null) {
         report.record(
-            Gate.SPEC_COVERAGE,
+            StagingGate.SPEC_COVERAGE,
             governance,
             bundle,
             bundle.specCoverage(docsDir).violations(),
@@ -159,7 +160,7 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
       }
       if (bundle.isBundle() && bundle.embed() != null) {
         report.record(
-            Gate.INSTANCE_DISCIPLINE,
+            StagingGate.INSTANCE_DISCIPLINE,
             governance,
             bundle,
             bundle.instanceDiscipline().violations(),
@@ -179,12 +180,12 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
 
     private final List<String> errors = new ArrayList<>();
     private final List<String> warnings = new ArrayList<>();
-    private final Map<Gate, int[]> tally =
-        new java.util.EnumMap<>(Gate.class); // [errors, warnings]
+    private final Map<StagingGate, int[]> tally =
+        new java.util.EnumMap<>(StagingGate.class); // [errors, warnings]
 
     void record(
-        Gate gate,
-        Map<Gate, EnforcementLevel> governance,
+        StagingGate gate,
+        Map<StagingGate, EnforcementLevel> governance,
         ResolvedBundle bundle,
         List<String> violations,
         String what) {
@@ -232,7 +233,7 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
      */
     private void logSummary() {
       final StringBuilder summary = new StringBuilder();
-      for (Gate gate : Gate.values()) {
+      for (StagingGate gate : StagingGate.values()) {
         final int[] counts = tally.getOrDefault(gate, new int[2]);
         summary
             .append("\n  ")
@@ -246,7 +247,7 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
       log.info("[osgi-staging] gate summary (violations by gate):{}", summary);
     }
 
-    private String gateLabel(Gate gate) {
+    private String gateLabel(StagingGate gate) {
       return gate.name().toLowerCase().replace('_', '-');
     }
   }

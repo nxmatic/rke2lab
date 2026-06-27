@@ -4,9 +4,9 @@
 // INSTANCE_DISCIPLINE is back at the ERROR-locked default: the port's two static helpers are gone
 // (Cidr#parseAddress made package-private, ClusterNetworkBlueprint#topology folded into the
 // constant).
-@GovernedBy(value = Gate.SPEC_COVERAGE, level = EnforcementLevel.WARN)
+@GovernedBy(value = StagingGate.SPEC_COVERAGE, level = EnforcementLevel.WARN)
 package io.nxmatic.rke2lab.netplan.port;
 
 import io.nxmatic.rke2lab.domain.annotations.EnforcementLevel;
-import io.nxmatic.rke2lab.domain.annotations.Gate;
 import io.nxmatic.rke2lab.domain.annotations.GovernedBy;
+import io.nxmatic.rke2lab.domain.annotations.StagingGate;

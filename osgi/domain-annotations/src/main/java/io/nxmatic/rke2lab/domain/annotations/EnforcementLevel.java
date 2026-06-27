@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.domain.annotations;
 
 /**
- * How a build-time staging {@link Gate} reports the violations it finds — the graduated dial
+ * How a build-time staging {@link StagingGate} reports the violations it finds — the graduated dial
  * carried by {@link GovernedBy}. It is the report level, not an on/off switch: the gate always
  * runs; this only decides what a non-empty report does to the build.
  *

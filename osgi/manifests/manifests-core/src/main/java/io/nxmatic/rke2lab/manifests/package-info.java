@@ -56,9 +56,9 @@
 // at the ERROR-locked default: the static ManifestYaml + ManifestSynthesisContext#bind are gone
 // (the
 // YamlMapper @Component, and bind() now an instance method).
-@GovernedBy(value = Gate.SPEC_COVERAGE, level = EnforcementLevel.WARN)
+@GovernedBy(value = StagingGate.SPEC_COVERAGE, level = EnforcementLevel.WARN)
 package io.nxmatic.rke2lab.manifests;
 
 import io.nxmatic.rke2lab.domain.annotations.EnforcementLevel;
-import io.nxmatic.rke2lab.domain.annotations.Gate;
+import io.nxmatic.rke2lab.domain.annotations.StagingGate;
 import io.nxmatic.rke2lab.domain.annotations.GovernedBy;

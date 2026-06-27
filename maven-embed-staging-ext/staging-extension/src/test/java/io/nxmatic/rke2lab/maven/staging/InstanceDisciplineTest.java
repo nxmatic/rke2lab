@@ -33,7 +33,7 @@ class InstanceDisciplineTest {
   private static final String PKG = "io.nxmatic.rke2lab.ex";
   private static final String PATH = PKG.replace('.', '/');
   private static final String EXEMPT = "io/nxmatic/rke2lab/domain/annotations/Exempt";
-  private static final String GATE = "io/nxmatic/rke2lab/domain/annotations/Gate";
+  private static final String GATE = "io/nxmatic/rke2lab/domain/annotations/StagingGate";
 
   @Test
   void aPublicStaticBehaviourMethodIsAViolation(@TempDir File dir) throws IOException {

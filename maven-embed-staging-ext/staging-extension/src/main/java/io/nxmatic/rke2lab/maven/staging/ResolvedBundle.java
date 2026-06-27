@@ -146,9 +146,10 @@ public record ResolvedBundle(
   }
 
   /**
-   * The governance OF this bundle — the {@link EnforcementLevel} each {@link Gate} reports it at,
-   * read from {@code @GovernedBy} on its package-infos (default {@link EnforcementLevel#ERROR}). An
-   * instance reached from its subject, like {@link #recordPurity()} / {@link #specCoverage}.
+   * The governance OF this bundle — the {@link EnforcementLevel} each {@link StagingGate} reports
+   * it at, read from {@code @GovernedBy} on its package-infos (default {@link
+   * EnforcementLevel#ERROR}). An instance reached from its subject, like {@link #recordPurity()} /
+   * {@link #specCoverage}.
    */
   public GovernanceReader governance() {
     return new GovernanceReader(this);

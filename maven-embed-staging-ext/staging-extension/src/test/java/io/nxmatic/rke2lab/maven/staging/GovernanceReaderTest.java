@@ -17,11 +17,11 @@ import org.objectweb.asm.Opcodes;
 
 /**
  * The contract of {@link GovernanceReader} — reading {@code @GovernedBy} / {@code @GovernedByAll}
- * from a bundle's {@code package-info} bytecode into a {@code Map<Gate, EnforcementLevel>}. Each
- * case synthesises a {@code package-info.class} carrying the annotation shape under test, packs it
- * into a jar, and asserts the level each gate resolves to (default {@link EnforcementLevel#ERROR}
- * when a gate is unspecified). Bytecode metadata only (ASM), the same reason as {@link
- * SpecCoverageTest}.
+ * from a bundle's {@code package-info} bytecode into a {@code Map<StagingGate, EnforcementLevel>}.
+ * Each case synthesises a {@code package-info.class} carrying the annotation shape under test,
+ * packs it into a jar, and asserts the level each gate resolves to (default {@link
+ * EnforcementLevel#ERROR} when a gate is unspecified). Bytecode metadata only (ASM), the same
+ * reason as {@link SpecCoverageTest}.
  */
 class GovernanceReaderTest {
 
@@ -29,33 +29,34 @@ class GovernanceReaderTest {
   private static final String GOVERNED_BY = "io/nxmatic/rke2lab/domain/annotations/GovernedBy";
   private static final String GOVERNED_BY_ALL =
       "io/nxmatic/rke2lab/domain/annotations/GovernedByAll";
-  private static final String GATE = "io/nxmatic/rke2lab/domain/annotations/Gate";
+  private static final String GATE = "io/nxmatic/rke2lab/domain/annotations/StagingGate";
   private static final String LEVEL = "io/nxmatic/rke2lab/domain/annotations/EnforcementLevel";
 
   @Test
   void noAnnotationDefaultsEveryGateToError(@TempDir File dir) throws IOException {
     final File jar = jar(dir, plainPackageInfo());
     final GovernanceReader g = governance(jar);
-    assertEquals(EnforcementLevel.ERROR, g.levelOf(Gate.SPEC_COVERAGE));
-    assertEquals(EnforcementLevel.ERROR, g.levelOf(Gate.RECORD_PURITY));
+    assertEquals(EnforcementLevel.ERROR, g.levelOf(StagingGate.SPEC_COVERAGE));
+    assertEquals(EnforcementLevel.ERROR, g.levelOf(StagingGate.RECORD_PURITY));
   }
 
   @Test
   void aSinglePoseSetsThatGateLeavingOthersAtDefault(@TempDir File dir) throws IOException {
     final File jar = jar(dir, packageInfo(av -> pose(av, "SPEC_COVERAGE", "WARN")));
     final GovernanceReader g = governance(jar);
-    assertEquals(EnforcementLevel.WARN, g.levelOf(Gate.SPEC_COVERAGE));
+    assertEquals(EnforcementLevel.WARN, g.levelOf(StagingGate.SPEC_COVERAGE));
     assertEquals(
-        EnforcementLevel.ERROR, g.levelOf(Gate.INSTANCE_DISCIPLINE), "unspecified ⇒ ERROR");
+        EnforcementLevel.ERROR, g.levelOf(StagingGate.INSTANCE_DISCIPLINE), "unspecified ⇒ ERROR");
   }
 
   @Test
   void repeatedPosesAreReadFromTheContainer(@TempDir File dir) throws IOException {
     final File jar = jar(dir, containerPackageInfo());
     final GovernanceReader g = governance(jar);
-    assertEquals(EnforcementLevel.WARN, g.levelOf(Gate.SPEC_COVERAGE));
-    assertEquals(EnforcementLevel.IGNORE, g.levelOf(Gate.INSTANCE_DISCIPLINE));
-    assertEquals(EnforcementLevel.ERROR, g.levelOf(Gate.RECORD_PURITY), "unspecified ⇒ ERROR");
+    assertEquals(EnforcementLevel.WARN, g.levelOf(StagingGate.SPEC_COVERAGE));
+    assertEquals(EnforcementLevel.IGNORE, g.levelOf(StagingGate.INSTANCE_DISCIPLINE));
+    assertEquals(
+        EnforcementLevel.ERROR, g.levelOf(StagingGate.RECORD_PURITY), "unspecified ⇒ ERROR");
   }
 
   private static GovernanceReader governance(File jar) {
