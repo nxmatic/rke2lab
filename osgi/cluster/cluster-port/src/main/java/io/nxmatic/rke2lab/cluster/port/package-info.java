@@ -2,6 +2,10 @@
 // WARN level: drift is listed at each build (green), a visible backlog — drop the annotation to
 // return to the ERROR default once the cluster port is specified type-by-type.
 @GovernedBy(value = StagingGate.SPEC_COVERAGE, level = EnforcementLevel.WARN)
+// REALM_BOUNDARY WARN: this seam still imports doctor.records (the boundary leak) —
+// listed while the surface migrates to Documents; drop to return to the ERROR default
+// once the import is gone.
+@GovernedBy(value = StagingGate.REALM_BOUNDARY, level = EnforcementLevel.WARN)
 package io.nxmatic.rke2lab.cluster.port;
 
 import io.nxmatic.rke2lab.domain.annotations.EnforcementLevel;

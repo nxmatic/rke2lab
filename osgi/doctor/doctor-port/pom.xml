@@ -23,6 +23,14 @@
       <artifactId>doctor-records</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- Governance annotations: this seam's package-info poses REALM_BOUNDARY=WARN so the staging
+         gate lists its doctor.records import as the boundary leak during the Plan 2 migration
+         (build-time only, not runtime behaviour). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>domain-annotations</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- test only: the serialization fixtures name the dbus-tcp unit via the typed SystemdUnitId so
          no literal drifts from the systemd domain's single source. Not a runtime/compile coupling —
          the port itself stays a pure leaf. -->
