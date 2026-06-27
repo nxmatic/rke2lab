@@ -60,5 +60,5 @@
 package io.nxmatic.rke2lab.manifests;
 
 import io.nxmatic.rke2lab.domain.annotations.EnforcementLevel;
-import io.nxmatic.rke2lab.domain.annotations.StagingGate;
 import io.nxmatic.rke2lab.domain.annotations.GovernedBy;
+import io.nxmatic.rke2lab.domain.annotations.StagingGate;
