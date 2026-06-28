@@ -33,6 +33,9 @@ public final class ExchangeCatalog {
   /** Checkpoint payload: the symptom's detail text. */
   public static final String FIELD_DETAILS = "details";
 
+  /** Checkpoint payload: the host's run instant (ISO-8601 string) for expectation timestamps. */
+  public static final String FIELD_RECORDED_AT = "recordedAt";
+
   /** Verdict payload: the provisioning action (see {@link Action} for values). */
   public static final String FIELD_ACTION = "action";
 
