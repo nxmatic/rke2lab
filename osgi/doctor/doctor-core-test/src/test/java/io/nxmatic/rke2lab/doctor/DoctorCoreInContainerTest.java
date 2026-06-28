@@ -27,11 +27,6 @@ import org.osgi.framework.Bundle;
  * DynamicTest}, so VSCode shows a node per test and a single failure fails alone.
  */
 @Osgi
-// To debug a failed in-container resolve/activation, annotate this class with @FrameworkLog(DEBUG)
-// (io.nxmatic.rke2lab.junit.testkit.FrameworkLog) — it raises Felix's own felix.log.level so the
-// resolver prints WHICH requirement could not be wired to System.out (resolve() otherwise returns a
-// bare false). Left as a comment: it is the lever to reach for, not a permanent dependency.
-//   @FrameworkLog(FrameworkLog.Level.DEBUG)
 class DoctorCoreInContainerTest {
 
   // The doctor suite's two fixtures, selected by what they declare. role=core is the host under

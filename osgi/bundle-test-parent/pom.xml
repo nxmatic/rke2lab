@@ -83,5 +83,36 @@
       <artifactId>org.osgi.util.function</artifactId>
       <scope>test</scope>
     </dependency>
+
+    <!-- The slf4j BACKEND for the out-of-container harness. junit-testkit carries slf4j-api ONLY (its
+         diagnostic — OutOfContainerFrameworkExtension.resolve() logging a bundle's unsatisfied
+         requirements — was muted by the NOP provider); the backend belongs to the consuming test
+         module, declared here so every -test fragment surfaces that diagnostic uniformly. Host-side
+         (JVM/JCL) only: logback exports ch.qos.logback.* (never org.slf4j), and the boot closure is
+         selected by explicit BSN with org.slf4j served as a flat systemPackage — so logback can never
+         be swept into the framework, the trap that a second org.slf4j provider (pax-logging-api) once
+         was. Version BOM-managed; the shared logback-test.xml ships in the junit-testkit jar. -->
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <!-- Pin logback as the slf4j provider so a future transitive provider cannot silently win
+               over it (same guard as boot-logging). These are host-side -test runs; the framework's
+               own LogService (pax-logging) lives in osgi/runtime and never reaches this classpath. -->
+          <systemPropertyVariables>
+            <slf4j.provider>ch.qos.logback.classic.spi.LogbackServiceProvider</slf4j.provider>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

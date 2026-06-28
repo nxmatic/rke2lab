@@ -36,9 +36,12 @@ class DoctorPortInContainerTest {
   static final OutOfContainerFrameworkExtension felix =
       OutOfContainerFrameworkExtension.builder()
           // The fragment names the dbus-tcp unit via the typed SystemdUnitId, so it imports the
-          // systemd domain's port; system-export it (it is a seam, system-exported in prod too) so
-          // the host resolves the merged-in fragment import.
-          .systemPackages("io.nxmatic.rke2lab.systemd.port;version=1.0.0")
+          // systemd domain's port; and doctor-port now declares consult(Document), so the host
+          // imports the exchange port too. Both are seams (system-exported in prod), so they are
+          // system-exported here for the host to resolve the merged-in fragment imports.
+          .systemPackages(
+              "io.nxmatic.rke2lab.systemd.port;version=1.0.0",
+              "io.nxmatic.rke2lab.exchange.port;version=1.0.0")
           // The JUnit runner world (launcher + engine + this testkit) — the proxy's own
           // infrastructure, the single shared declaration. What the host+fragment declare they need
           // (doctor.records, which doctor-port imports; doctor.spi, which the fragment's
