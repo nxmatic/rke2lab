@@ -2,6 +2,8 @@ package io.nxmatic.rke2lab.doctor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.internal.DefaultReadinessAuthority;
@@ -25,11 +27,28 @@ class ReadinessAuthorityTest {
     if (override != null) {
       payload.put(ExchangeCatalog.FIELD_OVERRIDE, override);
     }
-    return new Document(Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), payload);
+    return new Document(
+        Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), serialize(payload));
   }
 
   private static String action(Document verdict) {
-    return verdict.payload().get(ExchangeCatalog.FIELD_ACTION).asText();
+    return parse(verdict.payload()).get(ExchangeCatalog.FIELD_ACTION).asText();
+  }
+
+  private static String serialize(JsonNode node) {
+    try {
+      return MAPPER.writeValueAsString(node);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  private static JsonNode parse(String payload) {
+    try {
+      return MAPPER.readTree(payload);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   @Test

@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -22,7 +23,6 @@ import io.nxmatic.rke2lab.doctor.spi.Clinician;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.domain.annotations.Transitional;
 import io.nxmatic.rke2lab.exchange.port.Coordinate;
-import io.nxmatic.rke2lab.exchange.port.Document;
 import io.nxmatic.rke2lab.exchange.port.Domain;
 import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import io.nxmatic.rke2lab.exchange.port.SymptomKind;
@@ -167,7 +167,7 @@ public final class Generalist implements Clinician, ConsultingService {
   @Override
   public io.nxmatic.rke2lab.exchange.port.Document consult(
       io.nxmatic.rke2lab.exchange.port.Document checkpoint) {
-    final var payload = checkpoint.payload();
+    final JsonNode payload = parse(checkpoint.payload());
     final SymptomKind kind =
         SymptomKind.parse(payload.path(ExchangeCatalog.FIELD_SYMPTOM_KIND).asText()).orElseThrow();
     final Symptom symptom = toSymptom(kind);
@@ -179,19 +179,20 @@ public final class Generalist implements Clinician, ConsultingService {
     final Instant recordedAt =
         Instant.parse(payload.path(ExchangeCatalog.FIELD_RECORDED_AT).asText());
 
-    final ObjectNode out = Document.newPayload();
+    final ObjectNode out = mapper.createObjectNode();
     out.put(
         ExchangeCatalog.FIELD_SCENARIO_ID,
         payload.path(ExchangeCatalog.FIELD_SCENARIO_ID).asText());
     out.put(ExchangeCatalog.FIELD_NARRATION, narrationLine(symptom));
     out.put(ExchangeCatalog.FIELD_DIAGNOSIS_ADOC, diagnosisBlock(plan));
     // Structured reconstruction sub-trees, in the EXACT shape the egress + readers use today:
-    out.set(ConsultationReport.OUTPUT_KEY, toJson(report.toOutputMap()));
+    out.set(ConsultationReport.OUTPUT_KEY, mapper.valueToTree(report.toOutputMap()));
     out.set(
         Expectation.OUTPUT_KEY,
-        toJson(report.expectations(recordedAt).stream().map(Expectation::toOutputMap).toList()));
+        mapper.valueToTree(
+            report.expectations(recordedAt).stream().map(Expectation::toOutputMap).toList()));
     return new io.nxmatic.rke2lab.exchange.port.Document(
-        Domain.DOCTOR.slug(), Coordinate.CONSULTATION.slug(), out);
+        Domain.DOCTOR.slug(), Coordinate.CONSULTATION.slug(), serialize(out));
   }
 
   /** Maps the wire SymptomKind to the internal Symptom enum. No default — drift forces update. */
@@ -243,12 +244,24 @@ public final class Generalist implements Clinician, ConsultingService {
   }
 
   /**
-   * Converts a Map or List of plain values into a Jackson JsonNode for embedding in the
-   * consultation Document payload. Used to serialize the structured ConsultationReport and
-   * Expectation sub-trees.
+   * Parse the checkpoint payload String with doctor-core's own jackson (no JsonNode crosses the
+   * seam).
    */
-  private JsonNode toJson(Object value) {
-    return mapper.valueToTree(value);
+  private JsonNode parse(String payload) {
+    try {
+      return mapper.readTree(payload);
+    } catch (JsonProcessingException e) {
+      throw new IllegalArgumentException("malformed checkpoint payload", e);
+    }
+  }
+
+  /** Serialize the consultation payload tree back to the String the seam carries. */
+  private String serialize(JsonNode node) {
+    try {
+      return mapper.writeValueAsString(node);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("could not serialize consultation payload", e);
+    }
   }
 
   /**

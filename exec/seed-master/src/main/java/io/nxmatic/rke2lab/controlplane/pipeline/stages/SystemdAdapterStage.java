@@ -1,5 +1,8 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
@@ -55,6 +58,11 @@ public final class SystemdAdapterStage {
   private final SystemdAdapterProbe liveProbe;
   private final Consumer<Map<String, Object>> sink;
   private final ReadinessAuthority readinessAuthority;
+
+  /**
+   * The seam payload is a serialized JSON String; the host builds/reads it with its own jackson.
+   */
+  private final ObjectMapper mapper = new ObjectMapper();
 
   public SystemdAdapterStage(
       BootstrapConfig config,
@@ -210,7 +218,7 @@ public final class SystemdAdapterStage {
 
     final Document checkpoint = checkpointDocument(SCENARIO_ID);
     final Document verdict = readinessAuthority.assess(checkpoint);
-    final String action = verdict.payload().path(ExchangeCatalog.FIELD_ACTION).asText();
+    final String action = parse(verdict.payload()).path(ExchangeCatalog.FIELD_ACTION).asText();
     if (Action.STOP.slug().equals(action)) {
       log("✗ " + SCENARIO_ID + " FAILED, verdict=stop → stopping provisioning");
       throw new TopicFailure("systemd adapter", failure);
@@ -256,14 +264,33 @@ public final class SystemdAdapterStage {
 
   /** The checkpoint outcome as a structured Document for the readiness authority. */
   private Document checkpointDocument(String scenarioId) {
-    final ObjectNode payload = Document.newPayload();
+    final ObjectNode payload = mapper.createObjectNode();
     payload.put(ExchangeCatalog.FIELD_SCENARIO_ID, scenarioId);
     payload.put(ExchangeCatalog.FIELD_FAILED, true);
     policy
         .readiness()
         .rawOverride(scenarioId)
         .ifPresent(value -> payload.put(ExchangeCatalog.FIELD_OVERRIDE, value));
-    return new Document(Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), payload);
+    return new Document(
+        Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), serialize(payload));
+  }
+
+  /** Parse a verdict payload String with the host's own jackson (no JsonNode crosses the seam). */
+  private JsonNode parse(String payload) {
+    try {
+      return mapper.readTree(payload);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("malformed verdict payload", e);
+    }
+  }
+
+  /** Serialize a checkpoint payload tree to the String the seam carries. */
+  private String serialize(JsonNode node) {
+    try {
+      return mapper.writeValueAsString(node);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("could not serialize checkpoint payload", e);
+    }
   }
 
   private void log(String message) {

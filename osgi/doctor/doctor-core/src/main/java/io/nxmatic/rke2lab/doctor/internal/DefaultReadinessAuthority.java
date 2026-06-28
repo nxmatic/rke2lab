@@ -1,5 +1,8 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.records.Severity;
 import io.nxmatic.rke2lab.exchange.port.Action;
@@ -18,6 +21,9 @@ import org.osgi.service.component.annotations.Component;
  * and maps it to a provisioning verdict ({@code stop} iff CRITICAL, else {@code
  * continue-degraded}). Published as the {@link ReadinessAuthority} seam so the flat host reads only
  * the verdict's action field.
+ *
+ * <p>The Document payload is a serialized JSON {@code String}; this authority parses and serializes
+ * it with its OWN jackson (a doctor-core bundle dependency) — no jackson type crosses the seam.
  */
 @Component(service = ReadinessAuthority.class)
 public final class DefaultReadinessAuthority implements ReadinessAuthority {
@@ -31,13 +37,15 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
 
   private static final Severity DEFAULT_INTRINSIC = Severity.WARNING;
 
+  private final ObjectMapper mapper = new ObjectMapper();
+
   @Override
   public Document assess(Document checkpoint) {
-    final String scenarioId =
-        checkpoint.payload().path(ExchangeCatalog.FIELD_SCENARIO_ID).asText("");
+    final JsonNode payload = parse(checkpoint.payload());
+    final String scenarioId = payload.path(ExchangeCatalog.FIELD_SCENARIO_ID).asText("");
     final String override =
-        checkpoint.payload().hasNonNull(ExchangeCatalog.FIELD_OVERRIDE)
-            ? checkpoint.payload().get(ExchangeCatalog.FIELD_OVERRIDE).asText()
+        payload.hasNonNull(ExchangeCatalog.FIELD_OVERRIDE)
+            ? payload.get(ExchangeCatalog.FIELD_OVERRIDE).asText()
             : null;
 
     final Severity effective =
@@ -46,15 +54,32 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
             : intrinsicFor(scenarioId);
 
     final boolean stop = effective == Severity.CRITICAL;
-    final ObjectNode verdict = Document.newPayload();
+    final ObjectNode verdict = mapper.createObjectNode();
     verdict.put(
         ExchangeCatalog.FIELD_ACTION, stop ? Action.STOP.slug() : Action.CONTINUE_DEGRADED.slug());
     verdict.put(
         ExchangeCatalog.FIELD_REASON, scenarioId + " severity=" + effective.name().toLowerCase());
-    return new Document(Domain.DOCTOR.slug(), Coordinate.READINESS_VERDICT.slug(), verdict);
+    return new Document(
+        Domain.DOCTOR.slug(), Coordinate.READINESS_VERDICT.slug(), serialize(verdict));
   }
 
   private Severity intrinsicFor(String scenarioId) {
     return INTRINSIC.getOrDefault(scenarioId, DEFAULT_INTRINSIC);
+  }
+
+  private JsonNode parse(String payload) {
+    try {
+      return mapper.readTree(payload);
+    } catch (JsonProcessingException e) {
+      throw new IllegalArgumentException("malformed checkpoint payload", e);
+    }
+  }
+
+  private String serialize(JsonNode node) {
+    try {
+      return mapper.writeValueAsString(node);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("could not serialize verdict payload", e);
+    }
   }
 }

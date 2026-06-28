@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -18,6 +19,7 @@ import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Patient;
+import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.doctor.testkit.FakeSpecialist;
 import io.nxmatic.rke2lab.exchange.port.Coordinate;
@@ -54,7 +56,9 @@ class GeneralistConsultDocumentTest {
         ExchangeCatalog.FIELD_RECORDED_AT, Instant.parse("2026-06-28T00:00:00Z").toString());
     final Document checkpoint =
         new Document(
-            Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), checkpointPayload);
+            Domain.DOCTOR.slug(),
+            Coordinate.READINESS_CHECKPOINT.slug(),
+            serialize(checkpointPayload));
 
     // Assemble a Generalist with a prescribing FakeSpecialist (so plan has prescriptions)
     final GrantPolicy policy = GrantPolicy.empty().withSelfGrant(Generalist.GENERALIST_ID, PATIENT);
@@ -76,7 +80,7 @@ class GeneralistConsultDocumentTest {
         "coordinate should be CONSULTATION");
 
     // Assert: scenarioId echoed
-    final var consultationPayload = consultation.payload();
+    final JsonNode consultationPayload = parse(consultation.payload());
     assertEquals(
         "systemd-adapter",
         consultationPayload.path(ExchangeCatalog.FIELD_SCENARIO_ID).asText(),
@@ -111,7 +115,9 @@ class GeneralistConsultDocumentTest {
     checkpointPayload.put(ExchangeCatalog.FIELD_RECORDED_AT, recordedAt.toString());
     final Document checkpoint =
         new Document(
-            Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), checkpointPayload);
+            Domain.DOCTOR.slug(),
+            Coordinate.READINESS_CHECKPOINT.slug(),
+            serialize(checkpointPayload));
 
     // Assemble a Generalist with a prescribing FakeSpecialist (so plan has prescriptions →
     // non-empty expectations)
@@ -127,7 +133,7 @@ class GeneralistConsultDocumentTest {
     final Document consultation = generalist.consult(checkpoint);
 
     // Extract the ConsultationReport sub-tree and round-trip it through the reader
-    final JsonNode consultationPayload = consultation.payload();
+    final JsonNode consultationPayload = parse(consultation.payload());
     final JsonNode reportNode = consultationPayload.path(ConsultationReport.OUTPUT_KEY);
     assertNotNull(reportNode, "consultation should carry the ConsultationReport sub-tree");
 
@@ -142,8 +148,8 @@ class GeneralistConsultDocumentTest {
         reconstructed.checkpointId(),
         "checkpointId should match the input scenario");
     assertEquals(
-        "CONNECTION_REFUSED",
-        reconstructed.symptom().id(),
+        Symptom.CONNECTION_REFUSED,
+        reconstructed.symptom(),
         "symptom should match the input symptom kind");
     assertFalse(
         reconstructed.plan().replies().isEmpty(),
@@ -160,5 +166,23 @@ class GeneralistConsultDocumentTest {
 
     final var firstExpectationOpt = ExpectationReader.fromOutputMap(expectationsList.get(0));
     assertTrue(firstExpectationOpt.isPresent(), "first Expectation should round-trip successfully");
+  }
+
+  // The Document payload is a serialized JSON String; this test builds checkpoints and reads
+  // consultations with its own jackson, exactly as the two worlds do across the seam.
+  private static String serialize(JsonNode node) {
+    try {
+      return mapper.writeValueAsString(node);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  private static JsonNode parse(String payload) {
+    try {
+      return mapper.readTree(payload);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException(e);
+    }
   }
 }

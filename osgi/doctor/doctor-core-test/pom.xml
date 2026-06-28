@@ -53,6 +53,28 @@
       <scope>provided</scope>
     </dependency>
 
+    <!-- GeneralistConsultDocumentTest builds checkpoint Documents (the exchange seam) and reads
+         consultations with its own jackson (the seam payload is a serialized JSON String). Direct,
+         not transitive — every imported class must come from a direct dependency. provided: the
+         fragment's src/main bytecode resolves against the doctor-core host (which carries these as
+         bundles) at runtime. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>exchange-port</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
     <!-- bnd-consumed DS annotations: the dsproof @Component fakes (FakeDiagnostician + the EHR/ledger
          ports) so SCR activates DefaultHealthSystem and binds its tier-scoped roster in the boot test. -->
     <dependency>

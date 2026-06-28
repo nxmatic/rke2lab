@@ -2,24 +2,23 @@ package io.nxmatic.rke2lab.exchange.port;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 
 class DocumentTest {
 
-  private static final ObjectMapper MAPPER = new ObjectMapper();
-
   @Test
-  void carriesDomainCoordinateAndStructuredPayload() {
-    final ObjectNode payload = MAPPER.createObjectNode();
-    payload.put(ExchangeCatalog.FIELD_ACTION, Action.STOP.slug());
+  void carriesDomainCoordinateAndStringPayload() {
+    // The payload is a serialized JSON String — the seam carries only flat (JDK) types, never a
+    // jackson JsonNode, so exchange-port has no jackson dependency at all. Each world parses the
+    // String with its own jackson.
+    final String payload =
+        "{\"" + ExchangeCatalog.FIELD_ACTION + "\":\"" + Action.STOP.slug() + "\"}";
     final Document doc =
         new Document(Domain.DOCTOR.slug(), Coordinate.READINESS_VERDICT.slug(), payload);
 
     assertEquals(Domain.DOCTOR.slug(), doc.domain());
     assertEquals(Coordinate.READINESS_VERDICT.slug(), doc.coordinate());
-    assertEquals(Action.STOP.slug(), doc.payload().get(ExchangeCatalog.FIELD_ACTION).asText());
+    assertEquals(payload, doc.payload());
   }
 
   @Test

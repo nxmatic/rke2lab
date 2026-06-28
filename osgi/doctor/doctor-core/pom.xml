@@ -43,6 +43,19 @@
       <artifactId>exchange-port</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- jackson as a real bundle dependency: the exchange seam carries a serialized JSON String, so
+         doctor-core parses/serializes it with ITS OWN jackson rather than borrowing the seam's
+         (the seam now carries none). This is jackson entering the OSGi world via a bundle wire, not
+         leaking flat across the seam — the fix for the in-container LinkageError. jackson-core is a
+         direct dependency too (JsonProcessingException is imported directly, not transitively). -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
     <!-- The systemd domain's unit vocabulary: the dbus-tcp specialist names the unit it remediates
          via the typed SystemdUnitId, not a literal — the import draws the consumer edge in the graph. -->
     <dependency>
