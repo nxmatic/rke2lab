@@ -253,33 +253,56 @@ User-flagged: three components (`DefaultReadinessAuthority`, `SystemdAdapterStag
 
 ---
 
-## Task 4 (zone-1): systemd-adapter consumes the consult Document; probe emits a checkpoint Document
+## Task 4 (zone-1): the systemd-adapter CONSULT reasoning crosses as a Document — egress/reconstruction preserved
+
+> **REVISED 2026-06-28 (controller traced the coupling; see the `world-exchange-2b-zone1-egress-knot`
+> memory).** The plan's original "probe returns a Document instead of Observation" was UNSOUND: the
+> probe's `Observation` ALSO sources the Pulumi egress (`sink.accept(observation.toOutputMap())` →
+> `SystemdAdapterResource`) and the jGiven scenario assertions — both OUT of 2B's consult scope. And
+> the consult's `ConsultationReport` feeds the egress→`ConsultationReportReader` medical-record
+> reconstruction, which the user requires PRESERVED (same information, form may differ; the stack IS
+> the patient's record store). So zone-1 migrates ONLY the host's consult REASONING/RENDERING, not the
+> probe's data shape.
+
+**Design (A-struct):**
+- The probe KEEPS returning `Observation` — it is the egress `summary`/`toOutputMap()` source and the
+  scenario's assertion target, neither of which is the consult path. `SystemdAdapterProbe`,
+  `SimulatedSystemdAdapterProbe`, `SeedSystemdAdapterEndpointGate`, `SystemdAdapterScenario` are
+  UNCHANGED in this task (they migrate in the egress increment, not 2B).
+- The consultation Document (Task 2) is AMENDED to carry, besides `narration` + `diagnosisAdoc`, the
+  STRUCTURED reconstruction sub-trees in the EXACT shape the existing `toOutputMap()`s produce, so the
+  readers stay byte-compatible. This is a Task-2 prerequisite — see Step 0 below.
+- The host stage stops holding `Symptom`/`RemediationPlan`/`ConsultationReport`: `consultDoctor` calls
+  `consult(checkpoint)` and gets a Document; it logs `narration`, keeps the Document for the runbook
+  (Task 6) and the egress (the structured payload, opaque to the host).
 
 **Files:**
-- Modify: `exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/bdd/SystemdAdapterProbe.java` (return `Document` not `Observation`)
-- Modify: `exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/bdd/SimulatedSystemdAdapterProbe.java`
-- Modify: `exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/systemd/SeedSystemdAdapterEndpointGate.java` (the live probe path; stop building `Observation.failed(Symptom)`)
-- Modify: `exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/SystemdAdapterStage.java` (`consultDoctor` → call `consult(checkpoint)`, log `narration`; extend `checkpointDocument` with symptomKind/summary/details)
-- Modify: `exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/bdd/SystemdAdapterScenario.java` (jGiven Then asserts on Document fields, not `Observation`/`Symptom`)
-- Modify: `exec/seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/SystemdAdapterStageFixture.java` + `SystemdAdapterVerdictTest.java` (the probe now returns a checkpoint Document)
+- Modify: `osgi/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/internal/Generalist.java` (Step 0: enrich the consultation Document with the structured plan/observations/expectations sub-trees)
+- Modify: `osgi/exchange/exchange-port/.../ExchangeCatalog.java` (Step 0: add the field keys for the structured sub-trees if needed — `FIELD_PLAN`, `FIELD_OBSERVATIONS`, `FIELD_EXPECTATIONS`, `FIELD_RECORDED_AT`; reuse `ConsultationReport.OUTPUT_KEY`/`Expectation.OUTPUT_KEY` string values as the egress keys)
+- Modify: `exec/seed-master/.../pipeline/stages/SystemdAdapterStage.java` (`consultDoctor` → Document; `checkpointDocument` adds symptomKind/summary/details/recordedAt; drop `Symptom`/`RemediationPlan`/`ConsultationReport`/`Observation`-as-consult-arg imports — `Observation` stays ONLY as the egress/scenario type)
+- Modify: `exec/seed-master/.../pipeline/ConsultationLog` carrier — `ConsultationLog` (in `doctor-port`) holds consultation **Documents** keyed by checkpointId instead of `ConsultationReport`s; OR a host-side parallel carrier. Decide in Step 1 by reading how `ResourceCreationPipeline.consultationFor` + `RunbookRenderer` consume it.
+- Modify: `exec/seed-master/.../resources/ResourceCreationPipeline.java` + `systemd/SystemdAdapterResource.java` (read the consultation Document's structured payload into the SAME output keys — `ConsultationReport.OUTPUT_KEY`, `Expectation.OUTPUT_KEY` — opaque copy, no doctor type on the host)
+- Modify: `exec/seed-master/src/test/.../SystemdAdapterStageFixture.java` + `SystemdAdapterVerdictTest.java` (the stub `ConsultingService` returns a consultation Document carrying the structured sub-trees; assert reconstruction round-trips)
 
 **Interfaces:**
-- Consumes: `ConsultingService.consult(Document)` (Task 1), the `SymptomKind`/`Coordinate` seam enums + the extended checkpoint field keys (Task 1).
-- Produces: a systemd-adapter zone with zero `doctor.records` imports.
+- Consumes: `ConsultingService.consult(Document)` (Task 1), the enriched consultation Document (Step 0), `SymptomKind`/`Coordinate` seam enums.
+- Produces: a systemd-adapter stage that holds NO consult-path doctor type (`Symptom`/`RemediationPlan`/`ConsultationReport` gone; `Observation` remains as the egress/scenario type until the egress increment). The Pulumi output keys + the `ConsultationReportReader`/`ExpectationReader` round-trip are UNCHANGED — reconstruction preserved.
 
-- [ ] **Step 1: Write/adapt the failing test** — `SystemdAdapterVerdictTest` already drives the failing-probe → verdict path. Extend it (or add a sibling) asserting the stage, on failure, calls `consult` and logs a narration line — using a stub `ConsultingService` returning a known `consultation` Document. The fixture's probe now returns a checkpoint `Document` (failed + `symptomKind = SymptomKind.CONNECTION_REFUSED.slug()`), not an `Observation`.
+- [ ] **Step 0 (Task-2 amendment): enrich the consultation Document OSGi-side.** In `Generalist.consult(Document)`, after building the `RemediationPlan plan = consult(symptom, observation)`, build the internal `ConsultationReport report = new ConsultationReport(scenarioId, List.of(observation), plan)` and serialize its `report.toOutputMap()` (checkpointId + observations[] + plan{}) AND `report.expectations(recordedAt).stream().map(Expectation::toOutputMap).toList()` into the consultation Document payload as JSON sub-trees, alongside the existing `narration` + `diagnosisAdoc`. `recordedAt` comes from the checkpoint Document (an ISO string the host writes — see Step 2; OSGi parses it to `Instant` for `expectations(...)`). Use a Jackson `ObjectMapper().valueToTree(map)` (or build `ObjectNode`s) to convert the `Map<String,Object>` views into the payload. The host never reads these sub-trees as doctor types — only OSGi produces them and the readers consume them. Extend `GeneralistConsultDocumentTest`: assert the consultation Document round-trips through `ConsultationReportReader.fromOutputMap(...)` to an equal `ConsultationReport`.
 
-- [ ] **Step 2: Run it, verify it fails** — `flox activate -- ./mvnw -pl :seed-master -am package -Pall-worlds -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=SystemdAdapterVerdictTest`. Expected: FAIL (probe/consult signatures changed).
+- [ ] **Step 1: Decide + write the carrier change.** Read `ResourceCreationPipeline.consultationFor` (joins `ConsultationLog.consultations()` by `checkpoint.slug()`) and `RunbookRenderer.injectDiagnosis` (iterates `consultations.consultations()`, reads `report.plan()`). Change `ConsultationLog` to hold consultation **Documents** keyed by checkpointId. Write the failing test: `SystemdAdapterVerdictTest` (the stub `ConsultingService.consult(Document)` returns a consultation Document with the structured sub-trees) asserts (a) the stage logs the narration and (b) `consultationFor(SYSTEMD_ADAPTER)` round-trips via `ConsultationReportReader` to the expected `ConsultationReport`.
 
-- [ ] **Step 3: Migrate the probe + gate** — `SystemdAdapterProbe.probe(config)` returns `Document` (a checkpoint: status, failed, symptomKind slug, summary, details). `SeedSystemdAdapterEndpointGate` and `SimulatedSystemdAdapterProbe` build that Document from host-native values — the failure kind is written as `SymptomKind.CONNECTION_REFUSED.slug()` / `SymptomKind.TIMEOUT.slug()` (the seam enum, host-flat), never `Symptom.X` and never a literal. No `doctor.records` import remains in these files.
+- [ ] **Step 2: Run it, verify it fails** — `flox activate -- ./mvnw -pl :seed-master -am package -Pall-worlds -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=SystemdAdapterVerdictTest`. Expected: FAIL.
 
-- [ ] **Step 4: Migrate the stage** — `checkpointDocument` adds `symptomKind`/`summary`/`details` (it already adds scenarioId/failed/override) and uses `Coordinate.READINESS_CHECKPOINT.slug()` for the coordinate. `consultDoctor(Document checkpoint)` calls `doctor.consult(checkpoint)`, logs `consultation.payload().path(FIELD_NARRATION).asText()`, and (for the runbook) stashes the `consultation` Document for the renderer (see Task 6 for how it reaches `RunbookRenderer`). Drop the `Observation`/`Symptom`/`RemediationPlan`/`ConsultationReport` imports. The `doctor` field type stays `ConsultingService` (now used via the Document verb).
+- [ ] **Step 3: Migrate `SystemdAdapterStage`.** `checkpointDocument` adds `symptomKind` (`SymptomKind.X.slug()` mapped from the captured `Observation.symptom()` — the ONE place the stage still reads the Observation's symptom, to write its slug; that read is host-side classification, not a doctor reasoning call), `summary` (`observation.summary()`), `details` (from `observation.details()` or the summary), and `recordedAt` (the host's run `Instant` as ISO string). `consultDoctor` calls `doctor.consult(checkpoint)`, logs `payload.path(FIELD_NARRATION).asText()`, records the consultation Document in the log. DROP imports of `RemediationPlan`, `ConsultationReport`; keep `Observation` (egress + the symptom-slug read). The `doctor` field type stays `ConsultingService`.
 
-- [ ] **Step 5: Migrate the scenario + fixture** — `SystemdAdapterScenario` Then-steps assert on the checkpoint/consultation Document, not `Observation`. Fixture + `SystemdAdapterVerdictTest` build a checkpoint Document.
+- [ ] **Step 4: Migrate the egress reader.** `ResourceCreationPipeline.consultationFor` returns the consultation Document (or its structured payload Map); `SystemdAdapterResource` writes that payload to the SAME output keys (`ConsultationReport.OUTPUT_KEY` ← the `{checkpointId,observations,plan}` sub-tree, `Expectation.OUTPUT_KEY` ← the expectations sub-tree). The host copies opaque JSON — it imports NO `ConsultationReport`/`Expectation` type (verify the imports are gone from `ResourceCreationPipeline`/`SystemdAdapterResource` for the systemd path; they may remain for the cluster path until Task 5). `ConsultationReportReader`/`ExpectationReader` are UNCHANGED.
 
-- [ ] **Step 6: Run the test, verify it passes** — same as Step 2. Expected: PASS.
+- [ ] **Step 5: Run the test, verify it passes** — same as Step 2. Expected: PASS, including the reconstruction round-trip assertion.
 
-- [ ] **Step 7: Verify the worklist shrank** — full reactor `flox activate -- ./mvnw clean package -Pall-worlds -DskipTests=false -Dmaven.build.cache.skipCache=true`; the `realm-boundary` seed-master worklist must DROP (the systemd-adapter classes gone from it). Confirm `grep doctor.records SystemdAdapterStage.java SystemdAdapterProbe.java SimulatedSystemdAdapterProbe.java SeedSystemdAdapterEndpointGate.java SystemdAdapterScenario.java` is empty.
+- [ ] **Step 6: Verify the worklist shrank + reconstruction preserved** — full reactor `flox activate -- ./mvnw clean package -Pall-worlds -DskipTests=false -Dmaven.build.cache.skipCache=true`; the `realm-boundary` seed-master worklist DROPS `SystemdAdapterStage`'s consult-path entries (`RemediationPlan`/`ConsultationReport` gone). Confirm `grep -n "RemediationPlan\|ConsultationReport" SystemdAdapterStage.java` is empty (Observation may remain). Run the existing reconstruction tests (`ConsultationReportReaderTest`, `MedicalRecordDumpTest` / any round-trip test) — they MUST still pass (the user's reconstructibility invariant).
+
+- [ ] **Step 7: Commit** — `git commit -m "feat(seed): systemd-adapter consult reasoning crosses as a Document; egress + reconstruction preserved"`.
 
 - [ ] **Step 8: Commit** — `git commit -m "feat(seed): systemd-adapter consult path crosses as a checkpoint+consultation Document"`.
 
