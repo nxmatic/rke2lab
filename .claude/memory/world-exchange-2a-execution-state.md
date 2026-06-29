@@ -1,9 +1,38 @@
 ---
 name: world-exchange-2a-execution-state
-description: World-exchange 2A SHIPPED on feature/cluster-edge (2026-06-27). 2B IN EXECUTION (subagent-driven) — zone-0 (Tasks 1-3) SHIPPED; zone-1 (Task 4) BLOCKED on a root cause proven 2026-06-28: Document.payload exposes a jackson JsonNode (bundle type) through a flat seam → LinkageError in-container. SEQUENCE DECIDED: S1 (slf4j test backend) → Option B (Document.payload becomes a String, exchange-port drops jackson) → SEAM_PURITY staging gate. See the "2B EXECUTION — RESUME HERE" section at the bottom + [[document-seam-cannot-expose-jackson-jsonnode]].
+description: World-exchange 2A+2B SHIPPED on feature/cluster-edge. 2B COMPLETE through Task 4+5+6 (commit 33a2b30a, 2026-06-29) — the host consult path holds NO doctor reasoning; consult crosses as a Document (String payload, Option B), the seam split moved the 3 record verbs to ClinicalReasoning (doctor-spi) reached via ConsultingService.adapt. Full reactor all-worlds BUILD SUCCESS; realm-boundary worklist 41→38. REMAINING: Task 7 close-out + final whole-branch review. 2C (reconstruction) + egress-increment (Checkpoint/Observation→seam) are separate. Authoritative ledger: .superpowers/sdd/progress.md. See [[realm-duplication-gate-brainstorm-state]] [[checkpoint-identity-to-seam-backlog]] [[direct-dependency-for-every-import]].
 metadata:
   type: project
 ---
+
+## 2B COMPLETE through Task 4+5+6 — RESUME AT TASK 7 (2026-06-29)
+
+Trust the SDD ledger `.superpowers/sdd/progress.md` + `git log` over recollection. Session commits:
+`e4aeaec8` S1 slf4j backend · `7389e973` Option B (Document.payload→String, exchange-port jackson-free) ·
+`d786b6ce` DUPLICATE_REALM_CLASS static gate (found cdk8s dup, WARN) · `405dac85` memories · `b8481c2d`
+aggregator-layout spec (post-merge work) · `33a2b30a` Task 4+5+6 (consult reasoning crosses as Document).
+
+**State:** the host consult path holds ZERO doctor reasoning type. consult crosses as a checkpoint
+Document carrying an `observations` LIST (1 systemd / N cluster, all kept — no info lost); Generalist
+routes on the first symptom-bearing one. ConsultationLog holds Documents; egress copies the
+consultationReport/expectations sub-trees opaquely to the same OUTPUT_KEYs (readers UNCHANGED);
+RunbookRenderer reads diagnosisAdoc. The 3 record verbs left ConsultingService → ClinicalReasoning
+(doctor-spi), reached via `consultingService.adapt(ClinicalReasoning.class)` (the adapt(Class) default).
+Checkpoint (identity enum) + Observation/Symptom (egress/scenario) legitimately remain.
+
+**VERIFIED:** full reactor `package -Pall-worlds -DskipTests=false` BUILD SUCCESS; DoctorCoreInContainerTest
+33/33, DoctorPortInContainerTest 34/34; realm-boundary 41→38 warn; gates green (spec-coverage 0 error,
+duplicate-realm-class cdk8s WARN).
+
+**REMAINING:** Task 7 — close-out (mark 2B shipped) + a final whole-branch review (use
+requesting-code-review / a code-reviewer subagent on the whole branch diff). Then finishing-a-dev-branch.
+OUT of 2B: 2C (the reconstruction path — DriftReview, the *Readers, recordForCurrentPatient/reviewOpenProblems),
+the egress increment (Checkpoint/Observation/Symptom → seam, [[checkpoint-identity-to-seam-backlog]]),
+the in-container realm diagnostic ([[realm-duplication-gate-brainstorm-state]]), the doctor-core-test
+transitive-leak cleanup ([[transitive-import-leaks-doctor-core-test-backlog]]), the osgi/ aggregator
+re-layout ([[osgi-aggregator-layout-spec-state]], post-merge).
+
+(Historical 2B-execution detail — S1/Option B/root-cause — retained below.)
 
 ## 2A SHIPPED (2026-06-27, feature/cluster-edge — kept, not merged)
 
