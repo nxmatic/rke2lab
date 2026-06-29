@@ -241,7 +241,56 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
             "bundle-realm classes reference packages they do not import (OSGi-internal leak)");
       }
     }
+
+    // ---- DUPLICATE_REALM_CLASS: no package lives flat AND in a staged bundle at once ----
+    // The closure tells us which jars stage as bundles; everything else (non-launcher) shades flat.
+    // A staged bundle's exported package that ALSO appears flat is one class in two realms — the
+    // loader-constraint collision that surfaces as a LinkageError when an instance crosses the
+    // seam. Attributed to the EXEC, not the bundle: a duplication is a property of THIS assembly
+    // (the same bundle in an exec without the flat copy would not collide), so it is governed by
+    // the
+    // exec's package-info — exactly as REALM_BOUNDARY attributes its flat-realm leaks to the exec.
+    final StagingClosure closure = StagingClosure.compute(resolved);
+    final Set<String> stagedGas = closure.stagedGas();
+    final Set<String> flatPackages = new java.util.LinkedHashSet<>();
+    final java.nio.file.Path execClasses =
+        java.nio.file.Path.of(session.getCurrentProject().getBuild().getOutputDirectory());
+    for (ResolvedBundle.ClassEntry c : ResolvedBundle.classEntriesOf(execClasses)) {
+      addPackageOf(flatPackages, c.binaryName());
+    }
+    for (ResolvedBundle b : resolved) {
+      if (b.launcher() || stagedGas.contains(b.ga())) {
+        continue; // the framework, and the staged bundles, are NOT flat.
+      }
+      for (ResolvedBundle.ClassEntry c : b.classEntries()) {
+        addPackageOf(flatPackages, c.binaryName());
+      }
+    }
+    final DuplicateRealmClass duplicate = new DuplicateRealmClass(flatPackages);
+    final List<String> duplicateViolations = new ArrayList<>();
+    for (ResolvedBundle b : closure.staged()) {
+      for (String pkg : duplicate.violations(b)) {
+        duplicateViolations.add(b.symbolicName() + " exports " + pkg);
+      }
+    }
+    report.record(
+        StagingGate.DUPLICATE_REALM_CLASS,
+        execGovernance(session),
+        execPseudoBundle(session),
+        duplicateViolations,
+        "staged bundles export packages that ALSO live flat in this assembly (one class in two"
+            + " realms → LinkageError)");
     report.flush();
+  }
+
+  /**
+   * Add the package of a {@code com/foo/Bar} binary name to {@code packages} (dotted, no class).
+   */
+  private static void addPackageOf(Set<String> packages, String binaryName) {
+    final int slash = binaryName.lastIndexOf('/');
+    if (slash > 0) {
+      packages.add(binaryName.substring(0, slash).replace('/', '.'));
+    }
   }
 
   /**

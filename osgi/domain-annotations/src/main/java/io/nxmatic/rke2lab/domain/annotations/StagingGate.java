@@ -14,11 +14,16 @@ package io.nxmatic.rke2lab.domain.annotations;
  *       behaviour helpers (pass instances through the call graph; factories and constants exempt).
  *   <li>{@link #REALM_BOUNDARY} — no class references a type unreachable in its classloader realm
  *       (flat vs bundle realms; host/seam leak and OSGi-internal leak).
+ *   <li>{@link #DUPLICATE_REALM_CLASS} — no package's classes live in BOTH realms at once: a
+ *       package a staged bundle exports must not ALSO be present flat in the assembled host. Two
+ *       copies of a class — one loaded flat, one by a bundle classloader — is the loader-constraint
+ *       collision that surfaces as a {@code LinkageError} when an instance crosses the seam.
  * </ul>
  */
 public enum StagingGate {
   RECORD_PURITY,
   SPEC_COVERAGE,
   INSTANCE_DISCIPLINE,
-  REALM_BOUNDARY
+  REALM_BOUNDARY,
+  DUPLICATE_REALM_CLASS
 }
