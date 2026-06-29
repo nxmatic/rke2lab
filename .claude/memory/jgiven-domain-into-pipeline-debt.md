@@ -29,5 +29,11 @@ hindsight.
   `com.tngtech.jgiven.*` names (third-party), exported once by the wrap — no second exporter.
 
 Scheduled AFTER the current work (cdk8s carrier done; manifests-core-test Phase 2 next). The user
-flagged it as a known future migration while reviewing [[cdk8s-carrier-flat-jar-pattern]]. See
-[[jgiven-osgi-testkit-shipped]] [[bootstrap-pipeline-contributable-vision]] [[pipeline-orchestration-osgi-vision]].
+flagged it as a known future migration while reviewing [[cdk8s-carrier-flat-jar-pattern]].
+
+**ABSORBED by the aggregator layout spec (2026-06-28):** [[osgi-aggregator-layout-spec-state]] tranches
+this — its target layout dissolves `osgi/jgiven/` INTO `pipeline` (jgiven-testkit→pipeline-testkit,
+jgiven-probe→pipeline-probe), exactly the move described here. This debt is now subsumed by that
+post-merge layout increment.
+
+See [[jgiven-osgi-testkit-shipped]] [[bootstrap-pipeline-contributable-vision]] [[pipeline-orchestration-osgi-vision]].
