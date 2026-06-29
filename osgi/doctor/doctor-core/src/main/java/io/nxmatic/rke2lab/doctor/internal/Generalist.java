@@ -19,17 +19,18 @@ import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
 import io.nxmatic.rke2lab.doctor.records.Specialty;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.records.Visit;
+import io.nxmatic.rke2lab.doctor.spi.ClinicalReasoning;
 import io.nxmatic.rke2lab.doctor.spi.Clinician;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.domain.annotations.Transitional;
 import io.nxmatic.rke2lab.exchange.port.Coordinate;
 import io.nxmatic.rke2lab.exchange.port.Domain;
 import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
-import io.nxmatic.rke2lab.exchange.port.SymptomKind;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * The doctor's coordinator. When a checkpoint fails, the patient consults: the Generalist takes the
@@ -53,7 +54,7 @@ import java.util.Map;
 @Transitional(
     to = "GeneralPractitioner + Consultation",
     spec = "practitioners-as-components-design.adoc")
-public final class Generalist implements Clinician, ConsultingService {
+public final class Generalist implements Clinician, ConsultingService, ClinicalReasoning {
 
   /** The Generalist's stable id — the grant policy's join key for the general practitioner. */
   public static final ClinicianId GENERALIST_ID = new ClinicianId("generalist");
@@ -168,21 +169,25 @@ public final class Generalist implements Clinician, ConsultingService {
   public io.nxmatic.rke2lab.exchange.port.Document consult(
       io.nxmatic.rke2lab.exchange.port.Document checkpoint) {
     final JsonNode payload = parse(checkpoint.payload());
-    final SymptomKind kind =
-        SymptomKind.parse(payload.path(ExchangeCatalog.FIELD_SYMPTOM_KIND).asText()).orElseThrow();
-    final Symptom symptom = toSymptom(kind);
-    final Observation observation = observationFrom(payload, symptom);
-    final RemediationPlan plan = consult(symptom, observation);
-    final ConsultationReport report =
-        new ConsultationReport(
-            payload.path(ExchangeCatalog.FIELD_SCENARIO_ID).asText(), List.of(observation), plan);
+    final String scenarioId = payload.path(ExchangeCatalog.FIELD_SCENARIO_ID).asText();
+    final List<Observation> observations = observationsFrom(payload);
+    // Route on the first observation that carries a symptom (systemd has one; cluster has one per
+    // phase, only the failing one is symptom-bearing). The record keeps ALL of them — the seam
+    // loses no information.
+    final Observation routed =
+        observations.stream()
+            .filter(o -> o.symptom().isPresent())
+            .findFirst()
+            .orElseThrow(
+                () -> new IllegalArgumentException("checkpoint carries no symptom to consult"));
+    final Symptom symptom = routed.symptom().get();
+    final RemediationPlan plan = consult(symptom, routed);
+    final ConsultationReport report = new ConsultationReport(scenarioId, observations, plan);
     final Instant recordedAt =
         Instant.parse(payload.path(ExchangeCatalog.FIELD_RECORDED_AT).asText());
 
     final ObjectNode out = mapper.createObjectNode();
-    out.put(
-        ExchangeCatalog.FIELD_SCENARIO_ID,
-        payload.path(ExchangeCatalog.FIELD_SCENARIO_ID).asText());
+    out.put(ExchangeCatalog.FIELD_SCENARIO_ID, scenarioId);
     out.put(ExchangeCatalog.FIELD_NARRATION, narrationLine(symptom));
     out.put(ExchangeCatalog.FIELD_DIAGNOSIS_ADOC, diagnosisBlock(plan));
     // Structured reconstruction sub-trees, in the EXACT shape the egress + readers use today:
@@ -195,22 +200,29 @@ public final class Generalist implements Clinician, ConsultingService {
         Domain.DOCTOR.slug(), Coordinate.CONSULTATION.slug(), serialize(out));
   }
 
-  /** Maps the wire SymptomKind to the internal Symptom enum. No default — drift forces update. */
-  private static Symptom toSymptom(SymptomKind kind) {
-    return switch (kind) {
-      case CONNECTION_REFUSED -> Symptom.CONNECTION_REFUSED;
-      case TIMEOUT -> Symptom.TIMEOUT;
-      case KUBECONFIG_MISSING -> Symptom.KUBECONFIG_MISSING;
-      case API_NOT_READY -> Symptom.API_NOT_READY;
-      case CONTROLLER_NOT_READY -> Symptom.CONTROLLER_NOT_READY;
-    };
-  }
-
-  /** Rebuilds the Observation OSGi-side from the checkpoint payload. */
-  private static Observation observationFrom(JsonNode payload, Symptom symptom) {
-    final String summary = payload.path(ExchangeCatalog.FIELD_SUMMARY).asText();
-    final String details = payload.path(ExchangeCatalog.FIELD_DETAILS).asText();
-    return Observation.failed(symptom, summary, Map.of("details", details));
+  /**
+   * Rebuilds each captured Observation from the checkpoint's {@code observations} list — each entry
+   * is the flat {@code Observation.toOutputMap} shape (status, summary, the symptom slug under its
+   * envelope key, and the remaining details). The reconstruction mirrors {@code
+   * ConsultationReportReader.observationFrom}, OSGi-side.
+   */
+  private List<Observation> observationsFrom(JsonNode payload) {
+    final List<Observation> observations = new ArrayList<>();
+    for (JsonNode element : payload.path(ExchangeCatalog.FIELD_OBSERVATIONS)) {
+      final String status = element.path("status").asText();
+      final String summary = element.path("summary").asText();
+      final Optional<Symptom> symptom = Symptom.parse(element.path(Symptom.ENVELOPE_KEY).asText());
+      final Map<String, Object> details = new java.util.LinkedHashMap<>();
+      final var names = element.fieldNames();
+      while (names.hasNext()) {
+        final String key = names.next();
+        if (!key.equals("status") && !key.equals("summary") && !key.equals(Symptom.ENVELOPE_KEY)) {
+          details.put(key, element.path(key).asText());
+        }
+      }
+      observations.add(Observation.of(status, symptom, summary, details));
+    }
+    return observations;
   }
 
   /** Joins the two narration lines: consulted + cohort finding. */

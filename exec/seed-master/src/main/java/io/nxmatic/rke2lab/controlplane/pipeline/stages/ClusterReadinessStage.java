@@ -1,5 +1,10 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
@@ -14,12 +19,13 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifi
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
-import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.exchange.port.Coordinate;
+import io.nxmatic.rke2lab.exchange.port.Document;
+import io.nxmatic.rke2lab.exchange.port.Domain;
+import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
+import java.time.Instant;
 import java.util.EnumMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -50,6 +56,13 @@ public final class ClusterReadinessStage {
   private final Map<String, Object> systemdAdapterLaunchSummary;
   private final Consumer<VerificationResult> sink;
 
+  /**
+   * The run's stable instant, written into the consult checkpoint so OSGi stamps its expectations.
+   */
+  private final Instant recordedAt;
+
+  private final ObjectMapper mapper = new ObjectMapper();
+
   public ClusterReadinessStage(
       BootstrapConfig config,
       ControlplanePolicy policy,
@@ -61,7 +74,8 @@ public final class ClusterReadinessStage {
       ConsultingService doctor,
       ClusterReadinessProbe phaseProbe,
       Map<String, Object> systemdAdapterLaunchSummary,
-      Consumer<VerificationResult> sink) {
+      Consumer<VerificationResult> sink,
+      Instant recordedAt) {
     this.config = config;
     this.policy = policy;
     this.readinessEnabled = readinessEnabled;
@@ -71,6 +85,7 @@ public final class ClusterReadinessStage {
     this.consultations = consultations;
     this.doctor = doctor;
     this.phaseProbe = phaseProbe;
+    this.recordedAt = recordedAt;
     this.systemdAdapterLaunchSummary =
         systemdAdapterLaunchSummary == null ? Map.of() : systemdAdapterLaunchSummary;
     this.sink = sink;
@@ -211,25 +226,55 @@ public final class ClusterReadinessStage {
   }
 
   /**
-   * The patient consults the doctor on the first failing phase's symptom. The resulting plan is
-   * kept on a {@link ConsultationReport} in the shared log (no longer logged-then-dropped) — the
-   * raised observations it brought plus the plan the doctor wrote.
+   * The patient consults the doctor when a phase failed: the host crosses ALL phase observations as
+   * a checkpoint {@link Document} (the doctor routes on the first symptom-bearing one but keeps
+   * every observation in the record — no information lost), the doctor reasons OSGi-side, and the
+   * host logs the returned narration and keeps the consultation Document in the shared log. Skipped
+   * when no phase raised a symptom, or when there is no doctor.
    */
   private void consultDoctor(Map<ClusterReadinessPhase, Observation> phaseObservations) {
-    phaseObservations.values().stream()
-        .filter(observation -> observation.symptom().isPresent())
-        .findFirst()
-        .ifPresent(
-            observation -> {
-              final Symptom symptom = observation.symptom().get();
-              log("⚕ " + doctor.consultedLine(symptom));
-              final RemediationPlan plan = doctor.consult(symptom, observation);
-              if (consultations != null) {
-                consultations.record(
-                    new ConsultationReport(
-                        SCENARIO_ID, List.copyOf(phaseObservations.values()), plan));
-              }
-            });
+    if (doctor == null
+        || phaseObservations.values().stream().noneMatch(o -> o.symptom().isPresent())) {
+      return;
+    }
+    final Document consultation = doctor.consult(consultCheckpoint(phaseObservations.values()));
+    log("⚕ " + parse(consultation.payload()).path(ExchangeCatalog.FIELD_NARRATION).asText());
+    if (consultations != null) {
+      consultations.record(consultation);
+    }
+  }
+
+  /**
+   * The consult checkpoint Document: every phase observation (flat {@code Observation.toOutputMap}
+   * shape — the symptom slug travels in each) plus the run's stable {@code recordedAt}, so OSGi
+   * reconstructs them all and routes on the first symptom-bearing one.
+   */
+  private Document consultCheckpoint(Iterable<Observation> observations) {
+    final ObjectNode payload = mapper.createObjectNode();
+    payload.put(ExchangeCatalog.FIELD_SCENARIO_ID, SCENARIO_ID);
+    payload.put(ExchangeCatalog.FIELD_RECORDED_AT, recordedAt.toString());
+    final ArrayNode array = payload.putArray(ExchangeCatalog.FIELD_OBSERVATIONS);
+    for (Observation observation : observations) {
+      array.add(mapper.valueToTree(observation.toOutputMap()));
+    }
+    return new Document(
+        Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), serialize(payload));
+  }
+
+  private JsonNode parse(String payload) {
+    try {
+      return mapper.readTree(payload);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("malformed consultation payload", e);
+    }
+  }
+
+  private String serialize(JsonNode node) {
+    try {
+      return mapper.writeValueAsString(node);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("could not serialize checkpoint payload", e);
+    }
   }
 
   private void log(String message) {

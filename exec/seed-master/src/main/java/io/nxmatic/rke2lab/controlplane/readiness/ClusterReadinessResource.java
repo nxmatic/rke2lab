@@ -1,10 +1,14 @@
 package io.nxmatic.rke2lab.controlplane.readiness;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;
 import com.pulumi.resources.ComponentResourceOptions;
 import com.pulumi.resources.Resource;
-import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
+import io.nxmatic.rke2lab.exchange.port.Document;
+import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +30,7 @@ public final class ClusterReadinessResource extends ComponentResource {
   public ClusterReadinessResource(
       String name,
       ClusterBootstrapReadinessVerifier.VerificationResult result,
-      Optional<ConsultationReport> consultation,
+      Optional<Document> consultation,
       Resource dependsOnResource) {
     super(TYPE_TOKEN, name, buildOptions(dependsOnResource));
 
@@ -48,7 +52,7 @@ public final class ClusterReadinessResource extends ComponentResource {
 
   private static Map<String, Output<?>> asResourceOutputs(
       Output<ClusterBootstrapReadinessVerifier.VerificationResult> verificationResult,
-      Optional<ConsultationReport> consultation) {
+      Optional<Document> consultation) {
     final LinkedHashMap<String, Output<?>> outputs = new LinkedHashMap<>();
 
     outputs.put(
@@ -72,10 +76,34 @@ public final class ClusterReadinessResource extends ComponentResource {
     outputs.put("bootstrapStatus", verificationResult.applyValue(value -> value.bootstrapStatus()));
 
     // Additive, per-node only: the diagnostic layer lives under this component resource in state,
-    // never at top level (the Stage-B stack contract stays byte-identical).
+    // never at top level (the Stage-B stack contract stays byte-identical). The doctor reasons
+    // OSGi-side; the host copies the structured consultationReport sub-tree OPAQUELY from the
+    // consultation Document to the same output key (no doctor type held host-side).
     consultation.ifPresent(
-        report -> outputs.put(ConsultationReport.OUTPUT_KEY, Output.of(report.toOutputMap())));
+        document -> {
+          final JsonNode report =
+              parse(document.payload()).path(ExchangeCatalog.FIELD_CONSULTATION_REPORT);
+          if (report.isObject()) {
+            outputs.put(
+                ExchangeCatalog.FIELD_CONSULTATION_REPORT, Output.of(asPlainObject(report)));
+          }
+        });
 
     return outputs;
+  }
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  private static JsonNode parse(String payload) {
+    try {
+      return MAPPER.readTree(payload);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("malformed consultation payload", e);
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> asPlainObject(JsonNode node) {
+    return MAPPER.convertValue(node, Map.class);
   }
 }

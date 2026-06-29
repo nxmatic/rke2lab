@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
@@ -15,7 +17,8 @@ import io.nxmatic.rke2lab.controlplane.systemd.SystemdAdapterResource;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
-import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
+import io.nxmatic.rke2lab.exchange.port.Document;
+import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -86,21 +89,38 @@ final class ResourceCreationPipeline {
             new LiveClusterReadinessProbe(
                 policy, systemdRuntimeStatus, clusterReadinessContact, readinessLogger),
             systemdAdapterLaunchSummary,
-            result -> holder[0] = result)
+            result -> holder[0] = result,
+            bootstrapResult.deployment().timestamp())
         .launch();
     return holder[0];
   }
 
   /**
-   * Joins the shared {@link ConsultationLog} on the checkpoint's slug — the report exists only when
-   * that checkpoint raised a symptom (reactive consultation), so a healthy node yields empty.
+   * Joins the shared {@link ConsultationLog} on the checkpoint's slug — the consultation Document
+   * exists only when that checkpoint raised a symptom (reactive consultation), so a healthy node
+   * yields empty. The slug is read from each Document's opaque payload; the host holds no doctor
+   * type, it only matches the scenario id it wrote.
    */
-  private Optional<ConsultationReport> consultationFor(Checkpoint checkpoint) {
+  private Optional<Document> consultationFor(Checkpoint checkpoint) {
     if (consultations == null) {
       return Optional.empty();
     }
+    final ObjectMapper mapper = new ObjectMapper();
     return consultations.consultations().stream()
-        .filter(r -> r.checkpointId().equals(checkpoint.slug()))
+        .filter(
+            document -> {
+              try {
+                return checkpoint
+                    .slug()
+                    .equals(
+                        mapper
+                            .readTree(document.payload())
+                            .path(ExchangeCatalog.FIELD_SCENARIO_ID)
+                            .asText());
+              } catch (JsonProcessingException e) {
+                return false;
+              }
+            })
         .findFirst();
   }
 
@@ -142,7 +162,6 @@ final class ResourceCreationPipeline {
               Checkpoint.SYSTEMD_ADAPTER.resourceName(),
               systemdAdapterLaunchSummary,
               consultationFor(Checkpoint.SYSTEMD_ADAPTER),
-              bootstrapResult.deployment().timestamp(),
               bootstrapResult.readinessDependency());
       return this;
     }

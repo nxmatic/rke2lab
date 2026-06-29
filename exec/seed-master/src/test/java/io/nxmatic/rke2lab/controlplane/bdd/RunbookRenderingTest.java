@@ -4,43 +4,42 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
-import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
-import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.doctor.records.Prescription;
-import io.nxmatic.rke2lab.doctor.records.ReferralReply;
-import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
-import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
-import io.nxmatic.rke2lab.doctor.records.SchemaRef;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.exchange.port.Coordinate;
+import io.nxmatic.rke2lab.exchange.port.Document;
+import io.nxmatic.rke2lab.exchange.port.Domain;
+import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * A FAILED node is a first-class render state, and the doctor's diagnosis is rendered onto it. A
- * failed scenario renders FAILED; when a {@link ConsultationReport} is recorded for that
- * checkpoint, its Diagnosis (⚕ generalist summary) and Mitigation (℞ prescriptions) appear on the
- * node, joined to the {@code ScenarioModel} by {@link Checkpoint#scenarioTitle()}.
+ * failed scenario renders FAILED; when a consultation {@link Document} is recorded for that
+ * checkpoint, the OSGi-rendered {@code diagnosisAdoc} text appears on the node, joined to the
+ * {@code ScenarioModel} by {@link Checkpoint#scenarioTitle()}. The doctor reasons OSGi-side now, so
+ * the runbook reads the already-rendered AsciiDoc string — it builds no {@code RemediationPlan}
+ * itself.
  *
  * <p>Plays the systemd-adapter scenario the same way the checkpoint does on failure (the {@code
  * Then} throws, so {@code finished()} is skipped), then renders the shared model with a
- * consultation log and asserts the doctor's prescription survives into a readable runbook.
+ * consultation log of Documents and asserts the diagnosis text survives into a readable runbook.
  */
 class RunbookRenderingTest {
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Test
   void failed_node_renders_the_doctor_diagnosis(@TempDir Path outputDir) {
@@ -51,29 +50,15 @@ class RunbookRenderingTest {
     assertEquals(1, runbook.getScenarios().size());
     assertEquals(ExecutionStatus.FAILED, runbook.getScenarios().get(0).getExecutionStatus());
 
+    final String diagnosisAdoc =
+        "⚕ Diagnosis: the dbus-over-TCP endpoint refused the connection"
+            + "\n\n🔬 Assessment (dbus-tcp/connection-refused/v1): dbus-TCP endpoint refused the"
+            + " connection"
+            + "\n\n℞ Mitigation ("
+            + "restart-unit"
+            + "): restart the systemd-adapter unit";
     final ConsultationLog consultations = new ConsultationLog();
-    consultations.record(
-        new ConsultationReport(
-            Checkpoint.SYSTEMD_ADAPTER.slug(),
-            List.of(
-                Observation.failed(
-                    Symptom.CONNECTION_REFUSED,
-                    "dbus refused",
-                    Map.of("source", "systemd-adapter-probe"))),
-            new RemediationPlan(
-                Symptom.CONNECTION_REFUSED,
-                List.of(
-                    ReferralReply.reconstructed(
-                        Assessment.of(
-                            SchemaRef.of("dbus-tcp/connection-refused/v1"),
-                            Map.of(),
-                            "dbus-TCP endpoint refused the connection"),
-                        Optional.of(
-                            Prescription.of(
-                                RemediationProgramRef.RESTART_UNIT,
-                                Map.of("unit", "rke2lab-systemd-adapter.service"),
-                                "restart the systemd-adapter unit")))),
-                "the dbus-over-TCP endpoint refused the connection")));
+    consultations.record(consultationDocument(Checkpoint.SYSTEMD_ADAPTER.slug(), diagnosisAdoc));
 
     new RunbookRenderer(outputDir, message -> {}).render(runbook, consultations);
 
@@ -81,7 +66,8 @@ class RunbookRenderingTest {
     assertTrue(Files.exists(index), "runbook index should be rendered");
 
     final String report = readAll(outputDir.resolve("adoc"));
-    // FAILED rendered; and the doctor's diagnosis is now injected onto the failed node.
+    // FAILED rendered; and the doctor's OSGi-rendered diagnosis is now injected onto the failed
+    // node.
     assertTrue(
         report.contains("Systemd adapter becomes reachable"),
         "runbook should name the failed scenario");
@@ -92,36 +78,19 @@ class RunbookRenderingTest {
         "the assessment summary should render");
     assertTrue(report.contains("Mitigation"), "the doctor's Mitigation section should render");
     assertTrue(
-        report.contains(RemediationProgramRef.RESTART_UNIT.id()),
-        "the restart-systemd-unit prescription should render");
+        report.contains("restart-unit"), "the restart-systemd-unit prescription should render");
   }
 
   @Test
   void declined_reply_renders_a_why_not_silence(@TempDir Path outputDir) {
     final ReportModel runbook = playFailingScenario();
 
-    final ReferralReply declined =
-        ReferralReply.reconstructed(
-            Assessment.of(
-                SchemaRef.of("network/reachability/v1"),
-                Map.of("symptom", "connection-refused"),
-                "endpoint unreachable at the TCP layer; no network-level remediation — the listener is down, not the path"),
-            Optional.empty());
-    final RemediationPlan plan =
-        new RemediationPlan(
-            Symptom.CONNECTION_REFUSED, List.of(declined), "consulted [NETWORK]; assessment only");
-    final ConsultationReport report =
-        new ConsultationReport(
-            Checkpoint.SYSTEMD_ADAPTER.slug(),
-            List.of(
-                Observation.failed(
-                    Symptom.CONNECTION_REFUSED,
-                    "dbus refused",
-                    Map.of("source", "systemd-adapter-probe"))),
-            plan);
-
+    final String diagnosisAdoc =
+        "⚕ Diagnosis: consulted [NETWORK]; assessment only"
+            + "\n\n🔬 Assessment (network/reachability/v1): endpoint unreachable at the TCP layer;"
+            + " no network-level remediation — the listener is down, not the path";
     final ConsultationLog consultations = new ConsultationLog();
-    consultations.record(report);
+    consultations.record(consultationDocument(Checkpoint.SYSTEMD_ADAPTER.slug(), diagnosisAdoc));
 
     new RunbookRenderer(outputDir, message -> {}).render(runbook, consultations);
 
@@ -133,6 +102,19 @@ class RunbookRenderingTest {
     assertFalse(
         rendered.contains("℞ Mitigation"),
         "a declining reply (no prescription) should NOT render Mitigation");
+  }
+
+  /** A consultation Document carrying the OSGi-rendered diagnosisAdoc for the checkpoint slug. */
+  private static Document consultationDocument(String scenarioId, String diagnosisAdoc) {
+    final ObjectNode payload = MAPPER.createObjectNode();
+    payload.put(ExchangeCatalog.FIELD_SCENARIO_ID, scenarioId);
+    payload.put(ExchangeCatalog.FIELD_DIAGNOSIS_ADOC, diagnosisAdoc);
+    try {
+      return new Document(
+          Domain.DOCTOR.slug(), Coordinate.CONSULTATION.slug(), MAPPER.writeValueAsString(payload));
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   /**

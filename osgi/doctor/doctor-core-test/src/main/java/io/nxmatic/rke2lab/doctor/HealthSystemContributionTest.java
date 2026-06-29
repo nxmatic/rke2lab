@@ -10,6 +10,7 @@ import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Patient;
 import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.doctor.spi.ClinicalReasoning;
 import io.nxmatic.rke2lab.junit.testkit.diagnostic.ScrDiagnostics;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -58,7 +59,8 @@ class HealthSystemContributionTest {
     final ConsultingService doctor = healthSystem.admit(DEV);
     final Observation observation =
         Observation.failed(Symptom.CONNECTION_REFUSED, "dbus refused", Map.of());
-    final RemediationPlan plan = doctor.consult(Symptom.CONNECTION_REFUSED, observation);
+    final RemediationPlan plan =
+        doctor.adapt(ClinicalReasoning.class).consult(Symptom.CONNECTION_REFUSED, observation);
     assertTrue(
         plan.hasPrescriptions(),
         "the consult must carry the DS-contributed diagnostician's prescription — the tier-scoped"

@@ -373,7 +373,8 @@ public final class BootstrapPipeline {
               state.doctor,
               liveProbe,
               summary -> state.systemdAdapterLaunchSummary = summary,
-              state.readinessAuthority);
+              state.readinessAuthority,
+              state.bootstrapResult.deployment().timestamp());
       state.runner.runDuring(topic, stage, body, state.onFailure);
       return new SystemdAdapterDone(state);
     }

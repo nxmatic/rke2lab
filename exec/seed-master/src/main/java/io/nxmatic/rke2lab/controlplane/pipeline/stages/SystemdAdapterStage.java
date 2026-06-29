@@ -16,9 +16,7 @@ import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
-import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.exchange.port.Action;
 import io.nxmatic.rke2lab.exchange.port.Coordinate;
@@ -27,7 +25,7 @@ import io.nxmatic.rke2lab.exchange.port.Domain;
 import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.pipeline.TopicFailure;
-import java.util.List;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -60,6 +58,13 @@ public final class SystemdAdapterStage {
   private final ReadinessAuthority readinessAuthority;
 
   /**
+   * The run's stable instant (the deployment timestamp), written into the consult checkpoint so
+   * OSGi stamps the expectations it derives — one source of truth shared with the egress, so the
+   * Pulumi state shows no drift. Absent on the verdict-only test path (no consult runs there).
+   */
+  @Nullable private final Instant recordedAt;
+
+  /**
    * The seam payload is a serialized JSON String; the host builds/reads it with its own jackson.
    */
   private final ObjectMapper mapper = new ObjectMapper();
@@ -74,7 +79,8 @@ public final class SystemdAdapterStage {
       @Nullable ConsultingService doctor,
       SystemdAdapterProbe liveProbe,
       Consumer<Map<String, Object>> sink,
-      ReadinessAuthority readinessAuthority) {
+      ReadinessAuthority readinessAuthority,
+      Instant recordedAt) {
     this.config = config;
     this.policy = policy;
     this.pulumiMode = pulumiMode;
@@ -85,14 +91,15 @@ public final class SystemdAdapterStage {
     this.liveProbe = liveProbe;
     this.sink = sink;
     this.readinessAuthority = readinessAuthority;
+    this.recordedAt = recordedAt;
   }
 
   /**
    * The verdict-decision seam, without the optional reporting collaborators — package-private so it
-   * stays off the prod public API: the only caller is the same-package test fixture, which bridges
+   * stays off the live public API: the only caller is the same-package test fixture, which bridges
    * it to a public factory. A proof that exercises only the failing-probe → authority-verdict path
-   * has no runbook, consultation log, or doctor to supply; routing through this overload keeps that
-   * absence here rather than as three nulls at the call site.
+   * has no runbook, consultation log, doctor, or recordedAt to supply; routing through this
+   * overload keeps that absence here rather than as nulls at the call site.
    */
   SystemdAdapterStage(
       BootstrapConfig config,
@@ -112,7 +119,8 @@ public final class SystemdAdapterStage {
         null,
         liveProbe,
         sink,
-        readinessAuthority);
+        readinessAuthority,
+        null);
   }
 
   public SystemdAdapterStage launch() {
@@ -229,23 +237,39 @@ public final class SystemdAdapterStage {
   }
 
   /**
-   * The patient consults the doctor on failure: route the captured observation's symptom to the
-   * Generalist, log the prescriptions, and keep the plan on a {@link ConsultationReport} in the
-   * shared log (no longer dropped). A symptomless or absent observation (e.g. failure before the
-   * probe ran) has nothing to route, so the consultation is skipped. A null doctor (test fixture)
-   * also skips the consultation, as the verdict decision is independent of the consult.
+   * The patient consults the doctor on failure: the host crosses the captured observation as a
+   * checkpoint {@link Document}, the doctor reasons OSGi-side (routing, plan, narration, the
+   * rendered AsciiDoc), and the host logs the returned narration and keeps the consultation
+   * Document in the shared log — no doctor type held host-side. A symptomless or absent observation
+   * (failure before the probe ran) has nothing to route, so the consultation is skipped; a null
+   * doctor (test fixture) also skips it, as the verdict decision is independent of the consult.
    */
   private void consultDoctor(Observation observation) {
     if (doctor == null || observation == null || observation.symptom().isEmpty()) {
       return;
     }
-    final Symptom symptom = observation.symptom().get();
-    log("⚕ " + doctor.consultedLine(symptom));
-    log("⚕ " + doctor.cohortFinding(symptom));
-    final RemediationPlan plan = doctor.consult(symptom, observation);
+    final Document consultation = doctor.consult(consultCheckpoint(observation));
+    log("⚕ " + parse(consultation.payload()).path(ExchangeCatalog.FIELD_NARRATION).asText());
     if (consultations != null) {
-      consultations.record(new ConsultationReport(SCENARIO_ID, List.of(observation), plan));
+      consultations.record(consultation);
     }
+  }
+
+  /**
+   * The consult checkpoint Document: the captured observation (one, in the flat {@code
+   * Observation.toOutputMap} shape — the symptom slug travels in it) plus the run's stable {@code
+   * recordedAt}, so OSGi reconstructs the observation and stamps the expectations it derives. A
+   * distinct concern from {@link #checkpointDocument} (the verdict checkpoint the authority reads).
+   */
+  private Document consultCheckpoint(Observation observation) {
+    final ObjectNode payload = mapper.createObjectNode();
+    payload.put(ExchangeCatalog.FIELD_SCENARIO_ID, SCENARIO_ID);
+    payload.put(ExchangeCatalog.FIELD_RECORDED_AT, recordedAt.toString());
+    payload
+        .putArray(ExchangeCatalog.FIELD_OBSERVATIONS)
+        .add(mapper.valueToTree(observation.toOutputMap()));
+    return new Document(
+        Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), serialize(payload));
   }
 
   private Observation degradedObservation(Throwable failure) {

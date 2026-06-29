@@ -37,8 +37,7 @@ class DocumentTest {
   void consultationFieldsArePinned() {
     assertEquals("narration", ExchangeCatalog.FIELD_NARRATION);
     assertEquals("diagnosisAdoc", ExchangeCatalog.FIELD_DIAGNOSIS_ADOC);
-    assertEquals("symptomKind", ExchangeCatalog.FIELD_SYMPTOM_KIND);
-    assertEquals("summary", ExchangeCatalog.FIELD_SUMMARY);
-    assertEquals("details", ExchangeCatalog.FIELD_DETAILS);
+    assertEquals("observations", ExchangeCatalog.FIELD_OBSERVATIONS);
+    assertEquals("recordedAt", ExchangeCatalog.FIELD_RECORDED_AT);
   }
 }

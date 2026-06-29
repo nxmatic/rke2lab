@@ -52,9 +52,14 @@ zones then consume it.
   twin of 2A's `assess`). The OSGi authority (`Generalist`, assembled by `ConsultationDag`) produces
   the consultation Document: the narration strings AND the rendered AsciiDoc diagnosis block (it owns
   the `RemediationPlan`). The graph assembler `DoctorGraph` is renamed `ConsultationDag` (it is the
-  producer of the consultation DAG). The three old verbs (`consult(Symptom,Observation)`, `consultedLine`,
-  `cohortFinding`) are removed once both host zones stop calling them; the two reconstruction verbs
-  (`recordForCurrentPatient`, `reviewOpenProblems`) stay untouched (zone-3 / 2C).
+  producer of the consultation DAG). The three old record-typed verbs (`consult(Symptom,Observation)`,
+  `consultedLine`, `cohortFinding`) LEAVE the `ConsultingService` seam once both host zones stop calling
+  them — they move to a new bundle-side interface `ClinicalReasoning` (doctor-spi), the doctor's
+  INTERNAL reasoning surface that the host can never reach. The doctor's own in-container actor tests
+  reach it via `consultingService.adapt(ClinicalReasoning.class)` — a face-by-capability `adapt(Class)`
+  default method on `ConsultingService` (the OSGi `adapt` idiom), so the reasoning is identified and
+  exercised without widening the seam. The two reconstruction verbs (`recordForCurrentPatient`,
+  `reviewOpenProblems`) stay untouched (zone-3 / 2C).
 
 | *zone-1 — systemd-adapter*
 | `SystemdAdapterStage` calls `consult(checkpoint)`, logs `consultation.narration`, and the runbook

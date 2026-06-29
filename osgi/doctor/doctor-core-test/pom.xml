@@ -53,6 +53,17 @@
       <scope>provided</scope>
     </dependency>
 
+    <!-- the doctor's internal contracts the actor tests adapt to: ClinicalReasoning (the routing/
+         narration face reached via ConsultingService.adapt) + Clinician/Specialist. Direct, not
+         transitive — every imported class comes from a direct dependency. provided: resolved against
+         the doctor-core host at runtime. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>doctor-spi</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
     <!-- GeneralistConsultDocumentTest builds checkpoint Documents (the exchange seam) and reads
          consultations with its own jackson (the seam payload is a serialized JSON String). Direct,
          not transitive — every imported class must come from a direct dependency. provided: the

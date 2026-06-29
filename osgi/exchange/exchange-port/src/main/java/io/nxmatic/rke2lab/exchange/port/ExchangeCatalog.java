@@ -24,17 +24,35 @@ public final class ExchangeCatalog {
   /** Consultation payload: the specialists' rendered AsciiDoc diagnosis. */
   public static final String FIELD_DIAGNOSIS_ADOC = "diagnosisAdoc";
 
-  /** Checkpoint payload: the symptom kind discriminator. */
-  public static final String FIELD_SYMPTOM_KIND = "symptomKind";
-
-  /** Checkpoint payload: the symptom's summary text. */
-  public static final String FIELD_SUMMARY = "summary";
-
-  /** Checkpoint payload: the symptom's detail text. */
-  public static final String FIELD_DETAILS = "details";
+  /**
+   * Checkpoint payload: the captured observations, a list of the flat {@code
+   * Observation.toOutputMap} shape (status, summary, the symptom slug under its envelope key,
+   * details). One for the systemd-adapter checkpoint, N (one per phase) for cluster-readiness — a
+   * uniform schema across both consult paths, so OSGi keeps every observation in the reconstructed
+   * record (no information lost at the seam). OSGi routes on the first observation carrying a
+   * symptom.
+   */
+  public static final String FIELD_OBSERVATIONS = "observations";
 
   /** Checkpoint payload: the host's run instant (ISO-8601 string) for expectation timestamps. */
   public static final String FIELD_RECORDED_AT = "recordedAt";
+
+  /**
+   * Consultation payload + Pulumi egress key: the structured consultation report sub-tree
+   * (checkpointId + observations + plan). The host copies it opaquely from the consultation
+   * Document to this output key; reconstruction reads it back by the same name. Must equal {@code
+   * ConsultationReport.OUTPUT_KEY} (the doctor-side producer) — the shared seam name, so neither
+   * side hardcodes the literal.
+   */
+  public static final String FIELD_CONSULTATION_REPORT = "consultationReport";
+
+  /**
+   * Consultation payload + Pulumi egress key: the structured expectations sub-tree (what a
+   * prescribing consultation predicts will resolve by the next visit). Copied opaquely to this
+   * output key; reconstruction reads it back by the same name. Must equal {@code
+   * Expectation.OUTPUT_KEY}.
+   */
+  public static final String FIELD_EXPECTATIONS = "expectations";
 
   /** Verdict payload: the provisioning action (see {@link Action} for values). */
   public static final String FIELD_ACTION = "action";

@@ -1,12 +1,14 @@
 package io.nxmatic.rke2lab.controlplane.systemd;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;
 import com.pulumi.resources.ComponentResourceOptions;
 import com.pulumi.resources.Resource;
-import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
-import io.nxmatic.rke2lab.doctor.records.Expectation;
-import java.time.Instant;
+import io.nxmatic.rke2lab.exchange.port.Document;
+import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,13 +26,12 @@ public final class SystemdAdapterResource extends ComponentResource {
   public SystemdAdapterResource(
       String name,
       Map<String, Object> summary,
-      Optional<ConsultationReport> consultation,
-      Instant recordedAt,
+      Optional<Document> consultation,
       Resource dependsOnResource) {
     super(TYPE_TOKEN, name, buildOptions(dependsOnResource));
 
     this.summary = Map.copyOf(summary == null ? Map.of() : summary);
-    registerOutputs(asResourceOutputs(this.summary, consultation, recordedAt));
+    registerOutputs(asResourceOutputs(this.summary, consultation));
   }
 
   public Map<String, Object> summary() {
@@ -46,21 +47,51 @@ public final class SystemdAdapterResource extends ComponentResource {
   }
 
   private static Map<String, Output<?>> asResourceOutputs(
-      Map<String, Object> summary, Optional<ConsultationReport> consultation, Instant recordedAt) {
+      Map<String, Object> summary, Optional<Document> consultation) {
     final LinkedHashMap<String, Output<?>> outputs = new LinkedHashMap<>();
     summary.forEach((key, value) -> outputs.put(key, Output.of(value)));
     // Additive, per-node only: the diagnostic layer lives under this component resource in state,
-    // never at top level (the Stage-B stack contract stays byte-identical). A prescribing
-    // consultation also writes what it predicts, so the next visit can detect whether the
-    // intervention resolved the symptom.
-    consultation.ifPresent(
-        report -> {
-          outputs.put(ConsultationReport.OUTPUT_KEY, Output.of(report.toOutputMap()));
-          outputs.put(
-              Expectation.OUTPUT_KEY,
-              Output.of(
-                  report.expectations(recordedAt).stream().map(Expectation::toOutputMap).toList()));
-        });
+    // never at top level (the Stage-B stack contract stays byte-identical). The doctor reasons
+    // OSGi-side; the host copies the structured sub-trees OPAQUELY from the consultation Document
+    // to
+    // the same output keys (it holds no doctor type), and reconstruction reads them back by name.
+    consultation.ifPresent(document -> copyDiagnosticOutputs(document, outputs));
     return outputs;
+  }
+
+  /**
+   * Copy the consultation Document's structured sub-trees to the egress keys, opaque to the host.
+   */
+  private static void copyDiagnosticOutputs(
+      Document consultation, LinkedHashMap<String, Output<?>> outputs) {
+    final JsonNode payload = parse(consultation.payload());
+    final JsonNode report = payload.path(ExchangeCatalog.FIELD_CONSULTATION_REPORT);
+    if (report.isObject()) {
+      outputs.put(ExchangeCatalog.FIELD_CONSULTATION_REPORT, Output.of(asPlainObject(report)));
+    }
+    final JsonNode expectations = payload.path(ExchangeCatalog.FIELD_EXPECTATIONS);
+    if (expectations.isArray()) {
+      outputs.put(ExchangeCatalog.FIELD_EXPECTATIONS, Output.of(asPlainList(expectations)));
+    }
+  }
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  private static JsonNode parse(String payload) {
+    try {
+      return MAPPER.readTree(payload);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("malformed consultation payload", e);
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> asPlainObject(JsonNode node) {
+    return MAPPER.convertValue(node, Map.class);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<Object> asPlainList(JsonNode node) {
+    return MAPPER.convertValue(node, List.class);
   }
 }

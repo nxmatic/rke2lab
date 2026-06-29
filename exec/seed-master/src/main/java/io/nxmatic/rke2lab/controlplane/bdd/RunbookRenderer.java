@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tngtech.jgiven.report.asciidoc.AsciiDocReportConfig;
 import com.tngtech.jgiven.report.asciidoc.AsciiDocReportGenerator;
 import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
@@ -7,9 +9,8 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.ScenarioModel;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
-import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
-import io.nxmatic.rke2lab.doctor.records.ReferralReply;
-import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
+import io.nxmatic.rke2lab.exchange.port.Document;
+import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -111,10 +112,26 @@ public final class RunbookRenderer {
     if (consultations == null || consultations.consultations().isEmpty()) {
       return;
     }
-    for (ConsultationReport report : consultations.consultations()) {
-      Checkpoint.fromSlug(report.checkpointId())
+    final ObjectMapper mapper = new ObjectMapper();
+    for (Document consultation : consultations.consultations()) {
+      final String slug = field(mapper, consultation, ExchangeCatalog.FIELD_SCENARIO_ID);
+      final String diagnosisAdoc =
+          field(mapper, consultation, ExchangeCatalog.FIELD_DIAGNOSIS_ADOC);
+      if (diagnosisAdoc.isEmpty()) {
+        continue;
+      }
+      Checkpoint.fromSlug(slug)
           .flatMap(checkpoint -> scenarioFor(model, checkpoint))
-          .ifPresent(scenario -> scenario.setExtendedDescription(diagnosisBlock(report.plan())));
+          .ifPresent(scenario -> scenario.setExtendedDescription(diagnosisAdoc));
+    }
+  }
+
+  /** Read one field from a consultation Document's opaque JSON payload (empty when absent). */
+  private static String field(ObjectMapper mapper, Document consultation, String key) {
+    try {
+      return mapper.readTree(consultation.payload()).path(key).asText();
+    } catch (JsonProcessingException e) {
+      return "";
     }
   }
 
@@ -122,31 +139,6 @@ public final class RunbookRenderer {
     return model.getScenarios().stream()
         .filter(scenario -> checkpoint.scenarioTitle().equals(scenario.getDescription()))
         .findFirst();
-  }
-
-  /**
-   * The Diagnosis (⚕ generalist summary) + Assessment (🔬 specialist reasoning) + Mitigation (℞
-   * prescriptions) block, as AsciiDoc text. Each reply's assessment is always rendered; its
-   * prescription (mitigation) is rendered only when present.
-   */
-  private String diagnosisBlock(RemediationPlan plan) {
-    final StringBuilder block = new StringBuilder();
-    block.append("⚕ Diagnosis: ").append(plan.generalistSummary());
-    for (ReferralReply reply : plan.replies()) {
-      block
-          .append("\n\n🔬 Assessment (")
-          .append(reply.assessment().schemaRef().id())
-          .append("): ")
-          .append(reply.assessment().summary());
-      if (reply.hasPrescription()) {
-        block
-            .append("\n\n℞ Mitigation (")
-            .append(reply.prescription().get().programRef().id())
-            .append("): ")
-            .append(reply.prescription().get().humanHint());
-      }
-    }
-    return block.toString();
   }
 
   private void recreate(Path dir) throws IOException {

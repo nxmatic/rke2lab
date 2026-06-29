@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulumi.deployment.Deployment;
 import com.pulumi.deployment.DeploymentInstance;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
@@ -20,6 +21,7 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
 import io.nxmatic.rke2lab.doctor.ExactRosterDoctor;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
+import io.nxmatic.rke2lab.doctor.port.ConsultationReportReader;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
@@ -33,6 +35,8 @@ import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Specialty;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
+import io.nxmatic.rke2lab.exchange.port.Document;
+import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,6 +60,31 @@ class NestedRunbookTest {
 
   private static final Map<String, Object> REACHABLE_SYSTEMD_ADAPTER =
       Map.of("status", "ok", "summary", "dbusEndpoint reachable");
+
+  /**
+   * A fixed run instant for the consult checkpoint (deterministic — no wall-clock in the state).
+   */
+  private static final java.time.Instant RECORDED_AT =
+      java.time.Instant.parse("2026-06-29T00:00:00Z");
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  /**
+   * Reconstruct the {@link ConsultationReport} a recorded consultation {@link Document} carries,
+   * via the same {@link ConsultationReportReader} the egress/medical-record reconstruction uses —
+   * so the assertions prove the round-trip keeps the plan, not just that a Document was recorded.
+   */
+  private static ConsultationReport reconstruct(Document consultation) {
+    try {
+      final var report =
+          MAPPER.readTree(consultation.payload()).path(ExchangeCatalog.FIELD_CONSULTATION_REPORT);
+      @SuppressWarnings("unchecked")
+      final Map<String, Object> reportMap = MAPPER.convertValue(report, Map.class);
+      return ConsultationReportReader.fromOutputMap(reportMap).orElseThrow();
+    } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+      throw new IllegalStateException(e);
+    }
+  }
 
   private static final Patient TEST_PATIENT = new Patient("organization", "rke2lab", "test");
 
@@ -161,9 +190,7 @@ class NestedRunbookTest {
     assertEquals(1, consultations.consultations().size(), "the stage should consult the doctor");
     assertEquals(
         RemediationProgramRef.CHECK_CONNECTIVITY,
-        consultations
-            .consultations()
-            .get(0)
+        reconstruct(consultations.consultations().get(0))
             .plan()
             .primaryPrescription()
             .orElseThrow()
@@ -196,7 +223,7 @@ class NestedRunbookTest {
         1,
         consultations.consultations().size(),
         "the failing checkpoint should record one consultation");
-    final ConsultationReport consultation = consultations.consultations().get(0);
+    final ConsultationReport consultation = reconstruct(consultations.consultations().get(0));
     assertEquals(
         Symptom.TIMEOUT, consultation.symptom(), "the consultation names the raised symptom");
     assertTrue(
@@ -276,7 +303,8 @@ class NestedRunbookTest {
             doctor,
             probe,
             REACHABLE_SYSTEMD_ADAPTER,
-            result -> holder[0] = result)
+            result -> holder[0] = result,
+            RECORDED_AT)
         .launch();
     return holder[0];
   }

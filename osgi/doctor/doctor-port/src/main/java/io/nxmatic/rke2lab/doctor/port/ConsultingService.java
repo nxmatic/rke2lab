@@ -19,34 +19,30 @@ public interface ConsultingService {
    * Consult on a checkpoint: route its symptom + observation to the specialists and synthesize the
    * narration and the rendered AsciiDoc diagnosis, returned as a {@code consultation} Document. The
    * twin of {@link io.nxmatic.rke2lab.exchange.port.ReadinessAuthority#assess} — same checkpoint,
-   * the consulting concern rather than the provisioning verdict.
+   * the consulting concern rather than the provisioning verdict. The ONLY consult verb that crosses
+   * the seam; the record-typed routing/narration is the bundle-side {@link
+   * io.nxmatic.rke2lab.doctor.spi.ClinicalReasoning}, reached via {@link #adapt}.
    */
   Document consult(Document checkpoint);
-
-  /**
-   * The patient consults: route the symptom + the captured {@link Observation} to the relevant
-   * specialists and synthesize their replies into a {@link RemediationPlan}.
-   */
-  RemediationPlan consult(Symptom symptom, Observation observation);
 
   /**
    * The admitted patient's {@link MedicalRecord}, read through the model's grant-checked access.
    */
   MedicalRecord recordForCurrentPatient();
 
-  /** A one-line cross-patient finding for the symptom, folded across the granted cohort. */
-  String cohortFinding(Symptom symptom);
-
-  /**
-   * The one-line consultation narration for the symptom — "consulted with N prior visit(s); SYMPTOM
-   * seen K× before" — folded over the admitted patient's own record. Twin of {@link
-   * #cohortFinding(Symptom)}: both render a narration line the consulting stages log.
-   */
-  String consultedLine(Symptom symptom);
-
   /**
    * The follow-up coordination at reconstruction: for every resolved expectation on the record,
    * review the problem against the loaded {@link InterventionLedger} and collect the drift letters.
    */
   List<ReferralReply> reviewOpenProblems(MedicalRecord record, InterventionLedger ledger);
+
+  /**
+   * The face of this service that implements {@code type}, or {@code null} if it does not — the
+   * face-by-capability idiom (cf. OSGi's {@code adapt}). The host uses only the seam verbs above;
+   * the doctor's own in-container tests reach the bundle-side {@link
+   * io.nxmatic.rke2lab.doctor.spi.ClinicalReasoning} through this, without widening the seam.
+   */
+  default <T> T adapt(Class<T> type) {
+    return type.isInstance(this) ? type.cast(this) : null;
+  }
 }
