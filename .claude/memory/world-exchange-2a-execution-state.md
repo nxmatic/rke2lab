@@ -1,6 +1,6 @@
 ---
 name: world-exchange-2a-execution-state
-description: World-exchange 2A SHIPPED on feature/cluster-edge (2026-06-27) — readiness verdict crosses as a Document, ControlplanePolicy doctor-free, a Plan-1 gate cold-tree deadlock fixed, and the in-container proxy tests refactored to DERIVE their install closure from the host. 2B is SPECCED + PLANNED + COMMITTED (4c91a852), ready to EXECUTE subagent-driven — the consult path crosses as a Document, by zone (shared seam first), see the 2B RESUME section at the bottom.
+description: World-exchange 2A SHIPPED on feature/cluster-edge (2026-06-27). 2B IN EXECUTION (subagent-driven) — zone-0 (Tasks 1-3) SHIPPED; zone-1 (Task 4) BLOCKED on a root cause proven 2026-06-28: Document.payload exposes a jackson JsonNode (bundle type) through a flat seam → LinkageError in-container. SEQUENCE DECIDED: S1 (slf4j test backend) → Option B (Document.payload becomes a String, exchange-port drops jackson) → SEAM_PURITY staging gate. See the "2B EXECUTION — RESUME HERE" section at the bottom + [[document-seam-cannot-expose-jackson-jsonnode]].
 metadata:
   type: project
 ---
@@ -112,3 +112,77 @@ Branch kept, never merged ([[external-worktree-operating-model-state]]). Folds t
 [[doctor-graph-vs-dag-vocabulary-backlog]] rename. See [[world-exchange-document-design]]
 [[realm-boundary-gate]] [[maven-build-cache-and-staging-verify]]
 [[felixframeworkextension-renamed-outofcontainer]] [[options-always-as-c4-diagrams]].
+
+## 2B EXECUTION — RESUME HERE (2026-06-28)
+
+Plan `wip/plans/2026-06-27-world-exchange-2b-consult-path.md`; SDD ledger `.superpowers/sdd/progress.md`
+(authoritative — trust it + `git log` over recollection after compaction). The design evolved a LOT via
+user dialogue beyond the original plan; the live state:
+
+**zone-0 SHIPPED (Tasks 1-3, reviewed, in the ledger):**
+- Task 1 (`864ec8d8`+`a892c8ee`+`bdd41226`+`71ce2da3`+`8a971397`): the typed seam vocabulary —
+  user flagged the catalog "fourre-tout" → lifted the closed value domains into seam enums
+  `Domain`/`Coordinate`/`Action`/`SymptomKind` (each `slug()`+`parse()`, byte-for-byte uniform);
+  `ExchangeCatalog` slimmed to `FIELD_*` schema keys ONLY. `Document` STAYS neutral; call sites write
+  `.slug()`. NO flat `Field` enum (the per-coordinate JSON Schema in 2D is the real field typing).
+  `consult(Document)` verb + exchange-port→doctor-port pom dep. Opus review Approved (first reviewer
+  FABRICATED — 0 tool calls; ALWAYS make reviewers quote verbatim identifiers from the diff).
+- Task 2 (`fc0e441e`+`c1949cc3`+`1bbfdce0`): `Generalist.consult(Document)` (parse checkpoint,
+  `toSymptom(SymptomKind)` exhaustive switch no-default, rebuild Observation, route, return narration
+  + diagnosisAdoc). User flagged 3 dispersed `new ObjectMapper()` → seam owns payload build via static
+  `Document.newPayload()`; the instance `DocumentCodec` @Component (YamlMapper's JSON twin) deferred to
+  2D ([[document-codec-instance-in-2d-backlog]]). Opus review Approved.
+- Task 3 (`45f8b7fd`): pure rename DoctorGraph→ConsultationDag.
+
+**zone-1 (Task 4) — the egress/reconstruction knot + the jackson root cause:**
+- User constraint (HARD): the Pulumi output must keep the SAME info (form may differ) AND the medical
+  record must stay reconstructible from the stack (the stack IS the record store). →
+  [[world-exchange-2b-zone1-egress-knot]]. Resolution A-struct: the consultation Document carries the
+  RENDERED strings AND the STRUCTURED plan/observations/expectations in the existing `toOutputMap()`
+  shapes, so `ConsultationReportReader`/`ExpectationReader` stay UNCHANGED; the probe KEEPS `Observation`
+  (egress+scenario), only the consult reasoning leaves the host. Task 4 in the plan is rewritten for this.
+- Task 4a (`acf44cca`, COMMITTED but BROKEN) enriched the consultation Document with the structured
+  sub-trees — but introduced a `LinkageError` in-container (proven root cause below). It compiles + passes
+  FLAT but FAILS `DoctorCoreInContainerTest` [15]/[16].
+
+**ROOT CAUSE (proven 2026-06-28, [[document-seam-cannot-expose-jackson-jsonnode]]):** `Document.payload()`
+returns a jackson `JsonNode` — a BUNDLE type — exposed through a FLAT `type=seam` (exchange-port). jackson
+is a bundle (user's standing rule: jackson enters OSGi via a bundle, not the JCL); the seam is flat → two
+`JsonNode` realms → `LinkageError` when doctor-core (bundle) touches a Document payload. Latent since 2A;
+revealed by the first in-container test that exercises it. Felix `@FrameworkLog(DEBUG)` on
+DoctorCoreInContainerTest gave the WIRE proof.
+
+**DECIDED SEQUENCE (do in this order):**
+1. **S1 — slf4j test backend (NOW, before Option B).** The `OutOfContainerFrameworkExtension.resolve()`
+   diagnostic runs HOST-side and logs via slf4j `LOG.error(... unsatisfiedRequirements(bundle))` — but
+   `@Osgi` testkit runs have NO backend (junit-testkit deps slf4j-api ONLY, on purpose — a 2nd provider
+   once broke jGiven resolve). Add a TEST-SCOPE backend (logback-classic + logback-test.xml) on
+   junit-testkit / the `-test` modules — host-side, NOT in the boot closure, so the jGiven trap can't
+   recur. Gives a voice to the already-written `unsatisfiedRequirements()`. VERIFY by re-running a jGiven
+   in-container test after, to prove resolve isn't re-broken. (S3 — a dedicated testkit resolve-failure
+   dump — only if S1 proves insufficient; `unsatisfiedRequirements()` already does S3's job, just muted.)
+2. **Option B — Document.payload becomes a String.** `Document(String domain, String coordinate, String
+   payload)`; drop `Document.newPayload()`; exchange-port DROPS its jackson dependency. Each world
+   serializes/parses with ITS jackson (doctor-core's bundle one; host's). Refactor the 2A foundation:
+   `Document`, `ReadinessAuthority.assess`/`DefaultReadinessAuthority`, `SystemdAdapterStage`,
+   `Generalist.consult`, all tests reading `payload()` as JsonNode. This SUPERSEDES Task 4a's approach
+   (4a's `acf44cca` enrichment is re-expressed as String serialization). REVERT/rework 4a's Generalist
+   change accordingly. Verify via `DoctorCoreInContainerTest` (NOT flat).
+3. **SEAM_PURITY staging gate.** Add to `StagingGate` (maven-embed-staging-ext): a `type=seam` bundle's
+   `Import-Package` may name ONLY system-exported (other seams)/JDK/OSGi packages — a bundle package
+   (jackson) = ERROR. Goes green exactly when Option B drops jackson from exchange-port. Freezes the
+   invariant.
+4. THEN finish zone-1 (Task 4 host migration: consultDoctor→Document, ConsultationLog carries Documents,
+   egress reads the structured payload into the same OUTPUT_KEYs, readers unchanged), zone-2 (Task 5),
+   runbook (Task 6), close-out (Task 7).
+
+**Working-tree state at compaction:** on top of `acf44cca`. `Generalist.java` reverted to `acf44cca`
+(the moot toNode experiment dropped). `DoctorCoreInContainerTest.java` has `@FrameworkLog(DEBUG)` +
+the FrameworkLog import ADDED (diagnostic lever — REMOVE once S1 lands). The renamed memory
+`document-seam-cannot-expose-jackson-jsonnode.md` is untracked. NOTHING half-written in prod code beyond
+4a (which is committed and will be reworked by Option B).
+
+**Reviewer reliability rule (learned this session):** a subagent reviewer that reports 0 tool calls or
+identifiers absent from the codebase has FABRICATED — discard, re-dispatch forcing verbatim diff quotes.
+Always re-run the IN-CONTAINER harness yourself for seam/Document changes; a flat `-Dtest=` hides
+two-realm collisions.
