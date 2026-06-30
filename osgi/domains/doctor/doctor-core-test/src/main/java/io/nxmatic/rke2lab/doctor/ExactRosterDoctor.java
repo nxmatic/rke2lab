@@ -6,8 +6,8 @@ import io.nxmatic.rke2lab.doctor.port.HealthSystem;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.*;
-import io.nxmatic.rke2lab.doctor.records.Patient;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
+import io.nxmatic.rke2lab.world.gateway.port.Patient;
 import java.util.List;
 import java.util.function.Consumer;
 

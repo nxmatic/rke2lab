@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.doctor.port.ConsultationReportReader;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
-import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Prescription;
@@ -17,6 +16,7 @@ import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
 import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
+import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

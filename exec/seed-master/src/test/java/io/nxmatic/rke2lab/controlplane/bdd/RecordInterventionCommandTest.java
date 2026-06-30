@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import static io.nxmatic.rke2lab.doctor.records.Checkpoint.SYSTEMD_ADAPTER;
 import static io.nxmatic.rke2lab.doctor.records.Symptom.CONNECTION_REFUSED;
+import static io.nxmatic.rke2lab.world.gateway.port.Checkpoint.SYSTEMD_ADAPTER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;

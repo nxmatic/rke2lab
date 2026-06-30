@@ -16,7 +16,7 @@ import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSn
 import io.nxmatic.rke2lab.controlplane.systemd.SystemdAdapterResource;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
-import io.nxmatic.rke2lab.doctor.records.Checkpoint;
+import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.util.Map;

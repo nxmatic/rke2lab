@@ -1,9 +1,9 @@
 package io.nxmatic.rke2lab.doctor.port;
 
-import static io.nxmatic.rke2lab.doctor.records.Checkpoint.CLUSTER_READINESS;
-import static io.nxmatic.rke2lab.doctor.records.Checkpoint.SYSTEMD_ADAPTER;
 import static io.nxmatic.rke2lab.doctor.records.Symptom.CONNECTION_REFUSED;
 import static io.nxmatic.rke2lab.doctor.records.Symptom.TIMEOUT;
+import static io.nxmatic.rke2lab.world.gateway.port.Checkpoint.CLUSTER_READINESS;
+import static io.nxmatic.rke2lab.world.gateway.port.Checkpoint.SYSTEMD_ADAPTER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;

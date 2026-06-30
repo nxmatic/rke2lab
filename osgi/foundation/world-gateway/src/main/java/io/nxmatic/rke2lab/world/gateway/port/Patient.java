@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.doctor.records;
+package io.nxmatic.rke2lab.world.gateway.port;
 
 /**
  * The org/project/stack identity of a Pulumi stack being diagnosed — the patient in the

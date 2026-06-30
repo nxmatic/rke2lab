@@ -2,7 +2,7 @@ package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.ClinicianId;
-import io.nxmatic.rke2lab.doctor.records.Patient;
+import io.nxmatic.rke2lab.world.gateway.port.Patient;
 
 /**
  * The right of a {@link ClinicianId} to read a {@link Patient}'s record. The grant key; there is no

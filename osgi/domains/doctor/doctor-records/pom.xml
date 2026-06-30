@@ -24,6 +24,11 @@
       <artifactId>domain-annotations</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>world-gateway</artifactId>
+      <version>${project.version}</version>
+    </dependency>
   </dependencies>
 
   <build>

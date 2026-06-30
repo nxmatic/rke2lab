@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.doctor.port;
 
-import io.nxmatic.rke2lab.doctor.records.Patient;
+import io.nxmatic.rke2lab.world.gateway.port.Patient;
 
 /**
  * The institution — the seam the host crosses to obtain a doctor. The health system already HOLDS

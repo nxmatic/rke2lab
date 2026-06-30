@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.nxmatic.rke2lab.doctor.internal.*;
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.ClinicianId;
-import io.nxmatic.rke2lab.doctor.records.Patient;
+import io.nxmatic.rke2lab.world.gateway.port.Patient;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

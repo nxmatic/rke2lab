@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
 import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
+import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

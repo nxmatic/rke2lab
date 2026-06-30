@@ -8,7 +8,7 @@ import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.ScenarioModel;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.records.Checkpoint;
+import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.io.File;

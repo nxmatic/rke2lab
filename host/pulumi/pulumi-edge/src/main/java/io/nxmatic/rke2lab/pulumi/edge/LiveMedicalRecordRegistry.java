@@ -4,7 +4,7 @@ import io.nxmatic.rke2lab.doctor.port.MedicalRecordReader;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordReconstructionException;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
-import io.nxmatic.rke2lab.doctor.records.Patient;
+import io.nxmatic.rke2lab.world.gateway.port.Patient;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;

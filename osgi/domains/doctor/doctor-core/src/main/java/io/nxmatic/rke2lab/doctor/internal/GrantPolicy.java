@@ -2,7 +2,7 @@ package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.ClinicianId;
-import io.nxmatic.rke2lab.doctor.records.Patient;
+import io.nxmatic.rke2lab.world.gateway.port.Patient;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;

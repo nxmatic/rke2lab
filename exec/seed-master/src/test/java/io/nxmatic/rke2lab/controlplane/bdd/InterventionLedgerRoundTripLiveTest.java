@@ -3,7 +3,6 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.Intervention;
 import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
 import io.nxmatic.rke2lab.doctor.records.ProblemRef;
@@ -12,6 +11,7 @@ import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.pulumi.edge.InterventionLedgerSource;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiInterventionLedgerWriter;
 import io.nxmatic.rke2lab.pulumi.edge.testkit.GrpcChannelNoiseCapture;
+import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;

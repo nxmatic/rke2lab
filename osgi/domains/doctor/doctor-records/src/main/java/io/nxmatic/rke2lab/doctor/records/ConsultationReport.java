@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.doctor.records;
 
+import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
