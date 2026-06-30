@@ -53,7 +53,8 @@ import java.util.stream.Collectors;
  * aggregates like {@code osgi.cmpn} in the BOM, backed by the build-parent {@code
  * bannedDependencies}) is the developer's job; this class only derives what to stage.
  */
-public record StagingClosure(List<ResolvedBundle> staged, List<String> trace) {
+public record StagingClosure(
+    List<ResolvedBundle> staged, List<String> trace, Set<String> realmLibraryGas) {
 
   /** Compute the staging closure over an exec-module's resolved dependency jars. */
   public static StagingClosure compute(List<ResolvedBundle> resolved) {
@@ -65,6 +66,16 @@ public record StagingClosure(List<ResolvedBundle> staged, List<String> trace) {
     return staged.stream()
         .map(ResolvedBundle::ga)
         .collect(Collectors.toCollection(LinkedHashSet::new));
+  }
+
+  /**
+   * The staged jars to EXCLUDE from the flat uber-jar — staged minus the realm libraries (a realm
+   * library is staged as a bundle AND kept flat in the host).
+   */
+  public Set<String> shadeExcludeGas() {
+    final Set<String> excludes = new LinkedHashSet<>(stagedGas());
+    excludes.removeAll(realmLibraryGas);
+    return excludes;
   }
 
   /** Drives the fixpoint; one instance per computation so the state stays local and explicit. */
@@ -79,6 +90,7 @@ public record StagingClosure(List<ResolvedBundle> staged, List<String> trace) {
             .collect(Collectors.toCollection(LinkedHashSet::new));
 
     private final Map<String, ResolvedBundle> stagedByGa = new LinkedHashMap<>();
+    private final Map<String, ResolvedBundle> realmLibraryByGa = new LinkedHashMap<>();
     private final Set<String> stagedExportedPackages = new LinkedHashSet<>();
     private final Deque<ResolvedBundle> frontier = new ArrayDeque<>();
     private final List<String> trace = new ArrayList<>();
@@ -91,8 +103,10 @@ public record StagingClosure(List<ResolvedBundle> staged, List<String> trace) {
 
     StagingClosure run() {
       seed();
+      seedRealmLibraries();
       close();
-      return new StagingClosure(new ArrayList<>(stagedByGa.values()), trace);
+      return new StagingClosure(
+          new ArrayList<>(stagedByGa.values()), trace, Set.copyOf(realmLibraryByGa.keySet()));
     }
 
     /** Map every exported package to ALL the resolved bundles that export it. */
@@ -130,6 +144,42 @@ public record StagingClosure(List<ResolvedBundle> staged, List<String> trace) {
           stage(bundle, "seed: boot-stack");
         }
       }
+    }
+
+    /**
+     * Third-party OSGi bundles exporting a package a domain bundle imports — staged AND kept flat.
+     */
+    private void seedRealmLibraries() {
+      final Set<String> domainImports = new LinkedHashSet<>();
+      for (ResolvedBundle b : resolved) {
+        if (b.embed() != null && b.embed().isDomain()) {
+          domainImports.addAll(b.imports().names());
+        }
+      }
+      for (ResolvedBundle b : resolved) {
+        if (isRealmLibrary(b, domainImports)) {
+          realmLibraryByGa.put(b.ga(), b);
+          stage(b, "seed: realm library (a domain bundle imports its export)");
+        }
+      }
+    }
+
+    /**
+     * A third-party OSGi bundle (not ours, not a seam, not the launcher) exporting a domain import.
+     */
+    private static boolean isRealmLibrary(ResolvedBundle b, Set<String> domainImports) {
+      if (!b.isBundle() || b.launcher()) {
+        return false;
+      }
+      if (b.embed() != null) {
+        return false; // ours (model/edge/record/seam) — not a third-party library.
+      }
+      for (String exported : b.exports().names()) {
+        if (!ResolvedBundle.isOurs(exported) && domainImports.contains(exported)) {
+          return true;
+        }
+      }
+      return false;
     }
 
     /** Close over MANDATORY, host-uncovered Import-Package until no new bundle is pulled in. */
