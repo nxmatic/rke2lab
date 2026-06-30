@@ -7,8 +7,8 @@
     <version>0.0.0-SNAPSHOT</version>
     <relativePath>../../bundle-parent/pom.xml</relativePath>
   </parent>
-  <artifactId>document-codec</artifactId>
-  <name>osgi/foundation/document-codec</name>
+  <artifactId>gateway-document-codec</artifactId>
+  <name>osgi/foundation/gateway-document-codec</name>
   <description>The Document payload codec logic, written once and loaded per realm: shaded flat into
     the host, nested into doctor-core's Bundle-ClassPath OSGi-side (-includeresource;lib:=true). A
     plain flat jar (no Bundle-SymbolicName) so the realm-library rule never stages it as an

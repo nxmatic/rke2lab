@@ -195,7 +195,7 @@
          realm-specific copies, no codec type crosses the seam. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>document-codec</artifactId>
+      <artifactId>gateway-document-codec</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The doctor diagnostic model: pure operator-runbook types lifted to OSGi. COMPILE scope (not

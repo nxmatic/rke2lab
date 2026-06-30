@@ -19,6 +19,6 @@
     <module>domain-annotations</module>
     <module>world-gateway</module>
     <module>pipeline</module>
-    <module>document-codec</module>
+    <module>gateway-document-codec</module>
   </modules>
 </project>
