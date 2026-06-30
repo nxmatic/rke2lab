@@ -3,12 +3,13 @@ package io.nxmatic.rke2lab.doctor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.internal.*;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
-import io.nxmatic.rke2lab.doctor.records.Intervention;
 import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Prescription;
@@ -22,6 +23,8 @@ import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.records.Visit;
 import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
+import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -47,9 +50,20 @@ class GeneralistDriftReviewTest {
     return new ConsultationReport("systemd-adapter", List.of(), plan);
   }
 
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {};
+
+  private static Map<String, Object> payloadOf(Document document) {
+    try {
+      return MAPPER.readValue(document.payload(), MAP);
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
   @Test
   void resolvedExpectationIsReviewedAndExternalChangeInferred() {
-    final List<Intervention> captured = new ArrayList<>();
+    final List<Document> captured = new ArrayList<>();
     final DriftSpecialist drift = new DriftSpecialist(captured::add);
     final Generalist generalist =
         Generalist.builder()
@@ -79,8 +93,10 @@ class GeneralistDriftReviewTest {
     assertEquals(1, letters.size());
     assertEquals("drift/confounded-inferred/v1", letters.get(0).assessment().schemaRef().id());
     assertEquals(1, captured.size());
-    assertEquals(Provenance.EXTERNAL_CHANGE_DETECTED, captured.get(0).provenance());
-    assertEquals(problem, captured.get(0).problem());
+    assertEquals(Coordinate.INTERVENTION.slug(), captured.get(0).coordinate());
+    final Map<String, Object> inferred = payloadOf(captured.get(0));
+    assertEquals(Provenance.EXTERNAL_CHANGE_DETECTED.id(), inferred.get("provenance"));
+    assertEquals(problem.toRef(), inferred.get("problem"));
   }
 
   @Test
@@ -101,7 +117,7 @@ class GeneralistDriftReviewTest {
         new Visit(1, Instant.ofEpochSecond(2), List.of(connectionRefusedReport()), List.of());
 
     final MedicalRecord record2 = new MedicalRecord(PATIENT, List.of(visit1, visit2dirty));
-    final List<Intervention> captured2 = new ArrayList<>();
+    final List<Document> captured2 = new ArrayList<>();
     final Generalist g2 =
         Generalist.builder()
             .specialists(List.of())

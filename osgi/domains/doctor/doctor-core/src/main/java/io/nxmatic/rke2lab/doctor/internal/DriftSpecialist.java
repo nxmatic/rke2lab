@@ -74,20 +74,21 @@ public final class DriftSpecialist {
     }
 
     writer.append(
-        new Intervention(
-            Provenance.EXTERNAL_CHANGE_DETECTED,
-            review.nextVisit().when(),
-            "unexplained resolution of "
-                + review.problem().toRef()
-                + " between v"
-                + review.priorVisit().version()
-                + " and v"
-                + review.nextVisit().version(),
-            review.problem(),
-            Optional.empty(),
-            Map.of(
-                "windowFrom", review.priorVisit().when().toString(),
-                "windowTo", review.nextVisit().when().toString())));
+        InterventionDocuments.of(
+            new Intervention(
+                Provenance.EXTERNAL_CHANGE_DETECTED,
+                review.nextVisit().when(),
+                "unexplained resolution of "
+                    + review.problem().toRef()
+                    + " between v"
+                    + review.priorVisit().version()
+                    + " and v"
+                    + review.nextVisit().version(),
+                review.problem(),
+                Optional.empty(),
+                Map.of(
+                    "windowFrom", review.priorVisit().when().toString(),
+                    "windowTo", review.nextVisit().when().toString()))));
     return confoundedInferred(review);
   }
 

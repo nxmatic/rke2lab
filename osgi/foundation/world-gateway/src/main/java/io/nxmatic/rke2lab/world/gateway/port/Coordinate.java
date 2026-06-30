@@ -11,7 +11,11 @@ import java.util.Optional;
 public enum Coordinate {
   READINESS_CHECKPOINT("readiness-checkpoint"),
   READINESS_VERDICT("readiness-verdict"),
-  CONSULTATION("consultation");
+  CONSULTATION("consultation"),
+  /** The raw intervention facts the CLI pushes OSGi-side for canonicalization. */
+  INTERVENTION_REQUEST("intervention-request"),
+  /** The canonical intervention document OSGi returns and the ledger writer persists. */
+  INTERVENTION("intervention");
 
   private final String slug;
 

@@ -1,16 +1,20 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.nxmatic.rke2lab.doctor.port.InterventionIntake;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.doctor.records.Intervention;
-import io.nxmatic.rke2lab.doctor.records.ProblemRef;
-import io.nxmatic.rke2lab.doctor.records.Provenance;
-import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
+import io.nxmatic.rke2lab.osgi.runtime.BootPipeline;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiInterventionLedgerWriter;
+import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
-import java.util.Map;
-import java.util.Optional;
 
 /**
  * The operator's declaration command. When the operator fixes something out-of-band (e.g. {@code
@@ -19,101 +23,136 @@ import java.util.Optional;
  * closing that gap: the system learns WHO actually changed the world and stops attributing false
  * efficacy to its own engine.
  *
+ * <p>Option A: the host holds NO doctor type. It parses argv to raw strings, builds an {@code
+ * intervention-request} Document with its own jackson, and crosses the seam to the OSGi {@link
+ * InterventionIntake} verb that owns the intervention schema — it canonicalizes (or rejects) the
+ * facts and returns a canonical {@code intervention} Document, which the host then appends. The
+ * doctor vocabulary ({@code ProblemRef} / {@code Provenance} / {@code RemediationProgramRef}) never
+ * leaves the bundle.
+ *
  * <p>The wall clock is never read in the core. {@link #record(String[], Instant,
- * InterventionLedgerWriter)} is the testable seam — args, the run instant, and the writer are all
- * injected; only {@link #main(String[])} supplies {@link Instant#now()} and the real {@link
- * PulumiInterventionLedgerWriter}.
+ * InterventionIntake, InterventionLedgerWriter)} is the testable seam — args, the run instant, the
+ * canonicalize handle, and the writer are all injected; only {@link #main(String[])} supplies
+ * {@link Instant#now()}, boots the embedded framework for the real {@link InterventionIntake}, and
+ * builds the real {@link PulumiInterventionLedgerWriter}.
  */
 public final class RecordInterventionCommand {
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   private RecordInterventionCommand() {}
 
   /**
-   * Parses the arguments, builds the {@link Intervention}, appends it through the injected writer,
-   * and returns it. {@code --when} defaults to the injected {@code now}, so the core stays free of
-   * the wall clock.
+   * Parses argv to raw strings (keeping the flat well-formedness checks so obvious mistakes error
+   * early), builds the {@code intervention-request} Document, canonicalizes it through the OSGi
+   * verb, and appends the canonical Document through the injected writer. {@code --when} defaults
+   * to the injected {@code now}, so the core stays free of the wall clock.
+   *
+   * @return the canonical {@code intervention} Document that was appended
+   * @throws InterventionRejected if the verb returns an error verdict (a bad reference)
    */
-  static Intervention record(String[] args, Instant now, InterventionLedgerWriter writer) {
+  static Document record(
+      String[] args, Instant now, InterventionIntake intake, InterventionLedgerWriter writer) {
     final Args parsed = Args.parse(args);
-    final Intervention intervention =
-        new Intervention(
-            parsed.provenance,
-            parsed.when == null ? now : parsed.when,
-            parsed.what,
-            parsed.problem,
-            parsed.prescriptionRef,
-            Map.of());
-    writer.append(intervention);
-    return intervention;
+    final Instant when = parsed.when == null ? now : parsed.when;
+
+    final ObjectNode request = MAPPER.createObjectNode();
+    request.put(WorldGatewayCatalog.FIELD_PROBLEM, parsed.problem);
+    request.put(WorldGatewayCatalog.FIELD_WHAT, parsed.what);
+    if (parsed.provenance != null) {
+      request.put(WorldGatewayCatalog.FIELD_PROVENANCE, parsed.provenance);
+    }
+    if (parsed.prescriptionRef != null) {
+      request.put(WorldGatewayCatalog.FIELD_PRESCRIPTION_REF, parsed.prescriptionRef);
+    }
+    request.put(WorldGatewayCatalog.FIELD_WHEN, when.toString());
+
+    final Document rawFacts =
+        new Document(
+            Domain.DOCTOR.slug(), Coordinate.INTERVENTION_REQUEST.slug(), serialize(request));
+    final Document canonical = intake.canonicalize(rawFacts);
+    if (!Coordinate.INTERVENTION.slug().equals(canonical.coordinate())) {
+      throw new InterventionRejected(reasonOf(canonical));
+    }
+    writer.append(canonical);
+    return canonical;
   }
 
   public static void main(String[] args) {
     try {
       final Path backend = Args.backendOf(args);
-      record(args, Instant.now(), new PulumiInterventionLedgerWriter(backend));
+      BootPipeline.embedded()
+          .during(
+              "record-intervention",
+              InterventionIntake.class,
+              intake ->
+                  record(args, Instant.now(), intake, new PulumiInterventionLedgerWriter(backend)));
+    } catch (InterventionRejected rejected) {
+      System.err.println(rejected.getMessage());
+      System.exit(2);
     } catch (IllegalArgumentException e) {
       System.err.println(e.getMessage());
       System.exit(2);
     }
   }
 
+  /** The OSGi verb rejected the facts (a bad reference); the operator must fix the argv. */
+  static final class InterventionRejected extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
+    InterventionRejected(String reason) {
+      super("intervention rejected: " + reason);
+    }
+  }
+
+  private static String reasonOf(Document verdict) {
+    try {
+      final JsonNode payload = MAPPER.readTree(verdict.payload());
+      return payload.path(WorldGatewayCatalog.FIELD_REASON).asText("unknown reason");
+    } catch (JsonProcessingException e) {
+      return "unparseable verdict payload";
+    }
+  }
+
+  private static String serialize(JsonNode node) {
+    try {
+      return MAPPER.writeValueAsString(node);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("could not serialize intervention-request payload", e);
+    }
+  }
+
   private record Args(
-      ProblemRef problem,
-      String what,
-      Provenance provenance,
-      Optional<RemediationProgramRef> prescriptionRef,
-      Instant when) {
+      String problem, String what, String provenance, String prescriptionRef, Instant when) {
 
     private static final String USAGE =
         "usage: --problem <checkpoint[/symptom]> --what <text>"
             + " [--provenance <id>] [--prescription-ref <id>] [--when <iso>] [--backend <dir>]";
 
     static Args parse(String[] args) {
-      String problemArg = null;
+      String problem = null;
       String what = null;
-      String provenanceArg = null;
-      String prescriptionArg = null;
+      String provenance = null;
+      String prescriptionRef = null;
       String whenArg = null;
       for (int i = 0; i < args.length; i++) {
         final String flag = args[i];
         switch (flag) {
-          case "--problem" -> problemArg = value(args, ++i, flag);
+          case "--problem" -> problem = value(args, ++i, flag);
           case "--what" -> what = value(args, ++i, flag);
-          case "--provenance" -> provenanceArg = value(args, ++i, flag);
-          case "--prescription-ref" -> prescriptionArg = value(args, ++i, flag);
+          case "--provenance" -> provenance = value(args, ++i, flag);
+          case "--prescription-ref" -> prescriptionRef = value(args, ++i, flag);
           case "--when" -> whenArg = value(args, ++i, flag);
           case "--backend" -> i++;
           default -> throw new IllegalArgumentException("unknown flag: " + flag);
         }
       }
-      final String problemRef = problemArg;
-      final String provenanceRef = provenanceArg;
-      final String prescriptionRefArg = prescriptionArg;
-      if (problemRef == null) {
+      if (problem == null) {
         throw new IllegalArgumentException("missing --problem; " + USAGE);
       }
       if (what == null) {
         throw new IllegalArgumentException("missing --what; " + USAGE);
       }
-      final ProblemRef problem =
-          ProblemRef.parse(problemRef)
-              .orElseThrow(
-                  () -> new IllegalArgumentException("unknown --problem reference: " + problemRef));
-      final Provenance provenance =
-          provenanceRef == null
-              ? Provenance.OPERATOR_MANUAL
-              : Provenance.parse(provenanceRef)
-                  .orElseThrow(
-                      () -> new IllegalArgumentException("unknown --provenance: " + provenanceRef));
-      final Optional<RemediationProgramRef> prescriptionRef =
-          prescriptionRefArg == null
-              ? Optional.empty()
-              : Optional.of(
-                  RemediationProgramRef.parse(prescriptionRefArg)
-                      .orElseThrow(
-                          () ->
-                              new IllegalArgumentException(
-                                  "unknown --prescription-ref: " + prescriptionRefArg)));
       final Instant when = whenArg == null ? null : parseWhen(whenArg);
       return new Args(problem, what, provenance, prescriptionRef, when);
     }

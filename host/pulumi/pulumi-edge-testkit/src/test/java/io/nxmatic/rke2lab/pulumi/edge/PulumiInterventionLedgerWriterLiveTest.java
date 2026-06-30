@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.port.InterventionReader;
 import io.nxmatic.rke2lab.doctor.records.Intervention;
@@ -13,6 +14,9 @@ import io.nxmatic.rke2lab.doctor.records.Provenance;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.pulumi.edge.testkit.GrpcChannelNoiseCapture;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
+import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
@@ -47,9 +51,9 @@ final class PulumiInterventionLedgerWriterLiveTest {
             Optional.empty(),
             Map.of());
 
-    // Append it (does an out-of-run up())
+    // Append it (does an out-of-run up()) as the canonical intervention Document the seam carries.
     final InterventionLedgerWriter writer = new PulumiInterventionLedgerWriter(backendDir);
-    writer.append(it1);
+    writer.append(canonical(it1));
 
     // Read back via StackHandle
     final StackHandle handle =
@@ -108,8 +112,8 @@ final class PulumiInterventionLedgerWriterLiveTest {
             Map.of());
 
     final InterventionLedgerWriter writer = new PulumiInterventionLedgerWriter(backendDir);
-    writer.append(it1);
-    writer.append(it2);
+    writer.append(canonical(it1));
+    writer.append(canonical(it2));
 
     final StackHandle handle =
         StackHandle.forBackend(
@@ -136,5 +140,19 @@ final class PulumiInterventionLedgerWriterLiveTest {
 
     assertTrue(whats.contains("first fix"), "the first append must survive in history");
     assertTrue(whats.contains("second fix"), "the second append must survive in history");
+  }
+
+  /**
+   * Wrap an intervention into the canonical {@code intervention} Document the write seam carries.
+   */
+  private static Document canonical(Intervention intervention) {
+    try {
+      return new Document(
+          Domain.DOCTOR.slug(),
+          Coordinate.INTERVENTION.slug(),
+          new ObjectMapper().writeValueAsString(intervention.toOutputMap()));
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
   }
 }

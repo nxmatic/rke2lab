@@ -291,9 +291,21 @@ package — they belong at the seam (like 2A's checkpoint coordinate), not delet
 | host-pure: reads the timeline, transcodes its own opaque `consultationReport` blobs JSON→YAML. Drops
   the reader + `doctor.records` imports. No OSGi call.
 
+| `InterventionIntake` (NEW, doctor-port seam) + `DefaultInterventionIntake` (doctor-core `@Component`)
+| `canonicalize(Document rawFacts) : Document` — the ingress canonicalization verb that owns the
+  intervention schema. A *standalone* `@Component` (NOT a verb on `ConsultingService`): canonicalization
+  needs no patient/EHR/ledger, so SCR activates it without the CLI publishing any of those references —
+  the boot stays light (`awaitService(InterventionIntake.class)`, no patient admission). It parses the
+  raw-fact strings (`ProblemRef`/`Provenance`/`RemediationProgramRef`/`Instant`), builds the
+  `Intervention`, and returns its `toOutputMap` as a canonical `intervention` Document; an unparseable
+  reference returns an error verdict Document (a `reason`-bearing payload) rather than throwing across
+  the seam.
+
 | `RecordInterventionCommand` (host, modified)
-| IO host (parse argv) → push a raw intervention Document → OSGi canonicalizes → `append(Document)`.
-  Drops `Intervention`/`ProblemRef`/`Provenance`/`RemediationProgramRef` imports.
+| IO host (parse argv) → push a raw intervention-request Document → OSGi `InterventionIntake.canonicalize`
+  → `append(Document)`. Boots the embedded framework
+  (`BootPipeline.embedded().during("record-intervention", InterventionIntake.class, …)`), maps an error
+  verdict to exit code 2. Drops `Intervention`/`ProblemRef`/`Provenance`/`RemediationProgramRef` imports.
 
 | `ClusterSchemaRef` (cluster-port seam, modified)
 | stops referencing `doctor.records.SchemaRef` (the one cross-domain isolate).

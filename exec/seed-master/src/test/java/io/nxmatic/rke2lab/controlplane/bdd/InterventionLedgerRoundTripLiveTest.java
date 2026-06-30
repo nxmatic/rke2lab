@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.records.Intervention;
 import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
@@ -12,6 +13,9 @@ import io.nxmatic.rke2lab.pulumi.edge.InterventionLedgerSource;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiInterventionLedgerWriter;
 import io.nxmatic.rke2lab.pulumi.edge.testkit.GrpcChannelNoiseCapture;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
+import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
@@ -60,8 +64,8 @@ final class InterventionLedgerRoundTripLiveTest {
             Map.of());
 
     final InterventionLedgerWriter writer = new PulumiInterventionLedgerWriter(backendDir);
-    writer.append(first);
-    writer.append(second);
+    writer.append(canonical(first));
+    writer.append(canonical(second));
 
     // Read back via InterventionLedgerSource
     final InterventionLedgerSource source = new InterventionLedgerSource(backendDir);
@@ -84,5 +88,19 @@ final class InterventionLedgerRoundTripLiveTest {
     assertEquals(
         ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
         interventions.get(1).problem());
+  }
+
+  /**
+   * Wrap an intervention into the canonical {@code intervention} Document the write seam carries.
+   */
+  private static Document canonical(Intervention intervention) {
+    try {
+      return new Document(
+          Domain.DOCTOR.slug(),
+          Coordinate.INTERVENTION.slug(),
+          new ObjectMapper().writeValueAsString(intervention.toOutputMap()));
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
   }
 }

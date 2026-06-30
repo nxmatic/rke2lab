@@ -4,6 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.internal.*;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.records.*;
@@ -19,6 +22,8 @@ import io.nxmatic.rke2lab.doctor.records.ResolutionPredicate;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.records.Visit;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
+import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -67,10 +72,10 @@ class DriftSpecialistTest {
     assertEquals("drift/confounded-inferred/v1", reply.assessment().schemaRef().id());
 
     assertEquals(1, writer.captured.size());
-    final Intervention inferred = writer.captured.get(0);
-    assertEquals(Provenance.EXTERNAL_CHANGE_DETECTED, inferred.provenance());
-    assertEquals(problem, inferred.problem());
-    assertEquals(T2, inferred.when());
+    final Map<String, Object> inferred = writer.payloadOf(0);
+    assertEquals(Provenance.EXTERNAL_CHANGE_DETECTED.id(), inferred.get("provenance"));
+    assertEquals(problem.toRef(), inferred.get("problem"));
+    assertEquals(T2.toString(), inferred.get("when"));
   }
 
   @Test
@@ -134,11 +139,26 @@ class DriftSpecialistTest {
   }
 
   private static final class CapturingWriter implements InterventionLedgerWriter {
-    private final List<Intervention> captured = new ArrayList<>();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {};
+
+    private final List<Document> captured = new ArrayList<>();
 
     @Override
-    public void append(Intervention intervention) {
+    public void append(Document intervention) {
+      // Only the canonical intervention Document crosses the seam now.
+      org.junit.jupiter.api.Assertions.assertEquals(
+          Coordinate.INTERVENTION.slug(), intervention.coordinate());
       captured.add(intervention);
+    }
+
+    /** The flat output-map shape carried by the captured Document at {@code index}. */
+    Map<String, Object> payloadOf(int index) {
+      try {
+        return MAPPER.readValue(captured.get(index).payload(), MAP);
+      } catch (JsonProcessingException e) {
+        throw new IllegalStateException(e);
+      }
     }
   }
 }

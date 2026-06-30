@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.doctor.dsproof;
 
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.doctor.records.Intervention;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
 import org.osgi.service.component.annotations.Component;
 
 /**
@@ -13,7 +13,7 @@ import org.osgi.service.component.annotations.Component;
 public final class FakeInterventionLedgerWriter implements InterventionLedgerWriter {
 
   @Override
-  public void append(Intervention intervention) {
+  public void append(Document intervention) {
     // no-op: the DS proof does not assert persistence
   }
 }
