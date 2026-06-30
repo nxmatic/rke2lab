@@ -23,15 +23,9 @@
     <module>junit-testkit</module>
     <module>runtime</module>
     <module>bench</module>
-    <module>unitrepo</module>
-    <module>systemd</module>
-    <module>manifests</module>
-    <module>netplan</module>
-    <module>cluster</module>
     <module>exchange</module>
     <module>pipeline</module>
     <module>jgiven</module>
-    <module>doctor</module>
-    <module>ssh-to-age-edge</module>
+    <module>domains</module>
   </modules>
 </project>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>build-parent</artifactId>
+    <version>0.0.0</version>
+    <relativePath>../../../build-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>manifests-domain</artifactId>
+  <version>0.0.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>osgi/manifests</name>
+  <description>The manifests domain — the rke2lab view on cdk8s: it owns the cdk8s synthesis runtime
+    (manifests-cdk8s, the carrier that embeds the flat cdk8s closure and exports it to the OSGi
+    world) and the model/synthesis logic that puts cdk8s back into the rke2lab context
+    (manifests-core), over the contract both worlds share (manifests-port). Other domains contribute
+    their own cdk8s rendering as fragments of the carrier (e.g. systemd-cdk8s-manifests).</description>
+
+  <modules>
+    <module>manifests-port</module>
+    <module>manifests-cdk8s</module>
+    <module>manifests-core</module>
+    <module>manifests-core-test</module>
+  </modules>
+</project>
