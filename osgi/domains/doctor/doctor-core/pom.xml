@@ -56,10 +56,6 @@
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.networknt</groupId>
-      <artifactId>json-schema-validator</artifactId>
-    </dependency>
     <!-- The systemd domain's unit vocabulary: the dbus-tcp specialist names the unit it remediates
          via the typed SystemdUnitId, not a literal — the import draws the consumer edge in the graph. -->
     <dependency>

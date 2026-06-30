@@ -43,6 +43,15 @@
       <artifactId>asm</artifactId>
       <version>9.8</version>
     </dependency>
+    <!-- The SCHEMA_CONCORD gate validates each Document coordinate's <slug>.schema.json against the
+         JSON-Schema meta-schema. networknt is jackson-based; this is build-tooling only (no runtime
+         bundle imports it in 2D — DocumentCodec.validate is off until the remote capstone). Explicit
+         version: this aggregator has its own lifecycle and does not import the project BOM. -->
+    <dependency>
+      <groupId>com.networknt</groupId>
+      <artifactId>json-schema-validator</artifactId>
+      <version>1.5.6</version>
+    </dependency>
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-core</artifactId>
