@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>bench-config</artifactId>
-  <name>osgi/bench/bench-config</name>
+  <name>osgi/runtime/bench/bench-config</name>
   <description>Bench bundle that REQUIRES the DS and metatype extenders (annotations generate the
     Require-Capability headers) — the consuming side of the extender contract.</description>
 

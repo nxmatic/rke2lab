@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>cluster-core</artifactId>
-  <name>osgi/cluster/cluster-core</name>
+  <name>osgi/domains/cluster/cluster-core</name>
   <description>The cluster domain's in-world model facet: it contributes the cluster diagnostician
     (ClusterSpecialist) to the doctor as a Declarative Services @Component over the doctor's
     Specialist SPI. The cluster domain owns its specialist — it reasons about kubeconfig /

@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>bench-fragment-contribution</artifactId>
-  <name>osgi/bench/bench-fragment-contribution</name>
+  <name>osgi/runtime/bench/bench-fragment-contribution</name>
   <description>The fragment of the fragment-contribution proof: it attaches to bench-fragment-host
     and carries a @Component implementing ContributedService. The component is a host RESOURCE, not
     a started bundle; the proof is that SCR activates it in the host's context when the host starts.</description>

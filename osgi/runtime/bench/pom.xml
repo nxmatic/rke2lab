@@ -12,7 +12,7 @@
   <artifactId>bench</artifactId>
   <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
-  <name>osgi/bench</name>
+  <name>osgi/runtime/bench</name>
   <description>Disposable OSGi bench: real bnd bundles + a real embedded Felix engine proving the
     annotations-as-source-of-truth and extender-resolution theses. Scaffolding, not production.</description>
 

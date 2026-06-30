@@ -11,7 +11,7 @@
   </parent>
 
   <artifactId>netplan-core</artifactId>
-  <name>osgi/netplan/netplan-core</name>
+  <name>osgi/domains/netplan/netplan-core</name>
   <description>Network configuration synthesis: typed netplan models rendered to the YAML the host
     network layer consumes. The impl facet of the netplan domain — implements the netplan-port
     port and exposes its api/ for the netplan-cli north-adapter (exec/netplan-cli) to drive; carries

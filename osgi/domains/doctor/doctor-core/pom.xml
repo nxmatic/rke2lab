@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>doctor-core</artifactId>
-  <name>osgi/doctor/doctor-core</name>
+  <name>osgi/domains/doctor/doctor-core</name>
   <description>The doctor diagnostic model: the pure operator-runbook types (symptom, observation,
     assessment, prescription, remediation plan, medical record, health system, the specialists and
     the clinical-access model) lifted from exec/seed-master into the OSGi world. Consumes the

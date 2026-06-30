@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>ssh-to-age-edge</artifactId>
-  <name>osgi/ssh-to-age-edge</name>
+  <name>osgi/domains/ssh-to-age-edge</name>
   <description>The ssh-to-age external edge: the single door toward the ssh-to-age CLI. A pure point
     of contact (it converts an OpenSSH key to an age key by shelling the tool — no domain, no port of
     its own); it @Component-provides the consumer-owned SshToAgeConverter seam (manifests-port). The

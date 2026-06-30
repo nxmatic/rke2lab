@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>doctor-port-test</artifactId>
-  <name>osgi/doctor/doctor-port-test</name>
+  <name>osgi/domains/doctor/doctor-port-test</name>
   <description>The -test fragment of doctor-port, on the jgiven-probe-test model: a Fragment-Host
     attached to the doctor-port bundle, sharing its classloader so its test classes run IN-CONTAINER
     against the port's own world (not the bare-JVM flat classpath that produced the ReferralReplies

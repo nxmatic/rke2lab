@@ -11,7 +11,7 @@
   </parent>
 
   <artifactId>manifests-core</artifactId>
-  <name>osgi/manifests/manifests-core</name>
+  <name>osgi/domains/manifests/manifests-core</name>
   <description>The manifests universe: the CDK8s-based Kubernetes manifest units, their domains,
     and the soldered resolver-adapter — pure, declares its ports in the bundle manifest.</description>
 

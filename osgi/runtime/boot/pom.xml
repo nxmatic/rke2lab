@@ -11,7 +11,7 @@
 
   <artifactId>boot</artifactId>
   <packaging>pom</packaging>
-  <name>osgi/boot</name>
+  <name>osgi/runtime/boot</name>
   <description>The embedded-OSGi boot family. Splits the boot concern into the MODEL — what to boot
     and how to find it — and its consumers. boot-discovery declares the model (the embed capability,
     the BootStackJar registry, the classpath bundle index); the host-world executor osgi/runtime and

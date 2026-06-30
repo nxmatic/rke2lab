@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>doctor-records</artifactId>
-  <name>osgi/doctor/doctor-records</name>
+  <name>osgi/domains/doctor/doctor-records</name>
   <description>The doctor data model — pure immutable records, enums, and sealed ADT roots, zero
     behavior, zero pulumi, zero osgi runtime. The diagnostic DAG vocabulary (MedicalRecord,
     ConsultationReport, Observation, RemediationPlan, Symptom, ...) the contracts in doctor-port

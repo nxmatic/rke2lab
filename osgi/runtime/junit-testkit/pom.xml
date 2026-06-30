@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>junit-testkit</artifactId>
-  <name>osgi/junit-testkit</name>
+  <name>osgi/runtime/junit-testkit</name>
   <description>The JUnit-in-OSGi testkit: the shared fixtures for running JUnit IN AND AROUND a real
     embedded framework. Two halves, by world. JVM-side (loaded by surefire, BEFORE the framework):
     OutOfContainerFrameworkExtension boots a real Felix and the @Osgi/@OsgiSpike tags. In-container (loaded by

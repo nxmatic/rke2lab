@@ -11,7 +11,7 @@
   </parent>
 
   <artifactId>cluster-edge</artifactId>
-  <name>osgi/cluster/cluster-edge</name>
+  <name>osgi/domains/cluster/cluster-edge</name>
   <description>The cluster external edge: the single door toward the live RKE2 cluster's kube-apiserver.
     It @Component-provides the cluster domain's ClusterReadinessContact seam (cluster-port) by shelling
     kubectl over a published kubeconfig. Pure ProcessBuilder — zero embedded jars (simpler than the

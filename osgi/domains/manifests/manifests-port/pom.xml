@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>manifests-port</artifactId>
-  <name>osgi/manifests/manifests-port</name>
+  <name>osgi/domains/manifests/manifests-port</name>
   <description>The manifests contract — the domain port both worlds depend on: the OSGi
     manifests-core bundle implements it, the host depends on it. Pure POJO model: the
     synthesis/explode/update SPIs, their exchange records, NodeEnvContext/NodeEnvContributor, and the

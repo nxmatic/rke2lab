@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>netplan-port</artifactId>
-  <name>osgi/netplan/netplan-port</name>
+  <name>osgi/domains/netplan/netplan-port</name>
   <description>The netplan contract — the network blueprint port both worlds depend on. Carries
     ClusterNetworkBlueprint and its value-type collaborators (Cidr, MacAddress); the netplan-core
     bundle depends on it to derive and synthesise, the host (and the nix-darwin-home blueprint feed)

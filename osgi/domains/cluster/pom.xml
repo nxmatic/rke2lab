@@ -12,7 +12,7 @@
   <artifactId>cluster</artifactId>
   <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
-  <name>osgi/cluster</name>
+  <name>osgi/domains/cluster</name>
   <description>The cluster domain: the in-world model facet that reasons about cluster-layer concerns
     (kubeconfig, control-plane readiness). Its first content is the cluster diagnostician contributed
     to the doctor (cluster-core); the domain grows here as the cluster-edge chantier proceeds.</description>

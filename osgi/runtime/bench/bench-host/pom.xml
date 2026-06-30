@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>bench-host</artifactId>
-  <name>osgi/bench/bench-host</name>
+  <name>osgi/runtime/bench/bench-host</name>
   <description>Bench bundle that PROVIDES the metatype and component extenders (@Capability generates
     the Provide-Capability headers) — the host side of the extender contract.</description>
 

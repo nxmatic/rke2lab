@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>systemd-cdk8s-manifests</artifactId>
-  <name>osgi/systemd/systemd-cdk8s-manifests</name>
+  <name>osgi/domains/systemd/systemd-cdk8s-manifests</name>
   <description>Role inversion: the systemd domain OWNS the cdk8s rendering of its own units
     (SystemdChart/Service/Unit/Target/DropIn, under the systemd root package), and CONTRIBUTES it to
     the manifests domain as a fragment of the manifests-cdk8s carrier. Reading systemd → cdk8s →

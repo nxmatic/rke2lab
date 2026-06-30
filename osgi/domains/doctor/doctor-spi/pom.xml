@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>doctor-spi</artifactId>
-  <name>osgi/doctor/doctor-spi</name>
+  <name>osgi/domains/doctor/doctor-spi</name>
   <description>The doctor inter-domain Service Provider Interface: the contracts another OSGi domain
     implements to plug into the diagnostic model — Specialist (a domain expert the Generalist routes
     to, contributed by e.g. cluster) and Clinician (the employed-actor identity). References only the

@@ -11,7 +11,7 @@
   </parent>
 
   <artifactId>cluster-port</artifactId>
-  <name>osgi/cluster/cluster-port</name>
+  <name>osgi/domains/cluster/cluster-port</name>
   <description>The cluster domain's seam: the readiness vocabulary and the neutral cluster-contact
     contract the edge satisfies. It carries the canonical readiness phases, the typed schema refs the
     cluster specialist reasons with, the neutral controller reference, and the ClusterReadinessContact

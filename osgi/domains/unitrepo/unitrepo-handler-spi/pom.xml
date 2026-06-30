@@ -11,7 +11,7 @@
   </parent>
 
   <artifactId>unitrepo-handler-spi</artifactId>
-  <name>osgi/unitrepo/unitrepo-handler-spi</name>
+  <name>osgi/domains/unitrepo/unitrepo-handler-spi</name>
   <description>The handler SPI bundle: the UnitHandler contract a unit binds to via its constitutive
     osgi.extender requirement; provides the unitrepo.handler extender capability.</description>
 

@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>doctor-core-test</artifactId>
-  <name>osgi/doctor/doctor-core-test</name>
+  <name>osgi/domains/doctor/doctor-core-test</name>
   <description>The -test fragment of doctor-core: a Fragment-Host attached to the doctor-core bundle,
     sharing its classloader so its actor tests run IN-CONTAINER and reach doctor-core's sealed,
     package-private final-class actors (Generalist, HealthSystem, ClinicalAccess, GrantPolicy,

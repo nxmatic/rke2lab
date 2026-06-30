@@ -11,7 +11,7 @@
   </parent>
 
   <artifactId>dbus-systemd-edge</artifactId>
-  <name>osgi/systemd/dbus-systemd-edge</name>
+  <name>osgi/domains/systemd/dbus-systemd-edge</name>
   <description>The dbus-systemd external edge: the single door toward the systemd dbus-on-TCP endpoint
     of the running master node. It @Component-provides the systemd domain's SystemdRuntimeProbe seam
     (systemd-port) by speaking dbus over TCP. TCP is playable in OSGi, so this edge lives in the OSGi

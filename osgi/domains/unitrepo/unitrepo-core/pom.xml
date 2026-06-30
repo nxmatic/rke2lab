@@ -11,7 +11,7 @@
   </parent>
 
   <artifactId>unitrepo-core</artifactId>
-  <name>osgi/unitrepo/unitrepo-core</name>
+  <name>osgi/domains/unitrepo/unitrepo-core</name>
   <description>The unit resolution oracle: resolves UnitResource capability graphs through an
     injected OSGi Resolver service over the org.osgi.service.resolver interface.</description>
 

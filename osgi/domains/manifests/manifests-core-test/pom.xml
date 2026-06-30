@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>manifests-core-test</artifactId>
-  <name>osgi/manifests/manifests-core-test</name>
+  <name>osgi/domains/manifests/manifests-core-test</name>
   <description>The -test fragment of manifests-core: a Fragment-Host attached to the manifests-core
     bundle, sharing its classloader so its actor tests run IN-CONTAINER and exercise manifests-core's
     DS @Components (YamlMapper, the ManifestExplodeService) through the registry — injected, not

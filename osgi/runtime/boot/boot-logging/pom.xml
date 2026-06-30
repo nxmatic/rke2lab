@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>boot-logging</artifactId>
-  <name>osgi/boot/boot-logging</name>
+  <name>osgi/runtime/boot/boot-logging</name>
   <description>The embedded-OSGi boot's HOST-side logging convergence, shared by both boot executors
     (the prod FrameworkLauncher in osgi/runtime AND the test-world OutOfContainerFrameworkExtension in
     osgi/junit-testkit) so they converge logs the SAME way instead of each re-implementing it. Two

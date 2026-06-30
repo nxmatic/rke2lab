@@ -12,7 +12,7 @@
   <artifactId>systemd</artifactId>
   <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
-  <name>osgi/systemd</name>
+  <name>osgi/domains/systemd</name>
   <description>The systemd domain: the typed unit/contract vocabulary plus the runtime-status
     readiness seam (systemd-port), the systemd diagnostician (systemd-core), the cdk8s rendering of
     systemd units that systemd owns and contributes to the manifests domain as a carrier fragment

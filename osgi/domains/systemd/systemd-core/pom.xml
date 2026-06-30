@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>systemd-core</artifactId>
-  <name>osgi/systemd/systemd-core</name>
+  <name>osgi/domains/systemd/systemd-core</name>
   <description>The systemd domain's in-world model facet: it contributes the systemd diagnostician
     (DbusTcpSpecialist) to the doctor as a Declarative Services @Component over the doctor's
     Specialist SPI. The specialist owns the systemd unit it remediates (the typed SystemdUnitId from

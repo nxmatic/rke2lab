@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>boot-discovery</artifactId>
-  <name>osgi/boot/boot-discovery</name>
+  <name>osgi/runtime/boot/boot-discovery</name>
   <description>The embedded-OSGi boot MODEL, shared by the prod executor (osgi/runtime) and the
     test-world OutOfContainerFrameworkExtension so both agree on the boot topology instead of re-implementing
     it. Declares the embed capability namespace bundles self-mark with, the BootStackJar registry of

@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>domain-annotations</artifactId>
-  <name>osgi/domain-annotations</name>
+  <name>osgi/foundation/domain-annotations</name>
   <description>Cross-cutting domain annotations common to ALL domains, depending on nothing — so any
     bundle (even a type=record leaf under the purity guard) may target them without a dependency, and
     no domain couples to another's annotation module. @Transitional: a type still lives under the OLD

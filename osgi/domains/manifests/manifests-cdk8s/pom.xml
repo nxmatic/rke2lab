@@ -10,7 +10,7 @@
   </parent>
 
   <artifactId>manifests-cdk8s</artifactId>
-  <name>osgi/manifests/manifests-cdk8s</name>
+  <name>osgi/domains/manifests/manifests-cdk8s</name>
   <description>The cdk8s carrier bundle for the manifests domain: it embeds the flat (non-OSGi) cdk8s
     closure — cdk8s, software.constructs, jsii-runtime and the jetbrains annotations — INTACT into
     its Bundle-ClassPath (-includeresource …;lib:=true), then exports org.cdk8s and

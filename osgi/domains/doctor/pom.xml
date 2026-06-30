@@ -12,7 +12,7 @@
   <artifactId>doctor-domain</artifactId>
   <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
-  <name>osgi/doctor</name>
+  <name>osgi/domains/doctor</name>
   <description>The doctor domain: the pure diagnostic model of the operator runbook (symptoms,
     assessments, prescriptions, medical record, health system) lifted out of exec/ into the OSGi
     world where it belongs — it describes, it does not actualise. The observation seam stays a port
