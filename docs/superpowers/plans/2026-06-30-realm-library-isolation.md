@@ -92,7 +92,7 @@ private static ResolvedBundle thirdParty(String g, String a, String exports) {
 
 - [ ] **Step 2: Run it, verify it fails**
 
-Run: `flox activate -- ./mvnw -q -pl :staging-extension -am test -DskipTests=false -Dtest=StagingClosureTest#aThirdPartyBundleAModelImportsIsStagedAsRealmLibrary`
+Run: `flox activate -- ./mvnw -q -f maven-embed-staging-ext/pom.xml -pl staging-extension test -DskipTests=false -Dtest=StagingClosureTest#aThirdPartyBundleAModelImportsIsStagedAsRealmLibrary`
 Expected: FAIL — `stagedGas()` does NOT contain jackson (current code suppresses it via `hostFlatPackages`), and `realmLibraryGas()` does not compile yet.
 
 - [ ] **Step 3: Implement realm-library staging in StagingClosure**
@@ -169,7 +169,7 @@ Update the `new StagingClosure(...)` call in `run()` to pass the third arg (done
 
 - [ ] **Step 5: Run the test, verify it passes**
 
-Run: `flox activate -- ./mvnw -q -pl :staging-extension -am test -DskipTests=false -Dtest=StagingClosureTest`
+Run: `flox activate -- ./mvnw -q -f maven-embed-staging-ext/pom.xml -pl staging-extension test -DskipTests=false -Dtest=StagingClosureTest`
 Expected: PASS.
 
 - [ ] **Step 6: Add a guard test — a seam package is NOT a realm library**
@@ -225,7 +225,7 @@ This is the ONLY change — `staging-extension` has no unit test harness for the
 
 - [ ] **Step 2: Verify the module still compiles**
 
-Run: `flox activate -- ./mvnw -q -pl :staging-extension -am test-compile`
+Run: `flox activate -- ./mvnw -q -f maven-embed-staging-ext/pom.xml -pl staging-extension test-compile`
 Expected: BUILD SUCCESS.
 
 - [ ] **Step 3: Commit**
@@ -365,7 +365,7 @@ void aFlatAndStagedPackagePRESENTOnTheSeamIsAViolation() {
 
 - [ ] **Step 2: Run it, verify it fails**
 
-Run: `flox activate -- ./mvnw -q -pl :staging-extension -am test -DskipTests=false -Dtest=DuplicateRealmClassTest`
+Run: `flox activate -- ./mvnw -q -f maven-embed-staging-ext/pom.xml -pl staging-extension test -DskipTests=false -Dtest=DuplicateRealmClassTest`
 Expected: FAIL — `DuplicateRealmClass` has a one-arg constructor and the `ALLOWED_SHARED_ROOTS` hand-list, not a seam-surface arg.
 
 - [ ] **Step 3: Implement the seam-derived exemption**
@@ -413,7 +413,7 @@ Find where `new DuplicateRealmClass(flatPackages)` is constructed (line ~269). B
 
 - [ ] **Step 5: Run the test + compile the module**
 
-Run: `flox activate -- ./mvnw -q -pl :staging-extension -am test -DskipTests=false -Dtest=DuplicateRealmClassTest`
+Run: `flox activate -- ./mvnw -q -f maven-embed-staging-ext/pom.xml -pl staging-extension test -DskipTests=false -Dtest=DuplicateRealmClassTest`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
@@ -500,10 +500,23 @@ git commit -m "refactor(controlplane): drop dead DUPLICATE_REALM_CLASS WARN — 
 - Consumes: all prior tasks.
 - Produces: proof the increment holds end-to-end.
 
-- [ ] **Step 1: Run the full reactor verify**
+- [ ] **Step 1a: Reinstall the modified staging extension FIRST (the two-phase build)**
+
+CRITICAL: `staging-extension` is loaded by `.mvn/extensions.xml` as a RELEASE tooling jar from
+`~/.m2`, OUTSIDE the root `<modules>` aggregator. Tasks 1-4 changed its source, so the reactor would
+otherwise run with the STALE extension and the staging/gate changes would be invisible. Reinstall it
+to `~/.m2` before the reactor (this is the deliberate tooling install — the `no-snapshot-install`
+guard is satisfied because the extension is a RELEASE 1.0.0 coordinate, not a project SNAPSHOT):
+
+Run: `flox activate -- ./mvnw -f maven-embed-staging-ext/pom.xml clean install -DskipTests=false`
+Expected: `BUILD SUCCESS` — bnd-read + staging-extension both install, with the new StagingClosure /
+DuplicateRealmClass tests passing (`Tests run:` present).
+
+- [ ] **Step 1b: Run the full reactor verify**
 
 Run: `flox activate -- ./mvnw clean package -Pall-worlds -DskipTests=false -Dmaven.build.cache.skipCache=true`
-Expected: `BUILD SUCCESS` with `Tests run:` lines present.
+Expected: `BUILD SUCCESS` with `Tests run:` lines present. (The reactor now loads the freshly
+installed extension, so the staging + gate deltas are in force.)
 
 - [ ] **Step 2: Confirm the gate summary shows zero DUPLICATE_REALM_CLASS errors AND zero warnings**
 
