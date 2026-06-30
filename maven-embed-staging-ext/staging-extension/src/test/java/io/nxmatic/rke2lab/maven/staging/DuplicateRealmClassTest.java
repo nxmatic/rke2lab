@@ -47,4 +47,17 @@ class DuplicateRealmClassTest {
     assertEquals(1, v.size(), "a seam carrying the package loses the exemption");
     assertEquals("com.fasterxml.jackson.databind", v.get(0));
   }
+
+  @Test
+  void aPackageOnTheSeamButNotFlatIsClean() {
+    // A seam exports a package, but it is NOT flat in the host → no flat∧staged duplication.
+    // Exercises the flatPackages branch of the AND: not flat ⇒ no violation regardless of the seam.
+    final DuplicateRealmClass gate =
+        new DuplicateRealmClass(
+            Set.of("com.fasterxml.jackson.databind"),
+            Set.of("io.nxmatic.rke2lab.world.gateway.port"));
+    assertTrue(
+        gate.violations(exporting("io.nxmatic.rke2lab.world.gateway.port;version=1.0.0")).isEmpty(),
+        "a seam-only package that is not flat is the normal OSGi path, not a duplication");
+  }
 }
