@@ -9,8 +9,8 @@
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>jgiven-probe</artifactId>
-  <name>osgi/jgiven/jgiven-probe</name>
+  <artifactId>pipeline-probe</artifactId>
+  <name>osgi/foundation/pipeline/pipeline-probe</name>
   <description>The HOST bundle of the testkit's own non-regression guard: a pure POJO (Vault)
     carrying a package-private member, with ZERO test dependencies — it does not know jGiven exists.
     It stands in for a real host bundle like doctor-core. Its sibling -test fragment

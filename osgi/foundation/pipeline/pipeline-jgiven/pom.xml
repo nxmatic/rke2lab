@@ -9,8 +9,8 @@
     <relativePath>../../../bundle-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>jgiven-wrap</artifactId>
-  <name>osgi/jgiven/jgiven-wrap</name>
+  <artifactId>pipeline-jgiven</artifactId>
+  <name>osgi/foundation/pipeline/pipeline-jgiven</name>
   <description>jgiven-core + jgiven-junit5 (2.0.3) wrapped as a first-class OSGi bundle. EVERY jgiven
     dependency already carries a Bundle-SymbolicName (guava, gson, paranamer, jansi,
     jakarta.annotation, byte-buddy) and slf4j is owned by pax-logging — so there is no

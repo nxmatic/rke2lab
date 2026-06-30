@@ -20,6 +20,6 @@ Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=doctor; role=c
 # captured by that wildcard: org.junit.jupiter.engine (DoctorCoreTests names JupiterTestEngine.class),
 # jupiter.api, and io.nxmatic.rke2lab.doctor.testkit (the tests reference FakeSpecialist/Referral
 # Replies). So no manual Import-Package here — the include's wildcard suffices.
--include: ${.}/../../../foundation/jgiven/jgiven-testkit/src/main/resources/jgiven-fragment.bnd
+-include: ${.}/../../../foundation/pipeline/pipeline-testkit/src/main/resources/jgiven-fragment.bnd
 
 -noimportjava: true

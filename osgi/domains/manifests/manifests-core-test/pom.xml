@@ -57,13 +57,13 @@
          bundle worlds by classpath substring, so they must be on the TEST classpath. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>jgiven-testkit</artifactId>
+      <artifactId>pipeline-testkit</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>jgiven-wrap</artifactId>
+      <artifactId>pipeline-jgiven</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
@@ -104,7 +104,7 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>pipeline</artifactId>
+      <artifactId>pipeline-port</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

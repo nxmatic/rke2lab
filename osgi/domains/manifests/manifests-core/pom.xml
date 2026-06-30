@@ -88,7 +88,7 @@
          triplet. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>pipeline</artifactId>
+      <artifactId>pipeline-port</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- systemd's cdk8s rendering of its units (io.nxmatic.rke2lab.systemd.cdk8s), contributed as a

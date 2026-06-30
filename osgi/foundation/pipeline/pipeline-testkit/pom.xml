@@ -9,9 +9,9 @@
     <relativePath>../../../../build-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>jgiven-testkit</artifactId>
+  <artifactId>pipeline-testkit</artifactId>
   <version>0.0.0-SNAPSHOT</version>
-  <name>osgi/jgiven/jgiven-testkit</name>
+  <name>osgi/foundation/pipeline/pipeline-testkit</name>
   <description>The reusable jGiven-in-OSGi assets a host needs to run BDD scenarios in-container,
     factored out so a host writes one bnd line + one builder call. Two deliverables: (1) the shared
     bnd include jgiven-fragment.bnd — the single forced Import-Package (com.tngtech.jgiven.impl.intercept,
@@ -38,19 +38,19 @@
     -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>jgiven-wrap</artifactId>
+      <artifactId>pipeline-jgiven</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>jgiven-probe</artifactId>
+      <artifactId>pipeline-probe</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>jgiven-probe-test</artifactId>
+      <artifactId>pipeline-probe-test</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>

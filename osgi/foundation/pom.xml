@@ -19,6 +19,5 @@
     <module>domain-annotations</module>
     <module>world-gateway</module>
     <module>pipeline</module>
-    <module>jgiven</module>
   </modules>
 </project>

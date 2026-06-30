@@ -12,4 +12,4 @@ Fragment-Host: io.nxmatic.rke2lab.jgiven.probe
 # (the in-container jGiven proof), role=probe (the template host's fragment doctor copies).
 Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=jgiven; role=probe
 
--include: ${.}/../jgiven-testkit/src/main/resources/jgiven-fragment.bnd
+-include: ${.}/../pipeline-testkit/src/main/resources/jgiven-fragment.bnd
