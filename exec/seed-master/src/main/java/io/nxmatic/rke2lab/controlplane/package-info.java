@@ -1,21 +1,11 @@
 /**
- * The flat host control-plane. {@code REALM_BOUNDARY} is now build-enforced at its locked ERROR
- * default — the host holds no bundle-only doctor.records type; the world-exchange migration crosses
- * the boundary only as opaque Documents (see docs/architecture/osgi/world-exchange-spec.adoc).
- *
- * <p>One assembly-level law remains governed at {@code WARN} while its debt is paid down:
- *
- * <ul>
- *   <li>{@code DUPLICATE_REALM_CLASS} — cdk8s (org.cdk8s / software.constructs) is exported by the
- *       staged manifests carriers AND present flat in this assembly: a pre-existing two-realm
- *       duplication, listed until the carrier topology is corrected (its own increment).
- * </ul>
- *
- * Drop the pose to return to the locked ERROR default once that debt is cleared.
+ * The flat host control-plane. {@code REALM_BOUNDARY} and {@code DUPLICATE_REALM_CLASS} are both
+ * build-enforced at their locked ERROR default — the host holds no bundle-only doctor.records type.
+ * cdk8s is a legitimate dual-realm library: the host synthesizes its incus host-slot manifests with
+ * its own flat cdk8s copy while the OSGi manifests world synthesizes the k8s cluster manifests with
+ * its own bundle copy — cdk8s objects never cross the seam, so the seam-purity derivation exempts
+ * the flat∧staged duplication (no seam exports org.cdk8s / software.constructs). The world-exchange
+ * migration crosses the boundary only as opaque Documents (see
+ * docs/architecture/osgi/world-exchange-spec.adoc).
  */
-@GovernedBy(value = StagingGate.DUPLICATE_REALM_CLASS, level = EnforcementLevel.WARN)
 package io.nxmatic.rke2lab.controlplane;
-
-import io.nxmatic.rke2lab.domain.annotations.EnforcementLevel;
-import io.nxmatic.rke2lab.domain.annotations.GovernedBy;
-import io.nxmatic.rke2lab.domain.annotations.StagingGate;
