@@ -43,6 +43,14 @@
       <artifactId>world-gateway</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- The document codec: nested via -includeresource in bnd.bnd so doctor-core's Bundle-ClassPath
+         includes document-codec-*.jar, binding the codec to the bundle's jackson. The SAME source is
+         shaded flat into seed-master, binding to the host's jackson — one source, two realm copies. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>document-codec</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- jackson as a real bundle dependency: the gateway seam carries a serialized JSON String, so
          doctor-core parses/serializes it with ITS OWN jackson rather than borrowing the seam's
          (the seam now carries none). This is jackson entering the OSGi world via a bundle wire, not

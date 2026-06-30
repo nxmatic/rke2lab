@@ -189,6 +189,15 @@
       <artifactId>world-gateway</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- The document codec: JSON (de)serialization + validation for Document payloads. Shaded flat
+         into the host classpath (binding to the host's flat jackson). The SAME source is nested into
+         doctor-core's Bundle-ClassPath OSGi-side, binding to the bundle's jackson — one source, two
+         realm-specific copies, no codec type crosses the seam. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>document-codec</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- The doctor diagnostic model: pure operator-runbook types lifted to OSGi. COMPILE scope (not
          runtime like manifests-core): seed-master's staying code — the live registry, the reader,
          the scenarios and pipeline stages — references the model types directly, so it is a shared

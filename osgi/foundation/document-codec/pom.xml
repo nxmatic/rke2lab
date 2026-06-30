@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+    <relativePath>../../bundle-parent/pom.xml</relativePath>
+  </parent>
+  <artifactId>document-codec</artifactId>
+  <name>osgi/foundation/document-codec</name>
+  <description>The Document payload codec logic, written once and loaded per realm: shaded flat into
+    the host, nested into doctor-core's Bundle-ClassPath OSGi-side (-includeresource;lib:=true). A
+    plain flat jar (no Bundle-SymbolicName) so the realm-library rule never stages it as an
+    autonomous bundle — each realm binds it to its own jackson, no codec type crosses the seam.</description>
+  <dependencies>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <!-- Plain jar (no bnd): override the bundle-parent's maven-jar-plugin manifestFile config,
+           which expects bnd-maven-plugin to generate META-INF/MANIFEST.MF. This module does NOT run
+           bnd (it must be a plain jar without Bundle-SymbolicName, or the realm-library rule could
+           stage it as an autonomous bundle). Let maven-jar-plugin generate the default manifest. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifestFile combine.self="override"/>
+          </archive>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
