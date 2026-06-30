@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- @codebase -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+    <relativePath>../../bundle-parent/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>pipeline</artifactId>
+  <name>osgi/pipeline</name>
+  <description>The passive fluent-pipeline grammar engine: FluentTopicRunner (logs entry/exit with
+    elapsed time, wraps any throw inside the body as TopicFailure carrying the topic label), plus the
+    OnFailure SAM and the TopicFailure exception. PURE logic, slf4j-only, no @Component / no framework
+    boot — so it is dual-consumable: a real OSGi bundle at BUILD time (jar + bnd metadata + per-package
+    @Version), yet at RUNTIME equally usable flat on the host classloader (system-exported for type
+    resolution). Unifies the two byte-identical copies that drifted apart (seed-master's TopicRunner +
+    manifests-core's SynthesisTopicRunner).</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>domain-annotations</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>
