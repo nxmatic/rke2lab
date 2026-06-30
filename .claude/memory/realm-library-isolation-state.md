@@ -1,6 +1,6 @@
 ---
 name: realm-library-isolation-state
-description: Realm library isolation increment (feature/cluster-edge, before world-exchange 2D). Each world loads its own jackson — host flat (JCL), OSGi as an installed bundle — ending the system.packages.extra share that 2C's String-only seam made unnecessary. Spec 3aaa66fb; plan docs/superpowers/plans/2026-06-30-realm-library-isolation.md. 4 mechanism deltas + gate-law change, all derived (no hand-list). NEXT = execute subagent-driven, then resume the 2D plan.
+description: Realm library isolation increment (feature/cluster-edge, before world-gateway 2D). Each world loads its own jackson — host flat (JCL), OSGi as an installed bundle — ending the system.packages.extra share that 2C's String-only seam made unnecessary. Spec 3aaa66fb; plan docs/superpowers/plans/2026-06-30-realm-library-isolation.md. 4 mechanism deltas + gate-law change, all derived (no hand-list). NEXT = execute subagent-driven, then resume the 2D plan.
 metadata:
   type: project
 ---
@@ -93,5 +93,5 @@ rebuild and emits an empty bnd-read jar. Fix: disable the extension in .mvn, rei
 
 NEXT = resume the 2D plan (adds networknt onto this realm-library rule — it self-includes, zero code
 change). After 2D: the remote-validation capstone, then the merge. Merge gate: REALM_BOUNDARY ERROR +
-(2D) SCHEMA_CONCORD ERROR + the capstone. See [[world-exchange-2c-complete-2d-designed-state]]
+(2D) SCHEMA_CONCORD ERROR + the capstone. See [[world-gateway-2c-complete-2d-designed-state]]
 [[incus-edge-placement-backlog]].

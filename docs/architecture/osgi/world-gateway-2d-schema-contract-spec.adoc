@@ -1,28 +1,28 @@
-= World exchange 2D — the Document contract: a JSON Schema per coordinate, build-enforced
+= World gateway 2D — the Document contract: a JSON Schema per coordinate, build-enforced
 :toc: left
 :icons: font
 
 *Status:* DESIGN (converged 2026-06-30, NOT yet built). The fourth implementation increment of the
-world-exchange migration (link:world-exchange-spec.adoc[design of record]), following
-link:world-exchange-2a-document-foundation-spec.adoc[2A] (the Document foundation + the readiness
-verdict), link:world-exchange-2b-consult-path-spec.adoc[2B] (the consult path), and
-link:world-exchange-2c-reconstruction-path-spec.adoc[2C] (the reconstruction path — the peer model,
+world-gateway migration (link:world-gateway-spec.adoc[design of record]), following
+link:world-gateway-2a-document-foundation-spec.adoc[2A] (the Document foundation + the readiness
+verdict), link:world-gateway-2b-consult-path-spec.adoc[2B] (the consult path), and
+link:world-gateway-2c-reconstruction-path-spec.adoc[2C] (the reconstruction path — the peer model,
 which drove `REALM_BOUNDARY` to zero and locked it at `ERROR`).
 
-2D gives the now-untyped `Document` its *contract of form*. After 2C the two realms exchange only
+2D gives the now-untyped `Document` its *contract of form*. After 2C the two realms gateway only
 opaque `Document(domain, coordinate, payload : String)` values — no shared Java type. But an opaque
 payload with no contract trades a closed type-leak for a potential *silent schema drift*: a producer
 could write a malformed payload for its coordinate, or a consumer could expect a field the producer
 never writes, and nothing would catch it until runtime. 2D closes that: *one JSON Schema per
 coordinate, owned by OSGi, verified at build by a fourth staging gate* (`SCHEMA_CONCORD`), then flips
 that gate `WARN`→`ERROR`. After 2D the branch merges with TWO gates locked — `REALM_BOUNDARY`
-(2C, the realms are separated) and `SCHEMA_CONCORD` (2D, the Documents they exchange have a
+(2C, the realms are separated) and `SCHEMA_CONCORD` (2D, the Documents they gateway have a
 contractual shape).
 
 [IMPORTANT]
 .2D reconciles the design-of-record with what 2C actually built
 ====
-The link:world-exchange-spec.adoc[design of record] converged 2D's architecture early — schema per
+The link:world-gateway-spec.adoc[design of record] converged 2D's architecture early — schema per
 document type, owned OSGi-side, build-time concord check, runtime validation reserved-but-YAGNI. But
 it was written when `Document.payload` was a `JsonNode` and it imagined one `DomainDagMapper` per
 domain. 2C's reality is different: `payload` became a `String` (2B's Option B — no jackson type
@@ -37,7 +37,7 @@ build-enforced) and reconciles them to that reality. Five reconciliation decisio
 
 After 2D: *a producer that writes a malformed payload for its coordinate, or a schema that drifts
 from the code that produces/consumes it, breaks the build.* 2C's gate guarantees the two worlds
-exchange only Documents; 2D's gate guarantees those Documents have a contractual shape. The contract
+gateway only Documents; 2D's gate guarantees those Documents have a contractual shape. The contract
 is a JSON Schema keyed on the coordinate — not a shared Java class (which would re-introduce the
 shared data type 2C removed). The schema is owned by the OSGi world, beside the domain that owns the
 coordinate; OSGi holds the authority, so OSGi holds the contract. There is no shared schema file on
@@ -250,15 +250,15 @@ does NOT include:
   user's "stream avec cache" idea), recorded so it is not lost: bounded in-memory cache that spills to
   disk past a threshold, behind the codec, never on the `Document` API. KB-scale payloads never hit the
   threshold today (YAGNI until a real large payload + a real remote transport exist).
-* *the stale design-of-record cross-ref* — `world-exchange-2b-consult-path-spec.adoc:224` still says
+* *the stale design-of-record cross-ref* — `world-gateway-2b-consult-path-spec.adoc:224` still says
   "the REALM_BOUNDARY → ERROR flip — increment 2D"; the flip moved to 2C zone-5. Fix in the 2C/2D
   doc-close commit.
 
 == Related documentation
 
-* link:world-exchange-spec.adoc[World exchange] — the design of record; its "the contract: a JSON
+* link:world-gateway-spec.adoc[World gateway] — the design of record; its "the contract: a JSON
   Schema per document type, owned by OSGi" section is what 2D implements, reconciled to the 2C reality.
-* link:world-exchange-2c-reconstruction-path-spec.adoc[2C — reconstruction path] — the prior increment;
+* link:world-gateway-2c-reconstruction-path-spec.adoc[2C — reconstruction path] — the prior increment;
   2D contracts the Documents 2C's peer model crosses.
 * link:staging-gates-governance-spec.adoc[Staging-gates governance] — the gate framework
   `SCHEMA_CONCORD` joins as the fourth law.

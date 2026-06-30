@@ -41,7 +41,7 @@ with the user:
   runs in `test` phase, BEFORE the uber-jar shade, so failure blocks before a broken artifact exists.
 - **REALM_BOUNDARY stays** (re-discussed on the design): it is a DIFFERENT law — a flat class that
   REFERENCES a bundle-only package (reference leak), caught exhaustively by static bytecode scan AND it
-  IS the world-exchange migration worklist (41 warn, shrinking). A booted test can't catch an unexercised
+  IS the world-gateway migration worklist (41 warn, shrinking). A booted test can't catch an unexercised
   reference leak. So: keep REALM_BOUNDARY static; the static DUPLICATE gate becomes redundant ONCE the
   in-container diagnostic lands → remove it THEN (not yet).
 - **cdk8s is real debt to FIX** (user: "je vais vouloir corriger aussi, mais avant il nous faut les bons
@@ -52,7 +52,7 @@ with the user:
 
 ## How we got here
 
-After Option B ([[document-seam-cannot-expose-jackson-jsonnode]]) made exchange-port jackson-free, the
+After Option B ([[document-seam-cannot-expose-jackson-jsonnode]]) made gateway-port jackson-free, the
 plan was a `SEAM_PURITY` staging gate to freeze the invariant. The design evolved twice via dialogue:
 
 1. **Seam-centric → realm-wide (reversed).** Instead of "a type=seam may import only JDK/OSGi/seams"
@@ -100,4 +100,4 @@ Brainstorm the realm-gate architecture (superpowers:brainstorming): static-manif
 build-time, infers) vs boot-the-framework diagnostic (faithful, observes the real LinkageError, reuses
 OutOfContainerFrameworkExtension + the S1 slf4j diagnostic) vs hybrid (belt at build + braces at boot).
 The user leans toward the boot diagnostic for fidelity + role separation. Decide, THEN implement. The
-cdk8s duplication is real debt to govern WARN whichever mechanism wins. See [[world-exchange-2a-execution-state]].
+cdk8s duplication is real debt to govern WARN whichever mechanism wins. See [[world-gateway-2a-execution-state]].

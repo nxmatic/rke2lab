@@ -30,7 +30,7 @@ Each role has exactly one verb. Keeping the verbs straight is the whole model:
 
 | *port* (`-port`)
 | *DECLARES*
-| The shared interface of call + the pure exchange records. A *passive type*, exported so both sides
+| The shared interface of call + the pure gateway records. A *passive type*, exported so both sides
   share the same class. It is NOT resolved and carries no _resolution/service_ capability — no
   `@Component`. (It does carry one passive *discovery marker*, `type=seam` — see
   <<the-boot-face,the boot face>> — which the resolver ignores, being a namespace with no `Require`

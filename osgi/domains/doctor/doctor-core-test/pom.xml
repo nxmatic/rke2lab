@@ -64,7 +64,7 @@
       <scope>provided</scope>
     </dependency>
 
-    <!-- GeneralistConsultDocumentTest builds checkpoint Documents (the exchange seam) and reads
+    <!-- GeneralistConsultDocumentTest builds checkpoint Documents (the gateway seam) and reads
          consultations with its own jackson (the seam payload is a serialized JSON String). Direct,
          not transitive — every imported class must come from a direct dependency. provided: the
          fragment's src/main bytecode resolves against the doctor-core host (which carries these as

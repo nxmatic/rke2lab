@@ -1,6 +1,6 @@
 ---
-name: world-exchange-2a-execution-state
-description: World-exchange 2A+2B SHIPPED + REVIEWED on feature/cluster-edge. 2B COMPLETE (zone-0 Tasks 1-3 + Task 4+5+6 commit 33a2b30a; per-increment review done 2026-06-30, verdict APPROVED-WITH-MINOR, 2 hygiene nits in 2ff96746) — the host consult path holds NO doctor reasoning; consult crosses as a Document (String payload, Option B), seam split moved the 3 record verbs to ClinicalReasoning (doctor-spi) via ConsultingService.adapt. realm-boundary worklist 41→38. DECISION (2026-06-30): branch is NOT merged until the worklist reaches 0 and REALM_BOUNDARY flips WARN→ERROR — that gate flip IS the merge point ("the two worlds must live separate at merge"). 2C is BRAINSTORMED + SPEC'D (commit e6b2f6f1, the PEER MODEL → [[world-exchange-2c-peer-model-design]]). The LAYOUT-FIRST increment then SHIPPED (commits a05dd52c..a0f64f2a, osgi/ re-laid into foundation/runtime/domains, exchange→world-gateway → [[osgi-layout-shipped-state]]). NEXT: write the 2C PLAN (writing-plans on the existing 2C spec, against the NEW world-gateway/launcher names) → execute 2C (worklist 38→0) → flip REALM_BOUNDARY WARN→ERROR (the merge point) → remote-validation capstone → merge. Authoritative ledger: .superpowers/sdd/progress.md. See [[world-exchange-2c-peer-model-design]] [[osgi-layout-shipped-state]] [[checkpoint-identity-to-seam-backlog]].
+name: world-gateway-2a-execution-state
+description: World-gateway 2A+2B SHIPPED + REVIEWED on feature/cluster-edge. 2B COMPLETE (zone-0 Tasks 1-3 + Task 4+5+6 commit 33a2b30a; per-increment review done 2026-06-30, verdict APPROVED-WITH-MINOR, 2 hygiene nits in 2ff96746) — the host consult path holds NO doctor reasoning; consult crosses as a Document (String payload, Option B), seam split moved the 3 record verbs to ClinicalReasoning (doctor-spi) via ConsultingService.adapt. realm-boundary worklist 41→38. DECISION (2026-06-30): branch is NOT merged until the worklist reaches 0 and REALM_BOUNDARY flips WARN→ERROR — that gate flip IS the merge point ("the two worlds must live separate at merge"). 2C is BRAINSTORMED + SPEC'D (commit e6b2f6f1, the PEER MODEL → [[world-gateway-2c-peer-model-design]]). The LAYOUT-FIRST increment then SHIPPED (commits a05dd52c..a0f64f2a, osgi/ re-laid into foundation/runtime/domains, gateway→world-gateway → [[osgi-layout-shipped-state]]). NEXT: write the 2C PLAN (writing-plans on the existing 2C spec, against the NEW world-gateway/launcher names) → execute 2C (worklist 38→0) → flip REALM_BOUNDARY WARN→ERROR (the merge point) → remote-validation capstone → merge. Authoritative ledger: .superpowers/sdd/progress.md. See [[world-gateway-2c-peer-model-design]] [[osgi-layout-shipped-state]] [[checkpoint-identity-to-seam-backlog]].
 metadata:
   type: project
 ---
@@ -8,7 +8,7 @@ metadata:
 ## 2B COMPLETE through Task 4+5+6 — RESUME AT TASK 7 (2026-06-29)
 
 Trust the SDD ledger `.superpowers/sdd/progress.md` + `git log` over recollection. Session commits:
-`e4aeaec8` S1 slf4j backend · `7389e973` Option B (Document.payload→String, exchange-port jackson-free) ·
+`e4aeaec8` S1 slf4j backend · `7389e973` Option B (Document.payload→String, gateway-port jackson-free) ·
 `d786b6ce` DUPLICATE_REALM_CLASS static gate (found cdk8s dup, WARN) · `405dac85` memories · `b8481c2d`
 aggregator-layout spec (post-merge work) · `33a2b30a` Task 4+5+6 (consult reasoning crosses as Document).
 
@@ -36,9 +36,9 @@ re-layout ([[osgi-aggregator-layout-spec-state]], post-merge).
 
 ## 2A SHIPPED (2026-06-27, feature/cluster-edge — kept, not merged)
 
-Plan: `wip/plans/2026-06-27-world-exchange-2a-document-foundation.md`.
-Spec: `docs/architecture/osgi/world-exchange-2a-document-foundation-spec.adoc`.
-Parent design: [[world-exchange-document-design]] (2A/2B/2C/2D; 2A = Document foundation +
+Plan: `wip/plans/2026-06-27-world-gateway-2a-document-foundation.md`.
+Spec: `docs/architecture/osgi/world-gateway-2a-document-foundation-spec.adoc`.
+Parent design: [[world-gateway-document-design]] (2A/2B/2C/2D; 2A = Document foundation +
 readiness verdict crossing; cut = parse-vs-consume so `from()` is doctor-free).
 
 Commits (on top of `b423f407` Task 3):
@@ -95,8 +95,8 @@ prints the Felix resolver WIRE/FRAGMENT-WIRE trace to stdout (no slf4j backend n
 
 ## 2B — SPECCED + PLANNED, RESUME HERE (execute, 2026-06-27)
 
-Spec: `docs/architecture/osgi/world-exchange-2b-consult-path-spec.adoc`.
-Plan: `wip/plans/2026-06-27-world-exchange-2b-consult-path.md` (7 tasks, TDD, one commit each).
+Spec: `docs/architecture/osgi/world-gateway-2b-consult-path-spec.adoc`.
+Plan: `wip/plans/2026-06-27-world-gateway-2b-consult-path.md` (7 tasks, TDD, one commit each).
 Both committed `4c91a852`. Design brainstormed WITH the user (5 decisions, all in the spec) — do NOT
 re-litigate; execute.
 
@@ -124,7 +124,7 @@ feeds both assess and consult.
 
 **Two open verifications flagged for the executor** (in the plan's self-review): whether `Checkpoint`
 is a `doctor.records` type (then the runbook join uses the raw slug string instead) and whether
-`doctor-port` already deps `exchange-port` (add if absent — Task 1).
+`doctor-port` already deps `gateway-port` (add if absent — Task 1).
 
 **Boundaries:** 2B touches ONLY the consult/failure path. NOT the reconstruction path (`DriftReview`,
 `*Reader`, `recordForCurrentPatient`/`reviewOpenProblems` — those 2 seam verbs STAY) = 2C; NOT the
@@ -138,13 +138,13 @@ until zone-1/2 (host still calls old verbs) — expected, not a regression.
 `realm-boundary` worklist shrink per zone.
 
 Branch kept, never merged ([[external-worktree-operating-model-state]]). Folds the
-[[doctor-graph-vs-dag-vocabulary-backlog]] rename. See [[world-exchange-document-design]]
+[[doctor-graph-vs-dag-vocabulary-backlog]] rename. See [[world-gateway-document-design]]
 [[realm-boundary-gate]] [[maven-build-cache-and-staging-verify]]
 [[felixframeworkextension-renamed-outofcontainer]] [[options-always-as-c4-diagrams]].
 
 ## 2B EXECUTION — RESUME HERE (2026-06-28)
 
-Plan `wip/plans/2026-06-27-world-exchange-2b-consult-path.md`; SDD ledger `.superpowers/sdd/progress.md`
+Plan `wip/plans/2026-06-27-world-gateway-2b-consult-path.md`; SDD ledger `.superpowers/sdd/progress.md`
 (authoritative — trust it + `git log` over recollection after compaction). The design evolved a LOT via
 user dialogue beyond the original plan; the live state:
 
@@ -152,9 +152,9 @@ user dialogue beyond the original plan; the live state:
 - Task 1 (`864ec8d8`+`a892c8ee`+`bdd41226`+`71ce2da3`+`8a971397`): the typed seam vocabulary —
   user flagged the catalog "fourre-tout" → lifted the closed value domains into seam enums
   `Domain`/`Coordinate`/`Action`/`SymptomKind` (each `slug()`+`parse()`, byte-for-byte uniform);
-  `ExchangeCatalog` slimmed to `FIELD_*` schema keys ONLY. `Document` STAYS neutral; call sites write
+  `GatewayCatalog` slimmed to `FIELD_*` schema keys ONLY. `Document` STAYS neutral; call sites write
   `.slug()`. NO flat `Field` enum (the per-coordinate JSON Schema in 2D is the real field typing).
-  `consult(Document)` verb + exchange-port→doctor-port pom dep. Opus review Approved (first reviewer
+  `consult(Document)` verb + gateway-port→doctor-port pom dep. Opus review Approved (first reviewer
   FABRICATED — 0 tool calls; ALWAYS make reviewers quote verbatim identifiers from the diff).
 - Task 2 (`fc0e441e`+`c1949cc3`+`1bbfdce0`): `Generalist.consult(Document)` (parse checkpoint,
   `toSymptom(SymptomKind)` exhaustive switch no-default, rebuild Observation, route, return narration
@@ -166,7 +166,7 @@ user dialogue beyond the original plan; the live state:
 **zone-1 (Task 4) — the egress/reconstruction knot + the jackson root cause:**
 - User constraint (HARD): the Pulumi output must keep the SAME info (form may differ) AND the medical
   record must stay reconstructible from the stack (the stack IS the record store). →
-  [[world-exchange-2b-zone1-egress-knot]]. Resolution A-struct: the consultation Document carries the
+  [[world-gateway-2b-zone1-egress-knot]]. Resolution A-struct: the consultation Document carries the
   RENDERED strings AND the STRUCTURED plan/observations/expectations in the existing `toOutputMap()`
   shapes, so `ConsultationReportReader`/`ExpectationReader` stay UNCHANGED; the probe KEEPS `Observation`
   (egress+scenario), only the consult reasoning leaves the host. Task 4 in the plan is rewritten for this.
@@ -175,7 +175,7 @@ user dialogue beyond the original plan; the live state:
   FLAT but FAILS `DoctorCoreInContainerTest` [15]/[16].
 
 **ROOT CAUSE (proven 2026-06-28, [[document-seam-cannot-expose-jackson-jsonnode]]):** `Document.payload()`
-returns a jackson `JsonNode` — a BUNDLE type — exposed through a FLAT `type=seam` (exchange-port). jackson
+returns a jackson `JsonNode` — a BUNDLE type — exposed through a FLAT `type=seam` (gateway-port). jackson
 is a bundle (user's standing rule: jackson enters OSGi via a bundle, not the JCL); the seam is flat → two
 `JsonNode` realms → `LinkageError` when doctor-core (bundle) touches a Document payload. Latent since 2A;
 revealed by the first in-container test that exercises it. Felix `@FrameworkLog(DEBUG)` on
@@ -191,7 +191,7 @@ DoctorCoreInContainerTest gave the WIRE proof.
    in-container test after, to prove resolve isn't re-broken. (S3 — a dedicated testkit resolve-failure
    dump — only if S1 proves insufficient; `unsatisfiedRequirements()` already does S3's job, just muted.)
 2. **Option B — Document.payload becomes a String.** `Document(String domain, String coordinate, String
-   payload)`; drop `Document.newPayload()`; exchange-port DROPS its jackson dependency. Each world
+   payload)`; drop `Document.newPayload()`; gateway-port DROPS its jackson dependency. Each world
    serializes/parses with ITS jackson (doctor-core's bundle one; host's). Refactor the 2A foundation:
    `Document`, `ReadinessAuthority.assess`/`DefaultReadinessAuthority`, `SystemdAdapterStage`,
    `Generalist.consult`, all tests reading `payload()` as JsonNode. This SUPERSEDES Task 4a's approach
@@ -199,7 +199,7 @@ DoctorCoreInContainerTest gave the WIRE proof.
    change accordingly. Verify via `DoctorCoreInContainerTest` (NOT flat).
 3. **SEAM_PURITY staging gate.** Add to `StagingGate` (maven-embed-staging-ext): a `type=seam` bundle's
    `Import-Package` may name ONLY system-exported (other seams)/JDK/OSGi packages — a bundle package
-   (jackson) = ERROR. Goes green exactly when Option B drops jackson from exchange-port. Freezes the
+   (jackson) = ERROR. Goes green exactly when Option B drops jackson from gateway-port. Freezes the
    invariant.
 4. THEN finish zone-1 (Task 4 host migration: consultDoctor→Document, ConsultationLog carries Documents,
    egress reads the structured payload into the same OUTPUT_KEYs, readers unchanged), zone-2 (Task 5),

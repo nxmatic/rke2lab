@@ -18,7 +18,7 @@
 - Only `org.ow2.asm:asm` (core) is on the staging-extension classpath. No `asm-commons`, no `asm-tree`. Referenced-type collection must use core ASM visitors only.
 - The staging gates govern only OUR code: a type under `io.nxmatic.rke2lab.*` (`ResolvedBundle.isOurs` / `ourExportedPackages`). Foreign packages (cdk8s, jackson, JDK) are out of jurisdiction.
 - Artifact id = directory name; group id `io.nxmatic.rke2lab`; specs/plans live under `wip/` and `docs/`. Comments document the *why* only; single-developer repo — no compatibility shims, delete the old API in the same change.
-- Design-of-record: `docs/architecture/osgi/staging-gates-governance-spec.adoc` (the four gates + governance) and `docs/architecture/osgi/world-exchange-spec.adoc` (the boundary this gate guards, gate-first sequencing).
+- Design-of-record: `docs/architecture/osgi/staging-gates-governance-spec.adoc` (the four gates + governance) and `docs/architecture/osgi/world-gateway-spec.adoc` (the boundary this gate guards, gate-first sequencing).
 
 ## File structure
 
@@ -979,7 +979,7 @@ Create `exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/package-i
 ```java
 /**
  * The flat host control-plane. Governed at {@code REALM_BOUNDARY = WARN} while the host↔OSGi surface
- * is migrated to Documents (see docs/architecture/osgi/world-exchange-spec.adoc): the gate lists every
+ * is migrated to Documents (see docs/architecture/osgi/world-gateway-spec.adoc): the gate lists every
  * flat-realm class still referencing a bundle-only doctor.records type as a shrinking worklist, build
  * green. Drop this pose to return to the locked ERROR default once the migration (Plan 2) is complete.
  */
@@ -1056,4 +1056,4 @@ git commit -m "feat(staging): govern REALM_BOUNDARY at WARN; seed-master + seams
 
 ## Self-review checklist (run after writing — see end of plan)
 
-This plan delivers step 1 of the world-exchange sequencing (the gate + the two renames). Plan 2 (the Document migration) is written separately, FROM the worklist this gate prints — so its host edits are exact, not guessed.
+This plan delivers step 1 of the world-gateway sequencing (the gate + the two renames). Plan 2 (the Document migration) is written separately, FROM the worklist this gate prints — so its host edits are exact, not guessed.

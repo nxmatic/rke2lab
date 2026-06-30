@@ -1,10 +1,10 @@
-# World Exchange 2A — Document Foundation + Readiness Verdict — Implementation Plan
+# World Gateway 2A — Document Foundation + Readiness Verdict — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the neutral `Document` seam contract and cross the readiness verdict through it as a structured Document, removing every `doctor.records` parse/field from `ControlplanePolicy` (the boot-crash trigger).
 
-**Architecture:** A new `osgi/exchange/exchange-port` seam module (`type=seam`) carries an immutable `record Document(domain, coordinate, JsonNode payload)` and the `ReadinessAuthority` verb (`assess(Document) → Document`). The OSGi-side authority impl is a `doctor-core` `@Component` (the doctor owns `Severity` + the intrinsic severities). `ControlplanePolicy` drops its `Map<String,Severity>`/`Map<String,Symptom>` fields and `from()`'s `Severity.parse`/`Symptom.parse`, holding the readiness-override + preview-simulate as raw config strings. `SystemdAdapterStage` builds a checkpoint Document, awaits `ReadinessAuthority`, and reads the verdict's `action` field instead of `== Severity.CRITICAL`.
+**Architecture:** A new `osgi/gateway/gateway-port` seam module (`type=seam`) carries an immutable `record Document(domain, coordinate, JsonNode payload)` and the `ReadinessAuthority` verb (`assess(Document) → Document`). The OSGi-side authority impl is a `doctor-core` `@Component` (the doctor owns `Severity` + the intrinsic severities). `ControlplanePolicy` drops its `Map<String,Severity>`/`Map<String,Symptom>` fields and `from()`'s `Severity.parse`/`Symptom.parse`, holding the readiness-override + preview-simulate as raw config strings. `SystemdAdapterStage` builds a checkpoint Document, awaits `ReadinessAuthority`, and reads the verdict's `action` field instead of `== Severity.CRITICAL`.
 
 **Tech Stack:** Java 25 (flox), Maven (reactor + the separately-installed staging extension), bnd-maven-plugin, OSGi Declarative Services (Felix SCR), Jackson `JsonNode` (host-flat via `system.packages.extra`), JUnit5 Jupiter.
 
@@ -16,11 +16,11 @@
 - Build cache: pass `-Dmaven.build.cache.skipCache=true` for any load-bearing verification (SKIP, keeps the staging extension active — NOT `enabled=false`). (`maven-build-cache-and-staging-verify`)
 - A new module that adds an enum constant or annotation read by the staging extension requires the extension be rebuilt first: `flox activate -- ./mvnw -f maven-embed-staging-ext/pom.xml install -DskipTests -Dmaven.build.cache.skipCache=true`. (2A adds no such constant, but a full-reactor verify still loads the installed extension.)
 - New module artifactId = directory name; groupId `io.nxmatic.rke2lab`; `<name>` = relative dir path; parent is `io.nxmatic.rke2lab:bundle-parent:0.0.0-SNAPSHOT` for a bundle, `build-parent:0.0.0` for a `pom`-packaging aggregator. (verbatim from existing poms)
-- Design-of-record: `docs/architecture/osgi/world-exchange-2a-document-foundation-spec.adoc` (this increment) and `docs/architecture/osgi/world-exchange-spec.adoc` (the parent design).
+- Design-of-record: `docs/architecture/osgi/world-gateway-2a-document-foundation-spec.adoc` (this increment) and `docs/architecture/osgi/world-gateway-spec.adoc` (the parent design).
 
 ### Repo patterns every task MUST honor (the reviewer checks these)
 
-- **Single source of truth for identifiers:** the coordinates (`"readiness-checkpoint"`, `"readiness-verdict"`) and the payload field names (`"action"`, `"reason"`, `"scenarioId"`, `"failed"`, `"override"`) and the verdict values (`"stop"`, `"continue-degraded"`) are defined ONCE in an `ExchangeCatalog` constants class — NEVER hardcoded magic strings at call sites. (CLAUDE.md § Single-source-of-truth; the `clusterApi`-bug discipline.)
+- **Single source of truth for identifiers:** the coordinates (`"readiness-checkpoint"`, `"readiness-verdict"`) and the payload field names (`"action"`, `"reason"`, `"scenarioId"`, `"failed"`, `"override"`) and the verdict values (`"stop"`, `"continue-degraded"`) are defined ONCE in an `GatewayCatalog` constants class — NEVER hardcoded magic strings at call sites. (CLAUDE.md § Single-source-of-truth; the `clusterApi`-bug discipline.)
 - **Immutability by default:** `Document` is a `record`; any new value type is a record. (CLAUDE.md § Immutability)
 - **Instance-passing discipline:** no `public static` behaviour helpers on exported types (the `INSTANCE_DISCIPLINE` gate fails the build); factories (`of`, `from*`, `parse`, `builder`, `create`, `defaults`) are the only endorsed static surface. Pass instances through the call graph. (CLAUDE.md § Instance-passing; the gate is real.)
 - **Seam module conventions:** a `-port` carries `Bundle-SymbolicName` + `Export-Package` (the one package) + `Provide-Capability: io.nxmatic.rke2lab.embed; type=seam` + `-noimportjava: true` in `bnd.bnd`; a `package-info.java` with `@org.osgi.annotation.versioning.Version`. Exported types must be named in a `docs/` spec or the `SPEC_COVERAGE` gate fails — the 2A spec already names `Document` and `ReadinessAuthority`. (existing `cluster-port`; `staging-gates-governance-spec.adoc`)
@@ -32,19 +32,19 @@
 
 ## File structure
 
-**Task 1 — the `exchange` domain + `exchange-port` seam + `Document` + `ExchangeCatalog`:**
-- Create: `osgi/exchange/pom.xml` (packaging `pom`, one module `exchange-port`).
-- Modify: `osgi/pom.xml` (add `<module>exchange</module>`).
-- Create: `osgi/exchange/exchange-port/pom.xml`, `osgi/exchange/exchange-port/bnd.bnd`.
-- Create: `osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/Document.java`.
-- Create: `…/exchange/port/ExchangeCatalog.java` (the coordinate + field-name + verdict-value constants).
-- Create: `…/exchange/port/package-info.java`.
-- Test: `osgi/exchange/exchange-port/src/test/java/io/nxmatic/rke2lab/exchange/port/DocumentTest.java`.
+**Task 1 — the `gateway` domain + `gateway-port` seam + `Document` + `GatewayCatalog`:**
+- Create: `osgi/gateway/pom.xml` (packaging `pom`, one module `gateway-port`).
+- Modify: `osgi/pom.xml` (add `<module>gateway</module>`).
+- Create: `osgi/gateway/gateway-port/pom.xml`, `osgi/gateway/gateway-port/bnd.bnd`.
+- Create: `osgi/gateway/gateway-port/src/main/java/io/nxmatic/rke2lab/gateway/port/Document.java`.
+- Create: `…/gateway/port/GatewayCatalog.java` (the coordinate + field-name + verdict-value constants).
+- Create: `…/gateway/port/package-info.java`.
+- Test: `osgi/gateway/gateway-port/src/test/java/io/nxmatic/rke2lab/gateway/port/DocumentTest.java`.
 
 **Task 2 — `ReadinessAuthority` seam verb + the doctor-core `@Component` impl:**
-- Create: `osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/ReadinessAuthority.java`.
+- Create: `osgi/gateway/gateway-port/src/main/java/io/nxmatic/rke2lab/gateway/port/ReadinessAuthority.java`.
 - Create: `osgi/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/internal/DefaultReadinessAuthority.java` (`@Component` implementing `ReadinessAuthority`).
-- Modify: `osgi/doctor/doctor-core/pom.xml` (add `exchange-port` dependency).
+- Modify: `osgi/doctor/doctor-core/pom.xml` (add `gateway-port` dependency).
 - Test: `osgi/doctor/doctor-core/src/test/java/io/nxmatic/rke2lab/doctor/ReadinessAuthorityTest.java`.
 
 **Task 3 — `ControlplanePolicy` + `from()` doctor-free (raw config):**
@@ -54,32 +54,32 @@
 **Task 4 — `SystemdAdapterStage` reads the verdict via `ReadinessAuthority` + pipeline wiring:**
 - Modify: `exec/seed-master/.../pipeline/stages/SystemdAdapterStage.java` (build checkpoint Document, read `action`, drop `Severity`).
 - Modify: `exec/seed-master/.../pipeline/BootstrapPipeline.java` (await `ReadinessAuthority`, store on state, inject into the stage).
-- Modify: `exec/seed-master/pom.xml` (add `exchange-port` dependency).
+- Modify: `exec/seed-master/pom.xml` (add `gateway-port` dependency).
 - Test: `exec/seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/SystemdAdapterVerdictTest.java`.
 
 ---
 
-## Task 1: The `exchange-port` seam, the `Document` record, the `ExchangeCatalog`
+## Task 1: The `gateway-port` seam, the `Document` record, the `GatewayCatalog`
 
 **Files:**
-- Create: `osgi/exchange/pom.xml`
-- Modify: `osgi/pom.xml` (add `<module>exchange</module>` in the `<modules>` list, alphabetically near `cluster`)
-- Create: `osgi/exchange/exchange-port/pom.xml`
-- Create: `osgi/exchange/exchange-port/bnd.bnd`
-- Create: `osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/Document.java`
-- Create: `osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/ExchangeCatalog.java`
-- Create: `osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/package-info.java`
-- Test: `osgi/exchange/exchange-port/src/test/java/io/nxmatic/rke2lab/exchange/port/DocumentTest.java`
+- Create: `osgi/gateway/pom.xml`
+- Modify: `osgi/pom.xml` (add `<module>gateway</module>` in the `<modules>` list, alphabetically near `cluster`)
+- Create: `osgi/gateway/gateway-port/pom.xml`
+- Create: `osgi/gateway/gateway-port/bnd.bnd`
+- Create: `osgi/gateway/gateway-port/src/main/java/io/nxmatic/rke2lab/gateway/port/Document.java`
+- Create: `osgi/gateway/gateway-port/src/main/java/io/nxmatic/rke2lab/gateway/port/GatewayCatalog.java`
+- Create: `osgi/gateway/gateway-port/src/main/java/io/nxmatic/rke2lab/gateway/port/package-info.java`
+- Test: `osgi/gateway/gateway-port/src/test/java/io/nxmatic/rke2lab/gateway/port/DocumentTest.java`
 
 **Interfaces:**
 - Consumes: nothing (first task). Jackson `com.fasterxml.jackson.databind.JsonNode` (host-flat by construction — `manifests-core` imports it and the boot mirrors model-bundle imports into `system.packages.extra`).
 - Produces:
-  - `record Document(String domain, String coordinate, com.fasterxml.jackson.databind.JsonNode payload)` in package `io.nxmatic.rke2lab.exchange.port`.
-  - `final class ExchangeCatalog` with `public static final String` constants: `READINESS_CHECKPOINT = "readiness-checkpoint"`, `READINESS_VERDICT = "readiness-verdict"`, `DOMAIN_DOCTOR = "doctor"`, `FIELD_SCENARIO_ID = "scenarioId"`, `FIELD_FAILED = "failed"`, `FIELD_OVERRIDE = "override"`, `FIELD_ACTION = "action"`, `FIELD_REASON = "reason"`, `ACTION_STOP = "stop"`, `ACTION_CONTINUE_DEGRADED = "continue-degraded"`. Private constructor (utility constants class).
+  - `record Document(String domain, String coordinate, com.fasterxml.jackson.databind.JsonNode payload)` in package `io.nxmatic.rke2lab.gateway.port`.
+  - `final class GatewayCatalog` with `public static final String` constants: `READINESS_CHECKPOINT = "readiness-checkpoint"`, `READINESS_VERDICT = "readiness-verdict"`, `DOMAIN_DOCTOR = "doctor"`, `FIELD_SCENARIO_ID = "scenarioId"`, `FIELD_FAILED = "failed"`, `FIELD_OVERRIDE = "override"`, `FIELD_ACTION = "action"`, `FIELD_REASON = "reason"`, `ACTION_STOP = "stop"`, `ACTION_CONTINUE_DEGRADED = "continue-degraded"`. Private constructor (utility constants class).
 
-- [ ] **Step 1: Create the `exchange` aggregator pom**
+- [ ] **Step 1: Create the `gateway` aggregator pom**
 
-`osgi/exchange/pom.xml` (mirror `osgi/cluster/pom.xml` exactly — `build-parent` parent, `pom` packaging):
+`osgi/gateway/pom.xml` (mirror `osgi/cluster/pom.xml` exactly — `build-parent` parent, `pom` packaging):
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -93,30 +93,30 @@
     <relativePath>../../build-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>exchange</artifactId>
+  <artifactId>gateway</artifactId>
   <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
-  <name>osgi/exchange</name>
-  <description>The host↔OSGi exchange seam: the neutral Document envelope every world-exchange crossing
-    carries, and the exchange verbs (ReadinessAuthority) the host calls. type=seam packages, system-
-    exported, one shared copy across the boundary. See docs/architecture/osgi/world-exchange-spec.adoc.</description>
+  <name>osgi/gateway</name>
+  <description>The host↔OSGi gateway seam: the neutral Document envelope every world-gateway crossing
+    carries, and the gateway verbs (ReadinessAuthority) the host calls. type=seam packages, system-
+    exported, one shared copy across the boundary. See docs/architecture/osgi/world-gateway-spec.adoc.</description>
 
   <modules>
-    <module>exchange-port</module>
+    <module>gateway-port</module>
   </modules>
 </project>
 ```
 
 - [ ] **Step 2: Register the module in `osgi/pom.xml`**
 
-In `osgi/pom.xml`, add `<module>exchange</module>` to the `<modules>` list (place it adjacent to `<module>cluster</module>`).
+In `osgi/pom.xml`, add `<module>gateway</module>` to the `<modules>` list (place it adjacent to `<module>cluster</module>`).
 
-Run: `flox activate -- ./mvnw -q -pl :exchange validate -Dmaven.build.cache.skipCache=true`
-Expected: `BUILD SUCCESS` (the aggregator resolves; exchange-port not built yet — that's the next steps).
+Run: `flox activate -- ./mvnw -q -pl :gateway validate -Dmaven.build.cache.skipCache=true`
+Expected: `BUILD SUCCESS` (the aggregator resolves; gateway-port not built yet — that's the next steps).
 
-- [ ] **Step 3: Create the `exchange-port` bundle pom**
+- [ ] **Step 3: Create the `gateway-port` bundle pom**
 
-`osgi/exchange/exchange-port/pom.xml` (mirror `cluster-port`'s pom — `bundle-parent`, the bnd plugin; the only dependency is Jackson databind, `provided` because it is host-flat at runtime):
+`osgi/gateway/gateway-port/pom.xml` (mirror `cluster-port`'s pom — `bundle-parent`, the bnd plugin; the only dependency is Jackson databind, `provided` because it is host-flat at runtime):
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -130,10 +130,10 @@ Expected: `BUILD SUCCESS` (the aggregator resolves; exchange-port not built yet 
     <relativePath>../../bundle-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>exchange-port</artifactId>
-  <name>osgi/exchange/exchange-port</name>
-  <description>The world-exchange seam: the neutral Document envelope (domain, coordinate, JsonNode
-    payload) every host↔OSGi crossing carries, the ExchangeCatalog of coordinate + field names, and
+  <artifactId>gateway-port</artifactId>
+  <name>osgi/gateway/gateway-port</name>
+  <description>The world-gateway seam: the neutral Document envelope (domain, coordinate, JsonNode
+    payload) every host↔OSGi crossing carries, the GatewayCatalog of coordinate + field names, and
     the ReadinessAuthority verb the host calls to turn a checkpoint outcome into a provisioning
     verdict. type=seam: system-exported, one shared copy across the boundary, like every -port.</description>
 
@@ -164,26 +164,26 @@ Expected: `BUILD SUCCESS` (the aggregator resolves; exchange-port not built yet 
 
 - [ ] **Step 4: Create the `bnd.bnd`**
 
-`osgi/exchange/exchange-port/bnd.bnd` (mirror `cluster-port/bnd.bnd`'s seam shape):
+`osgi/gateway/gateway-port/bnd.bnd` (mirror `cluster-port/bnd.bnd`'s seam shape):
 
 ```
-Bundle-SymbolicName: io.nxmatic.rke2lab.exchange.port
-Export-Package: io.nxmatic.rke2lab.exchange.port
-# The world-exchange seam: the flat host and the bundles share ONE copy of the Document envelope and
-# the exchange verbs, so the system bundle is the SOLE exporter of this package (one exporter = one
+Bundle-SymbolicName: io.nxmatic.rke2lab.gateway.port
+Export-Package: io.nxmatic.rke2lab.gateway.port
+# The world-gateway seam: the flat host and the bundles share ONE copy of the Document envelope and
+# the gateway verbs, so the system bundle is the SOLE exporter of this package (one exporter = one
 # class, no split). type=seam declares that boot face — system-exported, never installed as a bundle,
 # and the REALM_BOUNDARY/leak guard never flags it. A discovery marker, not a resolution capability.
-# See docs/architecture/osgi/world-exchange-spec.adoc.
+# See docs/architecture/osgi/world-gateway-spec.adoc.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=seam
 -noimportjava: true
 ```
 
-- [ ] **Step 5: Write the failing test for `Document` + `ExchangeCatalog`**
+- [ ] **Step 5: Write the failing test for `Document` + `GatewayCatalog`**
 
-`osgi/exchange/exchange-port/src/test/java/io/nxmatic/rke2lab/exchange/port/DocumentTest.java`:
+`osgi/gateway/gateway-port/src/test/java/io/nxmatic/rke2lab/gateway/port/DocumentTest.java`:
 
 ```java
-package io.nxmatic.rke2lab.exchange.port;
+package io.nxmatic.rke2lab.gateway.port;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -199,39 +199,39 @@ class DocumentTest {
   @Test
   void carriesDomainCoordinateAndStructuredPayload() {
     final ObjectNode payload = MAPPER.createObjectNode();
-    payload.put(ExchangeCatalog.FIELD_ACTION, ExchangeCatalog.ACTION_STOP);
+    payload.put(GatewayCatalog.FIELD_ACTION, GatewayCatalog.ACTION_STOP);
     final Document doc =
-        new Document(ExchangeCatalog.DOMAIN_DOCTOR, ExchangeCatalog.READINESS_VERDICT, payload);
+        new Document(GatewayCatalog.DOMAIN_DOCTOR, GatewayCatalog.READINESS_VERDICT, payload);
 
-    assertEquals(ExchangeCatalog.DOMAIN_DOCTOR, doc.domain());
-    assertEquals(ExchangeCatalog.READINESS_VERDICT, doc.coordinate());
+    assertEquals(GatewayCatalog.DOMAIN_DOCTOR, doc.domain());
+    assertEquals(GatewayCatalog.READINESS_VERDICT, doc.coordinate());
     assertEquals(
-        ExchangeCatalog.ACTION_STOP, doc.payload().get(ExchangeCatalog.FIELD_ACTION).asText());
+        GatewayCatalog.ACTION_STOP, doc.payload().get(GatewayCatalog.FIELD_ACTION).asText());
   }
 
   @Test
   void catalogConstantsAreTheCanonicalStrings() {
     // The single source of truth — call sites must reference these, never literals.
-    assertEquals("readiness-checkpoint", ExchangeCatalog.READINESS_CHECKPOINT);
-    assertEquals("readiness-verdict", ExchangeCatalog.READINESS_VERDICT);
-    assertEquals("stop", ExchangeCatalog.ACTION_STOP);
-    assertEquals("continue-degraded", ExchangeCatalog.ACTION_CONTINUE_DEGRADED);
-    assertTrue(ExchangeCatalog.FIELD_ACTION.length() > 0);
+    assertEquals("readiness-checkpoint", GatewayCatalog.READINESS_CHECKPOINT);
+    assertEquals("readiness-verdict", GatewayCatalog.READINESS_VERDICT);
+    assertEquals("stop", GatewayCatalog.ACTION_STOP);
+    assertEquals("continue-degraded", GatewayCatalog.ACTION_CONTINUE_DEGRADED);
+    assertTrue(GatewayCatalog.FIELD_ACTION.length() > 0);
   }
 }
 ```
 
 - [ ] **Step 6: Run the test to verify it fails**
 
-Run: `flox activate -- ./mvnw -pl :exchange-port -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=DocumentTest`
-Expected: FAIL — compilation error "cannot find symbol Document / ExchangeCatalog".
+Run: `flox activate -- ./mvnw -pl :gateway-port -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=DocumentTest`
+Expected: FAIL — compilation error "cannot find symbol Document / GatewayCatalog".
 
-- [ ] **Step 7: Write `Document`, `ExchangeCatalog`, `package-info`**
+- [ ] **Step 7: Write `Document`, `GatewayCatalog`, `package-info`**
 
 `Document.java`:
 
 ```java
-package io.nxmatic.rke2lab.exchange.port;
+package io.nxmatic.rke2lab.gateway.port;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -239,23 +239,23 @@ import com.fasterxml.jackson.databind.JsonNode;
  * The neutral envelope every host↔OSGi crossing carries: a document of a given type, owned by a
  * domain, whose body is a structured JSON tree. The host and OSGi share no data type — only this
  * record and the {@link JsonNode} payload cross. {@code coordinate} is the document type and the
- * schema key; {@code domain} names the owner. See docs/architecture/osgi/world-exchange-spec.adoc.
+ * schema key; {@code domain} names the owner. See docs/architecture/osgi/world-gateway-spec.adoc.
  */
 public record Document(String domain, String coordinate, JsonNode payload) {}
 ```
 
-`ExchangeCatalog.java`:
+`GatewayCatalog.java`:
 
 ```java
-package io.nxmatic.rke2lab.exchange.port;
+package io.nxmatic.rke2lab.gateway.port;
 
 /**
- * The single source of truth for the exchange's string identifiers — coordinates, payload field
+ * The single source of truth for the gateway's string identifiers — coordinates, payload field
  * names, and enumerated field values. Call sites reference these constants, never literals, so a
  * mismatch cannot drift silently (the {@code clusterApi}-bug discipline). Build-time schemas (a later
  * increment) key on the coordinates here.
  */
-public final class ExchangeCatalog {
+public final class GatewayCatalog {
 
   /** The doctor domain owns the readiness vocabulary. */
   public static final String DOMAIN_DOCTOR = "doctor";
@@ -287,7 +287,7 @@ public final class ExchangeCatalog {
   /** Verdict action: continue in degraded mode (the failure is a warning). */
   public static final String ACTION_CONTINUE_DEGRADED = "continue-degraded";
 
-  private ExchangeCatalog() {}
+  private GatewayCatalog() {}
 }
 ```
 
@@ -295,26 +295,26 @@ public final class ExchangeCatalog {
 
 ```java
 @org.osgi.annotation.versioning.Version("1.0.0")
-package io.nxmatic.rke2lab.exchange.port;
+package io.nxmatic.rke2lab.gateway.port;
 ```
 
 - [ ] **Step 8: Run the test to verify it passes**
 
-Run: `flox activate -- ./mvnw -pl :exchange-port -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=DocumentTest`
+Run: `flox activate -- ./mvnw -pl :gateway-port -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=DocumentTest`
 Expected: PASS, `Tests run: 2, Failures: 0`.
 
 - [ ] **Step 9: Verify the bundle builds with the seam manifest**
 
-Run: `flox activate -- ./mvnw -pl :exchange-port -am package -DskipTests -Dmaven.build.cache.skipCache=true`
+Run: `flox activate -- ./mvnw -pl :gateway-port -am package -DskipTests -Dmaven.build.cache.skipCache=true`
 Expected: `BUILD SUCCESS`. Then confirm the manifest carries the seam capability:
-Run: `unzip -p osgi/exchange/exchange-port/target/exchange-port-0.0.0-SNAPSHOT.jar META-INF/MANIFEST.MF | tr -d '\r' | grep -E "Provide-Capability|Export-Package"`
-Expected: `Export-Package: io.nxmatic.rke2lab.exchange.port…` and `Provide-Capability: io.nxmatic.rke2lab.embed;type=seam`.
+Run: `unzip -p osgi/gateway/gateway-port/target/gateway-port-0.0.0-SNAPSHOT.jar META-INF/MANIFEST.MF | tr -d '\r' | grep -E "Provide-Capability|Export-Package"`
+Expected: `Export-Package: io.nxmatic.rke2lab.gateway.port…` and `Provide-Capability: io.nxmatic.rke2lab.embed;type=seam`.
 
 - [ ] **Step 10: Commit**
 
 ```bash
-git add osgi/pom.xml osgi/exchange
-git commit -m "feat(exchange): the exchange-port seam — Document envelope + ExchangeCatalog"
+git add osgi/pom.xml osgi/gateway
+git commit -m "feat(gateway): the gateway-port seam — Document envelope + GatewayCatalog"
 ```
 
 ---
@@ -322,15 +322,15 @@ git commit -m "feat(exchange): the exchange-port seam — Document envelope + Ex
 ## Task 2: The `ReadinessAuthority` verb + the doctor-core `@Component` impl
 
 **Files:**
-- Create: `osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/ReadinessAuthority.java`
+- Create: `osgi/gateway/gateway-port/src/main/java/io/nxmatic/rke2lab/gateway/port/ReadinessAuthority.java`
 - Create: `osgi/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/internal/DefaultReadinessAuthority.java`
-- Modify: `osgi/doctor/doctor-core/pom.xml` (add `exchange-port` dependency)
+- Modify: `osgi/doctor/doctor-core/pom.xml` (add `gateway-port` dependency)
 - Test: `osgi/doctor/doctor-core/src/test/java/io/nxmatic/rke2lab/doctor/ReadinessAuthorityTest.java`
 
 **Interfaces:**
-- Consumes: `Document`, `ExchangeCatalog` (Task 1); `io.nxmatic.rke2lab.doctor.records.Severity` (an enum with `CRITICAL`, `WARNING`, and `static Optional<Severity> parse(String)` — bundle-side, legitimately used by doctor-core).
+- Consumes: `Document`, `GatewayCatalog` (Task 1); `io.nxmatic.rke2lab.doctor.records.Severity` (an enum with `CRITICAL`, `WARNING`, and `static Optional<Severity> parse(String)` — bundle-side, legitimately used by doctor-core).
 - Produces:
-  - `interface ReadinessAuthority { Document assess(Document checkpoint); }` in `io.nxmatic.rke2lab.exchange.port`.
+  - `interface ReadinessAuthority { Document assess(Document checkpoint); }` in `io.nxmatic.rke2lab.gateway.port`.
   - `DefaultReadinessAuthority` — an `@Component(service = ReadinessAuthority.class)` in `doctor-core`, holding the intrinsic severity per scenario id (`systemd-adapter → WARNING`), producing a `readiness-verdict` Document with `action = stop` iff the effective severity is `CRITICAL`.
 
 - [ ] **Step 1: Create the `ReadinessAuthority` seam interface**
@@ -338,15 +338,15 @@ git commit -m "feat(exchange): the exchange-port seam — Document envelope + Ex
 `ReadinessAuthority.java`:
 
 ```java
-package io.nxmatic.rke2lab.exchange.port;
+package io.nxmatic.rke2lab.gateway.port;
 
 /**
- * The exchange verb the host calls to turn a readiness-checkpoint outcome into a provisioning
+ * The gateway verb the host calls to turn a readiness-checkpoint outcome into a provisioning
  * verdict. The host hands a {@code readiness-checkpoint} {@link Document} (the scenario id, whether
  * it failed, the operator's raw override) and receives a {@code readiness-verdict} {@link Document}
  * whose {@code action} field is {@code stop} or {@code continue-degraded}. The authority — not the
  * host — owns the severity vocabulary and the decision. See
- * docs/architecture/osgi/world-exchange-2a-document-foundation-spec.adoc.
+ * docs/architecture/osgi/world-gateway-2a-document-foundation-spec.adoc.
  */
 public interface ReadinessAuthority {
 
@@ -355,14 +355,14 @@ public interface ReadinessAuthority {
 }
 ```
 
-- [ ] **Step 2: Add the `exchange-port` dependency to doctor-core**
+- [ ] **Step 2: Add the `gateway-port` dependency to doctor-core**
 
 In `osgi/doctor/doctor-core/pom.xml`, add to `<dependencies>` (the impl implements the seam interface):
 
 ```xml
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>exchange-port</artifactId>
+      <artifactId>gateway-port</artifactId>
       <version>${project.version}</version>
     </dependency>
 ```
@@ -379,9 +379,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.internal.DefaultReadinessAuthority;
-import io.nxmatic.rke2lab.exchange.port.Document;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
-import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.gateway.port.Document;
+import io.nxmatic.rke2lab.gateway.port.GatewayCatalog;
+import io.nxmatic.rke2lab.gateway.port.ReadinessAuthority;
 import org.junit.jupiter.api.Test;
 
 class ReadinessAuthorityTest {
@@ -391,35 +391,35 @@ class ReadinessAuthorityTest {
 
   private static Document checkpoint(String scenarioId, boolean failed, String override) {
     final ObjectNode payload = MAPPER.createObjectNode();
-    payload.put(ExchangeCatalog.FIELD_SCENARIO_ID, scenarioId);
-    payload.put(ExchangeCatalog.FIELD_FAILED, failed);
+    payload.put(GatewayCatalog.FIELD_SCENARIO_ID, scenarioId);
+    payload.put(GatewayCatalog.FIELD_FAILED, failed);
     if (override != null) {
-      payload.put(ExchangeCatalog.FIELD_OVERRIDE, override);
+      payload.put(GatewayCatalog.FIELD_OVERRIDE, override);
     }
-    return new Document(ExchangeCatalog.DOMAIN_DOCTOR, ExchangeCatalog.READINESS_CHECKPOINT, payload);
+    return new Document(GatewayCatalog.DOMAIN_DOCTOR, GatewayCatalog.READINESS_CHECKPOINT, payload);
   }
 
   private static String action(Document verdict) {
-    return verdict.payload().get(ExchangeCatalog.FIELD_ACTION).asText();
+    return verdict.payload().get(GatewayCatalog.FIELD_ACTION).asText();
   }
 
   @Test
   void intrinsicWarningContinuesDegraded() {
     final Document verdict = authority.assess(checkpoint("systemd-adapter", true, null));
-    assertEquals(ExchangeCatalog.READINESS_VERDICT, verdict.coordinate());
-    assertEquals(ExchangeCatalog.ACTION_CONTINUE_DEGRADED, action(verdict));
+    assertEquals(GatewayCatalog.READINESS_VERDICT, verdict.coordinate());
+    assertEquals(GatewayCatalog.ACTION_CONTINUE_DEGRADED, action(verdict));
   }
 
   @Test
   void operatorCriticalOverrideStops() {
     final Document verdict = authority.assess(checkpoint("systemd-adapter", true, "critical"));
-    assertEquals(ExchangeCatalog.ACTION_STOP, action(verdict));
+    assertEquals(GatewayCatalog.ACTION_STOP, action(verdict));
   }
 
   @Test
   void operatorWarningOverrideContinuesDegraded() {
     final Document verdict = authority.assess(checkpoint("systemd-adapter", true, "warning"));
-    assertEquals(ExchangeCatalog.ACTION_CONTINUE_DEGRADED, action(verdict));
+    assertEquals(GatewayCatalog.ACTION_CONTINUE_DEGRADED, action(verdict));
   }
 }
 ```
@@ -439,9 +439,9 @@ package io.nxmatic.rke2lab.doctor.internal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.records.Severity;
-import io.nxmatic.rke2lab.exchange.port.Document;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
-import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.gateway.port.Document;
+import io.nxmatic.rke2lab.gateway.port.GatewayCatalog;
+import io.nxmatic.rke2lab.gateway.port.ReadinessAuthority;
 import java.util.Map;
 import org.osgi.service.component.annotations.Component;
 
@@ -468,10 +468,10 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
   @Override
   public Document assess(Document checkpoint) {
     final String scenarioId =
-        checkpoint.payload().path(ExchangeCatalog.FIELD_SCENARIO_ID).asText("");
+        checkpoint.payload().path(GatewayCatalog.FIELD_SCENARIO_ID).asText("");
     final String override =
-        checkpoint.payload().hasNonNull(ExchangeCatalog.FIELD_OVERRIDE)
-            ? checkpoint.payload().get(ExchangeCatalog.FIELD_OVERRIDE).asText()
+        checkpoint.payload().hasNonNull(GatewayCatalog.FIELD_OVERRIDE)
+            ? checkpoint.payload().get(GatewayCatalog.FIELD_OVERRIDE).asText()
             : null;
 
     final Severity effective =
@@ -482,12 +482,12 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
     final boolean stop = effective == Severity.CRITICAL;
     final ObjectNode verdict = mapper.createObjectNode();
     verdict.put(
-        ExchangeCatalog.FIELD_ACTION,
-        stop ? ExchangeCatalog.ACTION_STOP : ExchangeCatalog.ACTION_CONTINUE_DEGRADED);
+        GatewayCatalog.FIELD_ACTION,
+        stop ? GatewayCatalog.ACTION_STOP : GatewayCatalog.ACTION_CONTINUE_DEGRADED);
     verdict.put(
-        ExchangeCatalog.FIELD_REASON,
+        GatewayCatalog.FIELD_REASON,
         scenarioId + " severity=" + effective.name().toLowerCase());
-    return new Document(ExchangeCatalog.DOMAIN_DOCTOR, ExchangeCatalog.READINESS_VERDICT, verdict);
+    return new Document(GatewayCatalog.DOMAIN_DOCTOR, GatewayCatalog.READINESS_VERDICT, verdict);
   }
 
   private Severity intrinsicFor(String scenarioId) {
@@ -511,8 +511,8 @@ Expected: an `OSGI-INF/…DefaultReadinessAuthority.xml` entry (bnd's DS compone
 - [ ] **Step 8: Commit**
 
 ```bash
-git add osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/ReadinessAuthority.java osgi/doctor/doctor-core
-git commit -m "feat(exchange): ReadinessAuthority verb + doctor-core @Component authority"
+git add osgi/gateway/gateway-port/src/main/java/io/nxmatic/rke2lab/gateway/port/ReadinessAuthority.java osgi/doctor/doctor-core
+git commit -m "feat(gateway): ReadinessAuthority verb + doctor-core @Component authority"
 ```
 
 ---
@@ -689,23 +689,23 @@ git commit -m "refactor(seed): ControlplanePolicy holds raw config, from() is do
 **Files:**
 - Modify: `exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/SystemdAdapterStage.java`
 - Modify: `exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/BootstrapPipeline.java`
-- Modify: `exec/seed-master/pom.xml` (add `exchange-port` dependency)
+- Modify: `exec/seed-master/pom.xml` (add `gateway-port` dependency)
 - Test: `exec/seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/SystemdAdapterVerdictTest.java`
 
 **Interfaces:**
-- Consumes: `Document`, `ExchangeCatalog`, `ReadinessAuthority` (Tasks 1-2); `ControlplanePolicy.ReadinessPolicy.rawOverride` (Task 3); `BootedFramework.awaitService(Class, long)` (existing); the existing `SystemdAdapterStage` constructor (10 args) — this task replaces the `policy`-derived Severity branch with a `ReadinessAuthority`-derived action.
+- Consumes: `Document`, `GatewayCatalog`, `ReadinessAuthority` (Tasks 1-2); `ControlplanePolicy.ReadinessPolicy.rawOverride` (Task 3); `BootedFramework.awaitService(Class, long)` (existing); the existing `SystemdAdapterStage` constructor (10 args) — this task replaces the `policy`-derived Severity branch with a `ReadinessAuthority`-derived action.
 - Produces: `SystemdAdapterStage` constructor gains a `ReadinessAuthority readinessAuthority` parameter (replacing the host's `Severity` reasoning); `BootstrapPipeline` resolves it via `awaitService(ReadinessAuthority.class, 5000)` and injects it. After this task `SystemdAdapterStage` no longer imports `Severity`.
 
-- [ ] **Step 1: Add the `exchange-port` dependency to seed-master**
+- [ ] **Step 1: Add the `gateway-port` dependency to seed-master**
 
 In `exec/seed-master/pom.xml`, add (near the existing `domain-annotations` dep):
 
 ```xml
-    <!-- The world-exchange seam: Document + ReadinessAuthority. The stage builds a checkpoint
+    <!-- The world-gateway seam: Document + ReadinessAuthority. The stage builds a checkpoint
          Document and reads the verdict's action, instead of reasoning on Severity. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>exchange-port</artifactId>
+      <artifactId>gateway-port</artifactId>
       <version>${project.version}</version>
     </dependency>
 ```
@@ -722,9 +722,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.nxmatic.rke2lab.exchange.port.Document;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
-import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.gateway.port.Document;
+import io.nxmatic.rke2lab.gateway.port.GatewayCatalog;
+import io.nxmatic.rke2lab.gateway.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.pipeline.TopicFailure;
 import org.junit.jupiter.api.Test;
 
@@ -735,17 +735,17 @@ class SystemdAdapterVerdictTest {
   private static ReadinessAuthority authorityReturning(String action) {
     return checkpoint -> {
       final ObjectNode verdict = MAPPER.createObjectNode();
-      verdict.put(ExchangeCatalog.FIELD_ACTION, action);
-      verdict.put(ExchangeCatalog.FIELD_REASON, "test");
+      verdict.put(GatewayCatalog.FIELD_ACTION, action);
+      verdict.put(GatewayCatalog.FIELD_REASON, "test");
       return new Document(
-          ExchangeCatalog.DOMAIN_DOCTOR, ExchangeCatalog.READINESS_VERDICT, verdict);
+          GatewayCatalog.DOMAIN_DOCTOR, GatewayCatalog.READINESS_VERDICT, verdict);
     };
   }
 
   @Test
   void stopVerdictThrowsTopicFailure() {
     final SystemdAdapterStage stage =
-        SystemdAdapterStageFixture.failing(authorityReturning(ExchangeCatalog.ACTION_STOP));
+        SystemdAdapterStageFixture.failing(authorityReturning(GatewayCatalog.ACTION_STOP));
     assertThrows(TopicFailure.class, stage::launch);
   }
 
@@ -753,7 +753,7 @@ class SystemdAdapterVerdictTest {
   void continueDegradedVerdictDoesNotThrow() {
     final SystemdAdapterStage stage =
         SystemdAdapterStageFixture.failing(
-            authorityReturning(ExchangeCatalog.ACTION_CONTINUE_DEGRADED));
+            authorityReturning(GatewayCatalog.ACTION_CONTINUE_DEGRADED));
     assertDoesNotThrow(stage::launch);
   }
 }
@@ -771,7 +771,7 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
-import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.gateway.port.ReadinessAuthority;
 import java.util.Map;
 import java.util.Optional;
 
@@ -813,7 +813,7 @@ Expected: FAIL — the `SystemdAdapterStage` constructor does not yet take a `Re
 
 In `SystemdAdapterStage.java`:
 1. Remove `import io.nxmatic.rke2lab.doctor.records.Severity;`.
-2. Add `import io.nxmatic.rke2lab.exchange.port.Document;`, `import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;`, `import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;`, `import com.fasterxml.jackson.databind.ObjectMapper;`, `import com.fasterxml.jackson.databind.node.ObjectNode;`.
+2. Add `import io.nxmatic.rke2lab.gateway.port.Document;`, `import io.nxmatic.rke2lab.gateway.port.GatewayCatalog;`, `import io.nxmatic.rke2lab.gateway.port.ReadinessAuthority;`, `import com.fasterxml.jackson.databind.ObjectMapper;`, `import com.fasterxml.jackson.databind.node.ObjectNode;`.
 3. Remove the `INTRINSIC_SEVERITY` constant (the intrinsic severity now lives in `DefaultReadinessAuthority`).
 4. Add a `ReadinessAuthority readinessAuthority` field + constructor parameter (last param) + a `private final ObjectMapper mapper = new ObjectMapper();`.
 5. Replace the failure branch (the old lines 174-182) with the verdict crossing:
@@ -826,8 +826,8 @@ In `SystemdAdapterStage.java`:
 
     final Document checkpoint = checkpointDocument(SCENARIO_ID);
     final Document verdict = readinessAuthority.assess(checkpoint);
-    final String action = verdict.payload().path(ExchangeCatalog.FIELD_ACTION).asText();
-    if (ExchangeCatalog.ACTION_STOP.equals(action)) {
+    final String action = verdict.payload().path(GatewayCatalog.FIELD_ACTION).asText();
+    if (GatewayCatalog.ACTION_STOP.equals(action)) {
       log("✗ " + SCENARIO_ID + " FAILED, verdict=stop → stopping provisioning");
       throw new TopicFailure("systemd adapter", failure);
     }
@@ -842,14 +842,14 @@ In `SystemdAdapterStage.java`:
   /** The checkpoint outcome as a structured Document for the readiness authority. */
   private Document checkpointDocument(String scenarioId) {
     final ObjectNode payload = mapper.createObjectNode();
-    payload.put(ExchangeCatalog.FIELD_SCENARIO_ID, scenarioId);
-    payload.put(ExchangeCatalog.FIELD_FAILED, true);
+    payload.put(GatewayCatalog.FIELD_SCENARIO_ID, scenarioId);
+    payload.put(GatewayCatalog.FIELD_FAILED, true);
     policy
         .readiness()
         .rawOverride(scenarioId)
-        .ifPresent(value -> payload.put(ExchangeCatalog.FIELD_OVERRIDE, value));
+        .ifPresent(value -> payload.put(GatewayCatalog.FIELD_OVERRIDE, value));
     return new Document(
-        ExchangeCatalog.DOMAIN_DOCTOR, ExchangeCatalog.READINESS_CHECKPOINT, payload);
+        GatewayCatalog.DOMAIN_DOCTOR, GatewayCatalog.READINESS_CHECKPOINT, payload);
   }
 ```
 
@@ -858,7 +858,7 @@ In `SystemdAdapterStage.java`:
 - [ ] **Step 5: Update the construction site in `BootstrapPipeline`**
 
 In `BootstrapPipeline.java`:
-1. Add `import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;`.
+1. Add `import io.nxmatic.rke2lab.gateway.port.ReadinessAuthority;`.
 2. Add a `ReadinessAuthority readinessAuthority;` field to `PipelineState`.
 3. Add a resolve method mirroring `resolveClusterReadinessContact`, and call it in the same burst (after `resolveClusterReadinessContact(state);` at both sites ~line 139 and ~148):
 

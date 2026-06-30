@@ -1,6 +1,6 @@
 ---
-name: world-exchange-document-design
-description: "DESIGN CONVERGED 2026-06-27 (NOT built). The host<->OSGi exchange re-designed after a 5-angle code review found the multiplexor spec covers only 1 of 3 real leaks. Principle: ports describe SERVICES not data; everything crosses as a Document (YAML) validated by a per-document-type JSON Schema; OSGi holds authority + owns all typing; the host TRANSPORTS (no doctor types host-side); the boot pipeline is re-decomposed GROUND/EXCHANGE/APPLY with EXCHANGE framed by the boot-run-close. Supersedes the stale parts of multiplexor-spec + world-boundary-spec."
+name: world-gateway-document-design
+description: "DESIGN CONVERGED 2026-06-27 (NOT built). The host<->OSGi gateway re-designed after a 5-angle code review found the multiplexor spec covers only 1 of 3 real leaks. Principle: ports describe SERVICES not data; everything crosses as a Document (YAML) validated by a per-document-type JSON Schema; OSGi holds authority + owns all typing; the host TRANSPORTS (no doctor types host-side); the boot pipeline is re-decomposed GROUND/GATEWAY/APPLY with GATEWAY framed by the boot-run-close. Supersedes the stale parts of multiplexor-spec + world-boundary-spec."
 metadata:
   node_type: memory
   type: project
@@ -56,8 +56,8 @@ Verdict: "step 5 = preview green" was FALSE. The multiplexor (egress) alone leav
    `@Reference List`, the proven DS mechanism); the **DOCUMENT TYPE** (`coordinate`) is the contract
    unit (one JSON Schema each, what the validator sees). A domain owns N document types. Matches
    `Document(domain, coordinate, payload)`: domain = ownership, coordinate = type = schema key.
-5. **Boot pipeline re-decomposed GROUND / EXCHANGE / APPLY** — by real capability, not by function;
-   "we don't mix the two worlds at every level" (user). But verified on the code: EXCHANGE is FRAMED
+5. **Boot pipeline re-decomposed GROUND / GATEWAY / APPLY** — by real capability, not by function;
+   "we don't mix the two worlds at every level" (user). But verified on the code: GATEWAY is FRAMED
    BY the boot-run-close, not a flat sibling topic (see "verified facts" below).
 6. **Sequencing:** (a) open/ingress config as Document = closes the CRASH, preview green; (b) the 2
    seam stages as `consult(Document)` + the egress multiplexor; (c) APPLY = pure host transport.
@@ -69,7 +69,7 @@ The pipeline has THREE nested levels, NOT three flat topics:
 - L2 inside `bootstrap`: `BootstrapStage.runBootstrapPipeline()` calls `BootPipeline.embedded().during(...)`
   — boots Felix. **`BootPipeline.embedded()` owns the boot-run-close lifecycle: it closes Felix on
   return, ALWAYS (even if the tail throws).** So everything that needs the framework MUST stay under
-  that one `during`. EXCHANGE cannot be a first-rank sibling topic — it lives INSIDE the boot-run-close.
+  that one `during`. GATEWAY cannot be a first-rank sibling topic — it lives INSIDE the boot-run-close.
 - L3 `BootstrapPipeline`: `admitPatient` (register MedicalRecordRegistry + InterventionLedgerWriter,
   await HealthSystem) + `resolveSystemdRuntimeStatus` (await) + `resolveClusterReadinessContact`
   (await) — the 4-crossing BURST — THEN 5 stages: preflight → bbox → incus provisioning → systemd
@@ -78,7 +78,7 @@ The pipeline has THREE nested levels, NOT three flat topics:
 **Which stages cross the seam (grepped):** only **2 of 5** — `SystemdAdapterStage` (35 doctor/OSGi
 refs) and `ResourcesStage`/bootstrap-resources (6). `PreflightStage` = 0. `bbox` and `incus
 provisioning` are host-pure (incus = a host edge that provisions a VM, nothing to say to OSGi). So
-EXCHANGE is NOT a contiguous slice: it is the `open` (ingress config + register/await burst) + the 2
+GATEWAY is NOT a contiguous slice: it is the `open` (ingress config + register/await burst) + the 2
 seam stages (`consult(Document)`) + the egress. The 3 host-pure stages run in the SAME boot-run-close
 (they need Felix open so the 2 seam stages can consult) but don't talk to OSGi themselves.
 
@@ -143,7 +143,7 @@ Decisions converged WITH the user (figured in claude-preview each round, recos-w
 
 ## STATE (2026-06-27, written to FS — NOT committed) — resume exactly here
 
-Specs from session 1 still on FS (world-exchange-spec, deletions, atlas, redirections — see git status).
+Specs from session 1 still on FS (world-gateway-spec, deletions, atlas, redirections — see git status).
 NEW/UPDATED this session, all uncommitted:
 - WRITTEN `wip/plans/2026-06-27-realm-boundary-gate.md` — Plan 1, 5 tasks (T0 rename live, T1 rename
   Gate→StagingGate, T2 RealmBoundary+ReferencedTypes law, T3 wire into enforceGates over both realms +
@@ -155,7 +155,7 @@ NEW/UPDATED this session, all uncommitted:
 - UPDATED `docs/architecture/osgi/staging-gates-governance-spec.adoc` — now FOUR gates; Gate→StagingGate
   throughout; added the REALM_BOUNDARY row + a detailed two-realm/auto-attribution/reads-bodies+exec-
   classes subsection; C4 diagram gained RealmBoundary; fail-at-end notes the WARN→ERROR lifecycle.
-- UPDATED `docs/architecture/osgi/world-exchange-spec.adoc` — invariant now names REALM_BOUNDARY as the
+- UPDATED `docs/architecture/osgi/world-gateway-spec.adoc` — invariant now names REALM_BOUNDARY as the
   load-bearing guard (greps demoted to eyeballs); Sequencing rewritten gate-first/flip-last + the
   "two plans" note; Related-docs link to the governance spec.
 - `.claude/claude-preview.adoc` — the gate-design figures (scratch).

@@ -46,8 +46,8 @@ class DoctorCoreInContainerTest {
           .withScr()
           // doctor-core's dbus-tcp specialist names the unit via the typed SystemdUnitId, so the
           // host imports the systemd domain's port; system-export it (a seam) so the host resolves.
-          // doctor-core's DefaultReadinessAuthority @Component crosses the world-exchange boundary,
-          // so the host imports the exchange port (Document + ReadinessAuthority); it too is a
+          // doctor-core's DefaultReadinessAuthority @Component crosses the world-gateway boundary,
+          // so the host imports the gateway port (Document + ReadinessAuthority); it too is a
           // seam.
           .systemPackages(
               "io.nxmatic.rke2lab.systemd.port;version=1.0.0",

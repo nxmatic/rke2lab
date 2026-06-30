@@ -13,7 +13,7 @@
   <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>osgi/foundation</name>
-  <description>Compile-time shared foundation the domains build against: domain annotations, the world-exchange seam, the fluent pipeline grammar, and the jGiven wrap.</description>
+  <description>Compile-time shared foundation the domains build against: domain annotations, the world-gateway seam, the fluent pipeline grammar, and the jGiven wrap.</description>
 
   <modules>
     <module>domain-annotations</module>

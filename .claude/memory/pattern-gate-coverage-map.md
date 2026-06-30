@@ -58,5 +58,5 @@ port/edge/domain roles, uniformity.
 
 Do NOT inflate Plan 1 (the REALM_BOUNDARY gate — focused, mid-execution). Pose these after
 REALM_BOUNDARY flips ERROR (end of Plan 2): same engine, same WARN→ERROR ritual, one menu. This memo
-IS the menu. See [[world-exchange-document-design]] [[realm-boundary-gate]]
+IS the menu. See [[world-gateway-document-design]] [[realm-boundary-gate]]
 [[build-gates-over-review-reminders]].

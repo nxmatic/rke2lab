@@ -10,7 +10,7 @@ import java.util.Set;
  * classloader; the same package present FLAT in the host uber-jar is loaded by the application
  * (JCL) classloader. Two copies of one class across two realms is the loader-constraint collision
  * that surfaces as a {@code LinkageError} the moment an instance crosses the seam — exactly the
- * jackson-{@code JsonNode} failure world-exchange Option B fixed, frozen here so it cannot recur by
+ * jackson-{@code JsonNode} failure world-gateway Option B fixed, frozen here so it cannot recur by
  * any other route.
  *
  * <p>Built from the set of packages served flat (the exec's own + the shaded-flat tail + the

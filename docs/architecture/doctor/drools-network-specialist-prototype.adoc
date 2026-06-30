@@ -345,12 +345,12 @@ default specialist shape, and never above the seam.*
 == Open tensions (named, not resolved)
 
 . *Return arity — now framed by the `ReferralReply`, not `Optional<Prescription>`.* RETE naturally
-  fires *several* rules. The new exchange ([[doctor-remediation-model]] pt.5) already moves the seam
+  fires *several* rules. The new gateway ([[doctor-remediation-model]] pt.5) already moves the seam
   to `diagnose(Referral) → ReferralReply`, and a reply can carry *several* prescriptions (and keeps
   the *why* with none). So within-specialist multiplicity is *native* to the new seam — RETE's
   multiple firings map onto one `ReferralReply` carrying N prescriptions. The remaining sub-question is
   only conflict resolution *inside* the specialist (salience picks an order/winner) before it fills
-  the reply. The old `Optional<Prescription>` tension is dissolved by the exchange redesign.
+  the reply. The old `Optional<Prescription>` tension is dissolved by the gateway redesign.
 . *Who produces the network facts?* Today no probe emits reachability/port/MTU/DNS into
   `dossier.details`. The Drools specialist is only as good as the facts the probe captures — so a
   richer `NetworkReadinessProbe` is a *prerequisite*, and may be the larger piece of work than the

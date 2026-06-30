@@ -41,10 +41,12 @@ public final class ClasspathTreeCopier {
    */
   public static void copy(String classpathRoot, Path targetDir, boolean scriptsExecutable)
       throws IOException {
-    // Resolve against THIS class's loader, not the thread context classloader. These are host assets
+    // Resolve against THIS class's loader, not the thread context classloader. These are host
+    // assets
     // shaded into the exec-jar that also holds this class, so its loader always sees them. The TCCL
     // is not a reliable root here: the call runs on a pipeline worker after the embedded Felix boot
-    // and a cdk8s synthesis, and under the Pulumi runtime that worker's context classloader does not
+    // and a cdk8s synthesis, and under the Pulumi runtime that worker's context classloader does
+    // not
     // see the host uber-jar — getResource returns null though the resource is present (it resolves
     // fine standalone). The class loader is deterministic; the TCCL is ambient.
     final URL rootUrl = ClasspathTreeCopier.class.getClassLoader().getResource(classpathRoot);

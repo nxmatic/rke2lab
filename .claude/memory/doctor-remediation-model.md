@@ -78,7 +78,7 @@ already emitted, so the next specialist sees the run context (ordering matters: 
 siblings 1..N-1). This is the doctor model, NOT the what-if (see [[preview-whatif-topic]] for that).
 Open at impl: Prescription contained-in vs separate-from the ReferralReply.
 
-**5. The exchange consolidated = an agenda-owning generalist (2026-06-07 session-4, VALIDATED;
+**5. The gateway consolidated = an agenda-owning generalist (2026-06-07 session-4, VALIDATED;
 written to `docs/architecture/doctor/runbook-doctor.adoc` `[#consultation-flow]`).** Building on pt.4's referral round-trip, the
 user fixed how the consultation is *scheduled*. NINE invariants: (1) three objects —
 `Referral` (request, generalist→specialist) / `Prescription` (→patient) / `ReferralReply`

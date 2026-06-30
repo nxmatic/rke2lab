@@ -1,10 +1,10 @@
-= World exchange 2B — the consult path crosses as a Document
+= World gateway 2B — the consult path crosses as a Document
 :toc: left
 :icons: font
 
 *Status:* DESIGN (converged 2026-06-27, NOT yet built). The second implementation increment of the
-world-exchange migration (link:world-exchange-spec.adoc[design of record]), following
-link:world-exchange-2a-document-foundation-spec.adoc[2A] (the Document foundation + the readiness
+world-gateway migration (link:world-gateway-spec.adoc[design of record]), following
+link:world-gateway-2a-document-foundation-spec.adoc[2A] (the Document foundation + the readiness
 verdict crossing).
 
 2B closes the *consult path*: the host stops producing `Observation`/`Symptom`, stops calling the
@@ -123,14 +123,14 @@ Documents its code produces/consumes.
 
 == The typed vocabulary — closed domains are seam enums, not catalog strings
 
-`ExchangeCatalog` from 2A had begun to flatten three different natures into one list of `String`
+`GatewayCatalog` from 2A had begun to flatten three different natures into one list of `String`
 constants: *coordinates* (a closed set), *enumerated field values* (`stop`/`continue-degraded` — a
 closed set), and *payload field keys* (the schema). The first two are closed value domains; carrying
 them as loose strings reopens exactly the `clusterApi`-class drift the catalog discipline exists to
 prevent — and 2B would have added a third loose domain (the symptom kind the host needs once it drops
 `doctor.records.Symptom`).
 
-2B lifts the closed domains into typed seam enums in `osgi/exchange/exchange-port`, each with
+2B lifts the closed domains into typed seam enums in `osgi/gateway/gateway-port`, each with
 `String slug()` + `static Optional<E> parse(String)` (mirroring `Severity.parse`/`Symptom.parse`):
 
 * `Domain` — `DOCTOR`. The owner the document slot `Document.domain()` carries. One value today,
@@ -144,7 +144,7 @@ prevent — and 2B would have added a third loose domain (the symptom kind the h
   exhaustive `switch` (OSGi owns `Symptom`; the seam carries only the flat twin). The no-`default`
   switch is the anti-drift filet — a new symptom forces both enums and the map to update together.
 
-`ExchangeCatalog` slims to its sound role: the single source for *payload field keys* (the `FIELD_*`
+`GatewayCatalog` slims to its sound role: the single source for *payload field keys* (the `FIELD_*`
 schema keys) — and ONLY those, once `DOMAIN_DOCTOR` becomes `Domain.DOCTOR`. The `FIELD_*` keys stay
 constants deliberately: the real "which fields belong to which coordinate" typing is the per-coordinate
 JSON Schema in increment 2D. A flat `Field` enum would re-merge the checkpoint, verdict, and
@@ -228,10 +228,10 @@ two reconstruction verbs (still record-typed) — expected; the gate worklist tr
 
 == Related documentation
 
-* link:world-exchange-spec.adoc[World exchange] — the design of record this increment specializes.
-* link:world-exchange-2a-document-foundation-spec.adoc[2A — Document foundation] — the prior
-  increment; 2B reuses its `Document`/`ExchangeCatalog` seam and the checkpoint coordinate.
-* link:world-exchange-2c-reconstruction-path-spec.adoc[2C — reconstruction path] — the next
+* link:world-gateway-spec.adoc[World gateway] — the design of record this increment specializes.
+* link:world-gateway-2a-document-foundation-spec.adoc[2A — Document foundation] — the prior
+  increment; 2B reuses its `Document`/`GatewayCatalog` seam and the checkpoint coordinate.
+* link:world-gateway-2c-reconstruction-path-spec.adoc[2C — reconstruction path] — the next
   increment; reuses 2B's opaque-copy egress and the `ClinicalReasoning`/`adapt` seam-split idiom to
   drive the `REALM_BOUNDARY` worklist to zero, then flips the gate to `ERROR`.
 * link:staging-gates-governance-spec.adoc[Staging-gates governance] — the `REALM_BOUNDARY` gate whose

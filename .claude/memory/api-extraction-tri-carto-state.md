@@ -1,6 +1,6 @@
 ---
 name: api-extraction-tri-carto-state
-description: "DESIGN/CARTO (read-only on integration @a100b75d, 2026-06-19): the API-extraction sort, the prerequisite to R4. The principle (user): the host must NOT see OSGi impl classes — fail-fast at BUILD, via dedicated *-api modules. But there are TWO kinds of API distinguished by WHO consumes (confirmed against integration-atlas.adoc §'two spaces'): (1) BRIDGE api — consumed by the HOST (and implemented by an OSGi bundle) → belongs to the HOST world (host owns the port, OSGi implements it; DIP, both arrows point at the host api); OSGi consumes host interface classes via system.packages.extra from the system bundle (R1's single-exporter, atlas P2). (2) INTRA-OSGi api — consumed ONLY by other bundles, never the host → stays an api bundle in the OSGi world. Sort criterion = does the host import this type? Carto found: unitrepo = pure intra-OSGi (host imports nothing); netplan = host imports only ClusterNetworkBlueprint (from the IMPL package …netplan, NOT …netplan.api — the existing split is mis-oriented vs who-consumes); manifests = 17 host-imported types SORTED (settled with user 2026-06-19): contract set = the 3 SPIs + 4 exchange records + NodeEnvContext + NodeEnvContributor (re-exported to OSGi) + ManifestDomainPolicy/Catalog/Annotations + 2 profiles records; STAY OSGi (invert at R4) = ManifestYaml, NodeEnvContributorRegistry, FloxRuntimeAssets. netplan contract = ClusterNetworkBlueprint. Per-type sort DONE (api = ports + exchange records + shared value/constant types ONLY). ★ NAMING SETTLED: role-suffix, space=dir never in artifactId; BRIDGE port = `-contract` in host/ (`host/manifests-contract`, `host/netplan-contract`), impl stays `-core`/its name in osgi/ (`manifests-core` UNCHANGED — NOT `-impl`, cf. unitrepo-core), intra-OSGi api = `-api`/`-handler-api`, cli = `-cli`. READY to become a codable prerequisite slice BEFORE R4 (own worktree). NOT coded yet."
+description: "DESIGN/CARTO (read-only on integration @a100b75d, 2026-06-19): the API-extraction sort, the prerequisite to R4. The principle (user): the host must NOT see OSGi impl classes — fail-fast at BUILD, via dedicated *-api modules. But there are TWO kinds of API distinguished by WHO consumes (confirmed against integration-atlas.adoc §'two spaces'): (1) BRIDGE api — consumed by the HOST (and implemented by an OSGi bundle) → belongs to the HOST world (host owns the port, OSGi implements it; DIP, both arrows point at the host api); OSGi consumes host interface classes via system.packages.extra from the system bundle (R1's single-exporter, atlas P2). (2) INTRA-OSGi api — consumed ONLY by other bundles, never the host → stays an api bundle in the OSGi world. Sort criterion = does the host import this type? Carto found: unitrepo = pure intra-OSGi (host imports nothing); netplan = host imports only ClusterNetworkBlueprint (from the IMPL package …netplan, NOT …netplan.api — the existing split is mis-oriented vs who-consumes); manifests = 17 host-imported types SORTED (settled with user 2026-06-19): contract set = the 3 SPIs + 4 gateway records + NodeEnvContext + NodeEnvContributor (re-exported to OSGi) + ManifestDomainPolicy/Catalog/Annotations + 2 profiles records; STAY OSGi (invert at R4) = ManifestYaml, NodeEnvContributorRegistry, FloxRuntimeAssets. netplan contract = ClusterNetworkBlueprint. Per-type sort DONE (api = ports + gateway records + shared value/constant types ONLY). ★ NAMING SETTLED: role-suffix, space=dir never in artifactId; BRIDGE port = `-contract` in host/ (`host/manifests-contract`, `host/netplan-contract`), impl stays `-core`/its name in osgi/ (`manifests-core` UNCHANGED — NOT `-impl`, cf. unitrepo-core), intra-OSGi api = `-api`/`-handler-api`, cli = `-cli`. READY to become a codable prerequisite slice BEFORE R4 (own worktree). NOT coded yet."
 metadata:
   node_type: memory
   type: project
@@ -37,7 +37,7 @@ crosses; only the pure contract package is shared.
 
 For each type: **does any HOST module (exec/seed-master, host/*) import it?**
 - YES → BRIDGE api candidate → host world (`host/<domain>-api`). BUT verify it is a genuine PORT
-  (interface / exchange record), not an impl the host wrongly reaches into (= atlas wrong-direction
+  (interface / gateway record), not an impl the host wrongly reaches into (= atlas wrong-direction
   defect → either promote a real port or invert the dependency).
 - NO, but consumed by another bundle outside its origin → INTRA-OSGi api → OSGi api bundle.
 - NO, consumed only inside its own bundle → impl, stays private.
@@ -68,8 +68,8 @@ on @a100b75d; each type placed by who-consumes:
 | `ManifestSynthesisService` | interface | service consumed at the seam | BRIDGE-API (host)
 | `ManifestExplodeService` | interface | service consumed | BRIDGE-API
 | `ManifestUpdateGate` | interface | the gate (R3-deferred) | BRIDGE-API
-| `ManifestSynthesisRequest` / `…Result` | record | exchange | BRIDGE-API
-| `ManifestExplodeRequest` / `…Result` | record | exchange | BRIDGE-API
+| `ManifestSynthesisRequest` / `…Result` | record | gateway | BRIDGE-API
+| `ManifestExplodeRequest` / `…Result` | record | gateway | BRIDGE-API
 | `NodeEnvContext` | interface | host PROVIDES the impl (`new DefaultBootstrapNodeEnvContext()`) | BRIDGE-API (a clean port — host implements, bundle consumes)
 | `NodeEnvContributor` | interface | port consumed by host AND intra-OSGi (R3 registry) | BRIDGE-API host, RE-EXPORTED to OSGi via `system.packages.extra` (one definition, shared — user decision)
 | `ManifestDomainPolicy` | record | value read | BRIDGE-API
@@ -82,12 +82,12 @@ on @a100b75d; each type placed by who-consumes:
 | `units.runtime.flox.FloxRuntimeAssets` | final class + builder | `builder().build()` + reads packaged `/runtime/flox` resources | STAYS OSGi (impl/assets) — lifting it host-side would break the bundle-side asset access; INVERT at R4
 |===
 
-So manifests contract set = the 3 SPIs + 4 exchange records + `NodeEnvContext` + `NodeEnvContributor` +
+So manifests contract set = the 3 SPIs + 4 gateway records + `NodeEnvContext` + `NodeEnvContributor` +
 `ManifestDomainPolicy` + `ComponentVersions` + `FloxDebugPolicy` + `ManifestDomainCatalog` +
 `ManifestAnnotations`. The 3 impl/util types (`ManifestYaml`, `NodeEnvContributorRegistry`,
 `FloxRuntimeAssets`) STAY in the bundle; their current host usage is a wrong-direction crossing handled
 by INVERSION at R4 (consume a service / pass a port), NOT lifted into the api. This keeps the api a pure
-contract — the user's frontier rule: ports + exchange records + shared value/constant types ONLY.
+contract — the user's frontier rule: ports + gateway records + shared value/constant types ONLY.
 
 **netplan bridge-api = `ClusterNetworkBlueprint`** (record, currently mis-placed in the impl pkg
 `…netplan`). `NetplanSynthesisService` is CLI-facing (exec), NOT host-facing → it is netplan's own-world
@@ -151,7 +151,7 @@ Fraunhofer FIRST, EuroPLoP 2003) and asked, read-only/introspective: did we reas
 
 **Target modules for the extraction slice:**
 
-- `host/manifests-contract` — the manifests ports + exchange records + shared value/constant types
+- `host/manifests-contract` — the manifests ports + gateway records + shared value/constant types
   (the bridge-api column of the per-type table above). NodeEnvContributor lives here too, re-exported
   to OSGi via `system.packages.extra`.
 - `host/netplan-contract` — `ClusterNetworkBlueprint` (+ its transitive contract types). NOTE

@@ -55,7 +55,7 @@ world-of-residence differs.
 
 | The port (`-port`, the membrane)
 | `doctor-port` — `SnapshotSource` (the read seam) + `InterventionLedgerWriter` (the write seam) plus
-  the pure exchange records (`SnapshotEntry`, `SnapshotView`, `Intervention`, `StackCoordinate`, …).
+  the pure gateway records (`SnapshotEntry`, `SnapshotView`, `Intervention`, `StackCoordinate`, …).
   Reached *identically* from the OSGi world and the host world. Pure: zero `com.pulumi` imports — the
   only Pulumi mention is a `{@link}` in Javadoc.
 

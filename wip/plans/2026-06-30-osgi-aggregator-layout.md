@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Re-lay-out `osgi/` from a flat 17-entry `<modules>` into 3 nature-groups (`foundation/`, `runtime/`, `domains/`) + the 2 Maven parents, then apply 2 of the 3 renames (`runtime`→`runtime-host`, `exchange`→`world-gateway`). The third rename (`jgiven`→`pipeline` dissolution) is DEFERRED (see Global Constraints).
+**Goal:** Re-lay-out `osgi/` from a flat 17-entry `<modules>` into 3 nature-groups (`foundation/`, `runtime/`, `domains/`) + the 2 Maven parents, then apply 2 of the 3 renames (`runtime`→`runtime-host`, `gateway`→`world-gateway`). The third rename (`jgiven`→`pipeline` dissolution) is DEFERRED (see Global Constraints).
 
 **Architecture:** Pure `git mv` relocation first (transparent to dependents — Maven resolves by `artifactId`, not path; only each moved pom's `<parent><relativePath>` shifts `+1 ../` per level added), one group per task, each ending in a green full-reactor build. Then the 2 renames as separate verifiable tasks (each touches a small, enumerated consumer set). No code logic changes; no module fusion.
 
@@ -11,13 +11,13 @@
 ## Global Constraints
 
 - **Spec of record:** `docs/architecture/osgi/osgi-aggregator-layout-spec.adoc` (§3 target layout, §5.1–§5.7 sub-decisions, §6 migration mechanics). Twin prompt §B: `docs/architecture/osgi/osgi-aggregator-layout-spec.prompt`.
-- **No dedicated worktree** — implement directly in `feature/cluster-edge` (user decision 2026-06-30). The prompt §B's worktree mandate assumed a *concurrent* 2B session on `exchange-port`; 2B is now integrated, so there is no concurrent mutator. Base is `feature/cluster-edge` — `osgi/exchange`, `world-exchange`, and the recent domains exist ONLY there (`origin/main` has neither).
+- **No dedicated worktree** — implement directly in `feature/cluster-edge` (user decision 2026-06-30). The prompt §B's worktree mandate assumed a *concurrent* 2B session on `gateway-port`; 2B is now integrated, so there is no concurrent mutator. Base is `feature/cluster-edge` — `osgi/gateway`, `world-gateway`, and the recent domains exist ONLY there (`origin/main` has neither).
 - **jgiven dissolution (§5.4) is DEFERRED** — this increment relocates `osgi/jgiven/` AS-IS to `osgi/foundation/jgiven/` (4 modules + their aggregator, unchanged exports). The spec self-contradicts here: §5.4/§3/§6 say "dissolve jgiven into pipeline" but §8 says "Aucune fusion de modules." The dissolution is a *realm change*, not a layout move: `pipeline` is `type=seam` (system-exported, FLAT) while jGiven enters the framework as an INSTALLED bundle (`JGivenTestkit.installFromClasspath` + `installBundles(WRAP_BSN)`); making the seam export `com.tngtech.jgiven.*` would put jGiven in two realms → `LinkageError` (the exact class our `DUPLICATE_REALM_CLASS` gate forbids). It gets its own increment (the `jgiven-domain-into-pipeline-debt` backlog).
 - **Reactor-only resolution** — NEVER `mvn install` project artifacts to `~/.m2`. Sibling modules resolve from the reactor via `-am`. `maven-embed-staging-ext` is the documented exception (RELEASE coord via `.mvn/extensions.xml`); it is NOT moved by this plan.
 - **Verify recipe (every task's test):** `flox activate -- ./mvnw clean package -Pall-worlds -DskipTests=false -Dmaven.build.cache.skipCache=true`. A `BUILD SUCCESS` with the staging line `7 staging-law violation(s) at WARN … 0 ERROR` (or fewer) is the pass. A path/relativePath mistake fails the reactor at model-building — that IS the failing-test signal. NEVER a partial `-am` build for the final verify (the staging gates read the full dependency closure off disk).
 - **sed caveat:** GNU sed under flox rejects BSD `-i ''`; use `perl -0pi -e '...'` for in-place pom edits (per `layout-skeleton-state`).
 - **Every module keeps a `<description>`** (repo rule "every module has a description"). New aggregators get one.
-- **CLI selectors** use the unprefixed artifactId (`-pl :doctor-core`); the 2 renames change 2 selectors (`:runtime`→`:runtime-host`, `:exchange-port`→`:world-gateway`).
+- **CLI selectors** use the unprefixed artifactId (`-pl :doctor-core`); the 2 renames change 2 selectors (`:runtime`→`:runtime-host`, `:gateway-port`→`:world-gateway`).
 - **Commit trailer:** end every commit message with `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
 
 ## Current state (verified 2026-06-30)
@@ -26,7 +26,7 @@ Root aggregator is `pom.xml` (lists `<module>osgi</module>`). `build-parent/pom.
 
 ```
 bundle-parent, bundle-test-parent, domain-annotations, boot, junit-testkit,
-runtime, bench, unitrepo, systemd, manifests, netplan, cluster, exchange,
+runtime, bench, unitrepo, systemd, manifests, netplan, cluster, gateway,
 pipeline, jgiven, doctor, ssh-to-age-edge
 ```
 
@@ -34,7 +34,7 @@ relativePath patterns (all poms parent ONLY to build-parent/bundle-parent/bundle
 - subaggregator under `osgi/` (e.g. `osgi/doctor/pom.xml`): `parent=build-parent rel=../../build-parent/pom.xml`
 - leaf under subaggregator (e.g. `osgi/doctor/doctor-core`): `parent=bundle-parent rel=../../bundle-parent/pom.xml`
 - flat leaf under `osgi/` (e.g. `osgi/domain-annotations`): `parent=bundle-parent rel=../bundle-parent/pom.xml`
-- flat leaf under `osgi/` (e.g. `osgi/runtime`, `osgi/exchange/`): `parent=build-parent rel=../../build-parent/pom.xml`
+- flat leaf under `osgi/` (e.g. `osgi/runtime`, `osgi/gateway/`): `parent=build-parent rel=../../build-parent/pom.xml`
 - already-2-deep test leaf (e.g. `osgi/jgiven/jgiven-testkit`): `parent=build-parent rel=../../../build-parent/pom.xml`
 
 **relativePath rule:** moving a pom DOWN by one directory level adds exactly one `../` to its `<parent><relativePath>`. A subaggregator moved into a group takes all its children down with it → every child also gains one `../`.
@@ -144,25 +144,25 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 2: Create the `foundation/` group and move domain-annotations, exchange, pipeline, jgiven
+### Task 2: Create the `foundation/` group and move domain-annotations, gateway, pipeline, jgiven
 
 **Files:**
 - Create: `osgi/foundation/pom.xml`
-- Move (git mv): `osgi/domain-annotations/` → `osgi/foundation/domain-annotations/`; `osgi/exchange/` → `osgi/foundation/exchange/`; `osgi/pipeline/` → `osgi/foundation/pipeline/`; `osgi/jgiven/` → `osgi/foundation/jgiven/`
+- Move (git mv): `osgi/domain-annotations/` → `osgi/foundation/domain-annotations/`; `osgi/gateway/` → `osgi/foundation/gateway/`; `osgi/pipeline/` → `osgi/foundation/pipeline/`; `osgi/jgiven/` → `osgi/foundation/jgiven/`
 - Modify: every moved pom's relativePath (+1 `../`); `osgi/pom.xml` `<modules>`
 
 **Interfaces:**
 - Consumes: Task 1's root `<modules>` shape (domains already grouped).
-- Produces: `osgi/foundation/pom.xml` listing `domain-annotations`, `exchange`, `pipeline`, `jgiven`. All artifactIds UNCHANGED (the renames are Tasks 4–5). `exchange/` and `jgiven/` keep their internal structure (singleton-reduction + dissolution are later/deferred).
+- Produces: `osgi/foundation/pom.xml` listing `domain-annotations`, `gateway`, `pipeline`, `jgiven`. All artifactIds UNCHANGED (the renames are Tasks 4–5). `gateway/` and `jgiven/` keep their internal structure (singleton-reduction + dissolution are later/deferred).
 
 - [ ] **Step 1: Create the `foundation/` aggregator pom**
 
-Create `osgi/foundation/pom.xml` (same template as Task 1 Step 1), with `<artifactId>foundation</artifactId>`, `<name>osgi/foundation</name>`, `<description>Compile-time shared foundation the domains build against: domain annotations, the world-exchange seam, the fluent pipeline grammar, and the jGiven wrap.</description>`, and:
+Create `osgi/foundation/pom.xml` (same template as Task 1 Step 1), with `<artifactId>foundation</artifactId>`, `<name>osgi/foundation</name>`, `<description>Compile-time shared foundation the domains build against: domain annotations, the world-gateway seam, the fluent pipeline grammar, and the jGiven wrap.</description>`, and:
 
 ```xml
   <modules>
     <module>domain-annotations</module>
-    <module>exchange</module>
+    <module>gateway</module>
     <module>pipeline</module>
     <module>jgiven</module>
   </modules>
@@ -172,7 +172,7 @@ Create `osgi/foundation/pom.xml` (same template as Task 1 Step 1), with `<artifa
 
 ```bash
 cd /private/var/lib/git/nxmatic/rke2lab.d/feature/cluster-edge
-for d in domain-annotations exchange pipeline jgiven; do
+for d in domain-annotations gateway pipeline jgiven; do
   git mv "osgi/$d" "osgi/foundation/$d"
 done
 ```
@@ -193,8 +193,8 @@ done
 ⚠️ This combined substitution is order-sensitive (the 1-`../` and 2-`../` patterns must not chain). Because perl applies all `s///g` in sequence on the same file, run the deeper-path substitutions are written first would double-apply. SAFER: do it per-depth. Read each moved pom, confirm its current relativePath, and apply ONLY the one matching rule. The known starting values:
 - `foundation/domain-annotations/pom.xml`: `../bundle-parent` → `../../bundle-parent`
 - `foundation/pipeline/pom.xml`: `../bundle-parent` → `../../bundle-parent`
-- `foundation/exchange/pom.xml`: `../../build-parent` → `../../../build-parent`
-- `foundation/exchange/exchange-port/pom.xml`: `../../bundle-parent` → `../../../bundle-parent`
+- `foundation/gateway/pom.xml`: `../../build-parent` → `../../../build-parent`
+- `foundation/gateway/gateway-port/pom.xml`: `../../bundle-parent` → `../../../bundle-parent`
 - `foundation/jgiven/pom.xml`: `../../build-parent` → `../../../build-parent`
 - `foundation/jgiven/jgiven-wrap/pom.xml`: `../../bundle-parent` → `../../../bundle-parent`
 - `foundation/jgiven/jgiven-probe/pom.xml`, `jgiven-probe-test/pom.xml`: confirm (likely `../../bundle-parent` or `../../bundle-test-parent`) → +1
@@ -204,7 +204,7 @@ Verify each with: `grep -r relativePath osgi/foundation --include=pom.xml`.
 
 - [ ] **Step 4: Update the root `osgi/pom.xml` `<modules>`**
 
-Remove `domain-annotations`, `exchange`, `pipeline`, `jgiven`; add `<module>foundation</module>`.
+Remove `domain-annotations`, `gateway`, `pipeline`, `jgiven`; add `<module>foundation</module>`.
 
 - [ ] **Step 5: Run the full reactor build — expect green**
 
@@ -218,7 +218,7 @@ Expected: `BUILD SUCCESS`, staging `0 ERROR`. Fix any relativePath miss before c
 
 ```bash
 git add -A
-git commit -m "refactor(osgi): group domain-annotations, exchange, pipeline, jgiven under foundation/
+git commit -m "refactor(osgi): group domain-annotations, gateway, pipeline, jgiven under foundation/
 
 Pure relocation; jgiven moved AS-IS (dissolution into pipeline deferred — it is a
 realm change, not a layout move: pipeline is type=seam/flat while jGiven installs
@@ -389,16 +389,16 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 5: Rename `exchange`→`world-gateway` (module + package + WorldGatewayCatalog)
+### Task 5: Rename `gateway`→`world-gateway` (module + package + WorldGatewayCatalog)
 
 **Files:**
-- Move (git mv): `osgi/foundation/exchange/exchange-port/` → `osgi/foundation/world-gateway/`; delete the now-empty `osgi/foundation/exchange/` aggregator (singleton reduction, §5.7)
-- Rename package dir: `…/world-gateway/src/main/java/io/nxmatic/rke2lab/exchange/port/` → `…/world/gateway/port/` (and the `src/test/java` mirror)
-- Modify: the 8 seam types' `package` + `ExchangeCatalog`→`WorldGatewayCatalog`; `world-gateway/pom.xml` (artifactId, name, relativePath); `world-gateway/bnd.bnd` (Export-Package); the 30 `io.nxmatic.rke2lab.exchange` importers; the 5 pom consumers of `exchange-port`; `osgi/foundation/pom.xml` `<modules>`
+- Move (git mv): `osgi/foundation/gateway/gateway-port/` → `osgi/foundation/world-gateway/`; delete the now-empty `osgi/foundation/gateway/` aggregator (singleton reduction, §5.7)
+- Rename package dir: `…/world-gateway/src/main/java/io/nxmatic/rke2lab/gateway/port/` → `…/world/gateway/port/` (and the `src/test/java` mirror)
+- Modify: the 8 seam types' `package` + `GatewayCatalog`→`WorldGatewayCatalog`; `world-gateway/pom.xml` (artifactId, name, relativePath); `world-gateway/bnd.bnd` (Export-Package); the 30 `io.nxmatic.rke2lab.gateway` importers; the 5 pom consumers of `gateway-port`; `osgi/foundation/pom.xml` `<modules>`
 
 **Interfaces:**
-- Consumes: Task 2's `foundation/exchange/exchange-port`.
-- Produces: `foundation/world-gateway` bundle (artifactId `world-gateway`, package `io.nxmatic.rke2lab.world.gateway.port`, `type=seam` unchanged). `ExchangeCatalog` renamed `WorldGatewayCatalog`. All 30 importers + 5 pom consumers updated.
+- Consumes: Task 2's `foundation/gateway/gateway-port`.
+- Produces: `foundation/world-gateway` bundle (artifactId `world-gateway`, package `io.nxmatic.rke2lab.world.gateway.port`, `type=seam` unchanged). `GatewayCatalog` renamed `WorldGatewayCatalog`. All 30 importers + 5 pom consumers updated.
 
 [NOTE] This is the largest rename. The module name drops `-port` (§5.5: singleton, no `-core` sibling to contrast) but the PACKAGE keeps the `…port` leaf (`io.nxmatic.rke2lab.world.gateway.port`) — module names the concept, package names the API role.
 
@@ -406,9 +406,9 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ```bash
 cd /private/var/lib/git/nxmatic/rke2lab.d/feature/cluster-edge
-git mv osgi/foundation/exchange/exchange-port osgi/foundation/world-gateway
-git rm osgi/foundation/exchange/pom.xml        # the singleton aggregator is gone
-rmdir osgi/foundation/exchange 2>/dev/null || true
+git mv osgi/foundation/gateway/gateway-port osgi/foundation/world-gateway
+git rm osgi/foundation/gateway/pom.xml        # the singleton aggregator is gone
+rmdir osgi/foundation/gateway 2>/dev/null || true
 ```
 
 - [ ] **Step 2: Rename the package directories (main + test)**
@@ -416,69 +416,69 @@ rmdir osgi/foundation/exchange 2>/dev/null || true
 ```bash
 cd /private/var/lib/git/nxmatic/rke2lab.d/feature/cluster-edge/osgi/foundation/world-gateway
 for root in src/main/java src/test/java; do
-  if [ -d "$root/io/nxmatic/rke2lab/exchange/port" ]; then
+  if [ -d "$root/io/nxmatic/rke2lab/gateway/port" ]; then
     mkdir -p "$root/io/nxmatic/rke2lab/world/gateway"
-    git mv "$root/io/nxmatic/rke2lab/exchange/port" "$root/io/nxmatic/rke2lab/world/gateway/port"
-    git rm -r --ignore-unmatch "$root/io/nxmatic/rke2lab/exchange" 2>/dev/null || rmdir "$root/io/nxmatic/rke2lab/exchange" 2>/dev/null || true
+    git mv "$root/io/nxmatic/rke2lab/gateway/port" "$root/io/nxmatic/rke2lab/world/gateway/port"
+    git rm -r --ignore-unmatch "$root/io/nxmatic/rke2lab/gateway" 2>/dev/null || rmdir "$root/io/nxmatic/rke2lab/gateway" 2>/dev/null || true
   fi
 done
 ```
 
-- [ ] **Step 3: Rewrite the package declaration + ExchangeCatalog rename across the repo**
+- [ ] **Step 3: Rewrite the package declaration + GatewayCatalog rename across the repo**
 
 ```bash
 cd /private/var/lib/git/nxmatic/rke2lab.d/feature/cluster-edge
 # package rename in every java file (declarations AND imports), repo-wide:
-grep -rln "io\.nxmatic\.rke2lab\.exchange\.port" --include="*.java" . | grep -v /target/ | while read -r f; do
-  perl -0pi -e 's{io\.nxmatic\.rke2lab\.exchange\.port}{io.nxmatic.rke2lab.world.gateway.port}g' "$f"
+grep -rln "io\.nxmatic\.rke2lab\.gateway\.port" --include="*.java" . | grep -v /target/ | while read -r f; do
+  perl -0pi -e 's{io\.nxmatic\.rke2lab\.gateway\.port}{io.nxmatic.rke2lab.world.gateway.port}g' "$f"
 done
-# ExchangeCatalog → WorldGatewayCatalog (type name), repo-wide:
-grep -rln "ExchangeCatalog" --include="*.java" . | grep -v /target/ | while read -r f; do
-  perl -0pi -e 's{\bExchangeCatalog\b}{WorldGatewayCatalog}g' "$f"
+# GatewayCatalog → WorldGatewayCatalog (type name), repo-wide:
+grep -rln "GatewayCatalog" --include="*.java" . | grep -v /target/ | while read -r f; do
+  perl -0pi -e 's{\bGatewayCatalog\b}{WorldGatewayCatalog}g' "$f"
 done
 # rename the file itself:
-git mv osgi/foundation/world-gateway/src/main/java/io/nxmatic/rke2lab/world/gateway/port/ExchangeCatalog.java \
+git mv osgi/foundation/world-gateway/src/main/java/io/nxmatic/rke2lab/world/gateway/port/GatewayCatalog.java \
        osgi/foundation/world-gateway/src/main/java/io/nxmatic/rke2lab/world/gateway/port/WorldGatewayCatalog.java
 ```
 
 - [ ] **Step 4: Update the bundle's bnd Export-Package**
 
-In `osgi/foundation/world-gateway/bnd.bnd`, change any `Export-Package: io.nxmatic.rke2lab.exchange.port` → `io.nxmatic.rke2lab.world.gateway.port` (and the Bundle-SymbolicName if it embeds the old name — read it first; keep `Provide-Capability: io.nxmatic.rke2lab.embed; type=seam` unchanged).
+In `osgi/foundation/world-gateway/bnd.bnd`, change any `Export-Package: io.nxmatic.rke2lab.gateway.port` → `io.nxmatic.rke2lab.world.gateway.port` (and the Bundle-SymbolicName if it embeds the old name — read it first; keep `Provide-Capability: io.nxmatic.rke2lab.embed; type=seam` unchanged).
 
 ```bash
-perl -0pi -e 's{io\.nxmatic\.rke2lab\.exchange\.port}{io.nxmatic.rke2lab.world.gateway.port}g;
-               s{io\.nxmatic\.rke2lab\.exchange}{io.nxmatic.rke2lab.world.gateway}g' osgi/foundation/world-gateway/bnd.bnd
+perl -0pi -e 's{io\.nxmatic\.rke2lab\.gateway\.port}{io.nxmatic.rke2lab.world.gateway.port}g;
+               s{io\.nxmatic\.rke2lab\.gateway}{io.nxmatic.rke2lab.world.gateway}g' osgi/foundation/world-gateway/bnd.bnd
 ```
 
 - [ ] **Step 5: Update the world-gateway pom (artifactId, name, relativePath, internal package refs in systemPackages if any)**
 
-In `osgi/foundation/world-gateway/pom.xml`: `<artifactId>exchange-port</artifactId>` → `<artifactId>world-gateway</artifactId>`, `<name>osgi/exchange/exchange-port</name>` → `<name>osgi/foundation/world-gateway</name>`. relativePath: it WAS `osgi/foundation/exchange/exchange-port` (3 deep) → now `osgi/foundation/world-gateway` (2 deep), so relativePath to bundle-parent goes from `../../../bundle-parent` (set in Task 2) back to `../../bundle-parent`.
+In `osgi/foundation/world-gateway/pom.xml`: `<artifactId>gateway-port</artifactId>` → `<artifactId>world-gateway</artifactId>`, `<name>osgi/gateway/gateway-port</name>` → `<name>osgi/foundation/world-gateway</name>`. relativePath: it WAS `osgi/foundation/gateway/gateway-port` (3 deep) → now `osgi/foundation/world-gateway` (2 deep), so relativePath to bundle-parent goes from `../../../bundle-parent` (set in Task 2) back to `../../bundle-parent`.
 
-- [ ] **Step 6: Update the 5 pom consumers of `exchange-port`**
+- [ ] **Step 6: Update the 5 pom consumers of `gateway-port`**
 
-`osgi/domains/doctor/doctor-core/pom.xml`, `osgi/domains/doctor/doctor-core-test/pom.xml`, `osgi/domains/doctor/doctor-port/pom.xml`, `exec/seed-master/pom.xml` — change `<artifactId>exchange-port</artifactId>` → `<artifactId>world-gateway</artifactId>`.
+`osgi/domains/doctor/doctor-core/pom.xml`, `osgi/domains/doctor/doctor-core-test/pom.xml`, `osgi/domains/doctor/doctor-port/pom.xml`, `exec/seed-master/pom.xml` — change `<artifactId>gateway-port</artifactId>` → `<artifactId>world-gateway</artifactId>`.
 
 ```bash
 cd /private/var/lib/git/nxmatic/rke2lab.d/feature/cluster-edge
-grep -rln "<artifactId>exchange-port</artifactId>" --include=pom.xml . | grep -v /target/ | while read -r f; do
-  perl -0pi -e 's{<artifactId>exchange-port</artifactId>}{<artifactId>world-gateway</artifactId>}g' "$f"
+grep -rln "<artifactId>gateway-port</artifactId>" --include=pom.xml . | grep -v /target/ | while read -r f; do
+  perl -0pi -e 's{<artifactId>gateway-port</artifactId>}{<artifactId>world-gateway</artifactId>}g' "$f"
 done
-grep -rn "<artifactId>exchange-port<" --include=pom.xml . | grep -v /target/   # expect: empty
+grep -rn "<artifactId>gateway-port<" --include=pom.xml . | grep -v /target/   # expect: empty
 ```
 
 - [ ] **Step 7: Update `osgi/foundation/pom.xml` `<modules>`**
 
-`<module>exchange</module>` → `<module>world-gateway</module>`.
+`<module>gateway</module>` → `<module>world-gateway</module>`.
 
-- [ ] **Step 8: Sweep for any residual `exchange` reference**
+- [ ] **Step 8: Sweep for any residual `gateway` reference**
 
 ```bash
 cd /private/var/lib/git/nxmatic/rke2lab.d/feature/cluster-edge
 echo "--- java/bnd/pom residue (expect empty) ---"
-grep -rn "rke2lab\.exchange\|exchange-port\|ExchangeCatalog" --include="*.java" --include="*.bnd" --include=pom.xml . | grep -v /target/ | grep -v "wip/plans" | grep -v "docs/"
+grep -rn "rke2lab\.gateway\|gateway-port\|GatewayCatalog" --include="*.java" --include="*.bnd" --include=pom.xml . | grep -v /target/ | grep -v "wip/plans" | grep -v "docs/"
 ```
 
-Expected: empty. (Hits under `docs/` are spec prose — the spec/2C doc deliberately keep "exchange" as historical narration; leave them. Hits under `wip/plans/` are historical.)
+Expected: empty. (Hits under `docs/` are spec prose — the spec/2C doc deliberately keep "gateway" as historical narration; leave them. Hits under `wip/plans/` are historical.)
 
 - [ ] **Step 9: Full reactor build — expect green**
 
@@ -492,10 +492,10 @@ Expected: `BUILD SUCCESS`, `0 ERROR`, doctor in-container tests green (`DoctorCo
 
 ```bash
 git add -A
-git commit -m "refactor(osgi): rename exchange→world-gateway (module + package + WorldGatewayCatalog)
+git commit -m "refactor(osgi): rename gateway→world-gateway (module + package + WorldGatewayCatalog)
 
 The single inter-world door, named for the role that survives embedded→remote RSA.
-The exchange/ singleton aggregator is reduced (§5.7): the bundle rises to
+The gateway/ singleton aggregator is reduced (§5.7): the bundle rises to
 foundation/world-gateway, the -port suffix drops from the MODULE name while the
 PACKAGE keeps its …port role leaf (io.nxmatic.rke2lab.world.gateway.port). bundle
 stays type=seam. 30 importers + 5 pom consumers + the selector updated.
@@ -530,7 +530,7 @@ Expected exactly: `bundle-parent`, `bundle-test-parent`, `foundation`, `runtime`
 find osgi -name pom.xml -not -path "*/target/*" | sort
 ```
 
-Expected: `foundation/{domain-annotations,world-gateway,pipeline,jgiven/*}`, `runtime/{boot/*,runtime/* (artifactId runtime-host),junit-testkit,bench/*}`, `domains/{doctor/*,cluster/*,systemd/*,manifests/*,netplan/*,unitrepo/*,ssh-to-age-edge}`. NO `osgi/exchange`, NO flat domains.
+Expected: `foundation/{domain-annotations,world-gateway,pipeline,jgiven/*}`, `runtime/{boot/*,runtime/* (artifactId runtime-host),junit-testkit,bench/*}`, `domains/{doctor/*,cluster/*,systemd/*,manifests/*,netplan/*,unitrepo/*,ssh-to-age-edge}`. NO `osgi/gateway`, NO flat domains.
 
 - [ ] **Step 3: Final full reactor build with the staging gate inspected**
 
@@ -567,9 +567,9 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - §5.2 runtime→runtime-host → Tasks 3–4. ✓
 - §5.3 parents stay flat → never moved (Tasks touch only the 15 non-parent modules). ✓
 - §5.4 jgiven dissolution → DEFERRED (Global Constraints + Task 2 + Task 6 Step 4), with rationale. ✓ (intentional gap, documented)
-- §5.5 exchange→world-gateway (module + package + WorldGatewayCatalog) → Task 5. ✓
+- §5.5 gateway→world-gateway (module + package + WorldGatewayCatalog) → Task 5. ✓
 - §5.6 testing/ erased (junit-testkit + bench → runtime/) → Task 3. ✓
-- §5.7 aggregator iff ≥2 (exchange singleton reduced; ssh-to-age-edge flat) → Tasks 1, 5. ✓
+- §5.7 aggregator iff ≥2 (gateway singleton reduced; ssh-to-age-edge flat) → Tasks 1, 5. ✓
 - §6 migration mechanics (git mv, relativePath +1, <modules>, build-verify) → every task. ✓
 
 **2. Placeholder scan:** No "TBD"/"handle errors"/"similar to". The one judgment point (Task 3's collision resolution) is spelled out with the chosen resolution (fold the leaf artifactId rename into Task 3). ✓

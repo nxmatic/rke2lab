@@ -1,6 +1,6 @@
 ---
 name: multiplexor-two-models-design
-description: "DESIGN settled 2026-06-24; steps 1-4 BUILT (2026-06-25): doctor quartet + record-purity guard, HealthSystem as live OSGi entity, 3 specialists distributed to their domains + host switch to awaitService(HealthSystem).admit, ConsultingService rename, Specialist.diagnose split into assess+prescribe. Steps 5-6 (DomainDagMultiplexor/Adapter, the Document-contract data seam) NOT yet built. The host↔OSGi data exchange is reframed as TWO distinct world-models meeting ONLY at a Document contract, never sharing a type; mechanism = DS (over fragment), records stay private. Invariant: Pulumi is host-only vocabulary."
+description: "DESIGN settled 2026-06-24; steps 1-4 BUILT (2026-06-25): doctor quartet + record-purity guard, HealthSystem as live OSGi entity, 3 specialists distributed to their domains + host switch to awaitService(HealthSystem).admit, ConsultingService rename, Specialist.diagnose split into assess+prescribe. Steps 5-6 (DomainDagMultiplexor/Adapter, the Document-contract data seam) NOT yet built. The host↔OSGi data gateway is reframed as TWO distinct world-models meeting ONLY at a Document contract, never sharing a type; mechanism = DS (over fragment), records stay private. Invariant: Pulumi is host-only vocabulary."
 metadata:
   node_type: memory
   type: project

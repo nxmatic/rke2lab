@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-While enforcing [[direct-dependency-for-every-import]] during world-exchange Option B, two
+While enforcing [[direct-dependency-for-every-import]] during world-gateway Option B, two
 further transitive leaks in `osgi/doctor/doctor-core-test/pom.xml` were found but left for a
 dedicated hygiene pass (out of Option B's blast radius — the actor tests used these long before
 Option B):
@@ -18,8 +18,8 @@ Option B):
 
 Fix: add `doctor-records` and `doctor-spi` as DIRECT `provided` deps of doctor-core-test (the
 fragment's src/main bytecode resolves against the doctor-core host at runtime, like the existing
-`doctor-core`/`doctor-port`/`exchange-port`/jackson entries). Other `-test` fragments may have the
+`doctor-core`/`doctor-port`/`gateway-port`/jackson entries). Other `-test` fragments may have the
 same pattern — sweep them all in the same pass for uniformity.
 
-(Option B already added the missing DIRECT `exchange-port` + `jackson-core` + `jackson-databind`
+(Option B already added the missing DIRECT `gateway-port` + `jackson-core` + `jackson-databind`
 to doctor-core-test, since those were squarely in its scope.)

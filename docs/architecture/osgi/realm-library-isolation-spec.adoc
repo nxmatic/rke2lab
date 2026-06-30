@@ -3,7 +3,7 @@
 :icons: font
 
 *Status:* DESIGN (converged 2026-06-30, NOT yet built). A correction increment, sequenced BEFORE
-link:world-exchange-2d-schema-contract-spec.adoc[world-exchange 2D] and the remote-validation
+link:world-gateway-2d-schema-contract-spec.adoc[world-gateway 2D] and the remote-validation
 capstone. It closes a gap 2C's peer model exposed but did not yet act on: a third-party library a
 *world* uses (today jackson; with 2D, networknt) is still *shared* across the host/OSGi boundary
 through `system.packages.extra`, rather than each world loading its own classloader-isolated copy —
@@ -22,7 +22,7 @@ corrected rule.
 
 == The theorem this increment adds
 
-After 2C, the two worlds exchange only opaque `Document(domain, coordinate, payload : String)`
+After 2C, the two worlds gateway only opaque `Document(domain, coordinate, payload : String)`
 values — no Java type crosses the seam. A library a world uses to *parse* that String (jackson on
 both sides; networknt on the OSGi side from 2D) is therefore a *world-internal* concern: nothing
 about it needs to be the same class on both sides. The theorem:
@@ -222,9 +222,9 @@ derived rule. Derivation first; hand-list only if the evidence forces it.
 
 * link:staging-gates-governance-spec.adoc[Staging-gates governance] — `DUPLICATE_REALM_CLASS` is the
   law whose exemption this increment re-derives from seam purity.
-* link:world-exchange-2c-reconstruction-path-spec.adoc[2C — reconstruction path] — established the
+* link:world-gateway-2c-reconstruction-path-spec.adoc[2C — reconstruction path] — established the
   String-only seam that makes per-realm library copies safe.
-* link:world-exchange-2d-schema-contract-spec.adoc[2D — the schema contract] — adds networknt onto
+* link:world-gateway-2d-schema-contract-spec.adoc[2D — the schema contract] — adds networknt onto
   the realm-library rule this increment defines.
 * link:../patterns/port-edge-domain-ownership.adoc[Port/edge/domain ownership] — the `type=seam` vs
   `type=model` boot-face distinction the derivation reads.

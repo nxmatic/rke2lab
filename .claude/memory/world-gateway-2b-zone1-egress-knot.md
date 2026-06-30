@@ -1,6 +1,6 @@
 ---
-name: world-exchange-2b-zone1-egress-knot
-description: World-exchange 2B zone-1 (systemd-adapter consult path) is entangled with the Pulumi egress + medical-record reconstruction the user requires preserved — the consultation Document must carry the STRUCTURED plan/observations/expectations (not just rendered strings) so readers stay unchanged. Resolved design (A-struct) recorded here.
+name: world-gateway-2b-zone1-egress-knot
+description: World-gateway 2B zone-1 (systemd-adapter consult path) is entangled with the Pulumi egress + medical-record reconstruction the user requires preserved — the consultation Document must carry the STRUCTURED plan/observations/expectations (not just rendered strings) so readers stay unchanged. Resolved design (A-struct) recorded here.
 metadata:
   type: project
 ---
@@ -52,5 +52,5 @@ EXACT shape the existing `toOutputMap()`s produce (`checkpointId`, `observations
 stages, but `Observation` remains (egress + scenario), so the stage stays partially on the worklist —
 expected, the full clear is the egress increment. This is the corrected "green per zone".
 
-See [[world-exchange-2a-execution-state]] [[world-exchange-document-design]]
+See [[world-gateway-2a-execution-state]] [[world-gateway-document-design]]
 [[document-codec-instance-in-2d-backlog]].

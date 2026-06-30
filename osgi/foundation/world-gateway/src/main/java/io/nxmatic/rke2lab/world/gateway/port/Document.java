@@ -10,6 +10,6 @@ package io.nxmatic.rke2lab.world.gateway.port;
  * across the flat seam and caused a {@code LinkageError} in-container).
  *
  * <p>{@code coordinate} is the document type and the schema key; {@code domain} names the owner.
- * See docs/architecture/osgi/world-exchange-spec.adoc.
+ * See docs/architecture/osgi/world-gateway-spec.adoc.
  */
 public record Document(String domain, String coordinate, String payload) {}

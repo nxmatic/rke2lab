@@ -1,11 +1,11 @@
-= World exchange 2C — the reconstruction path crosses as opaque Documents between peers
+= World gateway 2C — the reconstruction path crosses as opaque Documents between peers
 :toc: left
 :icons: font
 
 *Status:* DESIGN (converged 2026-06-30, NOT yet built). The third implementation increment of the
-world-exchange migration (link:world-exchange-spec.adoc[design of record]), following
-link:world-exchange-2a-document-foundation-spec.adoc[2A] (the Document foundation + the readiness
-verdict) and link:world-exchange-2b-consult-path-spec.adoc[2B] (the consult path).
+world-gateway migration (link:world-gateway-spec.adoc[design of record]), following
+link:world-gateway-2a-document-foundation-spec.adoc[2A] (the Document foundation + the readiness
+verdict) and link:world-gateway-2b-consult-path-spec.adoc[2B] (the consult path).
 
 2C drives the `REALM_BOUNDARY` gate worklist from its post-2B residue (≈38 flat classes referencing
 `doctor.records`) to *zero*, then flips the gate `WARN`→`ERROR` — the lock that makes the
@@ -16,15 +16,15 @@ type; the two worlds are provably separated.
 .2C is written on the NEW module layout
 ====
 The aggregator re-layout (link:osgi-aggregator-layout-spec.adoc[osgi aggregator layout]) lands
-*before* 2C, on the same branch. That increment renames `exchange`→`world-gateway`
-(`ExchangeCatalog`→`WorldGatewayCatalog`, package `io.nxmatic.rke2lab.world.gateway.port`). 2C is
+*before* 2C, on the same branch. That increment renames `gateway`→`world-gateway`
+(`GatewayCatalog`→`WorldGatewayCatalog`, package `io.nxmatic.rke2lab.world.gateway.port`). 2C is
 written against those new names. This spec uses `world-gateway`/`WorldGatewayCatalog` throughout; read
-them as `exchange-port`/`ExchangeCatalog` if you are on a pre-layout tree.
+them as `gateway-port`/`GatewayCatalog` if you are on a pre-layout tree.
 ====
 
 == The load-bearing insight — two peers, not a host driving a service
 
-The world-exchange invariant (from the design of record) is that every seam crossing is an opaque,
+The world-gateway invariant (from the design of record) is that every seam crossing is an opaque,
 schema-bearing Document and the host holds no doctor type. 2A and 2B advanced the *ingress/consult*
 direction. 2C completes the *reconstruction* direction — and in doing so reveals the deepest framing
 of the whole migration:
@@ -392,7 +392,7 @@ preview` boots green throughout (2A closed the boot parse); 2C does not regress 
 
 2C migrates the reconstruction/egress path and clears the worklist. It does NOT include:
 
-* the *aggregator re-layout* (`exchange`→`world-gateway`, the 3 module groups) — that is a separate
+* the *aggregator re-layout* (`gateway`→`world-gateway`, the 3 module groups) — that is a separate
   increment that lands link:osgi-aggregator-layout-spec.adoc[BEFORE 2C], on the same branch.
 * the *remote-validation capstone* — proving the separation dynamically (host + OSGi in separate
   processes exchanging only Documents). That is increment 4, its own spec, sequenced after the flip,
@@ -403,12 +403,12 @@ preview` boots green throughout (2A closed the boot parse); 2C does not regress 
 
 == Related documentation
 
-* link:world-exchange-spec.adoc[World exchange] — the design of record this increment specializes; its
+* link:world-gateway-spec.adoc[World gateway] — the design of record this increment specializes; its
   "Sequencing" step 2.2 ("the four `*Reader` … are deleted; the egress DAG crosses as a Document") is
   what 2C implements.
-* link:world-exchange-2b-consult-path-spec.adoc[2B — consult path] — the prior increment; 2C reuses its
+* link:world-gateway-2b-consult-path-spec.adoc[2B — consult path] — the prior increment; 2C reuses its
   `Document` seam, the opaque-copy egress, and the `ClinicalReasoning`/`adapt` seam-split idiom.
 * link:osgi-aggregator-layout-spec.adoc[osgi aggregator layout] — the re-layout that renames
-  `exchange`→`world-gateway`; lands before 2C.
+  `gateway`→`world-gateway`; lands before 2C.
 * link:staging-gates-governance-spec.adoc[Staging-gates governance] — the `REALM_BOUNDARY` gate whose
   WARN worklist is 2C's progress meter and whose `ERROR` flip is 2C's terminal lock.

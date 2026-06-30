@@ -1,6 +1,6 @@
 ---
-name: world-exchange-2c-peer-model-design
-description: 2C design CONVERGED (2026-06-30, brainstorm on feature/cluster-edge, NOT yet spec'd/built). The PEER MODEL — host and OSGi are two peers at the same level joined ONLY by opaque Documents + shared checkpoint identity; neither reaches into the other's logic. Drives REALM_BOUNDARY worklist 38→0. Branch roadmap (4 increments before merge): layout-first (exchange→world-gateway, spec EXISTS) → 2C → flip WARN→ERROR → remote-validation capstone (own spec TBD). Whiteboard figures in .claude/claude-preview.adoc. See [[world-exchange-2a-execution-state]] [[checkpoint-identity-to-seam-backlog]] [[osgi-aggregator-layout-spec-state]] [[options-always-as-c4-diagrams]].
+name: world-gateway-2c-peer-model-design
+description: 2C design CONVERGED (2026-06-30, brainstorm on feature/cluster-edge, NOT yet spec'd/built). The PEER MODEL — host and OSGi are two peers at the same level joined ONLY by opaque Documents + shared checkpoint identity; neither reaches into the other's logic. Drives REALM_BOUNDARY worklist 38→0. Branch roadmap (4 increments before merge): layout-first (gateway→world-gateway, spec EXISTS) → 2C → flip WARN→ERROR → remote-validation capstone (own spec TBD). Whiteboard figures in .claude/claude-preview.adoc. See [[world-gateway-2a-execution-state]] [[checkpoint-identity-to-seam-backlog]] [[osgi-aggregator-layout-spec-state]] [[options-always-as-c4-diagrams]].
 metadata:
   type: project
 ---
@@ -81,6 +81,6 @@ canonicalize raw CLI facts into a valid intervention Document (host doesn't know
 
 The REALM_BOUNDARY gate proves separation STATICALLY (no flat class references a bundle type). The
 remote-validation capstone (increment 4, own spec) proves it DYNAMICALLY (host+OSGi in separate
-processes exchange only Documents, same result as embedded). Static + dynamic = merge in confidence.
+processes gateway only Documents, same result as embedded). Static + dynamic = merge in confidence.
 The design-of-record had this as YAGNI ("Runtime validation is designed, but YAGNI until remote"); the
 user wants to reach that *until remote* to VALIDATE the model, not to productionize RSA.

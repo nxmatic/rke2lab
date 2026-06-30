@@ -37,7 +37,7 @@ class DoctorPortInContainerTest {
       OutOfContainerFrameworkExtension.builder()
           // The fragment names the dbus-tcp unit via the typed SystemdUnitId, so it imports the
           // systemd domain's port; and doctor-port now declares consult(Document), so the host
-          // imports the exchange port too. Both are seams (system-exported live), so they are
+          // imports the gateway port too. Both are seams (system-exported live), so they are
           // system-exported here for the host to resolve the merged-in fragment imports.
           .systemPackages(
               "io.nxmatic.rke2lab.systemd.port;version=1.0.0",

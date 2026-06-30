@@ -6,11 +6,11 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the exchange vocabulary's closed domains — coordinates, actions, and symptom kinds. The
- * slugs cross the wire as strings in {@link Document}, so we lock them down: a refactor cannot
- * drift the value without breaking the test.
+ * Pins the gateway vocabulary's closed domains — coordinates, actions, and symptom kinds. The slugs
+ * cross the wire as strings in {@link Document}, so we lock them down: a refactor cannot drift the
+ * value without breaking the test.
  */
-class ExchangeVocabularyTest {
+class GatewayVocabularyTest {
 
   @Test
   void coordinateSlugsArePinnedAndRoundTrip() {

@@ -3,7 +3,7 @@
 
 Whiteboard de design *annexe* (hors conf, hors contexte de la branche cluster-edge en cours).
 Question : peut-on rendre le monde OSGi *live* et autonome, l'embed exec devenant *juste une interface*
-vers un monde OSGi *distant* ? Reponse : oui -- ton seam world-exchange est deja concu transport-neutre
+vers un monde OSGi *distant* ? Reponse : oui -- ton seam world-gateway est deja concu transport-neutre
 (*tout passe en `Document`/JSON sur des verbes, schema = OpenAPI ; "embedded today, remote later, same
 contract"*). Les Remote Services OSGi (RSA, chapitre 122) sont le mecanisme qui rend ce seam physique
 SANS toucher les consommateurs.
@@ -795,7 +795,7 @@ flowchart TB
   q -->|service vivant dynamique| rsa["Repository distribue par RSA ECF le proxy reflete l'etat reel de B"]
   q -->|index statique simple| http["repository xml R5 servi en HTTP refetche aucun RSA comme OBR Maven"]
   rsa --> caveat["caveat Requirement Capability doivent marshaller TCP = serialisation Java"]
-  caveat --> doc["echappatoire seam Document consult requirements rend capabilities urls coherent world-exchange"]
+  caveat --> doc["echappatoire seam Document consult requirements rend capabilities urls coherent world-gateway"]
 ....
 
 === Le tableau reequilibre
@@ -806,7 +806,7 @@ flowchart TB
   "pairs qui se decouvrent dynamiquement" ; (b) index xml R5 servi en HTTP -- plus simple, statique,
   zero RSA. Le dynamisme penche (a), la simplicite penche (b).
 * *Si (a)* : ne PAS distribuer le Repository cru (types OSGi pas forcement Serializable) -> un seam
-  Document devant (requirements in, capabilities+urls out), coherent avec ton contrat world-exchange.
+  Document devant (requirements in, capabilities+urls out), coherent avec ton contrat world-gateway.
 * *A verifier (pas presumer)* : ECF expose-t-il une aide a la federation de Repository, ou est-ce juste
   "le Repository est un service, RSA le distribue" ? + le comportement de marshalling Requirement
   Capability sur le transport ECF.

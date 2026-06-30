@@ -182,7 +182,7 @@
       <artifactId>domain-annotations</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- The world-exchange seam: Document + ReadinessAuthority. The stage builds a checkpoint
+    <!-- The world-gateway seam: Document + ReadinessAuthority. The stage builds a checkpoint
          Document and reads the verdict's action, instead of reasoning on Severity. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>

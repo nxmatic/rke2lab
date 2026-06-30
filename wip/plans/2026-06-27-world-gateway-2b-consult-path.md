@@ -1,4 +1,4 @@
-# World Exchange 2B — Consult Path Implementation Plan
+# World Gateway 2B — Consult Path Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -6,16 +6,16 @@
 
 **Architecture:** Add a `consult(Document checkpoint) → Document consultation` verb to the `ConsultingService` seam (the Document twin of 2A's `assess`). The OSGi authority (`Generalist`) parses the checkpoint, routes/reasons as today, and returns a consultation Document carrying only strings (`narration`, `diagnosisAdoc`, `checkpointId`). The host builds the checkpoint from host-native facts, logs the narration, and inserts `diagnosisAdoc` verbatim into its jGiven runbook shell. By zone: zone-0 (seam + the `DoctorGraph`→`ConsultationDag` rename) first, then zone-1 (systemd-adapter), then zone-2 (cluster).
 
-**Tech Stack:** Java 25, OSGi (embedded Felix, DS `@Component`), bnd, Jackson `JsonNode`, jGiven AsciiDoc report, JUnit 5, the `exchange-port` seam from 2A.
+**Tech Stack:** Java 25, OSGi (embedded Felix, DS `@Component`), bnd, Jackson `JsonNode`, jGiven AsciiDoc report, JUnit 5, the `gateway-port` seam from 2A.
 
 ## Global Constraints
 
-- *Spec of record:* `docs/architecture/osgi/world-exchange-2b-consult-path-spec.adoc`. Read it first.
+- *Spec of record:* `docs/architecture/osgi/world-gateway-2b-consult-path-spec.adoc`. Read it first.
 - *No doctor type on the host consult path.* After this plan, `SystemdAdapterStage`, `ClusterReadinessStage`, both probes (`Live`/`Simulated`), `SeedSystemdAdapterEndpointGate`, `RunbookRenderer`, and the two jGiven consult scenarios import ZERO `doctor.records` types.
 - *consult is a DISTINCT verb*, twin of `assess` — NOT folded into `assess`. `ReadinessAuthority` (verdict) and `ConsultingService` (consultation) stay separate seams.
 - *The host transports strings.* The consultation Document carries only `String` fields. `RemediationPlan`/`ReferralReply`/`ConsultationReport` NEVER cross to the host; they stay OSGi-side where `ConsultationDag` produces and renders them.
 - *AsciiDoc is markup, not rendered HTML.* `diagnosisAdoc` is a `StringBuilder` of AsciiDoc text. Add NO asciidoctor / jruby / graphviz dependency.
-- *Identifiers via `ExchangeCatalog`*, never literal strings (the `clusterApi`-bug discipline). New constants: the `consultation` coordinate and the `narration`/`diagnosisAdoc`/`symptomKind`/`summary`/`details` field names.
+- *Identifiers via `GatewayCatalog`*, never literal strings (the `clusterApi`-bug discipline). New constants: the `consultation` coordinate and the `narration`/`diagnosisAdoc`/`symptomKind`/`summary`/`details` field names.
 - *`ConsultationReport` is NOT deleted* — it stays alive for the reconstruction path (2C) and its OSGi-side tests. 2B only stops the host *consult path* from building it.
 - *The two reconstruction verbs* (`recordForCurrentPatient`, `reviewOpenProblems`) stay on `ConsultingService` untouched (zone-3 / 2C).
 - *Build & verify:* never `mvn install` project artifacts; build with `-am`; tests run with `-DskipTests=false`. **seed-master tests run via `package -Pall-worlds`, never bare `test`** (the staging `stage-embedded-bundles` copy is bound to generate-resources and needs shade in the mojo list). Cache off with `-Dmaven.build.cache.skipCache=true`. doctor in-container tests run via bare `test` on their module.
@@ -23,50 +23,50 @@
 
 ---
 
-## Task 1 (zone-0a): the typed exchange vocabulary (enums) + the `consult(Document)` seam verb
+## Task 1 (zone-0a): the typed gateway vocabulary (enums) + the `consult(Document)` seam verb
 
 > **Status note:** commit `864ec8d8` already landed the first half of this task — it added the
-> `consult(Document)` verb to `ConsultingService`, the `exchange-port`→`doctor-port` pom dependency,
-> and the consultation/checkpoint field constants to `ExchangeCatalog`. That commit STAYS. This task
+> `consult(Document)` verb to `ConsultingService`, the `gateway-port`→`doctor-port` pom dependency,
+> and the consultation/checkpoint field constants to `GatewayCatalog`. That commit STAYS. This task
 > as revised adds the second half (a user-requested refinement): lift the catalog's *closed value
-> domains* into typed enums, because `ExchangeCatalog` had become a flat fourre-tout mixing three
+> domains* into typed enums, because `GatewayCatalog` had become a flat fourre-tout mixing three
 > natures — coordinates (a closed set), enumerated field values (closed sets), and payload field
 > keys (the schema). Coordinates/actions/symptom-kinds are closed domains → enums; only the schema
 > keys stay catalog constants. This also supplies the **missing** symptom-kind vocabulary the host
 > needs in zone-1/2 once it drops `doctor.records.Symptom`.
 
 **Files:**
-- Create: `osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/Coordinate.java`
-- Create: `osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/Action.java`
-- Create: `osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/SymptomKind.java`
-- Modify: `osgi/exchange/exchange-port/src/main/java/io/nxmatic/rke2lab/exchange/port/ExchangeCatalog.java` (slim to schema keys)
+- Create: `osgi/gateway/gateway-port/src/main/java/io/nxmatic/rke2lab/gateway/port/Coordinate.java`
+- Create: `osgi/gateway/gateway-port/src/main/java/io/nxmatic/rke2lab/gateway/port/Action.java`
+- Create: `osgi/gateway/gateway-port/src/main/java/io/nxmatic/rke2lab/gateway/port/SymptomKind.java`
+- Modify: `osgi/gateway/gateway-port/src/main/java/io/nxmatic/rke2lab/gateway/port/GatewayCatalog.java` (slim to schema keys)
 - Modify: `osgi/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/internal/DefaultReadinessAuthority.java` (call sites)
 - Modify: `exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/SystemdAdapterStage.java` (call sites)
-- Test (create): `osgi/exchange/exchange-port/src/test/java/io/nxmatic/rke2lab/exchange/port/ExchangeVocabularyTest.java`
-- Test (modify): `osgi/exchange/exchange-port/src/test/java/io/nxmatic/rke2lab/exchange/port/DocumentTest.java`
+- Test (create): `osgi/gateway/gateway-port/src/test/java/io/nxmatic/rke2lab/gateway/port/GatewayVocabularyTest.java`
+- Test (modify): `osgi/gateway/gateway-port/src/test/java/io/nxmatic/rke2lab/gateway/port/DocumentTest.java`
 - Test (modify): `osgi/doctor/doctor-core/src/test/java/io/nxmatic/rke2lab/doctor/ReadinessAuthorityTest.java`
 - Test (modify): `exec/seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/pipeline/stages/SystemdAdapterVerdictTest.java`
 
 **Interfaces:**
 - Consumes: `Document` (from 2A). `Document` STAYS the neutral envelope `(String domain, String coordinate, JsonNode payload)` — do NOT type the coordinate into it; the envelope must not couple to the doctor coordinate vocabulary.
-- Produces: FOUR enums in `io.nxmatic.rke2lab.exchange.port`, each with `String slug()` + `static Optional<E> parse(String)` (slug-strict), mirroring the codebase enum idiom (`Severity.parse`, `Symptom.parse`, `Checkpoint.slug`):
-  - `Domain{ DOCTOR("doctor") }` — the document owner. (One value today; forward-extensible if other ports exchange Documents. This is the slot `Document.domain()` carries, NOT the host's `InfraDomainCatalog` provisioning axis nor `ManifestDomainCatalog` — a different axis AND a different layer; the seam leaf cannot reference the host.)
+- Produces: FOUR enums in `io.nxmatic.rke2lab.gateway.port`, each with `String slug()` + `static Optional<E> parse(String)` (slug-strict), mirroring the codebase enum idiom (`Severity.parse`, `Symptom.parse`, `Checkpoint.slug`):
+  - `Domain{ DOCTOR("doctor") }` — the document owner. (One value today; forward-extensible if other ports gateway Documents. This is the slot `Document.domain()` carries, NOT the host's `InfraDomainCatalog` provisioning axis nor `ManifestDomainCatalog` — a different axis AND a different layer; the seam leaf cannot reference the host.)
   - `Coordinate{ READINESS_CHECKPOINT("readiness-checkpoint"), READINESS_VERDICT("readiness-verdict"), CONSULTATION("consultation") }`
   - `Action{ STOP("stop"), CONTINUE_DEGRADED("continue-degraded") }`
   - `SymptomKind{ CONNECTION_REFUSED("connection-refused"), TIMEOUT("timeout"), KUBECONFIG_MISSING("kubeconfig-missing"), API_NOT_READY("api-not-ready"), CONTROLLER_NOT_READY("controller-not-ready") }` — the five slugs of `doctor.records.Symptom`, host-flat. (`Generalist` maps `SymptomKind`→`Symptom` in Task 2; the host produces `SymptomKind.X.slug()` in Tasks 4-5.)
-- `ExchangeCatalog` (slimmed) keeps ONLY the `FIELD_*` payload schema keys. REMOVES `DOMAIN_DOCTOR` (→ `Domain.DOCTOR`), `READINESS_CHECKPOINT`/`READINESS_VERDICT`/`CONSULTATION` (→ `Coordinate`), `ACTION_STOP`/`ACTION_CONTINUE_DEGRADED` (→ `Action`). The `FIELD_*` keys STAY constants — the real "which fields per coordinate" typing is the per-coordinate JSON Schema in 2D; a flat `Field` enum would re-merge checkpoint+verdict+consultation fields (the fourre-tout one level down) and pre-empt 2D. `consult(Document)` already on `ConsultingService` from `864ec8d8`.
+- `GatewayCatalog` (slimmed) keeps ONLY the `FIELD_*` payload schema keys. REMOVES `DOMAIN_DOCTOR` (→ `Domain.DOCTOR`), `READINESS_CHECKPOINT`/`READINESS_VERDICT`/`CONSULTATION` (→ `Coordinate`), `ACTION_STOP`/`ACTION_CONTINUE_DEGRADED` (→ `Action`). The `FIELD_*` keys STAY constants — the real "which fields per coordinate" typing is the per-coordinate JSON Schema in 2D; a flat `Field` enum would re-merge checkpoint+verdict+consultation fields (the fourre-tout one level down) and pre-empt 2D. `consult(Document)` already on `ConsultingService` from `864ec8d8`.
 
 > **Half-3 (this revision):** commits `864ec8d8` (verb + dep + field constants) and `a892c8ee`
 > (Coordinate/Action/SymptomKind enums + 2A call-site migration) already landed. Half-3 adds the
-> `Domain` enum and removes the last non-field constant `DOMAIN_DOCTOR` from `ExchangeCatalog`, so
+> `Domain` enum and removes the last non-field constant `DOMAIN_DOCTOR` from `GatewayCatalog`, so
 > the catalog is purely the `FIELD_*` schema keys and EVERY closed value domain in the seam is a typed
-> enum. Six `DOMAIN_DOCTOR` call sites migrate to `Domain.DOCTOR.slug()`: `ExchangeCatalog` (decl),
-> `DocumentTest` (×3 incl. the canonical-string assertion → move to `ExchangeVocabularyTest`),
+> enum. Six `DOMAIN_DOCTOR` call sites migrate to `Domain.DOCTOR.slug()`: `GatewayCatalog` (decl),
+> `DocumentTest` (×3 incl. the canonical-string assertion → move to `GatewayVocabularyTest`),
 > `ReadinessAuthorityTest`, `DefaultReadinessAuthority`, `SystemdAdapterVerdictTest`,
 > `SystemdAdapterStage`. `Document` STAYS the neutral `(String domain, String coordinate, JsonNode)`
 > — call sites write `Domain.DOCTOR.slug()` into the slot; the envelope is not coupled to the enum.
 
-- [ ] **Step 1: Write the failing test** — create `ExchangeVocabularyTest` pinning each enum's slug + a parse round-trip, mirroring `DocumentTest`'s canonical-strings discipline. Example for one enum (do all three):
+- [ ] **Step 1: Write the failing test** — create `GatewayVocabularyTest` pinning each enum's slug + a parse round-trip, mirroring `DocumentTest`'s canonical-strings discipline. Example for one enum (do all three):
 
 ```java
 @Test
@@ -79,12 +79,12 @@ void coordinateSlugsArePinnedAndRoundTrip() {
 }
 ```
 
-- [ ] **Step 2: Run it, verify it fails** — `flox activate -- ./mvnw -pl :exchange-port -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=ExchangeVocabularyTest`. Expected: FAIL (enums undefined / won't compile).
+- [ ] **Step 2: Run it, verify it fails** — `flox activate -- ./mvnw -pl :gateway-port -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=GatewayVocabularyTest`. Expected: FAIL (enums undefined / won't compile).
 
-- [ ] **Step 3: Create the three enums.** Each is a `public enum` in `io.nxmatic.rke2lab.exchange.port` with a private `final String slug`, a slug-arg constructor, `public String slug()`, and `public static Optional<E> parse(String slug)` that returns empty on null/blank/unknown and matches on `slug` only. Match the javadoc voice of `Document`/`ReadinessAuthority`. `Coordinate`:
+- [ ] **Step 3: Create the three enums.** Each is a `public enum` in `io.nxmatic.rke2lab.gateway.port` with a private `final String slug`, a slug-arg constructor, `public String slug()`, and `public static Optional<E> parse(String slug)` that returns empty on null/blank/unknown and matches on `slug` only. Match the javadoc voice of `Document`/`ReadinessAuthority`. `Coordinate`:
 
 ```java
-package io.nxmatic.rke2lab.exchange.port;
+package io.nxmatic.rke2lab.gateway.port;
 
 import java.util.Optional;
 
@@ -126,23 +126,23 @@ public enum Coordinate {
 
 `Action` and `SymptomKind` are byte-for-byte the same shape (constants + slug + parse) — UNIFORM, no variants. `SymptomKind`'s javadoc notes it is the host-flat twin of the doctor's internal symptom enum (OSGi owns and maps back).
 
-- [ ] **Step 4: Slim `ExchangeCatalog`.** Remove the lifted constants and their javadoc. (Half-2 removed the five coordinate/action constants but kept `DOMAIN_DOCTOR`; **half-3 (Step 7) removes `DOMAIN_DOCTOR` too** → `Domain.DOCTOR`, leaving ONLY the `FIELD_*` schema keys.) Update the class javadoc: it is now the single source for *payload field keys* (the schema); closed value domains (domain, coordinates, actions, symptom kinds) are the typed enums in this package.
+- [ ] **Step 4: Slim `GatewayCatalog`.** Remove the lifted constants and their javadoc. (Half-2 removed the five coordinate/action constants but kept `DOMAIN_DOCTOR`; **half-3 (Step 7) removes `DOMAIN_DOCTOR` too** → `Domain.DOCTOR`, leaving ONLY the `FIELD_*` schema keys.) Update the class javadoc: it is now the single source for *payload field keys* (the schema); closed value domains (domain, coordinates, actions, symptom kinds) are the typed enums in this package.
 
-- [ ] **Step 5: Migrate the call sites.** `DefaultReadinessAuthority`: `verdict.put(FIELD_ACTION, stop ? Action.STOP.slug() : Action.CONTINUE_DEGRADED.slug())` and `new Document(DOMAIN_DOCTOR, Coordinate.READINESS_VERDICT.slug(), verdict)`; add the `Action`/`Coordinate` imports. `SystemdAdapterStage`: `if (Action.STOP.slug().equals(action))` and `new Document(DOMAIN_DOCTOR, Coordinate.READINESS_CHECKPOINT.slug(), payload)` in `checkpointDocument`; add imports. Then the three test files: `DocumentTest` (the `READINESS_VERDICT`/`ACTION_STOP` references → `Coordinate`/`Action`, and drop the removed-constant assertions, which now live in `ExchangeVocabularyTest`), `ReadinessAuthorityTest`, `SystemdAdapterVerdictTest`. Grep `ExchangeCatalog.ACTION_`, `ExchangeCatalog.READINESS_`, `ExchangeCatalog.CONSULTATION` across `osgi exec` (exclude `/target/`) — expected ZERO after.
+- [ ] **Step 5: Migrate the call sites.** `DefaultReadinessAuthority`: `verdict.put(FIELD_ACTION, stop ? Action.STOP.slug() : Action.CONTINUE_DEGRADED.slug())` and `new Document(DOMAIN_DOCTOR, Coordinate.READINESS_VERDICT.slug(), verdict)`; add the `Action`/`Coordinate` imports. `SystemdAdapterStage`: `if (Action.STOP.slug().equals(action))` and `new Document(DOMAIN_DOCTOR, Coordinate.READINESS_CHECKPOINT.slug(), payload)` in `checkpointDocument`; add imports. Then the three test files: `DocumentTest` (the `READINESS_VERDICT`/`ACTION_STOP` references → `Coordinate`/`Action`, and drop the removed-constant assertions, which now live in `GatewayVocabularyTest`), `ReadinessAuthorityTest`, `SystemdAdapterVerdictTest`. Grep `GatewayCatalog.ACTION_`, `GatewayCatalog.READINESS_`, `GatewayCatalog.CONSULTATION` across `osgi exec` (exclude `/target/`) — expected ZERO after.
 
-- [ ] **Step 6: Verify green.** exchange-port + doctor-core via bare `test`; seed-master MUST go through `package -Pall-worlds`:
-  - `flox activate -- ./mvnw -pl :exchange-port -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=ExchangeVocabularyTest,DocumentTest`
+- [ ] **Step 6: Verify green.** gateway-port + doctor-core via bare `test`; seed-master MUST go through `package -Pall-worlds`:
+  - `flox activate -- ./mvnw -pl :gateway-port -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=GatewayVocabularyTest,DocumentTest`
   - `flox activate -- ./mvnw -pl :doctor-core -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=ReadinessAuthorityTest`
   - `flox activate -- ./mvnw -pl :seed-master -am package -Pall-worlds -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=SystemdAdapterVerdictTest`
   All PASS.
 
-- [ ] **Step 7: Commit** — `git commit -m "refactor(exchange): lift coordinate/action/symptom-kind closed domains into seam enums"` (the verb + dep already shipped in `864ec8d8`; this commit is the vocabulary typing). End with the `Co-Authored-By` trailer. *(Shipped: `a892c8ee`.)*
+- [ ] **Step 7: Commit** — `git commit -m "refactor(gateway): lift coordinate/action/symptom-kind closed domains into seam enums"` (the verb + dep already shipped in `864ec8d8`; this commit is the vocabulary typing). End with the `Co-Authored-By` trailer. *(Shipped: `a892c8ee`.)*
 
 ### Step 8 (half-3): the `Domain` enum — the last closed domain leaves the catalog
 
-Add `Domain` so EVERY closed value domain in the seam is a typed enum and `ExchangeCatalog` is purely the `FIELD_*` schema keys.
+Add `Domain` so EVERY closed value domain in the seam is a typed enum and `GatewayCatalog` is purely the `FIELD_*` schema keys.
 
-- [ ] **8a: RED** — in `ExchangeVocabularyTest`, add `domainSlugsArePinnedAndRoundTrip()`:
+- [ ] **8a: RED** — in `GatewayVocabularyTest`, add `domainSlugsArePinnedAndRoundTrip()`:
 
 ```java
 @Test
@@ -153,17 +153,17 @@ void domainSlugsArePinnedAndRoundTrip() {
 }
 ```
 
-Run `flox activate -- ./mvnw -pl :exchange-port -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=ExchangeVocabularyTest` → FAIL (Domain undefined).
+Run `flox activate -- ./mvnw -pl :gateway-port -am test -DskipTests=false -Dmaven.build.cache.skipCache=true -Dtest=GatewayVocabularyTest` → FAIL (Domain undefined).
 
-- [ ] **8b: Create `Domain`** in `io.nxmatic.rke2lab.exchange.port`, byte-for-byte the same shape as `Coordinate`/`Action`/`SymptomKind` (single value `DOCTOR("doctor")`). Javadoc: the document owner — the value carried in `Document.domain()`; note it is the exchange's own owner axis, NOT the host's `InfraDomainCatalog` provisioning domains nor `ManifestDomainCatalog` (different axis and layer; the seam leaf must not depend on the host).
+- [ ] **8b: Create `Domain`** in `io.nxmatic.rke2lab.gateway.port`, byte-for-byte the same shape as `Coordinate`/`Action`/`SymptomKind` (single value `DOCTOR("doctor")`). Javadoc: the document owner — the value carried in `Document.domain()`; note it is the gateway's own owner axis, NOT the host's `InfraDomainCatalog` provisioning domains nor `ManifestDomainCatalog` (different axis and layer; the seam leaf must not depend on the host).
 
-- [ ] **8c: Remove `DOMAIN_DOCTOR`** from `ExchangeCatalog` (decl + javadoc). The catalog now holds ONLY `FIELD_*`. Update its class javadoc to say so: the single source for payload field keys; all closed value domains (domain, coordinate, action, symptom-kind) are typed enums in this package.
+- [ ] **8c: Remove `DOMAIN_DOCTOR`** from `GatewayCatalog` (decl + javadoc). The catalog now holds ONLY `FIELD_*`. Update its class javadoc to say so: the single source for payload field keys; all closed value domains (domain, coordinate, action, symptom-kind) are typed enums in this package.
 
-- [ ] **8d: Migrate the 6 `DOMAIN_DOCTOR` call sites** to `Domain.DOCTOR.slug()`: `DefaultReadinessAuthority` (the `assess` verdict Document), `SystemdAdapterStage` (`checkpointDocument`), `DocumentTest` (the two `new Document(...)`/`doc.domain()` uses; the `assertEquals("doctor", ExchangeCatalog.DOMAIN_DOCTOR)` line is DELETED — `Domain`'s canonical-string assertion now lives in `ExchangeVocabularyTest`), `ReadinessAuthorityTest`, `SystemdAdapterVerdictTest`. Add the `Domain` import where needed. Grep `DOMAIN_DOCTOR` across `osgi exec` (exclude `/target/`) → ZERO after.
+- [ ] **8d: Migrate the 6 `DOMAIN_DOCTOR` call sites** to `Domain.DOCTOR.slug()`: `DefaultReadinessAuthority` (the `assess` verdict Document), `SystemdAdapterStage` (`checkpointDocument`), `DocumentTest` (the two `new Document(...)`/`doc.domain()` uses; the `assertEquals("doctor", GatewayCatalog.DOMAIN_DOCTOR)` line is DELETED — `Domain`'s canonical-string assertion now lives in `GatewayVocabularyTest`), `ReadinessAuthorityTest`, `SystemdAdapterVerdictTest`. Add the `Domain` import where needed. Grep `DOMAIN_DOCTOR` across `osgi exec` (exclude `/target/`) → ZERO after.
 
-- [ ] **8e: Verify green** — same three commands as Step 6 (exchange-port `ExchangeVocabularyTest,DocumentTest`; doctor-core `ReadinessAuthorityTest`; seed-master `package -Pall-worlds -Dtest=SystemdAdapterVerdictTest`). All PASS.
+- [ ] **8e: Verify green** — same three commands as Step 6 (gateway-port `GatewayVocabularyTest,DocumentTest`; doctor-core `ReadinessAuthorityTest`; seed-master `package -Pall-worlds -Dtest=SystemdAdapterVerdictTest`). All PASS.
 
-- [ ] **8f: Commit** — `git commit -m "refactor(exchange): lift the document-owner domain into a seam enum; catalog is now only schema field keys"`, `Co-Authored-By` trailer.
+- [ ] **8f: Commit** — `git commit -m "refactor(gateway): lift the document-owner domain into a seam enum; catalog is now only schema field keys"`, `Co-Authored-By` trailer.
 
 ---
 
@@ -188,14 +188,14 @@ Run `flox activate -- ./mvnw -pl :exchange-port -am test -DskipTests=false -Dmav
 public Document consult(Document checkpoint) {
   final var payload = checkpoint.payload();
   final SymptomKind kind =
-      SymptomKind.parse(payload.path(ExchangeCatalog.FIELD_SYMPTOM_KIND).asText()).orElseThrow();
+      SymptomKind.parse(payload.path(GatewayCatalog.FIELD_SYMPTOM_KIND).asText()).orElseThrow();
   final Symptom symptom = toSymptom(kind);          // exhaustive switch, OSGi owns Symptom
   final Observation observation = observationFrom(payload); // summary/details → Observation, OSGi-side
   final RemediationPlan plan = consult(symptom, observation);  // the existing record-typed internal path
   final ObjectNode out = Document.newPayload();  // the seam owns payload construction (no per-component ObjectMapper)
-  out.put(ExchangeCatalog.FIELD_SCENARIO_ID, payload.path(ExchangeCatalog.FIELD_SCENARIO_ID).asText());
-  out.put(ExchangeCatalog.FIELD_NARRATION, narrationLine(symptom)); // was consultedLine + cohortFinding, joined
-  out.put(ExchangeCatalog.FIELD_DIAGNOSIS_ADOC, diagnosisBlock(plan)); // moved in from RunbookRenderer
+  out.put(GatewayCatalog.FIELD_SCENARIO_ID, payload.path(GatewayCatalog.FIELD_SCENARIO_ID).asText());
+  out.put(GatewayCatalog.FIELD_NARRATION, narrationLine(symptom)); // was consultedLine + cohortFinding, joined
+  out.put(GatewayCatalog.FIELD_DIAGNOSIS_ADOC, diagnosisBlock(plan)); // moved in from RunbookRenderer
   return new Document(Domain.DOCTOR.slug(), Coordinate.CONSULTATION.slug(), out);
 }
 
@@ -210,7 +210,7 @@ private static Symptom toSymptom(SymptomKind kind) {
 }
 ```
 
-Add the private helpers: `observationFrom(JsonNode)` (rebuild the `Observation` OSGi-side from the checkpoint's summary/details), `narrationLine(Symptom)` (join `consultedLine` + `cohortFinding`), and `diagnosisBlock(RemediationPlan)` (copy verbatim from `RunbookRenderer.diagnosisBlock` — the `⚕/🔬/℞` AsciiDoc StringBuilder). The `toSymptom` switch has NO `default` — adding a `Symptom`/`SymptomKind` value later forces this site to update (the anti-drift filet). doctor-core's pom already deps `exchange-port`.
+Add the private helpers: `observationFrom(JsonNode)` (rebuild the `Observation` OSGi-side from the checkpoint's summary/details), `narrationLine(Symptom)` (join `consultedLine` + `cohortFinding`), and `diagnosisBlock(RemediationPlan)` (copy verbatim from `RunbookRenderer.diagnosisBlock` — the `⚕/🔬/℞` AsciiDoc StringBuilder). The `toSymptom` switch has NO `default` — adding a `Symptom`/`SymptomKind` value later forces this site to update (the anti-drift filet). doctor-core's pom already deps `gateway-port`.
 
 - [ ] **Step 4: Run the test, verify it passes** — same command as Step 2. Expected: PASS.
 
@@ -220,13 +220,13 @@ Add the private helpers: `observationFrom(JsonNode)` (rebuild the `Observation` 
 
 User-flagged: three components (`DefaultReadinessAuthority`, `SystemdAdapterStage`, `Generalist`) each held `new ObjectMapper()` only to call `createObjectNode()` — a dispersed concern. The seam owns the `Document` envelope, so it owns the payload's construction. Decision: a STATIC factory `Document.newPayload()` (stateless → uniform with the seam's `Coordinate/Action/SymptomKind.parse()` statics; the repo rule allows static for factory methods). The instance twin (`@Component DocumentCodec`, the JSON twin of manifests' `YamlMapper`) is deferred to 2D when payloads carry schema + ordering config — see the `document-codec-instance-in-2d-backlog` memory.
 
-- [ ] **6a:** Add to `osgi/exchange/exchange-port/.../Document.java`: `public static ObjectNode newPayload()` → `JsonNodeFactory.instance.objectNode()` (no `ObjectMapper`; distinct name from the instance accessor `payload()`). *(Done.)*
+- [ ] **6a:** Add to `osgi/gateway/gateway-port/.../Document.java`: `public static ObjectNode newPayload()` → `JsonNodeFactory.instance.objectNode()` (no `ObjectMapper`; distinct name from the instance accessor `payload()`). *(Done.)*
 
-- [ ] **6b:** Migrate the THREE `new ObjectMapper()` → `createObjectNode()` sites to `Document.newPayload()` and delete each `private final ObjectMapper mapper` field + the `ObjectMapper` import: `Generalist` (`out`), `DefaultReadinessAuthority` (`verdict`), `SystemdAdapterStage` (`checkpointDocument`'s `payload`). Uniformity: ALL three, not one — no half-migration. Grep `new ObjectMapper()` across `osgi exec` main sources (excl `/target/`, excl manifests' `YamlMapper`/`createYamlScalarSerializer` which are YAML config, legitimately their own) → only the now-removed exchange sites disappear.
+- [ ] **6b:** Migrate the THREE `new ObjectMapper()` → `createObjectNode()` sites to `Document.newPayload()` and delete each `private final ObjectMapper mapper` field + the `ObjectMapper` import: `Generalist` (`out`), `DefaultReadinessAuthority` (`verdict`), `SystemdAdapterStage` (`checkpointDocument`'s `payload`). Uniformity: ALL three, not one — no half-migration. Grep `new ObjectMapper()` across `osgi exec` main sources (excl `/target/`, excl manifests' `YamlMapper`/`createYamlScalarSerializer` which are YAML config, legitimately their own) → only the now-removed gateway sites disappear.
 
-- [ ] **6c: Verify green** — exchange-port `test`; doctor-core `ReadinessAuthorityTest` + doctor-core-test `GeneralistConsultDocumentTest`; seed-master `package -Pall-worlds -Dtest=SystemdAdapterVerdictTest`. All PASS.
+- [ ] **6c: Verify green** — gateway-port `test`; doctor-core `ReadinessAuthorityTest` + doctor-core-test `GeneralistConsultDocumentTest`; seed-master `package -Pall-worlds -Dtest=SystemdAdapterVerdictTest`. All PASS.
 
-- [ ] **6d: Commit** — `git commit -m "refactor(exchange): the seam owns Document payload construction (Document.newPayload), drop per-component ObjectMapper"`, `Co-Authored-By` trailer.
+- [ ] **6d: Commit** — `git commit -m "refactor(gateway): the seam owns Document payload construction (Document.newPayload), drop per-component ObjectMapper"`, `Co-Authored-By` trailer.
 
 ---
 
@@ -255,7 +255,7 @@ User-flagged: three components (`DefaultReadinessAuthority`, `SystemdAdapterStag
 
 ## Task 4 (zone-1): the systemd-adapter CONSULT reasoning crosses as a Document — egress/reconstruction preserved
 
-> **REVISED 2026-06-28 (controller traced the coupling; see the `world-exchange-2b-zone1-egress-knot`
+> **REVISED 2026-06-28 (controller traced the coupling; see the `world-gateway-2b-zone1-egress-knot`
 > memory).** The plan's original "probe returns a Document instead of Observation" was UNSOUND: the
 > probe's `Observation` ALSO sources the Pulumi egress (`sink.accept(observation.toOutputMap())` →
 > `SystemdAdapterResource`) and the jGiven scenario assertions — both OUT of 2B's consult scope. And
@@ -278,7 +278,7 @@ User-flagged: three components (`DefaultReadinessAuthority`, `SystemdAdapterStag
 
 **Files:**
 - Modify: `osgi/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/internal/Generalist.java` (Step 0: enrich the consultation Document with the structured plan/observations/expectations sub-trees)
-- Modify: `osgi/exchange/exchange-port/.../ExchangeCatalog.java` (Step 0: add the field keys for the structured sub-trees if needed — `FIELD_PLAN`, `FIELD_OBSERVATIONS`, `FIELD_EXPECTATIONS`, `FIELD_RECORDED_AT`; reuse `ConsultationReport.OUTPUT_KEY`/`Expectation.OUTPUT_KEY` string values as the egress keys)
+- Modify: `osgi/gateway/gateway-port/.../GatewayCatalog.java` (Step 0: add the field keys for the structured sub-trees if needed — `FIELD_PLAN`, `FIELD_OBSERVATIONS`, `FIELD_EXPECTATIONS`, `FIELD_RECORDED_AT`; reuse `ConsultationReport.OUTPUT_KEY`/`Expectation.OUTPUT_KEY` string values as the egress keys)
 - Modify: `exec/seed-master/.../pipeline/stages/SystemdAdapterStage.java` (`consultDoctor` → Document; `checkpointDocument` adds symptomKind/summary/details/recordedAt; drop `Symptom`/`RemediationPlan`/`ConsultationReport`/`Observation`-as-consult-arg imports — `Observation` stays ONLY as the egress/scenario type)
 - Modify: `exec/seed-master/.../pipeline/ConsultationLog` carrier — `ConsultationLog` (in `doctor-port`) holds consultation **Documents** keyed by checkpointId instead of `ConsultationReport`s; OR a host-side parallel carrier. Decide in Step 1 by reading how `ResourceCreationPipeline.consultationFor` + `RunbookRenderer` consume it.
 - Modify: `exec/seed-master/.../resources/ResourceCreationPipeline.java` + `systemd/SystemdAdapterResource.java` (read the consultation Document's structured payload into the SAME output keys — `ConsultationReport.OUTPUT_KEY`, `Expectation.OUTPUT_KEY` — opaque copy, no doctor type on the host)
@@ -375,7 +375,7 @@ User-flagged: three components (`DefaultReadinessAuthority`, `SystemdAdapterStag
 
 - [ ] **Step 3: Confirm no doctor type on the consult path** — `grep -rn 'doctor.records' exec/seed-master/src/main/java/.../pipeline/stages/SystemdAdapterStage.java .../ClusterReadinessStage.java .../bdd/*Probe*.java .../bdd/RunbookRenderer.java .../systemd/SeedSystemdAdapterEndpointGate.java` is empty.
 
-- [ ] **Step 4: Update the memory** — mark 2B shipped in `world-exchange-2a-execution-state.md` (or a new 2B memory) + the MEMORY.md pointer; record the new worklist count and what 2C (reconstruction) / 2D (egress + schema + flip) inherit.
+- [ ] **Step 4: Update the memory** — mark 2B shipped in `world-gateway-2a-execution-state.md` (or a new 2B memory) + the MEMORY.md pointer; record the new worklist count and what 2C (reconstruction) / 2D (egress + schema + flip) inherit.
 
 ---
 
@@ -383,6 +383,6 @@ User-flagged: three components (`DefaultReadinessAuthority`, `SystemdAdapterStag
 
 - *Spec coverage:* zone-0 (Tasks 1-3: typed vocabulary + seam verb, Generalist impl, rename), zone-1 (Task 4), zone-2 (Task 5), runbook tail (Task 6), close-out (Task 7). Every spec unit has a task.
 - *Order:* Task 1 (seam vocabulary + verb) precedes 4-5 (consumers) — the shared-seam-first constraint holds, and the `SymptomKind` enum the host needs is created before the host drops `Symptom`. Task 2 moves `diagnosisBlock` into `Generalist` BEFORE Task 6 deletes it from `RunbookRenderer` — no window where it is gone from both.
-- *Type consistency:* the consultation Document field KEYS (`narration`, `diagnosisAdoc`, `symptomKind`, `summary`, `details`) are `ExchangeCatalog.FIELD_*` constants named once in Task 1. The closed VALUE domains are the seam enums `Coordinate`/`Action`/`SymptomKind` (Task 1), referenced via `.slug()` everywhere: `Coordinate.READINESS_CHECKPOINT.slug()` (Task 4/5 checkpoint), `Coordinate.CONSULTATION.slug()` (Task 2), `Action.STOP.slug()` (DefaultReadinessAuthority + SystemdAdapterStage), `SymptomKind.X.slug()` (Task 4/5 probes); `Generalist.toSymptom(SymptomKind)` maps to the OSGi-owned `Symptom` via an exhaustive switch (Task 2). No literal symptom/action/coordinate string survives.
-- *Resolved before execution (controller):* `doctor-port` did NOT dep `exchange-port` — added in commit `864ec8d8`. `Checkpoint` IS a `doctor.records` enum → Task 6 uses the raw slug string, not the type. `Symptom` already has `parse(String)` but the host no longer touches `Symptom` at all — it uses the seam `SymptomKind`. No `ExchangeCatalogTest`; vocabulary assertions live in the new `ExchangeVocabularyTest` (enums) + `DocumentTest` (field keys).
+- *Type consistency:* the consultation Document field KEYS (`narration`, `diagnosisAdoc`, `symptomKind`, `summary`, `details`) are `GatewayCatalog.FIELD_*` constants named once in Task 1. The closed VALUE domains are the seam enums `Coordinate`/`Action`/`SymptomKind` (Task 1), referenced via `.slug()` everywhere: `Coordinate.READINESS_CHECKPOINT.slug()` (Task 4/5 checkpoint), `Coordinate.CONSULTATION.slug()` (Task 2), `Action.STOP.slug()` (DefaultReadinessAuthority + SystemdAdapterStage), `SymptomKind.X.slug()` (Task 4/5 probes); `Generalist.toSymptom(SymptomKind)` maps to the OSGi-owned `Symptom` via an exhaustive switch (Task 2). No literal symptom/action/coordinate string survives.
+- *Resolved before execution (controller):* `doctor-port` did NOT dep `gateway-port` — added in commit `864ec8d8`. `Checkpoint` IS a `doctor.records` enum → Task 6 uses the raw slug string, not the type. `Symptom` already has `parse(String)` but the host no longer touches `Symptom` at all — it uses the seam `SymptomKind`. No `GatewayCatalogTest`; vocabulary assertions live in the new `GatewayVocabularyTest` (enums) + `DocumentTest` (field keys).
 - *Open verification for the executor:* Task 6 Step 3 — confirm the host-side consultation carrier threading through `BootstrapPipeline`/`PipelineState` (string-only) before deleting `RunbookRenderer.diagnosisBlock`.

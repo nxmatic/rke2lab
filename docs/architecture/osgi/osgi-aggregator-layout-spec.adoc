@@ -5,7 +5,7 @@
 [NOTE]
 ====
 Design hors-bande (2026-06-28), **IMPLEMENTED** (2026-06-30, commits a05dd52c..46c7cdf0 on
-feature/cluster-edge). Shipped layout-first before world-exchange 2C, with two deliberate
+feature/cluster-edge). Shipped layout-first before world-gateway 2C, with two deliberate
 divergences from this spec recorded below. All tests green, full reactor BUILD SUCCESS
 confirmed.
 ====
@@ -70,7 +70,7 @@ flowchart TB
 
     subgraph C["C · seams &amp; grammaire transverses"]
       da["domain-annotations"]
-      ex["exchange/ (exchange-port)"]
+      ex["gateway/ (gateway-port)"]
       pl["pipeline"]
     end
 
@@ -114,7 +114,7 @@ flowchart TB
   posés *directement* sous `osgi/` (`domain-annotations`, `runtime`,
   `pipeline`, `junit-testkit`, `ssh-to-age-edge`), d'autres sont des
   *sous-agrégateurs* (`doctor/`, `cluster/`, `systemd/`, `manifests/`,
-  `netplan/`, `unitrepo/`, `boot/`, `bench/`, `jgiven/`, `exchange/`).
+  `netplan/`, `unitrepo/`, `boot/`, `bench/`, `jgiven/`, `gateway/`).
   La racine ne distingue pas les deux.
 * **Le métier (E) côtoie l'infra (A/B/C/D)** sans frontière : rien dans la liste
   `<modules>` ne dit « ceci est un domaine » vs « ceci est de la plomberie ».
@@ -173,7 +173,7 @@ flowchart TB
     subgraph FND["foundation/  —  ce contre quoi on COMPILE"]
       direction TB
       da["domain-annotations"]:::seam
-      gw["world-gateway  ← ex 'exchange' : la porte vers le monde OSGi ; SINGLETON, -port tombe (§5.5/§5.7)"]:::seam
+      gw["world-gateway  ← ex 'gateway' : la porte vers le monde OSGi ; SINGLETON, -port tombe (§5.5/§5.7)"]:::seam
       pl["pipeline/  (bundle + pipeline-testkit + -probe : absorbe jgiven — §5.4)"]:::seam
     end
 
@@ -238,7 +238,7 @@ osgi/
 ├─ bundle-test-parent/
 ├─ foundation/                  (ce contre quoi les domaines COMPILENT)
 │   ├─ domain-annotations/
-│   ├─ world-gateway/           ← ex 'exchange/exchange-port' : SINGLETON réduit (§5.7), -port tombe
+│   ├─ world-gateway/           ← ex 'gateway/gateway-port' : SINGLETON réduit (§5.7), -port tombe
 │   └─ pipeline/                (devient sous-agrégateur — absorbe jgiven §5.4)
 │       ├─ pipeline/            (bundle : grammaire fluent + exporte jGiven)
 │       ├─ pipeline-testkit/    ← ex jgiven-testkit
@@ -378,7 +378,7 @@ flowchart TB
 NOTE: `unitrepo` reste un domaine sous `domains/` sans traitement spécial (bundles
 pas encore câblés dans le flux de boot — hors périmètre layout).
 
-=== 5.5 `exchange` → `world-gateway` — la porte vers le monde OSGi, transport-agnostique
+=== 5.5 `gateway` → `world-gateway` — la porte vers le monde OSGi, transport-agnostique
 
 Ton intuition « ça ressemble à un edge » est plus juste que la première lecture
 ne le laissait croire — parce que la frontière a **deux topologies selon la
@@ -387,7 +387,7 @@ version du système** :
 [mermaid]
 ....
 flowchart TB
-  q["exchange : LA porte unique vers le monde OSGi — quel TRANSPORT ?"]
+  q["gateway : LA porte unique vers le monde OSGi — quel TRANSPORT ?"]
   q --> emb["EMBARQUÉ (aujourd'hui)\nclassloader hôte ↔ Felix in-process\n→ un SEAM intra-JVM (inter-classloaders)"]:::seam
   q --> rem["DISTANT (certaines versions)\nhôte ↔ runtime OSGi distant via OSGi Remote Services (RSA)\n→ une frontière de DISTRIBUTION (réseau/process) — EDGE-like"]:::edge
   emb --> inv["INVARIANT : ce qui change = le TRANSPORT, pas le RÔLE.\nLe rôle est constant : 'la porte unique vers le monde OSGi,\noù qu'il tourne'. C'est POURQUOI Document.payload est une\nString SÉRIALISÉE (pas un JsonNode partagé) : l'enveloppe\nest transport-agnostique BY DESIGN (cf. mémoire\ndocument-seam-cannot-expose-jackson-jsonnode)."]:::good
@@ -409,7 +409,7 @@ d'entrée unique du monde OSGi, indépendamment du lieu où il tourne*.
 | `gateway` (nu) | même rôle, mais mot nu ; moins ancré dans le vocabulaire « world » du projet et ne rime pas avec `domain-annotations`
 | `world-boundary` | le terme de la spec actuelle (« THE single inter-world door ») ; « boundary » évoque la membrane statique plutôt que la porte traversée à distance
 | `world-crossing` | nomme l'ACTE de traverser (le `Document` traverse) ; neutre transport, mais moins parlant comme nom de module
-| `exchange` (gardé) | statu quo — rejeté (« ça ne me parle pas »)
+| `gateway` (gardé) | statu quo — rejeté (« ça ne me parle pas »)
 |===
 
 Recommandation retenue : **`world-gateway`** — un **bundle unique** (artifactId
@@ -435,14 +435,14 @@ dans le transport, pas dans le port.
 ====
 
 Empreinte du renommage (mesurée — c'est une spec, non exécutée) : au-delà du
-dossier, le package `io.nxmatic.rke2lab.exchange.port` → `…world.gateway.port`
+dossier, le package `io.nxmatic.rke2lab.gateway.port` → `…world.gateway.port`
 (8 types : `Document`, `Coordinate`, `Domain`, `Action`, `SymptomKind`,
-`ReadinessAuthority`, `ExchangeCatalog`→`WorldGatewayCatalog`, `package-info`) et
+`ReadinessAuthority`, `GatewayCatalog`→`WorldGatewayCatalog`, `package-info`) et
 ~11 fichiers consommateurs (doctor-core/-port/-test, exec/seed-master) suivent le
-nom retenu. Le `<artifactId>` `exchange-port`→`world-gateway` (l'agrégateur
-`exchange` est supprimé, le bundle remonte d'un cran) ; ses consommateurs Maven
+nom retenu. Le `<artifactId>` `gateway-port`→`world-gateway` (l'agrégateur
+`gateway` est supprimé, le bundle remonte d'un cran) ; ses consommateurs Maven
 déclarent une `<dependency>` sur le nouvel artifactId. Sélecteur CLI :
-`-pl :exchange-port` → `-pl :world-gateway`.
+`-pl :gateway-port` → `-pl :world-gateway`.
 
 === 5.6 `testing/` s'érode — un testkit est un appendice, pas une nature
 
@@ -484,7 +484,7 @@ agrégateur.
 ....
 flowchart TB
   rule["RÈGLE : agrégateur ssi ≥2 modules"]
-  rule --> wg["world-gateway : exchange/ ne contient QUE exchange-port (singleton)\n→ un SEUL bundle foundation/world-gateway (pas de sous-dossier).\nLe suffixe -port TOMBE : pas de frère -core à contraster,\net 'gateway' nomme déjà la frontière."]:::good
+  rule --> wg["world-gateway : gateway/ ne contient QUE gateway-port (singleton)\n→ un SEUL bundle foundation/world-gateway (pas de sous-dossier).\nLe suffixe -port TOMBE : pas de frère -core à contraster,\net 'gateway' nomme déjà la frontière."]:::good
   rule --> ssh["ssh-to-age-edge : singleton → reste une FEUILLE À PLAT\ndomains/ssh-to-age-edge (PAS d'agrégateur ssh-to-age/).\nRENVERSE la reco §5.1 (6.1.a) : une feuille plate est CONFORME\nà iff-≥2, pas une entorse à l'uniformité."]:::good
   rule --> grow["DYNAMIQUE : quand un 2e module arrive (un world-gateway-core,\nun ssh-to-age-port, le transport RSA distant…), on RÉ-INTRODUIT\nl'agrégateur à ce moment-là — pas par anticipation (YAGNI)."]:::note
   classDef good fill:#d5f9d5,stroke:#00aa00;
@@ -510,8 +510,8 @@ Pour information ; aucune de ces opérations n'est faite dans cette passe.
 |===
 | Module actuel | Destination
 | `osgi/domain-annotations` | `osgi/foundation/domain-annotations`
-| `osgi/exchange/` (agrégateur) | SUPPRIMÉ — singleton réduit (§5.7)
-| `osgi/exchange/exchange-port` | `osgi/foundation/world-gateway`  (+ rename, -port tombe, §5.5)
+| `osgi/gateway/` (agrégateur) | SUPPRIMÉ — singleton réduit (§5.7)
+| `osgi/gateway/gateway-port` | `osgi/foundation/world-gateway`  (+ rename, -port tombe, §5.5)
 | `osgi/pipeline` | `osgi/foundation/pipeline/pipeline`
 | `osgi/jgiven/jgiven-wrap` | absorbé par `…/pipeline/pipeline` (exporté, §5.4)
 | `osgi/jgiven/jgiven-testkit` | `osgi/foundation/pipeline/pipeline-testkit`
@@ -524,7 +524,7 @@ Pour information ; aucune de ces opérations n'est faite dans cette passe.
 | `osgi/ssh-to-age-edge` | `osgi/domains/ssh-to-age-edge`  (feuille à plat, §5.1/§5.7)
 |===
 . **Trois renommages** au-delà du déplacement : `runtime`→`runtime-host` (§5.2),
-  `exchange`→`world-gateway` + package `…exchange.port`→`…world.gateway.port`
+  `gateway`→`world-gateway` + package `…gateway.port`→`…world.gateway.port`
   (§5.5), `jgiven-*`→`pipeline-*` (§5.4). Chacun touche ses consommateurs
   (mesurés dans la sous-décision correspondante).
 . **Reprendre les `relativePath`** : chaque module gagne autant de `../` que de

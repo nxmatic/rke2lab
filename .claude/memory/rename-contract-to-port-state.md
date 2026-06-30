@@ -11,7 +11,7 @@ GREEN (35 modules, 0 skipped), **not yet committed** at time of writing.
 
 **Why `port`, not `contract`** (user's call, 2026-06-19): `contract` is too
 generic — *any* API is a "contract", so the word doesn't say what the module
-*is*. `port` names the hexagonal nature precisely: the exchange point at the
+*is*. `port` names the hexagonal nature precisely: the gateway point at the
 frontier between two worlds (host ↔ osgi), like the maritime port where ships
 **abord**. Rejected `osgi-port` (the port is a PURE model, zero osgi-runtime
 import — prefixing `osgi-` would claim an belonging it doesn't have; and in

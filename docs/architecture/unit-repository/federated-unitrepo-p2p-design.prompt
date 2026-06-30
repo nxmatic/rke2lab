@@ -62,7 +62,7 @@ Contexte si besoin : le whiteboard visuel complet (32 figures Mermaid) reste dan
 - le whiteboard `.local.d/osgi-remote-edge-preview.adoc` (32 figures, tout le cheminement).
 
 **1. Worktree dédié — NE PAS implémenter dans `feature/cluster-edge`.** Ce checkout est PARTAGÉ avec une
-autre conversation qui y commite activement le world-exchange 2A. Muter le code ici = collision. Créer un
+autre conversation qui y commite activement le world-gateway 2A. Muter le code ici = collision. Créer un
 worktree externe frais (recette `instructions.md` § Workspace isolation) :
 `git fetch origin main` puis `git worktree add -b <namespace>/<slug> <repo>.d/<namespace>/<slug> origin/main`
 (ex. `refactor/osgi-remote-daemon`). Re-smudge sops, générer le `.code-workspace` sibling. Les artefacts
@@ -85,7 +85,7 @@ Même prudence pour `equinox.concurrent` / `core.runtime.jobs` : versions recomm
 **4. Deux faits encore OUVERTS à vérifier avant de figer le mécanisme (ne pas présumer) :**
 - le marshalling de `Requirement`/`Capability` sur le transport ECF (le TCP type-Aries = sérialisation
   Java ; ces types ne sont pas forcément `Serializable`) → d'où l'échappatoire : un seam `Document`
-  devant le Repository (`requirements in → capabilities+urls out`), cohérent world-exchange ;
+  devant le Repository (`requirements in → capabilities+urls out`), cohérent world-gateway ;
 - ECF fournit-il une aide à la FÉDÉRATION de Repository, ou est-ce juste « le Repository est un service,
   RSA le distribue » ?
 

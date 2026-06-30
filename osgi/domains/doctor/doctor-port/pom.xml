@@ -12,7 +12,7 @@
   <artifactId>doctor-port</artifactId>
   <name>osgi/domains/doctor/doctor-port</name>
   <description>The doctor observation port — the seam the diagnostic model depends on and the host
-    implements (DIP). Pure POJO model: the SnapshotSource interface and the pure exchange records
+    implements (DIP). Pure POJO model: the SnapshotSource interface and the pure gateway records
     (SnapshotEntry, SnapshotView) that replace the host StackSnapshot/StackHistory at the boundary,
     plus the port's failure-mode exceptions. Zero pulumi, zero osgi runtime — host-loaded and
     system-exported at runtime so both worlds share one copy. Per-package @Version (starts 1.0.0).</description>

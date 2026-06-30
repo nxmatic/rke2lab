@@ -48,7 +48,7 @@ dynamic, fits "peers discover dynamically"; (b) an R5 repository.xml served over
 RSA (OBR/Maven-style) — simpler, static. Dynamism leans (a); simplicity leans (b). **If (a): do NOT
 distribute the raw `Repository`** (Requirement/Capability may not marshal; Aries TCP = Java
 serialization) — put a `Document` seam in front (`requirements in → capabilities+urls out`), coherent
-with the world-exchange contract. To verify (don't presume): does ECF help federate a Repository, or is
+with the world-gateway contract. To verify (don't presume): does ECF help federate a Repository, or is
 it just "Repository is a service, RSA distributes it"; + Requirement/Capability marshalling on ECF.
 
 **RSA implementation facts (verified June 2026, manifest-level):**

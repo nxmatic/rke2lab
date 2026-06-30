@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.world.gateway.port;
 
 /**
- * The single source of truth for the exchange's payload field keys — the schema. Closed value
+ * The single source of truth for the gateway's payload field keys — the schema. Closed value
  * domains (domain, coordinate, action, symptom-kind) are now typed enums in this package: {@link
  * Domain}, {@link Coordinate}, {@link Action}, {@link SymptomKind}. Call sites reference these
  * enums and their constants, never literals, so a mismatch cannot drift silently (the {@code

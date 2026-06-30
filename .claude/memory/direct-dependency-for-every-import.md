@@ -5,13 +5,13 @@ metadata:
   type: feedback
 ---
 
-The user's rule, stated verbatim during world-exchange Option B: *"il faut ajouter la
+The user's rule, stated verbatim during world-gateway Option B: *"il faut ajouter la
 dépendance en direct, c'est la règle. toutes les classes qu'on importe doivent être tirées
 d'une dépendance directe."*
 
 **The rule:** if a module's source imports `com.fasterxml.jackson.core.JsonProcessingException`
-or `io.nxmatic.rke2lab.exchange.port.Document`, that module's POM must declare that artifact
-**directly** — `jackson-core`, `exchange-port` — at the right scope. A class reaching the
+or `io.nxmatic.rke2lab.gateway.port.Document`, that module's POM must declare that artifact
+**directly** — `jackson-core`, `gateway-port` — at the right scope. A class reaching the
 compiler only because some *other* direct dependency happens to drag it in transitively is a
 defect, even though `mvn` is green.
 
@@ -27,6 +27,6 @@ For a `-test` fragment whose `src/main` bytecode resolves against its host bundl
 the scope is `provided` (the host carries the bundle); for a normal module it is `compile`.
 
 Caught in Option B: doctor-core had only `jackson-databind` (used `JsonProcessingException`
-from `jackson-core` transitively); doctor-core-test declared NEITHER jackson NOR `exchange-port`
+from `jackson-core` transitively); doctor-core-test declared NEITHER jackson NOR `gateway-port`
 yet imported both (leaning entirely on the transitive path through doctor-core/provided). See
 [[transitive-import-leaks-doctor-core-test-backlog]] for the records/spi leaks still open there.

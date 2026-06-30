@@ -36,7 +36,7 @@ Does NOT (these are R4, [[osgi-runtime-r4-boot-seam-state]]):
 **manifests-bridge-api** (from `osgi/manifests/manifests-core`, pkg `io.nxmatic.rke2lab.manifests` +
 `.node` + `.profiles`):
 - 3 SPIs: `ManifestSynthesisService`, `ManifestExplodeService`, `ManifestUpdateGate`
-- 4 exchange records: `ManifestSynthesisRequest`, `ManifestSynthesisResult`, `ManifestExplodeRequest`,
+- 4 gateway records: `ManifestSynthesisRequest`, `ManifestSynthesisResult`, `ManifestExplodeRequest`,
   `ManifestExplodeResult`
 - `node.NodeEnvContext` (interface — host provides the impl), `node.NodeEnvContributor` (interface;
   consumed host AND intra-OSGi → lives in host bridge-api, re-exported to OSGi at R4)

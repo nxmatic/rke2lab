@@ -1,13 +1,13 @@
 ---
-name: world-exchange-2c-complete-2d-designed-state
-description: World-exchange on feature/cluster-edge — 2C MIGRATION COMPLETE (REALM_BOUNDARY worklist 38→0, gate flipped WARN→ERROR = the static separation lock; whole-branch review verdict READY TO MERGE) and 2D DESIGNED + SPEC'D (commit 50a4419f, the JSON-Schema-per-coordinate contract + a 4th SCHEMA_CONCORD gate). NEXT after compaction = writing-plans on the 2D spec, then execute (subagent-driven), then the remote-validation capstone (its own brainstorm→spec), then finishing-a-development-branch. The merge gate = REALM_BOUNDARY ERROR (done) + SCHEMA_CONCORD ERROR (2D) + the capstone (dynamic proof). Authoritative ledger: .superpowers/sdd/progress.md. See [[world-exchange-2a-execution-state]] [[document-codec-instance-in-2d-backlog]] [[osgi-layout-shipped-state]].
+name: world-gateway-2c-complete-2d-designed-state
+description: World-gateway on feature/cluster-edge — 2C MIGRATION COMPLETE (REALM_BOUNDARY worklist 38→0, gate flipped WARN→ERROR = the static separation lock; whole-branch review verdict READY TO MERGE) and 2D DESIGNED + SPEC'D (commit 50a4419f, the JSON-Schema-per-coordinate contract + a 4th SCHEMA_CONCORD gate). NEXT after compaction = writing-plans on the 2D spec, then execute (subagent-driven), then the remote-validation capstone (its own brainstorm→spec), then finishing-a-development-branch. The merge gate = REALM_BOUNDARY ERROR (done) + SCHEMA_CONCORD ERROR (2D) + the capstone (dynamic proof). Authoritative ledger: .superpowers/sdd/progress.md. See [[world-gateway-2a-execution-state]] [[document-codec-instance-in-2d-backlog]] [[osgi-layout-shipped-state]].
 metadata:
   type: project
 ---
 
 ## 2C COMPLETE (2026-06-30, feature/cluster-edge — kept, not merged)
 
-Executed via subagent-driven-development from `wip/plans/2026-06-30-world-exchange-2c-reconstruction-path.md`
+Executed via subagent-driven-development from `wip/plans/2026-06-30-world-gateway-2c-reconstruction-path.md`
 (committed 2c9bbe68 = the SDD review BASE). The PEER MODEL: host knows the STACK (opaque to OSGi), OSGi
 knows the DOCTOR (opaque to host), joined ONLY by opaque `Document(domain, coordinate, payload:String)`
 + the Checkpoint/Patient seam identities. 8 commits, all green, all reviewed:
@@ -36,7 +36,7 @@ N-1 PulumiInterventionLedgerWriter:41 stale InterventionLedgerSource comment; z3
 
 ## 2D DESIGNED + SPEC'D (2026-06-30, commit 50a4419f) — RESUME AT writing-plans
 
-Spec: `docs/architecture/osgi/world-exchange-2d-schema-contract-spec.adoc`. Brainstormed WITH the user
+Spec: `docs/architecture/osgi/world-gateway-2d-schema-contract-spec.adoc`. Brainstormed WITH the user
 (design-of-record CONFIRMED + reconciled with the 2C reality — the design imagined JsonNode + one
 DomainDagMapper/domain; 2C reality is String payload + N readers/coordinate). 5 reconciliation decisions,
 all settled — do NOT re-litigate, plan + execute:

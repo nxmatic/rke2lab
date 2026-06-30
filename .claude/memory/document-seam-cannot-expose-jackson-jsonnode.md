@@ -1,6 +1,6 @@
 ---
 name: document-seam-cannot-expose-jackson-jsonnode
-description: ROOT CAUSE (proven by Felix DEBUG trace 2026-06-28) — a type=seam bundle (exchange-port) must NOT expose a bundle-only type in its API. Document.payload() returns com.fasterxml.jackson.databind.JsonNode, but jackson is a BUNDLE while the seam is FLAT → two JsonNode realms → LinkageError in-container. Fix = Document.payload becomes a String (Option B); prevent recurrence with a SEAM_PURITY staging gate.
+description: ROOT CAUSE (proven by Felix DEBUG trace 2026-06-28) — a type=seam bundle (gateway-port) must NOT expose a bundle-only type in its API. Document.payload() returns com.fasterxml.jackson.databind.JsonNode, but jackson is a BUNDLE while the seam is FLAT → two JsonNode realms → LinkageError in-container. Fix = Document.payload becomes a String (Option B); prevent recurrence with a SEAM_PURITY staging gate.
 metadata:
   type: project
 ---
@@ -26,9 +26,9 @@ turn on the trace.
 The resolver WIRE lines showed:
 - `[doctor.core 25] com.fasterxml.jackson.databind -> [jackson-databind BUNDLE 28]` — jackson is a
   BUNDLE (the user's standing decision: "jackson arrives in OSGi via a bundle, not the JCL"). Correct.
-- `[doctor.core 25] io.nxmatic.rke2lab.exchange.port -> [felix.framework 0]` — the seam is FLAT
+- `[doctor.core 25] io.nxmatic.rke2lab.gateway.port -> [felix.framework 0]` — the seam is FLAT
   (system-exported). Correct.
-- exchange-port's BUILT manifest: `Import-Package: com.fasterxml.jackson.databind, .node` +
+- gateway-port's BUILT manifest: `Import-Package: com.fasterxml.jackson.databind, .node` +
   `Provide-Capability: type=seam`.
 
 The defect: **`Document` lives in the FLAT seam but its `payload()` returns `JsonNode` — a type that,
@@ -46,7 +46,7 @@ green; the flat `-Dtest=GeneralistConsultDocumentTest` also runs flat, which is 
 ## The fix — Option B (user-approved 2026-06-28)
 
 `Document(String domain, String coordinate, String payload)` — payload becomes a **String** of
-serialized JSON/YAML, NOT a live `JsonNode`. exchange-port DROPS its jackson dependency; no jackson
+serialized JSON/YAML, NOT a live `JsonNode`. gateway-port DROPS its jackson dependency; no jackson
 type crosses the seam. Each world (re)serializes/parses with ITS OWN jackson (the bundle one in OSGi,
 the host's on the flat side — or the host just transports the String). LinkageError impossible by
 construction. Aligns with the design-of-record ("everything crosses as a Document/YAML" = text). The
@@ -65,8 +65,8 @@ io.nxmatic.rke2lab.embed; type=seam`, its `Import-Package` may name ONLY package
 system-exported (other seams) / JDK / OSGi-framework — NEVER a package provided by a non-seam bundle
 (type=model/edge/record or a third-party lib bundle like com.fasterxml.jackson.*). A forbidden import
 = ERROR at build time. This would have failed 2A's build the moment Document(JsonNode) made
-exchange-port import jackson — the barrier instead of the crash two increments later. The gate goes
-green exactly when Option B drops jackson from exchange-port.
+gateway-port import jackson — the barrier instead of the crash two increments later. The gate goes
+green exactly when Option B drops jackson from gateway-port.
 
 ## Test-time filet (already a standing lesson)
 
@@ -74,5 +74,5 @@ Any change to a seam / Document / jackson MUST be verified via the `*InContainer
 realms), NEVER via a flat `-Dtest=`. A flat run has one jackson and hides the collision. `@FrameworkLog`
 (Felix stdout resolver trace) is the lever that proved this; it needs no slf4j backend.
 
-See [[world-exchange-2b-zone1-egress-knot]] [[world-exchange-2a-execution-state]]
+See [[world-gateway-2b-zone1-egress-knot]] [[world-gateway-2a-execution-state]]
 [[realm-boundary-gate]] [[bundle-on-jcl-is-wrong-classpath]].

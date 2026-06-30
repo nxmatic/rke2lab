@@ -13,8 +13,8 @@ The split, verified on the code:
 - The doctor's structure is called a **DAG** wherever it is actually discussed: `ConsultationLog`
   and `ConsultationReport` javadoc ("the runbook **DAG**, layer 3"), `SystemdAdapterStage` ("joins
   the shared **DAG**"), `ClusterReadinessStage` ("the follow-the-chain **DAG** edge"), and — load
-  bearing — the new world-exchange design's type names: `DomainDagMapper`, `DomainDagMultiplexor`,
-  `DomainDagSource`, `DomainDagAdapter` (see [[world-exchange-document-design]]).
+  bearing — the new world-gateway design's type names: `DomainDagMapper`, `DomainDagMultiplexor`,
+  `DomainDagSource`, `DomainDagAdapter` (see [[world-gateway-document-design]]).
 - But the one TYPE named for it uses **"Graph"**: `DoctorGraph`
   (`osgi/doctor/doctor-core/.../internal/DoctorGraph.java`), plus `RealGraphInjectionTest` and the
   "graph" prose in `DefaultHealthSystem` / `ExactRosterDoctor` / `HealthSystemTest`.
@@ -39,4 +39,4 @@ warns emitted and a task for cleaning up — handle this new one at the same tim
 names when Plan 2 designs the doctor domain's `DomainDagMapper`: decide whether `DoctorGraph` becomes
 e.g. `DoctorDagProducer` / stays the apparatus while the mapper carries the DAG-emission name.
 
-See [[world-exchange-document-design]] (the DomainDag* vocabulary) [[realm-boundary-gate]] (Plan 1).
+See [[world-gateway-document-design]] (the DomainDag* vocabulary) [[realm-boundary-gate]] (Plan 1).

@@ -1,16 +1,16 @@
-# World-exchange 2C — the reconstruction path crosses as opaque Documents — Implementation Plan
+# World-gateway 2C — the reconstruction path crosses as opaque Documents — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Drive the `REALM_BOUNDARY` gate worklist from 38 flat classes referencing `doctor.records` to **zero**, then flip the gate `WARN`→`ERROR` — the build-enforced lock that proves the host and OSGi realms are separated. This is the merge point.
 
-**Architecture:** The PEER MODEL (spec `world-exchange-2c-reconstruction-path-spec.adoc`). Host and OSGi are peers: the host knows the STACK (opaque to OSGi), OSGi knows the DOCTOR (opaque to the host), joined only by opaque `Document` blobs + the shared `Checkpoint`/`Patient` identities. Three host-provided ports flip record→Document: two read journals (`MedicalRecordJournal.historyOf(Patient)`, `InterventionJournal.entries()`) yield `List<Document>`; the write port `InterventionLedgerWriter.append(Document)` takes a Document; the review verb collapses to `ConsultingService.reviewDrift():void` (no-arg — the spec's `Checkpoint` parameter is vestigial, see Global Constraints). The flat readers move OSGi-side (Layer-2, behind the ports); `SnapshotView`/`SnapshotEntry`/`StackCoordinate` become host-internal (Layer-1, pulumi-edge).
+**Architecture:** The PEER MODEL (spec `world-gateway-2c-reconstruction-path-spec.adoc`). Host and OSGi are peers: the host knows the STACK (opaque to OSGi), OSGi knows the DOCTOR (opaque to the host), joined only by opaque `Document` blobs + the shared `Checkpoint`/`Patient` identities. Three host-provided ports flip record→Document: two read journals (`MedicalRecordJournal.historyOf(Patient)`, `InterventionJournal.entries()`) yield `List<Document>`; the write port `InterventionLedgerWriter.append(Document)` takes a Document; the review verb collapses to `ConsultingService.reviewDrift():void` (no-arg — the spec's `Checkpoint` parameter is vestigial, see Global Constraints). The flat readers move OSGi-side (Layer-2, behind the ports); `SnapshotView`/`SnapshotEntry`/`StackCoordinate` become host-internal (Layer-1, pulumi-edge).
 
 **Tech Stack:** Maven multi-module (reactor-only, `-am`), bnd-maven-plugin (OSGi bundles: `type=seam` system-exported flat, `type=record` not-exported, `type=model` installed), Declarative Services (`@Component`/`@Reference`), embedded Felix, jackson (each realm uses its own — no jackson type crosses), jGiven (in-container BDD), `maven-embed-staging-ext` (the `REALM_BOUNDARY` gate), flox JDK 25.
 
 ## Global Constraints
 
-- **Spec of record:** `docs/architecture/osgi/world-exchange-2c-reconstruction-path-spec.adoc` (the PEER MODEL, the two verified cases, the 5-zone cut). Read it before Task 1.
+- **Spec of record:** `docs/architecture/osgi/world-gateway-2c-reconstruction-path-spec.adoc` (the PEER MODEL, the two verified cases, the 5-zone cut). Read it before Task 1.
 - **One design correction to the spec, already adjudicated with the user (2026-06-30):** the spec's 3-port table says `DocumentJournal.historyOf(Checkpoint)`, but two distinct host reads cross — the per-`Patient` medical-record timeline AND the fixed `intervention-ledger/dev` stack. Resolution: **two focused read ports**, the record read keyed by **`Patient`** (matches `MedicalRecordRegistry.recordFor(Patient)` and `MedicalRecordReader.read(Patient)`), the ledger read **unkeyed** (`InterventionJournal.entries()`). `Checkpoint` stays the key of `reviewDrift`/consult only. The table's `Checkpoint` for the record read is a slip.
 - **One type the spec never names — `StackCoordinate`:** in `doctor-records`, referenced ONLY by host pulumi-edge (`InterventionLedgerLayout`, `InterventionLedgerSource`, `PulumiInterventionLedgerWriter`). It is stack vocabulary, the *inverse* of `Checkpoint`/`Patient`: it goes **host-internal to pulumi-edge** alongside `SnapshotView`/`SnapshotEntry`, NOT to the seam. (Only identities BOTH worlds name go to the seam.)
 - **Zone-4 "CLI tools" cannot be deferred to a late zone — they migrate INSIDE zone-3.** `MedicalRecordDump` consumes `MedicalRecordReader` (which zone-3 moves OSGi-side); `RecordInterventionCommand` consumes `append(Intervention)` (which zone-3 flips to `append(Document)`). Deferring them would break the build. Each rides the surface it is coupled to in zone-3. Only `ClusterSchemaRef` (the genuinely-independent cross-domain isolate) remains as its own zone-4.
@@ -147,7 +147,7 @@ Expected: `BUILD SUCCESS`; `realm-boundary: 0 error, N warn` with **N < 38** (th
 
 ```bash
 git add -A
-git commit -m "feat(world-exchange): 2C zone-1 — Checkpoint + Patient become world-gateway seam identities
+git commit -m "feat(world-gateway): 2C zone-1 — Checkpoint + Patient become world-gateway seam identities
 
 Both identities are named by BOTH realms (host flat + doctor bundle), so they
 belong on the system-exported seam, not in the type=record doctor bundle (which
@@ -231,7 +231,7 @@ Expected: `BUILD SUCCESS`; `realm-boundary` N drops by the consult-residue class
 
 ```bash
 git add -A
-git commit -m "feat(world-exchange): 2C zone-2 — the consult residue, Observation/Symptom leave the host
+git commit -m "feat(world-gateway): 2C zone-2 — the consult residue, Observation/Symptom leave the host
 
 The probes return a checkpoint Document; the jGiven scenarios assert on parsed
 Document fields; the gates build the flat observation shape with SymptomKind (the
@@ -328,7 +328,7 @@ Expected: `BUILD SUCCESS`; N drops by `RecordInterventionCommand`, `RecordInterv
 
 ```bash
 git add -A
-git commit -m "feat(world-exchange): 2C zone-3a — append(Document) + CLI canonicalizes through OSGi
+git commit -m "feat(world-gateway): 2C zone-3a — append(Document) + CLI canonicalizes through OSGi
 
 The write port flips record→Document. RecordInterventionCommand (Option A) boots
 the embedded framework and calls an OSGi canonicalize verb that owns the
@@ -444,7 +444,7 @@ Expected: `BUILD SUCCESS`; `realm-boundary` N collapses to just the `ClusterSche
 
 ```bash
 git add -A
-git commit -m "feat(world-exchange): 2C zone-3b — the peer node, reconstruction crosses as opaque Documents
+git commit -m "feat(world-gateway): 2C zone-3b — the peer node, reconstruction crosses as opaque Documents
 
 Two host read journals (MedicalRecordJournal.historyOf(Patient),
 InterventionJournal.entries()) yield opaque List<Document>; the readers move into
@@ -513,7 +513,7 @@ Expected: `BUILD SUCCESS`; `realm-boundary: 0 error, 0 warn`. If any warn remain
 
 ```bash
 git add -A
-git commit -m "feat(world-exchange): 2C zone-4 — ClusterSchemaRef drops the doctor.records.SchemaRef seam reference
+git commit -m "feat(world-gateway): 2C zone-4 — ClusterSchemaRef drops the doctor.records.SchemaRef seam reference
 
 The one cross-domain isolate: the cluster seam holds a plain String id; the
 conversion to a doctor SchemaRef moves bundle-side into ClusterSpecialist. The
@@ -573,7 +573,7 @@ Expected: `BUILD SUCCESS` with `realm-boundary: 0 error` and NO warn line (the g
 
 ```bash
 git add -A
-git commit -m "feat(world-exchange): 2C zone-5 — flip REALM_BOUNDARY WARN→ERROR, the static separation lock
+git commit -m "feat(world-gateway): 2C zone-5 — flip REALM_BOUNDARY WARN→ERROR, the static separation lock
 
 The worklist is zero; the three WARN overrides are removed so REALM_BOUNDARY
 returns to its ERROR default. Any future flat class referencing doctor.records now
@@ -587,7 +587,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ## Self-Review
 
-**1. Spec coverage** (against `world-exchange-2c-reconstruction-path-spec.adoc`):
+**1. Spec coverage** (against `world-gateway-2c-reconstruction-path-spec.adoc`):
 - The peer model (two peers, bidirectional, opaque Documents) → zone-3a (write) + zone-3b (read) realize all three ports. ✓
 - The reader two-layer split (Layer-1 host / Layer-2 OSGi) → zone-3b Steps 3-6. ✓
 - The three host-provided ports flip record→Document → `append(Document)` (3a), `MedicalRecordJournal`/`InterventionJournal` (3b), `reviewDrift()` (3b). ✓ (with the resolved corrections: two read ports not one; `reviewDrift()` no-arg)

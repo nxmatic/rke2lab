@@ -1,11 +1,11 @@
-= The world exchange — ports are services, data crosses as validated Documents
+= The world gateway — ports are services, data crosses as validated Documents
 :toc: left
 :toclevels: 3
 
 [NOTE]
 ====
 *Status:* DESIGN (converged 2026-06-27, NOT yet built). This spec is the design-of-record for the
-host↔OSGi data/behaviour exchange. It REPLACES two earlier specs (`multiplexor-spec`,
+host↔OSGi data/behaviour gateway. It REPLACES two earlier specs (`multiplexor-spec`,
 `world-boundary-spec`, deleted 2026-06-27, recoverable from git history): a five-angle code review
 found they covered only one of three real boundary leaks and that their "single door" / "records
 never cross" claims had drifted from the code. The sound parts (the egress mechanism: `Document`,
@@ -40,7 +40,7 @@ runs remote, it is the same contract with an HTTP transport instead of a method 
 == The claim
 
 The host world (flat JCL, Pulumi-aware orchestrator) and the OSGi world (bundle classloaders, the
-domain models + reasoning) exchange **no data type at all**. They exchange **services** — a port is a
+domain models + reasoning) gateway **no data type at all**. They gateway **services** — a port is a
 set of verbs — and the data those verbs carry crosses as a **`Document`** (a neutral YAML/`JsonNode`
 tree), validated by a **JSON Schema keyed on the document type**. OSGi holds the authority and owns
 all rich typing; the host transports. One rule, uniformly applied, closes the three leaks the review
@@ -233,11 +233,11 @@ unit. They form a hierarchy, matching `Document(domain, coordinate, payload)`.
 So `domain` = ownership, `coordinate` = type = schema key. A new domain plugs in additively: one more
 `@Component`, its own schemas, no gateway change.
 
-== The boot pipeline, re-decomposed by capability — GROUND / EXCHANGE / APPLY
+== The boot pipeline, re-decomposed by capability — GROUND / GATEWAY / APPLY
 
 The decomposition follows the system's real capabilities, not a functional view: we do not mix the
 two worlds at every level. But the framework lifecycle constrains the shape — verified on the code,
-`BootPipeline.embedded()` owns a *boot-run-close* (it closes Felix on return, always). So EXCHANGE is
+`BootPipeline.embedded()` owns a *boot-run-close* (it closes Felix on return, always). So GATEWAY is
 not a flat sibling topic; it is *framed by* the boot-run-close.
 
 [mermaid]
@@ -267,7 +267,7 @@ flowchart TB
 
 * *GROUND* (host only) — read Pulumi config, boot the embedded framework, publish the host infra
   (the EHR + ledger services the OSGi `HealthSystem` `@References`). No doctor type.
-* *EXCHANGE* (framed by boot-run-close) — the one place the worlds talk. Verified: only **2 of 5**
+* *GATEWAY* (framed by boot-run-close) — the one place the worlds talk. Verified: only **2 of 5**
   stages cross the seam — `systemd adapter` and `bootstrap resources` (they `consult(Document)`). The
   other three (`preflight`, `bbox`, `incus provisioning`) are host-pure; they run in the same
   boot-run-close because the framework must be open for the two seam stages, but they say nothing to
@@ -340,6 +340,6 @@ steps 2–4, written from the worklist the gate prints (so the host edits are ex
 * link:../patterns/port-edge-domain-ownership.adoc[port/edge/domain ownership] — the seam law this
   spec specializes (a `-port` is `type=seam`; its verbs now speak `Document`).
 * link:../patterns/fluent-pipeline-grammar.adoc[fluent pipeline grammar] — the grammar the
-  GROUND/EXCHANGE/APPLY decomposition is expressed in.
+  GROUND/GATEWAY/APPLY decomposition is expressed in.
 * link:staging-gates-governance-spec.adoc[staging-gates governance] — the `REALM_BOUNDARY` gate that
   mechanizes this spec's invariant at build time (`WARN` during migration, `ERROR` once clean).

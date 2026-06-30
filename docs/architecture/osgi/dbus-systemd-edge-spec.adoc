@@ -174,7 +174,7 @@ flowchart TB
 ....
 flowchart TB
   spec["doctor domain — CORE, REASONS over symptoms<br/>the specialist, Specialty SYSTEMD"]
-  snap["systemd domain — PORT, the EXCHANGE fact<br/>SystemdStatusSnapshot in systemd-port"]
+  snap["systemd domain — PORT, the GATEWAY fact<br/>SystemdStatusSnapshot in systemd-port"]
   edge["systemd domain — EDGE, the CONTACT over dbus<br/>DbusSystemdProbe in dbus-systemd-edge"]
   world["EXTERNAL<br/>systemd on the master node"]
   spec -->|reads a fact about| snap

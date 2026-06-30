@@ -1,6 +1,6 @@
 ---
 name: osgi-layout-shipped-state
-description: The osgi/ aggregator re-layout SHIPPED on feature/cluster-edge (2026-06-30, commits a05dd52c..a0f64f2a, full reactor + all tests GREEN). osgi/ is now 3 nature-groups — foundation/{domain-annotations, world-gateway, pipeline/{pipeline-port,pipeline-jgiven,pipeline-testkit,pipeline-probe,pipeline-probe-test}}, runtime/{boot, launcher, junit-testkit, bench}, domains/{doctor,cluster,systemd,manifests,netplan,unitrepo,ssh-to-age-edge} — root <modules> = 5 entries. This was the LAYOUT-FIRST increment that had to land before world-exchange 2C (2C is written on the world-gateway names). NEXT: plan 2C. See [[osgi-aggregator-layout-spec-state]] [[jgiven-dissolution-is-a-realm-change-backlog]] [[world-exchange-2c-peer-model-design]].
+description: The osgi/ aggregator re-layout SHIPPED on feature/cluster-edge (2026-06-30, commits a05dd52c..a0f64f2a, full reactor + all tests GREEN). osgi/ is now 3 nature-groups — foundation/{domain-annotations, world-gateway, pipeline/{pipeline-port,pipeline-jgiven,pipeline-testkit,pipeline-probe,pipeline-probe-test}}, runtime/{boot, launcher, junit-testkit, bench}, domains/{doctor,cluster,systemd,manifests,netplan,unitrepo,ssh-to-age-edge} — root <modules> = 5 entries. This was the LAYOUT-FIRST increment that had to land before world-gateway 2C (2C is written on the world-gateway names). NEXT: plan 2C. See [[osgi-aggregator-layout-spec-state]] [[jgiven-dissolution-is-a-realm-change-backlog]] [[world-gateway-2c-peer-model-design]].
 metadata:
   type: project
 ---
@@ -13,12 +13,12 @@ reactor `package -Pall-worlds` (a layout has no unit tests — a boundary that d
 failing test); the USER also ran the full suite with all tests enabled → SUCCESS.
 
 - `a05dd52c` domains/ group (6 domains + ssh-to-age-edge flat leaf)
-- `1ae89a1a` foundation/ group (domain-annotations, exchange, pipeline, jgiven — moved as-is)
+- `1ae89a1a` foundation/ group (domain-annotations, gateway, pipeline, jgiven — moved as-is)
 - `31f81da4` runtime/ group + collision-break (leaf → osgi/runtime/runtime/, temp artifactId runtime-host)
 - `1f408fe7` leaf named **launcher** (user rejected the runtime-host collision-patch; FrameworkLauncher
   + BootPipeline.embedded = the ACT of launching, pairs with boot/ the decision) + 3 exec consumers wired
-- `442e3894` **exchange→world-gateway** (module + package io.nxmatic.rke2lab.world.gateway.port +
-  ExchangeCatalog→WorldGatewayCatalog; singleton aggregator reduced; bnd type=seam kept; in-container
+- `442e3894` **gateway→world-gateway** (module + package io.nxmatic.rke2lab.world.gateway.port +
+  GatewayCatalog→WorldGatewayCatalog; singleton aggregator reduced; bnd type=seam kept; in-container
   tests prove the rename resolved across the realm boundary)
 - `46c7cdf0` + `a0f64f2a` **pipeline regroup** (jgiven under a pipeline/ aggregator: pipeline-port +
   pipeline-jgiven + pipeline-testkit + pipeline-probe + pipeline-probe-test). SAFE half of §5.4 only —
@@ -46,7 +46,7 @@ the user's full-test run was green — only the intermediate commit was an incom
 
 ## CLI selector changes (CLAUDE.md: unprefixed artifactId)
 
-`-pl :runtime` → `-pl :launcher` · `-pl :exchange-port` → `-pl :world-gateway` · `-pl :pipeline` →
+`-pl :runtime` → `-pl :launcher` · `-pl :gateway-port` → `-pl :world-gateway` · `-pl :pipeline` →
 `-pl :pipeline-port`. Module dirs moved but artifactIds drive resolution, so inter-module deps were
 transparent except where the artifactId itself was renamed (launcher, world-gateway, pipeline-port,
 pipeline-jgiven, pipeline-testkit, pipeline-probe, pipeline-probe-test).

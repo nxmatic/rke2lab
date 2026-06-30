@@ -128,7 +128,7 @@ close "which direction". Three closed questions = three judgements removed.
 == Worked example — the doctor domain
 
 * `doctor-core` (osgi-world) — the ~48 pure diagnostic types; in-domain, never leaves.
-* `doctor-port` — the membrane: `SnapshotSource` plus the pure exchange records `SnapshotEntry` /
+* `doctor-port` — the membrane: `SnapshotSource` plus the pure gateway records `SnapshotEntry` /
   `SnapshotView` that replace the host `StackSnapshot` / `StackHistory` at the boundary.
 * `pulumi-edge` (host today) — the realised egress/ingress: `StackHandleSnapshotSource` (ingress, reads
   the timeline) and `PulumiInterventionLedgerWriter` (egress, writes the ledger). Mutualised: any other
@@ -147,7 +147,7 @@ ONE shared edge that every Pulumi-touching domain uses.
 == Every port traces to an edge (no orphans)
 
 A discipline the inventory confirmed on the facts: *every port traces to an edge* — directly (the port
-exchanges the external system's own state types) or transitively (the port describes a pure model the
+gateways the external system's own state types) or transitively (the port describes a pure model the
 host actualises against an external system downstream). A port that traces to NO edge is not a port —
 it is a mis-named internal interface. The inventory found ZERO orphan ports, so the rule holds with no
 counter-example.

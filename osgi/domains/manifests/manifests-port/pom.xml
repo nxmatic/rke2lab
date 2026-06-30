@@ -13,7 +13,7 @@
   <name>osgi/domains/manifests/manifests-port</name>
   <description>The manifests contract — the domain port both worlds depend on: the OSGi
     manifests-core bundle implements it, the host depends on it. Pure POJO model: the
-    synthesis/explode/update SPIs, their exchange records, NodeEnvContext/NodeEnvContributor, and the
+    synthesis/explode/update SPIs, their gateway records, NodeEnvContext/NodeEnvContributor, and the
     shared value/constant types (domain policy + catalog, annotations, the profiles value records).
     Zero impl, zero pulumi, zero osgi runtime — that purity is what makes it a real OSGi bundle at
     BUILD time (jar + bnd metadata + per-package @Version), yet at RUNTIME host-loaded and

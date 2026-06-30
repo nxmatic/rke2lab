@@ -311,7 +311,7 @@ medical model.
 === Consultation flow — a referral round-trip on a generalist-owned agenda
 
 NOTE: This supersedes the earlier `firstLook` + hard-coded `switch` routing. The 2026-06-07
-sessions evolved the generalist↔specialist exchange into a *referral round-trip* and the
+sessions evolved the generalist↔specialist gateway into a *referral round-trip* and the
 generalist into an *agenda-owning coordinator*. The shape below is the consolidated, validated
 direction (DESIGN — not yet implemented). The routing key is the practitioner's self-declared
 `treats()` — the specialist provides its own symptom set, the `domain()` only seeds a default
@@ -319,7 +319,7 @@ repertoire it inherits (sole authority = the practitioner) — not a table the g
 is the same "routing must be contributed" move the open-roster tier already calls for (the
 hard-coded `routeBySymptom` switch is deleted).
 
-The exchange is a *medical referral circuit* of three objects with clear recipients:
+The gateway is a *medical referral circuit* of three objects with clear recipients:
 
 * *`Referral`* (REQUEST, generalist → a specialist resolved via `treats()`): the patient + the
   *symptom* (the why) + *references* (not copies) to the longitudinal patient record AND the

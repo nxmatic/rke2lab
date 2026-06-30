@@ -5,9 +5,9 @@ import java.util.Optional;
 /**
  * The closed set of document owners — the value carried in {@link Document#domain()}. Lifted from a
  * loose string so a call site cannot name an owner that does not exist (the {@code clusterApi}-bug
- * discipline). This is the exchange's own owner axis, NOT the host's provisioning-domain catalog
- * nor the manifest deployment-domain catalog: a different axis and a different layer (this seam
- * leaf must not depend on the host). {@code slug()} is the wire value placed in {@link
+ * discipline). This is the gateway's own owner axis, NOT the host's provisioning-domain catalog nor
+ * the manifest deployment-domain catalog: a different axis and a different layer (this seam leaf
+ * must not depend on the host). {@code slug()} is the wire value placed in {@link
  * Document#domain()}; the envelope stays neutral and never holds this enum.
  */
 public enum Domain {

@@ -1,11 +1,11 @@
-= World exchange 2A — the Document foundation + the readiness verdict crossing
+= World gateway 2A — the Document foundation + the readiness verdict crossing
 :toc: left
 :toclevels: 3
 
 [NOTE]
 ====
 *Status:* DESIGN (converged 2026-06-27, NOT yet built). This is the first implementation increment of
-link:world-exchange-spec.adoc[the world exchange] — the design-of-record this specializes. It builds
+link:world-gateway-spec.adoc[the world gateway] — the design-of-record this specializes. It builds
 the neutral `Document` contract and crosses the *readiness verdict* through it, removing the
 `doctor.records` types from `ControlplanePolicy` / `EnvironmentStage` (the boot-crash trigger). The
 remaining host surface (the probe / observation / consult machinery, the egress DAG, the readside
@@ -63,8 +63,8 @@ class:
 
 [source,java]
 ----
-// osgi/exchange/exchange-port  (Provide-Capability: io.nxmatic.rke2lab.embed; type=seam)
-package io.nxmatic.rke2lab.exchange.port;
+// osgi/gateway/gateway-port  (Provide-Capability: io.nxmatic.rke2lab.embed; type=seam)
+package io.nxmatic.rke2lab.gateway.port;
 
 public record Document(String domain, String coordinate, com.fasterxml.jackson.databind.JsonNode payload) { }
 ----
@@ -72,7 +72,7 @@ public record Document(String domain, String coordinate, com.fasterxml.jackson.d
 * `domain` = the owning domain (e.g. `"doctor"`); `coordinate` = the document type = the schema key
   (e.g. `"readiness-verdict"`); `payload` = a Jackson `JsonNode` tree (the structured body). This is
   exactly the `Document(domain, coordinate, payload)` triplet the design-of-record names.
-* It lives in `exchange-port` (`type=seam`): system-exported, one class shared by host + bundles —
+* It lives in `gateway-port` (`type=seam`): system-exported, one class shared by host + bundles —
   never `type=record`, so the `RECORD_PURITY` gate does not apply (a seam may carry a transport
   record; it carries no behaviour).
 * `JsonNode` crosses the seam, so `com.fasterxml.jackson.databind` must be a host-flat
@@ -85,9 +85,9 @@ public record Document(String domain, String coordinate, com.fasterxml.jackson.d
   represents — the very shape this migration deletes); a sealed `Document` hierarchy with one impl per
   coordinate (re-introduces N shared data types at the seam — leak #1).
 
-The exchange's string identifiers — the coordinates (`readiness-checkpoint`, `readiness-verdict`),
+The gateway's string identifiers — the coordinates (`readiness-checkpoint`, `readiness-verdict`),
 the payload field names, and the enumerated verdict values (`stop`, `continue-degraded`) — are
-defined once in an `ExchangeCatalog` constants class in the same seam package, the single source of
+defined once in an `GatewayCatalog` constants class in the same seam package, the single source of
 truth call sites reference (never a literal), so a coordinate or field name cannot drift silently
 (the `clusterApi`-bug discipline). Build-time schemas (a later increment) key on these coordinates.
 
@@ -100,7 +100,7 @@ After 2A the authority lives OSGi-side; the host reads one field.
 [mermaid]
 ....
 flowchart TB
-  subgraph "exchange-port type seam NEW"
+  subgraph "gateway-port type seam NEW"
     doc["record Document"]
     auth["ReadinessAuthority assess Document to Document"]
   end
@@ -118,7 +118,7 @@ flowchart TB
   stage -->|stop or continue degraded| prov["provisioning"]
 ....
 
-* New seam verb on `exchange-port`:
+* New seam verb on `gateway-port`:
 +
 [source,java]
 ----
@@ -134,7 +134,7 @@ public interface ReadinessAuthority {
   reason}`). `if "stop" -> throw TopicFailure; else continue degraded`. No `Severity` on the host.
 * The OSGi-side impl is the authority: it holds `Severity`, applies the operator override + the
   scenario's intrinsic severity, and maps the decision to `action`. (Where it is published — a doctor
-  bundle `@Component` vs an exchange service — is an implementation choice for the plan; the seam
+  bundle `@Component` vs an gateway service — is an implementation choice for the plan; the seam
   contract is `ReadinessAuthority`.)
 * Rejected: the host keeping the decision on raw config strings (`"critical" -> stop`) — that is
   `== Severity.CRITICAL` in disguise; the host would still encode the severity *meaning*, which the
@@ -188,8 +188,8 @@ validation stays YAGNI until remote.
 |===
 | unit | responsibility
 
-| `osgi/exchange/exchange-port` (new, `type=seam`)
-| the `Document` record, the `ExchangeCatalog` identifier constants, and the `ReadinessAuthority`
+| `osgi/gateway/gateway-port` (new, `type=seam`)
+| the `Document` record, the `GatewayCatalog` identifier constants, and the `ReadinessAuthority`
   verb. Shared host + bundles, system-exported.
 
 | the OSGi-side `ReadinessAuthority` impl
@@ -207,7 +207,7 @@ validation stays YAGNI until remote.
 
 == Related documentation
 
-* link:world-exchange-spec.adoc[World exchange] — the design-of-record this increment specializes
+* link:world-gateway-spec.adoc[World gateway] — the design-of-record this increment specializes
   (ports are services, data crosses as Documents, OSGi holds the authority).
 * link:staging-gates-governance-spec.adoc[Staging-gates governance] — the `REALM_BOUNDARY` gate whose
   WARN worklist tracks the remaining host↔OSGi drift this migration pays down.
