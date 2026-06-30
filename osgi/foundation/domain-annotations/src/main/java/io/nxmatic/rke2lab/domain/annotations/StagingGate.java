@@ -18,6 +18,11 @@ package io.nxmatic.rke2lab.domain.annotations;
  *       package a staged bundle exports must not ALSO be present flat in the assembled host. Two
  *       copies of a class — one loaded flat, one by a bundle classloader — is the loader-constraint
  *       collision that surfaces as a {@code LinkageError} when an instance crosses the seam.
+ *   <li>{@link #SCHEMA_CONCORD} — each Document coordinate has a JSON Schema ({@code
+ *       doctor-core/.../schema/<slug>.schema.json}) that (a) is itself valid against the
+ *       JSON-Schema meta-schema and (b) declares exactly the {@code WorldGatewayCatalog.FIELD_*}
+ *       properties the coordinate's producer/consumer code reads and writes. A field written but
+ *       not in the schema, or required by the schema but never written, is a concord violation.
  * </ul>
  */
 public enum StagingGate {
@@ -25,5 +30,6 @@ public enum StagingGate {
   SPEC_COVERAGE,
   INSTANCE_DISCIPLINE,
   REALM_BOUNDARY,
-  DUPLICATE_REALM_CLASS
+  DUPLICATE_REALM_CLASS,
+  SCHEMA_CONCORD
 }

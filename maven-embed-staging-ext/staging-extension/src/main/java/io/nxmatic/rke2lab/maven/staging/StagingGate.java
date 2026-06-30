@@ -12,7 +12,8 @@ enum StagingGate {
   SPEC_COVERAGE,
   INSTANCE_DISCIPLINE,
   REALM_BOUNDARY,
-  DUPLICATE_REALM_CLASS;
+  DUPLICATE_REALM_CLASS,
+  SCHEMA_CONCORD;
 
   /** Map an ASM enum-constant name to a gate, or {@code null} for an unknown name (ignored). */
   static StagingGate fromName(String name) {

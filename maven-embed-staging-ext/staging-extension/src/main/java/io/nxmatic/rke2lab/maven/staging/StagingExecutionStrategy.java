@@ -286,6 +286,76 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
         duplicateViolations,
         "staged bundles export packages that ALSO live flat in this assembly (one class in two"
             + " realms → LinkageError)");
+
+    // ---- SCHEMA_CONCORD: each Document coordinate has a schema that matches the code ----
+    // Find world-gateway (catalog) and doctor-core (schemas) bundles
+    ResolvedBundle worldGatewayBundle = null;
+    ResolvedBundle doctorCoreBundle = null;
+    for (ResolvedBundle b : closure.staged()) {
+      if (b.symbolicName().equals("io.nxmatic.rke2lab.world.gateway")) {
+        worldGatewayBundle = b;
+      }
+      if (b.symbolicName().equals("io.nxmatic.rke2lab.doctor.core")) {
+        doctorCoreBundle = b;
+      }
+    }
+
+    if (worldGatewayBundle != null && doctorCoreBundle != null) {
+      final CoordinateFieldUsage usage = new CoordinateFieldUsage();
+
+      // Index WorldGatewayCatalog to map FIELD_* names to their string values
+      byte[] catalogClass = null;
+      for (ResolvedBundle.ClassEntry c : worldGatewayBundle.classEntries()) {
+        if (c.binaryName().equals("io/nxmatic/rke2lab/world/gateway/port/WorldGatewayCatalog")) {
+          catalogClass = c.bytes();
+          break;
+        }
+      }
+      if (catalogClass != null) {
+        usage.indexCatalog(catalogClass);
+      }
+
+      // Index Coordinate enum constants to their slugs (hardcoded map for now — the 6 from
+      // Coordinate)
+      final Map<String, String> coordMap = new java.util.LinkedHashMap<>();
+      coordMap.put("READINESS_CHECKPOINT", "readiness-checkpoint");
+      coordMap.put("READINESS_VERDICT", "readiness-verdict");
+      coordMap.put("CONSULTATION", "consultation");
+      coordMap.put("INTERVENTION_REQUEST", "intervention-request");
+      coordMap.put("INTERVENTION", "intervention");
+      coordMap.put("VISIT", "visit");
+      usage.indexCoordinate(coordMap);
+
+      // Scan all staged bundle classes to discover FIELD_* usage per coordinate
+      for (ResolvedBundle b : closure.staged()) {
+        for (ResolvedBundle.ClassEntry c : b.classEntries()) {
+          usage.scan(c.bytes());
+        }
+      }
+
+      // Resolve the schema directory from doctor-core's target/classes
+      java.nio.file.Path schemaDir = null;
+      for (MavenProject p : session.getAllProjects()) {
+        if (p.getArtifactId().equals("doctor-core")) {
+          final java.nio.file.Path classes =
+              java.nio.file.Path.of(p.getBuild().getOutputDirectory());
+          schemaDir = classes.resolve("schema");
+          break;
+        }
+      }
+
+      if (schemaDir != null) {
+        final SchemaConcord schemaConcord =
+            new SchemaConcord(schemaDir, usage.fieldsByCoordinateSlug());
+        report.record(
+            StagingGate.SCHEMA_CONCORD,
+            doctorCoreBundle.governance().levels(),
+            doctorCoreBundle,
+            schemaConcord.violations(),
+            "Document coordinate schema/code concord violations (meta-schema or field mismatch)");
+      }
+    }
+
     report.flush();
   }
 
