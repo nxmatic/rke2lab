@@ -1,7 +1,5 @@
 package io.nxmatic.rke2lab.cluster.port;
 
-import io.nxmatic.rke2lab.doctor.records.SchemaRef;
-
 /**
  * The single source of truth for the cluster domain's reasoning schemas — the {@code
  * "cluster/*∕v1"} coordinates the {@code ClusterSpecialist} carries on its {@code Assessment}s.
@@ -15,14 +13,17 @@ public enum ClusterSchemaRef {
   API("cluster/api/v1"),
   OTHER("cluster/other/v1");
 
-  private final SchemaRef ref;
+  private final String id;
 
   ClusterSchemaRef(String id) {
-    this.ref = SchemaRef.of(id);
+    this.id = id;
   }
 
-  /** The typed schema reference an {@link io.nxmatic.rke2lab.doctor.records.Assessment} carries. */
-  public SchemaRef ref() {
-    return ref;
+  /**
+   * The schema identifier string an {@link io.nxmatic.rke2lab.doctor.records.Assessment}
+   * references.
+   */
+  public String id() {
+    return id;
   }
 }

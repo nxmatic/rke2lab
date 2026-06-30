@@ -4,6 +4,7 @@ import io.nxmatic.rke2lab.cluster.port.ClusterSchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.Prescription;
 import io.nxmatic.rke2lab.doctor.records.Referral;
+import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Specialty;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.spi.ClinicianProperties;
@@ -42,22 +43,22 @@ public final class ClusterSpecialist implements Specialist {
     return switch (symptom) {
       case KUBECONFIG_MISSING ->
           Assessment.of(
-              ClusterSchemaRef.KUBECONFIG.ref(),
+              SchemaRef.of(ClusterSchemaRef.KUBECONFIG.id()),
               Map.of("symptom", symptom.id()),
               "kubeconfig not yet written by the control-plane bootstrap; expected during early readiness — no treatment, awaiting convergence");
       case CONTROLLER_NOT_READY ->
           Assessment.of(
-              ClusterSchemaRef.CONTROLLER.ref(),
+              SchemaRef.of(ClusterSchemaRef.CONTROLLER.id()),
               Map.of("symptom", symptom.id()),
               "control-plane controller not Ready; a cluster specialist would inspect the kubelet/static pods — not yet automated");
       case API_NOT_READY ->
           Assessment.of(
-              ClusterSchemaRef.API.ref(),
+              SchemaRef.of(ClusterSchemaRef.API.id()),
               Map.of("symptom", symptom.id()),
               "kube-apiserver not serving yet; awaiting control-plane readiness");
       default ->
           Assessment.of(
-              ClusterSchemaRef.OTHER.ref(),
+              SchemaRef.of(ClusterSchemaRef.OTHER.id()),
               Map.of("symptom", symptom.id()),
               "not a cluster symptom — no cluster assessment for " + symptom.id());
     };
