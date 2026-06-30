@@ -35,8 +35,8 @@ import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Specialty;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
-import io.nxmatic.rke2lab.exchange.port.Document;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -77,7 +77,9 @@ class NestedRunbookTest {
   private static ConsultationReport reconstruct(Document consultation) {
     try {
       final var report =
-          MAPPER.readTree(consultation.payload()).path(ExchangeCatalog.FIELD_CONSULTATION_REPORT);
+          MAPPER
+              .readTree(consultation.payload())
+              .path(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT);
       @SuppressWarnings("unchecked")
       final Map<String, Object> reportMap = MAPPER.convertValue(report, Map.class);
       return ConsultationReportReader.fromOutputMap(reportMap).orElseThrow();

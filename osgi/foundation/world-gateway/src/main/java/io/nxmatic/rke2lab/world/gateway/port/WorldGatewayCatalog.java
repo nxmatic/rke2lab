@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.exchange.port;
+package io.nxmatic.rke2lab.world.gateway.port;
 
 /**
  * The single source of truth for the exchange's payload field keys — the schema. Closed value
@@ -7,7 +7,7 @@ package io.nxmatic.rke2lab.exchange.port;
  * enums and their constants, never literals, so a mismatch cannot drift silently (the {@code
  * clusterApi}-bug discipline). Build-time schemas (a later increment) key on the field names here.
  */
-public final class ExchangeCatalog {
+public final class WorldGatewayCatalog {
 
   /** Checkpoint payload: the scenario id (e.g. the systemd-adapter checkpoint slug). */
   public static final String FIELD_SCENARIO_ID = "scenarioId";
@@ -60,5 +60,5 @@ public final class ExchangeCatalog {
   /** Verdict payload: a human-readable reason for the action. */
   public static final String FIELD_REASON = "reason";
 
-  private ExchangeCatalog() {}
+  private WorldGatewayCatalog() {}
 }

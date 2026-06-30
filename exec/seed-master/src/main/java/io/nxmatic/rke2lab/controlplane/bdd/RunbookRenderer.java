@@ -9,8 +9,8 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.ScenarioModel;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
-import io.nxmatic.rke2lab.exchange.port.Document;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -114,9 +114,9 @@ public final class RunbookRenderer {
     }
     final ObjectMapper mapper = new ObjectMapper();
     for (Document consultation : consultations.consultations()) {
-      final String slug = field(mapper, consultation, ExchangeCatalog.FIELD_SCENARIO_ID);
+      final String slug = field(mapper, consultation, WorldGatewayCatalog.FIELD_SCENARIO_ID);
       final String diagnosisAdoc =
-          field(mapper, consultation, ExchangeCatalog.FIELD_DIAGNOSIS_ADOC);
+          field(mapper, consultation, WorldGatewayCatalog.FIELD_DIAGNOSIS_ADOC);
       if (diagnosisAdoc.isEmpty()) {
         continue;
       }

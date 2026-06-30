@@ -20,10 +20,10 @@ import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.exchange.port.Coordinate;
-import io.nxmatic.rke2lab.exchange.port.Document;
-import io.nxmatic.rke2lab.exchange.port.Domain;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
+import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.util.EnumMap;
 import java.util.Map;
@@ -238,7 +238,7 @@ public final class ClusterReadinessStage {
       return;
     }
     final Document consultation = doctor.consult(consultCheckpoint(phaseObservations.values()));
-    log("⚕ " + parse(consultation.payload()).path(ExchangeCatalog.FIELD_NARRATION).asText());
+    log("⚕ " + parse(consultation.payload()).path(WorldGatewayCatalog.FIELD_NARRATION).asText());
     if (consultations != null) {
       consultations.record(consultation);
     }
@@ -251,9 +251,9 @@ public final class ClusterReadinessStage {
    */
   private Document consultCheckpoint(Iterable<Observation> observations) {
     final ObjectNode payload = mapper.createObjectNode();
-    payload.put(ExchangeCatalog.FIELD_SCENARIO_ID, SCENARIO_ID);
-    payload.put(ExchangeCatalog.FIELD_RECORDED_AT, recordedAt.toString());
-    final ArrayNode array = payload.putArray(ExchangeCatalog.FIELD_OBSERVATIONS);
+    payload.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, SCENARIO_ID);
+    payload.put(WorldGatewayCatalog.FIELD_RECORDED_AT, recordedAt.toString());
+    final ArrayNode array = payload.putArray(WorldGatewayCatalog.FIELD_OBSERVATIONS);
     for (Observation observation : observations) {
       array.add(mapper.valueToTree(observation.toOutputMap()));
     }

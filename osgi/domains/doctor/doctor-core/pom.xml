@@ -40,7 +40,7 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>exchange-port</artifactId>
+      <artifactId>world-gateway</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- jackson as a real bundle dependency: the exchange seam carries a serialized JSON String, so

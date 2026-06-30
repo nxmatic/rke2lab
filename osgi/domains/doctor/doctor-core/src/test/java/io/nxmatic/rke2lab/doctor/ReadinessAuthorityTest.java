@@ -7,12 +7,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.internal.DefaultReadinessAuthority;
-import io.nxmatic.rke2lab.exchange.port.Action;
-import io.nxmatic.rke2lab.exchange.port.Coordinate;
-import io.nxmatic.rke2lab.exchange.port.Document;
-import io.nxmatic.rke2lab.exchange.port.Domain;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
-import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.world.gateway.port.Action;
+import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import org.junit.jupiter.api.Test;
 
 class ReadinessAuthorityTest {
@@ -22,17 +22,17 @@ class ReadinessAuthorityTest {
 
   private static Document checkpoint(String scenarioId, boolean failed, String override) {
     final ObjectNode payload = MAPPER.createObjectNode();
-    payload.put(ExchangeCatalog.FIELD_SCENARIO_ID, scenarioId);
-    payload.put(ExchangeCatalog.FIELD_FAILED, failed);
+    payload.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, scenarioId);
+    payload.put(WorldGatewayCatalog.FIELD_FAILED, failed);
     if (override != null) {
-      payload.put(ExchangeCatalog.FIELD_OVERRIDE, override);
+      payload.put(WorldGatewayCatalog.FIELD_OVERRIDE, override);
     }
     return new Document(
         Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), serialize(payload));
   }
 
   private static String action(Document verdict) {
-    return parse(verdict.payload()).get(ExchangeCatalog.FIELD_ACTION).asText();
+    return parse(verdict.payload()).get(WorldGatewayCatalog.FIELD_ACTION).asText();
   }
 
   private static String serialize(JsonNode node) {

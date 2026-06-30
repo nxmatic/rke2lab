@@ -17,7 +17,7 @@
 
   <modules>
     <module>domain-annotations</module>
-    <module>exchange</module>
+    <module>world-gateway</module>
     <module>pipeline</module>
     <module>jgiven</module>
   </modules>

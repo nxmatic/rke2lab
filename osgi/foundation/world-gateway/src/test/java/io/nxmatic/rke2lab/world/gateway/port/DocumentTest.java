@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.exchange.port;
+package io.nxmatic.rke2lab.world.gateway.port;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -9,10 +9,10 @@ class DocumentTest {
   @Test
   void carriesDomainCoordinateAndStringPayload() {
     // The payload is a serialized JSON String — the seam carries only flat (JDK) types, never a
-    // jackson JsonNode, so exchange-port has no jackson dependency at all. Each world parses the
+    // jackson JsonNode, so world-gateway has no jackson dependency at all. Each world parses the
     // String with its own jackson.
     final String payload =
-        "{\"" + ExchangeCatalog.FIELD_ACTION + "\":\"" + Action.STOP.slug() + "\"}";
+        "{\"" + WorldGatewayCatalog.FIELD_ACTION + "\":\"" + Action.STOP.slug() + "\"}";
     final Document doc =
         new Document(Domain.DOCTOR.slug(), Coordinate.READINESS_VERDICT.slug(), payload);
 
@@ -26,18 +26,18 @@ class DocumentTest {
     // The single source of truth for field keys (the schema) — call sites must reference these,
     // never literals. Closed value domains (domain, coordinate, action, symptom kind) are now
     // typed enums and tested in ExchangeVocabularyTest.
-    assertEquals("scenarioId", ExchangeCatalog.FIELD_SCENARIO_ID);
-    assertEquals("failed", ExchangeCatalog.FIELD_FAILED);
-    assertEquals("override", ExchangeCatalog.FIELD_OVERRIDE);
-    assertEquals("action", ExchangeCatalog.FIELD_ACTION);
-    assertEquals("reason", ExchangeCatalog.FIELD_REASON);
+    assertEquals("scenarioId", WorldGatewayCatalog.FIELD_SCENARIO_ID);
+    assertEquals("failed", WorldGatewayCatalog.FIELD_FAILED);
+    assertEquals("override", WorldGatewayCatalog.FIELD_OVERRIDE);
+    assertEquals("action", WorldGatewayCatalog.FIELD_ACTION);
+    assertEquals("reason", WorldGatewayCatalog.FIELD_REASON);
   }
 
   @Test
   void consultationFieldsArePinned() {
-    assertEquals("narration", ExchangeCatalog.FIELD_NARRATION);
-    assertEquals("diagnosisAdoc", ExchangeCatalog.FIELD_DIAGNOSIS_ADOC);
-    assertEquals("observations", ExchangeCatalog.FIELD_OBSERVATIONS);
-    assertEquals("recordedAt", ExchangeCatalog.FIELD_RECORDED_AT);
+    assertEquals("narration", WorldGatewayCatalog.FIELD_NARRATION);
+    assertEquals("diagnosisAdoc", WorldGatewayCatalog.FIELD_DIAGNOSIS_ADOC);
+    assertEquals("observations", WorldGatewayCatalog.FIELD_OBSERVATIONS);
+    assertEquals("recordedAt", WorldGatewayCatalog.FIELD_RECORDED_AT);
   }
 }

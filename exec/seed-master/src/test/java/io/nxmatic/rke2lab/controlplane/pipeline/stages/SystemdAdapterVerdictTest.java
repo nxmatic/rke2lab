@@ -7,13 +7,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.nxmatic.rke2lab.exchange.port.Action;
-import io.nxmatic.rke2lab.exchange.port.Coordinate;
-import io.nxmatic.rke2lab.exchange.port.Document;
-import io.nxmatic.rke2lab.exchange.port.Domain;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
-import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.pipeline.TopicFailure;
+import io.nxmatic.rke2lab.world.gateway.port.Action;
+import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import org.junit.jupiter.api.Test;
 
 class SystemdAdapterVerdictTest {
@@ -23,8 +23,8 @@ class SystemdAdapterVerdictTest {
   private static ReadinessAuthority authorityReturning(String action) {
     return checkpoint -> {
       final ObjectNode verdict = MAPPER.createObjectNode();
-      verdict.put(ExchangeCatalog.FIELD_ACTION, action);
-      verdict.put(ExchangeCatalog.FIELD_REASON, "test");
+      verdict.put(WorldGatewayCatalog.FIELD_ACTION, action);
+      verdict.put(WorldGatewayCatalog.FIELD_REASON, "test");
       return new Document(
           Domain.DOCTOR.slug(), Coordinate.READINESS_VERDICT.slug(), serialize(verdict));
     };

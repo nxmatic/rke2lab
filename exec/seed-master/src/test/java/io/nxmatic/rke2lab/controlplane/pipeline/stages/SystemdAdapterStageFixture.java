@@ -5,7 +5,7 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
-import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
 import java.util.Map;
 
 /** Builds a SystemdAdapterStage whose probe always fails, for verdict-decision tests. */

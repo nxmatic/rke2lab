@@ -23,9 +23,9 @@ import io.nxmatic.rke2lab.doctor.spi.ClinicalReasoning;
 import io.nxmatic.rke2lab.doctor.spi.Clinician;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.domain.annotations.Transitional;
-import io.nxmatic.rke2lab.exchange.port.Coordinate;
-import io.nxmatic.rke2lab.exchange.port.Domain;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
+import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
+import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -161,16 +161,16 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
   }
 
   /**
-   * Consult on a checkpoint {@link io.nxmatic.rke2lab.exchange.port.Document}: route its symptom +
-   * observation to the specialists and synthesize the narration and the rendered AsciiDoc
+   * Consult on a checkpoint {@link io.nxmatic.rke2lab.world.gateway.port.Document}: route its
+   * symptom + observation to the specialists and synthesize the narration and the rendered AsciiDoc
    * diagnosis, returned as a {@code consultation} Document. The twin of the readiness authority's
    * assess — same checkpoint, the consulting concern rather than the provisioning verdict.
    */
   @Override
-  public io.nxmatic.rke2lab.exchange.port.Document consult(
-      io.nxmatic.rke2lab.exchange.port.Document checkpoint) {
+  public io.nxmatic.rke2lab.world.gateway.port.Document consult(
+      io.nxmatic.rke2lab.world.gateway.port.Document checkpoint) {
     final JsonNode payload = parse(checkpoint.payload());
-    final String scenarioId = payload.path(ExchangeCatalog.FIELD_SCENARIO_ID).asText();
+    final String scenarioId = payload.path(WorldGatewayCatalog.FIELD_SCENARIO_ID).asText();
     final List<Observation> observations = observationsFrom(payload);
     // Route on the first observation that carries a symptom (systemd has one; cluster has one per
     // phase, only the failing one is symptom-bearing). The record keeps ALL of them — the seam
@@ -185,19 +185,19 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
     final RemediationPlan plan = consult(symptom, routed);
     final ConsultationReport report = new ConsultationReport(scenarioId, observations, plan);
     final Instant recordedAt =
-        Instant.parse(payload.path(ExchangeCatalog.FIELD_RECORDED_AT).asText());
+        Instant.parse(payload.path(WorldGatewayCatalog.FIELD_RECORDED_AT).asText());
 
     final ObjectNode out = mapper.createObjectNode();
-    out.put(ExchangeCatalog.FIELD_SCENARIO_ID, scenarioId);
-    out.put(ExchangeCatalog.FIELD_NARRATION, narrationLine(symptom));
-    out.put(ExchangeCatalog.FIELD_DIAGNOSIS_ADOC, diagnosisBlock(plan));
+    out.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, scenarioId);
+    out.put(WorldGatewayCatalog.FIELD_NARRATION, narrationLine(symptom));
+    out.put(WorldGatewayCatalog.FIELD_DIAGNOSIS_ADOC, diagnosisBlock(plan));
     // Structured reconstruction sub-trees, in the EXACT shape the egress + readers use today:
     out.set(ConsultationReport.OUTPUT_KEY, mapper.valueToTree(report.toOutputMap()));
     out.set(
         Expectation.OUTPUT_KEY,
         mapper.valueToTree(
             report.expectations(recordedAt).stream().map(Expectation::toOutputMap).toList()));
-    return new io.nxmatic.rke2lab.exchange.port.Document(
+    return new io.nxmatic.rke2lab.world.gateway.port.Document(
         Domain.DOCTOR.slug(), Coordinate.CONSULTATION.slug(), serialize(out));
   }
 
@@ -209,7 +209,7 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
    */
   private List<Observation> observationsFrom(JsonNode payload) {
     final List<Observation> observations = new ArrayList<>();
-    for (JsonNode element : payload.path(ExchangeCatalog.FIELD_OBSERVATIONS)) {
+    for (JsonNode element : payload.path(WorldGatewayCatalog.FIELD_OBSERVATIONS)) {
       final String status = element.path("status").asText();
       final String summary = element.path("summary").asText();
       final Optional<Symptom> symptom = Symptom.parse(element.path(Symptom.ENVELOPE_KEY).asText());

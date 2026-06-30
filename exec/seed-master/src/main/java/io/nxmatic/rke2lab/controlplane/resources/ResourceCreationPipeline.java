@@ -17,8 +17,8 @@ import io.nxmatic.rke2lab.controlplane.systemd.SystemdAdapterResource;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
-import io.nxmatic.rke2lab.exchange.port.Document;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -115,7 +115,7 @@ final class ResourceCreationPipeline {
                     .equals(
                         mapper
                             .readTree(document.payload())
-                            .path(ExchangeCatalog.FIELD_SCENARIO_ID)
+                            .path(WorldGatewayCatalog.FIELD_SCENARIO_ID)
                             .asText());
               } catch (JsonProcessingException e) {
                 return false;

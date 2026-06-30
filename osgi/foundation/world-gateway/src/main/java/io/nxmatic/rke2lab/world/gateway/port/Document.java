@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.exchange.port;
+package io.nxmatic.rke2lab.world.gateway.port;
 
 /**
  * The neutral envelope every host↔OSGi crossing carries: a document of a given type, owned by a

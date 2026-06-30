@@ -186,7 +186,7 @@
          Document and reads the verdict's action, instead of reasoning on Severity. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>exchange-port</artifactId>
+      <artifactId>world-gateway</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The doctor diagnostic model: pure operator-runbook types lifted to OSGi. COMPILE scope (not

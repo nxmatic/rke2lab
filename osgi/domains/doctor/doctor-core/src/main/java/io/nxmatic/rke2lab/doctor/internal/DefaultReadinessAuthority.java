@@ -5,12 +5,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.records.Severity;
-import io.nxmatic.rke2lab.exchange.port.Action;
-import io.nxmatic.rke2lab.exchange.port.Coordinate;
-import io.nxmatic.rke2lab.exchange.port.Document;
-import io.nxmatic.rke2lab.exchange.port.Domain;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
-import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.world.gateway.port.Action;
+import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.util.Map;
 import org.osgi.service.component.annotations.Component;
 
@@ -42,10 +42,10 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
   @Override
   public Document assess(Document checkpoint) {
     final JsonNode payload = parse(checkpoint.payload());
-    final String scenarioId = payload.path(ExchangeCatalog.FIELD_SCENARIO_ID).asText("");
+    final String scenarioId = payload.path(WorldGatewayCatalog.FIELD_SCENARIO_ID).asText("");
     final String override =
-        payload.hasNonNull(ExchangeCatalog.FIELD_OVERRIDE)
-            ? payload.get(ExchangeCatalog.FIELD_OVERRIDE).asText()
+        payload.hasNonNull(WorldGatewayCatalog.FIELD_OVERRIDE)
+            ? payload.get(WorldGatewayCatalog.FIELD_OVERRIDE).asText()
             : null;
 
     final Severity effective =
@@ -56,9 +56,11 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
     final boolean stop = effective == Severity.CRITICAL;
     final ObjectNode verdict = mapper.createObjectNode();
     verdict.put(
-        ExchangeCatalog.FIELD_ACTION, stop ? Action.STOP.slug() : Action.CONTINUE_DEGRADED.slug());
+        WorldGatewayCatalog.FIELD_ACTION,
+        stop ? Action.STOP.slug() : Action.CONTINUE_DEGRADED.slug());
     verdict.put(
-        ExchangeCatalog.FIELD_REASON, scenarioId + " severity=" + effective.name().toLowerCase());
+        WorldGatewayCatalog.FIELD_REASON,
+        scenarioId + " severity=" + effective.name().toLowerCase());
     return new Document(
         Domain.DOCTOR.slug(), Coordinate.READINESS_VERDICT.slug(), serialize(verdict));
   }

@@ -18,13 +18,13 @@ import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
-import io.nxmatic.rke2lab.exchange.port.Action;
-import io.nxmatic.rke2lab.exchange.port.Coordinate;
-import io.nxmatic.rke2lab.exchange.port.Document;
-import io.nxmatic.rke2lab.exchange.port.Domain;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
-import io.nxmatic.rke2lab.exchange.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.pipeline.TopicFailure;
+import io.nxmatic.rke2lab.world.gateway.port.Action;
+import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -226,7 +226,7 @@ public final class SystemdAdapterStage {
 
     final Document checkpoint = checkpointDocument(SCENARIO_ID);
     final Document verdict = readinessAuthority.assess(checkpoint);
-    final String action = parse(verdict.payload()).path(ExchangeCatalog.FIELD_ACTION).asText();
+    final String action = parse(verdict.payload()).path(WorldGatewayCatalog.FIELD_ACTION).asText();
     if (Action.STOP.slug().equals(action)) {
       log("✗ " + SCENARIO_ID + " FAILED, verdict=stop → stopping provisioning");
       throw new TopicFailure("systemd adapter", failure);
@@ -249,7 +249,7 @@ public final class SystemdAdapterStage {
       return;
     }
     final Document consultation = doctor.consult(consultCheckpoint(observation));
-    log("⚕ " + parse(consultation.payload()).path(ExchangeCatalog.FIELD_NARRATION).asText());
+    log("⚕ " + parse(consultation.payload()).path(WorldGatewayCatalog.FIELD_NARRATION).asText());
     if (consultations != null) {
       consultations.record(consultation);
     }
@@ -263,10 +263,10 @@ public final class SystemdAdapterStage {
    */
   private Document consultCheckpoint(Observation observation) {
     final ObjectNode payload = mapper.createObjectNode();
-    payload.put(ExchangeCatalog.FIELD_SCENARIO_ID, SCENARIO_ID);
-    payload.put(ExchangeCatalog.FIELD_RECORDED_AT, recordedAt.toString());
+    payload.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, SCENARIO_ID);
+    payload.put(WorldGatewayCatalog.FIELD_RECORDED_AT, recordedAt.toString());
     payload
-        .putArray(ExchangeCatalog.FIELD_OBSERVATIONS)
+        .putArray(WorldGatewayCatalog.FIELD_OBSERVATIONS)
         .add(mapper.valueToTree(observation.toOutputMap()));
     return new Document(
         Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), serialize(payload));
@@ -289,12 +289,12 @@ public final class SystemdAdapterStage {
   /** The checkpoint outcome as a structured Document for the readiness authority. */
   private Document checkpointDocument(String scenarioId) {
     final ObjectNode payload = mapper.createObjectNode();
-    payload.put(ExchangeCatalog.FIELD_SCENARIO_ID, scenarioId);
-    payload.put(ExchangeCatalog.FIELD_FAILED, true);
+    payload.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, scenarioId);
+    payload.put(WorldGatewayCatalog.FIELD_FAILED, true);
     policy
         .readiness()
         .rawOverride(scenarioId)
-        .ifPresent(value -> payload.put(ExchangeCatalog.FIELD_OVERRIDE, value));
+        .ifPresent(value -> payload.put(WorldGatewayCatalog.FIELD_OVERRIDE, value));
     return new Document(
         Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), serialize(payload));
   }

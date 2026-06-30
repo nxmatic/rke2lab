@@ -7,8 +7,8 @@ import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;
 import com.pulumi.resources.ComponentResourceOptions;
 import com.pulumi.resources.Resource;
-import io.nxmatic.rke2lab.exchange.port.Document;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,10 +82,10 @@ public final class ClusterReadinessResource extends ComponentResource {
     consultation.ifPresent(
         document -> {
           final JsonNode report =
-              parse(document.payload()).path(ExchangeCatalog.FIELD_CONSULTATION_REPORT);
+              parse(document.payload()).path(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT);
           if (report.isObject()) {
             outputs.put(
-                ExchangeCatalog.FIELD_CONSULTATION_REPORT, Output.of(asPlainObject(report)));
+                WorldGatewayCatalog.FIELD_CONSULTATION_REPORT, Output.of(asPlainObject(report)));
           }
         });
 

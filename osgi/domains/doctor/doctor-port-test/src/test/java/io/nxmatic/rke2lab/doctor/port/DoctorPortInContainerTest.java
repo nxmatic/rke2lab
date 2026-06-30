@@ -41,7 +41,7 @@ class DoctorPortInContainerTest {
           // system-exported here for the host to resolve the merged-in fragment imports.
           .systemPackages(
               "io.nxmatic.rke2lab.systemd.port;version=1.0.0",
-              "io.nxmatic.rke2lab.exchange.port;version=1.0.0")
+              "io.nxmatic.rke2lab.world.gateway.port;version=1.0.0")
           // The JUnit runner world (launcher + engine + this testkit) — the proxy's own
           // infrastructure, the single shared declaration. What the host+fragment declare they need
           // (doctor.records, which doctor-port imports; doctor.spi, which the fragment's

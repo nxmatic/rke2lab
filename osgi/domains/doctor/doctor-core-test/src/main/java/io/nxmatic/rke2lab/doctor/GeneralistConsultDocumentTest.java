@@ -23,10 +23,10 @@ import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Patient;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.testkit.FakeSpecialist;
-import io.nxmatic.rke2lab.exchange.port.Coordinate;
-import io.nxmatic.rke2lab.exchange.port.Document;
-import io.nxmatic.rke2lab.exchange.port.Domain;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
+import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -65,14 +65,14 @@ class GeneralistConsultDocumentTest {
     final JsonNode payload = parse(consultation.payload());
     assertEquals(
         "systemd-adapter",
-        payload.path(ExchangeCatalog.FIELD_SCENARIO_ID).asText(),
+        payload.path(WorldGatewayCatalog.FIELD_SCENARIO_ID).asText(),
         "scenarioId should be echoed");
 
-    final String narration = payload.path(ExchangeCatalog.FIELD_NARRATION).asText();
+    final String narration = payload.path(WorldGatewayCatalog.FIELD_NARRATION).asText();
     assertNotNull(narration, "narration should not be null");
     assertTrue(narration.length() > 0, "narration should be non-empty");
 
-    final String diagnosisAdoc = payload.path(ExchangeCatalog.FIELD_DIAGNOSIS_ADOC).asText();
+    final String diagnosisAdoc = payload.path(WorldGatewayCatalog.FIELD_DIAGNOSIS_ADOC).asText();
     assertTrue(
         diagnosisAdoc.contains("⚕ Diagnosis:"), "diagnosisAdoc should contain diagnosis marker");
     assertTrue(
@@ -163,9 +163,9 @@ class GeneralistConsultDocumentTest {
   /** A checkpoint Document carrying recordedAt + the observations list (each toOutputMap). */
   private static Document checkpointWith(String scenarioId, Observation... observations) {
     final ObjectNode payload = mapper.createObjectNode();
-    payload.put(ExchangeCatalog.FIELD_SCENARIO_ID, scenarioId);
-    payload.put(ExchangeCatalog.FIELD_RECORDED_AT, RECORDED_AT.toString());
-    final ArrayNode array = payload.putArray(ExchangeCatalog.FIELD_OBSERVATIONS);
+    payload.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, scenarioId);
+    payload.put(WorldGatewayCatalog.FIELD_RECORDED_AT, RECORDED_AT.toString());
+    final ArrayNode array = payload.putArray(WorldGatewayCatalog.FIELD_OBSERVATIONS);
     for (Observation observation : observations) {
       array.add(mapper.valueToTree(observation.toOutputMap()));
     }

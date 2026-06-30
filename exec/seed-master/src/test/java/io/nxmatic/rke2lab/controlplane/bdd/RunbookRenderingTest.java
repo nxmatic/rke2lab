@@ -14,10 +14,10 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.records.Checkpoint;
-import io.nxmatic.rke2lab.exchange.port.Coordinate;
-import io.nxmatic.rke2lab.exchange.port.Document;
-import io.nxmatic.rke2lab.exchange.port.Domain;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
+import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -107,8 +107,8 @@ class RunbookRenderingTest {
   /** A consultation Document carrying the OSGi-rendered diagnosisAdoc for the checkpoint slug. */
   private static Document consultationDocument(String scenarioId, String diagnosisAdoc) {
     final ObjectNode payload = MAPPER.createObjectNode();
-    payload.put(ExchangeCatalog.FIELD_SCENARIO_ID, scenarioId);
-    payload.put(ExchangeCatalog.FIELD_DIAGNOSIS_ADOC, diagnosisAdoc);
+    payload.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, scenarioId);
+    payload.put(WorldGatewayCatalog.FIELD_DIAGNOSIS_ADOC, diagnosisAdoc);
     try {
       return new Document(
           Domain.DOCTOR.slug(), Coordinate.CONSULTATION.slug(), MAPPER.writeValueAsString(payload));

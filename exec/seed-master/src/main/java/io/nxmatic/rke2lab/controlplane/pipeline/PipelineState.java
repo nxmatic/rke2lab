@@ -75,7 +75,7 @@ final class PipelineState {
    * that build checkpoint Documents and read verdict actions — so the host never reasons on
    * Severity.
    */
-  io.nxmatic.rke2lab.exchange.port.ReadinessAuthority readinessAuthority;
+  io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority readinessAuthority;
 
   BboxReconciliationOrchestrator bboxOrchestrator;
   ResourceManager resourceManager;

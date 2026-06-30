@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.exchange.port;
+package io.nxmatic.rke2lab.world.gateway.port;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

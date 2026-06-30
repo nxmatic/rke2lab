@@ -51,7 +51,7 @@ class DoctorCoreInContainerTest {
           // seam.
           .systemPackages(
               "io.nxmatic.rke2lab.systemd.port;version=1.0.0",
-              "io.nxmatic.rke2lab.exchange.port;version=1.0.0")
+              "io.nxmatic.rke2lab.world.gateway.port;version=1.0.0")
           // The JUnit runner world (launcher + engine + this testkit) — the proxy's own
           // infrastructure, the single shared declaration. Everything the HOST declares it needs
           // (doctor.records, doctor.spi, jackson) is derived from its manifest in the test body via

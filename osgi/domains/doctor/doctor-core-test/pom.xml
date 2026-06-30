@@ -71,7 +71,7 @@
          bundles) at runtime. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>exchange-port</artifactId>
+      <artifactId>world-gateway</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>

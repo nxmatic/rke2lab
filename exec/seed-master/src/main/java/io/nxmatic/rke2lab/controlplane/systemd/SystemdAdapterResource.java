@@ -7,8 +7,8 @@ import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;
 import com.pulumi.resources.ComponentResourceOptions;
 import com.pulumi.resources.Resource;
-import io.nxmatic.rke2lab.exchange.port.Document;
-import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,13 +65,13 @@ public final class SystemdAdapterResource extends ComponentResource {
   private static void copyDiagnosticOutputs(
       Document consultation, LinkedHashMap<String, Output<?>> outputs) {
     final JsonNode payload = parse(consultation.payload());
-    final JsonNode report = payload.path(ExchangeCatalog.FIELD_CONSULTATION_REPORT);
+    final JsonNode report = payload.path(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT);
     if (report.isObject()) {
-      outputs.put(ExchangeCatalog.FIELD_CONSULTATION_REPORT, Output.of(asPlainObject(report)));
+      outputs.put(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT, Output.of(asPlainObject(report)));
     }
-    final JsonNode expectations = payload.path(ExchangeCatalog.FIELD_EXPECTATIONS);
+    final JsonNode expectations = payload.path(WorldGatewayCatalog.FIELD_EXPECTATIONS);
     if (expectations.isArray()) {
-      outputs.put(ExchangeCatalog.FIELD_EXPECTATIONS, Output.of(asPlainList(expectations)));
+      outputs.put(WorldGatewayCatalog.FIELD_EXPECTATIONS, Output.of(asPlainList(expectations)));
     }
   }
 

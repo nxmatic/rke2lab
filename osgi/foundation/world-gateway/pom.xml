@@ -6,13 +6,13 @@
     <groupId>io.nxmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
-    <relativePath>../../../bundle-parent/pom.xml</relativePath>
+    <relativePath>../../bundle-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>exchange-port</artifactId>
-  <name>osgi/exchange/exchange-port</name>
-  <description>The world-exchange seam: the neutral Document envelope (domain, coordinate, String
-    payload) every host↔OSGi crossing carries, the ExchangeCatalog of coordinate + field names, and
+  <artifactId>world-gateway</artifactId>
+  <name>osgi/foundation/world-gateway</name>
+  <description>The world-gateway seam: the neutral Document envelope (domain, coordinate, String
+    payload) every host↔OSGi crossing carries, the WorldGatewayCatalog of coordinate + field names, and
     the ReadinessAuthority verb the host calls to turn a checkpoint outcome into a provisioning
     verdict. type=seam: system-exported, one shared copy across the boundary, like every -port. The
     payload is a serialized JSON String, never a jackson JsonNode — a seam references only flat (JDK)
