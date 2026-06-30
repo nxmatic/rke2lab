@@ -9,7 +9,6 @@ import com.tngtech.jgiven.annotation.Quoted;
 import com.tngtech.jgiven.annotation.ScenarioStage;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.doctor.records.Observation;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -73,7 +72,7 @@ public final class ClusterReadinessScenario {
     @ScenarioStage SystemdAdapterScenario.Then thenSystemdAdapter;
 
     @ProvidedScenarioState
-    Map<ClusterReadinessPhase, Observation> phaseObservations = new LinkedHashMap<>();
+    Map<ClusterReadinessPhase, ObservationView> phaseObservations = new LinkedHashMap<>();
 
     /** Nested: replay the upstream systemd-adapter scenario as sub-steps of this checkpoint. */
     @NestedSteps
@@ -106,7 +105,7 @@ public final class ClusterReadinessScenario {
      * identity is duplicated as a string.
      */
     private When checking(ClusterReadinessPhase phase) {
-      final Observation observation = phaseProbe.probe(config, phase);
+      final ObservationView observation = phaseProbe.probe(config, phase);
       phaseObservations.put(phase, observation);
       if (!observation.isOk()) {
         throw new AssertionError(phase.label() + ": " + observation.summary());

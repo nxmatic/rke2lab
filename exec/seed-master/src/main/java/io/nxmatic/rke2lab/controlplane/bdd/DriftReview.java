@@ -23,8 +23,8 @@ public final class DriftReview {
   }
 
   /**
-   * Symptom-independent: after the record is reconstructed for the run's patient, fold the ledger
-   * over every open problem. A no-op when no {@code file://} backend is configured.
+   * Independent of any raised diagnosis: after the record is reconstructed for the run's patient,
+   * fold the ledger over every open problem. A no-op when no {@code file://} backend is configured.
    */
   public void reviewAtReconstruction(ConsultingService doctor) {
     if (backendDir == null) {

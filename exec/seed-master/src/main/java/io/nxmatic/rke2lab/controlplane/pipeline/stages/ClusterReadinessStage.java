@@ -11,6 +11,7 @@ import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessScenario;
+import io.nxmatic.rke2lab.controlplane.bdd.ObservationView;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
@@ -18,7 +19,6 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifi
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
-import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
@@ -106,11 +106,11 @@ public final class ClusterReadinessStage {
     // injects
     // a LiveClusterReadinessProbe; tests inject a simulated/fake probe and play the same
     // launch(), so the scenario script lives in exactly one place.
-    final Map<ClusterReadinessPhase, Observation> phaseObservations =
+    final Map<ClusterReadinessPhase, ObservationView> phaseObservations =
         new EnumMap<>(ClusterReadinessPhase.class);
     final ClusterReadinessProbe capturingProbe =
         (cfg, phase) -> {
-          final Observation produced = phaseProbe.probe(cfg, phase);
+          final ObservationView produced = phaseProbe.probe(cfg, phase);
           phaseObservations.put(phase, produced);
           return produced;
         };
@@ -194,17 +194,17 @@ public final class ClusterReadinessStage {
   }
 
   /** Reconstruct the systemd-adapter dependency's observation from its already-captured summary. */
-  private Observation capturedSystemdAdapterObservation() {
+  private ObservationView capturedSystemdAdapterObservation() {
     final String status =
         String.valueOf(systemdAdapterLaunchSummary.getOrDefault("status", "unknown"));
     final String summary =
         String.valueOf(systemdAdapterLaunchSummary.getOrDefault("summary", "systemd adapter"));
-    return Observation.of(status, Optional.empty(), summary, systemdAdapterLaunchSummary);
+    return ObservationView.of(status, Optional.empty(), summary, systemdAdapterLaunchSummary);
   }
 
   /** Project the per-phase observations into the VerificationResult the output layer consumes. */
   private VerificationResult failedProjection(
-      Map<ClusterReadinessPhase, Observation> phaseObservations) {
+      Map<ClusterReadinessPhase, ObservationView> phaseObservations) {
     final boolean kubeconfig =
         phaseOk(phaseObservations, ClusterReadinessPhase.KUBECONFIG_PUBLISHED);
     final boolean api = phaseOk(phaseObservations, ClusterReadinessPhase.API_READY);
@@ -213,15 +213,15 @@ public final class ClusterReadinessStage {
     final String summary =
         phaseObservations.values().stream()
             .filter(observation -> !observation.isOk())
-            .map(Observation::summary)
+            .map(ObservationView::summary)
             .findFirst()
             .orElse("cluster readiness failed");
     return ClusterBootstrapReadinessVerifier.failed(kubeconfig, api, controllers, summary, policy);
   }
 
   private static boolean phaseOk(
-      Map<ClusterReadinessPhase, Observation> phaseObservations, ClusterReadinessPhase phase) {
-    final Observation observation = phaseObservations.get(phase);
+      Map<ClusterReadinessPhase, ObservationView> phaseObservations, ClusterReadinessPhase phase) {
+    final ObservationView observation = phaseObservations.get(phase);
     return observation != null && observation.isOk();
   }
 
@@ -232,7 +232,7 @@ public final class ClusterReadinessStage {
    * host logs the returned narration and keeps the consultation Document in the shared log. Skipped
    * when no phase raised a symptom, or when there is no doctor.
    */
-  private void consultDoctor(Map<ClusterReadinessPhase, Observation> phaseObservations) {
+  private void consultDoctor(Map<ClusterReadinessPhase, ObservationView> phaseObservations) {
     if (doctor == null
         || phaseObservations.values().stream().noneMatch(o -> o.symptom().isPresent())) {
       return;
@@ -245,16 +245,17 @@ public final class ClusterReadinessStage {
   }
 
   /**
-   * The consult checkpoint Document: every phase observation (flat {@code Observation.toOutputMap}
-   * shape — the symptom slug travels in each) plus the run's stable {@code recordedAt}, so OSGi
-   * reconstructs them all and routes on the first symptom-bearing one.
+   * The consult checkpoint Document, serialized at the consult boundary: every phase observation
+   * (flat {@code ObservationView.toOutputMap} shape — the symptom slug travels in each) merged into
+   * one checkpoint plus the run's stable {@code recordedAt}, so OSGi reconstructs them all and
+   * routes on the first symptom-bearing one. The only place the host renders the wire shape.
    */
-  private Document consultCheckpoint(Iterable<Observation> observations) {
+  private Document consultCheckpoint(Iterable<ObservationView> observations) {
     final ObjectNode payload = mapper.createObjectNode();
     payload.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, SCENARIO_ID);
     payload.put(WorldGatewayCatalog.FIELD_RECORDED_AT, recordedAt.toString());
     final ArrayNode array = payload.putArray(WorldGatewayCatalog.FIELD_OBSERVATIONS);
-    for (Observation observation : observations) {
+    for (ObservationView observation : observations) {
       array.add(mapper.valueToTree(observation.toOutputMap()));
     }
     return new Document(

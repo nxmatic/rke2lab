@@ -7,8 +7,7 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.PhaseOutcome;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
-import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -16,8 +15,8 @@ import java.util.function.Consumer;
  * The live cluster-readiness probe: each {@link ClusterReadinessPhase} delegates to the matching
  * per-phase check on {@link ClusterBootstrapReadinessVerifier} (which owns the host orchestration —
  * the systemd gate, the kubeconfig NIO poll, the policy→controller projection, the retry loops) and
- * maps the outcome to an {@link Observation} carrying a typed {@link Symptom} on failure. The
- * dependency direction is {@code bdd → readiness} only, so no package cycle.
+ * maps the outcome to an {@link ObservationView} carrying a typed {@link SymptomKind} on failure.
+ * The dependency direction is {@code bdd → readiness} only, so no package cycle.
  *
  * <p>The two kubectl-backed phases (API readiness, controller effectiveness) are satisfied by the
  * injected {@link ClusterReadinessContact} edge, resolved once from the OSGi registry (the
@@ -46,33 +45,33 @@ public final class LiveClusterReadinessProbe implements ClusterReadinessProbe {
   }
 
   @Override
-  public Observation probe(BootstrapConfig config, ClusterReadinessPhase phase) {
+  public ObservationView probe(BootstrapConfig config, ClusterReadinessPhase phase) {
     return switch (phase) {
       case KUBECONFIG_PUBLISHED ->
           toObservation(
               phase,
               ClusterBootstrapReadinessVerifier.checkKubeconfigPublished(
                   config, runtimeStatus, logger),
-              Symptom.KUBECONFIG_MISSING);
+              SymptomKind.KUBECONFIG_MISSING);
       case API_READY ->
           toObservation(
               phase,
               ClusterBootstrapReadinessVerifier.checkApiReady(config, contact, logger),
-              Symptom.API_NOT_READY);
+              SymptomKind.API_NOT_READY);
       case CONTROLLERS_EFFECTIVE ->
           toObservation(
               phase,
               ClusterBootstrapReadinessVerifier.checkControllersEffective(
                   config, contact, policy, logger),
-              Symptom.CONTROLLER_NOT_READY);
+              SymptomKind.CONTROLLER_NOT_READY);
     };
   }
 
-  private static Observation toObservation(
-      ClusterReadinessPhase phase, PhaseOutcome outcome, Symptom failureSymptom) {
+  private static ObservationView toObservation(
+      ClusterReadinessPhase phase, PhaseOutcome outcome, SymptomKind failureSymptom) {
     final Map<String, Object> details = Map.of("phase", phase.name());
     return outcome.ok()
-        ? Observation.ok(outcome.detail(), details)
-        : Observation.failed(failureSymptom, outcome.detail(), details);
+        ? ObservationView.ok(outcome.detail(), details)
+        : ObservationView.failed(failureSymptom, outcome.detail(), details);
   }
 }

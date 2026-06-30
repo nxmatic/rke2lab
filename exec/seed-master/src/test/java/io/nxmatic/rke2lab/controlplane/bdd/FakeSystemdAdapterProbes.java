@@ -1,8 +1,7 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
 import java.util.Map;
 import java.util.Optional;
 
@@ -22,15 +21,15 @@ final class FakeSystemdAdapterProbes {
         observation(
             config,
             "failed",
-            Optional.of(Symptom.CONNECTION_REFUSED),
+            Optional.of(SymptomKind.CONNECTION_REFUSED),
             "Connection refused at "
                 + config.systemdAdapterDbusHost()
                 + ":"
                 + config.systemdAdapterDbusPort());
   }
 
-  private static Observation observation(
-      BootstrapConfig config, String status, Optional<Symptom> symptom, String detail) {
+  private static ObservationView observation(
+      BootstrapConfig config, String status, Optional<SymptomKind> symptom, String detail) {
     final String summary =
         "dbusEndpoint="
             + config.systemdAdapterDbusHost()
@@ -41,6 +40,6 @@ final class FakeSystemdAdapterProbes {
             + " ("
             + detail
             + ")";
-    return Observation.of(status, symptom, summary, Map.of());
+    return ObservationView.of(status, symptom, summary, Map.of());
   }
 }

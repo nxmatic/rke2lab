@@ -6,7 +6,6 @@ import com.tngtech.jgiven.annotation.Hidden;
 import com.tngtech.jgiven.annotation.ProvidedScenarioState;
 import com.tngtech.jgiven.annotation.Quoted;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.doctor.records.Observation;
 
 /**
  * The systemd-adapter readiness scenario, grouped: its {@link Given}/{@link When}/{@link Then}
@@ -47,7 +46,7 @@ public final class SystemdAdapterScenario {
     @ExpectedScenarioState BootstrapConfig config;
     @ExpectedScenarioState SystemdAdapterProbe probe;
 
-    @ProvidedScenarioState Observation observation;
+    @ProvidedScenarioState ObservationView observation;
 
     public When the_systemd_adapter_probe_runs() {
       observation = probe.probe(config);
@@ -61,7 +60,7 @@ public final class SystemdAdapterScenario {
    */
   public static class Then extends Stage<Then> {
 
-    @ExpectedScenarioState Observation observation;
+    @ExpectedScenarioState ObservationView observation;
 
     public Then the_dbus_endpoint_responds() {
       return the_probe_reports_status("ok");
@@ -88,7 +87,7 @@ public final class SystemdAdapterScenario {
      * Hidden from the report: lets the gate read the captured observation back as its sink payload.
      */
     @Hidden
-    public Observation capturedObservation() {
+    public ObservationView capturedObservation() {
       return observation;
     }
   }

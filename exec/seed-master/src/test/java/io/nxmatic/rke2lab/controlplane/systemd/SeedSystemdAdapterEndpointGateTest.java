@@ -3,10 +3,10 @@ package io.nxmatic.rke2lab.controlplane.systemd;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.nxmatic.rke2lab.controlplane.bdd.ObservationView;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
-import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
@@ -17,10 +17,11 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The live gate's failure contract. {@link io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe}
- * promises a non-ok {@link Observation} carrying the typed {@link Symptom} the doctor routes on —
- * the simulate and fake probes honor it. These tests pin the <em>live</em> gate to the same
- * contract at its two deadlines, so a real {@code pulumi up} consults the doctor instead of
- * aborting on a bare exception (which bypasses the captured observation and silences the runbook).
+ * promises a non-ok {@link io.nxmatic.rke2lab.controlplane.bdd.ObservationView} carrying the typed
+ * {@link io.nxmatic.rke2lab.world.gateway.port.SymptomKind} the doctor routes on — the simulate and
+ * fake probes honor it. These tests pin the <em>live</em> gate to the same contract at its two
+ * deadlines, so a real {@code pulumi up} consults the doctor instead of aborting on a bare
+ * exception (which bypasses the captured observation and silences the runbook).
  *
  * <p>The gate's I/O is injected so the deadline paths are reachable with no real infrastructure and
  * no wall-clock waits: a mutable {@code clock} the failing probe advances past the deadline drives
@@ -72,10 +73,10 @@ class SeedSystemdAdapterEndpointGateTest {
     final SeedSystemdAdapterEndpointGate gate =
         new SeedSystemdAdapterEndpointGate(clock, NO_SLEEP, refusedRuntime, reachable);
 
-    final Observation observation = gate.ensureReachable(config(), null);
+    final ObservationView observation = gate.ensureReachable(config(), null);
 
     assertEquals("failed", observation.status());
-    assertEquals(Optional.of(Symptom.CONNECTION_REFUSED), observation.symptom());
+    assertEquals(Optional.of(SymptomKind.CONNECTION_REFUSED), observation.symptom());
     assertTrue(
         observation.summary().contains("Connection refused"),
         "summary should preserve the dbus why: " + observation.summary());
@@ -99,10 +100,10 @@ class SeedSystemdAdapterEndpointGateTest {
     final SeedSystemdAdapterEndpointGate gate =
         new SeedSystemdAdapterEndpointGate(clock, NO_SLEEP, unusedRuntime, neverReachable);
 
-    final Observation observation = gate.ensureReachable(config(), null);
+    final ObservationView observation = gate.ensureReachable(config(), null);
 
     assertEquals("failed", observation.status());
-    assertEquals(Optional.of(Symptom.TIMEOUT), observation.symptom());
+    assertEquals(Optional.of(SymptomKind.TIMEOUT), observation.symptom());
     assertTrue(
         observation.summary().contains("did not become reachable"),
         "summary should preserve the why: " + observation.summary());

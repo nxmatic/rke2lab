@@ -1,6 +1,5 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import io.nxmatic.rke2lab.doctor.records.Observation;
 import java.util.Map;
 
 /** Canned cluster-readiness phase outcomes for the DSL-first nested scenario. */
@@ -10,6 +9,7 @@ final class FakeClusterReadinessProbes {
 
   /** Every phase passes. */
   static ClusterReadinessProbe allPhasesReady() {
-    return (config, phase) -> Observation.ok(phase.label() + " ok", Map.of("phase", phase.name()));
+    return (config, phase) ->
+        ObservationView.ok(phase.label() + " ok", Map.of("phase", phase.name()));
   }
 }

@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.controlplane.bdd.ObservationView;
 import io.nxmatic.rke2lab.controlplane.bdd.SimulatedSystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterScenario;
@@ -15,8 +16,6 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
-import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.pipeline.TopicFailure;
 import io.nxmatic.rke2lab.world.gateway.port.Action;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
@@ -24,6 +23,7 @@ import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.util.Map;
@@ -132,11 +132,11 @@ public final class SystemdAdapterStage {
     // severity, would abort an apply over a defect that does not exist). In preview, the simulated
     // scenario lifts dry-run and runs a canned failing probe (emitting the typed symptom) so the
     // incident renders without touching live infrastructure.
-    // The policy now carries raw config; the probe path still parses Symptom here, so the
-    // preview-simulate interpretation stays on the host until the probe itself crosses the seam.
-    final Optional<Symptom> simulated =
+    // The policy carries raw config; the host parses the preview-simulate failure-kind into the
+    // seam's SymptomKind here (the host owns the preview interpretation; no doctor type involved).
+    final Optional<SymptomKind> simulated =
         preview
-            ? policy.preview().rawSimulate(SCENARIO_ID).flatMap(Symptom::parse)
+            ? policy.preview().rawSimulate(SCENARIO_ID).flatMap(SymptomKind::parse)
             : Optional.empty();
 
     // Normal preview skips step bodies (deferred-preview); a simulated preview runs them against
@@ -147,7 +147,7 @@ public final class SystemdAdapterStage {
     // the
     // doctor even when the Then assertion throws (the failed observation carries the typed
     // symptom).
-    final Observation[] observationHolder = new Observation[1];
+    final ObservationView[] observationHolder = new ObservationView[1];
     // The injected live probe is the default; a preview-only simulated incident overrides it (and
     // only then). Live injects the real endpoint gate; tests inject a fake and play the same
     // launch(), so the scenario script lives in one place.
@@ -155,12 +155,12 @@ public final class SystemdAdapterStage {
         simulated.<SystemdAdapterProbe>map(SimulatedSystemdAdapterProbe::of).orElse(liveProbe);
     final SystemdAdapterProbe probe =
         cfg -> {
-          final Observation produced = underlying.probe(cfg);
+          final ObservationView produced = underlying.probe(cfg);
           observationHolder[0] = produced;
           return produced;
         };
     if (simulated.isPresent()) {
-      log("⚙ " + SCENARIO_ID + " simulating incident: " + simulated.get().id());
+      log("⚙ " + SCENARIO_ID + " simulating incident: " + simulated.get().slug());
     }
 
     // Standalone (non-JUnit) scenarios have no report model wired; finished() NPEs without one.
@@ -174,7 +174,7 @@ public final class SystemdAdapterStage {
       System.setProperty(JGIVEN_DRY_RUN, "true");
     }
 
-    Observation captured = null;
+    ObservationView captured = null;
     Throwable failure = null;
     try {
       final Scenario<
@@ -213,7 +213,7 @@ public final class SystemdAdapterStage {
 
     if (failure == null) {
       // Success — or dry-run, where step bodies are skipped so no observation is produced.
-      final Observation observation =
+      final ObservationView observation =
           captured != null ? captured : SeedSystemdAdapterEndpointGate.deferredPreview(config);
       sink.accept(observation.toOutputMap());
       return this;
@@ -237,14 +237,15 @@ public final class SystemdAdapterStage {
   }
 
   /**
-   * The patient consults the doctor on failure: the host crosses the captured observation as a
-   * checkpoint {@link Document}, the doctor reasons OSGi-side (routing, plan, narration, the
-   * rendered AsciiDoc), and the host logs the returned narration and keeps the consultation
-   * Document in the shared log — no doctor type held host-side. A symptomless or absent observation
-   * (failure before the probe ran) has nothing to route, so the consultation is skipped; a null
-   * doctor (test fixture) also skips it, as the verdict decision is independent of the consult.
+   * The patient consults the doctor on failure: the host serializes the captured observation into a
+   * checkpoint {@link Document} at this boundary (the only place the host renders the flat wire
+   * shape), the doctor reasons OSGi-side (routing, plan, narration, the rendered AsciiDoc), and the
+   * host logs the returned narration and keeps the consultation Document in the shared log — no
+   * doctor type held host-side. A symptomless or absent observation (failure before the probe ran)
+   * has nothing to route, so the consultation is skipped; a null doctor (test fixture) also skips
+   * it, as the verdict decision is independent of the consult.
    */
-  private void consultDoctor(Observation observation) {
+  private void consultDoctor(ObservationView observation) {
     if (doctor == null || observation == null || observation.symptom().isEmpty()) {
       return;
     }
@@ -256,12 +257,14 @@ public final class SystemdAdapterStage {
   }
 
   /**
-   * The consult checkpoint Document: the captured observation (one, in the flat {@code
-   * Observation.toOutputMap} shape — the symptom slug travels in it) plus the run's stable {@code
-   * recordedAt}, so OSGi reconstructs the observation and stamps the expectations it derives. A
-   * distinct concern from {@link #checkpointDocument} (the verdict checkpoint the authority reads).
+   * The consult checkpoint Document, serialized at the consult boundary: the captured observation
+   * (one, in the flat {@code ObservationView.toOutputMap} shape — the symptom slug travels in it)
+   * plus the run's stable {@code recordedAt}, so OSGi reconstructs the observation and stamps the
+   * expectations it derives. The only place the host renders the wire shape — everywhere else the
+   * observation stays a typed {@link ObservationView}. A distinct concern from {@link
+   * #checkpointDocument} (the verdict checkpoint the authority reads).
    */
-  private Document consultCheckpoint(Observation observation) {
+  private Document consultCheckpoint(ObservationView observation) {
     final ObjectNode payload = mapper.createObjectNode();
     payload.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, SCENARIO_ID);
     payload.put(WorldGatewayCatalog.FIELD_RECORDED_AT, recordedAt.toString());
@@ -272,8 +275,8 @@ public final class SystemdAdapterStage {
         Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), serialize(payload));
   }
 
-  private Observation degradedObservation(Throwable failure) {
-    return Observation.of(
+  private ObservationView degradedObservation(Throwable failure) {
+    return ObservationView.of(
         "degraded",
         Optional.empty(),
         "dbusEndpoint="

@@ -36,6 +36,7 @@ import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
+import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -154,7 +155,8 @@ class NestedRunbookTest {
       @TempDir Path out) {
     // Order an incident at the api-ready phase; the dependency and the kubeconfig phase pass.
     final ClusterReadinessProbe simulated =
-        SimulatedClusterReadinessProbe.failingAt(ClusterReadinessPhase.API_READY, Symptom.TIMEOUT);
+        SimulatedClusterReadinessProbe.failingAt(
+            ClusterReadinessPhase.API_READY, SymptomKind.TIMEOUT);
 
     final ReportModel model = new ReportModel();
     final ConsultationLog consultations = new ConsultationLog();
@@ -216,7 +218,8 @@ class NestedRunbookTest {
     // byte-identical
     // Stage-B contract holds); this only adds an in-memory accumulation.
     final ClusterReadinessProbe simulated =
-        SimulatedClusterReadinessProbe.failingAt(ClusterReadinessPhase.API_READY, Symptom.TIMEOUT);
+        SimulatedClusterReadinessProbe.failingAt(
+            ClusterReadinessPhase.API_READY, SymptomKind.TIMEOUT);
     final ConsultationLog consultations = new ConsultationLog();
 
     play(new ReportModel(), consultations, simulated, false, networkGeneralist());

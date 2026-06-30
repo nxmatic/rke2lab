@@ -1,8 +1,8 @@
 package io.nxmatic.rke2lab.controlplane.systemd;
 
+import io.nxmatic.rke2lab.controlplane.bdd.ObservationView;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -62,8 +62,8 @@ public final class SeedSystemdAdapterEndpointGate {
         SeedSystemdAdapterEndpointGate::probeInstanceReachable);
   }
 
-  public static Observation deferredPreview(BootstrapConfig config) {
-    return Observation.of(
+  public static ObservationView deferredPreview(BootstrapConfig config) {
+    return ObservationView.of(
         "deferred-preview",
         Optional.empty(),
         "adapter endpoint gate deferred during preview",
@@ -76,15 +76,15 @@ public final class SeedSystemdAdapterEndpointGate {
   }
 
   /**
-   * Wait for the dbus-on-TCP adapter to report ok, returning the captured {@link Observation}. The
-   * contract the {@code SystemdAdapterProbe} interface promises: a reachable adapter yields an ok
-   * observation; a deadline that the instance never came up, or that dbus never answered, yields a
-   * non-ok observation carrying the typed {@link Symptom} — never a bare exception. The symptom and
-   * the last summary's "why" flow into the captured observation so the doctor is consulted on a
-   * real {@code pulumi up}, not only in preview-simulate.
+   * Wait for the dbus-on-TCP adapter to report ok, returning the captured {@link ObservationView}.
+   * The contract the {@code SystemdAdapterProbe} interface promises: a reachable adapter yields an
+   * ok observation; a deadline that the instance never came up, or that dbus never answered, yields
+   * a non-ok observation carrying the typed {@link SymptomKind} — never a bare exception. The
+   * symptom and the last summary's "why" flow into the captured observation so the doctor is
+   * consulted on a real {@code pulumi up}, not only in preview-simulate.
    */
-  public Observation ensureReachable(BootstrapConfig config, Consumer<String> logger) {
-    final Optional<Observation> instanceFailure = waitForInstanceReachable(config, logger);
+  public ObservationView ensureReachable(BootstrapConfig config, Consumer<String> logger) {
+    final Optional<ObservationView> instanceFailure = waitForInstanceReachable(config, logger);
     if (instanceFailure.isPresent()) {
       return instanceFailure.get();
     }
@@ -92,7 +92,7 @@ public final class SeedSystemdAdapterEndpointGate {
     return waitForRuntimeProbe(config, logger);
   }
 
-  private Observation waitForRuntimeProbe(BootstrapConfig config, Consumer<String> logger) {
+  private ObservationView waitForRuntimeProbe(BootstrapConfig config, Consumer<String> logger) {
     final Duration tolerance = config.readinessTimeout();
     final long startedAt = nanoClock.getAsLong();
     final long deadlineNanos = startedAt + tolerance.toNanos();
@@ -153,8 +153,8 @@ public final class SeedSystemdAdapterEndpointGate {
     // promoted to FLAT details keys (the gate holds them host-side, from config) so the pure
     // dbus-tcp specialist reads them off the observation without reaching back to BootstrapConfig
     // and without spelunking the nested adapterStatus map.
-    return Observation.failed(
-        Symptom.CONNECTION_REFUSED,
+    return ObservationView.failed(
+        SymptomKind.CONNECTION_REFUSED,
         summary,
         details(
             Map.of(
@@ -172,7 +172,7 @@ public final class SeedSystemdAdapterEndpointGate {
                 Map.copyOf(lastSnapshot))));
   }
 
-  private Observation reachableObservation(
+  private ObservationView reachableObservation(
       BootstrapConfig config, Map<String, Object> runtimeSnapshot, Consumer<String> logger) {
     final String runtimeStatus = String.valueOf(runtimeSnapshot.getOrDefault("status", "unknown"));
     final String summary =
@@ -186,7 +186,7 @@ public final class SeedSystemdAdapterEndpointGate {
     if (logger != null) {
       logger.accept("systemd adapter endpoint gate: " + summary);
     }
-    return Observation.ok(
+    return ObservationView.ok(
         summary,
         details(
             Map.of(
@@ -231,7 +231,7 @@ public final class SeedSystemdAdapterEndpointGate {
   // registers the instance resource concurrently with this Main-driven gate
   // call, so on first apply the instance may not yet exist when ensureReachable
   // runs. Retry the cheapest no-op probe until incus exec succeeds.
-  private Optional<Observation> waitForInstanceReachable(
+  private Optional<ObservationView> waitForInstanceReachable(
       BootstrapConfig config, Consumer<String> logger) {
     final Duration tolerance = config.readinessTimeout();
     final long startedAt = nanoClock.getAsLong();
@@ -277,8 +277,8 @@ public final class SeedSystemdAdapterEndpointGate {
     // isn't there yet, so this is a TIMEOUT symptom (no dedicated "instance-not-found" kind), still
     // carrying the why so the doctor consults rather than the gate throwing past the captured slot.
     return Optional.of(
-        Observation.failed(
-            Symptom.TIMEOUT,
+        ObservationView.failed(
+            SymptomKind.TIMEOUT,
             summary,
             details(
                 Map.of(
@@ -366,9 +366,9 @@ public final class SeedSystemdAdapterEndpointGate {
 
   /**
    * The gate's resource-identity metadata ({@code apiVersion}/{@code kind}) merged ahead of the
-   * call-site details, forming the {@link Observation}'s details map. {@code status}/{@code
+   * call-site details, forming the {@link ObservationView}'s details map. {@code status}/{@code
    * summary} are the observation's own fields and are re-added by {@link
-   * Observation#toOutputMap()}, so the flat output keys are unchanged from the former envelope.
+   * ObservationView#toOutputMap()}, so the flat output keys are unchanged from the former envelope.
    */
   private static Map<String, Object> details(Map<String, Object> callerDetails) {
     final LinkedHashMap<String, Object> map = new LinkedHashMap<>();
