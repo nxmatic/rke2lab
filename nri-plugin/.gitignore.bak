@@ -1,0 +1,13 @@
+# vendor/ is NOT committed and NOT pre-generated.
+#
+# The parent flake's `flox-nri-plugin` derivation uses `buildGoModule` with a
+# pinned `vendorHash`, which fetches Go modules in its own fixed-output
+# derivation (network is allowed inside that FOD; the output narHash must
+# match). If a vendor/ tree is present alongside go.mod, buildGoModule fails
+# with "vendor folder exists, please set 'vendorHash = null;'".
+#
+# Keep this file empty of vendor/. If go.mod or go.sum changes, regenerate
+# vendorHash:
+#   nix build .#flox-nri-plugin 2>&1 | grep 'got:.*sha256-'
+# and update flake.nix's `vendorHash` accordingly.
+vendor/

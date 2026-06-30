@@ -1,0 +1,34 @@
+# Tailscale debug environment: ships `tailscale-debug` (unstripped + -N -l,
+# delve wrapped onto both `tailscale` and `tailscaled`) plus delve and
+# interactive shell tools. Mounted by the flox NRI plugin into the prod
+# containers (tailscale-gateway Deployment, headscale-client DaemonSet) when
+# `policy.debug.nriPlugins.flox.enabled=true`, so the shell sidecar can
+# `dlv attach $(pgrep tailscaled)` through the shared (or host) PID namespace
+# with full source-level visibility. The debug package replaces (not augments)
+# the prod tailscale binaries in PATH while this env is active.
+schema-version = "1.10.0"
+
+[install]
+
+  [install.bash]
+  pkg-path = "bash"
+  outputs = "all"
+
+  [install.coreutils]
+  pkg-path = "coreutils"
+  outputs = "all"
+
+  [install.delve]
+  pkg-path = "delve"
+
+  [install.strace]
+  pkg-path = "strace"
+
+  [install.curl]
+  pkg-path = "curl"
+
+  [install.tailscale-debug]
+  flake = "path:../../..#tailscale-debug"
+
+[options]
+systems = ["aarch64-linux"]
