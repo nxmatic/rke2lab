@@ -9,15 +9,16 @@
     <relativePath>../../build-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>exchange</artifactId>
+  <artifactId>foundation</artifactId>
   <version>0.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
-  <name>osgi/exchange</name>
-  <description>The host↔OSGi exchange seam: the neutral Document envelope every world-exchange crossing
-    carries, and the exchange verbs (ReadinessAuthority) the host calls. type=seam packages, system-
-    exported, one shared copy across the boundary. See docs/architecture/osgi/world-exchange-spec.adoc.</description>
+  <name>osgi/foundation</name>
+  <description>Compile-time shared foundation the domains build against: domain annotations, the world-exchange seam, the fluent pipeline grammar, and the jGiven wrap.</description>
 
   <modules>
-    <module>exchange-port</module>
+    <module>domain-annotations</module>
+    <module>exchange</module>
+    <module>pipeline</module>
+    <module>jgiven</module>
   </modules>
 </project>

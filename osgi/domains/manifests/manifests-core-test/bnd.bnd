@@ -16,6 +16,6 @@ Provide-Capability: io.nxmatic.rke2lab.embed; type=fixture; suite=manifests; rol
 # Everything else this fragment needs is computed by bnd from bytecode and captured by that wildcard
 # (org.junit.jupiter.engine since ManifestsCoreTests names JupiterTestEngine.class, jupiter.api, the
 # manifests.port value types). So no manual Import-Package here — the include's wildcard suffices.
--include: ${.}/../../../jgiven/jgiven-testkit/src/main/resources/jgiven-fragment.bnd
+-include: ${.}/../../../foundation/jgiven/jgiven-testkit/src/main/resources/jgiven-fragment.bnd
 
 -noimportjava: true
