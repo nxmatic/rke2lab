@@ -28,6 +28,7 @@ import io.nxmatic.rke2lab.exchange.port.Domain;
 import io.nxmatic.rke2lab.exchange.port.ExchangeCatalog;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -212,7 +213,7 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
       final String status = element.path("status").asText();
       final String summary = element.path("summary").asText();
       final Optional<Symptom> symptom = Symptom.parse(element.path(Symptom.ENVELOPE_KEY).asText());
-      final Map<String, Object> details = new java.util.LinkedHashMap<>();
+      final Map<String, Object> details = new LinkedHashMap<>();
       final var names = element.fieldNames();
       while (names.hasNext()) {
         final String key = names.next();

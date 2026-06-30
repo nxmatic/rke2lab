@@ -53,8 +53,8 @@ public final class SystemdAdapterResource extends ComponentResource {
     // Additive, per-node only: the diagnostic layer lives under this component resource in state,
     // never at top level (the Stage-B stack contract stays byte-identical). The doctor reasons
     // OSGi-side; the host copies the structured sub-trees OPAQUELY from the consultation Document
-    // to
-    // the same output keys (it holds no doctor type), and reconstruction reads them back by name.
+    // to the same output keys (it holds no doctor type), and reconstruction reads them back by
+    // name.
     consultation.ifPresent(document -> copyDiagnosticOutputs(document, outputs));
     return outputs;
   }
