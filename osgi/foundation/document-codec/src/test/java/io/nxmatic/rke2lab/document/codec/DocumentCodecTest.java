@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.document;
+package io.nxmatic.rke2lab.document.codec;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 

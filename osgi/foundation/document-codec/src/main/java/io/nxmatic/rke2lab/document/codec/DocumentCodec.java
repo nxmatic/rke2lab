@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.document;
+package io.nxmatic.rke2lab.document.codec;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
