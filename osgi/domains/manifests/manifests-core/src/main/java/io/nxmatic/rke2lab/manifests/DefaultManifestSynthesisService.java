@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.manifests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import io.nxmatic.rke2lab.manifests.cdk8s.Cdk8sApps;
 import io.nxmatic.rke2lab.manifests.domain.CicdDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.ClusterApiDomainRegistrar;
 import io.nxmatic.rke2lab.manifests.domain.ClusterDomainRegistrar;
@@ -178,7 +179,8 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
           state.synthManifestFile = state.request.synthManifestFile();
           state.systemdOutdir = state.synthOutdir.resolve("systemd");
 
-          state.app = new App(AppProps.builder().outdir(state.synthOutdir.toString()).build());
+          state.app =
+              Cdk8sApps.create(AppProps.builder().outdir(state.synthOutdir.toString()).build());
           state.chart = new Chart(state.app, "manifests");
           state.systemdChart = new SystemdChart(state.app, "systemd");
 

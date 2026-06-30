@@ -8,6 +8,8 @@ import io.nxmatic.rke2lab.junit.testkit.Osgi;
 import io.nxmatic.rke2lab.manifests.port.FloxRuntimeAssetService;
 import io.nxmatic.rke2lab.manifests.port.ManifestDocumentService;
 import io.nxmatic.rke2lab.manifests.port.ManifestExplodeService;
+import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisRequest;
+import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisResult;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisService;
 import io.nxmatic.rke2lab.manifests.port.ManifestUpdateGate;
 import io.nxmatic.rke2lab.manifests.port.node.NodeEnvOverlayService;
@@ -88,5 +90,28 @@ class EmbeddedBundlesBootTest {
         "the embedded cluster-edge bundle booted and SCR published ClusterReadinessContact — the"
             + " host resolves the kubectl contact from the registry (cluster-port seam"
             + " single-exporter, typed, no ClassCastException)");
+  }
+
+  /**
+   * The coverage the {@code awaitService} proofs above do NOT give: they assert SCR PUBLISHES the
+   * synthesis service, never that it RUNS. {@code pulumi preview} boots this exact staged topology
+   * and then synthesizes — failing in the "cdk8s setup" topic with {@code
+   * ServiceConfigurationError: JavaTimeModule not a subtype}, because jsii-runtime's {@code
+   * ObjectMapper} drives a {@code ServiceLoader<com.fasterxml.jackson.databind.Module>} that
+   * resolves jackson-databind on one classloader and the runtime-discovered jsr310 {@code
+   * JavaTimeModule} on another. Calling {@code synthesize} here, on the staged bundles, exercises
+   * that path as a build failure — closing the gap between "boots + publishes" and "actually
+   * synthesizes".
+   */
+  @Test
+  void embeddedSynthesisRunsTheCdk8sSetupPathOnTheStagedJackson() throws Exception {
+    final ManifestSynthesisService synthesis =
+        framework.awaitService(ManifestSynthesisService.class, 5000);
+    assertNotNull(
+        synthesis, "the embedded manifests-core bundle published ManifestSynthesisService");
+
+    final ManifestSynthesisResult result =
+        synthesis.synthesize(ManifestSynthesisRequest.ephemeral());
+    assertNotNull(result, "synthesis returned a result (cdk8s setup ran on the staged jackson)");
   }
 }

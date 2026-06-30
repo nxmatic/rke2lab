@@ -47,11 +47,15 @@ import java.util.stream.Collectors;
  * exporters of a package is LEGAL in OSGi — the framework resolver selects the wire at resolution
  * time, by version and {@code uses:} constraints. We do not second-guess it, and we do not police
  * what the developer keeps on the classpath: a package that is both staged and left flat (e.g.
- * {@code org.slf4j}, deliberately host-flat AND provided to bundles by pax) is a legitimate shared
- * provider in one case and a leaked aggregate ({@code osgi.cmpn}) in another — the difference is
- * the developer's intent, which a derivation cannot read. Keeping the classpath clean (excluding
- * aggregates like {@code osgi.cmpn} in the BOM, backed by the build-parent {@code
- * bannedDependencies}) is the developer's job; this class only derives what to stage.
+ * jackson's {@code com.fasterxml.jackson.*}, deliberately host-flat AND staged as a realm-library
+ * bundle for the model world) is a legitimate per-realm copy in one case and a leaked aggregate
+ * ({@code osgi.cmpn}) in another — the difference is the developer's intent, which a derivation
+ * cannot read. Keeping the classpath clean (excluding aggregates like {@code osgi.cmpn} in the BOM,
+ * backed by the build-parent {@code bannedDependencies}) is the developer's job; this class only
+ * derives what to stage. The one exception the derivation DOES encode: a realm-library candidate
+ * whose package the boot-stack already provides in-framework ({@code org.slf4j} via
+ * pax-logging-api) is NOT staged — a second in-framework exporter would break slf4j 2.x resolution.
+ * See {@code isRealmLibrary}.
  */
 public record StagingClosure(
     List<ResolvedBundle> staged, List<String> trace, Set<String> realmLibraryGas) {
@@ -156,8 +160,9 @@ public record StagingClosure(
           domainImports.addAll(b.imports().names());
         }
       }
+      final Set<String> bootStackExports = bootStackExportedPackages();
       for (ResolvedBundle b : resolved) {
-        if (isRealmLibrary(b, domainImports)) {
+        if (isRealmLibrary(b, domainImports, bootStackExports)) {
           realmLibraryByGa.put(b.ga(), b);
           stage(b, "seed: realm library (a domain bundle imports its export)");
         }
@@ -165,9 +170,27 @@ public record StagingClosure(
     }
 
     /**
-     * A third-party OSGi bundle (not ours, not a seam, not the launcher) exporting a domain import.
+     * The packages the boot-stack already provides in-framework (e.g. pax-logging-api → org.slf4j).
      */
-    private static boolean isRealmLibrary(ResolvedBundle b, Set<String> domainImports) {
+    private Set<String> bootStackExportedPackages() {
+      final Set<String> exports = new LinkedHashSet<>();
+      for (ResolvedBundle b : resolved) {
+        if (b.symbolicName() != null && bootStackSymbolicNames.contains(b.symbolicName())) {
+          exports.addAll(b.exports().names());
+        }
+      }
+      return exports;
+    }
+
+    /**
+     * A third-party OSGi bundle (not ours, not a seam, not the launcher) exporting a domain import
+     * that the boot-stack does NOT already provide. A domain import already served by a boot-stack
+     * bundle (pax-logging-api exports {@code org.slf4j}) needs no realm-library copy — staging one
+     * would add a second in-framework exporter and break the slf4j 2.x ServiceLoader-processor
+     * resolution. So that package is not a staging trigger; the bundle stays host-flat only.
+     */
+    private static boolean isRealmLibrary(
+        ResolvedBundle b, Set<String> domainImports, Set<String> bootStackExports) {
       if (!b.isBundle() || b.launcher()) {
         return false;
       }
@@ -175,7 +198,9 @@ public record StagingClosure(
         return false; // ours (model/edge/record/seam) — not a third-party library.
       }
       for (String exported : b.exports().names()) {
-        if (!ResolvedBundle.isOurs(exported) && domainImports.contains(exported)) {
+        if (!ResolvedBundle.isOurs(exported)
+            && domainImports.contains(exported)
+            && !bootStackExports.contains(exported)) {
           return true;
         }
       }

@@ -36,8 +36,9 @@
   </dependencies>
 
   <!-- bnd execution + jar manifestFile inherited from osgi/bundle-parent; the bare reference
-       activates the managed bnd-process goal. No src/main/java: this bundle is a pure carrier whose
-       content is the embedded flat jars. -->
+       activates the managed bnd-process goal. Beyond the embedded flat jars, this carrier owns one
+       source class, Cdk8sApps — the App factory that pins the thread context classloader to this
+       bundle so jsii's ServiceLoader<Module> resolves the nested jsr310 here (see bnd.bnd). -->
   <build>
     <plugins>
       <plugin>
