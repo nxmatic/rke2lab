@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.doctor.port;
+package io.nxmatic.rke2lab.pulumi.edge;
 
 /**
  * Content failure — the source was reachable but malformed or rejected. Retrying will not help; the

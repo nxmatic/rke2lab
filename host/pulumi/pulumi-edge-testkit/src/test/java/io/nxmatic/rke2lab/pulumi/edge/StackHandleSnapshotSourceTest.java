@@ -4,10 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.doctor.port.SnapshotAccessException;
-import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
-import io.nxmatic.rke2lab.doctor.records.SnapshotEntry;
-import io.nxmatic.rke2lab.doctor.records.SnapshotView;
 import io.nxmatic.rke2lab.pulumi.edge.testkit.StackHistoryFixture;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,7 +56,7 @@ class StackHandleSnapshotSourceTest {
     final SnapshotEntry latest = source.timeline().get(0);
     final SnapshotView snapshot = source.at(latest);
 
-    assertEquals(1, snapshot.outputsNamed(ConsultationReport.OUTPUT_KEY).size());
+    assertEquals(1, snapshot.outputsNamed("consultationReport").size());
   }
 
   @Test
@@ -72,7 +68,7 @@ class StackHandleSnapshotSourceTest {
     final Optional<SnapshotView> latest = sourceOver(fixture).latest();
 
     assertTrue(latest.isPresent());
-    assertEquals(1, latest.get().outputsNamed(ConsultationReport.OUTPUT_KEY).size());
+    assertEquals(1, latest.get().outputsNamed("consultationReport").size());
   }
 
   @Test

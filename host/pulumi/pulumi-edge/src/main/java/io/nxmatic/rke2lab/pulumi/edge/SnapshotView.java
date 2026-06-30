@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.doctor.records;
+package io.nxmatic.rke2lab.pulumi.edge;
 
 import java.util.List;
 import java.util.Map;

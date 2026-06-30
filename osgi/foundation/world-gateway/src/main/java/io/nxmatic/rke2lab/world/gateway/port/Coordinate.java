@@ -15,7 +15,13 @@ public enum Coordinate {
   /** The raw intervention facts the CLI pushes OSGi-side for canonicalization. */
   INTERVENTION_REQUEST("intervention-request"),
   /** The canonical intervention document OSGi returns and the ledger writer persists. */
-  INTERVENTION("intervention");
+  INTERVENTION("intervention"),
+  /**
+   * One readable entry of a patient's record timeline, produced by the host READ journal: it
+   * carries the entry's version + when and the raw consultation-report/expectation output blobs.
+   * OSGi folds a sequence of these into one {@code Visit} per entry to rebuild the medical record.
+   */
+  VISIT("visit");
 
   private final String slug;
 

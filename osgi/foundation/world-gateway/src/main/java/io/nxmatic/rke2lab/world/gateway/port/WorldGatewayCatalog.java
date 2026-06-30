@@ -38,6 +38,12 @@ public final class WorldGatewayCatalog {
   public static final String FIELD_RECORDED_AT = "recordedAt";
 
   /**
+   * Visit payload: the monotonically increasing stack version of the history entry the visit was
+   * read from. The host READ journal stamps it; OSGi folds it back into the rebuilt {@code Visit}.
+   */
+  public static final String FIELD_VERSION = "version";
+
+  /**
    * Consultation payload + Pulumi egress key: the structured consultation report sub-tree
    * (checkpointId + observations + plan). The host copies it opaquely from the consultation
    * Document to this output key; reconstruction reads it back by the same name. Must equal {@code
@@ -74,6 +80,14 @@ public final class WorldGatewayCatalog {
 
   /** Intervention-request payload: the ISO-8601 instant the intervention happened. */
   public static final String FIELD_WHEN = "when";
+
+  /**
+   * Intervention-journal payload + Pulumi ledger output key: the list of raw {@code
+   * Intervention.toOutputMap} blobs a ledger history entry registered. The host READ journal wraps
+   * them opaquely; OSGi folds them back into the {@code InterventionLedger}. Must equal the host
+   * ledger writer's output key.
+   */
+  public static final String FIELD_INTERVENTIONS = "interventions";
 
   private WorldGatewayCatalog() {}
 }

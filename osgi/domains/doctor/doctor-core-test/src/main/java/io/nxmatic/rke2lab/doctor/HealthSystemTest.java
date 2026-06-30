@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.nxmatic.rke2lab.doctor.internal.*;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Observation;
@@ -41,13 +40,18 @@ class HealthSystemTest {
     return intervention -> {};
   }
 
-  private static ConsultingService admit(Patient patient, MedicalRecordRegistry registry) {
-    return ConsultationDag.assemble(patient, registry, noopLedger(), roster(), msg -> {});
+  // The single construction path returns the ConsultingService seam; the white-box actor tests
+  // reach
+  // the bundle-internal Generalist (recordForCurrentPatient is OFF the seam now — no record crosses
+  // to the host) by casting, since this fragment shares doctor-core's loader.
+  private static Generalist admit(Patient patient, MedicalRecordRegistry registry) {
+    return (Generalist)
+        ConsultationDag.assemble(patient, registry, noopLedger(), null, roster(), msg -> {});
   }
 
   @Test
   void admit_employs_a_doctor_that_can_read_its_own_patient() {
-    final ConsultingService doctor = admit(DEV, singlePatientRegistry());
+    final Generalist doctor = admit(DEV, singlePatientRegistry());
     assertNotNull(doctor);
     assertEquals(DEV, doctor.recordForCurrentPatient().patient());
   }
@@ -66,7 +70,7 @@ class HealthSystemTest {
   @Test
   void the_admitted_doctor_reads_its_own_patient_but_a_stranger_is_outside_the_cohort() {
     // cohortFor surfaces only DEV at admission, so only DEV is granted.
-    final ConsultingService doctor = admit(DEV, singlePatientRegistry());
+    final Generalist doctor = admit(DEV, singlePatientRegistry());
     // Self-read works (admitted + self-granted).
     assertEquals(DEV, doctor.recordForCurrentPatient().patient());
     // The cohort is exactly the admitted patient — no ungranted stranger leaks in.

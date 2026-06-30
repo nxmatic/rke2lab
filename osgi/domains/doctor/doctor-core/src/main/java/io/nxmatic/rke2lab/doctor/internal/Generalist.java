@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
+import io.nxmatic.rke2lab.doctor.port.InterventionJournal;
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.ClinicianId;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
@@ -63,13 +64,19 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
   private final List<Specialist> specialists;
   private final ClinicalAccess access;
   private final DriftSpecialist driftSpecialist;
+  private final InterventionJournal interventionJournal;
+  private final InterventionLedgerReader ledgerReader = new InterventionLedgerReader();
   private final ObjectMapper mapper = new ObjectMapper();
 
   private Generalist(
-      List<Specialist> specialists, ClinicalAccess access, DriftSpecialist driftSpecialist) {
+      List<Specialist> specialists,
+      ClinicalAccess access,
+      DriftSpecialist driftSpecialist,
+      InterventionJournal interventionJournal) {
     this.specialists = List.copyOf(specialists);
     this.access = access;
     this.driftSpecialist = driftSpecialist;
+    this.interventionJournal = interventionJournal;
   }
 
   public static Builder builder() {
@@ -81,6 +88,7 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
     private List<Specialist> specialists = List.of();
     private ClinicalAccess access;
     private DriftSpecialist driftSpecialist;
+    private InterventionJournal interventionJournal;
 
     public Builder specialists(List<Specialist> specialists) {
       this.specialists = specialists;
@@ -97,6 +105,15 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
       return this;
     }
 
+    /**
+     * The host intervention journal {@link #reviewDrift()} rebuilds the ledger from. Absent → the
+     * review folds the empty ledger (coherent with the registry's no-backend degrade).
+     */
+    public Builder interventionJournal(InterventionJournal interventionJournal) {
+      this.interventionJournal = interventionJournal;
+      return this;
+    }
+
     public Generalist build() {
       if (access == null) {
         throw new IllegalStateException("access is required");
@@ -106,7 +123,7 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
       // site.
       final DriftSpecialist drift =
           driftSpecialist != null ? driftSpecialist : new DriftSpecialist(intervention -> {});
-      return new Generalist(specialists, access, drift);
+      return new Generalist(specialists, access, drift, interventionJournal);
     }
   }
 
@@ -115,8 +132,11 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
     return GENERALIST_ID;
   }
 
-  /** The admitted patient's record, read through the held access. */
-  @Override
+  /**
+   * The admitted patient's record, read through the held access. Bundle-internal (no longer on the
+   * {@code ConsultingService} seam — no record crosses to the host); {@link #reviewDrift()} folds
+   * over it, and the doctor's own in-container tests read it white-box.
+   */
   public MedicalRecord recordForCurrentPatient() {
     return access.record();
   }
@@ -331,15 +351,34 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
   }
 
   /**
+   * The follow-up coordination, the ONLY record-path verb on the seam — no-arg by design: the
+   * patient comes from the held {@link ClinicalAccess} (so the record is rebuilt OSGi-side from the
+   * host medical-record journal, behind the registry) and the ledger from the held {@link
+   * InterventionJournal} (rebuilt OSGi-side via {@link InterventionLedgerReader}). Nothing is read
+   * from a caller and nothing crosses back: the host triggers {@code reviewDrift()} and the
+   * inferred drift is persisted through the drift specialist's writer. With no journal wired the
+   * ledger is empty (the no-backend degrade).
+   */
+  @Override
+  public void reviewDrift() {
+    final MedicalRecord record = access.record();
+    final InterventionLedger ledger =
+        interventionJournal == null
+            ? InterventionLedger.empty()
+            : ledgerReader.read(interventionJournal.entries());
+    reviewOpenProblems(record, ledger);
+  }
+
+  /**
    * The follow-up coordination at synthesis: for each visit with a following visit, for each
    * Expectation on that visit whose predicate held at the next visit (the symptom resolved), review
-   * the problem with the drift specialist and collect its letters. The ledger is loaded once by the
-   * caller (the reconstruction wiring) and passed in — no no-ledger overload.
+   * the problem with the drift specialist and collect its letters. The ledger is rebuilt once by
+   * {@link #reviewDrift()} and passed in. Bundle-internal (no longer on the seam — no record/ledger
+   * crosses to the host); the doctor's own in-container tests drive it white-box.
    *
    * <p>"Resolved-but-unadministered" today is simply "resolved": no engine administers fixes yet,
    * so every resolved expectation is reviewed.
    */
-  @Override
   public List<ReferralReply> reviewOpenProblems(MedicalRecord record, InterventionLedger ledger) {
     final List<ReferralReply> letters = new ArrayList<>();
     final List<Visit> visits = record.visits();

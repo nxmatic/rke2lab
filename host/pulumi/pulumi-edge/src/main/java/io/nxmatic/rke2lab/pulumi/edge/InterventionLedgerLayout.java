@@ -1,6 +1,6 @@
 package io.nxmatic.rke2lab.pulumi.edge;
 
-import io.nxmatic.rke2lab.doctor.records.StackCoordinate;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.nio.file.Path;
 
 /**
@@ -13,7 +13,9 @@ public final class InterventionLedgerLayout {
 
   public static final String PROJECT = "intervention-ledger";
   public static final String STACK = "dev";
-  public static final String OUTPUT_KEY = "interventions";
+
+  /** The Pulumi output key — the seam's intervention-journal field, shared host↔OSGi. */
+  public static final String OUTPUT_KEY = WorldGatewayCatalog.FIELD_INTERVENTIONS;
 
   private InterventionLedgerLayout() {}
 
@@ -30,7 +32,7 @@ public final class InterventionLedgerLayout {
   /**
    * The ledger's own stacks directory under a file-backend root, with {@link #PROJECT} pre-bound.
    * Mirrors the reader path, which locates a stack through {@link
-   * PulumiBackendLayout#stacksDir(Path, String)} (see {@code LiveMedicalRecordRegistry}).
+   * PulumiBackendLayout#stacksDir(Path, String)} (see {@code StackMedicalRecordJournal}).
    */
   public static Path stacksDir(Path backendDir) {
     return PulumiBackendLayout.stacksDir(backendDir, PROJECT);

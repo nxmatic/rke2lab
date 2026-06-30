@@ -1,8 +1,6 @@
 package io.nxmatic.rke2lab.doctor.port;
 
-import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
-import java.util.List;
 
 /**
  * The doctor's INTERNAL edge: the face the diagnostic model turns toward the rest of our system. A
@@ -11,7 +9,9 @@ import java.util.List;
  * freely behind it. Symmetric with manifests-port / netplan-port.
  *
  * <p>The graph behind it is assembled OSGi-side when the {@code HealthSystem} admits a patient, and
- * handed back as this contract; the consumer holds only the interface.
+ * handed back as this contract; the consumer holds only the interface. No {@code doctor.records}
+ * type crosses this port: the medical record and intervention ledger are rebuilt OSGi-side from the
+ * host journals, never returned to the host.
  */
 public interface ConsultingService {
 
@@ -26,15 +26,14 @@ public interface ConsultingService {
   Document consult(Document checkpoint);
 
   /**
-   * The admitted patient's {@link MedicalRecord}, read through the model's grant-checked access.
+   * The follow-up coordination at reconstruction: rebuild the admitted patient's record (through
+   * the model's grant-checked access) and the intervention ledger (from the host intervention
+   * journal), then for every resolved expectation review the problem against the ledger and persist
+   * any inferred drift. No-arg: the trace takes the patient from the held access and the ledger
+   * from the journal — nothing is read from the caller. The record and ledger never cross back to
+   * the host.
    */
-  MedicalRecord recordForCurrentPatient();
-
-  /**
-   * The follow-up coordination at reconstruction: for every resolved expectation on the record,
-   * review the problem against the loaded {@link InterventionLedger} and collect the drift letters.
-   */
-  List<ReferralReply> reviewOpenProblems(MedicalRecord record, InterventionLedger ledger);
+  void reviewDrift();
 
   /**
    * The face of this service that implements {@code type}, or {@code null} if it does not — the

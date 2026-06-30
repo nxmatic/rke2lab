@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.doctor.records;
+package io.nxmatic.rke2lab.pulumi.edge;
 
 /**
  * The typed identity of a Pulumi stack — a pair of project and stack names. This prevents the

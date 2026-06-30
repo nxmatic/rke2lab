@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulumi.deployment.Deployment;
 import com.pulumi.deployment.DeploymentInstance;
@@ -21,19 +22,7 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
 import io.nxmatic.rke2lab.doctor.ExactRosterDoctor;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
-import io.nxmatic.rke2lab.doctor.port.ConsultationReportReader;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
-import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
-import io.nxmatic.rke2lab.doctor.records.Assessment;
-import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
-import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
-import io.nxmatic.rke2lab.doctor.records.Prescription;
-import io.nxmatic.rke2lab.doctor.records.Referral;
-import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
-import io.nxmatic.rke2lab.doctor.records.SchemaRef;
-import io.nxmatic.rke2lab.doctor.records.Specialty;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
-import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
 import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
@@ -42,9 +31,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -71,28 +58,23 @@ class NestedRunbookTest {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   /**
-   * Reconstruct the {@link ConsultationReport} a recorded consultation {@link Document} carries,
-   * via the same {@link ConsultationReportReader} the egress/medical-record reconstruction uses —
-   * so the assertions prove the round-trip keeps the plan, not just that a Document was recorded.
+   * The {@code consultationReport} sub-tree a recorded consultation {@link Document} carries,
+   * parsed as RAW JSON via the host's own {@link ObjectMapper} — never reconstructed into a {@code
+   * doctor.records} type, which is off the host seam. The assertions navigate this tree by the
+   * shared wire field names (the {@code ConsultationReport.toOutputMap} shape), proving the
+   * round-trip keeps the plan, not just that a Document was recorded.
    */
-  private static ConsultationReport reconstruct(Document consultation) {
+  private static JsonNode consultationReport(Document consultation) {
     try {
-      final var report =
-          MAPPER
-              .readTree(consultation.payload())
-              .path(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT);
-      @SuppressWarnings("unchecked")
-      final Map<String, Object> reportMap = MAPPER.convertValue(report, Map.class);
-      return ConsultationReportReader.fromOutputMap(reportMap).orElseThrow();
+      return MAPPER
+          .readTree(consultation.payload())
+          .path(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT);
     } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
       throw new IllegalStateException(e);
     }
   }
 
   private static final Patient TEST_PATIENT = new Patient("organization", "rke2lab", "test");
-
-  /** These tests exercise routing/rendering, not history, so the held record is always empty. */
-  private static final MedicalRecordRegistry EMPTY_RECORDS = p -> new MedicalRecord(p, List.of());
 
   @Test
   void cluster_readiness_renders_with_the_systemd_adapter_dependency_nested(@TempDir Path out) {
@@ -192,13 +174,10 @@ class NestedRunbookTest {
     // calling Generalist apart. The diagnosis is no longer scraped from the Pulumi log: it reads
     // from the ConsultationLog (and renders into the runbook), the authoritative surface.
     assertEquals(1, consultations.consultations().size(), "the stage should consult the doctor");
+    final JsonNode plan = consultationReport(consultations.consultations().get(0)).path("plan");
     assertEquals(
-        RemediationProgramRef.CHECK_CONNECTIVITY,
-        reconstruct(consultations.consultations().get(0))
-            .plan()
-            .primaryPrescription()
-            .orElseThrow()
-            .programRef(),
+        "check-connectivity",
+        plan.path("replies").path(0).path("prescription").path("programRef").asText(),
         "the network specialist's prescription is kept on the consultation");
 
     new RunbookRenderer(out, message -> {}).render(model, new ConsultationLog());
@@ -228,15 +207,17 @@ class NestedRunbookTest {
         1,
         consultations.consultations().size(),
         "the failing checkpoint should record one consultation");
-    final ConsultationReport consultation = reconstruct(consultations.consultations().get(0));
+    final JsonNode plan = consultationReport(consultations.consultations().get(0)).path("plan");
+    // The plan's symptom is the kebab wire id (Symptom.ENVELOPE_KEY = "symptom"); assert the
+    // literal id String — the enum itself is doctor.records, off the host seam.
     assertEquals(
-        Symptom.TIMEOUT, consultation.symptom(), "the consultation names the raised symptom");
+        "timeout", plan.path("symptom").asText(), "the consultation names the raised symptom");
     assertTrue(
-        consultation.plan().hasPrescriptions(),
+        plan.path("replies").path(0).path("prescription").has("programRef"),
         "the network specialist's prescription is kept on the report, not dropped");
     assertEquals(
-        RemediationProgramRef.CHECK_CONNECTIVITY,
-        consultation.plan().primaryPrescription().orElseThrow().programRef());
+        "check-connectivity",
+        plan.path("replies").path(0).path("prescription").path("programRef").asText());
   }
 
   @Test
@@ -314,13 +295,6 @@ class NestedRunbookTest {
     return holder[0];
   }
 
-  private static ConsultingService doctorWith(List<Specialist> specialists) {
-    // ExactRosterDoctor takes the roster verbatim (no standard Network/Cluster prepended), so the
-    // routing/prescription assertions see exactly the specialists this test wires.
-    return ExactRosterDoctor.over(
-        TEST_PATIENT, EMPTY_RECORDS, intervention -> {}, specialists, msg -> {});
-  }
-
   /** Map each top-level When step's rendered name to its step status. */
   private static Map<String, StepStatus> phaseStepStatuses(ReportModel model) {
     final Map<String, StepStatus> statuses = new LinkedHashMap<>();
@@ -335,37 +309,11 @@ class NestedRunbookTest {
   }
 
   private static ConsultingService readyGeneralist() {
-    // The dbus-tcp specialist is in the core's standard roster now; no host injection needed.
-    return doctorWith(List.of());
+    return ExactRosterDoctor.readyGeneralist(TEST_PATIENT);
   }
 
   private static ConsultingService networkGeneralist() {
-    return doctorWith(List.of(new FakeNetworkSpecialist()));
-  }
-
-  /** A stand-in network specialist so a TIMEOUT (routed to NETWORK) yields a prescription. */
-  private static final class FakeNetworkSpecialist implements Specialist {
-    @Override
-    public Specialty domain() {
-      return Specialty.NETWORK;
-    }
-
-    @Override
-    public Assessment assess(Referral referral) {
-      return Assessment.of(
-          SchemaRef.of("network/check-connectivity/v1"),
-          Map.of("symptom", referral.symptom().id()),
-          "the API endpoint may be unreachable — verify network connectivity first");
-    }
-
-    @Override
-    public Optional<Prescription> prescribe(Referral referral, Assessment assessment) {
-      return Optional.of(
-          Prescription.of(
-              RemediationProgramRef.CHECK_CONNECTIVITY,
-              Map.of("symptom", referral.symptom().id()),
-              "check connectivity to the API endpoint"));
-    }
+    return ExactRosterDoctor.networkGeneralist(TEST_PATIENT);
   }
 
   private static String readAll(Path dir) {

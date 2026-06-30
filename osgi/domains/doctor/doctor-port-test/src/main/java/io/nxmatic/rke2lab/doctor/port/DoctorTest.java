@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.controlplane.bdd;
+package io.nxmatic.rke2lab.doctor.port;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

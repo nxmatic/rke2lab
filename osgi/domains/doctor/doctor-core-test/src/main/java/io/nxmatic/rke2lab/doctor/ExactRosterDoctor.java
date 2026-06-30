@@ -4,11 +4,12 @@ import io.nxmatic.rke2lab.doctor.internal.*;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.port.HealthSystem;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
@@ -33,6 +34,55 @@ public final class ExactRosterDoctor {
       InterventionLedgerWriter ledgerWriter,
       List<Specialist> exactRoster,
       Consumer<String> logger) {
-    return ConsultationDag.assemble(patient, registry, ledgerWriter, exactRoster, logger);
+    return ConsultationDag.assemble(patient, registry, ledgerWriter, null, exactRoster, logger);
+  }
+
+  /**
+   * A ready doctor over an empty roster — no specialist replies. The host obtains it without naming
+   * any {@code doctor.records}/{@code spi}/{@code internal} type; only the {@link
+   * ConsultingService} seam and the neutral {@link Patient} cross.
+   */
+  public static ConsultingService readyGeneralist(Patient patient) {
+    return over(
+        patient, p -> new MedicalRecord(p, List.of()), intervention -> {}, List.of(), msg -> {});
+  }
+
+  /**
+   * A doctor over a single network specialist: a TIMEOUT symptom routed to NETWORK yields a
+   * CHECK_CONNECTIVITY prescription. Same host-pure seam contract as {@link
+   * #readyGeneralist(Patient)}.
+   */
+  public static ConsultingService networkGeneralist(Patient patient) {
+    return over(
+        patient,
+        p -> new MedicalRecord(p, List.of()),
+        intervention -> {},
+        List.of(new FakeNetworkSpecialist()),
+        msg -> {});
+  }
+
+  /** A stand-in network specialist so a TIMEOUT (routed to NETWORK) yields a prescription. */
+  private static final class FakeNetworkSpecialist implements Specialist {
+    @Override
+    public Specialty domain() {
+      return Specialty.NETWORK;
+    }
+
+    @Override
+    public Assessment assess(Referral referral) {
+      return Assessment.of(
+          SchemaRef.of("network/check-connectivity/v1"),
+          Map.of("symptom", referral.symptom().id()),
+          "the API endpoint may be unreachable — verify network connectivity first");
+    }
+
+    @Override
+    public Optional<Prescription> prescribe(Referral referral, Assessment assessment) {
+      return Optional.of(
+          Prescription.of(
+              RemediationProgramRef.CHECK_CONNECTIVITY,
+              Map.of("symptom", referral.symptom().id()),
+              "check connectivity to the API endpoint"));
+    }
   }
 }

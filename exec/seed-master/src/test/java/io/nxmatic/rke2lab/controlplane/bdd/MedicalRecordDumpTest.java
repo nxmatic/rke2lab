@@ -7,125 +7,76 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import io.nxmatic.rke2lab.doctor.port.SnapshotContentException;
-import io.nxmatic.rke2lab.doctor.port.SnapshotSource;
-import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
-import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
-import io.nxmatic.rke2lab.doctor.records.Observation;
-import io.nxmatic.rke2lab.doctor.records.Prescription;
-import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
-import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
-import io.nxmatic.rke2lab.doctor.records.SnapshotEntry;
-import io.nxmatic.rke2lab.doctor.records.SnapshotView;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
-import io.nxmatic.rke2lab.doctor.records.Visit;
-import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
+import io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal;
+import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
+import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the two unit-testable halves of {@link MedicalRecordDump}: the deterministic YAML
- * serialization ({@code toYaml}) and the lenient-but-informed error policy ({@code dump}). The live
- * {@code attach(...)} wiring in {@code main} needs a real backend and is exercised in the sandbox,
- * not here — these tests pass a fake {@link SnapshotSource}.
+ * Pins the two host-pure halves of {@link MedicalRecordDump}: the deterministic YAML serialization
+ * ({@code toYaml}) and the lenient-but-informed error policy ({@code dump}). The dump reads its OWN
+ * timeline through the host {@link MedicalRecordJournal} (opaque {@code visit} Documents) and
+ * transcodes each visit's stored {@code consultationReport} blob JSON→YAML — no OSGi call, no
+ * {@code doctor.records} type. These tests pass a fake journal; the live wiring needs a real
+ * backend and is exercised in the sandbox.
  */
 class MedicalRecordDumpTest {
 
   private static final Patient PATIENT = new Patient("organization", "rke2lab", "dev");
+  private static final ObjectMapper JSON = new ObjectMapper();
 
   /**
-   * Same in-test seam shape as {@code MedicalRecordReaderTest}: per entry, a snapshot or a throw.
+   * A fake journal: an ordered list of {@code visit} Documents, as the host journal would yield.
    */
-  private static final class FakeSnapshotSource implements SnapshotSource {
-
-    private final List<SnapshotEntry> timeline = new ArrayList<>();
-    private final Map<SnapshotEntry, SnapshotView> snapshots = new LinkedHashMap<>();
-    private final Map<SnapshotEntry, SnapshotContentException> contentFailures =
-        new LinkedHashMap<>();
-
-    FakeSnapshotSource readable(SnapshotEntry entry, SnapshotView snapshot) {
-      timeline.add(entry);
-      snapshots.put(entry, snapshot);
-      return this;
-    }
-
-    FakeSnapshotSource failing(SnapshotEntry entry, SnapshotContentException failure) {
-      timeline.add(entry);
-      contentFailures.put(entry, failure);
-      return this;
-    }
-
-    @Override
-    public List<SnapshotEntry> timeline() {
-      return List.copyOf(timeline);
-    }
-
-    @Override
-    public SnapshotView at(SnapshotEntry entry) throws SnapshotContentException {
-      final SnapshotContentException failure = contentFailures.get(entry);
-      if (failure != null) {
-        throw failure;
+  private static MedicalRecordJournal journalOf(List<Document> visits) {
+    return new MedicalRecordJournal() {
+      @Override
+      public List<Document> historyOf(Patient patient) {
+        return List.copyOf(visits);
       }
-      return snapshots.get(entry);
-    }
 
-    @Override
-    public Optional<SnapshotView> latest() {
-      if (timeline.isEmpty()) {
-        return Optional.empty();
+      @Override
+      public List<Patient> cohort(Patient current) {
+        return List.of(current);
       }
-      return Optional.ofNullable(snapshots.get(timeline.get(timeline.size() - 1)));
-    }
+    };
   }
 
-  private static SnapshotEntry entry(int version) {
-    return new SnapshotEntry(version, Instant.ofEpochSecond(version));
-  }
-
-  private static String location(int version) {
-    return "v" + version + ".json";
-  }
-
-  private static SnapshotView snapshotOf(Symptom symptom) {
-    final Map<String, Object> plan = new LinkedHashMap<>();
-    plan.put(Symptom.ENVELOPE_KEY, symptom.id());
-    plan.put("generalistSummary", "s");
-    plan.put("replies", List.of());
+  /**
+   * A well-formed {@code visit} Document at {@code version} carrying one consultationReport blob.
+   */
+  private static Document visit(int version, String checkpointId) {
     final Map<String, Object> report = new LinkedHashMap<>();
-    report.put("checkpointId", "systemd-adapter");
+    report.put("checkpointId", checkpointId);
     report.put("observations", List.of());
-    report.put("plan", plan);
-    return new SnapshotView(Map.of(ConsultationReport.OUTPUT_KEY, List.of(report)));
+    report.put("plan", Map.of("symptom", "connection-refused", "generalistSummary", "s"));
+    final LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
+    payload.put(WorldGatewayCatalog.FIELD_VERSION, version);
+    payload.put(WorldGatewayCatalog.FIELD_WHEN, Instant.ofEpochSecond(version).toString());
+    payload.put(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT, List.of(report));
+    payload.put(WorldGatewayCatalog.FIELD_EXPECTATIONS, List.of());
+    return new Document(Domain.DOCTOR.slug(), Coordinate.VISIT.slug(), serialize(payload));
   }
 
-  /** A synthetic record with two visits; the first carries a symptom + a prescription. */
-  private static MedicalRecord sampleRecord() {
-    final ConsultationReport report =
-        new ConsultationReport(
-            "systemd-adapter",
-            List.of(
-                Observation.failed(
-                    Symptom.CONNECTION_REFUSED,
-                    "dbus port refused",
-                    Map.of("source", "systemd-adapter"))),
-            new RemediationPlan(
-                Symptom.CONNECTION_REFUSED,
-                List.of(
-                    ReferralReplies.treating(
-                        Prescription.of(
-                            RemediationProgramRef.CHECK_CONNECTIVITY,
-                            Map.of("port", 12434),
-                            "verify the dbus-over-tcp listener is up"))),
-                "the adapter could not reach dbus"));
-    final Visit v1 = new Visit(1, Instant.ofEpochSecond(1000), List.of(report), List.of());
-    final Visit v2 = new Visit(2, Instant.ofEpochSecond(2000), List.of(), List.of());
-    return new MedicalRecord(PATIENT, List.of(v1, v2));
+  /** A malformed visit Document: an unparseable JSON payload. */
+  private static Document brokenVisit() {
+    return new Document(Domain.DOCTOR.slug(), Coordinate.VISIT.slug(), "not json {");
+  }
+
+  private static String serialize(Object value) {
+    try {
+      return JSON.writeValueAsString(value);
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   @SuppressWarnings("unchecked")
@@ -137,28 +88,36 @@ class MedicalRecordDumpTest {
     }
   }
 
-  @Test
-  void toYaml_roundTripsTheLoadBearingFieldsAndIsParseable() {
-    final String yaml = MedicalRecordDump.toYaml(sampleRecord());
-
-    // The load-bearing identifiers survive into the text.
-    assertTrue(yaml.contains(PATIENT.qualifiedName()), () -> yaml);
-    assertTrue(yaml.contains(Symptom.CONNECTION_REFUSED.id()), () -> yaml);
-    assertTrue(yaml.contains(RemediationProgramRef.CHECK_CONNECTIVITY.id()), () -> yaml);
-
-    // It is real, parseable YAML with the documented top-level shape.
-    final Map<String, Object> parsed = parseYaml(yaml);
-    assertEquals(PATIENT.qualifiedName(), parsed.get("patient"));
-    final List<Map<String, Object>> visits = asListOfMaps(parsed.get("visits"));
-    assertEquals(2, visits.size());
-    assertEquals(1, visits.get(0).get("version"));
-    assertEquals(2, visits.get(1).get("version"));
-    assertEquals(Instant.ofEpochSecond(1000).toString(), visits.get(0).get("when"));
+  @SuppressWarnings("unchecked")
+  private static List<Map<String, Object>> asListOfMaps(Object value) {
+    return (List<Map<String, Object>>) value;
   }
 
   @Test
-  void toYaml_emptyRecord_isValidYamlWithEmptyVisits() {
-    final String yaml = MedicalRecordDump.toYaml(new MedicalRecord(PATIENT, List.of()));
+  void toYaml_roundTripsTheLoadBearingFieldsAndIsParseable() {
+    final List<Map<String, Object>> visits = new ArrayList<>();
+    final Map<String, Object> v1 = new LinkedHashMap<>();
+    v1.put("version", 1);
+    v1.put("when", Instant.ofEpochSecond(1000).toString());
+    v1.put("reports", List.of(Map.of("checkpointId", "systemd-adapter")));
+    visits.add(v1);
+
+    final String yaml = MedicalRecordDump.toYaml(PATIENT, visits);
+
+    assertTrue(yaml.contains(PATIENT.qualifiedName()), () -> yaml);
+    assertTrue(yaml.contains("systemd-adapter"), () -> yaml);
+
+    final Map<String, Object> parsed = parseYaml(yaml);
+    assertEquals(PATIENT.qualifiedName(), parsed.get("patient"));
+    final List<Map<String, Object>> back = asListOfMaps(parsed.get("visits"));
+    assertEquals(1, back.size());
+    assertEquals(1, back.get(0).get("version"));
+    assertEquals(Instant.ofEpochSecond(1000).toString(), back.get(0).get("when"));
+  }
+
+  @Test
+  void toYaml_emptyTimeline_isValidYamlWithEmptyVisits() {
+    final String yaml = MedicalRecordDump.toYaml(PATIENT, List.of());
 
     final Map<String, Object> parsed = parseYaml(yaml);
     assertEquals(PATIENT.qualifiedName(), parsed.get("patient"));
@@ -167,12 +126,10 @@ class MedicalRecordDumpTest {
 
   @Test
   void dump_success_emitsFullRecordWithZeroExitAndNoFailures() {
-    final SnapshotSource source =
-        new FakeSnapshotSource()
-            .readable(entry(1), snapshotOf(Symptom.TIMEOUT))
-            .readable(entry(2), snapshotOf(Symptom.CONNECTION_REFUSED));
+    final MedicalRecordJournal journal =
+        journalOf(List.of(visit(1, "systemd-adapter"), visit(2, "cluster-readiness")));
 
-    final MedicalRecordDump.Result result = MedicalRecordDump.dump(PATIENT, source);
+    final MedicalRecordDump.Result result = MedicalRecordDump.dump(PATIENT, journal);
 
     assertEquals(0, result.exitCode());
     assertTrue(result.failures().isEmpty());
@@ -181,17 +138,12 @@ class MedicalRecordDumpTest {
   }
 
   @Test
-  void dump_oneEntryUnreadable_dumpsThePartialAndSurfacesTheFailureWithNonZeroExit() {
-    final SnapshotEntry v2 = entry(2);
-    final SnapshotContentException leaf =
-        new SnapshotContentException(location(2), new IllegalStateException("broken checkpoint"));
-    final SnapshotSource source =
-        new FakeSnapshotSource()
-            .readable(entry(1), snapshotOf(Symptom.TIMEOUT))
-            .failing(v2, leaf)
-            .readable(entry(3), snapshotOf(Symptom.CONNECTION_REFUSED));
+  void dump_oneEntryMalformed_dumpsThePartialAndSurfacesTheFailureWithNonZeroExit() {
+    final MedicalRecordJournal journal =
+        journalOf(
+            List.of(visit(1, "systemd-adapter"), brokenVisit(), visit(3, "cluster-readiness")));
 
-    final MedicalRecordDump.Result result = MedicalRecordDump.dump(PATIENT, source);
+    final MedicalRecordDump.Result result = MedicalRecordDump.dump(PATIENT, journal);
 
     // The caller decided: a partial record is still emitted (the two readable visits).
     assertNotEquals(0, result.exitCode());
@@ -200,19 +152,7 @@ class MedicalRecordDumpTest {
     assertEquals(2, visits.size());
     assertEquals(List.of(1, 3), visits.stream().map(v -> v.get("version")).toList());
 
-    // The failure is SURFACED, not swallowed: identity (version) + the leaf's location are
-    // reportable.
+    // The failure is SURFACED, not swallowed.
     assertFalse(result.failures().isEmpty());
-    final String report = String.join("\n", result.failures());
-    assertTrue(report.contains("2"), () -> report);
-    assertTrue(report.contains(location(2)), () -> report);
-  }
-
-  /**
-   * Parsed YAML visits are a list of {@code Map<String, Object>} by the dump's documented shape.
-   */
-  @SuppressWarnings("unchecked")
-  private static List<Map<String, Object>> asListOfMaps(Object value) {
-    return (List<Map<String, Object>>) value;
   }
 }

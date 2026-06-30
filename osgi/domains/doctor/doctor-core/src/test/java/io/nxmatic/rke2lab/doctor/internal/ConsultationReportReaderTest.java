@@ -1,10 +1,9 @@
-package io.nxmatic.rke2lab.controlplane.bdd;
+package io.nxmatic.rke2lab.doctor.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.doctor.port.ConsultationReportReader;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.records.Observation;
@@ -14,7 +13,6 @@ import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
 import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
-import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
 import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import java.util.LinkedHashMap;
@@ -43,7 +41,10 @@ class ConsultationReportReaderTest {
     final RemediationPlan plan =
         new RemediationPlan(
             Symptom.CONNECTION_REFUSED,
-            List.of(ReferralReplies.treating(prescription)),
+            List.of(
+                ReferralReply.reconstructed(
+                    Assessment.of(SchemaRef.of("test/why/v1"), Map.of(), "test reasoning"),
+                    Optional.of(prescription))),
             "adapter unreachable");
     return new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(observation), plan);
   }

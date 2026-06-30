@@ -1,9 +1,8 @@
-package io.nxmatic.rke2lab.doctor.port;
+package io.nxmatic.rke2lab.pulumi.edge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import io.nxmatic.rke2lab.doctor.records.*;
 import org.junit.jupiter.api.Test;
 
 final class StackCoordinateTest {

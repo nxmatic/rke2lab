@@ -1,27 +1,19 @@
 package io.nxmatic.rke2lab.pulumi.edge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.doctor.port.InterventionReader;
-import io.nxmatic.rke2lab.doctor.records.Intervention;
-import io.nxmatic.rke2lab.doctor.records.ProblemRef;
-import io.nxmatic.rke2lab.doctor.records.Provenance;
-import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.pulumi.edge.testkit.GrpcChannelNoiseCapture;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import java.nio.file.Path;
-import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -31,6 +23,13 @@ import org.junit.jupiter.api.io.TempDir;
  * Both cases drive a real Pulumi inline {@code up()} via the writer, so this class is tagged {@code
  * host} + {@code live} (excluded from the default run) and registers {@link
  * GrpcChannelNoiseCapture} for the benign gRPC channel noise the inline deployment leaves behind.
+ *
+ * <p>The host can no longer parse interventions into typed records (that fold moved OSGi-internal),
+ * so the read-back asserts on the opaque {@code intervention} {@link Document}s the host READ port
+ * ({@link StackInterventionJournal}) yields: one Document per history entry, carrying the raw
+ * {@code interventions} output blob in its JSON {@code payload()}. Reconstruction of typed {@code
+ * Intervention} records is proven OSGi-side (doctor-core in-container tests) and by the
+ * full-reactor build.
  */
 @Tag("host")
 @Tag("live")
@@ -41,116 +40,72 @@ final class PulumiInterventionLedgerWriterLiveTest {
 
   @Test
   void appendInterventionToLedgerStack(@TempDir Path backendDir) throws Exception {
-    // Build an intervention
-    final Intervention it1 =
-        new Intervention(
-            Provenance.OPERATOR_MANUAL,
-            Instant.parse("2026-06-14T09:30:00Z"),
-            "nft delete ...",
-            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
-            Optional.empty(),
-            Map.of());
-
-    // Append it (does an out-of-run up()) as the canonical intervention Document the seam carries.
+    // Append the canonical intervention Document the write seam carries (does an out-of-run up()).
     final InterventionLedgerWriter writer = new PulumiInterventionLedgerWriter(backendDir);
-    writer.append(canonical(it1));
+    writer.append(canonical("nft delete ..."));
 
-    // Read back via StackHandle
-    final StackHandle handle =
-        StackHandle.forBackend(
-            backendDir, InterventionLedgerLayout.PROJECT, InterventionLedgerLayout.STACK);
+    // Read back via the host READ journal: one opaque intervention Document, no typed fold.
+    final List<Document> entries = new StackInterventionJournal(backendDir).entries();
 
-    final Optional<StackSnapshot> snapshotOpt = handle.currentSnapshot();
-    assertTrue(snapshotOpt.isPresent(), "Stack should have a snapshot after append");
+    assertEquals(1, entries.size(), "Should have exactly one intervention Document");
 
-    final StackSnapshot snapshot = snapshotOpt.get();
-    final List<Object> interventions = snapshot.outputsNamed(InterventionLedgerLayout.OUTPUT_KEY);
-
-    assertEquals(1, interventions.size(), "Should have exactly one intervention");
-
-    final Object raw = interventions.get(0);
-    assertNotNull(raw, "Intervention output should not be null");
-
-    final Optional<Intervention> roundTripped = InterventionReader.fromOutputMap(raw);
-    assertTrue(roundTripped.isPresent(), "Intervention should parse from output map");
-
-    final Intervention it1Back = roundTripped.get();
-    assertEquals(Provenance.OPERATOR_MANUAL, it1Back.provenance());
-    assertEquals(Instant.parse("2026-06-14T09:30:00Z"), it1Back.when());
-    assertEquals("nft delete ...", it1Back.what());
+    final Document document = entries.get(0);
     assertEquals(
-        ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED), it1Back.problem());
-    assertFalse(it1Back.prescriptionRef().isPresent());
-    assertEquals(Map.of(), it1Back.details());
+        Coordinate.INTERVENTION.slug(),
+        document.coordinate(),
+        "Document carries the canonical intervention coordinate");
+
+    final String payload = document.payload();
+    assertTrue(
+        payload.contains("nft delete ..."), "payload carries the raw 'what' text: " + payload);
+    assertTrue(
+        payload.contains("operator-manual"), "payload carries the raw provenance id: " + payload);
+    assertTrue(
+        payload.contains("systemd-adapter/connection-refused"),
+        "payload carries the raw problem ref: " + payload);
   }
 
   /**
    * The accumulation contract: two appends produce TWO history entries, each carrying its own
    * intervention — even though both share the one stable resource name. Accumulation is the history
-   * fold, not many resources in one snapshot; this is what {@link InterventionLedgerSource} (Task
-   * 7) folds. Same-instant + same-provenance interventions must BOTH survive (no resource-name
-   * collision loss).
+   * fold, not many resources in one snapshot. Same-instant + same-provenance interventions must
+   * BOTH survive (no resource-name collision loss). The host walks them as two opaque Documents;
+   * the blob→ledger fold happens OSGi-side.
    */
   @Test
   void twoAppendsProduceTwoRecoverableHistoryEntries(@TempDir Path backendDir) throws Exception {
-    final Instant sameInstant = Instant.parse("2026-06-14T09:30:00Z");
-    final Intervention it1 =
-        new Intervention(
-            Provenance.OPERATOR_MANUAL,
-            sameInstant,
-            "first fix",
-            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
-            Optional.empty(),
-            Map.of());
-    final Intervention it2 =
-        new Intervention(
-            Provenance.OPERATOR_MANUAL,
-            sameInstant,
-            "second fix",
-            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
-            Optional.empty(),
-            Map.of());
-
     final InterventionLedgerWriter writer = new PulumiInterventionLedgerWriter(backendDir);
-    writer.append(canonical(it1));
-    writer.append(canonical(it2));
+    writer.append(canonical("first fix"));
+    writer.append(canonical("second fix"));
 
-    final StackHandle handle =
-        StackHandle.forBackend(
-            backendDir, InterventionLedgerLayout.PROJECT, InterventionLedgerLayout.STACK);
-
-    final List<StackHistory.Entry> entries = handle.history().entries();
+    final List<Document> entries = new StackInterventionJournal(backendDir).entries();
     assertEquals(2, entries.size(), "two appends must write two history entries");
 
-    // Fold each entry to the intervention it carries — the read model Task 7 implements.
-    final List<String> whats =
-        entries.stream()
-            .map(
-                entry -> {
-                  try {
-                    final StackSnapshot snapshot = handle.snapshotOf(entry);
-                    final Object raw =
-                        snapshot.outputsNamed(InterventionLedgerLayout.OUTPUT_KEY).get(0);
-                    return InterventionReader.fromOutputMap(raw).orElseThrow().what();
-                  } catch (Exception e) {
-                    throw new RuntimeException(e);
-                  }
-                })
-            .toList();
-
-    assertTrue(whats.contains("first fix"), "the first append must survive in history");
-    assertTrue(whats.contains("second fix"), "the second append must survive in history");
+    final List<String> payloads = entries.stream().map(Document::payload).toList();
+    assertTrue(
+        payloads.stream().anyMatch(p -> p.contains("first fix")),
+        "the first append must survive in history");
+    assertTrue(
+        payloads.stream().anyMatch(p -> p.contains("second fix")),
+        "the second append must survive in history");
   }
 
   /**
-   * Wrap an intervention into the canonical {@code intervention} Document the write seam carries.
+   * Build the canonical {@code intervention} Document the write seam carries: a flat JSON payload
+   * (the {@code Intervention.toOutputMap} wire shape, owned OSGi-side) wrapped in the neutral
+   * envelope. The host holds no doctor record types, so it assembles the wire fields directly.
    */
-  private static Document canonical(Intervention intervention) {
+  private static Document canonical(String what) {
+    final Map<String, Object> outputMap = new LinkedHashMap<>();
+    outputMap.put("provenance", "operator-manual");
+    outputMap.put("when", "2026-06-14T09:30:00Z");
+    outputMap.put("what", what);
+    outputMap.put("problem", Checkpoint.SYSTEMD_ADAPTER.slug() + "/" + "connection-refused");
     try {
       return new Document(
           Domain.DOCTOR.slug(),
           Coordinate.INTERVENTION.slug(),
-          new ObjectMapper().writeValueAsString(intervention.toOutputMap()));
+          new ObjectMapper().writeValueAsString(outputMap));
     } catch (Exception e) {
       throw new IllegalStateException(e);
     }

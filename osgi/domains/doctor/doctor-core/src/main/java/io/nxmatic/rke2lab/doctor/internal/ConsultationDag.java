@@ -1,8 +1,8 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
+import io.nxmatic.rke2lab.doctor.port.InterventionJournal;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.doctor.port.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.doctor.records.ClinicianId;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
@@ -30,6 +30,7 @@ public final class ConsultationDag {
       Patient patient,
       MedicalRecordRegistry registry,
       InterventionLedgerWriter ledgerWriter,
+      InterventionJournal interventionJournal,
       List<Specialist> roster,
       Consumer<String> logger) {
     final ClinicianId generalistId = Generalist.GENERALIST_ID;
@@ -45,6 +46,7 @@ public final class ConsultationDag {
         .specialists(roster)
         .access(access)
         .driftSpecialist(new DriftSpecialist(ledgerWriter))
+        .interventionJournal(interventionJournal)
         .build();
   }
 }

@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.doctor.port;
+package io.nxmatic.rke2lab.pulumi.edge;
 
 /**
  * Base failure of the observation port: the snapshot that should have been readable could not be

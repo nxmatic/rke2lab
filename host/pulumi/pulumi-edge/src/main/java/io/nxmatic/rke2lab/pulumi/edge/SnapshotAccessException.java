@@ -1,4 +1,4 @@
-package io.nxmatic.rke2lab.doctor.port;
+package io.nxmatic.rke2lab.pulumi.edge;
 
 /**
  * Access failure — the source was absent, unreadable, or denied. Retrying may succeed if the source

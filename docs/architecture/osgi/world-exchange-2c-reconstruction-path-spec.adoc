@@ -156,6 +156,33 @@ The host implements `DocumentJournal` (Layer 1: it reads the stack and yields op
 write port carries a Document the host persists opaquely. The review verb takes only a checkpoint and
 returns nothing.
 
+=== Implementation note — two focused READ journals, no-arg `reviewDrift()`
+
+As built (zone-3b), the single placeholder `DocumentJournal.historyOf(Checkpoint)` resolved into TWO
+focused, host-published READ ports — both carrying only `List<Document>` (opaque JSON-String blobs),
+both in `doctor-port` (`type=seam`), neither referencing any `doctor.records` type:
+
+* `MedicalRecordJournal.historyOf(Patient) → List<Document>` — the patient's own stack timeline, one
+  `visit` Document per readable history entry (payload = `version` + `when` + the raw
+  `consultationReport`/`expectations` output blob lists, coordinate `VISIT`). It also exposes
+  `cohort(Patient) → List<Patient>` (the sibling enumeration is Layer-1 host knowledge). The host impl
+  is `StackMedicalRecordJournal` (pulumi-edge); OSGi's `JournalMedicalRecordRegistry` `@Component`
+  (`@Reference MedicalRecordJournal`) folds the blobs into a `MedicalRecord` via the moved
+  `MedicalRecordReader` + `ConsultationReportReader`/`ExpectationReader`.
+* `InterventionJournal.entries() → List<Document>` — the one fixed `intervention-ledger/dev` stack's
+  history, one `intervention` Document per entry (payload = the raw `interventions` blob), UNKEYED
+  (there is exactly one ledger stack). The host impl is `StackInterventionJournal`; OSGi rebuilds the
+  `InterventionLedger` via the moved `InterventionReader` (the internal `InterventionLedgerReader`),
+  consumed by `Generalist.reviewDrift()`.
+
+The review verb is `ConsultingService.reviewDrift()` **no-arg** (not `reviewDrift(Checkpoint)`): the
+trace takes the patient from the held `ClinicalAccess` and the ledger from the `InterventionJournal`,
+so nothing reads a checkpoint. The host `DriftReview` class is absorbed into the verb + its single
+call site (`BootstrapPipeline.admitPatient` becomes `state.doctor.reviewDrift()`). `SnapshotView`,
+`SnapshotEntry`, `SnapshotSource`, and `StackCoordinate` become host-internal (Layer-1, pulumi-edge),
+and `MedicalRecordDump` goes host-pure (it reads its own `MedicalRecordJournal` timeline and transcodes
+the stored `consultationReport` blobs JSON→YAML, never calling OSGi).
+
 == The design proven on two real cases
 
 The peer model was not asserted — it was traced end-to-end on the two real call paths.

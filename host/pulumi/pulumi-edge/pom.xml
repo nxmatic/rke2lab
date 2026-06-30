@@ -28,6 +28,15 @@
       <artifactId>doctor-port</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- The journals carry world-gateway seam types directly (Document, Patient, Coordinate, Domain,
+         WorldGatewayCatalog): the host produces opaque visit/intervention Documents that only OSGi
+         deserializes. Declared explicitly since pulumi-edge names these types itself, not just
+         transitively through doctor-port. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>world-gateway</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.pulumi</groupId>
       <artifactId>pulumi</artifactId>
