@@ -113,59 +113,116 @@ git commit -m "feat(2d): pin + bundle networknt json-schema-validator (realm lib
 
 ---
 
-## Task 2: The per-realm DocumentCodec (zone-0b) — BOTH realms, wired, validation OFF
+## Task 2: The DocumentCodec (zone-0b) — ONE source, loaded per realm, validation OFF
 
 **Files:**
-- Create: `osgi/domains/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/DocumentCodec.java` (OSGi `@Component`)
-- Create: `exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/DocumentCodec.java` (host plain instance)
-- Test: `osgi/domains/doctor/doctor-core-test/.../DocumentCodecTest.java` (OSGi side)
-- Test: `exec/seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/DocumentCodecTest.java` (host side)
+- Create: `osgi/foundation/document-codec/pom.xml` (a plain flat jar — NO bnd, NO embed capability)
+- Create: `osgi/foundation/document-codec/src/main/java/io/nxmatic/rke2lab/document/DocumentCodec.java`
+- Create: `osgi/foundation/document-codec/src/test/java/io/nxmatic/rke2lab/document/DocumentCodecTest.java`
+- Modify: `osgi/foundation/pom.xml` (add the module)
+- Modify: `osgi/domains/doctor/doctor-core/pom.xml` (depend on document-codec) + `bnd.bnd` (nest it)
+- Modify: `exec/seed-master/pom.xml` (depend on document-codec — shaded flat)
 
 **Interfaces:**
-- Produces (BOTH realms, identical shape): `DocumentCodec` with `String encode(JsonNode)`, `JsonNode decode(String)`, and `boolean validate(String payload, String schemaSlug)` that is INERT (returns `true`) when the validation flag is off.
+- Produces: `io.nxmatic.rke2lab.document.DocumentCodec` with `String encode(JsonNode)`, `JsonNode decode(String)`, `boolean validate(String payload, String schemaSlug)` (INERT — returns `true` — while validation is off), and `DocumentCodec withValidation(boolean)`. ONE class, consumed by both realms.
 
-**Why two classes, not one (decision 5.2):** the codec uses jackson, and since the realm-library isolation (commit `ae46278b`) jackson is loaded per realm — a flat copy host-side, a bundle copy OSGi-side. A shared codec class is therefore impossible: it cannot live in the `world-gateway` seam (`type=seam`, String-only, forbidden from exposing a jackson type), the OSGi copy binds to the bundle's jackson (`@Component` in doctor-core), and the host copy binds to the flat jackson (plain instance in seed-master). The two classes carry identical LOGIC but are bound to different `ObjectMapper` classes — the duplication is the realm boundary made concrete (the same reason jackson itself is dual-staged), NOT a DRY violation. The seam stays String-only; no jackson type crosses it.
+**NEW PATTERN — nesting one of OUR OWN flat modules into a bundle classpath (decision 5.2).** Until now we have nested only THIRD-PARTY jars (cdk8s, dbus-java, jsr310) into a carrier's Bundle-ClassPath. This task nests one of our own modules the same way, and it is the first time — capture it as a project pattern if the build proves it out. The reasoning:
 
-- [ ] **Step 1: Write the failing test — codec round-trips and validation is inert by default**
+The codec uses jackson, which since the realm-library isolation (commit `ae46278b`) is loaded per realm — flat host-side, bundle OSGi-side. We want ONE source of codec logic, but TWO runtime copies each bound to its realm's jackson, and NO codec type crossing the String-only seam. The carrier/nesting mechanism delivers exactly that WITHOUT touching the staging rules:
 
+- `document-codec` is a **plain flat jar** — no `Bundle-SymbolicName`, no `Provide-Capability`. So `StagingClosure.isRealmLibrary` (which requires `b.isBundle()`) never selects it for autonomous bundle staging; it is invisible to the realm-library rule.
+- The **host** (`seed-master`) depends on it normally → it is shaded **flat** into the uber-jar, binding to the host's flat jackson — like any host dependency.
+- **OSGi** (`doctor-core`) depends on it AND nests it via `-includeresource: document-codec-*.jar;lib:=true` → its classes ride doctor-core's Bundle-ClassPath, binding to the bundle's jackson — exactly the cdk8s/jsr310 mechanism.
+- `DUPLICATE_REALM_CLASS` is NOT triggered: its violation is `flat ∧ seamSurface`, and `io.nxmatic.rke2lab.document` is not a seam package (no `type=seam` bundle exports it). flat∧nested is fine.
+- It lives in `osgi/foundation/` because that aggregate builds BEFORE `host`/`exec` (so doctor-core can nest it AND seed-master can depend on it — `world-gateway` already proves foundation→host visibility), and because `host/` builds after `osgi/`, so the codec could NOT live host-side (doctor-core could not depend on an unbuilt host module).
+
+**No `@Component` in 2D (YAGNI).** The spec foresaw an `@Component` twin of `YamlMapper`, but in 2D nothing injects the codec by `@Reference` — the ~19 payload-construction sites use `new ObjectMapper()` and migrating them is the §8 follow-up (`document-codec-instance-in-2d-backlog`). So the codec is a plain class consumed by `new DocumentCodec()`. When the migration lands, a thin `@Component` in doctor-core can publish it (DS reads the host bundle's own classes, not nested jars — so the `@Component`, if added then, lives in doctor-core's own `src`, delegating to the nested codec; same shape as `Cdk8sApps`).
+
+- [ ] **Step 1: Create the `document-codec` module pom (flat jar, jackson dependency)**
+
+`osgi/foundation/document-codec/pom.xml`:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>io.nxmatic.rke2lab</groupId>
+    <artifactId>bundle-parent</artifactId>
+    <version>0.0.0-SNAPSHOT</version>
+    <relativePath>../../bundle-parent/pom.xml</relativePath>
+  </parent>
+  <artifactId>document-codec</artifactId>
+  <name>osgi/foundation/document-codec</name>
+  <description>The Document payload codec logic, written once and loaded per realm: shaded flat into
+    the host, nested into doctor-core's Bundle-ClassPath OSGi-side (-includeresource;lib:=true). A
+    plain flat jar (no Bundle-SymbolicName) so the realm-library rule never stages it as an
+    autonomous bundle — each realm binds it to its own jackson, no codec type crosses the seam.</description>
+  <dependencies>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+  </dependencies>
+</project>
+```
+NOTE: confirm `bundle-parent` does not force a bnd `Bundle-SymbolicName` on every child. If it does (the parent runs bnd-process by default), this module must instead inherit from a plain-jar parent or disable the bnd execution — the module MUST emit a plain jar with no OSGi manifest, or `isRealmLibrary` could pick it up. Verify the produced `target/document-codec-*.jar` MANIFEST.MF has NO `Bundle-SymbolicName` before proceeding; if it has one, switch the parent to `build-parent` (the non-bundle parent) and re-verify.
+
+- [ ] **Step 2: Add the module to `osgi/foundation/pom.xml`**
+
+Add `<module>document-codec</module>` to the `<modules>` list (alongside `world-gateway`, `domain-annotations`, `pipeline`).
+
+- [ ] **Step 3: Write the failing test**
+
+`osgi/foundation/document-codec/src/test/java/io/nxmatic/rke2lab/document/DocumentCodecTest.java`:
 ```java
-// DocumentCodecTest.java
-@Test
-void encodeDecodeRoundTripsAndValidationIsInertByDefault() {
-  final DocumentCodec codec = new DocumentCodec();
-  final String json = codec.encode(codec.decode("{\"action\":\"hold\"}"));
-  assertTrue(json.contains("\"action\""));
-  // validation OFF in embedded: a payload that does NOT match any schema still passes
-  assertTrue(codec.validate("{\"unexpected\":1}", "readiness-verdict"),
-      "validation is wired but OFF in embedded — the OSGi reader is the implicit validator");
+package io.nxmatic.rke2lab.document;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
+
+class DocumentCodecTest {
+
+  @Test
+  void encodeDecodeRoundTripsAndValidationIsInertByDefault() {
+    final DocumentCodec codec = new DocumentCodec();
+    final String json = codec.encode(codec.decode("{\"action\":\"hold\"}"));
+    assertTrue(json.contains("\"action\""));
+    // validation OFF by default: a payload matching no schema still passes (the embedded posture —
+    // the OSGi reader that parses the payload is the implicit validator).
+    assertTrue(codec.validate("{\"unexpected\":1}", "readiness-verdict"),
+        "validation is wired but OFF until the capstone turns it on");
+  }
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [ ] **Step 4: Run it to verify it fails**
 
-Run: `flox activate -- ./mvnw -pl :doctor-core-test -am test -DskipTests=false -Dtest=DocumentCodecTest -Pall-worlds`
+Run: `flox activate -- ./mvnw -pl :document-codec -am test -DskipTests=false`
 Expected: FAIL — `DocumentCodec` does not exist.
 
-- [ ] **Step 3: Implement `DocumentCodec` (twin of `YamlMapper`)**
+- [ ] **Step 5: Implement `DocumentCodec` (the single source)**
 
+`osgi/foundation/document-codec/src/main/java/io/nxmatic/rke2lab/document/DocumentCodec.java`:
 ```java
-package io.nxmatic.rke2lab.doctor;
+package io.nxmatic.rke2lab.document;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import org.osgi.service.component.annotations.Component;
 
 /**
- * The JSON (de)serialization + (capability) validation point for Document payloads in the OSGi
- * world — the JSON twin of the manifests domain's {@code YamlMapper}. A single {@code @Component}
- * so every payload build/parse shares one configured {@code ObjectMapper}; a plain {@code new
- * DocumentCodec()} is equally valid (tests). Runtime schema validation is WIRED but OFF in the
- * embedded build (the OSGi reader that parses a payload is the implicit validator); the remote
- * capstone turns it on via {@link #withValidation(boolean)}.
+ * The JSON (de)serialization + (capability) validation of {@code Document} payloads — the JSON
+ * analogue of the manifests domain's {@code YamlMapper}. Written ONCE here; loaded per realm: the
+ * host shades this jar flat (binding the host's flat jackson), and {@code doctor-core} nests it on
+ * its Bundle-ClassPath ({@code -includeresource;lib:=true}, binding the bundle's jackson). No codec
+ * type crosses the String-only world-gateway seam — each realm holds its own copy, exactly as
+ * jackson is dual-loaded. Runtime schema validation is WIRED but OFF by default (the embedded
+ * posture); the remote capstone flips it on via {@link #withValidation(boolean)}.
  */
-@Component(service = DocumentCodec.class)
 public final class DocumentCodec {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -202,7 +259,7 @@ public final class DocumentCodec {
   }
 
   /**
-   * Validate a payload against the coordinate's schema. INERT when validation is off (embedded):
+   * Validate a payload against the coordinate's schema. INERT while validation is off (embedded):
    * returns {@code true} without loading a schema. The capstone enables it; that path loads
    * {@code schema/<slug>.schema.json} from the classpath and runs networknt.
    */
@@ -210,44 +267,53 @@ public final class DocumentCodec {
     if (!validationEnabled) {
       return true;
     }
-    // capstone-only path; not exercised in embedded. networknt validation lands here.
     throw new UnsupportedOperationException(
         "runtime validation is enabled only by the remote capstone (schema=" + schemaSlug + ")");
   }
 }
 ```
 
-- [ ] **Step 4: Run the OSGi-side test to verify it passes**
+- [ ] **Step 6: Run the test to verify it passes**
 
-Run: `flox activate -- ./mvnw -pl :doctor-core-test -am test -DskipTests=false -Dtest=DocumentCodecTest -Pall-worlds`
-Expected: PASS.
+Run: `flox activate -- ./mvnw -pl :document-codec -am test -DskipTests=false`
+Expected: PASS. Then verify the jar is plain: `unzip -p osgi/foundation/document-codec/target/document-codec-0.0.0-SNAPSHOT.jar META-INF/MANIFEST.MF | grep -i Bundle-SymbolicName` → expect NO output (a plain jar; if a `Bundle-SymbolicName` appears, fix per Step 1's note before continuing).
 
-- [ ] **Step 5: Write the host-side failing test** (`exec/seed-master/.../controlplane/DocumentCodecTest.java`)
+- [ ] **Step 7: Wire the host (flat) — `exec/seed-master/pom.xml`**
 
-Same three assertions as Step 1, against `io.nxmatic.rke2lab.controlplane.DocumentCodec`:
-```java
-// host DocumentCodecTest.java — same behaviour, host realm
-@Test
-void encodeDecodeRoundTripsAndValidationIsInertByDefault() {
-  final DocumentCodec codec = new DocumentCodec();
-  final String json = codec.encode(codec.decode("{\"action\":\"hold\"}"));
-  assertTrue(json.contains("\"action\""));
-  assertTrue(codec.validate("{\"unexpected\":1}", "readiness-verdict"),
-      "validation is wired but OFF in embedded");
-}
+Add the dependency (managed version via the reactor):
+```xml
+<dependency>
+  <groupId>io.nxmatic.rke2lab</groupId>
+  <artifactId>document-codec</artifactId>
+</dependency>
 ```
-Run: `flox activate -- ./mvnw -pl :seed-master -am test-compile -DskipTests` then the focused test once the class exists — expect FAIL (class missing) first.
+The host shade includes it flat by default (it is NOT in the staging shade-exclude set — it is never staged as a bundle). No shade config change needed.
 
-- [ ] **Step 6: Implement the host `DocumentCodec`** — byte-identical logic to the OSGi one, WITHOUT the `@Component` annotation (the host has no DS), in package `io.nxmatic.rke2lab.controlplane`. Same `encode`/`decode`/`validate`/`withValidation`; the javadoc names it the host-realm twin of the OSGi `DocumentCodec`, bound to the host's flat jackson. Do NOT factor the two into a shared class — they are realm-bound (see Task 2 header). Do NOT migrate the ~19 dispersed payload-construction sites onto the codec — that is the §8 follow-up (`document-codec-instance-in-2d-backlog`), not a 2D blocker; this task only introduces the codec on each realm.
+- [ ] **Step 8: Wire OSGi (nested) — `doctor-core/pom.xml` + `bnd.bnd`**
 
-- [ ] **Step 7: Run the host-side test** — focused, expect PASS.
+In `doctor-core/pom.xml` add the same dependency. In `doctor-core/bnd.bnd` add the nesting (doctor-core has no `-includeresource` today — add one):
+```
+-includeresource: document-codec-*.jar;lib:=true
+```
+This puts the codec's classes on doctor-core's Bundle-ClassPath, bound to the jackson bundle doctor-core already imports. (doctor-core already imports `com.fasterxml.jackson.databind`, so the nested codec's jackson references resolve through doctor-core's existing wiring — no new Import-Package needed beyond what bnd computes.)
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Full reactor gate — prove the new pattern**
+
+Run: `flox activate -- ./mvnw clean package -DskipTests=false -Pall-worlds -Dmaven.build.cache.enabled=false`
+Expected: BUILD SUCCESS. Verify:
+- `unzip -l exec/seed-master/target/seed-master-0.0.0-SNAPSHOT-exec.jar | grep 'io/nxmatic/rke2lab/document/DocumentCodec'` → present FLAT (host copy).
+- `unzip -l exec/seed-master/target/seed-master-0.0.0-SNAPSHOT-exec.jar | grep 'META-INF/bundles/document-codec'` → ABSENT (not staged as an autonomous bundle).
+- `unzip -p exec/seed-master/target/.../META-INF/bundles/doctor-core.jar | …` — the doctor-core staged bundle contains `document-codec-*.jar` on its Bundle-ClassPath (nested copy).
+- gate summary: `duplicate-realm-class 0/0`, `realm-boundary 0/0` (the codec package is neither a seam nor a cross-realm collision).
+- `EmbeddedBundlesBootTest` still green.
+
+- [ ] **Step 10: Commit**
 
 ```bash
-git add osgi/domains/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/DocumentCodec.java osgi/domains/doctor/doctor-core-test/ exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/DocumentCodec.java exec/seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/DocumentCodecTest.java
-git commit -m "feat(2d): per-realm DocumentCodec — OSGi @Component + host instance, validation wired-but-off"
+git add osgi/foundation/pom.xml osgi/foundation/document-codec/ osgi/domains/doctor/doctor-core/pom.xml osgi/domains/doctor/doctor-core/bnd.bnd exec/seed-master/pom.xml
+git commit -m "feat(2d): DocumentCodec — one source in foundation, shaded flat host-side, nested OSGi-side"
 ```
+(If the build proves the pattern, record it: a memory note `nesting-our-own-flat-module-into-a-bundle` — the first time we nest one of our own modules, not a third-party jar, into a Bundle-ClassPath. See the final review.)
 
 ---
 
