@@ -80,7 +80,7 @@ public final class BootPlanner {
       }
     }
 
-    final Set<String> exports = deriveSystemExports(request, models);
+    final Set<String> exports = deriveSystemExports(request, models, stack);
 
     // Close over the stack's MANDATORY imports: a package a stacked bundle imports that no stacked
     // bundle exports and the system bundle does not export either (so it cannot resolve host-flat),
@@ -137,21 +137,26 @@ public final class BootPlanner {
    * on a remaining package the host classloader cannot resolve — a real missing dependency,
    * surfaced here rather than as an opaque NoClassDefFoundError once SCR injects.
    */
-  private Set<String> deriveSystemExports(BootRequest request, List<BundleLocation> models)
+  private Set<String> deriveSystemExports(
+      BootRequest request, List<BundleLocation> models, List<Installable> stack)
       throws IOException {
     final Set<String> exports = new LinkedHashSet<>(request.explicitSystemPackages());
     final List<BundleManifest> manifests = new ArrayList<>();
     for (BundleLocation model : models) {
       manifests.add(BundleManifest.from(model));
     }
-    final Set<String> bundleExportedPackages = new LinkedHashSet<>();
-    for (BundleManifest manifest : manifests) {
-      bundleExportedPackages.addAll(manifest.exports().names());
+    final Set<String> installedExportedPackages = new LinkedHashSet<>();
+    for (Installable installable : stack) {
+      installedExportedPackages.addAll(
+          discovery.manifestOf(installable.location()).exports().names());
     }
     for (BundleManifest manifest : manifests) {
       exports.addAll(manifest.imports().asSystemExports());
     }
-    exports.removeIf(e -> bundleExportedPackages.contains(Clause.parse(e).name()));
+    // A package an installed bundle exports is provided bundle-to-bundle inside the framework —
+    // re-exporting it from the system bundle would split the class. This covers domain bundles
+    // (their own exports) AND staged realm libraries (jackson): the same rule, one source.
+    exports.removeIf(e -> installedExportedPackages.contains(Clause.parse(e).name()));
     // The seam guard. A package owned by a domain bundle (type=model/edge) loads on the BUNDLE side
     // of the seam: its bundle is the sole exporter, never the system bundle. If such a package
     // still

@@ -88,6 +88,34 @@ final class BootPlannerTest {
   }
 
   @Test
+  void aStagedRealmLibraryIsNotMirroredIntoSystemExports(@TempDir Path dir) throws IOException {
+    // doctor-core (model) imports com.fasterxml.jackson.databind; jackson-databind is ALSO staged
+    // as
+    // a bundle (a realm library). Because an installed bundle now provides the package, it must NOT
+    // be system-exported — the bundle is the sole in-framework provider, wired bundle-to-bundle.
+    stage(
+        dir,
+        "model.jar",
+        Map.of(
+            "Bundle-SymbolicName", "com.example.model",
+            "Provide-Capability", EMBED + ";type=model",
+            "Export-Package", "com.example.model.api",
+            "Import-Package", "com.fasterxml.jackson.databind"));
+    stage(
+        dir,
+        "jackson-databind.jar",
+        Map.of(
+            "Bundle-SymbolicName", "com.fasterxml.jackson.core.jackson-databind",
+            "Export-Package", "com.fasterxml.jackson.databind"));
+
+    final BootPlan plan = planOf(dir, p -> true); // host carries jackson flat too
+
+    assertTrue(
+        plan.systemPackagesExtra().stream().noneMatch(e -> e.startsWith("com.fasterxml.jackson")),
+        "a package an installed bundle exports is NOT mirrored — it wires bundle-to-bundle");
+  }
+
+  @Test
   void closesOverFelixScrImportsPullingTheSpecJarAtPassiveLevel(@TempDir Path dir)
       throws IOException {
     // felix.scr (a boot-stack jar, matched by symbolic name) imports a DS-API package that no
