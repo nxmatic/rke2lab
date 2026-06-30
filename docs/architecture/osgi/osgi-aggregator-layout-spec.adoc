@@ -4,12 +4,34 @@
 
 [NOTE]
 ====
-Design hors-bande (2026-06-28), pas encore intégré ni implémenté. Produit dans
-une conversation tandis qu'une autre travaille le world-exchange 2B (qui touche
-`osgi/exchange/exchange-port` — renommé `world-gateway` ici). L'intégration et
-l'implémentation sont décrites dans le prompt jumeau
-`osgi-aggregator-layout-spec.prompt` (worktree dédié obligatoire). Cette spec est
-*descriptive* : elle ne mute aucun pom.
+Design hors-bande (2026-06-28), **IMPLEMENTED** (2026-06-30, commits a05dd52c..46c7cdf0 on
+feature/cluster-edge). Shipped layout-first before world-exchange 2C, with two deliberate
+divergences from this spec recorded below. All tests green, full reactor BUILD SUCCESS
+confirmed.
+====
+
+[NOTE]
+====
+**What actually shipped (2026-06-30)** — two deliberate divergences from this spec:
+
+1. **The runtime leaf is named `launcher`, NOT `runtime-host`** (§5.2 prescribed
+   `runtime-host`). During execution, the user rejected `runtime-host` as a
+   collision-patch and chose `launcher` — the ACT of launching (FrameworkLauncher +
+   BootPipeline.embedded), pairing with `boot/` (the decision). Short like boot/bench.
+   The directory is `osgi/runtime/launcher/`, artifactId `launcher`, and the 3 exec
+   consumers (seed-master, manifests-cli, netplan-cli) depend on `launcher`.
+
+2. **The jgiven→pipeline regroup WAS done (the SAFE half), export-fusion is STILL deferred**.
+   §5.4 prescribed "dissolve jgiven into pipeline"; §8 said "no fusion" (a contradiction).
+   What shipped: jgiven was REGROUPED under a `pipeline/` aggregator as pipeline-port (the
+   grammar seam, was `pipeline`), pipeline-jgiven (was jgiven-wrap), pipeline-testkit,
+   pipeline-probe, pipeline-probe-test — layout-only, NO export fusion. pipeline-port exports
+   ONLY `io.nxmatic.rke2lab.pipeline` (type=seam), pipeline-jgiven stays a separate bundle
+   exporting `com.tngtech.jgiven.*`. Packages and BSNs unchanged (jgiven name survives in
+   package/BSN; only Maven artifactIds renamed). The DANGEROUS part of §5.4 — making the
+   pipeline SEAM export com.tngtech.jgiven.* (which would put jGiven in two realms →
+   LinkageError) — is STILL deferred and remains the backlog (see memory file
+   [[jgiven-dissolution-is-a-realm-change-backlog]]).
 ====
 
 [abstract]
