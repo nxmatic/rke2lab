@@ -18,11 +18,8 @@
   <modules>
     <module>bundle-parent</module>
     <module>bundle-test-parent</module>
-    <module>boot</module>
-    <module>junit-testkit</module>
-    <module>runtime</module>
-    <module>bench</module>
     <module>foundation</module>
+    <module>runtime</module>
     <module>domains</module>
   </modules>
 </project>

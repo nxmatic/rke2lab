@@ -6,33 +6,29 @@
     <groupId>io.nxmatic.rke2lab</groupId>
     <artifactId>bundle-parent</artifactId>
     <version>0.0.0-SNAPSHOT</version>
-    <relativePath>../../bundle-parent/pom.xml</relativePath>
+    <relativePath>../../../bundle-parent/pom.xml</relativePath>
   </parent>
 
-  <artifactId>bench-scr-consumer</artifactId>
-  <name>osgi/bench/bench-scr-consumer</name>
-  <description>A @Component with a mandatory @Reference Greeter that publishes GreetingClient only
-    once bound — the BIND half and the anti-cheat, alone in its bundle so it can start without the
-    provider and be observed unsatisfied.</description>
+  <artifactId>bench-host</artifactId>
+  <name>osgi/bench/bench-host</name>
+  <description>Bench bundle that PROVIDES the metatype and component extenders (@Capability generates
+    the Provide-Capability headers) — the host side of the extender contract.</description>
 
   <dependencies>
     <dependency>
       <groupId>org.osgi</groupId>
       <artifactId>osgi.core</artifactId>
     </dependency>
-    <dependency>
-      <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>bench-scr-api</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <!-- bnd-consumed: @Component / @Reference generate OSGI-INF/*.xml + the Service-Component header -->
+    <!-- bnd-consumed construction annotations: @Capability declares the Provide bnd generates -->
     <dependency>
       <groupId>org.osgi</groupId>
-      <artifactId>org.osgi.service.component.annotations</artifactId>
+      <artifactId>org.osgi.annotation.bundle</artifactId>
       <scope>provided</scope>
     </dependency>
   </dependencies>
 
+  <!-- bnd execution + jar manifestFile inherited from osgi/bundle-parent; the bare
+       reference activates the managed bnd-process goal. -->
   <build>
     <plugins>
       <plugin>
