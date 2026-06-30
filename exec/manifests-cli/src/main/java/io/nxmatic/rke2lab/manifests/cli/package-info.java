@@ -1,13 +1,8 @@
 /**
- * The manifests CLI exec. Governed at {@code DUPLICATE_REALM_CLASS = WARN}: cdk8s (org.cdk8s /
- * software.constructs) is exported by the staged manifests carriers AND present flat in this
- * assembly — a pre-existing two-realm duplication, listed as a shrinking backlog until the carrier
- * topology is corrected (its own increment). Drop this pose to return to the locked ERROR default
- * once the debt is cleared.
+ * The manifests CLI exec. {@code DUPLICATE_REALM_CLASS} is build-enforced at its locked ERROR
+ * default. cdk8s is a legitimate dual-realm library: the host shades it flat while the OSGi
+ * manifests world stages it as a bundle copy — cdk8s objects never cross the seam, so the
+ * seam-purity derivation exempts the flat∧staged duplication (no seam exports org.cdk8s /
+ * software.constructs).
  */
-@GovernedBy(value = StagingGate.DUPLICATE_REALM_CLASS, level = EnforcementLevel.WARN)
 package io.nxmatic.rke2lab.manifests.cli;
-
-import io.nxmatic.rke2lab.domain.annotations.EnforcementLevel;
-import io.nxmatic.rke2lab.domain.annotations.GovernedBy;
-import io.nxmatic.rke2lab.domain.annotations.StagingGate;
