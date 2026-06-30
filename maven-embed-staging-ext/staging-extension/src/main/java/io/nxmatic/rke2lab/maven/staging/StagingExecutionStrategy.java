@@ -315,16 +315,17 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
         usage.indexCatalog(catalogClass);
       }
 
-      // Index Coordinate enum constants to their slugs (hardcoded map for now — the 6 from
-      // Coordinate)
-      final Map<String, String> coordMap = new java.util.LinkedHashMap<>();
-      coordMap.put("READINESS_CHECKPOINT", "readiness-checkpoint");
-      coordMap.put("READINESS_VERDICT", "readiness-verdict");
-      coordMap.put("CONSULTATION", "consultation");
-      coordMap.put("INTERVENTION_REQUEST", "intervention-request");
-      coordMap.put("INTERVENTION", "intervention");
-      coordMap.put("VISIT", "visit");
-      usage.indexCoordinate(coordMap);
+      // Index Coordinate enum constants to their slugs from bytecode
+      byte[] coordinateClass = null;
+      for (ResolvedBundle.ClassEntry c : worldGatewayBundle.classEntries()) {
+        if (c.binaryName().equals("io/nxmatic/rke2lab/world/gateway/port/Coordinate")) {
+          coordinateClass = c.bytes();
+          break;
+        }
+      }
+      if (coordinateClass != null) {
+        usage.indexCoordinate(coordinateClass);
+      }
 
       // Scan all staged bundle classes to discover FIELD_* usage per coordinate
       for (ResolvedBundle b : closure.staged()) {

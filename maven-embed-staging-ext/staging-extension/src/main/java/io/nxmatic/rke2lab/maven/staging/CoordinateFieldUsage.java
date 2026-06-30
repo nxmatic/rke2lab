@@ -52,10 +52,51 @@ final class CoordinateFieldUsage {
   }
 
   /**
-   * Provide the Coordinate enum's constant→slug map (parsed from the enum source or a known map).
+   * Index the Coordinate enum's constant→slug map by reading the enum's {@code <clinit>} bytecode.
+   * Pattern per constant: {@code ldc "NAME" → ldc "slug" → invokespecial → putstatic NAME}. The
+   * trailing {@code $VALUES} field is excluded by filtering on the exact field descriptor.
    */
-  void indexCoordinate(Map<String, String> constToSlug) {
-    coordinateConstToSlug.putAll(constToSlug);
+  void indexCoordinate(byte[] coordinateClass) {
+    new ClassReader(coordinateClass)
+        .accept(
+            new ClassVisitor(Opcodes.ASM9) {
+              @Override
+              public MethodVisitor visitMethod(int a, String n, String d, String s, String[] e) {
+                if (!"<clinit>".equals(n)) {
+                  return null;
+                }
+                return new MethodVisitor(Opcodes.ASM9) {
+                  private String pendingName;
+                  private String pendingSlug;
+
+                  @Override
+                  public void visitLdcInsn(Object value) {
+                    if (value instanceof String str) {
+                      if (pendingName == null) {
+                        pendingName = str;
+                      } else {
+                        pendingSlug = str;
+                      }
+                    }
+                  }
+
+                  @Override
+                  public void visitFieldInsn(
+                      int opcode, String owner, String name, String descriptor) {
+                    if (opcode == Opcodes.PUTSTATIC
+                        && COORDINATE.equals(owner)
+                        && ("L" + COORDINATE + ";").equals(descriptor)
+                        && pendingName != null
+                        && pendingSlug != null) {
+                      coordinateConstToSlug.put(pendingName, pendingSlug);
+                      pendingName = null;
+                      pendingSlug = null;
+                    }
+                  }
+                };
+              }
+            },
+            ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
   }
 
   /** Scan one bundle class: attribute its FIELD_* uses to the single Coordinate it names. */
@@ -103,5 +144,10 @@ final class CoordinateFieldUsage {
 
   Map<String, Set<String>> fieldsByCoordinateSlug() {
     return fieldsBySlug;
+  }
+
+  /** For testing: expose the indexed coordinate constant→slug map. */
+  Map<String, String> coordinateConstToSlug() {
+    return coordinateConstToSlug;
   }
 }
