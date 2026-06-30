@@ -1,0 +1,264 @@
+= World exchange 2D — the Document contract: a JSON Schema per coordinate, build-enforced
+:toc: left
+:icons: font
+
+*Status:* DESIGN (converged 2026-06-30, NOT yet built). The fourth implementation increment of the
+world-exchange migration (link:world-exchange-spec.adoc[design of record]), following
+link:world-exchange-2a-document-foundation-spec.adoc[2A] (the Document foundation + the readiness
+verdict), link:world-exchange-2b-consult-path-spec.adoc[2B] (the consult path), and
+link:world-exchange-2c-reconstruction-path-spec.adoc[2C] (the reconstruction path — the peer model,
+which drove `REALM_BOUNDARY` to zero and locked it at `ERROR`).
+
+2D gives the now-untyped `Document` its *contract of form*. After 2C the two realms exchange only
+opaque `Document(domain, coordinate, payload : String)` values — no shared Java type. But an opaque
+payload with no contract trades a closed type-leak for a potential *silent schema drift*: a producer
+could write a malformed payload for its coordinate, or a consumer could expect a field the producer
+never writes, and nothing would catch it until runtime. 2D closes that: *one JSON Schema per
+coordinate, owned by OSGi, verified at build by a fourth staging gate* (`SCHEMA_CONCORD`), then flips
+that gate `WARN`→`ERROR`. After 2D the branch merges with TWO gates locked — `REALM_BOUNDARY`
+(2C, the realms are separated) and `SCHEMA_CONCORD` (2D, the Documents they exchange have a
+contractual shape).
+
+[IMPORTANT]
+.2D reconciles the design-of-record with what 2C actually built
+====
+The link:world-exchange-spec.adoc[design of record] converged 2D's architecture early — schema per
+document type, owned OSGi-side, build-time concord check, runtime validation reserved-but-YAGNI. But
+it was written when `Document.payload` was a `JsonNode` and it imagined one `DomainDagMapper` per
+domain. 2C's reality is different: `payload` became a `String` (2B's Option B — no jackson type
+crosses the flat seam), and the translation landed as *N readers per coordinate* (`ConsultationReportReader`,
+`ExpectationReader`, `InterventionReader`, `MedicalRecordReader`, `InterventionLedgerReader` in
+`doctor-core/.internal`) plus the producers' `toOutputMap()` / `InterventionDocuments.of()` — never a
+`DomainDagMapper`. 2D keeps the design's *principles* (schema = the contract, owned by OSGi,
+build-enforced) and reconciles them to that reality. Five reconciliation decisions, §5.
+====
+
+== The theorem 2D adds
+
+After 2D: *a producer that writes a malformed payload for its coordinate, or a schema that drifts
+from the code that produces/consumes it, breaks the build.* 2C's gate guarantees the two worlds
+exchange only Documents; 2D's gate guarantees those Documents have a contractual shape. The contract
+is a JSON Schema keyed on the coordinate — not a shared Java class (which would re-introduce the
+shared data type 2C removed). The schema is owned by the OSGi world, beside the domain that owns the
+coordinate; OSGi holds the authority, so OSGi holds the contract. There is no shared schema file on
+the filesystem and no shared Java type.
+
+The forward-compat framing (from the design of record): the `coordinate` is the path, the `Document`
+is the body, the schema is the OpenAPI. The day Felix runs remote (the capstone, increment 4), it is
+the same contract with an HTTP transport instead of a method call — and the runtime validation 2D
+wires (but leaves OFF in embedded) is what surfaces a semver mismatch at the edge.
+
+== The six coordinates 2D schematises
+
+`Coordinate` (in `world-gateway`) is the closed set of document types. Each gets one schema. The
+producer/consumer map (verified against the 2C codebase):
+
+[cols="1,2,2,1",options="header"]
+|===
+| coordinate (slug) | producer (builds payload) | consumer (parses payload) | flow
+
+| `readiness-checkpoint`
+| host — `SystemdAdapterStage`, `ClusterReadinessStage`
+| OSGi — `Generalist.consult` / `observationsFrom`, `ConsultationReportReader`
+| host→OSGi
+
+| `readiness-verdict`
+| OSGi — `DefaultReadinessAuthority`, `DefaultInterventionIntake` (error path)
+| host — the stages read `FIELD_ACTION`
+| OSGi→host
+
+| `consultation`
+| OSGi — `Generalist`
+| host — the stages, `MedicalRecordDump`, `RunbookRenderer`
+| OSGi→host
+
+| `intervention-request`
+| host — `RecordInterventionCommand`
+| OSGi — `DefaultInterventionIntake.canonicalize`
+| host→OSGi
+
+| `intervention`
+| OSGi — `InterventionDocuments.of`; host CLI (the canonical doc)
+| OSGi — `InterventionReader`; host — `PulumiInterventionLedgerWriter`
+| mixed
+
+| `visit`
+| host — `StackMedicalRecordJournal`
+| OSGi — `MedicalRecordReader`; host — `MedicalRecordDump` (host-pure)
+| host→OSGi + host-pure
+|===
+
+The field keys each payload carries are the `WorldGatewayCatalog.FIELD_*` constants — already the
+single source of truth (the `clusterApi`-bug discipline). The schema's `properties` are keyed on
+exactly those names; that correspondence is what the gate checks (§6).
+
+== Architecture in one image
+
+[mermaid]
+....
+flowchart TB
+  subgraph SCHEMAS["6 schemas — doctor-core/src/main/resources/schema/&lt;slug&gt;.schema.json"]
+    S1["consultation.schema.json · visit.schema.json · …"]
+  end
+  subgraph BUILD["BUILD — the load-bearing check, NOW"]
+    GATE["SCHEMA_CONCORD staging gate (the 4th law)\n(a) each schema validates against the JSON-Schema meta-schema (networknt)\n(b) the FIELD_* a coordinate's code writes/reads == the schema's declared properties"]
+    RT["per-coordinate round-trip test: produce → validate against schema → consume"]
+  end
+  subgraph RUNTIME["RUNTIME — wired, OFF in embedded; the capstone turns it ON"]
+    OC["OSGi DocumentCodec @Component (twin of YamlMapper)\nholds its ObjectMapper + networknt"]
+    HC["host DocumentCodec (plain instance — the host has no DS)"]
+    NOTE["embedded: validation INERT — the OSGi reader that parses the payload IS the implicit validator"]
+  end
+  S1 --> GATE
+  S1 -. loaded by .-> OC
+  GATE --> RT
+  OC -. capability, gated by a flag .-> NOTE
+  HC -. capability, gated by a flag .-> NOTE
+....
+
+Two units, per the design of record: the *coordinate* owns the schema (anchored by slug — §5.1, no
+`DomainDagMapper` façade); the *domain* (here, `doctor`) owns the code (the readers already in
+`doctor-core/.internal`).
+
+== The five reconciliation decisions
+
+[cols="1,3",options="header"]
+|===
+| decision | what it means concretely
+
+| *5.1 — anchor by coordinate, no `DomainDagMapper` façade*
+| Schemas are classpath resources named after the coordinate slug:
+  `doctor-core/src/main/resources/schema/{readiness-checkpoint,readiness-verdict,consultation,intervention-request,intervention,visit}.schema.json`.
+  The gate links schema↔code through the `Coordinate` enum constant + the `WorldGatewayCatalog.FIELD_*`
+  keys (already the single source of truth). NO new `DomainDagMapper` type: the design's
+  one-mapper-per-domain was a prediction made for `JsonNode`; the reality is N readers per coordinate,
+  and a per-domain façade over them adds a layer the per-coordinate schema does not need. The
+  per-coordinate round-trip test anchors concord on the code side.
+
+| *5.2 — a codec PER REALM, not one shared `@Component`*
+| The `document-codec-instance-in-2d-backlog` foresaw replacing `Document.newPayload()` with one
+  `@Component DocumentCodec`. That backlog is partly stale: `newPayload()` is already gone (2B's String
+  payload), and payload construction is now dispersed across ~19 classes on BOTH realms. One shared
+  `@Component` is impossible cross-realm (a `@Component` lives OSGi-side; the host — `seed-master`, zero
+  `@Reference` — cannot consume it; the same wall as jackson). So the codec is a per-realm pattern: an
+  OSGi `DocumentCodec @Component` (the JSON twin of manifests' `YamlMapper` — holds its configured
+  `ObjectMapper` + networknt) and a plain host `DocumentCodec` instance. Each re-centralises payload
+  build+validate WITHIN its world. (Migrating the ~19 dispersed construction sites onto the codecs is
+  in scope where it is cheap; where it is not, it is a tracked follow-up — §8.)
+
+| *5.3 — networknt as the validation library*
+| `com.networknt:json-schema-validator` — jackson-based (it validates a `JsonNode`, reusing the jackson
+  already pinned at `2.22.0` and already bundled for OSGi), publishes a clean OSGi manifest, few
+  transitive dependencies (NOT the jgiven-style "wrap a non-OSGi jar" front). Pinned in `bom/pom.xml`;
+  bundled for OSGi the same way jackson is. It serves BOTH the build-time meta-schema check AND the
+  future runtime validation — one tool.
+
+| *5.4 — build-gate is load-bearing NOW; the codecs are runtime-validation-CAPABLE but OFF in embedded*
+| The `SCHEMA_CONCORD` gate is the check that earns its keep today (we build both worlds from one
+  reactor, so schemas cannot drift in version — the build is sufficient for embedded). The per-realm
+  codecs CAN validate at runtime, but that validation is OFF by default in the embedded build: the OSGi
+  reader that parses a payload IS the implicit validator (a missing field breaks there). The capstone
+  (increment 4) turns runtime validation ON to prove the remote split — it inherits a tested
+  off→on switch. Runtime validation is therefore not YAGNI-and-absent; it is *wired and dormant*,
+  exactly the "designed, reserved its shape" posture of the design of record.
+
+| *5.5 — schemas live OSGi-side, host gets them as wire-data when remote*
+| The schema files are owned by `doctor-core` (beside the readers). In embedded only OSGi needs them
+  (the host transports opaque Strings, validating nothing). When the capstone turns on host-side
+  validation, the host obtains the schema as DATA over the wire (networknt validates a `JsonNode`
+  against a schema loaded from any source — never a shared FS file, never a shared Java type), honouring
+  the design's "no shared schema file / the schema travels as data over the wire".
+|===
+
+== The `SCHEMA_CONCORD` gate — what it checks
+
+A fourth staging law beside `RECORD_PURITY` / `SPEC_COVERAGE` / `INSTANCE_DISCIPLINE` /
+`REALM_BOUNDARY` / `DUPLICATE_REALM_CLASS`. Added to the `StagingGate` enum in BOTH the annotation
+module (`io.nxmatic.rke2lab.domain.annotations.StagingGate`) and the staging extension's ASM-side
+mirror (`maven-embed-staging-ext/.../StagingGate.java`) — the constant names must stay in step (the
+extension reads the name via ASM, it cannot link the annotation module).
+
+The gate, per coordinate:
+
+. *meta-schema validity* — each `<slug>.schema.json` is itself a valid JSON Schema (validates against
+  the JSON-Schema draft meta-schema supplied by networknt, not by any domain). A malformed schema is an
+  immediate `ERROR` (the meta-schema does not forgive).
+. *concord* — the `FIELD_*` names the coordinate's producer writes and its consumer reads (discoverable
+  from `WorldGatewayCatalog` + the code that references `Coordinate.<X>`) match the `properties` the
+  schema declares. A field written-but-not-in-schema, or required-in-schema-but-never-written, is a
+  concord violation.
+
+Governed by `@GovernedBy(SCHEMA_CONCORD, WARN)` while the six schemas are written (a shrinking
+worklist, exactly as `REALM_BOUNDARY` was governed during 2C), then flipped to the `ERROR` default in
+the final zone.
+
+== The cut — by coordinate, worklist-driven
+
+2D is decomposed like 2A/2B/2C, but by *coordinate* rather than by zone. Each step is one commit + one
+review; the `SCHEMA_CONCORD` worklist shrinks visibly per coordinate.
+
+[cols="1,3",options="header"]
+|===
+| step | what it does
+
+| *zone-0 — the scaffolding*
+| Pin networknt in `bom/`; bundle it for OSGi (the jackson pattern). Add `SCHEMA_CONCORD` to both
+  `StagingGate` enums + the gate's check logic in `maven-embed-staging-ext` (governed WARN). Add the
+  per-realm `DocumentCodec` (OSGi `@Component` + host instance), validation capability OFF (the
+  off→on flag, with a test proving it inert in embedded). No schema yet → the whole worklist is WARN.
+
+| *zone 1..6 — one coordinate at a time*
+| For each coordinate (suggested order: the simplest first — `readiness-verdict`, then
+  `intervention-request`/`intervention`, then `readiness-checkpoint`, `consultation`, `visit`): write
+  its `<slug>.schema.json`, add its round-trip test (produce → validate → consume), and turn its
+  `SCHEMA_CONCORD` worklist entry green. The build stays green throughout (WARN until the flip).
+
+| *final zone — the flip*
+| When all six concord, remove `@GovernedBy(SCHEMA_CONCORD, WARN)` so the gate returns to the locked
+  `ERROR` default. The Document contract is now build-enforced. The branch can merge with both
+  `REALM_BOUNDARY` and `SCHEMA_CONCORD` at `ERROR`.
+|===
+
+== What "green" means per coordinate
+
+Each coordinate step keeps the full reactor `package -Pall-worlds` BUILD SUCCESS, shrinks the
+`SCHEMA_CONCORD` WARN worklist by one, and keeps the doctor in-container tests passing. The final flip
+turns the gate to `ERROR` only when the worklist is zero — if any coordinate's payload still drifts
+from its schema, the flip fails the build (the lock working). `REALM_BOUNDARY` stays at `ERROR`
+throughout (2D adds no flat→bundle reference).
+
+== Scope boundary — where 2D stops
+
+2D writes the six schemas, builds the gate, wires the dormant codecs, and flips `SCHEMA_CONCORD`. It
+does NOT include:
+
+* the *remote-validation capstone* — proving the separation dynamically (host + OSGi in separate
+  processes exchanging only Documents, with runtime validation turned ON). That is increment 4, its
+  own spec, sequenced after 2D, just before merge. 2D leaves it a tested off→on switch.
+* the *payload-carrier / streaming* question — `Document.payload` stays a `String` (the logical
+  contract). Whether a large payload is framed on the wire as one buffer or chunked (a
+  "spillable-cached-stream", in-memory under a threshold and spilling to disk beyond) is a TRANSPORT
+  concern, behind the `DocumentCodec`, decided at the remote capstone if a payload size ever warrants
+  it — never a change to the `Document` record. See §8.
+
+== Backlogs 2D records
+
+* *the dispersed construction sites* — ~19 classes build payloads with their own `ObjectMapper`. 2D's
+  per-realm codecs re-centralise this where cheap; the residual migration (full uniformity) is a
+  tracked follow-up, not a 2D blocker.
+* *the spillable-cached-stream carrier* — a candidate transport framing for the remote capstone (the
+  user's "stream avec cache" idea), recorded so it is not lost: bounded in-memory cache that spills to
+  disk past a threshold, behind the codec, never on the `Document` API. KB-scale payloads never hit the
+  threshold today (YAGNI until a real large payload + a real remote transport exist).
+* *the stale design-of-record cross-ref* — `world-exchange-2b-consult-path-spec.adoc:224` still says
+  "the REALM_BOUNDARY → ERROR flip — increment 2D"; the flip moved to 2C zone-5. Fix in the 2C/2D
+  doc-close commit.
+
+== Related documentation
+
+* link:world-exchange-spec.adoc[World exchange] — the design of record; its "the contract: a JSON
+  Schema per document type, owned by OSGi" section is what 2D implements, reconciled to the 2C reality.
+* link:world-exchange-2c-reconstruction-path-spec.adoc[2C — reconstruction path] — the prior increment;
+  2D contracts the Documents 2C's peer model crosses.
+* link:staging-gates-governance-spec.adoc[Staging-gates governance] — the gate framework
+  `SCHEMA_CONCORD` joins as the fourth law.
