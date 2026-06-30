@@ -266,7 +266,13 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
         addPackageOf(flatPackages, c.binaryName());
       }
     }
-    final DuplicateRealmClass duplicate = new DuplicateRealmClass(flatPackages);
+    final Set<String> seamSurface = new java.util.LinkedHashSet<>();
+    for (ResolvedBundle b : resolved) {
+      if (b.embed() != null && b.embed().isSeam()) {
+        seamSurface.addAll(b.exports().names());
+      }
+    }
+    final DuplicateRealmClass duplicate = new DuplicateRealmClass(flatPackages, seamSurface);
     final List<String> duplicateViolations = new ArrayList<>();
     for (ResolvedBundle b : closure.staged()) {
       for (String pkg : duplicate.violations(b)) {

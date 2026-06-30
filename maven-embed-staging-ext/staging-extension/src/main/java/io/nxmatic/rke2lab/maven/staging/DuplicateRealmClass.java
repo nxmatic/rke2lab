@@ -21,38 +21,26 @@ import java.util.Set;
  */
 final class DuplicateRealmClass {
 
-  /**
-   * The one deliberate flat∧bundle package in the boot model: {@code org.slf4j} is host-flat AND
-   * provided to bundles by pax-logging-api. {@code BootPlanner.deriveSystemExports} drops it from
-   * {@code system.packages.extra} so pax is the sole in-framework provider (the R1 scar) — the two
-   * copies never collide because the system bundle does not re-export it. The same intent exempts
-   * it here; everything else flat∧staged is the collision this law forbids.
-   */
-  private static final Set<String> ALLOWED_SHARED_ROOTS = Set.of("org.slf4j");
-
   private final Set<String> flatPackages;
+  private final Set<String> seamSurface;
 
-  DuplicateRealmClass(Set<String> flatPackages) {
+  DuplicateRealmClass(Set<String> flatPackages, Set<String> seamSurface) {
     this.flatPackages = flatPackages;
+    this.seamSurface = seamSurface;
   }
 
-  /** The packages a staged bundle exports that ALSO live flat — each a cross-realm duplication. */
+  /**
+   * The packages a staged bundle exports that ALSO live flat AND appear on a seam — each a
+   * dangerous cross-realm duplication (a type from it can cross the seam). A flat∧staged package
+   * absent from every seam cannot cross, so it is exempt — the derived realm-library case.
+   */
   List<String> violations(ResolvedBundle stagedBundle) {
     final List<String> lines = new ArrayList<>();
     for (String exported : stagedBundle.exports().names()) {
-      if (flatPackages.contains(exported) && !isAllowedShared(exported)) {
+      if (flatPackages.contains(exported) && seamSurface.contains(exported)) {
         lines.add(exported);
       }
     }
     return lines;
-  }
-
-  private static boolean isAllowedShared(String pkg) {
-    for (String root : ALLOWED_SHARED_ROOTS) {
-      if (pkg.equals(root) || pkg.startsWith(root + ".")) {
-        return true;
-      }
-    }
-    return false;
   }
 }

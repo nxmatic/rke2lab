@@ -25,28 +25,26 @@ class DuplicateRealmClassTest {
   }
 
   @Test
-  void aPackageExportedAndAlsoFlatIsADuplication() {
+  void aFlatAndStagedPackageAbsentFromTheSeamIsExempt() {
+    // jackson is flat AND staged, but no seam exports it → safe, exempt (the derived rule).
     final DuplicateRealmClass gate =
-        new DuplicateRealmClass(Set.of("org.cdk8s", "io.nxmatic.host"));
-    final List<String> v = gate.violations(exporting("org.cdk8s;version=1.0.0"));
-    assertEquals(1, v.size(), "the package lives flat AND is bundle-exported → one duplication");
-    assertEquals("org.cdk8s", v.get(0));
+        new DuplicateRealmClass(
+            Set.of("com.fasterxml.jackson.databind"),
+            /*seamSurface*/ Set.of("io.nxmatic.rke2lab.world.gateway.port"));
+    assertTrue(
+        gate.violations(exporting("com.fasterxml.jackson.databind;version=2.22.0")).isEmpty(),
+        "flat∧staged is safe when the package is not on any seam");
   }
 
   @Test
-  void aPackageExportedButNotFlatIsClean() {
-    final DuplicateRealmClass gate = new DuplicateRealmClass(Set.of("io.nxmatic.host"));
+  void aFlatAndStagedPackagePRESENTOnTheSeamIsAViolation() {
+    // if a seam exported jackson, a type could cross → the duplication is dangerous → flagged.
+    final DuplicateRealmClass gate =
+        new DuplicateRealmClass(
+            Set.of("com.fasterxml.jackson.databind"), Set.of("com.fasterxml.jackson.databind"));
     final List<String> v =
-        gate.violations(exporting("io.nxmatic.rke2lab.doctor.port;version=1.0.0"));
-    assertTrue(v.isEmpty(), "a bundle-only export (not present flat) is the normal single realm");
-  }
-
-  @Test
-  void slf4jIsExemptEvenWhenBothFlatAndExported() {
-    // org.slf4j is host-flat AND provided to bundles by pax — the one deliberate shared provider
-    // (BootPlanner drops it from system.packages.extra so it never collides). Not a duplication.
-    final DuplicateRealmClass gate = new DuplicateRealmClass(Set.of("org.slf4j"));
-    final List<String> v = gate.violations(exporting("org.slf4j;version=2.0.0"));
-    assertTrue(v.isEmpty(), "org.slf4j is the documented shared exemption");
+        gate.violations(exporting("com.fasterxml.jackson.databind;version=2.22.0"));
+    assertEquals(1, v.size(), "a seam carrying the package loses the exemption");
+    assertEquals("com.fasterxml.jackson.databind", v.get(0));
   }
 }
