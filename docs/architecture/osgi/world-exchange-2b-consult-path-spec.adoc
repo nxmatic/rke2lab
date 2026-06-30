@@ -231,5 +231,8 @@ two reconstruction verbs (still record-typed) — expected; the gate worklist tr
 * link:world-exchange-spec.adoc[World exchange] — the design of record this increment specializes.
 * link:world-exchange-2a-document-foundation-spec.adoc[2A — Document foundation] — the prior
   increment; 2B reuses its `Document`/`ExchangeCatalog` seam and the checkpoint coordinate.
+* link:world-exchange-2c-reconstruction-path-spec.adoc[2C — reconstruction path] — the next
+  increment; reuses 2B's opaque-copy egress and the `ClinicalReasoning`/`adapt` seam-split idiom to
+  drive the `REALM_BOUNDARY` worklist to zero, then flips the gate to `ERROR`.
 * link:staging-gates-governance-spec.adoc[Staging-gates governance] — the `REALM_BOUNDARY` gate whose
   WARN worklist is 2B's backlog and per-zone progress meter.

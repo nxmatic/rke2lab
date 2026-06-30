@@ -1,0 +1,375 @@
+= World exchange 2C — the reconstruction path crosses as opaque Documents between peers
+:toc: left
+:icons: font
+
+*Status:* DESIGN (converged 2026-06-30, NOT yet built). The third implementation increment of the
+world-exchange migration (link:world-exchange-spec.adoc[design of record]), following
+link:world-exchange-2a-document-foundation-spec.adoc[2A] (the Document foundation + the readiness
+verdict) and link:world-exchange-2b-consult-path-spec.adoc[2B] (the consult path).
+
+2C drives the `REALM_BOUNDARY` gate worklist from its post-2B residue (≈38 flat classes referencing
+`doctor.records`) to *zero*, then flips the gate `WARN`→`ERROR` — the lock that makes the
+host↔OSGi boundary build-enforced. After 2C no flat-realm class references any `doctor.records`
+type; the two worlds are provably separated.
+
+[IMPORTANT]
+.2C is written on the NEW module layout
+====
+The aggregator re-layout (link:osgi-aggregator-layout-spec.adoc[osgi aggregator layout]) lands
+*before* 2C, on the same branch. That increment renames `exchange`→`world-gateway`
+(`ExchangeCatalog`→`WorldGatewayCatalog`, package `io.nxmatic.rke2lab.world.gateway.port`). 2C is
+written against those new names. This spec uses `world-gateway`/`WorldGatewayCatalog` throughout; read
+them as `exchange-port`/`ExchangeCatalog` if you are on a pre-layout tree.
+====
+
+== The load-bearing insight — two peers, not a host driving a service
+
+The world-exchange invariant (from the design of record) is that every seam crossing is an opaque,
+schema-bearing Document and the host holds no doctor type. 2A and 2B advanced the *ingress/consult*
+direction. 2C completes the *reconstruction* direction — and in doing so reveals the deepest framing
+of the whole migration:
+
+[quote]
+The host and OSGi are PEERS at the same level. The host knows the STACK (and is opaque to OSGi); OSGi
+knows the DOCTOR (and is opaque to the host). They are joined ONLY by opaque Documents plus the shared
+checkpoint identity. The relationship is BIDIRECTIONAL — each world publishes Document-typed ports the
+other calls — and each KEEPS its own responsibilities. Neither reaches into the other's logic.
+
+This is the literal meaning of *world-gateway*: a door between two peers, not a host that pilots a
+remote service. And it is exactly what makes the later remote-OSGi (RSA) evolution trivial — two peers
+that speak only Documents are already distributable; RSA swaps the in-process call for a network call
+and the contract does not change. The design does not *prepare* for remote; it *renders remote
+trivial*.
+
+== Why the reconstruction path is the leak
+
+`doctor-port` is a `type=seam` bundle — *flat*, shared between the host JCL realm and the OSGi realm.
+Yet today it physically houses the reconstruction readers — `ConsultationReportReader`,
+`ExpectationReader`, `InterventionReader`, `MedicalRecordReader` — plus `MedicalRecordRegistry`,
+`SnapshotSource`, `ConsultationLog`. These flat classes reconstruct bundle-only `doctor.records`
+types. *The readers ARE the realm leak*, not innocent bystanders.
+
+The reconstruction runs *backwards* today: the host reconstructs records (via the flat readers) and
+sends them back INTO OSGi for the doctor to reason over. The record crosses host→OSGi, which is
+precisely the boundary violation `REALM_BOUNDARY` flags.
+
+.Figure 1 — the reconstruction TODAY (the leak, inverted)
+[mermaid]
+....
+flowchart TB
+  subgraph HOST["HOST — realm FLAT"]
+    DR["DriftReview"]
+    LMR["LiveMedicalRecordRegistry (host impl)"]
+    RD1["*Reader (FLAT!) — the leak"]
+    PILW["PulumiInterventionLedgerWriter.append(Intervention)"]
+  end
+  subgraph OSGI["OSGi — realm BUNDLE"]
+    GEN["Generalist: recordForCurrentPatient / reviewOpenProblems"]
+    DS["driftSpecialist"]
+  end
+  REC["MedicalRecord / InterventionLedger / Intervention — doctor.records"]
+  RD1 -->|reconstruit| REC
+  REC -.->|"① record TRAVERSE host→OSGi"| GEN
+  GEN -->|"② record+ledger RETRAVERSENT"| DS
+  DS -.->|"③ Intervention TRAVERSE OSGi→host"| PILW
+....
+
+== The mechanism — the readers mix two layers; split them
+
+The key to 2C is that today's `*Reader` conflate two responsibilities that belong to different worlds:
+
+[cols="1,3,1",options="header"]
+|===
+| layer | what it does | belongs to
+
+| *Layer 1 — stack-structural*
+| "given a stack snapshot, give me the output named K" — `SnapshotView.outputsNamed`, `version`,
+  `outputsByKey`. This is knowledge of how the host stores blobs in a Pulumi stack.
+| *host*
+
+| *Layer 2 — doctor-form*
+| "given the `consultationReport` sub-tree, rebuild a `ConsultationReport`." This is doctor knowledge
+  — and it is the SAME shape OSGi itself wrote at 2B egress (`toOutputMap`).
+| *OSGi*
+|===
+
+Split the two: Layer 1 stays host (it implements the read port), Layer 2 moves to `doctor-core`
+(behind the port). Between them crosses only a checkpoint-keyed `List<Document>` — opaque blobs.
+Neither the stack nor the doctor transpires.
+
+.Figure 2 — the reconstruction TARGET (peer model, opacity in both directions)
+[mermaid]
+....
+flowchart TB
+  subgraph HOST["HOST — PAIR (knows the STACK, opaque to the doctor)"]
+    DR["DriftReview / pipeline"]
+    JH["DocumentJournal impl (host)\nreads the stack, harvests opaque\nblobs per checkpoint"]
+    L1["SnapshotView / SnapshotEntry / SnapshotSource\n(Layer 1 — host-INTERNAL, pulumi-edge)"]
+    HW["append(Document) → writes to the stack"]
+  end
+  subgraph SEAM["world-gateway — Document-typed ports + checkpoint ids, NOTHING else"]
+    JP["DocumentJournal.historyOf(checkpoint) : List<Document>"]
+    ILW["InterventionLedgerWriter.append(Document)"]
+    CS["ConsultingService.reviewDrift(checkpoint) : void"]
+  end
+  subgraph OSGI["OSGi — PAIR (knows the DOCTOR, opaque to the stack)"]
+    GEN["Generalist"]
+    RD2["*Reader (Layer 2 — doctor-core)\nrebuilds from the opaque blobs\n(its OWN 2B-egress shape)"]
+    REG["MedicalRecordRegistry @Component"]
+  end
+  DR --> CS --> GEN
+  JH --> L1
+  GEN --> REG -->|"historyOf(checkpoint)"| JP
+  JP -. "provided by" .- JH
+  JP -->|"List<Document> opaque"| RD2 --> GEN
+  GEN -->|persists| ILW -.-> HW
+....
+
+OSGi *pulls* history via `historyOf(checkpoint)` — it knows the checkpoint IDENTITY (already shared,
+legitimate) but NOT the stack; the host answers in opaque blobs. `MedicalRecord`,
+`InterventionLedger`, and `Intervention` stay 100% bundle-only.
+
+== The three host-provided ports flip record→Document
+
+The host today provides three things to OSGi as records. In 2C each flips to a Document-typed port —
+this is the bidirectional seam:
+
+[cols="1,2,2",options="header"]
+|===
+| port | today (record-typed) | 2C (peer, opaque)
+
+| read
+| `MedicalRecordRegistry.recordFor(Patient) → MedicalRecord`
+| `DocumentJournal.historyOf(Checkpoint) → List<Document>`
+
+| write
+| `InterventionLedgerWriter.append(Intervention)`
+| `InterventionLedgerWriter.append(Document)`
+
+| review
+| `recordForCurrentPatient()` + `reviewOpenProblems(MedicalRecord, InterventionLedger)`
+| `reviewDrift(Checkpoint) : void`
+|===
+
+The host implements `DocumentJournal` (Layer 1: it reads the stack and yields opaque blobs); OSGi's
+`MedicalRecordRegistry` `@Component` consumes it (Layer 2: it rebuilds the record internally). The
+write port carries a Document the host persists opaquely. The review verb takes only a checkpoint and
+returns nothing.
+
+== The design proven on two real cases
+
+The peer model was not asserted — it was traced end-to-end on the two real call paths.
+
+=== Case 1 — `DriftReview` (the review path)
+
+Today `DriftReview.reviewAtReconstruction` (1) calls `recordForCurrentPatient()` (OSGi already has the
+record via `access.record()` — a wasted round-trip), (2) loads the ledger host-side through the flat
+`InterventionReader`, (3) calls `reviewOpenProblems(record, ledger)` AND *discards the return* — the
+review is a side-effect (the drift specialist persists through its own writer).
+
+[cols="1,3",options="header"]
+|===
+| what the trace revealed | consequence
+
+| `MedicalRecord` is useless on the host | it was fetched only to be passed straight back; OSGi has it. Dropped from the seam.
+| the drift-letters are never read | `reviewOpenProblems` is a side-effect; the collapsed verb needs NO return.
+| the ledger is the only real host read | it crosses via the opaque history; OSGi rebuilds `InterventionLedger` internally.
+| *(not seen at first)* the writer leaks too | `append(Intervention)` crosses a record OSGi→host → becomes `append(Document)`.
+| the collapse is total | the two record-typed seam verbs become `reviewDrift(Checkpoint) : void`.
+|===
+
+.Figure 3 — `DriftReview`, before and after
+[mermaid]
+....
+sequenceDiagram
+  autonumber
+  participant H as Host (DriftReview)
+  participant K as Seam
+  participant O as OSGi (Generalist)
+  rect rgb(254,226,226)
+  note over H,O: TODAY — 3 records cross, the return is DISCARDED
+  H->>O: recordForCurrentPatient()
+  O-->>H: MedicalRecord  (OSGi already had it)
+  H->>H: InterventionLedgerSource.load() via *Reader FLAT
+  H->>O: reviewOpenProblems(record, ledger)
+  O-->>H: List<ReferralReply>  (IGNORED)
+  O->>H: append(Intervention)  (record crosses back)
+  end
+  rect rgb(220,252,231)
+  note over H,O: 2C — one verb, no record, no semantic return
+  H->>K: reviewDrift(checkpoint)
+  K->>O: reviewDrift(checkpoint)
+  O->>O: record = access.record()  (internal)
+  O->>O: ledger rebuilt from historyOf(checkpoint)  (internal)
+  O->>O: driftSpecialist.review(...)
+  O->>K: append(Document)
+  K->>H: append(Document) → host writes opaquely to the stack
+  end
+....
+
+=== Case 2 — `MedicalRecordDump` (the egress-pure path)
+
+Today `MedicalRecordDump.toYaml` reconstructs each report into a `ConsultationReport` (via the reader)
+and *immediately re-serializes it* via `toOutputMap()` — a `Map → record → Map` round-trip of pure
+waste. Because the shape stored in the stack IS the `toOutputMap` shape (2B egress wrote it), the YAML
+is byte-identical whether the host transcodes the raw blob or reconstructs-then-re-serializes.
+
+On the peer model the dump is *host-pure*: it reads its timeline (Layer 1: `version`, `when`),
+harvests its own opaque `consultationReport` blobs, and transcodes JSON→YAML — a format transcoding
+with zero medical semantics. *It does not call OSGi at all.*
+
+This reveals that `MedicalRecord`/`Visit` is really a *stack-temporal* structure — patient (stack
+identity) → visits (timeline versions) → reports (opaque blobs); only the leaf content is medical, and
+it stays opaque. The skeleton is host knowledge.
+
+[NOTE]
+====
+*Asymmetry between the two CLI tools* (this refines the "CLI = record logic OSGi-side, IO host"
+decision): `MedicalRecordDump` (egress) is host-pure — it transcodes its own blobs, no OSGi.
+`RecordInterventionCommand` (ingress) DOES need OSGi: it must canonicalize raw CLI facts
+(`--problem`, `--what`, `--provenance`…) into a valid intervention Document, and the intervention
+schema is doctor knowledge the host does not hold. So ingress crosses (host pushes a raw Document, OSGi
+canonicalizes, then `append`), egress does not.
+====
+
+== The identity types are not medical
+
+Two `doctor.records` types referenced by the host turn out to be *identities*, mis-filed in the doctor
+package — they belong at the seam (like 2A's checkpoint coordinate), not deleted:
+
+* `Checkpoint` — a pure enum (`slug`/`scenarioTitle`/`resourceName`/`fromSlug`), zero record references.
+  Already shared between both worlds. → moves to `world-gateway`.
+* `Patient` — its own javadoc says "the org/project/stack IDENTITY of a Pulumi stack being diagnosed."
+  It is `(org, project, stack)` — a stack coordinate, host-built (`new Patient("organization", …)`),
+  consumed by OSGi. It is not medical. → moves to `world-gateway` as an identity.
+
+`SnapshotView`/`SnapshotEntry` are also mis-filed neutrals, but they go *host-internal* (to
+`pulumi-edge`), NOT to the seam — the peer model keeps stack vocabulary host-side. Only identities the
+*both* worlds name (checkpoint, patient) belong at the seam.
+
+== What moves where (the reconstruction-path units)
+
+[cols="1,3",options="header"]
+|===
+| unit | change
+
+| `Checkpoint`, `Patient` (doctor-records → world-gateway)
+| move to the seam as shared identities. Update host + OSGi references.
+
+| `SnapshotView`, `SnapshotEntry`, `SnapshotSource` (doctor-records/doctor-port → pulumi-edge)
+| become host-internal (Layer 1). `StackHandleSnapshotSource` already implements the read; it now
+  backs the host's `DocumentJournal`.
+
+| `ConsultationReportReader`, `ExpectationReader`, `InterventionReader`, `MedicalRecordReader`
+  (doctor-port seam → doctor-core bundle)
+| become Layer-2 internals: rebuild records from the opaque blobs. No longer flat; no longer on the seam.
+
+| `MedicalRecordRegistry` (seam interface, modified) + its impl (host `LiveMedicalRecordRegistry` →
+  doctor-core `@Component`)
+| the impl moves OSGi-side and consumes the host's `DocumentJournal` (`historyOf`). The host stops
+  implementing the registry; it provides only the journal.
+
+| `DocumentJournal` (NEW, world-gateway seam) + host impl (pulumi-edge)
+| `historyOf(Checkpoint) → List<Document>`. The host reads the stack and yields opaque blobs.
+
+| `ConsultingService` (seam, modified)
+| `recordForCurrentPatient` + `reviewOpenProblems(record, ledger)` collapse to `reviewDrift(Checkpoint)
+  : void`. The seam stops importing `MedicalRecord`/`InterventionLedger`/`ReferralReply`.
+
+| `InterventionLedgerWriter` (seam, modified) + `PulumiInterventionLedgerWriter` (host)
+| `append(Intervention)` → `append(Document)`; the host writes the Document opaquely to the stack.
+
+| `Generalist` (doctor-core, modified)
+| implements `reviewDrift(checkpoint)`: rebuild record + ledger internally (from `historyOf`), run the
+  drift specialist, persist via `append(Document)`. `recordForCurrentPatient`/`reviewOpenProblems`
+  become bundle-side (ClinicalReasoning) or internal.
+
+| `DriftReview` (host, modified)
+| reduces to a trigger: `doctor.reviewDrift(checkpoint)`. Drops all `doctor.records` imports.
+
+| `MedicalRecordDump` (host, modified)
+| host-pure: reads the timeline, transcodes its own opaque `consultationReport` blobs JSON→YAML. Drops
+  the reader + `doctor.records` imports. No OSGi call.
+
+| `RecordInterventionCommand` (host, modified)
+| IO host (parse argv) → push a raw intervention Document → OSGi canonicalizes → `append(Document)`.
+  Drops `Intervention`/`ProblemRef`/`Provenance`/`RemediationProgramRef` imports.
+
+| `ClusterSchemaRef` (cluster-port seam, modified)
+| stops referencing `doctor.records.SchemaRef` (the one cross-domain isolate).
+|===
+
+== The cut — by zone, worklist-driven
+
+2C is decomposed by zone (matching 2A/2B discipline). Each zone is one commit + one review; the gate
+worklist shrinks visibly per zone. The worklist counts below are *estimates* derived from the buckets —
+the real per-zone count is whatever the gate prints at execution, not a promise.
+
+[cols="1,3,1",options="header"]
+|===
+| zone | what it does | nature
+
+| *zone-1 — identities to the seam*
+| `Checkpoint` + `Patient` → `world-gateway`. Unblocks `ResourceCreationPipeline`, `BootstrapPipeline`,
+  `RunbookRenderer` (identity-only references).
+| mechanical
+
+| *zone-2 — the consult residue*
+| finish the probe→Document migration 2B's Task 4+5+6 deliberately skipped (the I-1 finding): the
+  probes return a checkpoint Document, the jGiven scenarios assert on Document fields, `Observation`
+  leaves the host (its `toOutputMap` form + `SymptomKind` already exist).
+| mechanical
+
+| *zone-3 — the peer node (the architectural core)*
+| the three ports flip record→Document (`DocumentJournal.historyOf`, `append(Document)`,
+  `reviewDrift(checkpoint)`); the `*Reader` move to doctor-core; `SnapshotView`/`Entry`/`Source` become
+  host-internal; `MedicalRecordRegistry` impl becomes a doctor-core `@Component`; `DriftReview` reduces
+  to a trigger.
+| architectural
+
+| *zone-4 — CLI tools + the isolate*
+| `RecordInterventionCommand` (ingress via OSGi canonicalization), `MedicalRecordDump` (host-pure
+  transcoding), `ClusterSchemaRef` (stops referencing `doctor.records.SchemaRef`).
+| mechanical
+
+| *zone-5 — the flip*
+| remove `@GovernedBy(REALM_BOUNDARY, WARN)` so the package returns to the locked `ERROR` default. The
+  boundary is now build-enforced. This is the merge point.
+| trivial
+|===
+
+The order honours the dependencies: identities first (they unblock everything), the architectural node
+isolated in the middle (already proven on `DriftReview`), the flip last.
+
+== What "green" means per zone
+
+Per the design's graduated-green rule: each migration zone (1–4) shrinks the `REALM_BOUNDARY` WARN
+worklist and keeps the full reactor `package -Pall-worlds` BUILD SUCCESS with the doctor in-container
+tests passing. zone-5 flips the gate to `ERROR` only when the worklist is *zero* — if any flat class
+still references `doctor.records`, the flip fails the build (that is the lock working). `pulumi
+preview` boots green throughout (2A closed the boot parse); 2C does not regress it.
+
+== Scope boundary — where 2C stops
+
+2C migrates the reconstruction/egress path and clears the worklist. It does NOT include:
+
+* the *aggregator re-layout* (`exchange`→`world-gateway`, the 3 module groups) — that is a separate
+  increment that lands link:osgi-aggregator-layout-spec.adoc[BEFORE 2C], on the same branch.
+* the *remote-validation capstone* — proving the separation dynamically (host + OSGi in separate
+  processes exchanging only Documents). That is increment 4, its own spec, sequenced after the flip,
+  just before merge. The `REALM_BOUNDARY` gate proves separation *statically*; the capstone proves it
+  *dynamically*; both together are the merge gate.
+* the JSON Schemas per coordinate (the schema increment / 2D) — 2C's own tests round-trip the Documents
+  its code produces and consumes.
+
+== Related documentation
+
+* link:world-exchange-spec.adoc[World exchange] — the design of record this increment specializes; its
+  "Sequencing" step 2.2 ("the four `*Reader` … are deleted; the egress DAG crosses as a Document") is
+  what 2C implements.
+* link:world-exchange-2b-consult-path-spec.adoc[2B — consult path] — the prior increment; 2C reuses its
+  `Document` seam, the opaque-copy egress, and the `ClinicalReasoning`/`adapt` seam-split idiom.
+* link:osgi-aggregator-layout-spec.adoc[osgi aggregator layout] — the re-layout that renames
+  `exchange`→`world-gateway`; lands before 2C.
+* link:staging-gates-governance-spec.adoc[Staging-gates governance] — the `REALM_BOUNDARY` gate whose
+  WARN worklist is 2C's progress meter and whose `ERROR` flip is 2C's terminal lock.
