@@ -498,7 +498,7 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
     final Xpp3Dom excludes = child(child(config, "artifactSet"), "excludes");
     final Set<String> present = childValues(excludes);
     int added = 0;
-    for (String ga : closure.stagedGas()) {
+    for (String ga : closure.shadeExcludeGas()) {
       if (present.add(ga)) {
         final Xpp3Dom exclude = new Xpp3Dom("exclude");
         exclude.setValue(ga);
