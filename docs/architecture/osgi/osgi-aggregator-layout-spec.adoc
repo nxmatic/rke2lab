@@ -309,12 +309,12 @@ flowchart LR
 
 Impact borné (vérifié par grep sur `<artifactId>runtime</artifactId>`) :
 
-* `osgi/runtime/runtime-host/pom.xml` — `<artifactId>` `runtime` → `runtime-host`,
-  `<name>` `osgi/runtime` → `osgi/runtime/runtime-host`, `relativePath` du
+* `osgi/runtime/launcher/pom.xml` — `<artifactId>` `runtime` → `launcher`,
+  `<name>` `osgi/runtime` → `osgi/runtime/launcher`, `relativePath` du
   parent +1 cran (`../../build-parent` → `../../../build-parent`).
 * **3 consommateurs** mettent à jour leur `<dependency>` : `exec/seed-master`,
   `exec/manifests-cli`, `exec/netplan-cli`.
-* Sélecteur CLI : `-pl :runtime` → `-pl :runtime-host` (artifactId non préfixé,
+* Sélecteur CLI : `-pl :runtime` → `-pl :launcher` (artifactId non préfixé,
   per CLAUDE.md).
 
 === 5.3 Les parents Maven restent à plat

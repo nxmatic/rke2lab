@@ -29,7 +29,7 @@
          stages + installs, never compiles against. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>runtime</artifactId>
+      <artifactId>launcher</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The seam contract the CLI consumes (netplan.api) + the value types (netplan.port), kept

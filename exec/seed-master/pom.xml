@@ -83,7 +83,7 @@
     </dependency>
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
-      <artifactId>runtime</artifactId>
+      <artifactId>launcher</artifactId>
       <version>${project.version}</version>
     </dependency>
     <!-- The passive fluent-pipeline grammar engine, consumed FLAT on the host classpath (JCL) —
