@@ -49,13 +49,9 @@ public final class PulumiInterventionLedgerWriter implements InterventionLedgerW
   private final Path backendDir;
   private final StackCoordinate coordinate;
 
-  public PulumiInterventionLedgerWriter(Path backendDir, StackCoordinate coordinate) {
-    this.backendDir = backendDir;
-    this.coordinate = coordinate;
-  }
-
   public PulumiInterventionLedgerWriter(Path backendDir) {
-    this(backendDir, InterventionLedgerLayout.ledger());
+    this.backendDir = backendDir;
+    this.coordinate = InterventionLedgerLayout.ledger();
   }
 
   // WorkspaceStack.close() declares InterruptedException; the catch below already handles it, and

@@ -26,7 +26,7 @@ class StackHandleSnapshotSourceTest {
   private static final String STACK = "dev";
 
   private static StackHandleSnapshotSource sourceOver(StackHistoryFixture fixture) {
-    return new StackHandleSnapshotSource(
+    return StackHandleSnapshotSourceFixture.over(
         StackHandle.forBackend(fixture.backendDir(), PROJECT, STACK));
   }
 
@@ -76,7 +76,7 @@ class StackHandleSnapshotSourceTest {
       throws Exception {
     // A fresh backend with no fixture updates: absence, not failure.
     final StackHandleSnapshotSource source =
-        new StackHandleSnapshotSource(StackHandle.forBackend(tempDir, PROJECT, STACK));
+        StackHandleSnapshotSourceFixture.over(StackHandle.forBackend(tempDir, PROJECT, STACK));
 
     assertTrue(source.latest().isEmpty());
     assertTrue(source.timeline().isEmpty());

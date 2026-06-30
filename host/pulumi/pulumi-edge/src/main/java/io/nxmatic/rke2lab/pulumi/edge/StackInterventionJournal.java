@@ -31,13 +31,9 @@ public final class StackInterventionJournal implements InterventionJournal {
   private final Path backendDir;
   private final StackCoordinate coordinate;
 
-  public StackInterventionJournal(Path backendDir, StackCoordinate coordinate) {
-    this.backendDir = backendDir;
-    this.coordinate = coordinate;
-  }
-
   public StackInterventionJournal(Path backendDir) {
-    this(backendDir, InterventionLedgerLayout.ledger());
+    this.backendDir = backendDir;
+    this.coordinate = InterventionLedgerLayout.ledger();
   }
 
   @Override

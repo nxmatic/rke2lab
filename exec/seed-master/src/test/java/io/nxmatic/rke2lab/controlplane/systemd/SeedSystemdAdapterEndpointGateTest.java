@@ -51,6 +51,14 @@ class SeedSystemdAdapterEndpointGateTest {
   }
 
   private static final Consumer<Duration> NO_SLEEP = duration -> {};
+  private static final Consumer<String> NO_LOG = message -> {};
+
+  // Runs the gate without logging — a no-op logger, not null — so the test reads as "no readiness
+  // log here" and the production path is never exercised with a null logger.
+  private static ObservationView silently(
+      SeedSystemdAdapterEndpointGate gate, BootstrapConfig config) {
+    return gate.ensureReachable(config, NO_LOG);
+  }
 
   @Test
   void runtime_probe_deadline_yields_a_connection_refused_observation() {
@@ -73,7 +81,7 @@ class SeedSystemdAdapterEndpointGateTest {
     final SeedSystemdAdapterEndpointGate gate =
         new SeedSystemdAdapterEndpointGate(clock, NO_SLEEP, refusedRuntime, reachable);
 
-    final ObservationView observation = gate.ensureReachable(config(), null);
+    final ObservationView observation = silently(gate, config());
 
     assertEquals("failed", observation.status());
     assertEquals(Optional.of(SymptomKind.CONNECTION_REFUSED), observation.symptom());
@@ -100,7 +108,7 @@ class SeedSystemdAdapterEndpointGateTest {
     final SeedSystemdAdapterEndpointGate gate =
         new SeedSystemdAdapterEndpointGate(clock, NO_SLEEP, unusedRuntime, neverReachable);
 
-    final ObservationView observation = gate.ensureReachable(config(), null);
+    final ObservationView observation = silently(gate, config());
 
     assertEquals("failed", observation.status());
     assertEquals(Optional.of(SymptomKind.TIMEOUT), observation.symptom());
