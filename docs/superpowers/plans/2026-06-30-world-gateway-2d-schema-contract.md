@@ -113,15 +113,18 @@ git commit -m "feat(2d): pin + bundle networknt json-schema-validator (realm lib
 
 ---
 
-## Task 2: The per-realm DocumentCodec (zone-0b) — wired, validation OFF
+## Task 2: The per-realm DocumentCodec (zone-0b) — BOTH realms, wired, validation OFF
 
 **Files:**
-- Create: `osgi/domains/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/DocumentCodec.java`
-- Test: `osgi/domains/doctor/doctor-core-test/.../DocumentCodecTest.java` (or doctor-core unit test if a flat test fits)
-- (Host instance deferred — see note)
+- Create: `osgi/domains/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/DocumentCodec.java` (OSGi `@Component`)
+- Create: `exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/DocumentCodec.java` (host plain instance)
+- Test: `osgi/domains/doctor/doctor-core-test/.../DocumentCodecTest.java` (OSGi side)
+- Test: `exec/seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/DocumentCodecTest.java` (host side)
 
 **Interfaces:**
-- Produces: `DocumentCodec` with `String encode(JsonNode)`, `JsonNode decode(String)`, and `boolean validate(String payload, String schemaSlug)` that is INERT (returns `true`) when the validation flag is off.
+- Produces (BOTH realms, identical shape): `DocumentCodec` with `String encode(JsonNode)`, `JsonNode decode(String)`, and `boolean validate(String payload, String schemaSlug)` that is INERT (returns `true`) when the validation flag is off.
+
+**Why two classes, not one (decision 5.2):** the codec uses jackson, and since the realm-library isolation (commit `ae46278b`) jackson is loaded per realm — a flat copy host-side, a bundle copy OSGi-side. A shared codec class is therefore impossible: it cannot live in the `world-gateway` seam (`type=seam`, String-only, forbidden from exposing a jackson type), the OSGi copy binds to the bundle's jackson (`@Component` in doctor-core), and the host copy binds to the flat jackson (plain instance in seed-master). The two classes carry identical LOGIC but are bound to different `ObjectMapper` classes — the duplication is the realm boundary made concrete (the same reason jackson itself is dual-staged), NOT a DRY violation. The seam stays String-only; no jackson type crosses it.
 
 - [ ] **Step 1: Write the failing test — codec round-trips and validation is inert by default**
 
@@ -214,18 +217,36 @@ public final class DocumentCodec {
 }
 ```
 
-NOTE on the host instance: the spec's decision 5.2 calls for a per-realm codec, but the host build sites are dispersed (~19 classes) and migrating them is a tracked follow-up (§8), NOT a 2D blocker. This task ships the OSGi codec only; the host instance + dispersed-site migration is recorded as a backlog (see `document-codec-instance-in-2d-backlog`). Do NOT migrate the 19 sites here.
-
-- [ ] **Step 4: Run the test to verify it passes**
+- [ ] **Step 4: Run the OSGi-side test to verify it passes**
 
 Run: `flox activate -- ./mvnw -pl :doctor-core-test -am test -DskipTests=false -Dtest=DocumentCodecTest -Pall-worlds`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Write the host-side failing test** (`exec/seed-master/.../controlplane/DocumentCodecTest.java`)
+
+Same three assertions as Step 1, against `io.nxmatic.rke2lab.controlplane.DocumentCodec`:
+```java
+// host DocumentCodecTest.java — same behaviour, host realm
+@Test
+void encodeDecodeRoundTripsAndValidationIsInertByDefault() {
+  final DocumentCodec codec = new DocumentCodec();
+  final String json = codec.encode(codec.decode("{\"action\":\"hold\"}"));
+  assertTrue(json.contains("\"action\""));
+  assertTrue(codec.validate("{\"unexpected\":1}", "readiness-verdict"),
+      "validation is wired but OFF in embedded");
+}
+```
+Run: `flox activate -- ./mvnw -pl :seed-master -am test-compile -DskipTests` then the focused test once the class exists — expect FAIL (class missing) first.
+
+- [ ] **Step 6: Implement the host `DocumentCodec`** — byte-identical logic to the OSGi one, WITHOUT the `@Component` annotation (the host has no DS), in package `io.nxmatic.rke2lab.controlplane`. Same `encode`/`decode`/`validate`/`withValidation`; the javadoc names it the host-realm twin of the OSGi `DocumentCodec`, bound to the host's flat jackson. Do NOT factor the two into a shared class — they are realm-bound (see Task 2 header). Do NOT migrate the ~19 dispersed payload-construction sites onto the codec — that is the §8 follow-up (`document-codec-instance-in-2d-backlog`), not a 2D blocker; this task only introduces the codec on each realm.
+
+- [ ] **Step 7: Run the host-side test** — focused, expect PASS.
+
+- [ ] **Step 8: Commit**
 
 ```bash
-git add osgi/domains/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/DocumentCodec.java osgi/domains/doctor/doctor-core-test/
-git commit -m "feat(2d): OSGi DocumentCodec @Component — JSON twin of YamlMapper, validation wired-but-off"
+git add osgi/domains/doctor/doctor-core/src/main/java/io/nxmatic/rke2lab/doctor/DocumentCodec.java osgi/domains/doctor/doctor-core-test/ exec/seed-master/src/main/java/io/nxmatic/rke2lab/controlplane/DocumentCodec.java exec/seed-master/src/test/java/io/nxmatic/rke2lab/controlplane/DocumentCodecTest.java
+git commit -m "feat(2d): per-realm DocumentCodec — OSGi @Component + host instance, validation wired-but-off"
 ```
 
 ---
