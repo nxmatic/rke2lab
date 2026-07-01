@@ -539,7 +539,7 @@
                 <arg>-Xlint:-processing</arg>
                 <arg>-XDcompilePolicy=simple</arg>
                 <arg>-XDshould-stop.ifError=FLOW</arg>
-                <arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:NullAway:WARN -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true</arg>
+                <arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:NullAway:WARN -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:ExcludedFieldAnnotations=com.tngtech.jgiven.annotation.ProvidedScenarioState,com.tngtech.jgiven.annotation.ExpectedScenarioState,com.tngtech.jgiven.annotation.ScenarioState,org.mockito.Mock,org.mockito.InjectMocks,org.mockito.Captor</arg>
                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>

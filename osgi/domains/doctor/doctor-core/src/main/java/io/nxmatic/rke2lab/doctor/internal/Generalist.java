@@ -31,6 +31,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The doctor's coordinator. When a checkpoint fails, the patient consults: the Generalist takes the
@@ -62,7 +63,7 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
   private final List<Specialist> specialists;
   private final ClinicalAccess access;
   private final DriftSpecialist driftSpecialist;
-  private final InterventionJournal interventionJournal;
+  private final Optional<InterventionJournal> interventionJournal;
   private final InterventionLedgerReader ledgerReader = new InterventionLedgerReader();
   private final DocumentCodec codec = new DocumentCodec();
 
@@ -70,7 +71,7 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
       List<Specialist> specialists,
       ClinicalAccess access,
       DriftSpecialist driftSpecialist,
-      InterventionJournal interventionJournal) {
+      Optional<InterventionJournal> interventionJournal) {
     this.specialists = List.copyOf(specialists);
     this.access = access;
     this.driftSpecialist = driftSpecialist;
@@ -84,9 +85,9 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
   public static final class Builder {
 
     private List<Specialist> specialists = List.of();
-    private ClinicalAccess access;
-    private DriftSpecialist driftSpecialist;
-    private InterventionJournal interventionJournal;
+    private @Nullable ClinicalAccess access;
+    private @Nullable DriftSpecialist driftSpecialist;
+    private @Nullable InterventionJournal interventionJournal;
 
     public Builder specialists(List<Specialist> specialists) {
       this.specialists = specialists;
@@ -113,7 +114,8 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
     }
 
     public Generalist build() {
-      if (access == null) {
+      final ClinicalAccess boundAccess = access;
+      if (boundAccess == null) {
         throw new IllegalStateException("access is required");
       }
       // No ledger wired → the drift inference is computed and returned but not persisted, coherent
@@ -121,7 +123,8 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
       // site.
       final DriftSpecialist drift =
           driftSpecialist != null ? driftSpecialist : new DriftSpecialist(intervention -> {});
-      return new Generalist(specialists, access, drift, interventionJournal);
+      return new Generalist(
+          specialists, boundAccess, drift, Optional.ofNullable(interventionJournal));
     }
   }
 
@@ -335,9 +338,9 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
   public void reviewDrift() {
     final MedicalRecord record = access.record();
     final InterventionLedger ledger =
-        interventionJournal == null
-            ? InterventionLedger.empty()
-            : ledgerReader.read(interventionJournal.entries());
+        interventionJournal
+            .map(journal -> ledgerReader.read(journal.entries()))
+            .orElseGet(InterventionLedger::empty);
     reviewOpenProblems(record, ledger);
   }
 

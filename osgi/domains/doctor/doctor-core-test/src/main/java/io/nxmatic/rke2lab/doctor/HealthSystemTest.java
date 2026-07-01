@@ -63,7 +63,10 @@ class HealthSystemTest {
     final Observation observation =
         Observation.failed(Symptom.CONNECTION_REFUSED, "dbus refused", java.util.Map.of());
     final RemediationPlan plan =
-        doctor.adapt(ClinicalReasoning.class).consult(Symptom.CONNECTION_REFUSED, observation);
+        doctor
+            .adapt(ClinicalReasoning.class)
+            .orElseThrow()
+            .consult(Symptom.CONNECTION_REFUSED, observation);
     assertEquals(Symptom.CONNECTION_REFUSED, plan.symptom());
     assertTrue(plan.hasPrescriptions(), "the dbus specialist treats connection-refused");
   }
@@ -78,6 +81,7 @@ class HealthSystemTest {
     assertTrue(
         doctor
             .adapt(ClinicalReasoning.class)
+            .orElseThrow()
             .cohortFinding(Symptom.CONNECTION_REFUSED)
             .contains("of 1 patient(s)"),
         "the cohort is the single admitted, self-granted patient");

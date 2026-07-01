@@ -62,7 +62,7 @@ public final class MedicalRecordReader {
     try {
       visit = codec.decode(entry, VisitWire.class);
     } catch (RuntimeException e) {
-      throw new EntryReadException(0, null, e);
+      throw new EntryReadException(0, Optional.empty(), e);
     }
 
     // The consultationReport blobs are one report map per resource: decode each directly via the
@@ -114,9 +114,9 @@ public final class MedicalRecordReader {
   private static final class EntryReadException extends Exception {
     private static final long serialVersionUID = 1L;
     private final int version;
-    private final transient Instant when;
+    private final transient Optional<Instant> when;
 
-    EntryReadException(int version, Instant when, Throwable cause) {
+    EntryReadException(int version, Optional<Instant> when, Throwable cause) {
       super(cause);
       this.version = version;
       this.when = when;

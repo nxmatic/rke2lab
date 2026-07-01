@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.doctor.port;
 
 import io.nxmatic.rke2lab.world.gateway.port.Document;
+import java.util.Optional;
 
 /**
  * The doctor's INTERNAL edge: the face the diagnostic model turns toward the rest of our system. A
@@ -36,12 +37,12 @@ public interface ConsultingService {
   void reviewDrift();
 
   /**
-   * The face of this service that implements {@code type}, or {@code null} if it does not — the
-   * face-by-capability idiom (cf. OSGi's {@code adapt}). The host uses only the seam verbs above;
-   * the doctor's own in-container tests reach the bundle-side {@link
+   * The face of this service that implements {@code type}, or {@link Optional#empty()} if it does
+   * not — the face-by-capability idiom (cf. OSGi's {@code adapt}). The host uses only the seam
+   * verbs above; the doctor's own in-container tests reach the bundle-side {@link
    * io.nxmatic.rke2lab.doctor.spi.ClinicalReasoning} through this, without widening the seam.
    */
-  default <T> T adapt(Class<T> type) {
-    return type.isInstance(this) ? type.cast(this) : null;
+  default <T> Optional<T> adapt(Class<T> type) {
+    return type.isInstance(this) ? Optional.of(type.cast(this)) : Optional.empty();
   }
 }

@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.doctor.internal;
 
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * The doctor layer's own aggregator exception: the fold reached the end of the journal but at least
@@ -46,10 +47,10 @@ public final class MedicalRecordReconstructionException extends Exception {
     private static final long serialVersionUID = 1L;
 
     private final int version;
-    private final transient Instant when;
+    private final transient Optional<Instant> when;
 
-    public EntryFailure(int version, Instant when, Throwable cause) {
-      super("entry version=" + version + " at " + when + " could not be read", cause);
+    public EntryFailure(int version, Optional<Instant> when, Throwable cause) {
+      super("entry version=" + version + " at " + when.orElse(null) + " could not be read", cause);
       this.version = version;
       this.when = when;
     }
@@ -58,7 +59,7 @@ public final class MedicalRecordReconstructionException extends Exception {
       return version;
     }
 
-    public Instant when() {
+    public Optional<Instant> when() {
       return when;
     }
   }
