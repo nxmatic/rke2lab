@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.doctor.records;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A typed readiness-failure kind. The probe classifies its own failure and records the symptom in
@@ -55,7 +56,7 @@ public enum Symptom {
    * degrades the enclosing record rather than crashing the decode).
    */
   @JsonCreator
-  static Symptom fromWire(String value) {
+  static @Nullable Symptom fromWire(String value) {
     return parse(value).orElse(null);
   }
 }

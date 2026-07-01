@@ -16,4 +16,9 @@ Provide-Capability: io.nxmatic.rke2lab.embed; type=library
 # binds its own copy. (Nesting is only needed when a ServiceLoader<Module> discovers the module off a
 # classloader — as jsii's findAndRegisterModules does for jsr310 in manifests-cdk8s. We register
 # modules EXPLICITLY, so there is no ServiceLoader and no nesting — even for jsr310 here.)
+# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
+# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
+# nothing resolves at runtime (no JSpecify bundle is staged in either realm). Drop it from the
+# computed imports; the annotations do their job at compile/analysis time only.
+Import-Package: !org.jspecify.annotations, *
 -noimportjava: true

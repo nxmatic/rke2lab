@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.doctor.records;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The closed set of remediation programs a {@link Prescription} can be addressed to — a typed
@@ -43,7 +44,7 @@ public enum RemediationProgramRef {
 
   /** The codec's {@code @JsonCreator}: unknown/blank slug decodes to {@code null} (absent). */
   @JsonCreator
-  static RemediationProgramRef fromWire(String value) {
+  static @Nullable RemediationProgramRef fromWire(String value) {
     return parse(value).orElse(null);
   }
 }

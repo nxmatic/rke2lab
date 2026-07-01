@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The problem-oriented join key shared by three actors: the generalist opens a problem when a
@@ -39,7 +40,7 @@ public record ProblemRef(Checkpoint checkpoint, Optional<Symptom> symptom) {
    * boundary).
    */
   @JsonCreator
-  static ProblemRef fromWire(String value) {
+  static @Nullable ProblemRef fromWire(String value) {
     return parse(value).orElse(null);
   }
 
