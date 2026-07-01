@@ -1,0 +1,12 @@
+Bundle-SymbolicName: io.nxmatic.rke2lab.gateway.document.codec
+Export-Package: \
+    io.nxmatic.rke2lab.world.gateway.codec
+# Our OWN dual-realm library — the Document payload codec (DocumentCodec), which carries jackson.
+# type=library is staged as a bundle (installed in-framework, importing the OSGi copy of jackson and
+# the world-gateway seam) AND kept flat in the host uber-jar (binding the host copy) — jackson's own
+# treatment, for our code. Its exported package legitimately lives in two realms: it is NOT a seam
+# surface (no codec type crosses the String-only world-gateway seam; each realm holds its own copy
+# bound to its own jackson), so DUPLICATE_REALM_CLASS exempts it like jackson. The .internal jackson
+# glue (WireEnumModule) is NOT exported — only DocumentCodec is the API.
+Provide-Capability: io.nxmatic.rke2lab.embed; type=library
+-noimportjava: true

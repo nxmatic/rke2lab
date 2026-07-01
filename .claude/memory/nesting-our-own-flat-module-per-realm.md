@@ -1,53 +1,58 @@
 ---
 name: nesting-our-own-flat-module-per-realm
-description: Pattern (proven 2026-06-30, world-gateway 2D, commits 3183a79e+e690a72a) — to share ONE source of jackson-using logic across the host/OSGi realms WITHOUT it crossing the String-only seam, make it a plain flat jar module and load it per realm: shaded flat into the host, nested into a domain bundle's Bundle-ClassPath (-includeresource;lib:=true). First time we nest one of OUR OWN modules, not a third-party jar. No staging-rule change needed.
+description: Pattern for sharing ONE source of jackson-using logic across the host/OSGi realms without it crossing the String-only seam. TWO forms — PREFER embed;type=library (an autonomous dual-realm bundle, jackson's own treatment, multi-domain, single exporter; world-gateway 2D T5 2026-07-01) over the older flat-jar-nested-in-one-domain (still valid but couples a foundation concern to one domain, splits on a 2nd OSGi consumer). Exemplar for both: gateway-document-codec / DocumentCodec.
 metadata:
   type: reference
 ---
 
 ## The problem it solves
 
-You have logic that BOTH realms need (host-flat + OSGi-bundle) and that depends on a
-realm-isolated library (jackson, since commit `ae46278b` each realm loads its own copy). You want
-ONE source, but the logic must NOT cross the world-gateway seam (the seam is `type=seam`,
-String-only — a type crossing it reopens what 2C closed, and jackson on the seam surface breaks
-REALM_BOUNDARY/DUPLICATE_REALM_CLASS). So you need ONE source compiled into TWO runtime copies, each
-bound to its realm's jackson.
+You have logic BOTH realms need (host-flat + OSGi-bundle) that depends on a realm-isolated library
+(jackson — since `ae46278b` each realm loads its own copy). You want ONE source compiled into TWO
+runtime copies, each bound to its realm's jackson, WITHOUT the logic crossing the world-gateway seam
+(the seam is `type=seam`, String-only; a type crossing it reopens what 2C closed, and jackson on the
+seam surface breaks REALM_BOUNDARY/DUPLICATE_REALM_CLASS).
 
-## The pattern (exemplar: `gateway-document-codec`, `DocumentCodec`)
+## PREFERRED form — an autonomous dual-realm library bundle (`embed; type=library`)
 
-1. **A plain flat jar module** in `osgi/foundation/` (builds before host/exec; foundation→host
-   visibility already proven by `world-gateway`). The module has NO `Bundle-SymbolicName`, NO embed
-   capability — a plain jar. CRITICAL: verify `unzip -p target/<m>.jar META-INF/MANIFEST.MF | grep
-   Bundle-SymbolicName` returns NOTHING. If the bundle-parent forces a BSN, inherit from a plain
-   parent instead. A BSN would let `StagingClosure.isRealmLibrary` (which needs `b.isBundle()`) stage
-   it as an AUTONOMOUS bundle — not what we want.
-2. **Host realm**: the exec module (seed-master) depends on it normally → shaded FLAT into the
-   uber-jar, binding the host's flat jackson. No shade-config change (it is never staged, so never in
-   the shade-exclude set).
-3. **OSGi realm**: a domain bundle (doctor-core) depends on it AND nests it in `bnd.bnd`:
-   `-includeresource: <module>-*.jar;lib:=true` → its classes ride that bundle's Bundle-ClassPath,
-   binding the bundle's jackson. (The glob is the ARTIFACT id — rename the artifact ⇒ update the
-   glob.)
+This is jackson's OWN treatment, generalized to our code — the right form when the logic is a
+FOUNDATION concern any realm/domain may need (the codec is: host + any OSGi domain). Proven
+2026-07-01 (world-gateway 2D T5).
 
-## Why it is safe (verified, gates 0/0)
+1. **A real OSGi bundle** in `osgi/foundation/`: `bnd.bnd` has a `Bundle-SymbolicName`,
+   `Export-Package: <the api pkg>`, `Import-Package` of its realm-isolated dep (jackson) + any seam
+   it uses (bnd emits these from bytecode), and the marker `Provide-Capability:
+   io.nxmatic.rke2lab.embed; type=library`. Keep the jackson glue in a NON-exported `.internal`
+   subpackage (only the API type is exported) so SPEC_COVERAGE need not document the glue.
+2. **Staging treats `type=library` as dual** (`StagingClosure.isRealmLibrary` returns
+   `b.embed().isLibrary()`): staged under `META-INF/bundles/` AND kept flat in the host uber-jar
+   (in `realmLibraryGas`, so `shadeExcludeGas` does NOT exclude it). This is the ONLY `embed` type
+   that lives in both realms — model/edge/record are bundle-only, seam is system-exported.
+   `EmbedCapability.TYPE_LIBRARY` + `isLibrary()`; also listed in `INSTALL_FILTER` (documentary —
+   runtime installs staged jars by presence via `BundleIndex`, not by that filter).
+3. **OSGi consumers IMPORT the package** (a normal compile dep; bnd emits `Import-Package`). **Host**
+   depends on it normally → shaded flat. Verify DUAL: `META-INF/bundles/<lib>.jar` present in the
+   uber-jar AND the api `.class` also flat at the top level.
 
-- The nested package is NOT exported by the host bundle (private to its Bundle-ClassPath, like
-  cdk8s/jsii in `manifests-cdk8s`). So no OSGi split-package: only one bundle nests it, and it is
-  invisible to the resolver. Keep it that way — if a 2nd OSGi consumer ever needs it, route through a
-  single exporter, don't let two bundles nest-and-export it.
-- `DUPLICATE_REALM_CLASS` fires on `flat ∧ seamSurface`. The codec package is flat∧nested but NOT a
-  seam package → exempt. `REALM_BOUNDARY` 0/0 (no type crosses).
-- Verify dual-loading: the class is FLAT in the exec-jar AND the `<module>-*.jar` is inside the
-  domain bundle's staged jar (`META-INF/bundles/<domain>.jar`), AND `META-INF/bundles/<module>.jar`
-  is ABSENT (not an autonomous bundle).
+Why it does NOT trip the gates: its exported package is `flat ∧ exported` but NOT a seam surface, so
+`DUPLICATE_REALM_CLASS` (fires on `flat ∧ seamSurface`) exempts it, exactly like jackson. No type of
+it crosses the seam, so `REALM_BOUNDARY` is clean. Dependency is one-way `library → seam`.
 
-## Naming lesson (from the same session)
+## OLDER form — flat-jar nested in one domain bundle (`-includeresource;lib:=true`)
 
-Name the module/package for what it serves, specific enough to avoid a future split. The codec
-encodes the gateway's `Document`, so: artifact `gateway-document-codec`, package
-`io.nxmatic.rke2lab.world.gateway.codec` — a SIBLING of the seam's `…world.gateway.port`, never
-inside the seam. Tempting-but-WRONG: putting shared logic INTO the `world-gateway` seam because "it's
-shared" — the seam shares DATA in one copy; this shares LOGIC+jackson in two isolated copies. Opposite
-contracts. See [[realm-library-isolation-state]] [[world-gateway-2c-complete-2d-designed-state]]
-[[cdk8s-carrier-flat-jar-pattern]].
+Still technically valid, but INFERIOR when the logic is foundation/multi-domain: it makes the host
+domain "own" a foundation concern, and a SECOND OSGi consumer forces a split package. Use only when
+the logic is genuinely private to ONE domain and will never be foundation. The module is a plain jar
+(NO `Bundle-SymbolicName`, NO embed cap); the domain bundle nests it in `bnd.bnd`
+(`-includeresource: <artifact>-*.jar;lib:=true`) so its classes ride that bundle's Bundle-ClassPath;
+the host shades the same jar flat. It stays nested-PRIVATE (never exported) — if a 2nd OSGi consumer
+appears, promote it to `type=library` rather than nest-and-export from two bundles.
+
+## Naming lesson
+
+Name the module/package for what it serves, specific enough to avoid a future split: artifact
+`gateway-document-codec`, package `io.nxmatic.rke2lab.world.gateway.codec` — a SIBLING of the seam's
+`…world.gateway.port`, NEVER inside the seam (the seam shares DATA in one copy; this shares
+LOGIC+jackson in two isolated copies — opposite contracts). BSN
+`io.nxmatic.rke2lab.gateway.document.codec`. See [[realm-library-isolation-state]]
+[[codec-foundation-single-exporter-when-needed-backlog]] [[world-gateway-2d-execution-state]].

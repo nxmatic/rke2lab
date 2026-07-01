@@ -7,7 +7,7 @@ import java.util.Optional;
  * host must not invent an action — this enum is the authority. {@code slug()} is the wire value
  * placed in the verdict's {@code action} field; call sites reference this, never literals.
  */
-public enum Action {
+public enum Action implements WireEnum {
   STOP("stop"),
   CONTINUE_DEGRADED("continue-degraded");
 
@@ -17,6 +17,7 @@ public enum Action {
     this.slug = slug;
   }
 
+  @Override
   public String slug() {
     return slug;
   }

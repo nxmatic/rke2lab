@@ -8,9 +8,11 @@ import io.nxmatic.rke2lab.doctor.port.InterventionIntake;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.osgi.runtime.BootPipeline;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiInterventionLedgerWriter;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -39,6 +41,7 @@ import java.time.format.DateTimeParseException;
 public final class RecordInterventionCommand {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final DocumentCodec CODEC = new DocumentCodec();
 
   private RecordInterventionCommand() {}
 
@@ -107,9 +110,8 @@ public final class RecordInterventionCommand {
 
   private static String reasonOf(Document verdict) {
     try {
-      final JsonNode payload = MAPPER.readTree(verdict.payload());
-      return payload.path(WorldGatewayCatalog.FIELD_REASON).asText("unknown reason");
-    } catch (JsonProcessingException e) {
+      return CODEC.decode(verdict.payload(), ReadinessVerdict.class).reason();
+    } catch (RuntimeException e) {
       return "unparseable verdict payload";
     }
   }

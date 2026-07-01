@@ -43,10 +43,10 @@
       <artifactId>world-gateway</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <!-- The gateway document codec: nested via -includeresource in bnd.bnd so doctor-core's
-         Bundle-ClassPath includes gateway-document-codec-*.jar, binding the codec to the bundle's
-         jackson. The SAME source is shaded flat into seed-master, binding to the host's jackson —
-         one source, two realm copies. -->
+    <!-- The gateway document codec: a dual-realm library bundle (embed; type=library). doctor-core
+         IMPORTS its package (bnd emits Import-Package from the DocumentCodec usage), binding to the
+         OSGi jackson. The SAME bundle is kept flat in seed-master's uber-jar, binding the host
+         jackson — one source, two realm copies, jackson's own treatment. -->
     <dependency>
       <groupId>io.nxmatic.rke2lab</groupId>
       <artifactId>gateway-document-codec</artifactId>

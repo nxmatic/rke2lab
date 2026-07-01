@@ -3,13 +3,14 @@ package io.nxmatic.rke2lab.doctor.internal;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.records.Severity;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Action;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.util.Map;
 import org.osgi.service.component.annotations.Component;
@@ -38,6 +39,7 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
   private static final Severity DEFAULT_INTRINSIC = Severity.WARNING;
 
   private final ObjectMapper mapper = new ObjectMapper();
+  private final DocumentCodec codec = new DocumentCodec();
 
   @Override
   public Document assess(Document checkpoint) {
@@ -53,16 +55,11 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
             ? Severity.parse(override).orElseGet(() -> intrinsicFor(scenarioId))
             : intrinsicFor(scenarioId);
 
-    final boolean stop = effective == Severity.CRITICAL;
-    final ObjectNode verdict = mapper.createObjectNode();
-    verdict.put(
-        WorldGatewayCatalog.FIELD_ACTION,
-        stop ? Action.STOP.slug() : Action.CONTINUE_DEGRADED.slug());
-    verdict.put(
-        WorldGatewayCatalog.FIELD_REASON,
-        scenarioId + " severity=" + effective.name().toLowerCase());
+    final Action action = effective == Severity.CRITICAL ? Action.STOP : Action.CONTINUE_DEGRADED;
+    final ReadinessVerdict verdict =
+        new ReadinessVerdict(action, scenarioId + " severity=" + effective.name().toLowerCase());
     return new Document(
-        Domain.DOCTOR.slug(), Coordinate.READINESS_VERDICT.slug(), serialize(verdict));
+        Domain.DOCTOR.slug(), Coordinate.READINESS_VERDICT.slug(), codec.encode(verdict));
   }
 
   private Severity intrinsicFor(String scenarioId) {
@@ -74,14 +71,6 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
       return mapper.readTree(payload);
     } catch (JsonProcessingException e) {
       throw new IllegalArgumentException("malformed checkpoint payload", e);
-    }
-  }
-
-  private String serialize(JsonNode node) {
-    try {
-      return mapper.writeValueAsString(node);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("could not serialize verdict payload", e);
     }
   }
 }

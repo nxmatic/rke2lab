@@ -20,9 +20,7 @@ Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=doctor
 # bench-fragment-host. (The osgi.component extender Require-Capability is still emitted by bnd from
 # the @Component, so it is not hand-declared here.)
 Service-Component: OSGI-INF/*.xml
-# Nest gateway-document-codec as a Bundle-ClassPath jar: the codec's classes ride doctor-core's
-# classpath, binding to the bundle's jackson. The SAME source is shaded flat into seed-master,
-# binding to the host's jackson — one source, two realm-specific copies, no codec type crosses the
-# seam.
--includeresource: gateway-document-codec-*.jar;lib:=true
+# gateway-document-codec is a dual-realm library bundle (embed; type=library) — imported here like
+# jackson (bnd emits the Import-Package for io.nxmatic.rke2lab.world.gateway.codec from the bytecode
+# that uses DocumentCodec). It is staged as its own bundle AND kept flat host-side; no longer nested.
 -noimportjava: true

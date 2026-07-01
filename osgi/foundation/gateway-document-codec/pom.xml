@@ -9,30 +9,36 @@
   </parent>
   <artifactId>gateway-document-codec</artifactId>
   <name>osgi/foundation/gateway-document-codec</name>
-  <description>The Document payload codec logic, written once and loaded per realm: shaded flat into
-    the host, nested into doctor-core's Bundle-ClassPath OSGi-side (-includeresource;lib:=true). A
-    plain flat jar (no Bundle-SymbolicName) so the realm-library rule never stages it as an
-    autonomous bundle — each realm binds it to its own jackson, no codec type crosses the seam.</description>
+  <description>The Document payload codec (DocumentCodec), written once and loaded per realm — our own
+    dual-realm library (embed; type=library, jackson's treatment for our code): staged as a bundle
+    OSGi-side (importing the OSGi jackson + world-gateway seam, exporting world.gateway.codec) AND
+    shaded flat host-side (binding the host jackson). No codec type crosses the String-only seam;
+    each realm holds its own copy. See docs/architecture/osgi/world-gateway-spec.adoc.</description>
   <dependencies>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
+    <!-- The wire-records + WireEnum the codec (de)serializes. provided: the world-gateway seam is
+         system-exported OSGi-side and flat host-side in BOTH realms, so the codec compiles against
+         it and bnd emits an Import-Package for it, but it must NOT be embedded (that would duplicate
+         the seam class → a realm collision). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>world-gateway</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
-      <!-- Plain jar (no bnd): override the bundle-parent's maven-jar-plugin manifestFile config,
-           which expects bnd-maven-plugin to generate META-INF/MANIFEST.MF. This module does NOT run
-           bnd (it must be a plain jar without Bundle-SymbolicName, or the realm-library rule could
-           stage it as an autonomous bundle). Let maven-jar-plugin generate the default manifest. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <configuration>
-          <archive>
-            <manifestFile combine.self="override"/>
-          </archive>
-        </configuration>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>biz.aQute.bnd</groupId>
+        <artifactId>bnd-maven-plugin</artifactId>
       </plugin>
     </plugins>
   </build>

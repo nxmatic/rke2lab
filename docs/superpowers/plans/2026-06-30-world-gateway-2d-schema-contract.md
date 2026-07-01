@@ -14,7 +14,7 @@
 
 - **Build through flox always:** `flox activate -- ./mvnw …`. Never `mvn install` to `~/.m2`; inter-module deps resolve through the reactor — every module build uses `-am`.
 - **Tests are skipped by default** (root `.mvn` config). Execute with `-DskipTests=false`. The OSGi/in-container tests run only under `-Pall-worlds`.
-- **Full-reactor gate command:** `flox activate -- ./mvnw clean package -DskipTests=false -Pall-worlds -Dmaven.build.cache.enabled=false`. Cache OFF is mandatory for a trustworthy gate verdict (a stale cache masked both a staging change and pre-existing test breakage on 2026-06-30).
+- **Full-reactor gate command:** `flox activate -- ./mvnw package -DskipTests=false -Pall-worlds -Dmaven.build.cache.skipCache=true`. SKIP the cache (`skipCache=true`) — it bypasses the restore-lookup for a fresh verdict while keeping the extension ACTIVE (still computes/saves checksums). Do NOT use `-Dmaven.build.cache.enabled=false` (it turns the mechanism off and breaks sibling-jar materialization the staging extension reads from disk). No `clean` by default — add it only when a stale `target/` is suspected (ECJ/incremental incoherence). See `maven-build-cache-and-staging-verify` memory.
 - **Two-phase build for the extension:** changing `maven-embed-staging-ext` requires the two-phase dance — the live extension self-poisons its own rebuild. Disable the `staging-extension` block in `.mvn/extensions.xml` (comment it out) → `./mvnw -f maven-embed-staging-ext/pom.xml clean install -DskipTests=false` → re-enable the block → run the reactor. See `osgi-staging-extension-chantier` memory.
 - **The two `StagingGate` enums must stay in step:** `osgi/foundation/domain-annotations/.../StagingGate.java` (the `@GovernedBy` value) and `maven-embed-staging-ext/.../StagingGate.java` (the ASM mirror, read by constant NAME). Adding a constant means editing BOTH.
 - **`Document.payload` stays a `String`** — the logical contract. No carrier/streaming change (transport/remote backlog).
@@ -57,15 +57,16 @@ This plan front-loads that engine (Task 3) and proves it on ONE coordinate (`rea
 
 ---
 
-## Task 1: Pin and bundle networknt (zone-0a)
+## Task 1: Pin networknt (zone-0a) — BOM + the build extension only
 
 **Files:**
-- Modify: `bom/pom.xml` (dependencyManagement)
-- Modify: `osgi/domains/doctor/doctor-core/pom.xml` (dependency)
-- Verify: `exec/seed-master/target/*-exec.jar` staging (networknt self-includes as a realm library)
+- Modify: `bom/pom.xml` (dependencyManagement — the version pin)
+- Modify: `maven-embed-staging-ext/staging-extension/pom.xml` (dependency — the gate uses it at build time)
 
 **Interfaces:**
-- Produces: `com.networknt.schema.*` available on the doctor-core bundle classpath and (flat) on the host.
+- Produces: `com.networknt.schema.*` on the staging-extension's classpath (the `SchemaConcord` gate, Task 3, validates each schema against the JSON-Schema meta-schema there).
+
+**Where networknt is — and is NOT — needed in 2D.** networknt has exactly ONE consumer in 2D: the build-time `SCHEMA_CONCORD` gate inside `maven-embed-staging-ext` (Task 3, the meta-schema check). It is NOT needed at runtime: `DocumentCodec.validate` is OFF in embedded (it throws if turned on — only the remote capstone enables it), so no runtime bundle imports networknt in 2D. Therefore doctor-core does NOT get a networknt dependency (it would be unused, never imported, never staged — dead weight). The realm-library auto-staging of networknt belongs to the capstone (when runtime validation turns on and a bundle actually imports `com.networknt.schema`), not 2D.
 
 - [ ] **Step 1: Add the networknt version property + management entry to `bom/pom.xml`**
 
@@ -81,34 +82,37 @@ In `<dependencyManagement><dependencies>`, after the jackson-bom import, add:
   <version>${networknt.json-schema.version}</version>
 </dependency>
 ```
-(Confirm 1.5.6 resolves a jackson-2.22-compatible build; if the reactor reports a jackson downgrade, pin to the latest networknt that targets jackson 2.x and record the exact version here.)
+(Confirm 1.5.6 resolves a jackson-2.22-compatible build; if the reactor reports a jackson downgrade, pin to the latest networknt that targets jackson 2.x and record the exact version here. Manage its transitive `com.ethlo.time:itu` here too if the reactor flags it.)
 
-- [ ] **Step 2: Add the dependency to doctor-core**
+- [ ] **Step 2: Add the dependency to the staging extension**
 
-In `osgi/domains/doctor/doctor-core/pom.xml`, add (no version — managed by the bom):
+The `maven-embed-staging-ext` aggregator has its OWN version line (it is a RELEASE built before the reactor), so it does NOT import the project BOM. Add networknt with an explicit version to `maven-embed-staging-ext/staging-extension/pom.xml` `<dependencies>`:
 ```xml
 <dependency>
   <groupId>com.networknt</groupId>
   <artifactId>json-schema-validator</artifactId>
+  <version>1.5.6</version>
 </dependency>
 ```
+(Use the same version the BOM pins. This is the lib the Task-3 `SchemaConcord` gate calls for meta-schema validity.)
 
-- [ ] **Step 3: Build doctor-core through the reactor**
+- [ ] **Step 3: Build the extension (two-phase) + the reactor, confirm both green**
 
-Run: `flox activate -- ./mvnw -pl :doctor-core -am clean package -DskipTests=false`
-Expected: BUILD SUCCESS. doctor-core's bnd computes an `Import-Package` for `com.networknt.schema`.
+Per the two-phase rule (the live extension self-poisons its own rebuild):
+```bash
+# comment out the staging-extension block in .mvn/extensions.xml
+flox activate -- ./mvnw -f maven-embed-staging-ext/pom.xml clean install -DskipTests=false
+# uncomment the block
+flox activate -- ./mvnw clean package -DskipTests -Pall-worlds -Dmaven.build.cache.skipCache=true
+```
+Expected: both BUILD SUCCESS. The extension now has networknt on its classpath (dormant until Task 3 uses it); the reactor is unaffected (no runtime bundle imports networknt). Confirm networknt is NOT under `META-INF/bundles/` in any exec-jar (it is build-tooling only):
+`unzip -l exec/seed-master/target/seed-master-0.0.0-SNAPSHOT-exec.jar | grep -i networknt` → expect NO output.
 
-- [ ] **Step 4: Verify networknt self-includes as a realm library (no staging code change)**
-
-Run: `flox activate -- ./mvnw -pl :seed-master -am clean package -DskipTests -Pall-worlds -Dmaven.build.cache.enabled=false`
-Then: `unzip -l exec/seed-master/target/seed-master-0.0.0-SNAPSHOT-exec.jar | grep -iE 'json-schema-validator|META-INF/bundles/.*networknt'`
-Expected: `json-schema-validator-*.jar` present under `META-INF/bundles/` (staged as a realm library — doctor-core imports `com.networknt.schema`). If networknt drags a package the boot-stack already provides, the realm-library bound (commit `ae46278b`) excludes it automatically — confirm no resolution error in the build log. NO staging-extension edit should be needed; if one seems necessary, STOP and reassess (the rule should be self-deriving).
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add bom/pom.xml osgi/domains/doctor/doctor-core/pom.xml
-git commit -m "feat(2d): pin + bundle networknt json-schema-validator (realm library, self-included)"
+git add bom/pom.xml maven-embed-staging-ext/staging-extension/pom.xml
+git commit -m "feat(2d): pin networknt — BOM version + staging-extension dep (the SCHEMA_CONCORD gate's meta-schema validator)"
 ```
 
 ---
@@ -299,7 +303,7 @@ This puts the codec's classes on doctor-core's Bundle-ClassPath, bound to the ja
 
 - [ ] **Step 9: Full reactor gate — prove the new pattern**
 
-Run: `flox activate -- ./mvnw clean package -DskipTests=false -Pall-worlds -Dmaven.build.cache.enabled=false`
+Run: `flox activate -- ./mvnw clean package -DskipTests=false -Pall-worlds -Dmaven.build.cache.skipCache=true`
 Expected: BUILD SUCCESS. Verify:
 - `unzip -l exec/seed-master/target/seed-master-0.0.0-SNAPSHOT-exec.jar | grep 'io/nxmatic/rke2lab/document/DocumentCodec'` → present FLAT (host copy).
 - `unzip -l exec/seed-master/target/seed-master-0.0.0-SNAPSHOT-exec.jar | grep 'META-INF/bundles/document-codec'` → ABSENT (not staged as an autonomous bundle).
@@ -619,7 +623,7 @@ In `enforceGates` (around line 148–290, after the `DuplicateRealmClass` block 
 # comment out the staging-extension block in .mvn/extensions.xml
 flox activate -- ./mvnw -f maven-embed-staging-ext/pom.xml clean install -DskipTests=false
 # uncomment the block
-flox activate -- ./mvnw clean package -DskipTests=false -Pall-worlds -Dmaven.build.cache.enabled=false
+flox activate -- ./mvnw clean package -DskipTests=false -Pall-worlds -Dmaven.build.cache.skipCache=true
 ```
 Expected: BUILD SUCCESS. Gate summary shows `schema-concord: 0 error, 0 warn` (no schema files yet → no coordinate has a schema → `violations()` skips them → clean). The enum + engine are in place, dormant.
 
@@ -663,7 +667,7 @@ For each coordinate the task is:
 
 - [ ] **Step 2: Remove the `@GovernedBy(SCHEMA_CONCORD, WARN)` line** from doctor-core's `package-info.java` (returns to the ERROR default).
 
-- [ ] **Step 3: Run the full reactor gate** — `flox activate -- ./mvnw clean package -DskipTests=false -Pall-worlds -Dmaven.build.cache.enabled=false`. Expected: BUILD SUCCESS with `schema-concord: 0 error, 0 warn` at ERROR level. A drift would now fail the build (the lock working).
+- [ ] **Step 3: Run the full reactor gate** — `flox activate -- ./mvnw clean package -DskipTests=false -Pall-worlds -Dmaven.build.cache.skipCache=true`. Expected: BUILD SUCCESS with `schema-concord: 0 error, 0 warn` at ERROR level. A drift would now fail the build (the lock working).
 
 - [ ] **Step 4: Commit** `feat(2d): flip SCHEMA_CONCORD WARN→ERROR — the Document contract is build-enforced`.
 

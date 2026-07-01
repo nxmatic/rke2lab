@@ -75,6 +75,14 @@
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
+    <!-- The codec that (de)serializes wire-records; nested in the doctor-core host bundle (T2), so
+         the fragment resolves it through the host at runtime — compile-only here, like the seam. -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>gateway-document-codec</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-core</artifactId>

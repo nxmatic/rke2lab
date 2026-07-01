@@ -8,9 +8,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.port.InterventionIntake;
 import io.nxmatic.rke2lab.junit.testkit.diagnostic.ScrDiagnostics;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -86,9 +88,10 @@ class InterventionIntakeTest {
         Coordinate.READINESS_VERDICT.slug(),
         verdict.coordinate(),
         "a bad reference must return an error verdict, not throw across the seam");
-    final Map<String, Object> payload = MAPPER.readValue(verdict.payload(), MAP);
+    final ReadinessVerdict decoded =
+        new DocumentCodec().decode(verdict.payload(), ReadinessVerdict.class);
     assertTrue(
-        payload.get(WorldGatewayCatalog.FIELD_REASON).toString().contains("no-such-checkpoint"),
-        () -> "the verdict reason must name the bad reference: " + payload);
+        decoded.reason().contains("no-such-checkpoint"),
+        () -> "the verdict reason must name the bad reference: " + decoded);
   }
 }

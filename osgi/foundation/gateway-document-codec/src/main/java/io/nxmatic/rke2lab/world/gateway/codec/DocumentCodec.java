@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.world.gateway.codec;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.nxmatic.rke2lab.world.gateway.codec.internal.WireEnumModule;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
@@ -16,7 +17,8 @@ import java.io.UncheckedIOException;
  */
 public final class DocumentCodec {
 
-  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final ObjectMapper MAPPER =
+      new ObjectMapper().registerModule(new WireEnumModule());
 
   private final boolean validationEnabled;
 
@@ -46,6 +48,24 @@ public final class DocumentCodec {
       return MAPPER.readTree(payload);
     } catch (IOException ex) {
       throw new UncheckedIOException("Failed to decode Document payload", ex);
+    }
+  }
+
+  /** Serialize a wire-record to its Document payload String (seam enums render as their slug). */
+  public String encode(Object wireRecord) {
+    try {
+      return MAPPER.writeValueAsString(wireRecord);
+    } catch (IOException ex) {
+      throw new UncheckedIOException("Failed to encode wire-record payload", ex);
+    }
+  }
+
+  /** Deserialize a Document payload String into its wire-record (slugs resolve to seam enums). */
+  public <T> T decode(String payload, Class<T> type) {
+    try {
+      return MAPPER.readValue(payload, type);
+    } catch (IOException ex) {
+      throw new UncheckedIOException("Failed to decode payload into " + type.getSimpleName(), ex);
     }
   }
 

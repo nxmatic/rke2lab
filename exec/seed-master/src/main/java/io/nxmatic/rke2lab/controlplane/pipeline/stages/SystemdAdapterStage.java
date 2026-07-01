@@ -17,12 +17,14 @@ import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.pipeline.TopicFailure;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Action;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
 import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
@@ -68,6 +70,8 @@ public final class SystemdAdapterStage {
    * The seam payload is a serialized JSON String; the host builds/reads it with its own jackson.
    */
   private final ObjectMapper mapper = new ObjectMapper();
+
+  private final DocumentCodec codec = new DocumentCodec();
 
   public SystemdAdapterStage(
       BootstrapConfig config,
@@ -226,8 +230,8 @@ public final class SystemdAdapterStage {
 
     final Document checkpoint = checkpointDocument(SCENARIO_ID);
     final Document verdict = readinessAuthority.assess(checkpoint);
-    final String action = parse(verdict.payload()).path(WorldGatewayCatalog.FIELD_ACTION).asText();
-    if (Action.STOP.slug().equals(action)) {
+    final Action action = codec.decode(verdict.payload(), ReadinessVerdict.class).action();
+    if (action == Action.STOP) {
       log("✗ " + SCENARIO_ID + " FAILED, verdict=stop → stopping provisioning");
       throw new TopicFailure("systemd adapter", failure);
     }

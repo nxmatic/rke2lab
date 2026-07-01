@@ -62,11 +62,26 @@ public record EmbedCapability(Clause clause) {
   public static final String TYPE_FIXTURE = "fixture";
 
   /**
-   * The bundles a runtime INSTALLS into the framework: domain {@code model} + {@code edge} + {@code
-   * record}, all loading on the bundle side. Excludes {@code seam} (system-exported, not installed)
-   * and {@code fixture} (test-only). The single source for the prod discovery filter.
+   * OUR OWN dual-realm library: logic we wrote that depends on a realm-isolated third-party library
+   * (jackson) and is needed in BOTH realms. It follows jackson's own treatment — staged as a bundle
+   * (installed in-framework, binding the OSGi copy of its dependency) AND kept flat in the host
+   * uber-jar (binding the host copy). Unlike a {@code model}/{@code edge}/{@code record} (bundle
+   * ONLY, excluded from flat), a {@code library} is BOTH realms at once. Its exported package
+   * legitimately lives in two realms — exempt from {@code DUPLICATE_REALM_CLASS} like jackson,
+   * because it is NOT a seam surface (no type of it crosses the String-only seam; each realm holds
+   * its own copy bound to its own jackson). Exemplar: {@code gateway-document-codec} (the {@code
+   * DocumentCodec}, one source, two realm-bound copies).
    */
-  public static final String INSTALL_FILTER = "(|(type=model)(type=edge)(type=record))";
+  public static final String TYPE_LIBRARY = "library";
+
+  /**
+   * The bundles a runtime INSTALLS into the framework: domain {@code model} + {@code edge} + {@code
+   * record} + our dual-realm {@code library}, all loading on the bundle side. Excludes {@code seam}
+   * (system-exported, not installed) and {@code fixture} (test-only). The single source for the
+   * prod discovery filter.
+   */
+  public static final String INSTALL_FILTER =
+      "(|(type=model)(type=edge)(type=record)(type=library))";
 
   /**
    * The embed capability declared in {@code provideCapability}, or {@code null} if the header does
@@ -101,6 +116,16 @@ public record EmbedCapability(Clause clause) {
   /** Whether this carrier is the seam — system-exported for the flat host, never installed. */
   public boolean isSeam() {
     return TYPE_SEAM.equals(type());
+  }
+
+  /**
+   * Whether this carrier is our own dual-realm library — staged as a bundle AND kept flat in the
+   * host (jackson's treatment, for our code). The staging closure turns on this to stage it yet
+   * keep it in the flat uber-jar; {@code DUPLICATE_REALM_CLASS} exempts its exported package (not a
+   * seam surface, each realm holds its own copy).
+   */
+  public boolean isLibrary() {
+    return TYPE_LIBRARY.equals(type());
   }
 
   /** Whether {@code filter} (an LDAP filter over the embed attributes) selects this capability. */

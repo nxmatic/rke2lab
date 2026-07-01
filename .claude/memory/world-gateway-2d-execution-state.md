@@ -51,20 +51,67 @@ producers/consumers onto them", not "write 6 schemas".
 - **visit** (host StackMedicalRecordJournal.visitDocument) — writes version, when,
   consultationReport[] (blobs), expectations[] (list-of-lists). Consumed by MedicalRecordReader.read.
 
-## NEXT (resume here)
+## DESIGN WRITTEN + USER GO (2026-06-30) — now EXECUTING
 
-1. WRITE the records-as-contract design (the user said OK to plan-mode). Decisions to settle in it:
-   (a) WHERE the records live — likely the `world-gateway` seam (String-only, NO jackson): a record of
-   scalars+lists+nested records can live there; its serialization (record↔String) belongs to the
-   per-realm `DocumentCodec` (jackson). Confirm the seam stays jackson-free.
-   (b) schema generation build-time vs runtime — likely build-time projection from the records (jackson
-   has jackson-module-jsonSchema, or generate from RecordComponents).
-   (c) nesting via nested records (the strong argument for records over a flat descriptor).
-   (d) the gate's NEW invariant (no parallel put(String,…) construction; Document built only via a record).
-   (e) how this respects realm isolation (records cross the seam as data? or only String crosses and the
-   record is realm-local on each side? — 2C says only String crosses; the record is likely a per-realm
-   shape the codec maps to/from String, NOT a type crossing the seam — VERIFY against 2C invariant).
-2. Get user GO on the design, THEN re-plan Tasks 4-9 and execute.
+Design doc: `docs/superpowers/plans/2026-06-30-world-gateway-2d-records-as-contract-design.md`.
+User said GO. The 5 decisions are SETTLED there; the 3 open points are resolved (user accepted the leanings):
+- (a) wire-records live in the **`world-gateway` seam** (jackson-free, system-exported, one shared
+  class — same status as Document/Coordinate; the TYPE never crosses, only the String, via the
+  per-realm DocumentCodec). Confirmed against 2C: stricter than today, does not reopen the JsonNode leak.
+- (b) schema GENERATED build-time from `RecordComponents`, generator in `maven-embed-staging-ext`.
+- (c) nesting via nested wire-records (Consultation→ConsultationReportWire+List<ExpectationWire>).
+- (d) gate invariant REWRITTEN: "every Document of coordinate X built/read via X's wire-record, never
+  parallel put(String,…)". Old `CoordinateFieldUsage` ASM read/write engine = DELETED (obsolete).
+- (e) isolation respected + strengthened.
+- Open-1 PACKAGE: flat in `world.gateway.port` (not a `.wire` sub-pkg).
+- Open-2 WIRE vs RICH: option (ii) — wire-record is schema-source AND serialization unit; rich
+  `doctor-records` types stay the domain model and gain `toWire()` where they're the producer.
+- Open-3 OPAQUE blobs (visit, host intervention pass-through): `Map<String,Object>`/`List<Object>`,
+  generator emits `{}`.
+
+### Re-planned tasks (replace old 4-9), gate stays WARN until T10 flip:
+- T4 scaffolding: wire-record base + opaque pass-through type, schema generator in extension, gate
+  new invariant WARN, 0 schemas yet (0/0 green). Subsumes old Task 3 rewrite.
+- T5 readiness-verdict (flat, OSGi-only) — proves the loop end-to-end.
+- T6 intervention-request (flat, HOST producer) — first host migration via shared seam record.
+- T7 intervention (OSGi producer already record-based; host pass-through opaque).
+- T8 readiness-checkpoint (host producers, nested observations[]).
+- T9 consultation + visit (nesting + opaque blobs).
+- T10 delete WorldGatewayCatalog FIELD_* block; FLIP SCHEMA_CONCORD WARN→ERROR; full reactor green = lock.
+
+EXECUTION POSTURE: T4 done inline (design-sensitive, full context). T5-T9 subagent-driven (repetitive
+per-coordinate migration). Build: `flox activate -- ./mvnw package -Pall-worlds
+-Dmaven.build.cache.skipCache=true -DskipTests=false`; extension = two-phase dance.
+
+## T4 + T5 DONE (2026-07-01)
+
+- **T4** (commit `63622488`): `@DocumentContract(Coordinate)` seam annotation, `RecordSchemaProjector`
+  (RecordComponents→JSON schema by ASM), `DocumentContractScan` (replaced CoordinateFieldUsage),
+  `SchemaConcord` rewritten (every Coordinate must have a wire-record whose projected schema is
+  meta-schema-valid; missing = WARN worklist). Gate WARN, 6-coordinate worklist, reactor green.
+- **T5** (readiness-verdict, first coordinate): `ReadinessVerdict(Action, reason)` wire-record —
+  holds the Action enum TYPED (the FIELD_* typing goal). `WireEnum` seam marker (Action implements
+  it) + `WireEnumModule` (jackson glue, codec `.internal`, non-exported) maps any WireEnum↔slug
+  generically. `DocumentCodec` gained typed `encode(record)`/`decode(String,Class)`. All 6
+  producers/consumers migrated (DefaultReadinessAuthority, DefaultInterventionIntake.error host
+  SystemdAdapterStage + RecordInterventionCommand + 5 tests); `FIELD_ACTION`/`FIELD_REASON` DELETED.
+  SCHEMA_CONCORD now 5 warn. NOT yet committed as of this note.
+
+### THE BIG T5 DESIGN SHIFT — codec is now a `type=library` bundle (user-driven)
+The codec was a flat-jar nested-private in doctor-core. The user pushed to resolve the
+"doctor-core owns a foundation concern" tension NOW: promoted it to an **autonomous dual-realm
+bundle** via a NEW staging category `embed; type=library` (jackson's own treatment, for our code):
+- `EmbedCapability.TYPE_LIBRARY` + `isLibrary()`; `INSTALL_FILTER` includes it (documentary).
+- `StagingClosure.isRealmLibrary` returns `b.embed().isLibrary()` for ours → staged bundle AND kept
+  flat (in realmLibraryGas, so NOT shade-excluded). The ONLY embed type in both realms.
+- codec bnd: BSN `io.nxmatic.rke2lab.gateway.document.codec`, Export `world.gateway.codec`, Import
+  jackson+seam, `Provide-Capability embed; type=library`. doctor-core IMPORTS it (no more nesting).
+- Verified DUAL in the uber-jar: `META-INF/bundles/gateway-document-codec.jar` AND flat
+  `world/gateway/codec/DocumentCodec.class`. Pattern memory rewritten: type=library is now PREFERRED
+  over nesting ([[nesting-our-own-flat-module-per-realm]] [[codec-foundation-single-exporter-when-needed-backlog]]).
+- Naming settled: KEEP `gateway-document-codec` (role, not jackson mechanism); it is NOT a jackson
+  fragment (depends on seam, dual-realm, owns its export) — only `WireEnumModule` is a jackson extension.
+- Dep-scope/version centralization DEFERRED by user ([[centralize-seam-dep-scope-version-backlog]]).
 
 Build command (user-confirmed, [[maven-build-cache-and-staging-verify]]): `flox activate -- ./mvnw
 package -Pall-worlds -Dmaven.build.cache.skipCache=true -DskipTests=false` (SKIP cache, not disable;

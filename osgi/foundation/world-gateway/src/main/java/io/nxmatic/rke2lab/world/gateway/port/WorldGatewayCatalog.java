@@ -60,12 +60,6 @@ public final class WorldGatewayCatalog {
    */
   public static final String FIELD_EXPECTATIONS = "expectations";
 
-  /** Verdict payload: the provisioning action (see {@link Action} for values). */
-  public static final String FIELD_ACTION = "action";
-
-  /** Verdict payload: a human-readable reason for the action. */
-  public static final String FIELD_REASON = "reason";
-
   /** Intervention-request payload: the problem reference slug (checkpoint[/symptom]). */
   public static final String FIELD_PROBLEM = "problem";
 

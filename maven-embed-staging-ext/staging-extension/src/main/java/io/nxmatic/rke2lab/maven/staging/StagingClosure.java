@@ -183,11 +183,19 @@ public record StagingClosure(
     }
 
     /**
-     * A third-party OSGi bundle (not ours, not a seam, not the launcher) exporting a domain import
-     * that the boot-stack does NOT already provide. A domain import already served by a boot-stack
-     * bundle (pax-logging-api exports {@code org.slf4j}) needs no realm-library copy — staging one
-     * would add a second in-framework exporter and break the slf4j 2.x ServiceLoader-processor
-     * resolution. So that package is not a staging trigger; the bundle stays host-flat only.
+     * A realm library — staged AND kept flat (dual). Two kinds:
+     *
+     * <ul>
+     *   <li>OUR OWN dual-realm library: a bundle self-declaring {@code embed; type=library} (e.g.
+     *       {@code gateway-document-codec}). It states its dual nature explicitly, so it is a realm
+     *       library by declaration — no import analysis needed.
+     *   <li>a THIRD-PARTY OSGi bundle (not ours, not a seam, not the launcher) exporting a domain
+     *       import the boot-stack does NOT already provide (jackson). A domain import already
+     *       served by a boot-stack bundle (pax-logging-api exports {@code org.slf4j}) needs no
+     *       realm-library copy — staging one would add a second in-framework exporter and break the
+     *       slf4j 2.x ServiceLoader-processor resolution. So that package is not a staging trigger;
+     *       the bundle stays host-flat only.
+     * </ul>
      */
     private static boolean isRealmLibrary(
         ResolvedBundle b, Set<String> domainImports, Set<String> bootStackExports) {
@@ -195,7 +203,8 @@ public record StagingClosure(
         return false;
       }
       if (b.embed() != null) {
-        return false; // ours (model/edge/record/seam) — not a third-party library.
+        // Ours: only a type=library is dual (staged + flat); model/edge/record/seam are not.
+        return b.embed().isLibrary();
       }
       for (String exported : b.exports().names()) {
         if (!ResolvedBundle.isOurs(exported)

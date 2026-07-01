@@ -12,9 +12,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.port.InterventionIntake;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
+import io.nxmatic.rke2lab.world.gateway.port.Action;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -26,6 +29,7 @@ import org.junit.jupiter.api.Test;
 class RecordInterventionCommandTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final DocumentCodec CODEC = new DocumentCodec();
   private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {};
 
   /**
@@ -51,10 +55,11 @@ class RecordInterventionCommandTest {
       final JsonNode req = read(rawFacts.payload());
       final String problem = req.path(WorldGatewayCatalog.FIELD_PROBLEM).asText();
       if (problem.startsWith("no-such")) {
-        final ObjectNode verdict = MAPPER.createObjectNode();
-        verdict.put(WorldGatewayCatalog.FIELD_REASON, "unknown problem reference: " + problem);
         return new Document(
-            Domain.DOCTOR.slug(), Coordinate.READINESS_VERDICT.slug(), write(verdict));
+            Domain.DOCTOR.slug(),
+            Coordinate.READINESS_VERDICT.slug(),
+            CODEC.encode(
+                new ReadinessVerdict(Action.STOP, "unknown problem reference: " + problem)));
       }
       final ObjectNode out = MAPPER.createObjectNode();
       out.put("provenance", textOr(req, WorldGatewayCatalog.FIELD_PROVENANCE, "operator-manual"));

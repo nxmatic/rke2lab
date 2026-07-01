@@ -3,16 +3,17 @@ package io.nxmatic.rke2lab.doctor.internal;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.port.InterventionIntake;
 import io.nxmatic.rke2lab.doctor.records.Intervention;
 import io.nxmatic.rke2lab.doctor.records.ProblemRef;
 import io.nxmatic.rke2lab.doctor.records.Provenance;
 import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Action;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -38,6 +39,7 @@ import org.osgi.service.component.annotations.Component;
 public final class DefaultInterventionIntake implements InterventionIntake {
 
   private final ObjectMapper mapper = new ObjectMapper();
+  private final DocumentCodec codec = new DocumentCodec();
 
   @Override
   public Document canonicalize(Document rawFacts) {
@@ -113,18 +115,9 @@ public final class DefaultInterventionIntake implements InterventionIntake {
   }
 
   private Document error(String reason) {
-    final ObjectNode verdict = mapper.createObjectNode();
-    verdict.put(WorldGatewayCatalog.FIELD_ACTION, Action.STOP.slug());
-    verdict.put(WorldGatewayCatalog.FIELD_REASON, reason);
     return new Document(
-        Domain.DOCTOR.slug(), Coordinate.READINESS_VERDICT.slug(), serialize(verdict));
-  }
-
-  private String serialize(JsonNode node) {
-    try {
-      return mapper.writeValueAsString(node);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("could not serialize verdict payload", e);
-    }
+        Domain.DOCTOR.slug(),
+        Coordinate.READINESS_VERDICT.slug(),
+        codec.encode(new ReadinessVerdict(Action.STOP, reason)));
   }
 }

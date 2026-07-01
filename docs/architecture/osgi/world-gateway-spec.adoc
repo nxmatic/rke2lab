@@ -159,6 +159,14 @@ payload, which each realm maps record↔`String` with its own jackson in the per
 mutable domain type and violate "ports are services") and stricter than the host hand-rolling a map
 independently: both realms now build the same coordinate through the same record shape.
 
+The first migrated coordinate is `readiness-verdict`, whose wire-record `ReadinessVerdict(Action,
+reason)` holds the provisioning `Action` **typed** rather than as a loose slug string — the typing
+the `FIELD_*` strings lacked. A closed-vocabulary seam enum a wire-record holds implements the
+`WireEnum` marker (its wire form is a kebab-case `slug()`); the codec maps every `WireEnum` ↔ slug
+generically with one jackson module, so the seam enum carries no jackson annotation and the seam
+stays flat. Deserializing a verdict into `ReadinessVerdict` leaks nothing the 2C boundary forbade:
+`Action` is the seam's own control vocabulary the host already names, never a doctor `Severity`.
+
 An opaque sub-tree a producer copies verbatim (a blob it does not re-describe, e.g. the host
 forwarding an OSGi-written `consultationReport`) is modelled as an open slot (`Map`/`List`), for
 which the projection emits an open `object` — the contract is "this slot is an object", its inner
