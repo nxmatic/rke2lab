@@ -17,8 +17,8 @@ import io.nxmatic.rke2lab.world.gateway.port.Action;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.InterventionRequest;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,23 +52,20 @@ class RecordInterventionCommandTest {
    */
   private static InterventionIntake fakeIntake() {
     return rawFacts -> {
-      final JsonNode req = read(rawFacts.payload());
-      final String problem = req.path(WorldGatewayCatalog.FIELD_PROBLEM).asText();
-      if (problem.startsWith("no-such")) {
+      final InterventionRequest req = CODEC.decode(rawFacts.payload(), InterventionRequest.class);
+      if (req.problem().startsWith("no-such")) {
         return new Document(
             Domain.DOCTOR.slug(),
             Coordinate.READINESS_VERDICT.slug(),
             CODEC.encode(
-                new ReadinessVerdict(Action.STOP, "unknown problem reference: " + problem)));
+                new ReadinessVerdict(Action.STOP, "unknown problem reference: " + req.problem())));
       }
       final ObjectNode out = MAPPER.createObjectNode();
-      out.put("provenance", textOr(req, WorldGatewayCatalog.FIELD_PROVENANCE, "operator-manual"));
-      out.put("when", req.path(WorldGatewayCatalog.FIELD_WHEN).asText());
-      out.put("what", req.path(WorldGatewayCatalog.FIELD_WHAT).asText());
-      out.put("problem", problem);
-      if (req.hasNonNull(WorldGatewayCatalog.FIELD_PRESCRIPTION_REF)) {
-        out.put("prescriptionRef", req.get(WorldGatewayCatalog.FIELD_PRESCRIPTION_REF).asText());
-      }
+      out.put("provenance", req.provenance().orElse("operator-manual"));
+      out.put("when", req.when().toString());
+      out.put("what", req.what());
+      out.put("problem", req.problem());
+      req.prescriptionRef().ifPresent(ref -> out.put("prescriptionRef", ref));
       return new Document(Domain.DOCTOR.slug(), Coordinate.INTERVENTION.slug(), write(out));
     };
   }
@@ -222,23 +219,11 @@ class RecordInterventionCommandTest {
     }
   }
 
-  private static JsonNode read(String json) {
-    try {
-      return MAPPER.readTree(json);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException(e);
-    }
-  }
-
   private static String write(JsonNode node) {
     try {
       return MAPPER.writeValueAsString(node);
     } catch (JsonProcessingException e) {
       throw new IllegalStateException(e);
     }
-  }
-
-  private static String textOr(JsonNode node, String field, String fallback) {
-    return node.hasNonNull(field) ? node.get(field).asText() : fallback;
   }
 }

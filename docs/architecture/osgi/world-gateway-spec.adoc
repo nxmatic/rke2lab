@@ -167,6 +167,15 @@ generically with one jackson module, so the seam enum carries no jackson annotat
 stays flat. Deserializing a verdict into `ReadinessVerdict` leaks nothing the 2C boundary forbade:
 `Action` is the seam's own control vocabulary the host already names, never a doctor `Severity`.
 
+The `intervention-request` wire-record `InterventionRequest(problem, what, provenance?,
+prescriptionRef?, when)` shows two more shapes the projection needs: an `Optional<String>` field
+(the `provenance`/`prescriptionRef` the operator may omit — the codec's `OptionalModule` maps it to
+an absent key, and the generated schema drops it from `required`) and an `Instant` (`when`, rendered
+ISO-8601 by the codec's `InstantModule`). The references stay RAW strings on the wire — the doctor
+vocabulary (`ProblemRef`, `Provenance`, `RemediationProgramRef`) is parsed only OSGi-side, so the
+host holds no doctor type. Both codec modules are hand-registered, keeping the codec free of the
+`jackson-datatype-*` family and its `ServiceLoader<Module>` discovery surface.
+
 An opaque sub-tree a producer copies verbatim (a blob it does not re-describe, e.g. the host
 forwarding an OSGi-written `consultationReport`) is modelled as an open slot (`Map`/`List`), for
 which the projection emits an open `object` — the contract is "this slot is an object", its inner

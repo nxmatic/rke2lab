@@ -113,6 +113,31 @@ bundle** via a NEW staging category `embed; type=library` (jackson's own treatme
   fragment (depends on seam, dual-realm, owns its export) — only `WireEnumModule` is a jackson extension.
 - Dep-scope/version centralization DEFERRED by user ([[centralize-seam-dep-scope-version-backlog]]).
 
+## T6 DONE (2026-07-01) — intervention-request + codec modules matured
+
+- `InterventionRequest(problem, what, Optional<String> provenance, Optional<String> prescriptionRef,
+  Instant when)` wire-record, `@DocumentContract(INTERVENTION_REQUEST)`. Compact ctor normalizes a
+  null Optional → empty (the codebase's Optional idiom, guards direct construction). Producer host
+  `RecordInterventionCommand` (its `Args` record also refactored to Optional per user), consumer OSGi
+  `DefaultInterventionIntake.canonicalize` (decodes to the record, keeps the graceful error-verdict
+  flow), + 2 tests migrated. `FIELD_PROBLEM/WHAT/PROVENANCE/PRESCRIPTION_REF` deleted; `FIELD_WHEN`
+  KEPT (visit/T9 still uses it). SCHEMA_CONCORD now 4 warn.
+- Codec gained `InstantModule` (Instant↔ISO-8601, home-made, 2 lines) + jackson's own **`Jdk8Module`**
+  for Optional. KEY LESSON (user-driven): a home-made OptionalModule was a dead end (fought jackson's
+  ReferenceType/REQUIRE_HANDLERS internals) — jackson's Module system is the right tool; registered
+  EXPLICITLY (`registerModule`), never `findAndRegisterModules`, so no ServiceLoader regression.
+- jdk8 is NOT nested (unlike jsr310 in manifests-cdk8s): nesting is needed ONLY when a ServiceLoader
+  discovers the module off a classloader (jsii's findAndRegisterModules drives jsr310). We register
+  explicitly, so jdk8 is imported bundle-to-bundle like databind. Declared ONCE in the codec pom (the
+  owner), NOT duplicated in seed-master.
+- STAGING FIX (extension, two-phase): `type=library` now feeds `indexHostFlatPackages` +
+  `seedRealmLibraries` (was `isDomain()` only). Without it, a library's imported jackson jars (jdk8)
+  were staged but NOT kept flat → host copy missing. Now jdk8 is dual (staged bundle + 23 flat
+  classes), exactly like databind. General fix for any future dual-lib.
+- New backlogs graved: [[sweep-objectmapper-onto-codec-backlog]] (remove residual `new ObjectMapper()`
+  after T9), [[jspecify-nullmarked-default-backlog]] (@NullMarked package default, post-2D).
+- NOT yet committed as of this note.
+
 Build command (user-confirmed, [[maven-build-cache-and-staging-verify]]): `flox activate -- ./mvnw
 package -Pall-worlds -Dmaven.build.cache.skipCache=true -DskipTests=false` (SKIP cache, not disable;
 no clean unless stale). Extension changes need the two-phase dance ([[osgi-staging-extension-chantier]]).

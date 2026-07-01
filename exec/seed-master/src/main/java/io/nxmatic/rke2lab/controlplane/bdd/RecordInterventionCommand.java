@@ -1,9 +1,5 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.port.InterventionIntake;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.osgi.runtime.BootPipeline;
@@ -12,11 +8,12 @@ import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.InterventionRequest;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.Optional;
 
 /**
  * The operator's declaration command. When the operator fixes something out-of-band (e.g. {@code
@@ -40,7 +37,6 @@ import java.time.format.DateTimeParseException;
  */
 public final class RecordInterventionCommand {
 
-  private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final DocumentCodec CODEC = new DocumentCodec();
 
   private RecordInterventionCommand() {}
@@ -57,22 +53,18 @@ public final class RecordInterventionCommand {
   static Document record(
       String[] args, Instant now, InterventionIntake intake, InterventionLedgerWriter writer) {
     final Args parsed = Args.parse(args);
-    final Instant when = parsed.when == null ? now : parsed.when;
 
-    final ObjectNode request = MAPPER.createObjectNode();
-    request.put(WorldGatewayCatalog.FIELD_PROBLEM, parsed.problem);
-    request.put(WorldGatewayCatalog.FIELD_WHAT, parsed.what);
-    if (parsed.provenance != null) {
-      request.put(WorldGatewayCatalog.FIELD_PROVENANCE, parsed.provenance);
-    }
-    if (parsed.prescriptionRef != null) {
-      request.put(WorldGatewayCatalog.FIELD_PRESCRIPTION_REF, parsed.prescriptionRef);
-    }
-    request.put(WorldGatewayCatalog.FIELD_WHEN, when.toString());
+    final InterventionRequest request =
+        new InterventionRequest(
+            parsed.problem(),
+            parsed.what(),
+            parsed.provenance(),
+            parsed.prescriptionRef(),
+            parsed.when().orElse(now));
 
     final Document rawFacts =
         new Document(
-            Domain.DOCTOR.slug(), Coordinate.INTERVENTION_REQUEST.slug(), serialize(request));
+            Domain.DOCTOR.slug(), Coordinate.INTERVENTION_REQUEST.slug(), CODEC.encode(request));
     final Document canonical = intake.canonicalize(rawFacts);
     if (!Coordinate.INTERVENTION.slug().equals(canonical.coordinate())) {
       throw new InterventionRejected(reasonOf(canonical));
@@ -116,16 +108,12 @@ public final class RecordInterventionCommand {
     }
   }
 
-  private static String serialize(JsonNode node) {
-    try {
-      return MAPPER.writeValueAsString(node);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("could not serialize intervention-request payload", e);
-    }
-  }
-
   private record Args(
-      String problem, String what, String provenance, String prescriptionRef, Instant when) {
+      String problem,
+      String what,
+      Optional<String> provenance,
+      Optional<String> prescriptionRef,
+      Optional<Instant> when) {
 
     private static final String USAGE =
         "usage: --problem <checkpoint[/symptom]> --what <text>"
@@ -155,8 +143,12 @@ public final class RecordInterventionCommand {
       if (what == null) {
         throw new IllegalArgumentException("missing --what; " + USAGE);
       }
-      final Instant when = whenArg == null ? null : parseWhen(whenArg);
-      return new Args(problem, what, provenance, prescriptionRef, when);
+      return new Args(
+          problem,
+          what,
+          Optional.ofNullable(provenance),
+          Optional.ofNullable(prescriptionRef),
+          Optional.ofNullable(whenArg).map(Args::parseWhen));
     }
 
     static Path backendOf(String[] args) {

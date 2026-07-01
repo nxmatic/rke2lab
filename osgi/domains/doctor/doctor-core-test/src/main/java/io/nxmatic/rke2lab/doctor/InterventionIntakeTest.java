@@ -12,9 +12,11 @@ import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.InterventionRequest;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
+import java.time.Instant;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.FrameworkUtil;
@@ -31,6 +33,7 @@ import org.osgi.framework.FrameworkUtil;
 class InterventionIntakeTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final DocumentCodec CODEC = new DocumentCodec();
   private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {};
 
   @Test
@@ -46,15 +49,16 @@ class InterventionIntakeTest {
     final InterventionIntake intake = context.getService(reference);
     assertNotNull(intake, "the InterventionIntake service reference must resolve to an instance");
 
-    final var request = MAPPER.createObjectNode();
-    request.put(WorldGatewayCatalog.FIELD_PROBLEM, "systemd-adapter/connection-refused");
-    request.put(WorldGatewayCatalog.FIELD_WHAT, "nft delete ...");
-    request.put(WorldGatewayCatalog.FIELD_WHEN, "2026-06-14T09:30:00Z");
+    final InterventionRequest request =
+        new InterventionRequest(
+            "systemd-adapter/connection-refused",
+            "nft delete ...",
+            Optional.empty(),
+            Optional.empty(),
+            Instant.parse("2026-06-14T09:30:00Z"));
     final Document rawFacts =
         new Document(
-            Domain.DOCTOR.slug(),
-            Coordinate.INTERVENTION_REQUEST.slug(),
-            MAPPER.writeValueAsString(request));
+            Domain.DOCTOR.slug(), Coordinate.INTERVENTION_REQUEST.slug(), CODEC.encode(request));
 
     final Document canonical = intake.canonicalize(rawFacts);
     assertEquals(
@@ -73,23 +77,23 @@ class InterventionIntakeTest {
     final InterventionIntake intake =
         context.getService(context.getServiceReference(InterventionIntake.class));
 
-    final var request = MAPPER.createObjectNode();
-    request.put(WorldGatewayCatalog.FIELD_PROBLEM, "no-such-checkpoint/whatever");
-    request.put(WorldGatewayCatalog.FIELD_WHAT, "something");
-    request.put(WorldGatewayCatalog.FIELD_WHEN, "2026-06-14T09:30:00Z");
+    final InterventionRequest request =
+        new InterventionRequest(
+            "no-such-checkpoint/whatever",
+            "something",
+            Optional.empty(),
+            Optional.empty(),
+            Instant.parse("2026-06-14T09:30:00Z"));
     final Document rawFacts =
         new Document(
-            Domain.DOCTOR.slug(),
-            Coordinate.INTERVENTION_REQUEST.slug(),
-            MAPPER.writeValueAsString(request));
+            Domain.DOCTOR.slug(), Coordinate.INTERVENTION_REQUEST.slug(), CODEC.encode(request));
 
     final Document verdict = intake.canonicalize(rawFacts);
     assertEquals(
         Coordinate.READINESS_VERDICT.slug(),
         verdict.coordinate(),
         "a bad reference must return an error verdict, not throw across the seam");
-    final ReadinessVerdict decoded =
-        new DocumentCodec().decode(verdict.payload(), ReadinessVerdict.class);
+    final ReadinessVerdict decoded = CODEC.decode(verdict.payload(), ReadinessVerdict.class);
     assertTrue(
         decoded.reason().contains("no-such-checkpoint"),
         () -> "the verdict reason must name the bad reference: " + decoded);

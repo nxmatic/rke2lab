@@ -1,24 +1,40 @@
 package io.nxmatic.rke2lab.world.gateway.codec;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import io.nxmatic.rke2lab.world.gateway.codec.internal.InstantModule;
 import io.nxmatic.rke2lab.world.gateway.codec.internal.WireEnumModule;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
 /**
  * The JSON (de)serialization + (capability) validation of {@code Document} payloads — the JSON
- * analogue of the manifests domain's {@code YamlMapper}. Written ONCE here; loaded per realm: the
- * host shades this jar flat (binding the host's flat jackson), and {@code doctor-core} nests it on
- * its Bundle-ClassPath ({@code -includeresource;lib:=true}, binding the bundle's jackson). No codec
- * type crosses the String-only world-gateway seam — each realm holds its own copy, exactly as
- * jackson is dual-loaded. Runtime schema validation is WIRED but OFF by default (the embedded
- * posture); the remote capstone flips it on via {@link #withValidation(boolean)}.
+ * analogue of the manifests domain's {@code YamlMapper}. Written ONCE here; loaded per realm as our
+ * own dual-realm library bundle ({@code embed; type=library}): staged as a bundle OSGi-side
+ * (binding the OSGi jackson) and shaded flat host-side (binding the host jackson). No codec type
+ * crosses the String-only world-gateway seam — each realm holds its own copy, exactly as jackson is
+ * dual-loaded.
+ *
+ * <p>Modules are registered EXPLICITLY (never {@code findAndRegisterModules} — that {@code
+ * ServiceLoader<Module>} discovery is the realm-isolation regression this project already closed):
+ * two of ours — {@link WireEnumModule} (seam enum ↔ slug) and {@link InstantModule} (Instant ↔
+ * ISO-8601) — plus jackson's own {@link Jdk8Module} for {@code Optional} (an absent key
+ * deserializes to {@code Optional.empty()}; paired with {@code NON_ABSENT} an empty Optional omits
+ * its key). Like {@code jackson-datatype-jsr310} in {@code manifests-cdk8s}, {@code
+ * jackson-datatype-jdk8} is a realm-isolated jackson artifact nested on this bundle's
+ * Bundle-ClassPath. Runtime schema validation is WIRED but OFF by default (the embedded posture);
+ * the remote capstone flips it on via {@link #withValidation(boolean)}.
  */
 public final class DocumentCodec {
 
   private static final ObjectMapper MAPPER =
-      new ObjectMapper().registerModule(new WireEnumModule());
+      new ObjectMapper()
+          .registerModule(new WireEnumModule())
+          .registerModule(new InstantModule())
+          .registerModule(new Jdk8Module())
+          .setDefaultPropertyInclusion(JsonInclude.Include.NON_ABSENT);
 
   private final boolean validationEnabled;
 

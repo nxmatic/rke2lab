@@ -127,12 +127,15 @@ public record StagingClosure(
 
     /**
      * The packages the host already serves flat — the build-time mirror of {@code
-     * system.packages.extra}: every package any model/edge bundle imports. An import whose package
-     * is here resolves against the host classloader, so its exporter stays flat, never staged.
+     * system.packages.extra}: every package a model/edge bundle OR our dual-realm {@code
+     * type=library} imports. A {@code library} is itself kept flat host-side, so the jackson (etc.)
+     * packages IT imports must be served flat too, exactly as a domain's imports are. An import
+     * whose package is here resolves against the host classloader, so its exporter stays flat,
+     * never staged.
      */
     private void indexHostFlatPackages() {
       for (ResolvedBundle bundle : resolved) {
-        if (bundle.embed() != null && bundle.embed().isDomain()) {
+        if (bundle.embed() != null && (bundle.embed().isDomain() || bundle.embed().isLibrary())) {
           hostFlatPackages.addAll(bundle.imports().names());
         }
       }
@@ -151,12 +154,15 @@ public record StagingClosure(
     }
 
     /**
-     * Third-party OSGi bundles exporting a package a domain bundle imports — staged AND kept flat.
+     * Third-party OSGi bundles exporting a package a domain OR {@code type=library} bundle imports
+     * — staged AND kept flat. A {@code library} (e.g. the codec) drives realm-library detection
+     * just like a domain: the jackson datatype jars it imports (jackson-datatype-jdk8) must be
+     * staged for the OSGi wire AND kept flat for the library's host copy.
      */
     private void seedRealmLibraries() {
       final Set<String> domainImports = new LinkedHashSet<>();
       for (ResolvedBundle b : resolved) {
-        if (b.embed() != null && b.embed().isDomain()) {
+        if (b.embed() != null && (b.embed().isDomain() || b.embed().isLibrary())) {
           domainImports.addAll(b.imports().names());
         }
       }

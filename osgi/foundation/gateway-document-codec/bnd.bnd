@@ -9,4 +9,10 @@ Export-Package: \
 # bound to its own jackson), so DUPLICATE_REALM_CLASS exempts it like jackson. The .internal jackson
 # glue (WireEnumModule) is NOT exported — only DocumentCodec is the API.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=library
+# jackson-datatype-jdk8 (the Optional Jdk8Module DocumentCodec registers) is IMPORTED bundle-to-bundle,
+# exactly like jackson-databind — NOT nested. It is a genuine OSGi bundle; the staging closure stages
+# it as a realm-library (a domain bundle imports its export) and keeps it flat host-side, so each
+# realm binds its own copy. (Nesting is only needed when a ServiceLoader<Module> discovers the module
+# off a classloader — jsr310 in manifests-cdk8s, driven by jsii's findAndRegisterModules. We register
+# modules EXPLICITLY, so there is no ServiceLoader and no nesting.)
 -noimportjava: true

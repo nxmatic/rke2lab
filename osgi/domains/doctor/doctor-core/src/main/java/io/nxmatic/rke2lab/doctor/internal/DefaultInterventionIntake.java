@@ -1,8 +1,5 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.port.InterventionIntake;
 import io.nxmatic.rke2lab.doctor.records.Intervention;
 import io.nxmatic.rke2lab.doctor.records.ProblemRef;
@@ -13,10 +10,8 @@ import io.nxmatic.rke2lab.world.gateway.port.Action;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.InterventionRequest;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
-import java.time.Instant;
-import java.time.format.DateTimeParseException;
 import java.util.Map;
 import java.util.Optional;
 import org.osgi.service.component.annotations.Component;
@@ -32,86 +27,61 @@ import org.osgi.service.component.annotations.Component;
  *
  * <p>Published as the {@link InterventionIntake} seam with NO references, so SCR activates it on
  * its own — the CLI awaits it without admitting a patient or publishing an EHR/ledger. The Document
- * payload is parsed and serialized with this bundle's OWN jackson; no jackson type crosses the
- * seam.
+ * payload is decoded/encoded through the {@link DocumentCodec} (this realm's own jackson copy); no
+ * jackson type crosses the seam.
  */
 @Component(service = InterventionIntake.class)
 public final class DefaultInterventionIntake implements InterventionIntake {
 
-  private final ObjectMapper mapper = new ObjectMapper();
   private final DocumentCodec codec = new DocumentCodec();
 
   @Override
   public Document canonicalize(Document rawFacts) {
-    final JsonNode payload = parse(rawFacts.payload());
+    final InterventionRequest request = codec.decode(rawFacts.payload(), InterventionRequest.class);
 
-    final String problemArg = text(payload, WorldGatewayCatalog.FIELD_PROBLEM);
-    final String what = text(payload, WorldGatewayCatalog.FIELD_WHAT);
-    final String provenanceArg = text(payload, WorldGatewayCatalog.FIELD_PROVENANCE);
-    final String prescriptionArg = text(payload, WorldGatewayCatalog.FIELD_PRESCRIPTION_REF);
-    final String whenArg = text(payload, WorldGatewayCatalog.FIELD_WHEN);
-
-    if (problemArg == null) {
+    if (isBlank(request.problem())) {
       return error("missing problem");
     }
-    if (what == null) {
+    if (isBlank(request.what())) {
       return error("missing what");
     }
 
-    final Optional<ProblemRef> problem = ProblemRef.parse(problemArg);
+    final Optional<ProblemRef> problem = ProblemRef.parse(request.problem());
     if (problem.isEmpty()) {
-      return error("unknown problem reference: " + problemArg);
+      return error("unknown problem reference: " + request.problem());
     }
 
     final Provenance provenance;
-    if (provenanceArg == null) {
+    if (request.provenance().isEmpty()) {
       provenance = Provenance.OPERATOR_MANUAL;
     } else {
-      final Optional<Provenance> parsed = Provenance.parse(provenanceArg);
+      final Optional<Provenance> parsed = Provenance.parse(request.provenance().get());
       if (parsed.isEmpty()) {
-        return error("unknown provenance: " + provenanceArg);
+        return error("unknown provenance: " + request.provenance().get());
       }
       provenance = parsed.get();
     }
 
     final Optional<RemediationProgramRef> prescriptionRef;
-    if (prescriptionArg == null) {
+    if (request.prescriptionRef().isEmpty()) {
       prescriptionRef = Optional.empty();
     } else {
-      final Optional<RemediationProgramRef> parsed = RemediationProgramRef.parse(prescriptionArg);
+      final Optional<RemediationProgramRef> parsed =
+          RemediationProgramRef.parse(request.prescriptionRef().get());
       if (parsed.isEmpty()) {
-        return error("unknown prescription-ref: " + prescriptionArg);
+        return error("unknown prescription-ref: " + request.prescriptionRef().get());
       }
       prescriptionRef = Optional.of(parsed.get());
     }
 
-    final Instant when;
-    try {
-      when = Instant.parse(whenArg);
-    } catch (DateTimeParseException e) {
-      return error("invalid when (expected ISO-8601 instant): " + whenArg);
-    }
-
     final Intervention intervention =
-        new Intervention(provenance, when, what, problem.get(), prescriptionRef, Map.of());
+        new Intervention(
+            provenance, request.when(), request.what(), problem.get(), prescriptionRef, Map.of());
     return InterventionDocuments.of(intervention);
   }
 
-  private JsonNode parse(String payload) {
-    try {
-      return mapper.readTree(payload);
-    } catch (JsonProcessingException e) {
-      throw new IllegalArgumentException("malformed intervention-request payload", e);
-    }
-  }
-
-  /** A present, non-blank text field, else null. */
-  private static String text(JsonNode payload, String field) {
-    if (!payload.hasNonNull(field)) {
-      return null;
-    }
-    final String value = payload.get(field).asText();
-    return value.isBlank() ? null : value;
+  private static boolean isBlank(String value) {
+    return value == null || value.isBlank();
   }
 
   private Document error(String reason) {

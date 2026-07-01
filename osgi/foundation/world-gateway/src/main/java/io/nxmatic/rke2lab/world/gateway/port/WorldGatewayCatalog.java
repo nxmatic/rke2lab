@@ -60,19 +60,7 @@ public final class WorldGatewayCatalog {
    */
   public static final String FIELD_EXPECTATIONS = "expectations";
 
-  /** Intervention-request payload: the problem reference slug (checkpoint[/symptom]). */
-  public static final String FIELD_PROBLEM = "problem";
-
-  /** Intervention-request payload: the free-text description of what was done. */
-  public static final String FIELD_WHAT = "what";
-
-  /** Intervention-request payload: the provenance id (defaults to operator-manual). */
-  public static final String FIELD_PROVENANCE = "provenance";
-
-  /** Intervention-request payload: the optional remediation-program reference id. */
-  public static final String FIELD_PRESCRIPTION_REF = "prescriptionRef";
-
-  /** Intervention-request payload: the ISO-8601 instant the intervention happened. */
+  /** Visit payload: the ISO-8601 instant a history entry was recorded. */
   public static final String FIELD_WHEN = "when";
 
   /**
