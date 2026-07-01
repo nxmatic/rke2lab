@@ -21,12 +21,13 @@ class DocumentTest {
   }
 
   @Test
-  void consultationFieldsArePinned() {
-    // The remaining FIELD_* pin the consultation coordinate's keys (the last hand-written wire
-    // shape, migrated in T9); the readiness-checkpoint/verdict/intervention coordinates are now
-    // typed wire-records whose components ARE the schema (projected by SCHEMA_CONCORD).
-    assertEquals("scenarioId", WorldGatewayCatalog.FIELD_SCENARIO_ID);
-    assertEquals("narration", WorldGatewayCatalog.FIELD_NARRATION);
-    assertEquals("diagnosisAdoc", WorldGatewayCatalog.FIELD_DIAGNOSIS_ADOC);
+  void pulumiTransportKeysArePinned() {
+    // Every coordinate's wire shape is now a typed wire-record (its components ARE the schema,
+    // projected by SCHEMA_CONCORD). The only FIELD_* left are the two Pulumi OUTPUT KEYS under
+    // which
+    // the doctor's opaque sub-trees round-trip through host state — pinned so a producer and the
+    // reconstruction cannot drift apart.
+    assertEquals("consultationReport", WorldGatewayCatalog.FIELD_CONSULTATION_REPORT);
+    assertEquals("expectations", WorldGatewayCatalog.FIELD_EXPECTATIONS);
   }
 }

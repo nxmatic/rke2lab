@@ -5,17 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.internal.*;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
-import io.nxmatic.rke2lab.doctor.records.Expectation;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.testkit.FakeSpecialist;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
+import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
@@ -23,7 +20,6 @@ import io.nxmatic.rke2lab.world.gateway.port.ObservationWire;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +38,6 @@ class GeneralistConsultDocumentTest {
 
   private static final Patient PATIENT = new Patient("organization", "rke2lab", "test");
   private static final Instant RECORDED_AT = Instant.parse("2026-06-28T00:00:00Z");
-  private static final ObjectMapper mapper = new ObjectMapper();
   private static final DocumentCodec codec = new DocumentCodec();
 
   @Test
@@ -61,21 +56,18 @@ class GeneralistConsultDocumentTest {
         consultation.coordinate(),
         "coordinate should be CONSULTATION");
 
-    final JsonNode payload = parse(consultation.payload());
-    assertEquals(
-        "systemd-adapter",
-        payload.path(WorldGatewayCatalog.FIELD_SCENARIO_ID).asText(),
-        "scenarioId should be echoed");
+    final Consultation decoded = codec.decode(consultation, Consultation.class);
+    assertEquals("systemd-adapter", decoded.scenarioId(), "scenarioId should be echoed");
 
-    final String narration = payload.path(WorldGatewayCatalog.FIELD_NARRATION).asText();
-    assertNotNull(narration, "narration should not be null");
-    assertTrue(narration.length() > 0, "narration should be non-empty");
+    assertNotNull(decoded.narration(), "narration should not be null");
+    assertTrue(decoded.narration().length() > 0, "narration should be non-empty");
 
-    final String diagnosisAdoc = payload.path(WorldGatewayCatalog.FIELD_DIAGNOSIS_ADOC).asText();
     assertTrue(
-        diagnosisAdoc.contains("⚕ Diagnosis:"), "diagnosisAdoc should contain diagnosis marker");
+        decoded.diagnosisAdoc().contains("⚕ Diagnosis:"),
+        "diagnosisAdoc should contain diagnosis marker");
     assertTrue(
-        diagnosisAdoc.contains("🔬 Assessment"), "diagnosisAdoc should contain assessment marker");
+        decoded.diagnosisAdoc().contains("🔬 Assessment"),
+        "diagnosisAdoc should contain assessment marker");
   }
 
   @Test
@@ -87,14 +79,9 @@ class GeneralistConsultDocumentTest {
                 Symptom.CONNECTION_REFUSED, "connection refused", Map.of("source", "dbus")));
 
     final Document consultation = newGeneralist().consult(checkpoint);
-    final JsonNode payload = parse(consultation.payload());
+    final Consultation decoded = codec.decode(consultation, Consultation.class);
 
-    final JsonNode reportNode = payload.path(ConsultationReport.OUTPUT_KEY);
-    assertNotNull(reportNode, "consultation should carry the ConsultationReport sub-tree");
-
-    @SuppressWarnings("unchecked")
-    final Map<String, Object> reportMap = mapper.convertValue(reportNode, Map.class);
-    final var reportOpt = ConsultationReportReader.fromOutputMap(reportMap);
+    final var reportOpt = ConsultationReportReader.fromOutputMap(decoded.consultationReport());
     assertTrue(reportOpt.isPresent(), "ConsultationReport should round-trip successfully");
 
     final ConsultationReport reconstructed = reportOpt.get();
@@ -106,15 +93,9 @@ class GeneralistConsultDocumentTest {
         reconstructed.plan().replies().isEmpty(),
         "plan should have at least one reply from FakeSpecialist");
 
-    final var expectationsNode = payload.path(Expectation.OUTPUT_KEY);
-    assertNotNull(expectationsNode, "consultation should carry the expectations sub-tree");
+    assertFalse(decoded.expectations().isEmpty(), "expectations list should be non-empty");
 
-    @SuppressWarnings("unchecked")
-    final List<Map<String, Object>> expectationsList =
-        mapper.convertValue(expectationsNode, List.class);
-    assertFalse(expectationsList.isEmpty(), "expectations list should be non-empty");
-
-    final var firstExpectationOpt = ExpectationReader.fromOutputMap(expectationsList.get(0));
+    final var firstExpectationOpt = ExpectationReader.fromOutputMap(decoded.expectations().get(0));
     assertTrue(firstExpectationOpt.isPresent(), "first Expectation should round-trip successfully");
   }
 
@@ -132,12 +113,9 @@ class GeneralistConsultDocumentTest {
             Observation.ok("controllers effective", Map.of("phase", "controllers")));
 
     final Document consultation = newGeneralist().consult(checkpoint);
-    final JsonNode payload = parse(consultation.payload());
+    final Consultation decoded = codec.decode(consultation, Consultation.class);
 
-    @SuppressWarnings("unchecked")
-    final Map<String, Object> reportMap =
-        mapper.convertValue(payload.path(ConsultationReport.OUTPUT_KEY), Map.class);
-    final var reportOpt = ConsultationReportReader.fromOutputMap(reportMap);
+    final var reportOpt = ConsultationReportReader.fromOutputMap(decoded.consultationReport());
     assertTrue(reportOpt.isPresent(), "the cluster report should round-trip");
 
     final ConsultationReport reconstructed = reportOpt.get();
@@ -180,13 +158,5 @@ class GeneralistConsultDocumentTest {
         observation.symptom().flatMap(s -> SymptomKind.parse(s.id()));
     return new ObservationWire(
         observation.status(), observation.summary(), symptom, observation.details());
-  }
-
-  private static JsonNode parse(String payload) {
-    try {
-      return mapper.readTree(payload);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException(e);
-    }
   }
 }

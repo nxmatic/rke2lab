@@ -1,7 +1,5 @@
 package io.nxmatic.rke2lab.controlplane.resources;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
@@ -16,9 +14,10 @@ import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSn
 import io.nxmatic.rke2lab.controlplane.systemd.SystemdAdapterResource;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
+import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -42,6 +41,7 @@ final class ResourceCreationPipeline {
   private final ClusterReadinessContact clusterReadinessContact;
   private final IncusResourceBootstrap.BootstrapResult bootstrapResult;
   private final Map<String, Object> systemdAdapterLaunchSummary;
+  private final DocumentCodec codec = new DocumentCodec();
 
   ResourceCreationPipeline(
       BootstrapConfig config,
@@ -105,22 +105,10 @@ final class ResourceCreationPipeline {
     if (consultations == null) {
       return Optional.empty();
     }
-    final ObjectMapper mapper = new ObjectMapper();
     return consultations.consultations().stream()
         .filter(
-            document -> {
-              try {
-                return checkpoint
-                    .slug()
-                    .equals(
-                        mapper
-                            .readTree(document.payload())
-                            .path(WorldGatewayCatalog.FIELD_SCENARIO_ID)
-                            .asText());
-              } catch (JsonProcessingException e) {
-                return false;
-              }
-            })
+            document ->
+                checkpoint.slug().equals(codec.decode(document, Consultation.class).scenarioId()))
         .findFirst();
   }
 

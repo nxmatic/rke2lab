@@ -1,8 +1,5 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
@@ -19,6 +16,7 @@ import io.nxmatic.rke2lab.pipeline.TopicFailure;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Action;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
+import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
@@ -26,7 +24,6 @@ import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
 import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -66,11 +63,6 @@ public final class SystemdAdapterStage {
    * Pulumi state shows no drift. Absent on the verdict-only test path (no consult runs there).
    */
   @Nullable private final Instant recordedAt;
-
-  /**
-   * The seam payload is a serialized JSON String; the host builds/reads it with its own jackson.
-   */
-  private final ObjectMapper mapper = new ObjectMapper();
 
   private final DocumentCodec codec = new DocumentCodec();
 
@@ -255,7 +247,7 @@ public final class SystemdAdapterStage {
       return;
     }
     final Document consultation = doctor.consult(consultCheckpoint(observation));
-    log("⚕ " + parse(consultation.payload()).path(WorldGatewayCatalog.FIELD_NARRATION).asText());
+    log("⚕ " + codec.decode(consultation, Consultation.class).narration());
     if (consultations != null) {
       consultations.record(consultation);
     }
@@ -306,15 +298,6 @@ public final class SystemdAdapterStage {
             List.of());
     return new Document(
         Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), codec.encode(checkpoint));
-  }
-
-  /** Parse a verdict payload String with the host's own jackson (no JsonNode crosses the seam). */
-  private JsonNode parse(String payload) {
-    try {
-      return mapper.readTree(payload);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("malformed verdict payload", e);
-    }
   }
 
   private void log(String message) {

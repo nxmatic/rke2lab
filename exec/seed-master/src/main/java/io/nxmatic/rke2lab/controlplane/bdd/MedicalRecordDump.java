@@ -1,14 +1,13 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal;
 import io.nxmatic.rke2lab.pulumi.edge.StackMedicalRecordJournal;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
+import io.nxmatic.rke2lab.world.gateway.port.VisitWire;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -33,9 +32,8 @@ import java.util.Map;
  */
 public final class MedicalRecordDump {
 
-  private static final ObjectMapper JSON = new ObjectMapper();
   private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
-  private static final TypeReference<Map<String, Object>> PAYLOAD_SHAPE = new TypeReference<>() {};
+  private static final DocumentCodec CODEC = new DocumentCodec();
 
   private MedicalRecordDump() {}
 
@@ -81,7 +79,7 @@ public final class MedicalRecordDump {
     for (Document entry : journal.historyOf(patient)) {
       try {
         visits.add(visitYaml(entry));
-      } catch (JsonProcessingException e) {
+      } catch (RuntimeException e) {
         failures.add(describe(entry, e));
       }
     }
@@ -90,21 +88,21 @@ public final class MedicalRecordDump {
 
   /**
    * One visit's YAML node from its opaque Document: version + when + the stored consultation-report
-   * blobs as {@code reports}. The blobs ARE the {@code toOutputMap} shape, copied through verbatim
-   * (the host authored them; it does not interpret them).
+   * blobs as {@code reports}. The codec decodes the {@link VisitWire}; the report blobs ARE the
+   * {@code toOutputMap} shape, copied through verbatim (the host authored them; it does not
+   * interpret them).
    */
-  private static Map<String, Object> visitYaml(Document entry) throws JsonProcessingException {
-    final Map<String, Object> payload = JSON.readValue(entry.payload(), PAYLOAD_SHAPE);
+  private static Map<String, Object> visitYaml(Document entry) {
+    final VisitWire visit = CODEC.decode(entry, VisitWire.class);
     final LinkedHashMap<String, Object> node = new LinkedHashMap<>();
-    node.put("version", payload.get(WorldGatewayCatalog.FIELD_VERSION));
-    node.put("when", payload.get(WorldGatewayCatalog.FIELD_WHEN));
-    node.put(
-        "reports", payload.getOrDefault(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT, List.of()));
+    node.put("version", visit.version());
+    node.put("when", visit.when().toString());
+    node.put("reports", visit.consultationReport());
     return node;
   }
 
-  private static String describe(Document entry, JsonProcessingException cause) {
-    return "unreadable visit Document (" + entry.coordinate() + "): " + cause.getOriginalMessage();
+  private static String describe(Document entry, RuntimeException cause) {
+    return "unreadable visit Document (" + entry.coordinate() + "): " + cause.getMessage();
   }
 
   public static void main(String[] args) {

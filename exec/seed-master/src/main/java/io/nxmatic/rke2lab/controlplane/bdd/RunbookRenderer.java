@@ -1,16 +1,15 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tngtech.jgiven.report.asciidoc.AsciiDocReportConfig;
 import com.tngtech.jgiven.report.asciidoc.AsciiDocReportGenerator;
 import com.tngtech.jgiven.report.json.ScenarioJsonWriter;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.ScenarioModel;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
+import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -42,6 +41,7 @@ public final class RunbookRenderer {
 
   private final Path outputDir;
   private final Consumer<String> logger;
+  private final DocumentCodec codec = new DocumentCodec();
 
   public RunbookRenderer(Path outputDir, Consumer<String> logger) {
     this.outputDir = outputDir;
@@ -112,26 +112,14 @@ public final class RunbookRenderer {
     if (consultations == null || consultations.consultations().isEmpty()) {
       return;
     }
-    final ObjectMapper mapper = new ObjectMapper();
     for (Document consultation : consultations.consultations()) {
-      final String slug = field(mapper, consultation, WorldGatewayCatalog.FIELD_SCENARIO_ID);
-      final String diagnosisAdoc =
-          field(mapper, consultation, WorldGatewayCatalog.FIELD_DIAGNOSIS_ADOC);
-      if (diagnosisAdoc.isEmpty()) {
+      final Consultation decoded = codec.decode(consultation, Consultation.class);
+      if (decoded.diagnosisAdoc().isEmpty()) {
         continue;
       }
-      Checkpoint.fromSlug(slug)
+      Checkpoint.fromSlug(decoded.scenarioId())
           .flatMap(checkpoint -> scenarioFor(model, checkpoint))
-          .ifPresent(scenario -> scenario.setExtendedDescription(diagnosisAdoc));
-    }
-  }
-
-  /** Read one field from a consultation Document's opaque JSON payload (empty when absent). */
-  private static String field(ObjectMapper mapper, Document consultation, String key) {
-    try {
-      return mapper.readTree(consultation.payload()).path(key).asText();
-    } catch (JsonProcessingException e) {
-      return "";
+          .ifPresent(scenario -> scenario.setExtendedDescription(decoded.diagnosisAdoc()));
     }
   }
 

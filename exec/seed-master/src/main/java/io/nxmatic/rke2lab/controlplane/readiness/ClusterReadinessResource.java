@@ -1,12 +1,11 @@
 package io.nxmatic.rke2lab.controlplane.readiness;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;
 import com.pulumi.resources.ComponentResourceOptions;
 import com.pulumi.resources.Resource;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
+import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.util.LinkedHashMap;
@@ -77,33 +76,22 @@ public final class ClusterReadinessResource extends ComponentResource {
 
     // Additive, per-node only: the diagnostic layer lives under this component resource in state,
     // never at top level (the Stage-B stack contract stays byte-identical). The doctor reasons
-    // OSGi-side; the host copies the structured consultationReport sub-tree OPAQUELY from the
-    // consultation Document to the same output key (no doctor type held host-side).
+    // OSGi-side; the codec decodes the consultation into the seam Consultation, and the host copies
+    // its consultationReport sub-tree OPAQUELY to the Pulumi output key reconstruction reads it
+    // back
+    // by (no doctor type held host-side). An empty report is not emitted.
     consultation.ifPresent(
         document -> {
-          final JsonNode report =
-              parse(document.payload()).path(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT);
-          if (report.isObject()) {
+          final Consultation decoded = CODEC.decode(document, Consultation.class);
+          if (!decoded.consultationReport().isEmpty()) {
             outputs.put(
-                WorldGatewayCatalog.FIELD_CONSULTATION_REPORT, Output.of(asPlainObject(report)));
+                WorldGatewayCatalog.FIELD_CONSULTATION_REPORT,
+                Output.of(decoded.consultationReport()));
           }
         });
 
     return outputs;
   }
 
-  private static final ObjectMapper MAPPER = new ObjectMapper();
-
-  private static JsonNode parse(String payload) {
-    try {
-      return MAPPER.readTree(payload);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("malformed consultation payload", e);
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  private static Map<String, Object> asPlainObject(JsonNode node) {
-    return MAPPER.convertValue(node, Map.class);
-  }
+  private static final DocumentCodec CODEC = new DocumentCodec();
 }

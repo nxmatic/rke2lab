@@ -8,11 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
+import io.nxmatic.rke2lab.world.gateway.port.VisitWire;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -31,7 +32,7 @@ import org.junit.jupiter.api.Test;
 class MedicalRecordDumpTest {
 
   private static final Patient PATIENT = new Patient("organization", "rke2lab", "dev");
-  private static final ObjectMapper JSON = new ObjectMapper();
+  private static final DocumentCodec CODEC = new DocumentCodec();
 
   /**
    * A fake journal: an ordered list of {@code visit} Documents, as the host journal would yield.
@@ -58,25 +59,14 @@ class MedicalRecordDumpTest {
     report.put("checkpointId", checkpointId);
     report.put("observations", List.of());
     report.put("plan", Map.of("symptom", "connection-refused", "generalistSummary", "s"));
-    final LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
-    payload.put(WorldGatewayCatalog.FIELD_VERSION, version);
-    payload.put(WorldGatewayCatalog.FIELD_WHEN, Instant.ofEpochSecond(version).toString());
-    payload.put(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT, List.of(report));
-    payload.put(WorldGatewayCatalog.FIELD_EXPECTATIONS, List.of());
-    return new Document(Domain.DOCTOR.slug(), Coordinate.VISIT.slug(), serialize(payload));
+    final VisitWire visit =
+        new VisitWire(version, Instant.ofEpochSecond(version), List.of(report), List.of());
+    return new Document(Domain.DOCTOR.slug(), Coordinate.VISIT.slug(), CODEC.encode(visit));
   }
 
   /** A malformed visit Document: an unparseable JSON payload. */
   private static Document brokenVisit() {
     return new Document(Domain.DOCTOR.slug(), Coordinate.VISIT.slug(), "not json {");
-  }
-
-  private static String serialize(Object value) {
-    try {
-      return JSON.writeValueAsString(value);
-    } catch (Exception e) {
-      throw new IllegalStateException(e);
-    }
   }
 
   @SuppressWarnings("unchecked")

@@ -1,9 +1,5 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.port.InterventionJournal;
 import io.nxmatic.rke2lab.doctor.records.*;
@@ -25,11 +21,12 @@ import io.nxmatic.rke2lab.doctor.spi.Clinician;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.domain.annotations.Transitional;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
+import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import io.nxmatic.rke2lab.world.gateway.port.ObservationWire;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessCheckpoint;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -67,7 +64,6 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
   private final DriftSpecialist driftSpecialist;
   private final InterventionJournal interventionJournal;
   private final InterventionLedgerReader ledgerReader = new InterventionLedgerReader();
-  private final ObjectMapper mapper = new ObjectMapper();
   private final DocumentCodec codec = new DocumentCodec();
 
   private Generalist(
@@ -183,14 +179,13 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
   }
 
   /**
-   * Consult on a checkpoint {@link io.nxmatic.rke2lab.world.gateway.port.Document}: route its
-   * symptom + observation to the specialists and synthesize the narration and the rendered AsciiDoc
-   * diagnosis, returned as a {@code consultation} Document. The twin of the readiness authority's
-   * assess — same checkpoint, the consulting concern rather than the provisioning verdict.
+   * Consult on a checkpoint {@link Document}: route its symptom + observation to the specialists
+   * and synthesize the narration and the rendered AsciiDoc diagnosis, returned as a {@code
+   * consultation} Document. The twin of the readiness authority's assess — same checkpoint, the
+   * consulting concern rather than the provisioning verdict.
    */
   @Override
-  public io.nxmatic.rke2lab.world.gateway.port.Document consult(
-      io.nxmatic.rke2lab.world.gateway.port.Document checkpoint) {
+  public Document consult(Document checkpoint) {
     final ReadinessCheckpoint decoded = codec.decode(checkpoint, ReadinessCheckpoint.class);
     final String scenarioId = decoded.scenarioId();
     final List<Observation> observations = observationsFrom(decoded);
@@ -212,18 +207,21 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
             .orElseThrow(
                 () -> new IllegalArgumentException("consult checkpoint carries no recordedAt"));
 
-    final ObjectNode out = mapper.createObjectNode();
-    out.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, scenarioId);
-    out.put(WorldGatewayCatalog.FIELD_NARRATION, narrationLine(symptom));
-    out.put(WorldGatewayCatalog.FIELD_DIAGNOSIS_ADOC, diagnosisBlock(plan));
-    // Structured reconstruction sub-trees, in the EXACT shape the egress + readers use today:
-    out.set(ConsultationReport.OUTPUT_KEY, mapper.valueToTree(report.toOutputMap()));
-    out.set(
-        Expectation.OUTPUT_KEY,
-        mapper.valueToTree(
-            report.expectations(recordedAt).stream().map(Expectation::toOutputMap).toList()));
-    return new io.nxmatic.rke2lab.world.gateway.port.Document(
-        Domain.DOCTOR.slug(), Coordinate.CONSULTATION.slug(), serialize(out));
+    // The two reconstruction sub-trees stay in their flat output-map shape — they cross opaquely to
+    // the host (which copies them verbatim into its Pulumi outputs) and OSGi rebuilds them via
+    // ConsultationReportReader/ExpectationReader. The codec renders the whole Consultation record.
+    final Consultation consultation =
+        new Consultation(
+            scenarioId,
+            narrationLine(symptom),
+            diagnosisBlock(plan),
+            report.toOutputMap(),
+            report.expectations(recordedAt).stream()
+                .map(Expectation::toOutputMap)
+                .map(Object.class::cast)
+                .toList());
+    return new Document(
+        Domain.DOCTOR.slug(), Coordinate.CONSULTATION.slug(), codec.encode(consultation));
   }
 
   /**
@@ -269,15 +267,6 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
       }
     }
     return block.toString();
-  }
-
-  /** Serialize the consultation payload tree back to the String the seam carries. */
-  private String serialize(JsonNode node) {
-    try {
-      return mapper.writeValueAsString(node);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("could not serialize consultation payload", e);
-    }
   }
 
   /**

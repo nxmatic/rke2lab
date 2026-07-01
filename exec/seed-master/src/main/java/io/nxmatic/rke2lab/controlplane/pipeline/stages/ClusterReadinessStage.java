@@ -1,8 +1,5 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
@@ -19,12 +16,12 @@ import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
+import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import io.nxmatic.rke2lab.world.gateway.port.ObservationWire;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessCheckpoint;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.util.EnumMap;
 import java.util.List;
@@ -63,8 +60,6 @@ public final class ClusterReadinessStage {
    * The run's stable instant, written into the consult checkpoint so OSGi stamps its expectations.
    */
   private final Instant recordedAt;
-
-  private final ObjectMapper mapper = new ObjectMapper();
 
   private final DocumentCodec codec = new DocumentCodec();
 
@@ -243,7 +238,7 @@ public final class ClusterReadinessStage {
       return;
     }
     final Document consultation = doctor.consult(consultCheckpoint(phaseObservations.values()));
-    log("⚕ " + parse(consultation.payload()).path(WorldGatewayCatalog.FIELD_NARRATION).asText());
+    log("⚕ " + codec.decode(consultation, Consultation.class).narration());
     if (consultations != null) {
       consultations.record(consultation);
     }
@@ -264,14 +259,6 @@ public final class ClusterReadinessStage {
             SCENARIO_ID, Optional.empty(), Optional.empty(), Optional.of(recordedAt), wires);
     return new Document(
         Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), codec.encode(checkpoint));
-  }
-
-  private JsonNode parse(String payload) {
-    try {
-      return mapper.readTree(payload);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("malformed consultation payload", e);
-    }
   }
 
   private void log(String message) {

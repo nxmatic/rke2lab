@@ -23,10 +23,11 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifi
 import io.nxmatic.rke2lab.doctor.ExactRosterDoctor;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
+import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
 import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,22 +57,19 @@ class NestedRunbookTest {
       java.time.Instant.parse("2026-06-29T00:00:00Z");
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final DocumentCodec CODEC = new DocumentCodec();
 
   /**
-   * The {@code consultationReport} sub-tree a recorded consultation {@link Document} carries,
-   * parsed as RAW JSON via the host's own {@link ObjectMapper} — never reconstructed into a {@code
-   * doctor.records} type, which is off the host seam. The assertions navigate this tree by the
-   * shared wire field names (the {@code ConsultationReport.toOutputMap} shape), proving the
-   * round-trip keeps the plan, not just that a Document was recorded.
+   * The {@code consultationReport} sub-tree a recorded consultation {@link Document} carries: the
+   * codec decodes the Document into the seam {@link Consultation}, and its opaque {@code
+   * consultationReport} Map is viewed as a tree for navigation — never reconstructed into a {@code
+   * doctor.records} type, which is off the host seam. The assertions navigate by the shared wire
+   * field names (the {@code ConsultationReport.toOutputMap} shape), proving the round-trip keeps
+   * the plan, not just that a Document was recorded.
    */
   private static JsonNode consultationReport(Document consultation) {
-    try {
-      return MAPPER
-          .readTree(consultation.payload())
-          .path(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT);
-    } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-      throw new IllegalStateException(e);
-    }
+    final Consultation decoded = CODEC.decode(consultation, Consultation.class);
+    return MAPPER.valueToTree(decoded.consultationReport());
   }
 
   private static final Patient TEST_PATIENT = new Patient("organization", "rke2lab", "test");

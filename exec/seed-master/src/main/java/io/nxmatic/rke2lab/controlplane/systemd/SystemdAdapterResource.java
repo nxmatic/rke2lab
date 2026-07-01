@@ -1,12 +1,11 @@
 package io.nxmatic.rke2lab.controlplane.systemd;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;
 import com.pulumi.resources.ComponentResourceOptions;
 import com.pulumi.resources.Resource;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
+import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.util.LinkedHashMap;
@@ -60,38 +59,23 @@ public final class SystemdAdapterResource extends ComponentResource {
   }
 
   /**
-   * Copy the consultation Document's structured sub-trees to the egress keys, opaque to the host.
+   * Copy the consultation's structured sub-trees to the egress keys, opaque to the host: the codec
+   * decodes the Document into the seam {@link Consultation}, and the two blobs ({@code
+   * consultationReport}, {@code expectations}) are carried through under the Pulumi output KEYS the
+   * reconstruction reads them back by. Empty blobs are not emitted, so a symptomless consult leaves
+   * the stack contract byte-identical.
    */
   private static void copyDiagnosticOutputs(
       Document consultation, LinkedHashMap<String, Output<?>> outputs) {
-    final JsonNode payload = parse(consultation.payload());
-    final JsonNode report = payload.path(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT);
-    if (report.isObject()) {
-      outputs.put(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT, Output.of(asPlainObject(report)));
+    final Consultation decoded = CODEC.decode(consultation, Consultation.class);
+    if (!decoded.consultationReport().isEmpty()) {
+      outputs.put(
+          WorldGatewayCatalog.FIELD_CONSULTATION_REPORT, Output.of(decoded.consultationReport()));
     }
-    final JsonNode expectations = payload.path(WorldGatewayCatalog.FIELD_EXPECTATIONS);
-    if (expectations.isArray()) {
-      outputs.put(WorldGatewayCatalog.FIELD_EXPECTATIONS, Output.of(asPlainList(expectations)));
-    }
-  }
-
-  private static final ObjectMapper MAPPER = new ObjectMapper();
-
-  private static JsonNode parse(String payload) {
-    try {
-      return MAPPER.readTree(payload);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("malformed consultation payload", e);
+    if (!decoded.expectations().isEmpty()) {
+      outputs.put(WorldGatewayCatalog.FIELD_EXPECTATIONS, Output.of(decoded.expectations()));
     }
   }
 
-  @SuppressWarnings("unchecked")
-  private static Map<String, Object> asPlainObject(JsonNode node) {
-    return MAPPER.convertValue(node, Map.class);
-  }
-
-  @SuppressWarnings("unchecked")
-  private static List<Object> asPlainList(JsonNode node) {
-    return MAPPER.convertValue(node, List.class);
-  }
+  private static final DocumentCodec CODEC = new DocumentCodec();
 }

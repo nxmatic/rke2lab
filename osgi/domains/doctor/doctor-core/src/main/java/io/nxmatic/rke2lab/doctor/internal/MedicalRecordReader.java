@@ -1,16 +1,13 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.records.*;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
+import io.nxmatic.rke2lab.world.gateway.port.VisitWire;
 import java.time.Instant;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -31,22 +28,20 @@ import java.util.Optional;
  */
 public final class MedicalRecordReader {
 
-  private static final TypeReference<Map<String, Object>> PAYLOAD_SHAPE = new TypeReference<>() {};
+  private final DocumentCodec codec = new DocumentCodec();
 
-  private final ObjectMapper mapper = new ObjectMapper();
-
-  public MedicalRecord read(
-      Patient patient, List<io.nxmatic.rke2lab.world.gateway.port.Document> journal)
+  public MedicalRecord read(Patient patient, List<Document> journal)
       throws MedicalRecordReconstructionException {
     final List<Visit> visits = new ArrayList<>();
     final List<Throwable> failures = new ArrayList<>();
 
-    for (io.nxmatic.rke2lab.world.gateway.port.Document entry : journal) {
+    for (Document entry : journal) {
       try {
         visits.add(visitOf(entry));
       } catch (EntryReadException e) {
-        // Identity-enrichment: a subordinate parse failure does not decide policy; record WHICH
-        // entry failed (version + when from the envelope) and keep folding.
+        // Identity-enrichment: a subordinate decode failure does not decide policy; record the
+        // failure and keep folding. A malformed payload cannot yield an identity (the codec throws
+        // before the version/when are readable), so it degrades to the unknown-entry identity.
         failures.add(
             new MedicalRecordReconstructionException.EntryFailure(e.version, e.when, e.getCause()));
       }
@@ -59,41 +54,31 @@ public final class MedicalRecordReader {
     throw failed(patient, partial, failures);
   }
 
-  private Visit visitOf(io.nxmatic.rke2lab.world.gateway.port.Document entry)
-      throws EntryReadException {
-    final Map<String, Object> payload;
+  private Visit visitOf(Document entry) throws EntryReadException {
+    final VisitWire visit;
     try {
-      payload = mapper.readValue(entry.payload(), PAYLOAD_SHAPE);
-    } catch (JsonProcessingException e) {
+      visit = codec.decode(entry, VisitWire.class);
+    } catch (RuntimeException e) {
       throw new EntryReadException(0, null, e);
-    }
-
-    final int version = intOrZero(payload.get(WorldGatewayCatalog.FIELD_VERSION));
-    final Instant when;
-    try {
-      when = Instant.parse(stringOrEmpty(payload.get(WorldGatewayCatalog.FIELD_WHEN)));
-    } catch (DateTimeParseException e) {
-      throw new EntryReadException(version, null, e);
     }
 
     // The consultationReport blobs are one report map per resource: parse each directly.
     final List<ConsultationReport> reports =
-        listOf(payload.get(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT)).stream()
+        visit.consultationReport().stream()
             .map(ConsultationReportReader::fromOutputMap)
             .flatMap(Optional::stream)
             .toList();
     // The expectations output was registered as Output.of(List<Map>), so the harvested blob is a
     // list-of-lists (one inner list per resource). Flatten the inner lists before parsing — the
-    // same
-    // shape the SnapshotView fold consumed.
+    // same shape the SnapshotView fold consumed.
     final List<Expectation> expectations =
-        listOf(payload.get(WorldGatewayCatalog.FIELD_EXPECTATIONS)).stream()
+        visit.expectations().stream()
             .filter(List.class::isInstance)
             .flatMap(perResource -> ((List<?>) perResource).stream())
             .map(ExpectationReader::fromOutputMap)
             .flatMap(Optional::stream)
             .toList();
-    return new Visit(version, when, reports, expectations);
+    return new Visit(visit.version(), visit.when(), reports, expectations);
   }
 
   private static MedicalRecordReconstructionException failed(
@@ -102,18 +87,6 @@ public final class MedicalRecordReader {
         new MedicalRecordReconstructionException(partial, failures.size());
     failures.forEach(aggregate::addSuppressed);
     return aggregate;
-  }
-
-  private static List<?> listOf(Object value) {
-    return value instanceof List<?> list ? list : List.of();
-  }
-
-  private static int intOrZero(Object value) {
-    return value instanceof Number n ? n.intValue() : 0;
-  }
-
-  private static String stringOrEmpty(Object value) {
-    return value instanceof String s ? s : "";
   }
 
   /** A per-entry read failure carrying the identity (version + when) the partial fold preserves. */

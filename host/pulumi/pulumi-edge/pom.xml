@@ -37,6 +37,14 @@
       <artifactId>world-gateway</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- The document codec: the journals build/read seam Documents through the typed wire-records
+         (VisitWire, …) rather than hand-rolled jackson trees. Shaded flat into the host classpath,
+         binding to the host's flat jackson (the same source is nested OSGi-side). -->
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>gateway-document-codec</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>com.pulumi</groupId>
       <artifactId>pulumi</artifactId>

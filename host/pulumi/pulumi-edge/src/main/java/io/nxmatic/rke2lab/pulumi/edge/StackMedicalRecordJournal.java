@@ -1,12 +1,12 @@
 package io.nxmatic.rke2lab.pulumi.edge;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
+import io.nxmatic.rke2lab.world.gateway.port.VisitWire;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -14,9 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -39,7 +37,7 @@ public final class StackMedicalRecordJournal implements MedicalRecordJournal {
   private static final String BACKEND_URL_ENV = "PULUMI_BACKEND_URL";
   private static final String FILE_SCHEME = "file://";
 
-  private final ObjectMapper mapper = new ObjectMapper();
+  private final DocumentCodec codec = new DocumentCodec();
   private final Path backendDir;
   private final Consumer<String> logger;
 
@@ -135,29 +133,19 @@ public final class StackMedicalRecordJournal implements MedicalRecordJournal {
 
   /**
    * The opaque {@code visit} Document for one history entry: the entry's version + when plus the
-   * raw consultation-report and expectation output blobs, harvested by the SAME traversal {@code
-   * StackSnapshot.outputsNamed} used to feed the old readers — so the blob lists keep their exact
-   * shape (consultationReport: report-map per resource; expectations: list-per-resource). The host
-   * never parses the blobs; it serializes the envelope with its OWN jackson.
+   * raw consultation-report and expectation output blobs, harvested by {@code
+   * StackSnapshot.outputsNamed} (the Pulumi output KEYS the resources wrote under — a host-internal
+   * transport concern, hence still {@code WorldGatewayCatalog} names, not {@code VisitWire}
+   * fields). The blob lists keep their exact per-resource shape; the host never parses them — it
+   * renders the whole {@link VisitWire} through the codec.
    */
   private Document visitDocument(StackHistory.Entry entry, StackSnapshot snapshot) {
-    final LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
-    payload.put(WorldGatewayCatalog.FIELD_VERSION, entry.version());
-    payload.put(WorldGatewayCatalog.FIELD_WHEN, entry.when().toString());
-    payload.put(
-        WorldGatewayCatalog.FIELD_CONSULTATION_REPORT,
-        snapshot.outputsNamed(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT));
-    payload.put(
-        WorldGatewayCatalog.FIELD_EXPECTATIONS,
-        snapshot.outputsNamed(WorldGatewayCatalog.FIELD_EXPECTATIONS));
-    return new Document(Domain.DOCTOR.slug(), Coordinate.VISIT.slug(), serialize(payload));
-  }
-
-  private String serialize(Map<String, Object> payload) {
-    try {
-      return mapper.writeValueAsString(payload);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("could not serialize visit Document payload", e);
-    }
+    final VisitWire visit =
+        new VisitWire(
+            entry.version(),
+            entry.when(),
+            snapshot.outputsNamed(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT),
+            snapshot.outputsNamed(WorldGatewayCatalog.FIELD_EXPECTATIONS));
+    return new Document(Domain.DOCTOR.slug(), Coordinate.VISIT.slug(), codec.encode(visit));
   }
 }

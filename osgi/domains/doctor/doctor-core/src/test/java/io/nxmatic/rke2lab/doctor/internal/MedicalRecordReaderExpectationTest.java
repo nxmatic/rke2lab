@@ -3,14 +3,14 @@ package io.nxmatic.rke2lab.doctor.internal;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.records.*;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
+import io.nxmatic.rke2lab.world.gateway.port.VisitWire;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
 class MedicalRecordReaderExpectationTest {
 
   private static final Patient PATIENT = new Patient("organization", "rke2lab", "dev");
-  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final DocumentCodec CODEC = new DocumentCodec();
 
   /**
    * A {@code visit} Document whose single resource carries BOTH a {@code consultationReport} Map
@@ -56,12 +56,9 @@ class MedicalRecordReaderExpectationTest {
   }
 
   private static Document visitDocument(List<Object> reportBlobs, List<Object> expectationBlobs) {
-    final LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
-    payload.put(WorldGatewayCatalog.FIELD_VERSION, 1);
-    payload.put(WorldGatewayCatalog.FIELD_WHEN, Instant.ofEpochSecond(1).toString());
-    payload.put(WorldGatewayCatalog.FIELD_CONSULTATION_REPORT, reportBlobs);
-    payload.put(WorldGatewayCatalog.FIELD_EXPECTATIONS, expectationBlobs);
-    return new Document(Domain.DOCTOR.slug(), Coordinate.VISIT.slug(), serialize(payload));
+    final VisitWire visit =
+        new VisitWire(1, Instant.ofEpochSecond(1), reportBlobs, expectationBlobs);
+    return new Document(Domain.DOCTOR.slug(), Coordinate.VISIT.slug(), CODEC.encode(visit));
   }
 
   private static Map<String, Object> consultationReportMap(Symptom symptom) {
@@ -82,14 +79,6 @@ class MedicalRecordReaderExpectationTest {
         program,
         new ResolutionPredicate(symptom),
         Instant.ofEpochSecond(1_780_000_000L));
-  }
-
-  private static String serialize(Object value) {
-    try {
-      return MAPPER.writeValueAsString(value);
-    } catch (Exception e) {
-      throw new IllegalStateException(e);
-    }
   }
 
   @Test

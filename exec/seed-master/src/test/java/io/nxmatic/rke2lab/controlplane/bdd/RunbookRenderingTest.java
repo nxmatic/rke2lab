@@ -4,23 +4,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
+import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -39,7 +39,7 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class RunbookRenderingTest {
 
-  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final DocumentCodec CODEC = new DocumentCodec();
 
   @Test
   void failed_node_renders_the_doctor_diagnosis(@TempDir Path outputDir) {
@@ -106,15 +106,10 @@ class RunbookRenderingTest {
 
   /** A consultation Document carrying the OSGi-rendered diagnosisAdoc for the checkpoint slug. */
   private static Document consultationDocument(String scenarioId, String diagnosisAdoc) {
-    final ObjectNode payload = MAPPER.createObjectNode();
-    payload.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, scenarioId);
-    payload.put(WorldGatewayCatalog.FIELD_DIAGNOSIS_ADOC, diagnosisAdoc);
-    try {
-      return new Document(
-          Domain.DOCTOR.slug(), Coordinate.CONSULTATION.slug(), MAPPER.writeValueAsString(payload));
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException(e);
-    }
+    final Consultation payload =
+        new Consultation(scenarioId, "", diagnosisAdoc, Map.of(), List.of());
+    return new Document(
+        Domain.DOCTOR.slug(), Coordinate.CONSULTATION.slug(), CODEC.encode(payload));
   }
 
   /**

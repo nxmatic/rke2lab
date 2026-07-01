@@ -201,6 +201,21 @@ host maps its `ObservationView` to it, and OSGi maps `ObservationWire` back to t
 `Observation` (`SymptomKind.slug()` → `Symptom.id()`, the shared kebab-case vocabulary) — no doctor
 type crosses the seam.
 
+The `consultation` and `visit` coordinates close the arc and exercise the OPAQUE-slot rule at scale.
+`Consultation(scenarioId, narration, diagnosisAdoc, consultationReport, expectations)` is what the
+doctor produces from a consult: the host reads only the three flat strings (`scenarioId` to join the
+runbook scenario, `narration` to log, `diagnosisAdoc` to inject), while `consultationReport` (a `Map`)
+and `expectations` (a `List`) cross OPAQUELY — a doctor→doctor payload the host copies verbatim into
+its Pulumi outputs, never interpreting. `VisitWire(version, when, consultationReport, expectations)`
+is the mirror on the read path: the host READ journal harvests those same two output blobs from a
+stack-history entry (carrying the `outputsNamed` per-resource framing) into one visit; OSGi's
+`MedicalRecordReader` unwraps and folds them into a typed `Visit`. Both records model the two
+sub-trees as open slots (`Map`/`List` → open `object`/`array`); their inner shape — the
+`ConsultationReport`/`Expectation` record graph — is owned OSGi-side, where `ConsultationReportReader`
+/ `ExpectationReader` reconstruct it. That inner graph is the next hardening pass (typed wire-records
+for the doctor sub-trees), tracked separately; the coordinate contract here is "these slots are nested
+structures".
+
 An opaque sub-tree a producer copies verbatim (a blob it does not re-describe, e.g. the host
 forwarding an OSGi-written `consultationReport`) is modelled as an open slot (`Map`/`List`), for
 which the projection emits an open `object` — the contract is "this slot is an object", its inner
