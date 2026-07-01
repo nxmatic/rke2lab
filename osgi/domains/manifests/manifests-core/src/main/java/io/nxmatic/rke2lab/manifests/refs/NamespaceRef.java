@@ -1,6 +1,8 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests.refs;
 
+import java.util.Optional;
+
 /** Stable reference to a Kubernetes Namespace (cluster-scoped). */
 public record NamespaceRef(String referenceId, String name) implements ApiObjectRef {
 
@@ -23,7 +25,7 @@ public record NamespaceRef(String referenceId, String name) implements ApiObject
   }
 
   @Override
-  public String namespace() {
-    return null;
+  public Optional<String> namespace() {
+    return Optional.empty();
   }
 }

@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.manifests;
 import io.nxmatic.rke2lab.manifests.refs.ApiObjectRef;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.cdk8s.ApiObject;
 import org.cdk8s.Chart;
 
@@ -51,8 +52,9 @@ public final class Cdk8sApiObjectResolver {
                 obj ->
                     ref.kind().equals(obj.getKind())
                         && ref.name().equals(obj.getName())
-                        && (ref.namespace() == null
-                            || ref.namespace().equals(extractNamespace(obj))))
+                        && ref.namespace()
+                            .map(ns -> extractNamespace(obj).equals(Optional.of(ns)))
+                            .orElse(true))
             .findFirst()
             .orElseThrow(
                 () ->
@@ -71,12 +73,12 @@ public final class Cdk8sApiObjectResolver {
     return found;
   }
 
-  private String extractNamespace(final ApiObject obj) {
+  private Optional<String> extractNamespace(final ApiObject obj) {
     final Object metadataObj = obj.getMetadata().toJson();
     if (!(metadataObj instanceof Map<?, ?> metadata)) {
-      return null;
+      return Optional.empty();
     }
     final Object namespaceObj = metadata.get("namespace");
-    return namespaceObj instanceof String s ? s : null;
+    return namespaceObj instanceof String s ? Optional.of(s) : Optional.empty();
   }
 }

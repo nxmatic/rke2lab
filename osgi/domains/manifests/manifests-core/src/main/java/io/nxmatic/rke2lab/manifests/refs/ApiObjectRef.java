@@ -1,6 +1,8 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests.refs;
 
+import java.util.Optional;
+
 /**
  * Stable reference to a realized cdk8s ApiObject, addressed by its Kubernetes coordinates.
  *
@@ -16,6 +18,6 @@ public interface ApiObjectRef {
 
   String name();
 
-  /** Namespace for namespaced resources; {@code null} for cluster-scoped resources. */
-  String namespace();
+  /** Namespace for namespaced resources; empty for cluster-scoped resources. */
+  Optional<String> namespace();
 }

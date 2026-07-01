@@ -36,6 +36,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.cdk8s.App;
@@ -225,7 +226,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
         DomainRegistryStage buildAndApplyUnits() {
           final ManifestsDomainRegistry configuredDomainRegistry =
-              buildDomainRegistry(state.request.manifestDomainPolicy().orElse(null));
+              buildDomainRegistry(state.request.manifestDomainPolicy());
 
           state.domainRegistry = applyManifestDomainPolicy(state.request, configuredDomainRegistry);
 
@@ -619,9 +620,9 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         .complete();
   }
 
-  ManifestsDomainRegistry buildDomainRegistry(ManifestDomainPolicy policy) {
+  ManifestsDomainRegistry buildDomainRegistry(Optional<ManifestDomainPolicy> policy) {
     final ManifestDomainPolicy effectivePolicy =
-        policy != null ? policy : ManifestDomainPolicy.builder().build();
+        policy.orElseGet(() -> ManifestDomainPolicy.builder().build());
 
     return new ManifestsDomainRegistryBuilder()
         .register(new ClusterDomainRegistrar(), effectivePolicy)

@@ -61,7 +61,7 @@ public record ManifestSynthesisRequest(
   /** A builder pre-loaded with this request's values, for immutable transformation. */
   public Builder toBuilder() {
     return new Builder(synthOutdir, synthManifestFile)
-        .manifestDomainPolicy(manifestDomainPolicy.orElse(null))
+        .manifestDomainPolicy(manifestDomainPolicy)
         .floxDebugPolicy(floxDebugPolicy)
         .bootstrapIdentity(bootstrapIdentity)
         .networkTopology(networkTopology)
@@ -74,7 +74,7 @@ public record ManifestSynthesisRequest(
   // toBuilder() so the field list lives in exactly one place (the Builder) — adding a slice never
   // touches these.
   public ManifestSynthesisRequest withManifestDomainPolicy(ManifestDomainPolicy policy) {
-    return toBuilder().manifestDomainPolicy(policy).build();
+    return toBuilder().manifestDomainPolicy(Optional.of(policy)).build();
   }
 
   public ManifestSynthesisRequest withFloxDebugPolicy(FloxDebugPolicy policy) {
@@ -124,7 +124,7 @@ public record ManifestSynthesisRequest(
       outdir = manifestFile.getParent() == null ? Paths.get(".") : manifestFile.getParent();
     }
     return builder(outdir, manifestFile)
-        .manifestDomainPolicy(manifestDomainPolicy.orElse(null))
+        .manifestDomainPolicy(manifestDomainPolicy)
         .floxDebugPolicy(floxDebugPolicy)
         .build();
   }
@@ -144,7 +144,7 @@ public record ManifestSynthesisRequest(
           Files.createTempDirectory("rke2lab-manifests-").toAbsolutePath().normalize();
       final Path manifestFile = outdir.resolve("manifests.yaml");
       return builder(outdir, manifestFile)
-          .manifestDomainPolicy(manifestDomainPolicy.orElse(null))
+          .manifestDomainPolicy(manifestDomainPolicy)
           .floxDebugPolicy(floxDebugPolicy)
           .build();
     } catch (IOException ex) {
@@ -169,8 +169,8 @@ public record ManifestSynthesisRequest(
       this.synthManifestFile = synthManifestFile;
     }
 
-    public Builder manifestDomainPolicy(final ManifestDomainPolicy v) {
-      this.manifestDomainPolicy = Optional.ofNullable(v);
+    public Builder manifestDomainPolicy(final Optional<ManifestDomainPolicy> v) {
+      this.manifestDomainPolicy = v;
       return this;
     }
 

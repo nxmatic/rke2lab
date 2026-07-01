@@ -18,26 +18,26 @@ import java.util.Optional;
  */
 public enum InstallPhase {
   /** Before rke2-server starts; RKE2 consumes the manifest at boot (e.g. HelmChartConfig). */
-  PRE_SERVER(null),
+  PRE_SERVER(Optional.empty()),
 
   /** API server up, RKE2 watches server/manifests/ (default, most domains). */
-  POST_SERVER(null),
+  POST_SERVER(Optional.empty()),
 
   /** After the Cilium CNI is Ready (Cilium CRDs exist) — e.g. cilium-advanced CRs. */
-  POST_CNI_READY("rke2lab-cilium-ready.service"),
+  POST_CNI_READY(Optional.of("rke2lab-cilium-ready.service")),
 
   /** After a specific operator's CRDs are established (e.g. vCluster/Flux for seed-vcluster). */
-  POST_OPERATOR_READY("rke2lab-operator-ready.service");
+  POST_OPERATOR_READY(Optional.of("rke2lab-operator-ready.service"));
 
-  private final String readyGateUnit;
+  private final Optional<String> readyGate;
 
-  InstallPhase(String readyGateUnit) {
-    this.readyGateUnit = readyGateUnit;
+  InstallPhase(Optional<String> readyGate) {
+    this.readyGate = readyGate;
   }
 
   /** The systemd unit this phase must wait on, if any. Empty for PRE_SERVER / POST_SERVER. */
   public Optional<String> readyGate() {
-    return Optional.ofNullable(readyGateUnit);
+    return readyGate;
   }
 
   /** Whether the installer for this phase runs before rke2-server (vs. after). */

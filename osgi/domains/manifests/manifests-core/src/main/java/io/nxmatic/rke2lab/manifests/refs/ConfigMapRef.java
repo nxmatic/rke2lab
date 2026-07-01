@@ -1,6 +1,8 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests.refs;
 
+import java.util.Optional;
+
 /** Stable reference to a Kubernetes ConfigMap. */
 public record ConfigMapRef(String referenceId, NamespaceRef namespaceRef, String name)
     implements ApiObjectRef {
@@ -28,8 +30,8 @@ public record ConfigMapRef(String referenceId, NamespaceRef namespaceRef, String
   }
 
   @Override
-  public String namespace() {
-    return namespaceRef.name();
+  public Optional<String> namespace() {
+    return Optional.of(namespaceRef.name());
   }
 
   public String namespaceName() {

@@ -1,6 +1,8 @@
 // @codebase
 package io.nxmatic.rke2lab.manifests.refs;
 
+import java.util.Optional;
+
 /** Stable reference to a Kubernetes Secret. */
 public record SecretRef(String referenceId, NamespaceRef namespaceRef, String name)
     implements ApiObjectRef {
@@ -28,8 +30,8 @@ public record SecretRef(String referenceId, NamespaceRef namespaceRef, String na
   }
 
   @Override
-  public String namespace() {
-    return namespaceRef.name();
+  public Optional<String> namespace() {
+    return Optional.of(namespaceRef.name());
   }
 
   public String namespaceName() {
