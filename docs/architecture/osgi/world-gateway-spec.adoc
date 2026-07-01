@@ -143,28 +143,38 @@ flowchart TB
 Rejected alternative (map-A, symmetric): a rich host-side mapper rebuilding doctor types host-side —
 it re-creates a doctor vocabulary on the host, the very leak we are closing.
 
-== The contract: a JSON Schema per document type, owned by OSGi
+== The contract: a wire-record per coordinate, the schema generated from it
 
 A `Document` is untyped; without a contract we would trade a type leak for a silent schema drift. The
-contract is a **JSON Schema keyed on the document type** — not a shared Java class (which would
-re-introduce a shared data type and violate "ports are services").
+contract is a **wire-record per `Coordinate`** — a flat seam record (scalars, `List`, nested
+wire-records, seam enums; no jackson) that carries `@DocumentContract(Coordinate)`. Its
+`RecordComponents` ARE the contract: the JSON Schema is a **build-time projection** of them, never
+hand-written. There is no `FIELD_*` string catalog to keep in step and no shared schema file — the
+record's components are the properties.
 
-*The schema is owned by the OSGi world*, with the domain that owns the document type — a resource
-beside that domain's `DomainDagMapper`. OSGi holds the authority, so OSGi holds the contract. There
-is no shared schema file on the filesystem and no shared Java type.
+The wire-record is a **seam type** (system-exported, one shared copy, like `Document` and
+`Coordinate` themselves): the *type* never crosses the boundary, only the serialized `String`
+payload, which each realm maps record↔`String` with its own jackson in the per-realm
+`DocumentCodec`. This is stricter than a shared Java data class (which would re-introduce a shared
+mutable domain type and violate "ports are services") and stricter than the host hand-rolling a map
+independently: both realms now build the same coordinate through the same record shape.
+
+An opaque sub-tree a producer copies verbatim (a blob it does not re-describe, e.g. the host
+forwarding an OSGi-written `consultationReport`) is modelled as an open slot (`Map`/`List`), for
+which the projection emits an open `object` — the contract is "this slot is an object", its inner
+shape owned where it is produced.
 
 === Build-time is the load-bearing contract check (we build on one codebase)
 
 We are *embedded*: the host and the OSGi exec-jar build from the same codebase, in one reactor. So
-the contract is enforced where that fact lives — at build time:
+the contract is enforced where that fact lives — at build time, by the `SCHEMA_CONCORD` staging gate
+(the fourth, alongside record-purity / spec-coverage / instance-discipline): it asserts every
+`Coordinate` has a wire-record and that the schema projected from that record validates against the
+*meta-schema* (the JSON Schema draft standard, supplied by the validation library). Deleting the old
+`FIELD_*` catalog makes the record the only way to name a coordinate's keys — construction-by-record
+is then enforced by compilation, not by fragile string reconciliation.
 
-* each domain's mapper carries unit tests that round-trip real `Document`s against its schema (the
-  schema's own regression);
-* a staging gate (the fourth, alongside record-purity / spec-coverage / instance-discipline) asserts
-  each mapper and its schema concur, and each schema validates against the *meta-schema* (the JSON
-  Schema draft standard, supplied by the validation library, not by any domain).
-
-Because the two worlds are built and shipped together, their schemas cannot drift apart in version —
+Because the two worlds are built and shipped together, their contract cannot drift apart in version —
 the reactor guarantees the pairing. The build check is sufficient for the embedded deployment.
 
 === Runtime validation is designed, but YAGNI until remote (graduated)

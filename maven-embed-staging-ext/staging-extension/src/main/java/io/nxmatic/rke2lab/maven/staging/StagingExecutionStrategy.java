@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.maven.staging;
 
 import io.nxmatic.rke2lab.osgi.bnd.BootStackJar;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -287,74 +288,49 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
         "staged bundles export packages that ALSO live flat in this assembly (one class in two"
             + " realms → LinkageError)");
 
-    // ---- SCHEMA_CONCORD: each Document coordinate has a schema that matches the code ----
-    // Find world-gateway (catalog) and doctor-core (schemas) bundles
+    // ---- SCHEMA_CONCORD: every Document coordinate has a wire-record whose projected schema is
+    // meta-schema-valid (records-as-contract; the record's components ARE the schema) ----
+    // The world-gateway seam is system-exported (type=seam), so it is in `resolved` with the seam
+    // marker — NOT in closure.staged(); find it by the export package it owns.
     ResolvedBundle worldGatewayBundle = null;
-    ResolvedBundle doctorCoreBundle = null;
-    for (ResolvedBundle b : closure.staged()) {
-      if (b.symbolicName().equals("io.nxmatic.rke2lab.world.gateway")) {
+    for (ResolvedBundle b : resolved) {
+      if (b.embed() != null
+          && b.embed().isSeam()
+          && b.exports().names().contains("io.nxmatic.rke2lab.world.gateway.port")) {
         worldGatewayBundle = b;
-      }
-      if (b.symbolicName().equals("io.nxmatic.rke2lab.doctor.core")) {
-        doctorCoreBundle = b;
+        break;
       }
     }
 
-    if (worldGatewayBundle != null && doctorCoreBundle != null) {
-      final CoordinateFieldUsage usage = new CoordinateFieldUsage();
-
-      // Index WorldGatewayCatalog to map FIELD_* names to their string values
-      byte[] catalogClass = null;
+    if (worldGatewayBundle != null) {
+      // The world-gateway seam carries both the Coordinate enum and the wire-records; index the
+      // coordinate slugs and the @DocumentContract-carrying records from its class entries, and
+      // resolve nested wire-record / seam-enum bytes by internal name over the same bundle.
+      final Map<String, byte[]> gatewayBytes = new LinkedHashMap<>();
       for (ResolvedBundle.ClassEntry c : worldGatewayBundle.classEntries()) {
-        if (c.binaryName().equals("io/nxmatic/rke2lab/world/gateway/port/WorldGatewayCatalog")) {
-          catalogClass = c.bytes();
-          break;
-        }
-      }
-      if (catalogClass != null) {
-        usage.indexCatalog(catalogClass);
+        gatewayBytes.put(c.binaryName(), c.bytes());
       }
 
-      // Index Coordinate enum constants to their slugs from bytecode
-      byte[] coordinateClass = null;
-      for (ResolvedBundle.ClassEntry c : worldGatewayBundle.classEntries()) {
-        if (c.binaryName().equals("io/nxmatic/rke2lab/world/gateway/port/Coordinate")) {
-          coordinateClass = c.bytes();
-          break;
-        }
-      }
+      final DocumentContractScan scan = new DocumentContractScan();
+      final byte[] coordinateClass =
+          gatewayBytes.get("io/nxmatic/rke2lab/world/gateway/port/Coordinate");
       if (coordinateClass != null) {
-        usage.indexCoordinate(coordinateClass);
+        scan.indexCoordinate(coordinateClass);
+      }
+      for (Map.Entry<String, byte[]> e : gatewayBytes.entrySet()) {
+        scan.scan(e.getKey(), e.getValue());
       }
 
-      // Scan all staged bundle classes to discover FIELD_* usage per coordinate
-      for (ResolvedBundle b : closure.staged()) {
-        for (ResolvedBundle.ClassEntry c : b.classEntries()) {
-          usage.scan(c.bytes());
-        }
-      }
-
-      // Resolve the schema directory from doctor-core's target/classes
-      java.nio.file.Path schemaDir = null;
-      for (MavenProject p : session.getAllProjects()) {
-        if (p.getArtifactId().equals("doctor-core")) {
-          final java.nio.file.Path classes =
-              java.nio.file.Path.of(p.getBuild().getOutputDirectory());
-          schemaDir = classes.resolve("schema");
-          break;
-        }
-      }
-
-      if (schemaDir != null) {
-        final SchemaConcord schemaConcord =
-            new SchemaConcord(schemaDir, usage.fieldsByCoordinateSlug());
-        report.record(
-            StagingGate.SCHEMA_CONCORD,
-            doctorCoreBundle.governance().levels(),
-            doctorCoreBundle,
-            schemaConcord.violations(),
-            "Document coordinate schema/code concord violations (meta-schema or field mismatch)");
-      }
+      final SchemaConcord schemaConcord =
+          new SchemaConcord(
+              scan.coordinateConstToSlug(), scan.slugToRecordInternalName(), gatewayBytes::get);
+      report.record(
+          StagingGate.SCHEMA_CONCORD,
+          worldGatewayBundle.governance().levels(),
+          worldGatewayBundle,
+          schemaConcord.violations(),
+          "Document coordinate without a wire-record, or a wire-record whose generated schema is"
+              + " invalid against the JSON-Schema meta-schema");
     }
 
     report.flush();

@@ -18,6 +18,14 @@
     payload is a serialized JSON String, never a jackson JsonNode — a seam references only flat (JDK)
     types, so it carries NO third-party dependency; each world parses with its own jackson.</description>
 
+  <dependencies>
+    <dependency>
+      <groupId>io.nxmatic.rke2lab</groupId>
+      <artifactId>domain-annotations</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+
   <build>
     <plugins>
       <plugin>
