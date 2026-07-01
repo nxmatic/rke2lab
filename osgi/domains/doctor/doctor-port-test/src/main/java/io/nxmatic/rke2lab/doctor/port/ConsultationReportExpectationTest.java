@@ -4,7 +4,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.doctor.records.*;
+import io.nxmatic.rke2lab.doctor.records.Assessment;
+import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.records.Expectation;
+import io.nxmatic.rke2lab.doctor.records.Observation;
+import io.nxmatic.rke2lab.doctor.records.Prescription;
+import io.nxmatic.rke2lab.doctor.records.ReferralReply;
+import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
+import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.records.ResolutionPredicate;
+import io.nxmatic.rke2lab.doctor.records.SchemaRef;
+import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.testkit.ReferralReplies;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import java.time.Instant;

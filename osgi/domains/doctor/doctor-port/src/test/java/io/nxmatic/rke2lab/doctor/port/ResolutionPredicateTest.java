@@ -3,7 +3,12 @@ package io.nxmatic.rke2lab.doctor.port;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.doctor.records.*;
+import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.records.ReferralReply;
+import io.nxmatic.rke2lab.doctor.records.RemediationPlan;
+import io.nxmatic.rke2lab.doctor.records.ResolutionPredicate;
+import io.nxmatic.rke2lab.doctor.records.Symptom;
+import io.nxmatic.rke2lab.doctor.records.Visit;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;

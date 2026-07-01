@@ -3,7 +3,8 @@ package io.nxmatic.rke2lab.doctor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.nxmatic.rke2lab.doctor.internal.*;
+import io.nxmatic.rke2lab.doctor.internal.InterventionLedgerReader;
+import io.nxmatic.rke2lab.doctor.internal.InterventionReader;
 import io.nxmatic.rke2lab.doctor.records.Intervention;
 import io.nxmatic.rke2lab.doctor.records.InterventionLedger;
 import io.nxmatic.rke2lab.doctor.records.ProblemRef;

@@ -1,6 +1,8 @@
 package io.nxmatic.rke2lab.doctor.spi;
 
-import io.nxmatic.rke2lab.doctor.records.*;
+import io.nxmatic.rke2lab.doctor.records.AdministrationOutcome;
+import io.nxmatic.rke2lab.doctor.records.Prescription;
+import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 
 /**
  * A {@link Clinician} that ADMINISTERS a prescribed treatment — the "hands" tier, distinct from the

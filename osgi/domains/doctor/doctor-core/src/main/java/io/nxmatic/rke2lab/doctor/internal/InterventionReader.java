@@ -1,6 +1,9 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import io.nxmatic.rke2lab.doctor.records.*;
+import io.nxmatic.rke2lab.doctor.records.Intervention;
+import io.nxmatic.rke2lab.doctor.records.ProblemRef;
+import io.nxmatic.rke2lab.doctor.records.Provenance;
+import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.world.gateway.port.InterventionWire;
 import java.util.Optional;
 

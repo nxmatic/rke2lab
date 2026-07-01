@@ -1,10 +1,17 @@
 package io.nxmatic.rke2lab.doctor;
 
-import io.nxmatic.rke2lab.doctor.internal.*;
+import io.nxmatic.rke2lab.doctor.internal.ConsultationDag;
+import io.nxmatic.rke2lab.doctor.internal.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.port.HealthSystem;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.doctor.records.*;
+import io.nxmatic.rke2lab.doctor.records.Assessment;
+import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
+import io.nxmatic.rke2lab.doctor.records.Prescription;
+import io.nxmatic.rke2lab.doctor.records.Referral;
+import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
+import io.nxmatic.rke2lab.doctor.records.SchemaRef;
+import io.nxmatic.rke2lab.doctor.records.Specialty;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
 import java.util.List;

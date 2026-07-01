@@ -1,10 +1,18 @@
 package io.nxmatic.rke2lab.manifests;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.manifests.refs.ConfigMapRef;
 import io.nxmatic.rke2lab.manifests.refs.NamespaceRef;
-import org.cdk8s.*;
+import org.cdk8s.ApiObject;
+import org.cdk8s.ApiObjectMetadata;
+import org.cdk8s.ApiObjectProps;
+import org.cdk8s.App;
+import org.cdk8s.AppProps;
+import org.cdk8s.Chart;
 import org.junit.jupiter.api.Test;
 
 /** Tests for cdk8s-tree-based ApiObject resolution. */

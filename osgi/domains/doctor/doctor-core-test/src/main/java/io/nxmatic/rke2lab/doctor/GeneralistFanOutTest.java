@@ -2,7 +2,10 @@ package io.nxmatic.rke2lab.doctor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.nxmatic.rke2lab.doctor.internal.*;
+import io.nxmatic.rke2lab.doctor.internal.ClinicalAccess;
+import io.nxmatic.rke2lab.doctor.internal.Generalist;
+import io.nxmatic.rke2lab.doctor.internal.GrantPolicy;
+import io.nxmatic.rke2lab.doctor.internal.MedicalRecordRegistry;
 import io.nxmatic.rke2lab.doctor.records.Assessment;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Observation;
