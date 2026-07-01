@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.pulumi.edge;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * The typed identity of a Pulumi stack — a pair of project and stack names. This prevents the
  * parameter-swap bug where {@code LocalWorkspace.createOrSelectStack(projectName, stackName, …)}
@@ -10,11 +12,11 @@ package io.nxmatic.rke2lab.pulumi.edge;
 public record StackCoordinate(String project, String stack) {
 
   public StackCoordinate {
-    if (project == null || project.isBlank()) {
-      throw new IllegalArgumentException("StackCoordinate project cannot be null or blank");
+    if (project.isBlank()) {
+      throw new IllegalArgumentException("StackCoordinate project cannot be blank");
     }
-    if (stack == null || stack.isBlank()) {
-      throw new IllegalArgumentException("StackCoordinate stack cannot be null or blank");
+    if (stack.isBlank()) {
+      throw new IllegalArgumentException("StackCoordinate stack cannot be blank");
     }
     project = project.trim();
     stack = stack.trim();
@@ -25,8 +27,8 @@ public record StackCoordinate(String project, String stack) {
   }
 
   public static final class Builder {
-    private String project;
-    private String stack;
+    private @Nullable String project;
+    private @Nullable String stack;
 
     public Builder project(String project) {
       this.project = project;
@@ -39,6 +41,12 @@ public record StackCoordinate(String project, String stack) {
     }
 
     public StackCoordinate build() {
+      if (project == null) {
+        throw new IllegalArgumentException("StackCoordinate project must be set");
+      }
+      if (stack == null) {
+        throw new IllegalArgumentException("StackCoordinate stack must be set");
+      }
       return new StackCoordinate(project, stack);
     }
   }

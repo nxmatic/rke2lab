@@ -348,11 +348,15 @@ public final class OutOfContainerFrameworkExtension implements BeforeAllCallback
               + matched.size());
     }
     final BundleLocation fragmentLocation = matched.get(0);
-    final String hostBsn = BundleManifest.from(fragmentLocation).fragmentHost();
-    if (hostBsn == null) {
-      throw new IllegalArgumentException(
-          "fixture matching " + ldapFilter + " declares no Fragment-Host — not a -test fragment");
-    }
+    final String hostBsn =
+        BundleManifest.from(fragmentLocation)
+            .flatMap(BundleManifest::fragmentHost)
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException(
+                        "fixture matching "
+                            + ldapFilter
+                            + " declares no Fragment-Host — not a -test fragment"));
     final Bundle host = install(hostBsn);
     final Bundle fragment = installAt(fragmentLocation);
     installedBundles.put(host.getSymbolicName(), host);

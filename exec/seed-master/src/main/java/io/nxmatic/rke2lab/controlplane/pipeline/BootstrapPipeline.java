@@ -30,6 +30,7 @@ import io.nxmatic.rke2lab.world.gateway.port.Patient;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -174,10 +175,13 @@ public final class BootstrapPipeline {
 
       final StackMedicalRecordJournal medicalRecordJournal =
           StackMedicalRecordJournal.fromEnvironment(logger);
-      final Path backendDir = medicalRecordJournal.backendDir();
-      final InterventionJournal interventionJournal = new StackInterventionJournal(backendDir);
+      final Optional<Path> backendDir = medicalRecordJournal.backendDir();
+      final InterventionJournal interventionJournal =
+          new StackInterventionJournal(backendDir.orElse(null));
       final InterventionLedgerWriter ledgerWriter =
-          backendDir != null ? new PulumiInterventionLedgerWriter(backendDir) : intervention -> {};
+          backendDir
+              .<InterventionLedgerWriter>map(PulumiInterventionLedgerWriter::new)
+              .orElse(intervention -> {});
       framework.context().registerService(MedicalRecordJournal.class, medicalRecordJournal, null);
       framework.context().registerService(InterventionJournal.class, interventionJournal, null);
       framework.context().registerService(InterventionLedgerWriter.class, ledgerWriter, null);

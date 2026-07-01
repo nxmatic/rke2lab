@@ -46,6 +46,10 @@
          export/open set the profile passes. -->
     <errorprone.version>2.50.0</errorprone.version>
     <nullaway.version>0.13.7</nullaway.version>
+    <!-- NullAway gate severity, ERROR by default (the gate bites). Override to WARN while
+         troubleshooting a surfaced null issue: -Dnullaway.severity=WARN. Turn the gate off
+         entirely with -Dnullaway.skip (the profile deactivates when that property is present). -->
+    <nullaway.severity>ERROR</nullaway.severity>
     <shellcheck.maven.plugin.version>0.5.1</shellcheck.maven.plugin.version>
     <google-java-format.version>1.35.0</google-java-format.version>
     <!-- Tracks the flake's nixpkgs shfmt (the toolchain source of truth);
@@ -508,14 +512,21 @@
         <surefire.excludedGroups/>
       </properties>
     </profile>
-    <!-- Opt-in NullAway static null-analysis via error-prone. OFF by default (error-prone forks the
-         compiler and needs the javac module exports/opens below); enable with -Pnullaway to "look"
-         at the null-issues the @NullMarked packages surface. Scoped by OnlyNullMarked=true, so only
-         packages that pose @NullMarked are analysed (today: doctor + world-gateway) — every other
-         module compiles clean and untouched. Severity WARN for now; flips to ERROR once the surfaced
-         warnings are cleared (the same WARN->ERROR ramp as SCHEMA_CONCORD and the -Werror plan). -->
+    <!-- NullAway static null-analysis via error-prone, ON BY DEFAULT (the gate). Scoped by
+         OnlyNullMarked=true, so only @NullMarked packages are analysed; every other module compiles
+         untouched. error-prone forks the compiler and needs the javac module exports/opens below.
+         Severity is ${nullaway.severity} (ERROR by default — the gate bites); override to WARN while
+         troubleshooting (-Dnullaway.severity=WARN), or skip the gate with -Dnullaway.skip. Test
+         sources are out of scope (XepExcludedPaths) — passing null to exercise a guard is legitimate
+         there. Activation is by ABSENCE of nullaway.skip, so it stays on regardless of which
+         -P<world> profiles are selected. -->
     <profile>
       <id>nullaway</id>
+      <activation>
+        <property>
+          <name>!nullaway.skip</name>
+        </property>
+      </activation>
       <build>
         <plugins>
           <plugin>
@@ -539,7 +550,7 @@
                 <arg>-Xlint:-processing</arg>
                 <arg>-XDcompilePolicy=simple</arg>
                 <arg>-XDshould-stop.ifError=FLOW</arg>
-                <arg>-Xplugin:ErrorProne -XepDisableAllChecks -XepExcludedPaths:(.*/src/test/.*)|(.*-test/src/.*)|(.*/junit-testkit/src/.*) -Xep:NullAway:ERROR -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:ExcludedFieldAnnotations=com.tngtech.jgiven.annotation.ProvidedScenarioState,com.tngtech.jgiven.annotation.ExpectedScenarioState,com.tngtech.jgiven.annotation.ScenarioState,org.mockito.Mock,org.mockito.InjectMocks,org.mockito.Captor,org.osgi.service.component.annotations.Reference</arg>
+                <arg>-Xplugin:ErrorProne -XepDisableAllChecks -XepExcludedPaths:(.*/src/test/.*)|(.*-test/src/.*)|(.*-testkit/src/.*) -Xep:NullAway:${nullaway.severity} -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:ExcludedFieldAnnotations=com.tngtech.jgiven.annotation.ProvidedScenarioState,com.tngtech.jgiven.annotation.ExpectedScenarioState,com.tngtech.jgiven.annotation.ScenarioState,org.mockito.Mock,org.mockito.InjectMocks,org.mockito.Captor,org.osgi.service.component.annotations.Reference</arg>
                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>

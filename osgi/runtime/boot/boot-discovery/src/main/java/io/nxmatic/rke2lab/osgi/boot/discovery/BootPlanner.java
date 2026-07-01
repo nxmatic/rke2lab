@@ -2,16 +2,17 @@ package io.nxmatic.rke2lab.osgi.boot.discovery;
 
 import io.nxmatic.rke2lab.osgi.bnd.BootStackJar;
 import io.nxmatic.rke2lab.osgi.bnd.Clause;
+import io.nxmatic.rke2lab.osgi.bnd.EmbedCapability;
 import io.nxmatic.rke2lab.osgi.boot.discovery.BootPlan.Installable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Computes the {@link BootPlan} — the boot DECISION — from a {@link BootRequest} and a {@link
@@ -74,7 +75,7 @@ public final class BootPlanner {
       for (BundleLocation location : request.discoveryPolicy().select(discovery)) {
         final BundleManifest manifest = discovery.manifestOf(location);
         stack.add(new Installable(location, startLevelOf(manifest)));
-        if (manifest.embed() != null && manifest.embed().isDomain()) {
+        if (manifest.embed().map(EmbedCapability::isDomain).orElse(false)) {
           models.add(location);
         }
       }
@@ -109,13 +110,13 @@ public final class BootPlanner {
    * that imports it, so it sits at the lowest level.
    */
   private static int startLevelOf(BundleManifest manifest) {
-    final String bsn = manifest.symbolicName();
+    final Optional<String> bsn = manifest.symbolicName();
     for (BootStackJar jar : BootStackJar.values()) {
-      if (jar.symbolicName().equals(bsn)) {
+      if (bsn.map(jar.symbolicName()::equals).orElse(false)) {
         return startLevelFor(jar.layer());
       }
     }
-    if (manifest.embed() != null && manifest.embed().isDomain()) {
+    if (manifest.embed().map(EmbedCapability::isDomain).orElse(false)) {
       return BootPlan.START_LEVEL_BUNDLES;
     }
     return BootPlan
@@ -143,7 +144,12 @@ public final class BootPlanner {
     final Set<String> exports = new LinkedHashSet<>(request.explicitSystemPackages());
     final List<BundleManifest> manifests = new ArrayList<>();
     for (BundleLocation model : models) {
-      manifests.add(BundleManifest.from(model));
+      manifests.add(
+          BundleManifest.from(model)
+              .orElseThrow(
+                  () ->
+                      new IllegalStateException(
+                          "model bundle without an installable manifest: " + model.locationId())));
     }
     final Set<String> installedExportedPackages = new LinkedHashSet<>();
     for (Installable installable : stack) {
@@ -170,12 +176,11 @@ public final class BootPlanner {
         exports.stream()
             .map(e -> Clause.parse(e).name())
             .flatMap(
-                p -> {
-                  final String exporter = discovery.domainExporterOf(p);
-                  return exporter == null
-                      ? Stream.empty()
-                      : Stream.of(p + " (owned by domain bundle " + exporter + ")");
-                })
+                p ->
+                    discovery
+                        .domainExporterOf(p)
+                        .map(exporter -> p + " (owned by domain bundle " + exporter + ")")
+                        .stream())
             .toList();
     if (!leaked.isEmpty()) {
       throw new IllegalStateException(

@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * The offline entry point that serializes a {@link Patient}'s medical record as YAML — HOST-PURE:
@@ -108,7 +109,7 @@ public final class MedicalRecordDump {
   public static void main(String[] args) {
     final Args parsed = Args.parse(args);
     final MedicalRecordJournal journal =
-        new StackMedicalRecordJournal(parsed.backend, msg -> System.err.println(msg));
+        new StackMedicalRecordJournal(Optional.of(parsed.backend), msg -> System.err.println(msg));
     final Result result = dump(parsed.patient(), journal);
 
     if (parsed.out == null) {

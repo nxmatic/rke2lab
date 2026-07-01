@@ -36,11 +36,12 @@ import java.util.Optional;
 public final class StackHandle {
 
   private final String stack;
-  private final Path workDir;
+  private final Optional<Path> workDir;
   private final StackHistory history;
   private final boolean isLive;
 
-  private StackHandle(String stack, Path workDir, Path backendDir, String project, boolean isLive) {
+  private StackHandle(
+      String stack, Optional<Path> workDir, Path backendDir, String project, boolean isLive) {
     this.stack = stack;
     this.workDir = workDir;
     this.history = StackHistory.of(backendDir, project, stack);
@@ -52,7 +53,7 @@ public final class StackHandle {
    * history for versioned reads.
    */
   public static StackHandle attach(String stack, Path workDir, Path backendDir, String project) {
-    return new StackHandle(stack, workDir, backendDir, project, true);
+    return new StackHandle(stack, Optional.of(workDir), backendDir, project, true);
   }
 
   /**
@@ -60,7 +61,7 @@ public final class StackHandle {
    * entry.
    */
   public static StackHandle forBackend(Path backendDir, String project, String stack) {
-    return new StackHandle(stack, null, backendDir, project, false);
+    return new StackHandle(stack, Optional.empty(), backendDir, project, false);
   }
 
   /**
@@ -80,8 +81,10 @@ public final class StackHandle {
   }
 
   private Optional<StackSnapshot> currentSnapshotLive() throws StackAccessException {
+    // Live mode is only ever constructed via attach(), which always supplies a workDir.
+    final Path liveWorkDir = workDir.orElseThrow();
     try {
-      WorkspaceStack workspaceStack = LocalWorkspace.createOrSelectStack(stack, workDir);
+      WorkspaceStack workspaceStack = LocalWorkspace.createOrSelectStack(stack, liveWorkDir);
       StackDeployment deployment = workspaceStack.exportStack();
       return Optional.of(StackSnapshot.of(deployment));
     } catch (AutomationException e) {
@@ -90,7 +93,7 @@ public final class StackHandle {
       // producing the state (CLI absent, process/IO, locked or missing stack): an access
       // problem, retryable. Content failures arise only where we parse raw JSON ourselves
       // (StackCheckpoint).
-      throw new StackAccessException(workDir, e);
+      throw new StackAccessException(liveWorkDir, e);
     }
   }
 

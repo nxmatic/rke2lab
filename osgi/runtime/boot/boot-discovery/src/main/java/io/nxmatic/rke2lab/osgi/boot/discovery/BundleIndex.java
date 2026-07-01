@@ -14,6 +14,7 @@ import java.util.Comparator;
 import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import org.osgi.framework.Filter;
@@ -75,14 +76,14 @@ public final class BundleIndex {
     final List<Entry> found = new ArrayList<>();
     for (BundleLocation location : locations) {
       try {
-        final BundleManifest manifest = BundleManifest.from(location);
-        if (manifest.symbolicName() == null && manifest.embed() == null) {
+        final Optional<BundleManifest> manifest = BundleManifest.from(location);
+        if (manifest.isEmpty()) {
           continue; // not a bundle we can install.
         }
         if (location.isFrameworkLauncher()) {
           continue; // the launcher becomes system bundle 0, never an installed bundle.
         }
-        found.add(new Entry(location, manifest));
+        found.add(new Entry(location, manifest.orElseThrow()));
       } catch (IOException ex) {
         // An unreadable entry is not a bundle we can install — skip it.
       }
@@ -97,7 +98,7 @@ public final class BundleIndex {
    */
   public BundleLocation locateBySymbolicName(String symbolicName) {
     return entries.stream()
-        .filter(e -> symbolicName.equals(e.manifest().symbolicName()))
+        .filter(e -> e.manifest().symbolicName().map(symbolicName::equals).orElse(false))
         .map(Entry::location)
         .findFirst()
         .orElseThrow(
@@ -115,8 +116,8 @@ public final class BundleIndex {
   public List<BundleLocation> matching(String ldapFilter) {
     final Filter filter = filter(ldapFilter);
     return entries.stream()
-        .filter(e -> e.manifest().embed() != null && e.manifest().embed().matches(filter))
-        .sorted(Comparator.comparing(e -> nullToEmpty(e.manifest().symbolicName())))
+        .filter(e -> e.manifest().embed().map(embed -> embed.matches(filter)).orElse(false))
+        .sorted(Comparator.comparing(e -> e.manifest().symbolicName().orElse("")))
         .map(Entry::location)
         .toList();
   }
@@ -126,7 +127,8 @@ public final class BundleIndex {
    * probe.
    */
   public boolean contains(String symbolicName) {
-    return entries.stream().anyMatch(e -> symbolicName.equals(e.manifest().symbolicName()));
+    return entries.stream()
+        .anyMatch(e -> e.manifest().symbolicName().map(symbolicName::equals).orElse(false));
   }
 
   /**
@@ -138,12 +140,11 @@ public final class BundleIndex {
   }
 
   /** The symbolic name a location declares, for a policy filtering the index by name. */
-  String symbolicNameOf(BundleLocation location) {
+  Optional<String> symbolicNameOf(BundleLocation location) {
     return entries.stream()
         .filter(e -> e.location().equals(location))
-        .map(e -> e.manifest().symbolicName())
         .findFirst()
-        .orElse(null);
+        .flatMap(e -> e.manifest().symbolicName());
   }
 
   /**
@@ -153,13 +154,12 @@ public final class BundleIndex {
    * spec jar that exports it. The launcher is already absent from the index. First match wins; a
    * genuine multi-exporter conflict is the developer's classpath to keep clean, as at build time.
    */
-  public BundleLocation exporterOf(String packageName) {
+  public Optional<BundleLocation> exporterOf(String packageName) {
     return entries.stream()
-        .filter(e -> e.manifest().embed() == null || !e.manifest().embed().isSeam())
+        .filter(e -> e.manifest().embed().map(embed -> !embed.isSeam()).orElse(true))
         .filter(e -> e.manifest().exports().names().contains(packageName))
         .map(Entry::location)
-        .findFirst()
-        .orElse(null);
+        .findFirst();
   }
 
   /**
@@ -195,13 +195,14 @@ public final class BundleIndex {
         if ("optional".equals(imported.attributes().get("resolution")) || provided.contains(pkg)) {
           continue;
         }
-        final BundleLocation exporter = exporterOf(pkg);
-        if (exporter == null || !pulledIds.add(exporter.locationId())) {
+        final Optional<BundleLocation> exporter = exporterOf(pkg);
+        if (exporter.isEmpty() || !pulledIds.add(exporter.orElseThrow().locationId())) {
           continue;
         }
-        final BundleManifest exporterManifest = manifestOf(exporter);
+        final BundleLocation pulled = exporter.orElseThrow();
+        final BundleManifest exporterManifest = manifestOf(pulled);
         provided.addAll(exporterManifest.exports().names());
-        onPulled.accept(exporter);
+        onPulled.accept(pulled);
         frontier.add(exporterManifest);
       }
     }
@@ -222,7 +223,7 @@ public final class BundleIndex {
    */
   public Set<String> exportsForImportsOf(String symbolicName) {
     return entries.stream()
-        .filter(e -> symbolicName.equals(e.manifest().symbolicName()))
+        .filter(e -> e.manifest().symbolicName().map(symbolicName::equals).orElse(false))
         .map(e -> e.manifest().imports().asSystemExports())
         .findFirst()
         .orElseThrow(
@@ -239,21 +240,16 @@ public final class BundleIndex {
    * over the whole classpath, so a domain package whose exporter is NOT in the install set is still
    * recognised (exactly the leak we forbid).
    */
-  public String domainExporterOf(String packageName) {
+  public Optional<String> domainExporterOf(String packageName) {
     return entries.stream()
-        .filter(e -> e.manifest().embed() != null && e.manifest().embed().isDomain())
+        .filter(e -> e.manifest().embed().map(EmbedCapability::isDomain).orElse(false))
         .filter(e -> e.manifest().exports().names().contains(packageName))
-        .map(e -> e.manifest().symbolicName())
         .findFirst()
-        .orElse(null);
+        .flatMap(e -> e.manifest().symbolicName());
   }
 
   private String describe() {
     return entries.size() + " indexed bundle(s)";
-  }
-
-  private static String nullToEmpty(String s) {
-    return s == null ? "" : s;
   }
 
   private static List<BundleLocation> classpathLocations() {

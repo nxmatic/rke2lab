@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.jar.JarFile;
 import java.util.jar.JarInputStream;
 import java.util.jar.Manifest;
@@ -27,8 +28,8 @@ public sealed interface BundleLocation {
   /** The service file a launchable OSGi framework declares — how the launcher identifies itself. */
   String FRAMEWORK_FACTORY_SERVICE = "META-INF/services/org.osgi.framework.launch.FrameworkFactory";
 
-  /** Read this bundle's manifest, or {@code null} if it has none. The only read of the bytes. */
-  Manifest readManifest() throws IOException;
+  /** Read this bundle's manifest, or empty if it has none. The only read of the bytes. */
+  Optional<Manifest> readManifest() throws IOException;
 
   /** Open this bundle's bytes — the caller closes the stream. */
   InputStream open() throws IOException;
@@ -49,18 +50,18 @@ public sealed interface BundleLocation {
    */
   record OnClasspath(Path path) implements BundleLocation {
     @Override
-    public Manifest readManifest() throws IOException {
+    public Optional<Manifest> readManifest() throws IOException {
       if (Files.isDirectory(path)) {
         final Path mf = path.resolve("META-INF/MANIFEST.MF");
         if (!Files.exists(mf)) {
-          return null;
+          return Optional.empty();
         }
         try (InputStream in = Files.newInputStream(mf)) {
-          return new Manifest(in);
+          return Optional.of(new Manifest(in));
         }
       }
       try (JarFile jar = new JarFile(path.toFile())) {
-        return jar.getManifest();
+        return Optional.ofNullable(jar.getManifest());
       }
     }
 
@@ -89,9 +90,9 @@ public sealed interface BundleLocation {
   /** A jar staged under {@code META-INF/bundles/<name>}, reached through {@code loader}. */
   record Staged(ClassLoader loader, String resourceName) implements BundleLocation {
     @Override
-    public Manifest readManifest() throws IOException {
+    public Optional<Manifest> readManifest() throws IOException {
       try (JarInputStream jar = new JarInputStream(open())) {
-        return jar.getManifest();
+        return Optional.ofNullable(jar.getManifest());
       }
     }
 

@@ -15,8 +15,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The Pulumi file-backend implementation of the host {@link MedicalRecordJournal} READ port
@@ -29,7 +31,7 @@ import java.util.stream.Stream;
  * MedicalRecordReader} used to do host-side: the timeline walk and the per-entry output harvest
  * stay here (stack knowledge); the blob→record fold moved OSGi-side. A per-entry snapshot read
  * failure degrades to skipping that entry with a logged reason — the diagnosis path tolerates a
- * partial record, matching the registry's old fail-at-end-into-partial stance. A null backend
+ * partial record, matching the registry's old fail-at-end-into-partial stance. An absent backend
  * yields an empty history.
  */
 public final class StackMedicalRecordJournal implements MedicalRecordJournal {
@@ -38,10 +40,10 @@ public final class StackMedicalRecordJournal implements MedicalRecordJournal {
   private static final String FILE_SCHEME = "file://";
 
   private final DocumentCodec codec = new DocumentCodec();
-  private final Path backendDir;
+  private final Optional<Path> backendDir;
   private final Consumer<String> logger;
 
-  public StackMedicalRecordJournal(Path backendDir, Consumer<String> logger) {
+  public StackMedicalRecordJournal(Optional<Path> backendDir, Consumer<String> logger) {
     this.backendDir = backendDir;
     this.logger = logger;
   }
@@ -50,32 +52,28 @@ public final class StackMedicalRecordJournal implements MedicalRecordJournal {
     return new StackMedicalRecordJournal(backendDirFromUrl(System.getenv(BACKEND_URL_ENV)), logger);
   }
 
-  static Path backendDirFromUrl(String pulumiBackendUrl) {
-    if (pulumiBackendUrl == null || !pulumiBackendUrl.startsWith(FILE_SCHEME)) {
-      return null;
-    }
-    return Path.of(pulumiBackendUrl.substring(FILE_SCHEME.length()));
+  static Optional<Path> backendDirFromUrl(@Nullable String pulumiBackendUrl) {
+    return Optional.ofNullable(pulumiBackendUrl)
+        .filter(url -> url.startsWith(FILE_SCHEME))
+        .map(url -> Path.of(url.substring(FILE_SCHEME.length())));
   }
 
-  /**
-   * The file-backend root this journal reads from, or {@code null} when no file:// backend is
-   * configured.
-   */
-  public Path backendDir() {
+  /** The file-backend root this journal reads from, or empty when no file:// backend is set. */
+  public Optional<Path> backendDir() {
     return backendDir;
   }
 
   @Override
   public List<Document> historyOf(Patient patient) {
-    if (backendDir == null) {
+    if (backendDir.isEmpty()) {
       logger.accept(
           "medical record empty for "
               + patient.qualifiedName()
               + ": no file:// PULUMI_BACKEND_URL configured");
       return List.of();
     }
-    final StackHandle handle =
-        StackHandle.forBackend(backendDir, patient.project(), patient.stack());
+    final Path root = backendDir.orElseThrow();
+    final StackHandle handle = StackHandle.forBackend(root, patient.project(), patient.stack());
 
     final List<StackHistory.Entry> entries;
     try {
@@ -83,8 +81,7 @@ public final class StackMedicalRecordJournal implements MedicalRecordJournal {
     } catch (StackException e) {
       // The spine is the precondition for any reconstruction: with no readable timeline there is no
       // partial to build. A present-but-unreadable history is propagated, never masked as empty.
-      throw new RuntimeException(
-          "medical record history present but unreadable under " + backendDir, e);
+      throw new RuntimeException("medical record history present but unreadable under " + root, e);
     }
 
     final List<Document> journal = new ArrayList<>(entries.size());
@@ -110,10 +107,11 @@ public final class StackMedicalRecordJournal implements MedicalRecordJournal {
 
   @Override
   public List<Patient> cohort(Patient current) {
-    if (backendDir == null) {
+    if (backendDir.isEmpty()) {
       return List.of(current);
     }
-    final Path stacksDir = PulumiBackendLayout.stacksDir(backendDir, current.project());
+    final Path stacksDir =
+        PulumiBackendLayout.stacksDir(backendDir.orElseThrow(), current.project());
     if (!Files.isDirectory(stacksDir)) {
       return List.of(current);
     }

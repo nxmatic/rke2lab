@@ -67,7 +67,8 @@ public sealed interface DiscoveryPolicy {
     @Override
     public List<BundleLocation> select(BundleIndex index) {
       return index.all().stream()
-          .filter(b -> !symbolicNames.contains(index.symbolicNameOf(b)))
+          .filter(
+              b -> index.symbolicNameOf(b).map(name -> !symbolicNames.contains(name)).orElse(true))
           .toList();
     }
   }
@@ -76,7 +77,7 @@ public sealed interface DiscoveryPolicy {
     @Override
     public List<BundleLocation> select(BundleIndex index) {
       return index.all().stream()
-          .filter(b -> symbolicNames.contains(index.symbolicNameOf(b)))
+          .filter(b -> index.symbolicNameOf(b).map(symbolicNames::contains).orElse(false))
           .toList();
     }
   }
