@@ -32,16 +32,6 @@
       <artifactId>org.osgi.annotation.versioning</artifactId>
       <scope>provided</scope>
     </dependency>
-    <!-- JSpecify null-safety annotations (@NullMarked/@Nullable): compile-only intent metadata, no
-         runtime engine — the same provided/inherited treatment as the versioning annotation above.
-         A package opts IN by posing @NullMarked on its package-info; the jar merely sits on the
-         classpath everywhere so no bundle redeclares it. bnd's org.jspecify.annotations import is
-         dropped per-bundle (analysis-only, nothing resolves it at runtime). -->
-    <dependency>
-      <groupId>org.jspecify</groupId>
-      <artifactId>jspecify</artifactId>
-      <scope>provided</scope>
-    </dependency>
   </dependencies>
 
   <build>

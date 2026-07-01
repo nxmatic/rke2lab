@@ -41,6 +41,11 @@
     <surefire.groups/>
     <surefire.excludedGroups>live | spike</surefire.excludedGroups>
     <spotless.version>3.7.0</spotless.version>
+    <!-- NullAway static null-analysis via error-prone (the -Pnullaway opt-in profile below reads the
+         @NullMarked packages). Confirmed to run on the JDK 25 toolchain with the full javac module
+         export/open set the profile passes. -->
+    <errorprone.version>2.50.0</errorprone.version>
+    <nullaway.version>0.13.7</nullaway.version>
     <shellcheck.maven.plugin.version>0.5.1</shellcheck.maven.plugin.version>
     <google-java-format.version>1.35.0</google-java-format.version>
     <!-- Tracks the flake's nixpkgs shfmt (the toolchain source of truth);
@@ -119,6 +124,17 @@
     production to emit the runbook.
   -->
   <dependencies>
+    <!-- JSpecify null-safety annotations (@NullMarked/@Nullable): compile-only intent metadata, no
+         runtime engine. Declared here at the ROOT parent so EVERY module (osgi bundles via
+         bundle-parent, host/exec via build-parent directly) gets it without redeclaration. A
+         package opts IN by posing @NullMarked on its package-info; the jar merely sits on the
+         classpath. OSGi bundles drop the RUNTIME-retained org.jspecify.annotations import in their
+         bnd.bnd (analysis-only, nothing resolves it at runtime). -->
+    <dependency>
+      <groupId>org.jspecify</groupId>
+      <artifactId>jspecify</artifactId>
+      <scope>provided</scope>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
@@ -491,6 +507,56 @@
         <surefire.groups>osgi</surefire.groups>
         <surefire.excludedGroups/>
       </properties>
+    </profile>
+    <!-- Opt-in NullAway static null-analysis via error-prone. OFF by default (error-prone forks the
+         compiler and needs the javac module exports/opens below); enable with -Pnullaway to "look"
+         at the null-issues the @NullMarked packages surface. Scoped by OnlyNullMarked=true, so only
+         packages that pose @NullMarked are analysed (today: doctor + world-gateway) — every other
+         module compiles clean and untouched. Severity WARN for now; flips to ERROR once the surfaced
+         warnings are cleared (the same WARN->ERROR ramp as SCHEMA_CONCORD and the -Werror plan). -->
+    <profile>
+      <id>nullaway</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+              <annotationProcessorPaths>
+                <path>
+                  <groupId>com.google.errorprone</groupId>
+                  <artifactId>error_prone_core</artifactId>
+                  <version>${errorprone.version}</version>
+                </path>
+                <path>
+                  <groupId>com.uber.nullaway</groupId>
+                  <artifactId>nullaway</artifactId>
+                  <version>${nullaway.version}</version>
+                </path>
+              </annotationProcessorPaths>
+              <compilerArgs>
+                <arg>-Xlint:all</arg>
+                <arg>-Xlint:-processing</arg>
+                <arg>-XDcompilePolicy=simple</arg>
+                <arg>-XDshould-stop.ifError=FLOW</arg>
+                <arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:NullAway:WARN -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true</arg>
+                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+                <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
+              </compilerArgs>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
   </profiles>
 </project>
