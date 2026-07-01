@@ -1,15 +1,9 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.port.InterventionIntake;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
@@ -18,19 +12,19 @@ import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import io.nxmatic.rke2lab.world.gateway.port.InterventionRequest;
+import io.nxmatic.rke2lab.world.gateway.port.InterventionWire;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class RecordInterventionCommandTest {
 
-  private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final DocumentCodec CODEC = new DocumentCodec();
-  private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() {};
 
   /**
    * A Document-capturing writer — the seam now persists a canonical {@code intervention} Document.
@@ -52,7 +46,7 @@ class RecordInterventionCommandTest {
    */
   private static InterventionIntake fakeIntake() {
     return rawFacts -> {
-      final InterventionRequest req = CODEC.decode(rawFacts.payload(), InterventionRequest.class);
+      final InterventionRequest req = CODEC.decode(rawFacts, InterventionRequest.class);
       if (req.problem().startsWith("no-such")) {
         return new Document(
             Domain.DOCTOR.slug(),
@@ -60,13 +54,15 @@ class RecordInterventionCommandTest {
             CODEC.encode(
                 new ReadinessVerdict(Action.STOP, "unknown problem reference: " + req.problem())));
       }
-      final ObjectNode out = MAPPER.createObjectNode();
-      out.put("provenance", req.provenance().orElse("operator-manual"));
-      out.put("when", req.when().toString());
-      out.put("what", req.what());
-      out.put("problem", req.problem());
-      req.prescriptionRef().ifPresent(ref -> out.put("prescriptionRef", ref));
-      return new Document(Domain.DOCTOR.slug(), Coordinate.INTERVENTION.slug(), write(out));
+      final InterventionWire wire =
+          new InterventionWire(
+              req.provenance().orElse("operator-manual"),
+              req.when(),
+              req.what(),
+              req.problem(),
+              req.prescriptionRef(),
+              Map.of());
+      return new Document(Domain.DOCTOR.slug(), Coordinate.INTERVENTION.slug(), CODEC.encode(wire));
     };
   }
 
@@ -84,12 +80,12 @@ class RecordInterventionCommandTest {
             fakeIntake(),
             writer);
 
-    final Map<String, Object> payload = payloadOf(recorded);
-    assertEquals("operator-manual", payload.get("provenance"));
-    assertEquals(now.toString(), payload.get("when"));
-    assertEquals("nft delete ...", payload.get("what"));
-    assertEquals("systemd-adapter/connection-refused", payload.get("problem"));
-    assertFalse(payload.containsKey("prescriptionRef"));
+    final InterventionWire wire = wireOf(recorded);
+    assertEquals("operator-manual", wire.provenance());
+    assertEquals(now, wire.when());
+    assertEquals("nft delete ...", wire.what());
+    assertEquals("systemd-adapter/connection-refused", wire.problem());
+    assertTrue(wire.prescriptionRef().isEmpty());
     assertEquals(List.of(recorded), writer.appended);
   }
 
@@ -112,7 +108,7 @@ class RecordInterventionCommandTest {
             fakeIntake(),
             writer);
 
-    assertEquals("2026-06-10T00:00:00Z", payloadOf(recorded).get("when"));
+    assertEquals(Instant.parse("2026-06-10T00:00:00Z"), wireOf(recorded).when());
   }
 
   @Test
@@ -133,7 +129,7 @@ class RecordInterventionCommandTest {
             fakeIntake(),
             writer);
 
-    assertEquals("restart-systemd-unit", payloadOf(recorded).get("prescriptionRef"));
+    assertEquals(Optional.of("restart-systemd-unit"), wireOf(recorded).prescriptionRef());
   }
 
   @Test
@@ -211,19 +207,7 @@ class RecordInterventionCommandTest {
                 writer));
   }
 
-  private static Map<String, Object> payloadOf(Document document) {
-    try {
-      return MAPPER.readValue(document.payload(), MAP);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException(e);
-    }
-  }
-
-  private static String write(JsonNode node) {
-    try {
-      return MAPPER.writeValueAsString(node);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException(e);
-    }
+  private static InterventionWire wireOf(Document document) {
+    return CODEC.decode(document, InterventionWire.class);
   }
 }

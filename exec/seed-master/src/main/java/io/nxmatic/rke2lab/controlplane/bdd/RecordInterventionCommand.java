@@ -102,7 +102,7 @@ public final class RecordInterventionCommand {
 
   private static String reasonOf(Document verdict) {
     try {
-      return CODEC.decode(verdict.payload(), ReadinessVerdict.class).reason();
+      return CODEC.decode(verdict, ReadinessVerdict.class).reason();
     } catch (RuntimeException e) {
       return "unparseable verdict payload";
     }

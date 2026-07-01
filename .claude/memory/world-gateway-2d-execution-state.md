@@ -138,6 +138,81 @@ bundle** via a NEW staging category `embed; type=library` (jackson's own treatme
   after T9), [[jspecify-nullmarked-default-backlog]] (@NullMarked package default, post-2D).
 - NOT yet committed as of this note.
 
+## T7 IN PROGRESS (2026-07-01) — intervention, NOT built, NOT committed
+
+BIG MODEL FIX (user-confirmed "c'est un bug"): the `intervention` coordinate had TWO wire shapes
+under one slug — a bug (1 coordinate MUST = 1 schema). Root cause: the host read path wrapped
+`{interventions:[blob]}`, but that `[...]` was Pulumi's `outputsNamed`→List transport framing LEAKING
+into the payload (InterventionResource registers ONE intervention via `Output.of(data)`; outputsNamed
+collects it as a 1-element list). The write path already wrote ONE flat intervention. TRUE contract =
+ONE intervention. Fix = UNWRAP the Pulumi framing at the host, one Document per blob.
+
+Changes DONE (files edited, not yet built):
+- NEW `InterventionWire(provenance, when:Instant, what, problem, Optional<String> prescriptionRef,
+  Map<String,Object> details)` in world-gateway seam, `@DocumentContract(INTERVENTION)`. Refs stay
+  RAW strings (doctor vocab parsed OSGi-side). `details` is now an EXPLICIT nested Map field (was
+  putAll-flattened at root by Intervention.toOutputMap).
+- `InterventionDocuments.of` (OSGi producer): builds InterventionWire from Intervention (provenance.id,
+  problem.toRef, prescriptionRef.map(id)) + `codec.encode`. No more toOutputMap.
+- `InterventionReader`: `fromOutputMap(Object)` → `fromWire(InterventionWire)` — TYPED, no more Object
+  + instanceof guards (user praised this: "on laisse pas passer n'importe quoi"). Keeps tolerance
+  (unparseable required ref → empty).
+- `InterventionLedgerReader`: decodes ONE InterventionWire per Document (was payload→FIELD_INTERVENTIONS
+  list→blobs→fromOutputMap). Uses codec.
+- `StackInterventionJournal` (host): `interventionDocuments()` emits one `intervention` Document PER
+  blob from `outputsNamed` (was one Document wrapping the list). serialize(Object) now.
+- `InterventionLedgerLayout.OUTPUT_KEY`: decoupled from WorldGatewayCatalog → literal "interventions"
+  (a host-internal Pulumi transport key, NOT a seam wire field). Import of catalog dropped.
+- `WorldGatewayCatalog.FIELD_INTERVENTIONS` DELETED.
+
+STILL TODO for T7 (resume here):
+1. Add `InterventionWire` to docs/architecture/osgi/world-gateway-spec.adoc (SPEC_COVERAGE names it,
+   like ReadinessVerdict/InterventionRequest — else ERROR).
+2. Migrate tests: `InterventionReaderTest` (fromOutputMap→fromWire, build InterventionWire not Map),
+   `InterventionLedgerReaderTest` (rewrite: one InterventionWire per Document, drop FIELD_INTERVENTIONS
+   list shape — uses it at lines ~110/123/178), any others referencing the old shapes. Grep
+   FIELD_INTERVENTIONS + `.fromOutputMap` under intervention tests.
+3. Build: PLAIN reactor (no extension change in T7): `flox activate -- ./mvnw package -Pall-worlds
+   -Dmaven.build.cache.skipCache=true -DskipTests=false`. Expect SCHEMA_CONCORD 3 warn (readiness-
+   checkpoint, consultation, visit). Commit.
+
+## T7 DONE (2026-07-01) — all done, reactor + tests GREEN, SCHEMA_CONCORD 3 warn
+
+All 3 gestes done. Spec names InterventionWire (+ fixed a stale mention: the para said the deleted
+home-made OptionalModule; now says jackson's Jdk8Module). Tests migrated:
+- `InterventionReaderTest`: fromOutputMap(Object/Map)→fromWire(InterventionWire); dropped the
+  null/non-map/unparseable-when cases (the TYPE eliminates them — the hardening).
+- `InterventionLedgerReaderTest`: rewritten off the `{interventions:[...]}` envelope (deleted) — now
+  one InterventionWire per Document; malformed = undecodable payload or unparseable wire.
+- `RecordInterventionCommandTest`: fakeIntake builds InterventionWire; and (user push) the test's
+  residual `new ObjectMapper()` REMOVED — `wireOf(doc)` decodes via CODEC, assertions on the
+  contract (wire.provenance()/when()/prescriptionRef()) not on string map keys. Tests-at-the-contract.
+- Fix: RemediationProgramRef wire id is "restart-systemd-unit" (not "restart-unit").
+User praised: typed door not open door; test at contract not implementation. NOT yet committed.
+
+## SCOPE DECISION (user 2026-07-01): ALL reliability work stays IN THIS BRANCH
+
+The user wants the whole reliability arc (design+build) DONE on feature/cluster-edge, NOT deferred
+post-merge ("je me connais" — a deferred backlog won't happen). So after the 2D coordinate arc
+(T7 done → T8, T9, T10 flip), do these IN THIS BRANCH, each its own commit:
+- 2E: harden internal fromOutputMap(Object)→typed (doctor-records internal, non-wire) —
+  [[harden-internal-fromoutputmap-backlog]]. User wants it right after the wire arc, not last.
+- 2F: sweep residual `new ObjectMapper()` onto the codec — [[sweep-objectmapper-onto-codec-backlog]].
+- 2G: JSpecify @NullMarked package default (non-null by default) —
+  [[jspecify-nullmarked-default-backlog]] (will delete many now-dead null guards — synergy with typing).
+- 2H: centralize seam dep scope/version in dependencyManagement/BOM —
+  [[centralize-seam-dep-scope-version-backlog]].
+(Naming caveat: 2E-2H are shorthand; @NullMarked + dep-centralization are repo-transverse, not strictly
+world-gateway. Order TBD with user; capstone remote-validation still after.)
+
+## fromOutputMap hardening scope (user Q, 2026-07-01)
+
+`fromOutputMap`→`fromWire` (Object→typed) widens ONLY where it's gateway WIRE:
+- `ConsultationReportReader`/`ExpectationReader` (consultation coordinate) → hardened in T9 via nested
+  ConsultationReportWire/ExpectationWire sub-records.
+- `ExpectationPredicate.fromOutputMap`/`ResolutionPredicate` = doctor-records-INTERNAL record↔map
+  (kind-discriminator dispatch, never crosses the seam) → separate post-2D backlog, NOT 2D.
+
 Build command (user-confirmed, [[maven-build-cache-and-staging-verify]]): `flox activate -- ./mvnw
 package -Pall-worlds -Dmaven.build.cache.skipCache=true -DskipTests=false` (SKIP cache, not disable;
 no clean unless stale). Extension changes need the two-phase dance ([[osgi-staging-extension-chantier]]).

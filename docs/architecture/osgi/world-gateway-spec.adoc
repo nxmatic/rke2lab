@@ -169,12 +169,24 @@ stays flat. Deserializing a verdict into `ReadinessVerdict` leaks nothing the 2C
 
 The `intervention-request` wire-record `InterventionRequest(problem, what, provenance?,
 prescriptionRef?, when)` shows two more shapes the projection needs: an `Optional<String>` field
-(the `provenance`/`prescriptionRef` the operator may omit — the codec's `OptionalModule` maps it to
-an absent key, and the generated schema drops it from `required`) and an `Instant` (`when`, rendered
-ISO-8601 by the codec's `InstantModule`). The references stay RAW strings on the wire — the doctor
-vocabulary (`ProblemRef`, `Provenance`, `RemediationProgramRef`) is parsed only OSGi-side, so the
-host holds no doctor type. Both codec modules are hand-registered, keeping the codec free of the
-`jackson-datatype-*` family and its `ServiceLoader<Module>` discovery surface.
+(the `provenance`/`prescriptionRef` the operator may omit — jackson's `Jdk8Module` maps it to an
+absent key, and the generated schema drops it from `required`) and an `Instant` (`when`, rendered
+ISO-8601 by the codec's home-made `InstantModule`). The references stay RAW strings on the wire — the
+doctor vocabulary (`ProblemRef`, `Provenance`, `RemediationProgramRef`) is parsed only OSGi-side, so
+the host holds no doctor type. The codec registers its modules EXPLICITLY (never
+`findAndRegisterModules`), so it stays clear of the `ServiceLoader<Module>` discovery surface even
+while using jackson's own `Jdk8Module`.
+
+The canonical `intervention` wire-record `InterventionWire(provenance, when, what, problem,
+prescriptionRef?, details)` carries ONE intervention — who changed the world and what problem it
+addresses, refs raw as strings, with an open `details` bag (a `Map` the projection emits as an open
+`object`). It is the record's-are-contract fix for a modelling bug: the coordinate previously carried
+TWO shapes under one slug — the write path a flat intervention, the read path a `{interventions:[…]}`
+list. That list was not a contract but Pulumi's array-valued `outputsNamed` transport framing leaking
+into the payload (one ledger history entry records exactly one intervention). The host journal now
+UNWRAPS that framing — one `intervention` Document per intervention — so one coordinate has one wire
+shape, and `InterventionReader.fromWire(InterventionWire)` replaced a permissive
+`fromOutputMap(Object)` (a typed door, not an open one).
 
 An opaque sub-tree a producer copies verbatim (a blob it does not re-describe, e.g. the host
 forwarding an OSGi-written `consultationReport`) is modelled as an open slot (`Map`/`List`), for

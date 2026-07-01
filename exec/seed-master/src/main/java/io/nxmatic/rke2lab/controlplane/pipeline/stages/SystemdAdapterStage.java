@@ -230,7 +230,7 @@ public final class SystemdAdapterStage {
 
     final Document checkpoint = checkpointDocument(SCENARIO_ID);
     final Document verdict = readinessAuthority.assess(checkpoint);
-    final Action action = codec.decode(verdict.payload(), ReadinessVerdict.class).action();
+    final Action action = codec.decode(verdict, ReadinessVerdict.class).action();
     if (action == Action.STOP) {
       log("✗ " + SCENARIO_ID + " FAILED, verdict=stop → stopping provisioning");
       throw new TopicFailure("systemd adapter", failure);

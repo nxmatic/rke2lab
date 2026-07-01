@@ -93,7 +93,7 @@ class InterventionIntakeTest {
         Coordinate.READINESS_VERDICT.slug(),
         verdict.coordinate(),
         "a bad reference must return an error verdict, not throw across the seam");
-    final ReadinessVerdict decoded = CODEC.decode(verdict.payload(), ReadinessVerdict.class);
+    final ReadinessVerdict decoded = CODEC.decode(verdict, ReadinessVerdict.class);
     assertTrue(
         decoded.reason().contains("no-such-checkpoint"),
         () -> "the verdict reason must name the bad reference: " + decoded);

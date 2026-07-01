@@ -63,13 +63,5 @@ public final class WorldGatewayCatalog {
   /** Visit payload: the ISO-8601 instant a history entry was recorded. */
   public static final String FIELD_WHEN = "when";
 
-  /**
-   * Intervention-journal payload + Pulumi ledger output key: the list of raw {@code
-   * Intervention.toOutputMap} blobs a ledger history entry registered. The host READ journal wraps
-   * them opaquely; OSGi folds them back into the {@code InterventionLedger}. Must equal the host
-   * ledger writer's output key.
-   */
-  public static final String FIELD_INTERVENTIONS = "interventions";
-
   private WorldGatewayCatalog() {}
 }

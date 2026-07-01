@@ -37,7 +37,7 @@ public final class DefaultInterventionIntake implements InterventionIntake {
 
   @Override
   public Document canonicalize(Document rawFacts) {
-    final InterventionRequest request = codec.decode(rawFacts.payload(), InterventionRequest.class);
+    final InterventionRequest request = codec.decode(rawFacts, InterventionRequest.class);
 
     if (isBlank(request.problem())) {
       return error("missing problem");

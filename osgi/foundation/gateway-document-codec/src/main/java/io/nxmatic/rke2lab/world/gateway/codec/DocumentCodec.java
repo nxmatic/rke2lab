@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import io.nxmatic.rke2lab.world.gateway.codec.internal.InstantModule;
 import io.nxmatic.rke2lab.world.gateway.codec.internal.WireEnumModule;
+import io.nxmatic.rke2lab.world.gateway.port.Document;
+import io.nxmatic.rke2lab.world.gateway.port.DocumentContract;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
@@ -83,6 +85,28 @@ public final class DocumentCodec {
     } catch (IOException ex) {
       throw new UncheckedIOException("Failed to decode payload into " + type.getSimpleName(), ex);
     }
+  }
+
+  /**
+   * Deserialize a {@link Document} into the wire-record {@code type}, first checking the Document's
+   * coordinate matches the coordinate {@code type} declares via {@link DocumentContract} — so
+   * decoding an {@code intervention} Document as a {@code ReadinessVerdict} fails loudly at the
+   * seam rather than silently mis-parsing. The one call site's {@code decode(doc.payload(),
+   * X.class)} is this, minus the guard.
+   */
+  public <T> T decode(Document document, Class<T> type) {
+    final DocumentContract contract = type.getAnnotation(DocumentContract.class);
+    if (contract != null && !contract.value().slug().equals(document.coordinate())) {
+      throw new IllegalArgumentException(
+          "cannot decode a '"
+              + document.coordinate()
+              + "' Document as "
+              + type.getSimpleName()
+              + " (contract coordinate '"
+              + contract.value().slug()
+              + "')");
+    }
+    return decode(document.payload(), type);
   }
 
   /**

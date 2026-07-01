@@ -1,6 +1,5 @@
 package io.nxmatic.rke2lab.pulumi.edge;
 
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.nio.file.Path;
 
 /**
@@ -14,8 +13,14 @@ public final class InterventionLedgerLayout {
   public static final String PROJECT = "intervention-ledger";
   public static final String STACK = "dev";
 
-  /** The Pulumi output key — the seam's intervention-journal field, shared host↔OSGi. */
-  public static final String OUTPUT_KEY = WorldGatewayCatalog.FIELD_INTERVENTIONS;
+  /**
+   * The Pulumi output key each {@link InterventionResource} registers its intervention blob under —
+   * a host-internal transport key (NOT a seam wire field): the writer registers it, the reader
+   * harvests it, and {@code StackInterventionJournal} unwraps the resulting list into one {@code
+   * intervention} Document per blob. The wire contract is {@code InterventionWire}, decoupled from
+   * this storage key.
+   */
+  public static final String OUTPUT_KEY = "interventions";
 
   private InterventionLedgerLayout() {}
 

@@ -8,16 +8,14 @@ import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * The Pulumi file-backend implementation of the host {@link InterventionJournal} READ port
- * (Layer-1): it walks the one fixed intervention-ledger stack's history and wraps each entry's RAW
- * {@code interventions} output blob into one opaque {@code intervention} {@link Document}, WITHOUT
- * interpreting the content. OSGi rebuilds the {@code InterventionLedger} from these blobs inside
- * the bundle realm.
+ * (Layer-1): it walks the one fixed intervention-ledger stack's history and emits one {@code
+ * intervention} {@link Document} PER intervention blob each entry registered, WITHOUT interpreting
+ * the content. OSGi rebuilds the {@code InterventionLedger} from these Documents inside the bundle
+ * realm — one Document decodes as one {@code InterventionWire}.
  *
  * <p>This is the Layer-1 half of what {@code InterventionLedgerSource.load} used to do host-side:
  * the history walk and the per-entry output harvest stay here (stack knowledge); the blob→ledger
@@ -60,23 +58,27 @@ public final class StackInterventionJournal implements InterventionJournal {
     for (StackHistory.Entry entry : entries) {
       // A present entry that cannot be read is exceptional, not absence: let the StackException
       // propagate rather than masking corruption as an empty ledger (layered error contract).
-      journal.add(interventionDocument(snapshotOf(handle, entry)));
+      journal.addAll(interventionDocuments(snapshotOf(handle, entry)));
     }
     return journal;
   }
 
   /**
-   * The opaque {@code intervention} Document for one history entry: the raw {@code interventions}
-   * output blob(s) harvested by {@code StackSnapshot.outputsNamed} — the SAME traversal that fed
-   * the old {@code InterventionReader}. The host never parses the blobs; it serializes the envelope
-   * with its OWN jackson.
+   * One {@code intervention} Document PER intervention blob a history entry registered. {@code
+   * StackSnapshot.outputsNamed} returns a list (it collects the output across the entry's
+   * resources); each element is one intervention's flat map, which the host copies verbatim into a
+   * Document payload — the wire shape OSGi decodes as an {@code InterventionWire}. The host never
+   * parses a blob; it serializes each with its OWN jackson. (The former single Document wrapping
+   * the whole {@code {interventions:[…]}} list was the array-output framing leaking into the
+   * payload; unwrapping it here keeps one coordinate = one wire shape.)
    */
-  private Document interventionDocument(StackSnapshot snapshot) {
-    final LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
-    payload.put(
-        InterventionLedgerLayout.OUTPUT_KEY,
-        snapshot.outputsNamed(InterventionLedgerLayout.OUTPUT_KEY));
-    return new Document(Domain.DOCTOR.slug(), Coordinate.INTERVENTION.slug(), serialize(payload));
+  private List<Document> interventionDocuments(StackSnapshot snapshot) {
+    final List<Document> documents = new ArrayList<>();
+    for (Object blob : snapshot.outputsNamed(InterventionLedgerLayout.OUTPUT_KEY)) {
+      documents.add(
+          new Document(Domain.DOCTOR.slug(), Coordinate.INTERVENTION.slug(), serialize(blob)));
+    }
+    return documents;
   }
 
   private static StackSnapshot snapshotOf(StackHandle handle, StackHistory.Entry entry) {
@@ -94,9 +96,9 @@ public final class StackInterventionJournal implements InterventionJournal {
     }
   }
 
-  private String serialize(Map<String, Object> payload) {
+  private String serialize(Object blob) {
     try {
-      return mapper.writeValueAsString(payload);
+      return mapper.writeValueAsString(blob);
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("could not serialize intervention Document payload", e);
     }

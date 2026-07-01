@@ -1,11 +1,11 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.doctor.records.*;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
+import io.nxmatic.rke2lab.world.gateway.port.InterventionWire;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -13,149 +13,118 @@ import org.junit.jupiter.api.Test;
 
 class InterventionReaderTest {
 
+  private static final Instant WHEN = Instant.parse("2026-06-13T10:13:50Z");
+
   @Test
   void round_trip_intervention_without_prescription_or_details() {
-    final Intervention original =
+    final InterventionWire wire =
+        new InterventionWire(
+            "operator-manual",
+            WHEN,
+            "nft delete ...",
+            "systemd-adapter/connection-refused",
+            Optional.empty(),
+            Map.of());
+
+    final Intervention expected =
         new Intervention(
             Provenance.OPERATOR_MANUAL,
-            Instant.parse("2026-06-13T10:13:50Z"),
+            WHEN,
             "nft delete ...",
             ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
             Optional.empty(),
             Map.of());
 
-    final Optional<Intervention> reconstructed =
-        InterventionReader.fromOutputMap(original.toOutputMap());
-
-    assertTrue(reconstructed.isPresent());
-    assertEquals(original, reconstructed.get());
+    assertEquals(Optional.of(expected), InterventionReader.fromWire(wire));
   }
 
   @Test
   void round_trip_intervention_with_prescription_and_details() {
-    final Intervention original =
+    final InterventionWire wire =
+        new InterventionWire(
+            "pulumi-engine",
+            WHEN,
+            "systemctl restart ...",
+            "systemd-adapter/timeout",
+            Optional.of("restart-systemd-unit"),
+            Map.of("windowFrom", "t1", "unitName", "rke2-server"));
+
+    final Intervention expected =
         new Intervention(
             Provenance.PULUMI_ENGINE,
-            Instant.parse("2026-06-13T10:13:50Z"),
+            WHEN,
             "systemctl restart ...",
             ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.TIMEOUT),
             Optional.of(RemediationProgramRef.RESTART_UNIT),
             Map.of("windowFrom", "t1", "unitName", "rke2-server"));
 
-    final Optional<Intervention> reconstructed =
-        InterventionReader.fromOutputMap(original.toOutputMap());
-
-    assertTrue(reconstructed.isPresent());
-    assertEquals(original, reconstructed.get());
+    assertEquals(Optional.of(expected), InterventionReader.fromWire(wire));
   }
 
   @Test
-  void fromOutputMap_of_null_is_empty() {
-    assertTrue(InterventionReader.fromOutputMap(null).isEmpty());
+  void fromWire_of_null_is_empty() {
+    assertTrue(InterventionReader.fromWire(null).isEmpty());
   }
 
   @Test
-  void fromOutputMap_of_non_map_is_empty() {
-    assertTrue(InterventionReader.fromOutputMap("a string").isEmpty());
+  void unparseable_provenance_is_empty() {
+    final InterventionWire wire =
+        new InterventionWire(
+            "not-a-real-provenance",
+            WHEN,
+            "something",
+            "systemd-adapter/connection-refused",
+            Optional.empty(),
+            Map.of());
+    assertTrue(InterventionReader.fromWire(wire).isEmpty());
   }
 
   @Test
-  void fromOutputMap_without_provenance_is_empty() {
-    final Map<String, Object> map = Map.of("when", "2026-06-13T10:13:50Z", "what", "something");
-    assertTrue(InterventionReader.fromOutputMap(map).isEmpty());
+  void unparseable_problem_is_empty() {
+    final InterventionWire wire =
+        new InterventionWire(
+            "operator-manual", WHEN, "something", "not-a-checkpoint/x", Optional.empty(), Map.of());
+    assertTrue(InterventionReader.fromWire(wire).isEmpty());
   }
 
   @Test
-  void fromOutputMap_with_unparseable_provenance_is_empty() {
-    final Map<String, Object> map =
-        Map.of("provenance", "not-a-real-provenance", "when", "2026-06-13T10:13:50Z");
-    assertTrue(InterventionReader.fromOutputMap(map).isEmpty());
-  }
-
-  @Test
-  void fromOutputMap_without_when_is_empty() {
-    final Map<String, Object> map = Map.of("provenance", "operator-manual", "what", "something");
-    assertTrue(InterventionReader.fromOutputMap(map).isEmpty());
-  }
-
-  @Test
-  void fromOutputMap_with_unparseable_when_is_empty() {
-    final Map<String, Object> map =
-        Map.of("provenance", "operator-manual", "when", "not-an-instant");
-    assertTrue(InterventionReader.fromOutputMap(map).isEmpty());
-  }
-
-  @Test
-  void unknown_key_survives_into_details() {
-    final Intervention original =
-        new Intervention(
-            Provenance.OPERATOR_MANUAL,
-            Instant.parse("2026-06-13T10:13:50Z"),
+  void details_are_carried_through() {
+    final InterventionWire wire =
+        new InterventionWire(
+            "operator-manual",
+            WHEN,
             "nft delete ...",
-            ProblemRef.of(Checkpoint.SYSTEMD_ADAPTER, Symptom.CONNECTION_REFUSED),
+            "systemd-adapter/connection-refused",
             Optional.empty(),
             Map.of("futureField", "tomorrow-value"));
 
-    final Optional<Intervention> reconstructed =
-        InterventionReader.fromOutputMap(original.toOutputMap());
-
-    assertTrue(reconstructed.isPresent());
-    final Intervention intervention = reconstructed.get();
+    final Intervention intervention = InterventionReader.fromWire(wire).orElseThrow();
     assertEquals("tomorrow-value", intervention.details().get("futureField"));
-    assertFalse(intervention.details().containsKey("provenance"));
-    assertFalse(intervention.details().containsKey("when"));
-    assertFalse(intervention.details().containsKey("what"));
-    assertFalse(intervention.details().containsKey("problem"));
-    assertFalse(intervention.details().containsKey("prescriptionRef"));
   }
 
   @Test
-  void absent_prescriptionRef_key_yields_empty_optional() {
-    final Map<String, Object> map =
-        Map.of(
-            "provenance", "operator-manual",
-            "when", "2026-06-13T10:13:50Z",
-            "what", "foo",
-            "problem", "systemd-adapter/connection-refused");
-
-    final Optional<Intervention> reconstructed = InterventionReader.fromOutputMap(map);
-
-    assertTrue(reconstructed.isPresent());
-    assertTrue(reconstructed.get().prescriptionRef().isEmpty());
+  void absent_prescriptionRef_yields_empty_optional() {
+    final InterventionWire wire =
+        new InterventionWire(
+            "operator-manual",
+            WHEN,
+            "foo",
+            "systemd-adapter/connection-refused",
+            Optional.empty(),
+            Map.of());
+    assertTrue(InterventionReader.fromWire(wire).orElseThrow().prescriptionRef().isEmpty());
   }
 
   @Test
   void unparseable_prescriptionRef_yields_empty_optional() {
-    final Map<String, Object> map =
-        Map.of(
-            "provenance", "operator-manual",
-            "when", "2026-06-13T10:13:50Z",
-            "what", "foo",
-            "problem", "systemd-adapter/connection-refused",
-            "prescriptionRef", "not-a-valid-ref");
-
-    final Optional<Intervention> reconstructed = InterventionReader.fromOutputMap(map);
-
-    assertTrue(reconstructed.isPresent());
-    assertTrue(reconstructed.get().prescriptionRef().isEmpty());
-  }
-
-  @Test
-  void fromOutputMap_without_problem_is_empty() {
-    final Map<String, Object> map =
-        Map.of(
-            "provenance", "operator-manual", "when", "2026-06-13T10:13:50Z", "what", "something");
-    assertTrue(InterventionReader.fromOutputMap(map).isEmpty());
-  }
-
-  @Test
-  void fromOutputMap_with_unparseable_problem_is_empty() {
-    final Map<String, Object> map =
-        Map.of(
-            "provenance", "operator-manual",
-            "when", "2026-06-13T10:13:50Z",
-            "what", "something",
-            "problem", "not-a-checkpoint/x");
-    assertTrue(InterventionReader.fromOutputMap(map).isEmpty());
+    final InterventionWire wire =
+        new InterventionWire(
+            "operator-manual",
+            WHEN,
+            "foo",
+            "systemd-adapter/connection-refused",
+            Optional.of("not-a-valid-ref"),
+            Map.of());
+    assertTrue(InterventionReader.fromWire(wire).orElseThrow().prescriptionRef().isEmpty());
   }
 }

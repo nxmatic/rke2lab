@@ -35,7 +35,7 @@ class ReadinessAuthorityTest {
   }
 
   private static Action action(Document verdict) {
-    return CODEC.decode(verdict.payload(), ReadinessVerdict.class).action();
+    return CODEC.decode(verdict, ReadinessVerdict.class).action();
   }
 
   private static String serialize(JsonNode node) {
