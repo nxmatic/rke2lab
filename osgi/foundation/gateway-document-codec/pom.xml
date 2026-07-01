@@ -19,10 +19,15 @@
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
-    <!-- jackson's own Optional support (Jdk8Module), registered explicitly by DocumentCodec. A
-         realm-isolated jackson artifact, so it is nested on this bundle's Bundle-ClassPath in bnd.bnd
-         (like jackson-datatype-jsr310 in manifests-cdk8s) — one copy per realm, bound to that realm's
-         databind. -->
+    <!-- jackson's own official datatype modules, registered EXPLICITLY by DocumentCodec: jsr310's
+         JavaTimeModule (Instant ↔ ISO-8601, replacing a hand-rolled module) and jdk8's Jdk8Module
+         (Optional). Realm-isolated jackson artifacts imported bundle-to-bundle like jackson-databind
+         (NOT nested — explicit registration means no ServiceLoader discovery drives them; the staging
+         closure keeps each realm its own copy bound to that realm's databind). -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.datatype</groupId>
+      <artifactId>jackson-datatype-jsr310</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.datatype</groupId>
       <artifactId>jackson-datatype-jdk8</artifactId>

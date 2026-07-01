@@ -3,8 +3,9 @@ package io.nxmatic.rke2lab.world.gateway.codec;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
-import io.nxmatic.rke2lab.world.gateway.codec.internal.InstantModule;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.nxmatic.rke2lab.world.gateway.codec.internal.WireEnumModule;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.DocumentContract;
@@ -21,22 +22,25 @@ import java.io.UncheckedIOException;
  *
  * <p>Modules are registered EXPLICITLY (never {@code findAndRegisterModules} — that {@code
  * ServiceLoader<Module>} discovery is the realm-isolation regression this project already closed):
- * two of ours — {@link WireEnumModule} (seam enum ↔ slug) and {@link InstantModule} (Instant ↔
- * ISO-8601) — plus jackson's own {@link Jdk8Module} for {@code Optional} (an absent key
+ * one of ours — {@link WireEnumModule} (seam enum ↔ slug) — plus jackson's own official datatype
+ * modules {@link JavaTimeModule} (for {@code Instant}, rendered ISO-8601 via {@code
+ * WRITE_DATES_AS_TIMESTAMPS} disabled) and {@link Jdk8Module} for {@code Optional} (an absent key
  * deserializes to {@code Optional.empty()}; paired with {@code NON_ABSENT} an empty Optional omits
- * its key). Like {@code jackson-datatype-jsr310} in {@code manifests-cdk8s}, {@code
- * jackson-datatype-jdk8} is a realm-isolated jackson artifact nested on this bundle's
- * Bundle-ClassPath. Runtime schema validation is WIRED but OFF by default (the embedded posture);
- * the remote capstone flips it on via {@link #withValidation(boolean)}.
+ * its key). Both {@code jackson-datatype-jsr310} and {@code jackson-datatype-jdk8} are
+ * realm-isolated jackson artifacts imported bundle-to-bundle (NOT nested — we register explicitly,
+ * so no ServiceLoader discovery drives them; the staging closure keeps each realm its own copy).
+ * Runtime schema validation is WIRED but OFF by default (the embedded posture); the remote capstone
+ * flips it on via {@link #withValidation(boolean)}.
  */
 public final class DocumentCodec {
 
   private static final ObjectMapper MAPPER =
       new ObjectMapper()
           .registerModule(new WireEnumModule())
-          .registerModule(new InstantModule())
+          .registerModule(new JavaTimeModule())
           .registerModule(new Jdk8Module())
-          .setDefaultPropertyInclusion(JsonInclude.Include.NON_ABSENT);
+          .setDefaultPropertyInclusion(JsonInclude.Include.NON_ABSENT)
+          .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
   private final boolean validationEnabled;
 
