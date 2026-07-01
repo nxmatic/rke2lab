@@ -8,8 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.nxmatic.rke2lab.doctor.internal.*;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
 import io.nxmatic.rke2lab.doctor.records.Expectation;
@@ -17,14 +15,19 @@ import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.doctor.testkit.FakeSpecialist;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.ObservationWire;
 import io.nxmatic.rke2lab.world.gateway.port.Patient;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessCheckpoint;
+import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -40,6 +43,7 @@ class GeneralistConsultDocumentTest {
   private static final Patient PATIENT = new Patient("organization", "rke2lab", "test");
   private static final Instant RECORDED_AT = Instant.parse("2026-06-28T00:00:00Z");
   private static final ObjectMapper mapper = new ObjectMapper();
+  private static final DocumentCodec codec = new DocumentCodec();
 
   @Test
   void consult_document_returns_consultation_with_narration_and_diagnosis_block() {
@@ -155,25 +159,27 @@ class GeneralistConsultDocumentTest {
     return Generalist.builder().specialists(List.of(new FakeSpecialist())).access(access).build();
   }
 
-  /** A checkpoint Document carrying recordedAt + the observations list (each toOutputMap). */
+  /**
+   * A consult checkpoint Document carrying recordedAt + the observations, encoded via the codec.
+   */
   private static Document checkpointWith(String scenarioId, Observation... observations) {
-    final ObjectNode payload = mapper.createObjectNode();
-    payload.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, scenarioId);
-    payload.put(WorldGatewayCatalog.FIELD_RECORDED_AT, RECORDED_AT.toString());
-    final ArrayNode array = payload.putArray(WorldGatewayCatalog.FIELD_OBSERVATIONS);
-    for (Observation observation : observations) {
-      array.add(mapper.valueToTree(observation.toOutputMap()));
-    }
+    final List<ObservationWire> wires =
+        List.of(observations).stream().map(GeneralistConsultDocumentTest::toWire).toList();
+    final ReadinessCheckpoint checkpoint =
+        new ReadinessCheckpoint(
+            scenarioId, Optional.empty(), Optional.empty(), Optional.of(RECORDED_AT), wires);
     return new Document(
-        Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), serialize(payload));
+        Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), codec.encode(checkpoint));
   }
 
-  private static String serialize(JsonNode node) {
-    try {
-      return mapper.writeValueAsString(node);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException(e);
-    }
+  /**
+   * The doctor {@link Observation} as its seam {@link ObservationWire} twin (symptom id → slug).
+   */
+  private static ObservationWire toWire(Observation observation) {
+    final Optional<SymptomKind> symptom =
+        observation.symptom().flatMap(s -> SymptomKind.parse(s.id()));
+    return new ObservationWire(
+        observation.status(), observation.summary(), symptom, observation.details());
   }
 
   private static JsonNode parse(String payload) {

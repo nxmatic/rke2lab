@@ -1,5 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bdd;
 
+import io.nxmatic.rke2lab.world.gateway.port.ObservationWire;
 import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -9,11 +10,16 @@ import java.util.Optional;
  * The host-flat snapshot a readiness probe produces — the host-side twin of the doctor's {@code
  * io.nxmatic.rke2lab.doctor.records.Observation}, carrying the same {@code status}/{@code
  * summary}/{@code symptom}/{@code details} but typed against the seam's {@link SymptomKind} rather
- * than the bundle-only doctor {@code Symptom}. The host reasons on the typed fields; only {@link
- * #toOutputMap()} renders the flat map, and only at the consult boundary (inside the checkpoint
- * Document payload), where OSGi's {@code Generalist.observationsFrom} reconstructs the doctor
- * {@code Observation} from it. This view never crosses the realm boundary — it is host-internal
- * scaffolding, so it is package-private.
+ * than the bundle-only doctor {@code Symptom}. The host reasons on the typed fields; it renders in
+ * two distinct places, at two distinct boundaries:
+ *
+ * <ul>
+ *   <li>{@link #toWire()} — the seam boundary: the observation as an {@link ObservationWire} nested
+ *       in the {@code readiness-checkpoint} Document the consult carries, where OSGi's {@code
+ *       Generalist} reconstructs the doctor {@code Observation}.
+ *   <li>{@link #toOutputMap()} — the Pulumi output boundary: the flat map the launch summary fans
+ *       into the resource's outputs (host-internal; never crosses the realm boundary).
+ * </ul>
  *
  * <p>{@code status} is the gate's contract value ({@code "ok"}, {@code "failed"}, {@code
  * "degraded"}, {@code "deferred-preview"}); {@code symptom} is present only on a non-ok result and
@@ -27,9 +33,7 @@ import java.util.Optional;
 public record ObservationView(
     String status, Optional<SymptomKind> symptom, String summary, Map<String, Object> details) {
 
-  /**
-   * The flat-map key under which the symptom slug travels — matches {@code Symptom.ENVELOPE_KEY}.
-   */
+  /** Output-map key under which a non-ok snapshot records its symptom slug. */
   static final String SYMPTOM_KEY = "symptom";
 
   public ObservationView {
@@ -59,9 +63,21 @@ public record ObservationView(
   }
 
   /**
-   * The flat map view: {@code details} plus the canonical {@code status}/{@code summary} keys and,
-   * when present, the symptom slug under {@link #SYMPTOM_KEY}. Identical to the doctor {@code
-   * Observation.toOutputMap()} shape, so the checkpoint Document the consult carries is unchanged.
+   * The seam wire view: this host snapshot as an {@link ObservationWire} nested in a {@code
+   * readiness-checkpoint}. The typed {@link SymptomKind} carries straight through (the codec
+   * renders it as its slug); {@code details} is carried as-is. OSGi's {@code
+   * Generalist.observationsFrom} maps the wire to the doctor {@code Observation} — no doctor type
+   * crosses the seam.
+   */
+  public ObservationWire toWire() {
+    return new ObservationWire(status, summary, symptom, details);
+  }
+
+  /**
+   * The Pulumi output view: {@code details} plus the canonical {@code status}/{@code summary} keys
+   * and, when present, the symptom slug under {@link #SYMPTOM_KEY}. This is the host-internal flat
+   * map the launch summary fans into the resource's Pulumi outputs — a distinct concern from {@link
+   * #toWire()} (the seam), and it never crosses the realm boundary.
    */
   public Map<String, Object> toOutputMap() {
     final LinkedHashMap<String, Object> map = new LinkedHashMap<>(details);

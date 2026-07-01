@@ -21,20 +21,12 @@ class DocumentTest {
   }
 
   @Test
-  void catalogConstantsAreTheCanonicalStrings() {
-    // The single source of truth for field keys (the schema) — call sites must reference these,
-    // never literals. Closed value domains (domain, coordinate, action, symptom kind) are now
-    // typed enums and tested in GatewayVocabularyTest.
-    assertEquals("scenarioId", WorldGatewayCatalog.FIELD_SCENARIO_ID);
-    assertEquals("failed", WorldGatewayCatalog.FIELD_FAILED);
-    assertEquals("override", WorldGatewayCatalog.FIELD_OVERRIDE);
-  }
-
-  @Test
   void consultationFieldsArePinned() {
+    // The remaining FIELD_* pin the consultation coordinate's keys (the last hand-written wire
+    // shape, migrated in T9); the readiness-checkpoint/verdict/intervention coordinates are now
+    // typed wire-records whose components ARE the schema (projected by SCHEMA_CONCORD).
+    assertEquals("scenarioId", WorldGatewayCatalog.FIELD_SCENARIO_ID);
     assertEquals("narration", WorldGatewayCatalog.FIELD_NARRATION);
     assertEquals("diagnosisAdoc", WorldGatewayCatalog.FIELD_DIAGNOSIS_ADOC);
-    assertEquals("observations", WorldGatewayCatalog.FIELD_OBSERVATIONS);
-    assertEquals("recordedAt", WorldGatewayCatalog.FIELD_RECORDED_AT);
   }
 }

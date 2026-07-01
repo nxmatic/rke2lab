@@ -10,7 +10,7 @@ import java.util.Optional;
  * doctor-records). {@code slug()} is the wire value placed in the checkpoint's {@code symptomKind}
  * field.
  */
-public enum SymptomKind {
+public enum SymptomKind implements WireEnum {
   CONNECTION_REFUSED("connection-refused"),
   TIMEOUT("timeout"),
   KUBECONFIG_MISSING("kubeconfig-missing"),
@@ -23,6 +23,7 @@ public enum SymptomKind {
     this.slug = slug;
   }
 
+  @Override
   public String slug() {
     return slug;
   }

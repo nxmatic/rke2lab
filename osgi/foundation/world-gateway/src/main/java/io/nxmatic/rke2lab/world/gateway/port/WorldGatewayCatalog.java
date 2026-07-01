@@ -9,33 +9,14 @@ package io.nxmatic.rke2lab.world.gateway.port;
  */
 public final class WorldGatewayCatalog {
 
-  /** Checkpoint payload: the scenario id (e.g. the systemd-adapter checkpoint slug). */
+  /** Consultation payload: the scenario id (e.g. the systemd-adapter checkpoint slug). */
   public static final String FIELD_SCENARIO_ID = "scenarioId";
 
-  /** Checkpoint payload: whether the checkpoint failed. */
-  public static final String FIELD_FAILED = "failed";
-
-  /** Checkpoint payload: the operator's raw severity override for this scenario, or absent. */
-  public static final String FIELD_OVERRIDE = "override";
-
-  /** Checkpoint payload: the symptom's plain-text narration. */
+  /** Consultation payload: the symptom's plain-text narration. */
   public static final String FIELD_NARRATION = "narration";
 
   /** Consultation payload: the specialists' rendered AsciiDoc diagnosis. */
   public static final String FIELD_DIAGNOSIS_ADOC = "diagnosisAdoc";
-
-  /**
-   * Checkpoint payload: the captured observations, a list of the flat {@code
-   * Observation.toOutputMap} shape (status, summary, the symptom slug under its envelope key,
-   * details). One for the systemd-adapter checkpoint, N (one per phase) for cluster-readiness — a
-   * uniform schema across both consult paths, so OSGi keeps every observation in the reconstructed
-   * record (no information lost at the seam). OSGi routes on the first observation carrying a
-   * symptom.
-   */
-  public static final String FIELD_OBSERVATIONS = "observations";
-
-  /** Checkpoint payload: the host's run instant (ISO-8601 string) for expectation timestamps. */
-  public static final String FIELD_RECORDED_AT = "recordedAt";
 
   /**
    * Visit payload: the monotonically increasing stack version of the history entry the visit was

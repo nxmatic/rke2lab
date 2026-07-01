@@ -24,14 +24,15 @@ import io.nxmatic.rke2lab.doctor.spi.ClinicalReasoning;
 import io.nxmatic.rke2lab.doctor.spi.Clinician;
 import io.nxmatic.rke2lab.doctor.spi.Specialist;
 import io.nxmatic.rke2lab.domain.annotations.Transitional;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.ObservationWire;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -67,6 +68,7 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
   private final InterventionJournal interventionJournal;
   private final InterventionLedgerReader ledgerReader = new InterventionLedgerReader();
   private final ObjectMapper mapper = new ObjectMapper();
+  private final DocumentCodec codec = new DocumentCodec();
 
   private Generalist(
       List<Specialist> specialists,
@@ -189,9 +191,9 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
   @Override
   public io.nxmatic.rke2lab.world.gateway.port.Document consult(
       io.nxmatic.rke2lab.world.gateway.port.Document checkpoint) {
-    final JsonNode payload = parse(checkpoint.payload());
-    final String scenarioId = payload.path(WorldGatewayCatalog.FIELD_SCENARIO_ID).asText();
-    final List<Observation> observations = observationsFrom(payload);
+    final ReadinessCheckpoint decoded = codec.decode(checkpoint, ReadinessCheckpoint.class);
+    final String scenarioId = decoded.scenarioId();
+    final List<Observation> observations = observationsFrom(decoded);
     // Route on the first observation that carries a symptom (systemd has one; cluster has one per
     // phase, only the failing one is symptom-bearing). The record keeps ALL of them — the seam
     // loses no information.
@@ -205,7 +207,10 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
     final RemediationPlan plan = consult(symptom, routed);
     final ConsultationReport report = new ConsultationReport(scenarioId, observations, plan);
     final Instant recordedAt =
-        Instant.parse(payload.path(WorldGatewayCatalog.FIELD_RECORDED_AT).asText());
+        decoded
+            .recordedAt()
+            .orElseThrow(
+                () -> new IllegalArgumentException("consult checkpoint carries no recordedAt"));
 
     final ObjectNode out = mapper.createObjectNode();
     out.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, scenarioId);
@@ -222,26 +227,16 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
   }
 
   /**
-   * Rebuilds each captured Observation from the checkpoint's {@code observations} list — each entry
-   * is the flat {@code Observation.toOutputMap} shape (status, summary, the symptom slug under its
-   * envelope key, and the remaining details). The reconstruction mirrors {@code
-   * ConsultationReportReader.observationFrom}, OSGi-side.
+   * Maps each captured {@link ObservationWire} to the doctor's own {@link Observation}: the wire's
+   * typed {@code SymptomKind} slug resolves to a {@link Symptom} (the two share one kebab-case
+   * vocabulary), the rest carries through. No doctor type crossed the seam — the mapping happens
+   * here, OSGi-side.
    */
-  private List<Observation> observationsFrom(JsonNode payload) {
+  private List<Observation> observationsFrom(ReadinessCheckpoint checkpoint) {
     final List<Observation> observations = new ArrayList<>();
-    for (JsonNode element : payload.path(WorldGatewayCatalog.FIELD_OBSERVATIONS)) {
-      final String status = element.path("status").asText();
-      final String summary = element.path("summary").asText();
-      final Optional<Symptom> symptom = Symptom.parse(element.path(Symptom.ENVELOPE_KEY).asText());
-      final Map<String, Object> details = new LinkedHashMap<>();
-      final var names = element.fieldNames();
-      while (names.hasNext()) {
-        final String key = names.next();
-        if (!key.equals("status") && !key.equals("summary") && !key.equals(Symptom.ENVELOPE_KEY)) {
-          details.put(key, element.path(key).asText());
-        }
-      }
-      observations.add(Observation.of(status, symptom, summary, details));
+    for (ObservationWire wire : checkpoint.observations()) {
+      final Optional<Symptom> symptom = wire.symptom().flatMap(k -> Symptom.parse(k.slug()));
+      observations.add(Observation.of(wire.status(), symptom, wire.summary(), wire.details()));
     }
     return observations;
   }
@@ -274,18 +269,6 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
       }
     }
     return block.toString();
-  }
-
-  /**
-   * Parse the checkpoint payload String with doctor-core's own jackson (no JsonNode crosses the
-   * seam).
-   */
-  private JsonNode parse(String payload) {
-    try {
-      return mapper.readTree(payload);
-    } catch (JsonProcessingException e) {
-      throw new IllegalArgumentException("malformed checkpoint payload", e);
-    }
   }
 
   /** Serialize the consultation payload tree back to the String the seam carries. */

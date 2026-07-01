@@ -1,8 +1,5 @@
 package io.nxmatic.rke2lab.doctor.internal;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nxmatic.rke2lab.doctor.records.Severity;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Action;
@@ -10,8 +7,8 @@ import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
-import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.util.Map;
 import org.osgi.service.component.annotations.Component;
 
@@ -38,22 +35,15 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
 
   private static final Severity DEFAULT_INTRINSIC = Severity.WARNING;
 
-  private final ObjectMapper mapper = new ObjectMapper();
   private final DocumentCodec codec = new DocumentCodec();
 
   @Override
   public Document assess(Document checkpoint) {
-    final JsonNode payload = parse(checkpoint.payload());
-    final String scenarioId = payload.path(WorldGatewayCatalog.FIELD_SCENARIO_ID).asText("");
-    final String override =
-        payload.hasNonNull(WorldGatewayCatalog.FIELD_OVERRIDE)
-            ? payload.get(WorldGatewayCatalog.FIELD_OVERRIDE).asText()
-            : null;
+    final ReadinessCheckpoint decoded = codec.decode(checkpoint, ReadinessCheckpoint.class);
+    final String scenarioId = decoded.scenarioId();
 
     final Severity effective =
-        override != null
-            ? Severity.parse(override).orElseGet(() -> intrinsicFor(scenarioId))
-            : intrinsicFor(scenarioId);
+        decoded.override().flatMap(Severity::parse).orElseGet(() -> intrinsicFor(scenarioId));
 
     final Action action = effective == Severity.CRITICAL ? Action.STOP : Action.CONTINUE_DEGRADED;
     final ReadinessVerdict verdict =
@@ -64,13 +54,5 @@ public final class DefaultReadinessAuthority implements ReadinessAuthority {
 
   private Severity intrinsicFor(String scenarioId) {
     return INTRINSIC.getOrDefault(scenarioId, DEFAULT_INTRINSIC);
-  }
-
-  private JsonNode parse(String payload) {
-    try {
-      return mapper.readTree(payload);
-    } catch (JsonProcessingException e) {
-      throw new IllegalArgumentException("malformed checkpoint payload", e);
-    }
   }
 }

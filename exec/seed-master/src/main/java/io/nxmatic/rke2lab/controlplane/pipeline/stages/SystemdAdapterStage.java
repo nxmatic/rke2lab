@@ -3,7 +3,6 @@ package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
@@ -24,10 +23,12 @@ import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessVerdict;
 import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -269,14 +270,15 @@ public final class SystemdAdapterStage {
    * #checkpointDocument} (the verdict checkpoint the authority reads).
    */
   private Document consultCheckpoint(ObservationView observation) {
-    final ObjectNode payload = mapper.createObjectNode();
-    payload.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, SCENARIO_ID);
-    payload.put(WorldGatewayCatalog.FIELD_RECORDED_AT, recordedAt.toString());
-    payload
-        .putArray(WorldGatewayCatalog.FIELD_OBSERVATIONS)
-        .add(mapper.valueToTree(observation.toOutputMap()));
+    final ReadinessCheckpoint checkpoint =
+        new ReadinessCheckpoint(
+            SCENARIO_ID,
+            Optional.empty(),
+            Optional.empty(),
+            Optional.of(recordedAt),
+            List.of(observation.toWire()));
     return new Document(
-        Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), serialize(payload));
+        Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), codec.encode(checkpoint));
   }
 
   private ObservationView degradedObservation(Throwable failure) {
@@ -295,15 +297,15 @@ public final class SystemdAdapterStage {
 
   /** The checkpoint outcome as a structured Document for the readiness authority. */
   private Document checkpointDocument(String scenarioId) {
-    final ObjectNode payload = mapper.createObjectNode();
-    payload.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, scenarioId);
-    payload.put(WorldGatewayCatalog.FIELD_FAILED, true);
-    policy
-        .readiness()
-        .rawOverride(scenarioId)
-        .ifPresent(value -> payload.put(WorldGatewayCatalog.FIELD_OVERRIDE, value));
+    final ReadinessCheckpoint checkpoint =
+        new ReadinessCheckpoint(
+            scenarioId,
+            Optional.of(true),
+            policy.readiness().rawOverride(scenarioId),
+            Optional.empty(),
+            List.of());
     return new Document(
-        Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), serialize(payload));
+        Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), codec.encode(checkpoint));
   }
 
   /** Parse a verdict payload String with the host's own jackson (no JsonNode crosses the seam). */
@@ -312,15 +314,6 @@ public final class SystemdAdapterStage {
       return mapper.readTree(payload);
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("malformed verdict payload", e);
-    }
-  }
-
-  /** Serialize a checkpoint payload tree to the String the seam carries. */
-  private String serialize(JsonNode node) {
-    try {
-      return mapper.writeValueAsString(node);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("could not serialize checkpoint payload", e);
     }
   }
 

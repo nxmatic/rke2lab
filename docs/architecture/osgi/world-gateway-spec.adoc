@@ -188,6 +188,19 @@ UNWRAPS that framing — one `intervention` Document per intervention — so one
 shape, and `InterventionReader.fromWire(InterventionWire)` replaced a permissive
 `fromOutputMap(Object)` (a typed door, not an open one).
 
+The `readiness-checkpoint` wire-record `ReadinessCheckpoint(scenarioId, failed?, override?,
+recordedAt?, observations)` is the nesting exemplar: it holds a `List<ObservationWire>`, and the
+projection recurses into that nested wire-record to emit an `array` of `object`. Two producer
+concerns union into this one shape — the VERDICT checkpoint (`ReadinessAuthority.assess` reads
+`scenarioId`/`override`) and the CONSULT checkpoint (the doctor's `consult` reads `recordedAt` +
+`observations`) — so every field beyond `scenarioId` is `Optional`/`List`, each producer filling only
+its concern (legitimately one coordinate, one schema: both are the same checkpoint object, unlike the
+`intervention` bug above). The nested `ObservationWire(status, summary, symptom?, details)` holds the
+`SymptomKind` **typed** (the routing key the loose slug string lacked) and an open `details` bag; the
+host maps its `ObservationView` to it, and OSGi maps `ObservationWire` back to the doctor's own
+`Observation` (`SymptomKind.slug()` → `Symptom.id()`, the shared kebab-case vocabulary) — no doctor
+type crosses the seam.
+
 An opaque sub-tree a producer copies verbatim (a blob it does not re-describe, e.g. the host
 forwarding an OSGi-written `consultationReport`) is modelled as an open slot (`Map`/`List`), for
 which the projection emits an open `object` — the contract is "this slot is an object", its inner

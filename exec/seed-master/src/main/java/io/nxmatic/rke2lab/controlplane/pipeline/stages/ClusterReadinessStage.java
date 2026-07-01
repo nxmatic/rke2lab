@@ -3,8 +3,6 @@ package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
@@ -19,16 +17,21 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifi
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.Domain;
+import io.nxmatic.rke2lab.world.gateway.port.ObservationWire;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessCheckpoint;
 import io.nxmatic.rke2lab.world.gateway.port.WorldGatewayCatalog;
 import java.time.Instant;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.stream.StreamSupport;
 
 /**
  * Cluster-readiness checkpoint, played as the BDD scenario it documents — the second checkpoint,
@@ -62,6 +65,8 @@ public final class ClusterReadinessStage {
   private final Instant recordedAt;
 
   private final ObjectMapper mapper = new ObjectMapper();
+
+  private final DocumentCodec codec = new DocumentCodec();
 
   public ClusterReadinessStage(
       BootstrapConfig config,
@@ -245,21 +250,20 @@ public final class ClusterReadinessStage {
   }
 
   /**
-   * The consult checkpoint Document, serialized at the consult boundary: every phase observation
-   * (flat {@code ObservationView.toOutputMap} shape — the symptom slug travels in each) merged into
-   * one checkpoint plus the run's stable {@code recordedAt}, so OSGi reconstructs them all and
-   * routes on the first symptom-bearing one. The only place the host renders the wire shape.
+   * The consult checkpoint Document: every phase observation ({@link ObservationView#toWire()})
+   * plus the run's stable {@code recordedAt}, unioned into one {@link ReadinessCheckpoint} the
+   * codec encodes, so OSGi reconstructs them all and routes on the first symptom-bearing one.
    */
   private Document consultCheckpoint(Iterable<ObservationView> observations) {
-    final ObjectNode payload = mapper.createObjectNode();
-    payload.put(WorldGatewayCatalog.FIELD_SCENARIO_ID, SCENARIO_ID);
-    payload.put(WorldGatewayCatalog.FIELD_RECORDED_AT, recordedAt.toString());
-    final ArrayNode array = payload.putArray(WorldGatewayCatalog.FIELD_OBSERVATIONS);
-    for (ObservationView observation : observations) {
-      array.add(mapper.valueToTree(observation.toOutputMap()));
-    }
+    final List<ObservationWire> wires =
+        StreamSupport.stream(observations.spliterator(), false)
+            .map(ObservationView::toWire)
+            .toList();
+    final ReadinessCheckpoint checkpoint =
+        new ReadinessCheckpoint(
+            SCENARIO_ID, Optional.empty(), Optional.empty(), Optional.of(recordedAt), wires);
     return new Document(
-        Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), serialize(payload));
+        Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), codec.encode(checkpoint));
   }
 
   private JsonNode parse(String payload) {
@@ -267,14 +271,6 @@ public final class ClusterReadinessStage {
       return mapper.readTree(payload);
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("malformed consultation payload", e);
-    }
-  }
-
-  private String serialize(JsonNode node) {
-    try {
-      return mapper.writeValueAsString(node);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("could not serialize checkpoint payload", e);
     }
   }
 
