@@ -1,6 +1,8 @@
 # @codebase
 # Build outputs
 target/
+# Alternate build directory used by the `nxmatic` Maven profile (parallel builds)
+target~nxmatic/
 
 # OS
 .DS_Store

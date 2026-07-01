@@ -444,6 +444,12 @@
   </build>
 
   <profiles>
+    <profile>
+      <id>nxmatic</id>
+      <build>
+        <directory>target~nxmatic</directory>
+      </build>
+    </profile>
     <!-- Test selection by tag. The default build excludes 'live | spike'
          (see the surefire.excludedGroups property). These profiles re-include
          or narrow by tag; -Dgroups=… / -DexcludedGroups=… still work for ad hoc
