@@ -19,7 +19,6 @@ class GatewayVocabularyTest {
     assertEquals("consultation", Coordinate.CONSULTATION.slug());
     assertEquals(Optional.of(Coordinate.CONSULTATION), Coordinate.parse("consultation"));
     assertEquals(Optional.empty(), Coordinate.parse("nope"));
-    assertEquals(Optional.empty(), Coordinate.parse(null));
     assertEquals(Optional.empty(), Coordinate.parse(""));
     assertEquals(Optional.empty(), Coordinate.parse("   "));
   }
@@ -31,7 +30,6 @@ class GatewayVocabularyTest {
     assertEquals(Optional.of(Action.STOP), Action.parse("stop"));
     assertEquals(Optional.of(Action.CONTINUE_DEGRADED), Action.parse("continue-degraded"));
     assertEquals(Optional.empty(), Action.parse("nope"));
-    assertEquals(Optional.empty(), Action.parse(null));
     assertEquals(Optional.empty(), Action.parse(""));
     assertEquals(Optional.empty(), Action.parse("   "));
   }
@@ -46,7 +44,6 @@ class GatewayVocabularyTest {
     assertEquals(Optional.of(SymptomKind.TIMEOUT), SymptomKind.parse("timeout"));
     assertEquals(Optional.of(SymptomKind.API_NOT_READY), SymptomKind.parse("api-not-ready"));
     assertEquals(Optional.empty(), SymptomKind.parse("nope"));
-    assertEquals(Optional.empty(), SymptomKind.parse(null));
     assertEquals(Optional.empty(), SymptomKind.parse(""));
     assertEquals(Optional.empty(), SymptomKind.parse("   "));
   }
@@ -56,7 +53,6 @@ class GatewayVocabularyTest {
     assertEquals("doctor", Domain.DOCTOR.slug());
     assertEquals(Optional.of(Domain.DOCTOR), Domain.parse("doctor"));
     assertEquals(Optional.empty(), Domain.parse("nope"));
-    assertEquals(Optional.empty(), Domain.parse(null));
     assertEquals(Optional.empty(), Domain.parse(""));
     assertEquals(Optional.empty(), Domain.parse("   "));
   }

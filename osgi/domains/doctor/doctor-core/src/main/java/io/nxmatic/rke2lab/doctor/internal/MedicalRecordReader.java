@@ -46,7 +46,7 @@ public final class MedicalRecordReader {
         // failure and keep folding. A malformed payload cannot yield an identity (the codec throws
         // before the version/when are readable), so it degrades to the unknown-entry identity.
         failures.add(
-            new MedicalRecordReconstructionException.EntryFailure(e.version, e.when, e.getCause()));
+            new MedicalRecordReconstructionException.EntryFailure(e.version, e.when, e.failure()));
       }
     }
 
@@ -115,11 +115,20 @@ public final class MedicalRecordReader {
     private static final long serialVersionUID = 1L;
     private final int version;
     private final transient Optional<Instant> when;
+    private final transient Throwable failure;
 
-    EntryReadException(int version, Optional<Instant> when, Throwable cause) {
-      super(cause);
+    EntryReadException(int version, Optional<Instant> when, Throwable failure) {
+      super(failure);
       this.version = version;
       this.when = when;
+      this.failure = failure;
+    }
+
+    /**
+     * The wrapped decode failure — always present (unlike the JDK's {@code @Nullable getCause}).
+     */
+    Throwable failure() {
+      return failure;
     }
   }
 }

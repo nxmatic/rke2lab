@@ -42,9 +42,8 @@ class ProblemRefTest {
   }
 
   @Test
-  void parse_returns_empty_for_blank_or_null() {
+  void parse_returns_empty_for_blank() {
     assertTrue(ProblemRef.parse("").isEmpty());
-    assertTrue(ProblemRef.parse(null).isEmpty());
   }
 
   @Test

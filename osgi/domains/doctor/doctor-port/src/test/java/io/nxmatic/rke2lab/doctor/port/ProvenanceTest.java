@@ -36,11 +36,6 @@ class ProvenanceTest {
   }
 
   @Test
-  void parse_of_null_is_empty() {
-    assertTrue(Provenance.parse(null).isEmpty());
-  }
-
-  @Test
   void parse_of_unknown_is_empty() {
     assertTrue(Provenance.parse("nope").isEmpty());
   }

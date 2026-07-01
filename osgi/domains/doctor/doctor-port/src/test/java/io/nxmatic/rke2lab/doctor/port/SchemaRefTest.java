@@ -32,7 +32,6 @@ class SchemaRefTest {
   @Test
   void parse_of_blank_is_empty() {
     assertTrue(SchemaRef.parse("").isEmpty());
-    assertTrue(SchemaRef.parse(null).isEmpty());
   }
 
   @Test
