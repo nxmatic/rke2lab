@@ -5,6 +5,7 @@
 // (Cidr#parseAddress made package-private, ClusterNetworkBlueprint#topology folded into the
 // constant).
 @GovernedBy(value = StagingGate.SPEC_COVERAGE, level = EnforcementLevel.WARN)
+@org.jspecify.annotations.NullMarked
 package io.nxmatic.rke2lab.netplan.port;
 
 import io.nxmatic.rke2lab.domain.annotations.EnforcementLevel;

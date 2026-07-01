@@ -32,4 +32,5 @@
  *       Grammar</a> — the staged-synthesis pattern used here.
  * </ul>
  */
+@org.jspecify.annotations.NullMarked
 package io.nxmatic.rke2lab.manifests.systemd;

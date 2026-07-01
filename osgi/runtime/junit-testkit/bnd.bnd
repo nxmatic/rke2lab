@@ -15,6 +15,7 @@ Export-Package: \
 # a consumer that has no slf4j provider (e.g. a non-jGiven in-container test) still wires. A bundle is
 # a superset of a plain jar — this keeps both uses true from one artifact.
 Import-Package: \
+    !org.jspecify.annotations, \
     org.osgi.framework.launch;resolution:=optional, \
     org.apache.felix.framework.util;resolution:=optional, \
     org.osgi.service.component.runtime;resolution:=optional, \

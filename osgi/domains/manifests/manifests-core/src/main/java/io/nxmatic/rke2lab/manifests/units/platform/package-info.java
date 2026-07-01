@@ -18,4 +18,5 @@
  *       Architecture</a> — the unit model, synthesis flow, and Chart-vs-Construct rule.
  * </ul>
  */
+@org.jspecify.annotations.NullMarked
 package io.nxmatic.rke2lab.manifests.units.platform;

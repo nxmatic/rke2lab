@@ -28,4 +28,5 @@
  *       Host Assets Architecture</a> — the daemonset-to-host asset trampoline.
  * </ul>
  */
+@org.jspecify.annotations.NullMarked
 package io.nxmatic.rke2lab.manifests.units.runtime;

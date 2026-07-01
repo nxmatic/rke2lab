@@ -5,6 +5,7 @@
  * {@code ERROR} default once a systemd design spec exists.
  */
 @GovernedBy(value = StagingGate.SPEC_COVERAGE, level = EnforcementLevel.WARN)
+@org.jspecify.annotations.NullMarked
 package io.nxmatic.rke2lab.systemd.internal;
 
 import io.nxmatic.rke2lab.domain.annotations.EnforcementLevel;

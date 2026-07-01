@@ -21,6 +21,7 @@
 # forcing. These two forced imports are the entire build-time virality measure — bounded, named,
 # contributed by the fragment to the host, single point of change for every jGiven host.
 Import-Package: \
+    !org.jspecify.annotations, \
     com.tngtech.jgiven.impl, \
     com.tngtech.jgiven.impl.intercept, \
     com.tngtech.jgiven.*, \

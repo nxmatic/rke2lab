@@ -27,4 +27,5 @@
  *       Architecture</a> — the unit model and synthesis flow.
  * </ul>
  */
+@org.jspecify.annotations.NullMarked
 package io.nxmatic.rke2lab.manifests.units.clusterapi;

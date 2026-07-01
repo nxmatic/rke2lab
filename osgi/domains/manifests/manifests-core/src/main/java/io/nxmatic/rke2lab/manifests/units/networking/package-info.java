@@ -25,4 +25,5 @@
  *       Multi-Host Topology</a> — networking design for multi-node clusters.
  * </ul>
  */
+@org.jspecify.annotations.NullMarked
 package io.nxmatic.rke2lab.manifests.units.networking;

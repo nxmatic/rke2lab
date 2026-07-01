@@ -5,6 +5,7 @@
  * {@code ERROR} default once a cluster design spec exists.
  */
 @GovernedBy(value = StagingGate.SPEC_COVERAGE, level = EnforcementLevel.WARN)
+@org.jspecify.annotations.NullMarked
 package io.nxmatic.rke2lab.cluster.internal;
 
 import io.nxmatic.rke2lab.domain.annotations.EnforcementLevel;

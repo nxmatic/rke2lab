@@ -6,4 +6,5 @@
  * their own).
  */
 @GovernedBy(value = StagingGate.SPEC_COVERAGE, level = EnforcementLevel.IGNORE)
+@org.jspecify.annotations.NullMarked
 package io.nxmatic.rke2lab.domain.annotations;

@@ -57,6 +57,7 @@
 // (the
 // YamlMapper @Component, and bind() now an instance method).
 @GovernedBy(value = StagingGate.SPEC_COVERAGE, level = EnforcementLevel.WARN)
+@org.jspecify.annotations.NullMarked
 package io.nxmatic.rke2lab.manifests;
 
 import io.nxmatic.rke2lab.domain.annotations.EnforcementLevel;

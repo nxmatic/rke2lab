@@ -4,4 +4,9 @@ Export-Package: io.nxmatic.rke2lab.unitrepo.core
 # planned ("embed it intact as an OSGi bundle"). Staged under META-INF/bundles by the capability
 # scan like the other domains.
 Provide-Capability: io.nxmatic.rke2lab.embed; type=model; model=unitrepo
+# JSpecify annotations are compile-only null-safety metadata (@NullMarked/@Nullable), yet
+# RUNTIME-retained, so bnd would emit an Import-Package for org.jspecify.annotations — a package
+# nothing resolves at runtime (no JSpecify bundle is staged in either realm). Drop it from the
+# computed imports; the annotations do their job at compile/analysis time only.
+Import-Package: !org.jspecify.annotations, *
 -noimportjava: true
