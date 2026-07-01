@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.osgi.resource.Capability;
 import org.osgi.resource.Requirement;
 import org.osgi.resource.Resource;
@@ -49,7 +50,8 @@ public final class UnitResolver {
 
           @Override
           public List<Capability> findProviders(Requirement requirement) {
-            String filter = requirement.getDirectives().get("filter");
+            Optional<String> filter =
+                Optional.ofNullable(requirement.getDirectives().get("filter"));
             List<Capability> providers = new ArrayList<>();
             for (UnitResource unit : universe) {
               for (Capability cap : unit.getCapabilities(requirement.getNamespace())) {

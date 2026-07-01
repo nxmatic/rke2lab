@@ -7,4 +7,9 @@ package io.nxmatic.rke2lab.pipeline;
 @FunctionalInterface
 public interface OnFailure {
   void handle(String topic, Throwable cause);
+
+  /** No-op handler for pipelines that opt out of per-topic failure notification. */
+  static OnFailure noop() {
+    return (topic, cause) -> {};
+  }
 }

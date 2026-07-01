@@ -20,13 +20,10 @@ public class ManifestsDomain {
 
   public ManifestsDomain(
       String domainId, List<String> dependsOnDomainIds, List<? extends ManifestsUnit> units) {
-    if (domainId == null || domainId.isBlank()) {
+    if (domainId.isBlank()) {
       throw new IllegalArgumentException("Domain id must not be blank");
     }
-    if (dependsOnDomainIds == null) {
-      throw new IllegalArgumentException("Domain dependencies must not be null: " + domainId);
-    }
-    if (units == null || units.isEmpty()) {
+    if (units.isEmpty()) {
       throw new IllegalArgumentException("Domain must define at least one unit: " + domainId);
     }
     this.domainId = domainId;

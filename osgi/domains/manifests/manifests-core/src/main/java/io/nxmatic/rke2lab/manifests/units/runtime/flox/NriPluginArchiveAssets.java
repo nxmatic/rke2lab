@@ -17,6 +17,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.jspecify.annotations.Nullable;
 
 public final class NriPluginArchiveAssets {
 
@@ -259,8 +260,8 @@ public final class NriPluginArchiveAssets {
     }
 
     public static final class Builder {
-      private String classpathResource;
-      private String relativePath;
+      private @Nullable String classpathResource;
+      private @Nullable String relativePath;
 
       private Builder() {}
 

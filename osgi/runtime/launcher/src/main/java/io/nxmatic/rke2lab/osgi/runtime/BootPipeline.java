@@ -55,7 +55,7 @@ public final class BootPipeline {
    */
   public static final class Embedded {
 
-    private OnFailure onFailure;
+    private OnFailure onFailure = OnFailure.noop();
 
     private Embedded() {}
 

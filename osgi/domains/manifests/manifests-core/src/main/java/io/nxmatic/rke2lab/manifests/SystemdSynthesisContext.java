@@ -3,6 +3,8 @@ package io.nxmatic.rke2lab.manifests;
 
 import io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdTarget;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Context passed to systemd unit synthesis, containing references to common targets and the domain
@@ -35,36 +37,6 @@ public record SystemdSynthesisContext(
     SystemdTarget toolsTarget,
     ManifestDomainCatalog domainCatalog) {
 
-  public SystemdSynthesisContext {
-    if (rke2labTarget == null) {
-      throw new IllegalArgumentException("rke2labTarget must not be null");
-    }
-    if (bootstrapTarget == null) {
-      throw new IllegalArgumentException("bootstrapTarget must not be null");
-    }
-    if (manifestsTarget == null) {
-      throw new IllegalArgumentException("manifestsTarget must not be null");
-    }
-    if (cniManifestsTarget == null) {
-      throw new IllegalArgumentException("cniManifestsTarget must not be null");
-    }
-    if (operatorManifestsTarget == null) {
-      throw new IllegalArgumentException("operatorManifestsTarget must not be null");
-    }
-    if (secretsTarget == null) {
-      throw new IllegalArgumentException("secretsTarget must not be null");
-    }
-    if (networkTarget == null) {
-      throw new IllegalArgumentException("networkTarget must not be null");
-    }
-    if (toolsTarget == null) {
-      throw new IllegalArgumentException("toolsTarget must not be null");
-    }
-    if (domainCatalog == null) {
-      throw new IllegalArgumentException("domainCatalog must not be null");
-    }
-  }
-
   /**
    * The target an installer for {@code phase} should be {@code WantedBy}/{@code PartOf}. The phase
    * selects among the pre-created targets; it never creates one (see
@@ -89,15 +61,15 @@ public record SystemdSynthesisContext(
    * caught by the compiler.
    */
   public static final class Builder {
-    private SystemdTarget rke2labTarget;
-    private SystemdTarget bootstrapTarget;
-    private SystemdTarget manifestsTarget;
-    private SystemdTarget cniManifestsTarget;
-    private SystemdTarget operatorManifestsTarget;
-    private SystemdTarget secretsTarget;
-    private SystemdTarget networkTarget;
-    private SystemdTarget toolsTarget;
-    private ManifestDomainCatalog domainCatalog;
+    private @Nullable SystemdTarget rke2labTarget;
+    private @Nullable SystemdTarget bootstrapTarget;
+    private @Nullable SystemdTarget manifestsTarget;
+    private @Nullable SystemdTarget cniManifestsTarget;
+    private @Nullable SystemdTarget operatorManifestsTarget;
+    private @Nullable SystemdTarget secretsTarget;
+    private @Nullable SystemdTarget networkTarget;
+    private @Nullable SystemdTarget toolsTarget;
+    private @Nullable ManifestDomainCatalog domainCatalog;
 
     private Builder() {}
 
@@ -148,15 +120,15 @@ public record SystemdSynthesisContext(
 
     public SystemdSynthesisContext build() {
       return new SystemdSynthesisContext(
-          rke2labTarget,
-          bootstrapTarget,
-          manifestsTarget,
-          cniManifestsTarget,
-          operatorManifestsTarget,
-          secretsTarget,
-          networkTarget,
-          toolsTarget,
-          domainCatalog);
+          Objects.requireNonNull(rke2labTarget, "rke2labTarget"),
+          Objects.requireNonNull(bootstrapTarget, "bootstrapTarget"),
+          Objects.requireNonNull(manifestsTarget, "manifestsTarget"),
+          Objects.requireNonNull(cniManifestsTarget, "cniManifestsTarget"),
+          Objects.requireNonNull(operatorManifestsTarget, "operatorManifestsTarget"),
+          Objects.requireNonNull(secretsTarget, "secretsTarget"),
+          Objects.requireNonNull(networkTarget, "networkTarget"),
+          Objects.requireNonNull(toolsTarget, "toolsTarget"),
+          Objects.requireNonNull(domainCatalog, "domainCatalog"));
     }
   }
 }

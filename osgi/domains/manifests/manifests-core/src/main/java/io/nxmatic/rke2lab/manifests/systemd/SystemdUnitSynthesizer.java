@@ -99,10 +99,10 @@ public final class SystemdUnitSynthesizer {
    */
   private SystemdUnit ensureReadyGate(String gateUnitFile) {
     final String gateUnitId = gateUnitFile.replace(".service", "");
-    final SystemdUnit existing = systemdChart.findUnit(gateUnitId);
-    if (existing != null) {
-      return existing;
-    }
+    return systemdChart.findUnit(gateUnitId).orElseGet(() -> synthesizeReadyGate(gateUnitId));
+  }
+
+  private SystemdUnit synthesizeReadyGate(String gateUnitId) {
     return SystemdService.oneshotInstaller(systemdChart, gateUnitId)
         .description("RKE2Lab readiness gate: " + gateUnitId)
         .after("local-fs.target", "rke2-server.service")
@@ -114,13 +114,14 @@ public final class SystemdUnitSynthesizer {
   }
 
   private SystemdUnit requireUnit(String unitId) {
-    final SystemdUnit unit = systemdChart.findUnit(unitId);
-    if (unit == null) {
-      throw new IllegalStateException(
-          unitId
-              + " not found in systemd chart — ensure BootstrapInfrastructureSynthesizer runs first");
-    }
-    return unit;
+    return systemdChart
+        .findUnit(unitId)
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    unitId
+                        + " not found in systemd chart — ensure BootstrapInfrastructureSynthesizer"
+                        + " runs first"));
   }
 
   /** Synthesizes the secrets installer service for this domain (post-server). */

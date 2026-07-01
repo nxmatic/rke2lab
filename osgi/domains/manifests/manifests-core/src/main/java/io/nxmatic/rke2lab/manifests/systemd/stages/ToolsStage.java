@@ -5,6 +5,8 @@ import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.ServiceType;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.StandardStream;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Tools installation stage: Nix and Flox package managers.
@@ -17,8 +19,8 @@ public final class ToolsStage {
   private final SystemdSynthesisContext context;
 
   // Store construct references for dependency resolution
-  private SystemdService nixInstallService;
-  private SystemdService floxInstallService;
+  private @Nullable SystemdService nixInstallService;
+  private @Nullable SystemdService floxInstallService;
 
   public ToolsStage(SystemdChart systemdChart, SystemdSynthesisContext context) {
     this.systemdChart = systemdChart;
@@ -42,11 +44,12 @@ public final class ToolsStage {
   }
 
   public ToolsStage floxInstall() {
+    final SystemdService nixInstall = getNixInstallService();
     floxInstallService =
         new SystemdService(systemdChart, "rke2lab-flox-install")
             .description("Install Flox Package Manager for RKE2 Lab")
-            .after(nixInstallService.getUnitFileName())
-            .requires(nixInstallService.getUnitFileName())
+            .after(nixInstall.getUnitFileName())
+            .requires(nixInstall.getUnitFileName())
             .type(ServiceType.ONESHOT)
             .execStart("/srv/host/systemd-scripts.d/rke2lab-flox-install.sh")
             .remainAfterExit(true)
@@ -59,11 +62,11 @@ public final class ToolsStage {
 
   /** Package-private accessor for bootstrap stage dependency. */
   public SystemdService getFloxInstallService() {
-    return floxInstallService;
+    return Objects.requireNonNull(floxInstallService, "floxInstall() not yet run");
   }
 
   /** Package-private accessor for bootstrap stage dependency. */
   public SystemdService getNixInstallService() {
-    return nixInstallService;
+    return Objects.requireNonNull(nixInstallService, "nixInstall() not yet run");
   }
 }

@@ -370,9 +370,6 @@ public final class KdnsManifestsUnit extends AbstractManifestsUnit {
             "spec",
             runtimePodProfile.apply(containers, List.copyOf(volumes), "kdns", Map.of())));
 
-    deployment.addJsonPatch(
-        JsonPatch.add("/spec", deploymentSpec),
-        JsonPatch.add("/spec/template/spec/containers/0/livenessProbe", null),
-        JsonPatch.add("/spec/template/spec/containers/0/readinessProbe", null));
+    deployment.addJsonPatch(JsonPatch.add("/spec", deploymentSpec));
   }
 }

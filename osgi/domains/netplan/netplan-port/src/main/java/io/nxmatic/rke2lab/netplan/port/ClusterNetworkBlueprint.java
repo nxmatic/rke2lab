@@ -1,6 +1,8 @@
 package io.nxmatic.rke2lab.netplan.port;
 
 import java.net.InetAddress;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Stage B network blueprint for clusters provisioned by the management control-plane.
@@ -253,8 +255,8 @@ public record ClusterNetworkBlueprint(
 
   /** Fluent API for deriving blueprint from cluster/node identity. */
   public static final class Builder {
-    private String clusterName;
-    private String nodeName;
+    private @Nullable String clusterName;
+    private @Nullable String nodeName;
     private boolean deriveRecipeModel;
 
     public Builder cluster(String clusterName) {
@@ -276,13 +278,15 @@ public record ClusterNetworkBlueprint(
       if (!deriveRecipeModel) {
         throw new IllegalStateException("Builder requires deriveRecipeModel() before build()");
       }
-      if (clusterName == null || clusterName.isBlank()) {
+      final String cluster = Objects.requireNonNull(clusterName, "clusterName must be set");
+      final String node = Objects.requireNonNull(nodeName, "nodeName must be set");
+      if (cluster.isBlank()) {
         throw new IllegalArgumentException("clusterName must be set");
       }
-      if (nodeName == null || nodeName.isBlank()) {
+      if (node.isBlank()) {
         throw new IllegalArgumentException("nodeName must be set");
       }
-      return derive(clusterName, nodeName);
+      return derive(cluster, node);
     }
   }
 }

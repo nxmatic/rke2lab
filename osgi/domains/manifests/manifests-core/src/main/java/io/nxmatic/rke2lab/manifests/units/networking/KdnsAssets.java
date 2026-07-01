@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 
 public final class KdnsAssets {
 
@@ -118,8 +119,8 @@ public final class KdnsAssets {
     }
 
     public static final class Builder {
-      private String configMapKey;
-      private String classpathResource;
+      private @Nullable String configMapKey;
+      private @Nullable String classpathResource;
 
       private Builder() {}
 

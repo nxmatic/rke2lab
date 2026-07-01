@@ -5,6 +5,8 @@ import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.ServiceType;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.StandardStream;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Bootstrap stage: environment setup, config installation, RKE2 installation, and systemd linking.
@@ -18,8 +20,8 @@ public final class BootstrapStage {
   private final ToolsStage toolsStage;
 
   // Store construct references for dependency resolution
-  private SystemdService bootstrapEnvService;
-  private SystemdService installService;
+  private @Nullable SystemdService bootstrapEnvService;
+  private @Nullable SystemdService installService;
 
   public BootstrapStage(
       SystemdChart systemdChart, SystemdSynthesisContext context, ToolsStage toolsStage) {
@@ -66,15 +68,15 @@ public final class BootstrapStage {
   }
 
   public BootstrapStage configInstall() {
+    final SystemdService bootstrapEnv = getBootstrapEnvService();
     new SystemdService(systemdChart, "rke2lab-config-install")
         .description("Install RKE2 config fragments before server start")
         .after(
             "local-fs.target",
-            bootstrapEnvService.getUnitFileName(),
+            bootstrapEnv.getUnitFileName(),
             toolsStage.getFloxInstallService().getUnitFileName())
         .requires(
-            bootstrapEnvService.getUnitFileName(),
-            toolsStage.getFloxInstallService().getUnitFileName())
+            bootstrapEnv.getUnitFileName(), toolsStage.getFloxInstallService().getUnitFileName())
         .before("rke2-server.service", "rke2-agent.service")
         .conditionPathExists("/srv/host/systemd-scripts.d/rke2lab-config-install.sh")
         .type(ServiceType.ONESHOT)
@@ -97,7 +99,7 @@ public final class BootstrapStage {
                 "local-fs.target",
                 context.networkTarget().getUnitFileName(),
                 context.toolsTarget().getUnitFileName(),
-                bootstrapEnvService.getUnitFileName())
+                getBootstrapEnvService().getUnitFileName())
             .wants(
                 "network-online.target",
                 "systemd-networkd.service",
@@ -105,7 +107,7 @@ public final class BootstrapStage {
             .requires(
                 context.networkTarget().getUnitFileName(),
                 context.toolsTarget().getUnitFileName(),
-                bootstrapEnvService.getUnitFileName())
+                getBootstrapEnvService().getUnitFileName())
             .requiresMountsFor("/srv/host/systemd-scripts.d")
             .conditionPathExists(
                 "/srv/host/systemd-scripts.d/rke2lab-install.sh",
@@ -128,8 +130,8 @@ public final class BootstrapStage {
         .description("Link RKE2Lab systemd service files from host share")
         .documentation("https://github.com/nxmatic/rke2lab")
         .requiresMountsFor("/srv/host/systemd-units.d", "/srv/host")
-        .after("local-fs.target", bootstrapEnvService.getUnitFileName())
-        .requires(bootstrapEnvService.getUnitFileName())
+        .after("local-fs.target", getBootstrapEnvService().getUnitFileName())
+        .requires(getBootstrapEnvService().getUnitFileName())
         .before("rke2-server.service", "rke2-agent.service")
         .conditionPathExists(
             "/srv/host/systemd-scripts.d/rke2lab-systemd-link.sh", "/srv/host/systemd-units.d")
@@ -144,12 +146,11 @@ public final class BootstrapStage {
   }
 
   public BootstrapStage cachixWatchStore() {
+    final SystemdService install = getInstallService();
     new SystemdService(systemdChart, "rke2lab-cachix-watch-store")
         .description("Watch Nix store and push to Cachix")
-        .after(
-            toolsStage.getNixInstallService().getUnitFileName(), installService.getUnitFileName())
-        .requires(
-            toolsStage.getNixInstallService().getUnitFileName(), installService.getUnitFileName())
+        .after(toolsStage.getNixInstallService().getUnitFileName(), install.getUnitFileName())
+        .requires(toolsStage.getNixInstallService().getUnitFileName(), install.getUnitFileName())
         .type(ServiceType.SIMPLE)
         .execStart("/srv/host/systemd-scripts.d/rke2lab-cachix-watch-store.sh")
         .standardOutput(StandardStream.JOURNAL)
@@ -161,11 +162,11 @@ public final class BootstrapStage {
 
   /** Package-private accessor for storage stage dependency. */
   public SystemdService getBootstrapEnvService() {
-    return bootstrapEnvService;
+    return Objects.requireNonNull(bootstrapEnvService, "bootstrapEnv() not yet run");
   }
 
   /** Package-private accessor for storage stage dependency. */
   public SystemdService getInstallService() {
-    return installService;
+    return Objects.requireNonNull(installService, "install() not yet run");
   }
 }

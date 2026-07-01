@@ -1,7 +1,9 @@
 package io.nxmatic.rke2lab.netplan.api;
 
 import java.net.URI;
+import java.util.Objects;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 /**
  * External Net2Plan API endpoint contract for future mesh-topology integration.
@@ -39,7 +41,7 @@ public record Net2PlanEndpoint(URI baseUri, String networkPlanPath) {
   }
 
   public static final class Builder {
-    private URI baseUri;
+    private @Nullable URI baseUri;
     private String networkPlanPath = DEFAULT_NETWORK_PLAN_PATH;
 
     private Builder() {}
@@ -55,24 +57,23 @@ public record Net2PlanEndpoint(URI baseUri, String networkPlanPath) {
     }
 
     public Net2PlanEndpoint build() {
-      return new Net2PlanEndpoint(baseUri, networkPlanPath);
+      return new Net2PlanEndpoint(Objects.requireNonNull(baseUri, "baseUri"), networkPlanPath);
     }
   }
 
   /** Resolve endpoint settings from system properties/environment when configured. */
   public static Optional<Net2PlanEndpoint> fromSystemProperties() {
-    final String endpointValue = configuredEndpointValue();
-    if (endpointValue == null || endpointValue.isBlank()) {
-      return Optional.empty();
-    }
-
-    final String path =
-        System.getProperty(PATH_PROPERTY) == null
-            ? DEFAULT_NETWORK_PLAN_PATH
-            : System.getProperty(PATH_PROPERTY);
-
-    return Optional.of(
-        builder().baseUri(URI.create(endpointValue.trim())).networkPlanPath(path).build());
+    return configuredEndpointValue()
+        .map(
+            endpointValue -> {
+              final String path =
+                  Optional.ofNullable(System.getProperty(PATH_PROPERTY))
+                      .orElse(DEFAULT_NETWORK_PLAN_PATH);
+              return builder()
+                  .baseUri(URI.create(endpointValue.trim()))
+                  .networkPlanPath(path)
+                  .build();
+            });
   }
 
   /** Canonical full URL for posting/reading network plans in Net2Plan. */
@@ -80,18 +81,10 @@ public record Net2PlanEndpoint(URI baseUri, String networkPlanPath) {
     return baseUri.resolve(networkPlanPath);
   }
 
-  private static String configuredEndpointValue() {
-    final String propertyValue = System.getProperty(ENDPOINT_PROPERTY);
-    if (propertyValue != null && !propertyValue.isBlank()) {
-      return propertyValue;
-    }
-
-    final String envValue = System.getenv(ENDPOINT_ENV);
-    if (envValue != null && !envValue.isBlank()) {
-      return envValue;
-    }
-
-    return null;
+  private static Optional<String> configuredEndpointValue() {
+    return Optional.ofNullable(System.getProperty(ENDPOINT_PROPERTY))
+        .or(() -> Optional.ofNullable(System.getenv(ENDPOINT_ENV)))
+        .filter(value -> !value.isBlank());
   }
 
   private static String normalizePath(String value) {

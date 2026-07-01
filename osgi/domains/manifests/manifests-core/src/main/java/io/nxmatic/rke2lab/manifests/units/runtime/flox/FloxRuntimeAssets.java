@@ -14,8 +14,10 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import org.jspecify.annotations.Nullable;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.FrameworkUtil;
 
@@ -157,10 +159,9 @@ public final class FloxRuntimeAssets {
   }
 
   private String resolveAssetContent(InstallerAsset asset) {
-    if (asset.inlineContent() != null) {
-      return asset.inlineContent();
-    }
-    return readResource(asset.classpathResource());
+    return asset
+        .inlineContent()
+        .orElseGet(() -> readResource(asset.classpathResource().orElseThrow()));
   }
 
   private String readResource(String resourcePath) {
@@ -423,16 +424,16 @@ public final class FloxRuntimeAssets {
    */
   public static final class InstallerAsset {
     private final String configMapKey;
-    private final String classpathResource;
-    private final String inlineContent;
+    private final Optional<String> classpathResource;
+    private final Optional<String> inlineContent;
     private final String mountPath;
 
     private InstallerAsset(Builder builder) {
       this.configMapKey = Objects.requireNonNull(builder.configMapKey, "configMapKey");
-      this.classpathResource = builder.classpathResource;
-      this.inlineContent = builder.inlineContent;
+      this.classpathResource = Optional.ofNullable(builder.classpathResource);
+      this.inlineContent = Optional.ofNullable(builder.inlineContent);
       this.mountPath = Objects.requireNonNull(builder.mountPath, "mountPath");
-      if (classpathResource == null && inlineContent == null) {
+      if (classpathResource.isEmpty() && inlineContent.isEmpty()) {
         throw new IllegalArgumentException(
             "InstallerAsset '" + configMapKey + "' must set classpathResource or inlineContent");
       }
@@ -446,11 +447,11 @@ public final class FloxRuntimeAssets {
       return configMapKey;
     }
 
-    public String classpathResource() {
+    public Optional<String> classpathResource() {
       return classpathResource;
     }
 
-    public String inlineContent() {
+    public Optional<String> inlineContent() {
       return inlineContent;
     }
 
@@ -459,10 +460,10 @@ public final class FloxRuntimeAssets {
     }
 
     public static final class Builder {
-      private String configMapKey;
-      private String classpathResource;
-      private String inlineContent;
-      private String mountPath;
+      private @Nullable String configMapKey;
+      private @Nullable String classpathResource;
+      private @Nullable String inlineContent;
+      private @Nullable String mountPath;
 
       private Builder() {}
 

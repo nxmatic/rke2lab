@@ -36,12 +36,14 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.cdk8s.App;
 import org.cdk8s.AppProps;
 import org.cdk8s.Chart;
+import org.jspecify.annotations.Nullable;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.resolver.Resolver;
@@ -121,35 +123,58 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         return new AwaitingOnFailure(new State(request, handler));
       }
 
+      /** Cdk8s app, charts and output paths — produced once by the setup stage. */
+      record Scaffold(
+          App app,
+          Chart chart,
+          SystemdChart systemdChart,
+          Path synthOutdir,
+          Path synthManifestFile,
+          Path systemdOutdir) {}
+
+      /** Configured domain registry and its unit hit count — produced by the registry stage. */
+      record Registry(ManifestsDomainRegistry domainRegistry, int manifestUnitHitCount) {}
+
+      /** Systemd target hierarchy and its context — produced by the systemd-targets stage. */
+      record Targets(
+          SystemdTarget rke2labTarget,
+          SystemdTarget networkTarget,
+          SystemdTarget toolsTarget,
+          SystemdTarget bootstrapTarget,
+          SystemdTarget manifestsTarget,
+          SystemdTarget cniManifestsTarget,
+          SystemdTarget operatorManifestsTarget,
+          SystemdTarget secretsTarget,
+          SystemdSynthesisContext systemdContext) {}
+
+      /**
+       * Working memory shared across pipeline stages. Each phase produces one immutable record; the
+       * type-state chain guarantees a record is set before a later stage reads it, so the narrowing
+       * accessors never fail. These three slots are the only mutable state.
+       */
       final class State {
         final ManifestSynthesisRequest request;
         final OnFailure onFailure;
 
-        App app;
-        Chart chart;
-        SystemdChart systemdChart;
-        Path synthOutdir;
-        Path synthManifestFile;
-        Path systemdOutdir;
-
-        ManifestsDomainRegistry domainRegistry;
-        int manifestUnitHitCount;
-
-        ManifestDomainCatalog domainCatalog;
-
-        SystemdTarget rke2labTarget;
-        SystemdTarget networkTarget;
-        SystemdTarget toolsTarget;
-        SystemdTarget bootstrapTarget;
-        SystemdTarget manifestsTarget;
-        SystemdTarget cniManifestsTarget;
-        SystemdTarget operatorManifestsTarget;
-        SystemdTarget secretsTarget;
-        SystemdSynthesisContext systemdContext;
+        @Nullable Scaffold scaffold;
+        @Nullable Registry registry;
+        @Nullable Targets targets;
 
         State(ManifestSynthesisRequest request, OnFailure onFailure) {
           this.request = request;
           this.onFailure = onFailure;
+        }
+
+        Scaffold scaffold() {
+          return Objects.requireNonNull(scaffold, "cdk8s scaffold not yet produced");
+        }
+
+        Registry registry() {
+          return Objects.requireNonNull(registry, "domain registry not yet produced");
+        }
+
+        Targets targets() {
+          return Objects.requireNonNull(targets, "systemd targets not yet produced");
         }
       }
 
@@ -176,14 +201,17 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         }
 
         Cdk8sSetupStage createChartsAndPaths() {
-          state.synthOutdir = state.request.synthOutdir();
-          state.synthManifestFile = state.request.synthManifestFile();
-          state.systemdOutdir = state.synthOutdir.resolve("systemd");
+          final Path synthOutdir = state.request.synthOutdir();
+          final Path synthManifestFile = state.request.synthManifestFile();
+          final Path systemdOutdir = synthOutdir.resolve("systemd");
 
-          state.app =
-              Cdk8sApps.create(AppProps.builder().outdir(state.synthOutdir.toString()).build());
-          state.chart = new Chart(state.app, "manifests");
-          state.systemdChart = new SystemdChart(state.app, "systemd");
+          final App app =
+              Cdk8sApps.create(AppProps.builder().outdir(synthOutdir.toString()).build());
+          final Chart chart = new Chart(app, "manifests");
+          final SystemdChart systemdChart = new SystemdChart(app, "systemd");
+
+          state.scaffold =
+              new Scaffold(app, chart, systemdChart, synthOutdir, synthManifestFile, systemdOutdir);
 
           return this;
         }
@@ -228,38 +256,39 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
           final ManifestsDomainRegistry configuredDomainRegistry =
               buildDomainRegistry(state.request.manifestDomainPolicy());
 
-          state.domainRegistry = applyManifestDomainPolicy(state.request, configuredDomainRegistry);
+          final ManifestsDomainRegistry domainRegistry =
+              applyManifestDomainPolicy(state.request, configuredDomainRegistry);
 
-          final Cdk8sApiObjectResolver resolver = new Cdk8sApiObjectResolver(state.chart);
+          final Cdk8sApiObjectResolver resolver =
+              new Cdk8sApiObjectResolver(state.scaffold().chart());
           final ManifestsUnitVisitor manifestUnitVisitor = new ApplyingManifestsUnitVisitor();
 
-          LOG.info("Configured {} manifest domains", state.domainRegistry.domains().size());
+          LOG.info("Configured {} manifest domains", domainRegistry.domains().size());
           LOG.debug(
               "Manifest domains: {}",
-              state.domainRegistry.domains().stream()
-                  .map(ManifestsDomain::domainId)
-                  .sorted()
-                  .toList());
+              domainRegistry.domains().stream().map(ManifestsDomain::domainId).sorted().toList());
 
           final CoherentManifestsDomainRegistry coherent =
-              state.domainRegistry.resolve(DefaultManifestSynthesisService.this.resolver);
+              domainRegistry.resolve(DefaultManifestSynthesisService.this.resolver);
 
-          state.manifestUnitHitCount = 0;
+          int manifestUnitHitCount = 0;
           for (ManifestsUnit manifestUnit : coherent.visitOrder()) {
-            state.manifestUnitHitCount++;
+            manifestUnitHitCount++;
             final String manifestUnitId = manifestUnit.manifestUnitId();
             LOG.debug("Applying manifest unit '{}'", manifestUnitId);
             final String domainId = coherent.requireDomainIdForManifestsUnit(manifestUnitId);
             manifestUnitVisitor.visit(
                 manifestUnit,
                 new ManifestsUnitContext(
-                    state.chart,
+                    state.scaffold().chart(),
                     domainId,
                     manifestUnitId,
                     resolver,
                     DefaultManifestSynthesisService.this.contributorRegistry,
                     DefaultManifestSynthesisService.this.yaml));
           }
+
+          state.registry = new Registry(domainRegistry, manifestUnitHitCount);
 
           return this;
         }
@@ -301,92 +330,104 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         }
 
         SystemdTargetsStage createTargetHierarchy() {
-          state.domainCatalog =
+          final SystemdChart systemdChart = state.scaffold().systemdChart();
+          final ManifestDomainCatalog domainCatalog =
               ManifestDomainCatalog.builder()
                   .addDefaultDomains()
                   .addDefaultStageALinkableDomains()
                   .build();
 
           LOG.debug("Creating systemd targets");
-          state.rke2labTarget =
-              new SystemdTarget(state.systemdChart, "rke2lab")
+          final SystemdTarget rke2labTarget =
+              new SystemdTarget(systemdChart, "rke2lab")
                   .description("RKE2 Lab Bootstrap Target")
                   .documentation("https://github.com/nxmatic/rke2lab")
                   .wantedBy("multi-user.target");
 
-          state.networkTarget =
-              new SystemdTarget(state.systemdChart, "rke2lab-network")
+          final SystemdTarget networkTarget =
+              new SystemdTarget(systemdChart, "rke2lab-network")
                   .description("RKE2 Lab Network Infrastructure Target")
                   .after("network-online.target")
                   .wants("network-online.target")
-                  .partOf(state.rke2labTarget.getUnitFileName())
-                  .wantedBy(state.rke2labTarget.getUnitFileName());
+                  .partOf(rke2labTarget.getUnitFileName())
+                  .wantedBy(rke2labTarget.getUnitFileName());
 
-          state.toolsTarget =
-              new SystemdTarget(state.systemdChart, "rke2lab-tools")
+          final SystemdTarget toolsTarget =
+              new SystemdTarget(systemdChart, "rke2lab-tools")
                   .description("RKE2 Lab Tools and Utilities Target")
-                  .after(state.networkTarget.getUnitFileName())
-                  .wants(state.networkTarget.getUnitFileName())
-                  .partOf(state.rke2labTarget.getUnitFileName())
-                  .wantedBy(state.rke2labTarget.getUnitFileName());
+                  .after(networkTarget.getUnitFileName())
+                  .wants(networkTarget.getUnitFileName())
+                  .partOf(rke2labTarget.getUnitFileName())
+                  .wantedBy(rke2labTarget.getUnitFileName());
 
-          state.bootstrapTarget =
-              new SystemdTarget(state.systemdChart, "rke2lab-bootstrap")
+          final SystemdTarget bootstrapTarget =
+              new SystemdTarget(systemdChart, "rke2lab-bootstrap")
                   .description("RKE2 Lab Early Bootstrap (pre-server)")
-                  .after(state.networkTarget.getUnitFileName(), state.toolsTarget.getUnitFileName())
-                  .requires(
-                      state.networkTarget.getUnitFileName(), state.toolsTarget.getUnitFileName())
-                  .partOf(state.rke2labTarget.getUnitFileName())
-                  .wantedBy(state.rke2labTarget.getUnitFileName())
-                  .also(state.networkTarget.getUnitFileName(), state.toolsTarget.getUnitFileName());
+                  .after(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName())
+                  .requires(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName())
+                  .partOf(rke2labTarget.getUnitFileName())
+                  .wantedBy(rke2labTarget.getUnitFileName())
+                  .also(networkTarget.getUnitFileName(), toolsTarget.getUnitFileName());
 
-          state.manifestsTarget =
-              new SystemdTarget(state.systemdChart, "rke2lab-manifests")
+          final SystemdTarget manifestsTarget =
+              new SystemdTarget(systemdChart, "rke2lab-manifests")
                   .description("RKE2 Lab Manifest Installers (post-server)")
-                  .after(state.bootstrapTarget.getUnitFileName(), "rke2-server.service")
+                  .after(bootstrapTarget.getUnitFileName(), "rke2-server.service")
                   .requires("rke2-server.service")
-                  .partOf(state.rke2labTarget.getUnitFileName())
+                  .partOf(rke2labTarget.getUnitFileName())
                   .wantedBy("rke2-server.service");
 
-          state.cniManifestsTarget =
-              new SystemdTarget(state.systemdChart, "rke2lab-cni-manifests")
+          final SystemdTarget cniManifestsTarget =
+              new SystemdTarget(systemdChart, "rke2lab-cni-manifests")
                   .description("RKE2 Lab Manifest Installers (post-CNI-ready)")
-                  .after(state.manifestsTarget.getUnitFileName(), "rke2-server.service")
+                  .after(manifestsTarget.getUnitFileName(), "rke2-server.service")
                   .requires("rke2-server.service")
-                  .partOf(state.rke2labTarget.getUnitFileName())
-                  .wantedBy(state.rke2labTarget.getUnitFileName());
+                  .partOf(rke2labTarget.getUnitFileName())
+                  .wantedBy(rke2labTarget.getUnitFileName());
 
-          state.operatorManifestsTarget =
-              new SystemdTarget(state.systemdChart, "rke2lab-operator-manifests")
+          final SystemdTarget operatorManifestsTarget =
+              new SystemdTarget(systemdChart, "rke2lab-operator-manifests")
                   .description("RKE2 Lab Manifest Installers (post-operator-ready)")
-                  .after(state.cniManifestsTarget.getUnitFileName(), "rke2-server.service")
+                  .after(cniManifestsTarget.getUnitFileName(), "rke2-server.service")
                   .requires("rke2-server.service")
-                  .partOf(state.rke2labTarget.getUnitFileName())
-                  .wantedBy(state.rke2labTarget.getUnitFileName());
+                  .partOf(rke2labTarget.getUnitFileName())
+                  .wantedBy(rke2labTarget.getUnitFileName());
 
-          state.secretsTarget =
-              new SystemdTarget(state.systemdChart, "rke2lab-secrets")
+          final SystemdTarget secretsTarget =
+              new SystemdTarget(systemdChart, "rke2lab-secrets")
                   .description("RKE2 Lab Secrets Installers (post-server)")
                   .after(
-                      state.bootstrapTarget.getUnitFileName(),
-                      state.manifestsTarget.getUnitFileName(),
+                      bootstrapTarget.getUnitFileName(),
+                      manifestsTarget.getUnitFileName(),
                       "rke2-server.service")
                   .requires("rke2-server.service")
-                  .partOf(state.rke2labTarget.getUnitFileName())
-                  .wantedBy(state.rke2labTarget.getUnitFileName());
+                  .partOf(rke2labTarget.getUnitFileName())
+                  .wantedBy(rke2labTarget.getUnitFileName());
 
-          state.systemdContext =
+          final SystemdSynthesisContext systemdContext =
               SystemdSynthesisContext.builder()
-                  .rke2labTarget(state.rke2labTarget)
-                  .bootstrapTarget(state.bootstrapTarget)
-                  .manifestsTarget(state.manifestsTarget)
-                  .cniManifestsTarget(state.cniManifestsTarget)
-                  .operatorManifestsTarget(state.operatorManifestsTarget)
-                  .secretsTarget(state.secretsTarget)
-                  .networkTarget(state.networkTarget)
-                  .toolsTarget(state.toolsTarget)
-                  .domainCatalog(state.domainCatalog)
+                  .rke2labTarget(rke2labTarget)
+                  .bootstrapTarget(bootstrapTarget)
+                  .manifestsTarget(manifestsTarget)
+                  .cniManifestsTarget(cniManifestsTarget)
+                  .operatorManifestsTarget(operatorManifestsTarget)
+                  .secretsTarget(secretsTarget)
+                  .networkTarget(networkTarget)
+                  .toolsTarget(toolsTarget)
+                  .domainCatalog(domainCatalog)
                   .build();
+
+          state.targets =
+              new Targets(
+                  rke2labTarget,
+                  networkTarget,
+                  toolsTarget,
+                  bootstrapTarget,
+                  manifestsTarget,
+                  cniManifestsTarget,
+                  operatorManifestsTarget,
+                  secretsTarget,
+                  systemdContext);
 
           return this;
         }
@@ -427,13 +468,15 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         }
 
         SystemdUnitsStage synthesizeInfrastructureAndDomains() {
-          LOG.debug("Synthesizing bootstrap and infrastructure systemd units");
-          new BootstrapInfrastructureSynthesizer(state.systemdChart, state.systemdContext)
-              .synthesizeAll();
+          final SystemdChart systemdChart = state.scaffold().systemdChart();
+          final SystemdSynthesisContext systemdContext = state.targets().systemdContext();
 
-          for (ManifestsDomain domain : state.domainRegistry.domains()) {
+          LOG.debug("Synthesizing bootstrap and infrastructure systemd units");
+          new BootstrapInfrastructureSynthesizer(systemdChart, systemdContext).synthesizeAll();
+
+          for (ManifestsDomain domain : state.registry().domainRegistry().domains()) {
             LOG.debug("Synthesizing systemd units for domain '{}'", domain.domainId());
-            domain.synthesizeSystemdUnits(state.systemdChart, state.systemdContext);
+            domain.synthesizeSystemdUnits(systemdChart, systemdContext);
           }
 
           return this;
@@ -476,32 +519,35 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         }
 
         TargetFinalizationStage finalizeAndCreateDropIn() {
+          final SystemdChart systemdChart = state.scaffold().systemdChart();
+          final Targets targets = state.targets();
+
           LOG.debug("Configuring main rke2lab.target dependencies");
-          state
-              .rke2labTarget
+          targets
+              .rke2labTarget()
               .after(
-                  state.networkTarget.getUnitFileName(),
-                  state.toolsTarget.getUnitFileName(),
-                  state.bootstrapTarget.getUnitFileName(),
+                  targets.networkTarget().getUnitFileName(),
+                  targets.toolsTarget().getUnitFileName(),
+                  targets.bootstrapTarget().getUnitFileName(),
                   "rke2-server.service")
               .wants(
-                  state.networkTarget.getUnitFileName(),
-                  state.toolsTarget.getUnitFileName(),
-                  state.bootstrapTarget.getUnitFileName(),
-                  state.manifestsTarget.getUnitFileName(),
-                  state.cniManifestsTarget.getUnitFileName(),
-                  state.operatorManifestsTarget.getUnitFileName(),
-                  state.secretsTarget.getUnitFileName(),
+                  targets.networkTarget().getUnitFileName(),
+                  targets.toolsTarget().getUnitFileName(),
+                  targets.bootstrapTarget().getUnitFileName(),
+                  targets.manifestsTarget().getUnitFileName(),
+                  targets.cniManifestsTarget().getUnitFileName(),
+                  targets.operatorManifestsTarget().getUnitFileName(),
+                  targets.secretsTarget().getUnitFileName(),
                   "rke2-server.service");
 
           LOG.debug("Finalizing systemd target dependencies");
-          state.systemdChart.finalizeTargetDependencies();
+          systemdChart.finalizeTargetDependencies();
 
           LOG.debug("Creating rke2-server.service drop-in for lifecycle hooks");
-          new SystemdDropIn(state.systemdChart, "rke2lab-server-hooks", "rke2-server.service")
+          new SystemdDropIn(systemdChart, "rke2lab-server-hooks", "rke2-server.service")
               .execStartPre("/srv/host/systemd-scripts.d/rke2lab-server-pre-start.sh")
               .execStartPost("/srv/host/systemd-scripts.d/rke2lab-server-post-start.sh")
-              .wants(state.manifestsTarget.getUnitFileName());
+              .wants(targets.manifestsTarget().getUnitFileName());
 
           return this;
         }
@@ -542,48 +588,53 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         }
 
         SynthesisStage synthAndPostprocess() {
+          final Scaffold scaffold = state.scaffold();
           try {
-            LOG.info("Calling app.synth() to synthesize K8s manifests to: {}", state.synthOutdir);
-            state.app.synth();
+            LOG.info(
+                "Calling app.synth() to synthesize K8s manifests to: {}", scaffold.synthOutdir());
+            scaffold.app().synth();
             LOG.info(
                 "app.synth() completed, now synthesizing systemd units to: {}",
-                state.systemdOutdir);
-            state.systemdChart.synthesize(state.systemdOutdir);
+                scaffold.systemdOutdir());
+            scaffold.systemdChart().synthesize(scaffold.systemdOutdir());
             LOG.info("systemdChart.synthesize() completed");
 
-            Path synthesizedFile = null;
-            try (var files = Files.list(state.synthOutdir)) {
-              synthesizedFile =
-                  files
-                      .filter(
-                          p -> {
-                            String name = p.getFileName().toString();
-                            return name.endsWith("-manifests.k8s.yaml")
-                                || name.equals("manifests.k8s.yaml");
-                          })
-                      .findFirst()
-                      .orElse(null);
-            }
-
-            if (synthesizedFile == null || !Files.exists(synthesizedFile)) {
-              throw new IllegalStateException(
-                  "Expected synthesized manifest file (manifests.k8s.yaml or *-manifests.k8s.yaml) is missing in: "
-                      + state.synthOutdir);
-            }
+            final Path synthesizedFile = getSynthesizedFile();
 
             enforceLiteralBlockStyleForConfigMapScripts(synthesizedFile);
 
-            Files.createDirectories(state.synthManifestFile.getParent());
+            Files.createDirectories(scaffold.synthManifestFile().getParent());
             Files.move(
-                synthesizedFile, state.synthManifestFile, StandardCopyOption.REPLACE_EXISTING);
+                synthesizedFile, scaffold.synthManifestFile(), StandardCopyOption.REPLACE_EXISTING);
 
             LOG.info(
                 "Synthesized K8s manifests and systemd units from canonical manifest units (manifest unit hits={})",
-                state.manifestUnitHitCount);
+                state.registry().manifestUnitHitCount());
 
             return this;
           } catch (IOException e) {
             throw new UncheckedIOException(e);
+          }
+        }
+
+        private Path getSynthesizedFile() throws IOException {
+          final Path synthOutdir = state.scaffold().synthOutdir();
+          try (var files = Files.list(synthOutdir)) {
+            return files
+                .filter(
+                    p -> {
+                      final String name = p.getFileName().toString();
+                      return name.endsWith("-manifests.k8s.yaml")
+                          || name.equals("manifests.k8s.yaml");
+                    })
+                .filter(Files::exists)
+                .findFirst()
+                .orElseThrow(
+                    () ->
+                        new IllegalStateException(
+                            "Expected synthesized manifest file (manifests.k8s.yaml or"
+                                + " *-manifests.k8s.yaml) is missing in: "
+                                + synthOutdir));
           }
         }
       }
@@ -596,11 +647,13 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         }
 
         ManifestSynthesisResult complete() {
+          final Scaffold scaffold = state.scaffold();
+          final Registry registry = state.registry();
           return new ManifestSynthesisResult(
-              state.synthManifestFile,
-              state.systemdOutdir,
-              state.manifestUnitHitCount,
-              state.domainRegistry.domains().size());
+              scaffold.synthManifestFile(),
+              scaffold.systemdOutdir(),
+              registry.manifestUnitHitCount(),
+              registry.domainRegistry().domains().size());
         }
       }
     }

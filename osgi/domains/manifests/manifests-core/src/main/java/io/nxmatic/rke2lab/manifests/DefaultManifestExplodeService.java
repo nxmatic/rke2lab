@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -79,17 +80,16 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
         .filter(JsonNode::isObject)
         .forEach(
             document -> {
-              final String kind = textOrNull(document.get("kind"));
-              if (kind == null) {
+              final Optional<String> kind = text(document.get("kind"));
+              if (kind.isEmpty()) {
                 return;
               }
               final String domain = annotation(document, ManifestAnnotations.DOMAIN, "default");
               final String pkg = annotation(document, ManifestAnnotations.PACKAGE, "unknown");
-              final String namespace = textOrNull(document.path("metadata").get("namespace"));
-              final String name =
-                  sanitizeFileSegment(textOrNull(document.path("metadata").get("name")));
+              final Optional<String> namespace = text(document.path("metadata").get("namespace"));
+              final String name = sanitizeFileSegment(text(document.path("metadata").get("name")));
 
-              final String fileName = fileNameFor(document, kind, namespace, name);
+              final String fileName = fileNameFor(document, kind.get(), namespace, name);
               final Path outFile = target.resolve(domain).resolve(pkg).resolve(fileName);
               yaml.write(outFile).document(document);
               written.add(outFile);
@@ -113,7 +113,8 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
    *   <li>otherwise: {@code <order>-<kind>-<name>.yml} for cluster apply.
    * </ul>
    */
-  private static String fileNameFor(JsonNode document, String kind, String namespace, String name) {
+  private static String fileNameFor(
+      JsonNode document, String kind, Optional<String> namespace, String name) {
     if (isAnnotated(document, ManifestAnnotations.RKE2_CONFIG)) {
       return name;
     }
@@ -129,14 +130,11 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
     return "true".equalsIgnoreCase(annotation(document, key, "false"));
   }
 
-  private static String orderPrefixFor(String kind, String namespace) {
+  private static String orderPrefixFor(String kind, Optional<String> namespace) {
     if (CRD_KIND.equals(kind)) {
       return "00";
     }
-    if (namespace == null || namespace.isBlank()) {
-      return "01";
-    }
-    return "02";
+    return namespace.filter(ns -> !ns.isBlank()).isPresent() ? "02" : "01";
   }
 
   private static String annotation(JsonNode document, String key, String fallback) {
@@ -144,14 +142,14 @@ public final class DefaultManifestExplodeService implements ManifestExplodeServi
     return value == null || value.isNull() ? fallback : value.asText();
   }
 
-  private static String textOrNull(JsonNode node) {
-    return node == null || node.isNull() ? null : node.asText();
+  private static Optional<String> text(JsonNode node) {
+    return Optional.ofNullable(node).filter(n -> !n.isNull()).map(JsonNode::asText);
   }
 
-  private static String sanitizeFileSegment(String value) {
-    if (value == null || value.isBlank()) {
-      return "unnamed";
-    }
-    return value.toLowerCase(Locale.ROOT).replace(':', '-').replace('/', '-');
+  private static String sanitizeFileSegment(Optional<String> value) {
+    return value
+        .filter(v -> !v.isBlank())
+        .map(v -> v.toLowerCase(Locale.ROOT).replace(':', '-').replace('/', '-'))
+        .orElse("unnamed");
   }
 }

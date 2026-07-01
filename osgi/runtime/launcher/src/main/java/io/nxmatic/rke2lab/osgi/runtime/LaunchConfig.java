@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.osgi.runtime;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The launch KNOBS that genuinely differ between executors — everything else the {@link
@@ -18,7 +19,7 @@ import java.util.List;
  *       leaves the Felix default; the test executor raises it via {@code @FrameworkLog}.
  * </ul>
  */
-public record LaunchConfig(List<String> bootDelegation, Integer felixLogLevel) {
+public record LaunchConfig(List<String> bootDelegation, Optional<Integer> felixLogLevel) {
 
   public LaunchConfig {
     bootDelegation = List.copyOf(bootDelegation);
@@ -26,7 +27,7 @@ public record LaunchConfig(List<String> bootDelegation, Integer felixLogLevel) {
 
   /** The prod default: no boot-delegation, Felix's default log level. */
   public static LaunchConfig defaults() {
-    return new LaunchConfig(List.of(), null);
+    return new LaunchConfig(List.of(), Optional.empty());
   }
 
   public LaunchConfig withBootDelegation(String... packages) {
@@ -34,6 +35,6 @@ public record LaunchConfig(List<String> bootDelegation, Integer felixLogLevel) {
   }
 
   public LaunchConfig withFelixLogLevel(int level) {
-    return new LaunchConfig(bootDelegation, level);
+    return new LaunchConfig(bootDelegation, Optional.of(level));
   }
 }

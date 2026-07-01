@@ -35,9 +35,7 @@ public final class FluentTopicRunner {
     try {
       body.apply(stage);
     } catch (Throwable cause) {
-      if (onFailure != null) {
-        onFailure.handle(topic, cause);
-      }
+      onFailure.handle(topic, cause);
       throw new TopicFailure(topic, cause);
     }
     final long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;

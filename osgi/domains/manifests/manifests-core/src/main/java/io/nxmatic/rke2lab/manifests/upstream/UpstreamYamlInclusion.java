@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
@@ -57,8 +58,11 @@ public final class UpstreamYamlInclusion {
   }
 
   private static String upstreamIdentifierFor(
-      final String apiGroup, final String kind, final String namespace, final String name) {
-    return apiGroup + "|" + kind + "|" + (namespace == null ? "" : namespace) + "|" + name;
+      final String apiGroup,
+      final String kind,
+      final Optional<String> namespace,
+      final String name) {
+    return apiGroup + "|" + kind + "|" + namespace.orElse("") + "|" + name;
   }
 
   @SuppressWarnings("unchecked")
@@ -77,44 +81,43 @@ public final class UpstreamYamlInclusion {
       }
       final Map<String, Object> shaped = transform(document);
 
-      final String apiVersion = stringField(shaped, "apiVersion");
-      final String kind = stringField(shaped, "kind");
-      if (apiVersion == null || kind == null) {
+      final Optional<String> apiVersion = stringField(shaped, "apiVersion");
+      final Optional<String> kind = stringField(shaped, "kind");
+      if (apiVersion.isEmpty() || kind.isEmpty()) {
         continue;
       }
-      final Map<String, Object> metadata = nestedMap(shaped, "metadata");
-      final String name = metadata == null ? null : (String) metadata.get("name");
-      final String namespace = metadata == null ? null : (String) metadata.get("namespace");
-      if (name == null || name.isBlank()) {
+      final Optional<Map<String, Object>> metadata = nestedMap(shaped, "metadata");
+      final Optional<String> name =
+          metadata.map(m -> (String) m.get("name")).filter(n -> !n.isBlank());
+      if (name.isEmpty()) {
         continue;
       }
+      final Optional<String> namespace =
+          metadata.map(m -> (String) m.get("namespace")).filter(ns -> !ns.isBlank());
 
-      final String apiGroup = apiGroupOf(apiVersion);
-      final String upstreamIdentifier = upstreamIdentifierFor(apiGroup, kind, namespace, name);
+      final String apiGroup = apiGroupOf(apiVersion.get());
+      final String upstreamIdentifier =
+          upstreamIdentifierFor(apiGroup, kind.get(), namespace, name.get());
 
       final Map<String, String> annotations =
           mergeStringMap(
               packageProfile.packageAnnotations(upstreamIdentifier),
-              metadata == null ? null : (Map<String, String>) metadata.get("annotations"));
-      final Map<String, String> labels =
-          metadata == null ? null : (Map<String, String>) metadata.get("labels");
+              metadata.map(m -> (Map<String, String>) m.get("annotations")));
+      final Optional<Map<String, String>> labels =
+          metadata.map(m -> (Map<String, String>) m.get("labels")).filter(l -> !l.isEmpty());
 
       final ApiObjectMetadata.Builder metaBuilder =
-          ApiObjectMetadata.builder().name(name).annotations(annotations);
-      if (namespace != null && !namespace.isBlank()) {
-        metaBuilder.namespace(namespace);
-      }
-      if (labels != null && !labels.isEmpty()) {
-        metaBuilder.labels(labels);
-      }
+          ApiObjectMetadata.builder().name(name.get()).annotations(annotations);
+      namespace.ifPresent(metaBuilder::namespace);
+      labels.ifPresent(metaBuilder::labels);
 
       final ApiObject apiObject =
           new ApiObject(
               scope,
-              constructIdFor(classpathResource, kind, name, namespace, index),
+              constructIdFor(classpathResource, kind.get(), name.get(), namespace, index),
               ApiObjectProps.builder()
-                  .apiVersion(apiVersion)
-                  .kind(kind)
+                  .apiVersion(apiVersion.get())
+                  .kind(kind.get())
                   .metadata(metaBuilder.build())
                   .build());
 
@@ -139,10 +142,10 @@ public final class UpstreamYamlInclusion {
       final String classpathResource,
       final String kind,
       final String name,
-      final String namespace,
+      final Optional<String> namespace,
       final int index) {
     final String stem = classpathResource.replaceAll(".*/", "").replaceAll("\\..*$", "");
-    final String nsPart = namespace == null || namespace.isBlank() ? "" : "-" + namespace;
+    final String nsPart = namespace.map(ns -> "-" + ns).orElse("");
     return "upstream-" + stem + "-" + index + "-" + kind.toLowerCase() + nsPart + "-" + name;
   }
 
@@ -151,26 +154,29 @@ public final class UpstreamYamlInclusion {
     return slash < 0 ? "" : apiVersion.substring(0, slash);
   }
 
-  private static String stringField(final Map<String, Object> document, final String key) {
-    final Object value = document.get(key);
-    return value == null ? null : value.toString();
+  private static Optional<String> stringField(
+      final Map<String, Object> document, final String key) {
+    return Optional.ofNullable(document.get(key)).map(Object::toString);
   }
 
   @SuppressWarnings("unchecked")
-  private static Map<String, Object> nestedMap(
+  private static Optional<Map<String, Object>> nestedMap(
       final Map<String, Object> document, final String key) {
     final Object value = document.get(key);
-    return value instanceof Map<?, ?> ? (Map<String, Object>) value : null;
+    return value instanceof Map<?, ?> ? Optional.of((Map<String, Object>) value) : Optional.empty();
   }
 
   private static Map<String, String> mergeStringMap(
-      final Map<String, String> base, final Map<String, String> overlay) {
-    if (overlay == null || overlay.isEmpty()) {
-      return base;
-    }
-    final LinkedHashMap<String, String> merged = new LinkedHashMap<>(base);
-    merged.putAll(overlay);
-    return Map.copyOf(merged);
+      final Map<String, String> base, final Optional<Map<String, String>> overlay) {
+    return overlay
+        .filter(o -> !o.isEmpty())
+        .map(
+            o -> {
+              final LinkedHashMap<String, String> merged = new LinkedHashMap<>(base);
+              merged.putAll(o);
+              return Map.copyOf(merged);
+            })
+        .orElse(base);
   }
 
   private static List<Map<String, Object>> readDocuments(

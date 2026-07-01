@@ -126,8 +126,10 @@ public final class FrameworkLauncher {
     config.put("felix.bootdelegation.implicit", "false");
     // Felix's own internal logger routes into JUL (→ the bridge → logback) instead of System.out.
     config.put("felix.log.logger", new FelixJulLogger());
-    if (config.get("felix.log.level") == null && this.config.felixLogLevel() != null) {
-      config.put("felix.log.level", Integer.toString(this.config.felixLogLevel()));
+    if (config.get("felix.log.level") == null) {
+      this.config
+          .felixLogLevel()
+          .ifPresent(level -> config.put("felix.log.level", Integer.toString(level)));
     }
     config.put(
         Constants.FRAMEWORK_BEGINNING_STARTLEVEL, Integer.toString(plan.beginningStartLevel()));

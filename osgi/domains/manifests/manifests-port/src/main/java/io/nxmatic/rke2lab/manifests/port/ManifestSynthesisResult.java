@@ -1,6 +1,8 @@
 package io.nxmatic.rke2lab.manifests.port;
 
 import java.nio.file.Path;
+import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Result contract for canonical manifest synthesis.
@@ -18,8 +20,8 @@ public record ManifestSynthesisResult(
   }
 
   public static final class Builder {
-    private Path manifestFile;
-    private Path systemdUnitsDir;
+    private @Nullable Path manifestFile;
+    private @Nullable Path systemdUnitsDir;
     private int manifestUnitHitCount;
     private int domainCount;
 
@@ -47,7 +49,10 @@ public record ManifestSynthesisResult(
 
     public ManifestSynthesisResult build() {
       return new ManifestSynthesisResult(
-          manifestFile, systemdUnitsDir, manifestUnitHitCount, domainCount);
+          Objects.requireNonNull(manifestFile, "manifestFile"),
+          Objects.requireNonNull(systemdUnitsDir, "systemdUnitsDir"),
+          manifestUnitHitCount,
+          domainCount);
     }
   }
 }

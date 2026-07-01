@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import software.constructs.Construct;
 import software.constructs.ConstructOrder;
 
@@ -103,18 +104,16 @@ public class SystemdChart extends Construct {
   /**
    * Looks up a unit by its construct ID.
    *
-   * <p>Returns null if not found.
-   *
    * @param id the construct ID (without suffix, e.g., "rke2lab-nix-install")
-   * @return the unit, or null if not found
+   * @return the unit, or empty if not found
    */
-  public SystemdUnit findUnit(String id) {
+  public Optional<SystemdUnit> findUnit(String id) {
     for (SystemdUnit unit : units()) {
       if (unit.getUnitId().equals(id)) {
-        return unit;
+        return Optional.of(unit);
       }
     }
-    return null;
+    return Optional.empty();
   }
 
   /**
