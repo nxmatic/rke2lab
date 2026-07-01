@@ -2,6 +2,7 @@ package io.nxmatic.rke2lab.doctor.internal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.doctor.records.Assessment;
@@ -14,6 +15,7 @@ import io.nxmatic.rke2lab.doctor.records.RemediationProgramRef;
 import io.nxmatic.rke2lab.doctor.records.SchemaRef;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
 import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
+import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,14 +24,17 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 /**
- * The inverse contract of {@link ConsultationReport#toOutputMap()} and its nested {@code
- * toOutputMap}s: feed a real round-tripped output map back into {@link ConsultationReportReader},
- * assert the report rebuilds identically. Also pins the tolerance/additivity guarantee (unknown
- * keys survive into {@code details}, absent optional keys degrade to empty) and the three hard
- * requirements that make reconstruction impossible (no map / no checkpointId / no parseable
- * diagnosis).
+ * The {@link DocumentCodec} round-trip of a {@link ConsultationReport} through its opaque {@code
+ * Map} blob (the shape a Document's open slot carries) — the direct-decode path that replaced the
+ * hand-rolled {@code ConsultationReportReader}. Proves the record graph (observations, plan,
+ * replies, assessment, prescription) survives {@code toMap → fromMap} with kebab-cased enum ids,
+ * that additive keys are tolerated ({@code FAIL_ON_UNKNOWN_PROPERTIES} off), and that a
+ * structurally-invalid blob throws (the compact-ctor guard) so the {@code MedicalRecordReader}
+ * boundary can degrade it.
  */
-class ConsultationReportReaderTest {
+class ConsultationReportCodecTest {
+
+  private static final DocumentCodec CODEC = new DocumentCodec();
 
   private static ConsultationReport sampleReport() {
     final Observation observation =
@@ -49,10 +54,13 @@ class ConsultationReportReaderTest {
     return new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(observation), plan);
   }
 
+  private static ConsultationReport roundTrip(ConsultationReport report) {
+    return CODEC.fromMap(CODEC.toMap(report), ConsultationReport.class);
+  }
+
   @Test
   void round_trips_a_full_report() {
-    final ConsultationReport rebuilt =
-        ConsultationReportReader.fromOutputMap(sampleReport().toOutputMap()).orElseThrow();
+    final ConsultationReport rebuilt = roundTrip(sampleReport());
 
     assertEquals("systemd-adapter", rebuilt.checkpointId());
     assertEquals(Symptom.CONNECTION_REFUSED, rebuilt.symptom());
@@ -71,36 +79,31 @@ class ConsultationReportReaderTest {
   }
 
   @Test
-  void null_returns_empty() {
-    assertTrue(ConsultationReportReader.fromOutputMap(null).isEmpty());
-  }
-
-  @Test
-  void non_map_returns_empty() {
-    assertTrue(ConsultationReportReader.fromOutputMap("not a map").isEmpty());
-  }
-
-  @Test
-  void missing_checkpointId_returns_empty() {
-    final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
+  void missing_checkpointId_is_rejected() {
+    final Map<String, Object> raw = new LinkedHashMap<>(CODEC.toMap(sampleReport()));
     raw.remove("checkpointId");
-    assertTrue(ConsultationReportReader.fromOutputMap(raw).isEmpty());
+    assertThrows(
+        IllegalArgumentException.class, () -> CODEC.fromMap(raw, ConsultationReport.class));
   }
 
   @Test
-  void missing_plan_returns_empty() {
-    final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
+  void missing_plan_is_rejected() {
+    final Map<String, Object> raw = new LinkedHashMap<>(CODEC.toMap(sampleReport()));
     raw.remove("plan");
-    assertTrue(ConsultationReportReader.fromOutputMap(raw).isEmpty());
+    assertThrows(
+        IllegalArgumentException.class, () -> CODEC.fromMap(raw, ConsultationReport.class));
   }
 
   @Test
-  void unparseable_plan_symptom_returns_empty() {
-    final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
+  void unparseable_plan_symptom_is_rejected() {
+    final Map<String, Object> raw = new LinkedHashMap<>(CODEC.toMap(sampleReport()));
     final Map<String, Object> plan = new LinkedHashMap<>(asMap(raw.get("plan")));
     plan.put("symptom", "not-a-real-symptom");
     raw.put("plan", plan);
-    assertTrue(ConsultationReportReader.fromOutputMap(raw).isEmpty());
+    // A lenient Symptom creator yields null → RemediationPlan's guard throws; the enclosing entry
+    // degrades at the MedicalRecordReader boundary.
+    assertThrows(
+        IllegalArgumentException.class, () -> CODEC.fromMap(raw, ConsultationReport.class));
   }
 
   @Test
@@ -115,11 +118,7 @@ class ConsultationReportReaderTest {
     final ConsultationReport report =
         new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(observation), plan);
 
-    final Observation rebuilt =
-        ConsultationReportReader.fromOutputMap(report.toOutputMap())
-            .orElseThrow()
-            .observations()
-            .get(0);
+    final Observation rebuilt = roundTrip(report).observations().get(0);
 
     assertEquals("tomorrow", rebuilt.details().get("futureField"));
     assertEquals("endpoint-gate", rebuilt.details().get("source"));
@@ -131,17 +130,16 @@ class ConsultationReportReaderTest {
 
   @Test
   void extra_top_level_key_does_not_break_reconstruction() {
-    final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
+    final Map<String, Object> raw = new LinkedHashMap<>(CODEC.toMap(sampleReport()));
     raw.put("correspondence", Map.of("seenBy", "future-doctor"));
-    assertTrue(ConsultationReportReader.fromOutputMap(raw).isPresent());
+    assertEquals("systemd-adapter", CODEC.fromMap(raw, ConsultationReport.class).checkpointId());
   }
 
   @Test
   void missing_observations_yields_empty_list() {
-    final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
+    final Map<String, Object> raw = new LinkedHashMap<>(CODEC.toMap(sampleReport()));
     raw.remove("observations");
-    final ConsultationReport rebuilt = ConsultationReportReader.fromOutputMap(raw).orElseThrow();
-    assertTrue(rebuilt.observations().isEmpty());
+    assertTrue(CODEC.fromMap(raw, ConsultationReport.class).observations().isEmpty());
   }
 
   @Test
@@ -150,19 +148,19 @@ class ConsultationReportReaderTest {
         new RemediationPlan(Symptom.CONNECTION_REFUSED, List.of(), "adapter unreachable");
     final ConsultationReport report =
         new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(), plan);
-    final Map<String, Object> raw = new LinkedHashMap<>(report.toOutputMap());
+    final Map<String, Object> raw = new LinkedHashMap<>(CODEC.toMap(report));
     final Map<String, Object> planMap = new LinkedHashMap<>(asMap(raw.get("plan")));
     planMap.remove("replies");
     raw.put("plan", planMap);
 
-    final ConsultationReport rebuilt = ConsultationReportReader.fromOutputMap(raw).orElseThrow();
+    final ConsultationReport rebuilt = CODEC.fromMap(raw, ConsultationReport.class);
     assertTrue(rebuilt.plan().replies().isEmpty());
     assertTrue(rebuilt.plan().prescriptions().isEmpty());
   }
 
   @Test
   void prescription_without_payload_yields_empty_map() {
-    final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
+    final Map<String, Object> raw = new LinkedHashMap<>(CODEC.toMap(sampleReport()));
     final Map<String, Object> planMap = new LinkedHashMap<>(asMap(raw.get("plan")));
     final List<?> replies = (List<?>) planMap.get("replies");
     final Map<String, Object> reply = new LinkedHashMap<>(asMap(replies.get(0)));
@@ -172,49 +170,10 @@ class ConsultationReportReaderTest {
     planMap.put("replies", List.of(reply));
     raw.put("plan", planMap);
 
-    final Prescription rebuilt =
-        ConsultationReportReader.fromOutputMap(raw)
-            .orElseThrow()
-            .plan()
-            .primaryPrescription()
-            .orElseThrow();
-    assertTrue(rebuilt.payload().isEmpty());
-  }
-
-  @Test
-  void unparseable_prescription_programRef_is_dropped_but_reply_keeps_its_assessment() {
-    final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
-    final Map<String, Object> planMap = new LinkedHashMap<>(asMap(raw.get("plan")));
-    final List<?> replies = (List<?>) planMap.get("replies");
-    final Map<String, Object> reply = new LinkedHashMap<>(asMap(replies.get(0)));
-    reply.put(
-        "prescription",
-        Map.of("programRef", "no-such-program", "payload", Map.of(), "humanHint", "ignored"));
-    planMap.put("replies", List.of(reply));
-    raw.put("plan", planMap);
-
-    final RemediationPlan rebuilt =
-        ConsultationReportReader.fromOutputMap(raw).orElseThrow().plan();
-    // The malformed prescription drops, but the reply survives — its assessment (the "why") stands.
-    assertTrue(rebuilt.prescriptions().isEmpty());
-    assertEquals(1, rebuilt.replies().size());
-    assertFalse(rebuilt.replies().get(0).hasPrescription());
-  }
-
-  @Test
-  void reply_without_a_parseable_assessment_is_dropped() {
-    final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
-    final Map<String, Object> planMap = new LinkedHashMap<>(asMap(raw.get("plan")));
-    final List<?> replies = (List<?>) planMap.get("replies");
-    final Map<String, Object> reply = new LinkedHashMap<>(asMap(replies.get(0)));
-    reply.remove("assessment");
-    planMap.put("replies", List.of(reply));
-    raw.put("plan", planMap);
-
-    // A reply with no "why" is not a reply — it is dropped, leaving an empty (but valid) plan.
-    final RemediationPlan rebuilt =
-        ConsultationReportReader.fromOutputMap(raw).orElseThrow().plan();
-    assertTrue(rebuilt.replies().isEmpty());
+    final Prescription withoutPayload =
+        CODEC.fromMap(raw, ConsultationReport.class).plan().primaryPrescription().orElseThrow();
+    assertTrue(withoutPayload.payload().isEmpty());
+    assertEquals(RemediationProgramRef.RESTART_UNIT, withoutPayload.programRef());
   }
 
   @Test
@@ -230,8 +189,7 @@ class ConsultationReportReaderTest {
     final ConsultationReport report =
         new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(), plan);
 
-    final ConsultationReport rebuilt =
-        ConsultationReportReader.fromOutputMap(report.toOutputMap()).orElseThrow();
+    final ConsultationReport rebuilt = roundTrip(report);
 
     assertEquals(1, rebuilt.plan().replies().size());
     final ReferralReply rebuiltReply = rebuilt.plan().replies().get(0);
@@ -240,6 +198,8 @@ class ConsultationReportReaderTest {
     assertEquals(
         "not a dbus-TCP symptom — the systemd adapter has no treatment for timeout",
         rebuiltReply.assessment().summary());
+    // The transient referral back-ref is never serialized.
+    assertTrue(rebuiltReply.referral().isEmpty());
   }
 
   @Test
@@ -261,8 +221,7 @@ class ConsultationReportReaderTest {
     final ConsultationReport report =
         new ConsultationReport(Checkpoint.SYSTEMD_ADAPTER.slug(), List.of(), plan);
 
-    final ConsultationReport rebuilt =
-        ConsultationReportReader.fromOutputMap(report.toOutputMap()).orElseThrow();
+    final ConsultationReport rebuilt = roundTrip(report);
 
     assertEquals(1, rebuilt.plan().replies().size());
     final ReferralReply rebuiltReply = rebuilt.plan().replies().get(0);
@@ -275,7 +234,7 @@ class ConsultationReportReaderTest {
 
   @Test
   void unknown_reply_key_survives_reconstruction() {
-    final Map<String, Object> raw = new LinkedHashMap<>(sampleReport().toOutputMap());
+    final Map<String, Object> raw = new LinkedHashMap<>(CODEC.toMap(sampleReport()));
     final Map<String, Object> planMap = new LinkedHashMap<>(asMap(raw.get("plan")));
     final List<?> replies = (List<?>) planMap.get("replies");
     final Map<String, Object> reply = new LinkedHashMap<>(asMap(replies.get(0)));
@@ -283,10 +242,9 @@ class ConsultationReportReaderTest {
     planMap.put("replies", List.of(reply));
     raw.put("plan", planMap);
 
-    final Optional<ConsultationReport> rebuilt = ConsultationReportReader.fromOutputMap(raw);
-    assertTrue(rebuilt.isPresent());
-    assertEquals(1, rebuilt.get().plan().replies().size());
-    assertEquals("dbus refused", rebuilt.get().observations().get(0).summary());
+    final ConsultationReport rebuilt = CODEC.fromMap(raw, ConsultationReport.class);
+    assertEquals(1, rebuilt.plan().replies().size());
+    assertEquals("dbus refused", rebuilt.observations().get(0).summary());
   }
 
   /** The output map is a {@code Map<String, Object>} by construction; the nested reads are too. */

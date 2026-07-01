@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.doctor.records;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Optional;
 
 /**
@@ -26,6 +28,7 @@ public enum Symptom {
   }
 
   /** The kebab-case id used in config (e.g. the {@code policy.preview.simulate} sub-map). */
+  @JsonValue
   public String id() {
     return id;
   }
@@ -44,5 +47,15 @@ public enum Symptom {
       }
     }
     return Optional.empty();
+  }
+
+  /**
+   * The codec's {@code @JsonCreator}: decodes a slug to the enum, an unknown/blank slug to {@code
+   * null} (an absent value) — keeping the tolerance the string readers had (a malformed symptom
+   * degrades the enclosing record rather than crashing the decode).
+   */
+  @JsonCreator
+  static Symptom fromWire(String value) {
+    return parse(value).orElse(null);
   }
 }

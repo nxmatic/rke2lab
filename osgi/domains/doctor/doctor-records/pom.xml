@@ -29,6 +29,15 @@
       <artifactId>world-gateway</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- jackson-ANNOTATIONS only: 78 inert metadata classes, no engine, no ServiceLoader — the
+         hints (@JsonValue/@JsonCreator/@JsonTypeInfo/@JsonIgnore) the codec's MAPPER reads to
+         (de)serialize these records DIRECTLY, retiring the hand-rolled *Reader classes. Does NOT
+         pull jackson-databind (the leaf stays behavior-free); the annotation package is already in
+         both realms transitively via the codec, so this adds zero new realm surface. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+    </dependency>
   </dependencies>
 
   <build>

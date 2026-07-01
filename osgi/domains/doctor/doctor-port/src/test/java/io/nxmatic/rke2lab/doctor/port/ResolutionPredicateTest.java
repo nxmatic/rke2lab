@@ -1,16 +1,19 @@
 package io.nxmatic.rke2lab.doctor.port;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.doctor.records.*;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
+/**
+ * The {@link ResolutionPredicate} behavior — does the symptom-resolved prediction hold at the next
+ * visit? The wire shape ({@code {"kind":"resolution","symptom":...}}) is now the codec's
+ * polymorphic (de)serialization, covered by the round-trip tests in doctor-core; here we pin only
+ * the domain predicate.
+ */
 class ResolutionPredicateTest {
 
   private static ConsultationReport report(Symptom symptom) {
@@ -55,76 +58,5 @@ class ResolutionPredicateTest {
     boolean held = predicate.heldAt(visit);
 
     assertTrue(held);
-  }
-
-  @Test
-  void toOutputMap_containsKindAndSymptom() {
-    ResolutionPredicate predicate = new ResolutionPredicate(Symptom.CONNECTION_REFUSED);
-
-    Map<String, Object> map = predicate.toOutputMap();
-
-    assertEquals("resolution", map.get("kind"));
-    assertEquals("connection-refused", map.get("symptom"));
-  }
-
-  @Test
-  void fromOutputMap_roundTrip_preservesValue() {
-    ResolutionPredicate original = new ResolutionPredicate(Symptom.TIMEOUT);
-
-    Optional<ExpectationPredicate> reconstructed =
-        ExpectationPredicate.fromOutputMap(original.toOutputMap());
-
-    assertTrue(reconstructed.isPresent());
-    assertEquals(original, reconstructed.get());
-  }
-
-  @Test
-  void fromOutputMap_unknownKind_returnsEmpty() {
-    Map<String, Object> map = Map.of("kind", "unknown-kind");
-
-    Optional<ExpectationPredicate> result = ExpectationPredicate.fromOutputMap(map);
-
-    assertTrue(result.isEmpty());
-  }
-
-  @Test
-  void fromOutputMap_nullInput_returnsEmpty() {
-    Optional<ExpectationPredicate> result = ExpectationPredicate.fromOutputMap(null);
-
-    assertTrue(result.isEmpty());
-  }
-
-  @Test
-  void fromOutputMap_nonMapInput_returnsEmpty() {
-    Optional<ExpectationPredicate> result = ExpectationPredicate.fromOutputMap("not-a-map");
-
-    assertTrue(result.isEmpty());
-  }
-
-  @Test
-  void fromOutputMap_missingKind_returnsEmpty() {
-    Map<String, Object> map = Map.of("symptom", "timeout");
-
-    Optional<ExpectationPredicate> result = ExpectationPredicate.fromOutputMap(map);
-
-    assertTrue(result.isEmpty());
-  }
-
-  @Test
-  void fromOutputMap_missingSymptom_returnsEmpty() {
-    Map<String, Object> map = Map.of("kind", "resolution");
-
-    Optional<ExpectationPredicate> result = ExpectationPredicate.fromOutputMap(map);
-
-    assertTrue(result.isEmpty());
-  }
-
-  @Test
-  void fromOutputMap_unparseableSymptom_returnsEmpty() {
-    Map<String, Object> map = Map.of("kind", "resolution", "symptom", "unknown-symptom");
-
-    Optional<ExpectationPredicate> result = ExpectationPredicate.fromOutputMap(map);
-
-    assertTrue(result.isEmpty());
   }
 }

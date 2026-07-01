@@ -45,10 +45,7 @@ class ReferralReplyTest {
     final ReferralReply reply = ReferralReply.assessing(referral, assessment);
 
     assertFalse(reply.hasPrescription());
-
-    final Map<String, Object> map = reply.toOutputMap();
-    assertTrue(map.containsKey("assessment"));
-    assertFalse(map.containsKey("prescription"));
+    assertTrue(reply.referral().isPresent());
   }
 
   @Test
@@ -56,13 +53,8 @@ class ReferralReplyTest {
     final ReferralReply reply = ReferralReply.prescribing(referral, assessment, prescription);
 
     assertTrue(reply.hasPrescription());
-
-    final Map<String, Object> map = reply.toOutputMap();
-    assertTrue(map.containsKey("assessment"));
-    assertTrue(map.containsKey("prescription"));
-
-    final Map<?, ?> prescriptionMap = (Map<?, ?>) map.get("prescription");
-    assertEquals("restart-systemd-unit", prescriptionMap.get("programRef"));
+    assertEquals(
+        RemediationProgramRef.RESTART_UNIT, reply.prescription().orElseThrow().programRef());
   }
 
   @Test

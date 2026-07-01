@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.doctor.records;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Optional;
 
 /**
@@ -21,6 +23,7 @@ public enum RemediationProgramRef {
   }
 
   /** The kebab-case id used in rendered runbooks and (future) executor dispatch. */
+  @JsonValue
   public String id() {
     return id;
   }
@@ -36,5 +39,11 @@ public enum RemediationProgramRef {
       }
     }
     return Optional.empty();
+  }
+
+  /** The codec's {@code @JsonCreator}: unknown/blank slug decodes to {@code null} (absent). */
+  @JsonCreator
+  static RemediationProgramRef fromWire(String value) {
+    return parse(value).orElse(null);
   }
 }

@@ -13,9 +13,8 @@ import java.util.Map;
  * <p>Those two are therefore modelled as open slots ({@link Map} / {@link List}), for which the
  * {@code SCHEMA_CONCORD} projector emits an open {@code object} / {@code array}: the contract is
  * "this slot is a nested structure", its inner shape (the {@code ConsultationReport} / {@code
- * Expectation} record graph) owned OSGi-side, where {@code ConsultationReportReader} / {@code
- * ExpectationReader} reconstruct it. Each realm maps this record ↔ {@code String} via {@code
- * DocumentCodec}.
+ * Expectation} record graph) owned OSGi-side, where {@code DocumentCodec.fromMap} decodes it. Each
+ * realm maps this record ↔ {@code String} via {@code DocumentCodec}.
  */
 @DocumentContract(Coordinate.CONSULTATION)
 public record Consultation(

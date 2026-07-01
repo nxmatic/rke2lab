@@ -39,7 +39,7 @@ class MedicalRecordReaderExpectationTest {
    */
   private static Document visitWithExpectation(Symptom symptom, Expectation expectation) {
     return visitDocument(
-        List.of(consultationReportMap(symptom)), List.of(List.of(expectation.toOutputMap())));
+        List.of(consultationReportMap(symptom)), List.of(List.of(CODEC.toMap(expectation))));
   }
 
   /** A healthy run: a resource carrying only the consultationReport. */

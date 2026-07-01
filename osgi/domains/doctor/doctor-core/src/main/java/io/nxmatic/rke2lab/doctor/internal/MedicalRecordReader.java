@@ -16,9 +16,9 @@ import java.util.Optional;
  * Visit} per readable entry — INSIDE the bundle realm, where the {@code doctor.records} types are
  * legal. Each Document's payload is the opaque blob the host produced WITHOUT interpreting it:
  * {@code version} + {@code when} plus the raw consultation-report and expectation output blob
- * lists. This reader parses the payload with doctor-core's OWN jackson (no jackson type crosses the
- * seam) and rebuilds the typed visit via {@link ConsultationReportReader}/{@link
- * ExpectationReader}.
+ * lists. This reader decodes the payload with doctor-core's OWN jackson (via {@link DocumentCodec},
+ * no jackson type crosses the seam) and rebuilds the typed visit by decoding each opaque blob
+ * directly into its record ({@link ConsultationReport} / {@link Expectation}).
  *
  * <p>The aggregator does fail-AT-END, not fail-fast: an unreadable Document is collected
  * (identity-enriched) and the fold continues; if any entry failed it throws a {@link
@@ -62,23 +62,41 @@ public final class MedicalRecordReader {
       throw new EntryReadException(0, null, e);
     }
 
-    // The consultationReport blobs are one report map per resource: parse each directly.
+    // The consultationReport blobs are one report map per resource: decode each directly via the
+    // codec. A structurally-invalid blob throws (a record's compact-ctor guard) — caught here to
+    // Optional.empty and dropped, so a malformed report degrades WITHOUT sinking the visit (the
+    // additive-tolerance the hand-rolled readers had).
     final List<ConsultationReport> reports =
         visit.consultationReport().stream()
-            .map(ConsultationReportReader::fromOutputMap)
+            .map(blob -> decodeBlob(blob, ConsultationReport.class))
             .flatMap(Optional::stream)
             .toList();
     // The expectations output was registered as Output.of(List<Map>), so the harvested blob is a
-    // list-of-lists (one inner list per resource). Flatten the inner lists before parsing — the
+    // list-of-lists (one inner list per resource). Flatten the inner lists before decoding — the
     // same shape the SnapshotView fold consumed.
     final List<Expectation> expectations =
         visit.expectations().stream()
             .filter(List.class::isInstance)
             .flatMap(perResource -> ((List<?>) perResource).stream())
-            .map(ExpectationReader::fromOutputMap)
+            .map(blob -> decodeBlob(blob, Expectation.class))
             .flatMap(Optional::stream)
             .toList();
     return new Visit(visit.version(), visit.when(), reports, expectations);
+  }
+
+  /**
+   * Decode one opaque blob to a typed record, degrading a malformed blob to {@link Optional#empty}
+   * rather than sinking the whole visit. This is the finer-grained tolerance the deleted {@code
+   * *Reader} classes gave (a bad report/expectation is dropped, its siblings survive); the
+   * entry-level fold in {@link #read} degrades the whole visit only when the {@code VisitWire}
+   * envelope itself is unreadable.
+   */
+  private <T> Optional<T> decodeBlob(Object blob, Class<T> type) {
+    try {
+      return Optional.ofNullable(codec.fromMap(blob, type));
+    } catch (RuntimeException e) {
+      return Optional.empty();
+    }
   }
 
   private static MedicalRecordReconstructionException failed(

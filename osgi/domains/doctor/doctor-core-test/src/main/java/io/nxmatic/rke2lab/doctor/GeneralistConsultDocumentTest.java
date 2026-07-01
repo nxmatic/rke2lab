@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.doctor.internal.*;
 import io.nxmatic.rke2lab.doctor.records.ConsultationReport;
+import io.nxmatic.rke2lab.doctor.records.Expectation;
 import io.nxmatic.rke2lab.doctor.records.MedicalRecord;
 import io.nxmatic.rke2lab.doctor.records.Observation;
 import io.nxmatic.rke2lab.doctor.records.Symptom;
@@ -81,10 +82,8 @@ class GeneralistConsultDocumentTest {
     final Document consultation = newGeneralist().consult(checkpoint);
     final Consultation decoded = codec.decode(consultation, Consultation.class);
 
-    final var reportOpt = ConsultationReportReader.fromOutputMap(decoded.consultationReport());
-    assertTrue(reportOpt.isPresent(), "ConsultationReport should round-trip successfully");
-
-    final ConsultationReport reconstructed = reportOpt.get();
+    final ConsultationReport reconstructed =
+        codec.fromMap(decoded.consultationReport(), ConsultationReport.class);
     assertEquals(
         "systemd-adapter", reconstructed.checkpointId(), "checkpointId should match the input");
     assertEquals(
@@ -95,8 +94,12 @@ class GeneralistConsultDocumentTest {
 
     assertFalse(decoded.expectations().isEmpty(), "expectations list should be non-empty");
 
-    final var firstExpectationOpt = ExpectationReader.fromOutputMap(decoded.expectations().get(0));
-    assertTrue(firstExpectationOpt.isPresent(), "first Expectation should round-trip successfully");
+    final Expectation firstExpectation =
+        codec.fromMap(decoded.expectations().get(0), Expectation.class);
+    assertEquals(
+        Symptom.CONNECTION_REFUSED,
+        firstExpectation.symptom(),
+        "first Expectation should round-trip successfully");
   }
 
   @Test
@@ -115,10 +118,8 @@ class GeneralistConsultDocumentTest {
     final Document consultation = newGeneralist().consult(checkpoint);
     final Consultation decoded = codec.decode(consultation, Consultation.class);
 
-    final var reportOpt = ConsultationReportReader.fromOutputMap(decoded.consultationReport());
-    assertTrue(reportOpt.isPresent(), "the cluster report should round-trip");
-
-    final ConsultationReport reconstructed = reportOpt.get();
+    final ConsultationReport reconstructed =
+        codec.fromMap(decoded.consultationReport(), ConsultationReport.class);
     assertEquals(
         Symptom.API_NOT_READY,
         reconstructed.symptom(),

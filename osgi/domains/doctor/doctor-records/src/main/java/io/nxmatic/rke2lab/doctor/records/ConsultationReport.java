@@ -2,9 +2,7 @@ package io.nxmatic.rke2lab.doctor.records;
 
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * One consultation of one checkpoint: what the patient brought to the doctor (the {@link
@@ -29,6 +27,12 @@ public record ConsultationReport(
   public static final String OUTPUT_KEY = "consultationReport";
 
   public ConsultationReport {
+    if (checkpointId == null || checkpointId.isBlank()) {
+      throw new IllegalArgumentException("checkpointId cannot be null or blank");
+    }
+    if (plan == null) {
+      throw new IllegalArgumentException("plan cannot be null");
+    }
     observations = observations == null ? List.of() : List.copyOf(observations);
   }
 
@@ -55,14 +59,5 @@ public record ConsultationReport(
                     new ResolutionPredicate(symptom()),
                     recordedAt))
         .toList();
-  }
-
-  /** Flat map view; {@code observations} and {@code plan} are themselves flat map views. */
-  public Map<String, Object> toOutputMap() {
-    final LinkedHashMap<String, Object> map = new LinkedHashMap<>();
-    map.put("checkpointId", checkpointId);
-    map.put("observations", observations.stream().map(Observation::toOutputMap).toList());
-    map.put("plan", plan.toOutputMap());
-    return map;
   }
 }

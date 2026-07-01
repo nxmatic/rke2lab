@@ -1,8 +1,6 @@
 package io.nxmatic.rke2lab.doctor.records;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -17,6 +15,9 @@ public record RemediationPlan(
     Symptom symptom, List<ReferralReply> replies, String generalistSummary) {
 
   public RemediationPlan {
+    if (symptom == null) {
+      throw new IllegalArgumentException("symptom cannot be null");
+    }
     replies = replies == null ? List.of() : List.copyOf(replies);
   }
 
@@ -33,14 +34,5 @@ public record RemediationPlan(
   public Optional<Prescription> primaryPrescription() {
     final List<Prescription> prescriptions = prescriptions();
     return prescriptions.isEmpty() ? Optional.empty() : Optional.of(prescriptions.get(0));
-  }
-
-  /** Flat map view; {@code symptom} is the kebab id, replies are nested flat maps. */
-  public Map<String, Object> toOutputMap() {
-    final LinkedHashMap<String, Object> map = new LinkedHashMap<>();
-    map.put(Symptom.ENVELOPE_KEY, symptom.id());
-    map.put("generalistSummary", generalistSummary);
-    map.put("replies", replies.stream().map(ReferralReply::toOutputMap).toList());
-    return map;
   }
 }

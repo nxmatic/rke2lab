@@ -1,7 +1,6 @@
 package io.nxmatic.rke2lab.doctor.records;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -19,7 +18,9 @@ import java.util.Optional;
  * #reconstructed} factory leaves it empty (no synthetic Referral is fabricated).
  */
 public record ReferralReply(
-    Optional<Referral> referral, Assessment assessment, Optional<Prescription> prescription) {
+    @JsonIgnore Optional<Referral> referral,
+    Assessment assessment,
+    Optional<Prescription> prescription) {
 
   public ReferralReply {
     Objects.requireNonNull(assessment, "assessment");
@@ -58,17 +59,5 @@ public record ReferralReply(
 
   public boolean hasPrescription() {
     return prescription.isPresent();
-  }
-
-  /**
-   * Flat map view for serialization. Contains the {@code assessment} (always) and the {@code
-   * prescription} (only when present — additive shape; an absent key means no prescription). The
-   * {@code referral} back-ref is NOT serialized (it is transient).
-   */
-  public Map<String, Object> toOutputMap() {
-    final LinkedHashMap<String, Object> map = new LinkedHashMap<>();
-    map.put("assessment", assessment.toOutputMap());
-    prescription.ifPresent(p -> map.put("prescription", p.toOutputMap()));
-    return map;
   }
 }

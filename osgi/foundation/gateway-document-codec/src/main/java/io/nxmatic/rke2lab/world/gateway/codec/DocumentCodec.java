@@ -1,6 +1,8 @@
 package io.nxmatic.rke2lab.world.gateway.codec;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -11,6 +13,7 @@ import io.nxmatic.rke2lab.world.gateway.port.Document;
 import io.nxmatic.rke2lab.world.gateway.port.DocumentContract;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Map;
 
 /**
  * The JSON (de)serialization + (capability) validation of {@code Document} payloads — the JSON
@@ -40,7 +43,13 @@ public final class DocumentCodec {
           .registerModule(new JavaTimeModule())
           .registerModule(new Jdk8Module())
           .setDefaultPropertyInclusion(JsonInclude.Include.NON_ABSENT)
-          .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+          .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+          // Additive-schema tolerance: an unknown key is ignored, not a crash — the contract the
+          // hand-rolled *Reader classes had (the schema evolves by adding keys, a producer's newer
+          // key survives a reader written today). Keeps the "full-typed + lenient" posture.
+          .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+  private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
   private final boolean validationEnabled;
 
@@ -111,6 +120,29 @@ public final class DocumentCodec {
               + "')");
     }
     return decode(document.payload(), type);
+  }
+
+  /**
+   * Convert an already-parsed structure (the opaque {@code Map}/{@code List} blob a Document
+   * carries in an open slot) DIRECTLY into a typed record — no re-serialization round-trip. The
+   * inverse of {@link #toMap}; the same MAPPER, so seam enums, {@code Instant}, {@code Optional},
+   * and the annotated value types decode exactly as from a String payload. Unknown keys are
+   * tolerated ({@code FAIL_ON_UNKNOWN_PROPERTIES} disabled); a structurally-invalid blob throws (a
+   * record's compact-ctor guard surfaces as an {@link IllegalArgumentException}), which the caller
+   * catches to degrade the enclosing entry.
+   */
+  public <T> T fromMap(Object rawStructure, Class<T> type) {
+    return MAPPER.convertValue(rawStructure, type);
+  }
+
+  /**
+   * Render a typed record to its opaque {@code Map} blob (the shape a Document's open slot carries,
+   * and the host copies verbatim into a Pulumi output). The inverse of {@link #fromMap}; enum refs
+   * render as their annotated slug, {@code Instant} as ISO-8601 — the exact flat shape the deleted
+   * {@code toOutputMap()} methods produced.
+   */
+  public Map<String, Object> toMap(Object record) {
+    return MAPPER.convertValue(record, MAP_TYPE);
   }
 
   /**

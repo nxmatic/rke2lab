@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.doctor.records;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Optional;
 
 /**
@@ -9,7 +11,7 @@ import java.util.Optional;
  * AI-ready. This is the "schemaRef" property an assessment carries to say "I am structured this
  * way; a consumer who understands this schema can parse my details."
  */
-public record SchemaRef(String id) {
+public record SchemaRef(@JsonValue String id) {
 
   public SchemaRef {
     if (id == null || id.isBlank()) {
@@ -18,6 +20,7 @@ public record SchemaRef(String id) {
     id = id.trim();
   }
 
+  @JsonCreator
   public static SchemaRef of(String id) {
     return new SchemaRef(id);
   }

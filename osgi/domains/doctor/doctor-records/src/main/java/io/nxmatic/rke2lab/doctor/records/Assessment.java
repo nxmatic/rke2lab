@@ -1,6 +1,5 @@
 package io.nxmatic.rke2lab.doctor.records;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -9,6 +8,11 @@ import java.util.Map;
  * {@link #schemaRef} the specialist declares — open set, no registry. The {@link #payload} carries
  * the structured details; the {@link #summary} is the human "why" (never null or blank — a reply
  * without reasoning is incomplete state).
+ *
+ * <p>The codec (de)serializes it natively: {@code schemaRef} as its annotated id string, {@code
+ * payload} as an open map, {@code summary} as the prose. A malformed decode (blank summary, missing
+ * schemaRef) throws the compact-ctor guard, caught at the fromMap boundary — the enclosing entry
+ * degrades, keeping the string reader's tolerance.
  */
 public record Assessment(SchemaRef schemaRef, Map<String, Object> payload, String summary) {
 
@@ -24,14 +28,5 @@ public record Assessment(SchemaRef schemaRef, Map<String, Object> payload, Strin
 
   public static Assessment of(SchemaRef schemaRef, Map<String, Object> payload, String summary) {
     return new Assessment(schemaRef, payload, summary);
-  }
-
-  /** Flat map view; {@code schemaRef} is the schema id string, not the SchemaRef object. */
-  public Map<String, Object> toOutputMap() {
-    final LinkedHashMap<String, Object> map = new LinkedHashMap<>();
-    map.put("schemaRef", schemaRef.id());
-    map.put("payload", payload);
-    map.put("summary", summary);
-    return map;
   }
 }

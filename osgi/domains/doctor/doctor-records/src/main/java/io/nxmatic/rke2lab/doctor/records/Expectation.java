@@ -1,8 +1,6 @@
 package io.nxmatic.rke2lab.doctor.records;
 
 import java.time.Instant;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * One expectation about what a prescription predicts will be true at the next visit. When a
@@ -17,6 +15,21 @@ public record Expectation(
     ExpectationPredicate predicate,
     Instant recordedAt) {
 
+  public Expectation {
+    if (problem == null) {
+      throw new IllegalArgumentException("problem cannot be null");
+    }
+    if (fromPrescription == null) {
+      throw new IllegalArgumentException("fromPrescription cannot be null");
+    }
+    if (predicate == null) {
+      throw new IllegalArgumentException("predicate cannot be null");
+    }
+    if (recordedAt == null) {
+      throw new IllegalArgumentException("recordedAt cannot be null");
+    }
+  }
+
   /**
    * The Pulumi output key under which a list of expectations is persisted — mirrors {@link
    * ConsultationReport#OUTPUT_KEY}. Each checkpoint that writes a prescription can append its
@@ -30,18 +43,5 @@ public record Expectation(
    */
   public Symptom symptom() {
     return problem.symptom().orElseThrow();
-  }
-
-  /**
-   * Flat map view for persistence. The {@code predicate} is itself a flat map (dispatched via its
-   * {@code kind} discriminator), so this structure is fully serializable.
-   */
-  public Map<String, Object> toOutputMap() {
-    final LinkedHashMap<String, Object> map = new LinkedHashMap<>();
-    map.put("problem", problem.toRef());
-    map.put("fromPrescription", fromPrescription.id());
-    map.put("predicate", predicate.toOutputMap());
-    map.put("recordedAt", recordedAt.toString());
-    return Map.copyOf(map);
   }
 }

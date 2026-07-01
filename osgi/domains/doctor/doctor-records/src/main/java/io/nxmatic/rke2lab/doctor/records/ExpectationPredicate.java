@@ -1,7 +1,7 @@
 package io.nxmatic.rke2lab.doctor.records;
 
-import java.util.Map;
-import java.util.Optional;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 /**
  * A predicate about what a prescription expects to be true at the next visit. Today the only
@@ -9,38 +9,15 @@ import java.util.Optional;
  * specialist will want a richer predicate (a fingerprint of the observed state to diff). Modeled as
  * a sealed interface — the explicit extension seam — so future implementations (e.g.,
  * FingerprintPredicate) can slot in without touching callers.
+ *
+ * <p>The codec (de)serializes the ADT polymorphically: a {@code "kind"} discriminator property
+ * names the implementation ({@code "resolution"} → {@link ResolutionPredicate}). A future subtype
+ * registers by adding a {@link JsonSubTypes.Type} entry here.
  */
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "kind")
+@JsonSubTypes(@JsonSubTypes.Type(value = ResolutionPredicate.class, name = "resolution"))
 public sealed interface ExpectationPredicate permits ResolutionPredicate {
 
   /** Did the prediction hold at the following visit? */
   boolean heldAt(Visit nextVisit);
-
-  /**
-   * Flat map view for persistence. MUST include a discriminator key {@code "kind"} so {@link
-   * #fromOutputMap} can dispatch to the right implementation.
-   */
-  Map<String, Object> toOutputMap();
-
-  /**
-   * Parse a flat map into a typed predicate. Non-map/null/missing-kind → empty. Reads {@code
-   * "kind"}, dispatches to the appropriate implementation's parser. Unknown kind → empty.
-   */
-  static Optional<ExpectationPredicate> fromOutputMap(Object raw) {
-    if (!(raw instanceof Map<?, ?> uncheckedMap)) {
-      return Optional.empty();
-    }
-    @SuppressWarnings("unchecked")
-    final Map<String, Object> map = (Map<String, Object>) uncheckedMap;
-
-    final Object kindRaw = map.get("kind");
-    if (!(kindRaw instanceof String kind)) {
-      return Optional.empty();
-    }
-
-    return switch (kind) {
-      case "resolution" ->
-          ResolutionPredicate.fromOutputMap(map).map(p -> (ExpectationPredicate) p);
-      default -> Optional.empty();
-    };
-  }
 }

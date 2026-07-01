@@ -1,5 +1,7 @@
 package io.nxmatic.rke2lab.doctor.records;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import java.util.Optional;
 
@@ -22,10 +24,23 @@ public record ProblemRef(Checkpoint checkpoint, Optional<Symptom> symptom) {
 
   /**
    * Renders the problem reference as a string: {@code "checkpoint/symptom"} or {@code
-   * "checkpoint"}.
+   * "checkpoint"}. Also the codec's {@code @JsonValue} — a ProblemRef serializes as this single
+   * string, decoded back via {@link #fromWire}.
    */
+  @JsonValue
   public String toRef() {
     return checkpoint.slug() + symptom.map(s -> "/" + s.id()).orElse("");
+  }
+
+  /**
+   * The codec's {@code @JsonCreator}: parses the {@code "checkpoint/symptom"} string, an
+   * unknown/blank reference decoding to {@code null} (an absent value) — keeping the string
+   * reader's tolerance (a malformed ref degrades the enclosing Expectation, caught at the fromMap
+   * boundary).
+   */
+  @JsonCreator
+  static ProblemRef fromWire(String value) {
+    return parse(value).orElse(null);
   }
 
   /**

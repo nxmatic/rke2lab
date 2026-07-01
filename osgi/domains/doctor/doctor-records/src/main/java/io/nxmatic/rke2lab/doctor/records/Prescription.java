@@ -1,6 +1,5 @@
 package io.nxmatic.rke2lab.doctor.records;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -23,14 +22,5 @@ public record Prescription(
   public static Prescription of(
       RemediationProgramRef programRef, Map<String, Object> payload, String humanHint) {
     return new Prescription(programRef, payload, humanHint);
-  }
-
-  /** Flat map view; {@code programRef} is the kebab catalog id, never the enum name. */
-  public Map<String, Object> toOutputMap() {
-    final LinkedHashMap<String, Object> map = new LinkedHashMap<>();
-    map.put("programRef", programRef.id());
-    map.put("payload", payload);
-    map.put("humanHint", humanHint);
-    return map;
   }
 }

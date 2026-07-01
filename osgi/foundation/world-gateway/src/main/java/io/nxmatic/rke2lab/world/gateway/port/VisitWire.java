@@ -12,8 +12,8 @@ import java.util.List;
  * <p>Both lists are OPAQUE ({@code List} of open objects, for which the {@code SCHEMA_CONCORD}
  * projector emits an open {@code array}): they carry the {@code outputsNamed} transport framing
  * (one inner element per resource) that OSGi's {@code MedicalRecordReader} unwraps and folds into a
- * typed {@code Visit} via {@code ConsultationReportReader} / {@code ExpectationReader}. The host
- * never parses the blobs; each realm maps this record ↔ {@code String} via {@code DocumentCodec}.
+ * typed {@code Visit} via {@code DocumentCodec.fromMap}. The host never parses the blobs; each
+ * realm maps this record ↔ {@code String} via {@code DocumentCodec}.
  */
 @DocumentContract(Coordinate.VISIT)
 public record VisitWire(

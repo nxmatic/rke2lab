@@ -207,17 +207,17 @@ public final class Generalist implements Clinician, ConsultingService, ClinicalR
             .orElseThrow(
                 () -> new IllegalArgumentException("consult checkpoint carries no recordedAt"));
 
-    // The two reconstruction sub-trees stay in their flat output-map shape — they cross opaquely to
-    // the host (which copies them verbatim into its Pulumi outputs) and OSGi rebuilds them via
-    // ConsultationReportReader/ExpectationReader. The codec renders the whole Consultation record.
+    // The two reconstruction sub-trees cross opaquely to the host (which copies them verbatim into
+    // its Pulumi outputs); OSGi rebuilds them via the codec (fromMap) on the read path. The codec
+    // (toMap) renders each rich record to its opaque blob, then the whole Consultation record.
     final Consultation consultation =
         new Consultation(
             scenarioId,
             narrationLine(symptom),
             diagnosisBlock(plan),
-            report.toOutputMap(),
+            codec.toMap(report),
             report.expectations(recordedAt).stream()
-                .map(Expectation::toOutputMap)
+                .map(codec::toMap)
                 .map(Object.class::cast)
                 .toList());
     return new Document(
