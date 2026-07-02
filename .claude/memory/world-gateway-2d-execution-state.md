@@ -205,6 +205,103 @@ post-merge ("je me connais" — a deferred backlog won't happen). So after the 2
 (Naming caveat: 2E-2H are shorthand; @NullMarked + dep-centralization are repo-transverse, not strictly
 world-gateway. Order TBD with user; capstone remote-validation still after.)
 
+## T8 IN PROGRESS (2026-07-01) — readiness-checkpoint, NOT built, NOT committed
+
+Commits so far: T5 5aa8b7e4, T6 20ffc7c2, T7 de30368d. T8 edits ON DISK, not built/committed.
+readiness-checkpoint is the NESTING coordinate (observations[]), 2 host producers + 2 OSGi consumers.
+Design decision (settled, consistent with T7): the two producer variants (verdict: failed/override;
+consult: observations[]/recordedAt) UNION into ONE ReadinessCheckpoint with optionals — legitimate
+here (same object type, unlike T7's structurally-incompatible shapes; carto already settled 1 coord).
+details becomes an EXPLICIT nested field (not root-flattened), both realms move together.
+
+DONE (edited, not built):
+- SymptomKind now `implements WireEnum` (@Override slug()).
+- NEW ObservationWire(status, summary, Optional<SymptomKind> symptom, Map details) — nested wire-record.
+- NEW ReadinessCheckpoint(scenarioId, Optional<Boolean> failed, Optional<String> override,
+  Optional<Instant> recordedAt, List<ObservationWire> observations), @DocumentContract(READINESS_CHECKPOINT),
+  compact ctor normalizes nulls.
+- SystemdAdapterStage: both checkpointDocument (verdict) + consultCheckpoint migrated to build
+  ReadinessCheckpoint + codec.encode; dead serialize() removed; ObjectNode import dropped; added
+  List + ReadinessCheckpoint imports. mapper/parse/FIELD_NARRATION KEPT — they now serve ONLY the
+  consultation-narration read (line ~258), a T9 coordinate. THIS IS A TRACKED TRANSITIONAL SMELL
+  (two idioms in one class); user OK'd leaving it, ELIMINATE IT IN T9 when consultation migrates.
+- ObservationView (host): toOutputMap() → toWire() returning ObservationWire; SYMPTOM_KEY +
+  LinkedHashMap removed; imports ObservationWire.
+
+STILL TODO for T8 (resume here):
+1. ClusterReadinessStage (host producer): its consultCheckpoint builds ReadinessCheckpoint + codec
+   (same as SystemdAdapterStage's consult variant); migrate observations via ObservationView.toWire().
+   Check its mapper/parse — likely also kept for a consultation read (T9).
+2. DefaultReadinessAuthority (OSGi consumer, assess): decode ReadinessCheckpoint; read scenarioId +
+   override (+ maybe failed). Currently reads FIELD_SCENARIO_ID/FIELD_OVERRIDE via jackson. Use
+   codec.decode(checkpoint, ReadinessCheckpoint.class).
+3. Generalist (OSGi consumer, consult + observationsFrom): decode ReadinessCheckpoint, map each
+   ObservationWire → doctor Observation (was observationsFrom parsing FIELD_OBSERVATIONS list + the
+   status/summary/symptom/details keys). scenarioId + recordedAt reads too. NOTE Generalist also
+   reads/writes consultation (T9) — keep its mapper for that, tracked smell again.
+4. Delete FIELD_SCENARIO_ID, FIELD_FAILED, FIELD_OVERRIDE, FIELD_RECORDED_AT, FIELD_OBSERVATIONS from
+   WorldGatewayCatalog (verify no remaining users first — DocumentTest/GatewayVocabularyTest assert
+   some of these; migrate/drop those assertions). FIELD_NARRATION/DIAGNOSIS_ADOC/CONSULTATION_REPORT/
+   EXPECTATIONS stay (consultation T9); FIELD_WHEN/VERSION stay (visit T9).
+5. Migrate tests: ReadinessAuthorityTest (builds checkpoint via FIELD_* → ReadinessCheckpoint),
+   GeneralistConsultDocumentTest, RunbookRenderingTest, DocumentTest, GatewayVocabularyTest.
+6. Name ObservationWire + ReadinessCheckpoint in world-gateway-spec.adoc (SPEC_COVERAGE).
+7. Build: PLAIN reactor (no extension change): `flox activate -- ./mvnw package -Pall-worlds
+   -Dmaven.build.cache.skipCache=true -DskipTests=false`. Expect SCHEMA_CONCORD 2 warn (consultation,
+   visit). Commit T8.
+
+Files with ObservationView.toWire/ReadinessCheckpoint already edited: SymptomKind.java, ObservationWire.java
+(new), ReadinessCheckpoint.java (new), SystemdAdapterStage.java, ObservationView.java.
+
+## T8 gestes 1-6 DONE (2026-07-01) — building, NOT committed
+
+All migration edits done; build running (seed-master -am, plain target/). Per-geste:
+1. ClusterReadinessStage: consultCheckpoint builds ReadinessCheckpoint via ObservationView.toWire()
+   + codec.encode; dead serialize()/ArrayNode/ObjectNode dropped. mapper/parse KEPT (T9 narration read).
+2. DefaultReadinessAuthority: decode(checkpoint, ReadinessCheckpoint.class), reads scenarioId +
+   override().flatMap(Severity::parse). ObjectMapper/parse/JsonNode FULLY removed (bonus 2F — was
+   only used by assess). failed field is carried but authority ignores it (override/intrinsic drives).
+3. Generalist: consult() read side decodes ReadinessCheckpoint; observationsFrom(ReadinessCheckpoint)
+   maps ObservationWire→Observation (SymptomKind.slug()→Symptom.parse(id), shared kebab vocab);
+   recordedAt via decoded.recordedAt().orElseThrow. Dead parse() removed. WRITE side (consultation
+   Document: mapper/serialize/ObjectNode + FIELD_SCENARIO_ID/NARRATION/DIAGNOSIS_ADOC) KEPT — T9 smell.
+4. WorldGatewayCatalog: DELETED FIELD_FAILED, FIELD_OVERRIDE, FIELD_OBSERVATIONS, FIELD_RECORDED_AT.
+   KEPT FIELD_SCENARIO_ID (retagged "Consultation payload" — still used by Generalist/RunbookRenderer/
+   ResourceCreationPipeline consultation WRITE, a T9 field), FIELD_NARRATION, FIELD_DIAGNOSIS_ADOC,
+   FIELD_CONSULTATION_REPORT, FIELD_EXPECTATIONS, FIELD_WHEN, FIELD_VERSION (all T9/visit).
+5. Tests migrated: ReadinessAuthorityTest (checkpoint via ReadinessCheckpoint+codec, no ObjectNode),
+   GeneralistConsultDocumentTest (checkpointWith builds ReadinessCheckpoint+codec, toWire() helper
+   maps Observation→ObservationWire; consult-OUTPUT reads unchanged=T9), DocumentTest (dropped the 4
+   deleted pins, kept scenarioId/narration/diagnosisAdoc). RunbookRenderingTest NOT touched — its
+   consultationDocument builds a CONSULTATION Document (T9), uses only surviving fields.
+6. Spec: added readiness-checkpoint para naming ReadinessCheckpoint + ObservationWire (nesting exemplar).
+
+### RECONSIDERATION (the memory note was wrong): ObservationView has TWO views, TWO boundaries
+The prior note said "toOutputMap()→toWire()" (rename). WRONG — over-removal. ObservationView.toOutputMap()
+serves the PULUMI OUTPUT surface (the sink Consumer<Map<String,Object>> → systemdAdapterLaunchSummary,
+a host-internal Pulumi output read back by ClusterReadinessStage for status/summary), which is a
+SEPARATE concern from the seam wire. So ObservationView now has BOTH: toWire() (seam→ObservationWire)
+AND toOutputMap() (Pulumi output, flat map, SYMPTOM_KEY="symptom" slug). Restored toOutputMap +
+SYMPTOM_KEY const + LinkedHashMap import; retagged the record's javadoc to name the two boundaries.
+Lesson [[reconsider-choices-when-revisiting]]: verify a "rename" note against actual call sites first.
+
+## T8 DONE (2026-07-01) — committed b7de5a28, build+tests GREEN, SCHEMA_CONCORD 2 warn
+
+All 7 gestes done, seed-master -am reactor GREEN (0 fail, 0 skip), SCHEMA_CONCORD 0 error / 2 warn
+(consultation, visit — the last two coordinates, T9). Committed b7de5a28. Also committed 2f193242:
+the developer's `nxmatic` Maven profile (build-parent/pom.xml <directory>target~nxmatic) + gitignore
+rule for target~nxmatic/ — lets the developer run parallel builds (-Pnxmatic) without colliding with
+my default target/. NOTE: target~nxmatic/ was NOT gitignored before; a naive `git add <dir>` aspirates
+all its artifacts — stage `src` subtrees explicitly, never whole module dirs.
+
+USER's next-step note (2026-07-01): "on a encore du travail pour concilier les internals avec
+l'interface gateway. on regarde ca a la fin en regard des string constants tjrs reference dans la
+codebase." → at the END (after T9/T10), do a sweep of the STRING CONSTANTS still referenced across the
+codebase, to reconcile the internal record↔map readers (ConsultationReport.OUTPUT_KEY,
+Expectation.OUTPUT_KEY, Symptom.ENVELOPE_KEY, the surviving FIELD_*, ObservationView.SYMPTOM_KEY, the
+InterventionLedgerLayout "interventions" literal, etc.) with the typed gateway interface. This is the
+2E/internal-hardening theme widened to "no loose string keys at the internal seams either".
+
 ## fromOutputMap hardening scope (user Q, 2026-07-01)
 
 `fromOutputMap`→`fromWire` (Object→typed) widens ONLY where it's gateway WIRE:
@@ -217,3 +314,30 @@ Build command (user-confirmed, [[maven-build-cache-and-staging-verify]]): `flox 
 package -Pall-worlds -Dmaven.build.cache.skipCache=true -DskipTests=false` (SKIP cache, not disable;
 no clean unless stale). Extension changes need the two-phase dance ([[osgi-staging-extension-chantier]]).
 See [[world-gateway-2c-complete-2d-designed-state]] [[realm-library-isolation-state]].
+
+## ARC STATUS (2026-07-01) — coordinate arc DONE + LOCKED; reliability arc in progress
+
+ALL 6 coordinates typed + committed + reactor/tests green:
+- T5 `5aa8b7e4` readiness-verdict, T6 `20ffc7c2` intervention-request, T7 `de30368d` intervention,
+  T8 `b7de5a28` readiness-checkpoint (nested), T9 `acb231b8` consultation+visit (opaque blobs) —
+  T9 ALSO eliminated the tracked mapper/parse smell (SystemdAdapterStage, ClusterReadinessStage,
+  Generalist, DefaultReadinessAuthority are now jackson-free).
+- T10 `42c785a1` — dropped the @GovernedBy(SCHEMA_CONCORD, WARN) override from the seam package-info;
+  gate back to ERROR default, 0/0. THE 6-COORDINATE CONTRACT IS LOCKED (build fails if a coordinate
+  lacks a wire-record). WorldGatewayCatalog reduced to 2 Pulumi transport keys (consultationReport,
+  expectations); every wire-field FIELD_* deleted.
+- jsr310 swap `9af2c777` — InstantModule→jackson's JavaTimeModule (see the dedicated memory). Also
+  committed `2f193242` the developer's `nxmatic` Maven profile (target~nxmatic dir) + gitignore.
+
+Build (both me + user, 2026-07-01): all-green, 0 fail/skip, SCHEMA_CONCORD 0 error/0 warn.
+
+REMAINING (reliability arc, IN THIS BRANCH per user's "je me connais"):
+- **2E** = NEXT, big change, DESIGNED + APPROVED, NOT started → see [[world-gateway-2e-annotations-plan]]
+  for the exact bottom-up plan. Decode rich doctor records DIRECTLY via codec by putting
+  jackson-ANNOTATIONS on the pure domain (adds zero realm surface — doctor-records already type=record
+  dual-realm, annotations already in both realms). Deletes 3 *Reader classes + 6 toOutputMap + 2
+  fromOutputMap. Compact BEFORE starting (user's call at 45% ctx).
+- 2F sweep residual `new ObjectMapper()` onto codec (T9 removed many; audit what's left).
+- 2G JSpecify @NullMarked package default. 2H centralize dep scope/version in dependencyManagement/BOM.
+- FINAL: string-constant reconciliation (internals↔gateway) — 2E is the biggest slice of this; +
+  FQCN→import pass (e.g. `io.nxmatic...Document` fully-qualified uses, user flagged); whole-branch review.
