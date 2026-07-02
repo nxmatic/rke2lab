@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -45,7 +46,7 @@ final class PulumiInterventionLedgerWriterLiveTest {
     writer.append(canonical("nft delete ..."));
 
     // Read back via the host READ journal: one opaque intervention Document, no typed fold.
-    final List<Document> entries = new StackInterventionJournal(backendDir).entries();
+    final List<Document> entries = new StackInterventionJournal(Optional.of(backendDir)).entries();
 
     assertEquals(1, entries.size(), "Should have exactly one intervention Document");
 
@@ -78,7 +79,7 @@ final class PulumiInterventionLedgerWriterLiveTest {
     writer.append(canonical("first fix"));
     writer.append(canonical("second fix"));
 
-    final List<Document> entries = new StackInterventionJournal(backendDir).entries();
+    final List<Document> entries = new StackInterventionJournal(Optional.of(backendDir)).entries();
     assertEquals(2, entries.size(), "two appends must write two history entries");
 
     final List<String> payloads = entries.stream().map(Document::payload).toList();

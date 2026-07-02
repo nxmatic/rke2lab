@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -58,12 +59,8 @@ public final class PulumiIncusImageProvider {
   }
 
   /** Ensure the seed image exists and return its fingerprint output. */
-  public Output<String> ensureSeedImageFingerprint(InvokeOptions invokeOptions, Provider provider) {
-    return ensureSeedImageFingerprint(invokeOptions, provider, null);
-  }
-
   public Output<String> ensureSeedImageFingerprint(
-      InvokeOptions invokeOptions, Provider provider, Resource projectDependency) {
+      InvokeOptions invokeOptions, Provider provider, Optional<Resource> projectDependency) {
     final long startedAt = System.nanoTime();
     logInfo("ensureSeedImageFingerprint: starting");
     final Path workspace = config.worktreeDirOn(WorktreeHost.DARWIN);
@@ -145,12 +142,10 @@ public final class PulumiIncusImageProvider {
   }
 
   private Image createSeedImageFromArtifacts(
-      Provider provider, BuiltImageArtifacts artifacts, Resource projectDependency) {
+      Provider provider, BuiltImageArtifacts artifacts, Optional<Resource> projectDependency) {
     final CustomResourceOptions.Builder optionsBuilder =
         CustomResourceOptions.builder().provider(provider);
-    if (projectDependency != null) {
-      optionsBuilder.dependsOn(List.of(projectDependency));
-    }
+    projectDependency.ifPresent(dep -> optionsBuilder.dependsOn(List.of(dep)));
 
     return new Image(
         "seed-image",

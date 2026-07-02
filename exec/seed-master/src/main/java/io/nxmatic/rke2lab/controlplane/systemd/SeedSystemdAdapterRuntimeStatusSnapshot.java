@@ -7,6 +7,7 @@ import io.nxmatic.rke2lab.systemd.port.SystemdRuntimeProbe;
 import io.nxmatic.rke2lab.systemd.port.SystemdStatusSnapshot;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
@@ -56,9 +57,14 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
       }
       return Map.copyOf(parsed);
     } catch (IllegalStateException ex) {
+      final String detail =
+          Optional.ofNullable(ex.getMessage())
+              .map(String::trim)
+              .filter(s -> !s.isBlank())
+              .orElse("unknown");
       return envelope(
           "execution-error",
-          "systemd adapter runtime probe execution error: " + sanitize(ex.getMessage()),
+          "systemd adapter runtime probe execution error: " + detail,
           Map.of(
               "source", "systemd-adapter-runtime-probe", "probeMode", "systemd-adapter-runtime"));
     }
@@ -74,13 +80,6 @@ public final class SeedSystemdAdapterRuntimeStatusSnapshot {
         config.systemdAdapterDbusPort(),
         config.nodeName(),
         config.imageBuilderHost());
-  }
-
-  private static String sanitize(String raw) {
-    if (raw == null || raw.isBlank()) {
-      return "unknown";
-    }
-    return raw.trim();
   }
 
   private static Map<String, Object> envelope(

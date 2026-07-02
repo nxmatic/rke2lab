@@ -9,6 +9,7 @@ import io.nxmatic.rke2lab.world.gateway.port.Domain;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The Pulumi file-backend implementation of the host {@link InterventionJournal} READ port
@@ -26,21 +27,22 @@ import java.util.List;
 public final class StackInterventionJournal implements InterventionJournal {
 
   private final ObjectMapper mapper = new ObjectMapper();
-  private final Path backendDir;
+  private final Optional<Path> backendDir;
   private final StackCoordinate coordinate;
 
-  public StackInterventionJournal(Path backendDir) {
+  public StackInterventionJournal(Optional<Path> backendDir) {
     this.backendDir = backendDir;
     this.coordinate = InterventionLedgerLayout.ledger();
   }
 
   @Override
   public List<Document> entries() {
-    if (backendDir == null) {
+    if (backendDir.isEmpty()) {
       return List.of();
     }
+    final Path backend = backendDir.get();
     final StackHandle handle =
-        StackHandle.forBackend(backendDir, coordinate.project(), coordinate.stack());
+        StackHandle.forBackend(backend, coordinate.project(), coordinate.stack());
 
     final List<StackHistory.Entry> entries;
     try {
@@ -50,8 +52,7 @@ public final class StackInterventionJournal implements InterventionJournal {
       // StackException here means the history is present but unreadable — corruption or an I/O
       // fault. Masking it as empty would resurrect the dishonesty the ledger kills: efficacy would
       // compute as if no intervention ever happened. Propagate; never mask.
-      throw new RuntimeException(
-          "intervention ledger present but unreadable under " + backendDir, e);
+      throw new RuntimeException("intervention ledger present but unreadable under " + backend, e);
     }
 
     final List<Document> journal = new ArrayList<>(entries.size());

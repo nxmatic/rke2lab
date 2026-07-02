@@ -699,7 +699,7 @@ public final class IncusResourceBootstrap {
               .ensureSeedImageFingerprint(
                   state.providerContext.invokeOptions(),
                   state.providerContext.provider(),
-                  state.ensuredProject);
+                  Optional.of(state.ensuredProject));
 
       // Update BuildMetadata with image checksum (manifests already registered in HostStage)
       final BuildMetadata existing = state.registry.require(BuildMetadata.class);

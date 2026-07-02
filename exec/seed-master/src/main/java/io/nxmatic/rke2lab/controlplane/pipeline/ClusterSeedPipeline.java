@@ -176,8 +176,7 @@ public final class ClusterSeedPipeline {
       final StackMedicalRecordJournal medicalRecordJournal =
           StackMedicalRecordJournal.fromEnvironment(logger);
       final Optional<Path> backendDir = medicalRecordJournal.backendDir();
-      final InterventionJournal interventionJournal =
-          new StackInterventionJournal(backendDir.orElse(null));
+      final InterventionJournal interventionJournal = new StackInterventionJournal(backendDir);
       final InterventionLedgerWriter ledgerWriter =
           backendDir
               .<InterventionLedgerWriter>map(PulumiInterventionLedgerWriter::new)

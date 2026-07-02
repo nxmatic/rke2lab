@@ -13,6 +13,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -155,25 +156,35 @@ public final class TargetChecksumPipeline {
       for (Map.Entry<String, List<Path>> entry : state.registry.getTargetRoots().entrySet()) {
         final String targetName = entry.getKey();
         state.targetChecksums.put(
-            targetName, computeChecksum(entry.getValue(), targetName, state.registry));
+            targetName,
+            computeChecksum(
+                entry.getValue(), Optional.of(new ChecksumScope(targetName, state.registry))));
       }
       return this;
     }
   }
 
-  private static String computeChecksum(List<Path> roots) {
-    return computeChecksum(roots, null, null);
+  /**
+   * When a target's roots are checksummed against a registry, foreign descendants (files owned by
+   * other targets that happen to nest under this target's roots) must be excluded — {@code
+   * ownerName} and {@code registry} are only ever used together, so they travel as one scope.
+   */
+  private record ChecksumScope(String ownerName, ProvisioningTargetRegistry registry) {
+    java.util.Set<Path> foreignDescendants(Path root) {
+      return registry.nestedForeignDescendants(root, ownerName);
+    }
   }
 
-  private static String computeChecksum(
-      List<Path> roots, String ownerName, ProvisioningTargetRegistry registry) {
+  private static String computeChecksum(List<Path> roots) {
+    return computeChecksum(roots, Optional.empty());
+  }
+
+  private static String computeChecksum(List<Path> roots, Optional<ChecksumScope> scope) {
     try {
       final MessageDigest digest = MessageDigest.getInstance("SHA-256");
       for (Path root : roots) {
         final java.util.Set<Path> foreign =
-            (ownerName != null && registry != null)
-                ? registry.nestedForeignDescendants(root, ownerName)
-                : java.util.Set.of();
+            scope.map(s -> s.foreignDescendants(root)).orElseGet(java.util.Set::of);
         updateDigestForPath(digest, root, foreign);
       }
       return HexFormat.of().formatHex(digest.digest());
