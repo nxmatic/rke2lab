@@ -9,6 +9,7 @@ import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSn
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /** Manages bootstrap resource creation, delegating to pipelines based on execution mode. */
@@ -19,8 +20,8 @@ public final class ResourceManager {
       ControlplanePolicy policy,
       boolean readinessEnabled,
       Consumer<String> readinessLogger,
-      ReportModel runbook,
-      ConsultationLog consultations,
+      Optional<ReportModel> runbook,
+      Optional<ConsultationLog> consultations,
       ConsultingService doctor,
       SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
       ClusterReadinessContact clusterReadinessContact,

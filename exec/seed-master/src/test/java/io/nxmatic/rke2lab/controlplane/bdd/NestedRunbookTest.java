@@ -33,6 +33,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -282,8 +283,8 @@ class NestedRunbookTest {
             true,
             pulumiMode,
             logger,
-            runbook,
-            consultations,
+            Optional.of(runbook),
+            Optional.of(consultations),
             doctor,
             probe,
             REACHABLE_SYSTEMD_ADAPTER,

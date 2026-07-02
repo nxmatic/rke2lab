@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
+import io.nxmatic.rke2lab.controlplane.pipeline.PipelineState.PipelineInputs;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.BboxTopic;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.IncusTopic;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.PreflightTopic;
@@ -16,6 +17,7 @@ import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
+import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.doctor.port.HealthSystem;
 import io.nxmatic.rke2lab.doctor.port.InterventionJournal;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
@@ -64,50 +66,47 @@ public final class ClusterSeedPipeline {
   private ClusterSeedPipeline() {}
 
   public static ConfiguringPipeline forCluster(BootstrapConfig config, ControlplanePolicy policy) {
-    return new ConfiguringPipeline(new PipelineState(config, policy));
+    return new ConfiguringPipeline(PipelineInputs.forCluster(config, policy));
   }
 
   public static final class ConfiguringPipeline {
-    private final PipelineState state;
+    private final PipelineInputs.Builder inputsBuilder;
 
-    private ConfiguringPipeline(PipelineState state) {
-      this.state = state;
+    private ConfiguringPipeline(PipelineInputs.Builder inputsBuilder) {
+      this.inputsBuilder = inputsBuilder;
     }
 
     public ConfiguredPipeline withOptions(BootstrapOptions options) {
-      state.options = options;
-      return new ConfiguredPipeline(state);
+      return new ConfiguredPipeline(inputsBuilder.options(options));
     }
   }
 
   public static final class ConfiguredPipeline {
-    private final PipelineState state;
+    private final PipelineInputs.Builder inputsBuilder;
 
-    private ConfiguredPipeline(PipelineState state) {
-      this.state = state;
+    private ConfiguredPipeline(PipelineInputs.Builder inputsBuilder) {
+      this.inputsBuilder = inputsBuilder;
     }
 
     public ComponentBoundPipeline using(
         BboxReconciliationOrchestrator bboxOrchestrator,
         ResourceManager resourceManager,
         OutputBuilder outputBuilder) {
-      state.bboxOrchestrator = bboxOrchestrator;
-      state.resourceManager = resourceManager;
-      state.outputBuilder = outputBuilder;
-      return new ComponentBoundPipeline(state);
+      return new ComponentBoundPipeline(
+          inputsBuilder.using(bboxOrchestrator, resourceManager, outputBuilder));
     }
   }
 
   public static final class ComponentBoundPipeline {
-    private final PipelineState state;
+    private final PipelineInputs.Builder inputsBuilder;
 
-    private ComponentBoundPipeline(PipelineState state) {
-      this.state = state;
+    private ComponentBoundPipeline(PipelineInputs.Builder inputsBuilder) {
+      this.inputsBuilder = inputsBuilder;
     }
 
     /** Optional: register a per-topic failure handler. Defaults to no-op when not called. */
     public ComponentBoundPipeline onFailure(OnFailure handler) {
-      state.onFailure = handler;
+      inputsBuilder.onFailure(handler);
       return this;
     }
 
@@ -116,7 +115,7 @@ public final class ClusterSeedPipeline {
      * from its registry.
      */
     public ComponentBoundPipeline withBootedFramework(BootedFramework bootedFramework) {
-      state.bootedFramework = bootedFramework;
+      inputsBuilder.bootedFramework(bootedFramework);
       return this;
     }
 
@@ -129,29 +128,26 @@ public final class ClusterSeedPipeline {
      */
     public ComponentBoundPipeline recordingInto(
         ReportModel runbook, ConsultationLog consultations) {
-      state.runbook = runbook;
-      state.consultations = consultations;
+      inputsBuilder.recordingInto(runbook, consultations);
       return this;
     }
 
     public AwaitingPreflight runningStandalone(Consumer<String> readinessLogger) {
-      state.readinessLogger = readinessLogger;
-      state.pulumiMode = false;
-      admitPatient(state);
-      resolveSystemdRuntimeStatus(state);
-      resolveClusterReadinessContact(state);
-      resolveReadinessAuthority(state);
-      return new AwaitingPreflight(state);
+      return running(readinessLogger, false);
     }
 
     public AwaitingPreflight runningInPulumi(Consumer<String> readinessLogger) {
-      state.readinessLogger = readinessLogger;
-      state.pulumiMode = true;
-      admitPatient(state);
-      resolveSystemdRuntimeStatus(state);
-      resolveClusterReadinessContact(state);
-      resolveReadinessAuthority(state);
-      return new AwaitingPreflight(state);
+      return running(readinessLogger, true);
+    }
+
+    private AwaitingPreflight running(Consumer<String> readinessLogger, boolean pulumiMode) {
+      inputsBuilder.readinessLogger(readinessLogger).pulumiMode(pulumiMode);
+      inputsBuilder
+          .doctor(admitPatient(inputsBuilder, readinessLogger, pulumiMode))
+          .systemdRuntimeStatus(resolveSystemdRuntimeStatus(inputsBuilder))
+          .clusterReadinessContact(resolveClusterReadinessContact(inputsBuilder))
+          .readinessAuthority(resolveReadinessAuthority(inputsBuilder));
+      return new AwaitingPreflight(new PipelineState(inputsBuilder.build()));
     }
 
     /**
@@ -168,10 +164,9 @@ public final class ClusterSeedPipeline {
      * {@code doctor.records} type ever crosses back; the stages consult the contract, never the
      * hidden actors.
      */
-    private static void admitPatient(PipelineState state) {
-      final Consumer<String> logger =
-          state.readinessLogger != null ? state.readinessLogger : msg -> {};
-      final BootedFramework framework = state.bootedFramework;
+    private static ConsultingService admitPatient(
+        PipelineInputs.Builder inputsBuilder, Consumer<String> logger, boolean pulumiMode) {
+      final BootedFramework framework = inputsBuilder.bootedFramework();
 
       final StackMedicalRecordJournal medicalRecordJournal =
           StackMedicalRecordJournal.fromEnvironment(logger);
@@ -192,8 +187,9 @@ public final class ClusterSeedPipeline {
                 + " activate (a domain diagnostician @Component, the medical-record journal, the"
                 + " intervention journal, or the ledger writer reference is unbound).");
       }
-      state.doctor = healthSystem.admit(currentPatient(state.pulumiMode));
-      state.doctor.reviewDrift();
+      final ConsultingService doctor = healthSystem.admit(currentPatient(pulumiMode));
+      doctor.reviewDrift();
+      return doctor;
     }
 
     /**
@@ -222,15 +218,16 @@ public final class ClusterSeedPipeline {
      * the snapshot instance and threaded to the readiness sites, so none of them reaches the edge
      * statically.
      */
-    private static void resolveSystemdRuntimeStatus(PipelineState state) {
+    private static SeedSystemdAdapterRuntimeStatusSnapshot resolveSystemdRuntimeStatus(
+        PipelineInputs.Builder inputsBuilder) {
       final SystemdRuntimeProbe probe =
-          state.bootedFramework.awaitService(SystemdRuntimeProbe.class, 5000);
+          inputsBuilder.bootedFramework().awaitService(SystemdRuntimeProbe.class, 5000);
       if (probe == null) {
         throw new IllegalStateException(
             "No SystemdRuntimeProbe published in the OSGi registry within 5s "
                 + "(dbus-systemd-edge @Component absent).");
       }
-      state.systemdRuntimeStatus = new SeedSystemdAdapterRuntimeStatusSnapshot(probe);
+      return new SeedSystemdAdapterRuntimeStatusSnapshot(probe);
     }
 
     /**
@@ -239,15 +236,16 @@ public final class ClusterSeedPipeline {
      * Threaded to the readiness probe, so the host wraps it in its retry loops without reaching the
      * edge statically.
      */
-    private static void resolveClusterReadinessContact(PipelineState state) {
+    private static ClusterReadinessContact resolveClusterReadinessContact(
+        PipelineInputs.Builder inputsBuilder) {
       final ClusterReadinessContact contact =
-          state.bootedFramework.awaitService(ClusterReadinessContact.class, 5000);
+          inputsBuilder.bootedFramework().awaitService(ClusterReadinessContact.class, 5000);
       if (contact == null) {
         throw new IllegalStateException(
             "No ClusterReadinessContact published in the OSGi registry within 5s "
                 + "(cluster-edge @Component absent).");
       }
-      state.clusterReadinessContact = contact;
+      return contact;
     }
 
     /**
@@ -255,15 +253,16 @@ public final class ClusterSeedPipeline {
      * {@code @Component} that implements {@code ReadinessAuthority}. Threaded to the stages that
      * build checkpoint Documents and read verdict actions — so the host never reasons on Severity.
      */
-    private static void resolveReadinessAuthority(PipelineState state) {
+    private static ReadinessAuthority resolveReadinessAuthority(
+        PipelineInputs.Builder inputsBuilder) {
       final ReadinessAuthority authority =
-          state.bootedFramework.awaitService(ReadinessAuthority.class, 5000);
+          inputsBuilder.bootedFramework().awaitService(ReadinessAuthority.class, 5000);
       if (authority == null) {
         throw new IllegalStateException(
             "No ReadinessAuthority published in the OSGi registry within 5s "
                 + "(doctor-core DefaultReadinessAuthority @Component absent).");
       }
-      state.readinessAuthority = authority;
+      return authority;
     }
   }
 
@@ -277,12 +276,12 @@ public final class ClusterSeedPipeline {
     public PreflightDone during(String topic, Function<PreflightTopic, PreflightTopic> body) {
       final PreflightTopic stage =
           new PreflightTopic(
-              state.config.localWorktreePath(),
-              state.config.imageBuilderHost(),
-              state.options.cleanWorktreeRequired(),
-              state.readinessLogger,
-              state.bootedFramework);
-      state.runner.runDuring(topic, stage, body, state.onFailure);
+              state.inputs.config().localWorktreePath(),
+              state.inputs.config().imageBuilderHost(),
+              state.inputs.options().cleanWorktreeRequired(),
+              state.inputs.readinessLogger(),
+              state.inputs.bootedFramework());
+      state.runner.runDuring(topic, stage, body, state.inputs.onFailure());
       return new PreflightDone(state);
     }
   }
@@ -309,11 +308,11 @@ public final class ClusterSeedPipeline {
     public BboxDone during(String topic, Function<BboxTopic, BboxTopic> body) {
       final BboxTopic stage =
           new BboxTopic(
-              state.bboxOrchestrator,
-              state.config.localWorktreePath(),
-              state.options.bboxFailOnError(),
+              state.inputs.bboxOrchestrator(),
+              state.inputs.config().localWorktreePath(),
+              state.inputs.options().bboxFailOnError(),
               output -> state.builder.bbox = output);
-      state.runner.runDuring(topic, stage, body, state.onFailure);
+      state.runner.runDuring(topic, stage, body, state.inputs.onFailure());
       return new BboxDone(state);
     }
   }
@@ -340,11 +339,11 @@ public final class ClusterSeedPipeline {
     public IncusDone during(String topic, Function<IncusTopic, IncusTopic> body) {
       final IncusTopic stage =
           new IncusTopic(
-              state.config,
-              state.policy,
-              state.bootedFramework,
+              state.inputs.config(),
+              state.inputs.policy(),
+              state.inputs.bootedFramework(),
               output -> state.builder.bootstrap = output);
-      state.runner.runDuring(topic, stage, body, state.onFailure);
+      state.runner.runDuring(topic, stage, body, state.inputs.onFailure());
       return new IncusDone(state);
     }
   }
@@ -371,22 +370,23 @@ public final class ClusterSeedPipeline {
     public SystemdAdapterDone during(
         String topic, Function<SystemdAdapterTopic, SystemdAdapterTopic> body) {
       final SeedSystemdAdapterEndpointGate gate =
-          SeedSystemdAdapterEndpointGate.live(state.systemdRuntimeStatus);
-      final SystemdAdapterProbe liveProbe = cfg -> gate.ensureReachable(cfg, state.readinessLogger);
+          SeedSystemdAdapterEndpointGate.live(state.inputs.systemdRuntimeStatus());
+      final SystemdAdapterProbe liveProbe =
+          cfg -> gate.ensureReachable(cfg, state.inputs.readinessLogger());
       final SystemdAdapterTopic stage =
           new SystemdAdapterTopic(
-              state.config,
-              state.policy,
-              state.pulumiMode,
-              state.readinessLogger,
-              state.runbook,
-              state.consultations,
-              state.doctor,
+              state.inputs.config(),
+              state.inputs.policy(),
+              state.inputs.pulumiMode(),
+              state.inputs.readinessLogger(),
+              state.inputs.runbook(),
+              state.inputs.consultations(),
+              Optional.of(state.inputs.doctor()),
               liveProbe,
               output -> state.builder.systemdAdapterLaunch = output,
-              state.readinessAuthority,
-              state.builder.bootstrap().deployment().timestamp());
-      state.runner.runDuring(topic, stage, body, state.onFailure);
+              state.inputs.readinessAuthority(),
+              Optional.of(state.builder.bootstrap().deployment().timestamp()));
+      state.runner.runDuring(topic, stage, body, state.inputs.onFailure());
       return new SystemdAdapterDone(state);
     }
   }
@@ -413,21 +413,21 @@ public final class ClusterSeedPipeline {
     public ResourcesDone during(String topic, Function<ResourcesTopic, ResourcesTopic> body) {
       final ResourcesTopic stage =
           new ResourcesTopic(
-              state.resourceManager,
-              state.config,
-              state.policy,
-              state.options.readinessEnabled(),
-              state.pulumiMode,
-              state.readinessLogger,
-              state.runbook,
-              state.consultations,
-              state.doctor,
-              state.systemdRuntimeStatus,
-              state.clusterReadinessContact,
+              state.inputs.resourceManager(),
+              state.inputs.config(),
+              state.inputs.policy(),
+              state.inputs.options().readinessEnabled(),
+              state.inputs.pulumiMode(),
+              state.inputs.readinessLogger(),
+              state.inputs.runbook(),
+              state.inputs.consultations(),
+              state.inputs.doctor(),
+              state.inputs.systemdRuntimeStatus(),
+              state.inputs.clusterReadinessContact(),
               () -> state.builder.bootstrap(),
               () -> state.builder.systemdAdapterLaunch(),
               output -> state.builder.resources = output);
-      state.runner.runDuring(topic, stage, body, state.onFailure);
+      state.runner.runDuring(topic, stage, body, state.inputs.onFailure());
       return new ResourcesDone(state);
     }
   }
@@ -440,13 +440,16 @@ public final class ClusterSeedPipeline {
     }
 
     public Map<String, Object> collectOutputs() {
-      return state.outputBuilder.buildOutputs(
-          state.config,
-          state.policy,
-          state.builder.bootstrap(),
-          state.builder.bbox(),
-          state.builder.systemdAdapterLaunch(),
-          state.builder.resources());
+      return state
+          .inputs
+          .outputBuilder()
+          .buildOutputs(
+              state.inputs.config(),
+              state.inputs.policy(),
+              state.builder.bootstrap(),
+              state.builder.bbox(),
+              state.builder.systemdAdapterLaunch(),
+              state.builder.resources());
     }
   }
 }

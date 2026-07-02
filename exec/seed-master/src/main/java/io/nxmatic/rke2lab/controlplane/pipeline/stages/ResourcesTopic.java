@@ -11,6 +11,7 @@ import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSn
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -22,8 +23,8 @@ public final class ResourcesTopic {
   private final boolean readinessEnabled;
   private final boolean pulumiMode;
   private final Consumer<String> readinessLogger;
-  private final ReportModel runbook;
-  private final ConsultationLog consultations;
+  private final Optional<ReportModel> runbook;
+  private final Optional<ConsultationLog> consultations;
   private final ConsultingService doctor;
   private final SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
   private final ClusterReadinessContact clusterReadinessContact;
@@ -38,8 +39,8 @@ public final class ResourcesTopic {
       boolean readinessEnabled,
       boolean pulumiMode,
       Consumer<String> readinessLogger,
-      ReportModel runbook,
-      ConsultationLog consultations,
+      Optional<ReportModel> runbook,
+      Optional<ConsultationLog> consultations,
       ConsultingService doctor,
       SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
       ClusterReadinessContact clusterReadinessContact,

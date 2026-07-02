@@ -49,8 +49,8 @@ public final class ClusterReadinessTopic {
   private final boolean readinessEnabled;
   private final boolean pulumiMode;
   private final Consumer<String> readinessLogger;
-  private final ReportModel runbook;
-  private final ConsultationLog consultations;
+  private final Optional<ReportModel> runbook;
+  private final Optional<ConsultationLog> consultations;
   private final ConsultingService doctor;
   private final ClusterReadinessProbe phaseProbe;
   private final Map<String, Object> systemdAdapterLaunchSummary;
@@ -69,8 +69,8 @@ public final class ClusterReadinessTopic {
       boolean readinessEnabled,
       boolean pulumiMode,
       Consumer<String> readinessLogger,
-      ReportModel runbook,
-      ConsultationLog consultations,
+      Optional<ReportModel> runbook,
+      Optional<ConsultationLog> consultations,
       ConsultingService doctor,
       ClusterReadinessProbe phaseProbe,
       Map<String, Object> systemdAdapterLaunchSummary,
@@ -120,7 +120,7 @@ public final class ClusterReadinessTopic {
     final SystemdAdapterProbe nestedSystemdAdapterProbe =
         cfg -> capturedSystemdAdapterObservation();
 
-    final ReportModel reportModel = runbook != null ? runbook : new ReportModel();
+    final ReportModel reportModel = runbook.orElseGet(ReportModel::new);
 
     // Preview: set JGiven dry-run so the step bodies are skipped (no live infra touched), but still
     // PLAY the scenario so its shell renders in the runbook — the same "walk structure, emit doc,
@@ -239,9 +239,7 @@ public final class ClusterReadinessTopic {
     }
     final Document consultation = doctor.consult(consultCheckpoint(phaseObservations.values()));
     log("⚕ " + codec.decode(consultation, Consultation.class).narration());
-    if (consultations != null) {
-      consultations.record(consultation);
-    }
+    consultations.ifPresent(log -> log.record(consultation));
   }
 
   /**

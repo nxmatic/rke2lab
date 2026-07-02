@@ -36,8 +36,8 @@ final class ResourceCreationPipeline {
   private final ControlplanePolicy policy;
   private final boolean readinessEnabled;
   private final Consumer<String> readinessLogger;
-  private final ReportModel runbook;
-  private final ConsultationLog consultations;
+  private final Optional<ReportModel> runbook;
+  private final Optional<ConsultationLog> consultations;
   private final ConsultingService doctor;
   private final SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
   private final ClusterReadinessContact clusterReadinessContact;
@@ -50,8 +50,8 @@ final class ResourceCreationPipeline {
       ControlplanePolicy policy,
       boolean readinessEnabled,
       Consumer<String> readinessLogger,
-      ReportModel runbook,
-      ConsultationLog consultations,
+      Optional<ReportModel> runbook,
+      Optional<ConsultationLog> consultations,
       ConsultingService doctor,
       SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
       ClusterReadinessContact clusterReadinessContact,
@@ -104,10 +104,8 @@ final class ResourceCreationPipeline {
    * type, it only matches the scenario id it wrote.
    */
   private Optional<Document> consultationFor(Checkpoint checkpoint) {
-    if (consultations == null) {
-      return Optional.empty();
-    }
-    return consultations.consultations().stream()
+    return consultations.stream()
+        .flatMap(log -> log.consultations().stream())
         .filter(
             document ->
                 checkpoint.slug().equals(codec.decode(document, Consultation.class).scenarioId()))

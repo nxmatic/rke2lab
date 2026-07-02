@@ -13,90 +13,178 @@ import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
+import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Consumer;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
+/**
+ * The state threaded through {@link ClusterSeedPipeline}'s topics: immutable {@link #inputs}
+ * (everything known before the first topic runs), the {@link #builder} that accumulates each
+ * topic's output (the builder of the next state), and the shared {@link #runner}. See
+ * docs/architecture/patterns/fluent-pipeline-grammar.adoc ("State shape").
+ */
 final class PipelineState {
 
-  final BootstrapConfig config;
-  final ControlplanePolicy policy;
-  BootstrapOptions options;
-  Consumer<String> readinessLogger;
-  boolean pulumiMode;
-
-  /**
-   * The embedded OSGi framework booted once for this run (see {@code ClusterSeedTopic}). Threaded
-   * to the stages that read manifests-world services so they read them from the booted registry.
-   */
-  BootedFramework bootedFramework;
-
-  /**
-   * The runbook model, owned by the caller and threaded through every checkpoint so each records
-   * its scenario into one shared model (rather than the discarded per-stage model). Null until the
-   * caller calls {@code recordingInto}; checkpoints fall back to a local model when absent.
-   */
-  ReportModel runbook;
-
-  /**
-   * The consultation log, owned by the caller and threaded through every checkpoint so each records
-   * its doctor consultation (the raised observations + the plan) into one shared log instead of
-   * dropping the plan after the inline log. Null until {@code recordingInto}; checkpoints fall back
-   * to a discarded local one when absent. In-memory only — does not touch the Pulumi outputs.
-   */
-  ConsultationLog consultations;
-
-  /**
-   * The doctor's consulting contract for this run, obtained host-side by admitting the patient into
-   * the OSGi {@code HealthSystem} (the host publishes the EHR + ledger, then {@code
-   * awaitService(HealthSystem).admit}). Built once at the readiness transition; the stages consult
-   * it without naming the hidden actors behind it.
-   */
-  ConsultingService doctor;
-
-  /**
-   * The systemd runtime-status probe for this run, resolved once from the booted OSGi registry (the
-   * dbus-systemd-edge {@code @Component} implementing {@code SystemdRuntimeProbe}) and wrapped as
-   * this instance. Threaded to the readiness sites that take a status snapshot, so none of them
-   * reaches the edge statically.
-   */
-  SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
-
-  /**
-   * The cluster-readiness contact for this run, resolved once from the booted OSGi registry (the
-   * cluster-edge {@code @Component} implementing {@code ClusterReadinessContact}). Threaded to the
-   * readiness probe, which the host orchestration wraps in its retry loops — so the host never
-   * reaches the edge statically.
-   */
-  ClusterReadinessContact clusterReadinessContact;
-
-  /**
-   * The readiness authority for this run, resolved once from the booted OSGi registry (the
-   * doctor-core {@code @Component} implementing {@code ReadinessAuthority}). Threaded to the stages
-   * that build checkpoint Documents and read verdict actions — so the host never reasons on
-   * Severity.
-   */
-  io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority readinessAuthority;
-
-  BboxReconciliationOrchestrator bboxOrchestrator;
-  ResourceManager resourceManager;
-  OutputBuilder outputBuilder;
+  final PipelineInputs inputs;
 
   /**
    * The builder of the next state: each topic folds its output in here, and that accumulated output
-   * — combined with the inputs — is what constitutes the state the next topic reads. See
-   * docs/fluent-pipeline-grammar.adoc, "State shape" ("the output of the current state is the
-   * builder of the next").
+   * — combined with the inputs — is what constitutes the state the next topic reads.
    */
   final StateBuilder builder = new StateBuilder();
 
-  OnFailure onFailure;
   final FluentTopicRunner runner = new FluentTopicRunner("pipeline");
 
-  PipelineState(BootstrapConfig config, ControlplanePolicy policy) {
-    this.config = config;
-    this.policy = policy;
+  PipelineState(PipelineInputs inputs) {
+    this.inputs = inputs;
+  }
+
+  /**
+   * Everything the pipeline is configured with, known before the first topic runs and never changed
+   * after. Immutable by construction — every field is {@code @NonNull} (genuinely-optional ones are
+   * {@link Optional}), so a topic reads any input without a guard. Assembled once via {@link
+   * Builder} at the pre-execution → execution boundary (the {@code running…()} transition).
+   */
+  record PipelineInputs(
+      BootstrapConfig config,
+      ControlplanePolicy policy,
+      BootstrapOptions options,
+      Consumer<String> readinessLogger,
+      boolean pulumiMode,
+      BootedFramework bootedFramework,
+      ConsultingService doctor,
+      SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
+      ClusterReadinessContact clusterReadinessContact,
+      ReadinessAuthority readinessAuthority,
+      BboxReconciliationOrchestrator bboxOrchestrator,
+      ResourceManager resourceManager,
+      OutputBuilder outputBuilder,
+      OnFailure onFailure,
+      Optional<ReportModel> runbook,
+      Optional<ConsultationLog> consultations) {
+
+    static Builder forCluster(BootstrapConfig config, ControlplanePolicy policy) {
+      return new Builder(config, policy);
+    }
+
+    /**
+     * Accumulates the inputs across the pre-execution type-state chain ({@code forCluster} → {@code
+     * withOptions} → {@code using} → the optional setters → {@code running…}). Fields are {@link
+     * MonotonicNonNull} (set once by their transition); {@code build()} freezes the immutable
+     * record, failing fast with the field name if a required input was never supplied. The
+     * genuinely-optional fields default to empty / no-op.
+     */
+    static final class Builder {
+      private final BootstrapConfig config;
+      private final ControlplanePolicy policy;
+      private @MonotonicNonNull BootstrapOptions options;
+      private @MonotonicNonNull Consumer<String> readinessLogger;
+      private boolean pulumiMode;
+      private @MonotonicNonNull BootedFramework bootedFramework;
+      private @MonotonicNonNull ConsultingService doctor;
+      private @MonotonicNonNull SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
+      private @MonotonicNonNull ClusterReadinessContact clusterReadinessContact;
+      private @MonotonicNonNull ReadinessAuthority readinessAuthority;
+      private @MonotonicNonNull BboxReconciliationOrchestrator bboxOrchestrator;
+      private @MonotonicNonNull ResourceManager resourceManager;
+      private @MonotonicNonNull OutputBuilder outputBuilder;
+      private OnFailure onFailure = OnFailure.noop();
+      private Optional<ReportModel> runbook = Optional.empty();
+      private Optional<ConsultationLog> consultations = Optional.empty();
+
+      private Builder(BootstrapConfig config, ControlplanePolicy policy) {
+        this.config = config;
+        this.policy = policy;
+      }
+
+      Builder options(BootstrapOptions options) {
+        this.options = options;
+        return this;
+      }
+
+      Builder using(
+          BboxReconciliationOrchestrator bboxOrchestrator,
+          ResourceManager resourceManager,
+          OutputBuilder outputBuilder) {
+        this.bboxOrchestrator = bboxOrchestrator;
+        this.resourceManager = resourceManager;
+        this.outputBuilder = outputBuilder;
+        return this;
+      }
+
+      Builder onFailure(OnFailure onFailure) {
+        this.onFailure = onFailure;
+        return this;
+      }
+
+      Builder bootedFramework(BootedFramework bootedFramework) {
+        this.bootedFramework = bootedFramework;
+        return this;
+      }
+
+      Builder recordingInto(ReportModel runbook, ConsultationLog consultations) {
+        this.runbook = Optional.of(runbook);
+        this.consultations = Optional.of(consultations);
+        return this;
+      }
+
+      Builder readinessLogger(Consumer<String> readinessLogger) {
+        this.readinessLogger = readinessLogger;
+        return this;
+      }
+
+      Builder pulumiMode(boolean pulumiMode) {
+        this.pulumiMode = pulumiMode;
+        return this;
+      }
+
+      Builder doctor(ConsultingService doctor) {
+        this.doctor = doctor;
+        return this;
+      }
+
+      Builder systemdRuntimeStatus(SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus) {
+        this.systemdRuntimeStatus = systemdRuntimeStatus;
+        return this;
+      }
+
+      Builder clusterReadinessContact(ClusterReadinessContact clusterReadinessContact) {
+        this.clusterReadinessContact = clusterReadinessContact;
+        return this;
+      }
+
+      Builder readinessAuthority(ReadinessAuthority readinessAuthority) {
+        this.readinessAuthority = readinessAuthority;
+        return this;
+      }
+
+      BootedFramework bootedFramework() {
+        return Objects.requireNonNull(bootedFramework, "bootedFramework");
+      }
+
+      PipelineInputs build() {
+        return new PipelineInputs(
+            config,
+            policy,
+            Objects.requireNonNull(options, "options"),
+            Objects.requireNonNull(readinessLogger, "readinessLogger"),
+            pulumiMode,
+            Objects.requireNonNull(bootedFramework, "bootedFramework"),
+            Objects.requireNonNull(doctor, "doctor"),
+            Objects.requireNonNull(systemdRuntimeStatus, "systemdRuntimeStatus"),
+            Objects.requireNonNull(clusterReadinessContact, "clusterReadinessContact"),
+            Objects.requireNonNull(readinessAuthority, "readinessAuthority"),
+            Objects.requireNonNull(bboxOrchestrator, "bboxOrchestrator"),
+            Objects.requireNonNull(resourceManager, "resourceManager"),
+            Objects.requireNonNull(outputBuilder, "outputBuilder"),
+            onFailure,
+            runbook,
+            consultations);
+      }
+    }
   }
 
   /**

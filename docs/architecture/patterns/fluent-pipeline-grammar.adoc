@@ -116,12 +116,25 @@ The insight that ties it to the grammar: **the output of the current state is th
 ----
 final class PipelineState {
   final PipelineInputs inputs;   // immutable record, frozen at running…()
-  final Outputs outputs;         // mutable set-once builder (@MonotonicNonNull fields)
+  final StateBuilder builder;    // mutable set-once output accumulator (@MonotonicNonNull fields)
   final FluentTopicRunner runner;
 }
 ----
 
 Genuinely-optional inputs (a caller-supplied runbook, an optional failure handler) are `Optional<>` fields on the record — real absence, not "not yet set". Do not use `@Nullable` for either part: inputs are complete, outputs are set-once. See the null-safety conventions (`@MonotonicNonNull` for set-once, `Optional` for genuine absence).
+
+[NOTE]
+.This is the FLAT shape — per-topic `State<I,O>` is a planned refinement
+====
+As described here, `PipelineInputs` and `StateBuilder` are *flat*: they merge EVERY topic's inputs and
+outputs into one record + one builder. That is null-safe, but it means each topic sees the whole sack —
+`PreflightTopic` can read `doctor` or the `bootstrap` output it has no business with. The intended
+refinement lifts this to the type level: a generic `State<I, O>` where each topic declares only the
+input record `I` it consumes and the output record `O` it produces, the transition folding `O_n` into
+`I_{n+1}` — so the compiler forbids a topic from reaching another's data. That is a refactor of this
+pattern itself (its own design pass), tracked separately; see the `pipeline-state-per-topic-io-refactor`
+memory. Until then, the flat shape above is the convention.
+====
 
 == Pitfalls observed in this codebase
 

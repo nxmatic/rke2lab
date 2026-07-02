@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
-import javax.annotation.Nullable;
 
 /**
  * Readiness gate, played as the BDD scenario it documents. The same Given/When/Then that runs
@@ -50,9 +49,9 @@ public final class SystemdAdapterTopic {
   private final ControlplanePolicy policy;
   private final boolean pulumiMode;
   private final Consumer<String> readinessLogger;
-  @Nullable private final ReportModel runbook;
-  @Nullable private final ConsultationLog consultations;
-  @Nullable private final ConsultingService doctor;
+  private final Optional<ReportModel> runbook;
+  private final Optional<ConsultationLog> consultations;
+  private final Optional<ConsultingService> doctor;
   private final SystemdAdapterProbe liveProbe;
   private final Consumer<Map<String, Object>> sink;
   private final ReadinessAuthority readinessAuthority;
@@ -62,7 +61,7 @@ public final class SystemdAdapterTopic {
    * OSGi stamps the expectations it derives — one source of truth shared with the egress, so the
    * Pulumi state shows no drift. Absent on the verdict-only test path (no consult runs there).
    */
-  @Nullable private final Instant recordedAt;
+  private final Optional<Instant> recordedAt;
 
   private final DocumentCodec codec = new DocumentCodec();
 
@@ -71,13 +70,13 @@ public final class SystemdAdapterTopic {
       ControlplanePolicy policy,
       boolean pulumiMode,
       Consumer<String> readinessLogger,
-      @Nullable ReportModel runbook,
-      @Nullable ConsultationLog consultations,
-      @Nullable ConsultingService doctor,
+      Optional<ReportModel> runbook,
+      Optional<ConsultationLog> consultations,
+      Optional<ConsultingService> doctor,
       SystemdAdapterProbe liveProbe,
       Consumer<Map<String, Object>> sink,
       ReadinessAuthority readinessAuthority,
-      Instant recordedAt) {
+      Optional<Instant> recordedAt) {
     this.config = config;
     this.policy = policy;
     this.pulumiMode = pulumiMode;
@@ -111,13 +110,13 @@ public final class SystemdAdapterTopic {
         policy,
         pulumiMode,
         readinessLogger,
-        null,
-        null,
-        null,
+        Optional.empty(),
+        Optional.empty(),
+        Optional.empty(),
         liveProbe,
         sink,
         readinessAuthority,
-        null);
+        Optional.empty());
   }
 
   public SystemdAdapterTopic launch() {
@@ -164,7 +163,7 @@ public final class SystemdAdapterTopic {
     // Record into the caller-owned runbook when present so this scenario joins the shared DAG;
     // otherwise a local model (inline log only). Held outside the try so the prose is logged even
     // when the probe fails the scenario.
-    final ReportModel reportModel = runbook != null ? runbook : new ReportModel();
+    final ReportModel reportModel = runbook.orElseGet(ReportModel::new);
 
     final String previousDryRun = System.getProperty(JGIVEN_DRY_RUN);
     if (dryRun) {
@@ -219,7 +218,7 @@ public final class SystemdAdapterTopic {
     // Failure: the patient consults the doctor, then the host asks the OSGi authority for the
     // provisioning verdict — the authority owns the severity vocabulary, the host reads only the
     // action field. No Severity type on the host.
-    consultDoctor(captured);
+    consultDoctor(Optional.ofNullable(captured));
 
     final Document checkpoint = checkpointDocument(SCENARIO_ID);
     final Document verdict = readinessAuthority.assess(checkpoint);
@@ -242,15 +241,13 @@ public final class SystemdAdapterTopic {
    * has nothing to route, so the consultation is skipped; a null doctor (test fixture) also skips
    * it, as the verdict decision is independent of the consult.
    */
-  private void consultDoctor(ObservationView observation) {
-    if (doctor == null || observation == null || observation.symptom().isEmpty()) {
+  private void consultDoctor(Optional<ObservationView> observation) {
+    if (doctor.isEmpty() || observation.isEmpty() || observation.get().symptom().isEmpty()) {
       return;
     }
-    final Document consultation = doctor.consult(consultCheckpoint(observation));
+    final Document consultation = doctor.get().consult(consultCheckpoint(observation.get()));
     log("⚕ " + codec.decode(consultation, Consultation.class).narration());
-    if (consultations != null) {
-      consultations.record(consultation);
-    }
+    consultations.ifPresent(log -> log.record(consultation));
   }
 
   /**
@@ -267,7 +264,7 @@ public final class SystemdAdapterTopic {
             SCENARIO_ID,
             Optional.empty(),
             Optional.empty(),
-            Optional.of(recordedAt),
+            recordedAt,
             List.of(observation.toWire()));
     return new Document(
         Domain.DOCTOR.slug(), Coordinate.READINESS_CHECKPOINT.slug(), codec.encode(checkpoint));
