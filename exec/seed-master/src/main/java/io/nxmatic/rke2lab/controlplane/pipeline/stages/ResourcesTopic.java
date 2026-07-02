@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-public final class ResourcesStage {
+public final class ResourcesTopic {
 
   private final ResourceManager resourceManager;
   private final BootstrapConfig config;
@@ -31,7 +31,7 @@ public final class ResourcesStage {
   private final Supplier<Map<String, Object>> systemdAdapterLaunchSupplier;
   private final Consumer<ResourceCreationResult> sink;
 
-  public ResourcesStage(
+  public ResourcesTopic(
       ResourceManager resourceManager,
       BootstrapConfig config,
       ControlplanePolicy policy,
@@ -62,7 +62,7 @@ public final class ResourcesStage {
     this.sink = sink;
   }
 
-  public ResourcesStage createAll() {
+  public ResourcesTopic createAll() {
     sink.accept(
         resourceManager.createResources(
             config,

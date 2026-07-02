@@ -120,7 +120,7 @@ public final class ClusterReadinessScenario {
    * scenario, not where phase evaluation happens. The failing phase's observation (with its
    * symptom) is captured by the stage via the probe-holder seam, not read back through a stage
    * getter (JGiven intercepts public stage methods as steps), exactly as {@code
-   * SystemdAdapterStage} does.
+   * SystemdAdapterTopic} does.
    */
   public static class Then extends Stage<Then> {
 

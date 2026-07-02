@@ -5,14 +5,14 @@ import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator.Recon
 import java.nio.file.Path;
 import java.util.function.Consumer;
 
-public final class BboxStage {
+public final class BboxTopic {
 
   private final BboxReconciliationOrchestrator orchestrator;
   private final Path localWorktreePath;
   private final boolean failOnError;
   private final Consumer<ReconciliationResult> sink;
 
-  public BboxStage(
+  public BboxTopic(
       BboxReconciliationOrchestrator orchestrator,
       Path localWorktreePath,
       boolean failOnError,
@@ -23,7 +23,7 @@ public final class BboxStage {
     this.sink = sink;
   }
 
-  public BboxStage reconcileReservations() {
+  public BboxTopic reconcileReservations() {
     sink.accept(orchestrator.reconcile(localWorktreePath, failOnError));
     return this;
   }

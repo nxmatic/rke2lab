@@ -39,7 +39,7 @@ import javax.annotation.Nullable;
  * infrastructure — the same "walk structure, emit doc, no side effects" notion as {@code pulumi
  * preview} itself.
  */
-public final class SystemdAdapterStage {
+public final class SystemdAdapterTopic {
 
   private static final String JGIVEN_DRY_RUN = "jgiven.report.dry-run";
 
@@ -66,7 +66,7 @@ public final class SystemdAdapterStage {
 
   private final DocumentCodec codec = new DocumentCodec();
 
-  public SystemdAdapterStage(
+  public SystemdAdapterTopic(
       BootstrapConfig config,
       ControlplanePolicy policy,
       boolean pulumiMode,
@@ -98,7 +98,7 @@ public final class SystemdAdapterStage {
    * has no runbook, consultation log, doctor, or recordedAt to supply; routing through this
    * overload keeps that absence here rather than as nulls at the call site.
    */
-  SystemdAdapterStage(
+  SystemdAdapterTopic(
       BootstrapConfig config,
       ControlplanePolicy policy,
       boolean pulumiMode,
@@ -120,7 +120,7 @@ public final class SystemdAdapterStage {
         null);
   }
 
-  public SystemdAdapterStage launch() {
+  public SystemdAdapterTopic launch() {
     final boolean preview = pulumiMode && Deployment.getInstance().isDryRun();
 
     // A fake incident is PREVIEW-ONLY: the simulate map is consulted only during `pulumi preview`,

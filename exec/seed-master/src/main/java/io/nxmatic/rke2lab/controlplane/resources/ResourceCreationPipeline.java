@@ -6,7 +6,7 @@ import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.controlplane.bdd.LiveClusterReadinessProbe;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap;
-import io.nxmatic.rke2lab.controlplane.pipeline.stages.ClusterReadinessStage;
+import io.nxmatic.rke2lab.controlplane.pipeline.stages.ClusterReadinessTopic;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterReadinessResource;
@@ -77,7 +77,7 @@ final class ResourceCreationPipeline {
       boolean pulumiMode) {
     final ClusterBootstrapReadinessVerifier.VerificationResult[] holder =
         new ClusterBootstrapReadinessVerifier.VerificationResult[1];
-    new ClusterReadinessStage(
+    new ClusterReadinessTopic(
             config,
             policy,
             readinessEnabled,
@@ -236,7 +236,7 @@ final class ResourceCreationPipeline {
 
     StandaloneResourceBuilder withReadiness() {
       // Same eager BDD checkpoint as the Pulumi path; standalone keeps the plain VerificationResult
-      // (no Pulumi resource wrapping). Unified by the pulumiMode flag, as SystemdAdapterStage is.
+      // (no Pulumi resource wrapping). Unified by the pulumiMode flag, as SystemdAdapterTopic is.
       this.readinessOutput = playClusterReadiness(false);
       return this;
     }

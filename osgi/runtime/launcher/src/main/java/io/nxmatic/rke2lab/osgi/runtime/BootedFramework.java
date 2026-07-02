@@ -13,8 +13,8 @@ import org.slf4j.LoggerFactory;
  * produced this; the boot DECISION ({@code BootPlan}) is upstream and framework-free.
  *
  * <p>{@code AutoCloseable} so an entrypoint that owns the boot span ({@code
- * BootPipeline.embedded()}) can try-with-resources it; the test executor hands it out and closes it
- * in its own lifecycle.
+ * FrameworkLaunchPipeline.embedded()}) can try-with-resources it; the test executor hands it out
+ * and closes it in its own lifecycle.
  */
 public final class BootedFramework implements AutoCloseable {
 

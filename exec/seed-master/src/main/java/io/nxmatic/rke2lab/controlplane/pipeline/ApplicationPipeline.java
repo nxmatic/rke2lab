@@ -5,9 +5,9 @@ import com.pulumi.Pulumi;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.controlplane.pipeline.stages.BootstrapStage;
-import io.nxmatic.rke2lab.controlplane.pipeline.stages.EnvironmentStage;
-import io.nxmatic.rke2lab.controlplane.pipeline.stages.OutputsStage;
+import io.nxmatic.rke2lab.controlplane.pipeline.stages.ClusterSeedTopic;
+import io.nxmatic.rke2lab.controlplane.pipeline.stages.EnvironmentTopic;
+import io.nxmatic.rke2lab.controlplane.pipeline.stages.OutputsTopic;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
@@ -88,11 +88,11 @@ public final class ApplicationPipeline {
       return this;
     }
 
-    public EnvironmentDone during(String topic, Function<EnvironmentStage, EnvironmentStage> body) {
-      final EnvironmentStage stage =
-          new EnvironmentStage(
+    public EnvironmentDone during(String topic, Function<EnvironmentTopic, EnvironmentTopic> body) {
+      final EnvironmentTopic stage =
+          new EnvironmentTopic(
               state.pulumiContext,
-              new EnvironmentStage.Sink() {
+              new EnvironmentTopic.Sink() {
                 @Override
                 public void logSink(AutoCloseable closeable) {
                   state.logSinkCloseable = closeable;
@@ -137,9 +137,9 @@ public final class ApplicationPipeline {
       this.state = state;
     }
 
-    public BootstrapDone during(String topic, Function<BootstrapStage, BootstrapStage> body) {
-      final BootstrapStage stage =
-          new BootstrapStage(
+    public BootstrapDone during(String topic, Function<ClusterSeedTopic, ClusterSeedTopic> body) {
+      final ClusterSeedTopic stage =
+          new ClusterSeedTopic(
               state.pulumiMode,
               () -> state.bootstrapConfig,
               () -> state.controlplanePolicy,
@@ -174,8 +174,8 @@ public final class ApplicationPipeline {
       this.state = state;
     }
 
-    public OutputsDone during(String topic, Function<OutputsStage, OutputsStage> body) {
-      final OutputsStage stage = new OutputsStage(state.pulumiContext, () -> state.outputs);
+    public OutputsDone during(String topic, Function<OutputsTopic, OutputsTopic> body) {
+      final OutputsTopic stage = new OutputsTopic(state.pulumiContext, () -> state.outputs);
       state.runner.runDuring(topic, stage, body, state.onFailure);
       return new OutputsDone(state);
     }

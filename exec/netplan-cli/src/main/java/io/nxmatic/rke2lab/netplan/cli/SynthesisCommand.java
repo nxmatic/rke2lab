@@ -3,7 +3,7 @@ package io.nxmatic.rke2lab.netplan.cli;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisRequest;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisResult;
 import io.nxmatic.rke2lab.netplan.api.NetplanSynthesisService;
-import io.nxmatic.rke2lab.osgi.runtime.BootPipeline;
+import io.nxmatic.rke2lab.osgi.runtime.FrameworkLaunchPipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +16,8 @@ public final class SynthesisCommand implements NetplanCli.Command {
     // Boot the embedded Felix from the bundles staged in this exec-jar (the shared boot seam),
     // resolve the one netplan service from the registry, drive it, then close. No flat-classpath
     // fallback: netplan-core's @Component activates only under a framework.
-    BootPipeline.embedded().during("synthesis", NetplanSynthesisService.class, this::synthesize);
+    FrameworkLaunchPipeline.embedded()
+        .during("synthesis", NetplanSynthesisService.class, this::synthesize);
   }
 
   private void synthesize(NetplanSynthesisService service) {

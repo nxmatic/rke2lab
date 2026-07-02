@@ -4,7 +4,7 @@ package io.nxmatic.rke2lab.manifests.cli;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisRequest;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisResult;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisService;
-import io.nxmatic.rke2lab.osgi.runtime.BootPipeline;
+import io.nxmatic.rke2lab.osgi.runtime.FrameworkLaunchPipeline;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
@@ -149,7 +149,7 @@ public final class Main {
       // flat-classpath fallback: since the Resolver became an @Reference, manifests-core's
       // @Component activates only under a framework, so off-framework ServiceLoader yielded a null
       // Resolver — the bug this migration fixes.
-      BootPipeline.embedded()
+      FrameworkLaunchPipeline.embedded()
           .during("synthesize", ManifestSynthesisService.class, this::synthesize);
     }
 

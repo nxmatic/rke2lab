@@ -7,14 +7,14 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
 import java.util.function.Consumer;
 
-public final class IncusStage {
+public final class IncusTopic {
 
   private final BootstrapConfig config;
   private final ControlplanePolicy policy;
   private final BootedFramework bootedFramework;
   private final Consumer<BootstrapResult> sink;
 
-  public IncusStage(
+  public IncusTopic(
       BootstrapConfig config,
       ControlplanePolicy policy,
       BootedFramework bootedFramework,
@@ -25,7 +25,7 @@ public final class IncusStage {
     this.sink = sink;
   }
 
-  public IncusStage provisionInstance() {
+  public IncusTopic provisionInstance() {
     sink.accept(new IncusResourceBootstrap(config, bootedFramework).apply(policy));
     return this;
   }

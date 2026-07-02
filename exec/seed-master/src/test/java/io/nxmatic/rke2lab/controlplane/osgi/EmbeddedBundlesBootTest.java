@@ -13,19 +13,19 @@ import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisResult;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisService;
 import io.nxmatic.rke2lab.manifests.port.ManifestUpdateGate;
 import io.nxmatic.rke2lab.manifests.port.node.NodeEnvOverlayService;
-import io.nxmatic.rke2lab.osgi.runtime.BootPipeline;
 import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
+import io.nxmatic.rke2lab.osgi.runtime.FrameworkLaunchPipeline;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
  * WI-C packaging proof: boot the framework from the bundles EMBEDDED in this artifact under {@code
- * META-INF/bundles/} — the exact deployed topology — via {@code BootPipeline.embedded()}, the same
- * staged source a deployed exec-jar boots from. The {@code stage-embedded-bundles}
- * dependency-plugin execution copies the jars into {@code generated-resources}, a resource root, so
- * they are on the test classpath here just as they are inside the deployed exec-jar; the pipeline
- * streams each staged jar straight into Felix.
+ * META-INF/bundles/} — the exact deployed topology — via {@code
+ * FrameworkLaunchPipeline.embedded()}, the same staged source a deployed exec-jar boots from. The
+ * {@code stage-embedded-bundles} dependency-plugin execution copies the jars into {@code
+ * generated-resources}, a resource root, so they are on the test classpath here just as they are
+ * inside the deployed exec-jar; the pipeline streams each staged jar straight into Felix.
  *
  * <p>This closes the gap a {@code jar tf} check leaves open: it proves the embedded jars actually
  * boot, resolve, and publish their services — not merely that they are present in the archive.
@@ -44,9 +44,9 @@ class EmbeddedBundlesBootTest {
   @BeforeAll
   static void bootFromEmbeddedBundles() {
     assertTrue(
-        BootPipeline.hasEmbeddedBundles(),
+        FrameworkLaunchPipeline.hasEmbeddedBundles(),
         "the stage-embedded-bundles execution must have placed the jars under META-INF/bundles");
-    framework = BootPipeline.embedded().launch();
+    framework = FrameworkLaunchPipeline.embedded().launch();
   }
 
   @AfterAll

@@ -6,11 +6,11 @@ import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.controlplane.pipeline.stages.BboxStage;
-import io.nxmatic.rke2lab.controlplane.pipeline.stages.IncusStage;
-import io.nxmatic.rke2lab.controlplane.pipeline.stages.PreflightStage;
-import io.nxmatic.rke2lab.controlplane.pipeline.stages.ResourcesStage;
-import io.nxmatic.rke2lab.controlplane.pipeline.stages.SystemdAdapterStage;
+import io.nxmatic.rke2lab.controlplane.pipeline.stages.BboxTopic;
+import io.nxmatic.rke2lab.controlplane.pipeline.stages.IncusTopic;
+import io.nxmatic.rke2lab.controlplane.pipeline.stages.PreflightTopic;
+import io.nxmatic.rke2lab.controlplane.pipeline.stages.ResourcesTopic;
+import io.nxmatic.rke2lab.controlplane.pipeline.stages.SystemdAdapterTopic;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
@@ -39,7 +39,7 @@ import java.util.function.Function;
  * class is the canonical exemplar.
  *
  * <pre>
- * BootstrapPipeline.forCluster(config, policy)
+ * ClusterSeedPipeline.forCluster(config, policy)
  *     .withOptions(options)
  *     .using(bboxOrchestrator, resourceManager, outputBuilder)
  *     .onFailure(SeedLog::error)
@@ -59,9 +59,9 @@ import java.util.function.Function;
  *     .collectOutputs();
  * </pre>
  */
-public final class BootstrapPipeline {
+public final class ClusterSeedPipeline {
 
-  private BootstrapPipeline() {}
+  private ClusterSeedPipeline() {}
 
   public static ConfiguringPipeline forCluster(BootstrapConfig config, ControlplanePolicy policy) {
     return new ConfiguringPipeline(new PipelineState(config, policy));
@@ -275,9 +275,9 @@ public final class BootstrapPipeline {
       this.state = state;
     }
 
-    public PreflightDone during(String topic, Function<PreflightStage, PreflightStage> body) {
-      final PreflightStage stage =
-          new PreflightStage(
+    public PreflightDone during(String topic, Function<PreflightTopic, PreflightTopic> body) {
+      final PreflightTopic stage =
+          new PreflightTopic(
               state.config.localWorktreePath(),
               state.config.imageBuilderHost(),
               state.options.cleanWorktreeRequired(),
@@ -307,9 +307,9 @@ public final class BootstrapPipeline {
       this.state = state;
     }
 
-    public BboxDone during(String topic, Function<BboxStage, BboxStage> body) {
-      final BboxStage stage =
-          new BboxStage(
+    public BboxDone during(String topic, Function<BboxTopic, BboxTopic> body) {
+      final BboxTopic stage =
+          new BboxTopic(
               state.bboxOrchestrator,
               state.config.localWorktreePath(),
               state.options.bboxFailOnError(),
@@ -338,9 +338,9 @@ public final class BootstrapPipeline {
       this.state = state;
     }
 
-    public IncusDone during(String topic, Function<IncusStage, IncusStage> body) {
-      final IncusStage stage =
-          new IncusStage(
+    public IncusDone during(String topic, Function<IncusTopic, IncusTopic> body) {
+      final IncusTopic stage =
+          new IncusTopic(
               state.config,
               state.policy,
               state.bootedFramework,
@@ -370,12 +370,12 @@ public final class BootstrapPipeline {
     }
 
     public SystemdAdapterDone during(
-        String topic, Function<SystemdAdapterStage, SystemdAdapterStage> body) {
+        String topic, Function<SystemdAdapterTopic, SystemdAdapterTopic> body) {
       final SeedSystemdAdapterEndpointGate gate =
           SeedSystemdAdapterEndpointGate.live(state.systemdRuntimeStatus);
       final SystemdAdapterProbe liveProbe = cfg -> gate.ensureReachable(cfg, state.readinessLogger);
-      final SystemdAdapterStage stage =
-          new SystemdAdapterStage(
+      final SystemdAdapterTopic stage =
+          new SystemdAdapterTopic(
               state.config,
               state.policy,
               state.pulumiMode,
@@ -411,9 +411,9 @@ public final class BootstrapPipeline {
       this.state = state;
     }
 
-    public ResourcesDone during(String topic, Function<ResourcesStage, ResourcesStage> body) {
-      final ResourcesStage stage =
-          new ResourcesStage(
+    public ResourcesDone during(String topic, Function<ResourcesTopic, ResourcesTopic> body) {
+      final ResourcesTopic stage =
+          new ResourcesTopic(
               state.resourceManager,
               state.config,
               state.policy,

@@ -39,7 +39,7 @@ import java.util.stream.StreamSupport;
  * the output layer already consumes. {@code ClusterReadinessResource} is a thin mirror of the
  * result.
  */
-public final class ClusterReadinessStage {
+public final class ClusterReadinessTopic {
 
   private static final String JGIVEN_DRY_RUN = "jgiven.report.dry-run";
   private static final String SCENARIO_ID = Checkpoint.CLUSTER_READINESS.slug();
@@ -63,7 +63,7 @@ public final class ClusterReadinessStage {
 
   private final DocumentCodec codec = new DocumentCodec();
 
-  public ClusterReadinessStage(
+  public ClusterReadinessTopic(
       BootstrapConfig config,
       ControlplanePolicy policy,
       boolean readinessEnabled,
@@ -91,7 +91,7 @@ public final class ClusterReadinessStage {
     this.sink = sink;
   }
 
-  public ClusterReadinessStage launch() {
+  public ClusterReadinessTopic launch() {
     final boolean preview = pulumiMode && Deployment.getInstance().isDryRun();
 
     if (!readinessEnabled) {

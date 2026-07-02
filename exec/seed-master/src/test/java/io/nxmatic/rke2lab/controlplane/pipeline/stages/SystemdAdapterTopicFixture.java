@@ -8,12 +8,12 @@ import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
 import java.util.Map;
 
-/** Builds a SystemdAdapterStage whose probe always fails, for verdict-decision tests. */
-final class SystemdAdapterStageFixture {
+/** Builds a SystemdAdapterTopic whose probe always fails, for verdict-decision tests. */
+final class SystemdAdapterTopicFixture {
 
-  private SystemdAdapterStageFixture() {}
+  private SystemdAdapterTopicFixture() {}
 
-  static SystemdAdapterStage failing(ReadinessAuthority authority) {
+  static SystemdAdapterTopic failing(ReadinessAuthority authority) {
     final BootstrapConfig config =
         BootstrapConfig.from(io.nxmatic.rke2lab.controlplane.config.Rke2labConfig.defaults());
     final ControlplanePolicy policy = ControlplanePolicy.defaults();
@@ -23,7 +23,7 @@ final class SystemdAdapterStageFixture {
                 SymptomKind.CONNECTION_REFUSED, "fake failure", Map.of("source", "test"));
     // The verdict-decision overload: no runbook / consultation log / doctor — this proof exercises
     // only the failing-probe → authority-verdict path, which reads none of them.
-    return new SystemdAdapterStage(
+    return new SystemdAdapterTopic(
         config,
         policy,
         false, // pulumiMode off → no dry-run, step bodies run

@@ -2,7 +2,7 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 
 import io.nxmatic.rke2lab.doctor.port.InterventionIntake;
 import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
-import io.nxmatic.rke2lab.osgi.runtime.BootPipeline;
+import io.nxmatic.rke2lab.osgi.runtime.FrameworkLaunchPipeline;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiInterventionLedgerWriter;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
@@ -76,7 +76,7 @@ public final class RecordInterventionCommand {
   public static void main(String[] args) {
     try {
       final Path backend = Args.backendOf(args);
-      BootPipeline.embedded()
+      FrameworkLaunchPipeline.embedded()
           .during(
               "record-intervention",
               InterventionIntake.class,

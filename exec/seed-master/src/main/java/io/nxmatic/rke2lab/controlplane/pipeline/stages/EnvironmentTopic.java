@@ -8,7 +8,7 @@ import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import java.util.function.Consumer;
 
-public final class EnvironmentStage {
+public final class EnvironmentTopic {
 
   public interface Sink {
     void logSink(AutoCloseable closeable);
@@ -23,12 +23,12 @@ public final class EnvironmentStage {
   private final Context pulumiContext;
   private final Sink sink;
 
-  public EnvironmentStage(Context pulumiContext, Sink sink) {
+  public EnvironmentTopic(Context pulumiContext, Sink sink) {
     this.pulumiContext = pulumiContext;
     this.sink = sink;
   }
 
-  public EnvironmentStage installLogSink() {
+  public EnvironmentTopic installLogSink() {
     if (pulumiContext == null) {
       return this;
     }
@@ -62,17 +62,17 @@ public final class EnvironmentStage {
     return config;
   }
 
-  public EnvironmentStage loadBootstrapConfig() {
+  public EnvironmentTopic loadBootstrapConfig() {
     sink.bootstrapConfig(BootstrapConfig.from(config()));
     return this;
   }
 
-  public EnvironmentStage loadControlplanePolicy() {
+  public EnvironmentTopic loadControlplanePolicy() {
     sink.controlplanePolicy(ControlplanePolicy.from(config()));
     return this;
   }
 
-  public EnvironmentStage loadOptions() {
+  public EnvironmentTopic loadOptions() {
     sink.options(BootstrapOptions.from(config()));
     return this;
   }

@@ -15,7 +15,7 @@ import java.util.Optional;
 
 /**
  * Thin Pulumi-graph mirror of the cluster-readiness result. The checkpoint is played eagerly as a
- * BDD scenario by {@code ClusterReadinessStage} (which records it into the runbook and consults the
+ * BDD scenario by {@code ClusterReadinessTopic} (which records it into the runbook and consults the
  * doctor); this resource only registers the already-computed {@link
  * ClusterBootstrapReadinessVerifier.VerificationResult} as graph outputs and carries the {@code
  * dependsOn} edge — the same shape as {@code SystemdAdapterResource}. No verification runs here.

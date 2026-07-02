@@ -5,20 +5,20 @@ import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.bdd.RunbookRenderer;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions;
-import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapPipeline;
+import io.nxmatic.rke2lab.controlplane.pipeline.ClusterSeedPipeline;
 import io.nxmatic.rke2lab.controlplane.pipeline.OutputBuilder;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
-import io.nxmatic.rke2lab.osgi.runtime.BootPipeline;
 import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
+import io.nxmatic.rke2lab.osgi.runtime.FrameworkLaunchPipeline;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-public final class BootstrapStage {
+public final class ClusterSeedTopic {
 
   private final boolean pulumiMode;
   private final Supplier<BootstrapConfig> configSupplier;
@@ -31,7 +31,7 @@ public final class BootstrapStage {
   private final OutputBuilder outputBuilder;
   private final Consumer<Map<String, Object>> outputsSink;
 
-  public BootstrapStage(
+  public ClusterSeedTopic(
       boolean pulumiMode,
       Supplier<BootstrapConfig> configSupplier,
       Supplier<ControlplanePolicy> policySupplier,
@@ -54,27 +54,28 @@ public final class BootstrapStage {
     this.outputsSink = outputsSink;
   }
 
-  public BootstrapStage runBootstrapPipeline() {
+  public ClusterSeedTopic runBootstrapPipeline() {
     // The runbook is owned here, recorded into by every checkpoint, and rendered in the finally so
     // a CRITICAL stop (a checkpoint that throws to abort provisioning) still produces a runbook —
     // exactly the failure the runbook exists to document.
     final ReportModel runbook = new ReportModel();
     final ConsultationLog consultations = new ConsultationLog();
     // Boot the embedded OSGi framework once for the whole run via the shared boot seam; the stages
-    // read the manifests-world services from its registry. BootPipeline closes the framework after
+    // read the manifests-world services from its registry. FrameworkLaunchPipeline closes the
+    // framework after
     // the tail returns or throws — and the runbook render in the tail's own finally runs BEFORE
     // that
     // close, so a CRITICAL stop still produces a runbook.
-    BootPipeline.embedded()
-        .during("bootstrap", framework -> runUnderRuntime(framework, runbook, consultations));
+    FrameworkLaunchPipeline.embedded()
+        .during("framework", framework -> runUnderRuntime(framework, runbook, consultations));
     return this;
   }
 
   private void runUnderRuntime(
       BootedFramework framework, ReportModel runbook, ConsultationLog consultations) {
     try {
-      BootstrapPipeline.ComponentBoundPipeline ready =
-          BootstrapPipeline.forCluster(configSupplier.get(), policySupplier.get())
+      ClusterSeedPipeline.ComponentBoundPipeline ready =
+          ClusterSeedPipeline.forCluster(configSupplier.get(), policySupplier.get())
               .withOptions(optionsSupplier.get())
               .using(bboxOrchestrator, resourceManager, outputBuilder)
               .withBootedFramework(framework)
@@ -83,7 +84,7 @@ public final class BootstrapStage {
       if (handler != null) {
         ready = ready.onFailure(handler);
       }
-      final BootstrapPipeline.AwaitingPreflight primed =
+      final ClusterSeedPipeline.AwaitingPreflight primed =
           pulumiMode
               ? ready.runningInPulumi(readinessLogger)
               : ready.runningStandalone(readinessLogger);

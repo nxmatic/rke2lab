@@ -5,8 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.nxmatic.rke2lab.junit.testkit.Osgi;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisService;
-import io.nxmatic.rke2lab.osgi.runtime.BootPipeline;
 import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
+import io.nxmatic.rke2lab.osgi.runtime.FrameworkLaunchPipeline;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -16,8 +16,8 @@ import org.junit.jupiter.api.Test;
  * {@code META-INF/bundles/} — the exact topology {@code Main} uses at runtime — and reads {@code
  * ManifestSynthesisService} from the registry. This is the standalone-{@code main()} counterpart of
  * seed-master's {@code EmbeddedBundlesBootTest}; it proves the shared {@link
- * BootPipeline#embedded()} seam carries to a CLI, fixing the off-framework ServiceLoader bug (a
- * null {@code Resolver} since the Resolver became an {@code @Reference}).
+ * FrameworkLaunchPipeline#embedded()} seam carries to a CLI, fixing the off-framework ServiceLoader
+ * bug (a null {@code Resolver} since the Resolver became an {@code @Reference}).
  */
 @Osgi
 class EmbeddedBundlesBootTest {
@@ -27,9 +27,9 @@ class EmbeddedBundlesBootTest {
   @BeforeAll
   static void bootFromEmbeddedBundles() {
     assertTrue(
-        BootPipeline.hasEmbeddedBundles(),
+        FrameworkLaunchPipeline.hasEmbeddedBundles(),
         "the stage-embedded-bundles execution must have placed the jars under META-INF/bundles");
-    framework = BootPipeline.embedded().launch();
+    framework = FrameworkLaunchPipeline.embedded().launch();
   }
 
   @AfterAll

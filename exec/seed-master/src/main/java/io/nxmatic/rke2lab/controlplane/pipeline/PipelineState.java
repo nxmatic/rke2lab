@@ -25,8 +25,8 @@ final class PipelineState {
   boolean pulumiMode;
 
   /**
-   * The embedded OSGi framework booted once for this run (see {@code BootstrapStage}). Threaded to
-   * the stages that read manifests-world services so they read them from the booted registry.
+   * The embedded OSGi framework booted once for this run (see {@code ClusterSeedTopic}). Threaded
+   * to the stages that read manifests-world services so they read them from the booted registry.
    */
   BootedFramework bootedFramework;
 

@@ -113,7 +113,7 @@ class RunbookRenderingTest {
   }
 
   /**
-   * Mirrors {@code SystemdAdapterStage.launch()} on failure: the Then throws, but {@code
+   * Mirrors {@code SystemdAdapterTopic.launch()} on failure: the Then throws, but {@code
    * finished()} still runs in a finally so the failed scenario is flushed into the model and
    * renders (the bug this test guards against).
    */

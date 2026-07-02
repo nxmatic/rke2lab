@@ -26,7 +26,7 @@ import java.util.stream.Stream;
  * statistics files — it is a multi-file report, not a single document; {@code index.asciidoc} is
  * the entry point.
  *
- * <p>Called from the caller-owned {@code finally} (see {@code BootstrapStage}): the render must
+ * <p>Called from the caller-owned {@code finally} (see {@code ClusterSeedTopic}): the render must
  * survive a CRITICAL scenario that throws, since that is exactly the failure the runbook documents.
  * Rendering never throws back into the pipeline — a runbook that fails to render must not also fail
  * the provisioning.

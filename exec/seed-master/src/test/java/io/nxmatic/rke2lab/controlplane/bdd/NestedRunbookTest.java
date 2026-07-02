@@ -17,7 +17,7 @@ import com.tngtech.jgiven.report.model.StepStatus;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.OperatorConfiguration;
-import io.nxmatic.rke2lab.controlplane.pipeline.stages.ClusterReadinessStage;
+import io.nxmatic.rke2lab.controlplane.pipeline.stages.ClusterReadinessTopic;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
 import io.nxmatic.rke2lab.doctor.ExactRosterDoctor;
@@ -41,7 +41,7 @@ import org.mockito.MockedStatic;
 /**
  * The cluster-readiness checkpoint plays the systemd-adapter scenario nested (the follow-the-chain
  * dependency edge) and renders as a two-tier runbook. These tests drive the REAL {@link
- * ClusterReadinessStage#launch()} with an injected probe — the same code production runs — so the
+ * ClusterReadinessTopic#launch()} with an injected probe — the same code production runs — so the
  * scenario script lives in exactly one place. An ordered fake incident on one phase produces a
  * targeted runbook, and the stage consults the doctor on the failing phase's symptom.
  */
@@ -263,7 +263,7 @@ class NestedRunbookTest {
   }
 
   /**
-   * Drive the production {@link ClusterReadinessStage#launch()} with an injected probe and capture
+   * Drive the production {@link ClusterReadinessTopic#launch()} with an injected probe and capture
    * its {@link VerificationResult}. This is the single owner of the scenario script — the test
    * varies only the probe (fake/simulated), the runbook model, the consultation log, and the log
    * sink.
@@ -276,7 +276,7 @@ class NestedRunbookTest {
       ConsultingService doctor,
       java.util.function.Consumer<String> logger) {
     final VerificationResult[] holder = new VerificationResult[1];
-    new ClusterReadinessStage(
+    new ClusterReadinessTopic(
             config(),
             policy(),
             true,

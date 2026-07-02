@@ -32,12 +32,12 @@ import java.util.function.Consumer;
  * the TAIL: {@code .during(topic, framework -> …)} (read several services) or {@code .during(topic,
  * Service.class, svc -> …)} (resolve one). The preset owns the boot-run-close lifecycle.
  */
-public final class BootPipeline {
+public final class FrameworkLaunchPipeline {
 
   /** How long the single-service tail waits for SCR to publish the service before failing fast. */
   private static final long SERVICE_TIMEOUT_MILLIS = 5000;
 
-  private BootPipeline() {}
+  private FrameworkLaunchPipeline() {}
 
   /**
    * The prod preset: boot the embedded stack staged under {@code META-INF/bundles/} (the staged
@@ -89,9 +89,10 @@ public final class BootPipeline {
     /**
      * Boot and HAND the live {@link BootedFramework} OUT — the caller owns the lifecycle (closes it
      * itself). The shape a test needs when it boots once and reads the registry from several
-     * {@code @Test} methods (e.g. {@code try (var f = BootPipeline.embedded().launch()) { … }});
-     * the embedded prod topology is exercised exactly as a deployed exec-jar would. Fails fast if
-     * the artifact carries no embedded bundles (a packaging defect, not a degraded run mode).
+     * {@code @Test} methods (e.g. {@code try (var f = FrameworkLaunchPipeline.embedded().launch())
+     * { … }}); the embedded prod topology is exercised exactly as a deployed exec-jar would. Fails
+     * fast if the artifact carries no embedded bundles (a packaging defect, not a degraded run
+     * mode).
      */
     public BootedFramework launch() {
       if (!hasEmbeddedBundles()) {
@@ -137,7 +138,7 @@ public final class BootPipeline {
    * BootPlanner} rather than reached through static helpers.
    */
   private static final HostClassLoaderView HOST =
-      HostClassLoaderView.of(BootPipeline.class.getClassLoader());
+      HostClassLoaderView.of(FrameworkLaunchPipeline.class.getClassLoader());
 
   /**
    * Whether the running process carries the embedded boot stack — true in a deployed exec-jar,

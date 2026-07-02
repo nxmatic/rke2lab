@@ -6,7 +6,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Consumer;
 
-public final class PreflightStage {
+public final class PreflightTopic {
 
   private final Path localWorktreePath;
   private final String imageBuilderHost;
@@ -14,7 +14,7 @@ public final class PreflightStage {
   private final Consumer<String> readinessLogger;
   private final BootedFramework bootedFramework;
 
-  public PreflightStage(
+  public PreflightTopic(
       Path localWorktreePath,
       String imageBuilderHost,
       boolean cleanWorktreeRequired,
@@ -27,17 +27,17 @@ public final class PreflightStage {
     this.bootedFramework = bootedFramework;
   }
 
-  public PreflightStage enforceEntryGates() {
+  public PreflightTopic enforceEntryGates() {
     EntryGatePolicyEnforcer.enforceAll(localWorktreePath, cleanWorktreeRequired, bootedFramework);
     return this;
   }
 
-  public PreflightStage requireLocalCommands(String... commands) {
+  public PreflightTopic requireLocalCommands(String... commands) {
     RuntimeCommandPreflight.enforceRequiredCommands(List.of(commands), readinessLogger);
     return this;
   }
 
-  public PreflightStage requireRemoteCommand(String command) {
+  public PreflightTopic requireRemoteCommand(String command) {
     RuntimeCommandPreflight.enforceRemoteCommandAvailable(
         imageBuilderHost, command, readinessLogger);
     return this;

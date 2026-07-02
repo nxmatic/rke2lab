@@ -27,15 +27,15 @@ class SystemdAdapterVerdictTest {
 
   @Test
   void stopVerdictThrowsTopicFailure() {
-    final SystemdAdapterStage stage =
-        SystemdAdapterStageFixture.failing(authorityReturning(Action.STOP));
+    final SystemdAdapterTopic stage =
+        SystemdAdapterTopicFixture.failing(authorityReturning(Action.STOP));
     assertThrows(TopicFailure.class, stage::launch);
   }
 
   @Test
   void continueDegradedVerdictDoesNotThrow() {
-    final SystemdAdapterStage stage =
-        SystemdAdapterStageFixture.failing(authorityReturning(Action.CONTINUE_DEGRADED));
+    final SystemdAdapterTopic stage =
+        SystemdAdapterTopicFixture.failing(authorityReturning(Action.CONTINUE_DEGRADED));
     assertDoesNotThrow(stage::launch);
   }
 }
