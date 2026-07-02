@@ -83,6 +83,83 @@ does `RunMode` enter?). This `RunMode→OSGi→runbook` joint = the next brainst
 2026-07-02) = `docs/architecture/osgi/pipeline-spec.adoc` (moved from `patterns/`, renamed from
 `two-gates-spec`; `dsl-unification-exploration.adoc` DELETED and folded in).
 
+## ★ NAMING + THREE LEVELS (2026-07-02, graved in pipeline-spec.adoc)
+"Boot" vs "bootstrap" hid an altitude difference. DECIDED naming: **`FrameworkLaunch`** (launch the
+OSGi framework) vs **`ClusterSeed`** (seed-master seeds the cluster) — two verbs, two objects, no
+homonym. And `Stage` is jgiven's word → our unit is a **`Topic`**. So the renames:
+- `BootPipeline` (osgi/runtime/launcher) → **`FrameworkLaunchPipeline`**, topic `"bootstrap"`→`"framework"`.
+- `BootstrapPipeline` (exec/seed-master) → **`ClusterSeedPipeline`**.
+- `BootstrapStage` → **`ClusterSeedTopic`** (NOT `*Stage` — Topic is our word).
+
+The atlas-first audit (reading the late-June memories BEFORE speccing) found the dissociation the user
+asked for is really **THREE levels of pipeline**, each with a vision ALREADY mapped — do NOT re-derive:
+- **L-boot (framework launch)** = the boot EXECUTOR (`FrameworkLaunchPipeline` + `BootPlanner`/`BootPlan`
+  + `FrameworkLauncher`). Grammar yes, jgiven NO. Vision = unify prod `OsgiRuntime` + test
+  `FelixFrameworkExtension` into one boot-pipeline → [[boot-pipeline-unification-backlog]].
+- **L-shape (contributable seed)** = `ClusterSeedPipeline`. Grammar yes, jgiven YES (owns runbook).
+  Vision = the boot PREFIX is identical for all 3 seeds (seed-master/manifests-cli/netplan-cli); only
+  the TAIL diverges → each seed contributes its tail → [[bootstrap-pipeline-contributable-vision]].
+- **L-altitude (decision in OSGi)** = WHERE decision logic lives. Vision = the orchestration DSL becomes
+  an OSGi capability, actualisation stays host as ports (DIP); `ClusterSeedTopic` is pure decision
+  (candidate), 4/~10 topics still import Pulumi/gRPC (re-seam first) → [[pipeline-orchestration-osgi-vision]].
+- Two transverse: pure jgiven MODEL vs host rendering ENGINE → [[orchestration-purity-benefit]]; and
+  `osgi/jgiven/` dissolves into `pipeline` → [[jgiven-domain-into-pipeline-debt]].
+
+KEY dissociation resolved: `FrameworkLaunch` is NOT seed-master's — it is the shared boot prefix of the
+3 seeds; `ClusterSeed` is only seed-master's tail; `ClusterSeedTopic` is their single seam (the embedded
+fold) AND the pure-decision unit L-altitude moves into OSGi. Rename is SAFE/orthogonal (doesn't prejudge
+contributable or OSGi-orchestration); the shape rewrite is the vision, later. **This session RE-DERIVED
+part of these 5 notes for lack of the atlas-first reflex — hence the reflex is now the rule.**
+
+BEFORE/AFTER cartography graved in the spec (factual, ~8 pipelines) on TWO axes: defined-where
+(host/OSGi) + INITIATED-by (host/OSGi) — the user's axis. Finding: exactly ONE pipeline is
+OSGi-INITIATED today (`BootstrapInfrastructureSynthesizer`, called by the manifests `@Component`); all
+others are host-initiated (directly or via ~15 `awaitService(...)` calls). No `@Activate` runs a
+`during/then`. ⇒ the L-altitude vision's MEASURE = moving rows host→OSGi on the initiation axis; the
+column has 1 entry today, the vision fills it. Verdict: design HOLDS (renames are a partition not a
+rewrite; initiation only moves host→OSGi). CAVEAT surfaced: **`Stage` is overloaded** — `BootstrapStage`
+exists TWICE (seed-master + manifests-core), 14 `*Stage` over 4 modules; `Stage→Topic` is transverse,
+scope must be decided up front (I once ran the rename blind and it clobbered manifests-core's
+`BootstrapStage`/`NetworkStage`/`StorageStage` — REVERTED; lesson: no blind sweep).
+
+WORK PLAN graved (spec § "Work plan"): TWO orthogonal threads, do NOT braid.
+- Thread R (reliability, tactical) = non-null→outputs→jgiven→pipeline, fixed in reverse (the arc).
+- Thread S (structure, strategic), dependency order: **S0** lexical rename (decide Stage scope FIRST) →
+  **S1** untangle the fold in ClusterSeedTopic → **S2** contributable seed (rewrites ClusterSeedPipeline)
+  → **S3** decision-into-OSGi (re-seam the 4 pulumi/grpc topics; the RunMode→OSGi→runbook seam decided
+  HERE) → **S4** boot-executor unification (parallel) → **S5** transverse (pure jgiven model; osgi/jgiven
+  →pipeline). S2/S3 overlap (both rewrite ClusterSeedPipeline). Each S# = own chantier + worktree.
+NOTE (user, 2026-07-02): stay in BRAINSTORM/SPEC — finish the spec + a high-level plan; do NOT jump to
+implementation. The code stays untouched (only the uncommitted pulumi-edge trio + readiness WIP remain).
+
+## ★ MODE / PREVIEW — the fine decisions (2026-07-02, all graved in pipeline-spec)
+A chain of user corrections that settled how "mode" works across the seam. Each supersedes my prior
+wrong framing — recorded so they are not re-derived:
+1. **Preview is NOT Pulumi-only.** Separate the preview CAPABILITY (dry-run the reasoning → jgiven
+   PENDING + living gate closed — OSGi-NATIVE, jgiven is a bundle) from its TRIGGER
+   (`Deployment.isDryRun()` in bootstrap; operator command / CRD field detached — OPEN). My error was
+   "no Pulumi → no preview".
+2. **Promote the AXES, not the enum.** `RunMode {STANDALONE,PREVIEW,APPLY}` is HOST launch vocabulary —
+   STANDALONE = "host runs exec without Pulumi", meaningless detached, and that's CORRECT: the OSGi
+   world must never see "STANDALONE". The OSGi-native PORT speaks in AXES (probe: live/deferred).
+   `RunMode` is the host's PROJECTION (mode→axis values). Corrects my "promote RunMode into OSGi".
+3. **The mode RESOLVES; the context INJECTS (complementary).** The probe axis becomes a RESOLUTION axis
+   — resolve the pipeline/topic under LDAP `(probe=deferred)`, Felix wires the variant that never
+   touches the real system (the living gate stops being an `if`, becomes a `Require` — "gates become
+   resolution edges", the [[orchestration-purity-benefit]] idea applied to the mode). Changing mode =
+   a RE-RESOLUTION event (natural: each bootstrap launch resolves once; operator re-resolves in-cluster).
+   BUT resolution carries no run data — the patient/config/sink/instant still enter via `TopicContext`
+   (injected instance). Rule: **the mode resolves, the context injects.** The stack (output) axis stays
+   Pulumi/host-only and simply has no in-cluster edge; the probe/preview axis survives detached.
+4. **Host transposes the ROLE, not the MECHANISM.** Resolution is OSGi-native (Felix resolver); the host
+   has no resolver and today looks up by TYPE only (`awaitService(Class)`, no filter — verified). So the
+   host does NOT resolve — a **port-factory** carries the mode INTENTION and OSGi resolves it:
+   `PipelineProvider.forMode(probe=deferred)` → OSGi resolves the variant internally (LDAP stays
+   OSGi-side) → returns it. Chosen OVER extending `awaitService(Class, filter)` because that teaches the
+   host LDAP AND breaks detached (a remote host has no local registry). The port-factory carries an
+   intention → works embedded (folds onto awaitService) AND detached (remote call) — remote-first.
+   `RunMode` = the host's producer of that intention. Port shape decided at chantier S3.
+
 ## The thread (each link revealed by fixing the previous at its source)
 **non-null → pulumi-outputs → jgiven → pipeline.** The user's framing, verbatim: "le fil c'est
 non-null -> pulumi outputs -> jgiven -> pipeline". Each `→` is "fixing X at the source revealed the
