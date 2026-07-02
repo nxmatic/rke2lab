@@ -1,14 +1,21 @@
 package io.nxmatic.rke2lab.controlplane.incus;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Build metadata — state of build artifacts at deployment time.
  *
- * @param image container image build state
+ * @param image container image build state — empty until the image build stage produces the
+ *     checksum (the host stage registers it before that)
  * @param manifests synthesized Kubernetes manifests state
  */
-public record BuildMetadata(Image image, Manifests manifests) {
+public record BuildMetadata(Optional<Image> image, Manifests manifests) {
+
+  /** The built image, required — throws if read before the image build stage produced it. */
+  public Image requireImage() {
+    return image.orElseThrow(() -> new IllegalStateException("image checksum not yet built"));
+  }
 
   /**
    * Container image build state.

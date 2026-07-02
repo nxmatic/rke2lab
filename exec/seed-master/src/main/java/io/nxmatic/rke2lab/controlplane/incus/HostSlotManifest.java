@@ -208,9 +208,7 @@ public final class HostSlotManifest extends Construct {
     final Map<String, Object> map = new LinkedHashMap<>();
     map.put("type", source.type.toYamlValue());
     map.put("scratchPath", source.scratchPath);
-    if (source.parentSlot != null) {
-      map.put("parentSlot", source.parentSlot);
-    }
+    source.parentSlot.ifPresent(parentSlot -> map.put("parentSlot", parentSlot));
     return map;
   }
 
@@ -264,7 +262,7 @@ public final class HostSlotManifest extends Construct {
     }
   }
 
-  public record SourceInfo(SourceType type, String scratchPath, String parentSlot) {}
+  public record SourceInfo(SourceType type, String scratchPath, Optional<String> parentSlot) {}
 
   public static Builder builder() {
     return new Builder();
@@ -373,7 +371,7 @@ public final class HostSlotManifest extends Construct {
       return this;
     }
 
-    public Builder source(SourceType type, String scratchPath, String parentSlot) {
+    public Builder source(SourceType type, String scratchPath, Optional<String> parentSlot) {
       this.source = Optional.of(new SourceInfo(type, scratchPath, parentSlot));
       return this;
     }

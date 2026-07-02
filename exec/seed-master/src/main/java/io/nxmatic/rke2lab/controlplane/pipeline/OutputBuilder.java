@@ -64,7 +64,7 @@ public final class OutputBuilder {
         "seedBuildMetadata",
         Map.of(
             "image",
-            Map.of("checksum", bootstrapResult.build().image().checksum()),
+            Map.of("checksum", bootstrapResult.build().requireImage().checksum()),
             "manifests",
             bootstrapResult.build().manifests().summary()));
 

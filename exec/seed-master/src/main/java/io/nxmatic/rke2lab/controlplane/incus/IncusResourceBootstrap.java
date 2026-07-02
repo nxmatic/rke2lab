@@ -69,6 +69,7 @@ import org.cdk8s.AppProps;
 import org.cdk8s.Chart;
 import org.cdk8s.JsonPatch;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
+import org.jspecify.annotations.Nullable;
 
 /** Provider-native Stage A bootstrap resources for the Incus management seed node. */
 public final class IncusResourceBootstrap {
@@ -439,10 +440,10 @@ public final class IncusResourceBootstrap {
 
       @SuppressWarnings("unchecked")
       final Map<String, Object> layerEnvSummary =
-          (Map<String, Object>) targets.runtimeSummaries().get("layerEnv");
+          (Map<String, Object>) targets.runtimeSummaries().getOrDefault("layerEnv", Map.of());
       @SuppressWarnings("unchecked")
       final Map<String, Object> systemdSummary =
-          (Map<String, Object>) targets.runtimeSummaries().get("systemd");
+          (Map<String, Object>) targets.runtimeSummaries().getOrDefault("systemd", Map.of());
 
       state.registry.register(DeploymentMetadata.class, DeploymentMetadata.capture());
       state.registry.register(
@@ -451,7 +452,8 @@ public final class IncusResourceBootstrap {
               provisioningTargets, new ProvisioningMetadata.Paths(hostSourceDirRelative)));
       state.registry.register(
           BuildMetadata.class,
-          new BuildMetadata(null, BuildMetadata.Manifests.of(staging.manifestSynthSummary())));
+          new BuildMetadata(
+              Optional.empty(), BuildMetadata.Manifests.of(staging.manifestSynthSummary())));
       state.registry.register(
           RuntimeMetadata.class,
           new RuntimeMetadata(
@@ -753,7 +755,7 @@ public final class IncusResourceBootstrap {
       state.registry.update(
           BuildMetadata.class,
           new BuildMetadata(
-              new BuildMetadata.Image(context.imageProvider().buildChecksum()),
+              Optional.of(new BuildMetadata.Image(context.imageProvider().buildChecksum())),
               existing.manifests()));
       return this;
     }
@@ -864,7 +866,8 @@ public final class IncusResourceBootstrap {
       }
 
       final BuildMetadata buildMetadata = state.registry.require(BuildMetadata.class);
-      instanceConfig.put("user.rke2lab.imageBuildChecksum", buildMetadata.image().checksum());
+      instanceConfig.put(
+          "user.rke2lab.imageBuildChecksum", buildMetadata.requireImage().checksum());
 
       state.instance =
           new Instance(
@@ -915,12 +918,12 @@ public final class IncusResourceBootstrap {
 
     static final class Builder {
       private final IncusResourceBootstrap instance;
-      private String clusterName;
-      private String imageAlias;
-      private String imageFingerprint;
-      private String imageBuildChecksum;
-      private String incusProject;
-      private String incusRemoteAddress;
+      private @MonotonicNonNull String clusterName;
+      private @MonotonicNonNull String imageAlias;
+      private @MonotonicNonNull String imageFingerprint;
+      private @MonotonicNonNull String imageBuildChecksum;
+      private @MonotonicNonNull String incusProject;
+      private @MonotonicNonNull String incusRemoteAddress;
 
       private Builder(IncusResourceBootstrap instance) {
         this.instance = instance;
@@ -958,12 +961,12 @@ public final class IncusResourceBootstrap {
 
       ImageStateConfig build() {
         return new ImageStateConfig(
-            clusterName,
-            imageAlias,
-            imageFingerprint,
-            imageBuildChecksum,
-            incusProject,
-            incusRemoteAddress);
+            Objects.requireNonNull(clusterName, "clusterName"),
+            Objects.requireNonNull(imageAlias, "imageAlias"),
+            Objects.requireNonNull(imageFingerprint, "imageFingerprint"),
+            Objects.requireNonNull(imageBuildChecksum, "imageBuildChecksum"),
+            Objects.requireNonNull(incusProject, "incusProject"),
+            Objects.requireNonNull(incusRemoteAddress, "incusRemoteAddress"));
       }
 
       String synthesize() {
@@ -1590,7 +1593,11 @@ public final class IncusResourceBootstrap {
           .scriptsRoot(scriptsRoot)
           .systemdLibexecRoot(systemdLibexecRoot)
           .systemdRoot(systemdRoot)
-          .gitRoot(worktreeRoot.getParent().getParent())
+          .gitRoot(
+              Objects.requireNonNull(
+                  Objects.requireNonNull(worktreeRoot.getParent(), "worktreeRoot parent")
+                      .getParent(),
+                  "worktreeRoot grandparent (git root)"))
           .shareRoot(stateRoot.resolve("share"))
           .kubeconfigRoot(clusterRoot)
           .cloudSeedRoot(nodeRoot.resolve("cloud.d"))
@@ -2249,7 +2256,8 @@ public final class IncusResourceBootstrap {
               .timestamp(timestamp)
               .buildId(buildId)
               .policy(policy)
-              .source(HostSlotManifest.SourceType.FRESH_BUILD, slotPath.toString(), null);
+              .source(
+                  HostSlotManifest.SourceType.FRESH_BUILD, slotPath.toString(), Optional.empty());
 
       gitInfo.ifPresent(
           info ->
@@ -2294,13 +2302,17 @@ public final class IncusResourceBootstrap {
      */
     private void symlinkManifestToMasterLevel(Path hostAssetRoot) throws IOException {
       final Path hostManifest = hostAssetRoot.resolve(".rke2lab-manifest.yaml");
-      final Path masterManifest = hostAssetRoot.getParent().resolve("MANIFEST.yaml");
+      final Path masterManifest =
+          Objects.requireNonNull(hostAssetRoot.getParent(), "hostAssetRoot parent")
+              .resolve("MANIFEST.yaml");
 
       // Remove existing symlink/file if present
       Files.deleteIfExists(masterManifest);
 
       // Create relative symlink: MANIFEST.yaml -> host/.rke2lab-manifest.yaml
-      final Path relativeTarget = masterManifest.getParent().relativize(hostManifest);
+      final Path relativeTarget =
+          Objects.requireNonNull(masterManifest.getParent(), "masterManifest parent")
+              .relativize(hostManifest);
       Files.createSymbolicLink(masterManifest, relativeTarget);
     }
 
@@ -2741,18 +2753,18 @@ public final class IncusResourceBootstrap {
       FAILED
     }
 
-    private record LookupResult(String importId, LookupState state, Boolean managed) {
+    private record LookupResult(String importId, LookupState state, Optional<Boolean> managed) {
 
-      private static LookupResult found(String importId, Boolean managed) {
-        return new LookupResult(importId, LookupState.FOUND, managed);
+      private static LookupResult found(String importId, @Nullable Boolean managed) {
+        return new LookupResult(importId, LookupState.FOUND, Optional.ofNullable(managed));
       }
 
       private static LookupResult notFound() {
-        return new LookupResult("", LookupState.NOT_FOUND, null);
+        return new LookupResult("", LookupState.NOT_FOUND, Optional.empty());
       }
 
       private static LookupResult failed() {
-        return new LookupResult("", LookupState.FAILED, null);
+        return new LookupResult("", LookupState.FAILED, Optional.empty());
       }
     }
 
@@ -2845,7 +2857,7 @@ public final class IncusResourceBootstrap {
               context,
               GetNetworkPlainArgs.builder().name(networkName).project(incusProject).build());
       if (projectScoped.state() == LookupState.FOUND) {
-        return Boolean.FALSE.equals(projectScoped.managed());
+        return projectScoped.managed().map(Boolean.FALSE::equals).orElse(false);
       }
       if (projectScoped.state() == LookupState.FAILED) {
         logInfo(
@@ -2860,7 +2872,7 @@ public final class IncusResourceBootstrap {
       final LookupResult unscoped =
           resolveNetworkImportId(context, GetNetworkPlainArgs.builder().name(networkName).build());
       if (unscoped.state() == LookupState.FOUND) {
-        return Boolean.FALSE.equals(unscoped.managed());
+        return unscoped.managed().map(Boolean.FALSE::equals).orElse(false);
       }
       if (unscoped.state() == LookupState.FAILED) {
         logInfo(
@@ -2951,7 +2963,7 @@ public final class IncusResourceBootstrap {
       return message.isBlank() ? type : type + ": " + message;
     }
 
-    private String normalizeImportId(String value) {
+    private String normalizeImportId(@Nullable String value) {
       if (value == null) {
         return "";
       }
@@ -3057,7 +3069,7 @@ public final class IncusResourceBootstrap {
       return payload;
     }
 
-    private Map<String, String> extractStringMap(Object value) {
+    private Map<String, String> extractStringMap(@Nullable Object value) {
       if (!(value instanceof Map<?, ?> mapValue)) {
         return Map.of();
       }
@@ -3073,7 +3085,7 @@ public final class IncusResourceBootstrap {
       return result;
     }
 
-    private String asString(Object value) {
+    private String asString(@Nullable Object value) {
       return value == null ? "" : value.toString();
     }
 
@@ -3458,7 +3470,9 @@ public final class IncusResourceBootstrap {
       phased.put("other", new ArrayList<>());
 
       for (String name : names) {
-        phased.get(phaseForName(name)).add(name);
+        // phaseForName always returns one of the keys pre-populated above (with "other" as the
+        // total fallback), so the list is never absent.
+        Objects.requireNonNull(phased.get(phaseForName(name)), "phase bucket").add(name);
       }
 
       final LinkedHashMap<String, List<String>> result = new LinkedHashMap<>();

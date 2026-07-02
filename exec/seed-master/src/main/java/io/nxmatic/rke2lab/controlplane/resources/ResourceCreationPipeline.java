@@ -188,7 +188,7 @@ final class ResourceCreationPipeline {
           new SeedImageBuildResource(
               "seed-image-build",
               config,
-              bootstrapResult.build().image().checksum(),
+              bootstrapResult.build().requireImage().checksum(),
               bootstrapResult.imageFingerprint(),
               bootstrapResult.readinessDependency());
       return this;
@@ -271,7 +271,7 @@ final class ResourceCreationPipeline {
       this.imageBuildSummary =
           Map.of(
               "checksum",
-              bootstrapResult.build().image().checksum(),
+              bootstrapResult.build().requireImage().checksum(),
               "imageAlias",
               config.imageAlias(),
               "imageFingerprint",

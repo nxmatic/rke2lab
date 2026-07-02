@@ -112,11 +112,11 @@ public final class MedicalRecordDump {
         new StackMedicalRecordJournal(Optional.of(parsed.backend), msg -> System.err.println(msg));
     final Result result = dump(parsed.patient(), journal);
 
-    if (parsed.out == null) {
+    if (parsed.out.isEmpty()) {
       System.out.print(result.yaml());
     } else {
       try {
-        Files.writeString(parsed.out, result.yaml());
+        Files.writeString(parsed.out.get(), result.yaml());
       } catch (IOException e) {
         throw new UncheckedIOException(e);
       }
@@ -125,7 +125,7 @@ public final class MedicalRecordDump {
     System.exit(result.exitCode());
   }
 
-  private record Args(String stack, Path backend, String project, String org, Path out) {
+  private record Args(String stack, Path backend, String project, String org, Optional<Path> out) {
 
     Patient patient() {
       return new Patient(org, project, stack);
@@ -136,7 +136,7 @@ public final class MedicalRecordDump {
       Path backend = null;
       String project = null;
       String org = "organization";
-      Path out = null;
+      Optional<Path> out = Optional.empty();
       for (int i = 0; i < args.length; i++) {
         final String flag = args[i];
         switch (flag) {
@@ -144,7 +144,7 @@ public final class MedicalRecordDump {
           case "--backend" -> backend = Path.of(value(args, ++i, flag));
           case "--project" -> project = value(args, ++i, flag);
           case "--org" -> org = value(args, ++i, flag);
-          case "--out" -> out = Path.of(value(args, ++i, flag));
+          case "--out" -> out = Optional.of(Path.of(value(args, ++i, flag)));
           default -> throw new IllegalArgumentException("unknown flag: " + flag);
         }
       }
