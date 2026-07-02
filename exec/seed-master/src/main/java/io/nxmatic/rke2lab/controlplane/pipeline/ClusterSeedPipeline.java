@@ -312,7 +312,7 @@ public final class ClusterSeedPipeline {
               state.bboxOrchestrator,
               state.config.localWorktreePath(),
               state.options.bboxFailOnError(),
-              result -> state.bboxResult = result);
+              output -> state.builder.bbox = output);
       state.runner.runDuring(topic, stage, body, state.onFailure);
       return new BboxDone(state);
     }
@@ -343,7 +343,7 @@ public final class ClusterSeedPipeline {
               state.config,
               state.policy,
               state.bootedFramework,
-              result -> state.bootstrapResult = result);
+              output -> state.builder.bootstrap = output);
       state.runner.runDuring(topic, stage, body, state.onFailure);
       return new IncusDone(state);
     }
@@ -383,9 +383,9 @@ public final class ClusterSeedPipeline {
               state.consultations,
               state.doctor,
               liveProbe,
-              summary -> state.systemdAdapterLaunchSummary = summary,
+              output -> state.builder.systemdAdapterLaunch = output,
               state.readinessAuthority,
-              state.bootstrapResult.deployment().timestamp());
+              state.builder.bootstrap().deployment().timestamp());
       state.runner.runDuring(topic, stage, body, state.onFailure);
       return new SystemdAdapterDone(state);
     }
@@ -424,9 +424,9 @@ public final class ClusterSeedPipeline {
               state.doctor,
               state.systemdRuntimeStatus,
               state.clusterReadinessContact,
-              () -> state.bootstrapResult,
-              () -> state.systemdAdapterLaunchSummary,
-              result -> state.resourceResult = result);
+              () -> state.builder.bootstrap(),
+              () -> state.builder.systemdAdapterLaunch(),
+              output -> state.builder.resources = output);
       state.runner.runDuring(topic, stage, body, state.onFailure);
       return new ResourcesDone(state);
     }
@@ -443,10 +443,10 @@ public final class ClusterSeedPipeline {
       return state.outputBuilder.buildOutputs(
           state.config,
           state.policy,
-          state.bootstrapResult,
-          state.bboxResult,
-          state.systemdAdapterLaunchSummary,
-          state.resourceResult);
+          state.builder.bootstrap(),
+          state.builder.bbox(),
+          state.builder.systemdAdapterLaunch(),
+          state.builder.resources());
     }
   }
 }

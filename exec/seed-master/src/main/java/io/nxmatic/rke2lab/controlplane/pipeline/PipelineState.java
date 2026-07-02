@@ -14,7 +14,9 @@ import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 final class PipelineState {
 
@@ -81,10 +83,13 @@ final class PipelineState {
   ResourceManager resourceManager;
   OutputBuilder outputBuilder;
 
-  BboxReconciliationOrchestrator.ReconciliationResult bboxResult;
-  IncusResourceBootstrap.BootstrapResult bootstrapResult;
-  Map<String, Object> systemdAdapterLaunchSummary;
-  ResourceManager.ResourceCreationResult resourceResult;
+  /**
+   * The builder of the next state: each topic folds its output in here, and that accumulated output
+   * — combined with the inputs — is what constitutes the state the next topic reads. See
+   * docs/fluent-pipeline-grammar.adoc, "State shape" ("the output of the current state is the
+   * builder of the next").
+   */
+  final StateBuilder builder = new StateBuilder();
 
   OnFailure onFailure;
   final FluentTopicRunner runner = new FluentTopicRunner("pipeline");
@@ -92,5 +97,37 @@ final class PipelineState {
   PipelineState(BootstrapConfig config, ControlplanePolicy policy) {
     this.config = config;
     this.policy = policy;
+  }
+
+  /**
+   * The builder of the next state — one field per topic output, set once by that topic's sink and
+   * read by a later topic (or the terminal {@code collectOutputs}). It is not a passive bag of
+   * results: each output folded in advances the construction of the next topic's state. Each field
+   * is {@link MonotonicNonNull} — null until its producing topic runs — and read through a guarded
+   * accessor so a premature read fails fast with the field name rather than a distant NPE. See
+   * docs/fluent-pipeline-grammar.adoc ("State shape").
+   */
+  static final class StateBuilder {
+    BboxReconciliationOrchestrator.@MonotonicNonNull ReconciliationResult bbox;
+    IncusResourceBootstrap.@MonotonicNonNull BootstrapResult bootstrap;
+    @MonotonicNonNull Map<String, Object> systemdAdapterLaunch;
+    ResourceManager.@MonotonicNonNull ResourceCreationResult resources;
+
+    BboxReconciliationOrchestrator.ReconciliationResult bbox() {
+      return Objects.requireNonNull(bbox, "bbox output (bbox topic not yet run)");
+    }
+
+    IncusResourceBootstrap.BootstrapResult bootstrap() {
+      return Objects.requireNonNull(bootstrap, "bootstrap output (incus topic not yet run)");
+    }
+
+    Map<String, Object> systemdAdapterLaunch() {
+      return Objects.requireNonNull(
+          systemdAdapterLaunch, "systemdAdapterLaunch output (systemd-adapter topic not yet run)");
+    }
+
+    ResourceManager.ResourceCreationResult resources() {
+      return Objects.requireNonNull(resources, "resources output (resources topic not yet run)");
+    }
   }
 }
