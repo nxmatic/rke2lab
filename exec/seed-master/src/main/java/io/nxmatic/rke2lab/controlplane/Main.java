@@ -21,7 +21,7 @@ public final class Main {
                             .loadControlplanePolicy()
                             .loadOptions())
                 .then()
-                .during("bootstrap", bootstrap -> bootstrap.runBootstrapPipeline())
+                .during("cluster seed", seed -> seed.seedCluster())
                 .then()
                 .during("outputs", outputs -> outputs.exportOrPrint())
                 .complete());

@@ -17,7 +17,7 @@ import java.util.function.Function;
 
 /**
  * Top-level entry pipeline. Wraps Pulumi-vs-standalone dispatch, configuration loading, the
- * bootstrap workflow, and output export as four topics. See docs/fluent-pipeline-grammar.adoc.
+ * cluster-seed workflow, and output export as four topics. See docs/fluent-pipeline-grammar.adoc.
  *
  * <pre>
  * ApplicationPipeline.run(launch -&gt; launch
@@ -28,7 +28,7 @@ import java.util.function.Function;
  *         .loadControlplanePolicy()
  *         .loadOptions())
  *     .then()
- *     .during("bootstrap", bootstrap -&gt; bootstrap.runBootstrapPipeline())
+ *     .during("cluster seed", seed -&gt; seed.seedCluster())
  *     .then()
  *     .during("outputs", outputs -&gt; outputs.exportOrPrint())
  *     .complete());
@@ -125,19 +125,19 @@ public final class ApplicationPipeline {
       this.state = state;
     }
 
-    public AwaitingBootstrap then() {
-      return new AwaitingBootstrap(state);
+    public AwaitingClusterSeed then() {
+      return new AwaitingClusterSeed(state);
     }
   }
 
-  public static final class AwaitingBootstrap {
+  public static final class AwaitingClusterSeed {
     private final State state;
 
-    private AwaitingBootstrap(State state) {
+    private AwaitingClusterSeed(State state) {
       this.state = state;
     }
 
-    public BootstrapDone during(String topic, Function<ClusterSeedTopic, ClusterSeedTopic> body) {
+    public ClusterSeedDone during(String topic, Function<ClusterSeedTopic, ClusterSeedTopic> body) {
       final ClusterSeedTopic stage =
           new ClusterSeedTopic(
               state.pulumiMode,
@@ -151,14 +151,14 @@ public final class ApplicationPipeline {
               state.outputBuilder,
               outputs -> state.outputs = outputs);
       state.runner.runDuring(topic, stage, body, state.onFailure);
-      return new BootstrapDone(state);
+      return new ClusterSeedDone(state);
     }
   }
 
-  public static final class BootstrapDone {
+  public static final class ClusterSeedDone {
     private final State state;
 
-    private BootstrapDone(State state) {
+    private ClusterSeedDone(State state) {
       this.state = state;
     }
 

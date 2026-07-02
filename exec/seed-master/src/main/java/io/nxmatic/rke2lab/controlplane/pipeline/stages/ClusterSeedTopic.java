@@ -54,24 +54,33 @@ public final class ClusterSeedTopic {
     this.outputsSink = outputsSink;
   }
 
-  public ClusterSeedTopic runBootstrapPipeline() {
-    // The runbook is owned here, recorded into by every checkpoint, and rendered in the finally so
-    // a CRITICAL stop (a checkpoint that throws to abort provisioning) still produces a runbook —
-    // exactly the failure the runbook exists to document.
+  /**
+   * Seeds the cluster across two altitudes, kept explicitly apart:
+   *
+   * <ol>
+   *   <li>the <em>framework-launch crossing</em> ({@link FrameworkLaunchPipeline#embedded()}) —
+   *       boot the embedded OSGi framework once for the whole run, so the reasoning below can read
+   *       the manifests-world services from its registry;
+   *   <li>the <em>cluster-seed reasoning body</em> ({@link #seedClusterWithinFramework}) — run
+   *       under the booted framework.
+   * </ol>
+   *
+   * <p>The runbook is owned here and recorded into by every checkpoint. It is rendered in the
+   * reasoning body's own {@code finally}, which runs BEFORE {@code FrameworkLaunchPipeline} closes
+   * the framework — so a CRITICAL stop (a checkpoint that throws to abort provisioning) still
+   * produces a runbook, exactly the failure the runbook exists to document.
+   */
+  public ClusterSeedTopic seedCluster() {
     final ReportModel runbook = new ReportModel();
     final ConsultationLog consultations = new ConsultationLog();
-    // Boot the embedded OSGi framework once for the whole run via the shared boot seam; the stages
-    // read the manifests-world services from its registry. FrameworkLaunchPipeline closes the
-    // framework after
-    // the tail returns or throws — and the runbook render in the tail's own finally runs BEFORE
-    // that
-    // close, so a CRITICAL stop still produces a runbook.
     FrameworkLaunchPipeline.embedded()
-        .during("framework", framework -> runUnderRuntime(framework, runbook, consultations));
+        .during(
+            "framework",
+            framework -> seedClusterWithinFramework(framework, runbook, consultations));
     return this;
   }
 
-  private void runUnderRuntime(
+  private void seedClusterWithinFramework(
       BootedFramework framework, ReportModel runbook, ConsultationLog consultations) {
     try {
       ClusterSeedPipeline.ComponentBoundPipeline ready =
