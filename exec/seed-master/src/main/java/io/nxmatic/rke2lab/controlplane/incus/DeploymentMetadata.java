@@ -20,10 +20,9 @@ public record DeploymentMetadata(GitMetadata git, Instant timestamp) {
 
     static GitMetadata capture() {
       final Path repoRoot = Path.of(System.getProperty("user.dir"));
-      final HostSlotManifest.GitInfo info = GitMetadataExtractor.extract(repoRoot, false);
-      return info == null
-          ? new GitMetadata("unknown", "unknown")
-          : new GitMetadata(info.branch(), info.commitFull());
+      return GitMetadataExtractor.extract(repoRoot, false)
+          .map(info -> new GitMetadata(info.branch(), info.commitFull()))
+          .orElseGet(() -> new GitMetadata("unknown", "unknown"));
     }
   }
 }

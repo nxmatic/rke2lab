@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Fluent, section-aware reader over Pulumi config; the only class that touches {@link
@@ -42,7 +43,7 @@ public final class ConfigLoader {
           final String[] parts = section.split("\\.");
           final Optional<Map<String, Object>> top =
               (Optional<Map<String, Object>>) (Optional<?>) config.getObject(parts[0], Map.class);
-          return walk(top.orElse(null), parts);
+          return walk(top, parts);
         });
   }
 
@@ -53,8 +54,9 @@ public final class ConfigLoader {
   }
 
   @SuppressWarnings("unchecked")
-  private static Optional<Map<String, Object>> walk(Map<String, Object> top, String[] parts) {
-    Object current = top;
+  private static Optional<Map<String, Object>> walk(
+      Optional<Map<String, Object>> top, String[] parts) {
+    Object current = top.orElse(null);
     for (int i = 1; i < parts.length && current instanceof Map; i++) {
       current = ((Map<String, Object>) current).get(parts[i]);
     }
@@ -62,8 +64,8 @@ public final class ConfigLoader {
   }
 
   @SuppressWarnings("unchecked")
-  private static Map<String, Object> asMap(Object value) {
-    return value instanceof Map ? (Map<String, Object>) value : null;
+  private static Optional<Map<String, Object>> asMap(@Nullable Object value) {
+    return value instanceof Map ? Optional.of((Map<String, Object>) value) : Optional.empty();
   }
 
   // --- optional* : empty when absent/blank, no defaults here ---

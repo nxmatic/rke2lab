@@ -1,8 +1,11 @@
 package io.nxmatic.rke2lab.controlplane.incus;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Objects;
+import java.util.Optional;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Constants;
@@ -28,58 +31,55 @@ public final class GitMetadataExtractor {
    * @param repoRoot the repository root (directory containing {@code .git/})
    * @param dirtyCheckEnabled whether to compute the working-tree dirty flag; disabled during heavy
    *     refactors via {@code policy.gitDirtyCheck.enabled=false} to avoid committing on every run
-   * @return git metadata, or {@code null} if not a git repository
+   * @return git metadata, or empty if not a git repository
    */
-  public static HostSlotManifest.GitInfo extract(Path repoRoot, boolean dirtyCheckEnabled) {
-    try (Repository repo = openRepository(repoRoot)) {
+  public static Optional<HostSlotManifest.GitInfo> extract(
+      Path repoRoot, boolean dirtyCheckEnabled) {
+    try (Repository repo = openRepository(repoRoot).orElse(null)) {
       if (repo == null) {
-        return null;
+        return Optional.empty(); // not a git repository
       }
-
-      final ObjectId head = repo.resolve(Constants.HEAD);
-      if (head == null) {
-        // Empty repository (no commits yet)
-        return null;
-      }
-
-      try (RevWalk walk = new RevWalk(repo)) {
-        final RevCommit commit = walk.parseCommit(head);
-        final String commitShort = head.abbreviate(8).name();
-        final String commitFull = head.name();
-        final String branch = repo.getBranch(); // "main", "feature/xyz", or commit SHA if detached
-        final boolean dirty = dirtyCheckEnabled && isDirty(repo);
-        final String commitMessage = commit.getShortMessage();
-        final PersonIdent author = commit.getAuthorIdent();
-        final String authorName = author.getName();
-        final Instant commitDate = Instant.ofEpochSecond(commit.getCommitTime());
-
-        return new HostSlotManifest.GitInfo(
-            commitShort,
-            commitFull,
-            branch,
-            dirty,
-            commitMessage,
-            authorName,
-            commitDate.toString());
-      }
-    } catch (IOException ex) {
+      // A repository with no commits yet resolves HEAD to null (third-party jgit) — absorb it once.
+      return Optional.ofNullable(repo.resolve(Constants.HEAD))
+          .map(head -> gitInfoOf(repo, head, dirtyCheckEnabled));
+    } catch (IOException | UncheckedIOException ex) {
       // Log but don't fail bootstrap if git metadata extraction fails
       System.err.println("Warning: Failed to extract git metadata: " + ex.getMessage());
-      return null;
+      return Optional.empty();
     }
   }
 
-  private static Repository openRepository(Path repoRoot) throws IOException {
+  private static HostSlotManifest.GitInfo gitInfoOf(
+      Repository repo, ObjectId head, boolean dirtyCheckEnabled) {
+    try (RevWalk walk = new RevWalk(repo)) {
+      final RevCommit commit = walk.parseCommit(head);
+      final PersonIdent author = commit.getAuthorIdent();
+      return new HostSlotManifest.GitInfo(
+          head.abbreviate(8).name(),
+          head.name(),
+          // "main", "feature/xyz", or commit SHA if detached; jgit returns null only for a
+          // never-checked-out repo, which cannot reach here (HEAD already resolved).
+          Objects.requireNonNullElse(repo.getBranch(), head.name()),
+          dirtyCheckEnabled && isDirty(repo),
+          commit.getShortMessage(),
+          author.getName(),
+          Instant.ofEpochSecond(commit.getCommitTime()).toString());
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  private static Optional<Repository> openRepository(Path repoRoot) throws IOException {
     final FileRepositoryBuilder builder = new FileRepositoryBuilder();
     builder.setWorkTree(repoRoot.toFile());
     builder.findGitDir(repoRoot.toFile());
 
     if (builder.getGitDir() == null) {
       // Not a git repository
-      return null;
+      return Optional.empty();
     }
 
-    return builder.build();
+    return Optional.of(builder.build());
   }
 
   /** Checks if the working tree has uncommitted changes (tracked, untracked, or staged). */
@@ -100,7 +100,7 @@ public final class GitMetadataExtractor {
    *
    * <p>Example: {@code 20260529-080523-b71a8f8f}
    */
-  public static String generateBuildId(HostSlotManifest.GitInfo gitInfo) {
+  public static String generateBuildId(Optional<HostSlotManifest.GitInfo> gitInfo) {
     final Instant now = Instant.now();
     final String timestamp =
         String.format(
@@ -112,7 +112,7 @@ public final class GitMetadataExtractor {
             now.atZone(java.time.ZoneOffset.UTC).getMinute(),
             now.atZone(java.time.ZoneOffset.UTC).getSecond());
 
-    final String commitSuffix = gitInfo != null ? gitInfo.commit() : "unknown";
+    final String commitSuffix = gitInfo.map(HostSlotManifest.GitInfo::commit).orElse("unknown");
     return timestamp + "-" + commitSuffix;
   }
 }

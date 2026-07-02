@@ -55,6 +55,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -2186,7 +2187,7 @@ public final class IncusResourceBootstrap {
 
       final java.time.Instant timestamp = java.time.Instant.now();
       final Path repoRoot = java.nio.file.Paths.get(System.getProperty("user.dir"));
-      final HostSlotManifest.GitInfo gitInfo =
+      final Optional<HostSlotManifest.GitInfo> gitInfo =
           GitMetadataExtractor.extract(repoRoot, policy.provisioning().gitDirtyCheck());
       final String buildId = GitMetadataExtractor.generateBuildId(gitInfo);
 
@@ -2203,16 +2204,16 @@ public final class IncusResourceBootstrap {
               .policy(policy)
               .source(HostSlotManifest.SourceType.FRESH_BUILD, slotPath.toString(), null);
 
-      if (gitInfo != null) {
-        manifestBuilder.gitInfo(
-            gitInfo.commit(),
-            gitInfo.commitFull(),
-            gitInfo.branch(),
-            gitInfo.dirty(),
-            gitInfo.commitMessage(),
-            gitInfo.author(),
-            gitInfo.commitDate());
-      }
+      gitInfo.ifPresent(
+          info ->
+              manifestBuilder.gitInfo(
+                  info.commit(),
+                  info.commitFull(),
+                  info.branch(),
+                  info.dirty(),
+                  info.commitMessage(),
+                  info.author(),
+                  info.commitDate()));
 
       // Add discovered flox environments
       for (var env : systemdTarget.floxAssetService().discoveredEnvironments()) {
@@ -3332,11 +3333,11 @@ public final class IncusResourceBootstrap {
       for (Map.Entry<String, String> entry : allChecksums.entrySet()) {
         final String targetName = entry.getKey();
         final String checksum = entry.getValue();
-        final TargetReloadPolicy policy = registry.getReloadPolicy(targetName);
+        final Optional<TargetReloadPolicy> policy = registry.getReloadPolicy(targetName);
 
-        if (policy == TargetReloadPolicy.STATIC) {
+        if (policy.filter(TargetReloadPolicy.STATIC::equals).isPresent()) {
           staticTargets.put(targetName, checksum);
-        } else if (policy == TargetReloadPolicy.DYNAMIC) {
+        } else if (policy.filter(TargetReloadPolicy.DYNAMIC::equals).isPresent()) {
           dynamicTargets.put(targetName, checksum);
         }
       }

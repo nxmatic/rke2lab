@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Registry for provisioning targets — independently reconcilable downstream consumers.
@@ -131,10 +132,10 @@ public final class ProvisioningTargetRegistry {
    * Returns the reload policy for the named target.
    *
    * @param targetName target to query
-   * @return reload policy, or null if target not defined
+   * @return reload policy, or empty if target not defined
    */
-  public TargetReloadPolicy getReloadPolicy(String targetName) {
-    return targetDefinitions.get(targetName);
+  public Optional<TargetReloadPolicy> getReloadPolicy(String targetName) {
+    return Optional.ofNullable(targetDefinitions.get(targetName));
   }
 
   /**

@@ -1,6 +1,7 @@
 package io.nxmatic.rke2lab.controlplane;
 
 import java.util.Locale;
+import java.util.Optional;
 import java.util.logging.Handler;
 import java.util.logging.Logger;
 
@@ -32,7 +33,7 @@ public final class SeedLog {
 
   private static final LogLevel THRESHOLD = resolveThreshold();
 
-  private static volatile PulumiLogSink pulumiLogSink;
+  private static volatile Optional<PulumiLogSink> optSink = Optional.empty();
 
   static {
     configureJavaUtilLogging();
@@ -62,13 +63,18 @@ public final class SeedLog {
     log(scope, LogLevel.TRACE, message);
   }
 
-  public static AutoCloseable installPulumiLogSink(PulumiLogSink sink) {
-    pulumiLogSink = sink;
-    return () -> pulumiLogSink = null;
+  public static AutoCloseable open(PulumiLogSink sink) {
+    optSink = Optional.of(sink);
+    return SeedLog::close;
   }
 
-  public static void clearPulumiLogSink() {
-    pulumiLogSink = null;
+  public static void close() {
+    optSink = Optional.empty();
+  }
+
+  /** The installed Pulumi log sink, or empty when logs route through java.util.logging. */
+  private static Optional<PulumiLogSink> currentSink() {
+    return optSink;
   }
 
   private static void log(String scope, LogLevel level, String message) {
@@ -78,9 +84,9 @@ public final class SeedLog {
 
     final String prefix = "[" + normalize(scope, "seed") + "] ";
     final String payload = prefix + normalize(message, "");
-    final PulumiLogSink sink = pulumiLogSink;
-    if (sink != null) {
-      sink.emit(toEvent(level), payload);
+    final Optional<PulumiLogSink> sink = currentSink();
+    if (sink.isPresent()) {
+      sink.orElseThrow().emit(toEvent(level), payload);
       return;
     }
     LOGGER.log(toJavaLevel(level), payload);
@@ -100,7 +106,7 @@ public final class SeedLog {
     if (level.ordinal() <= LogLevel.INFO.ordinal()) {
       return true;
     }
-    if (pulumiLogSink != null) {
+    if (currentSink().isPresent()) {
       return true;
     }
     return level.ordinal() <= THRESHOLD.ordinal();
@@ -140,9 +146,9 @@ public final class SeedLog {
     final String explicit =
         firstNonBlank(System.getenv("RKE2LAB_LOG_LEVEL"), System.getenv("PULUMI_LOG_LEVEL"));
     if (!explicit.isBlank()) {
-      final LogLevel parsed = parseNamedLevel(explicit);
-      if (parsed != null) {
-        return parsed;
+      final Optional<LogLevel> parsed = parseNamedLevel(explicit);
+      if (parsed.isPresent()) {
+        return parsed.orElseThrow();
       }
     }
 
@@ -165,15 +171,15 @@ public final class SeedLog {
     return LogLevel.INFO;
   }
 
-  private static LogLevel parseNamedLevel(String value) {
+  private static Optional<LogLevel> parseNamedLevel(String value) {
     final String normalized = value.trim().toLowerCase(Locale.ROOT);
     return switch (normalized) {
-      case "error", "err", "severe" -> LogLevel.ERROR;
-      case "warn", "warning" -> LogLevel.WARN;
-      case "info", "information" -> LogLevel.INFO;
-      case "debug", "fine" -> LogLevel.DEBUG;
-      case "trace", "finer", "finest" -> LogLevel.TRACE;
-      default -> null;
+      case "error", "err", "severe" -> Optional.of(LogLevel.ERROR);
+      case "warn", "warning" -> Optional.of(LogLevel.WARN);
+      case "info", "information" -> Optional.of(LogLevel.INFO);
+      case "debug", "fine" -> Optional.of(LogLevel.DEBUG);
+      case "trace", "finer", "finest" -> Optional.of(LogLevel.TRACE);
+      default -> Optional.empty();
     };
   }
 

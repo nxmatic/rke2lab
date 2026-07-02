@@ -14,7 +14,9 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Watches seed-node runtime/systemd bootstrap preconditions and reports progress while waiting for
@@ -160,14 +162,14 @@ public final class SeedNodeBootstrapWatcher {
     }
 
     static final class Builder {
-      private String probeStatus;
-      private String mandatoryTarget;
-      private String mandatoryTargetState;
+      private @Nullable String probeStatus;
+      private @Nullable String mandatoryTarget;
+      private @Nullable String mandatoryTargetState;
       private int pendingJobCount;
       private int failedUnitCount;
-      private String hostContext;
-      private Map<String, Object> statusSnapshot;
-      private String adapterSummary;
+      private @Nullable String hostContext;
+      private @Nullable Map<String, Object> statusSnapshot;
+      private @Nullable String adapterSummary;
 
       private Builder() {}
 
@@ -213,14 +215,14 @@ public final class SeedNodeBootstrapWatcher {
 
       YamlSummaryContext build() {
         return new YamlSummaryContext(
-            probeStatus,
-            mandatoryTarget,
-            mandatoryTargetState,
+            Objects.requireNonNull(probeStatus, "probeStatus"),
+            Objects.requireNonNull(mandatoryTarget, "mandatoryTarget"),
+            Objects.requireNonNull(mandatoryTargetState, "mandatoryTargetState"),
             pendingJobCount,
             failedUnitCount,
-            hostContext,
-            statusSnapshot,
-            adapterSummary);
+            Objects.requireNonNull(hostContext, "hostContext"),
+            Objects.requireNonNull(statusSnapshot, "statusSnapshot"),
+            Objects.requireNonNull(adapterSummary, "adapterSummary"));
       }
 
       String render() {
@@ -268,14 +270,14 @@ public final class SeedNodeBootstrapWatcher {
     }
   }
 
-  private static boolean toBoolean(Object value) {
+  private static boolean toBoolean(@Nullable Object value) {
     if (value instanceof Boolean boolValue) {
       return boolValue;
     }
     return Boolean.parseBoolean(stringValue(value));
   }
 
-  private static int toInt(Object value, int fallback) {
+  private static int toInt(@Nullable Object value, int fallback) {
     if (value instanceof Number numberValue) {
       return numberValue.intValue();
     }
@@ -290,7 +292,7 @@ public final class SeedNodeBootstrapWatcher {
     }
   }
 
-  private static String stringValue(Object value) {
+  private static String stringValue(@Nullable Object value) {
     return value == null ? "" : value.toString();
   }
 

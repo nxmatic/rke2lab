@@ -33,7 +33,7 @@ public final class EnvironmentStage {
       return this;
     }
     final AutoCloseable closeable =
-        SeedLog.installPulumiLogSink(
+        SeedLog.open(
             (event, message) -> {
               switch (event) {
                 case ERROR -> pulumiContext.log().error(message);
