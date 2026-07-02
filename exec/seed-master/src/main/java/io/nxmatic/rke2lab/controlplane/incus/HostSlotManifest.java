@@ -6,10 +6,13 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import org.cdk8s.ApiObject;
 import org.cdk8s.ApiObjectMetadata;
 import org.cdk8s.ApiObjectProps;
 import org.cdk8s.JsonPatch;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import software.constructs.Construct;
 
 /**
@@ -35,15 +38,15 @@ public final class HostSlotManifest extends Construct {
       Construct scope,
       String id,
       SlotType slotType,
-      Integer slotSequence,
+      Optional<Integer> slotSequence,
       Instant timestamp,
       String buildId,
-      GitInfo git,
-      PolicyInfo policy,
+      Optional<GitInfo> git,
+      Optional<PolicyInfo> policy,
       List<FloxEnvironment> floxEnvironments,
       List<StagedManifest> stagedManifests,
-      PromotionInfo promotion,
-      SourceInfo source) {
+      Optional<PromotionInfo> promotion,
+      Optional<SourceInfo> source) {
 
     super(scope, id);
 
@@ -51,21 +54,15 @@ public final class HostSlotManifest extends Construct {
 
     // Metadata section
     data.put("slotType", slotType.toYamlValue());
-    if (slotSequence != null) {
-      data.put("slotSequence", slotSequence);
-    }
+    slotSequence.ifPresent(seq -> data.put("slotSequence", seq));
     data.put("timestamp", timestamp.toString());
     data.put("buildId", buildId);
 
     // Git section
-    if (git != null) {
-      data.put("git", gitToMap(git));
-    }
+    git.ifPresent(g -> data.put("git", gitToMap(g)));
 
     // Policy section
-    if (policy != null) {
-      data.put("policy", policyToMap(policy));
-    }
+    policy.ifPresent(p -> data.put("policy", policyToMap(p)));
 
     // Flox environments
     if (!floxEnvironments.isEmpty()) {
@@ -78,14 +75,10 @@ public final class HostSlotManifest extends Construct {
     }
 
     // Promotion tracking
-    if (promotion != null) {
-      data.put("promotion", promotionToMap(promotion));
-    }
+    promotion.ifPresent(p -> data.put("promotion", promotionToMap(p)));
 
     // Source provenance
-    if (source != null) {
-      data.put("source", sourceToMap(source));
-    }
+    source.ifPresent(s -> data.put("source", sourceToMap(s)));
 
     // Create ConfigMap with manifest data as YAML-formatted string
     this.configMap =
@@ -278,16 +271,16 @@ public final class HostSlotManifest extends Construct {
   }
 
   public static final class Builder {
-    private SlotType slotType;
-    private Integer slotSequence;
-    private Instant timestamp;
-    private String buildId;
-    private GitInfo git;
-    private PolicyInfo policy;
+    private @MonotonicNonNull SlotType slotType;
+    private Optional<Integer> slotSequence = Optional.empty();
+    private Optional<Instant> timestamp = Optional.empty();
+    private @MonotonicNonNull String buildId;
+    private Optional<GitInfo> git = Optional.empty();
+    private Optional<PolicyInfo> policy = Optional.empty();
     private final List<FloxEnvironment> floxEnvironments = new java.util.ArrayList<>();
     private final List<StagedManifest> stagedManifests = new java.util.ArrayList<>();
-    private PromotionInfo promotion;
-    private SourceInfo source;
+    private Optional<PromotionInfo> promotion = Optional.empty();
+    private Optional<SourceInfo> source = Optional.empty();
 
     private Builder() {}
 
@@ -297,12 +290,12 @@ public final class HostSlotManifest extends Construct {
     }
 
     public Builder slotSequence(int slotSequence) {
-      this.slotSequence = slotSequence;
+      this.slotSequence = Optional.of(slotSequence);
       return this;
     }
 
     public Builder timestamp(Instant timestamp) {
-      this.timestamp = timestamp;
+      this.timestamp = Optional.of(timestamp);
       return this;
     }
 
@@ -323,7 +316,9 @@ public final class HostSlotManifest extends Construct {
         String commitMessage,
         String author,
         String commitDate) {
-      this.git = new GitInfo(commit, commitFull, branch, dirty, commitMessage, author, commitDate);
+      this.git =
+          Optional.of(
+              new GitInfo(commit, commitFull, branch, dirty, commitMessage, author, commitDate));
       return this;
     }
 
@@ -357,7 +352,7 @@ public final class HostSlotManifest extends Construct {
       debug.put("networking", policy.debug().networking());
       debug.put("nriPluginsFlox", policy.debug().nriPluginsFlox());
 
-      this.policy = new PolicyInfo(manifestDomain, debug);
+      this.policy = Optional.of(new PolicyInfo(manifestDomain, debug));
       return this;
     }
 
@@ -373,12 +368,13 @@ public final class HostSlotManifest extends Construct {
 
     public Builder promotion(
         boolean promotedToActive, Instant promotedAt, String previousActiveManifest) {
-      this.promotion = new PromotionInfo(promotedToActive, promotedAt, previousActiveManifest);
+      this.promotion =
+          Optional.of(new PromotionInfo(promotedToActive, promotedAt, previousActiveManifest));
       return this;
     }
 
     public Builder source(SourceType type, String scratchPath, String parentSlot) {
-      this.source = new SourceInfo(type, scratchPath, parentSlot);
+      this.source = Optional.of(new SourceInfo(type, scratchPath, parentSlot));
       return this;
     }
 
@@ -386,10 +382,10 @@ public final class HostSlotManifest extends Construct {
       return new HostSlotManifest(
           scope,
           id,
-          slotType,
+          Objects.requireNonNull(slotType, "slotType"),
           slotSequence,
-          timestamp != null ? timestamp : Instant.now(),
-          buildId,
+          timestamp.orElseGet(Instant::now),
+          Objects.requireNonNull(buildId, "buildId"),
           git,
           policy,
           List.copyOf(floxEnvironments),

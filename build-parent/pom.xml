@@ -139,6 +139,13 @@
       <artifactId>jspecify</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- checker-qual: @MonotonicNonNull for set-once fields (builder fields, lazy caches). NullAway
+         reads it at compile time; provided (analysis-only, nothing resolves it at runtime). -->
+    <dependency>
+      <groupId>org.checkerframework</groupId>
+      <artifactId>checker-qual</artifactId>
+      <scope>provided</scope>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
@@ -550,7 +557,7 @@
                 <arg>-Xlint:-processing</arg>
                 <arg>-XDcompilePolicy=simple</arg>
                 <arg>-XDshould-stop.ifError=FLOW</arg>
-                <arg>-Xplugin:ErrorProne -XepDisableAllChecks -XepExcludedPaths:(.*/src/test/.*)|(.*-test/src/.*)|(.*-testkit/src/.*) -Xep:NullAway:${nullaway.severity} -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:ExcludedFieldAnnotations=com.tngtech.jgiven.annotation.ProvidedScenarioState,com.tngtech.jgiven.annotation.ExpectedScenarioState,com.tngtech.jgiven.annotation.ScenarioState,org.mockito.Mock,org.mockito.InjectMocks,org.mockito.Captor,org.osgi.service.component.annotations.Reference</arg>
+                <arg>-Xplugin:ErrorProne -XepDisableAllChecks -XepExcludedPaths:(.*/src/test/.*)|(.*-test/src/.*)|(.*-testkit/src/.*) -Xep:NullAway:${nullaway.severity} -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:ExcludedFieldAnnotations=com.tngtech.jgiven.annotation.ProvidedScenarioState,com.tngtech.jgiven.annotation.ExpectedScenarioState,com.tngtech.jgiven.annotation.ScenarioState,com.tngtech.jgiven.annotation.ScenarioStage,org.mockito.Mock,org.mockito.InjectMocks,org.mockito.Captor,org.osgi.service.component.annotations.Reference</arg>
                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
                 <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>

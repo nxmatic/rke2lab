@@ -6,7 +6,9 @@ import io.nxmatic.rke2lab.manifests.port.ManifestDomainCatalog;
 import io.nxmatic.rke2lab.manifests.port.ManifestDomainPolicy;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /** Canonical operational policy derived from Pulumi config for Stage A bootstrap. */
 public record ControlplanePolicy(
@@ -204,10 +206,10 @@ public record ControlplanePolicy(
   }
 
   public static final class Builder {
-    private DebugPolicy debug;
-    private NetworkPolicy network;
-    private ProvisioningPolicy provisioning;
-    private ManifestLinkPolicy manifestLink;
+    private @MonotonicNonNull DebugPolicy debug;
+    private @MonotonicNonNull NetworkPolicy network;
+    private @MonotonicNonNull ProvisioningPolicy provisioning;
+    private @MonotonicNonNull ManifestLinkPolicy manifestLink;
     private ReadinessPolicy readiness = ReadinessPolicy.none();
     private PreviewPolicy preview = PreviewPolicy.none();
 
@@ -244,7 +246,13 @@ public record ControlplanePolicy(
     }
 
     public ControlplanePolicy build() {
-      return new ControlplanePolicy(debug, network, provisioning, manifestLink, readiness, preview);
+      return new ControlplanePolicy(
+          Objects.requireNonNull(debug, "debug"),
+          Objects.requireNonNull(network, "network"),
+          Objects.requireNonNull(provisioning, "provisioning"),
+          Objects.requireNonNull(manifestLink, "manifestLink"),
+          readiness,
+          preview);
     }
   }
 }
