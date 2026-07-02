@@ -14,7 +14,7 @@
 - **seed-master uses `package`, not `compile`** (the `stage-embedded-bundles` goal needs it).
 - **Own external worktree per this chantier** (external model, sibling of `main`, not `.claude/worktrees/`). Re-smudge sops on creation.
 - **No blind sweeps.** The `Stage`→`Topic` rename is transverse (14 `*Stage` over 4 modules; `BootstrapStage` exists TWICE — seed-master AND manifests-core). A blind `perl -i` clobbered manifests-core once this session — REVERTED. Scope every rename explicitly (P1).
-- **Stay design-first between S-tasks:** each S# that rewrites structure (S2, S3) reopens the atlas before coding.
+- **Stay design-first between S-tasks:** each S# that rewrites structure (S3) reopens the atlas before coding.
 
 ## Preludes — decide BEFORE any `git mv`
 
@@ -29,8 +29,8 @@
   - *Excluded:* `VaultStage` (`extends Stage<>` jgiven, probe-test fixture) keeps "Stage".
   - *Depends: P1.*
 - [x] **S1 — Untangle the fold in `ClusterSeedTopic` DONE 2026-07-02** (`77fc9c81`). `runBootstrapPipeline()` split into two named gestures: `seedCluster()` (the framework-launch crossing) + `seedClusterWithinFramework()` (the reasoning body). Caller grammar aligned off the residual "bootstrap" homonym (`AwaitingBootstrap`/`BootstrapDone`→`AwaitingClusterSeed`/`ClusterSeedDone`, label `"bootstrap"`→`"cluster seed"`). Config-domain names (`BootstrapConfig`/`BootstrapOptions`) + the internal `"bootstrap resources"` topic left untouched. No behaviour change; built green (`-Dnullaway.skip`). *Depended: S0.*
-- [ ] **S2 — Contributable seed.** `ClusterSeedPipeline` becomes a shared boot PREFIX + a per-seed contributed TAIL (seed-master / manifests-cli / netplan-cli each contribute their topics). The 3 seeds already share `FrameworkLaunchPipeline.embedded().during(...)` — only the tail differs (proven in Figure 2c). Trades type-state rigidity for an ordered list of contributed topics — a real rewrite. *Sub-tasks to detail when reached (reopen atlas first).* *Depends: S1.*
-- [ ] **S3 — Decision into OSGi.** Re-seam the 4 topics that import Pulumi/gRPC (`ClusterReadinessStage`, `EnvironmentStage`, `OutputsStage`, `SystemdAdapterStage` — pre-rename names) behind ports; the orchestrator becomes an OSGi capability, actualisation bodies stay host. Realise the port-factory `PipelineProvider.forMode(intention)` (host asks intention, OSGi resolves via LDAP `(probe=…)`); `TopicContext` injected for run data. Moves initiation rows host→OSGi. *Depends: S2 + P2.*
+- **S2 — Contributable seed — dropped 2026-07-02 (dissolves into S3).** The composition only earns its keep once the decision is inverted behind ports = S3. Rationale kept in the `bootstrap-pipeline-contributable-vision` memory + the spec's "Rejected alternative" note.
+- [ ] **S3 — Decision into OSGi.** Re-seam the 4 topics that import Pulumi/gRPC (`ClusterReadinessStage`, `EnvironmentStage`, `OutputsStage`, `SystemdAdapterStage` — pre-rename names) behind ports; the orchestrator becomes an OSGi capability, actualisation bodies stay host. Realise the port-factory `PipelineProvider.forMode(intention)` (host asks intention, OSGi resolves via LDAP `(probe=…)`); `TopicContext` injected for run data. Moves initiation rows host→OSGi. *Depends: S1 + P2.*
 - [ ] **S4 — Boot-executor unification.** One `boot-pipeline` for prod (`OsgiRuntime`) + test (`FelixFrameworkExtension`), beside `boot-discovery`. Parallelisable (own concern). *Depends: S0.*
 - [ ] **S5 — Transverse.** Separate the pure jgiven scenario MODEL from the host rendering ENGINE (runbook → pure bundle, scenario → resolvable `UnitResource`); dissolve `osgi/jgiven/` INTO `pipeline`. *Depends: S3.*
 
@@ -45,16 +45,16 @@ The arc that started it all, fixed in reverse (`non-null → pulumi-outputs → 
 
 ## Critical path & sequencing
 
-```
-P1 → S0 → S1 → S2 → S3 → S5
-                    ↑
-              P2 ───┘         S4 ∥ (parallel, after S0)
+```text
+P1 → S0 → S1 → S3 → S5      (S2 abandoned — dissolves into S3)
+               ↑
+         P2 ───┘         S4 ∥ (parallel, after S0)
 
 Thread R (R1→R2→R3→R4) is independent — run any time.
 ```
 
 - P1 gates everything (the vocabulary). P2 gates S3 (the seam reconciliation).
-- S2 and S3 both rewrite `ClusterSeedPipeline` — settle order when S2 starts (contributable before or with the OSGi move).
+- S2 ("contributable seed") was dropped 2026-07-02 — it dissolves into S3, which now depends directly on S1 + P2.
 - The open `RunMode → OSGi → runbook` trigger (detached mode) is decided inside S3.
 
 ## Verification gate per task

@@ -41,8 +41,8 @@ substrate + reasoning underneath it.
 * *Two gates, from `RunMode {STANDALONE,PREVIEW,APPLY}`:* the *living gate* (may an action touch the
   real system) + the *output gate* (what is written to the stack). Both at the host edge.
 * *Two work threads (do NOT braid):* *R* = reliability (non-null→outputs→jgiven→pipeline, fixed in
-  reverse); *S* = structure (S0 rename → S1 untangle → S2 contributable → S3 decision-in-OSGi → S4
-  boot-executor → S5 transverse). Each S# = own chantier.
+  reverse); *S* = structure (S0 rename → S1 untangle → S3 decision-in-OSGi → S4 boot-executor → S5
+  transverse). Each S# = own chantier.
 * *Status:* DESIGN, mostly not built. The design HOLDS (Figure 2c before/after is monotone).
 ====
 
@@ -225,9 +225,9 @@ flowchart TB
     lb["FrameworkLaunchPipeline (was BootPipeline)<br/>BootPlanner→BootPlan + FrameworkLauncher<br/>grammar yes · jgiven NO"]
     lb_v["vision: unify prod OsgiRuntime + test extension<br/>→ boot-pipeline-unification-backlog"]
   end
-  subgraph LS["L-shape — contributable seed"]
+  subgraph LS["L-shape — cluster-seed reasoning"]
     ls["ClusterSeedPipeline (was BootstrapPipeline)<br/>grammar yes · jgiven YES · owns runbook"]
-    ls_v["vision: shared boot prefix + per-seed TAIL<br/>→ bootstrap-pipeline-contributable-vision"]
+    ls_v["vision: decision logic → OSGi capability<br/>(this level folds into L-altitude)"]
   end
   subgraph LA["L-altitude — decision in OSGi"]
     la["ClusterSeedTopic = pure decision (candidate)<br/>4/~10 topics still import Pulumi/gRPC"]
@@ -283,7 +283,7 @@ flowchart LR
   subgraph A["after — initiation migrates host→OSGi"]
     direction TB
     a_fl["FrameworkLaunchPipeline<br/>shared boot PREFIX of 3 seeds"]
-    a_cs["ClusterSeedPipeline<br/>contributable TAIL (seed-master)"]
+    a_cs["ClusterSeedPipeline<br/>seed-master's reasoning TAIL"]
     a_ct["ClusterSeedTopic<br/>pure decision → into OSGi"]
     a_ms["manifests tail<br/>(contributed)"]
     a_bis["OSGi-internal init<br/>(the shape all migrate toward)"]
@@ -809,22 +809,29 @@ threads*, and they must not be braided into one chantier:
 | S1 | *Untangle the fold* — in `ClusterSeedTopic`, name the two altitudes apart: the framework-launch
   crossing (`FrameworkLaunchPipeline.embedded()`) vs the cluster-seed reasoning body. No behaviour
   change; make the seam explicit. | L-boot/shape | S0
-| S2 | *Contributable seed* — `ClusterSeedPipeline` becomes a shared boot prefix + a per-seed contributed
-  TAIL (seed-master / manifests-cli / netplan-cli each contribute their topics). Trades type-state
-  rigidity for composition — a real rewrite. | L-shape | S1
 | S3 | *Decision into OSGi* — re-seam the 4 topics that import Pulumi/gRPC (`ClusterReadinessStage`,
   `EnvironmentStage`, `OutputsStage`, `SystemdAdapterStage`) behind ports; the orchestrator becomes an
-  OSGi capability, actualisation bodies stay host. Moves initiation rows host→OSGi. | L-altitude | S2
+  OSGi capability, actualisation bodies stay host. Moves initiation rows host→OSGi. | L-altitude | S1 + P2
 | S4 | *Boot-executor unification* — one `boot-pipeline` for prod (`OsgiRuntime`) + test
   (`FelixFrameworkExtension`), beside `boot-discovery`. Parallelisable (own concern). | L-boot | S0
 | S5 | *Transverse* — pure jgiven scenario MODEL vs host rendering ENGINE (runbook becomes a pure bundle,
   scenario becomes a resolvable `UnitResource`); `osgi/jgiven/` dissolves into `pipeline`. | transverse | S3
 |===
 
-Sequencing note: S0 is the only prerequisite everything else reads (the vocabulary). S2 and S3 overlap
-(both rewrite `ClusterSeedPipeline`) — settle whether contributable comes before or with the OSGi move
-when S2 starts. The open seam (`RunMode → OSGi → runbook`, the detached trigger) is decided inside S3.
-Thread R can proceed at any time — it touches the topics' bodies, not their structure.
+Sequencing note: S0 is the only prerequisite everything else reads (the vocabulary). The open seam
+(`RunMode → OSGi → runbook`, the detached trigger) is decided inside S3. Thread R can proceed at any
+time — it touches the topics' bodies, not their structure.
+
+[TIP]
+.Rejected alternative — a "contributable seed" step before S3
+====
+Making `ClusterSeedPipeline` a shared boot prefix + a per-seed contributed tail was considered and
+rejected: the prefix already exists (all three seeds already share `FrameworkLaunchPipeline.embedded()`),
+the tails are incommensurable (one resolved service for the CLIs vs seed-master's 6-topic type-state
+chain), and it moves nothing on the initiation axis. The composition only earns its keep once the
+decision logic is inverted behind ports — which is S3 itself. Full rationale (both the pipeline and the
+module side): the `bootstrap-pipeline-contributable-vision` memory.
+====
 
 == Build order — thread R (reliability), fixed in reverse
 

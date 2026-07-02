@@ -92,5 +92,28 @@ STALE (talks of a 171-method `IncusResourceBootstrap`, "week 1-4", and `../seed-
 pre-`exec/` layout) — REFRESH it against the current tree before acting on this horizon, don't trust it
 verbatim. This note is the pointer; the doc is the source of truth once refreshed.
 
+## RESOLUTION — the contributable refactor is CLOSED, it dissolves into the OSGi move (2026-07-02)
+
+Revisited from the pipeline side during the OSGi-ownership chantier (spec
+`docs/architecture/osgi/pipeline-spec.adoc`), planned as task "S2 — contributable seed". Reading the
+code before starting it confirmed, from the pipeline side, exactly what the "L2 ABANDONED" section above
+found from the module side — so S2 was abandoned, not scheduled:
+
+1. the shared boot PREFIX already exists (all 3 seeds already call
+   `FrameworkLaunchPipeline.embedded().during(...)` — the renamed `OsgiRuntime.embeddedBootStack()` motif);
+   nothing left to factor.
+2. the tails are incommensurable, not "same engine, different composition": the two CLIs' tail is a
+   single `during(topic, Service.class, consumer)`; seed-master's is a 6-topic type-state chain owning
+   the runbook + gates. A generic ordered list of contributed topics trades seed-master's compile-time
+   order/skip safety for a uniformity with no business payoff.
+3. it moves ZERO arrows on the initiation axis (the measure of OSGi-ownership) — a host-side
+   rearrangement.
+
+The contributable idea only becomes meaningful once what a seed contributes is *what it asks OSGi to
+reason about* — i.e. once the decision logic is inverted behind ports. That IS
+[[pipeline-orchestration-osgi-vision]] (planned as S3), which this memory's own "L2 abandoned" and
+"Relation to the other vision" sections already pointed to. So this whole note is now a CLOSED vision
+absorbed into that one; do not resurrect a standalone "contributable pipeline" chantier.
+
 See [[cli-osgi-migration-carto]] (the prerequisite, shipped) [[pipeline-orchestration-osgi-vision]]
 [[osgi-runtime-r4-boot-seam-state]].
