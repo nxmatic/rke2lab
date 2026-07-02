@@ -780,5 +780,5 @@ methods as rules (no inference), a bounded DAG sweep as propagation (no RETE net
   serves; `recruiting-a-specialist` is now *triggered* by `treats()` returning no declarer.
 * link:layer3-medical-record-design.adoc[layer3-medical-record-design] — the per-node serialization
   decision *stays intact* (the what-if no longer needs a top-level channel; the placement fight is off).
-* link:../patterns/dsl-unification-exploration.adoc[dsl-unification] — separate parked subject (JGiven shared
-  engine); both touch the BDD layer but are independent. The DAG-as-data tension may interact with it.
+* link:../osgi/pipeline-spec.adoc[the pipeline (OSGi-owned)] — the JGiven shared-engine subject,
+  now a design spec; both touch the BDD layer but are independent. The DAG-as-data tension may interact with it.

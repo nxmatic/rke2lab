@@ -1,0 +1,131 @@
+= Atlas L1 — Config subsystem view
+:toc: left
+:toclevels: 3
+
+_Level-1 (per-subsystem) view of the link:../integration-atlas.adoc[integration atlas] (L0)._
+_L0 shows how this subsystem integrates with the others and the value that emerges; this file is the detail._
+
+[[config-view]]
+== Config subsystem — per-subsystem view
+
+Step 2's second subsystem to adopt the ritual. The OSGi bench (four modules under `osgi-bench/`)
+proved, on the real Felix framework, the *schema/resolution* half of the crossing contract: the
+`Require osgi.extender` contract (P1) and an introspectable Metatype `ObjectClassDefinition`
+retrieved by PID (P2). The *value/`SectionReader`* half (inverting `Rke2labConfig → ConfigLoader`)
+stays stage 3, and Config Admin delivery / DS activation are stages 3–4, gated.
+
+The bench is disposable scaffolding — it proved the principles without touching production config
+code (`InfraDomain`, `InfraConfigRegistry`, `Rke2labConfig` all unchanged). Real config will adopt
+these patterns by MOVE in later increments, never by duplication.
+
+=== Diagram E — config seam: BEFORE (the enum island)
+
+[mermaid]
+....
+flowchart TB
+  enumb["InfraDomain enum loop"]
+  regb["InfraConfigRegistry aggregates fragments"]
+  rke2b["Rke2labConfig pure record"]
+  enumb -->|contribute| regb
+  regb -->|sealed by| rke2b
+  classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+  class enumb,regb,rke2b built;
+....
+
+=== Diagram F — AFTER (+ extender contract + Metatype schema, monotone)
+
+[mermaid]
+....
+flowchart TB
+  enuma["InfraDomain enum loop unchanged"]
+  rega["InfraConfigRegistry unchanged"]
+  rke2a["Rke2labConfig pure record unchanged"]
+  needs["config bundle Require osgi.extender"]
+  host["host bundle Provide osgi.extender"]
+  ocd["Metatype ObjectClassDefinition introspectable by PID"]
+  enuma -->|contribute| rega
+  rega -->|sealed by| rke2a
+  needs -->|resolved by real framework| host
+  ocd -.->|describes keys type required for| rega
+  classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+  classDef neu fill:#dfd,stroke:#2a2,stroke-width:3px;
+  class enuma,rega,rke2a built;
+  class needs,host,ocd neu;
+....
+
+=== Verdict — does it hold?
+
+An honest reading:
+
+. *Monotone: yes.* No built box erased or rewired from BEFORE to AFTER. The three boxes
+  (`InfraDomain` loop, `InfraConfigRegistry`, `Rke2labConfig`) are unchanged because the bench is
+  separate scaffolding — it proved the contract without touching production. The three green
+  additions (the Require/Provide extender pair + the Metatype OCD) are NEW, not rewrites.
+
+. *Honest scope:* only the *schema/resolution* half is proven here. The `Require osgi.extender` +
+  `Provide osgi.extender` contract is resolved by the REAL Felix framework (P1:
+  `ExtenderContractSpikeTest`), and the Metatype `ObjectClassDefinition` is introspectable by PID
+  (P2: `MetatypeIntrospectionSpikeTest`). The *value* channel (`SectionReader`, inverting
+  `Rke2labConfig → ConfigLoader`) is stage 3, and Config Admin delivery / DS activation are stages
+  3–4, deferred.
+
+. *The proof is on the REAL engine, not asserted.* Both tests run on the real embedded Felix
+  framework (via `OutOfContainerFrameworkExtension`, a JUnit5 extension), installing real bundles built by
+  `bnd-maven-plugin`. P1 proved the framework refuses to resolve when the host is absent
+  (`BundleException`). P2 proved typed access (no reflection) by having the framework export
+  `org.osgi.service.metatype` from the system bundle (`system.packages.extra`) so the test and
+  felix.metatype share one API copy.
+
+. *Metatype is a NEW box.* The atlas previously defined the crossing contract as `Require
+  osgi.extender` + `SectionReader` (value channel); Metatype (schema) is the new addition this slice
+  introduced. Its additivity is proven above: it connects to the existing `InfraConfigRegistry` by
+  describing its shape, but does not rewrite any existing box.
+
+Conclusion: the config constellation holds, and the extender + Metatype additions are monotone. The
+bench is disposable scaffolding that graduates these principles to the durable atlas.
+
+[NOTE]
+====
+*Confirmed in code (2026-06-17).* The bench shipped on `refactor/config-extender` with four modules
+(`osgi-bench-config`, `osgi-bench-host`, `osgi-bench-testkit`, `osgi-bench-tests`), two spike tests
+(P1 and P2, both `@OsgiSpike`), runnable from VSCode Test Explorer and surefire. The production
+config island (`InfraDomain` / `InfraConfigRegistry` / `Rke2labConfig`) was never touched — the
+monotone proof held. The above figures are kept as the design-time proof; the spec will graduate
+into `docs/architecture/` at merge.
+====
+
+=== Design scenarios — the config capabilities as DSL sentences
+
+The third movement (see <<the-scenario-map>>) for the config seam. GIVEN the enum island shipped,
+WHEN the extender contract / schema lands, THEN the capability AND its additivity. The two proven
+halves are playable on the OSGi bench; the value channel is narrated.
+
+. *The framework refuses to resolve a config bundle without its host* — `[playable]` green +
+.. GIVEN `InfraDomain` / `InfraConfigRegistry` / `Rke2labConfig` shipped as a pure record island
+.. WHEN the config bundle declares `Require osgi.extender` and no host provides it
+.. THEN the real Felix framework refuses to resolve (a `BundleException`, P1) — AND the production
+   island is untouched, the contract is a new box.
+
+. *Config keys are introspectable by PID, typed, no reflection* — `[playable]` green +
+.. GIVEN the registry's fragments and their key shapes
+.. WHEN a Metatype `ObjectClassDefinition` describes them, retrieved by PID (P2)
+.. THEN config keys (name, type, required) are introspectable by PID without reflection — AND the OCD
+   describes the existing registry without rewriting it.
+
+. *A pure config record reads its values through a SectionReader, not ConfigLoader* — `[narrated]`
+  amber +
+.. GIVEN the wrong-direction crossing `Rke2labConfig → ConfigLoader` the two-spaces frame flags
+.. WHEN the `SectionReader` value channel inverts it (stage 3)
+.. THEN a pure config record reads its values across the bundle/host contract, not by reaching into
+   host code — AND the crossing is inverted, not duplicated (real config adopts by MOVE).
+
+. *Config is delivered and activated by the running framework* — `[narrated]` amber +
+.. GIVEN the resolved extender contract and the introspectable schema
+.. WHEN Config Admin delivery + DS activation land (stages 3–4)
+.. THEN config values are delivered to components and activate them through the framework — AND this
+   composes onto the shipped registry, additive.
+
+*Coverage of this view:* 4 capabilities, 4 scenarios — complete per <<scenario-completeness>>. Two
+playable-green (proven on the bench, not yet in production), two narrated-amber (the value/activation
+half, gated).
+

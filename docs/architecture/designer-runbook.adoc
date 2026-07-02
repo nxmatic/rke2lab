@@ -270,7 +270,7 @@ the reactor, and render their report.
 
 * link:integration-atlas.adoc[Integration atlas] — the map of models and the additivity ritual; today
   hand-written, which is the re-entrance debt this runbook pays.
-* link:patterns/dsl-unification-exploration.adoc[DSL unification] — the one-engine-two-layers decision
+* link:osgi/pipeline-spec.adoc[the pipeline (OSGi-owned)] — the one-engine-two-layers decision
   (JGiven as substrate, the fluent grammar as authoring surface) this runbook builds on.
 * link:unit-repository/model-overview.adoc[Unit repository model overview] — the design whose state the
   runbook renders, including the capability map it flips blue/green/amber.

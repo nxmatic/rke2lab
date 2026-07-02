@@ -16,8 +16,8 @@ grounded in the source read during the session; the three options are candidate 
 their value/cost named, not a decision. +
 *Branch (when started):* TBD — likely a `refactor/` branch (it restructures the diagnosis layer,
 external behaviour unchanged) for options ①/②; option ③ would be a `feature/` branch. +
-*Workshop:* parked in `wip/` deliberately. Sibling to link:../patterns/dsl-unification-exploration.adoc[the
-JGiven shared-engine subject] and link:preview-whatif-replay-exploration.adoc[the what-if subject];
+*Workshop:* parked in `wip/` deliberately. Sibling to link:../osgi/pipeline-spec.adoc[the
+pipeline spec (JGiven shared-engine, OSGi-owned)] and link:preview-whatif-replay-exploration.adoc[the what-if subject];
 all three touch the BDD/diagnosis layer but are independent. Do NOT interleave.
 
 == Why this doc exists (read first)
@@ -437,7 +437,7 @@ counterfactual replay propagates along.
 
 * link:preview-whatif-replay-exploration.adoc[preview-whatif] — rests on a *declared* edge (Option
   ①); the what-if propagates along exactly the edge this doc proposes to single-source.
-* link:../patterns/dsl-unification-exploration.adoc[dsl-unification] — the JGiven shared-engine subject; both
+* link:../osgi/pipeline-spec.adoc[the pipeline (OSGi-owned)] — the JGiven shared-engine subject; both
   touch the BDD layer but are independent. Neither needs a rules engine.
 * link:runbook-doctor.adoc[runbook-doctor] — the doctor (`Generalist`/`Specialist`) this doc's Option ②
   de-duplicates; the checkpoints Option ① gives topology to.

@@ -1,0 +1,733 @@
+= Atlas L1 — Doctor subsystem view
+:toc: left
+:toclevels: 3
+
+_Level-1 (per-subsystem) view of the link:../integration-atlas.adoc[integration atlas] (L0)._
+_L0 shows how this subsystem integrates with the others and the value that emerges; this file is the detail._
+
+[[doctor-view]]
+== Doctor subsystem — per-subsystem view
+
+This section holds the doctor model inventory, the additivity figures (HealthSystem keystone,
+referral round-trip), the ritual, and the related-documentation links.
+
+=== The model inventory
+
+[cols="1,2,2",options="header"]
+|===
+| Tier | Model | Status
+
+| foundation
+| link:../doctor/glossary.adoc[glossary]
+| Cross-cutting vocabulary source of truth.
+
+| substrate
+| link:../doctor/runbook-doctor.adoc[runbook-doctor]
+| ✅ Implemented (Increments A–E). The overall doctor design.
+
+| substrate
+| link:../doctor/medical-record-query-api-design.adoc[medical-record-query-api]
+| ✅ Implemented. The record reconstructed on demand from Pulumi — the read substrate.
+
+| substrate
+| link:../doctor/layer3-medical-record-design.adoc[layer3-medical-record (write-side)]
+| ✅ Implemented. Per-node serialization of the diagnostic layer.
+
+| substrate
+| link:../doctor/layer3-readside-runtime-enrichment-design.adoc[layer3 read-side]
+| ✅ Implemented. Diagnosis rendered into the runbook.
+
+| substrate
+| link:../doctor/vocabulary-and-live-record-design.adoc[vocabulary-and-live-record]
+| ✅ Implemented (step 1). Clinical-vocabulary refactor + live record wired in (latent).
+
+| substrate
+| link:../doctor/pulumi-doctor-integration.adoc[pulumi-doctor-integration]
+| The Pulumi entity model and the doctor's Pulumi seam.
+
+| KEYSTONE
+| link:../doctor/healthsystem-access-control-design.adoc[healthsystem-access-control]
+| ✅ Implemented 2026-06-11 on `feature/healthsystem-keystone` (keystone + interim gate). The
+  per-run HealthSystem holds the registry + GrantPolicy, employs the Generalist with a credentialed
+  ClinicalAccess, admits the patient. Cohort read promoted off `@Spike`. The model this atlas first
+  proved additive — now shipped, and the additivity held in code (no built box was rewritten, only
+  wrapped).
+
+| proof
+| link:../doctor/cohort-correlation-proof.adoc[cohort-correlation-proof]
+| ✅ Proof record. Phase 1 unit + Phase 2 live `pulumi preview` evidence that the read half of
+  cross-patient correlation works; motivated the keystone, kept as the empirical record.
+
+| exploration
+| link:../doctor/preview-whatif-replay-exploration.adoc[preview-whatif-replay]
+| ⬜ Not built (step 3). The what-if planner.
+
+| exploration
+| link:../doctor/rules-engine-checkpoint-topology-exploration.adoc[rules-engine-topology]
+| ⬜ Not built. Three ways to dissolve diagnosis-layer redundancy.
+
+| exploration
+| link:../doctor/drools-network-specialist-prototype.adoc[drools-network-specialist]
+| ⬜ Not built. Drools behind the Specialist seam.
+|===
+
+=== Additivity proof: HealthSystem keystone (shipped 2026-06-11)
+
+==== Diagram A — model constellation: BEFORE (without HealthSystem)
+
+[mermaid]
+....
+flowchart TB
+    GLO["glossary<br/>vocabulary SoT"]
+
+    subgraph BUILT[implemented substrate]
+        RB["runbook-doctor<br/>overall design"]
+        QAPI["medical-record-query-api<br/>read substrate"]
+        L3W["layer3 write-side<br/>per-node serialize"]
+        L3R["layer3 read-side<br/>runbook enrichment"]
+        VLR["vocabulary-and-live-record<br/>step 1, latent record"]
+        PDI["pulumi-doctor-integration<br/>Pulumi entity seam"]
+    end
+
+    subgraph EXPL[explorations, not built]
+        WHATIF["preview-whatif-replay"]
+        RULES["rules-engine-topology"]
+        DROOLS["drools-network-specialist"]
+    end
+
+    GLO -.->|defines terms for| RB
+    RB --> QAPI
+    QAPI --> L3W
+    L3W --> L3R
+    RB --> VLR
+    QAPI --> VLR
+    PDI --> QAPI
+    WHATIF -.->|loops over| RB
+    RULES -.->|reshapes| RB
+    DROOLS -.->|behind| RB
+
+    classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+    classDef expl fill:#ffd,stroke:#aa2,stroke-width:1px,stroke-dasharray:4 3;
+    classDef found fill:#eee,stroke:#999,stroke-width:1px;
+    class RB,QAPI,L3W,L3R,VLR,PDI built;
+    class WHATIF,RULES,DROOLS expl;
+    class GLO found;
+....
+
+==== Diagram B — model constellation: AFTER (+ HealthSystem, monotone)
+
+Same graph, nothing erased or rewired. HealthSystem (green) is added, wrapping the read substrate and
+giving the explorations a real seam to attach to. Every blue box and arrow is identical to BEFORE.
+
+[mermaid]
+....
+flowchart TB
+    GLO["glossary<br/>vocabulary SoT"]
+
+    subgraph BUILT[implemented substrate]
+        RB["runbook-doctor<br/>overall design"]
+        QAPI["medical-record-query-api<br/>read substrate"]
+        L3W["layer3 write-side<br/>per-node serialize"]
+        L3R["layer3 read-side<br/>runbook enrichment"]
+        VLR["vocabulary-and-live-record<br/>step 1, latent record"]
+        PDI["pulumi-doctor-integration<br/>Pulumi entity seam"]
+    end
+
+    HS["healthsystem-access-control<br/>keystone: gate plus cohort"]
+
+    subgraph EXPL[explorations, not built]
+        WHATIF["preview-whatif-replay"]
+        RULES["rules-engine-topology"]
+        DROOLS["drools-network-specialist"]
+    end
+
+    GLO -.->|defines terms for| RB
+    RB --> QAPI
+    QAPI --> L3W
+    L3W --> L3R
+    RB --> VLR
+    QAPI --> VLR
+    PDI --> QAPI
+    WHATIF -.->|loops over| RB
+    RULES -.->|reshapes| RB
+    DROOLS -.->|behind| RB
+
+    GLO -.->|defines HealthSystem terms| HS
+    HS -->|wraps without changing| QAPI
+    HS -->|employs clinicians from| VLR
+    WHATIF -.->|needs the patient record from| HS
+    HS -.->|grant seam awaits referrals from| RULES
+
+    classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+    classDef expl fill:#ffd,stroke:#aa2,stroke-width:1px,stroke-dasharray:4 3;
+    classDef found fill:#eee,stroke:#999,stroke-width:1px;
+    classDef neu fill:#dfd,stroke:#2a2,stroke-width:3px;
+    class RB,QAPI,L3W,L3R,VLR,PDI built;
+    class WHATIF,RULES,DROOLS expl;
+    class GLO found;
+    class HS neu;
+....
+
+==== Diagram C — internal seam: BEFORE vs AFTER (where HealthSystem clips onto built code)
+
+The class-level view of the same additive claim. Blue = shipped types, untouched. Green = added. The
+shipped read core (recordFor, the folds) is wrapped, never edited.
+
+[mermaid]
+....
+flowchart LR
+    subgraph B[before, shipped]
+        b_reg["MedicalRecordRegistry"]
+        b_live["LiveMedicalRecordRegistry<br/>recordFor plus cohortFor, Spike-marked"]
+        b_gen["Generalist holds registry plus patient"]
+        b_rec["MedicalRecord folds"]
+        b_gen --> b_reg
+        b_reg --> b_live
+        b_live --> b_rec
+    end
+
+    subgraph A[after, wrapped, monotone]
+        a_hs["HealthSystem, new"]
+        a_gp["GrantPolicy, new"]
+        a_acc["ClinicalAccess, new"]
+        a_reg["MedicalRecordRegistry, unchanged"]
+        a_live["LiveMedicalRecordRegistry<br/>cohortFor promoted off Spike"]
+        a_gen["Generalist, now employed, holds access"]
+        a_rec["MedicalRecord folds, unchanged"]
+        a_hs --> a_gp
+        a_hs --> a_acc
+        a_hs --> a_gen
+        a_acc --> a_gp
+        a_acc --> a_reg
+        a_reg --> a_live
+        a_live --> a_rec
+    end
+
+    classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+    classDef neu fill:#dfd,stroke:#2a2,stroke-width:3px;
+    class b_reg,b_live,b_gen,b_rec,a_reg,a_live,a_rec built;
+    class a_hs,a_gp,a_acc,a_gen neu;
+....
+
+==== Verdict — does it hold?
+
+An honest reading of the three figures:
+
+. *Monotone: yes.* No blue box or arrow is erased or rewired from A to B, or within C. Every change
+  is an addition. The HealthSystem model is additive against the whole constellation.
+
+. *Two honest edits (changes, not deletions):*
+.. `Generalist` gains a held `ClinicalAccess` (it held registry + patient before). That is a *changed
+   collaborator*, but the read core it ultimately calls is unchanged — the wrap is real, not a
+   rewrite.
+.. `LiveMedicalRecordRegistry.cohortFor` loses its `@Spike` marker on promotion. A marker strip, not
+   a logic change.
+
+. *The explorations gain seams, lose nothing:* the what-if planner now has a concrete patient-record
+  provider (the HealthSystem), and the rules-engine / referral work has the named grant seam to plug
+  into. The keystone does not merely sit beside the explorations — it makes them more buildable.
+
+. *The one not-yet-proven edge* is the amber dashed "grant seam awaits referrals". It is proven only
+  when step 2 plugs referral-derived grants into the GrantPolicy. Everything else is solid today.
+
+Conclusion: the constellation holds, and HealthSystem is additive.
+
+[NOTE]
+====
+*Confirmed in code (2026-06-11).* HealthSystem shipped on `feature/healthsystem-keystone`, and the
+additivity the figures predicted held: no built box was rewritten — `Generalist` swapped its held
+collaborator (registry+patient → `ClinicalAccess`) but the read core it calls is unchanged, and the
+only other touch was stripping the `@Spike` marker. The 121-test build stayed green throughout. The
+before/after figures above are kept *frozen* as the design-time proof; the inventory row carries the
+live ✅ status. The amber "grant seam awaits referrals" edge remains the single not-yet-proven edge,
+deferred to step 2.
+====
+
+=== Additivity proof: Referral round-trip (shipped 2026-06-13)
+
+The referral round-trip flips the diagnosis seam from `diagnose(Symptom, Observation) →
+Optional<Prescription>` (the why drops on `Optional.empty()`) to `diagnose(Referral) →
+ReferralReply` (the why — an `Assessment` — ALWAYS survives, prescription or not). Four new types
+(`Referral`, `ReferralReply`, `Assessment`, `SchemaRef`) plus a persisted-shape change
+(`RemediationPlan` carries `List<ReferralReply>` not `List<Prescription>`, with `prescriptions()` as
+a derived view). The changed collaborator (`Prescription.humanHint` shrinks to action-only; the
+reasoning migrates into `Assessment`). Two exemplar specialists (`NetworkSpecialist`,
+`ClusterSpecialist`) co-consult.
+
+==== Diagram D — type model: BEFORE vs AFTER (the seam flip, monotone)
+
+The seam before and after, with the ONE honest changed collaborator (amber) and the additive new
+types (green). Plain = existing, unchanged.
+
+[mermaid]
+....
+flowchart TD
+    subgraph BEFORE[Before: Optional Prescription drops the why]
+        b_spec["Specialist<br/>diagnose symptom,observation → Optional Prescription"]
+        b_gen["Generalist<br/>consult, synthesize"]
+        b_plan["RemediationPlan<br/>List Prescription<br/>generalistSummary"]
+        b_presc["Prescription<br/>humanHint = reasoning + action"]
+        b_obs["Observation"]
+        b_spec -->|returns, may be empty| b_presc
+        b_gen -->|synthesizes| b_plan
+        b_plan -->|collects| b_presc
+        b_obs -->|read by| b_spec
+    end
+
+    subgraph AFTER[After: ReferralReply always carries the why]
+        a_spec["Specialist<br/>diagnose Referral → ReferralReply"]
+        a_gen["Generalist<br/>consult, synthesize"]
+        a_plan["RemediationPlan<br/>List ReferralReply<br/>prescriptions is derived"]
+        a_ref["Referral — NEW<br/>patient, symptom, observation, record"]
+        a_reply["ReferralReply — NEW<br/>assessment ALWAYS<br/>prescription OPTIONAL"]
+        a_assess["Assessment — NEW<br/>schemaRef, payload, summary"]
+        a_schema["SchemaRef — NEW<br/>open self-declared id"]
+        a_presc["Prescription — CHANGED<br/>humanHint = action ONLY"]
+        a_obs["Observation"]
+        a_spec -->|builds and sends| a_ref
+        a_spec -->|returns, always carries assessment| a_reply
+        a_gen -->|synthesizes| a_plan
+        a_plan -->|collects| a_reply
+        a_reply -->|always| a_assess
+        a_reply -->|optionally| a_presc
+        a_assess -->|declares| a_schema
+        a_obs -->|flows into| a_ref
+    end
+
+    classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+    classDef new fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
+    classDef changed fill:#fff3cd,stroke:#f57f17,stroke-width:2px;
+    class b_spec,b_gen,b_plan,b_obs,a_spec,a_gen,a_obs built;
+    class b_presc changed;
+    class a_ref,a_reply,a_assess,a_schema new;
+    class a_presc changed;
+....
+
+==== Verdict — does it hold?
+
+An honest reading:
+
+. *Monotone at the persisted-shape level: yes.* `RemediationPlan` carries a new collection (`replies`)
+  and a derived view (`prescriptions()`) — the old `prescriptions` field is gone, BUT the persisted
+  output map gains a `replies` key (additive) and loses nothing (the doctor predates any persisted
+  remediation plan in the dev stack, so no real data is rewritten). `ConsultationReport` gains the
+  `assessment` key under each reply in `plan.replies`, additive. The negative check: no other
+  shipped box or serialized shape was rewritten; `Observation`, `Symptom`, `ConsultationReport`
+  envelope, and all read/write paths for them are untouched.
+
+. *One honest changed collaborator:* `Prescription.humanHint` shrinks from "reasoning + action" to
+  "action only" — the reasoning migrates into the reply's `Assessment`. This is a changed
+  collaborator, not an erased one. The `Prescription` box itself remains; only its content shifts.
+
+. *The seam method signature changed* (`diagnose(Symptom, Observation)` → `diagnose(Referral)`), but
+  both the `Specialist` box and all its existing collaborators (`Patient`, `Observation`, `Symptom`,
+  `MedicalRecord`, `HealthSystem`) remain — the flip adds a request/response envelope, rewires
+  nothing downstream.
+
+. *Two fake exemplar specialists added* (`NetworkSpecialist`, `ClusterSpecialist`) to show the
+  integration seams (treatment vs decline-with-why). These are NEW boxes, not rewrites.
+
+Conclusion: the referral round-trip is additive. The seam flip is monotone; the one changed
+collaborator (`Prescription.humanHint` shrink) is honest and isolated.
+
+[NOTE]
+====
+*Confirmed in code (2026-06-13).* The referral round-trip shipped on `feature/referral-roundtrip`,
+and the additivity the figure predicted held: no built box was rewritten beyond the
+`Prescription.humanHint` shrink and the `RemediationPlan` collection swap (which is additive at the
+persisted-shape level — the new `replies` key appears; no old key vanishes). The driver specialist
+(`DbusTcpSpecialist`) returns a `ReferralReply` with an `Assessment` even when declining (no longer
+mute on `Optional.empty()`). The runbook renders the `Assessment` distinctly. The above figure is
+kept as the design-time proof; the inventory will carry the ✅ status when this chunk lands.
+====
+
+=== Additivity proof: world gateway — ports are services, data crosses as Documents (SHIPPED 2026-07-01, by records-as-contract)
+
+This proof REVISES the earlier "DomainDagMultiplexor" proof (design 2026-06-24, never shipped) after a
+five-angle code review found that design closed only ONE of three boundary leaks. The full reasoning
+is link:../osgi/world-gateway-spec.adoc[the world-gateway spec]; the three leaks it must close:
+
+. *the seam SPEAKS records* — `doctor-port` / `cluster-port` (`type=seam`) import `doctor.records`;
+. *the host REASONS on records* — `ControlplanePolicy.Severity.parse()` at boot (the `pulumi preview`
+  crash), `SystemdAdapterStage` branches `== Severity.CRITICAL`;
+. *egress self-serialization* — 14 `toOutputMap`/`OUTPUT_KEY`/`Reader` in `osgi/` (the only leak the
+  2026-06-24 design addressed).
+
+Like Diagram K, it is *monotone-with-named-erasure*: the diagnostic model sheds its Pulumi-shaped
+serialization AND the seam stops naming records (the ports speak `Document`), and those erasures are
+deliberate and named. The claim is threefold — the *model* loses self-serialization, the *seam* stops
+speaking records, and the *pipeline* re-decomposes (GROUND/GATEWAY/APPLY) — all in the same
+increment, because a half-landed state would not `pulumi preview` green, so would not be deliverable.
+
+==== Diagram N — the model: BEFORE vs AFTER (named erasure)
+
+Blue = shipped, untouched. Green = added. Red-dashed = deliberately erased. The doctor records stop
+knowing Pulumi; `Patient` keeps its name but loses its "is a stack" definition; `StackCoordinate`
+relocates to the host world.
+
+[mermaid]
+....
+flowchart LR
+    subgraph B[before, shipped]
+        b_rec["ConsultationReport<br/>holds OUTPUT_KEY, toOutputMap"]
+        b_rdr["ConsultationReportReader plus 3 more"]
+        b_pat["Patient, defined as a Pulumi stack"]
+        b_coord["StackCoordinate, in doctor-port"]
+        b_rec -->|parsed back by| b_rdr
+        b_pat -->|is| b_coord
+    end
+
+    subgraph A[after, two models]
+        a_rec["ConsultationReport<br/>pure record, no output methods"]
+        a_map["DomainDagMapper impl<br/>contribution bundle, Jackson"]
+        a_doc["Document, domain coordinate payload"]
+        a_pat["Patient, abstract diagnosed identity"]
+        a_coord["StackCoordinate, moved to host"]
+        a_rec -->|mapped by| a_map
+        a_map -->|emits| a_doc
+        a_pat -.adapter maps to.-> a_coord
+    end
+
+    classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+    classDef new fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
+    classDef gone fill:#fdd,stroke:#c33,stroke-width:2px,stroke-dasharray:4 3;
+    class b_rec,b_pat,a_rec,a_pat built;
+    class a_map,a_doc new;
+    class b_rdr,b_coord gone;
+    class a_coord new;
+....
+
+==== Diagram N2 — the seam and the host: BEFORE vs AFTER (leaks #1 and #2 closed)
+
+The revision the 2026-06-24 design lacked. BEFORE: the seam imports `doctor.records` (leak #1) and the
+host parses/branches on records (leak #2). AFTER: the port verbs take/return `Document`; the host maps
+its facts to a `Document` and reads a control field — it no longer names a record. Red-dashed = the
+erased imports/branches; green = the verb signatures now speaking `Document`.
+
+[mermaid]
+....
+flowchart LR
+    subgraph B2[before, the seam speaks records, the host reasons]
+        b_port["doctor-port<br/>consult Symptom Observation<br/>Import-Package doctor.records"]
+        b_host["host<br/>Severity.parse, == CRITICAL"]
+        b_rec2["doctor.records"]
+        b_host -->|imports and branches| b_rec2
+        b_port -->|imports| b_rec2
+    end
+
+    subgraph A2[after, the seam speaks Document, the host transports]
+        a_port["doctor-port<br/>consult Document returns Document"]
+        a_host["host<br/>maps facts to Document, reads control field"]
+        a_doc2["Document"]
+        a_rec2["doctor.records, OSGi-private"]
+        a_host -->|Document in| a_port
+        a_port -->|reads OSGi-side| a_rec2
+        a_host -->|builds and reads| a_doc2
+    end
+
+    classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+    classDef new fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
+    classDef gone fill:#fdd,stroke:#c33,stroke-width:2px,stroke-dasharray:4 3;
+    class b_rec2,a_rec2 built;
+    class b_port,b_host gone;
+    class a_port,a_host,a_doc2 new;
+....
+
+==== Diagram O — the pipeline: BEFORE vs AFTER (the orchestrator refactor)
+
+The same increment refactors the boot pipeline. *What is decided* (firm): `OutputBuilder`
+(hand-concatenation) becomes the DomainDagMultiplexor mux OSGi-side; `ReadinessOutputMapper` (host,
+Pulumi-typed) becomes per-domain `DomainDagMapper` `@Component`s OSGi-side; `OutputsStage` stays
+host — it is the one legitimate `com.pulumi.Context` — but consumes a `DocumentStream`. *The stage
+decomposition is now designed* (it was open in the 2026-06-24 version): the pipeline re-decomposes by
+capability into GROUND / GATEWAY / APPLY, verified on the code — only 2 of the 5 existing stages
+cross the seam, and GATEWAY is framed by the boot-run-close (Felix open for the gateway, closed on
+return). See the world-gateway spec.
+
+[mermaid]
+....
+flowchart LR
+    subgraph PB[before, host-side egress]
+        p_map["ReadinessOutputMapper<br/>host, imports com.pulumi"]
+        p_build["OutputBuilder<br/>flat 23-key map by hand"]
+        p_out["OutputsStage<br/>pulumiContext export"]
+        p_map -->|feeds| p_build
+        p_build -->|flat map| p_out
+    end
+
+    subgraph PA[after, GROUND GATEWAY APPLY]
+        a_ground["GROUND host only<br/>config, boot Felix, publish infra"]
+        a_exch["GATEWAY framed by boot run close<br/>ingress, 2 seam stages, egress"]
+        a_dm["DomainDagMapper Components<br/>OSGi, Pulumi-blind"]
+        a_mux["DomainDagMultiplexor<br/>OSGi, mux demux"]
+        a_adapter["DomainDagAdapter<br/>host, stream to Pulumi"]
+        a_apply["APPLY host only<br/>OutputsStage pulumi export"]
+        a_ground -->|opens| a_exch
+        a_dm -->|emit Document| a_mux
+        a_mux -->|within GATEWAY| a_exch
+        a_exch -->|DAG stream| a_adapter
+        a_adapter -->|per domain coordinate| a_apply
+    end
+
+    classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+    classDef new fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
+    classDef moved fill:#fff3cd,stroke:#f57f17,stroke-width:2px;
+    class p_out,a_apply built;
+    class a_dm,a_mux,a_adapter,a_ground,a_exch new;
+    class p_map,p_build moved;
+....
+
+==== Verdict — does it hold?
+
+An honest reading:
+
+. *Monotone-with-named-erasure, declared not hidden.* Five things are deliberately erased: the four
+  `*Reader` classes, the `toOutputMap`/`OUTPUT_KEY` methods, `StackCoordinate`'s residence in
+  `doctor-port`, the `-port` bundles' `Import-Package doctor.records` (leak #1, Diagram N2), and the
+  host's `Severity.parse` / `== CRITICAL` record reasoning (leak #2, Diagram N2). These are not silent
+  rewrites — they are the named cost of the worlds-speak-Documents split, and the whiteboard
+  constraint (we rewrite the stack content; no prior outputs preserved) makes the erasure safe: no
+  persisted data is migrated.
+
+. *Two honest relocations (not deletions):* `StackCoordinate` moves doctor-port → host (it was always
+  a stack concept squatting in the diagnostic model); `ReadinessOutputMapper`'s mapping logic moves
+  host → a per-domain `DomainDagMapper` `@Component`. The behavior survives; only the world it lives
+  in changes — which is the whole point.
+
+. *The seam shrinks, provably:* doctor-port's exported surface drops from 61 types toward
+  `DomainDagMapper` + `Document`; the DomainDagMultiplexor imports one interface package, not N record packages
+  (the DS mechanism, chosen over a fragment precisely so records stay private). Fewer exported types
+  AND fewer live components (one `@Reference List<DomainDagMapper>` replaces a fan of per-fact
+  host-published services).
+
+. *The atomicity is the integration invariant:* the model half and the pipeline half are one
+  increment because the boot pipeline IS the orchestrator that runs `pulumi preview` — the
+  integration gate. Half-landed would not preview green, so it is not separately deliverable. The
+  "after" of both diagrams is therefore a committed target, not a direction.
+
+. *The open items, rated (this is a refactor — doubt is normal; the atlas's job is to say whether
+  the residual risk is acceptable):*
+.. *Stage decomposition of the "after" pipeline — NOW RESOLVED (was open in the 2026-06-24 version).*
+   The decomposition is designed: GROUND / GATEWAY / APPLY, read from the code (only 2 of 5 stages
+   cross the seam; GATEWAY is framed by the boot-run-close). It is a *mechanical re-slicing within
+   the existing fluent pipeline grammar*, whose `during(...)` blocks already compose type-safely — the
+   names are now committed, not deferred.
+.. *SCR binds `@Reference List<DomainDagMapper>` in the DomainDagMultiplexor boot topology — OPEN, risk
+   LOW/ACCEPTABLE.* A sibling proof already exists (`FragmentContributedComponentTest` binds a
+   `@Reference List` across the contribution boundary). Nonzero but small; the increment must carry
+   the boot test before the move is trusted.
+.. *Runtime Document validation — DEFERRED (YAGNI), not a risk.* The schema contract is enforced at
+   build (mapper unit tests + a fourth staging gate); runtime validation (OSGi fragment + host
+   remote-switch) is reserved for when host and OSGi become separately deployable. We build on one
+   codebase, so the build check suffices for the embedded increment.
+
+Conclusion: *on the right path, residual risks acceptable.* The model is additive-with-named-erasure;
+the seam stops speaking records and the pipeline re-decomposes by capability; all three leaks close in
+one atomic increment at the integration boundary. The one remaining open item (the SCR `@Reference
+List` bind) is bounded and rated LOW — not a reason to withhold the increment, provided the boot test
+lands with it. The atlas says: go.
+
+[NOTE]
+.Status update (2026-07-01): SHIPPED, but by a different mechanism — the multiplexor is a NAMED ERASURE
+====
+*Status: IMPLEMENTED (2026-07-01), by records-as-contract, not the DomainDagMultiplexor.* The three
+leaks above DID close, atomically, and `pulumi preview` is green — but the `DomainDagMultiplexor` /
+`DomainDagMapper` / `DomainDagAdapter` mechanism of Diagrams N/N2/O was itself *deliberately erased*
+during execution and replaced. This is monotone-with-named-erasure applied to the atlas's OWN prior
+design: the multiplexor is the erased box, records-as-contract is the additive one, and the erasure is
+named here rather than hidden.
+
+*What actually shipped (2A–2D, commits `4c91a852`..`42c785a1`):* the two realms gateway opaque
+`Document(domain, coordinate, payload : String)` values (2C, `REALM_BOUNDARY` locked at `ERROR`); the
+translation landed as *N readers per coordinate* in `doctor-core/.internal` (`ConsultationReportReader`,
+`ExpectationReader`, `InterventionReader`, `MedicalRecordReader`, `InterventionLedgerReader`) plus the
+producers' `toOutputMap()` — NEVER a `DomainDagMapper`. Then 2D gave each of the six coordinates a
+*contract of form*: a `@DocumentContract` wire-record whose JSON Schema is generated and checked at
+build by a fourth staging gate, `SCHEMA_CONCORD`, locked `WARN`→`ERROR`. `Document.payload` stayed a
+`String` (no jackson type crosses the flat seam), which is why the design-of-record's `JsonNode` +
+one-`DomainDagMapper`-per-domain picture (Diagrams N/N2/O) does not match the code.
+
+*Why the pivot holds (monotone):* the principles the atlas signed off on all survived — OSGi owns the
+authority and the typing, the seam speaks `Document`, the host transports and never names a record, the
+contract is enforced at build. Only the *mechanism* changed (readers + schema-per-coordinate instead of
+a mux/demux of mapper components), and the change dropped a whole class of live components (no
+`@Reference List<DomainDagMapper>` boot bind was ever needed — the LOW-rated open proof above is moot).
+Diagrams N/N2/O are kept as the design-time reasoning that led here; the shipped shape is specified in
+link:../osgi/world-gateway-2d-schema-contract-spec.adoc[the 2D schema-contract spec] and its 2A/2B/2C
+siblings. The verdict stands — three leaks closed, atomic, preview green — reached by the lighter path.
+====
+
+=== Design scenarios — the doctor capabilities as DSL sentences
+
+The doctor view predates the capability-anchoring device, so its design lived only in the inventory
+prose and the two additivity verdicts. The third movement (see <<the-scenario-map>>) lifts those
+facts into scenarios. GIVEN the shipped substrate, WHEN a model lands, THEN the capability AND its
+additivity.
+
+. *The doctor reconstructs a patient's medical record on demand* — `[playable]` blue +
+.. GIVEN per-node diagnosis serialized into Pulumi (layer3 write-side)
+.. WHEN the medical-record query API reconstructs the record on demand from Pulumi
+.. THEN the doctor reads a patient's full history without an accumulator — AND the read substrate is
+   additive over the write-side, nothing rewired.
+
+. *Each node serializes its diagnosis; the runbook renders it back* — `[playable]` blue +
+.. GIVEN the clinical vocabulary and the live record wired in (vocabulary-and-live-record, step 1)
+.. WHEN layer3 write-side serializes per node and the read-side enriches the runbook
+.. THEN every node's diagnosis round-trips into the operator's runbook — AND the render is additive
+   over the existing runbook.
+
+. *A per-run HealthSystem admits a patient through a credentialed gate* — `[playable]` blue +
+.. GIVEN the `MedicalRecordRegistry` read core shipped
+.. WHEN the HealthSystem keystone wraps it with a `GrantPolicy` + `ClinicalAccess` and employs the
+   `Generalist`
+.. THEN the doctor admits a patient only through a credentialed access gate — AND the read core is
+   wrapped, never edited (the one honest collaborator swap: `Generalist` holds `ClinicalAccess`).
+
+. *The doctor reads a cohort across patients* — `[playable]` blue +
+.. GIVEN `LiveMedicalRecordRegistry.cohortFor` proven by live `pulumi preview` (cohort-correlation)
+.. WHEN the keystone promotes `cohortFor` off `@Spike`
+.. THEN the doctor correlates findings across a cohort — AND the promotion is a marker strip, not a
+   logic change.
+
+. *A diagnosis always carries its reasoning, prescription or not* — `[playable]` blue +
+.. GIVEN the old `diagnose(Symptom, Observation) → Optional<Prescription>` seam (the why dropped on
+   `Optional.empty()`)
+.. WHEN the referral round-trip flips it to `diagnose(Referral) → ReferralReply`
+.. THEN a declined diagnosis still carries its `Assessment` — the why always survives — AND the flip
+   is additive at the persisted shape (`replies` key added, none removed); the one named collaborator
+   shrink is `Prescription.humanHint` → action-only.
+
+. *The doctor replays a what-if on observed plus hypothesis* — `[narrated]` amber +
+.. GIVEN the HealthSystem as a concrete patient-record provider
+.. WHEN the preview/what-if planner lands
+.. THEN the doctor replays a diagnosis against observed-⊕-hypothesis state — AND it attaches to the
+   keystone's grant seam, adding nothing to the read core.
+
+. *Diagnosis-layer redundancy dissolves into a rules engine* — `[narrated]` amber +
+.. GIVEN the diagnosis layer's checkpoint topology
+.. WHEN the rules-engine exploration lands
+.. THEN the redundant per-node diagnosis collapses behind a rules engine — AND the grant seam awaits
+   its referral-derived grants (the single not-yet-proven edge).
+
+. *A Drools specialist sits behind the Specialist seam* — `[narrated]` amber +
+.. GIVEN the `Specialist` SPI seam
+.. WHEN a Drools-backed network specialist is plugged in
+.. THEN a rules-driven specialist co-consults behind the same seam — AND the seam is unchanged, the
+   specialist is a new box.
+
+*Coverage of this view:* 8 capabilities, 8 scenarios — complete per <<scenario-completeness>>. Five
+playable-and-blue today (all shipped), three narrated-amber (the explorations not built).
+
+=== The ritual — how this atlas stays alive
+
+Reopen this atlas at the START of every design activity (doctor or another subsystem), before
+writing a new model's spec:
+
+. *Add the new model* as a green box in a fresh before/after pair (or extend Diagrams A–C).
+. *Prove monotone:* confirm no existing box or arrow is erased or rewired. If you must erase one,
+  STOP — the new model is not additive; rework the seam until it is, or record explicitly why a
+  breaking change is justified.
+. *List honest edits:* any changed collaborator (not just additions) is named in the verdict, as
+  the two edits above are.
+. *Write the scenarios:* for every capability the model adds (every row of the view's capability
+  map), write the design scenario it stands for — GIVEN the constellation before, WHEN the model or
+  term lands, THEN the capability holds AND additivity holds (nothing erased). See <<the-scenario-map>>.
+. *Flip green→blue* when a model ships, and update its inventory status.
+. *Update the inventory table* with the new model and its links.
+
+This keeps "a well-integrated spec is the proof we are on the right path" a standing practice, not a
+one-time exercise.
+
+[[the-scenario-map]]
+=== The third movement — the scenario map (the design DSL)
+
+Additivity proves nothing is *broken*; the capability map proves each box *earns its place* by
+licensing a sentence; the *scenario map* writes that sentence in full as a design scenario, in our
+own Given/When/Then DSL. A capability-map row is only the THEN clause; the scenario adds the GIVEN
+(the constellation as shipped) and the WHEN (the model or term that lands), and pairs the THEN with
+its AND (additivity). The three clauses map one-to-one onto the ritual above:
+
+* *GIVEN* — the constellation BEFORE (the inventory rows already blue).
+* *WHEN* — the model or term this activity lands (the green box).
+* *THEN* — the capability we can now say (the capability-map row), *AND* additivity holds (the verdict).
+
+*playable / narrated is NOT a nature of the scenario — it is the state of its GATES.* A scenario's
+path runs GIVEN → WHEN → THEN, and each clause is licensed by a box. A box is GATED by its horizon
+colour: blue (shipped) = gate OPEN, green (the current design increment) / amber (horizon) = gate
+SHUT. The tag is then DERIVED, never hand-maintained:
+
+* *playable* — every box on the scenario's path is blue (all gates open). The THEN is a fact
+  re-derivable from the reactor today (a module exists, a capability is exported, the walker is gone,
+  the unit count). Marked `[playable]`.
+* *narrated* — at least one box on the path is still green or amber (a gate is shut). The scenario is
+  ALREADY fully written — all three clauses are graved — it is only waiting for its gating boxes to
+  ship. Marked `[narrated]`.
+
+Every scenario is DESTINED to become playable; narrated is transitory, not a category. The ritual's
+*flip green→blue* step (when a model ships) IS the act of opening a gate — it flips the scenario
+narrated→playable automatically, by derivation. No scenario floats: a narrated scenario is moored to
+the named green/amber boxes it waits on, so one can always point to exactly what must ship to make it
+playable (see the worked example in <<unitrepo-view>>, scenario 3, where two named green boxes — a
+concrete `UnitHandler` and load-from-store — are the shut gates).
+
+This derivation is also the future guard's drift criterion, mechanical and judgement-free: a box is
+blue but its scenario is still narrated → a gate was left shut (we forgot to flip); a scenario claims
+playable but a box on its path is not blue → a gate opened falsely (a lie). Drift is no longer the
+fuzzy "do we cover everything?" but the crisp "is each tag synchronized with the colour of its path's
+boxes?".
+
+Each per-subsystem view therefore carries a *Design scenarios* section: one scenario per
+capability-map row, tagged playable/narrated (derived from its gates) and colored by horizon. The
+link:../designer-runbook.adoc[designer's runbook] renders the playable ones live from the code; the
+narrated ones it renders as prose until their gates open. The scenarios ARE part of the spec — not a
+test artifact that lives only in Java.
+
+[[scenario-completeness]]
+==== The completeness clause (a standing rule)
+
+The ritual is not done when the model is proven additive. *Every capability a view declares MUST
+have a scenario, and every scenario MUST trace to a capability* — the two-way coverage test the
+capability map already states ("a sentence with no enabling box is a design gap; a box licensing no
+sentence is dead weight") is now extended to scenarios: a capability with no scenario is an
+*uncovered* design fact; a scenario with no capability is a *stray*. The whole design is covered by
+the DSL when every view's scenario map is complete. This is itself a re-entrance instance: the atlas
+submits its OWN design state to the same "render it, do not let it drift" rule it imposes on the
+operator's runtime state. The designer's runbook is the machine that will eventually *enforce* this
+clause by replay; until then it is enforced by reading.
+
+==== The answerability cascade — design → spec → plan → codebase
+
+The completeness clause above is one link of a longer chain. Our delivery has four layers, and *each
+layer must answer to the one above it* — be traceable up, and not invent down. This is the
+superpowers shape (brainstorm/design → spec → plan → implementation), made explicit here so the
+coverage test is the same at every seam:
+
+[cols="1,2,2",options="header"]
+|===
+| Layer | Answers to the layer above by | Coverage test
+
+| *design* (this atlas)
+| —  (the root: the constellation + additivity + capability map)
+| every box licenses a capability; every capability a box
+
+| *spec* (the scenario maps, the per-subsystem docs)
+| every capability has a scenario; every scenario traces to a capability
+| <<scenario-completeness>> — the clause above
+
+| *plan* (the increments, the WI breakdown)
+| every planned increment realises one or more scenarios; no increment without a scenario
+| a plan step with no scenario is scope creep; a scenario no plan touches is unscheduled design
+
+| *codebase* (the reactor)
+| every shipped slice flips a scenario playable-green; the designer's runbook replays it from code
+| the designer-runbook's playable half — a green that no longer holds is drift, caught at render
+|===
+
+Read top-down it is generation (design licenses spec licenses plan licenses code); read bottom-up it
+is answerability (code answers a scenario, a scenario answers a capability, a capability answers a
+box). A break at any seam is the same failure the completeness clause names — an orphan one way, a
+stray the other. The designer's runbook closes the bottom seam (code ⇄ spec) by replay; this atlas
+closes the top seam (design ⇄ spec) by the scenario map; the plan seam (spec ⇄ plan) is closed by
+each increment naming the scenario it lands. The whole chain is one re-entrance discipline applied at
+four heights.
+

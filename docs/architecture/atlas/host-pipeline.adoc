@@ -1,0 +1,144 @@
+= Atlas L1 — Host / control-plane pipeline view
+:toc: left
+:toclevels: 3
+
+_Level-1 (per-subsystem) view of the link:../integration-atlas.adoc[integration atlas] (L0)._
+_L0 shows how this subsystem integrates with the others and the value that emerges; this file is the detail._
+
+[[host-pipeline-view]]
+== Host / control-plane pipeline — per-subsystem view
+
+The sixth view, and the first for the HOST world (the five before are OSGi-centric). It holds the
+control-plane pipeline that runs `pulumi preview`/`up` — the one process that decides what crosses the
+system's two boundaries. Folds in the link:../osgi/pipeline-spec.adoc[pipeline design of record (OSGi-owned)], and
+carries the null-safety governance note.
+
+=== The thesis — the pipeline owns two gates; nothing else decides a crossing
+
+The pipeline is the sole orchestrator of two boundaries, and until now both were crossed by scattered
+code reaching for global state:
+
+* the *living gate* (IN) — may an action touch the REAL system (systemd probe, kubeconfig wait)? In
+  `preview` it must not. Today seven sites read `Deployment.getInstance().isDryRun()` inline, and one
+  (cluster readiness) reads it too late: the live probe runs before the gate is consulted, so
+  `pulumi preview` hangs one minute waiting for a kubeconfig that a dry-run will never publish.
+* the *output gate* (OUT) — what is written to the stack? Today an omniscient `OutputBuilder` pulls
+  each summary by name over raw `Map`s; one producer (`systemd`) flattens its typed snapshot at
+  production time, so the flat map travels internally and `SeedNodeBootstrapWatcher` re-parses it
+  (the null that triggered this whole view).
+
+Neither gate is a new orchestrator. `LiveGate` is the preview/up STATE; `PulumiOutputRegistry` is a
+guaranteed ASSEMBLER. The pipeline holds both and actions them — it consults the living gate per
+action (`through(live, deferred)`) and drives the write once (`registry.add(...).assemble()`).
+
+=== Diagram P — the two gates: BEFORE vs AFTER (named erasure)
+
+Blue = shipped, untouched. Green = added. Red-dashed = deliberately erased.
+
+[mermaid]
+....
+flowchart LR
+  subgraph B[before — scattered global reads]
+    b_dry["7× Deployment.getInstance().isDryRun()<br/>read inline, readiness reads it LATE"]
+    b_hub["OutputBuilder<br/>omniscient hub, raw maps by name"]
+    b_flat["systemd flattens at production<br/>watcher re-parses (the null)"]
+    b_jgiven["System.setProperty(JGIVEN_DRY_RUN)<br/>false belief: skips report, not bodies"]
+  end
+  subgraph A[after — the pipeline holds two gates]
+    a_gate["LiveGate (state)<br/>gate.through(live, deferred)"]
+    a_reg["PulumiOutputRegistry<br/>add()+assemble(): unique keys, 1 flatten"]
+    a_spi["PulumiOutputContributor (SPI)<br/>structured in, flat only in contribute()"]
+    a_report["SystemdRuntimeStatusReport<br/>typed record, watcher reads it typed"]
+    a_gate -->|per action| a_reg
+    a_spi -->|contributes| a_reg
+    a_report -.->|its contributor projects| a_spi
+  end
+  classDef built fill:#eef,stroke:#88a,stroke-width:1px;
+  classDef new fill:#d4f4dd,stroke:#2e7d32,stroke-width:2px;
+  classDef gone fill:#fdd,stroke:#c33,stroke-width:2px,stroke-dasharray:4 3;
+  class b_dry,b_hub,b_flat,b_jgiven gone;
+  class a_gate,a_reg,a_spi,a_report new;
+....
+
+=== Verdict — does it hold?
+
+An honest reading:
+
+. *Monotone-with-named-erasure.* Four things are deliberately erased: the seven scattered `isDryRun()`
+  reads (collapsed to one passed `LiveGate`), the omniscient `OutputBuilder` (melts into the registry),
+  the systemd production-time flatten + the watcher's re-parse helpers (`toBoolean`/`toInt`/
+  `stringValue` + `@Nullable Object`), and the false `System.setProperty(JGIVEN_DRY_RUN)`. Each is
+  named, none silent; behavior survives (same outputs, same preview/up semantics) — only WHERE the
+  decision lives changes: from the domain reaching for globals to the pipeline holding a gate.
+
+. *The mechanisms are not orchestrators.* `LiveGate` answers `isOpen()` and offers `through(...)`;
+  `PulumiOutputRegistry` answers `assemble()` with a unique-key + deterministic-order guarantee. The
+  pipeline is the only orchestrator — consistent with the fluent-pipeline grammar the boot pipeline
+  already uses. No new live component, no new boot bind.
+
+. *A real bug closes as a side effect.* The readiness preview hang (one minute per `pulumi preview`)
+  is not a separate fix — it is what the living gate removes by construction: in preview the deferred
+  probe is injected, the scenario still renders its runbook shell, but no `waitFor` fires.
+
+. *The seam shrinks the null surface.* `SystemdRuntimeStatusReport` stays a domain-pure record, so the
+  watcher reads `report.snapshot()` typed. The null-safety arc (below) turned WARN→ERROR on the live
+  surface; this view keeps the host null-clean at the source rather than annotating consumers.
+
+Conclusion: *additive-with-named-erasure; the pipeline gains one clear responsibility (own both gates)
+and loses four scattered anti-patterns.* Status: DESIGN (2026-07-01), the living gate slated first
+(it fixes the hang), then the systemd report, then the output registry.
+
+[NOTE]
+.Governance note — the build-time laws (staging extension) + the null-safety javac gate
+====
+The host doesn't only orchestrate at runtime; it is also where the build-time governance is enforced,
+because `seed-master` is the module that shades+stages the exec-jar and its dependency closure. Two
+sibling enforcement families, cross-cutting rather than subsystems of their own:
+
+*Staging-extension laws (six `StagingGate`s, ASM over staged bytecode, committed `0299913a`+):* each is
+an instance reached from `ResolvedBundle`, governable per-package via `@GovernedBy(StagingGate, level)`
+(default ERROR) with single-element `@Exempt`. `RECORD_PURITY` (a `type=record` bundle exports only
+records/enums/sealed ADTs — ERROR); `SPEC_COVERAGE` (every exported type is named in a `docs/` spec or
+`@Transitional` — WARN, paid down domain by domain — this IS the law enforcing the very atlas-coverage
+discipline this view is written under); `INSTANCE_DISCIPLINE` (no exported `public static` behaviour
+helper — ERROR, debt cleared); `REALM_BOUNDARY` (a class stays in its host/OSGi realm — ERROR, locked
+by 2C); `DUPLICATE_REALM_CLASS` (no class duplicated across realms — the jackson bug; exemptions
+derived from the seam surface); `SCHEMA_CONCORD` (records-as-contract: every `Coordinate` has a
+`@DocumentContract` wire-record whose schema is generated + checked — ERROR, locked by 2D). See
+link:../osgi/staging-gates-governance-spec.adoc[staging-gates governance].
+
+*Null-safety (2G, a javac gate — NOT a staging law):* JSpecify `@NullMarked` now covers doctor,
+world-gateway, all OSGi modules, host `pulumi-edge` + boot-discovery, and (in progress) `exec`.
+NullAway runs as an error-prone javac plugin (ep 2.50.0 / NullAway 0.13.7 / jspecify 1.0.0 on JDK 25),
+gated by the build-parent `nullaway` profile — ON BY DEFAULT (`!nullaway.skip`), severity
+`${nullaway.severity}` default `ERROR`, test sources excluded. Discipline: eliminate the null (return
+`Optional`, fix at the SOURCE) rather than document it (`@Nullable`). This view exists partly BECAUSE
+that discipline surfaced a design defect — the watcher's re-parse — which the two gates resolve at the
+source.
+====
+
+=== Design scenarios — the host-pipeline capabilities as DSL sentences
+
+. *The pipeline refuses to touch the live system in preview* — `[narrated]` green +
+.. GIVEN seven scattered `Deployment.getInstance().isDryRun()` reads, one consulted too late so the
+   readiness probe waits a full minute for a kubeconfig a dry-run never publishes
+.. WHEN `LiveGate` becomes an instance the pipeline holds and consults per action via
+   `through(live, deferred)`, the deferred probe injected in preview
+.. THEN no live probe or wait fires in preview (the one-minute hang is gone), the runbook shell still
+   renders — AND the change is additive: the up path is unchanged, only the scattered reads collapse to
+   one passed gate (named erasure of the seven reads + the false `JGIVEN_DRY_RUN`).
+
+. *The pipeline decides the stack outputs through one guarded assembler* — `[narrated]` green +
+.. GIVEN an omniscient `OutputBuilder` pulling each summary by name over raw maps, systemd flattening
+   at production so the watcher re-parses an untyped map
+.. WHEN outputs become `PulumiOutputContributor`s assembled by `PulumiOutputRegistry` (unique-key
+   guarantee, single flatten point) and `SystemdRuntimeStatusReport` stays a typed record read by the
+   watcher
+.. THEN adding an output means implementing the SPI (never editing a hub), a key collision is a named
+   failure not a silent overwrite, and the watcher reads typed fields — AND the change is additive: the
+   same outputs cross, the hub + the re-parse helpers are the named erasure.
+
+*Coverage of this view:* 2 capabilities, 2 scenarios — complete per <<scenario-completeness>>. Both
+narrated-green (the two-gates design, not yet built); they flip playable when the living gate and the
+output registry ship.
+
