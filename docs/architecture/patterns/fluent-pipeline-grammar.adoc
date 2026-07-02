@@ -45,15 +45,15 @@ The string passed to `during(...)` is not decoration. It is used in three places
 
 * On entry: `→ entering preflight` is logged.
 * On exit: `← leaving preflight` is logged with elapsed time.
-* On failure: the exception is wrapped as `PipelineStageFailure("preflight", cause)` so the topic name appears in stack traces and reaches the failure handler.
+* On failure: the exception is wrapped as `TopicFailure("preflight", cause)` so the topic name appears in stack traces and reaches the failure handler.
 
 Labels are short, lowercase, descriptive of the *domain* not the action. Good: `"bbox reconciliation"`. Bad: `"step 2"`, `"reconcile-bbox-and-update"`.
 
 === 4. Failure handler
 
-A per-topic failure handler is registered *before* the first `during(...)` call, typically via an `.onFailure(handler)` method on the pre-execution builder state. This is mandatory by structural design: the handler is consumed by `TopicRunner` on every topic execution, so it must be in place when the first stage runs. Putting it at the end (after all `during` calls) was the previous shape and silently never fired — the type-state pattern now puts the handler before any `during` so it's always live.
+A per-topic failure handler is registered *before* the first `during(...)` call, typically via an `.onFailure(handler)` method on the pre-execution builder state. This is mandatory by structural design: the handler is consumed by `FluentTopicRunner` on every topic execution, so it must be in place when the first topic runs. Putting it at the end (after all `during` calls) was the previous shape and silently never fired — the type-state pattern now puts the handler before any `during` so it's always live.
 
-The handler is optional; when not supplied, failures still propagate as `PipelineStageFailure` carrying the topic label, but no user-supplied side-effect runs.
+The handler is optional; when not supplied, failures still propagate as `TopicFailure` carrying the topic label, but no user-supplied side-effect runs.
 
 === 5. Outcome verbs
 
@@ -76,6 +76,26 @@ Authors literally cannot:
 
 The cost is one class per state transition (typically one method each). The benefit is that valid pipelines are the only ones that compile.
 
+== State shape: immutable inputs + a mutable output builder
+
+The shared state threaded through the transitions is not one flat mutable bag. It has two parts with two different natures, and conflating them is what makes a pipeline state hard to keep null-safe:
+
+* **inputs** — everything the pipeline was configured with (config, policy, options, resolved services, the booted framework…). These are *known before the first topic runs* and never change afterwards. Model them as an **immutable record**, assembled once at the pre-execution → execution boundary (the `running…()` transition, where the last inputs — logger, mode, the services resolved from the booted registry — are settled). Because the record is built complete, every input read is `@NonNull` by construction: nothing to annotate.
+* **outputs** — what each topic *produces* (the bbox result, the incus bootstrap result, the launch summary…). These come into being *during* the run, one per topic. Hold them in a **mutable output builder**: the topic writes its result through a sink, the next topic reads it. This builder is a set-once accumulator, so its fields follow the builder convention — `@MonotonicNonNull` + a `requireNonNull` guard where the next topic reads them (see the null-safety memory).
+
+The insight that ties it to the grammar: **the output of the current state is the builder of the next.** Each transition constructs its topic from `state.inputs` (complete) plus the outputs already accumulated, runs it, folds the new output into the builder, and hands the enriched state to the next `Awaiting…` class. The type-state guarantees a topic can only read outputs that an earlier topic has already produced.
+
+[source,java]
+----
+final class PipelineState {
+  final PipelineInputs inputs;   // immutable record, frozen at running…()
+  final Outputs outputs;         // mutable set-once builder (@MonotonicNonNull fields)
+  final FluentTopicRunner runner;
+}
+----
+
+Genuinely-optional inputs (a caller-supplied runbook, an optional failure handler) are `Optional<>` fields on the record — real absence, not "not yet set". Do not use `@Nullable` for either part: inputs are complete, outputs are set-once. See the null-safety conventions (`@MonotonicNonNull` for set-once, `Optional` for genuine absence).
+
 == Pitfalls observed in this codebase
 
 These are mistakes we made and fixed. Listing them so the next author doesn't repeat them.
@@ -86,7 +106,7 @@ A tempting DRY: put a generic `<S, R> R runDuring(topic, stage, body)` on the sh
 
 [source,java]
 ----
-TopicRunner.runDuring("pipeline", topic, stage, body, onFailure);
+state.runner.runDuring(topic, stage, body, onFailure);
 @SuppressWarnings("unchecked")
 final R cast = (R) this;
 return cast;
@@ -94,13 +114,13 @@ return cast;
 
 This compiles. It does not work. `(R) this` lies — `this` is the shared `State`, not the next-state class — and the JVM throws `ClassCastException` the first time a transition runs. The `@SuppressWarnings` was suppressing a real bug.
 
-**Correct shape**: each transition calls `TopicRunner.runDuring(...)` directly and returns `new <Next>(state)` explicitly. Three lines instead of one, but type-safe at runtime:
+**Correct shape**: each transition calls `FluentTopicRunner.runDuring(...)` directly and returns `new <Next>(state)` explicitly. Three lines instead of one, but type-safe at runtime:
 
 [source,java]
 ----
-public PreflightDone during(String topic, Function<PreflightStage, PreflightStage> body) {
-  final PreflightStage stage = new PreflightStage(...);
-  TopicRunner.runDuring("pipeline", topic, stage, body, state.onFailure);
+public PreflightDone during(String topic, Function<PreflightTopic, PreflightTopic> body) {
+  final PreflightTopic stage = new PreflightTopic(...);
+  state.runner.runDuring(topic, stage, body, state.onFailure);
   return new PreflightDone(state);
 }
 ----
@@ -109,7 +129,7 @@ Mnemonic: **the type-state pattern is the deduplication.** Don't try to deduplic
 
 === Don't put the failure handler at the end of the chain
 
-`.orFailWith(handler)` placed after the last `during(...)` *cannot work*: every preceding topic already ran with a `null` handler. Failures still propagate as `PipelineStageFailure`, but no user-supplied side-effect fires.
+An `.onFailure(handler)` placed after the last `during(...)` *cannot work*: every preceding topic already ran with a `null` handler. Failures still propagate as `TopicFailure`, but no user-supplied side-effect fires.
 
 **Correct shape**: the handler slot lives on the pre-execution builder state, before any `during(...)`. Optional, defaults to no-op when not called. See <<_failure_handler>>.
 
@@ -120,11 +140,11 @@ Failures are caught per-topic. A throw inside any `during(...)` lambda is wrappe
 [source,java]
 ----
 catch (Throwable cause) {
-  throw new PipelineStageFailure(topicLabel, cause);
+  throw new TopicFailure(topicLabel, cause);
 }
 ----
 
-`PipelineStageFailure` carries the topic label so logs and handlers receive structured context (`"bbox reconciliation: <message>"`).
+`TopicFailure` carries the topic label so logs and handlers receive structured context (`"bbox reconciliation: <message>"`).
 
 The default mode is *fail-fast*: the wrapped exception propagates to the terminal handler, the pipeline aborts, no later stages run. A degraded-continuation mode is intentionally not provided — add it only when a real workflow needs it.
 
@@ -133,23 +153,23 @@ The default mode is *fail-fast*: the wrapped exception propagates to the termina
 When you find yourself writing a builder with three or more boolean parameters or a sequence of methods that need explanatory comments, consider expressing it as a fluent pipeline:
 
 . Identify the topics. Each topic should map to a real domain in the codebase (a package, a problem area), not an arbitrary chunk of work.
-. Define a topic builder for each (a class with the verbs that topic supports). Stages are package-private and have a public constructor so the pipeline machinery in the parent package can instantiate them.
-. Build the type-state machine: one `Awaiting<Topic>` class per entry point, one `<Topic>Done` class per transition. Each transition calls `TopicRunner.runDuring("scope", topic, stage, body, state.onFailure)` and returns `new <Next>(state)` explicitly. Do *not* try to factor the runDuring call onto the shared state with an unchecked cast — see Pitfalls.
+. Define a topic builder for each (a `<Topic>Topic` class with the verbs that topic supports). Topic builders live in `pipeline/stages/` and have a public constructor so the pipeline machinery in the parent package can instantiate them.
+. Build the type-state machine: one `Awaiting<Topic>` class per entry point, one `<Topic>Done` class per transition. Each transition calls `state.runner.runDuring(topic, stage, body, state.onFailure)` (the `FluentTopicRunner` is instance-based, its scope fixed at construction) and returns `new <Next>(state)` explicitly. Do *not* try to factor the runDuring call onto the shared state with an unchecked cast — see Pitfalls.
 . Add an optional `.onFailure(handler)` method on the pre-execution builder state, before the first `during(...)` slot.
 . Add the terminal verb(s) on the final `*Done` class.
 . Write a sample call site as the first thing — let the call site shape the API.
 
 Reuse from `controlplane.pipeline`:
 
-* `TopicRunner.runDuring(scope, topic, stage, body, onFailure)` — the topic-execution loop with logging and exception wrapping
+* `FluentTopicRunner` (in `osgi/foundation/pipeline/pipeline-port`) — instance-based; `new FluentTopicRunner(scope)` then `.runDuring(topic, stage, body, onFailure)` — the topic-execution loop with logging and exception wrapping
 * `OnFailure` — failure callback SAM
-* `PipelineStageFailure` — wrapped exception type
+* `TopicFailure` — wrapped exception type
 
 Exemplars in this codebase:
 
-* `controlplane.pipeline.BootstrapPipeline` — outer workflow (5 topics)
+* `controlplane.pipeline.ClusterSeedPipeline` — outer workflow (5 topics)
 * `controlplane.pipeline.ApplicationPipeline` — entry-point pipeline (3 topics)
-* `controlplane.incus.IncusResourceBootstrap.ApplyPipeline` — internal incus apply, state-machine inner classes (4 topics)
+* `controlplane.incus.IncusResourceBootstrap` — internal incus apply, state-machine inner classes (4 topics)
 
 == When *not* to use this
 
@@ -163,10 +183,10 @@ For those, prefer a plain method or a small builder without the topic/conjunctio
 
 == Naming
 
-* **Topic builders**: `<Topic>Stage` (e.g. `PreflightStage`, `BboxStage`).
+* **Topic builders**: `<Topic>Topic` (e.g. `PreflightTopic`, `BboxTopic`) — the grammar unit is a *topic*; `Stage` is jgiven's reserved word (a class `extends Stage<>`), never our fluent unit.
 * **State classes**: `Awaiting<Topic>`, `<Topic>Done`. Package-private.
-* **Failure type**: one shared `PipelineStageFailure` per pipeline package.
-* **Outer pipeline**: short, domain-named (e.g. `BootstrapPipeline`), not `…ExecutionPipeline` or `…Orchestrator`.
+* **Failure type**: the shared `TopicFailure` (in `pipeline-port`).
+* **Outer pipeline**: short, domain-named (e.g. `ClusterSeedPipeline`), not `…ExecutionPipeline` or `…Orchestrator`.
 
 == Cross-references
 
