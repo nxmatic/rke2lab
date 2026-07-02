@@ -29,17 +29,17 @@ public final class FluentTopicRunner {
     this.logScope = logScope;
   }
 
-  public <S> S runDuring(String topic, S stage, Function<S, S> body, OnFailure onFailure) {
+  public <S> S runDuring(String topic, S topicBuilder, Function<S, S> body, OnFailure onFailure) {
     final long startedAt = System.nanoTime();
     LOG.info("[{}] → entering {}", logScope, topic);
     try {
-      body.apply(stage);
+      body.apply(topicBuilder);
     } catch (Throwable cause) {
       onFailure.handle(topic, cause);
       throw new TopicFailure(topic, cause);
     }
     final long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
     LOG.info("[{}] ← leaving {} ({}ms)", logScope, topic, elapsedMs);
-    return stage;
+    return topicBuilder;
   }
 }

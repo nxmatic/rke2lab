@@ -2,13 +2,40 @@
 :toc: left
 :toclevels: 3
 
-This document defines the conventions for authoring multi-stage workflows in the seed-master codebase as fluent pipelines that read like English narrative.
+This document defines the conventions for authoring multi-topic workflows in the seed-master codebase as fluent pipelines that read like English narrative.
+
+== Vocabulary
+
+One word per concept, used everywhere (code, docs, commits). This table is the authority.
+
+[cols="1,4",options="header"]
+|===
+| Term | Meaning
+
+| *topic* | The grammar unit — one domain phase, entered with `during(label, lambda)`. The topic builder class is `<Topic>Topic` (e.g. `PreflightTopic`). This is the ONLY word for a phase.
+| *input* | Something the pipeline is configured with, known before the first topic runs. Immutable, modelled as a record (`PipelineInputs`). `@NonNull` by construction.
+| *output* | Something a topic produces. Named by what it is (`bbox`, `bootstrap`), never suffixed `Result`/`Summary` — everything a topic yields is an output.
+| *builder* | The `StateBuilder`: the builder of the *next* state. Each topic folds its output in via a sink; the accumulated output + the inputs constitute the next topic's state. Set-once fields (`@MonotonicNonNull`), read through guarded accessors.
+| *state* | The `PipelineState` aggregate: `inputs` (record) + `builder` (StateBuilder) + `runner`.
+| *sink* | The `Consumer` a topic writes its output through, into the builder.
+| *during* / *then* | The two grammar verbs: enter a topic / conjoin to the next. `then()` is mandatory, for readability.
+| *transition* | The move from one topic to the next, carried by the type-state classes `Awaiting<Topic>` and `<Topic>Done`.
+| *runner* | `FluentTopicRunner` — runs one topic (entry/exit logging + exception wrapping). Instance-based, scope fixed at construction.
+| *onFailure* / *TopicFailure* | The per-topic failure handler (SAM) / the exception that wraps a topic throw, carrying the label.
+| *outcome verb* | The terminal verb ending the chain: `collectOutputs()` / `complete()` / `toResult()`.
+| *label* / *scope* | The topic's name (passed to `during`) / the runner's log scope.
+|===
+
+*Forbidden words (they belong to jGiven, never to our grammar):*
+
+* *stage* — jGiven's `Stage<>` (a scenario class `extends Stage<>`). Our phase is a *topic*. A field/var named `stage` or a class `<X>Stage` in a pipeline is a bug.
+* *step* — jGiven's step methods (`@As`). Use *topic* for the unit, *transition* for the move between them.
 
 == Motivation
 
-A workflow expressed as a sequence of method calls on a builder is easy to write but hard to read. Boolean arguments lose context (`reconcileBbox(true, false, true)`), and stage boundaries are invisible — readers cannot tell where one logical phase ends and another begins.
+A workflow expressed as a sequence of method calls on a builder is easy to write but hard to read. Boolean arguments lose context (`reconcileBbox(true, false, true)`), and topic boundaries are invisible — readers cannot tell where one logical phase ends and another begins.
 
-The grammar below makes the structure explicit: stages are scoped, conjunctions are explicit, and labels carry weight (logging, error context). The result reads as a sentence describing the workflow.
+The grammar below makes the structure explicit: topics are scoped, conjunctions are explicit, and labels carry weight (logging, error context). The result reads as a sentence describing the workflow.
 
 == The four primitives
 
@@ -28,7 +55,7 @@ Topic builders are package-private interfaces. The lambda parameter type narrows
 
 === 2. Conjunctions
 
-Stages are joined with explicit `then()`. The conjunction is mandatory — its purpose is readability, not data flow.
+Topics are joined with explicit `then()`. The conjunction is mandatory — its purpose is readability, not data flow.
 
 [source,java]
 ----
@@ -47,7 +74,7 @@ The string passed to `during(...)` is not decoration. It is used in three places
 * On exit: `← leaving preflight` is logged with elapsed time.
 * On failure: the exception is wrapped as `TopicFailure("preflight", cause)` so the topic name appears in stack traces and reaches the failure handler.
 
-Labels are short, lowercase, descriptive of the *domain* not the action. Good: `"bbox reconciliation"`. Bad: `"step 2"`, `"reconcile-bbox-and-update"`.
+Labels are short, lowercase, descriptive of the *domain* not the action. Good: `"bbox reconciliation"`. Bad: `"topic 2"`, `"reconcile-bbox-and-update"`.
 
 === 4. Failure handler
 
@@ -65,7 +92,7 @@ The pipeline ends with one terminal verb that turns the chain into a result:
 
 == Type-state ordering
 
-Stage order is enforced by the type system. Each `during(...)` returns a distinct class representing "topic X done", which exposes only `then()`. Each `then()` returns the next-expected `Awaiting…` class, which exposes only the corresponding `during(...)`.
+Topic order is enforced by the type system. Each `during(...)` returns a distinct class representing "topic X done", which exposes only `then()`. Each `then()` returns the next-expected `Awaiting…` class, which exposes only the corresponding `during(...)`.
 
 Authors literally cannot:
 
@@ -106,7 +133,7 @@ A tempting DRY: put a generic `<S, R> R runDuring(topic, stage, body)` on the sh
 
 [source,java]
 ----
-state.runner.runDuring(topic, stage, body, onFailure);
+state.runner.runDuring(topic, topicBuilder, body, onFailure);
 @SuppressWarnings("unchecked")
 final R cast = (R) this;
 return cast;
@@ -119,8 +146,8 @@ This compiles. It does not work. `(R) this` lies — `this` is the shared `State
 [source,java]
 ----
 public PreflightDone during(String topic, Function<PreflightTopic, PreflightTopic> body) {
-  final PreflightTopic stage = new PreflightTopic(...);
-  state.runner.runDuring(topic, stage, body, state.onFailure);
+  final PreflightTopic preflight = new PreflightTopic(...);
+  state.runner.runDuring(topic, preflight, body, state.onFailure);
   return new PreflightDone(state);
 }
 ----
@@ -146,7 +173,7 @@ catch (Throwable cause) {
 
 `TopicFailure` carries the topic label so logs and handlers receive structured context (`"bbox reconciliation: <message>"`).
 
-The default mode is *fail-fast*: the wrapped exception propagates to the terminal handler, the pipeline aborts, no later stages run. A degraded-continuation mode is intentionally not provided — add it only when a real workflow needs it.
+The default mode is *fail-fast*: the wrapped exception propagates to the terminal handler, the pipeline aborts, no later topics run. A degraded-continuation mode is intentionally not provided — add it only when a real workflow needs it.
 
 == Authoring a new pipeline
 
@@ -175,9 +202,9 @@ Exemplars in this codebase:
 
 A fluent pipeline is overkill for:
 
-* Single-step operations.
-* Workflows with two stages whose order is obvious from data flow alone.
-* Code that needs to vary stage order at runtime (the type-state pattern is rigid by design).
+* Single-operation tasks.
+* Workflows with two topics whose order is obvious from data flow alone.
+* Code that needs to vary topic order at runtime (the type-state pattern is rigid by design).
 
 For those, prefer a plain method or a small builder without the topic/conjunction machinery.
 
