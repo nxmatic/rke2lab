@@ -2,7 +2,10 @@
 :toc: left
 :icons: font
 
-*Status:* DESIGN (converged 2026-06-30, NOT yet built). The fourth implementation increment of the
+*Status:* IMPLEMENTED (2026-07-01, commits `7448daae`..`42c785a1`). The `SCHEMA_CONCORD` gate is
+locked at `ERROR`; the six coordinates are typed as `@DocumentContract` wire-records with generated
+schemas; the branch merges with both `REALM_BOUNDARY` (2C) and `SCHEMA_CONCORD` (2D) locked. The
+fourth implementation increment of the
 world-gateway migration (link:world-gateway-spec.adoc[design of record]), following
 link:world-gateway-2a-document-foundation-spec.adoc[2A] (the Document foundation + the readiness
 verdict), link:world-gateway-2b-consult-path-spec.adoc[2B] (the consult path), and

@@ -11,7 +11,7 @@ project's answer to a recurring problem: a discipline asked for at review time s
 reviews. A *gate* is seen at every build (impossible to forget) and, once a bundle's debt is cleared,
 its default level locks the rule so the anti-pattern can never silently reappear.
 
-This document specifies the four gates and the single annotation that governs how each reports.
+This document specifies the six gates and the single annotation that governs how each reports.
 
 [NOTE]
 ====
@@ -23,7 +23,7 @@ collides with the project's two *runtime* gate senses (readiness gates like
 (it reads the annotation via ASM and cannot link the module — see "Reader side").
 ====
 
-=== The four gates
+=== The six gates
 
 [cols="1,3",options="header"]
 |===
@@ -56,6 +56,21 @@ collides with the project's two *runtime* gate senses (readiness gates like
   `Import-Package` + the system packages. A reference that leaves the realm is a leak. Read by
   `RealmBoundary` (see below). (Target zero; the gate the `doctor.records`-into-the-host drift would
   have caught.)
+
+| `DUPLICATE_REALM_CLASS`
+| No class may be present in more than one realm's classpath — the guard against the two-realm
+  linkage failure (the jackson `JavaTimeModule not a subtype` regression): a class loaded by two
+  classloaders is two distinct types, and passing an instance across the seam throws. Legitimate
+  dual-realm cases (a flat realm-library nested into a bundle, e.g. the cdk8s carrier or the document
+  codec) are EXEMPT — the exemption is *derived from the seam surface*, not a hand-list. (Read by the
+  duplicate-realm scan.)
+
+| `SCHEMA_CONCORD`
+| Under records-as-contract: every `Coordinate` (the closed set of document types the world gateway
+  crosses) must have a `@DocumentContract` wire-record whose JSON Schema is *generated from the
+  record* and checked for concord at build — a coordinate with no wire-record, or a schema that
+  drifts from the record, fails. Locked at ERROR by the 2D increment. (Read by `SchemaConcord` /
+  `DocumentContractScan` / `RecordSchemaProjector`.)
 |===
 
 ==== `REALM_BOUNDARY` — the two-realm model, in detail
