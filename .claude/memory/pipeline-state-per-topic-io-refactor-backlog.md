@@ -46,4 +46,33 @@ touch its own inputs; the compiler forbids reaching for another topic's data. Th
 (the grammar) and every pipeline that uses it, not just `ClusterSeedPipeline`. Sequenced AFTER the
 null-cleanup; needs its own design pass (start from the grammar doc, per the atlas-first reflex).
 
+## The mechanism — a back-reference chain, lookup-by-input-class (user, 2026-07-02)
+
+Key design idea, using `ApplicationPipeline` as the study case (small: `State` + `EnvironmentDone` +
+`AwaitingClusterSeed` + `ClusterSeedDone` + … — they are ALL states). Today each type-state class holds
+a forward reference to one shared flat `State`. Instead:
+
+- every state keeps a **back-reference to the PREVIOUS state** (we already chain forward for ordering;
+  add a backward link for data). So at execution, from any state you can walk the chain back to the
+  initial one.
+- each state declares only **its own** input + what it **collects** (outputs). No merged sack.
+- to read an input a topic needs, **walk the back-chain and extract it by its input class**
+  (`State.Input` — the type is the key). The ancestor that produced/holds that input answers.
+
+Benefits the user called out: keep the common part, but implement each state specifically → each
+state's ROLE, its input, and what it collects are visible at a glance; and the states are easy to
+locate (they implement the common pipeline-state interface — greppable).
+
+**The open arbitrage (must be settled in the design pass):** the "extract by input class" lookup has
+two realisations with different guarantees —
+- *runtime walk* (`find(SomeInput.class)` + instanceof up the chain): simple, but a miss (topic run too
+  early, input never produced) is a RUNTIME failure — it weakens the compile-time guarantee the
+  type-state gives today. Mitigate with a named `orElseThrow`/`requireNonNull` at the lookup, like the
+  guarded accessors this null-cleanup introduced.
+- *compile-time* (recursive generics `State<I, O, Prev extends State<…>>`, HList-style): keeps the
+  guarantee but is heavy/illegible in Java — works against the "clear roles" benefit.
+- likely **hybrid**: forward type-state keeps the ORDER guarantee (already had it); the back-chain
+  serves DATA sharing with a runtime-checked typed lookup. Trades a little compile-time safety for a lot
+  of decoupling + legibility. Decide the curser in the design pass.
+
 See [[null-safety-set-once-fields-monotonic]] [[null-safety-optional-from-source-to-resolver]].
