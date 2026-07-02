@@ -75,4 +75,15 @@ two realisations with different guarantees —
   serves DATA sharing with a runtime-checked typed lookup. Trades a little compile-time safety for a lot
   of decoupling + legibility. Decide the curser in the design pass.
 
+**Alternative to the back-chain walk — a typed input map carried forward (user, 2026-07-02):** instead
+of walking the chain on each lookup, accumulate every traversed state's input into a `Class → Input`
+map and pass it to the next state, so it holds a reference to all inputs. Trade-off vs the walk: lookup
+is O(1) (`map.get(InputClass)`) instead of O(n), at the cost of carrying/copying the map each transition
+and losing provenance (which state produced it). SAME guarantee level though — a miss is still a runtime
+absence, not a compile error. **Prototype already in the codebase:** `IncusResourceBootstrap.ApplyState`
+has a `ContextRegistry registry` — a typed `Class → record` registry (`register`/`require`). The refactor
+could GENERALISE `ContextRegistry` into the pipeline state rather than invent a new structure. Design
+pass to choose: back-chain (keeps provenance, states already exist) vs typed map/registry (O(1), reuses
+ContextRegistry).
+
 See [[null-safety-set-once-fields-monotonic]] [[null-safety-optional-from-source-to-resolver]].
