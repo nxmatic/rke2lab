@@ -19,8 +19,10 @@ import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /**
  * Functional pipeline for bootstrap resource creation.
@@ -137,12 +139,12 @@ final class ResourceCreationPipeline {
 
   /** Builder for Pulumi-managed resources. */
   private final class PulumiResourceBuilder {
-    private SystemdAdapterResource systemdAdapter;
-    private ClusterReadinessResource readiness;
-    private BootstrapRegistryResource registry;
-    private SeedImageBuildResource imageBuild;
-    private SeedManifestSynthResource manifestSynth;
-    private Object systemdRuntimeStatus;
+    private @MonotonicNonNull SystemdAdapterResource systemdAdapter;
+    private @MonotonicNonNull ClusterReadinessResource readiness;
+    private @MonotonicNonNull BootstrapRegistryResource registry;
+    private @MonotonicNonNull SeedImageBuildResource imageBuild;
+    private @MonotonicNonNull SeedManifestSynthResource manifestSynth;
+    private @MonotonicNonNull Object systemdRuntimeStatus;
 
     PulumiResourceBuilder withSystemdAdapter() {
       this.systemdAdapter =
@@ -167,7 +169,8 @@ final class ResourceCreationPipeline {
               Checkpoint.CLUSTER_READINESS.resourceName(),
               result,
               consultationFor(Checkpoint.CLUSTER_READINESS),
-              this.systemdAdapter);
+              Objects.requireNonNull(
+                  this.systemdAdapter, "systemdAdapter (call withSystemdAdapter first)"));
       return this;
     }
 
@@ -212,6 +215,15 @@ final class ResourceCreationPipeline {
     }
 
     PulumiResources build() {
+      final ClusterReadinessResource readiness =
+          Objects.requireNonNull(this.readiness, "readiness");
+      final SystemdAdapterResource systemdAdapter =
+          Objects.requireNonNull(this.systemdAdapter, "systemdAdapter");
+      final BootstrapRegistryResource registry = Objects.requireNonNull(this.registry, "registry");
+      final SeedImageBuildResource imageBuild =
+          Objects.requireNonNull(this.imageBuild, "imageBuild");
+      final SeedManifestSynthResource manifestSynth =
+          Objects.requireNonNull(this.manifestSynth, "manifestSynth");
       return new PulumiResources(
           readiness.verificationResult(),
           readiness.urn(),
@@ -222,17 +234,17 @@ final class ResourceCreationPipeline {
           registry.summary(),
           imageBuild.summary(),
           manifestSynth.summary(),
-          systemdRuntimeStatus);
+          Objects.requireNonNull(systemdRuntimeStatus, "systemdRuntimeStatus"));
     }
   }
 
   /** Builder for standalone resources. */
   private final class StandaloneResourceBuilder {
-    private Object readinessOutput;
-    private Map<String, Object> registrySummary;
-    private Map<String, Object> imageBuildSummary;
-    private Map<String, Object> manifestSynthSummary;
-    private Object systemdRuntimeStatus;
+    private @MonotonicNonNull Object readinessOutput;
+    private @MonotonicNonNull Map<String, Object> registrySummary;
+    private @MonotonicNonNull Map<String, Object> imageBuildSummary;
+    private @MonotonicNonNull Map<String, Object> manifestSynthSummary;
+    private @MonotonicNonNull Object systemdRuntimeStatus;
 
     StandaloneResourceBuilder withReadiness() {
       // Same eager BDD checkpoint as the Pulumi path; standalone keeps the plain VerificationResult
@@ -287,11 +299,11 @@ final class ResourceCreationPipeline {
 
     StandaloneResources build() {
       return new StandaloneResources(
-          readinessOutput,
-          registrySummary,
-          imageBuildSummary,
-          manifestSynthSummary,
-          systemdRuntimeStatus);
+          Objects.requireNonNull(readinessOutput, "readinessOutput"),
+          Objects.requireNonNull(registrySummary, "registrySummary"),
+          Objects.requireNonNull(imageBuildSummary, "imageBuildSummary"),
+          Objects.requireNonNull(manifestSynthSummary, "manifestSynthSummary"),
+          Objects.requireNonNull(systemdRuntimeStatus, "systemdRuntimeStatus"));
     }
   }
 

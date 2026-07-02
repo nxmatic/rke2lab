@@ -7,6 +7,7 @@ import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import java.util.function.Consumer;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 public final class EnvironmentTopic {
 
@@ -46,20 +47,22 @@ public final class EnvironmentTopic {
     return this;
   }
 
-  private Rke2labConfig config;
+  private @MonotonicNonNull Rke2labConfig config;
 
   /**
    * The root config DTO, read once. Live wraps the Pulumi config; offline (no context) uses
    * defaults so the pipeline can run without operator YAML.
    */
   private Rke2labConfig config() {
-    if (config == null) {
-      config =
+    Rke2labConfig resolved = config;
+    if (resolved == null) {
+      resolved =
           pulumiContext != null
               ? Rke2labConfig.from(pulumiContext.config("rke2lab"))
               : Rke2labConfig.defaults();
+      config = resolved;
     }
-    return config;
+    return resolved;
   }
 
   public EnvironmentTopic loadBootstrapConfig() {
