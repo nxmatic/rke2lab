@@ -55,6 +55,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -67,6 +68,7 @@ import org.cdk8s.App;
 import org.cdk8s.AppProps;
 import org.cdk8s.Chart;
 import org.cdk8s.JsonPatch;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /** Provider-native Stage A bootstrap resources for the Incus management seed node. */
 public final class IncusResourceBootstrap {
@@ -177,28 +179,71 @@ public final class IncusResourceBootstrap {
    */
   private static final class ApplyState {
     // Immutable bootstrap context (config + services)
-    BootstrapContext bootstrapContext;
+    @MonotonicNonNull BootstrapContext bootstrapContext;
 
     // Type-safe record registry for computed/intermediate records
     final ContextRegistry registry = new ContextRegistry();
 
     // Pipeline coordination
-    OnFailure onFailure;
+    OnFailure onFailure = OnFailure.noop();
     final FluentTopicRunner runner = new FluentTopicRunner("incus");
 
     // Path state (kept as direct fields: dual instance, frequent access)
-    BootstrapPaths localPaths;
-    BootstrapPaths nixosPaths;
+    @MonotonicNonNull BootstrapPaths localPaths;
+    @MonotonicNonNull BootstrapPaths nixosPaths;
 
-    // Provider-specific state (Incus resources)
-    IncusProviderContext providerContext;
-    Project ensuredProject;
-    Output<String> ensuredProjectName;
-    Output<String> ensuredProfileName;
-    Output<String> ensuredImageFingerprint;
+    // Provider-specific state (Incus resources), each set once by its stage.
+    @MonotonicNonNull IncusProviderContext providerContext;
+    @MonotonicNonNull Project ensuredProject;
+    @MonotonicNonNull Output<String> ensuredProjectName;
+    @MonotonicNonNull Output<String> ensuredProfileName;
+    @MonotonicNonNull Output<String> ensuredImageFingerprint;
 
     // Final result
-    Instance instance;
+    @MonotonicNonNull Instance instance;
+
+    // Guarded accessors: each field is set once by its stage, read by later stages. A premature
+    // read fails fast with the field name rather than a distant NPE. See
+    // docs/fluent-pipeline-grammar.adoc ("State shape").
+    BootstrapContext bootstrapContext() {
+      return Objects.requireNonNull(bootstrapContext, "bootstrapContext (not yet initialized)");
+    }
+
+    BootstrapPaths localPaths() {
+      return Objects.requireNonNull(localPaths, "localPaths (path stage not yet run)");
+    }
+
+    BootstrapPaths nixosPaths() {
+      return Objects.requireNonNull(nixosPaths, "nixosPaths (path stage not yet run)");
+    }
+
+    IncusProviderContext providerContext() {
+      return Objects.requireNonNull(
+          providerContext, "providerContext (provider stage not yet run)");
+    }
+
+    Project ensuredProject() {
+      return Objects.requireNonNull(ensuredProject, "ensuredProject (provider stage not yet run)");
+    }
+
+    Output<String> ensuredProjectName() {
+      return Objects.requireNonNull(
+          ensuredProjectName, "ensuredProjectName (provider stage not yet run)");
+    }
+
+    Output<String> ensuredProfileName() {
+      return Objects.requireNonNull(
+          ensuredProfileName, "ensuredProfileName (provider stage not yet run)");
+    }
+
+    Output<String> ensuredImageFingerprint() {
+      return Objects.requireNonNull(
+          ensuredImageFingerprint, "ensuredImageFingerprint (image stage not yet run)");
+    }
+
+    Instance instance() {
+      return Objects.requireNonNull(instance, "instance (instance stage not yet run)");
+    }
   }
 
   /** Topic stages — each holds a reference to the shared ApplyState. */
@@ -216,7 +261,7 @@ public final class IncusResourceBootstrap {
       state.localPaths =
           BootstrapPaths.fromLocalWorktree(
               localWorktreeRoot, context.config().clusterName(), context.config().nodeName());
-      state.nixosPaths = state.localPaths.asHostView(context.config(), WorktreeHost.NIXOS);
+      state.nixosPaths = state.localPaths().asHostView(context.config(), WorktreeHost.NIXOS);
       return this;
     }
   }
@@ -260,7 +305,7 @@ public final class IncusResourceBootstrap {
     }
 
     HostStage ensureSecrets() {
-      ensureLaunchSecretsToken(state.localPaths.secretsFile());
+      ensureLaunchSecretsToken(state.localPaths().secretsFile());
       return this;
     }
 
@@ -272,10 +317,10 @@ public final class IncusResourceBootstrap {
     }
 
     private StagingContext materializeToStaging(HostAssetRootLifecycle lifecycle) {
-      final Path stagingRoot = lifecycle.prepareStagingRoot(state.localPaths.assetsRoot());
+      final Path stagingRoot = lifecycle.prepareStagingRoot(state.localPaths().assetsRoot());
       final Path stagingManifestsRoot =
           stagingRoot.resolve(
-              state.localPaths.assetsRoot().relativize(state.localPaths.manifestsRoot()));
+              state.localPaths().assetsRoot().relativize(state.localPaths().manifestsRoot()));
 
       final BootstrapPaths stagingPaths = createStagingPaths(stagingRoot);
       final NodeEnvContext layerContext = new DefaultBootstrapNodeEnvContext();
@@ -378,7 +423,7 @@ public final class IncusResourceBootstrap {
         HostAssetRootLifecycle lifecycle, Path stagingRoot, TargetContext targets) {
       return lifecycle.syncStagingToFinal(
           stagingRoot,
-          state.localPaths.assetsRoot(),
+          state.localPaths().assetsRoot(),
           context.config(),
           state.registry.require(ControlplanePolicy.class),
           targets.systemdTarget());
@@ -386,10 +431,11 @@ public final class IncusResourceBootstrap {
 
     private void captureDeploymentMetadata(StagingContext staging, TargetContext targets) {
       final ProvisioningMetadata.Targets provisioningTargets =
-          ProvisioningResourceInventory.targetChecksums(state.localPaths, targets.targetRegistry());
+          ProvisioningResourceInventory.targetChecksums(
+              state.localPaths(), targets.targetRegistry());
 
       final String hostSourceDirRelative =
-          state.localPaths.relativizeAgainst(state.localPaths.worktreeRoot());
+          state.localPaths().relativizeAgainst(state.localPaths().worktreeRoot());
 
       @SuppressWarnings("unchecked")
       final Map<String, Object> layerEnvSummary =
@@ -414,7 +460,7 @@ public final class IncusResourceBootstrap {
     }
 
     private BootstrapPaths createStagingPaths(Path stagingRoot) {
-      return state.localPaths.asStagingView(stagingRoot);
+      return state.localPaths().asStagingView(stagingRoot);
     }
 
     private record StagingContext(
@@ -673,22 +719,23 @@ public final class IncusResourceBootstrap {
     ProviderStage ensureProject() {
       state.providerContext =
           IncusProviderContext.forBootstrap("seed-incus-provider", context.config());
-      state.ensuredProject = IncusResourceBootstrap.this.ensureProject(state.providerContext);
-      state.ensuredProjectName = state.ensuredProject.name();
+      state.ensuredProject = IncusResourceBootstrap.this.ensureProject(state.providerContext());
+      state.ensuredProjectName = state.ensuredProject().name();
       return this;
     }
 
     ProviderStage ensureNetworks() {
       IncusResourceBootstrap.this.ensureNetwork(
-          state.providerContext, context.config().lanBridgeParent(), state.ensuredProject);
+          state.providerContext(), context.config().lanBridgeParent(), state.ensuredProject());
       IncusResourceBootstrap.this.ensureNetwork(
-          state.providerContext, context.config().vmnetNetworkName(), state.ensuredProject);
+          state.providerContext(), context.config().vmnetNetworkName(), state.ensuredProject());
       return this;
     }
 
     ProviderStage ensureProfile() {
       state.ensuredProfileName =
-          IncusResourceBootstrap.this.ensureProfile(state.providerContext, state.ensuredProject);
+          IncusResourceBootstrap.this.ensureProfile(
+              state.providerContext(), state.ensuredProject());
       return this;
     }
 
@@ -697,9 +744,9 @@ public final class IncusResourceBootstrap {
           context
               .imageProvider()
               .ensureSeedImageFingerprint(
-                  state.providerContext.invokeOptions(),
-                  state.providerContext.provider(),
-                  Optional.of(state.ensuredProject));
+                  state.providerContext().invokeOptions(),
+                  state.providerContext().provider(),
+                  Optional.of(state.ensuredProject()));
 
       // Update BuildMetadata with image checksum (manifests already registered in HostStage)
       final BuildMetadata existing = state.registry.require(BuildMetadata.class);
@@ -730,7 +777,7 @@ public final class IncusResourceBootstrap {
 
       final Output<String> manifestYaml =
           Output.all(
-                  state.ensuredImageFingerprint,
+                  state.ensuredImageFingerprint(),
                   Output.of(context.config().imageAlias()),
                   Output.of(context.imageProvider().buildChecksum()),
                   Output.of(context.config().incusProject()),
@@ -765,7 +812,7 @@ public final class IncusResourceBootstrap {
 
     private void writeImageStateManifest(String yaml) {
       try {
-        final Path targetDir = state.localPaths.manifestsRoot().resolve("cluster-api/staged");
+        final Path targetDir = state.localPaths().manifestsRoot().resolve("cluster-api/staged");
         Files.createDirectories(targetDir);
 
         final Path targetFile = targetDir.resolve("image-state-configmap.yaml");
@@ -824,12 +871,12 @@ public final class IncusResourceBootstrap {
               "seed-instance",
               InstanceArgs.builder()
                   .name(context.config().nodeName())
-                  .project(state.ensuredProjectName)
-                  .image(state.ensuredImageFingerprint)
-                  .profiles(state.ensuredProfileName.applyValue(List::of))
+                  .project(state.ensuredProjectName())
+                  .image(state.ensuredImageFingerprint())
+                  .profiles(state.ensuredProfileName().applyValue(List::of))
                   .config(instanceConfig)
                   .running(true)
-                  .devices(seedInstanceDevices(state.nixosPaths))
+                  .devices(seedInstanceDevices(state.nixosPaths()))
                   .build(),
               instanceOptions());
       return this;
@@ -837,7 +884,7 @@ public final class IncusResourceBootstrap {
 
     private CustomResourceOptions instanceOptions() {
       return CustomResourceOptions.builder()
-          .provider(state.providerContext.provider())
+          .provider(state.providerContext().provider())
           .deleteBeforeReplace(true)
           .replaceOnChanges(List.of("config", "config.*"))
           .ignoreChanges(List.of("image"))
@@ -1034,7 +1081,7 @@ public final class IncusResourceBootstrap {
 
     PathDone during(String topic, java.util.function.Function<PathStage, PathStage> body) {
       state.runner.runDuring(
-          topic, new PathStage(state.bootstrapContext, state), body, state.onFailure);
+          topic, new PathStage(state.bootstrapContext(), state), body, state.onFailure);
       return new PathDone(state);
     }
   }
@@ -1060,7 +1107,7 @@ public final class IncusResourceBootstrap {
 
     HostDone during(String topic, java.util.function.Function<HostStage, HostStage> body) {
       state.runner.runDuring(
-          topic, new HostStage(state.bootstrapContext, state), body, state.onFailure);
+          topic, new HostStage(state.bootstrapContext(), state), body, state.onFailure);
       return new HostDone(state);
     }
   }
@@ -1087,7 +1134,7 @@ public final class IncusResourceBootstrap {
     ProviderDone during(
         String topic, java.util.function.Function<ProviderStage, ProviderStage> body) {
       state.runner.runDuring(
-          topic, new ProviderStage(state.bootstrapContext, state), body, state.onFailure);
+          topic, new ProviderStage(state.bootstrapContext(), state), body, state.onFailure);
       return new ProviderDone(state);
     }
   }
@@ -1114,7 +1161,7 @@ public final class IncusResourceBootstrap {
     InstanceDone during(
         String topic, java.util.function.Function<InstanceStage, InstanceStage> body) {
       state.runner.runDuring(
-          topic, new InstanceStage(state.bootstrapContext, state), body, state.onFailure);
+          topic, new InstanceStage(state.bootstrapContext(), state), body, state.onFailure);
       return new InstanceDone(state);
     }
   }
@@ -1129,18 +1176,18 @@ public final class IncusResourceBootstrap {
     BootstrapResult toResult() {
       return new BootstrapResult(
           "incus://"
-              + state.bootstrapContext.config().incusProject()
+              + state.bootstrapContext().config().incusProject()
               + "/"
-              + state.bootstrapContext.config().nodeName(),
-          state.ensuredImageFingerprint,
-          state.instance.status(),
-          state.instance.urn(),
-          state.providerContext.provider().urn(),
+              + state.bootstrapContext().config().nodeName(),
+          state.ensuredImageFingerprint(),
+          state.instance().status(),
+          state.instance().urn(),
+          state.providerContext().provider().urn(),
           state.registry.require(DeploymentMetadata.class),
           state.registry.require(ProvisioningMetadata.class),
           state.registry.require(BuildMetadata.class),
           state.registry.require(RuntimeMetadata.class),
-          state.instance);
+          state.instance());
     }
   }
 
@@ -1608,23 +1655,23 @@ public final class IncusResourceBootstrap {
     }
 
     private static final class Builder {
-      private Path worktreeRoot;
-      private Path stateRoot;
-      private Path clusterNodeRoot;
-      private Path manifestsRoot;
-      private Path runtimeRke2ConfigRoot;
-      private Path runtimeCloudConfigRoot;
-      private Path runtimeEnvConfigRoot;
-      private Path secretsFile;
-      private Path assetsRoot;
-      private Path daemonsetRoot;
-      private Path scriptsRoot;
-      private Path systemdLibexecRoot;
-      private Path systemdRoot;
-      private Path gitRoot;
-      private Path shareRoot;
-      private Path kubeconfigRoot;
-      private Path cloudSeedRoot;
+      private @MonotonicNonNull Path worktreeRoot;
+      private @MonotonicNonNull Path stateRoot;
+      private @MonotonicNonNull Path clusterNodeRoot;
+      private @MonotonicNonNull Path manifestsRoot;
+      private @MonotonicNonNull Path runtimeRke2ConfigRoot;
+      private @MonotonicNonNull Path runtimeCloudConfigRoot;
+      private @MonotonicNonNull Path runtimeEnvConfigRoot;
+      private @MonotonicNonNull Path secretsFile;
+      private @MonotonicNonNull Path assetsRoot;
+      private @MonotonicNonNull Path daemonsetRoot;
+      private @MonotonicNonNull Path scriptsRoot;
+      private @MonotonicNonNull Path systemdLibexecRoot;
+      private @MonotonicNonNull Path systemdRoot;
+      private @MonotonicNonNull Path gitRoot;
+      private @MonotonicNonNull Path shareRoot;
+      private @MonotonicNonNull Path kubeconfigRoot;
+      private @MonotonicNonNull Path cloudSeedRoot;
 
       private Builder worktreeRoot(Path value) {
         this.worktreeRoot = value;
@@ -1713,23 +1760,23 @@ public final class IncusResourceBootstrap {
 
       private BootstrapPaths build() {
         return new BootstrapPaths(
-            worktreeRoot,
-            stateRoot,
-            clusterNodeRoot,
-            manifestsRoot,
-            runtimeRke2ConfigRoot,
-            runtimeCloudConfigRoot,
-            runtimeEnvConfigRoot,
-            secretsFile,
-            assetsRoot,
-            daemonsetRoot,
-            scriptsRoot,
-            systemdLibexecRoot,
-            systemdRoot,
-            gitRoot,
-            shareRoot,
-            kubeconfigRoot,
-            cloudSeedRoot);
+            Objects.requireNonNull(worktreeRoot, "worktreeRoot"),
+            Objects.requireNonNull(stateRoot, "stateRoot"),
+            Objects.requireNonNull(clusterNodeRoot, "clusterNodeRoot"),
+            Objects.requireNonNull(manifestsRoot, "manifestsRoot"),
+            Objects.requireNonNull(runtimeRke2ConfigRoot, "runtimeRke2ConfigRoot"),
+            Objects.requireNonNull(runtimeCloudConfigRoot, "runtimeCloudConfigRoot"),
+            Objects.requireNonNull(runtimeEnvConfigRoot, "runtimeEnvConfigRoot"),
+            Objects.requireNonNull(secretsFile, "secretsFile"),
+            Objects.requireNonNull(assetsRoot, "assetsRoot"),
+            Objects.requireNonNull(daemonsetRoot, "daemonsetRoot"),
+            Objects.requireNonNull(scriptsRoot, "scriptsRoot"),
+            Objects.requireNonNull(systemdLibexecRoot, "systemdLibexecRoot"),
+            Objects.requireNonNull(systemdRoot, "systemdRoot"),
+            Objects.requireNonNull(gitRoot, "gitRoot"),
+            Objects.requireNonNull(shareRoot, "shareRoot"),
+            Objects.requireNonNull(kubeconfigRoot, "kubeconfigRoot"),
+            Objects.requireNonNull(cloudSeedRoot, "cloudSeedRoot"));
       }
     }
   }
