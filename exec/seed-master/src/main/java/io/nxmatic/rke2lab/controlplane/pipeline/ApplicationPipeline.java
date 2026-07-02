@@ -13,7 +13,10 @@ import io.nxmatic.rke2lab.controlplane.resources.ResourceManager;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
+import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
 /**
  * Top-level entry pipeline. Wraps Pulumi-vs-standalone dispatch, configuration loading, the
@@ -40,9 +43,9 @@ public final class ApplicationPipeline {
 
   public static void run(Function<Launch, Completed> body) {
     if (isPulumiEngineAvailable()) {
-      Pulumi.run(context -> body.apply(new Launch(context)));
+      Pulumi.run(context -> body.apply(new Launch(Optional.of(context))));
     } else {
-      body.apply(new Launch(null));
+      body.apply(new Launch(Optional.empty()));
     }
   }
 
@@ -52,33 +55,53 @@ public final class ApplicationPipeline {
   }
 
   static final class State {
-    final Context pulumiContext;
+    final Optional<Context> pulumiContext;
     final boolean pulumiMode;
     final BboxReconciliationOrchestrator bboxOrchestrator;
     final ResourceManager resourceManager;
     final OutputBuilder outputBuilder;
 
-    AutoCloseable logSinkCloseable;
-    BootstrapConfig bootstrapConfig;
-    ControlplanePolicy controlplanePolicy;
-    BootstrapOptions options;
-    Map<String, Object> outputs;
-    OnFailure onFailure;
+    // Outputs each topic produces, set once by that topic's sink and read by a later topic — the
+    // builder of the next state (see docs/fluent-pipeline-grammar.adoc, "State shape").
+    @MonotonicNonNull AutoCloseable logSinkCloseable;
+    @MonotonicNonNull BootstrapConfig bootstrapConfig;
+    @MonotonicNonNull ControlplanePolicy controlplanePolicy;
+    @MonotonicNonNull BootstrapOptions options;
+    @MonotonicNonNull Map<String, Object> outputs;
+    OnFailure onFailure = OnFailure.noop();
     final FluentTopicRunner runner = new FluentTopicRunner("pipeline");
 
-    State(Context pulumiContext) {
+    State(Optional<Context> pulumiContext) {
       this.pulumiContext = pulumiContext;
-      this.pulumiMode = pulumiContext != null;
+      this.pulumiMode = pulumiContext.isPresent();
       this.bboxOrchestrator = new BboxReconciliationOrchestrator(pulumiMode);
       this.resourceManager = new ResourceManager();
       this.outputBuilder = new OutputBuilder();
+    }
+
+    BootstrapConfig bootstrapConfig() {
+      return Objects.requireNonNull(
+          bootstrapConfig, "bootstrapConfig (environment topic not yet run)");
+    }
+
+    ControlplanePolicy controlplanePolicy() {
+      return Objects.requireNonNull(
+          controlplanePolicy, "controlplanePolicy (environment topic not yet run)");
+    }
+
+    BootstrapOptions options() {
+      return Objects.requireNonNull(options, "options (environment topic not yet run)");
+    }
+
+    Map<String, Object> outputs() {
+      return Objects.requireNonNull(outputs, "outputs (cluster-seed topic not yet run)");
     }
   }
 
   public static final class Launch {
     private final State state;
 
-    Launch(Context pulumiContext) {
+    Launch(Optional<Context> pulumiContext) {
       this.state = new State(pulumiContext);
     }
 
@@ -141,9 +164,9 @@ public final class ApplicationPipeline {
       final ClusterSeedTopic stage =
           new ClusterSeedTopic(
               state.pulumiMode,
-              () -> state.bootstrapConfig,
-              () -> state.controlplanePolicy,
-              () -> state.options,
+              state::bootstrapConfig,
+              state::controlplanePolicy,
+              state::options,
               () -> state.onFailure,
               message -> SeedLog.info("readiness", message),
               state.bboxOrchestrator,
@@ -175,7 +198,7 @@ public final class ApplicationPipeline {
     }
 
     public OutputsDone during(String topic, Function<OutputsTopic, OutputsTopic> body) {
-      final OutputsTopic stage = new OutputsTopic(state.pulumiContext, () -> state.outputs);
+      final OutputsTopic stage = new OutputsTopic(state.pulumiContext, state::outputs);
       state.runner.runDuring(topic, stage, body, state.onFailure);
       return new OutputsDone(state);
     }

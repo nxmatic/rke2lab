@@ -6,6 +6,7 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
+import java.util.Optional;
 import java.util.function.Consumer;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
@@ -21,26 +22,27 @@ public final class EnvironmentTopic {
     void options(BootstrapOptions options);
   }
 
-  private final Context pulumiContext;
+  private final Optional<Context> pulumiContext;
   private final Sink sink;
 
-  public EnvironmentTopic(Context pulumiContext, Sink sink) {
+  public EnvironmentTopic(Optional<Context> pulumiContext, Sink sink) {
     this.pulumiContext = pulumiContext;
     this.sink = sink;
   }
 
   public EnvironmentTopic installLogSink() {
-    if (pulumiContext == null) {
+    if (pulumiContext.isEmpty()) {
       return this;
     }
+    final Context context = pulumiContext.get();
     final AutoCloseable closeable =
         SeedLog.open(
             (event, message) -> {
               switch (event) {
-                case ERROR -> pulumiContext.log().error(message);
-                case WARN -> pulumiContext.log().warn(message);
-                case INFO -> pulumiContext.log().info(message);
-                case DEBUG, TRACE -> pulumiContext.log().debug(message);
+                case ERROR -> context.log().error(message);
+                case WARN -> context.log().warn(message);
+                case INFO -> context.log().info(message);
+                case DEBUG, TRACE -> context.log().debug(message);
               }
             });
     sink.logSink(closeable);
@@ -57,9 +59,9 @@ public final class EnvironmentTopic {
     Rke2labConfig resolved = config;
     if (resolved == null) {
       resolved =
-          pulumiContext != null
-              ? Rke2labConfig.from(pulumiContext.config("rke2lab"))
-              : Rke2labConfig.defaults();
+          pulumiContext
+              .map(context -> Rke2labConfig.from(context.config("rke2lab")))
+              .orElseGet(Rke2labConfig::defaults);
       config = resolved;
     }
     return resolved;

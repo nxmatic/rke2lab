@@ -3,22 +3,25 @@ package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 import com.pulumi.Context;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 public final class OutputsTopic {
 
-  private final Context pulumiContext;
+  private final Optional<Context> pulumiContext;
   private final Supplier<Map<String, Object>> outputsSupplier;
 
-  public OutputsTopic(Context pulumiContext, Supplier<Map<String, Object>> outputsSupplier) {
+  public OutputsTopic(
+      Optional<Context> pulumiContext, Supplier<Map<String, Object>> outputsSupplier) {
     this.pulumiContext = pulumiContext;
     this.outputsSupplier = outputsSupplier;
   }
 
   public OutputsTopic exportOrPrint() {
     final Map<String, Object> outputs = outputsSupplier.get();
-    if (pulumiContext != null) {
-      outputs.forEach(pulumiContext::export);
+    if (pulumiContext.isPresent()) {
+      final Context context = pulumiContext.get();
+      outputs.forEach(context::export);
     } else {
       SeedLog.info(
           "standalone",
