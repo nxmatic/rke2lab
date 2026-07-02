@@ -3,7 +3,6 @@ package io.nxmatic.rke2lab.controlplane.bbox;
 import com.pulumi.core.Output;
 import com.pulumi.resources.ComponentResource;
 import com.pulumi.resources.ComponentResourceOptions;
-import com.pulumi.resources.Resource;
 import io.nxmatic.bbox.api.BboxApiClient;
 import io.nxmatic.bbox.reconcile.Action;
 import io.nxmatic.bbox.reconcile.ReservationReconciler;
@@ -41,15 +40,10 @@ public final class BboxReservationsResource extends ComponentResource {
    * @param bboxBaseUri base URI for the bbox API (from {@code .secrets:lan.bbox.uri}).
    * @param adminPassword admin password (from {@code .secrets:lan.bbox.password}).
    * @param dryRun when {@code true}, no writes are issued — matches {@code pulumi preview}.
-   * @param dependsOnResource optional explicit dependency edge.
    */
   public BboxReservationsResource(
-      String name,
-      URI bboxBaseUri,
-      String adminPassword,
-      boolean dryRun,
-      Resource dependsOnResource) {
-    super(TYPE_TOKEN, name, buildOptions(dependsOnResource));
+      String name, URI bboxBaseUri, String adminPassword, boolean dryRun) {
+    super(TYPE_TOKEN, name, ComponentResourceOptions.builder().build());
 
     this.dryRun = dryRun;
     final List<DesiredRow> rows = new BlueprintRowEnumerator().rows();
@@ -93,14 +87,6 @@ public final class BboxReservationsResource extends ComponentResource {
     } catch (Exception ex) {
       throw new IllegalStateException("Failed to open bbox session: " + ex.getMessage(), ex);
     }
-  }
-
-  private static ComponentResourceOptions buildOptions(Resource dependsOnResource) {
-    final ComponentResourceOptions.Builder optionsBuilder = ComponentResourceOptions.builder();
-    if (dependsOnResource != null) {
-      optionsBuilder.dependsOn(List.of(dependsOnResource));
-    }
-    return optionsBuilder.build();
   }
 
   private Map<String, Output<?>> buildOutputs() {

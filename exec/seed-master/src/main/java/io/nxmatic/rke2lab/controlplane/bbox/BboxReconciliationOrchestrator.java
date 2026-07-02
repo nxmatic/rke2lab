@@ -34,7 +34,7 @@ public final class BboxReconciliationOrchestrator {
 
   private ReconciliationResult reconcileForPulumi(Path worktreePath, boolean failOnError) {
     final BboxReconcilerComponent.ReconcileResult result =
-        BboxReconcilerComponent.reconcileForPulumi(worktreePath, failOnError, null);
+        BboxReconcilerComponent.reconcileForPulumi(worktreePath, failOnError);
     return new ReconciliationResult(result.resourceUrn(), result.summaryMap());
   }
 

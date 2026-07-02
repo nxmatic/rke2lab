@@ -1,7 +1,6 @@
 package io.nxmatic.rke2lab.controlplane.bbox;
 
 import com.pulumi.deployment.Deployment;
-import com.pulumi.resources.Resource;
 import io.nxmatic.bbox.api.BboxApiClient;
 import io.nxmatic.bbox.reconcile.Action;
 import io.nxmatic.bbox.reconcile.ReservationReconciler;
@@ -11,6 +10,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** Component responsible for bbox DHCP reservation reconciliation. */
 public final class BboxReconcilerComponent {
@@ -22,17 +22,15 @@ public final class BboxReconcilerComponent {
    *
    * @return reconciliation result containing the resource URN and summary map, or null if skipped
    */
-  public static ReconcileResult reconcileForPulumi(
-      Path worktreePath, boolean failOnError, Resource dependsOn) {
+  public static ReconcileResult reconcileForPulumi(Path worktreePath, boolean failOnError) {
     final boolean dryRun = Deployment.getInstance().isDryRun();
-    final BboxReservationsResource resource =
-        buildBboxReservationsResource(worktreePath, dryRun, failOnError, dependsOn);
-
-    if (resource != null) {
-      logBboxSummary(resource);
-      return new ReconcileResult(resource.urn(), toBboxSummaryMap(resource), resource);
-    }
-    return new ReconcileResult("", Map.of("status", "skipped"), null);
+    return buildBboxReservationsResource(worktreePath, dryRun, failOnError)
+        .map(
+            resource -> {
+              logBboxSummary(resource);
+              return new ReconcileResult(resource.urn(), toBboxSummaryMap(resource));
+            })
+        .orElseGet(() -> new ReconcileResult("", Map.of("status", "skipped")));
   }
 
   /**
@@ -74,7 +72,7 @@ public final class BboxReconcilerComponent {
       return Map.of("status", "skipped", "reason", ex.getMessage());
     }
 
-    checkFailedActions(counts.get(Action.FAILED), failOnError);
+    checkFailedActions(counts.getOrDefault(Action.FAILED, 0), failOnError);
 
     final LinkedHashMap<String, Object> out = new LinkedHashMap<>();
     out.put("dryRun", false);
@@ -86,8 +84,8 @@ public final class BboxReconcilerComponent {
     return out;
   }
 
-  private static BboxReservationsResource buildBboxReservationsResource(
-      Path worktreePath, boolean dryRun, boolean failOnError, Resource dependsOn) {
+  private static Optional<BboxReservationsResource> buildBboxReservationsResource(
+      Path worktreePath, boolean dryRun, boolean failOnError) {
     final BboxSecretsReader.BboxCoordinates coordinates;
     try {
       coordinates = BboxSecretsReader.readBboxCoordinates(worktreePath);
@@ -98,24 +96,24 @@ public final class BboxReconcilerComponent {
       SeedLog.warn(
           "bbox-reconcile",
           "skipping reconciliation: cannot read bbox coordinates (" + ex.getMessage() + ")");
-      return null;
+      return Optional.empty();
     }
 
     try {
       final BboxReservationsResource resource =
           new BboxReservationsResource(
-              "bbox-reservations", coordinates.uri(), coordinates.password(), dryRun, dependsOn);
+              "bbox-reservations", coordinates.uri(), coordinates.password(), dryRun);
       if (failOnError) {
         checkFailedActions(resource.countOf(Action.FAILED), true);
       }
-      return resource;
+      return Optional.of(resource);
     } catch (RuntimeException ex) {
       if (failOnError) {
         throw ex;
       }
       SeedLog.warn(
           "bbox-reconcile", "skipping reconciliation: bbox call failed (" + ex.getMessage() + ")");
-      return null;
+      return Optional.empty();
     }
   }
 
@@ -170,6 +168,5 @@ public final class BboxReconcilerComponent {
             + resource.countOf(Action.FAILED));
   }
 
-  public record ReconcileResult(
-      Object resourceUrn, Map<String, Object> summaryMap, BboxReservationsResource resource) {}
+  public record ReconcileResult(Object resourceUrn, Map<String, Object> summaryMap) {}
 }
