@@ -1,6 +1,6 @@
 ---
 name: realm-library-isolation-state
-description: Realm library isolation increment (feature/cluster-edge, before world-gateway 2D). Each world loads its own jackson — host flat (JCL), OSGi as an installed bundle — ending the system.packages.extra share that 2C's String-only seam made unnecessary. Spec 3aaa66fb; plan docs/superpowers/plans/2026-06-30-realm-library-isolation.md. 4 mechanism deltas + gate-law change, all derived (no hand-list). NEXT = execute subagent-driven, then resume the 2D plan.
+description: Realm library isolation increment (feature/cluster-edge, before world-gateway 2D). Each world loads its own jackson — host flat (JCL), OSGi as an installed bundle — ending the system.packages.extra share that 2C's String-only seam made unnecessary. Spec 3aaa66fb; plan wip/plans/2026-06-30-realm-library-isolation.md. 4 mechanism deltas + gate-law change, all derived (no hand-list). NEXT = execute subagent-driven, then resume the 2D plan.
 metadata:
   type: project
 ---

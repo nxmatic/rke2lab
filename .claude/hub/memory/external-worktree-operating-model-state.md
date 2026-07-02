@@ -64,8 +64,8 @@ nix-darwin **keeps** providing Bedrock via `home.sessionVariables` (shell vars,
 location-independent); its settings.json-seeding becomes redundant (retire later).
 
 **ARTIFACTS (on branch `chore/worktree-config-home` in BOTH repos, NOT integrated):**
-- Hub spec: `docs/superpowers/specs/2026-06-15-worktree-config-home-design.adoc` (4 C4 figures).
-- Hub plan: `docs/superpowers/plans/2026-06-15-worktree-config-home-step1.md`.
+- Hub spec: `wip/specs/2026-06-15-worktree-config-home-design.adoc` (4 C4 figures).
+- Hub plan: `wip/plans/2026-06-15-worktree-config-home-step1.md`.
 - Hub `.claude/` now carries the shareable tree (instructions.md, settings.json with 3 plugins, skills/, bin/link-memory.sh CONFIG_DIR-aware, .gitignore); local split branch `split/claude-hub/dot-claude`.
 - rke2lab `chore/worktree-config-home` worktree has the subtree at `.claude/hub` (added from the LOCAL hub via remote `claude-hub-local`, squashed) + `@import` at CLAUDE.md tail + README-SUBTREE.md.
 - Disposable test workspace: `/private/var/lib/git/nxmatic/rke2lab-config-home-test.code-workspace`.

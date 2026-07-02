@@ -4,7 +4,7 @@ AVANT TOUT : lis `.claude/hub/instructions.md` § "Progress narration" et appliq
 Branche : `feature/cluster-edge`. Lis EN ENTIER, dans l'ordre :
 1. `.claude/memory/world-gateway-2d-execution-state.md` — l'état 2D + LE PIVOT + LA CARTO (ne PAS re-scanner).
 2. `.claude/memory/world-gateway-2c-complete-2d-designed-state.md` — le contexte 2D d'origine.
-3. Le plan : `docs/superpowers/plans/2026-06-30-world-gateway-2d-schema-contract.md` (zone-0 fait ; le
+3. Le plan : `wip/plans/2026-06-30-world-gateway-2d-schema-contract.md` (zone-0 fait ; le
    concord ASM est SUPERSEDED par le pivot).
 
 ## Où on en est — EXACTEMENT
@@ -20,7 +20,7 @@ record**, automatisé par scan. Ça fusionne le backlog "éliminer les FIELD_*" 
 
 ## PROCHAINE ÉTAPE (précise)
 
-Design ÉCRIT + **USER GO**. Doc : `docs/superpowers/plans/2026-06-30-world-gateway-2d-records-as-contract-design.md`.
+Design ÉCRIT + **USER GO**. Doc : `wip/plans/2026-06-30-world-gateway-2d-records-as-contract-design.md`.
 Décisions tranchées (cf. `world-gateway-2d-execution-state.md` § DESIGN WRITTEN + USER GO) :
 wire-records dans le seam `world.gateway.port` (à plat), schéma GÉNÉRÉ build-time des `RecordComponents`
 (générateur dans `maven-embed-staging-ext`), nesting via records imbriqués, gate réécrit

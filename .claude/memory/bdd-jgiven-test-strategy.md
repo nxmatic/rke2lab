@@ -48,7 +48,7 @@ The user is starting a test discipline for rke2lab (near-zero coverage today: on
   - **Scenario A — operator, synthesize()**: "master deploys only what vcluster provisioning needs" (= the trimming spec, executable). Chosen fake strategy: **call the real `synthesize()` and capture the current failure** — `buildDomainRegistry` throws UnsupportedOperationException. A is a red-expected scenario that documents reality AND becomes the engine that drives restoring buildDomainRegistry. (Not a hand-built tree, not a stub list.)
   - **Scenario B — operator, explode()**: "rke2-config fragments land where the installer can find them" — the config.yaml.d fix told as operator behavior. Branchable for real immediately.
 - *Unit test fate:* **fold `DefaultManifestExplodeServiceTest` (fe213bf0) into Scenario B and delete it**; its 6 naming cases become parameterized JGiven `@Case` variants of B. (Matches "tests = use-cases" + no dead code.)
-- *Still to do when resuming:* propose 2-3 JGiven wiring approaches (dep coords/versions in BOM), present remaining design sections, write spec to `docs/superpowers/specs/`, user review, then writing-plans.
+- *Still to do when resuming:* propose 2-3 JGiven wiring approaches (dep coords/versions in BOM), present remaining design sections, write spec to `wip/specs/`, user review, then writing-plans.
 
 **Bigger why (user's stated direction, 2026-06-04):** the user is tired of typing command lines and wants to move toward **automation with a natural-language-oriented interface**. BDD "tests = living manual" is a first step on that path (readable sentences that describe + verify behavior instead of commands to retype). Keep this north star in mind for future tooling choices, not just tests.
 

@@ -582,3 +582,6 @@ flycheck_*.el
 # kroki-generated diagram SVGs (regenerable from the .adoc mermaid blocks)
 docs/architecture/**/diag-*.svg
 *.swp
+
+# Superpowers skill defaults to docs/superpowers/; our plans/specs live in wip/ (flat wip/plans, wip/specs).
+docs/superpowers/

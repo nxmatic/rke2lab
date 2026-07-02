@@ -1,6 +1,6 @@
 ---
 name: world-gateway-2d-execution-state
-description: World-gateway 2D IN EXECUTION (feature/cluster-edge, subagent-driven). Zone-0 DONE (networknt pinned, gateway-document-codec built, SCHEMA_CONCORD gate wired). BUT a code-structure carto INVALIDATED the ASM concord approach — PIVOT (user-chosen): records-as-contract per Document, JSON schema GENERATED from the record (not hand-written, not ASM-reconciled). NEXT = write the records-as-contract DESIGN before resuming execution. Plan: docs/superpowers/plans/2026-06-30-world-gateway-2d-schema-contract.md (zone-0 part now superseded).
+description: World-gateway 2D IN EXECUTION (feature/cluster-edge, subagent-driven). Zone-0 DONE (networknt pinned, gateway-document-codec built, SCHEMA_CONCORD gate wired). BUT a code-structure carto INVALIDATED the ASM concord approach — PIVOT (user-chosen): records-as-contract per Document, JSON schema GENERATED from the record (not hand-written, not ASM-reconciled). NEXT = write the records-as-contract DESIGN before resuming execution. Plan: wip/plans/2026-06-30-world-gateway-2d-schema-contract.md (zone-0 part now superseded).
 metadata:
   type: project
 ---
@@ -53,7 +53,7 @@ producers/consumers onto them", not "write 6 schemas".
 
 ## DESIGN WRITTEN + USER GO (2026-06-30) — now EXECUTING
 
-Design doc: `docs/superpowers/plans/2026-06-30-world-gateway-2d-records-as-contract-design.md`.
+Design doc: `wip/plans/2026-06-30-world-gateway-2d-records-as-contract-design.md`.
 User said GO. The 5 decisions are SETTLED there; the 3 open points are resolved (user accepted the leanings):
 - (a) wire-records live in the **`world-gateway` seam** (jackson-free, system-exported, one shared
   class — same status as Document/Coordinate; the TYPE never crosses, only the String, via the

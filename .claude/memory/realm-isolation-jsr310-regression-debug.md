@@ -124,7 +124,7 @@ findAndRegisterModules runs against the STAGED jackson-databind.
 
 Increment commits on feature/cluster-edge: 8bc21cce(t1) 17e67a8a(t2) 843d3220(t3) fb1decb9+441105e4(t4)
 f10a81b7(t5 controlplane WARN) caea2d7b(manifests-cli WARN, the final-review twin fix). Plan:
-docs/superpowers/plans/2026-06-30-realm-library-isolation.md. Spec: 3aaa66fb. Ledger:
+wip/plans/2026-06-30-realm-library-isolation.md. Spec: 3aaa66fb. Ledger:
 .superpowers/sdd/progress.md. The deployed jar (exec/seed-master/target/seed-master-*-exec.jar) was
 built at the green gate; it is the artifact pulumi preview boots and that fails.
 
