@@ -12,25 +12,25 @@ import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
  *
  * <p>Package-private stage builder for synthesis pipeline. See docs/fluent-pipeline-grammar.adoc.
  */
-public final class StorageStage {
+public final class StorageTopic {
 
   private final SystemdChart systemdChart;
   private final SystemdSynthesisContext context;
-  private final ToolsStage toolsStage;
-  private final BootstrapStage bootstrapStage;
+  private final ToolsTopic toolsStage;
+  private final Rke2InstallTopic bootstrapStage;
 
-  public StorageStage(
+  public StorageTopic(
       SystemdChart systemdChart,
       SystemdSynthesisContext context,
-      ToolsStage toolsStage,
-      BootstrapStage bootstrapStage) {
+      ToolsTopic toolsStage,
+      Rke2InstallTopic bootstrapStage) {
     this.systemdChart = systemdChart;
     this.context = context;
     this.toolsStage = toolsStage;
     this.bootstrapStage = bootstrapStage;
   }
 
-  public StorageStage remountShared() {
+  public StorageTopic remountShared() {
     new SystemdService(systemdChart, "rke2lab-remount-shared")
         .description("Remount root filesystem as shared for RKE2")
         .defaultDependencies(false)
@@ -44,7 +44,7 @@ public final class StorageStage {
     return this;
   }
 
-  public StorageStage containerdZfsMountConfig() {
+  public StorageTopic containerdZfsMountConfig() {
     new SystemdService(systemdChart, "rke2lab-containerd-zfs-mount-config")
         .description("Configure containerd for ZFS mounts")
         .after(
@@ -67,7 +67,7 @@ public final class StorageStage {
     return this;
   }
 
-  public StorageStage dbusTcpSystemBus() {
+  public StorageTopic dbusTcpSystemBus() {
     new SystemdService(systemdChart, SystemdUnitId.DBUS_TCP_SYSTEM_BUS.bareName())
         .description("Expose DBus system bus over TCP for RKE2Lab")
         .after("dbus.service")
@@ -82,7 +82,7 @@ public final class StorageStage {
     return this;
   }
 
-  public StorageStage zfsEarlyUmount() {
+  public StorageTopic zfsEarlyUmount() {
     new SystemdService(systemdChart, "zfs-early-umount")
         .description("Early unmount of ZFS filesystems before shutdown")
         .defaultDependencies(false)
@@ -97,7 +97,7 @@ public final class StorageStage {
     return this;
   }
 
-  public StorageStage vipKubeconfig() {
+  public StorageTopic vipKubeconfig() {
     new SystemdService(systemdChart, "rke2lab-vip-kubeconfig")
         .description("Generate VIP-enabled kubeconfig for cluster access")
         .after(

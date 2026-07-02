@@ -11,20 +11,20 @@ import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.StandardStream;
  *
  * <p>Package-private stage builder for synthesis pipeline. See docs/fluent-pipeline-grammar.adoc.
  */
-public final class NetworkStage {
+public final class NetworkTopic {
 
   private final SystemdChart systemdChart;
   private final SystemdSynthesisContext context;
-  private final BootstrapStage bootstrapStage;
+  private final Rke2InstallTopic bootstrapStage;
 
-  public NetworkStage(
-      SystemdChart systemdChart, SystemdSynthesisContext context, BootstrapStage bootstrapStage) {
+  public NetworkTopic(
+      SystemdChart systemdChart, SystemdSynthesisContext context, Rke2InstallTopic bootstrapStage) {
     this.systemdChart = systemdChart;
     this.context = context;
     this.bootstrapStage = bootstrapStage;
   }
 
-  public NetworkStage routeCleanup() {
+  public NetworkTopic routeCleanup() {
     new SystemdService(systemdChart, "rke2lab-route-cleanup")
         .description("Clean up conflicting routes for RKE2Lab")
         .after("network-online.target")
@@ -39,7 +39,7 @@ public final class NetworkStage {
     return this;
   }
 
-  public NetworkStage networkConfig() {
+  public NetworkTopic networkConfig() {
     new SystemdService(systemdChart, "rke2lab-network-config")
         .description("RKE2Lab Network Configuration Service")
         .after("systemd-networkd.service", "cloud-init.service")
@@ -55,7 +55,7 @@ public final class NetworkStage {
     return this;
   }
 
-  public NetworkStage networkWait() {
+  public NetworkTopic networkWait() {
     new SystemdService(systemdChart, "rke2lab-network-wait")
         .description("Wait for RKE2Lab network readiness")
         .after("network-online.target")
@@ -70,7 +70,7 @@ public final class NetworkStage {
     return this;
   }
 
-  public NetworkStage networkDebug() {
+  public NetworkTopic networkDebug() {
     new SystemdService(systemdChart, "rke2lab-network-debug")
         .description("RKE2Lab network diagnostics")
         .after(context.networkTarget().getUnitFileName())

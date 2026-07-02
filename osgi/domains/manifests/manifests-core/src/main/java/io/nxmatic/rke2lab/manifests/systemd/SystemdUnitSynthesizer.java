@@ -120,7 +120,7 @@ public final class SystemdUnitSynthesizer {
             () ->
                 new IllegalStateException(
                     unitId
-                        + " not found in systemd chart — ensure BootstrapInfrastructureSynthesizer"
+                        + " not found in systemd chart — ensure SystemdInfrastructureSynthesizer"
                         + " runs first"));
   }
 

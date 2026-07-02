@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Package-private stage builder for synthesis pipeline. See docs/fluent-pipeline-grammar.adoc.
  */
-public final class ToolsStage {
+public final class ToolsTopic {
 
   private final SystemdChart systemdChart;
   private final SystemdSynthesisContext context;
@@ -22,12 +22,12 @@ public final class ToolsStage {
   private @Nullable SystemdService nixInstallService;
   private @Nullable SystemdService floxInstallService;
 
-  public ToolsStage(SystemdChart systemdChart, SystemdSynthesisContext context) {
+  public ToolsTopic(SystemdChart systemdChart, SystemdSynthesisContext context) {
     this.systemdChart = systemdChart;
     this.context = context;
   }
 
-  public ToolsStage nixInstall() {
+  public ToolsTopic nixInstall() {
     nixInstallService =
         new SystemdService(systemdChart, "rke2lab-nix-install")
             .description("Install Nix Package Manager for RKE2 Lab")
@@ -43,7 +43,7 @@ public final class ToolsStage {
     return this;
   }
 
-  public ToolsStage floxInstall() {
+  public ToolsTopic floxInstall() {
     final SystemdService nixInstall = getNixInstallService();
     floxInstallService =
         new SystemdService(systemdChart, "rke2lab-flox-install")

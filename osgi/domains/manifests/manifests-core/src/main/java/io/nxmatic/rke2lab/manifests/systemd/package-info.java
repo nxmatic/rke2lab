@@ -6,8 +6,8 @@
  * <h2>What lives here</h2>
  *
  * <ul>
- *   <li>{@link io.nxmatic.rke2lab.manifests.systemd.BootstrapInfrastructureSynthesizer} — creates
- *       the bootstrap/infrastructure services (e.g. {@code rke2lab-install}) that domain installer
+ *   <li>{@link io.nxmatic.rke2lab.manifests.systemd.SystemdInfrastructureSynthesizer} — creates the
+ *       bootstrap/infrastructure services (e.g. {@code rke2lab-install}) that domain installer
  *       services depend on; runs before the domain loop in the synthesis service. Hosts the
  *       method-local staged-synthesis pipeline (see the fluent pipeline grammar).
  *   <li>{@link io.nxmatic.rke2lab.manifests.systemd.SystemdUnitSynthesizer} — the synthesis

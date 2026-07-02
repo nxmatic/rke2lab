@@ -20,7 +20,7 @@ import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisResult;
 import io.nxmatic.rke2lab.manifests.port.ManifestSynthesisService;
 import io.nxmatic.rke2lab.manifests.port.SshToAgeConverter;
 import io.nxmatic.rke2lab.manifests.port.profiles.SopsAgeMaterial;
-import io.nxmatic.rke2lab.manifests.systemd.BootstrapInfrastructureSynthesizer;
+import io.nxmatic.rke2lab.manifests.systemd.SystemdInfrastructureSynthesizer;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
@@ -472,7 +472,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
           final SystemdSynthesisContext systemdContext = state.targets().systemdContext();
 
           LOG.debug("Synthesizing bootstrap and infrastructure systemd units");
-          new BootstrapInfrastructureSynthesizer(systemdChart, systemdContext).synthesizeAll();
+          new SystemdInfrastructureSynthesizer(systemdChart, systemdContext).synthesizeAll();
 
           for (ManifestsDomain domain : state.registry().domainRegistry().domains()) {
             LOG.debug("Synthesizing systemd units for domain '{}'", domain.domainId());

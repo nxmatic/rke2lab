@@ -13,24 +13,24 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Package-private stage builder for synthesis pipeline. See docs/fluent-pipeline-grammar.adoc.
  */
-public final class BootstrapStage {
+public final class Rke2InstallTopic {
 
   private final SystemdChart systemdChart;
   private final SystemdSynthesisContext context;
-  private final ToolsStage toolsStage;
+  private final ToolsTopic toolsStage;
 
   // Store construct references for dependency resolution
   private @Nullable SystemdService bootstrapEnvService;
   private @Nullable SystemdService installService;
 
-  public BootstrapStage(
-      SystemdChart systemdChart, SystemdSynthesisContext context, ToolsStage toolsStage) {
+  public Rke2InstallTopic(
+      SystemdChart systemdChart, SystemdSynthesisContext context, ToolsTopic toolsStage) {
     this.systemdChart = systemdChart;
     this.context = context;
     this.toolsStage = toolsStage;
   }
 
-  public BootstrapStage bootstrapEnv() {
+  public Rke2InstallTopic bootstrapEnv() {
     bootstrapEnvService =
         new SystemdService(systemdChart, "rke2lab-bootstrap-env")
             .description("RKE2Lab bootstrap environment (Nix + Flox + nocloud)")
@@ -67,7 +67,7 @@ public final class BootstrapStage {
     return this;
   }
 
-  public BootstrapStage configInstall() {
+  public Rke2InstallTopic configInstall() {
     final SystemdService bootstrapEnv = getBootstrapEnvService();
     new SystemdService(systemdChart, "rke2lab-config-install")
         .description("Install RKE2 config fragments before server start")
@@ -89,7 +89,7 @@ public final class BootstrapStage {
     return this;
   }
 
-  public BootstrapStage install() {
+  public Rke2InstallTopic install() {
     installService =
         new SystemdService(systemdChart, "rke2lab-install")
             .description("Run RKE2Lab Installation Script")
@@ -125,7 +125,7 @@ public final class BootstrapStage {
     return this;
   }
 
-  public BootstrapStage systemdLink() {
+  public Rke2InstallTopic systemdLink() {
     new SystemdService(systemdChart, "rke2lab-systemd-link")
         .description("Link RKE2Lab systemd service files from host share")
         .documentation("https://github.com/nxmatic/rke2lab")
@@ -145,7 +145,7 @@ public final class BootstrapStage {
     return this;
   }
 
-  public BootstrapStage cachixWatchStore() {
+  public Rke2InstallTopic cachixWatchStore() {
     final SystemdService install = getInstallService();
     new SystemdService(systemdChart, "rke2lab-cachix-watch-store")
         .description("Watch Nix store and push to Cachix")
