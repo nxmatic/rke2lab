@@ -14,6 +14,15 @@
 
 **Relationship to the OSGi-ownership plan.** Adjacent, not the same. `2026-07-02-pipeline-osgi-ownership.md` is Thread S (structure: `*Stage`→`*Topic`, decision-into-OSGi) + Thread R (reliability). Its **S3** injects run data via a context — THIS plan supplies the `PipelineContext` that S3 will inject. Do them so S3 consumes this plan's `PipelineContext` rather than inventing `TopicContext`. This plan is transverse to the 7 pipelines; keep it independent, sequence-after where they touch.
 
+## Blast-radius (verified 2026-07-03 — the break-all is CONFINED to seed-master)
+
+Checked before materializing, to be sure the reactor reaches the pipeline we refactor:
+- **`ContextRegistry`** — 2 files, both in `controlplane/incus/`, both in seed-master. Deleting it breaks nothing upstream.
+- **Incus records** (`DeploymentMetadata`/`ProvisioningMetadata`/`BuildMetadata`/`RuntimeMetadata`/`BootstrapResult`) — every referent is inside `exec/seed-master/` (packages `incus`/`resources`/`pipeline`). No `osgi/`, `sdks/`, `host/`, `netplan/` module sees them.
+- **Reactor order:** `pipeline-port` [9/69] (upstream, additive, already green) → `seed-master` [65/69]. The 4 modules after seed-master (`netplan-cli`, `manifests-cli`, `exec`, `rke2lab`) do NOT depend on seed-master (only `build-parent` names it, in dependencyManagement). So: nothing upstream blocks reaching seed-master; nothing downstream propagates the break.
+- **The only break-all is intra-seed-master** (e.g. changing `BootstrapResult` breaks the 6 files consuming it — `PipelineState`, `OutputBuilder`, `ResourcesTopic`, `IncusTopic`, `ResourceManager`, `ResourceCreationPipeline` — all in one module, seen at once by javac; no reactor barrier).
+- **Practical loop:** iterate with `-pl :seed-master -am` (rebuilds the green port upstream, confines the break); keep full `-Pall-worlds` for final validation only.
+
 ## Global Constraints
 
 - **Build through flox always:** `flox activate -- ./mvnw …`. Never `mvn install` to `~/.m2`; inter-module deps resolve through the reactor — every module build uses `-am`. Build `-Pall-worlds` (NEVER `,nxmatic`). Measure NullAway with `clean package -DskipTests=true -Dmaven.build.cache.skipCache=true` (cache-off is mandatory or warnings don't re-emit).
