@@ -18,10 +18,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * <h2>The determinism discipline</h2>
  *
  * <p>A context is read AND written ONLY while a transition builds a topic's input — never inside a
- * topic. A {@link Topic} does not receive the context ({@code run(I)}, not {@code run(I,
- * context)}), so it cannot read a record at an arbitrary instant nor write one back. That
- * confinement is what makes each topic's input deterministic: at the moment {@code I} is assembled
- * it is frozen, and the topic has no handle to reopen the context.
+ * topic. A {@link Topic} is constructed with its frozen input and its sink only, never the context,
+ * so it cannot read a record at an arbitrary instant nor write one back. That confinement is what
+ * makes each topic's input deterministic: at the moment {@code I} is assembled it is frozen, and
+ * the topic has no handle to reopen the context.
  *
  * <h2>No {@code update}</h2>
  *
