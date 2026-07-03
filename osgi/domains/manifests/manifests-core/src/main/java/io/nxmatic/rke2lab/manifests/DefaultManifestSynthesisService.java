@@ -23,6 +23,7 @@ import io.nxmatic.rke2lab.manifests.port.profiles.SopsAgeMaterial;
 import io.nxmatic.rke2lab.manifests.systemd.SystemdInfrastructureSynthesizer;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
+import io.nxmatic.rke2lab.pipeline.Topic;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdDropIn;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdTarget;
@@ -187,17 +188,30 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
 
         Cdk8sSetupDone during(
             String topic, java.util.function.Function<Cdk8sSetupStage, Cdk8sSetupStage> body) {
-          final Cdk8sSetupStage stage = new Cdk8sSetupStage(state);
+          final Cdk8sSetupStage stage =
+              new Cdk8sSetupStage(state, scaffold -> state.scaffold = scaffold);
           runner.runDuring(topic, stage, body, state.onFailure);
           return new Cdk8sSetupDone(state);
         }
       }
 
-      final class Cdk8sSetupStage {
+      final class Cdk8sSetupStage implements Topic.Execution {
         final State state;
+        final Sink sink;
 
-        Cdk8sSetupStage(State state) {
+        Cdk8sSetupStage(State state, Sink sink) {
           this.state = state;
+          this.sink = sink;
+        }
+
+        /** The write-face of the cdk8s-setup topic. */
+        interface Sink extends Topic.Sink {
+          void scaffold(Scaffold scaffold);
+        }
+
+        @Override
+        public String role() {
+          return "cdk8s setup";
         }
 
         Cdk8sSetupStage createChartsAndPaths() {
@@ -210,8 +224,9 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
           final Chart chart = new Chart(app, "manifests");
           final SystemdChart systemdChart = new SystemdChart(app, "systemd");
 
-          state.scaffold =
-              new Scaffold(app, chart, systemdChart, synthOutdir, synthManifestFile, systemdOutdir);
+          sink.scaffold(
+              new Scaffold(
+                  app, chart, systemdChart, synthOutdir, synthManifestFile, systemdOutdir));
 
           return this;
         }
@@ -239,17 +254,30 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         DomainRegistryDone during(
             String topic,
             java.util.function.Function<DomainRegistryStage, DomainRegistryStage> body) {
-          final DomainRegistryStage stage = new DomainRegistryStage(state);
+          final DomainRegistryStage stage =
+              new DomainRegistryStage(state, registry -> state.registry = registry);
           runner.runDuring(topic, stage, body, state.onFailure);
           return new DomainRegistryDone(state);
         }
       }
 
-      final class DomainRegistryStage {
+      final class DomainRegistryStage implements Topic.Execution {
         final State state;
+        final Sink sink;
 
-        DomainRegistryStage(State state) {
+        DomainRegistryStage(State state, Sink sink) {
           this.state = state;
+          this.sink = sink;
+        }
+
+        /** The write-face of the domain-registry topic. */
+        interface Sink extends Topic.Sink {
+          void registry(Registry registry);
+        }
+
+        @Override
+        public String role() {
+          return "domain registry";
         }
 
         DomainRegistryStage buildAndApplyUnits() {
@@ -288,7 +316,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                     DefaultManifestSynthesisService.this.yaml));
           }
 
-          state.registry = new Registry(domainRegistry, manifestUnitHitCount);
+          sink.registry(new Registry(domainRegistry, manifestUnitHitCount));
 
           return this;
         }
@@ -316,17 +344,30 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         SystemdTargetsDone during(
             String topic,
             java.util.function.Function<SystemdTargetsStage, SystemdTargetsStage> body) {
-          final SystemdTargetsStage stage = new SystemdTargetsStage(state);
+          final SystemdTargetsStage stage =
+              new SystemdTargetsStage(state, targets -> state.targets = targets);
           runner.runDuring(topic, stage, body, state.onFailure);
           return new SystemdTargetsDone(state);
         }
       }
 
-      final class SystemdTargetsStage {
+      final class SystemdTargetsStage implements Topic.Execution {
         final State state;
+        final Sink sink;
 
-        SystemdTargetsStage(State state) {
+        SystemdTargetsStage(State state, Sink sink) {
           this.state = state;
+          this.sink = sink;
+        }
+
+        /** The write-face of the systemd-targets topic. */
+        interface Sink extends Topic.Sink {
+          void targets(Targets targets);
+        }
+
+        @Override
+        public String role() {
+          return "systemd targets";
         }
 
         SystemdTargetsStage createTargetHierarchy() {
@@ -417,7 +458,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                   .domainCatalog(domainCatalog)
                   .build();
 
-          state.targets =
+          sink.targets(
               new Targets(
                   rke2labTarget,
                   networkTarget,
@@ -427,7 +468,7 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
                   cniManifestsTarget,
                   operatorManifestsTarget,
                   secretsTarget,
-                  systemdContext);
+                  systemdContext));
 
           return this;
         }
@@ -460,11 +501,16 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         }
       }
 
-      final class SystemdUnitsStage {
+      final class SystemdUnitsStage implements Topic.Execution {
         final State state;
 
         SystemdUnitsStage(State state) {
           this.state = state;
+        }
+
+        @Override
+        public String role() {
+          return "systemd units";
         }
 
         SystemdUnitsStage synthesizeInfrastructureAndDomains() {
@@ -511,11 +557,16 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         }
       }
 
-      final class TargetFinalizationStage {
+      final class TargetFinalizationStage implements Topic.Execution {
         final State state;
 
         TargetFinalizationStage(State state) {
           this.state = state;
+        }
+
+        @Override
+        public String role() {
+          return "target finalization";
         }
 
         TargetFinalizationStage finalizeAndCreateDropIn() {
@@ -580,11 +631,16 @@ public final class DefaultManifestSynthesisService implements ManifestSynthesisS
         }
       }
 
-      final class SynthesisStage {
+      final class SynthesisStage implements Topic.Execution {
         final State state;
 
         SynthesisStage(State state) {
           this.state = state;
+        }
+
+        @Override
+        public String role() {
+          return "synthesis";
         }
 
         SynthesisStage synthAndPostprocess() {

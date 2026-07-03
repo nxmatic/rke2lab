@@ -65,6 +65,40 @@ transition, fail-fast there); Supplier only when read is deferred / conditional 
 `ResourcesTopic` fan-in = eager/unconditional/same-level → direct value (done in G1b). Grave now, wire the
 Supplier face last so it lands as one uniform pass, not braided into each G step.
 
+**Sink is OPTIONAL — a Topic.Execution can be a pure EFFECT (G3, user 2026-07-03).** A topic does not always
+produce an output-value to fold into `B`. It may perform a side EFFECT: mutate an external builder (a cdk8s
+`App`/`Chart` produced by an earlier stage — cdk8s is build-by-side-effect, `synth()` walks the mutated tree)
+or write to disk. `DefaultManifestSynthesisService`'s `systemd units`/`target finalization`/`synthesis`
+stages have NO sink — nothing to add to `B`. They stay topics for the NARRATION (during/then label, phase
+logging, per-phase TopicFailure), not for a flux. Doc's "pushes its output through its sink" was too absolute
+→ "…OR performs an effect". An output type would be phantom on an effect topic (same reason State has no O).
+
+**Ambient verdict FINAL (3 pipelines observed, G1b-2 resolved 2026-07-03).** `PipelineContext` is FOR
+pipeline-level ambient ONLY — transverse data the TRANSITIONS read, shared across a pipeline + its
+sub-pipelines. NOT a blanket `Inputs` replacement. Incus needed it (mid-flow `registry.update`, parent↔sub
+shared) → cured. ClusterSeed/Application did NOT (clean set-once inputs, no mid-flow write, no sub-pipeline) →
+left as-is (converting = compile-time→runtime downgrade). Two shapes it must NOT absorb, both from G3:
+(1) DEEP-RENDER ambient — `ManifestSynthesisContext` is a THREAD-LOCAL read by 20+ UNITS via the
+`ManifestsUnitVisitor` (not topics); threading an instance to each unit is what the thread-local avoids → stays
+thread-local. KEY (user, verified in source): it carries the SAME KIND of data as PipelineContext — pure
+pre-run ambient (the host→OSGi `ManifestSynthesisRequest` + pre-synthesis age key), NOT accumulated flux. The
+two differ on ONE axis: DEPTH OF THE READER. PipelineContext = read by TRANSITIONS (surface, explicit
+instance); thread-local = read by UNITS (deep, ambient by necessity — an explicit instance would contaminate
+20+ non-topic unit signatures). Surface ambient → PipelineContext; deep ambient → thread-local. Neither is
+"better"; different reader depth. (2) FLUX-mistaken-for-ambient — `SystemdSynthesisContext` is built INTO the `Targets` output
+record and read off the accumulator → belongs in `B`, not context. So G3 = stages-only (done); the plan's
+"retire ManifestSynthesisContext into PipelineContext" is CANCELLED (false premise).
+
+**Build-by-side-effect: sink-less topics ↔ thread-local CO-OCCUR, same cause (G3, user insight 2026-07-03).**
+In DefaultManifestSynthesisService the real accumulator is NOT our `B` — it's the EXTERNAL cdk8s tree
+(App/Chart built by setup, mutated by every later stage, walked by synth()). `Topic.Sink` and
+`PipelineContext` are the WRITE/READ faces of OUR `B`; when work lands in an external accumulator, BOTH faces
+recede together: no value to push (sink-less effect topic) AND ambient must reach deep out-of-pipeline code
+(thread-local, not stage-threaded context). Pipeline ORCHESTRATES the subsystem (narration/order/phase-fail),
+doesn't CONTAIN it. NOT 1:1: `domain registry` both pushes a sink AND triggers the thread-local deep-render;
+`synthesis` mutates disk with no thread-local. Correlation = "external accumulator ⇒ both I/O faces of B
+recede", not "sink-less ⇔ thread-local".
+
 **Naming — the `Pipeline` prefix is top-level only (user, 2026-07-03).** A type carries `Pipeline` only
 when top-level and the prefix qualifies it (`PipelineContext`, `ClusterSeedPipeline`). Inner
 classes/interfaces/records inherit the qualifier from the outer pipeline, so the prefix is redundant
