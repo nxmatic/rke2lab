@@ -1,11 +1,11 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
-import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
 import io.nxmatic.rke2lab.cluster.port.ClusterReadinessPhase;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.ClusterReadinessScenario;
+import io.nxmatic.rke2lab.controlplane.bdd.DeferringScenarioExecutor;
 import io.nxmatic.rke2lab.controlplane.bdd.ObservationView;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
@@ -15,6 +15,7 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifi
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.pipeline.Topic;
+import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
@@ -41,8 +42,6 @@ import java.util.stream.StreamSupport;
  */
 public final class ClusterReadinessTopic implements Topic.Checkpoint {
 
-  private static final String JGIVEN_DRY_RUN = "jgiven.report.dry-run";
-
   /**
    * The domain checkpoint this scenario plays. Named by its fully-qualified name because {@code
    * implements Topic.Checkpoint} brings the nested {@code Topic.Checkpoint} type into scope,
@@ -56,7 +55,7 @@ public final class ClusterReadinessTopic implements Topic.Checkpoint {
   private final BootstrapConfig config;
   private final ControlplanePolicy policy;
   private final boolean readinessEnabled;
-  private final boolean pulumiMode;
+  private final LiveGate gate;
   private final Consumer<String> readinessLogger;
   private final Optional<ReportModel> runbook;
   private final Optional<ConsultationLog> consultations;
@@ -76,7 +75,7 @@ public final class ClusterReadinessTopic implements Topic.Checkpoint {
       BootstrapConfig config,
       ControlplanePolicy policy,
       boolean readinessEnabled,
-      boolean pulumiMode,
+      LiveGate gate,
       Consumer<String> readinessLogger,
       Optional<ReportModel> runbook,
       Optional<ConsultationLog> consultations,
@@ -88,7 +87,7 @@ public final class ClusterReadinessTopic implements Topic.Checkpoint {
     this.config = config;
     this.policy = policy;
     this.readinessEnabled = readinessEnabled;
-    this.pulumiMode = pulumiMode;
+    this.gate = gate;
     this.readinessLogger = readinessLogger;
     this.runbook = runbook;
     this.consultations = consultations;
@@ -106,7 +105,7 @@ public final class ClusterReadinessTopic implements Topic.Checkpoint {
   }
 
   public ClusterReadinessTopic launch() {
-    final boolean preview = pulumiMode && Deployment.getInstance().isDryRun();
+    final boolean preview = !gate.isOpen();
 
     if (!readinessEnabled) {
       log("cluster readiness disabled by configuration");
@@ -136,14 +135,6 @@ public final class ClusterReadinessTopic implements Topic.Checkpoint {
 
     final ReportModel reportModel = runbook.orElseGet(ReportModel::new);
 
-    // Preview: set JGiven dry-run so the step bodies are skipped (no live infra touched), but still
-    // PLAY the scenario so its shell renders in the runbook — the same "walk structure, emit doc,
-    // no side effects" notion as the systemd-adapter checkpoint. The result stays deferred.
-    final String previousDryRun = System.getProperty(JGIVEN_DRY_RUN);
-    if (preview) {
-      System.setProperty(JGIVEN_DRY_RUN, "true");
-    }
-
     Throwable failure = null;
     try {
       final Scenario<
@@ -155,6 +146,11 @@ public final class ClusterReadinessTopic implements Topic.Checkpoint {
                   ClusterReadinessScenario.Given.class,
                   ClusterReadinessScenario.When.class,
                   ClusterReadinessScenario.Then.class);
+      // Preview (the LiveGate closed): play the scenario through a DeferringScenarioExecutor that
+      // skips every step body — no live probe touches infrastructure — but the shell still renders
+      // in the runbook. The result stays deferred. Our programmatic startScenario(String) never
+      // consults JGiven's dry-run property, so this executor is what makes the dry-run effective.
+      scenario.setExecutor(new DeferringScenarioExecutor(preview));
       scenario.setModel(reportModel);
       scenario.startScenario(DOMAIN_CHECKPOINT.scenarioTitle());
       try {
@@ -178,12 +174,6 @@ public final class ClusterReadinessTopic implements Topic.Checkpoint {
       }
     } catch (Throwable cause) {
       failure = cause;
-    } finally {
-      if (previousDryRun == null) {
-        System.clearProperty(JGIVEN_DRY_RUN);
-      } else {
-        System.setProperty(JGIVEN_DRY_RUN, previousDryRun);
-      }
     }
 
     if (preview) {

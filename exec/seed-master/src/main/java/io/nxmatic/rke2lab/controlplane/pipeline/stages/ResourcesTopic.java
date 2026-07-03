@@ -11,6 +11,7 @@ import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSn
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.pipeline.Topic;
+import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -28,6 +29,7 @@ public final class ResourcesTopic implements Topic.Execution {
   private final ControlplanePolicy policy;
   private final boolean readinessEnabled;
   private final boolean pulumiMode;
+  private final LiveGate gate;
   private final Consumer<String> readinessLogger;
   private final Optional<ReportModel> runbook;
   private final Optional<ConsultationLog> consultations;
@@ -44,6 +46,7 @@ public final class ResourcesTopic implements Topic.Execution {
       ControlplanePolicy policy,
       boolean readinessEnabled,
       boolean pulumiMode,
+      LiveGate gate,
       Consumer<String> readinessLogger,
       Optional<ReportModel> runbook,
       Optional<ConsultationLog> consultations,
@@ -58,6 +61,7 @@ public final class ResourcesTopic implements Topic.Execution {
     this.policy = policy;
     this.readinessEnabled = readinessEnabled;
     this.pulumiMode = pulumiMode;
+    this.gate = gate;
     this.readinessLogger = readinessLogger;
     this.runbook = runbook;
     this.consultations = consultations;
@@ -93,7 +97,8 @@ public final class ResourcesTopic implements Topic.Execution {
             clusterReadinessContact,
             bootstrapResult,
             systemdAdapterLaunch,
-            pulumiMode));
+            pulumiMode,
+            gate));
     return this;
   }
 }

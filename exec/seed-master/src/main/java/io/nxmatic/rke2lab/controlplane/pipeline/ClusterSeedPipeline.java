@@ -24,6 +24,7 @@ import io.nxmatic.rke2lab.doctor.port.InterventionLedgerWriter;
 import io.nxmatic.rke2lab.doctor.port.MedicalRecordJournal;
 import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
+import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import io.nxmatic.rke2lab.pulumi.edge.PulumiInterventionLedgerWriter;
 import io.nxmatic.rke2lab.pulumi.edge.StackInterventionJournal;
 import io.nxmatic.rke2lab.pulumi.edge.StackMedicalRecordJournal;
@@ -141,7 +142,10 @@ public final class ClusterSeedPipeline {
     }
 
     private AwaitingPreflight running(Consumer<String> readinessLogger, boolean pulumiMode) {
-      inputsBuilder.readinessLogger(readinessLogger).pulumiMode(pulumiMode);
+      inputsBuilder
+          .readinessLogger(readinessLogger)
+          .pulumiMode(pulumiMode)
+          .gate(LiveGate.forRun(pulumiMode));
       inputsBuilder
           .doctor(admitPatient(inputsBuilder, readinessLogger, pulumiMode))
           .systemdRuntimeStatus(resolveSystemdRuntimeStatus(inputsBuilder))
@@ -377,7 +381,7 @@ public final class ClusterSeedPipeline {
           new SystemdAdapterTopic(
               state.inputs.config(),
               state.inputs.policy(),
-              state.inputs.pulumiMode(),
+              state.inputs.gate(),
               state.inputs.readinessLogger(),
               state.inputs.runbook(),
               state.inputs.consultations(),
@@ -418,6 +422,7 @@ public final class ClusterSeedPipeline {
               state.inputs.policy(),
               state.inputs.options().readinessEnabled(),
               state.inputs.pulumiMode(),
+              state.inputs.gate(),
               state.inputs.readinessLogger(),
               state.inputs.runbook(),
               state.inputs.consultations(),

@@ -3,14 +3,9 @@ package io.nxmatic.rke2lab.controlplane.bdd;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.pulumi.deployment.Deployment;
-import com.pulumi.deployment.DeploymentInstance;
 import com.tngtech.jgiven.report.model.ExecutionStatus;
 import com.tngtech.jgiven.report.model.ReportModel;
 import com.tngtech.jgiven.report.model.StepStatus;
@@ -23,6 +18,7 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifi
 import io.nxmatic.rke2lab.doctor.ExactRosterDoctor;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
+import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
@@ -37,7 +33,6 @@ import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.MockedStatic;
 
 /**
  * The cluster-readiness checkpoint plays the systemd-adapter scenario nested (the follow-the-chain
@@ -79,7 +74,11 @@ class NestedRunbookTest {
   void cluster_readiness_renders_with_the_systemd_adapter_dependency_nested(@TempDir Path out) {
     final ReportModel runbook = new ReportModel();
     final VerificationResult result =
-        play(runbook, FakeClusterReadinessProbes.allPhasesReady(), false, readyGeneralist());
+        play(
+            runbook,
+            FakeClusterReadinessProbes.allPhasesReady(),
+            LiveGate.opened(),
+            readyGeneralist());
 
     assertEquals(1, runbook.getScenarios().size());
     assertEquals(ExecutionStatus.SUCCESS, runbook.getScenarios().get(0).getExecutionStatus());
@@ -107,19 +106,20 @@ class NestedRunbookTest {
 
   @Test
   void cluster_readiness_renders_its_shell_in_preview_dry_run(@TempDir Path out) {
-    // Preview = pulumiMode && Deployment.isDryRun(). Mock the static Pulumi seam so the stage takes
-    // its preview path: it sets JGiven dry-run (step bodies skipped, no live infra), still plays +
-    // finishes the scenario so its shell renders, and sinks a deferred result. This is the fix that
-    // makes the cluster checkpoint appear in the runbook on `pulumi preview`.
+    // Preview = the LiveGate closed. The stage plays the scenario through a
+    // DeferringScenarioExecutor (step bodies skipped, no live infra), still finishes it so its
+    // shell
+    // renders, and sinks a deferred result — the fix that makes the cluster checkpoint appear in
+    // the
+    // runbook on `pulumi preview`. The closed gate is injected directly; no static Pulumi seam to
+    // mock.
     final ReportModel runbook = new ReportModel();
-    final DeploymentInstance dryRunDeployment = mock(DeploymentInstance.class);
-    when(dryRunDeployment.isDryRun()).thenReturn(true);
-
-    final VerificationResult result;
-    try (MockedStatic<Deployment> deployment = mockStatic(Deployment.class)) {
-      deployment.when(Deployment::getInstance).thenReturn(dryRunDeployment);
-      result = play(runbook, FakeClusterReadinessProbes.allPhasesReady(), true, readyGeneralist());
-    }
+    final VerificationResult result =
+        play(
+            runbook,
+            FakeClusterReadinessProbes.allPhasesReady(),
+            LiveGate.closed(),
+            readyGeneralist());
 
     assertEquals(1, runbook.getScenarios().size());
     assertFalse(result.handoffReady(), "a preview defers the live checks — no handoff");
@@ -142,7 +142,7 @@ class NestedRunbookTest {
     final ReportModel model = new ReportModel();
     final ConsultationLog consultations = new ConsultationLog();
     final VerificationResult result =
-        play(model, consultations, simulated, false, networkGeneralist());
+        play(model, consultations, simulated, LiveGate.opened(), networkGeneralist());
 
     // The targeted incident makes the cluster scenario FAIL — a targeted runbook — and the failed
     // projection holds the handoff (the output contract the output layer + Stage B gate consume).
@@ -200,7 +200,7 @@ class NestedRunbookTest {
             ClusterReadinessPhase.API_READY, SymptomKind.TIMEOUT);
     final ConsultationLog consultations = new ConsultationLog();
 
-    play(new ReportModel(), consultations, simulated, false, networkGeneralist());
+    play(new ReportModel(), consultations, simulated, LiveGate.opened(), networkGeneralist());
 
     assertEquals(
         1,
@@ -228,7 +228,7 @@ class NestedRunbookTest {
         new ReportModel(),
         consultations,
         FakeClusterReadinessProbes.allPhasesReady(),
-        false,
+        LiveGate.opened(),
         readyGeneralist());
 
     assertTrue(
@@ -238,29 +238,26 @@ class NestedRunbookTest {
 
   /** Play the real stage with no log capture. */
   private static VerificationResult play(
-      ReportModel runbook,
-      ClusterReadinessProbe probe,
-      boolean pulumiMode,
-      ConsultingService doctor) {
-    return play(runbook, probe, pulumiMode, doctor, message -> {});
+      ReportModel runbook, ClusterReadinessProbe probe, LiveGate gate, ConsultingService doctor) {
+    return play(runbook, probe, gate, doctor, message -> {});
   }
 
   private static VerificationResult play(
       ReportModel runbook,
       ClusterReadinessProbe probe,
-      boolean pulumiMode,
+      LiveGate gate,
       ConsultingService doctor,
       java.util.function.Consumer<String> logger) {
-    return play(runbook, new ConsultationLog(), probe, pulumiMode, doctor, logger);
+    return play(runbook, new ConsultationLog(), probe, gate, doctor, logger);
   }
 
   private static VerificationResult play(
       ReportModel runbook,
       ConsultationLog consultations,
       ClusterReadinessProbe probe,
-      boolean pulumiMode,
+      LiveGate gate,
       ConsultingService doctor) {
-    return play(runbook, consultations, probe, pulumiMode, doctor, message -> {});
+    return play(runbook, consultations, probe, gate, doctor, message -> {});
   }
 
   /**
@@ -273,7 +270,7 @@ class NestedRunbookTest {
       ReportModel runbook,
       ConsultationLog consultations,
       ClusterReadinessProbe probe,
-      boolean pulumiMode,
+      LiveGate gate,
       ConsultingService doctor,
       java.util.function.Consumer<String> logger) {
     final VerificationResult[] holder = new VerificationResult[1];
@@ -281,7 +278,7 @@ class NestedRunbookTest {
             config(),
             policy(),
             true,
-            pulumiMode,
+            gate,
             logger,
             Optional.of(runbook),
             Optional.of(consultations),

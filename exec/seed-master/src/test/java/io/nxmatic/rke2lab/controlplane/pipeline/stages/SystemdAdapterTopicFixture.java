@@ -4,6 +4,7 @@ import io.nxmatic.rke2lab.controlplane.bdd.ObservationView;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
+import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
 import io.nxmatic.rke2lab.world.gateway.port.SymptomKind;
 import java.util.Map;
@@ -26,7 +27,7 @@ final class SystemdAdapterTopicFixture {
     return new SystemdAdapterTopic(
         config,
         policy,
-        false, // pulumiMode off → no dry-run, step bodies run
+        LiveGate.opened(), // a real run → step bodies execute (the failing probe must fire)
         message -> {},
         failingProbe,
         summary -> {},

@@ -13,6 +13,7 @@ import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
+import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import io.nxmatic.rke2lab.world.gateway.port.ReadinessAuthority;
 import java.util.Map;
 import java.util.Objects;
@@ -54,6 +55,7 @@ final class PipelineState {
       BootstrapOptions options,
       Consumer<String> readinessLogger,
       boolean pulumiMode,
+      LiveGate gate,
       BootedFramework bootedFramework,
       ConsultingService doctor,
       SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
@@ -83,6 +85,7 @@ final class PipelineState {
       private @MonotonicNonNull BootstrapOptions options;
       private @MonotonicNonNull Consumer<String> readinessLogger;
       private boolean pulumiMode;
+      private @MonotonicNonNull LiveGate gate;
       private @MonotonicNonNull BootedFramework bootedFramework;
       private @MonotonicNonNull ConsultingService doctor;
       private @MonotonicNonNull SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
@@ -141,6 +144,11 @@ final class PipelineState {
         return this;
       }
 
+      Builder gate(LiveGate gate) {
+        this.gate = gate;
+        return this;
+      }
+
       Builder doctor(ConsultingService doctor) {
         this.doctor = doctor;
         return this;
@@ -172,6 +180,7 @@ final class PipelineState {
             Objects.requireNonNull(options, "options"),
             Objects.requireNonNull(readinessLogger, "readinessLogger"),
             pulumiMode,
+            Objects.requireNonNull(gate, "gate"),
             Objects.requireNonNull(bootedFramework, "bootedFramework"),
             Objects.requireNonNull(doctor, "doctor"),
             Objects.requireNonNull(systemdRuntimeStatus, "systemdRuntimeStatus"),

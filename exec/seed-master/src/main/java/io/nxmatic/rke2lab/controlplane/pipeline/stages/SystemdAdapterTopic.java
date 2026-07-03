@@ -1,8 +1,8 @@
 package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
-import com.pulumi.deployment.Deployment;
 import com.tngtech.jgiven.impl.Scenario;
 import com.tngtech.jgiven.report.model.ReportModel;
+import io.nxmatic.rke2lab.controlplane.bdd.DeferringScenarioExecutor;
 import io.nxmatic.rke2lab.controlplane.bdd.ObservationView;
 import io.nxmatic.rke2lab.controlplane.bdd.SimulatedSystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
@@ -14,6 +14,7 @@ import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
 import io.nxmatic.rke2lab.pipeline.Topic;
 import io.nxmatic.rke2lab.pipeline.TopicFailure;
+import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Action;
 import io.nxmatic.rke2lab.world.gateway.port.Consultation;
@@ -33,14 +34,12 @@ import java.util.function.Consumer;
 /**
  * Readiness gate, played as the BDD scenario it documents. The same Given/When/Then that runs
  * offline in tests runs here against the real probe; the scenario's captured snapshot becomes the
- * gate summary that flows into {@code SystemdAdapterResource}. During a Pulumi preview the gate
- * sets JGiven's dry-run property so the scenario renders its living-doc report without probing live
- * infrastructure — the same "walk structure, emit doc, no side effects" notion as {@code pulumi
- * preview} itself.
+ * gate summary that flows into {@code SystemdAdapterResource}. During a Pulumi preview (the {@link
+ * LiveGate} closed) the scenario is played through a {@link DeferringScenarioExecutor} that skips
+ * every step body, so it renders its living-doc report without probing live infrastructure — the
+ * same "walk structure, emit doc, no side effects" notion as {@code pulumi preview} itself.
  */
 public final class SystemdAdapterTopic implements Topic.Checkpoint {
-
-  private static final String JGIVEN_DRY_RUN = "jgiven.report.dry-run";
 
   /**
    * The domain checkpoint this gate plays. Held as a constant because {@code implements
@@ -56,7 +55,7 @@ public final class SystemdAdapterTopic implements Topic.Checkpoint {
 
   private final BootstrapConfig config;
   private final ControlplanePolicy policy;
-  private final boolean pulumiMode;
+  private final LiveGate gate;
   private final Consumer<String> readinessLogger;
   private final Optional<ReportModel> runbook;
   private final Optional<ConsultationLog> consultations;
@@ -77,7 +76,7 @@ public final class SystemdAdapterTopic implements Topic.Checkpoint {
   public SystemdAdapterTopic(
       BootstrapConfig config,
       ControlplanePolicy policy,
-      boolean pulumiMode,
+      LiveGate gate,
       Consumer<String> readinessLogger,
       Optional<ReportModel> runbook,
       Optional<ConsultationLog> consultations,
@@ -88,7 +87,7 @@ public final class SystemdAdapterTopic implements Topic.Checkpoint {
       Optional<Instant> recordedAt) {
     this.config = config;
     this.policy = policy;
-    this.pulumiMode = pulumiMode;
+    this.gate = gate;
     this.readinessLogger = readinessLogger;
     this.runbook = runbook;
     this.consultations = consultations;
@@ -109,7 +108,7 @@ public final class SystemdAdapterTopic implements Topic.Checkpoint {
   SystemdAdapterTopic(
       BootstrapConfig config,
       ControlplanePolicy policy,
-      boolean pulumiMode,
+      LiveGate gate,
       Consumer<String> readinessLogger,
       SystemdAdapterProbe liveProbe,
       Sink sink,
@@ -117,7 +116,7 @@ public final class SystemdAdapterTopic implements Topic.Checkpoint {
     this(
         config,
         policy,
-        pulumiMode,
+        gate,
         readinessLogger,
         Optional.empty(),
         Optional.empty(),
@@ -139,7 +138,7 @@ public final class SystemdAdapterTopic implements Topic.Checkpoint {
   }
 
   public SystemdAdapterTopic launch() {
-    final boolean preview = pulumiMode && Deployment.getInstance().isDryRun();
+    final boolean preview = !gate.isOpen();
 
     // A fake incident is PREVIEW-ONLY: the simulate map is consulted only during `pulumi preview`,
     // never during a real `pulumi up`. Gating purely on dry-run is the safety contract — a stale
@@ -184,11 +183,6 @@ public final class SystemdAdapterTopic implements Topic.Checkpoint {
     // when the probe fails the scenario.
     final ReportModel reportModel = runbook.orElseGet(ReportModel::new);
 
-    final String previousDryRun = System.getProperty(JGIVEN_DRY_RUN);
-    if (dryRun) {
-      System.setProperty(JGIVEN_DRY_RUN, "true");
-    }
-
     ObservationView captured = null;
     Throwable failure = null;
     try {
@@ -201,6 +195,10 @@ public final class SystemdAdapterTopic implements Topic.Checkpoint {
                   SystemdAdapterScenario.Given.class,
                   SystemdAdapterScenario.When.class,
                   SystemdAdapterScenario.Then.class);
+      // A deferred preview plays the scenario but skips every step body (no live probe), so its
+      // shell renders in the runbook without touching infrastructure — the Java seam for JGiven's
+      // dry-run, since our programmatic startScenario(String) never consults the dry-run property.
+      scenario.setExecutor(new DeferringScenarioExecutor(dryRun));
       scenario.setModel(reportModel);
       scenario.startScenario(DOMAIN_CHECKPOINT.scenarioTitle());
       try {
@@ -218,12 +216,6 @@ public final class SystemdAdapterTopic implements Topic.Checkpoint {
       failure = cause;
       captured =
           observationHolder[0]; // the failed observation (with its symptom), if the probe ran
-    } finally {
-      if (previousDryRun == null) {
-        System.clearProperty(JGIVEN_DRY_RUN);
-      } else {
-        System.setProperty(JGIVEN_DRY_RUN, previousDryRun);
-      }
     }
 
     if (failure == null) {

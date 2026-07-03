@@ -8,6 +8,7 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
+import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -27,7 +28,8 @@ public final class ResourceManager {
       ClusterReadinessContact clusterReadinessContact,
       IncusResourceBootstrap.BootstrapResult bootstrapResult,
       Map<String, Object> systemdAdapterLaunchSummary,
-      boolean pulumiMode) {
+      boolean pulumiMode,
+      LiveGate gate) {
 
     final ResourceCreationPipeline pipeline =
         new ResourceCreationPipeline(
@@ -41,7 +43,8 @@ public final class ResourceManager {
             systemdRuntimeStatus,
             clusterReadinessContact,
             bootstrapResult,
-            systemdAdapterLaunchSummary);
+            systemdAdapterLaunchSummary,
+            gate);
 
     if (pulumiMode) {
       final ResourceCreationPipeline.PulumiResources resources = pipeline.createPulumiResources();
