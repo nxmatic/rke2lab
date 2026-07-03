@@ -88,6 +88,62 @@ Conclusion: *additive-with-named-erasure; the pipeline gains one clear responsib
 and loses four scattered anti-patterns.* Status: DESIGN (2026-07-01), the living gate slated first
 (it fixes the hang), then the systemd report, then the output registry.
 
+=== The role map — every pipeline role, where it lives, who touches it
+
+The pattern behind every fluent pipeline (`ClusterSeedPipeline`, `IncusResourceBootstrap`,
+`ApplicationPipeline`, the manifest/systemd synthesizers…) is one set of named roles. The realization
+(2026-07-03) was that the codebase already HAD each role — locally, unnamed, non-uniform (one pipeline
+used a `Sink`, another a registry, a third `Supplier`s, a fourth direct field writes). The refactor
+does not invent; it NAMES the roles and makes them uniform. This map is the transversal view (the
+grammar doc link:../patterns/fluent-pipeline-grammar.adoc[fluent-pipeline-grammar] holds the pattern
+detail; this is where it integrates into the host pipeline).
+
+[mermaid]
+....
+flowchart TB
+  subgraph PORT["pipeline-port — shared, pure (what is common)"]
+    R["FluentTopicRunner<br/>runDuring(S extends Topic)"]:::port
+    OF["OnFailure / TopicFailure"]:::port
+    PC["PipelineContext<br/>ambient Class→record registry"]:::port
+    TP["Topic (identification)<br/>nature() + role() + nested Topic.Sink"]:::port
+    TN["TopicNature<br/>EXECUTION · CHECKPOINT · PIPELINE"]:::port
+  end
+  subgraph PIPE["each pipeline — inner, per-pipeline (what is its own)"]
+    ST["State&lt;I,O,B&gt; = inputs I + accumulator B + context + runner"]:::pipe
+    TS["type-state Awaiting/Done (the ordering)"]:::pipe
+    SK["&lt;Topic&gt;.Sink per topic (the write-face)"]:::pipe
+    TO["topics = fluent multi-verb builders (stages/)"]:::pipe
+  end
+  PORT --> PIPE
+  classDef port fill:#1f6feb,color:#fff;
+  classDef pipe fill:#6f42c1,color:#fff;
+....
+
+[cols="1,1,2",options="header"]
+|===
+| Role | Lives | Touched by
+| `FluentTopicRunner` | port | the transition (`runDuring`)
+| `PipelineContext` (ambient, READ, static) | port type / instanced per pipeline | the transition (`require`) — NEVER a topic
+| `Topic` (identification: `nature`/`role`) | port | the runner's bound; governance + retrofit read it
+| `Topic.Sink` (write-face, per topic) | nested in each topic | the topic (pushes) + the transition (wires it → `B`)
+| `TopicNature` | port | identification
+| `State<I,B>` (I + B + context + runner) | inner to each pipeline | the transition
+| input record `I` (flux + ambient, fused) | inner (per topic) | the transition (composes) + the topic (reads)
+| accumulator `B` (all outputs so far) | inner | the transition (folds sinks in, reads for next `I`)
+| type-state `Awaiting/Done` | inner | the author (ordering)
+| topics (fluent builders) | inner (`stages/`) | the transition
+|===
+
+Two axes make the roles fall out cleanly. *Direction × time:* `PipelineContext` is a READ source that is
+STATIC (frozen before the first topic, an input of the pipeline itself); a `Topic.Sink` is a WRITE
+channel that is FLOWING (one per topic, wired at the transition, it is how an output enters `B` and
+becomes the next topic's flux). *API vs implementation:* the topic's API is its fluent verbs +
+`nature()`/`role()`; its `(input, sink)` construction is implementation the transition wires — the sink
+is never on the API, which is why `Topic.Sink` is nested, not a top-level type. A topic sees only its
+frozen `I` and its `Sink` — never `B`, never the context — so it is deterministic and testable in
+isolation. Writing an output by directly assigning an accumulator field (topic holding a state
+reference) is a DERIVATION the `PIPELINE_PATTERN` governance gate is meant to catch.
+
 [NOTE]
 .Governance note — the build-time laws (staging extension) + the null-safety javac gate
 ====
@@ -141,4 +197,3 @@ source.
 *Coverage of this view:* 2 capabilities, 2 scenarios — complete per <<scenario-completeness>>. Both
 narrated-green (the two-gates design, not yet built); they flip playable when the living gate and the
 output registry ship.
-

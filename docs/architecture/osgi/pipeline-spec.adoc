@@ -424,11 +424,12 @@ borrowed them and *caused the tangle*. The reset:
 | living doc | `ReportModel` | produced VIA the jgiven session, held by the provider
 |===
 
-`PipelineState` (today, flat) becomes `State<I,O,B>` per topic: the shared read-bag splits into a narrow
+`PipelineState` (today, flat) becomes `State<I,B>` per topic: the shared read-bag splits into a narrow
 input record `I` (per-topic flux + ambient, fused by the transition) and the `PipelineContext` (ambient
 only). A topic today recopies ~7 identical params (config/policy/runbook/consultations/doctor/recordedAt/gate);
-after, a topic is `Topic<I,O>` with `O run(I)` — it takes only its input, plus its probe/sink wired at
-construction. `RunMode` is an *ambient record in `PipelineContext`*, read by the transition when it builds
+after, a topic is a fluent multi-verb builder constructed with `(input I, Topic.Sink)` — it reads only its
+input `I` and pushes its output through its sink; it implements the `Topic` identification interface
+(`nature()`/`role()`), NOT a mono-shot `O run(I)`. `RunMode` is an *ambient record in `PipelineContext`*, read by the transition when it builds
 an input — never threaded as a per-topic param (the "gate mal placée" realization). Genuinely-optional
 per-topic data (runbook, consultations) are `Optional<>` fields on `I`. See
 `docs/architecture/patterns/fluent-pipeline-grammar.adoc` for the full State-shape + determinism rule;
@@ -777,7 +778,7 @@ answered both from the design work above — no prototype needed:
   (`RunMode`/`LiveGate`). Pure — `String`/`Map`/`Supplier`, no seed-master type.
 
 | *controlplane.pipeline* (seed-master)
-| flat `PipelineState` becomes `State<I,O,B>` per topic (input record `I` + accumulator `B` +
+| flat `PipelineState` becomes `State<I,B>` per topic (input record `I` + accumulator `B` +
   `PipelineContext` ambient); `*Stage` classes rename to `*Topic`; `BootstrapTopic` becomes the jgiven
   provider (owns session create + render). `RunMode` resolved once, held as an ambient record in
   `PipelineContext`.
@@ -846,7 +847,7 @@ module side): the `bootstrap-pipeline-contributable-vision` memory.
 The defects were discovered symptom-to-root along the thread *non-null → pulumi-outputs → jgiven →
 pipeline*; they are fixed in reverse (pipeline first), each link green before the next:
 
-1. *pipeline* — flat `PipelineState`→`State<I,O,B>` per topic (input record `I` + accumulator `B` +
+1. *pipeline* — flat `PipelineState`→`State<I,B>` per topic (input record `I` + accumulator `B` +
    `PipelineContext` ambient); rename `*Stage`→`*Topic`; `RunMode` as an ambient record in
    `PipelineContext`; `BootstrapTopic` as the jgiven provider.
 2. *jgiven* — resolve the honest-PENDING question (drive dry-run without the JUnit entry), or keep the

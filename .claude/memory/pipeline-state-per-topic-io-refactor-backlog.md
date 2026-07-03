@@ -1,6 +1,6 @@
 ---
 name: pipeline-state-per-topic-io-refactor-backlog
-description: "DESIGN CONVERGED 2026-07-03 (whiteboard .claude/claude-preview.adoc), materialization STARTED. The fluent-pipeline state becomes generic per topic — State<I,O> where each topic declares a narrow input record I (only what it consumes) + output record O; the transition folds O_n into I_{n+1}. Ambient/transverse data goes through a generalized PipelineContext registry (Class→record, lifted from IncusResourceBootstrap.ContextRegistry), READ/WRITTEN ONLY when a transition builds an input — never inside a topic, which keeps each topic's input DETERMINISTIC. Backref chain REJECTED. Census of all 7 rke2lab pipelines done."
+description: "DESIGN CONVERGED 2026-07-03 (whiteboard .claude/claude-preview.adoc), Phase A (Incus pilot) committed ca30367a. Fluent-pipeline state = generic State<I,B> per topic (narrow input record I + fixed accumulator B). NO O type param: a topic PUSHES its output through its Topic.Sink into B (it does not return it). Topic contract = IDENTIFICATION (interface Topic{nature();role(); nested Topic.Sink}), NOT Topic<I,O>{O run(I)} (a topic is a fluent multi-verb builder). Ambient via generalized PipelineContext registry (Class→record, from IncusResourceBootstrap.ContextRegistry), READ/WRITTEN ONLY when a transition builds an input — determinism rule. Backref REJECTED (Sink→B forward supersedes it). Third nature = PIPELINE (nested; 'sub' implicit). Census of 7 pipelines done. KEY: the codebase already HAD every role, we just named + uniformized them."
 metadata:
   node_type: memory
   type: project
@@ -12,29 +12,42 @@ Design **converged** on the whiteboard `.claude/claude-preview.adoc` (full C4/Me
 for the diagrams). Materialization **started**: `Topic<I,O>` + `PipelineContext` in the pipeline-port.
 This memory is the durable summary so we don't re-litigate.
 
-## The decided shape — generic `State<I,O>` + ambient `PipelineContext`
+## The decided shape — `State<I,B>` + `Topic` (identification) + `Topic.Sink` + ambient `PipelineContext`
 
-Each topic declares its own **input record `I`** (only what it consumes) and **output record `O`**
-(only what it produces). The transition folds `O_n` into `I_{n+1}` — "the output of the current state
-is the builder of the next", now lifted to the TYPE level.
+Each topic reads a narrow **input record `I`** (only what it consumes) and PUSHES its output through its
+nested **`Topic.Sink`** into the accumulator `B`. It does NOT return an output — so `State` has no `O`
+parameter (it would be phantom), and `Topic` is NOT `Topic<I,O>`.
 
 ```java
-final class State<I, O, B> {       // State<I,O,Builder> — the user's 3-param shape (2026-07-02)
-  final I inputs;                  // per-topic (MOVES)    — flux + ambient FUSED into I at the transition, safe alone
-  final B builder;                 // per-pipeline (FIXED) — set-once accumulator of the O's = the builder of the next state
-  final PipelineContext context;   // ambient registry — touched ONLY by the transition
+final class State<I,B> {             // per-pipeline shape; I moves per topic, B fixed for the pipeline
+  final I inputs;                    // flux + ambient FUSED into I at the transition, @NonNull, safe alone
+  final B builder;                   // set-once accumulator; topics push into it via their Topic.Sink
+  final PipelineContext context;     // ambient registry — touched ONLY by the transition
   final FluentTopicRunner runner;
 }
-interface Topic<I, O> { O run(I inputs); }   // sees ONLY its frozen I — no context → deterministic
+// port topic contract = IDENTIFICATION, not O run(I) (a topic is a fluent multi-verb builder)
+interface Topic {
+  default TopicNature nature() { return TopicNature.EXECUTION; }
+  String role();
+  interface Sink {}                  // nested: a sink is the write-face OF a topic, not top-level
+}
 ```
 
-**`B` IS parameterized (user, 2026-07-03).** `State<I,O,B>`, not `State<I,O>` over a raw `StateBuilder`
-base — else the shared contract can't type the `O → builder` fold. Kind asymmetry: `I`/`O` MOVE (the
-mutable pair each transition rebuilds); `B` is FIXED for the whole pipeline (it grows as outputs fold in
-but its type never changes). Parameterizing `B` makes the sink `Consumer<O>` folding into `B` — "output
-of the current state = builder of the next" holds at the TYPE level. This resolves the open "single
-accumulator vs last-O-only" question toward the SINGLE ACCUMULATOR: `B` carries all outputs so far, and
-a fan-in topic's input is built by reading several outputs off `B` at the transition.
+**`B` parameterized, `O` dropped (user, 2026-07-03).** `B` is FIXED for the pipeline (grows as outputs
+fold in, type never changes); `I` MOVES per topic. `O` was a phantom once the topic pushes via
+`Topic.Sink` instead of returning — same code smell we refused for `Topic<S extends Sink>`. Single
+accumulator: `B` carries all outputs so far; a fan-in topic's input is built by reading several off `B`
+at the transition.
+
+**API vs impl (user, 2026-07-03).** A topic's API = its fluent verbs + `nature()`/`role()`. Its
+`(inputs, sink)` construction is IMPL the transition wires; the sink is never on the API → `Topic.Sink`
+is NESTED, not top-level. A topic sees only its frozen `I` + its `Sink` — never `B`, never the context.
+Direct accumulator-field writes (`pipeline.x = v`) are a DERIVATION the `PIPELINE_PATTERN` gate catches.
+
+**Sink vs context — orthogonal (user, 2026-07-03).** Context = READ source, STATIC (frozen before topic
+1, an input of the pipeline). Sink = WRITE channel, FLOWING (one per topic, wired at the transition,
+how an output enters `B`). The Sink is also what CLOSES the back-reference question: a topic never walks
+back — the accumulator holds forward (via sinks) everything a downstream topic could want.
 
 **Naming — the `Pipeline` prefix is top-level only (user, 2026-07-03).** A type carries `Pipeline` only
 when top-level and the prefix qualifies it (`PipelineContext`, `ClusterSeedPipeline`). Inner
@@ -71,18 +84,23 @@ what makes the pattern hold over time, not just compile.
 - **Typed-map lookup for flux**: same runtime-miss trade. The map/registry stays for AMBIENT only.
 - **Recursive generics `State<I,O,Prev>` (HList)**: illegible in Java, fights the "clear roles" benefit.
 - **Factoring the transition classes** (a generic `runDuring` on the shared state + `(R) this` cast):
-  the grammar doc's own Pitfall — the type-state IS the deduplication. `State<I,O>` is a per-pipeline
+  the grammar doc's own Pitfall — the type-state IS the deduplication. `State<I,B>` is a per-pipeline
   SHAPE; the transition classes stay explicit and hand-written per pipeline.
+- **`Topic<I,O>{O run(I)}`** — a wrong intuition briefly materialized at the port. Mono-shot, but topics
+  are fluent multi-verb builders. Replaced by `Topic` (identification) + `Topic.Sink`.
 
 ## What IS shared at the pipeline-port (the materialization)
 
-- `Topic<I,O>` — the `O run(I)` contract (deterministic, no context param).
-- `PipelineContext` — the ambient registry, generalized from
-  `controlplane.incus.ContextRegistry` (register/require/update/lookup/contains, `Class→record`,
-  fail-fast `require`). `IncusResourceBootstrap` becomes a CONSUMER of this port type, not its owner —
-  its local `ContextRegistry` is then deleted (no legacy variant, CLAUDE.md uniformity).
-- `FluentTopicRunner` / `OnFailure` / `TopicFailure` are ALREADY generic-ready (`<S> runDuring(...)`) —
-  no change needed.
+- `Topic` — the IDENTIFICATION contract: `nature()` (default EXECUTION) + `role()` + nested `Topic.Sink`
+  marker. The runner's bound `runDuring(<S extends Topic>…)`; the governance/retrofit hook. NOT `O run(I)`.
+- `TopicNature` — `{EXECUTION, CHECKPOINT, PIPELINE}` ("sub" implicit in nesting).
+- `PipelineContext` — the ambient registry, generalized from `controlplane.incus.ContextRegistry`
+  (register/require/lookup/contains — NO `update`, `Class→record`, fail-fast `require`).
+  `IncusResourceBootstrap` becomes a CONSUMER; its local `ContextRegistry` deleted (done, ca30367a).
+- `FluentTopicRunner` / `OnFailure` / `TopicFailure` — bound `runDuring(<S extends Topic>…)`, else no
+  change.
+- Bases `CheckpointTopic` / `PipelineTopic` — emerge later, NOT at the pure port (jGiven lives elsewhere);
+  `PipelineTopic` NOT extracted per A5 (honest duplication).
 
 ## The census — all 7 rke2lab pipelines (scan 2026-07-03)
 
@@ -136,7 +154,7 @@ before topic 1) + FOUR outputs (`DeploymentMetadata`, `ProvisioningMetadata`, `B
 conflating flux and ambient. Under the design: ambient → `PipelineContext`, outputs → accumulator `B`.
 And `ProviderStage.ensureImage`'s `registry.update(BuildMetadata)` mid-flow (the motion the determinism
 rule forbids) is NOT a legitimate ambient enrichment — `BuildMetadata` is a TWO-CONTRIBUTOR output
-(Host: manifests, Provider: imageChecksum). In `State<I,O,B>` it splits into two distinct outputs fused
+(Host: manifests, Provider: imageChecksum). In `State<I,B>` it splits into two distinct outputs fused
 at the fan-in (`toResult`); the `update()` disappears as the symptom it was.
 
 **Decision (user 2026-07-03): materialize `PipelineContext` WITHOUT `update()`** (register/require/
@@ -147,7 +165,7 @@ decide empirically on what the conversion shows, not on hypothesis. This is why 
 ## Sub-pipelines + the three topic-body natures (user, 2026-07-03)
 
 **Sub-pipeline pattern (`pipeline → sub-pipeline1, sub-pipeline2, …`).** A topic whose body is itself a
-`during/then` chain, with its OWN `State<I,O,B>` (own `B`, own topics), returning ONE composite output
+`during/then` chain, with its OWN `State<I,B>` (own `B`, own topics), returning ONE composite output
 to the parent. The parent sees one slot in its `B`, one `O`; the sub-pipeline encapsulates its
 complexity → the parent's `B` stays small, each `I` narrow. Not speculative — the codebase ALREADY
 nests: `ApplicationPipeline`→`ClusterSeedPipeline`; `ClusterSeedPipeline`→`ResourceManager`→
@@ -163,7 +181,7 @@ model?" — yes, as a topic BODY, not a topic):
   (JGiven), two layers": `during/then` orchestrates, jgiven narrates INSIDE a topic. Narration serves
   the operator (runbook) — put it where a human must READ the result, not everywhere.
 - *sub-pipeline* — body is itself a `during/then` chain (own `B`).
-All three share ONE orchestration contract `Topic<I,O> { O run(I); }` (all `FluentTopicRunner` sees), but
+All three share ONE identification contract `interface Topic { nature(); role(); interface Sink {} }` (the runner's `<S extends Topic>` bound), but
 checkpoint + sub-pipeline get an abstract BASE above it (execution stays plain `Topic`). The base does
 TWO things at once — the reconciliation of the two visions we debated (user 2026-07-03): (1) IDENTIFY
 the nature (`nature()`/`role()` — the topic's role in the pipeline is readable at a glance, the thing
@@ -171,7 +189,7 @@ that guides the retrofit), and (2) HOST the ceremony proven identical across ins
 reading BOTH checkpoints (`SystemdAdapterTopic` + `ClusterReadinessTopic`): the ceremony IS byte-identical
 — `preview` flag, `reportModel=runbook.orElseGet`, the `JGIVEN_DRY_RUN` save/set/restore, the
 `Scenario.create→setModel→startScenario→try{script}finally{finished}catch{failure}` skeleton, the
-`consult→log→record` plumbing — so a `CheckpointTopic<I,O>` base hosts it, leaving 2 hooks for the
+`consult→log→record` plumbing — so a `CheckpointTopic` base hosts it, leaving 2 hooks for the
 genuine divergence: `playScript` (given/when/then) + `outcome` (systemd `ReadinessAuthority` STOP/degraded
 vs cluster `VerificationResult` projection). `run(I)` is `final` on the base → the concrete topic supplies
 only what diverges, NEVER re-implements orchestration (this is why base, not interface-with-defaults: the
@@ -180,7 +198,7 @@ scenario collaborators (`ReportModel`/doctor/authority) are AMBIENT → base pul
 (consistent with the determinism rule). jgiven stays a narration engine CALLED from the base, never a
 rival of `during/then`. **CAVEAT (challenge, keep honest):** N=2 checkpoints; a base with ≥3 hooks for 2
 impls is a leaky abstraction — validate at A5 that hooks stay ≤~2, else keep the duplication. Same for
-`SubPipelineTopic<I,O>` (hosts "launch sub-chain, share ambient, local B").
+`PipelineTopic` (hosts "launch nested pipeline, share ambient, local B") — NOT extracted per A5.
 
 ## DECISION — Incus re-decomposed by phases (Option D, user 2026-07-03)
 
@@ -202,6 +220,31 @@ launch`:
 Parent `B` = 3 composite slots instead of 10 flat fields. This is the concrete payoff of the
 sub-pipeline pattern for the richest case, and it is why the pilot is Incus (the decomposition need only
 surfaces on a rich pipeline).
+
+## The Sink closes the back-reference question (2026-07-03)
+
+The codebase already had every role — we just hadn't NAMED or generalized them. Sharpest example:
+yesterday's back-reference chain (walk previous states to find an upstream output by input-class) was
+answering "how does a topic reach a non-adjacent upstream output?". The `Sink` (+ its accumulator `B`)
+answers the SAME need, FORWARD: every topic PUSHES its output through its `Sink` into `B`; `B` retains
+all outputs so far; the transition READS `B` (flux) + context (ambient) to compose the next topic's
+`I`. So a topic never walks back — the accumulator already holds forward everything a downstream topic
+could want, and the transition picks the exact `I`. Yesterday we rejected backref and chose
+"inputs-safe-alone, `I` built at the transition" on paper; we didn't see the FEEDING mechanism
+(`Sink`) was already present in `EnvironmentTopic`. The forward-accumulator is alive because of the
+sink. Mapping of "already there vs false trail": ambient → `ContextRegistry`→`PipelineContext` (was
+there); reach an upstream output → backref-walk (FALSE trail) vs `Sink`→`B` forward (was there); write
+output → `O run(I)` mono-shot (FALSE trail I briefly materialized) vs `Sink` push multi-verb (was there,
+in EnvironmentTopic).
+
+**Correction (2026-07-03): the topic contract is a fluent multi-verb builder + Sink, NOT `O run(I)`.**
+`Topic<I,O>{O run(I)}` was a wrong intuition materialized in the port — it models a mono-shot call,
+but our topics are multi-verb fluent chains (`env.loadX().loadY()`, each verb `this`-returning, pushing
+its part via the sink as it goes) executed by `runDuring<S>`. Remove `Topic<I,O>` from the port. The
+canonical sink is the multi-method interface (à la `EnvironmentTopic.Sink`), not a mono-record
+`Consumer<O>` — it fits topics that produce progressively across verbs. Incus's direct-field writes
+(`prepare.localPaths = x`) are a DERIVATION to fix: route through a per-topic Sink so the topic is
+decoupled from `B` and testable in isolation.
 
 ## A5 retro verdict (2026-07-03, Incus pilot done)
 
