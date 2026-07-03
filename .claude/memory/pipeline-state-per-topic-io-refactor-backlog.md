@@ -203,6 +203,25 @@ Parent `B` = 3 composite slots instead of 10 flat fields. This is the concrete p
 sub-pipeline pattern for the richest case, and it is why the pilot is Incus (the decomposition need only
 surfaces on a rich pipeline).
 
+## A5 retro verdict (2026-07-03, Incus pilot done)
+
+- **No `SubPipelineTopic` base.** Read the 3 hand-written sub-pipelines (PreparePipeline/
+  ProvisionPipeline/LaunchPipeline) side by side: the only common part is `runner`/`onFailure`/
+  `bootstrap = context.require(BootstrapContext.class)` + the `runDuring→assemble record` skeleton
+  (~3-4 lines). Everything else diverges structurally — each accumulator is a set of TYPED fields
+  (not a map, deliberately, to keep flux compile-time), the topics/bodies/upstreams/output type all
+  differ. A base would force heavy generics for ~4 lines of gain and couldn't abstract the typed-field
+  accumulators without reintroducing a runtime map. This is the caveat "honest duplication beats the
+  leaky abstraction" — visual regularity of the three (same ossature) is convention-uniformity, enough.
+  Revisit only if a later pipeline shows a genuinely shared sub-pipeline shape.
+- **`update()`-free confirmed.** Splitting BuildMetadata into two producers (PREPARE manifests +
+  PROVISION imageChecksum) recombined at `toResult` removed the only `update` use → `PipelineContext`
+  stays register/require/lookup/contains, no update.
+- **`toResult` = the parent's terminal verb = `build()` of the parent B** (3 composite slots →
+  BootstrapResult). Kept the name `toResult` (a documented terminal verb); sub-pipelines use `run()`
+  as their `toOutput`.
+- Cleaned the dangling `ApplyState` javadoc left above PreparePipeline.
+
 ## Still to settle (final design, before/while materializing)
 
 - Where `PipelineContext` lives: pipeline-port (`osgi/foundation/pipeline`, beside FluentTopicRunner) —
