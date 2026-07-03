@@ -35,13 +35,22 @@
       <artifactId>bnd-read</artifactId>
       <version>1.0.0</version>
     </dependency>
-    <!-- The record-purity guard reads each type=record bundle's exported .class through ASM (bytecode
-         only, no linking — the records reference jackson/systemd types this realm does not carry).
-         9.8 reads JDK 25 class files; Maven core bundles an older ASM, so we carry our own. -->
+    <!-- ASM (versions from the asm-bom imported in bom/pom.xml): the record-purity / realm gates read
+         bytecode via the core visitor; the PIPELINE_PATTERN read-face check runs a SourceInterpreter
+         over each owner's topic-construction call-site (asm-tree + asm-analysis) — it traces the
+         producing instruction of every constructor argument, a bare read of the mutated accumulator
+         being the drift it catches. -->
     <dependency>
       <groupId>org.ow2.asm</groupId>
       <artifactId>asm</artifactId>
-      <version>9.8</version>
+    </dependency>
+    <dependency>
+      <groupId>org.ow2.asm</groupId>
+      <artifactId>asm-tree</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.ow2.asm</groupId>
+      <artifactId>asm-analysis</artifactId>
     </dependency>
     <!-- The SCHEMA_CONCORD gate validates each Document coordinate's <slug>.schema.json against the
          JSON-Schema meta-schema. networknt is jackson-based; this is build-tooling only (no runtime

@@ -1,23 +1,52 @@
 package io.nxmatic.rke2lab.maven.staging;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldInsnNode;
+import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.analysis.Analyzer;
+import org.objectweb.asm.tree.analysis.AnalyzerException;
+import org.objectweb.asm.tree.analysis.Frame;
+import org.objectweb.asm.tree.analysis.SourceInterpreter;
+import org.objectweb.asm.tree.analysis.SourceValue;
 
 /**
- * The build-time shape check of a fluent-pipeline topic (the {@code PIPELINE_PATTERN} law): a class
- * that participates in the pipeline grammar must {@code implements Topic} AND declare exactly one
- * nature — {@code Topic.Execution}, {@code Topic.Checkpoint}, or {@code Topic.Pipeline}. The nature
- * is a nested TYPE, not a returned enum, so it is visible in the {@code implements} list of the
- * bytecode; a class that carries the bare {@code Topic} marker with no nature (or, defensively,
- * more than one) is out of spec. See docs/architecture/patterns/fluent-pipeline-grammar.adoc.
+ * The build-time shape check of a fluent-pipeline topic (the {@code PIPELINE_PATTERN} law), two
+ * increments in one pass over a scanned surface (a bundle jar or the exec's {@code target/classes},
+ * the dual-surface scan {@link RealmBoundary} also uses). See
+ * docs/architecture/patterns/fluent-pipeline-grammar.adoc.
  *
- * <p>Reads signatures only (the interface list, {@code ClassReader.SKIP_CODE}) over every class of
- * a scanned surface — {@code ClassEntry} list, so the SAME instance serves a bundle jar
- * (manifests's internal topics) and the exec's own {@code target/classes} (seed-master's host
- * topics), exactly as {@link RealmBoundary} runs on both realms. The read-face invariant (a topic
- * reads a produced slot through a {@code Supplier}, never a copied reference) is a separate later
- * increment — it needs call-site stack analysis, not the interface list.
+ * <ul>
+ *   <li><b>Nature (A):</b> a class that {@code implements Topic} declares EXACTLY one nature —
+ *       {@code Topic.Execution} / {@code Topic.Checkpoint} / {@code Topic.Pipeline}. The nature is
+ *       a nested TYPE (not a returned enum), visible in the interface list; a bare {@code Topic}
+ *       with no nature, or two natures, is out of spec.
+ *   <li><b>Read-face (C) — the one-source-of-truth invariant:</b> at the site where an owner
+ *       constructs a topic, no constructor argument may be a bare read of a produced slot off the
+ *       accumulator. A topic reads such a slot through a {@code Supplier} read-face (a method-ref,
+ *       compiled to {@code invokedynamic}), never a copied reference — because a copy silently
+ *       drifts from its source when the system evolves.
+ * </ul>
+ *
+ * <p><b>How C decides, with no name heuristic.</b> The <i>accumulator</i> is discovered
+ * structurally: a type whose instance field is written ({@code putfield}) from a method of ANOTHER
+ * class — the signature of a mutable slot a sink writes into (the pipeline's {@code StateBuilder} /
+ * local {@code State}), never an immutable inputs record (its fields are written only in its own
+ * constructor). At each {@code new Topic(...)} the {@link SourceInterpreter} traces the producing
+ * instruction of every argument; an argument produced by an {@code invokevirtual}/{@code
+ * invokeinterface} whose owner IS an accumulator type is a bare slot read — the violation. A {@code
+ * Supplier} read-face is an {@code invokedynamic} (not flagged); a derived scalar ({@code
+ * builder.bootstrap().deployment().timestamp()}) has its argument produced by {@code timestamp()}
+ * on a non-accumulator type (not flagged) — the immediate producer is what the interpreter reports,
+ * so the intermediate accumulator read is invisible, exactly as intended.
  */
 final class PipelinePattern {
 
@@ -25,49 +54,38 @@ final class PipelinePattern {
   private static final String EXECUTION = "io/nxmatic/rke2lab/pipeline/Topic$Execution";
   private static final String CHECKPOINT = "io/nxmatic/rke2lab/pipeline/Topic$Checkpoint";
   private static final String PIPELINE = "io/nxmatic/rke2lab/pipeline/Topic$Pipeline";
+  private static final String INIT = "<init>";
 
   private PipelinePattern() {}
 
-  /** The out-of-spec lines for one scanned surface: each topic that carries no single nature. */
+  /** Nature (A) + read-face (C) violations across one scanned surface. */
   static List<String> violations(List<ResolvedBundle.ClassEntry> classes) {
-    final List<String> lines = new ArrayList<>();
+    final List<ClassNode> nodes = new ArrayList<>();
     for (ResolvedBundle.ClassEntry entry : classes) {
-      inspect(entry, lines);
+      final ClassNode node = new ClassNode();
+      new ClassReader(entry.bytes()).accept(node, ClassReader.SKIP_DEBUG);
+      nodes.add(node);
+    }
+
+    final Set<String> topics = topicTypes(nodes);
+    final Set<String> accumulators = accumulatorTypes(nodes);
+
+    final List<String> lines = new ArrayList<>();
+    for (ClassNode node : nodes) {
+      natureViolations(node, lines);
+      readFaceViolations(node, topics, accumulators, lines);
     }
     return lines;
   }
 
-  /**
-   * A class is a topic iff its interface list mentions {@code Topic} or any nature. Of those, a
-   * valid topic declares EXACTLY one nature; the bare {@code Topic} marker alone (no nature) or two
-   * natures is the violation. The contract itself — {@code Topic} and its three nested nature
-   * interfaces ({@code Topic$Execution} …), which extend {@code Topic} and so carry it in their own
-   * interface list — is the DEFINITION, not a topic, so it is skipped by binary name (pipeline-port
-   * IS in the reactor, so they DO reach this scan).
-   */
-  private static void inspect(ResolvedBundle.ClassEntry entry, List<String> lines) {
-    if (entry.binaryName().startsWith(TOPIC)) {
-      return; // the Topic contract + its nested nature interfaces — the definition, not a topic.
-    }
-    final String[] interfaces = new ClassReader(entry.bytes()).getInterfaces();
+  // ---- Nature (A) ----------------------------------------------------------------------------
 
-    boolean marker = false;
-    int natures = 0;
-    for (String iface : interfaces) {
-      switch (iface) {
-        case TOPIC -> marker = true;
-        case EXECUTION, CHECKPOINT, PIPELINE -> {
-          marker = true;
-          natures++;
-        }
-        default -> {}
-      }
+  private static void natureViolations(ClassNode node, List<String> lines) {
+    if (isContract(node.name) || !isTopic(node)) {
+      return;
     }
-    if (!marker) {
-      return; // not a topic — nothing to say.
-    }
-
-    final String simple = simpleName(entry.binaryName());
+    final int natures = natureCount(node);
+    final String simple = simpleName(node.name);
     if (natures == 0) {
       lines.add(simple + " implements Topic with no nature (Execution/Checkpoint/Pipeline)");
     } else if (natures > 1) {
@@ -75,8 +93,167 @@ final class PipelinePattern {
     }
   }
 
-  private static String simpleName(String binaryName) {
-    final int slash = binaryName.lastIndexOf('/');
-    return slash < 0 ? binaryName : binaryName.substring(slash + 1);
+  // ---- Read-face (C) -------------------------------------------------------------------------
+
+  /**
+   * Types whose classes construct topics carry the accumulator reads: for each method, each {@code
+   * new Topic(...)} is traced and any argument produced by a bare accumulator-slot read is flagged.
+   */
+  private static void readFaceViolations(
+      ClassNode owner, Set<String> topics, Set<String> accumulators, List<String> lines) {
+    for (MethodNode method : owner.methods) {
+      if (method.instructions.size() == 0 || !constructsATopic(method, topics)) {
+        continue;
+      }
+      final Frame<SourceValue>[] frames = analyze(owner.name, method);
+      if (frames == null) {
+        continue;
+      }
+      final AbstractInsnNode[] insns = method.instructions.toArray();
+      for (int i = 0; i < insns.length; i++) {
+        if (!(insns[i] instanceof MethodInsnNode call)
+            || call.getOpcode() != Opcodes.INVOKESPECIAL
+            || !INIT.equals(call.name)
+            || !topics.contains(call.owner)) {
+          continue;
+        }
+        final Frame<SourceValue> frame = frames[i];
+        if (frame == null) {
+          continue; // dead code — never reached.
+        }
+        flagBareAccumulatorArgs(call, frame, accumulators, simpleName(owner.name), lines);
+      }
+    }
+  }
+
+  /**
+   * For each argument of the topic constructor {@code call}, flag it when its single producing
+   * instruction is an {@code invokevirtual}/{@code invokeinterface} whose owner is an accumulator
+   * type — a bare read of a produced slot, which must instead be a {@code Supplier} read-face.
+   */
+  private static void flagBareAccumulatorArgs(
+      MethodInsnNode call,
+      Frame<SourceValue> frame,
+      Set<String> accumulators,
+      String ownerSimple,
+      List<String> lines) {
+    final Type[] argTypes = Type.getArgumentTypes(call.desc);
+    int slot = frame.getStackSize();
+    for (int a = argTypes.length - 1; a >= 0; a--) {
+      slot -= argTypes[a].getSize();
+      if (slot < 0) {
+        return; // defensive: stack shape unexpected.
+      }
+      final SourceValue value = frame.getStack(slot);
+      if (value.insns.size() != 1) {
+        continue; // merged from branches — not a single bare read.
+      }
+      final AbstractInsnNode producer = value.insns.iterator().next();
+      if (producer instanceof MethodInsnNode read
+          && (read.getOpcode() == Opcodes.INVOKEVIRTUAL
+              || read.getOpcode() == Opcodes.INVOKEINTERFACE)
+          && accumulators.contains(read.owner)) {
+        lines.add(
+            ownerSimple
+                + " constructs "
+                + simpleName(call.owner)
+                + " with a bare accumulator read "
+                + simpleName(read.owner)
+                + "."
+                + read.name
+                + "() (use a Supplier read-face)");
+      }
+    }
+  }
+
+  private static boolean constructsATopic(MethodNode method, Set<String> topics) {
+    for (AbstractInsnNode insn : method.instructions.toArray()) {
+      if (insn instanceof MethodInsnNode call
+          && call.getOpcode() == Opcodes.INVOKESPECIAL
+          && INIT.equals(call.name)
+          && topics.contains(call.owner)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static Frame<SourceValue>[] analyze(String ownerInternalName, MethodNode method) {
+    try {
+      return new Analyzer<>(new SourceInterpreter()).analyze(ownerInternalName, method);
+    } catch (AnalyzerException ex) {
+      return null; // unanalyzable method — skip rather than fail the build on a tooling limit.
+    }
+  }
+
+  // ---- Type sets over the surface ------------------------------------------------------------
+
+  private static Set<String> topicTypes(List<ClassNode> nodes) {
+    final Set<String> topics = new HashSet<>();
+    for (ClassNode node : nodes) {
+      if (!isContract(node.name) && isTopic(node)) {
+        topics.add(node.name);
+      }
+    }
+    return topics;
+  }
+
+  /**
+   * A type is an accumulator iff one of its instance fields is written ({@code putfield}) from a
+   * method of ANOTHER class — a mutable slot a sink writes into. An immutable inputs record writes
+   * its fields only in its own constructor (same class), so it never qualifies.
+   */
+  private static Set<String> accumulatorTypes(List<ClassNode> nodes) {
+    final Set<String> accumulators = new HashSet<>();
+    for (ClassNode node : nodes) {
+      for (MethodNode method : node.methods) {
+        for (AbstractInsnNode insn : method.instructions.toArray()) {
+          if (insn instanceof FieldInsnNode field
+              && field.getOpcode() == Opcodes.PUTFIELD
+              && !field.owner.equals(node.name)) {
+            accumulators.add(field.owner);
+          }
+        }
+      }
+    }
+    return accumulators;
+  }
+
+  // ---- Shared predicates ---------------------------------------------------------------------
+
+  private static boolean isTopic(ClassNode node) {
+    for (String iface : node.interfaces) {
+      if (TOPIC.equals(iface)
+          || EXECUTION.equals(iface)
+          || CHECKPOINT.equals(iface)
+          || PIPELINE.equals(iface)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static int natureCount(ClassNode node) {
+    int natures = 0;
+    for (String iface : node.interfaces) {
+      if (EXECUTION.equals(iface) || CHECKPOINT.equals(iface) || PIPELINE.equals(iface)) {
+        natures++;
+      }
+    }
+    return natures;
+  }
+
+  /**
+   * The {@code Topic} contract itself and its nested nature interfaces extend {@code Topic} (so
+   * they carry it in their own interface list) but are the DEFINITION, not topics — skipped by
+   * name.
+   */
+  private static boolean isContract(String internalName) {
+    return internalName.startsWith(TOPIC);
+  }
+
+  private static String simpleName(String internalName) {
+    final int slash = internalName.lastIndexOf('/');
+    return slash < 0 ? internalName : internalName.substring(slash + 1);
   }
 }
