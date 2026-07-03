@@ -6,7 +6,7 @@ import io.nxmatic.rke2lab.cluster.port.ClusterReadinessContact;
 import io.nxmatic.rke2lab.controlplane.bbox.BboxReconciliationOrchestrator;
 import io.nxmatic.rke2lab.controlplane.bdd.SystemdAdapterProbe;
 import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
-import io.nxmatic.rke2lab.controlplane.pipeline.PipelineState.PipelineInputs;
+import io.nxmatic.rke2lab.controlplane.pipeline.State.Inputs;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.BboxTopic;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.IncusTopic;
 import io.nxmatic.rke2lab.controlplane.pipeline.stages.PreflightTopic;
@@ -67,13 +67,13 @@ public final class ClusterSeedPipeline {
   private ClusterSeedPipeline() {}
 
   public static ConfiguringPipeline forCluster(BootstrapConfig config, ControlplanePolicy policy) {
-    return new ConfiguringPipeline(PipelineInputs.forCluster(config, policy));
+    return new ConfiguringPipeline(Inputs.forCluster(config, policy));
   }
 
   public static final class ConfiguringPipeline {
-    private final PipelineInputs.Builder inputsBuilder;
+    private final Inputs.Builder inputsBuilder;
 
-    private ConfiguringPipeline(PipelineInputs.Builder inputsBuilder) {
+    private ConfiguringPipeline(Inputs.Builder inputsBuilder) {
       this.inputsBuilder = inputsBuilder;
     }
 
@@ -83,9 +83,9 @@ public final class ClusterSeedPipeline {
   }
 
   public static final class ConfiguredPipeline {
-    private final PipelineInputs.Builder inputsBuilder;
+    private final Inputs.Builder inputsBuilder;
 
-    private ConfiguredPipeline(PipelineInputs.Builder inputsBuilder) {
+    private ConfiguredPipeline(Inputs.Builder inputsBuilder) {
       this.inputsBuilder = inputsBuilder;
     }
 
@@ -99,9 +99,9 @@ public final class ClusterSeedPipeline {
   }
 
   public static final class ComponentBoundPipeline {
-    private final PipelineInputs.Builder inputsBuilder;
+    private final Inputs.Builder inputsBuilder;
 
-    private ComponentBoundPipeline(PipelineInputs.Builder inputsBuilder) {
+    private ComponentBoundPipeline(Inputs.Builder inputsBuilder) {
       this.inputsBuilder = inputsBuilder;
     }
 
@@ -151,7 +151,7 @@ public final class ClusterSeedPipeline {
           .systemdRuntimeStatus(resolveSystemdRuntimeStatus(inputsBuilder))
           .clusterReadinessContact(resolveClusterReadinessContact(inputsBuilder))
           .readinessAuthority(resolveReadinessAuthority(inputsBuilder));
-      return new AwaitingPreflight(new PipelineState(inputsBuilder.build()));
+      return new AwaitingPreflight(new State(inputsBuilder.build()));
     }
 
     /**
@@ -169,7 +169,7 @@ public final class ClusterSeedPipeline {
      * hidden actors.
      */
     private static ConsultingService admitPatient(
-        PipelineInputs.Builder inputsBuilder, Consumer<String> logger, boolean pulumiMode) {
+        Inputs.Builder inputsBuilder, Consumer<String> logger, boolean pulumiMode) {
       final BootedFramework framework = inputsBuilder.bootedFramework();
 
       final StackMedicalRecordJournal medicalRecordJournal =
@@ -223,7 +223,7 @@ public final class ClusterSeedPipeline {
      * statically.
      */
     private static SeedSystemdAdapterRuntimeStatusSnapshot resolveSystemdRuntimeStatus(
-        PipelineInputs.Builder inputsBuilder) {
+        Inputs.Builder inputsBuilder) {
       final SystemdRuntimeProbe probe =
           inputsBuilder.bootedFramework().awaitService(SystemdRuntimeProbe.class, 5000);
       if (probe == null) {
@@ -241,7 +241,7 @@ public final class ClusterSeedPipeline {
      * edge statically.
      */
     private static ClusterReadinessContact resolveClusterReadinessContact(
-        PipelineInputs.Builder inputsBuilder) {
+        Inputs.Builder inputsBuilder) {
       final ClusterReadinessContact contact =
           inputsBuilder.bootedFramework().awaitService(ClusterReadinessContact.class, 5000);
       if (contact == null) {
@@ -257,8 +257,7 @@ public final class ClusterSeedPipeline {
      * {@code @Component} that implements {@code ReadinessAuthority}. Threaded to the stages that
      * build checkpoint Documents and read verdict actions — so the host never reasons on Severity.
      */
-    private static ReadinessAuthority resolveReadinessAuthority(
-        PipelineInputs.Builder inputsBuilder) {
+    private static ReadinessAuthority resolveReadinessAuthority(Inputs.Builder inputsBuilder) {
       final ReadinessAuthority authority =
           inputsBuilder.bootedFramework().awaitService(ReadinessAuthority.class, 5000);
       if (authority == null) {
@@ -271,9 +270,9 @@ public final class ClusterSeedPipeline {
   }
 
   public static final class AwaitingPreflight {
-    private final PipelineState state;
+    private final State state;
 
-    private AwaitingPreflight(PipelineState state) {
+    private AwaitingPreflight(State state) {
       this.state = state;
     }
 
@@ -291,9 +290,9 @@ public final class ClusterSeedPipeline {
   }
 
   public static final class PreflightDone {
-    private final PipelineState state;
+    private final State state;
 
-    private PreflightDone(PipelineState state) {
+    private PreflightDone(State state) {
       this.state = state;
     }
 
@@ -303,9 +302,9 @@ public final class ClusterSeedPipeline {
   }
 
   public static final class AwaitingBbox {
-    private final PipelineState state;
+    private final State state;
 
-    private AwaitingBbox(PipelineState state) {
+    private AwaitingBbox(State state) {
       this.state = state;
     }
 
@@ -322,9 +321,9 @@ public final class ClusterSeedPipeline {
   }
 
   public static final class BboxDone {
-    private final PipelineState state;
+    private final State state;
 
-    private BboxDone(PipelineState state) {
+    private BboxDone(State state) {
       this.state = state;
     }
 
@@ -334,9 +333,9 @@ public final class ClusterSeedPipeline {
   }
 
   public static final class AwaitingIncus {
-    private final PipelineState state;
+    private final State state;
 
-    private AwaitingIncus(PipelineState state) {
+    private AwaitingIncus(State state) {
       this.state = state;
     }
 
@@ -353,9 +352,9 @@ public final class ClusterSeedPipeline {
   }
 
   public static final class IncusDone {
-    private final PipelineState state;
+    private final State state;
 
-    private IncusDone(PipelineState state) {
+    private IncusDone(State state) {
       this.state = state;
     }
 
@@ -365,9 +364,9 @@ public final class ClusterSeedPipeline {
   }
 
   public static final class AwaitingSystemdAdapter {
-    private final PipelineState state;
+    private final State state;
 
-    private AwaitingSystemdAdapter(PipelineState state) {
+    private AwaitingSystemdAdapter(State state) {
       this.state = state;
     }
 
@@ -396,9 +395,9 @@ public final class ClusterSeedPipeline {
   }
 
   public static final class SystemdAdapterDone {
-    private final PipelineState state;
+    private final State state;
 
-    private SystemdAdapterDone(PipelineState state) {
+    private SystemdAdapterDone(State state) {
       this.state = state;
     }
 
@@ -408,9 +407,9 @@ public final class ClusterSeedPipeline {
   }
 
   public static final class AwaitingResources {
-    private final PipelineState state;
+    private final State state;
 
-    private AwaitingResources(PipelineState state) {
+    private AwaitingResources(State state) {
       this.state = state;
     }
 
@@ -438,9 +437,9 @@ public final class ClusterSeedPipeline {
   }
 
   public static final class ResourcesDone {
-    private final PipelineState state;
+    private final State state;
 
-    private ResourcesDone(PipelineState state) {
+    private ResourcesDone(State state) {
       this.state = state;
     }
 

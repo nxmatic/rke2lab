@@ -27,9 +27,9 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
  * topic's output (the builder of the next state), and the shared {@link #runner}. See
  * docs/architecture/patterns/fluent-pipeline-grammar.adoc ("State shape").
  */
-final class PipelineState {
+final class State {
 
-  final PipelineInputs inputs;
+  final Inputs inputs;
 
   /**
    * The builder of the next state: each topic folds its output in here, and that accumulated output
@@ -39,7 +39,7 @@ final class PipelineState {
 
   final FluentTopicRunner runner = new FluentTopicRunner("pipeline");
 
-  PipelineState(PipelineInputs inputs) {
+  State(Inputs inputs) {
     this.inputs = inputs;
   }
 
@@ -49,7 +49,7 @@ final class PipelineState {
    * {@link Optional}), so a topic reads any input without a guard. Assembled once via {@link
    * Builder} at the pre-execution → execution boundary (the {@code running…()} transition).
    */
-  record PipelineInputs(
+  record Inputs(
       BootstrapConfig config,
       ControlplanePolicy policy,
       BootstrapOptions options,
@@ -173,8 +173,8 @@ final class PipelineState {
         return Objects.requireNonNull(bootedFramework, "bootedFramework");
       }
 
-      PipelineInputs build() {
-        return new PipelineInputs(
+      Inputs build() {
+        return new Inputs(
             config,
             policy,
             Objects.requireNonNull(options, "options"),
