@@ -29,7 +29,8 @@ public final class FluentTopicRunner {
     this.logScope = logScope;
   }
 
-  public <S> S runDuring(String topic, S topicBuilder, Function<S, S> body, OnFailure onFailure) {
+  public <S extends Topic> S runDuring(
+      String topic, S topicBuilder, Function<S, S> body, OnFailure onFailure) {
     final long startedAt = System.nanoTime();
     LOG.info("[{}] → entering {}", logScope, topic);
     try {
