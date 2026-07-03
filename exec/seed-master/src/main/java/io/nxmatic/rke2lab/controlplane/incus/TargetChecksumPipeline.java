@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
@@ -51,6 +52,16 @@ public final class TargetChecksumPipeline {
       this.paths = paths;
       this.registry = registry;
     }
+
+    // The State owns the ambient; topics read it through state::paths / state::registry (Suppliers
+    // that resolve here on each .get()), never a copied reference — same read-face as the flux.
+    BootstrapPaths paths() {
+      return paths;
+    }
+
+    ProvisioningTargetRegistry registry() {
+      return registry;
+    }
   }
 
   public static final class AwaitingOnFailure {
@@ -68,7 +79,7 @@ public final class TargetChecksumPipeline {
     public CloudInitDone during(
         String topic, Function<CloudInitTargetStage, CloudInitTargetStage> body) {
       final CloudInitTargetStage stage =
-          new CloudInitTargetStage(state.paths, state.targetChecksums::put);
+          new CloudInitTargetStage(state::paths, state.targetChecksums::put);
       state.runner.runDuring(topic, stage, body, state.onFailure);
       return new CloudInitDone(state);
     }
@@ -84,7 +95,7 @@ public final class TargetChecksumPipeline {
     public CloudInitDone during(
         String topic, Function<CloudInitTargetStage, CloudInitTargetStage> body) {
       final CloudInitTargetStage stage =
-          new CloudInitTargetStage(state.paths, state.targetChecksums::put);
+          new CloudInitTargetStage(state::paths, state.targetChecksums::put);
       state.runner.runDuring(topic, stage, body, state.onFailure);
       return new CloudInitDone(state);
     }
@@ -112,7 +123,7 @@ public final class TargetChecksumPipeline {
     public RegisteredComponentsDone during(
         String topic, Function<RegisteredComponentsStage, RegisteredComponentsStage> body) {
       final RegisteredComponentsStage stage =
-          new RegisteredComponentsStage(state.registry, state.targetChecksums::put);
+          new RegisteredComponentsStage(state::registry, state.targetChecksums::put);
       state.runner.runDuring(topic, stage, body, state.onFailure);
       return new RegisteredComponentsDone(state);
     }
@@ -139,10 +150,10 @@ public final class TargetChecksumPipeline {
   }
 
   public static final class CloudInitTargetStage implements Topic.Execution {
-    private final BootstrapPaths paths;
+    private final Supplier<BootstrapPaths> paths;
     private final ChecksumSink sink;
 
-    CloudInitTargetStage(BootstrapPaths paths, ChecksumSink sink) {
+    CloudInitTargetStage(Supplier<BootstrapPaths> paths, ChecksumSink sink) {
       this.paths = paths;
       this.sink = sink;
     }
@@ -153,6 +164,7 @@ public final class TargetChecksumPipeline {
     }
 
     public CloudInitTargetStage fromCloudInitRoots() {
+      final BootstrapPaths paths = this.paths.get();
       // Cloud-init target: STATIC. Cloud-init reads the seed once at first boot, so any change
       // to the source ConfigMap means we recreate the instance.
       // runtimeCloudConfigRoot generates cloudSeedRoot (user-data/meta-data/network-config);
@@ -165,10 +177,10 @@ public final class TargetChecksumPipeline {
   }
 
   public static final class RegisteredComponentsStage implements Topic.Execution {
-    private final ProvisioningTargetRegistry registry;
+    private final Supplier<ProvisioningTargetRegistry> registry;
     private final ChecksumSink sink;
 
-    RegisteredComponentsStage(ProvisioningTargetRegistry registry, ChecksumSink sink) {
+    RegisteredComponentsStage(Supplier<ProvisioningTargetRegistry> registry, ChecksumSink sink) {
       this.registry = registry;
       this.sink = sink;
     }
@@ -179,6 +191,7 @@ public final class TargetChecksumPipeline {
     }
 
     public RegisteredComponentsStage fromRegistry() {
+      final ProvisioningTargetRegistry registry = this.registry.get();
       for (Map.Entry<String, List<Path>> entry : registry.getTargetRoots().entrySet()) {
         final String targetName = entry.getKey();
         sink.checksum(
