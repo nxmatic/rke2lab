@@ -19,6 +19,74 @@ and runs the netplan jar to produce the blueprint and exposes it as
 `lib.networkBlueprint`; nix-darwin-home adds rke2lab as a flake input and consumes
 `deriveMacs` instead of hand-copying the values.
 
+== The synthesis port contract
+
+The `ClusterNetworkBlueprint` above is not reached directly by callers — it is the
+`blueprint` field of a `NetplanSynthesisResult`, produced by the `netplan-port` SPI. That
+port is the exported surface of the domain: a request/response pair over the SPI, plus two
+strongly-typed value objects the addressing model is built from.
+
+[mermaid]
+....
+flowchart LR
+  req["NetplanSynthesisRequest\nclusterName + nodeName\n+ Optional&lt;Net2PlanEndpoint&gt;"]:::v
+  spi["NetplanSynthesisService (SPI)\nproviderId() + synthesize(request)"]:::s
+  res["NetplanSynthesisResult\nblueprint"]:::v
+  bp["ClusterNetworkBlueprint\n(host/lan/lb/node/vip/…)"]:::s
+  cidr["Cidr\nInetAddress + prefixLength"]:::v
+  mac["MacAddress\nvalidated 6-octet value"]:::v
+  n2p["Net2PlanEndpoint\nbaseUri + networkPlanPath"]:::v
+
+  impl["DefaultNetplanSynthesisService\n@Component (netplan-core)"]:::i
+
+  req -->|input| spi
+  spi -->|output| res
+  spi -.->|implemented by| impl
+  res --> bp
+  bp -.->|addressing plans use| cidr
+  bp -.->|interface plans use| mac
+  req -.->|optional mesh intent| n2p
+  classDef s fill:#dae8fc,stroke:#6c8ebf
+  classDef v fill:#d5e8d4,stroke:#82b366
+  classDef i fill:#d5e8d4,stroke:#82b366
+....
+
+[cols="2,3",options="header"]
+|===
+| Port type | Contract
+
+| `NetplanSynthesisService`
+| The SPI: `providerId()` (a stable provider id for diagnostics/policy) and
+  `synthesize(NetplanSynthesisRequest)` → `NetplanSynthesisResult`. Canonical netplan synthesis
+  behind one seam.
+
+| `DefaultNetplanSynthesisService`
+| The OSGi `@Component` (in `netplan-core`) implementing that SPI — the default provider that derives
+  the `ClusterNetworkBlueprint` from a request.
+
+| `NetplanSynthesisRequest`
+| Request record: `clusterName` + `nodeName` (both required, blank-rejected in the canonical
+  constructor) and an `Optional<Net2PlanEndpoint>` mesh-integration intent. Has a `Builder`
+  (defaults `bioskop`/`master`) and a two-arg convenience constructor.
+
+| `NetplanSynthesisResult`
+| Response record wrapping the single `ClusterNetworkBlueprint` the synthesis derived.
+
+| `Net2PlanEndpoint`
+| A lightweight endpoint record (`baseUri` — http/https only — + `networkPlanPath`) letting netplan
+  declare Net2Plan mesh-topology integration intent WITHOUT coupling current synthesis to a remote
+  planner. Resolvable from the `rke2lab.netplan.net2plan.*` properties / `RK2LAB_NET2PLAN_API_ENDPOINT`.
+
+| `Cidr`
+| Strongly-typed IPv4 CIDR value (`InetAddress networkAddress` + `int prefixLength`), parsed and
+  validated via the IPAddress library (`Cidr.parse("10.80.0.0/21")`); a missing prefix or non-IPv4
+  input is rejected at construction.
+
+| `MacAddress`
+| Strongly-typed MAC value: a 6-octet colon-separated string, validated by regex at construction and
+  normalized to lowercase canonical form by `MacAddress.parse`.
+|===
+
 == Background: how the link broke and why it matters
 
 The reverse edge (nix-darwin-home consuming rke2lab's blueprint) was removed.

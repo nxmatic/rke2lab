@@ -119,11 +119,18 @@ package "systemd-adapter" {
   rectangle "SystemdAdapterProperties\nmandatoryTarget + timeout" as props
 }
 
+package "systemd-port (seam)" {
+  rectangle "SystemdAdapterApiPaths\nSTATUS_SYSTEMD + HEALTHZ_SYSTEMD" as apiPaths
+  rectangle "SystemdProbeRequest\ndbusHost/Port + nodeName + imageBuilderHost" as probeReq
+}
+
 rectangle "systemd D-Bus\norg.freedesktop.systemd1" as systemdDbus
 
 app --> controller
+controller ..> apiPaths : serves the paths named by
 controller --> provider
 provider <|.. dbusProvider
+dbusProvider ..> probeReq : opens dbus-on-TCP from
 dbusProvider --> props
 dbusProvider --> systemdDbus
 @enduml
@@ -161,6 +168,30 @@ Provider --> Controller : SystemdStatusSnapshot
 Controller --> Caller : 200 + JSON snapshot
 @enduml
 ----
+
+=== 5) Port contract — the seam types
+
+Review question: what crosses the host↔OSGi frontier, and does it stay free of host types?
+
+The adapter's normalized surface is published to the flat host as two `systemd-port` seam types
+(loaded by the system bundle, so neither side leaks its own config type across):
+
+[cols="2,3",options="header"]
+|===
+| Port type | Contract
+
+| `SystemdAdapterApiPaths`
+| The two normalized HTTP endpoints as constants — `STATUS_SYSTEMD` (`/status/systemd`) and
+  `HEALTHZ_SYSTEMD` (`/healthz/systemd`). A single source of truth shared by the controller that
+  serves them and the Pulumi readiness probe that reads them; no path string is hand-typed twice.
+
+| `SystemdProbeRequest`
+| The pure input crossing the readiness seam: the host-side facts `SystemdRuntimeProbe` needs to
+  open dbus-on-TCP and stamp the connection context — `dbusHost`, `dbusPort`, `nodeName`,
+  `imageBuilderHost`. A record with a normalizing canonical constructor (blank/absent fields fall
+  back to `localhost` / `0` / `unknown`), so the flat host fills it from its `BootstrapConfig` and
+  the OSGi edge consumes it without the host's config type ever crossing the frontier.
+|===
 
 == Review and evolution policy
 

@@ -46,6 +46,12 @@ gets there is additive.
 | Re-expresses each `ManifestsUnit` and domain as a `UnitResource` with Provide/Require — the resolver
   candidate set, the reserved sense of `universe`.
 
+| filter match — `CapabilityFilter`
+| ✅ Shipped (blue)
+| Matches a requirement's `filter:` directive (RFC-1960 LDAP) against a candidate capability's
+  attributes, via `FrameworkUtil.createFilter` — a pure parser usable with no running framework, so it
+  fits the standalone-resolver model. An absent/blank filter matches anything.
+
 | handler SPI, providing half — `UnitHandler`
 | ✅ Shipped (blue)
 | Provides `osgi.extender=unitrepo.handler`. No concrete implementor yet; the requiring half lands with
@@ -323,4 +329,3 @@ Folding the unitrepo docs in reconciles their vocabulary with the atlas's reserv
 The figures above are the design-time proof; the inventory carries the live status. The first buildable
 increment is the handler edge plus load-from-store. Flip green→blue as each ships.
 ====
-

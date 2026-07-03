@@ -213,7 +213,9 @@ view. The mirror constant NAMES must stay in step with the annotation module's e
 A `@Repeatable` annotation posed once is stored as `@GovernedBy`; posed twice or more, Java wraps the
 poses in the container `@GovernedByAll`. The reader handles BOTH shapes and yields a
 `Map<StagingGate, EnforcementLevel>` for the bundle; each gate looks up its own level, defaulting to
-`ERROR`.
+`ERROR`. The element-level `@Exempt` follows the identical rule: one pose stays `@Exempt`, two or
+more fold into the container `@ExemptAll`, and the extension reads both shapes the same way — so an
+element may carry any number of per-gate exemptions without the reader caring which shape Java chose.
 
 == Fail-at-end
 
