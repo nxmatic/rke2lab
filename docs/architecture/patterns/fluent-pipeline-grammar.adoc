@@ -12,11 +12,15 @@ One word per concept, used everywhere (code, docs, commits). This table is the a
 |===
 | Term | Meaning
 
-| *topic* | The grammar unit — one domain phase, entered with `during(label, lambda)`. The topic builder class is `<Topic>Topic` (e.g. `PreflightTopic`). This is the ONLY word for a phase.
-| *input* | Something the pipeline is configured with, known before the first topic runs. Immutable, modelled as a record (`PipelineInputs`). `@NonNull` by construction.
-| *output* | Something a topic produces. Named by what it is (`bbox`, `bootstrap`), never suffixed `Result`/`Summary` — everything a topic yields is an output.
-| *builder* | The `StateBuilder`: the builder of the *next* state. Each topic folds its output in via a sink; the accumulated output + the inputs constitute the next topic's state. Set-once fields (`@MonotonicNonNull`), read through guarded accessors.
-| *state* | The `PipelineState` aggregate: `inputs` (record) + `builder` (StateBuilder) + `runner`.
+| *topic* | The grammar unit — one domain phase, entered with `during(label, lambda)`. The topic builder class is `<Topic>Topic` (e.g. `PreflightTopic`). This is the ONLY word for a phase. Its contract is `Topic<I,O>`: `O run(I)` — it sees only its frozen input, never the context, so its output is a pure function of `I`. A topic's body has one of three natures (see <<_the_three_topic_body_natures>>): execution, checkpoint (narrated), or sub-pipeline.
+| *sub-pipeline* | A topic whose body is itself a `during/then` chain, with its own `State<I,O,B>` (own `B`, own topics), returning ONE composite output to the parent. The parent sees one slot; the sub-pipeline encapsulates its complexity, keeping the parent's `B` small and each `I` narrow. It SHARES the parent's `PipelineContext` (ambient is common) but its `B` is strictly local.
+| *input* | The typed record `I` a topic consumes — only what THAT topic needs. Built explicitly by the transition, `@NonNull` by construction. Carries both flux and ambient, already fused; the topic need not know which field came from where.
+| *output* | The typed record `O` a topic produces. Named by what it is (`bbox`, `bootstrap`), never suffixed `Result`/`Summary` — everything a topic yields is an output.
+| *flux* | Data produced by an upstream topic and consumed by a downstream one. Carried by fields of the input record `I`, so a missing flux value is a compile error. NEVER carried by the context.
+| *ambient* | Transverse data known before the first topic (modes, orchestrators, resolved services, shared charts). Carried by the `PipelineContext` registry; a miss is a fail-fast `require` (mis-wiring), not a "not-yet-produced".
+| *builder* | The `StateBuilder`: the builder of the *next* state — the set-once accumulator of the outputs. Each topic folds its output in via a sink; a transition reads the accumulated outputs to build the next topic's input. Set-once fields (`@MonotonicNonNull`), read through guarded accessors.
+| *context* | The `PipelineContext`: a type-safe `Class→record` registry for AMBIENT records, shared by every pipeline (generalized from the per-pipeline registries that were each reinvented). Read AND written ONLY while a transition builds an input — never inside a topic.
+| *state* | The `State<I,O,B>` aggregate: `inputs` (the record `I`) + `builder` (the accumulator `B`) + `context` (`PipelineContext`) + `runner`. A per-pipeline SHAPE, not a factored base — the transition classes stay explicit. Inner to each pipeline, so it is `State`, not `PipelineState`: the outer pipeline already supplies the qualifier. `I`/`O` move per topic; `B` is fixed for the pipeline.
 | *sink* | The `Consumer` a topic writes its output through, into the builder.
 | *during* / *then* | The two grammar verbs: enter a topic / conjoin to the next. `then()` is mandatory, for readability.
 | *transition* | The move from one topic to the next, carried by the type-state classes `Awaiting<Topic>` and `<Topic>Done`.
@@ -103,38 +107,71 @@ Authors literally cannot:
 
 The cost is one class per state transition (typically one method each). The benefit is that valid pipelines are the only ones that compile.
 
-== State shape: immutable inputs + a mutable output builder
+== State shape: per-topic `State<I,O>` + an ambient `PipelineContext`
 
-The shared state threaded through the transitions is not one flat mutable bag. It has two parts with two different natures, and conflating them is what makes a pipeline state hard to keep null-safe:
+The state threaded through the transitions is not one flat mutable bag. Each topic works against a **narrow input** it fully owns, and everything transverse lives in a **shared context** touched only at the seams. Three parts, three natures — conflating them is what makes a pipeline state hard to keep null-safe AND deterministic:
 
-* **inputs** — everything the pipeline was configured with (config, policy, options, resolved services, the booted framework…). These are *known before the first topic runs* and never change afterwards. Model them as an **immutable record**, assembled once at the pre-execution → execution boundary (the `running…()` transition, where the last inputs — logger, mode, the services resolved from the booted registry — are settled). Because the record is built complete, every input read is `@NonNull` by construction: nothing to annotate.
-* **outputs** — what each topic *produces* (the bbox result, the incus bootstrap result, the launch summary…). These come into being *during* the run, one per topic. Hold them in a **mutable output builder**: the topic writes its result through a sink, the next topic reads it. This builder is a set-once accumulator, so its fields follow the builder convention — `@MonotonicNonNull` + a `requireNonNull` guard where the next topic reads them (see the null-safety memory).
+* **input `I`** — the typed record a topic consumes, *only what THAT topic needs*. Built explicitly by the transition just before the topic runs, so every field is `@NonNull` by construction. It carries two kinds of data, already fused so the topic can't tell them apart:
+** **flux** — an upstream topic's output. Read from the accumulated outputs by the transition. Because it lands in the record `I`, a missing flux value is a *compile* error, not a runtime one.
+** **ambient** — transverse data known before the first topic. Read from the `PipelineContext` by the transition.
+* **output `O`** — the typed record a topic *produces*, one per topic. Folded through a sink into the `StateBuilder`, a set-once accumulator (`@MonotonicNonNull` + `requireNonNull` guard where the next transition reads it).
+* **context** — the `PipelineContext`, a `Class→record` registry for the ambient records, shared by every pipeline.
 
-The insight that ties it to the grammar: **the output of the current state is the builder of the next.** Each transition constructs its topic from `state.inputs` (complete) plus the outputs already accumulated, runs it, folds the new output into the builder, and hands the enriched state to the next `Awaiting…` class. The type-state guarantees a topic can only read outputs that an earlier topic has already produced.
+The insight that ties it to the grammar: **the output of the current state is the builder of the next.** Each transition reads the accumulated outputs (flux) and the context (ambient), *fuses them into the next topic's input `I`*, runs the topic, folds its output into the builder, and hands the enriched state to the next `Awaiting…` class. The type-state guarantees a topic can only receive an `I` built from outputs an earlier topic has already produced.
 
 [source,java]
 ----
-final class PipelineState {
-  final PipelineInputs inputs;   // immutable record, frozen at running…()
-  final StateBuilder builder;    // mutable set-once output accumulator (@MonotonicNonNull fields)
+final class State<I, O, B> {       // a per-pipeline SHAPE, not a factored base
+  final I inputs;                  // per-topic (moves)     — flux + ambient fused at the transition, @NonNull, safe alone
+  final B builder;                 // per-pipeline (fixed)  — the set-once accumulator of the outputs = the builder of the next state
+  final PipelineContext context;   // ambient registry      — read/written ONLY by a transition
   final FluentTopicRunner runner;
 }
+interface Topic<I, O> { O run(I inputs); }   // sees ONLY its frozen I — no context → deterministic
 ----
 
-Genuinely-optional inputs (a caller-supplied runbook, an optional failure handler) are `Optional<>` fields on the record — real absence, not "not yet set". Do not use `@Nullable` for either part: inputs are complete, outputs are set-once. See the null-safety conventions (`@MonotonicNonNull` for set-once, `Optional` for genuine absence).
+The three type parameters are not all of the same kind: `I` and `O` *move* — they are the mutable pair each transition rebuilds (topic N's input and output). `B` is *fixed* for the whole pipeline: it is the one accumulator that grows as outputs fold in, but its type never changes across topics. Parameterizing `B` (rather than a raw `StateBuilder` base) is what keeps the shared shape fully typed — the sink a topic writes through is `Consumer<O>` folding into `B`, so "the output of the current state is the builder of the next" holds at the *type* level, not just by convention. `B` also carries the fan-in: a late topic's input is built by reading several outputs off the accumulator (see <<_the_fan_in>>).
+
+=== The determinism rule — the context is touched only when a transition builds an input
+
+`PipelineContext` is a *mutable* aggregator: nothing technically stops a topic from writing a record mid-flow. If a topic could, its input would depend on the runtime context state at execution time — order-coupled, *non-deterministic*, the exact flat-bag disease wearing a clean type. So the rule:
+
+**The context is read AND written only while a transition builds a topic's input. Never inside a topic.**
+
+* A `Topic` does not receive the context (`run(I)`, not `run(I, context)`), so it can neither read a record at an arbitrary instant nor write one back. Its output is a pure function of `I` → deterministic, testable in isolation.
+* The transition is the single point of contact: read flux (accumulated outputs) + read ambient (`context.require(...)`) → fuse into a frozen `I` → optionally write newly-available ambient for later transitions. Read and write co-located, at one instant.
+* Flux and ambient meet inside `I`; where each field came from is a transition detail the topic need not know.
+
+This turns a *typed* contract into a *typed + deterministic + localized* one: at the moment `I` is assembled it is frozen, and the topic has no handle to reopen the context.
+
+Genuinely-optional inputs (a caller-supplied runbook, an optional failure handler) are `Optional<>` fields on the input record — real absence, not "not yet set". Do not use `@Nullable`: inputs are complete, outputs are set-once, ambient is fail-fast. See the null-safety conventions (`@MonotonicNonNull` for set-once, `Optional` for genuine absence).
 
 [NOTE]
-.This is the FLAT shape — per-topic `State<I,O>` is a planned refinement
+.The flat `PipelineState` is the shape being migrated away from
 ====
-As described here, `PipelineInputs` and `StateBuilder` are *flat*: they merge EVERY topic's inputs and
-outputs into one record + one builder. That is null-safe, but it means each topic sees the whole sack —
-`PreflightTopic` can read `doctor` or the `bootstrap` output it has no business with. The intended
-refinement lifts this to the type level: a generic `State<I, O>` where each topic declares only the
-input record `I` it consumes and the output record `O` it produces, the transition folding `O_n` into
-`I_{n+1}` — so the compiler forbids a topic from reaching another's data. That is a refactor of this
-pattern itself (its own design pass), tracked separately; see the `pipeline-state-per-topic-io-refactor`
-memory. Until then, the flat shape above is the convention.
+Before this design converged, the state was *flat*: a single `PipelineInputs` record + a single `StateBuilder`
+merging EVERY topic's inputs and outputs, threaded via `state::` suppliers. That was null-safe (the null-cleanup
+chantier), but each topic saw the whole sack — `PreflightTopic` could reach `doctor` or the `bootstrap` output it
+has no business with — and the mutable `ContextRegistry` inside `IncusResourceBootstrap` could in principle be
+written mid-flow, making an input order-dependent. The `State<I,O>` + `PipelineContext` shape above is the target;
+the migration is a wave across all pipelines (its own plan), and until a given pipeline is migrated it may still
+show the flat shape. The census of which pipelines conform, diverge, or are pending lives in the
+`pipeline-state-per-topic-io-refactor-backlog` memory.
 ====
+
+== The three topic-body natures
+
+A topic comes in three natures. They share ONE orchestration contract — `Topic<I,O> { O run(I); }`, all the `FluentTopicRunner` ever sees — but two of them get an abstract base *above* that contract that serves two purposes at once: it **identifies** the nature (a topic's role in the pipeline is readable at a glance) and it **hosts the ceremony that is provably identical** across instances. Execution stays a plain `Topic<I,O>`; checkpoint and sub-pipeline get a base.
+
+* **execution** — does a gesture and produces an output `O` (most topics: resolve paths, ensure a provider resource, create an instance, export outputs). Plain `Topic<I,O>`, no base needed.
+* **checkpoint (narrated)** — runs a jGiven scenario to produce a `ReportModel` narrative + a verdict, for the parts an operator must *read*. Only two exist today (`ClusterReadinessTopic`, `SystemdAdapterTopic`, via `*Scenario extends Stage<>`). This is the answer to "do we have jGiven's scenarios in the pipeline model?" — **yes, as a topic nature, not a rival grammar.** *One engine (jGiven), two layers*: `during/then` orchestrates; jGiven narrates *inside* a checkpoint. A `CheckpointTopic<I,O>` base hosts the ceremony the two share verbatim — the `preview` flag, `reportModel = runbook.orElseGet(...)`, the `JGIVEN_DRY_RUN` save/set/restore, the `Scenario.create → setModel → startScenario → try{script}finally{finished()}catch{failure}` skeleton, the `consult → log narration → record` plumbing — leaving two hooks for what genuinely diverges: `playScript(...)` (the given/when/then) and `outcome(...)` (systemd's `ReadinessAuthority` STOP/degraded vs cluster's `VerificationResult` projection). The scenario collaborators (`ReportModel`, doctor, authority) are *ambient* — the base pulls them from `PipelineContext`, consistent with the determinism rule.
+* **sub-pipeline** — the body is itself a `during/then` chain with its own `State<I,O,B>`. It returns one composite output to the parent, so the parent's `B` stays small and each `I` narrow. It shares the parent's `PipelineContext` (ambient is common) but its `B` is strictly local. A `SubPipelineTopic<I,O>` base hosts "launch a sub-chain sharing ambient, keep a local `B`". Already present organically: `ApplicationPipeline`→`ClusterSeedPipeline`; `ClusterSeedPipeline`→`ResourceCreationPipeline`; `DefaultManifestSynthesisService`→`SystemdInfrastructureSynthesizer`.
+
+Base over interface-with-defaults: the shared ceremony needs *state* (the captured observation, the dry-run save/restore), which a default method cannot hold. The base carries the identical logic and the `nature()`/`role()` identifiers; `run(I)` itself is `final` on the base and delegates to the hooks — the concrete topic supplies only what diverges, never re-implements the orchestration.
+
+CAVEAT (honest): there are only N=2 checkpoints. A base with ≥3 abstract hooks for 2 implementations is a leaky abstraction — the duplication would be more honest. The *ceremony* is provably identical (that justifies the base); the *outcome* genuinely diverges (that stays a hook). Validate at materialization that the hooks stay ≤ ~2; if they multiply, keep the duplication instead.
+
+A 10-field `B` (a topic producing four outputs at once) is the smell that a pipeline is hiding several: extract the offender as a sub-pipeline so its outputs live in *its* `B`, not the parent's. Composition is how the small-`I` / small-`B` rule is honoured, rather than one flat giant accumulator.
 
 == Pitfalls observed in this codebase
 
@@ -199,11 +236,13 @@ When you find yourself writing a builder with three or more boolean parameters o
 . Add the terminal verb(s) on the final `*Done` class.
 . Write a sample call site as the first thing — let the call site shape the API.
 
-Reuse from `controlplane.pipeline`:
+Reuse from the pipeline-port (`osgi/foundation/pipeline/pipeline-port`):
 
-* `FluentTopicRunner` (in `osgi/foundation/pipeline/pipeline-port`) — instance-based; `new FluentTopicRunner(scope)` then `.runDuring(topic, stage, body, onFailure)` — the topic-execution loop with logging and exception wrapping
+* `FluentTopicRunner` — instance-based; `new FluentTopicRunner(scope)` then `.runDuring(topic, stage, body, onFailure)` — the topic-execution loop with logging and exception wrapping. Already generic (`<S> runDuring(...)`).
 * `OnFailure` — failure callback SAM
 * `TopicFailure` — wrapped exception type
+* `Topic<I,O>` — the `O run(I)` topic contract (deterministic; no context param) [TARGET — materialized by the per-topic refactor wave]
+* `PipelineContext` — the shared ambient `Class→record` registry, `require`/`lookup`/`register`/`update` [TARGET — generalized from `controlplane.incus.ContextRegistry`, which is then deleted]
 
 Exemplars in this codebase:
 
@@ -225,8 +264,17 @@ For those, prefer a plain method or a small builder without the topic/conjunctio
 
 * **Topic builders**: `<Topic>Topic` (e.g. `PreflightTopic`, `BboxTopic`) — the grammar unit is a *topic*; `Stage` is jgiven's reserved word (a class `extends Stage<>`), never our fluent unit.
 * **State classes**: `Awaiting<Topic>`, `<Topic>Done`. Package-private.
+* **State aggregate**: `State<I,O,B>`, and its accumulator `StateBuilder` — inner to each pipeline. NOT `PipelineState`/`PipelineInputs`: see the `Pipeline`-prefix rule below.
 * **Failure type**: the shared `TopicFailure` (in `pipeline-port`).
 * **Outer pipeline**: short, domain-named (e.g. `ClusterSeedPipeline`), not `…ExecutionPipeline` or `…Orchestrator`.
+
+=== The `Pipeline` prefix — top-level only
+
+A type carries the `Pipeline` prefix only when it is *top-level* and the prefix is what qualifies it (`PipelineContext`, `ClusterSeedPipeline`). A class, interface, or record defined *inner* to a pipeline inherits the qualifier from its outer class, so the prefix there is redundant noise:
+
+* ✅ inner: `State`, `StateBuilder`, `Launch`, `Awaiting<Topic>`, `<Topic>Done` — the enclosing `…Pipeline` already names the context.
+* ✅ top-level / shared port: `PipelineContext`, `Topic<I,O>`, `FluentTopicRunner`, `TopicFailure` — no enclosing class, so the name stands alone (domain-named, `Pipeline`-prefixed only where it disambiguates).
+* ❌ `PipelineState`, `PipelineInputs` as *inner* names — redundant; drop to `State` / the input record's own name.
 
 == Cross-references
 

@@ -414,18 +414,25 @@ borrowed them and *caused the tangle*. The reset:
   `ClusterReadinessStage`→`ClusterReadinessTopic`, `SystemdAdapterStage`→`SystemdAdapterTopic`)
 | executor | `ScenarioExecutor` | `FluentTopicRunner` (already ours)
 | the whole | `Scenario` | the pipeline (`during`.`then`)
-| read context | `@ScenarioState` | *`TopicContext`* — immutable: config, policy, `RunMode`, runbook,
-  consultations, doctor, recordedAt, resolved ports
-| accumulated results | — | *`TopicOutcomes`* — mutable: bboxResult, bootstrapResult,
-  systemdAdapterLaunchSummary, resourceResult
+| per-topic input | `@ScenarioState` | *the input record `I`* — only what THAT topic consumes (flux from
+  an upstream topic + ambient, fused at the transition). `@NonNull` by construction, deterministic.
+| ambient context | `@ScenarioState` (shared) | *`PipelineContext`* — the `Class→record` registry for
+  transverse data known before the first topic: config, policy, `RunMode`, doctor, resolved ports.
+  Read/written ONLY when a transition builds an input.
+| accumulated outputs | — | *the accumulator `B` / `StateBuilder`* — set-once: bbox, bootstrap,
+  systemdAdapterLaunch, resources (outputs, no `Result`/`Summary` suffix).
 | living doc | `ReportModel` | produced VIA the jgiven session, held by the provider
 |===
 
-`PipelineState` (today) splits into `TopicContext` (read) + `TopicOutcomes` (mutable). A topic today
-recopies ~7 identical params (config/policy/runbook/consultations/doctor/recordedAt/gate); after, a
-topic takes `(TopicContext, its probe, its sink)` — ~10 params collapse to ~3. `RunMode` becomes a
-*field of `TopicContext`*, read by reference — no longer threaded as a per-topic param (that was the
-"gate mal placée" realization).
+`PipelineState` (today, flat) becomes `State<I,O,B>` per topic: the shared read-bag splits into a narrow
+input record `I` (per-topic flux + ambient, fused by the transition) and the `PipelineContext` (ambient
+only). A topic today recopies ~7 identical params (config/policy/runbook/consultations/doctor/recordedAt/gate);
+after, a topic is `Topic<I,O>` with `O run(I)` — it takes only its input, plus its probe/sink wired at
+construction. `RunMode` is an *ambient record in `PipelineContext`*, read by the transition when it builds
+an input — never threaded as a per-topic param (the "gate mal placée" realization). Genuinely-optional
+per-topic data (runbook, consultations) are `Optional<>` fields on `I`. See
+`docs/architecture/patterns/fluent-pipeline-grammar.adoc` for the full State-shape + determinism rule;
+the migration census is in the `pipeline-state-per-topic-io-refactor-backlog` memory.
 
 == The jgiven provider — one topic furnishes the session, the rest consume it
 
@@ -488,14 +495,14 @@ is then a *re-resolution* event — natural in bootstrap (each launch resolves i
 in-cluster (the operator commanding preview re-resolves, read+ACT).
 
 But resolution chooses only the *form* — it carries no run data. The *matter* of a run (the patient, the
-resolved config, the outputs sink, the recorded instant) still enters through *`TopicContext`*, injected
-as an instance (instance-passing discipline). So:
+resolved config, the outputs sink, the recorded instant) still enters through the *`PipelineContext`*
+(ambient) and the per-topic input, injected as instances (instance-passing discipline). So:
 
 * *resolution (LDAP)* answers *which variant* — `(probe=deferred)` → the preview variant;
-* *`TopicContext` (injected)* answers *with what data this run* — patient, config, sink.
+* *`PipelineContext` (injected)* answers *with what data this run* — patient, config, sink.
 
 The host `RunMode` then projects to *both*: it supplies the resolution filter (probe live/deferred) AND
-feeds the data part of `TopicContext` (e.g. the stack sink). One host axis, two destinations by nature —
+feeds the ambient data in `PipelineContext` (e.g. the stack sink). One host axis, two destinations by nature —
 structural facts resolve, data is passed. *Rule: the mode resolves, the context injects.* NOT built.
 
 *How the host gets this — transpose the ROLE, not the MECHANISM (user, 2026-07-02).* Resolution is an
@@ -519,7 +526,7 @@ sends), never a resolver itself. The port-factory's exact shape is decided at ch
 
 There are three launch modes *in the embedded/bootstrap host*, three coordinates in a *two-axis* space
 (probe × stack), not one binary. A single `RunMode` enum names the input; both gates are projections of
-it. Topics read `RunMode` off `TopicContext`; none reaches for `Deployment.getInstance()`.
+it. The transition reads `RunMode` off `PipelineContext` when it builds a topic's input; no topic reaches for `Deployment.getInstance()`.
 
 [cols="1,1,1",options="header"]
 |===
@@ -538,8 +545,8 @@ system, it merely writes no stack. The axes are orthogonal, each binary in our c
   read-only/read-write split is *internal to Pulumi* (`OutputsStage.exportOrPrint` makes the same
   `context.export` call; the engine simply does not apply in preview). We do not pilot ro/rw.
 
-`RunMode` is resolved once at launch (the one place the dry-run flag is read) and lives on
-`TopicContext`. The `LiveGate` type built today (`LiveGate.forRun(pulumiMode)`, `isOpen()`,
+`RunMode` is resolved once at launch (the one place the dry-run flag is read) and lives as an ambient
+record in `PipelineContext`. The `LiveGate` type built today (`LiveGate.forRun(pulumiMode)`, `isOpen()`,
 `through(live, deferred)`) is the *transitional projection* of the probe axis — on implement it
 becomes `runMode.probesLive()` and the combinator stays.
 
@@ -635,7 +642,7 @@ interface LiveGate {                                       // transitional; beco
 [mermaid]
 ....
 flowchart LR
-  P["pipeline<br/>holds RunMode (on TopicContext)"] --> G["living gate<br/>= runMode.probesLive()"]
+  P["pipeline<br/>holds RunMode (in PipelineContext)"] --> G["living gate<br/>= runMode.probesLive()"]
   G -->|through live/deferred| S["systemd edge<br/>snapshot() | deferredPreview()"]
   G -->|through live/deferred| K["k8s readiness<br/>live probe | jgiven session in dry-run (PENDING)"]
   S --> world1["EXTERNAL — systemd-adapter (dbus)"]
@@ -722,7 +729,7 @@ flowchart TB
   end
   IN --> real["EXTERNAL systems (dbus, kubectl)"]
   OUT --> stack["Pulumi stack outputs"]
-  RM["RunMode (on TopicContext)"]:::mech -.derives.- IN
+  RM["RunMode (in PipelineContext)"]:::mech -.derives.- IN
   RM -.derives.- OUT
   REG["PulumiOutputRegistry (assembly)"]:::mech -.held by.- pipeline
   classDef mech fill:#6f42c1,color:#fff;
@@ -749,10 +756,10 @@ answered both from the design work above — no prototype needed:
 | Open question (June) | Answer (this session)
 | *State model* — jgiven thread-local (`@ProvidedScenarioState`) as the threading mechanism (Role 2),
   or narration+report only with inter-topic state passed as an instance (Role 1)?
-| *Role 1.* `TopicContext` (read) + `TopicOutcomes` (mutable) are passed as instances — honoring the
-  CLAUDE.md instance-passing discipline. jgiven's thread-local stays confined *within* a single
-  verification scenario (local, short-lived). Role 2 is rejected: it would frontally contradict the
-  discipline.
+| *Role 1.* the input record `I` (per-topic, read) + the accumulator `B`/`PipelineContext` (ambient) are
+  passed as instances — honoring the CLAUDE.md instance-passing discipline. jgiven's thread-local stays
+  confined *within* a single verification scenario (local, short-lived). Role 2 is rejected: it would
+  frontally contradict the discipline.
 | *Depth* — do all topics narrate (full Mapping B), or only verification topics keep jgiven?
 | Judged by *the compass*, not by a blanket rule: a topic narrates *iff the operator needs it to
   understand or act*. Not "all 8 by default", not "verification only" — operator-need decides
@@ -770,9 +777,10 @@ answered both from the design work above — no prototype needed:
   (`RunMode`/`LiveGate`). Pure — `String`/`Map`/`Supplier`, no seed-master type.
 
 | *controlplane.pipeline* (seed-master)
-| `PipelineState` splits into `TopicContext` + `TopicOutcomes`; `*Stage` classes rename to `*Topic`;
-  `BootstrapTopic` becomes the jgiven provider (owns session create + render). `RunMode` resolved once,
-  held on `TopicContext`.
+| flat `PipelineState` becomes `State<I,O,B>` per topic (input record `I` + accumulator `B` +
+  `PipelineContext` ambient); `*Stage` classes rename to `*Topic`; `BootstrapTopic` becomes the jgiven
+  provider (owns session create + render). `RunMode` resolved once, held as an ambient record in
+  `PipelineContext`.
 
 | *controlplane.systemd* (seed-master)
 | `SystemdRuntimeStatusReport` (record + `Status`); `SeedSystemdAdapterRuntimeStatusSnapshot.snapshot()`
@@ -785,7 +793,7 @@ answered both from the design work above — no prototype needed:
   `System.setProperty(JGIVEN_DRY_RUN)` and the `isDryRun()` recompute in both topics.
 
 | *the seven `isDryRun()` sites*
-| Refactored to read `RunMode` off `TopicContext` instead of `Deployment.getInstance()` (incremental —
+| Refactored to read `RunMode` off `PipelineContext` instead of `Deployment.getInstance()` (incremental —
   the two readiness/systemd sites first; Incus/image/bbox as they are touched).
 |===
 
@@ -838,8 +846,9 @@ module side): the `bootstrap-pipeline-contributable-vision` memory.
 The defects were discovered symptom-to-root along the thread *non-null → pulumi-outputs → jgiven →
 pipeline*; they are fixed in reverse (pipeline first), each link green before the next:
 
-1. *pipeline* — split `PipelineState`→`TopicContext`+`TopicOutcomes`; rename `*Stage`→`*Topic`;
-   `RunMode` on `TopicContext`; `BootstrapTopic` as the jgiven provider.
+1. *pipeline* — flat `PipelineState`→`State<I,O,B>` per topic (input record `I` + accumulator `B` +
+   `PipelineContext` ambient); rename `*Stage`→`*Topic`; `RunMode` as an ambient record in
+   `PipelineContext`; `BootstrapTopic` as the jgiven provider.
 2. *jgiven* — resolve the honest-PENDING question (drive dry-run without the JUnit entry), or keep the
    gate-deferred probe transitionally; delete the dead `System.setProperty(JGIVEN_DRY_RUN)`; unwind the
    fake-green `SimulatedClusterReadinessProbe.deferred()` + `checking()` tweak. `pulumi preview` proves
