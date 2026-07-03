@@ -24,6 +24,11 @@ package io.nxmatic.rke2lab.domain.annotations;
  *       coordinate with no wire-record yet, or a record whose projected schema is
  *       meta-schema-invalid, is a violation. There is no hand-written schema and no {@code FIELD_*}
  *       string catalog to reconcile — the record's components are the properties.
+ *   <li>{@link #PIPELINE_PATTERN} — a fluent-pipeline topic follows the documented shape: it {@code
+ *       implements Topic} and declares exactly one nature ({@code Topic.Execution} / {@code
+ *       Topic.Checkpoint} / {@code Topic.Pipeline}). The read-face invariant (a topic reads a
+ *       produced slot through a {@code Supplier}, never a copied reference) is a later increment of
+ *       this gate. See docs/architecture/patterns/fluent-pipeline-grammar.adoc.
  * </ul>
  */
 public enum StagingGate {
@@ -32,5 +37,6 @@ public enum StagingGate {
   INSTANCE_DISCIPLINE,
   REALM_BOUNDARY,
   DUPLICATE_REALM_CLASS,
-  SCHEMA_CONCORD
+  SCHEMA_CONCORD,
+  PIPELINE_PATTERN
 }

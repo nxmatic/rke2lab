@@ -478,7 +478,7 @@ public final class IncusResourceBootstrap {
    * deterministic and testable in isolation (give it a config + a throwaway sink, assert what it
    * pushes).
    */
-  private final class PathStage implements Topic {
+  private final class PathStage implements Topic.Execution {
     private final Supplier<BootstrapContext> context;
     private final Sink sink;
 
@@ -519,7 +519,7 @@ public final class IncusResourceBootstrap {
    * metadata it produces in local fields only to log its own summary — it never reads back from the
    * accumulator.
    */
-  private final class HostStage implements Topic {
+  private final class HostStage implements Topic.Execution {
     private final Supplier<BootstrapContext> context;
     private final Supplier<BootstrapPaths> localPaths;
     private final Supplier<ControlplanePolicy> policy;
@@ -1009,7 +1009,7 @@ public final class IncusResourceBootstrap {
    * The provider context, ensured project and image fingerprint are kept as local working fields
    * because later verbs read them — never read back from the accumulator.
    */
-  private final class ProviderStage implements Topic {
+  private final class ProviderStage implements Topic.Execution {
     private final Supplier<BootstrapContext> context;
     private final Supplier<PreparedHost> prepared;
     private final Sink sink;
@@ -1181,7 +1181,7 @@ public final class IncusResourceBootstrap {
    * instance. Reads both flux inputs and its ambient (bootstrap context) by construction; pushes
    * its single output through its {@link Sink}. Holds no reference to the accumulator.
    */
-  private final class InstanceStage implements Topic {
+  private final class InstanceStage implements Topic.Execution {
     private final Supplier<BootstrapContext> context;
     private final Supplier<PreparedHost> prepared;
     private final Supplier<ProvisionedResources> provisioned;

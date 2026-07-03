@@ -333,6 +333,34 @@ public class StagingExecutionStrategy implements MojosExecutionStrategy {
               + " invalid against the JSON-Schema meta-schema");
     }
 
+    // ---- PIPELINE_PATTERN: a fluent-pipeline topic implements Topic + exactly one nature ----
+    // Topics live BOTH in bundle jars (manifests's internal *Topic classes) and in the exec's own
+    // host classes (seed-master's stages), so the scan spans both surfaces exactly as
+    // REALM_BOUNDARY
+    // does. Exec-side violations attribute to the exec's package-info; bundle-side to the bundle.
+    report.record(
+        StagingGate.PIPELINE_PATTERN,
+        execGovernance(session),
+        execPseudoBundle(session),
+        PipelinePattern.violations(
+            ResolvedBundle.classEntriesOf(
+                java.nio.file.Path.of(
+                    session.getCurrentProject().getBuild().getOutputDirectory()))),
+        "fluent-pipeline topics that implement Topic without exactly one nature"
+            + " (Execution/Checkpoint/Pipeline)");
+    for (ResolvedBundle b : resolved) {
+      if (b.launcher()) {
+        continue; // the framework carrier holds no topics.
+      }
+      report.record(
+          StagingGate.PIPELINE_PATTERN,
+          b.governance().levels(),
+          b,
+          PipelinePattern.violations(b.classEntries()),
+          "fluent-pipeline topics that implement Topic without exactly one nature"
+              + " (Execution/Checkpoint/Pipeline)");
+    }
+
     report.flush();
   }
 
