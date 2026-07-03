@@ -1,10 +1,44 @@
 ---
 name: pipeline-state-per-topic-io-refactor-backlog
-description: "DESIGN CONVERGED 2026-07-03 (whiteboard .claude/claude-preview.adoc), Phase A (Incus pilot) committed ca30367a. Fluent-pipeline state = generic State<I,B> per topic (narrow input record I + fixed accumulator B). NO O type param: a topic PUSHES its output through its Topic.Sink into B (it does not return it). Topic contract = IDENTIFICATION (interface Topic{role(); nested Topic.Sink; nested nature types Topic.Execution/Checkpoint/Pipeline}), NOT Topic<I,O>{O run(I)} (a topic is a fluent multi-verb builder). Nature is a nested TYPE not an enum — TopicNature+nature() DELETED, governance reads instanceof Topic.Checkpoint. Ambient via generalized PipelineContext registry (Class→record, from IncusResourceBootstrap.ContextRegistry), READ/WRITTEN ONLY when a transition builds an input — determinism rule. Backref REJECTED (Sink→B forward supersedes it). Census of 7 pipelines done. KEY: the codebase already HAD every role, we just named + uniformized them."
+description: "GZ-2 DONE 2026-07-03: all 7 pipelines on the one-source-of-truth invariant — a topic reads every consumed value through a Supplier resolving at the owner (state::accessor), NEVER a copied reference (flux AND inherited ambient; the G4 'ambient direct' rule RETIRED). Exemplar systemd-synth bba655a9 (+ TargetChecksum fa9b8315, ClusterSeed 8f463496, Incus f5a539c7); LiveGate chantier DONE 809d42d3. DESIGN CONVERGED 2026-07-03 (whiteboard .claude/claude-preview.adoc), Phase A (Incus pilot) committed ca30367a. Fluent-pipeline state = generic State<I,B> per topic (narrow input record I + fixed accumulator B). NO O type param: a topic PUSHES its output through its Topic.Sink into B (it does not return it). Topic contract = IDENTIFICATION (interface Topic{role(); nested Topic.Sink; nested nature types Topic.Execution/Checkpoint/Pipeline}), NOT Topic<I,O>{O run(I)} (a topic is a fluent multi-verb builder). Nature is a nested TYPE not an enum — TopicNature+nature() DELETED, governance reads instanceof Topic.Checkpoint. Ambient via generalized PipelineContext registry (Class→record, from IncusResourceBootstrap.ContextRegistry), READ/WRITTEN ONLY when a transition builds an input — determinism rule. Backref REJECTED (Sink→B forward supersedes it). Census of 7 pipelines done. KEY: the codebase already HAD every role, we just named + uniformized them."
 metadata:
   node_type: memory
   type: project
 ---
+
+## GZ-2 DONE — the one-source-of-truth invariant, applied to all 7 pipelines (2026-07-03)
+
+**The invariant (final, graved in fluent-pipeline-grammar.adoc):** every value a topic consumes it
+reaches through a `Supplier` that resolves at the source of truth (the owner — `State`/sub-pipeline)
+on each read; a topic NEVER holds a copied reference. Rationale the user insisted on: a copied
+reference is a constant only at the instant it is read — when the system later evolves (mid-flow
+write, reordering, a slot gaining a second writer) the copy silently drifts from its source, and that
+drift is hard to find because nothing signals divergence. `Supplier` delegation makes it impossible by
+construction. **"!!! one source of trust !!!"** (user).
+
+Applies to BOTH input kinds, no exception: flux (`state::nixInstall`, `state.builder::bootstrap`) AND
+inherited ambient (`state::systemdChart`, `this::policy`). This RESOLVES the G4 open question (inherited
+ambient direct vs Supplier) in favour of **uniformity → Supplier**: the ambient's owner is the State, so
+it delegates its read like any slot. The earlier "inherited ambient passed direct" rule is RETIRED.
+Sole admissible bare value: a trivially eager single-use read a topic merely FORWARDS (e.g.
+`ResourcesTopic` forwards config/policy to `createResources`), where delegating buys nothing.
+
+**Idiom.** Topic holds `Supplier` fields, unwraps at the verb head (`final var chart =
+this.systemdChart.get();`); a read spread across many methods (Incus `HostStage`) keeps a private
+accessor (`context()` → `context.get()`) so bodies change only `context.`→`context()`. Owner exposes
+the accessor; transition wires the method-ref. **`state::accessor` IS the Supplier** (compiler
+synthesises it, capturing the owner) — do NOT add explicit `Supplier` fields on the owner, that is
+ceremony for the same call path (settled with user after a full back-and-forth). systemd-synth is the
+reference exemplar.
+
+Commits: systemd-synth `bba655a9` (reference) · TargetChecksum `fa9b8315` · ClusterSeed ResourcesTopic
+`8f463496` · Incus 4 topics `f5a539c7` · Application was already conform. All green under
+`-Pall-worlds,nxmatic`. Incus note: it builds-then-runs sequentially (Supplier defers nothing there),
+converted anyway for uniformity + latent-drift safety — no per-pipeline exception for the future
+`PIPELINE_PATTERN` gate (F0) to special-case.
+
+**Still open (post-GZ-2, cosmetic/governance):** F0 `PIPELINE_PATTERN` governance gate; F1 inner-prefix
+renames (`PipelineState`→`State`, `PipelineInputs`→`Inputs`). LiveGate chantier is DONE (`809d42d3`).
 
 ## Status (2026-07-03)
 
