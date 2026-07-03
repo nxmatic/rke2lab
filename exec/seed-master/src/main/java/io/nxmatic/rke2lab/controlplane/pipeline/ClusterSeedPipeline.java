@@ -311,7 +311,7 @@ public final class ClusterSeedPipeline {
               state.inputs.bboxOrchestrator(),
               state.inputs.config().localWorktreePath(),
               state.inputs.options().bboxFailOnError(),
-              output -> state.builder.bbox = output);
+              result -> state.builder.bbox = result);
       state.runner.runDuring(topic, stage, body, state.inputs.onFailure());
       return new BboxDone(state);
     }
@@ -424,9 +424,9 @@ public final class ClusterSeedPipeline {
               state.inputs.doctor(),
               state.inputs.systemdRuntimeStatus(),
               state.inputs.clusterReadinessContact(),
-              () -> state.builder.bootstrap(),
-              () -> state.builder.systemdAdapterLaunch(),
-              output -> state.builder.resources = output);
+              state.builder.bootstrap(),
+              state.builder.systemdAdapterLaunch(),
+              result -> state.builder.resources = result);
       state.runner.runDuring(topic, stage, body, state.inputs.onFailure());
       return new ResourcesDone(state);
     }

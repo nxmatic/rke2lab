@@ -10,12 +10,18 @@ import io.nxmatic.rke2lab.controlplane.resources.ResourceManager.ResourceCreatio
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterRuntimeStatusSnapshot;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
+import io.nxmatic.rke2lab.pipeline.Topic;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
-public final class ResourcesTopic {
+/**
+ * Bootstrap-resources topic — the FAN-IN: its two flux inputs ({@code bootstrap}, {@code
+ * systemdAdapterLaunch}) are outputs of upstream topics, read off the accumulator by the transition
+ * and handed in as concrete values (no {@code Supplier} back-reference). Pushes the created
+ * resources through its {@link Sink}.
+ */
+public final class ResourcesTopic implements Topic.Execution {
 
   private final ResourceManager resourceManager;
   private final BootstrapConfig config;
@@ -28,9 +34,9 @@ public final class ResourcesTopic {
   private final ConsultingService doctor;
   private final SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
   private final ClusterReadinessContact clusterReadinessContact;
-  private final Supplier<IncusResourceBootstrap.BootstrapResult> bootstrapResultSupplier;
-  private final Supplier<Map<String, Object>> systemdAdapterLaunchSupplier;
-  private final Consumer<ResourceCreationResult> sink;
+  private final IncusResourceBootstrap.BootstrapResult bootstrapResult;
+  private final Map<String, Object> systemdAdapterLaunch;
+  private final Sink sink;
 
   public ResourcesTopic(
       ResourceManager resourceManager,
@@ -44,9 +50,9 @@ public final class ResourcesTopic {
       ConsultingService doctor,
       SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
       ClusterReadinessContact clusterReadinessContact,
-      Supplier<IncusResourceBootstrap.BootstrapResult> bootstrapResultSupplier,
-      Supplier<Map<String, Object>> systemdAdapterLaunchSupplier,
-      Consumer<ResourceCreationResult> sink) {
+      IncusResourceBootstrap.BootstrapResult bootstrapResult,
+      Map<String, Object> systemdAdapterLaunch,
+      Sink sink) {
     this.resourceManager = resourceManager;
     this.config = config;
     this.policy = policy;
@@ -58,13 +64,23 @@ public final class ResourcesTopic {
     this.doctor = doctor;
     this.systemdRuntimeStatus = systemdRuntimeStatus;
     this.clusterReadinessContact = clusterReadinessContact;
-    this.bootstrapResultSupplier = bootstrapResultSupplier;
-    this.systemdAdapterLaunchSupplier = systemdAdapterLaunchSupplier;
+    this.bootstrapResult = bootstrapResult;
+    this.systemdAdapterLaunch = systemdAdapterLaunch;
     this.sink = sink;
   }
 
+  /** The write-face of the resources topic. */
+  public interface Sink extends Topic.Sink {
+    void resources(ResourceCreationResult result);
+  }
+
+  @Override
+  public String role() {
+    return "bootstrap resources";
+  }
+
   public ResourcesTopic createAll() {
-    sink.accept(
+    sink.resources(
         resourceManager.createResources(
             config,
             policy,
@@ -75,8 +91,8 @@ public final class ResourcesTopic {
             doctor,
             systemdRuntimeStatus,
             clusterReadinessContact,
-            bootstrapResultSupplier.get(),
-            systemdAdapterLaunchSupplier.get(),
+            bootstrapResult,
+            systemdAdapterLaunch,
             pulumiMode));
     return this;
   }

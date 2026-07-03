@@ -52,6 +52,19 @@ Direct accumulator-field writes (`pipeline.x = v`) are a DERIVATION the `PIPELIN
 how an output enters `B`). The Sink is also what CLOSES the back-reference question: a topic never walks
 back — the accumulator holds forward (via sinks) everything a downstream topic could want.
 
+**Read-face inversion: `Supplier` is the dual of the sink `Consumer` (user insight 2026-07-03 — the LAST
+structuring element; APPLY LAST, uniformly, after every pipeline is on Topic/Topic.Sink).** Sink=`Consumer<O>`
+= WRITE face (topic produces, transition decides where). `Supplier<X>` fan-in input = READ face (another
+topic produced it, transition decides whence, topic decides WHEN it reads). Both keep the topic decoupled
+from `B` (never names `state.builder`). NOT a determinism violation: the CALLER (transition) supplies the
+Supplier over a set-once monotonic upstream output — can't drift, no order-coupling (my initial objection
+was WRONG; user corrected — it's the caller who owns/forwards the supplier). Payoff = the reference stays
+borne at ONE point of the DAG, esp. FORWARDED across a nesting boundary (nested pipeline hands a supplier of
+its parent's output onward without materializing it). CRITERION: default to direct VALUE (materialized at
+transition, fail-fast there); Supplier only when read is deferred / conditional / forwarded cross-nesting.
+`ResourcesTopic` fan-in = eager/unconditional/same-level → direct value (done in G1b). Grave now, wire the
+Supplier face last so it lands as one uniform pass, not braided into each G step.
+
 **Naming — the `Pipeline` prefix is top-level only (user, 2026-07-03).** A type carries `Pipeline` only
 when top-level and the prefix qualifies it (`PipelineContext`, `ClusterSeedPipeline`). Inner
 classes/interfaces/records inherit the qualifier from the outer pipeline, so the prefix is redundant

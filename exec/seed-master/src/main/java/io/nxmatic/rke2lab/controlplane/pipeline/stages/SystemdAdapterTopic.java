@@ -62,7 +62,7 @@ public final class SystemdAdapterTopic implements Topic.Checkpoint {
   private final Optional<ConsultationLog> consultations;
   private final Optional<ConsultingService> doctor;
   private final SystemdAdapterProbe liveProbe;
-  private final Consumer<Map<String, Object>> sink;
+  private final Sink sink;
   private final ReadinessAuthority readinessAuthority;
 
   /**
@@ -83,7 +83,7 @@ public final class SystemdAdapterTopic implements Topic.Checkpoint {
       Optional<ConsultationLog> consultations,
       Optional<ConsultingService> doctor,
       SystemdAdapterProbe liveProbe,
-      Consumer<Map<String, Object>> sink,
+      Sink sink,
       ReadinessAuthority readinessAuthority,
       Optional<Instant> recordedAt) {
     this.config = config;
@@ -112,7 +112,7 @@ public final class SystemdAdapterTopic implements Topic.Checkpoint {
       boolean pulumiMode,
       Consumer<String> readinessLogger,
       SystemdAdapterProbe liveProbe,
-      Consumer<Map<String, Object>> sink,
+      Sink sink,
       ReadinessAuthority readinessAuthority) {
     this(
         config,
@@ -126,6 +126,11 @@ public final class SystemdAdapterTopic implements Topic.Checkpoint {
         sink,
         readinessAuthority,
         Optional.empty());
+  }
+
+  /** The write-face of the systemd-adapter checkpoint — the gate observation as an output map. */
+  public interface Sink extends Topic.Sink {
+    void observation(Map<String, Object> observation);
   }
 
   @Override
@@ -225,7 +230,7 @@ public final class SystemdAdapterTopic implements Topic.Checkpoint {
       // Success — or dry-run, where step bodies are skipped so no observation is produced.
       final ObservationView observation =
           captured != null ? captured : SeedSystemdAdapterEndpointGate.deferredPreview(config);
-      sink.accept(observation.toOutputMap());
+      sink.observation(observation.toOutputMap());
       return this;
     }
 
@@ -242,7 +247,7 @@ public final class SystemdAdapterTopic implements Topic.Checkpoint {
       throw new TopicFailure("systemd adapter", failure);
     }
     log("⚠ " + SCENARIO_ID + " FAILED, verdict=continue-degraded → continuing in DEGRADED mode");
-    sink.accept(degradedObservation(failure).toOutputMap());
+    sink.observation(degradedObservation(failure).toOutputMap());
     return this;
   }
 
