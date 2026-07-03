@@ -17,13 +17,13 @@ import java.util.function.Supplier;
  */
 public final class NetworkTopic implements Topic.Execution {
 
-  private final SystemdChart systemdChart;
-  private final SystemdSynthesisContext context;
+  private final Supplier<SystemdChart> systemdChart;
+  private final Supplier<SystemdSynthesisContext> context;
   private final Supplier<SystemdService> install;
 
   public NetworkTopic(
-      SystemdChart systemdChart,
-      SystemdSynthesisContext context,
+      Supplier<SystemdChart> systemdChart,
+      Supplier<SystemdSynthesisContext> context,
       Supplier<SystemdService> install) {
     this.systemdChart = systemdChart;
     this.context = context;
@@ -36,6 +36,8 @@ public final class NetworkTopic implements Topic.Execution {
   }
 
   public NetworkTopic routeCleanup() {
+    final SystemdChart systemdChart = this.systemdChart.get();
+    final SystemdSynthesisContext context = this.context.get();
     new SystemdService(systemdChart, "rke2lab-route-cleanup")
         .description("Clean up conflicting routes for RKE2Lab")
         .after("network-online.target")
@@ -51,6 +53,8 @@ public final class NetworkTopic implements Topic.Execution {
   }
 
   public NetworkTopic networkConfig() {
+    final SystemdChart systemdChart = this.systemdChart.get();
+    final SystemdSynthesisContext context = this.context.get();
     new SystemdService(systemdChart, "rke2lab-network-config")
         .description("RKE2Lab Network Configuration Service")
         .after("systemd-networkd.service", "cloud-init.service")
@@ -67,6 +71,8 @@ public final class NetworkTopic implements Topic.Execution {
   }
 
   public NetworkTopic networkWait() {
+    final SystemdChart systemdChart = this.systemdChart.get();
+    final SystemdSynthesisContext context = this.context.get();
     new SystemdService(systemdChart, "rke2lab-network-wait")
         .description("Wait for RKE2Lab network readiness")
         .after("network-online.target")
@@ -82,6 +88,8 @@ public final class NetworkTopic implements Topic.Execution {
   }
 
   public NetworkTopic networkDebug() {
+    final SystemdChart systemdChart = this.systemdChart.get();
+    final SystemdSynthesisContext context = this.context.get();
     new SystemdService(systemdChart, "rke2lab-network-debug")
         .description("RKE2Lab network diagnostics")
         .after(context.networkTarget().getUnitFileName())

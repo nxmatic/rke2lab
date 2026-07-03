@@ -20,8 +20,8 @@ import org.jspecify.annotations.Nullable;
  */
 public final class Rke2InstallTopic implements Topic.Execution {
 
-  private final SystemdChart systemdChart;
-  private final SystemdSynthesisContext context;
+  private final Supplier<SystemdChart> systemdChart;
+  private final Supplier<SystemdSynthesisContext> context;
   private final Supplier<SystemdService> nixInstall;
   private final Supplier<SystemdService> floxInstall;
   private final Sink sink;
@@ -32,8 +32,8 @@ public final class Rke2InstallTopic implements Topic.Execution {
   private @Nullable SystemdService installService;
 
   public Rke2InstallTopic(
-      SystemdChart systemdChart,
-      SystemdSynthesisContext context,
+      Supplier<SystemdChart> systemdChart,
+      Supplier<SystemdSynthesisContext> context,
       Supplier<SystemdService> nixInstall,
       Supplier<SystemdService> floxInstall,
       Sink sink) {
@@ -57,6 +57,8 @@ public final class Rke2InstallTopic implements Topic.Execution {
   }
 
   public Rke2InstallTopic bootstrapEnv() {
+    final SystemdChart systemdChart = this.systemdChart.get();
+    final SystemdSynthesisContext context = this.context.get();
     bootstrapEnvService =
         new SystemdService(systemdChart, "rke2lab-bootstrap-env")
             .description("RKE2Lab bootstrap environment (Nix + Flox + nocloud)")
@@ -95,6 +97,8 @@ public final class Rke2InstallTopic implements Topic.Execution {
   }
 
   public Rke2InstallTopic configInstall() {
+    final SystemdChart systemdChart = this.systemdChart.get();
+    final SystemdSynthesisContext context = this.context.get();
     final SystemdService bootstrapEnv = getBootstrapEnvService();
     new SystemdService(systemdChart, "rke2lab-config-install")
         .description("Install RKE2 config fragments before server start")
@@ -114,6 +118,8 @@ public final class Rke2InstallTopic implements Topic.Execution {
   }
 
   public Rke2InstallTopic install() {
+    final SystemdChart systemdChart = this.systemdChart.get();
+    final SystemdSynthesisContext context = this.context.get();
     installService =
         new SystemdService(systemdChart, "rke2lab-install")
             .description("Run RKE2Lab Installation Script")
@@ -151,6 +157,8 @@ public final class Rke2InstallTopic implements Topic.Execution {
   }
 
   public Rke2InstallTopic systemdLink() {
+    final SystemdChart systemdChart = this.systemdChart.get();
+    final SystemdSynthesisContext context = this.context.get();
     new SystemdService(systemdChart, "rke2lab-systemd-link")
         .description("Link RKE2Lab systemd service files from host share")
         .documentation("https://github.com/nxmatic/rke2lab")
@@ -171,6 +179,8 @@ public final class Rke2InstallTopic implements Topic.Execution {
   }
 
   public Rke2InstallTopic cachixWatchStore() {
+    final SystemdChart systemdChart = this.systemdChart.get();
+    final SystemdSynthesisContext context = this.context.get();
     final SystemdService install = getInstallService();
     final SystemdService nix = nixInstall.get();
     new SystemdService(systemdChart, "rke2lab-cachix-watch-store")

@@ -19,15 +19,15 @@ import java.util.function.Supplier;
  */
 public final class StorageTopic implements Topic.Execution {
 
-  private final SystemdChart systemdChart;
-  private final SystemdSynthesisContext context;
+  private final Supplier<SystemdChart> systemdChart;
+  private final Supplier<SystemdSynthesisContext> context;
   private final Supplier<SystemdService> floxInstall;
   private final Supplier<SystemdService> bootstrapEnv;
   private final Supplier<SystemdService> install;
 
   public StorageTopic(
-      SystemdChart systemdChart,
-      SystemdSynthesisContext context,
+      Supplier<SystemdChart> systemdChart,
+      Supplier<SystemdSynthesisContext> context,
       Supplier<SystemdService> floxInstall,
       Supplier<SystemdService> bootstrapEnv,
       Supplier<SystemdService> install) {
@@ -44,6 +44,7 @@ public final class StorageTopic implements Topic.Execution {
   }
 
   public StorageTopic remountShared() {
+    final SystemdChart systemdChart = this.systemdChart.get();
     new SystemdService(systemdChart, "rke2lab-remount-shared")
         .description("Remount root filesystem as shared for RKE2")
         .defaultDependencies(false)
@@ -58,6 +59,8 @@ public final class StorageTopic implements Topic.Execution {
   }
 
   public StorageTopic containerdZfsMountConfig() {
+    final SystemdChart systemdChart = this.systemdChart.get();
+    final SystemdSynthesisContext context = this.context.get();
     new SystemdService(systemdChart, "rke2lab-containerd-zfs-mount-config")
         .description("Configure containerd for ZFS mounts")
         .after(
@@ -81,6 +84,8 @@ public final class StorageTopic implements Topic.Execution {
   }
 
   public StorageTopic dbusTcpSystemBus() {
+    final SystemdChart systemdChart = this.systemdChart.get();
+    final SystemdSynthesisContext context = this.context.get();
     new SystemdService(systemdChart, SystemdUnitId.DBUS_TCP_SYSTEM_BUS.bareName())
         .description("Expose DBus system bus over TCP for RKE2Lab")
         .after("dbus.service")
@@ -96,6 +101,7 @@ public final class StorageTopic implements Topic.Execution {
   }
 
   public StorageTopic zfsEarlyUmount() {
+    final SystemdChart systemdChart = this.systemdChart.get();
     new SystemdService(systemdChart, "zfs-early-umount")
         .description("Early unmount of ZFS filesystems before shutdown")
         .defaultDependencies(false)
@@ -111,6 +117,8 @@ public final class StorageTopic implements Topic.Execution {
   }
 
   public StorageTopic vipKubeconfig() {
+    final SystemdChart systemdChart = this.systemdChart.get();
+    final SystemdSynthesisContext context = this.context.get();
     new SystemdService(systemdChart, "rke2lab-vip-kubeconfig")
         .description("Generate VIP-enabled kubeconfig for cluster access")
         .after(

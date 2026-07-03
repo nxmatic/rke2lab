@@ -7,6 +7,7 @@ import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.ServiceType;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.StandardStream;
 import java.util.Objects;
+import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -18,15 +19,16 @@ import org.jspecify.annotations.Nullable;
  */
 public final class ToolsTopic implements Topic.Execution {
 
-  private final SystemdChart systemdChart;
-  private final SystemdSynthesisContext context;
+  private final Supplier<SystemdChart> systemdChart;
+  private final Supplier<SystemdSynthesisContext> context;
   private final Sink sink;
 
   // The nix-install service is read back by floxInstall() within this topic (a same-topic verb
   // dependency), so it is kept as a local working field; both services are pushed through the sink.
   private @Nullable SystemdService nixInstallService;
 
-  public ToolsTopic(SystemdChart systemdChart, SystemdSynthesisContext context, Sink sink) {
+  public ToolsTopic(
+      Supplier<SystemdChart> systemdChart, Supplier<SystemdSynthesisContext> context, Sink sink) {
     this.systemdChart = systemdChart;
     this.context = context;
     this.sink = sink;
@@ -45,6 +47,8 @@ public final class ToolsTopic implements Topic.Execution {
   }
 
   public ToolsTopic nixInstall() {
+    final SystemdChart systemdChart = this.systemdChart.get();
+    final SystemdSynthesisContext context = this.context.get();
     nixInstallService =
         new SystemdService(systemdChart, "rke2lab-nix-install")
             .description("Install Nix Package Manager for RKE2 Lab")
@@ -62,6 +66,8 @@ public final class ToolsTopic implements Topic.Execution {
   }
 
   public ToolsTopic floxInstall() {
+    final SystemdChart systemdChart = this.systemdChart.get();
+    final SystemdSynthesisContext context = this.context.get();
     final SystemdService nixInstall =
         Objects.requireNonNull(nixInstallService, "nixInstall() not yet run");
     final SystemdService floxInstallService =

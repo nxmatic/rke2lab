@@ -57,12 +57,26 @@ public final class SystemdInfrastructureSynthesizer {
 
       final class State {
         @Nullable OnFailure onFailure;
+        // Ambient inherited from the enclosing synthesizer, held by the owner (the State) so every
+        // topic reads it through the SAME read-face as the flux: state::systemdChart /
+        // state::context.
+        // The State is the single source of truth a topic stays wired to — never the outer fields.
+        final SystemdChart systemdChart = SystemdInfrastructureSynthesizer.this.systemdChart;
+        final SystemdSynthesisContext context = SystemdInfrastructureSynthesizer.this.context;
         // Service outputs, set once by each producing topic's sink, read by later topics through
         // Supplier read-faces (state::nixInstall, …) — never by holding the producing topic.
         @Nullable SystemdService nixInstall;
         @Nullable SystemdService floxInstall;
         @Nullable SystemdService bootstrapEnv;
         @Nullable SystemdService install;
+
+        SystemdChart systemdChart() {
+          return systemdChart;
+        }
+
+        SystemdSynthesisContext context() {
+          return context;
+        }
 
         OnFailure onFailure() {
           return Objects.requireNonNull(onFailure, "onFailure not yet set");
@@ -94,8 +108,8 @@ public final class SystemdInfrastructureSynthesizer {
         ToolsDone during(String topic, Function<ToolsTopic, ToolsTopic> body) {
           final ToolsTopic toolsTopic =
               new ToolsTopic(
-                  systemdChart,
-                  context,
+                  state::systemdChart,
+                  state::context,
                   new ToolsTopic.Sink() {
                     @Override
                     public void nixInstall(SystemdService service) {
@@ -122,8 +136,8 @@ public final class SystemdInfrastructureSynthesizer {
         Rke2InstallDone during(String topic, Function<Rke2InstallTopic, Rke2InstallTopic> body) {
           final Rke2InstallTopic rke2InstallTopic =
               new Rke2InstallTopic(
-                  systemdChart,
-                  context,
+                  state::systemdChart,
+                  state::context,
                   state::nixInstall,
                   state::floxInstall,
                   new Rke2InstallTopic.Sink() {
@@ -150,7 +164,8 @@ public final class SystemdInfrastructureSynthesizer {
 
       final class AwaitingNetwork {
         NetworkDone during(String topic, Function<NetworkTopic, NetworkTopic> body) {
-          final NetworkTopic networkTopic = new NetworkTopic(systemdChart, context, state::install);
+          final NetworkTopic networkTopic =
+              new NetworkTopic(state::systemdChart, state::context, state::install);
           runner.runDuring(topic, networkTopic, body, state.onFailure());
           return new NetworkDone();
         }
@@ -166,7 +181,11 @@ public final class SystemdInfrastructureSynthesizer {
         StorageDone during(String topic, Function<StorageTopic, StorageTopic> body) {
           final StorageTopic storageTopic =
               new StorageTopic(
-                  systemdChart, context, state::floxInstall, state::bootstrapEnv, state::install);
+                  state::systemdChart,
+                  state::context,
+                  state::floxInstall,
+                  state::bootstrapEnv,
+                  state::install);
           runner.runDuring(topic, storageTopic, body, state.onFailure());
           return new StorageDone();
         }
