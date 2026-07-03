@@ -130,10 +130,13 @@ final class State<I, B> {          // a per-pipeline SHAPE, not a factored base
 
 // The port's topic contract is IDENTIFICATION, not a mono-shot `O run(I)`. A topic is a fluent
 // multi-verb builder constructed with (inputs, sink); the sink is its nested Topic.Sink.
+// The NATURE is a nested type, not a returned enum: a topic implements one of the three.
 interface Topic {
-  default TopicNature nature() { return TopicNature.EXECUTION; }
   String role();
   interface Sink {}                // a sink is the write-face OF a topic → nested, not top-level
+  interface Execution  extends Topic {}   // most topics
+  interface Checkpoint extends Topic {}   // plays a jGiven scenario
+  interface Pipeline   extends Topic {}   // a nested during/then chain
 }
 ----
 
@@ -168,15 +171,18 @@ show the flat shape. The census of which pipelines conform, diverge, or are pend
 
 == The three topic-body natures
 
-A topic comes in three natures, named by the `TopicNature` enum (`EXECUTION`, `CHECKPOINT`, `PIPELINE`) in the pipeline-port. They share ONE identifying contract — the `Topic` interface (`nature()` + `role()`), all the `FluentTopicRunner`'s `runDuring(<S extends Topic>…)` bound ever needs — but two of them get an abstract base *above* that interface that serves two purposes at once: it **identifies** the nature (a topic's role in the pipeline is readable at a glance, via `TopicNature`) and it **hosts the ceremony that is provably identical** across instances. Execution stays a plain `Topic` implementor; checkpoint and nested-pipeline get a base.
+A topic comes in three natures, and **the nature IS a type, not a returned value**: each is a nested sub-interface of `Topic` — `Topic.Execution`, `Topic.Checkpoint`, `Topic.Pipeline` — and a topic implements exactly one. There is no `nature()` method and no `TopicNature` enum: the type already carries it. Governance and retrofit test the nature at compile time (`topic instanceof Topic.Checkpoint`) rather than switching on a stringly value, and the three interfaces are the **entry points** where a nature-specific shared contract could later be defined (empty today — honest). This is symmetric with `Topic.Sink`: `Topic` nests both its write-face and its natures.
 
-* **execution** — does a gesture and pushes its output through its `Topic.Sink` (most topics: resolve paths, ensure a provider resource, create an instance, export outputs). Plain `Topic` implementor, no base needed.
-* **checkpoint (narrated)** — runs a jGiven scenario to produce a `ReportModel` narrative + a verdict, for the parts an operator must *read*. Only two exist today (`ClusterReadinessTopic`, `SystemdAdapterTopic`, via `*Scenario extends Stage<>`). This is the answer to "do we have jGiven's scenarios in the pipeline model?" — **yes, as a topic nature, not a rival grammar.** *One engine (jGiven), two layers*: `during/then` orchestrates; jGiven narrates *inside* a checkpoint. A `CheckpointTopic` base hosts the ceremony the two share verbatim — the `preview` flag, `reportModel = runbook.orElseGet(...)`, the `JGIVEN_DRY_RUN` save/set/restore, the `Scenario.create → setModel → startScenario → try{script}finally{finished()}catch{failure}` skeleton, the `consult → log narration → record` plumbing — leaving two hooks for what genuinely diverges: `playScript(...)` (the given/when/then) and `outcome(...)` (systemd's `ReadinessAuthority` STOP/degraded vs cluster's `VerificationResult` projection). The scenario collaborators (`ReportModel`, doctor, authority) are *ambient* — the base pulls them from `PipelineContext`, consistent with the determinism rule.
-* **pipeline (nested)** — the body is itself a `during/then` chain with its own `State<I,B>`. It returns one composite output to the parent, so the parent's `B` stays small and each `I` narrow. It shares the parent's `PipelineContext` (ambient is common) but its `B` is strictly local. A `PipelineTopic` base hosts "launch a nested chain sharing ambient, keep a local `B`". Already present organically: `ApplicationPipeline`→`ClusterSeedPipeline`; `ClusterSeedPipeline`→`ResourceCreationPipeline`; `DefaultManifestSynthesisService`→`SystemdInfrastructureSynthesizer`.
+* **`Topic.Execution`** — does a gesture and pushes its output through its `Topic.Sink` (most topics: resolve paths, ensure a provider resource, create an instance, export outputs).
+* **`Topic.Checkpoint`** — runs a jGiven scenario to produce a `ReportModel` narrative + a verdict, for the parts an operator must *read*. Only two exist today (`ClusterReadinessTopic`, `SystemdAdapterTopic`, via `*Scenario extends Stage<>`). This is the answer to "do we have jGiven's scenarios in the pipeline model?" — **yes, as a topic nature, not a rival grammar.** *One engine (jGiven), two layers*: `during/then` orchestrates; jGiven narrates *inside* a checkpoint.
+* **`Topic.Pipeline`** — the body is itself a `during/then` chain with its own `State<I,B>`. It returns one composite output to the parent, so the parent's `B` stays small and each `I` narrow. It shares the parent's `PipelineContext` (ambient is common) but its `B` is strictly local. Already present organically: `ApplicationPipeline`→`ClusterSeedPipeline`; `ClusterSeedPipeline`→`ResourceCreationPipeline`; `DefaultManifestSynthesisService`→`SystemdInfrastructureSynthesizer`.
 
-Base over interface-with-defaults: the shared ceremony needs *state* (the captured observation, the dry-run save/restore), which a default method cannot hold. The base carries the identical logic and the `nature()`/`role()` identifiers; the concrete topic supplies only what diverges (the hooks + its verbs), never re-implements the orchestration. *A5 caveat (Incus pilot): with only 3 hand-written nested pipelines whose accumulators are distinct typed-field sets, a `PipelineTopic` base earned nothing — kept as honest duplication. Extract a base only when a genuinely shared nested-pipeline shape appears.*
+**No shared-ceremony base — decided against on the code (2026-07-03).** An earlier design gave checkpoint and nested-pipeline an abstract base *above* the interface, to host the ceremony proven identical across instances. Two findings killed it:
 
-CAVEAT (honest): there are only N=2 checkpoints. A base with ≥3 abstract hooks for 2 implementations is a leaky abstraction — the duplication would be more honest. The *ceremony* is provably identical (that justifies the base); the *outcome* genuinely diverges (that stays a hook). Validate at materialization that the hooks stay ≤ ~2; if they multiply, keep the duplication instead.
+* *Checkpoint:* the two checkpoints share the jGiven lifecycle SHAPE but diverge on ~6 axes — the scenario script, the skip-bodies condition (`preview && simulated.isEmpty()` vs `preview`), all three outcomes (success / preview / failure — the failure path is `ReadinessAuthority` STOP/degraded vs `VerificationResult` projection), the consult-checkpoint shape (one observation vs a phase collection), and even the collaborator field types (`doctor` `Optional` vs nullable, `recordedAt` `Optional<Instant>` vs `Instant`, sink `Map` vs `VerificationResult`). A template-method base would need ≥6 hooks — a leaky abstraction hiding more than it shares. The ceremony stays honestly duplicated. Also: the two do NOT live in one pipeline — `SystemdAdapterTopic` is in `ClusterSeedPipeline`, `ClusterReadinessTopic` is driven by `ResourceCreationPipeline` (out of the type-state pattern).
+* *Pipeline:* A5 verdict (Incus pilot) — the 3 hand-written nested pipelines have distinct typed-field accumulators; a `PipelineTopic` base earned nothing (~3 lines, would force generics + a map). Honest duplication.
+
+So `Topic.Checkpoint`/`Topic.Pipeline` are identification-only (fix the nature by their type, prescribe no body). Extract a base only if a genuinely shared shape appears (a 3rd checkpoint, a shared nested-pipeline accumulator).
 
 A 10-field `B` (a topic producing four outputs at once) is the smell that a pipeline is hiding several: extract the offender as a nested pipeline so its outputs live in *its* `B`, not the parent's. Composition is how the small-`I` / small-`B` rule is honoured, rather than one flat giant accumulator.
 
@@ -248,8 +254,7 @@ Reuse from the pipeline-port (`osgi/foundation/pipeline/pipeline-port`):
 * `FluentTopicRunner` — instance-based; `new FluentTopicRunner(scope)` then `.runDuring(topic, stage, body, onFailure)` — the topic-execution loop with logging and exception wrapping. Bound `runDuring(<S extends Topic>…)`.
 * `OnFailure` — failure callback SAM
 * `TopicFailure` — wrapped exception type
-* `Topic` — the topic IDENTIFICATION contract: `nature()` (default `EXECUTION`) + `role()`, plus the nested `Topic.Sink` marker. NOT `O run(I)` (a topic is a fluent multi-verb builder, not a mono-shot call). The runner's bound; the governance/retrofit hook.
-* `TopicNature` — `{EXECUTION, CHECKPOINT, PIPELINE}` (a nested pipeline; "sub" is implicit in the nesting).
+* `Topic` — the topic IDENTIFICATION contract: `role()`, the nested `Topic.Sink` marker, and the three nested nature sub-interfaces `Topic.Execution`/`Topic.Checkpoint`/`Topic.Pipeline` (a topic implements one). NOT `O run(I)` (a topic is a fluent multi-verb builder, not a mono-shot call). The runner's bound; the governance/retrofit hook (`instanceof Topic.Checkpoint`, not a `nature()` switch). No `TopicNature` enum — the nature is the type.
 * `PipelineContext` — the shared ambient `Class→record` registry, `require`/`lookup`/`register`/`contains` (no `update` — ambient is set once before the first topic). Generalized from `controlplane.incus.ContextRegistry`, which is then deleted.
 
 Exemplars in this codebase:
@@ -281,7 +286,7 @@ For those, prefer a plain method or a small builder without the topic/conjunctio
 A type carries the `Pipeline` prefix only when it is *top-level* and the prefix is what qualifies it (`PipelineContext`, `ClusterSeedPipeline`). A class, interface, or record defined *inner* to a pipeline inherits the qualifier from its outer class, so the prefix there is redundant noise:
 
 * ✅ inner: `State`, `StateBuilder`, `Launch`, `Awaiting<Topic>`, `<Topic>Done` — the enclosing `…Pipeline` already names the context.
-* ✅ top-level / shared port: `PipelineContext`, `Topic`, `TopicNature`, `FluentTopicRunner`, `TopicFailure` — no enclosing class, so the name stands alone (domain-named, `Pipeline`-prefixed only where it disambiguates).
+* ✅ top-level / shared port: `PipelineContext`, `Topic`, `FluentTopicRunner`, `TopicFailure` — no enclosing class, so the name stands alone (domain-named, `Pipeline`-prefixed only where it disambiguates).
 * ✅ nested where it belongs to its owner: `Topic.Sink` (the write-face OF a topic), a topic's own `<Topic>.Sink` and its output records — a sink has no existence outside its topic, so it lives in the topic's namespace, not top-level.
 * ❌ `PipelineState`, `PipelineInputs` as *inner* names — redundant; drop to `State` / the input record's own name.
 

@@ -12,10 +12,10 @@ import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
 import io.nxmatic.rke2lab.controlplane.systemd.SeedSystemdAdapterEndpointGate;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
+import io.nxmatic.rke2lab.pipeline.Topic;
 import io.nxmatic.rke2lab.pipeline.TopicFailure;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
 import io.nxmatic.rke2lab.world.gateway.port.Action;
-import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
@@ -38,12 +38,21 @@ import java.util.function.Consumer;
  * infrastructure — the same "walk structure, emit doc, no side effects" notion as {@code pulumi
  * preview} itself.
  */
-public final class SystemdAdapterTopic {
+public final class SystemdAdapterTopic implements Topic.Checkpoint {
 
   private static final String JGIVEN_DRY_RUN = "jgiven.report.dry-run";
 
+  /**
+   * The domain checkpoint this gate plays. Held as a constant because {@code implements
+   * Topic.Checkpoint} brings the nested {@code Topic.Checkpoint} type into scope, shadowing the
+   * simple name {@code Checkpoint} — so the domain enum is named once, here, by its fully-qualified
+   * name.
+   */
+  private static final io.nxmatic.rke2lab.world.gateway.port.Checkpoint DOMAIN_CHECKPOINT =
+      io.nxmatic.rke2lab.world.gateway.port.Checkpoint.SYSTEMD_ADAPTER;
+
   /** Override key + report label for this gate. */
-  private static final String SCENARIO_ID = Checkpoint.SYSTEMD_ADAPTER.slug();
+  private static final String SCENARIO_ID = DOMAIN_CHECKPOINT.slug();
 
   private final BootstrapConfig config;
   private final ControlplanePolicy policy;
@@ -119,6 +128,11 @@ public final class SystemdAdapterTopic {
         Optional.empty());
   }
 
+  @Override
+  public String role() {
+    return "systemd adapter";
+  }
+
   public SystemdAdapterTopic launch() {
     final boolean preview = pulumiMode && Deployment.getInstance().isDryRun();
 
@@ -183,7 +197,7 @@ public final class SystemdAdapterTopic {
                   SystemdAdapterScenario.When.class,
                   SystemdAdapterScenario.Then.class);
       scenario.setModel(reportModel);
-      scenario.startScenario(Checkpoint.SYSTEMD_ADAPTER.scenarioTitle());
+      scenario.startScenario(DOMAIN_CHECKPOINT.scenarioTitle());
       try {
         scenario.given().the_seed_node(config.systemdAdapterDbusHost(), config).probed_by(probe);
         scenario.when().the_systemd_adapter_probe_runs();

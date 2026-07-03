@@ -14,8 +14,8 @@ import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifi
 import io.nxmatic.rke2lab.controlplane.readiness.ClusterBootstrapReadinessVerifier.VerificationResult;
 import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.doctor.port.ConsultingService;
+import io.nxmatic.rke2lab.pipeline.Topic;
 import io.nxmatic.rke2lab.world.gateway.codec.DocumentCodec;
-import io.nxmatic.rke2lab.world.gateway.port.Checkpoint;
 import io.nxmatic.rke2lab.world.gateway.port.Consultation;
 import io.nxmatic.rke2lab.world.gateway.port.Coordinate;
 import io.nxmatic.rke2lab.world.gateway.port.Document;
@@ -39,10 +39,19 @@ import java.util.stream.StreamSupport;
  * the output layer already consumes. {@code ClusterReadinessResource} is a thin mirror of the
  * result.
  */
-public final class ClusterReadinessTopic {
+public final class ClusterReadinessTopic implements Topic.Checkpoint {
 
   private static final String JGIVEN_DRY_RUN = "jgiven.report.dry-run";
-  private static final String SCENARIO_ID = Checkpoint.CLUSTER_READINESS.slug();
+
+  /**
+   * The domain checkpoint this scenario plays. Named by its fully-qualified name because {@code
+   * implements Topic.Checkpoint} brings the nested {@code Topic.Checkpoint} type into scope,
+   * shadowing the simple name {@code Checkpoint}.
+   */
+  private static final io.nxmatic.rke2lab.world.gateway.port.Checkpoint DOMAIN_CHECKPOINT =
+      io.nxmatic.rke2lab.world.gateway.port.Checkpoint.CLUSTER_READINESS;
+
+  private static final String SCENARIO_ID = DOMAIN_CHECKPOINT.slug();
 
   private final BootstrapConfig config;
   private final ControlplanePolicy policy;
@@ -89,6 +98,11 @@ public final class ClusterReadinessTopic {
     this.systemdAdapterLaunchSummary =
         systemdAdapterLaunchSummary == null ? Map.of() : systemdAdapterLaunchSummary;
     this.sink = sink;
+  }
+
+  @Override
+  public String role() {
+    return "cluster readiness";
   }
 
   public ClusterReadinessTopic launch() {
@@ -142,7 +156,7 @@ public final class ClusterReadinessTopic {
                   ClusterReadinessScenario.When.class,
                   ClusterReadinessScenario.Then.class);
       scenario.setModel(reportModel);
-      scenario.startScenario(Checkpoint.CLUSTER_READINESS.scenarioTitle());
+      scenario.startScenario(DOMAIN_CHECKPOINT.scenarioTitle());
       try {
         scenario
             .given()

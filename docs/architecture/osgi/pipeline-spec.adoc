@@ -429,7 +429,7 @@ input record `I` (per-topic flux + ambient, fused by the transition) and the `Pi
 only). A topic today recopies ~7 identical params (config/policy/runbook/consultations/doctor/recordedAt/gate);
 after, a topic is a fluent multi-verb builder constructed with `(input I, Topic.Sink)` — it reads only its
 input `I` and pushes its output through its sink; it implements the `Topic` identification interface
-(`nature()`/`role()`), NOT a mono-shot `O run(I)`. `RunMode` is an *ambient record in `PipelineContext`*, read by the transition when it builds
+(`role()` + one nested nature type `Topic.Execution`/`Checkpoint`/`Pipeline`), NOT a mono-shot `O run(I)`. `RunMode` is an *ambient record in `PipelineContext`*, read by the transition when it builds
 an input — never threaded as a per-topic param (the "gate mal placée" realization). Genuinely-optional
 per-topic data (runbook, consultations) are `Optional<>` fields on `I`. See
 `docs/architecture/patterns/fluent-pipeline-grammar.adoc` for the full State-shape + determinism rule;

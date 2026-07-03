@@ -105,8 +105,7 @@ flowchart TB
     R["FluentTopicRunner<br/>runDuring(S extends Topic)"]:::port
     OF["OnFailure / TopicFailure"]:::port
     PC["PipelineContext<br/>ambient Class→record registry"]:::port
-    TP["Topic (identification)<br/>nature() + role() + nested Topic.Sink"]:::port
-    TN["TopicNature<br/>EXECUTION · CHECKPOINT · PIPELINE"]:::port
+    TP["Topic (identification)<br/>role() + nested Topic.Sink<br/>+ Topic.{Execution,Checkpoint,Pipeline}"]:::port
   end
   subgraph PIPE["each pipeline — inner, per-pipeline (what is its own)"]
     ST["State&lt;I,O,B&gt; = inputs I + accumulator B + context + runner"]:::pipe
@@ -124,9 +123,9 @@ flowchart TB
 | Role | Lives | Touched by
 | `FluentTopicRunner` | port | the transition (`runDuring`)
 | `PipelineContext` (ambient, READ, static) | port type / instanced per pipeline | the transition (`require`) — NEVER a topic
-| `Topic` (identification: `nature`/`role`) | port | the runner's bound; governance + retrofit read it
+| `Topic` (identification: `role` + nested natures) | port | the runner's bound; governance + retrofit read it
 | `Topic.Sink` (write-face, per topic) | nested in each topic | the topic (pushes) + the transition (wires it → `B`)
-| `TopicNature` | port | identification
+| `Topic.{Execution,Checkpoint,Pipeline}` (nature = type) | port (nested in `Topic`) | identification (`instanceof`)
 | `State<I,B>` (I + B + context + runner) | inner to each pipeline | the transition
 | input record `I` (flux + ambient, fused) | inner (per topic) | the transition (composes) + the topic (reads)
 | accumulator `B` (all outputs so far) | inner | the transition (folds sinks in, reads for next `I`)
@@ -138,7 +137,7 @@ Two axes make the roles fall out cleanly. *Direction × time:* `PipelineContext`
 STATIC (frozen before the first topic, an input of the pipeline itself); a `Topic.Sink` is a WRITE
 channel that is FLOWING (one per topic, wired at the transition, it is how an output enters `B` and
 becomes the next topic's flux). *API vs implementation:* the topic's API is its fluent verbs +
-`nature()`/`role()`; its `(input, sink)` construction is implementation the transition wires — the sink
+its `role()` and its nature type; its `(input, sink)` construction is implementation the transition wires — the sink
 is never on the API, which is why `Topic.Sink` is nested, not a top-level type. A topic sees only its
 frozen `I` and its `Sink` — never `B`, never the context — so it is deterministic and testable in
 isolation. Writing an output by directly assigning an accumulator field (topic holding a state

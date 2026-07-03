@@ -5,9 +5,26 @@ package io.nxmatic.rke2lab.pipeline;
  * fluent multi-verb builder (each verb returns {@code this} and pushes its part of the work through
  * a sink); it is NOT a {@code O run(I)} mono-shot. So this interface does not prescribe HOW a topic
  * runs — {@link FluentTopicRunner#runDuring} drives the body as a {@code Function<S,S>} — it only
- * lets any topic be recognized: its {@link #nature()} (how its body is shaped) and its {@link
- * #role()} (its place in the pipeline). That recognition is what the governance gate and the
+ * lets any topic be recognized: its NATURE (which nested sub-interface it implements) and its
+ * {@link #role()} (its place in the pipeline). That recognition is what the governance gate and the
  * retrofit tooling read.
+ *
+ * <h2>Nature is a type, not a value</h2>
+ *
+ * <p>A topic's nature is carried by which nested interface it implements — {@link Execution},
+ * {@link Checkpoint}, {@link Pipeline} — not by a returned enum. Governance and retrofit test it at
+ * compile time ({@code topic instanceof Topic.Checkpoint}) rather than switching on a stringly
+ * value. The three are the exhaustive body shapes:
+ *
+ * <ul>
+ *   <li>{@link Execution} — does a gesture and pushes its output through its {@link Sink}. Most
+ *       topics.
+ *   <li>{@link Checkpoint} — plays a jGiven scenario to produce a narrative + verdict, for the
+ *       parts an operator must read.
+ *   <li>{@link Pipeline} — its body is itself a {@code during/then} chain with its own local
+ *       accumulator, sharing the parent's {@link PipelineContext}. ("Sub" is implicit in the
+ *       nesting.)
+ * </ul>
  *
  * <h2>The write-face: {@link Sink}</h2>
  *
@@ -24,13 +41,6 @@ package io.nxmatic.rke2lab.pipeline;
  */
 public interface Topic {
 
-  /**
-   * How this topic's body is shaped. Defaults to {@link TopicNature#EXECUTION}, the common case.
-   */
-  default TopicNature nature() {
-    return TopicNature.EXECUTION;
-  }
-
   /** This topic's place in the pipeline — a short human-readable label, e.g. {@code "path"}. */
   String role();
 
@@ -40,4 +50,20 @@ public interface Topic {
    * folds those pushes into the pipeline accumulator.
    */
   interface Sink {}
+
+  /** An execution topic — does a gesture and pushes its output through its {@link Sink}. */
+  interface Execution extends Topic {}
+
+  /**
+   * A checkpoint topic — plays a jGiven scenario to produce a narrative + verdict. The base stays
+   * jGiven-free (a topic is recognized, not scripted, here); the concrete checkpoint hosts the
+   * scenario where jGiven lives.
+   */
+  interface Checkpoint extends Topic {}
+
+  /**
+   * A pipeline topic — its body is itself a {@code during/then} chain with its own local
+   * accumulator, sharing the parent's {@link PipelineContext}.
+   */
+  interface Pipeline extends Topic {}
 }

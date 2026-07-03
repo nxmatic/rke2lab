@@ -1,6 +1,6 @@
 ---
 name: pipeline-state-per-topic-io-refactor-backlog
-description: "DESIGN CONVERGED 2026-07-03 (whiteboard .claude/claude-preview.adoc), Phase A (Incus pilot) committed ca30367a. Fluent-pipeline state = generic State<I,B> per topic (narrow input record I + fixed accumulator B). NO O type param: a topic PUSHES its output through its Topic.Sink into B (it does not return it). Topic contract = IDENTIFICATION (interface Topic{nature();role(); nested Topic.Sink}), NOT Topic<I,O>{O run(I)} (a topic is a fluent multi-verb builder). Ambient via generalized PipelineContext registry (Class→record, from IncusResourceBootstrap.ContextRegistry), READ/WRITTEN ONLY when a transition builds an input — determinism rule. Backref REJECTED (Sink→B forward supersedes it). Third nature = PIPELINE (nested; 'sub' implicit). Census of 7 pipelines done. KEY: the codebase already HAD every role, we just named + uniformized them."
+description: "DESIGN CONVERGED 2026-07-03 (whiteboard .claude/claude-preview.adoc), Phase A (Incus pilot) committed ca30367a. Fluent-pipeline state = generic State<I,B> per topic (narrow input record I + fixed accumulator B). NO O type param: a topic PUSHES its output through its Topic.Sink into B (it does not return it). Topic contract = IDENTIFICATION (interface Topic{role(); nested Topic.Sink; nested nature types Topic.Execution/Checkpoint/Pipeline}), NOT Topic<I,O>{O run(I)} (a topic is a fluent multi-verb builder). Nature is a nested TYPE not an enum — TopicNature+nature() DELETED, governance reads instanceof Topic.Checkpoint. Ambient via generalized PipelineContext registry (Class→record, from IncusResourceBootstrap.ContextRegistry), READ/WRITTEN ONLY when a transition builds an input — determinism rule. Backref REJECTED (Sink→B forward supersedes it). Census of 7 pipelines done. KEY: the codebase already HAD every role, we just named + uniformized them."
 metadata:
   node_type: memory
   type: project
@@ -26,10 +26,13 @@ final class State<I,B> {             // per-pipeline shape; I moves per topic, B
   final FluentTopicRunner runner;
 }
 // port topic contract = IDENTIFICATION, not O run(I) (a topic is a fluent multi-verb builder)
+// nature is a nested TYPE, not a returned enum — a topic implements one of the three.
 interface Topic {
-  default TopicNature nature() { return TopicNature.EXECUTION; }
   String role();
   interface Sink {}                  // nested: a sink is the write-face OF a topic, not top-level
+  interface Execution  extends Topic {}
+  interface Checkpoint extends Topic {}
+  interface Pipeline   extends Topic {}
 }
 ```
 
@@ -39,7 +42,7 @@ fold in, type never changes); `I` MOVES per topic. `O` was a phantom once the to
 accumulator: `B` carries all outputs so far; a fan-in topic's input is built by reading several off `B`
 at the transition.
 
-**API vs impl (user, 2026-07-03).** A topic's API = its fluent verbs + `nature()`/`role()`. Its
+**API vs impl (user, 2026-07-03).** A topic's API = its fluent verbs + `role()` + its nature type. Its
 `(inputs, sink)` construction is IMPL the transition wires; the sink is never on the API → `Topic.Sink`
 is NESTED, not top-level. A topic sees only its frozen `I` + its `Sink` — never `B`, never the context.
 Direct accumulator-field writes (`pipeline.x = v`) are a DERIVATION the `PIPELINE_PATTERN` gate catches.
@@ -91,9 +94,12 @@ what makes the pattern hold over time, not just compile.
 
 ## What IS shared at the pipeline-port (the materialization)
 
-- `Topic` — the IDENTIFICATION contract: `nature()` (default EXECUTION) + `role()` + nested `Topic.Sink`
-  marker. The runner's bound `runDuring(<S extends Topic>…)`; the governance/retrofit hook. NOT `O run(I)`.
-- `TopicNature` — `{EXECUTION, CHECKPOINT, PIPELINE}` ("sub" implicit in nesting).
+- `Topic` — the IDENTIFICATION contract: `role()` + nested `Topic.Sink` marker + the three nested nature
+  types `Topic.Execution`/`Topic.Checkpoint`/`Topic.Pipeline` (a topic implements one). The runner's bound
+  `runDuring(<S extends Topic>…)`; the governance/retrofit hook (`instanceof Topic.Checkpoint`). NOT `O run(I)`.
+- Nature = a nested TYPE, not a returned enum. `TopicNature` enum + `nature()` method DELETED (2026-07-03):
+  the type already carries the nature; `instanceof` beats a stringly switch, and the three interfaces are the
+  entry points where a nature-specific shared contract could later attach (empty today). Symmetric w/ `Topic.Sink`.
 - `PipelineContext` — the ambient registry, generalized from `controlplane.incus.ContextRegistry`
   (register/require/lookup/contains — NO `update`, `Class→record`, fail-fast `require`).
   `IncusResourceBootstrap` becomes a CONSUMER; its local `ContextRegistry` deleted (done, ca30367a).
@@ -175,30 +181,36 @@ common: config/policy/services) but its `B` is strictly local.
 
 **Three natures a topic's body can have** (answers "do we have jgiven's scenarios in the pipeline
 model?" — yes, as a topic BODY, not a topic):
-- *execution* — does a gesture, produces output `O` (Path, Provider, Instance, environment, outputs).
-- *checkpoint (narrated)* — runs a jgiven scenario → a `ReportModel` narrative + verdict. Only TWO
-  today: `ClusterReadinessTopic`, `SystemdAdapterTopic` (via `*Scenario extends Stage<>`). "One engine
+
+- *execution* (`Topic.Execution`) — does a gesture, pushes output via its `Topic.Sink`.
+- *checkpoint (narrated)* (`Topic.Checkpoint`) — runs a jgiven scenario → a `ReportModel` narrative + verdict.
+  Only TWO today: `ClusterReadinessTopic`, `SystemdAdapterTopic` (via `*Scenario extends Stage<>`). "One engine
   (JGiven), two layers": `during/then` orchestrates, jgiven narrates INSIDE a topic. Narration serves
   the operator (runbook) — put it where a human must READ the result, not everywhere.
-- *sub-pipeline* — body is itself a `during/then` chain (own `B`).
-All three share ONE identification contract `interface Topic { nature(); role(); interface Sink {} }` (the runner's `<S extends Topic>` bound), but
-checkpoint + sub-pipeline get an abstract BASE above it (execution stays plain `Topic`). The base does
-TWO things at once — the reconciliation of the two visions we debated (user 2026-07-03): (1) IDENTIFY
-the nature (`nature()`/`role()` — the topic's role in the pipeline is readable at a glance, the thing
-that guides the retrofit), and (2) HOST the ceremony proven identical across instances. Verified by
-reading BOTH checkpoints (`SystemdAdapterTopic` + `ClusterReadinessTopic`): the ceremony IS byte-identical
-— `preview` flag, `reportModel=runbook.orElseGet`, the `JGIVEN_DRY_RUN` save/set/restore, the
-`Scenario.create→setModel→startScenario→try{script}finally{finished}catch{failure}` skeleton, the
-`consult→log→record` plumbing — so a `CheckpointTopic` base hosts it, leaving 2 hooks for the
-genuine divergence: `playScript` (given/when/then) + `outcome` (systemd `ReadinessAuthority` STOP/degraded
-vs cluster `VerificationResult` projection). `run(I)` is `final` on the base → the concrete topic supplies
-only what diverges, NEVER re-implements orchestration (this is why base, not interface-with-defaults: the
-ceremony needs STATE — captured observation, dry-run save/restore — a default method can't hold it). The
-scenario collaborators (`ReportModel`/doctor/authority) are AMBIENT → base pulls from `PipelineContext`
-(consistent with the determinism rule). jgiven stays a narration engine CALLED from the base, never a
-rival of `during/then`. **CAVEAT (challenge, keep honest):** N=2 checkpoints; a base with ≥3 hooks for 2
-impls is a leaky abstraction — validate at A5 that hooks stay ≤~2, else keep the duplication. Same for
-`PipelineTopic` (hosts "launch nested pipeline, share ambient, local B") — NOT extracted per A5.
+- *pipeline (nested)* (`Topic.Pipeline`) — body is itself a `during/then` chain (own `B`).
+
+**Nature is a nested TYPE, not a returned enum + not an abstract base (REVISED 2026-07-03, on the code +
+user insight).** The three natures are nested sub-interfaces of `Topic` (`Topic.Execution`/`Checkpoint`/
+`Pipeline`), symmetric with `Topic.Sink`. A topic implements one; governance reads `instanceof
+Topic.Checkpoint`. The `TopicNature` enum + `nature()` method were DELETED — the type carries the nature,
+`instanceof` beats a stringly switch, and the three interfaces are the entry points where a shared
+nature-specific contract could later attach (empty today — honest).
+
+An earlier design gave checkpoint + nested-pipeline an abstract BASE hosting shared ceremony. KILLED on
+reading the code: (1) the two checkpoints live in DIFFERENT pipelines (`SystemdAdapterTopic` in
+`ClusterSeedPipeline`, `ClusterReadinessTopic` in `ResourceCreationPipeline` which is OUT of the pattern);
+(2) the ceremony diverges on ~6 axes, not 2 — the jgiven script, the skip-bodies condition
+(`preview && simulated.isEmpty()` vs `preview`), all THREE outcomes (success/preview/failure — `ReadinessAuthority`
+STOP/degraded vs `VerificationResult` projection), the consult-checkpoint shape (one observation vs a phase
+collection), even the field types (`doctor` Optional vs nullable, `recordedAt` `Optional<Instant>` vs `Instant`,
+sink `Map` vs `VerificationResult`). A template-method base needs ≥6 hooks → the plan's own CAVEAT
+("N=2; if hooks ≥3 keep duplication") fires. So the ceremony stays honestly DUPLICATED; `Topic.Checkpoint`
+is identification-only. Same for `Topic.Pipeline` (A5 verdict): NOT a base. Extract only if a 3rd checkpoint
+or a genuinely shared nested-pipeline accumulator appears.
+
+**Nested-type friction found + accepted:** `implements Topic.Checkpoint` brings the nested `Checkpoint`
+type into scope, SHADOWING a same-named domain import (`world.gateway.port.Checkpoint`). Fixed by naming the
+domain enum by FQN via a `DOMAIN_CHECKPOINT` constant in each checkpoint. Localized cost of the nesting.
 
 ## DECISION — Incus re-decomposed by phases (Option D, user 2026-07-03)
 
