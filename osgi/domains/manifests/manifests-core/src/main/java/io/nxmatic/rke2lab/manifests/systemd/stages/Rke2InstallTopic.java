@@ -1,33 +1,59 @@
 package io.nxmatic.rke2lab.manifests.systemd.stages;
 
 import io.nxmatic.rke2lab.manifests.SystemdSynthesisContext;
+import io.nxmatic.rke2lab.pipeline.Topic;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.ServiceType;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.StandardStream;
 import java.util.Objects;
+import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Bootstrap stage: environment setup, config installation, RKE2 installation, and systemd linking.
+ * Reads the tools topic's flox-install service through a {@code Supplier} read-face (never by
+ * holding the tools topic); pushes its own bootstrap-env and install services through its {@link
+ * Sink}.
  *
  * <p>Package-private stage builder for synthesis pipeline. See docs/fluent-pipeline-grammar.adoc.
  */
-public final class Rke2InstallTopic {
+public final class Rke2InstallTopic implements Topic.Execution {
 
   private final SystemdChart systemdChart;
   private final SystemdSynthesisContext context;
-  private final ToolsTopic toolsStage;
+  private final Supplier<SystemdService> nixInstall;
+  private final Supplier<SystemdService> floxInstall;
+  private final Sink sink;
 
-  // Store construct references for dependency resolution
+  // bootstrapEnv/install are read back by later verbs of THIS topic (same-topic dependency), so
+  // they are kept as local working fields in addition to being pushed through the sink.
   private @Nullable SystemdService bootstrapEnvService;
   private @Nullable SystemdService installService;
 
   public Rke2InstallTopic(
-      SystemdChart systemdChart, SystemdSynthesisContext context, ToolsTopic toolsStage) {
+      SystemdChart systemdChart,
+      SystemdSynthesisContext context,
+      Supplier<SystemdService> nixInstall,
+      Supplier<SystemdService> floxInstall,
+      Sink sink) {
     this.systemdChart = systemdChart;
     this.context = context;
-    this.toolsStage = toolsStage;
+    this.nixInstall = nixInstall;
+    this.floxInstall = floxInstall;
+    this.sink = sink;
+  }
+
+  /** The write-face of the rke2-install topic — the services later topics depend on. */
+  public interface Sink extends Topic.Sink {
+    void bootstrapEnv(SystemdService service);
+
+    void install(SystemdService service);
+  }
+
+  @Override
+  public String role() {
+    return "rke2 install";
   }
 
   public Rke2InstallTopic bootstrapEnv() {
@@ -41,7 +67,7 @@ public final class Rke2InstallTopic {
                 "local-fs.target",
                 context.networkTarget().getUnitFileName(),
                 context.toolsTarget().getUnitFileName(),
-                toolsStage.getFloxInstallService().getUnitFileName())
+                floxInstall.get().getUnitFileName())
             .wants(
                 "network-online.target",
                 "systemd-networkd.service",
@@ -49,7 +75,7 @@ public final class Rke2InstallTopic {
             .requires(
                 context.networkTarget().getUnitFileName(),
                 context.toolsTarget().getUnitFileName(),
-                toolsStage.getFloxInstallService().getUnitFileName())
+                floxInstall.get().getUnitFileName())
             .requiresMountsFor(
                 "/srv/host/systemd-scripts.d",
                 "/srv/host/rke2lab-environment.d",
@@ -64,6 +90,7 @@ public final class Rke2InstallTopic {
             .standardError(StandardStream.JOURNAL)
             .partOf(context.bootstrapTarget().getUnitFileName())
             .wantedBy(context.bootstrapTarget().getUnitFileName());
+    sink.bootstrapEnv(bootstrapEnvService);
     return this;
   }
 
@@ -72,11 +99,8 @@ public final class Rke2InstallTopic {
     new SystemdService(systemdChart, "rke2lab-config-install")
         .description("Install RKE2 config fragments before server start")
         .after(
-            "local-fs.target",
-            bootstrapEnv.getUnitFileName(),
-            toolsStage.getFloxInstallService().getUnitFileName())
-        .requires(
-            bootstrapEnv.getUnitFileName(), toolsStage.getFloxInstallService().getUnitFileName())
+            "local-fs.target", bootstrapEnv.getUnitFileName(), floxInstall.get().getUnitFileName())
+        .requires(bootstrapEnv.getUnitFileName(), floxInstall.get().getUnitFileName())
         .before("rke2-server.service", "rke2-agent.service")
         .conditionPathExists("/srv/host/systemd-scripts.d/rke2lab-config-install.sh")
         .type(ServiceType.ONESHOT)
@@ -122,6 +146,7 @@ public final class Rke2InstallTopic {
             .standardError(StandardStream.JOURNAL)
             .partOf(context.bootstrapTarget().getUnitFileName())
             .wantedBy(context.bootstrapTarget().getUnitFileName());
+    sink.install(installService);
     return this;
   }
 
@@ -147,10 +172,11 @@ public final class Rke2InstallTopic {
 
   public Rke2InstallTopic cachixWatchStore() {
     final SystemdService install = getInstallService();
+    final SystemdService nix = nixInstall.get();
     new SystemdService(systemdChart, "rke2lab-cachix-watch-store")
         .description("Watch Nix store and push to Cachix")
-        .after(toolsStage.getNixInstallService().getUnitFileName(), install.getUnitFileName())
-        .requires(toolsStage.getNixInstallService().getUnitFileName(), install.getUnitFileName())
+        .after(nix.getUnitFileName(), install.getUnitFileName())
+        .requires(nix.getUnitFileName(), install.getUnitFileName())
         .type(ServiceType.SIMPLE)
         .execStart("/srv/host/systemd-scripts.d/rke2lab-cachix-watch-store.sh")
         .standardOutput(StandardStream.JOURNAL)
@@ -160,13 +186,13 @@ public final class Rke2InstallTopic {
     return this;
   }
 
-  /** Package-private accessor for storage stage dependency. */
-  public SystemdService getBootstrapEnvService() {
+  /** Same-topic accessor: later verbs of this topic read the bootstrap-env service. */
+  private SystemdService getBootstrapEnvService() {
     return Objects.requireNonNull(bootstrapEnvService, "bootstrapEnv() not yet run");
   }
 
-  /** Package-private accessor for storage stage dependency. */
-  public SystemdService getInstallService() {
+  /** Same-topic accessor: {@code cachixWatchStore()} reads the install service. */
+  private SystemdService getInstallService() {
     return Objects.requireNonNull(installService, "install() not yet run");
   }
 }

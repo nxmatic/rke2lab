@@ -9,6 +9,7 @@ import io.nxmatic.rke2lab.manifests.systemd.stages.ToolsTopic;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
+import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService;
 import java.util.Objects;
 import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
@@ -56,20 +57,31 @@ public final class SystemdInfrastructureSynthesizer {
 
       final class State {
         @Nullable OnFailure onFailure;
-        // Topic references threaded for cross-topic dependencies.
-        @Nullable ToolsTopic toolsTopic;
-        @Nullable Rke2InstallTopic rke2InstallTopic;
+        // Service outputs, set once by each producing topic's sink, read by later topics through
+        // Supplier read-faces (state::nixInstall, …) — never by holding the producing topic.
+        @Nullable SystemdService nixInstall;
+        @Nullable SystemdService floxInstall;
+        @Nullable SystemdService bootstrapEnv;
+        @Nullable SystemdService install;
 
         OnFailure onFailure() {
           return Objects.requireNonNull(onFailure, "onFailure not yet set");
         }
 
-        ToolsTopic toolsTopic() {
-          return Objects.requireNonNull(toolsTopic, "tools topic not yet produced");
+        SystemdService nixInstall() {
+          return Objects.requireNonNull(nixInstall, "nix-install not yet produced");
         }
 
-        Rke2InstallTopic rke2InstallTopic() {
-          return Objects.requireNonNull(rke2InstallTopic, "rke2-install topic not yet produced");
+        SystemdService floxInstall() {
+          return Objects.requireNonNull(floxInstall, "flox-install not yet produced");
+        }
+
+        SystemdService bootstrapEnv() {
+          return Objects.requireNonNull(bootstrapEnv, "bootstrap-env not yet produced");
+        }
+
+        SystemdService install() {
+          return Objects.requireNonNull(install, "install not yet produced");
         }
       }
 
@@ -80,9 +92,22 @@ public final class SystemdInfrastructureSynthesizer {
 
       final class AwaitingTools {
         ToolsDone during(String topic, Function<ToolsTopic, ToolsTopic> body) {
-          final ToolsTopic toolsTopic = new ToolsTopic(systemdChart, context);
+          final ToolsTopic toolsTopic =
+              new ToolsTopic(
+                  systemdChart,
+                  context,
+                  new ToolsTopic.Sink() {
+                    @Override
+                    public void nixInstall(SystemdService service) {
+                      state.nixInstall = service;
+                    }
+
+                    @Override
+                    public void floxInstall(SystemdService service) {
+                      state.floxInstall = service;
+                    }
+                  });
           runner.runDuring(topic, toolsTopic, body, state.onFailure());
-          state.toolsTopic = toolsTopic;
           return new ToolsDone();
         }
       }
@@ -96,9 +121,23 @@ public final class SystemdInfrastructureSynthesizer {
       final class AwaitingRke2Install {
         Rke2InstallDone during(String topic, Function<Rke2InstallTopic, Rke2InstallTopic> body) {
           final Rke2InstallTopic rke2InstallTopic =
-              new Rke2InstallTopic(systemdChart, context, state.toolsTopic());
+              new Rke2InstallTopic(
+                  systemdChart,
+                  context,
+                  state::nixInstall,
+                  state::floxInstall,
+                  new Rke2InstallTopic.Sink() {
+                    @Override
+                    public void bootstrapEnv(SystemdService service) {
+                      state.bootstrapEnv = service;
+                    }
+
+                    @Override
+                    public void install(SystemdService service) {
+                      state.install = service;
+                    }
+                  });
           runner.runDuring(topic, rke2InstallTopic, body, state.onFailure());
-          state.rke2InstallTopic = rke2InstallTopic;
           return new Rke2InstallDone();
         }
       }
@@ -111,8 +150,7 @@ public final class SystemdInfrastructureSynthesizer {
 
       final class AwaitingNetwork {
         NetworkDone during(String topic, Function<NetworkTopic, NetworkTopic> body) {
-          final NetworkTopic networkTopic =
-              new NetworkTopic(systemdChart, context, state.rke2InstallTopic());
+          final NetworkTopic networkTopic = new NetworkTopic(systemdChart, context, state::install);
           runner.runDuring(topic, networkTopic, body, state.onFailure());
           return new NetworkDone();
         }
@@ -127,7 +165,8 @@ public final class SystemdInfrastructureSynthesizer {
       final class AwaitingStorage {
         StorageDone during(String topic, Function<StorageTopic, StorageTopic> body) {
           final StorageTopic storageTopic =
-              new StorageTopic(systemdChart, context, state.toolsTopic(), state.rke2InstallTopic());
+              new StorageTopic(
+                  systemdChart, context, state::floxInstall, state::bootstrapEnv, state::install);
           runner.runDuring(topic, storageTopic, body, state.onFailure());
           return new StorageDone();
         }

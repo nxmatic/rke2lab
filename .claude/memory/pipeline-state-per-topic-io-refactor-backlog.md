@@ -52,18 +52,32 @@ Direct accumulator-field writes (`pipeline.x = v`) are a DERIVATION the `PIPELIN
 how an output enters `B`). The Sink is also what CLOSES the back-reference question: a topic never walks
 back — the accumulator holds forward (via sinks) everything a downstream topic could want.
 
-**Read-face inversion: `Supplier` is the dual of the sink `Consumer` (user insight 2026-07-03 — the LAST
-structuring element; APPLY LAST, uniformly, after every pipeline is on Topic/Topic.Sink).** Sink=`Consumer<O>`
-= WRITE face (topic produces, transition decides where). `Supplier<X>` fan-in input = READ face (another
-topic produced it, transition decides whence, topic decides WHEN it reads). Both keep the topic decoupled
-from `B` (never names `state.builder`). NOT a determinism violation: the CALLER (transition) supplies the
-Supplier over a set-once monotonic upstream output — can't drift, no order-coupling (my initial objection
-was WRONG; user corrected — it's the caller who owns/forwards the supplier). Payoff = the reference stays
-borne at ONE point of the DAG, esp. FORWARDED across a nesting boundary (nested pipeline hands a supplier of
-its parent's output onward without materializing it). CRITERION: default to direct VALUE (materialized at
-transition, fail-fast there); Supplier only when read is deferred / conditional / forwarded cross-nesting.
-`ResourcesTopic` fan-in = eager/unconditional/same-level → direct value (done in G1b). Grave now, wire the
-Supplier face last so it lands as one uniform pass, not braided into each G step.
+**Read-face: `Supplier` is the CANONICAL dual of the sink `Consumer` (user insight 2026-07-03, refined at G4).**
+The owner (`State`) holds a slot's reference at ONE point and hands out a capability: WRITE = `x -> state.f = x`
+(the sink `Consumer`), READ = `state::f` (the source `Supplier`, a free method-ref on the owner's accessor —
+"the state becomes its own supplier", user). The topic never names `state.builder`; it holds only capabilities
+the transition wired. NOT a determinism violation (caller supplies it over a set-once monotonic slot — my
+initial "value by default" objection was WRONG, user corrected). `source == Supplier` — NO `Topic.Source` type:
+reads don't aggregate per consumer (the aggregate of a topic's reads is already `I`); dual of `Sink` is `I`,
+dual of `Consumer<O>` is `Supplier<X>`. Honest asymmetry: WRITE is FORCED into Consumer (multi-verb topic can't
+return); READ is a CHOSEN coherence (a bare value also compiles) — adopted because reads spread across a topic's
+verbs just like writes. REVISED CRITERION: the Supplier read-face is the DEFAULT (not "only when deferred") —
+it is the coherent decoupling. A bare value is admissible only for a trivially eager single-use read where
+delegating buys nothing.
+
+**Inherited ambient (direct) vs sibling flux (Supplier) — the input split at the constructor (G4).** A topic's
+constructor args are either: (a) AMBIENT inherited from the parent (precedes the pipeline: `SystemdChart`,
+`SystemdSynthesisContext`) → passed DIRECT, no Supplier (nothing to delegate — no in-pipeline owner); or (b)
+FLUX produced by a sibling topic → `Supplier` read-face. Same `I` flux/ambient split, applied to constructor
+args. TARGET END-STATE (user's compass): a topic holds ONLY Suppliers (reads) + one Sink (writes) + direct
+ambient — never an upstream topic, never a public getter. OPEN for GZ: does inherited ambient ALSO become a
+Supplier (full uniformity) or stay direct? decide at GZ.
+
+**Applied at G4 (SystemdInfrastructureSynthesizer, done):** the 4 topics dropped the whole-upstream-topic
+derivation for `Supplier<SystemdService>` read-faces (`state::nixInstall`…), all public getters deleted. No
+`ToolsOutput`/`Rke2InstallOutput` aggregation (readers pick disjoint individual services — same verdict as
+A2''s deleted `PathOutput`). `ResourcesTopic` (G1b) fan-in was a direct value; revisit under the revised
+canonical-Supplier criterion at GZ. Bound `runDuring<S extends Topic>` + uniform Supplier pass both at GZ.
 
 **Sink is OPTIONAL — a Topic.Execution can be a pure EFFECT (G3, user 2026-07-03).** A topic does not always
 produce an output-value to fold into `B`. It may perform a side EFFECT: mutate an external builder (a cdk8s

@@ -1,33 +1,46 @@
 package io.nxmatic.rke2lab.manifests.systemd.stages;
 
 import io.nxmatic.rke2lab.manifests.SystemdSynthesisContext;
+import io.nxmatic.rke2lab.pipeline.Topic;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdChart;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.ServiceType;
 import io.nxmatic.rke2lab.systemd.cdk8s.SystemdService.StandardStream;
 import io.nxmatic.rke2lab.systemd.port.SystemdUnitId;
+import java.util.function.Supplier;
 
 /**
- * Storage and system stage: filesystem configuration, ZFS, DBus, and kubeconfig generation.
+ * Storage and system stage: filesystem configuration, ZFS, DBus, and kubeconfig generation. An
+ * EFFECT topic — mutates the chart, produces no output for the accumulator, so it has no sink.
+ * Reads the flox-install, bootstrap-env and install services through {@code Supplier} read-faces
+ * (never by holding the tools/rke2-install topics).
  *
  * <p>Package-private stage builder for synthesis pipeline. See docs/fluent-pipeline-grammar.adoc.
  */
-public final class StorageTopic {
+public final class StorageTopic implements Topic.Execution {
 
   private final SystemdChart systemdChart;
   private final SystemdSynthesisContext context;
-  private final ToolsTopic toolsStage;
-  private final Rke2InstallTopic bootstrapStage;
+  private final Supplier<SystemdService> floxInstall;
+  private final Supplier<SystemdService> bootstrapEnv;
+  private final Supplier<SystemdService> install;
 
   public StorageTopic(
       SystemdChart systemdChart,
       SystemdSynthesisContext context,
-      ToolsTopic toolsStage,
-      Rke2InstallTopic bootstrapStage) {
+      Supplier<SystemdService> floxInstall,
+      Supplier<SystemdService> bootstrapEnv,
+      Supplier<SystemdService> install) {
     this.systemdChart = systemdChart;
     this.context = context;
-    this.toolsStage = toolsStage;
-    this.bootstrapStage = bootstrapStage;
+    this.floxInstall = floxInstall;
+    this.bootstrapEnv = bootstrapEnv;
+    this.install = install;
+  }
+
+  @Override
+  public String role() {
+    return "storage and system";
   }
 
   public StorageTopic remountShared() {
@@ -49,13 +62,13 @@ public final class StorageTopic {
         .description("Configure containerd for ZFS mounts")
         .after(
             "local-fs.target",
-            bootstrapStage.getBootstrapEnvService().getUnitFileName(),
-            toolsStage.getFloxInstallService().getUnitFileName(),
-            bootstrapStage.getInstallService().getUnitFileName())
+            bootstrapEnv.get().getUnitFileName(),
+            floxInstall.get().getUnitFileName(),
+            install.get().getUnitFileName())
         .requires(
-            bootstrapStage.getBootstrapEnvService().getUnitFileName(),
-            toolsStage.getFloxInstallService().getUnitFileName(),
-            bootstrapStage.getInstallService().getUnitFileName())
+            bootstrapEnv.get().getUnitFileName(),
+            floxInstall.get().getUnitFileName(),
+            install.get().getUnitFileName())
         .before("rke2-server.service", "rke2-agent.service")
         .type(ServiceType.ONESHOT)
         .execStart("/srv/host/systemd-scripts.d/rke2lab-configure-containerd-zfs-mount.sh")
@@ -102,12 +115,12 @@ public final class StorageTopic {
         .description("Generate VIP-enabled kubeconfig for cluster access")
         .after(
             "local-fs.target",
-            bootstrapStage.getBootstrapEnvService().getUnitFileName(),
-            toolsStage.getFloxInstallService().getUnitFileName(),
+            bootstrapEnv.get().getUnitFileName(),
+            floxInstall.get().getUnitFileName(),
             "rke2-server.service")
         .requires(
-            bootstrapStage.getBootstrapEnvService().getUnitFileName(),
-            toolsStage.getFloxInstallService().getUnitFileName(),
+            bootstrapEnv.get().getUnitFileName(),
+            floxInstall.get().getUnitFileName(),
             "rke2-server.service")
         .conditionPathExists(
             "/srv/host/systemd-scripts.d/rke2lab-vip-kubeconfig.sh",
