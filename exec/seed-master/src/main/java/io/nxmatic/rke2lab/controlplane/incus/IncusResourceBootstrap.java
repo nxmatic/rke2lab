@@ -60,6 +60,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -227,11 +228,19 @@ public final class IncusResourceBootstrap {
       this.bootstrap = context.require(BootstrapContext.class);
     }
 
+    BootstrapContext bootstrap() {
+      return bootstrap;
+    }
+
+    ControlplanePolicy policy() {
+      return context.require(ControlplanePolicy.class);
+    }
+
     PreparedHost run() {
       runner.runDuring(
           "path resolution",
           new PathStage(
-              bootstrap,
+              this::bootstrap,
               new PathStage.Sink() {
                 @Override
                 public void localPaths(BootstrapPaths resolved) {
@@ -248,9 +257,9 @@ public final class IncusResourceBootstrap {
       runner.runDuring(
           "host state",
           new HostStage(
-              bootstrap,
-              localPaths(),
-              context.require(ControlplanePolicy.class),
+              this::bootstrap,
+              this::localPaths,
+              this::policy,
               new HostStage.Sink() {
                 @Override
                 public void deployment(DeploymentMetadata captured) {
@@ -332,12 +341,20 @@ public final class IncusResourceBootstrap {
       this.prepared = prepared;
     }
 
+    BootstrapContext bootstrap() {
+      return bootstrap;
+    }
+
+    PreparedHost prepared() {
+      return prepared;
+    }
+
     ProvisionedResources run() {
       runner.runDuring(
           "provider resources",
           new ProviderStage(
-              bootstrap,
-              prepared,
+              this::bootstrap,
+              this::prepared,
               new ProviderStage.Sink() {
                 @Override
                 public void providerContext(IncusProviderContext ensured) {
@@ -431,10 +448,23 @@ public final class IncusResourceBootstrap {
       this.provisioned = provisioned;
     }
 
+    BootstrapContext bootstrap() {
+      return bootstrap;
+    }
+
+    PreparedHost prepared() {
+      return prepared;
+    }
+
+    ProvisionedResources provisioned() {
+      return provisioned;
+    }
+
     LaunchedInstance run() {
       runner.runDuring(
           "instance",
-          new InstanceStage(bootstrap, prepared, provisioned, launched -> instance = launched),
+          new InstanceStage(
+              this::bootstrap, this::prepared, this::provisioned, launched -> instance = launched),
           InstanceStage::create,
           onFailure);
       return new LaunchedInstance(
@@ -449,10 +479,10 @@ public final class IncusResourceBootstrap {
    * pushes).
    */
   private final class PathStage implements Topic {
-    private final BootstrapContext context;
+    private final Supplier<BootstrapContext> context;
     private final Sink sink;
 
-    PathStage(BootstrapContext context, Sink sink) {
+    PathStage(Supplier<BootstrapContext> context, Sink sink) {
       this.context = context;
       this.sink = sink;
     }
@@ -470,6 +500,7 @@ public final class IncusResourceBootstrap {
     }
 
     PathStage resolve() {
+      final BootstrapContext context = this.context.get();
       final Path localWorktreeRoot = context.config().worktreeDirOn(WorktreeHost.DARWIN);
       final BootstrapPaths localPaths =
           BootstrapPaths.fromLocalWorktree(
@@ -489,20 +520,37 @@ public final class IncusResourceBootstrap {
    * accumulator.
    */
   private final class HostStage implements Topic {
-    private final BootstrapContext context;
-    private final BootstrapPaths localPaths;
-    private final ControlplanePolicy policy;
+    private final Supplier<BootstrapContext> context;
+    private final Supplier<BootstrapPaths> localPaths;
+    private final Supplier<ControlplanePolicy> policy;
     private final Sink sink;
 
     private @MonotonicNonNull DeploymentMetadata deployment;
     private @MonotonicNonNull ProvisioningMetadata provisioning;
 
     HostStage(
-        BootstrapContext context, BootstrapPaths localPaths, ControlplanePolicy policy, Sink sink) {
+        Supplier<BootstrapContext> context,
+        Supplier<BootstrapPaths> localPaths,
+        Supplier<ControlplanePolicy> policy,
+        Sink sink) {
       this.context = context;
       this.localPaths = localPaths;
       this.policy = policy;
       this.sink = sink;
+    }
+
+    // Read-faces onto the owner (PREPARE's accumulator): each read resolves at the source of truth,
+    // never a copied reference. The many private methods below read through these, not the fields.
+    private BootstrapContext context() {
+      return context.get();
+    }
+
+    private BootstrapPaths localPaths() {
+      return localPaths.get();
+    }
+
+    private ControlplanePolicy policy() {
+      return policy.get();
     }
 
     /** The write-face of the host topic — one verb per captured metadata. */
@@ -530,7 +578,7 @@ public final class IncusResourceBootstrap {
       final HostAssetRootLifecycle lifecycle =
           dryRun
               ? HostAssetRootLifecycle.previewLifecycle()
-              : new HostAssetRootLifecycle(context.config().hostAssetRotationRetentionCount());
+              : new HostAssetRootLifecycle(context().config().hostAssetRotationRetentionCount());
 
       final StagingContext staging = materializeToStaging(lifecycle);
       final TargetContext targets = registerProvisioningTargets(staging);
@@ -551,7 +599,7 @@ public final class IncusResourceBootstrap {
     }
 
     HostStage ensureSecrets() {
-      ensureLaunchSecretsToken(localPaths.secretsFile());
+      ensureLaunchSecretsToken(localPaths().secretsFile());
       return this;
     }
 
@@ -564,6 +612,7 @@ public final class IncusResourceBootstrap {
     }
 
     private StagingContext materializeToStaging(HostAssetRootLifecycle lifecycle) {
+      final BootstrapPaths localPaths = localPaths();
       final Path stagingRoot = lifecycle.prepareStagingRoot(localPaths.assetsRoot());
       final Path stagingManifestsRoot =
           stagingRoot.resolve(localPaths.assetsRoot().relativize(localPaths.manifestsRoot()));
@@ -572,7 +621,7 @@ public final class IncusResourceBootstrap {
       final NodeEnvContext layerContext = new DefaultBootstrapNodeEnvContext();
       final Map<String, Object> manifestSynthSummary =
           synthesizeAndExplodeManifests(
-              stagingManifestsRoot, stagingPaths.systemdRoot(), policy, layerContext);
+              stagingManifestsRoot, stagingPaths.systemdRoot(), policy(), layerContext);
 
       return new StagingContext(
           stagingRoot, stagingPaths, stagingManifestsRoot, layerContext, manifestSynthSummary);
@@ -597,7 +646,7 @@ public final class IncusResourceBootstrap {
       final BootstrapPaths stagingPaths = staging.stagingPaths();
       final CloudInitTarget cloudInitTarget =
           new CloudInitTarget(
-              context.nodeConfigRegenerator(),
+              context().nodeConfigRegenerator(),
               stagingPaths.runtimeCloudConfigRoot(),
               stagingPaths.cloudSeedRoot());
       try {
@@ -641,7 +690,7 @@ public final class IncusResourceBootstrap {
       final NodeEnvContext layerContext = staging.layerContext();
 
       final List<String> hostMountNotes =
-          context.hostMountSourceVerifier().ensureSources(stagingPaths);
+          context().hostMountSourceVerifier().ensureSources(stagingPaths);
       final Map<String, Object> systemdProvisioningSummary =
           SystemdProvisioningInventory.summarize(stagingPaths, hostMountNotes);
 
@@ -649,7 +698,7 @@ public final class IncusResourceBootstrap {
           new Rke2labEnvTarget(
               singleSpiProvider(NodeEnvOverlayService.class),
               layerContext,
-              policy,
+              policy(),
               stagingPaths.runtimeEnvConfigRoot());
       try {
         rke2labEnvTarget.materialize(stagingPaths);
@@ -665,7 +714,11 @@ public final class IncusResourceBootstrap {
     private boolean syncStagingToFinal(
         HostAssetRootLifecycle lifecycle, Path stagingRoot, TargetContext targets) {
       return lifecycle.syncStagingToFinal(
-          stagingRoot, localPaths.assetsRoot(), context.config(), policy, targets.systemdTarget());
+          stagingRoot,
+          localPaths().assetsRoot(),
+          context().config(),
+          policy(),
+          targets.systemdTarget());
     }
 
     /**
@@ -675,6 +728,7 @@ public final class IncusResourceBootstrap {
      * {@code update} of a shared record.
      */
     private void captureDeploymentMetadata(StagingContext staging, TargetContext targets) {
+      final BootstrapPaths localPaths = localPaths();
       final ProvisioningMetadata.Targets provisioningTargets =
           ProvisioningResourceInventory.targetChecksums(localPaths, targets.targetRegistry());
 
@@ -701,7 +755,7 @@ public final class IncusResourceBootstrap {
     }
 
     private BootstrapPaths createStagingPaths(Path stagingRoot) {
-      return localPaths.asStagingView(stagingRoot);
+      return localPaths().asStagingView(stagingRoot);
     }
 
     private record StagingContext(
@@ -956,18 +1010,27 @@ public final class IncusResourceBootstrap {
    * because later verbs read them — never read back from the accumulator.
    */
   private final class ProviderStage implements Topic {
-    private final BootstrapContext context;
-    private final PreparedHost prepared;
+    private final Supplier<BootstrapContext> context;
+    private final Supplier<PreparedHost> prepared;
     private final Sink sink;
 
     private @MonotonicNonNull IncusProviderContext providerContext;
     private @MonotonicNonNull Project ensuredProject;
     private @MonotonicNonNull Output<String> ensuredImageFingerprint;
 
-    ProviderStage(BootstrapContext context, PreparedHost prepared, Sink sink) {
+    ProviderStage(Supplier<BootstrapContext> context, Supplier<PreparedHost> prepared, Sink sink) {
       this.context = context;
       this.prepared = prepared;
       this.sink = sink;
+    }
+
+    // Read-faces onto the owner (PROVISION's inputs): resolve at the source on each read.
+    private BootstrapContext context() {
+      return context.get();
+    }
+
+    private PreparedHost prepared() {
+      return prepared.get();
     }
 
     /** The write-face of the provider topic — one verb per provider output. */
@@ -997,7 +1060,8 @@ public final class IncusResourceBootstrap {
     }
 
     ProviderStage ensureProject() {
-      providerContext = IncusProviderContext.forBootstrap("seed-incus-provider", context.config());
+      providerContext =
+          IncusProviderContext.forBootstrap("seed-incus-provider", context().config());
       ensuredProject = IncusResourceBootstrap.this.ensureProject(providerContext);
       sink.providerContext(providerContext);
       sink.projectName(ensuredProject.name());
@@ -1005,6 +1069,7 @@ public final class IncusResourceBootstrap {
     }
 
     ProviderStage ensureNetworks() {
+      final BootstrapContext context = context();
       IncusResourceBootstrap.this.ensureNetwork(
           providerContext(), context.config().lanBridgeParent(), ensuredProject());
       IncusResourceBootstrap.this.ensureNetwork(
@@ -1019,6 +1084,7 @@ public final class IncusResourceBootstrap {
     }
 
     ProviderStage ensureImage() {
+      final BootstrapContext context = context();
       ensuredImageFingerprint =
           context
               .imageProvider()
@@ -1052,6 +1118,7 @@ public final class IncusResourceBootstrap {
       // (ImageStateConfigMapManifestUnit), even for staged resources. The staging only affects
       // WHEN synthesis happens (Output.apply time vs. host-state prep), not WHO authors it.
 
+      final BootstrapContext context = context();
       final Output<String> manifestYaml =
           Output.all(
                   Objects.requireNonNull(
@@ -1090,7 +1157,8 @@ public final class IncusResourceBootstrap {
 
     private void writeImageStateManifest(String yaml) {
       try {
-        final Path targetDir = prepared.localPaths().manifestsRoot().resolve("cluster-api/staged");
+        final Path targetDir =
+            prepared().localPaths().manifestsRoot().resolve("cluster-api/staged");
         Files.createDirectories(targetDir);
 
         final Path targetFile = targetDir.resolve("image-state-configmap.yaml");
@@ -1114,15 +1182,15 @@ public final class IncusResourceBootstrap {
    * its single output through its {@link Sink}. Holds no reference to the accumulator.
    */
   private final class InstanceStage implements Topic {
-    private final BootstrapContext context;
-    private final PreparedHost prepared;
-    private final ProvisionedResources provisioned;
+    private final Supplier<BootstrapContext> context;
+    private final Supplier<PreparedHost> prepared;
+    private final Supplier<ProvisionedResources> provisioned;
     private final Sink sink;
 
     InstanceStage(
-        BootstrapContext context,
-        PreparedHost prepared,
-        ProvisionedResources provisioned,
+        Supplier<BootstrapContext> context,
+        Supplier<PreparedHost> prepared,
+        Supplier<ProvisionedResources> provisioned,
         Sink sink) {
       this.context = context;
       this.prepared = prepared;
@@ -1141,6 +1209,9 @@ public final class IncusResourceBootstrap {
     }
 
     InstanceStage create() {
+      final BootstrapContext context = this.context.get();
+      final PreparedHost prepared = this.prepared.get();
+      final ProvisionedResources provisioned = this.provisioned.get();
       final Map<String, String> instanceConfig = new LinkedHashMap<>();
       instanceConfig.put(
           "raw.lxc",
@@ -1182,7 +1253,7 @@ public final class IncusResourceBootstrap {
 
     private CustomResourceOptions instanceOptions() {
       return CustomResourceOptions.builder()
-          .provider(provisioned.providerContext().provider())
+          .provider(provisioned.get().providerContext().provider())
           .deleteBeforeReplace(true)
           .replaceOnChanges(List.of("config", "config.*"))
           .ignoreChanges(List.of("image"))
