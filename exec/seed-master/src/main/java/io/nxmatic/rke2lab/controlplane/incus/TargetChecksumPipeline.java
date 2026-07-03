@@ -3,6 +3,7 @@ package io.nxmatic.rke2lab.controlplane.incus;
 import io.nxmatic.rke2lab.controlplane.incus.IncusResourceBootstrap.BootstrapPaths;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
+import io.nxmatic.rke2lab.pipeline.Topic;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -66,7 +67,8 @@ public final class TargetChecksumPipeline {
 
     public CloudInitDone during(
         String topic, Function<CloudInitTargetStage, CloudInitTargetStage> body) {
-      final CloudInitTargetStage stage = new CloudInitTargetStage(state);
+      final CloudInitTargetStage stage =
+          new CloudInitTargetStage(state.paths, state.targetChecksums::put);
       state.runner.runDuring(topic, stage, body, state.onFailure);
       return new CloudInitDone(state);
     }
@@ -81,7 +83,8 @@ public final class TargetChecksumPipeline {
 
     public CloudInitDone during(
         String topic, Function<CloudInitTargetStage, CloudInitTargetStage> body) {
-      final CloudInitTargetStage stage = new CloudInitTargetStage(state);
+      final CloudInitTargetStage stage =
+          new CloudInitTargetStage(state.paths, state.targetChecksums::put);
       state.runner.runDuring(topic, stage, body, state.onFailure);
       return new CloudInitDone(state);
     }
@@ -108,7 +111,8 @@ public final class TargetChecksumPipeline {
 
     public RegisteredComponentsDone during(
         String topic, Function<RegisteredComponentsStage, RegisteredComponentsStage> body) {
-      final RegisteredComponentsStage stage = new RegisteredComponentsStage(state);
+      final RegisteredComponentsStage stage =
+          new RegisteredComponentsStage(state.registry, state.targetChecksums::put);
       state.runner.runDuring(topic, stage, body, state.onFailure);
       return new RegisteredComponentsDone(state);
     }
@@ -126,11 +130,26 @@ public final class TargetChecksumPipeline {
     }
   }
 
-  public static final class CloudInitTargetStage {
-    private final State state;
+  /**
+   * The write-face shared by both checksum topics — each pushes named checksum entries, the owner
+   * folds them into the accumulator map. A single-method sink; the topics never hold the state.
+   */
+  public interface ChecksumSink extends Topic.Sink {
+    void checksum(String targetName, String checksum);
+  }
 
-    CloudInitTargetStage(State state) {
-      this.state = state;
+  public static final class CloudInitTargetStage implements Topic.Execution {
+    private final BootstrapPaths paths;
+    private final ChecksumSink sink;
+
+    CloudInitTargetStage(BootstrapPaths paths, ChecksumSink sink) {
+      this.paths = paths;
+      this.sink = sink;
+    }
+
+    @Override
+    public String role() {
+      return "cloud-init";
     }
 
     public CloudInitTargetStage fromCloudInitRoots() {
@@ -138,27 +157,34 @@ public final class TargetChecksumPipeline {
       // to the source ConfigMap means we recreate the instance.
       // runtimeCloudConfigRoot generates cloudSeedRoot (user-data/meta-data/network-config);
       // checksum only the input — output is deterministically derived.
-      final List<Path> roots = List.of(state.paths.runtimeCloudConfigRoot());
+      final List<Path> roots = List.of(paths.runtimeCloudConfigRoot());
 
-      state.targetChecksums.put("cloud-init", computeChecksum(roots));
+      sink.checksum("cloud-init", computeChecksum(roots));
       return this;
     }
   }
 
-  public static final class RegisteredComponentsStage {
-    private final State state;
+  public static final class RegisteredComponentsStage implements Topic.Execution {
+    private final ProvisioningTargetRegistry registry;
+    private final ChecksumSink sink;
 
-    RegisteredComponentsStage(State state) {
-      this.state = state;
+    RegisteredComponentsStage(ProvisioningTargetRegistry registry, ChecksumSink sink) {
+      this.registry = registry;
+      this.sink = sink;
+    }
+
+    @Override
+    public String role() {
+      return "registered components";
     }
 
     public RegisteredComponentsStage fromRegistry() {
-      for (Map.Entry<String, List<Path>> entry : state.registry.getTargetRoots().entrySet()) {
+      for (Map.Entry<String, List<Path>> entry : registry.getTargetRoots().entrySet()) {
         final String targetName = entry.getKey();
-        state.targetChecksums.put(
+        sink.checksum(
             targetName,
             computeChecksum(
-                entry.getValue(), Optional.of(new ChecksumScope(targetName, state.registry))));
+                entry.getValue(), Optional.of(new ChecksumScope(targetName, registry))));
       }
       return this;
     }
