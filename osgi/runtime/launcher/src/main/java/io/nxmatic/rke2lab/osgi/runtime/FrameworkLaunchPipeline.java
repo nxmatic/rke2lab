@@ -7,30 +7,27 @@ import io.nxmatic.rke2lab.osgi.boot.discovery.BootRequest;
 import io.nxmatic.rke2lab.osgi.boot.discovery.HostClassLoaderView;
 import io.nxmatic.rke2lab.pipeline.FluentTopicRunner;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
+import io.nxmatic.rke2lab.pipeline.Topic;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.function.Consumer;
 
 /**
- * The embedded-OSGi boot expressed in the project's fluent-pipeline grammar — three topics in a
- * fixed, non-reorderable order:
+ * The embedded-OSGi boot expressed in the project's fluent-pipeline grammar — a single {@code boot}
+ * topic of the EFFECT nature: it enacts the boot (plan then launch, via {@link BootPlanner} +
+ * {@link FrameworkLauncher}) and runs a caller tail against the live framework. It produces no
+ * value folded into an accumulator, so it is a plain {@link Topic.Execution} with no sink — the
+ * booted framework is handed to the tail (or out via {@link Embedded#launch()}), not accumulated.
  *
- * <pre>
- *   discovery  →  plan  →  launch
- *   (PURE: choose the    (PURE: BootPlanner     (EFFECT: FrameworkLauncher
- *    index + policy)      decides the BootPlan)   enacts it → BootedFramework)
- * </pre>
+ * <p>Plan and launch are NOT separate topics: no caller inspects a {@code BootPlan} without booting
+ * (verified across all entrypoints and {@code OutOfContainerFrameworkExtension}, which does not use
+ * {@code BootPlanner} at all), so materializing a {@code PlanDone} state would be a speculative
+ * abstraction with no reader. {@link #bootEmbedded()} does plan+launch in one step.
  *
- * <p>The state boundary is the plan/launch seam: you cannot launch without a plan, and the pure
- * plan can be inspected at {@code PlanDone} without booting Felix. This is the executor counterpart
- * of the boot MODEL in {@code osgi/boot/boot-discovery}; the test harness ({@code
- * OutOfContainerFrameworkExtension}) is the other one, sharing {@link BootPlanner} + {@link
- * FrameworkLauncher}.
- *
- * <p>Exec entrypoints do not spell the three topics out — they call {@link #embedded()}, a preset
- * that pre-fills the fixed prod topology (the staged index, install-everything) and exposes only
- * the TAIL: {@code .during(topic, framework -> …)} (read several services) or {@code .during(topic,
- * Service.class, svc -> …)} (resolve one). The preset owns the boot-run-close lifecycle.
+ * <p>Exec entrypoints call {@link #embedded()}, a preset that pre-fills the fixed prod topology
+ * (the staged index, install-everything) and exposes only the boot tail: {@code .during(topic,
+ * framework -> …)} (read several services) or {@code .during(topic, Service.class, svc -> …)}
+ * (resolve one). The preset owns the boot-run-close lifecycle.
  */
 public final class FrameworkLaunchPipeline {
 
@@ -53,11 +50,16 @@ public final class FrameworkLaunchPipeline {
    * The boot-run-close preset over the fixed embedded topology; choose the tail with {@code
    * during}.
    */
-  public static final class Embedded {
+  public static final class Embedded implements Topic.Execution {
 
     private OnFailure onFailure = OnFailure.noop();
 
     private Embedded() {}
+
+    @Override
+    public String role() {
+      return "boot";
+    }
 
     /**
      * Optional per-topic failure handler; a boot failure wraps as {@code TopicFailure("boot", …)}.
