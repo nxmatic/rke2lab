@@ -6,13 +6,16 @@ import io.nxmatic.rke2lab.controlplane.config.BootstrapConfig;
 import io.nxmatic.rke2lab.controlplane.config.Rke2labConfig;
 import io.nxmatic.rke2lab.controlplane.pipeline.BootstrapOptions;
 import io.nxmatic.rke2lab.controlplane.policy.ControlplanePolicy;
+import io.nxmatic.rke2lab.pipeline.Topic;
 import java.util.Optional;
 import java.util.function.Consumer;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
-public final class EnvironmentTopic {
+/** Environment topic — loads config/policy/options and installs the log sink. */
+public final class EnvironmentTopic implements Topic.Execution {
 
-  public interface Sink {
+  /** The write-face of the environment topic — one verb per loaded input. */
+  public interface Sink extends Topic.Sink {
     void logSink(AutoCloseable closeable);
 
     void bootstrapConfig(BootstrapConfig config);
@@ -28,6 +31,11 @@ public final class EnvironmentTopic {
   public EnvironmentTopic(Optional<Context> pulumiContext, Sink sink) {
     this.pulumiContext = pulumiContext;
     this.sink = sink;
+  }
+
+  @Override
+  public String role() {
+    return "environment";
   }
 
   public EnvironmentTopic installLogSink() {

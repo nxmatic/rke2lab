@@ -2,11 +2,17 @@ package io.nxmatic.rke2lab.controlplane.pipeline.stages;
 
 import com.pulumi.Context;
 import io.nxmatic.rke2lab.controlplane.SeedLog;
+import io.nxmatic.rke2lab.pipeline.Topic;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-public final class OutputsTopic {
+/**
+ * Outputs topic — exports (Pulumi) or prints (standalone) the collected stack outputs. Its input is
+ * read via a {@link Supplier} — the read-face dual of a sink — because it is the terminal consumer
+ * of the cluster-seed output.
+ */
+public final class OutputsTopic implements Topic.Execution {
 
   private final Optional<Context> pulumiContext;
   private final Supplier<Map<String, Object>> outputsSupplier;
@@ -15,6 +21,11 @@ public final class OutputsTopic {
       Optional<Context> pulumiContext, Supplier<Map<String, Object>> outputsSupplier) {
     this.pulumiContext = pulumiContext;
     this.outputsSupplier = outputsSupplier;
+  }
+
+  @Override
+  public String role() {
+    return "outputs";
   }
 
   public OutputsTopic exportOrPrint() {

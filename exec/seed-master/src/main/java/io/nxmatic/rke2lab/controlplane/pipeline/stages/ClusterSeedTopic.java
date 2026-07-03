@@ -13,12 +13,20 @@ import io.nxmatic.rke2lab.doctor.port.ConsultationLog;
 import io.nxmatic.rke2lab.osgi.runtime.BootedFramework;
 import io.nxmatic.rke2lab.osgi.runtime.FrameworkLaunchPipeline;
 import io.nxmatic.rke2lab.pipeline.OnFailure;
+import io.nxmatic.rke2lab.pipeline.Topic;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-public final class ClusterSeedTopic {
+/**
+ * Cluster-seed topic — a {@link Topic.Pipeline}: its body launches the nested {@link
+ * ClusterSeedPipeline} (under a booted framework), so it is a pipeline nature, not a plain
+ * execution. Its config/policy/options/onFailure inputs arrive as {@link Supplier}s (the read-face
+ * dual of a sink) — forwarded from the parent's builder without materializing here. Pushes the
+ * collected outputs through its {@link Sink}.
+ */
+public final class ClusterSeedTopic implements Topic.Pipeline {
 
   private final boolean pulumiMode;
   private final Supplier<BootstrapConfig> configSupplier;
@@ -29,7 +37,7 @@ public final class ClusterSeedTopic {
   private final BboxReconciliationOrchestrator bboxOrchestrator;
   private final ResourceManager resourceManager;
   private final OutputBuilder outputBuilder;
-  private final Consumer<Map<String, Object>> outputsSink;
+  private final Sink sink;
 
   public ClusterSeedTopic(
       boolean pulumiMode,
@@ -41,7 +49,7 @@ public final class ClusterSeedTopic {
       BboxReconciliationOrchestrator bboxOrchestrator,
       ResourceManager resourceManager,
       OutputBuilder outputBuilder,
-      Consumer<Map<String, Object>> outputsSink) {
+      Sink sink) {
     this.pulumiMode = pulumiMode;
     this.configSupplier = configSupplier;
     this.policySupplier = policySupplier;
@@ -51,7 +59,17 @@ public final class ClusterSeedTopic {
     this.bboxOrchestrator = bboxOrchestrator;
     this.resourceManager = resourceManager;
     this.outputBuilder = outputBuilder;
-    this.outputsSink = outputsSink;
+    this.sink = sink;
+  }
+
+  /** The write-face of the cluster-seed topic — the collected stack outputs. */
+  public interface Sink extends Topic.Sink {
+    void outputs(Map<String, Object> outputs);
+  }
+
+  @Override
+  public String role() {
+    return "cluster seed";
   }
 
   /**
@@ -115,7 +133,7 @@ public final class ClusterSeedTopic {
               .then()
               .during("bootstrap resources", resources -> resources.createAll())
               .collectOutputs();
-      outputsSink.accept(outputs);
+      sink.outputs(outputs);
     } finally {
       new RunbookRenderer(runbookOutputDir(), readinessLogger).render(runbook, consultations);
     }
