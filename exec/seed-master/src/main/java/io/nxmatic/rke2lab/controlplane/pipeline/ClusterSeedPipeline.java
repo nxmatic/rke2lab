@@ -429,8 +429,8 @@ public final class ClusterSeedPipeline {
               state.inputs.doctor(),
               state.inputs.systemdRuntimeStatus(),
               state.inputs.clusterReadinessContact(),
-              state.builder.bootstrap(),
-              state.builder.systemdAdapterLaunch(),
+              state.builder::bootstrap,
+              state.builder::systemdAdapterLaunch,
               result -> state.builder.resources = result);
       state.runner.runDuring(topic, stage, body, state.inputs.onFailure());
       return new ResourcesDone(state);

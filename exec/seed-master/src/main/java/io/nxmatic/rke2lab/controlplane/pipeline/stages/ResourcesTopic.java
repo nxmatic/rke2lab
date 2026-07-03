@@ -15,12 +15,14 @@ import io.nxmatic.rke2lab.pulumi.edge.LiveGate;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Bootstrap-resources topic — the FAN-IN: its two flux inputs ({@code bootstrap}, {@code
- * systemdAdapterLaunch}) are outputs of upstream topics, read off the accumulator by the transition
- * and handed in as concrete values (no {@code Supplier} back-reference). Pushes the created
- * resources through its {@link Sink}.
+ * systemdAdapterLaunch}) are outputs of upstream topics, read through {@code Supplier} read-faces
+ * that resolve at the accumulator (the source of truth) when {@code createAll()} runs — never a
+ * copied reference snapshotted at construction. Pushes the created resources through its {@link
+ * Sink}.
  */
 public final class ResourcesTopic implements Topic.Execution {
 
@@ -36,8 +38,8 @@ public final class ResourcesTopic implements Topic.Execution {
   private final ConsultingService doctor;
   private final SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus;
   private final ClusterReadinessContact clusterReadinessContact;
-  private final IncusResourceBootstrap.BootstrapResult bootstrapResult;
-  private final Map<String, Object> systemdAdapterLaunch;
+  private final Supplier<IncusResourceBootstrap.BootstrapResult> bootstrapResult;
+  private final Supplier<Map<String, Object>> systemdAdapterLaunch;
   private final Sink sink;
 
   public ResourcesTopic(
@@ -53,8 +55,8 @@ public final class ResourcesTopic implements Topic.Execution {
       ConsultingService doctor,
       SeedSystemdAdapterRuntimeStatusSnapshot systemdRuntimeStatus,
       ClusterReadinessContact clusterReadinessContact,
-      IncusResourceBootstrap.BootstrapResult bootstrapResult,
-      Map<String, Object> systemdAdapterLaunch,
+      Supplier<IncusResourceBootstrap.BootstrapResult> bootstrapResult,
+      Supplier<Map<String, Object>> systemdAdapterLaunch,
       Sink sink) {
     this.resourceManager = resourceManager;
     this.config = config;
@@ -95,8 +97,8 @@ public final class ResourcesTopic implements Topic.Execution {
             doctor,
             systemdRuntimeStatus,
             clusterReadinessContact,
-            bootstrapResult,
-            systemdAdapterLaunch,
+            bootstrapResult.get(),
+            systemdAdapterLaunch.get(),
             pulumiMode,
             gate));
     return this;
